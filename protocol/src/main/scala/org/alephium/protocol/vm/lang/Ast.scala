@@ -797,54 +797,50 @@ object Ast {
       }
     }
 
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    private def getParentContracts(
+    private def buildDependencies(
         contract: TxContract,
         parentsCache: mutable.Map[TypeId, Seq[TxContract]],
-        childrenCache: mutable.Map[TypeId, Seq[TypeId]]
-    ): Seq[TxContract] = {
-      val children = childrenCache.getOrElse(contract.ident, Seq.empty)
-      contract.inheritances.foreach { inheritance =>
-        if (children.contains(inheritance.parentId)) {
-          throw Compiler.Error(
-            s"Circle inheritance between contract ${contract.ident.name} and ${inheritance.parentId.name}"
-          )
-        }
-        val parentChildren =
-          (childrenCache.getOrElse(inheritance.parentId, Seq.empty) :+ contract.ident) ++ children
-        childrenCache += inheritance.parentId -> parentChildren
+        visited: mutable.Set[TypeId]
+    ): Unit = {
+      if (!visited.add(contract.ident)) {
+        throw Compiler.Error(s"Cyclic inheritance detected for contract ${contract.ident.name}")
       }
 
-      parentsCache.get(contract.ident) match {
-        case None =>
-          contract.inheritances.foldLeft(Seq.empty[TxContract]) { case (acc, inheritance) =>
-            val parentContract = getContract(inheritance.parentId)
-            val fields = inheritance.idents.map { ident =>
-              contract.fields
-                .find(_.ident == ident)
-                .getOrElse(
-                  throw Compiler.Error(s"Contract field ${ident.name} does not exist")
-                )
-            }
-            if (fields != parentContract.fields) {
-              throw Compiler.Error(
-                s"Invalid contract inheritance fields, expect ${parentContract.fields}, have $fields"
-              )
-            }
-            val parents =
-              parentContract +: getParentContracts(parentContract, parentsCache, childrenCache)
-            val allParents = acc ++ parents.filterNot(c => acc.exists(_.ident == c.ident))
-            parentsCache += contract.ident -> allParents
-            allParents
-          }
-        case Some(contracts) => contracts
+      val allParents = mutable.Map.empty[TypeId, TxContract]
+      contract.inheritances.foreach { inheritance =>
+        val parentId       = inheritance.parentId
+        val parentContract = getContract(parentId)
+        MultiTxContract.checkInheritance(contract, inheritance, parentContract)
+
+        allParents += parentId -> parentContract
+        if (!parentsCache.contains(parentId)) {
+          buildDependencies(parentContract, parentsCache, visited)
+        }
+        parentsCache(parentId).foreach { grandParent =>
+          allParents += grandParent.ident -> grandParent
+        }
       }
+      parentsCache += contract.ident -> allParents.values.toSeq
+    }
+
+    private def buildDependencies(): mutable.Map[TypeId, Seq[TxContract]] = {
+      val parentsCache = mutable.Map.empty[TypeId, Seq[TxContract]]
+      val visited      = mutable.Set.empty[TypeId]
+      contracts.foreach {
+        case contract: TxContract =>
+          if (!parentsCache.contains(contract.ident)) {
+            buildDependencies(contract, parentsCache, visited)
+          }
+        case _ => ()
+      }
+      parentsCache
     }
 
     def extendedContracts(): MultiTxContract = {
+      val parentsCache = buildDependencies()
       val newContracts: Seq[ContractWithState] = contracts.map {
         case contract: TxContract =>
-          val parents = getParentContracts(contract, mutable.Map.empty, mutable.Map.empty)
+          val parents = parentsCache(contract.ident)
           val funcs   = contract.funcs ++ parents.flatMap(_.funcs)
           val events  = contract.events ++ parents.flatMap(_.events)
           TxContract(contract.ident, contract.fields, funcs, events, contract.inheritances)
@@ -872,6 +868,27 @@ object Ast {
       get(contractIndex) match {
         case contract: TxContract => (contract.genCode(state), contract)
         case _: TxScript          => throw Compiler.Error(s"The code is for TxScript, not for TxContract")
+      }
+    }
+  }
+
+  object MultiTxContract {
+    def checkInheritance(
+        contract: TxContract,
+        inheritance: ContractInheritance,
+        parentContract: TxContract
+    ): Unit = {
+      val fields = inheritance.idents.map { ident =>
+        contract.fields
+          .find(_.ident == ident)
+          .getOrElse(
+            throw Compiler.Error(s"Contract field ${ident.name} does not exist")
+          )
+      }
+      if (fields != parentContract.fields) {
+        throw Compiler.Error(
+          s"Invalid contract inheritance fields, expect ${parentContract.fields}, have $fields"
+        )
       }
     }
   }

@@ -1633,7 +1633,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("circle inheritance")
+      info("Cyclic inheritance")
 
       val code =
         s"""
@@ -1654,7 +1654,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(code).leftValue.message is
-        "Circle inheritance between contract C and A"
+        "Cyclic inheritance detected for contract A"
     }
 
     {
