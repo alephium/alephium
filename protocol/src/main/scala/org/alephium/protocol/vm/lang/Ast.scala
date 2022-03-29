@@ -17,6 +17,7 @@
 package org.alephium.protocol.vm.lang
 
 import scala.annotation.switch
+import scala.collection.mutable
 
 import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm.{Contract => VmContract, _}
@@ -717,6 +718,7 @@ object Ast {
   sealed trait ContractWithState extends Contract[StatefulContext] {
     def ident: TypeId
     def name: String = ident.name
+    def inheritances: Seq[ContractInheritance]
 
     def fields: Seq[Argument]
     def events: Seq[EventDef]
@@ -737,8 +739,9 @@ object Ast {
 
   final case class TxScript(ident: TypeId, funcs: Seq[FuncDef[StatefulContext]])
       extends ContractWithState {
-    val events: Seq[EventDef] = Seq.empty
-    val fields: Seq[Argument] = Seq.empty
+    val events: Seq[EventDef]                  = Seq.empty
+    val fields: Seq[Argument]                  = Seq.empty
+    val inheritances: Seq[ContractInheritance] = Seq.empty
 
     def getFieldsSignature(): String = s"TxScript $name()"
     def getFieldTypes(): Seq[String] = Seq.empty
@@ -756,11 +759,13 @@ object Ast {
     }
   }
 
+  final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident])
   final case class TxContract(
       ident: TypeId,
       fields: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]],
-      events: Seq[EventDef]
+      events: Seq[EventDef],
+      inheritances: Seq[ContractInheritance]
   ) extends ContractWithState {
     def getFieldsSignature(): String =
       s"TxContract ${name}(${fields.map(_.signature).mkString(",")})"
@@ -782,6 +787,70 @@ object Ast {
       } else {
         throw Compiler.Error(s"Invalid contract index $contractIndex")
       }
+    }
+
+    private def getContract(typeId: TypeId): TxContract = {
+      contracts.find(_.ident == typeId) match {
+        case Some(contract: TxContract) => contract
+        case Some(_: TxScript)          => throw Compiler.Error(s"Expect contract $typeId, but got script")
+        case None                       => throw Compiler.Error(s"Contract $typeId does not exist")
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    private def getParentContracts(
+        contract: TxContract,
+        parentsCache: mutable.Map[TypeId, Seq[TxContract]],
+        childrenCache: mutable.Map[TypeId, Seq[TypeId]]
+    ): Seq[TxContract] = {
+      val children = childrenCache.getOrElse(contract.ident, Seq.empty)
+      contract.inheritances.foreach { inheritance =>
+        if (children.contains(inheritance.parentId)) {
+          throw Compiler.Error(
+            s"Circle inheritance between contract ${contract.ident.name} and ${inheritance.parentId.name}"
+          )
+        }
+        val parentChildren =
+          (childrenCache.getOrElse(inheritance.parentId, Seq.empty) :+ contract.ident) ++ children
+        childrenCache += inheritance.parentId -> parentChildren
+      }
+
+      parentsCache.get(contract.ident) match {
+        case None =>
+          contract.inheritances.foldLeft(Seq.empty[TxContract]) { case (acc, inheritance) =>
+            val parentContract = getContract(inheritance.parentId)
+            val fields = inheritance.idents.map { ident =>
+              contract.fields
+                .find(_.ident == ident)
+                .getOrElse(
+                  throw Compiler.Error(s"Contract field ${ident.name} does not exist")
+                )
+            }
+            if (fields != parentContract.fields) {
+              throw Compiler.Error(
+                s"Invalid contract inheritance fields, expect ${parentContract.fields}, have $fields"
+              )
+            }
+            val parents =
+              parentContract +: getParentContracts(parentContract, parentsCache, childrenCache)
+            val allParents = acc ++ parents.filterNot(c => acc.exists(_.ident == c.ident))
+            parentsCache += contract.ident -> allParents
+            allParents
+          }
+        case Some(contracts) => contracts
+      }
+    }
+
+    def extendedContracts(): MultiTxContract = {
+      val newContracts: Seq[ContractWithState] = contracts.map {
+        case contract: TxContract =>
+          val parents = getParentContracts(contract, mutable.Map.empty, mutable.Map.empty)
+          val funcs   = contract.funcs ++ parents.flatMap(_.funcs)
+          val events  = contract.events ++ parents.flatMap(_.events)
+          TxContract(contract.ident, contract.fields, funcs, events, contract.inheritances)
+        case script: TxScript => script
+      }
+      MultiTxContract(newContracts)
     }
 
     def genStatefulScript(

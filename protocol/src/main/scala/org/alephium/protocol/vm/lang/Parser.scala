@@ -275,11 +275,21 @@ object StatefulParser extends Parser[StatefulContext] {
 
   def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
 
+  def contractInheritance[_: P]: P[Ast.ContractInheritance] =
+    P(Lexer.typeId ~ P("(" ~ Lexer.ident.rep(0, ",") ~ ")")).map { case (typeId, idents) =>
+      Ast.ContractInheritance(typeId, idents)
+    }
+  def contractInheritances[_: P]: P[Seq[Ast.ContractInheritance]] =
+    P(Lexer.keyword("extends") ~/ contractInheritance.rep(1, ","))
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[_: P]: P[Ast.TxContract] =
     P(
-      Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~ "{" ~ P(event | func).rep ~ "}"
-    ).map { case (typeId, params, statements) =>
+      Lexer.keyword(
+        "TxContract"
+      ) ~/ Lexer.typeId ~ contractParams ~ contractInheritances.? ~ "{" ~ P(
+        event | func
+      ).rep ~ "}"
+    ).map { case (typeId, params, contractInheritances, statements) =>
       val funcs = statements.collect { case func: Ast.FuncDef[_] =>
         func.asInstanceOf[Ast.FuncDef[StatefulContext]]
       }
@@ -287,7 +297,7 @@ object StatefulParser extends Parser[StatefulContext] {
         throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
       } else {
         val events = statements.collect { case event: Ast.EventDef => event }
-        Ast.TxContract(typeId, params, funcs, events)
+        Ast.TxContract(typeId, params, funcs, events, contractInheritances.getOrElse(Seq.empty))
       }
     }
   def contract[_: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
