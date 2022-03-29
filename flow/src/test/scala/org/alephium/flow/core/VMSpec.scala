@@ -1175,6 +1175,74 @@ class VMSpec extends AlephiumSpec {
     checkContract(ALPH.cent(95), 5)
   }
 
+  it should "test contract inheritance" in new ContractFixture {
+    val contract: String =
+      s"""
+         |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+         |  pub fn foo() -> () {
+         |    p0()
+         |    p1()
+         |    gp()
+         |  }
+         |}
+         |
+         |TxContract Grandparent(mut x: U256) {
+         |  event GP(value: U256)
+         |
+         |  fn gp() -> () {
+         |    x = x + 1
+         |    emit GP(x)
+         |  }
+         |}
+         |
+         |TxContract Parent0(mut x: U256) extends Grandparent(x) {
+         |  fn p0() -> () {
+         |    gp()
+         |  }
+         |}
+         |
+         |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+         |  fn p1() -> () {
+         |    gp()
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractOutputRef = createContract(contract, AVector(Val.U256(0)))
+    val contractId        = contractOutputRef.key.toHexString
+    checkContractState(contractId, contractOutputRef, true)
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let child = Child(#$contractId)
+         |    child.foo()
+         |  }
+         |}
+         |$contract
+         |""".stripMargin
+
+    val main  = Compiler.compileTxScript(script).rightValue
+    val block = simpleScript(blockFlow, chainIndex, main)
+    val txId  = block.nonCoinbase.head.id
+    addAndCheck(blockFlow, block)
+
+    val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+    val contractState = worldState.getContractState(contractOutputRef.key).rightValue
+    contractState.fields is AVector[Val](Val.U256(3))
+    getLogStates(blockFlow, chainIndex.from, block.hash, contractOutputRef.key).value is
+      LogStates(
+        block.hash,
+        contractOutputRef.key,
+        AVector(
+          LogState(txId, 0, AVector(Val.U256(1))),
+          LogState(txId, 0, AVector(Val.U256(2))),
+          LogState(txId, 0, AVector(Val.U256(3)))
+        )
+      )
+  }
+
   trait EventFixture extends FlowFixture {
     def contractRaw: String
     def callingScriptRaw: String
