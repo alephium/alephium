@@ -19,24 +19,9 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 
 import org.alephium.io._
+import org.alephium.protocol.Hash
 
-final class CachedLogStates(
-    val underlying: KeyValueStorage[LogStatesId, LogStates],
-    val caches: mutable.LinkedHashMap[LogStatesId, Cache[LogStates]]
-) extends CachedKV[LogStatesId, LogStates, Cache[LogStates]] {
-  protected def getOptFromUnderlying(key: LogStatesId): IOResult[Option[LogStates]] = {
-    CachedKV.getOptFromUnderlying(underlying, caches, key)
-  }
-
-  def persist(): IOResult[KeyValueStorage[LogStatesId, LogStates]] = {
-    CachedKV.persist(underlying, caches)
-  }
-
-  def staging(): StagingLogStates = new StagingLogStates(this, mutable.LinkedHashMap.empty)
-}
-
-object CachedLogStates {
-  def from(storage: KeyValueStorage[LogStatesId, LogStates]): CachedLogStates = {
-    new CachedLogStates(storage, mutable.LinkedHashMap.empty)
-  }
-}
+final class StagingLogCounterState(
+    val underlying: CachedLogCounterState,
+    val caches: mutable.Map[Hash, Modified[Int]]
+) extends StagingKV[Hash, Int] {}

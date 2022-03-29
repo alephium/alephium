@@ -118,7 +118,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     test(
       WorldState.emptyCached(
         newDB(storage, RocksDBSource.ColumnFamily.All),
-        newDB(storage, RocksDBSource.ColumnFamily.Log)
+        newDB(storage, RocksDBSource.ColumnFamily.Log),
+        newDB(storage, RocksDBSource.ColumnFamily.LogCounter)
       )
     )
   }
@@ -128,7 +129,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     test(
       WorldState.emptyPersisted(
         newDB(storage, RocksDBSource.ColumnFamily.All),
-        newDB(storage, RocksDBSource.ColumnFamily.Log)
+        newDB(storage, RocksDBSource.ColumnFamily.Log),
+        newDB(storage, RocksDBSource.ColumnFamily.LogCounter)
       )
     )
   }
@@ -144,7 +146,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val worldState = WorldState
       .emptyCached(
         newDB(storage, RocksDBSource.ColumnFamily.All),
-        newDB(storage, RocksDBSource.ColumnFamily.Log)
+        newDB(storage, RocksDBSource.ColumnFamily.Log),
+        newDB(storage, RocksDBSource.ColumnFamily.LogCounter)
       )
       .staging()
 
@@ -169,7 +172,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val storage = newDBStorage()
     val worldState = WorldState.emptyCached(
       newDB(storage, RocksDBSource.ColumnFamily.All),
-      newDB(storage, RocksDBSource.ColumnFamily.Log)
+      newDB(storage, RocksDBSource.ColumnFamily.Log),
+      newDB(storage, RocksDBSource.ColumnFamily.LogCounter)
     )
     val staging = worldState.staging()
 
