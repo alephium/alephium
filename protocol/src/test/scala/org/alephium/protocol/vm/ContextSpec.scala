@@ -85,4 +85,33 @@ class ContextSpec
       GasSchedule.txOutputBaseGas.value) is context.gasRemaining.value
     context.generatedOutputs.size is 2
   }
+
+  it should "migrate contract without state change" in new Fixture {
+    val contractId = createContract()
+    val obj        = context.loadContractObj(contractId).rightValue
+    val newCode: StatefulContract =
+      StatefulContract(0, AVector(Method.forSMT, Method.forSMT))
+    context.migrateContract(contractId, obj, newCode, None) isE ()
+    context.contractPool.contains(contractId) is false
+    val newObj = context.loadContractObj(contractId).rightValue
+    newObj.code is newCode.toHalfDecoded()
+    newObj.codeHash is newCode.hash
+    newObj.initialStateHash is obj.initialStateHash
+    newObj.contractId is contractId
+  }
+
+  it should "migrate contract with state change" in new Fixture {
+    val contractId = createContract()
+    val obj        = context.loadContractObj(contractId).rightValue
+    val newCode: StatefulContract =
+      StatefulContract(1, AVector(Method.forSMT, Method.forSMT))
+    context.migrateContract(contractId, obj, newCode, None).leftValue isE InvalidFieldLength
+    context.migrateContract(contractId, obj, newCode, Some(AVector(Val.True))) isE ()
+    context.contractPool.contains(contractId) is false
+    val newObj = context.loadContractObj(contractId).rightValue
+    newObj.code is newCode.toHalfDecoded()
+    newObj.codeHash is newCode.hash
+    newObj.initialStateHash is obj.initialStateHash
+    newObj.contractId is contractId
+  }
 }

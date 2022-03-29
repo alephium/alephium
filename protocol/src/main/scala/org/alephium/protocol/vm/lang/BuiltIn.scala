@@ -465,6 +465,22 @@ object BuiltIn {
       DestroySelf
     )
 
+  val migrate: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "migrate",
+      Seq[Type](Type.ByteVec),
+      Seq.empty,
+      MigrateSimple
+    )
+
+  val migrateWithState: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "migrateWithState",
+      Seq[Type](Type.ByteVec, Type.ByteVec),
+      Seq.empty,
+      MigrateWithState
+    )
+
   val selfAddress: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn("selfAddress", Seq.empty, Seq(Type.Address), SelfAddress)
 
@@ -533,6 +549,8 @@ object BuiltIn {
       copyCreateContract,
       copyCreateContractWithToken,
       destroySelf,
+      migrate,
+      migrateWithState,
       selfAddress,
       selfContractId,
       selfTokenId,

@@ -97,6 +97,7 @@ case object InvalidBytesSliceArg                               extends ExeFailur
 case object InvalidBytesSize                                   extends ExeFailure
 final case class SerdeErrorByteVecToAddress(error: SerdeError) extends ExeFailure
 case object FailedInRecoverEthAddress                          extends ExeFailure
+case object UnexpectedRecursiveCallInMigration                 extends ExeFailure
 
 final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends ExeFailure
 
@@ -104,8 +105,9 @@ sealed trait IOFailure extends Product {
   def error: IOError
   def name: String = productPrefix
 }
-final case class IOErrorUpdateState(error: IOError)    extends IOFailure
-final case class IOErrorRemoveContract(error: IOError) extends IOFailure
-final case class IOErrorLoadContract(error: IOError)   extends IOFailure
-final case class IOErrorLoadOutputs(error: IOError)    extends IOFailure
-final case class IOErrorWriteLog(error: IOError)       extends IOFailure
+final case class IOErrorUpdateState(error: IOError)     extends IOFailure
+final case class IOErrorRemoveContract(error: IOError)  extends IOFailure
+final case class IOErrorLoadContract(error: IOError)    extends IOFailure
+final case class IOErrorLoadOutputs(error: IOError)     extends IOFailure
+final case class IOERrorMigrateContract(error: IOError) extends IOFailure
+final case class IOErrorWriteLog(error: IOError)        extends IOFailure

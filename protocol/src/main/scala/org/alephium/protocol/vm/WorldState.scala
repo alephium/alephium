@@ -365,6 +365,21 @@ object WorldState {
       } yield ()
     }
 
+    def migrateContractUnsafe(
+        contractId: ContractId,
+        newCode: StatefulContract,
+        newFields: AVector[Val]
+    ): IOResult[Unit] = {
+      for {
+        state            <- getContractState(contractId)
+        _                <- contractState.put(contractId, state.migrate(newCode, newFields))
+        codeRecord       <- codeState.get(state.codeHash)
+        _                <- removeContractCode(state, codeRecord)
+        newCodeRecordOpt <- codeState.getOpt(newCode.hash)
+        _                <- codeState.put(newCode.hash, CodeRecord.from(newCode.toHalfDecoded(), newCodeRecordOpt))
+      } yield ()
+    }
+
     def removeAsset(outputRef: TxOutputRef): IOResult[Unit] = {
       outputState.remove(outputRef)
     }

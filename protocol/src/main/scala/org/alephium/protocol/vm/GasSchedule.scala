@@ -147,6 +147,12 @@ object GasDestroy {
 }
 
 @Gas
+trait GasMigrate extends GasSimple
+object GasMigrate {
+  val gas: GasBox = GasCreate.gas
+}
+
+@Gas
 trait GasBalance extends GasSimple
 object GasBalance {
   val gas: GasBox = GasBox.unsafe(30)

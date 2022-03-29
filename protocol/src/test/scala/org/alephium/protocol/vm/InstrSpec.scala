@@ -64,25 +64,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   trait LemanForkFixture extends AllInstrsFixture {
     // format: off
-    val lemanInstrs = AVector(
+    val lemanStatelessInstrs = AVector(
       /* Below are instructions for Leman hard fork */
       ByteVecSlice,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
       ByteVecToAddress, EthEcRecover
     )
+    val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithState)
     // format: on
-  }
-
-  it should "derive from LemanInstr" in new LemanForkFixture {
-    lemanInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
-    (statelessInstrs.toSet -- lemanInstrs.toSet).map(_.isInstanceOf[LemanInstr[_]] is false)
-    (statefulInstrs.toSet -- lemanInstrs.toSet).map(_.isInstanceOf[LemanInstr[_]] is false)
-  }
-
-  it should "fail if the fork is not activated yet" in new LemanForkFixture with StatelessFixture {
-    val frame0 = prepareFrame(AVector.empty)(networkConfig) // hardfork is activated
-    lemanInstrs.foreach(instr => instr.runWith(frame0).leftValue isnotE InactiveInstr(instr))
 
     val networkConfig1 = new NetworkConfig {
       override def networkId: model.NetworkId = model.NetworkId.AlephiumMainNet
@@ -90,17 +80,49 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       override def lemanHardForkTimestamp: TimeStamp =
         TimeStamp.now().plusUnsafe(Duration.ofSecondsUnsafe(10))
     }
-    val frame1 = prepareFrame(AVector.empty)(networkConfig1) // hardfork is not activated yet
-    lemanInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
-
     val networkConfig2 = new NetworkConfig {
       override def networkId: model.NetworkId = model.NetworkId.AlephiumMainNet
       override def noPreMineProof: ByteString = ByteString.empty
       override def lemanHardForkTimestamp: TimeStamp =
         TimeStamp.now().minusUnsafe(Duration.ofSecondsUnsafe(10))
     }
+  }
+
+  it should "derive from LemanInstr" in new LemanForkFixture {
+    lemanStatelessInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
+    lemanStatefulInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
+    (statelessInstrs.toSet -- lemanStatelessInstrs.toSet)
+      .map(_.isInstanceOf[LemanInstr[_]] is false)
+    (statefulInstrs.toSet -- lemanStatefulInstrs.toSet)
+      .map(_.isInstanceOf[LemanInstr[_]] is false)
+  }
+
+  it should "fail if the fork is not activated yet for stateless instrs" in new LemanForkFixture
+    with StatelessFixture {
+    val frame0 = prepareFrame(AVector.empty)(networkConfig) // hardfork is activated
+    lemanStatelessInstrs.foreach(instr =>
+      instr.runWith(frame0).leftValue isnotE InactiveInstr(instr)
+    )
+    val frame1 = prepareFrame(AVector.empty)(networkConfig1) // hardfork is not activated yet
+    lemanStatelessInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
     val frame2 = prepareFrame(AVector.empty)(networkConfig2) // hardfork is not activated yet
-    lemanInstrs.foreach(instr => instr.runWith(frame2).leftValue isnotE InactiveInstr(instr))
+    lemanStatelessInstrs.foreach(instr =>
+      instr.runWith(frame2).leftValue isnotE InactiveInstr(instr)
+    )
+  }
+
+  it should "fail if the fork is not activated yet for stateful instrs" in new LemanForkFixture
+    with StatefulFixture {
+    val frame0 = prepareFrame() // hardfork is activated
+    lemanStatefulInstrs.foreach(instr =>
+      instr.runWith(frame0).leftValue isnotE InactiveInstr(instr)
+    )
+    val frame1 = prepareFrame()(networkConfig1) // hardfork is not activated yet
+    lemanStatelessInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
+    val frame2 = prepareFrame()(networkConfig2) // hardfork is not activated yet
+    lemanStatelessInstrs.foreach(instr =>
+      instr.runWith(frame2).leftValue isnotE InactiveInstr(instr)
+    )
   }
 
   trait GenFixture extends ContextGenerators {
@@ -1559,8 +1581,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         balanceState: Option[BalanceState] = None,
         contractOutputOpt: Option[(ContractOutput, ContractOutputRef)] = None,
         txEnvOpt: Option[TxEnv] = None,
-        callerFrameOpt: Option[Frame[StatefulContext]] = None
-    ) = {
+        callerFrameOpt: Option[StatefulFrame] = None
+    )(implicit networkConfig: NetworkConfig) = {
       val (obj, ctx) =
         prepareContract(
           contract,
@@ -1965,7 +1987,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val contractOutputRef = ContractOutputRef.unsafe(txId, contractOutput, 0)
 
-    val callerFrame = prepareFrame()
+    val callerFrame = prepareFrame().asInstanceOf[StatefulFrame]
 
     val from = LockupScript.P2C(contractOutputRef.key)
 
@@ -2005,7 +2027,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait CallerFrameFixture extends ContractInstrFixture {
-    val callerFrame         = prepareFrame()
+    val callerFrame         = prepareFrame().asInstanceOf[StatefulFrame]
     override lazy val frame = prepareFrame(callerFrameOpt = Some(callerFrame))
   }
 
@@ -2090,7 +2112,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ApproveAlph -> 30, ApproveToken -> 30, AlphRemaining -> 30, TokenRemaining -> 30, IsPaying -> 30,
       TransferAlph -> 30, TransferAlphFromSelf -> 30, TransferAlphToSelf -> 30, TransferToken -> 30, TransferTokenFromSelf -> 30, TransferTokenToSelf -> 30,
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
-      CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5
+      CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5,
+      MigrateSimple -> 32000, MigrateWithState -> 32000
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -2187,7 +2210,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
       TransferAlph -> 167, TransferAlphFromSelf -> 168, TransferAlphToSelf -> 169, TransferToken -> 170, TransferTokenFromSelf -> 171, TransferTokenToSelf -> 172,
       CreateContract -> 173, CreateContractWithToken -> 174, CopyCreateContract -> 175, DestroySelf -> 176, SelfContractId -> 177, SelfAddress -> 178,
-      CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185
+      CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185,
+      MigrateSimple -> 186, MigrateWithState -> 187
     )
     // format: on
 
@@ -2235,7 +2259,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ApproveAlph, ApproveToken, AlphRemaining, TokenRemaining, IsPaying,
       TransferAlph, TransferAlphFromSelf, TransferAlphToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
-      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
+      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
+      /* Below are instructions for Leman hard fork */
+      MigrateSimple, MigrateWithState
     )
     // format: on
   }

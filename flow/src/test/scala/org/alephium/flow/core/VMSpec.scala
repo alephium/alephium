@@ -34,7 +34,7 @@ import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize, Serde}
 import org.alephium.util._
 
-// scalastyle:off file.size.limit
+// scalastyle:off file.size.limit method.length number.of.methods
 class VMSpec extends AlephiumSpec {
   implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
 
@@ -653,6 +653,69 @@ class VMSpec extends AlephiumSpec {
       info("Destroy a contract properly")
       callTxScript(main(genesisAddress.toBase58))
       checkContractState(fooId, fooAssetRef, false)
+    }
+  }
+
+  it should "migrate contract" in new DestroyFixture {
+    val fooV1 =
+      s"""
+         |TxContract Foo(x: Bool) {
+         |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
+         |    // in practice, we should check the permission for migration
+         |    if (!changeState) {
+         |      migrate!(code)
+         |    } else {
+         |      migrateWithState!(code, #010000)
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    val (fooId, _) = prepareContract(fooV1, AVector[Val](Val.True))
+    val fooV2 =
+      s"""
+         |TxContract Foo(x: Bool) {
+         |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
+         |    if (changeState) {
+         |      migrateWithState!(code, #010000)
+         |    } else {
+         |      migrate!(code)
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    val fooV2Code = Compiler.compileContract(fooV2).rightValue
+
+    def main(changeState: String): String =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    Foo(#$fooId).foo(#${Hex.toHexString(serialize(fooV2Code))}, ${changeState})
+         |  }
+         |}
+         |
+         |$fooV1
+         |""".stripMargin
+
+    {
+      info("migrate without state change")
+      callTxScript(main("false"))
+      val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val contractKey = Hash.from(Hex.from(fooId).get).get
+      val obj         = worldState.getContractObj(contractKey).rightValue
+      obj.contractId is contractKey
+      obj.code is fooV2Code.toHalfDecoded()
+      obj.initialFields is AVector[Val](Val.True)
+    }
+
+    {
+      info("migrate with state change")
+      callTxScript(main("true"))
+      val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val contractKey = Hash.from(Hex.from(fooId).get).get
+      val obj         = worldState.getContractObj(contractKey).rightValue
+      obj.contractId is contractKey
+      obj.code is fooV2Code.toHalfDecoded()
+      obj.initialFields is AVector[Val](Val.False)
     }
   }
 

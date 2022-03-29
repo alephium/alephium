@@ -137,7 +137,9 @@ object Instr {
     ApproveAlph, ApproveToken, AlphRemaining, TokenRemaining, IsPaying,
     TransferAlph, TransferAlphFromSelf, TransferAlphToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
-    CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
+    CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
+    /* Below are instructions for Leman hard fork */
+    MigrateSimple, MigrateWithState
   )
   // format: on
 
@@ -1315,6 +1317,42 @@ object DestroySelf extends ContractInstr with GasDestroy {
       address <- frame.popOpStackAddress()
       _       <- frame.destroyContract(address.lockupScript)
     } yield ()
+  }
+}
+
+sealed trait MigrateBase
+    extends LemanInstr[StatefulContext]
+    with StatefulInstrCompanion0
+    with GasMigrate {
+  def migrate[C <: StatefulContext](
+      frame: Frame[C],
+      newFieldsOpt: Option[AVector[Val]]
+  ): ExeResult[Unit] = {
+    for {
+      _               <- frame.ctx.chargeGas(gas())
+      contractCodeRaw <- frame.popOpStackByteVec()
+      _               <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
+      contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
+        Right(SerdeErrorCreateContract(e))
+      )
+      _ <- frame.migrateContract(contractCode, newFieldsOpt)
+    } yield ()
+  }
+}
+
+object MigrateSimple extends MigrateBase {
+  def runWithLeman[C <: StatefulContext](
+      frame: Frame[C]
+  ): ExeResult[Unit] = {
+    migrate(frame, None)
+  }
+}
+
+object MigrateWithState extends MigrateBase {
+  def runWithLeman[C <: StatefulContext](
+      frame: Frame[C]
+  ): ExeResult[Unit] = {
+    frame.popFields().flatMap(newFields => migrate(frame, Some(newFields)))
   }
 }
 

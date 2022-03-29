@@ -154,6 +154,11 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def destroyContract(address: LockupScript): ExeResult[Unit]
 
+  def migrateContract(
+      newContractCode: StatefulContract,
+      newFieldsOpt: Option[AVector[Val]]
+  ): ExeResult[Unit]
+
   def callLocal(index: Byte): ExeResult[Option[Frame[Ctx]]] = {
     advancePC()
     for {
@@ -216,7 +221,11 @@ final class StatelessFrame(
       tokenAmount: Option[Val.U256]
   ): ExeResult[Unit]                                          = StatelessFrame.notAllowed
   def destroyContract(address: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
-  def getCallerFrame(): ExeResult[Frame[StatelessContext]]    = StatelessFrame.notAllowed
+  def migrateContract(
+      newContractCode: StatefulContract,
+      newFieldsOpt: Option[AVector[Val]]
+  ): ExeResult[Unit]                                       = StatelessFrame.notAllowed
+  def getCallerFrame(): ExeResult[Frame[StatelessContext]] = StatelessFrame.notAllowed
   def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] =
     StatelessFrame.notAllowed
 }
@@ -233,10 +242,10 @@ final class StatefulFrame(
     val locals: VarVector[Val],
     val returnTo: AVector[Val] => ExeResult[Unit],
     val ctx: StatefulContext,
-    val callerFrameOpt: Option[Frame[StatefulContext]],
+    val callerFrameOpt: Option[StatefulFrame],
     val balanceStateOpt: Option[BalanceState]
 ) extends Frame[StatefulContext] {
-  def getCallerFrame(): ExeResult[Frame[StatefulContext]] = {
+  def getCallerFrame(): ExeResult[StatefulFrame] = {
     callerFrameOpt.toRight(Right(NoCaller))
   }
 
@@ -303,6 +312,37 @@ final class StatefulFrame(
       _ <- runReturn()
     } yield {
       pc -= 1 // because of the `advancePC` call following this instruction
+    }
+  }
+
+  @tailrec
+  private def checkNonRecursive(targetContractId: ContractId): ExeResult[Unit] = {
+    obj.contractIdOpt match {
+      case Some(contractId) =>
+        if (contractId == targetContractId) {
+          failed(UnexpectedRecursiveCallInMigration)
+        } else {
+          callerFrameOpt match {
+            case Some(frame) => frame.checkNonRecursive(targetContractId)
+            case None        => okay
+          }
+        }
+      case None => okay // Frame for TxScript
+    }
+  }
+
+  def migrateContract(
+      newContractCode: StatefulContract,
+      newFieldsOpt: Option[AVector[Val]]
+  ): ExeResult[Unit] = {
+    for {
+      contractId  <- obj.getContractId()
+      callerFrame <- getCallerFrame()
+      _           <- callerFrame.checkNonRecursive(contractId)
+      _           <- ctx.migrateContract(contractId, obj, newContractCode, newFieldsOpt)
+      _           <- runReturn() // return immediately as the code is upgraded
+    } yield {
+      pc -= 1
     }
   }
 
@@ -388,7 +428,7 @@ object Frame {
 
   def stateful(
       ctx: StatefulContext,
-      callerFrame: Option[Frame[StatefulContext]],
+      callerFrame: Option[StatefulFrame],
       balanceStateOpt: Option[BalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
@@ -414,7 +454,7 @@ object Frame {
 
   def stateful(
       ctx: StatefulContext,
-      callerFrame: Option[Frame[StatefulContext]],
+      callerFrame: Option[StatefulFrame],
       balanceStateOpt: Option[BalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],

@@ -213,6 +213,29 @@ trait StatefulContext extends StatelessContext with ContractPool {
     } yield ()
   }
 
+  def migrateContract(
+      contractId: ContractId,
+      obj: ContractObj[StatefulContext],
+      newContractCode: StatefulContract,
+      newFieldsOpt: Option[AVector[Val]]
+  ): ExeResult[Unit] = {
+    val newFields = newFieldsOpt.getOrElse(AVector.from(obj.fields))
+    for {
+      _ <- chargeFieldSize(newFields.toIterable)
+      _ <-
+        if (newFields.length == newContractCode.fieldLength) { okay }
+        else {
+          failed(InvalidFieldLength)
+        }
+      _ <- worldState
+        .migrateContractUnsafe(contractId, newContractCode, newFields)
+        .left
+        .map(e => Left(IOERrorMigrateContract(e)))
+    } yield {
+      removeContractFromCache(contractId)
+    }
+  }
+
   def updateContractAsset(
       contractId: ContractId,
       outputRef: ContractOutputRef,
