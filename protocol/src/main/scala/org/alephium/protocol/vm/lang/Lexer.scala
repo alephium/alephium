@@ -163,7 +163,8 @@ object Lexer {
     "payable",
     "event",
     "emit",
-    "loop"
+    "loop",
+    "extends"
   )
 
   val primTpes: Map[String, Type] =

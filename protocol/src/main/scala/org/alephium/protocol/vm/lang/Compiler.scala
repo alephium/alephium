@@ -84,7 +84,7 @@ object Compiler {
   private def compileStateful[T](input: String, genCode: MultiTxContract => T): Either[Error, T] = {
     try {
       fastparse.parse(input, StatefulParser.multiContract(_)) match {
-        case Parsed.Success(multiContract, _) => Right(genCode(multiContract))
+        case Parsed.Success(multiContract, _) => Right(genCode(multiContract.extendedContracts()))
         case failure: Parsed.Failure          => Left(Error.parse(failure))
       }
     } catch {
@@ -266,10 +266,6 @@ object Compiler {
     def setFuncScope(funcId: Ast.FuncId): Unit = {
       scope = funcId
       varIndex = 0
-    }
-
-    def addVariable(ident: Ast.Ident, tpe: Seq[Type], isMutable: Boolean): Unit = {
-      addVariable(ident, expectOneType(ident, tpe), isMutable)
     }
 
     protected def scopedName(name: String): String = {

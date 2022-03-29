@@ -1512,4 +1512,188 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         .message is "Invalid args type List(U256, Bool) for event Add(U256, U256)"
     }
   }
+
+  it should "test compile contract inheritance" in {
+    val parent =
+      s"""
+         |TxContract Parent(mut x: U256) {
+         |  event Foo()
+         |
+         |  pub fn foo() -> () {
+         |  }
+         |}
+         |""".stripMargin
+
+    {
+      info("extends from parent contract")
+
+      val child =
+        s"""
+           |TxContract Child(mut x: U256, y: U256) extends Parent(x) {
+           |  pub fn bar() -> () {
+           |    foo()
+           |  }
+           |
+           |  pub fn emitEvent() -> () {
+           |    emit Foo()
+           |  }
+           |}
+           |
+           |$parent
+           |""".stripMargin
+
+      Compiler.compileContract(child).isRight is true
+    }
+
+    {
+      info("field does not exist")
+
+      val child =
+        s"""
+           |TxContract Child(mut x: U256, y: U256) extends Parent(z) {
+           |  pub fn foo() -> () {
+           |  }
+           |}
+           |
+           |$parent
+           |""".stripMargin
+
+      Compiler.compileContract(child).leftValue.message is
+        "Contract field z does not exist"
+    }
+
+    {
+      info("duplicated function definitions")
+
+      val child =
+        s"""
+           |TxContract Child(mut x: U256, y: U256) extends Parent(x) {
+           |  pub fn foo() -> () {
+           |  }
+           |}
+           |
+           |$parent
+           |""".stripMargin
+
+      Compiler.compileContract(child).leftValue.message is
+        "These functions are defined multiple times: foo"
+    }
+
+    {
+      info("duplicated event definitions")
+
+      val child =
+        s"""
+           |TxContract Child(mut x: U256, y: U256) extends Parent(x) {
+           |  event Foo()
+           |
+           |  pub fn bar() -> () {
+           |  }
+           |}
+           |
+           |$parent
+           |""".stripMargin
+
+      Compiler.compileContract(child).leftValue.message is
+        "These events are defined multiple times: Foo"
+    }
+
+    {
+      info("invalid field in child contract")
+
+      val child =
+        s"""
+           |TxContract Child(x: U256, y: U256) extends Parent(x) {
+           |  pub fn bar() -> () {
+           |  }
+           |}
+           |
+           |$parent
+           |""".stripMargin
+
+      Compiler.compileContract(child).leftValue.message is
+        "Invalid contract inheritance fields, expect List(Argument(Ident(x),U256,true)), have List(Argument(Ident(x),U256,false))"
+    }
+
+    {
+      info("invalid field in parent contract")
+
+      val child =
+        s"""
+           |TxContract Child(mut x: U256, mut y: U256) extends Parent(y) {
+           |  pub fn bar() -> () {
+           |  }
+           |}
+           |
+           |$parent
+           |""".stripMargin
+
+      Compiler.compileContract(child).leftValue.message is
+        "Invalid contract inheritance fields, expect List(Argument(Ident(x),U256,true)), have List(Argument(Ident(y),U256,true))"
+    }
+
+    {
+      info("Cyclic inheritance")
+
+      val code =
+        s"""
+           |TxContract A(x: U256) extends B(x) {
+           |  fn a() -> () {
+           |  }
+           |}
+           |
+           |TxContract B(x: U256) extends C(x) {
+           |  fn b() -> () {
+           |  }
+           |}
+           |
+           |TxContract C(x: U256) extends A(x) {
+           |  fn c() -> () {
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code).leftValue.message is
+        "Cyclic inheritance detected for contract A"
+    }
+
+    {
+      info("extends from multiple parent")
+
+      val code =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  pub fn foo() -> () {
+           |    p0()
+           |    p1()
+           |    gp()
+           |  }
+           |}
+           |
+           |TxContract Grandparent(mut x: U256) {
+           |  event GP(value: U256)
+           |
+           |  fn gp() -> () {
+           |    x = x + 1
+           |    emit GP(x)
+           |  }
+           |}
+           |
+           |TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |  fn p0() -> () {
+           |    gp()
+           |  }
+           |}
+           |
+           |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |  fn p1() -> () {
+           |    gp()
+           |  }
+           |}
+           |""".stripMargin
+
+      val contract = Compiler.compileContract(code).rightValue
+      contract.methodsLength is 4
+    }
+  }
 }

@@ -362,4 +362,25 @@ class ParserSpec extends AlephiumSpec {
       )
     }
   }
+
+  it should "parse contract inheritance" in {
+    val code =
+      s"""
+         |TxContract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
+         |  fn foo() -> () {
+         |  }
+         |}
+         |""".stripMargin
+
+    fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+      TypeId("Child"),
+      Seq(Argument(Ident("x"), Type.U256, false), Argument(Ident("y"), Type.U256, false)),
+      Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
+      Seq.empty,
+      List(
+        ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
+        ContractInheritance(TypeId("Parent1"), Seq(Ident("x")))
+      )
+    )
+  }
 }
