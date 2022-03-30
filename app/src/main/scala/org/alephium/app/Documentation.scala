@@ -70,9 +70,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     minerAction,
     minerListAddresses,
     minerUpdateAddresses,
-    getContractEventsForBlock,
-    getContractEventsWithinBlocks,
-    getContractEventsWithinTimeInterval,
+    getContractEvents,
     getTxScriptEvents
   )
 

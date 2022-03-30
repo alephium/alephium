@@ -327,13 +327,19 @@ object ServerFixture {
     }
 
     override def getEvents(
-        blockHash: BlockHash,
-        eventKey: Hash
+        chainIndex: ChainIndex,
+        eventKey: Hash,
+        start: Int,
+        endOpt: Option[Int]
     ): IOResult[Option[LogStates]] = {
       lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
       lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
       lazy val txId = Hash
         .from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"))
+        .get
+      // FIXME: tests are feeding block here, but it is hardcoded here
+      lazy val blockHash = BlockHash
+        .from(Hex.unsafe("bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"))
         .get
 
       Right(

@@ -354,87 +354,18 @@ class ServerUtils(implicit
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
-  def getEventsForBlock(
+  def getEvents(
       blockFlow: BlockFlow,
-      blockHash: BlockHash,
+      start: Int,
+      endOpt: Option[Int],
+      groupIndex: GroupIndex,
       eventKey: Hash
   ): Try[Events] = {
-    val chainIndex = ChainIndex.from(blockHash)
-    if (chainIndex.isIntraGroup) {
-      wrapResult(blockFlow.getEvents(blockHash, eventKey)).map {
-        case Some(logs) => Events.from(chainIndex, logs)
-        case None       => Events.empty(chainIndex)
-      }
-    } else {
-      Right(Events.empty(chainIndex))
+    val chainIndex = ChainIndex(groupIndex, groupIndex)
+    wrapResult(blockFlow.getEvents(chainIndex, eventKey, start, endOpt)).map {
+      case Some(logs) => Events.from(chainIndex, logs)
+      case None       => Events.empty(chainIndex)
     }
-  }
-
-  def getContractEventsWithinBlocks(
-      blockFlow: BlockFlow,
-      fromBlock: BlockHash,
-      toBlockOpt: Option[BlockHash],
-      contractId: ContractId
-  ): Try[AVector[Events]] = {
-    for {
-      timeInterval <- timeIntervalFromBlockRange(blockFlow, fromBlock, toBlockOpt)
-      events       <- getContractEventsWithinTimeInterval(blockFlow, timeInterval, contractId)
-    } yield events
-  }
-
-  private def timeIntervalFromBlockRange(
-      blockFlow: BlockFlow,
-      fromBlock: BlockHash,
-      toBlockOpt: Option[BlockHash]
-  ): Try[TimeInterval] = {
-    for {
-      fromTimestamp <- wrapResult(blockFlow.getBlockHeader(fromBlock)).map(_.timestamp)
-      timeInterval <- toBlockOpt match {
-        case Some(toBlock) =>
-          for {
-            toTimestamp <- wrapResult(blockFlow.getBlockHeader(toBlock)).map(_.timestamp)
-            timeInterval <- validateTimeInterval(
-              TimeInterval(fromTimestamp, toTimestamp),
-              "`fromBlock` must be before `toBlock`"
-            )
-          } yield timeInterval
-        case None =>
-          validateTimeInterval(
-            TimeInterval(fromTimestamp, None),
-            "Timestamp for `fromBlock` is in the future"
-          )
-      }
-    } yield timeInterval
-  }
-
-  private def validateTimeInterval(
-      timeInterval: TimeInterval,
-      errorMsg: String
-  ): Try[TimeInterval] = {
-    if (timeInterval.from >= timeInterval.to) {
-      Left(badRequest(errorMsg))
-    } else {
-      Right(timeInterval)
-    }
-  }
-
-  def getContractEventsWithinTimeInterval(
-      blockFlow: BlockFlow,
-      timeInterval: TimeInterval,
-      contractId: ContractId
-  ): Try[AVector[Events]] = {
-    for {
-      heightedBlocks <- wrapResult(
-        blockFlow.getHeightedIntraBlocks(timeInterval.from, timeInterval.to)
-      )
-      events <- heightedBlocks.mapE { case (chainIndex, heightedBlocksPerChain) =>
-        heightedBlocksPerChain.foldE(Events.empty(chainIndex)) { case (eventsSoFar, (block, _)) =>
-          getEventsForBlock(blockFlow, block.hash, contractId).map { eventsForBlock =>
-            eventsSoFar.copy(events = eventsSoFar.events ++ eventsForBlock.events)
-          }
-        }
-      }
-    } yield events
   }
 
   def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =

@@ -427,37 +427,20 @@ trait Endpoints
       .in("check-hash-indexing")
       .summary("Check and repair the indexing of block hashes")
 
-  val getContractEventsForBlock: BaseEndpoint[(BlockHash, Address.Contract), Events] =
+  val getContractEvents
+      : BaseEndpoint[(Option[Int], Option[Int], Address.Contract, GroupIndex), Events] =
     contractEventsEndpoint.get
-      .in("in-block")
-      .in(query[BlockHash]("block"))
+      .in(query[Option[Int]]("start"))
+      .in(query[Option[Int]]("end"))
       .in(query[Address.Contract]("contractAddress"))
+      .in(query[GroupIndex]("group"))
       .out(jsonBody[Events])
-      .summary("Get events for a contract within a block")
+      .summary("Get events for a contract within a range of counters")
 
-  val getContractEventsWithinBlocks
-      : BaseEndpoint[(BlockHash, Option[BlockHash], Address.Contract), AVector[Events]] =
-    contractEventsEndpoint.get
-      .in("within-blocks")
-      .in(query[BlockHash]("fromBlock"))
-      .in(query[Option[BlockHash]]("toBlock"))
-      .in(query[Address.Contract]("contractAddress"))
-      .out(jsonBody[AVector[Events]])
-      .summary("Get events for a contract within a range of blocks")
-
-  val getContractEventsWithinTimeInterval
-      : BaseEndpoint[(TimeInterval, Address.Contract), AVector[Events]] =
-    contractEventsEndpoint.get
-      .in("within-time-interval")
-      .in(timeIntervalQuery)
-      .in(query[Address.Contract]("contractAddress"))
-      .out(jsonBody[AVector[Events]])
-      .summary("Get events for a contract within a time interval")
-
-  val getTxScriptEvents: BaseEndpoint[(BlockHash, Hash), Events] =
+  val getTxScriptEvents: BaseEndpoint[(Hash, GroupIndex), Events] =
     txScriptEventsEndpoint.get
-      .in(query[BlockHash]("block"))
       .in(query[Hash]("txId"))
+      .in(query[GroupIndex]("group"))
       .out(jsonBody[Events])
       .summary("Get events for a TxScript")
 }

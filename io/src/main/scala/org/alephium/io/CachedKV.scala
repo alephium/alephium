@@ -27,7 +27,7 @@ abstract class CachedKV[K, V, C >: Modified[V] <: Cache[V]] extends MutableKV[K,
 
   def get(key: K): IOResult[V] = {
     getOpt(key).flatMap {
-      case None        => Left(IOError.keyNotFound(key, "CachedTrie.get"))
+      case None        => Left(IOError.keyNotFound(key, "CachedKV.get"))
       case Some(value) => Right(value)
     }
   }

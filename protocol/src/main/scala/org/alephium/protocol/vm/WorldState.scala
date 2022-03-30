@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import scala.collection.mutable
+
 import akka.util.ByteString
 
 import org.alephium.io._
@@ -346,6 +348,7 @@ object WorldState {
     def codeState: MutableKV[Hash, CodeRecord, Unit]
     def logState: MutableKV[LogStatesId, LogStates, Unit]
     def logCounterState: MutableKV[Hash, Int, Unit]
+    val initialLogCounterCache: mutable.Map[Hash, Int] = mutable.Map.empty
 
     def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Unit] = {
       outputState.put(outputRef, output)
@@ -417,9 +420,8 @@ object WorldState {
       (blockHashOpt, getIndex(fields)) match {
         case (Some(blockHash), Some(index)) =>
           if (logConfig.logContractEnabled(Address.contract(contractId))) {
-            val id    = LogStatesId(blockHash, contractId)
             val state = LogState(txId, index, fields.tail)
-            writeLog(id, state)
+            writeLog(blockHash, contractId, state)
           } else {
             Right(())
           }
@@ -434,26 +436,49 @@ object WorldState {
     ): IOResult[Unit] = {
       (blockHashOpt, getIndex(fields)) match {
         case (Some(blockHash), Some(index)) =>
-          val id    = LogStatesId(blockHash, txId)
           val state = LogState(txId, index, fields.tail)
-          writeLog(id, state)
+          writeLog(blockHash, txId, state)
         case _ => Right(())
       }
     }
 
     private[WorldState] def writeLog(
-        id: LogStatesId,
+        blockHash: BlockHash,
+        eventKey: Hash,
         state: LogState
     ): IOResult[Unit] = {
-      for {
-        logStatesOpt <- logState.getOpt(id)
-        _ <- logStatesOpt match {
-          case Some(logStates) =>
-            logState.put(id, logStates.copy(states = logStates.states :+ state))
-          case None =>
-            logState.put(id, LogStates(id.blockHash, id.eventKey, AVector(state)))
-        }
-      } yield ()
+      getInitialLogCounter(eventKey).flatMap { counter =>
+        val id = LogStatesId(eventKey, counter)
+        for {
+          logCounter   <- logCounterState.get(eventKey)
+          logStatesOpt <- logState.getOpt(id)
+          _ <- logStatesOpt match {
+            case Some(logStates) =>
+              logState.put(id, logStates.copy(states = logStates.states :+ state))
+            case None =>
+              logState.put(id, LogStates(blockHash, eventKey, AVector(state)))
+          }
+          _ <- logCounterState.put(eventKey, logCounter + 1)
+        } yield ()
+      }
+    }
+
+    def getInitialLogCounter(eventKey: Hash): IOResult[Int] = {
+      (initialLogCounterCache.get(eventKey): @unchecked) match {
+        case None =>
+          logCounterState.getOpt(eventKey).flatMap { counterOpt =>
+            counterOpt match {
+              case Some(counter) =>
+                initialLogCounterCache.put(eventKey, counter)
+                Right(counter)
+              case None =>
+                initialLogCounterCache.put(eventKey, 0)
+                logCounterState.put(eventKey, 0).map(_ => 0)
+            }
+          }
+        case Some(value) =>
+          Right(value)
+      }
     }
 
     private[WorldState] def getIndex(
@@ -511,6 +536,7 @@ object WorldState {
       contractState.commit()
       codeState.commit()
       logState.commit()
+      logCounterState.commit()
     }
 
     def rollback(): Unit = {
@@ -518,6 +544,7 @@ object WorldState {
       contractState.rollback()
       codeState.rollback()
       logState.rollback()
+      logCounterState.rollback()
     }
 
     def persist(): IOResult[Persisted] = ??? // should not be called

@@ -17,15 +17,22 @@
 package org.alephium.flow.core
 
 import org.alephium.io.IOResult
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.protocol.vm.LogStates
 import org.alephium.protocol.vm.LogStatesId
 
 trait LogUtils { Self: FlowUtils =>
-  def getEvents(blockHash: BlockHash, eventKey: Hash): IOResult[Option[LogStates]] = {
-    val chainIndex  = ChainIndex.from(blockHash)
-    val logStatesId = LogStatesId(blockHash, eventKey)
+
+  def getEvents(
+      chainIndex: ChainIndex,
+      eventKey: Hash,
+      start: Int,
+      endOpt: Option[Int]
+  ): IOResult[Option[LogStates]] = {
+    logger.info(s"$endOpt")
+
+    val logStatesId = LogStatesId(eventKey, start)
 
     for {
       worldState   <- blockFlow.getBestPersistedWorldState(chainIndex.from)

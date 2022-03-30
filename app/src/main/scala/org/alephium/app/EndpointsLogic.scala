@@ -572,33 +572,23 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
-  val getContractEventsForBlockLogic = serverLogic(getContractEventsForBlock) {
-    case (blockHash, contractAddress) =>
+  val getContractEventsLogic = serverLogic(getContractEvents) {
+    case (startOpt, endOpt, contractAddress, groupIndex) =>
       Future.successful {
         val contractId = contractAddress.lockupScript.contractId
-        serverUtils.getEventsForBlock(blockFlow, blockHash, contractId)
+        serverUtils.getEvents(
+          blockFlow,
+          startOpt.getOrElse(0),
+          endOpt,
+          groupIndex,
+          contractId
+        )
       }
   }
 
-  val getContractEventsWithinBlocksLogic = serverLogic(getContractEventsWithinBlocks) {
-    case (fromBlock, toBlockOpt, contractAddress) =>
-      Future.successful {
-        val contractId = contractAddress.lockupScript.contractId
-        serverUtils.getContractEventsWithinBlocks(blockFlow, fromBlock, toBlockOpt, contractId)
-      }
-  }
-
-  val getContractEventsWithinTimeIntervalLogic = serverLogic(getContractEventsWithinTimeInterval) {
-    case (timeInterval, contractAddress) =>
-      Future.successful {
-        val contractId = contractAddress.lockupScript.contractId
-        serverUtils.getContractEventsWithinTimeInterval(blockFlow, timeInterval, contractId)
-      }
-  }
-
-  val getTxScriptEventsLogic = serverLogic(getTxScriptEvents) { case (blockHash, txId) =>
+  val getTxScriptEventsLogic = serverLogic(getTxScriptEvents) { case (txId, groupIndex) =>
     Future.successful {
-      serverUtils.getEventsForBlock(blockFlow, blockHash, txId)
+      serverUtils.getEvents(blockFlow, 0, None, groupIndex, txId)
     }
   }
 
