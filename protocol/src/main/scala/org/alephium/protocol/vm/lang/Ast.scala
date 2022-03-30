@@ -841,7 +841,7 @@ object Ast {
       val parentsCache = buildDependencies()
       val newContracts: Seq[ContractWithState] = contracts.map {
         case contract: TxContract =>
-          val parents = parentsCache(contract.ident)
+          val parents = parentsCache(contract.ident).sortBy(_.ident.name)
           val funcs   = contract.funcs ++ parents.flatMap(_.funcs)
           val events  = contract.events ++ parents.flatMap(_.events)
           TxContract(contract.ident, contract.fields, funcs, events, contract.inheritances)
