@@ -150,7 +150,7 @@ abstract class Frame[Ctx <: StatelessContext] {
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
-  ): ExeResult[Unit]
+  ): ExeResult[ContractId]
 
   def destroyContract(address: LockupScript): ExeResult[Unit]
 
@@ -219,7 +219,7 @@ final class StatelessFrame(
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
-  ): ExeResult[Unit]                                          = StatelessFrame.notAllowed
+  ): ExeResult[ContractId]                                    = StatelessFrame.notAllowed
   def destroyContract(address: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
   def migrateContract(
       newContractCode: StatefulContract,
@@ -280,7 +280,7 @@ final class StatefulFrame(
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
-  ): ExeResult[Unit] = {
+  ): ExeResult[ContractId] = {
     for {
       balanceState      <- getBalanceState()
       balances          <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
@@ -292,7 +292,7 @@ final class StatefulFrame(
           Val.Address(LockupScript.p2c(createdContractId))
         )
       )
-    } yield ()
+    } yield createdContractId
   }
 
   def destroyContract(address: LockupScript): ExeResult[Unit] = {

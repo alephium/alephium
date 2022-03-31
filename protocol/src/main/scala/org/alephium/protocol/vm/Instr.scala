@@ -1253,22 +1253,40 @@ sealed trait CreateContractAbstract extends ContractInstr {
   ): ExeResult[Option[Val.U256]] = {
     if (issueToken) frame.popOpStackU256().map(Some(_)) else Right(None)
   }
+
+  def prepareContractCode[C <: StatefulContext](
+      frame: Frame[C]
+  ): ExeResult[StatefulContract.HalfDecoded]
+
+  def __runWith[C <: StatefulContext](frame: Frame[C], issueToken: Boolean): ExeResult[Unit] = {
+    for {
+      tokenAmount   <- getTokenAmount(frame, issueToken)
+      fields        <- frame.popFields()
+      _             <- frame.ctx.chargeFieldSize(fields.toIterable)
+      contractCode  <- prepareContractCode(frame)
+      newContractId <- frame.createContract(contractCode, fields, tokenAmount)
+      _ <-
+        if (frame.ctx.getHardFork() >= HardFork.Leman) {
+          frame.pushOpStack(Val.ByteVec(newContractId.bytes))
+        } else {
+          okay
+        }
+    } yield ()
+  }
 }
 
 sealed trait CreateContractBase extends CreateContractAbstract with GasCreate {
-  def __runWith[C <: StatefulContext](frame: Frame[C], issueToken: Boolean): ExeResult[Unit] = {
+  def prepareContractCode[C <: StatefulContext](
+      frame: Frame[C]
+  ): ExeResult[StatefulContract.HalfDecoded] = {
     for {
-      tokenAmount     <- getTokenAmount(frame, issueToken)
-      fields          <- frame.popFields()
-      _               <- frame.ctx.chargeFieldSize(fields.toIterable)
       contractCodeRaw <- frame.popOpStackByteVec()
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
       _ <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
       _ <- StatefulContract.check(contractCode)
-      _ <- frame.createContract(contractCode.toHalfDecoded(), fields, tokenAmount)
-    } yield ()
+    } yield contractCode.toHalfDecoded()
   }
 }
 
@@ -1285,15 +1303,13 @@ object CreateContractWithToken extends CreateContractBase {
 }
 
 sealed trait CopyCreateContractBase extends CreateContractAbstract with GasCopyCreate {
-  def __runWith[C <: StatefulContext](frame: Frame[C], issueToken: Boolean): ExeResult[Unit] = {
+  def prepareContractCode[C <: StatefulContext](
+      frame: Frame[C]
+  ): ExeResult[StatefulContract.HalfDecoded] = {
     for {
-      tokenAmount <- getTokenAmount(frame, issueToken)
-      fields      <- frame.popFields()
-      _           <- frame.ctx.chargeFieldSize(fields.toIterable)
       contractId  <- frame.popContractId()
       contractObj <- frame.ctx.loadContractObj(contractId)
-      _           <- frame.createContract(contractObj.code, fields, tokenAmount)
-    } yield ()
+    } yield contractObj.code
   }
 }
 

@@ -1941,6 +1941,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           .value + fields.length + contractBytes.length + 200 //TODO where those 200 come from?
       )
       //TODO Test the updated contract, like code, state, and assets
+      frame.opStack.size is 1
+      frame.opStack.pop() isE a[Val.ByteVec] // the new contract id
     }
   }
 

@@ -205,7 +205,7 @@ class VMSpec extends AlephiumSpec {
       contractOutputRef
     }
 
-    def callTxScript(input: String): Unit = {
+    def callTxScript(input: String): Block = {
       val script = Compiler.compileTxScript(input).rightValue
       val block =
         if (script.entryMethod.isPayable) {
@@ -214,6 +214,7 @@ class VMSpec extends AlephiumSpec {
           simpleScript(blockFlow, chainIndex, script)
         }
       addAndCheck(blockFlow, block)
+      block
     }
 
     def callTxScriptMulti(input: Int => String): Block = {
@@ -1562,6 +1563,45 @@ class VMSpec extends AlephiumSpec {
       worldState   <- blockFlow.getBestPersistedWorldState(groupIndex)
       logStatesOpt <- worldState.logState.getOpt(logStatesId)
     } yield logStatesOpt).rightValue
+  }
+
+  it should "return contract id in contract creation" in new ContractFixture {
+    val contract: String =
+      s"""
+         |TxContract Foo(mut subContractId: ByteVec) {
+         |  event Create(subContractId: ByteVec)
+         |  pub payable fn foo() -> () {
+         |    approveAlph!(txCaller!(0), ${ALPH.nanoAlph(1000).v})
+         |    subContractId = copyCreateContract!(selfContractId!(), #010300)
+         |    emit Create(subContractId)
+         |  }
+         |}
+         |""".stripMargin
+    val contractId =
+      createContractAndCheckState(contract, 2, 2, AVector(Val.ByteVec(ByteString.empty))).key
+
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    approveAlph!(txCaller!(0), ${ALPH.alph(1).v})
+         |    Foo(#${contractId.toHexString}).foo()
+         |  }
+         |}
+         |
+         |$contract
+         |""".stripMargin
+    val block = callTxScript(main)
+
+    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, block.hash, contractId)
+    val logStates    = logStatesOpt.value
+    logStates.states.length is 2 // one system event, another one emitted event
+    val subContractId = logStates.states(1).fields.head.asInstanceOf[Val.ByteVec].bytes
+
+    val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+    worldState.getContractState(contractId).rightValue.fields is AVector[Val](
+      Val.ByteVec(subContractId)
+    )
   }
 }
 // scalastyle:on file.size.limit no.equal regex

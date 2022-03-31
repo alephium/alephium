@@ -429,7 +429,7 @@ object BuiltIn {
     SimpleStatefulBuiltIn(
       "createContract",
       Seq[Type](Type.ByteVec, Type.ByteVec),
-      Seq.empty,
+      Seq[Type](Type.ByteVec),
       CreateContract
     )
 
@@ -437,7 +437,7 @@ object BuiltIn {
     SimpleStatefulBuiltIn(
       "createContractWithToken",
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
-      Seq.empty,
+      Seq[Type](Type.ByteVec),
       CreateContractWithToken
     )
 
@@ -445,7 +445,7 @@ object BuiltIn {
     SimpleStatefulBuiltIn(
       "copyCreateContract",
       Seq[Type](Type.ByteVec, Type.ByteVec),
-      Seq.empty,
+      Seq[Type](Type.ByteVec),
       CopyCreateContract
     )
 
@@ -453,7 +453,7 @@ object BuiltIn {
     SimpleStatefulBuiltIn(
       "copyCreateContractWithToken",
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
-      Seq.empty,
+      Seq[Type](Type.ByteVec),
       CopyCreateContractWithToken
     )
 
