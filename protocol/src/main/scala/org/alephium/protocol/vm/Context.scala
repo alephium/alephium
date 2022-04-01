@@ -195,7 +195,10 @@ trait StatefulContext extends StatelessContext with ContractPool {
           .map(_ => discard(generatedOutputs.addOne(contractOutput)))
           .left
           .map(e => Left(IOErrorUpdateState(e)))
-    } yield contractId
+    } yield {
+      blockContractLoad(contractId)
+      contractId
+    }
   }
 
   def destroyContract(

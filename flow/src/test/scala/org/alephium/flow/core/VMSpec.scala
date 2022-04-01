@@ -1603,5 +1603,37 @@ class VMSpec extends AlephiumSpec {
       Val.ByteVec(subContractId)
     )
   }
+
+  it should "not load contract just after creation" in new ContractFixture {
+    val contract: String =
+      s"""
+         |TxContract Foo(mut subContractId: ByteVec) {
+         |  pub payable fn foo() -> () {
+         |    approveAlph!(txCaller!(0), ${ALPH.nanoAlph(1000).v})
+         |    subContractId = copyCreateContract!(selfContractId!(), #010300)
+         |    let subContract = Foo(subContractId)
+         |    subContract.foo()
+         |  }
+         |}
+         |""".stripMargin
+    val contractId =
+      createContractAndCheckState(contract, 2, 2, AVector(Val.ByteVec(ByteString.empty))).key
+
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    approveAlph!(txCaller!(0), ${ALPH.alph(1).v})
+         |    Foo(#${contractId.toHexString}).foo()
+         |  }
+         |}
+         |
+         |$contract
+         |""".stripMargin
+    val script = Compiler.compileTxScript(main).rightValue
+    val errorMessage =
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+    errorMessage.contains(s"Right(TxScriptExeFailed(ContractLoadDisallowed") is true
+  }
 }
 // scalastyle:on file.size.limit no.equal regex

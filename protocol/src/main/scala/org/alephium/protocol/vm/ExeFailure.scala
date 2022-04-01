@@ -86,6 +86,7 @@ case object ExpectAContract                                    extends ExeFailur
 case object OutOfGas                                           extends ExeFailure
 case object ContractPoolOverflow                               extends ExeFailure
 case object ContractFieldOverflow                              extends ExeFailure
+final case class ContractLoadDisallowed(id: ContractId)        extends ExeFailure
 case object ContractAssetAlreadyInUsing                        extends ExeFailure
 case object ContractAssetAlreadyFlushed                        extends ExeFailure
 case object ContractAssetUnloaded                              extends ExeFailure
