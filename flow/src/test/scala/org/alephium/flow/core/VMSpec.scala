@@ -1635,5 +1635,46 @@ class VMSpec extends AlephiumSpec {
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
     errorMessage.contains(s"Right(TxScriptExeFailed(ContractLoadDisallowed") is true
   }
+
+  it should "not call contract destruction from the same contract" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  pub payable fn foo(barId: ByteVec) -> () {
+         |    let bar = Bar(barId)
+         |    bar.bar(selfContractId!())
+         |  }
+         |  pub payable fn xx() -> () {
+         |    destroySelf!(txCaller!(0))
+         |  }
+         |}
+         |""".stripMargin
+    val bar: String =
+      s"""
+         |TxContract Bar() {
+         |  pub payable fn bar(fooId: ByteVec) -> () {
+         |    let foo = Foo(fooId)
+         |    foo.xx()
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(s"$foo\n$bar", AVector.empty).key
+    val barId = createContract(s"$bar\n$foo", AVector.empty).key
+
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    Foo(#${fooId.toHexString}).foo(#${barId.toHexString})
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    val script = Compiler.compileTxScript(main).rightValue
+    val errorMessage =
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+    errorMessage.contains(s"Left(org.alephium.io.IOError") is true
+  }
 }
 // scalastyle:on file.size.limit no.equal regex
