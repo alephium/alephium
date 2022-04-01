@@ -27,8 +27,8 @@ trait ExeFailure extends Product {
   def name: String = productPrefix
 }
 
-final case object CodeSizeTooLarge                             extends ExeFailure
-final case object FieldsSizeTooLarge                           extends ExeFailure
+case object CodeSizeTooLarge                                   extends ExeFailure
+case object FieldsSizeTooLarge                                 extends ExeFailure
 case object ExpectStatefulFrame                                extends ExeFailure
 case object InvalidFinalState                                  extends ExeFailure
 case object StackOverflow                                      extends ExeFailure
@@ -110,5 +110,5 @@ final case class IOErrorUpdateState(error: IOError)     extends IOFailure
 final case class IOErrorRemoveContract(error: IOError)  extends IOFailure
 final case class IOErrorLoadContract(error: IOError)    extends IOFailure
 final case class IOErrorLoadOutputs(error: IOError)     extends IOFailure
-final case class IOERrorMigrateContract(error: IOError) extends IOFailure
+final case class IOErrorMigrateContract(error: IOError) extends IOFailure
 final case class IOErrorWriteLog(error: IOError)        extends IOFailure

@@ -233,7 +233,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       _ <- worldState
         .migrateContractUnsafe(contractId, newContractCode, newFields)
         .left
-        .map(e => Left(IOERrorMigrateContract(e)))
+        .map(e => Left(IOErrorMigrateContract(e)))
     } yield {
       removeContractFromCache(contractId)
     }
