@@ -65,11 +65,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   trait LemanForkFixture extends AllInstrsFixture {
     // format: off
     val lemanStatelessInstrs = AVector(
-      /* Below are instructions for Leman hard fork */
-      ByteVecSlice,
+      ByteVecSlice, ByteVecToAddress,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
-      ByteVecToAddress, EthEcRecover
+      EthEcRecover
     )
     val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithState)
     // format: on
@@ -2104,10 +2103,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 54, Keccak256 -> 54, Sha256 -> 54, Sha3 -> 54, VerifyTxSignature -> 2000, VerifySecP256K1 -> 2000, VerifyED25519 -> 2000,
       NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxCaller -> 3, TxCallerSize -> 3,
       VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
-      Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200, ByteVecSlice -> 1,
+      Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200,
+      /* Below are instructions for Leman hard fork */
+      ByteVecSlice -> 1, ByteVecToAddress -> 5,
       U256To1Byte -> 1, U256To2Byte -> 1, U256To4Byte -> 1, U256To8Byte -> 1, U256To16Byte -> 2, U256To32Byte -> 4,
       U256From1Byte -> 1, U256From2Byte -> 1, U256From4Byte -> 1, U256From8Byte -> 1, U256From16Byte -> 2, U256From32Byte -> 4,
-      ByteVecToAddress -> 5, EthEcRecover -> 2500
+      EthEcRecover -> 2500
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -2115,6 +2116,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       TransferAlph -> 30, TransferAlphFromSelf -> 30, TransferAlphToSelf -> 30, TransferToken -> 30, TransferTokenFromSelf -> 30, TransferTokenToSelf -> 30,
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
       CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5,
+      /* Below are instructions for Leman hard fork */
       MigrateSimple -> 32000, MigrateWithState -> 32000
     )
     // format: on
@@ -2203,10 +2205,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 78, Keccak256 -> 79, Sha256 -> 80, Sha3 -> 81, VerifyTxSignature -> 82, VerifySecP256K1 -> 83, VerifyED25519 -> 84,
       NetworkId -> 85, BlockTimeStamp -> 86, BlockTarget -> 87, TxId -> 88, TxCaller -> 89, TxCallerSize -> 90,
       VerifyAbsoluteLocktime -> 91, VerifyRelativeLocktime -> 92,
-      Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97, ByteVecSlice -> 98,
-      U256To1Byte -> 99, U256To2Byte -> 100, U256To4Byte -> 101, U256To8Byte -> 102, U256To16Byte -> 103, U256To32Byte -> 104,
-      U256From1Byte -> 105, U256From2Byte -> 106, U256From4Byte -> 107, U256From8Byte -> 108, U256From16Byte -> 109, U256From32Byte -> 110,
-      ByteVecToAddress -> 111, EthEcRecover -> 112,
+      Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97,
+      /* Below are instructions for Leman hard fork */
+      ByteVecSlice -> 98, ByteVecToAddress -> 99,
+      U256To1Byte -> 100, U256To2Byte -> 101, U256To4Byte -> 102, U256To8Byte -> 103, U256To16Byte -> 104, U256To32Byte -> 105,
+      U256From1Byte -> 106, U256From2Byte -> 107, U256From4Byte -> 108, U256From8Byte -> 109, U256From16Byte -> 110, U256From32Byte -> 111,
+      EthEcRecover -> 112,
 
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -2251,10 +2255,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       VerifyAbsoluteLocktime, VerifyRelativeLocktime,
       Log1, Log2, Log3, Log4, Log5,
       /* Below are instructions for Leman hard fork */
-      ByteVecSlice,
+      ByteVecSlice, ByteVecToAddress,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
-      ByteVecToAddress, EthEcRecover
+      EthEcRecover
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
