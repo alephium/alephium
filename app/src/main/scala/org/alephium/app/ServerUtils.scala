@@ -16,6 +16,7 @@
 
 package org.alephium.app
 
+import scala.annotation.tailrec
 import scala.concurrent._
 
 import akka.util.Timeout
@@ -141,14 +142,17 @@ class ServerUtils(implicit
   def getGroup(blockFlow: BlockFlow, query: GetGroup): Try[Group] = query match {
     case GetGroup(assetAddress: Address.Asset) =>
       Right(Group(assetAddress.groupIndex(brokerConfig).value))
-    case GetGroup(Address.Contract(LockupScript.P2C(contractId))) => {
-      val failure: Try[Group] = Left(failed("Group not found.")).withRight[Group]
-      brokerConfig.groupRange.foldLeft(failure) { case (prevResult, currentGroup: Int) =>
-        prevResult match {
-          case Right(prevResult) => Right(prevResult)
-          case Left(_) =>
-            getContractGroup(blockFlow, contractId, GroupIndex.unsafe(currentGroup))
-        }
+    case GetGroup(Address.Contract(LockupScript.P2C(contractId))) =>
+      getGroupForContract(blockFlow, contractId)
+  }
+
+  def getGroupForContract(blockFlow: BlockFlow, contractId: ContractId): Try[Group] = {
+    val failure: Try[Group] = Left(failed("Group not found.")).withRight[Group]
+    brokerConfig.groupRange.foldLeft(failure) { case (prevResult, currentGroup: Int) =>
+      prevResult match {
+        case Right(prevResult) => Right(prevResult)
+        case Left(_) =>
+          getContractGroup(blockFlow, contractId, GroupIndex.unsafe(currentGroup))
       }
     }
   }
@@ -354,18 +358,39 @@ class ServerUtils(implicit
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
-  def getEvents(
+  def getEventsForContract(
       blockFlow: BlockFlow,
       start: Int,
       endOpt: Option[Int],
-      groupIndex: GroupIndex,
-      eventKey: Hash
+      contractId: Hash
   ): Try[Events] = {
-    val chainIndex = ChainIndex(groupIndex, groupIndex)
-    wrapResult(blockFlow.getEvents(chainIndex, eventKey, start, endOpt)).map {
-      case Some(logs) => Events.from(chainIndex, logs)
-      case None       => Events.empty(chainIndex)
-    }
+    for {
+      group <- getGroupForContract(blockFlow, contractId)
+      groupIndex = new GroupIndex(group.group)
+      chainIndex = ChainIndex(groupIndex, groupIndex)
+      result <- getEvents(blockFlow, start, endOpt, chainIndex, contractId)
+    } yield result
+  }
+
+  def getEventsForTxScript(
+      blockFlow: BlockFlow,
+      start: Int,
+      endOpt: Option[Int],
+      txId: Hash
+  ): Try[Events] = {
+    for {
+      chainIndex <- searchLocalTransactionStatus(blockFlow, txId, brokerConfig.chainIndexes) match {
+        case Right(Confirmed(blockHash, _, _, _, _)) =>
+          Right(ChainIndex.from(blockHash))
+        case Right(TxNotFound) =>
+          Left(notFound(s"Transaction $txId not found"))
+        case Right(MemPooled) =>
+          Left(notFound(s"Transaction $txId in mempool"))
+        case Left(error) =>
+          Left(error)
+      }
+      result <- getEvents(blockFlow, start, endOpt, chainIndex, txId)
+    } yield result
   }
 
   def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =
@@ -425,6 +450,44 @@ class ServerUtils(implicit
         .left
         .map(_ => failedInIO)
     } yield ChainInfo(maxHeight)
+
+  def searchLocalTransactionStatus(
+      blockFlow: BlockFlow,
+      txId: Hash,
+      chainIndexes: AVector[ChainIndex]
+  ): Try[TxStatus] = {
+    @tailrec
+    def rec(
+        indexes: AVector[ChainIndex],
+        currentRes: Try[TxStatus]
+    ): Try[TxStatus] = {
+      if (indexes.isEmpty) {
+        currentRes
+      } else {
+        val index = indexes.head
+        val res   = getTransactionStatus(blockFlow, txId, index)
+        res match {
+          case Right(TxNotFound) => rec(indexes.tail, res)
+          case Right(_)          => res
+          case Left(_)           => res
+        }
+      }
+    }
+    rec(chainIndexes, Right(TxNotFound))
+  }
+
+  private def getEvents(
+      blockFlow: BlockFlow,
+      start: Int,
+      endOpt: Option[Int],
+      chainIndex: ChainIndex,
+      eventKey: Hash
+  ): Try[Events] = {
+    wrapResult(blockFlow.getEvents(chainIndex, eventKey, start, endOpt)).map {
+      case Some(logs) => Events.from(chainIndex, logs)
+      case None       => Events.empty(chainIndex)
+    }
+  }
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
