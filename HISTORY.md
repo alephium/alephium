@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.3.2
+
+* Fix OpenAPI version
+
+## 1.3.1
+
+* Upgrade Rocksdb to support Apple M1
+
 ## 1.3.0
 
 ## API changes
