@@ -65,7 +65,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   trait LemanForkFixture extends AllInstrsFixture {
     // format: off
     val lemanStatelessInstrs = AVector(
-      ByteVecSlice, ByteVecToAddress,
+      ByteVecSlice, ByteVecToAddress, Encode,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
       EthEcRecover
@@ -958,6 +958,18 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       initialGas.subUnsafe(context.gasRemaining) is ByteVecSlice.gas(slice.length)
       stack.pop()
     }
+  }
+
+  it should "Encode" in new StatelessInstrFixture {
+    stack.push(Val.True)
+    stack.push(Val.U256(U256.One))
+    stack.push(Val.False)
+    stack.push(Val.U256(U256.MaxValue))
+    Encode.runWith(frame).leftValue isE InvalidLengthForEncodeInstr
+
+    stack.push(Val.U256(U256.unsafe(3)))
+    Encode.runWith(frame) isE ()
+    stack.pop() isE Val.ByteVec(Hex.unsafe("03000121010000"))
   }
 
   it should "ByteVecToAddress" in new StatelessInstrFixture {
@@ -2105,7 +2117,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
       Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200,
       /* Below are instructions for Leman hard fork */
-      ByteVecSlice -> 1, ByteVecToAddress -> 5,
+      ByteVecSlice -> 1, ByteVecToAddress -> 5, Encode -> 1,
       U256To1Byte -> 1, U256To2Byte -> 1, U256To4Byte -> 1, U256To8Byte -> 1, U256To16Byte -> 2, U256To32Byte -> 4,
       U256From1Byte -> 1, U256From2Byte -> 1, U256From4Byte -> 1, U256From8Byte -> 1, U256From16Byte -> 2, U256From32Byte -> 4,
       EthEcRecover -> 2500
@@ -2128,6 +2140,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         case i: ToByteVecInstr[_]     => testToByteVec(i, gas)
         case _: ByteVecConcat.type    => testByteVecConcatGas(gas)
         case _: ByteVecSlice.type     => testByteVecSliceGas(gas)
+        case _: Encode.type           => testEncode(gas)
         case i: U256ToBytesInstr      => testU256ToBytes(i, gas)
         case i: U256FromBytesInstr    => testU256FromBytes(i, gas)
         case i: ByteVecToAddress.type => i.gas(33).value is gas
@@ -2165,6 +2178,16 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val initialGas = frame.ctx.gasRemaining
       ByteVecSlice.runWith(frame) isE ()
       (initialGas.value - frame.ctx.gasRemaining.value) is (GasVeryLow.gas.value + 9 * gas)
+    }
+    def testEncode(gas: Int) = {
+      val frame = genStatefulFrame()
+      frame.pushOpStack(Val.True) isE ()
+      frame.pushOpStack(Val.False) isE ()
+      frame.pushOpStack(Val.U256(U256.Zero)) isE ()
+      frame.pushOpStack(Val.U256(U256.unsafe(3)))
+      val initialGas = frame.ctx.gasRemaining
+      Encode.runWith(frame) isE ()
+      (initialGas.value - frame.ctx.gasRemaining.value) is (GasVeryLow.gas.value + 7 * gas)
     }
     def testLog(instr: LogInstr, gas: Int) = instr match {
       case i: Log1.type => i.gas(1).value is gas
@@ -2207,10 +2230,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       VerifyAbsoluteLocktime -> 91, VerifyRelativeLocktime -> 92,
       Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97,
       /* Below are instructions for Leman hard fork */
-      ByteVecSlice -> 98, ByteVecToAddress -> 99,
-      U256To1Byte -> 100, U256To2Byte -> 101, U256To4Byte -> 102, U256To8Byte -> 103, U256To16Byte -> 104, U256To32Byte -> 105,
-      U256From1Byte -> 106, U256From2Byte -> 107, U256From4Byte -> 108, U256From8Byte -> 109, U256From16Byte -> 110, U256From32Byte -> 111,
-      EthEcRecover -> 112,
+      ByteVecSlice -> 98, ByteVecToAddress -> 99, Encode -> 100,
+      U256To1Byte -> 101, U256To2Byte -> 102, U256To4Byte -> 103, U256To8Byte -> 104, U256To16Byte -> 105, U256To32Byte -> 106,
+      U256From1Byte -> 107, U256From2Byte -> 108, U256From4Byte -> 109, U256From8Byte -> 110, U256From16Byte -> 111, U256From32Byte -> 112,
+      EthEcRecover -> 113,
 
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -2255,7 +2278,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       VerifyAbsoluteLocktime, VerifyRelativeLocktime,
       Log1, Log2, Log3, Log4, Log5,
       /* Below are instructions for Leman hard fork */
-      ByteVecSlice, ByteVecToAddress,
+      ByteVecSlice, ByteVecToAddress, Encode,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
       EthEcRecover

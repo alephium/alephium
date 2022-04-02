@@ -116,6 +116,8 @@ object GasBytesSlice {
     GasVeryLow.gas.addUnsafe(GasBox.unsafe(byteLength * gasPerByte))
 }
 
+trait GasEncode extends GasBytesSlice
+
 @Gas
 trait GasSignature extends GasSimple
 object GasSignature {

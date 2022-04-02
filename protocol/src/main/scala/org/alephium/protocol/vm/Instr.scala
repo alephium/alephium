@@ -25,7 +25,7 @@ import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
 import org.alephium.protocol.model.{AssetOutput, HardFork}
-import org.alephium.serde.{deserialize => decode, _}
+import org.alephium.serde.{deserialize => decode, serialize => encode, _}
 import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
 import org.alephium.util
 
@@ -127,7 +127,7 @@ object Instr {
     VerifyAbsoluteLocktime, VerifyRelativeLocktime,
     Log1, Log2, Log3, Log4, Log5,
     /* Below are instructions for Leman hard fork */
-    ByteVecSlice, ByteVecToAddress,
+    ByteVecSlice, ByteVecToAddress, Encode,
     U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
     U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
     EthEcRecover
@@ -810,6 +810,23 @@ case object ByteVecToAddress
 case object AddressEq        extends EqT[Val.Address] with AddressStackOps
 case object AddressNeq       extends NeT[Val.Address] with AddressStackOps
 case object AddressToByteVec extends ToByteVecInstr[Val.Address] with AddressStackOps
+
+case object Encode
+    extends StatelessInstr
+    with LemanInstr[StatelessContext]
+    with StatelessInstrCompanion0
+    with GasEncode {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      u256   <- frame.popOpStackU256()
+      n      <- u256.v.toInt.toRight(Right(InvalidLengthForEncodeInstr))
+      values <- frame.opStack.pop(n)
+      bytes = encode(values)
+      _ <- frame.ctx.chargeGasWithSize(this, bytes.length)
+      _ <- frame.pushOpStack(Val.ByteVec(bytes))
+    } yield ()
+  }
+}
 
 case object IsAssetAddress
     extends StatelessInstrSimpleGas
