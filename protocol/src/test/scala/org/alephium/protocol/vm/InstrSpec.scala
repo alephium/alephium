@@ -70,7 +70,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
       EthEcRecover
     )
-    val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithState)
+    val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithState, LoadContractFields)
     // format: on
 
     val networkConfig1 = new NetworkConfig {
@@ -969,7 +969,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(Val.U256(U256.unsafe(3)))
     Encode.runWith(frame) isE ()
-    stack.pop() isE Val.ByteVec(Hex.unsafe("03000121010000"))
+    stack.pop() isE Val.ByteVec(Hex.unsafe("03000102010000"))
   }
 
   it should "ByteVecToAddress" in new StatelessInstrFixture {
@@ -2129,7 +2129,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
       CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple -> 32000, MigrateWithState -> 32000
+      MigrateSimple -> 32000, MigrateWithState -> 32000, LoadContractFields -> 8
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -2137,16 +2137,17 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     def test(instr: Instr[_], gas: Int) = {
       instr match {
-        case i: ToByteVecInstr[_]     => testToByteVec(i, gas)
-        case _: ByteVecConcat.type    => testByteVecConcatGas(gas)
-        case _: ByteVecSlice.type     => testByteVecSliceGas(gas)
-        case _: Encode.type           => testEncode(gas)
-        case i: U256ToBytesInstr      => testU256ToBytes(i, gas)
-        case i: U256FromBytesInstr    => testU256FromBytes(i, gas)
-        case i: ByteVecToAddress.type => i.gas(33).value is gas
-        case i: LogInstr              => testLog(i, gas)
-        case i: GasSimple             => i.gas().value is gas
-        case i: GasFormula            => i.gas(32).value is gas
+        case i: ToByteVecInstr[_]       => testToByteVec(i, gas)
+        case _: ByteVecConcat.type      => testByteVecConcatGas(gas)
+        case _: ByteVecSlice.type       => testByteVecSliceGas(gas)
+        case _: Encode.type             => testEncode(gas)
+        case i: U256ToBytesInstr        => testU256ToBytes(i, gas)
+        case i: U256FromBytesInstr      => testU256FromBytes(i, gas)
+        case i: ByteVecToAddress.type   => i.gas(33).value is gas
+        case i: LogInstr                => testLog(i, gas)
+        case i: LoadContractFields.type => i.gas(3) is gas
+        case i: GasSimple               => i.gas().value is gas
+        case i: GasFormula              => i.gas(32).value is gas
       }
     }
     def testToByteVec(instr: ToByteVecInstr[_], gas: Int) = instr match {
@@ -2240,7 +2241,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       TransferAlph -> 167, TransferAlphFromSelf -> 168, TransferAlphToSelf -> 169, TransferToken -> 170, TransferTokenFromSelf -> 171, TransferTokenToSelf -> 172,
       CreateContract -> 173, CreateContractWithToken -> 174, CopyCreateContract -> 175, DestroySelf -> 176, SelfContractId -> 177, SelfAddress -> 178,
       CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185,
-      MigrateSimple -> 186, MigrateWithState -> 187
+      MigrateSimple -> 186, MigrateWithState -> 187, LoadContractFields -> 188
     )
     // format: on
 
@@ -2290,7 +2291,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
       CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple, MigrateWithState
+      MigrateSimple, MigrateWithState, LoadContractFields
     )
     // format: on
   }

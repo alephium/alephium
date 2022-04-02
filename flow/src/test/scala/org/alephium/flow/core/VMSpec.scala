@@ -1700,5 +1700,32 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     testSimpleScript(main)
   }
+
+  it should "load contract fields" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo(x: Bool, y: U256, z: Bool) {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, AVector(Val.True, Val.U256(U256.One), Val.False)).key
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let foo = Foo(#${fooId.toHexString})
+         |    let (x, y, z) = foo.loadFields!()
+         |    assert!(x == true)
+         |    assert!(y == 1)
+         |    assert!(z == false)
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    testSimpleScript(main)
+  }
 }
 // scalastyle:on file.size.limit no.equal regex

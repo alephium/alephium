@@ -692,9 +692,16 @@ object Ast {
     def fields: Seq[Argument]
     def funcs: Seq[FuncDef[Ctx]]
 
-    lazy val funcTable: Map[FuncId, Compiler.SimpleFunc[Ctx]] = {
-      val table = Compiler.SimpleFunc.from(funcs).map(f => f.id -> f).toMap
-      if (table.size != funcs.size) {
+    def builtInContractFuncs(): Seq[Compiler.ContractFunc[Ctx]]
+
+    lazy val funcTable: Map[FuncId, Compiler.ContractFunc[Ctx]] = {
+      val builtInFuncs = builtInContractFuncs()
+      var table = Compiler.SimpleFunc
+        .from(funcs)
+        .map(f => f.id -> f)
+        .toMap[FuncId, Compiler.ContractFunc[Ctx]]
+      builtInFuncs.foreach(func => table = table + (FuncId(func.name, isBuiltIn = true) -> func))
+      if (table.size != (funcs.size + builtInFuncs.length)) {
         val duplicates = UniqueDef.duplicates(funcs)
         throw Compiler.Error(s"These functions are defined multiple times: $duplicates")
       }
@@ -713,6 +720,8 @@ object Ast {
       extends Contract[StatelessContext] {
     val fields: Seq[Argument] = Seq.empty
 
+    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatelessContext]] = Seq.empty
+
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
       check(state)
       val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
@@ -727,6 +736,30 @@ object Ast {
 
     def fields: Seq[Argument]
     def events: Seq[EventDef]
+
+    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = Seq(loadFieldsFunc)
+    private val loadFieldsFunc: Compiler.ContractFunc[StatefulContext] =
+      new Compiler.ContractFunc[StatefulContext] {
+        def name: String      = "loadFields"
+        def isPublic: Boolean = true
+
+        lazy val returnType: Seq[Type] = fields.map(_.tpe)
+
+        def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+          if (inputType.isEmpty) {
+            returnType
+          } else {
+            throw Compiler.Error(s"Built-in function loadFields does not need any argument")
+          }
+        }
+
+        def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
+          throw Compiler.Error(s"Built-in function loadFields should be external call")
+        }
+
+        def genExternalCallCode(typeId: TypeId): Seq[Instr[StatefulContext]] =
+          Seq(LoadContractFields)
+      }
 
     def getFieldsSignature(): String
     def getFieldTypes(): Seq[String]

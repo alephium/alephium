@@ -154,6 +154,10 @@ object GasMigrate {
   val gas: GasBox = GasCreate.gas
 }
 
+trait GasLoadContractFields extends GasFormula {
+  def gas(size: Int): GasBox = GasBox.unsafe((size + 1) * GasBase.gas.value)
+}
+
 @Gas
 trait GasBalance extends GasSimple
 object GasBalance {
