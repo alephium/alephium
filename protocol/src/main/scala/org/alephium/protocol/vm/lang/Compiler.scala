@@ -106,6 +106,7 @@ object Compiler {
   trait FuncInfo[-Ctx <: StatelessContext] {
     def name: String
     def isPublic: Boolean
+    def isVariadic: Boolean = false
     def getReturnType(inputType: Seq[Type]): Seq[Type]
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]

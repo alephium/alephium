@@ -1676,5 +1676,29 @@ class VMSpec extends AlephiumSpec {
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
     errorMessage.contains(s"Left(org.alephium.io.IOError") is true
   }
+
+  it should "encode values" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    let bytes = encode!(true, 1, false)
+         |    assert!(bytes == #03000102010000)
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, AVector.empty).key
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    Foo(#${fooId.toHexString}).foo()
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    testSimpleScript(main)
+  }
 }
 // scalastyle:on file.size.limit no.equal regex

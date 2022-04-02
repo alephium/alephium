@@ -207,6 +207,16 @@ object BuiltIn {
       ByteVecSlice
     )
 
+  val encode: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
+    val name: String = "encode"
+
+    override def isVariadic: Boolean = true
+
+    def getReturnType(inputType: Seq[Type]): Seq[Type] = Seq(Type.ByteVec)
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(Encode)
+  }
+
   val u256To1Byte: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn(
       "u256To1Byte",
@@ -334,8 +344,9 @@ object BuiltIn {
     size,
     isAssetAddress,
     isContractAddress,
-    /* Below are instructions for Leman hard fork */
+    /* Below are functions for Leman hard fork */
     byteVecSlice,
+    encode,
     u256To1Byte,
     u256To2Byte,
     u256To4Byte,
