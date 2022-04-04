@@ -81,7 +81,7 @@ object Lexer {
       }
 
   def bytesInternal[_: P]: P[Val.ByteVec] =
-    P(CharsWhileIn("0-9a-zA-Z")).!.map { string =>
+    P(CharsWhileIn("0-9a-zA-Z", 0)).!.map { string =>
       Hex.from(string) match {
         case Some(bytes) => ByteVec(bytes)
         case None =>

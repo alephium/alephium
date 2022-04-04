@@ -491,6 +491,8 @@ class VMSpec extends AlephiumSpec {
          |    assert!(byteVec!(${i256}i) == #${encode(i256)})
          |    assert!(byteVec!(${u256}) == #${encode(u256)})
          |    assert!(byteVec!(@${address.toBase58}) == #${encode(address.lockupScript)})
+         |    assert!(# ++ #$bytes0 == #$bytes0)
+         |    assert!(#$bytes0 ++ # == #$bytes0)
          |    assert!((#${bytes0} ++ #${bytes1}) == #${bytes0 ++ bytes1})
          |    assert!(size!(byteVec!(true)) == 1)
          |    assert!(size!(byteVec!(false)) == 1)

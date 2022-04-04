@@ -16,13 +16,15 @@
 
 package org.alephium.protocol.vm.lang
 
+import akka.util.ByteString
+
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
 import org.alephium.protocol.vm.lang.ArithOperator._
 import org.alephium.protocol.vm.lang.LogicalOperator._
 import org.alephium.protocol.vm.lang.TestOperator._
-import org.alephium.util.{AlephiumSpec, AVector, I256, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, I256, U256}
 
 class ParserSpec extends AlephiumSpec {
   import Ast._
@@ -83,6 +85,14 @@ class ParserSpec extends AlephiumSpec {
       )
     fastparse.parse("foo(?)", StatefulParser.callExpr(_)).get.value is
       CallExpr(FuncId("foo", false), List(Placeholder[StatefulContext]()))
+    fastparse.parse("# ++ #00", StatefulParser.expr(_)).get.value is
+      Binop[StatefulContext](
+        Concat,
+        Const(Val.ByteVec(ByteString.empty)),
+        Const(Val.ByteVec(Hex.unsafe("00")))
+      )
+    fastparse.parse("let bytes = #", StatefulParser.statement(_)).get.value is
+      VarDef[StatefulContext](Seq((false, Ident("bytes"))), Const(Val.ByteVec(ByteString.empty)))
   }
 
   it should "parse return" in {
