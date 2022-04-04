@@ -918,13 +918,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val bytes = ByteString(Array[Byte](1, 2, 3, 4))
     // The type is U256 and cannot be less than 0
-    val invalidArgs = Seq((0, 5), (3, 2), (3, 3))
+    val invalidArgs = Seq((0, 5), (3, 2))
     invalidArgs.foreach { case (begin, end) =>
       prepare(bytes, begin, end)
       ByteVecSlice.runWith(frame).leftValue isE InvalidBytesSliceArg
       stack.pop(3)
     }
-    val validArgs = Seq((0, 4), (1, 3))
+    val validArgs = Seq((0, 4), (1, 3), (3, 3))
     validArgs.foreach { case (begin, end) =>
       prepare(bytes, begin, end)
 
