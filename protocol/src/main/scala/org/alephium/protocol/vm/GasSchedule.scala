@@ -132,7 +132,7 @@ object GasBytesSlice {
 
 trait GasEncode extends GasBytesSlice
 
-trait GasZeros extends GasBytesSlice
+trait GasZeros extends GasBytesEq
 
 @Gas
 trait GasSignature extends GasSimple

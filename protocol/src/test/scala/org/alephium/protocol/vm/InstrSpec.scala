@@ -2149,7 +2149,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         case _: ByteVecConcat.type      => testByteVecConcatGas(gas)
         case _: ByteVecSlice.type       => testByteVecSliceGas(gas)
         case _: Encode.type             => testEncode(gas)
-        case i: Zeros.type              => i.gas(33).value is (3 + 33 * gas)
+        case i: Zeros.type              => i.gas(33).value is (3 + 5 * gas)
         case i: U256ToBytesInstr        => testU256ToBytes(i, gas)
         case i: U256FromBytesInstr      => testU256FromBytes(i, gas)
         case i: ByteVecToAddress.type   => i.gas(33).value is gas
