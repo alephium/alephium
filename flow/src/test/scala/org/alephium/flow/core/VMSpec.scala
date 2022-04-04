@@ -919,7 +919,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     testSimpleScript(main(4, 13, hex.slice(4 * 2, 13 * 2)))
-    failSimpleScript(main(4, 4, "00"), InvalidBytesSliceArg)
+    testSimpleScript(main(4, 4, ""))
     failSimpleScript(main(13, 4, "00"), InvalidBytesSliceArg)
     failSimpleScript(main(4, 33, "00"), InvalidBytesSliceArg)
   }

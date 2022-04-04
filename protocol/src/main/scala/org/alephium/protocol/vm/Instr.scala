@@ -781,7 +781,7 @@ case object ByteVecSlice
       begin <- frame.popOpStackU256().flatMap(_.v.toInt.toRight(Right(InvalidBytesSliceArg)))
       bytes <- frame.popOpStackByteVec().map(_.bytes)
       result <-
-        if (0 <= begin && begin < end && end <= bytes.length) {
+        if (0 <= begin && begin <= end && end <= bytes.length) {
           Right(Val.ByteVec(bytes.slice(begin, end)))
         } else {
           failed(InvalidBytesSliceArg)
