@@ -130,7 +130,8 @@ object Instr {
     ByteVecSlice, ByteVecToAddress, Encode, Zeros,
     U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
     U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
-    EthEcRecover
+    EthEcRecover,
+    Log6, Log7, Log8, Log9
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -1643,7 +1644,7 @@ object VerifyRelativeLocktime extends LockTimeInstr with GasMid {
 sealed trait LogInstr extends StatelessInstr with StatelessInstrCompanion0 with GasLog {
   def n: Int
 
-  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       _      <- frame.ctx.chargeGasWithSize(this, n)
       fields <- frame.opStack.pop(n)
@@ -1651,8 +1652,18 @@ sealed trait LogInstr extends StatelessInstr with StatelessInstrCompanion0 with 
     } yield ()
   }
 }
-object Log1 extends LogInstr { val n: Int = 1 }
-object Log2 extends LogInstr { val n: Int = 2 }
-object Log3 extends LogInstr { val n: Int = 3 }
-object Log4 extends LogInstr { val n: Int = 4 }
-object Log5 extends LogInstr { val n: Int = 5 }
+sealed trait MainnetLogInstr extends LogInstr {
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = _runWith(frame)
+}
+sealed trait LemanLogInstr extends LogInstr with LemanInstr[StatelessContext] {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = _runWith(frame)
+}
+object Log1 extends MainnetLogInstr { val n: Int = 1 }
+object Log2 extends MainnetLogInstr { val n: Int = 2 }
+object Log3 extends MainnetLogInstr { val n: Int = 3 }
+object Log4 extends MainnetLogInstr { val n: Int = 4 }
+object Log5 extends MainnetLogInstr { val n: Int = 5 }
+object Log6 extends LemanLogInstr   { val n: Int = 6 }
+object Log7 extends LemanLogInstr   { val n: Int = 7 }
+object Log8 extends LemanLogInstr   { val n: Int = 8 }
+object Log9 extends LemanLogInstr   { val n: Int = 9 }

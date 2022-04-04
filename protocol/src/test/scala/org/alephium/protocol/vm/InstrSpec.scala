@@ -68,7 +68,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ByteVecSlice, ByteVecToAddress, Encode, Zeros,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
-      EthEcRecover
+      EthEcRecover,
+      Log6, Log7, Log8, Log9
     )
     val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithState, LoadContractFields)
     // format: on
@@ -1430,6 +1431,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   trait LogFixture extends StatefulInstrFixture {
     def test(instr: LogInstr, n: Int) = {
+      stack.pop(stack.size).isRight is true
       (0 until n).foreach { _ =>
         stack.push(Val.True)
       }
@@ -1444,6 +1446,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       }
 
       instr.runWith(frame).leftValue isE StackUnderflow
+    }
+  }
+
+  it should "test Log" in new LogFixture {
+    val logInstrs = Seq(Log1, Log2, Log3, Log4, Log5, Log6, Log7, Log8, Log9)
+    logInstrs.zipWithIndex.foreach { case (log, index) =>
+      test(log, index + 1)
     }
   }
 
@@ -2128,7 +2137,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ByteVecSlice -> 1, ByteVecToAddress -> 5, Encode -> 1, Zeros -> 1,
       U256To1Byte -> 1, U256To2Byte -> 1, U256To4Byte -> 1, U256To8Byte -> 1, U256To16Byte -> 2, U256To32Byte -> 4,
       U256From1Byte -> 1, U256From2Byte -> 1, U256From4Byte -> 1, U256From8Byte -> 1, U256From16Byte -> 2, U256From32Byte -> 4,
-      EthEcRecover -> 2500
+      EthEcRecover -> 2500,
+      Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -2205,6 +2215,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       case i: Log3.type => i.gas(3).value is gas
       case i: Log4.type => i.gas(4).value is gas
       case i: Log5.type => i.gas(5).value is gas
+      case i: Log6.type => i.gas(6).value is gas
+      case i: Log7.type => i.gas(7).value is gas
+      case i: Log8.type => i.gas(8).value is gas
+      case i: Log9.type => i.gas(9).value is gas
     }
     statelessCases.foreach(test.tupled)
     statefulCases.foreach(test.tupled)
@@ -2244,7 +2258,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256To1Byte -> 102, U256To2Byte -> 103, U256To4Byte -> 104, U256To8Byte -> 105, U256To16Byte -> 106, U256To32Byte -> 107,
       U256From1Byte -> 108, U256From2Byte -> 109, U256From4Byte -> 110, U256From8Byte -> 111, U256From16Byte -> 112, U256From32Byte -> 113,
       EthEcRecover -> 114,
+      Log6 -> 115, Log7 -> 116, Log8 -> 117, Log9 -> 118,
 
+      // stateful instructions
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
       TransferAlph -> 167, TransferAlphFromSelf -> 168, TransferAlphToSelf -> 169, TransferToken -> 170, TransferTokenFromSelf -> 171, TransferTokenToSelf -> 172,
@@ -2291,7 +2307,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ByteVecSlice, ByteVecToAddress, Encode, Zeros,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
-      EthEcRecover
+      EthEcRecover,
+      Log6, Log7, Log8, Log9
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
