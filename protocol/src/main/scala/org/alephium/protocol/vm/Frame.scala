@@ -63,47 +63,37 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackBool(): ExeResult[Val.Bool] =
-    popOpStack().flatMap { elem =>
-      try Right(elem.asInstanceOf[Val.Bool])
-      catch {
-        case _: ClassCastException => failed(InvalidType(elem))
-      }
+    popOpStack().flatMap {
+      case elem: Val.Bool => Right(elem)
+      case elem           => failed(InvalidType(elem))
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackI256(): ExeResult[Val.I256] =
-    popOpStack().flatMap { elem =>
-      try Right(elem.asInstanceOf[Val.I256])
-      catch {
-        case _: ClassCastException => failed(InvalidType(elem))
-      }
+    popOpStack().flatMap {
+      case elem: Val.I256 => Right(elem)
+      case elem           => failed(InvalidType(elem))
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackU256(): ExeResult[Val.U256] =
-    popOpStack().flatMap { elem =>
-      try Right(elem.asInstanceOf[Val.U256])
-      catch {
-        case _: ClassCastException => failed(InvalidType(elem))
-      }
+    popOpStack().flatMap {
+      case elem: Val.U256 => Right(elem)
+      case elem           => failed(InvalidType(elem))
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackByteVec(): ExeResult[Val.ByteVec] =
-    popOpStack().flatMap { elem =>
-      try Right(elem.asInstanceOf[Val.ByteVec])
-      catch {
-        case _: ClassCastException => failed(InvalidType(elem))
-      }
+    popOpStack().flatMap {
+      case elem: Val.ByteVec => Right(elem)
+      case elem              => failed(InvalidType(elem))
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackAddress(): ExeResult[Val.Address] =
-    popOpStack().flatMap { elem =>
-      try Right(elem.asInstanceOf[Val.Address])
-      catch {
-        case _: ClassCastException => failed(InvalidType(elem))
-      }
+    popOpStack().flatMap {
+      case elem: Val.Address => Right(elem)
+      case elem              => failed(InvalidType(elem))
     }
 
   @inline
