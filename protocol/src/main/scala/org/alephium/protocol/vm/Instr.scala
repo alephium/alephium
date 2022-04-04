@@ -127,7 +127,7 @@ object Instr {
     VerifyAbsoluteLocktime, VerifyRelativeLocktime,
     Log1, Log2, Log3, Log4, Log5,
     /* Below are instructions for Leman hard fork */
-    ByteVecSlice, ByteVecToAddress, Encode,
+    ByteVecSlice, ByteVecToAddress, Encode, Zeros,
     U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
     U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
     EthEcRecover
@@ -824,6 +824,29 @@ case object Encode
       bytes = encode(values)
       _ <- frame.ctx.chargeGasWithSize(this, bytes.length)
       _ <- frame.pushOpStack(Val.ByteVec(bytes))
+    } yield ()
+  }
+}
+
+case object Zeros
+    extends StatelessInstr
+    with LemanInstr[StatelessContext]
+    with StatelessInstrCompanion0
+    with GasZeros {
+  //scalastyle:off magic.number
+  val maxSize: util.U256 = util.U256.unsafe(4096)
+  //scalastyle:on magic.number
+
+  @inline def checkSizeRange(size: util.U256): ExeResult[Int] = {
+    if (size <= maxSize) Right(size.toIntUnsafe) else failed(InvalidSizeForZeros)
+  }
+
+  override def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      u256 <- frame.popOpStackU256()
+      size <- checkSizeRange(u256.v)
+      _    <- frame.ctx.chargeGasWithSize(this, size)
+      _    <- frame.pushOpStack(Val.ByteVec(ByteString.fromArrayUnsafe(Array.fill(size)(0.toByte))))
     } yield ()
   }
 }

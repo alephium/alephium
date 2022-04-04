@@ -217,6 +217,14 @@ object BuiltIn {
     def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(Encode)
   }
 
+  val zeros: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "zeros",
+      Seq[Type](Type.U256),
+      Seq[Type](Type.ByteVec),
+      Zeros
+    )
+
   val u256To1Byte: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn(
       "u256To1Byte",
@@ -347,6 +355,7 @@ object BuiltIn {
     /* Below are functions for Leman hard fork */
     byteVecSlice,
     encode,
+    zeros,
     u256To1Byte,
     u256To2Byte,
     u256To4Byte,

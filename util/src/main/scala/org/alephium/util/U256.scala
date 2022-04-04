@@ -143,10 +143,12 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
   def toByte: Option[Byte] = if (v.bitLength() <= 7) Some(v.intValue().toByte) else None
 
   def toInt: Option[Int] = try {
-    Some(v.intValueExact())
+    Some(toIntUnsafe)
   } catch {
     case _: ArithmeticException => None
   }
+
+  def toIntUnsafe: Int = v.intValueExact()
 
   def toLong: Option[Long] = try {
     Some(v.longValueExact())
