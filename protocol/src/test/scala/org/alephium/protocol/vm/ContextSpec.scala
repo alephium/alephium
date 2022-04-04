@@ -20,19 +20,17 @@ import org.scalacheck.Gen
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
-import org.alephium.protocol.model.{ContractId, GroupIndex, TxGenerators, TxOutputRef}
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.protocol.model.{ContractId, GroupIndex, HardFork, TxGenerators, TxOutputRef}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class ContextSpec
     extends AlephiumSpec
     with ContextGenerators
     with TxGenerators
-    with GroupConfigFixture.Default
-    with NetworkConfigFixture.Default {
-  trait Fixture {
-    val initialGas = 1000000
-    val context    = genStatefulContext(None, gasLimit = initialGas)
-    context.gasRemaining is initialGas
+    with GroupConfigFixture.Default {
+  trait Fixture extends NetworkConfigFixture.Default {
+    lazy val initialGas = 1000000
+    lazy val context    = genStatefulContext(None, gasLimit = initialGas)
 
     def createContract(): ContractId = {
       val output   = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(Hash.zero))).sample.get
@@ -115,5 +113,30 @@ class ContextSpec
     newObj.codeHash is newCode.hash
     newObj.initialStateHash is obj.initialStateHash
     newObj.contractId is contractId
+  }
+
+  it should "charge gas based on mainnet hardfork" in new Fixture {
+    override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    context.getHardFork() is HardFork.Mainnet
+
+    context.chargeGasWithSizeLeman(ByteVecEq, 7)
+    val expected0 = initialGas.use(GasBox.unsafe(1)).rightValue
+    context.gasRemaining is expected0
+
+    context.chargeGasWithSizeLeman(ByteVecConcat, 7)
+    val expected1 = expected0.use(GasBox.unsafe(7)).rightValue
+    context.gasRemaining is expected1
+  }
+
+  it should "charge gas based on leman hardfork" in new Fixture {
+    context.getHardFork() is HardFork.Leman
+
+    context.chargeGasWithSizeLeman(ByteVecEq, 7)
+    val expected0 = initialGas.use(GasBox.unsafe(4)).rightValue
+    context.gasRemaining is expected0
+
+    context.chargeGasWithSizeLeman(ByteVecConcat, 7)
+    val expected1 = expected0.use(GasBox.unsafe(10)).rightValue
+    context.gasRemaining is expected1
   }
 }

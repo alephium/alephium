@@ -742,7 +742,7 @@ sealed trait ByteVecComparison
     for {
       x <- frame.popOpStackByteVec()
       y <- frame.popOpStackByteVec()
-      _ <- frame.ctx.chargeGasWithSize(this, x.bytes.size)
+      _ <- frame.ctx.chargeGasWithSizeLeman(this, x.bytes.size)
       _ <- frame.pushOpStack(op(x, y))
     } yield ()
   }
@@ -767,7 +767,7 @@ case object ByteVecConcat extends StatelessInstr with StatelessInstrCompanion0 w
       v2 <- frame.popOpStackByteVec()
       v1 <- frame.popOpStackByteVec()
       result = Val.ByteVec(v1.bytes ++ v2.bytes)
-      _ <- frame.ctx.chargeGasWithSize(this, result.estimateByteSize())
+      _ <- frame.ctx.chargeGasWithSizeLeman(this, result.estimateByteSize())
       _ <- frame.pushOpStack(result)
     } yield ()
   }

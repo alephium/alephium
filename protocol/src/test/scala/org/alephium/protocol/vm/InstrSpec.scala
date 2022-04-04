@@ -2115,7 +2115,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256Add -> 3, U256Sub -> 3, U256Mul -> 5, U256Div -> 5, U256Mod -> 5, U256Eq -> 3, U256Neq -> 3, U256Lt -> 3, U256Le -> 3, U256Gt -> 3, U256Ge -> 3,
       U256ModAdd -> 8, U256ModSub -> 8, U256ModMul -> 8, U256BitAnd -> 5, U256BitOr -> 5, U256Xor -> 5, U256SHL -> 5, U256SHR -> 5,
       I256ToU256 -> 3, I256ToByteVec -> 5, U256ToI256 -> 3, U256ToByteVec -> 5,
-      ByteVecEq -> 4, ByteVecNeq -> 4, ByteVecSize -> 2, ByteVecConcat -> 1, AddressEq -> 3, AddressNeq -> 3, AddressToByteVec -> 5,
+      ByteVecEq -> 7, ByteVecNeq -> 7, ByteVecSize -> 2, ByteVecConcat -> 1, AddressEq -> 3, AddressNeq -> 3, AddressToByteVec -> 5,
       IsAssetAddress -> 3, IsContractAddress -> 3,
       Jump(int) -> 8, IfTrue(int) -> 8, IfFalse(int) -> 8,
       /* CallLocal(byte) -> ???, */ Return -> 0,
@@ -2178,7 +2178,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       frame.pushOpStack(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](200)))) isE ()
       val initialGas = frame.ctx.gasRemaining
       ByteVecConcat.runWith(frame) isE ()
-      (initialGas.value - frame.ctx.gasRemaining.value) is (323 * gas)
+      (initialGas.value - frame.ctx.gasRemaining.value) is (326 * gas)
     }
     def testByteVecSliceGas(gas: Int) = {
       val frame = genStatefulFrame()

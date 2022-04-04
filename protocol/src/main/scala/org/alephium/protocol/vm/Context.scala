@@ -119,6 +119,14 @@ trait StatelessContext extends CostStrategy {
   def getTxCaller(indexRaw: Val.U256): ExeResult[Val.Address] = {
     getTxPrevOutput(indexRaw).map(output => Val.Address(output.lockupScript))
   }
+
+  def chargeGasWithSizeLeman(gasFormula: UpgradedGasFormula, size: Int): ExeResult[Unit] = {
+    if (getHardFork() >= HardFork.Leman) {
+      this.chargeGas(gasFormula.gas(size))
+    } else {
+      this.chargeGas(gasFormula.gasDeprecated(size))
+    }
+  }
 }
 
 object StatelessContext {
