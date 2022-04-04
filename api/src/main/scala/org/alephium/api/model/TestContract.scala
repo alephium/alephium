@@ -38,18 +38,34 @@ final case class TestContract(
     existingContracts: Option[AVector[ContractState]] = None,
     inputAssets: Option[AVector[TestContract.InputAsset]] = None
 ) {
-  def toComplete: TestContract.Complete =
-    Complete(
-      group.getOrElse(groupDefault),
-      address.getOrElse(addressDefault).contractId,
-      code = bytecode,
-      initialFields,
-      initialAsset.getOrElse(initialAssetDefault),
-      testMethodIndex.getOrElse(testMethodIndexDefault),
-      testArgs,
-      existingContracts.getOrElse(existingContractsDefault),
-      inputAssets.getOrElse(inputAssetsDefault)
-    )
+  def toComplete(): Try[TestContract.Complete] = {
+    val methodIndex = testMethodIndex.getOrElse(testMethodIndexDefault)
+    bytecode.methods.get(methodIndex) match {
+      case Some(method) =>
+        val testCode =
+          if (method.isPublic) {
+            bytecode
+          } else {
+            bytecode.copy(methods =
+              bytecode.methods.replace(methodIndex, method.copy(isPublic = true))
+            )
+          }
+        Right(
+          Complete(
+            group.getOrElse(groupDefault),
+            address.getOrElse(addressDefault).contractId,
+            code = testCode,
+            initialFields,
+            initialAsset.getOrElse(initialAssetDefault),
+            methodIndex,
+            testArgs,
+            existingContracts.getOrElse(existingContractsDefault),
+            inputAssets.getOrElse(inputAssetsDefault)
+          )
+        )
+      case None => Left(badRequest(s"Invalid method index ${methodIndex}"))
+    }
+  }
 }
 
 object TestContract {
