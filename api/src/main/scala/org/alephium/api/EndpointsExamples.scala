@@ -589,6 +589,8 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val testContractResultExamples: List[Example[TestContractResult]] =
     simpleExample(
       TestContractResult(
+        originalCodeHash = hash,
+        testCodeHash = hash,
         returns = AVector[Val](ValU256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),
