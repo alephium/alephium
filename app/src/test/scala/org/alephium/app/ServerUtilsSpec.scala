@@ -18,6 +18,8 @@ package org.alephium.app
 
 import java.net.InetSocketAddress
 
+import scala.util.Random
+
 import akka.util.ByteString
 
 import org.alephium.api.{model => api}
@@ -798,6 +800,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test AMM contract: add liquidity" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
+      originalCodeHash = AMMContract.swapCode.hash,
       code = AMMContract.swapCode,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
@@ -846,6 +849,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
+      originalCodeHash = AMMContract.swapProxyCode.hash,
       code = AMMContract.swapProxyCode,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
@@ -896,6 +900,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test AMM contract: swap token" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
+      originalCodeHash = AMMContract.swapCode.hash,
       code = AMMContract.swapCode,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
@@ -940,6 +945,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
+      originalCodeHash = AMMContract.swapProxyCode.hash,
       code = AMMContract.swapProxyCode,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
@@ -990,6 +996,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test AMM contract: swap Alph" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
+      originalCodeHash = AMMContract.swapCode.hash,
       code = AMMContract.swapCode,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
@@ -1034,6 +1041,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
+      originalCodeHash = AMMContract.swapProxyCode.hash,
       code = AMMContract.swapProxyCode,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
@@ -1083,10 +1091,11 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "test array parameters in contract" in new Fixture {
+    val isPublic = if (Random.nextBoolean()) "pub" else ""
     val contract =
       s"""
          |TxContract ArrayTest(mut array: [U256; 2]) {
-         |  pub fn swap(input: [U256; 2]) -> ([U256; 2]) {
+         |  ${isPublic} fn swap(input: [U256; 2]) -> ([U256; 2]) {
          |    array[0] = input[1]
          |    array[1] = input[0]
          |    return array
@@ -1099,7 +1108,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       bytecode = code,
       initialFields = AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))),
       testArgs = AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))
-    ).toComplete
+    ).toComplete().rightValue
 
     val serverUtils   = new ServerUtils()
     val compileResult = serverUtils.compileContract(Compile.Contract(contract)).rightValue
@@ -1108,11 +1117,21 @@ class ServerUtilsSpec extends AlephiumSpec {
     func.argTypes is AVector("[U256;2]")
     func.returnTypes is AVector("[U256;2]")
 
-    val testFlow    = BlockFlow.emptyUnsafe(config)
-    lazy val result = serverUtils.runTestContract(testFlow, testContract).rightValue
+    val testFlow      = BlockFlow.emptyUnsafe(config)
+    val result        = serverUtils.runTestContract(testFlow, testContract).rightValue
+    val contractState = result.contracts(0)
     result.contracts.length is 1
-    result.contracts(0).fields is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
+    contractState.fields is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
     result.returns is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
+    if (isPublic.nonEmpty) {
+      contractState.codeHash is compileResult.codeHash
+      result.originalCodeHash is result.testCodeHash
+      contractState.codeHash is result.originalCodeHash
+    } else {
+      contractState.codeHash isnot compileResult.codeHash
+      result.originalCodeHash isnot result.testCodeHash
+      contractState.codeHash is result.testCodeHash
+    }
   }
 
   private def generateDestination(

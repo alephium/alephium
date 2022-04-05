@@ -6187,6 +6187,8 @@
                   "$ref": "#/components/schemas/TestContractResult"
                 },
                 "example": {
+                  "originalCodeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "testCodeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "returns": [
                     {
                       "type": "U256",
@@ -9355,6 +9357,8 @@
       },
       "TestContractResult": {
         "required": [
+          "originalCodeHash",
+          "testCodeHash",
           "returns",
           "gasUsed",
           "contracts",
@@ -9363,6 +9367,12 @@
         ],
         "type": "object",
         "properties": {
+          "originalCodeHash": {
+            "type": "string"
+          },
+          "testCodeHash": {
+            "type": "string"
+          },
           "returns": {
             "type": "array",
             "items": {

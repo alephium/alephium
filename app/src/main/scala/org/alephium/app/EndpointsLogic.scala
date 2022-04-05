@@ -551,7 +551,12 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   val testContractLogic = serverLogic(testContract) { testContract: TestContract =>
     val blockFlow = BlockFlow.emptyUnsafe(node.config)
-    Future(serverUtils.runTestContract(blockFlow, testContract.toComplete))
+    Future.successful {
+      for {
+        completeTestContract <- testContract.toComplete()
+        result               <- serverUtils.runTestContract(blockFlow, completeTestContract)
+      } yield result
+    }
   }
 
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
