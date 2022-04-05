@@ -33,7 +33,7 @@ class BroadcastTxTest extends AlephiumActorSpec {
     val restPort1 = clique.getServer(tx.fromGroup).config.network.restPort
     val restPort2 = clique.getServer((tx.fromGroup + 1) % groups0).config.network.restPort
     eventually(request[TxStatus](getTransactionStatus(tx), restPort1) is MemPooled)
-    eventually(requestFailed(getTransactionStatus(tx), restPort2, StatusCode.BadRequest))
+    eventually(requestFailed(getTransactionStatus(tx), restPort2, StatusCode.InternalServerError))
 
     clique.stop()
   }

@@ -363,7 +363,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       start: Int,
       endOpt: Option[Int],
-      contractId: Hash
+      contractId: ContractId
   ): Try[Events] = {
     for {
       groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
