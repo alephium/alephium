@@ -16,7 +16,6 @@
 
 package org.alephium.app
 
-import scala.annotation.tailrec
 import scala.concurrent._
 
 import akka.util.Timeout
@@ -311,34 +310,36 @@ class ServerUtils(implicit
     )
   }
 
-  def convert(status: BlockFlowState.TxStatus): TxStatus =
-    Confirmed(
-      status.index.hash,
-      status.index.index,
-      status.chainConfirmations,
-      status.fromGroupConfirmations,
-      status.toGroupConfirmations
-    )
+  def convert(statusOpt: Option[BlockFlowState.TxStatus]): TxStatus = {
+    statusOpt match {
+      case Some(confirmed: BlockFlowState.Confirmed) =>
+        Confirmed(
+          confirmed.index.hash,
+          confirmed.index.index,
+          confirmed.chainConfirmations,
+          confirmed.fromGroupConfirmations,
+          confirmed.toGroupConfirmations
+        )
+      case Some(BlockFlowState.MemPooled) =>
+        MemPooled
+      case None =>
+        TxNotFound
+    }
+  }
 
   def getTransactionStatus(
       blockFlow: BlockFlow,
       txId: Hash,
       chainIndex: ChainIndex
   ): Try[TxStatus] = {
-    for {
-      _ <- checkTxChainIndex(chainIndex, txId)
-      status <- blockFlow.getTxStatus(txId, chainIndex).left.map(failedInIO).map {
-        case Some(status) => convert(status)
-        case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else TxNotFound
-      }
-    } yield status
+    blockFlow.getTransactionStatus(txId, chainIndex).left.map(failed).map(convert)
   }
 
   def decodeUnsignedTransaction(
       unsignedTx: String
   ): Try[UnsignedTransaction] = {
     for {
-      txByteString <- Hex.from(unsignedTx).toRight(badRequest(s"Invalid hex"))
+      txByteString <- Hex.from(unsignedTx).toRight(badRequest("Invalid hex"))
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left
         .map(serdeError => badRequest(serdeError.getMessage))
       _ <- validateUnsignedTransaction(unsignedTx)
@@ -348,7 +349,7 @@ class ServerUtils(implicit
   def decodeUnlockScript(
       unlockScript: String
   ): Try[UnlockScript] = {
-    Hex.from(unlockScript).toRight(badRequest(s"Invalid hex")).flatMap { unlockScriptBytes =>
+    Hex.from(unlockScript).toRight(badRequest("Invalid hex")).flatMap { unlockScriptBytes =>
       deserialize[UnlockScript](unlockScriptBytes).left
         .map(serdeError => badRequest(serdeError.getMessage))
     }
@@ -365,8 +366,7 @@ class ServerUtils(implicit
       contractId: Hash
   ): Try[Events] = {
     for {
-      group <- getGroupForContract(blockFlow, contractId)
-      groupIndex = new GroupIndex(group.group)
+      groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
       chainIndex = ChainIndex(groupIndex, groupIndex)
       result <- getEvents(blockFlow, start, endOpt, chainIndex, contractId)
     } yield result
@@ -374,8 +374,6 @@ class ServerUtils(implicit
 
   def getEventsForTxScript(
       blockFlow: BlockFlow,
-      start: Int,
-      endOpt: Option[Int],
       txId: Hash
   ): Try[Events] = {
     for {
@@ -383,13 +381,13 @@ class ServerUtils(implicit
         case Right(Confirmed(blockHash, _, _, _, _)) =>
           Right(ChainIndex.from(blockHash))
         case Right(TxNotFound) =>
-          Left(notFound(s"Transaction $txId not found"))
+          Left(notFound(s"Transaction ${txId.toHexString}"))
         case Right(MemPooled) =>
-          Left(notFound(s"Transaction $txId in mempool"))
+          Left(failed(s"Transaction ${txId.toHexString} still in mempool"))
         case Left(error) =>
           Left(error)
       }
-      result <- getEvents(blockFlow, start, endOpt, chainIndex, txId)
+      result <- getEvents(blockFlow, 0, None, chainIndex, txId)
     } yield result
   }
 
@@ -456,24 +454,7 @@ class ServerUtils(implicit
       txId: Hash,
       chainIndexes: AVector[ChainIndex]
   ): Try[TxStatus] = {
-    @tailrec
-    def rec(
-        indexes: AVector[ChainIndex],
-        currentRes: Try[TxStatus]
-    ): Try[TxStatus] = {
-      if (indexes.isEmpty) {
-        currentRes
-      } else {
-        val index = indexes.head
-        val res   = getTransactionStatus(blockFlow, txId, index)
-        res match {
-          case Right(TxNotFound) => rec(indexes.tail, res)
-          case Right(_)          => res
-          case Left(_)           => res
-        }
-      }
-    }
-    rec(chainIndexes, Right(TxNotFound))
+    blockFlow.searchLocalTransactionStatus(txId, chainIndexes).left.map(failed).map(convert)
   }
 
   private def getEvents(
@@ -483,10 +464,14 @@ class ServerUtils(implicit
       chainIndex: ChainIndex,
       eventKey: Hash
   ): Try[Events] = {
-    wrapResult(blockFlow.getEvents(chainIndex, eventKey, start, endOpt)).map {
-      case Some(logs) => Events.from(chainIndex, logs)
-      case None       => Events.empty(chainIndex)
-    }
+    wrapResult(
+      blockFlow
+        .getEvents(chainIndex, eventKey, start, endOpt)
+        .map(_.flatMap(Events.from))
+        .map { events =>
+          Events(chainIndex.from.value, chainIndex.to.value, events)
+        }
+    )
   }
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
@@ -642,14 +627,6 @@ class ServerUtils(implicit
   def checkHashChainIndex(hash: BlockHash): Try[ChainIndex] = {
     val chainIndex = ChainIndex.from(hash)
     checkChainIndex(chainIndex, hash.toHexString)
-  }
-
-  def checkTxChainIndex(chainIndex: ChainIndex, tx: Hash): Try[Unit] = {
-    if (brokerConfig.contains(chainIndex.from)) {
-      Right(())
-    } else {
-      Left(badRequest(s"${tx.toHexString} belongs to other groups"))
-    }
   }
 
   def execute(f: => Unit): FutureTry[Boolean] =

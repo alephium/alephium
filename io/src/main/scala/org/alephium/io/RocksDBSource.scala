@@ -46,7 +46,7 @@ object RocksDBSource {
     case object LogCounter extends ColumnFamily("logcounter")
 
     val values: AVector[ColumnFamily] =
-      AVector(All, Block, Broker, Header, Log, PendingTx, ReadyTx, Trie)
+      AVector(All, Block, Broker, Header, Log, LogCounter, PendingTx, ReadyTx, Trie)
   }
 
   final case class Compaction(

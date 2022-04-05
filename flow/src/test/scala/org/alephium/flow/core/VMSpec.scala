@@ -1267,17 +1267,25 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("Events emitted from the contract does not exist in the block")
+      info("Events emitted from the contract with wrong counter")
 
-//      val wrongBlockId = BlockHash.generate
-      val logStatesOpt1 =
-        getLogStates(blockFlow, chainIndex.from, 0, contractId)
-      logStatesOpt1 is None
+      val logStatesOpt1 = getLogStates(blockFlow, chainIndex.from, 0, contractId)
+      val logStates1    = logStatesOpt1.value
+      val newCounter    = logStates1.states.length
+
+      newCounter is 2
+
+      AVector(1, 2, 100).foreach { counter =>
+        getLogStates(blockFlow, chainIndex.from, counter, contractId) is None
+      }
+    }
+
+    {
+      info("Events emitted from a non-existent contract")
 
       val wrongContractId = Hash.generate
-      val logStatesOpt2 =
-        getLogStates(blockFlow, chainIndex.from, 0, wrongContractId)
-      logStatesOpt2 is None
+      val logStatesOpt    = getLogStates(blockFlow, chainIndex.from, 0, wrongContractId)
+      logStatesOpt is None
     }
   }
 

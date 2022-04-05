@@ -16,11 +16,13 @@
 
 package org.alephium.flow.core
 
+import scala.annotation.tailrec
+
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.protocol.vm.LogStates
-import org.alephium.protocol.vm.LogStatesId
+import org.alephium.protocol.vm.{LogStates, LogStatesId, WorldState}
+import org.alephium.util.AVector
 
 trait LogUtils { Self: FlowUtils =>
 
@@ -29,14 +31,39 @@ trait LogUtils { Self: FlowUtils =>
       eventKey: Hash,
       start: Int,
       endOpt: Option[Int]
-  ): IOResult[Option[LogStates]] = {
-    logger.info(s"$endOpt")
+  ): IOResult[AVector[LogStates]] = {
+    var allLogStates: Seq[LogStates] = Seq.empty
 
-    val logStatesId = LogStatesId(eventKey, start)
+    @tailrec
+    def rec(worldState: WorldState.Persisted, logStatesId: LogStatesId): IOResult[Unit] = {
+      worldState.logState.getOpt(logStatesId) match {
+        case Right(Some(logStates)) =>
+          assume(logStates.states.nonEmpty)
+          val newCounter = logStatesId.counter + logStates.states.length
+          endOpt match {
+            case None =>
+              allLogStates = allLogStates :+ logStates
+              rec(worldState, LogStatesId(eventKey, newCounter))
+            case Some(end) =>
+              if (end < newCounter) {
+                allLogStates = allLogStates :+ logStates.copy(
+                  states = logStates.states.take(end - logStatesId.counter)
+                )
+                Right(())
+              } else {
+                rec(worldState, LogStatesId(eventKey, newCounter))
+              }
+          }
+        case Right(None) =>
+          Right(())
+        case Left(error) =>
+          Left(error)
+      }
+    }
 
     for {
-      worldState   <- blockFlow.getBestPersistedWorldState(chainIndex.from)
-      logStatesOpt <- worldState.logState.getOpt(logStatesId)
-    } yield logStatesOpt
+      worldState <- blockFlow.getBestPersistedWorldState(chainIndex.from)
+      _          <- rec(worldState, LogStatesId(eventKey, start))
+    } yield AVector.from(allLogStates)
   }
 }

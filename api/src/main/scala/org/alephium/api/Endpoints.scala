@@ -54,6 +54,14 @@ trait Endpoints
       )
       .validate(TimeInterval.validator)
 
+  private val counterQuery: EndpointInput[CounterRange] =
+    query[Option[Int]]("start")
+      .and(query[Option[Int]]("end"))
+      .map { case (fromOpt, toOpt) => CounterRange(fromOpt, toOpt) }(counterQuery =>
+        (counterQuery.startOpt, counterQuery.endOpt)
+      )
+      .validate(CounterRange.validator)
+
   private lazy val chainIndexQuery: EndpointInput[ChainIndex] =
     query[GroupIndex]("fromGroup")
       .and(query[GroupIndex]("toGroup"))
@@ -427,10 +435,9 @@ trait Endpoints
       .in("check-hash-indexing")
       .summary("Check and repair the indexing of block hashes")
 
-  val getContractEvents: BaseEndpoint[(Option[Int], Option[Int], Address.Contract), Events] =
+  val getContractEvents: BaseEndpoint[(CounterRange, Address.Contract), Events] =
     contractEventsEndpoint.get
-      .in(query[Option[Int]]("start"))
-      .in(query[Option[Int]]("end"))
+      .in(counterQuery)
       .in(query[Address.Contract]("contractAddress"))
       .out(jsonBody[Events])
       .summary("Get events for a contract within a range of counters")

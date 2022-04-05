@@ -519,10 +519,14 @@ object BlockFlowState {
     }
   }
 
-  final case class TxStatus(
+  sealed trait TxStatus
+
+  final case class Confirmed(
       index: TxIndex,
       chainConfirmations: Int,
       fromGroupConfirmations: Int,
       toGroupConfirmations: Int
-  )
+  ) extends TxStatus
+
+  final case object MemPooled extends TxStatus
 }

@@ -7161,20 +7161,28 @@
         }
       }
     },
-    "/events/contract/in-block": {
+    "/events/contract": {
       "get": {
         "tags": [
           "Events"
         ],
-        "summary": "Get events for a contract within a block",
-        "operationId": "getEventsContractIn-block",
+        "summary": "Get events for a contract within a range of counters",
+        "operationId": "getEventsContract",
         "parameters": [
           {
-            "name": "block",
+            "name": "start",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "string"
+              "type": "integer"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
             }
           },
           {
@@ -7288,290 +7296,6 @@
         }
       }
     },
-    "/events/contract/within-blocks": {
-      "get": {
-        "tags": [
-          "Events"
-        ],
-        "summary": "Get events for a contract within a range of blocks",
-        "operationId": "getEventsContractWithin-blocks",
-        "parameters": [
-          {
-            "name": "fromBlock",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "toBlock",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "contractAddress",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Events"
-                  }
-                },
-                "example": [
-                  {
-                    "chainFrom": 0,
-                    "chainTo": 1,
-                    "events": [
-                      {
-                        "type": "ContractEvent",
-                        "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                        "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
-                        "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
-                        "eventIndex": 1,
-                        "fields": [
-                          {
-                            "type": "Address",
-                            "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
-                          },
-                          {
-                            "type": "U256",
-                            "value": "10"
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          },
-          "400": {
-            "description": "BadRequest",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequest"
-                },
-                "example": {
-                  "detail": "Something bad in the request"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalServerError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalServerError"
-                },
-                "example": {
-                  "detail": "Ouch"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                },
-                "example": {
-                  "resource": "wallet-name",
-                  "detail": "wallet-name not found"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "ServiceUnavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceUnavailable"
-                },
-                "example": {
-                  "detail": "Self clique unsynced"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                },
-                "example": {
-                  "detail": "You shall not pass"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/events/contract/within-time-interval": {
-      "get": {
-        "tags": [
-          "Events"
-        ],
-        "summary": "Get events for a contract within a time interval",
-        "operationId": "getEventsContractWithin-time-interval",
-        "parameters": [
-          {
-            "name": "fromTs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": "0"
-            }
-          },
-          {
-            "name": "toTs",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": "0"
-            }
-          },
-          {
-            "name": "contractAddress",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Events"
-                  }
-                },
-                "example": [
-                  {
-                    "chainFrom": 0,
-                    "chainTo": 1,
-                    "events": [
-                      {
-                        "type": "ContractEvent",
-                        "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                        "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
-                        "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
-                        "eventIndex": 1,
-                        "fields": [
-                          {
-                            "type": "Address",
-                            "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
-                          },
-                          {
-                            "type": "U256",
-                            "value": "10"
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          },
-          "400": {
-            "description": "BadRequest",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequest"
-                },
-                "example": {
-                  "detail": "Something bad in the request"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalServerError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalServerError"
-                },
-                "example": {
-                  "detail": "Ouch"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                },
-                "example": {
-                  "resource": "wallet-name",
-                  "detail": "wallet-name not found"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "ServiceUnavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceUnavailable"
-                },
-                "example": {
-                  "detail": "Self clique unsynced"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                },
-                "example": {
-                  "detail": "You shall not pass"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/events/tx-script": {
       "get": {
         "tags": [
@@ -7580,14 +7304,6 @@
         "summary": "Get events for a TxScript",
         "operationId": "getEventsTx-script",
         "parameters": [
-          {
-            "name": "block",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "name": "txId",
             "in": "query",
