@@ -581,9 +581,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpGet(s"/contracts/${address}/state?group=${group}")
   }
 
-  def getEventsWithinTimeInterval(startTs: TimeStamp, toTs: TimeStamp, address: Address) = {
+  def getContractEvents(start: Int, address: Address) = {
     httpGet(
-      s"/events/contract/within-time-interval?fromTs=${startTs.millis}&toTs=${toTs.millis}&contractAddress=${address.toBase58}"
+      s"/events/contract?start=$start&contractAddress=${address.toBase58}"
     )
   }
 

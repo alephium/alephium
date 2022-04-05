@@ -32,12 +32,11 @@ class VotingTest extends AlephiumActorSpec {
       deployContract(admin, voters, U256.unsafe(voters.size))
     checkState(0, 0, false, false)
 
-    val startVotingTs = TimeStamp.now()
     allocateTokens(admin, voters, contractId.toHexString, contractCode)
     checkState(0, 0, false, true)
 
-    checkEvents(contractAddress, startVotingTs) { events =>
-      val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
+    checkEvents(contractAddress, 0) { response =>
+      val allEvents = response.events
 
       allEvents.length is 1
       val votingStartedEvent = allEvents.head.asInstanceOf[ContractEvent]
@@ -45,15 +44,14 @@ class VotingTest extends AlephiumActorSpec {
       votingStartedEvent.contractId is contractAddress.lockupScript.contractId
     }
 
-    val startVoteCastingTs = TimeStamp.now()
-    val nbYes              = voters.size - 1
-    val nbNo               = voters.size - nbYes
+    val nbYes = voters.size - 1
+    val nbNo  = voters.size - nbYes
     voters.take(nbYes).foreach(wallet => vote(wallet, contractId.toHexString, true, contractCode))
     voters.drop(nbYes).foreach(wallet => vote(wallet, contractId.toHexString, false, contractCode))
     checkState(nbYes, nbNo, false, true)
 
-    checkEvents(contractAddress, startVoteCastingTs) { events =>
-      val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
+    checkEvents(contractAddress, 1) { response =>
+      val allEvents = response.events
 
       val expectedResult = voters.take(nbYes).map { wallet =>
         (1, wallet.activeAddress, true)
@@ -70,12 +68,11 @@ class VotingTest extends AlephiumActorSpec {
       returnedResult.toSeq is expectedResult.toSeq
     }
 
-    val closeVotingTs = TimeStamp.now()
     close(admin, contractId.toHexString, contractCode)
     checkState(nbYes, nbNo, true, true)
 
-    checkEvents(contractAddress, closeVotingTs) { events =>
-      val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
+    checkEvents(contractAddress, 1 + voters.length) { response =>
+      val allEvents = response.events
 
       allEvents.length is 1
       val votingStartedEvent = allEvents.head.asInstanceOf[ContractEvent]
@@ -107,16 +104,13 @@ class VotingTest extends AlephiumActorSpec {
     @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
     def checkEvents(
         contractAddress: Address,
-        startTs: TimeStamp,
-        toTs: TimeStamp = TimeStamp.now()
+        startCounter: Int
     )(
-        validate: (AVector[Events]) => Any
+        validate: (Events) => Any
     ) = {
-      import org.alephium.api.UtilJson._
-
       val events =
-        request[AVector[Events]](
-          getEventsWithinTimeInterval(startTs, toTs, contractAddress),
+        request[Events](
+          getContractEvents(startCounter, contractAddress),
           restPort
         )
 
