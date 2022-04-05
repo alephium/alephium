@@ -34,6 +34,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
+          prerelease: ${{ contains(steps.get_version.outputs.VERSION, '-') }}
           files: |
             app/target/scala-2.13/alephium-${{ steps.get_version.outputs.VERSION }}.jar
             app/target/scala-2.13/alephium-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum
