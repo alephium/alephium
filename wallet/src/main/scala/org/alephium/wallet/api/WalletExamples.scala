@@ -154,7 +154,7 @@ trait WalletExamples extends EndpointsExamples {
   )
 
   implicit val signTransactionExamples: List[Example[Sign]] =
-    simpleExample(Sign(hexString))
+    simpleExample(Sign(hash.toHexString))
 
   implicit val signTransactionResultExamples: List[Example[SignResult]] =
     simpleExample(SignResult(signature))
