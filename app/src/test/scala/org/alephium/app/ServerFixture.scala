@@ -381,6 +381,13 @@ object ServerFixture {
       )
     }
 
+    override def getEventsCurrentCount(
+        chainIndex: ChainIndex,
+        eventKey: Hash
+    ): IOResult[Option[Int]] = {
+      Right(Some(10))
+    }
+
     // scalastyle:off no.equal
     override def getBestCachedWorldState(groupIndex: GroupIndex): IOResult[WorldState.Cached] = {
       val contractGroup = brokerConfig.groups - 1

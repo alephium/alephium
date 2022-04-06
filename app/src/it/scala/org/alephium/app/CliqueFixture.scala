@@ -587,6 +587,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
+  def getContractEventsCurrentCount(address: Address) = {
+    httpGet(
+      s"/events/contract/current-count?contractAddress=${address.toBase58}"
+    )
+  }
+
   def multisig(keys: AVector[String], mrequired: Int) = {
     val body = s"""
         |{

@@ -847,6 +847,24 @@ abstract class RestServerSpec(
       }
     }
   }
+
+  it should "get current events count for a contract" in {
+    val urlBase = s"/events/contract/current-count?contractAddress=$dummyContractAddress"
+
+    Get(urlBase).check { response =>
+      response.code is StatusCode.Ok
+      response.body.rightValue is "10"
+    }
+  }
+
+  it should "get current events count for a TxScript" in {
+    val urlBase = s"/events/tx-script/current-count?txId=${dummyTx.id.toHexString}"
+
+    Get(urlBase).check { response =>
+      response.code is StatusCode.Ok
+      response.body.rightValue is "10"
+    }
+  }
 }
 
 abstract class RestServerApiKeyDisableSpec(

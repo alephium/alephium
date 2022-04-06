@@ -444,6 +444,7 @@ trait Endpoints
 
   val getContractEventsCurrentCount: BaseEndpoint[Address.Contract, Int] =
     contractEventsEndpoint.get
+      .in("current-count")
       .in(query[Address.Contract]("contractAddress"))
       .out(jsonBody[Int])
       .summary("Get current value of the events counter for a contract")
@@ -456,6 +457,7 @@ trait Endpoints
 
   val getTxScriptEventsCurrentCount: BaseEndpoint[Hash, Int] =
     txScriptEventsEndpoint.get
+      .in("current-count")
       .in(query[Hash]("txId"))
       .out(jsonBody[Int])
       .summary("Get current value of the events counter for a TxScript")
