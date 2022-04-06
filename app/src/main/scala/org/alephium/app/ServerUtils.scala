@@ -372,23 +372,38 @@ class ServerUtils(implicit
     } yield result
   }
 
+  def getEventsForContractCurrentCount(
+      blockFlow: BlockFlow,
+      contractAddress: Address.Contract
+  ): Try[Int] = {
+    val contractId = contractAddress.lockupScript.contractId
+    for {
+      groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
+      chainIndex = ChainIndex(groupIndex, groupIndex)
+      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId))
+      count    <- countOpt.toRight(notFound(s"Current events count for contract $contractAddress"))
+    } yield count
+  }
+
   def getEventsForTxScript(
       blockFlow: BlockFlow,
       txId: Hash
   ): Try[Events] = {
     for {
-      chainIndex <- searchLocalTransactionStatus(blockFlow, txId, brokerConfig.chainIndexes) match {
-        case Right(Confirmed(blockHash, _, _, _, _)) =>
-          Right(ChainIndex.from(blockHash))
-        case Right(TxNotFound) =>
-          Left(notFound(s"Transaction ${txId.toHexString}"))
-        case Right(MemPooled) =>
-          Left(failed(s"Transaction ${txId.toHexString} still in mempool"))
-        case Left(error) =>
-          Left(error)
-      }
-      result <- getEvents(blockFlow, 0, None, chainIndex, txId)
+      chainIndex <- getChainIndexForTx(blockFlow, txId)
+      result     <- getEvents(blockFlow, 0, None, chainIndex, txId)
     } yield result
+  }
+
+  def getEventsForTxScriptCurrentCount(
+      blockFlow: BlockFlow,
+      txId: Hash
+  ): Try[Int] = {
+    for {
+      chainIndex <- getChainIndexForTx(blockFlow, txId)
+      countOpt   <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, txId))
+      count      <- countOpt.toRight(notFound(s"Current events count for TxScript in transaction $txId"))
+    } yield count
   }
 
   def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =
@@ -455,6 +470,22 @@ class ServerUtils(implicit
       chainIndexes: AVector[ChainIndex]
   ): Try[TxStatus] = {
     blockFlow.searchLocalTransactionStatus(txId, chainIndexes).left.map(failed).map(convert)
+  }
+
+  def getChainIndexForTx(
+      blockFlow: BlockFlow,
+      txId: Hash
+  ): Try[ChainIndex] = {
+    searchLocalTransactionStatus(blockFlow, txId, brokerConfig.chainIndexes) match {
+      case Right(Confirmed(blockHash, _, _, _, _)) =>
+        Right(ChainIndex.from(blockHash))
+      case Right(TxNotFound) =>
+        Left(notFound(s"Transaction ${txId.toHexString}"))
+      case Right(MemPooled) =>
+        Left(failed(s"Transaction ${txId.toHexString} still in mempool"))
+      case Left(error) =>
+        Left(error)
+    }
   }
 
   private def getEvents(

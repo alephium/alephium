@@ -7166,7 +7166,7 @@
         "tags": [
           "Events"
         ],
-        "summary": "Get events for a contract within a range of counters",
+        "summary": "Get events for a contract within a counter range",
         "operationId": "getEventsContract",
         "parameters": [
           {

@@ -568,9 +568,22 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       }
   }
 
-  val getTxScriptEventsLogic = serverLogic(getTxScriptEvents) { case txId =>
+  val getContractEventsCurrentCountLogic = serverLogic(getContractEventsCurrentCount) {
+    contractAddress =>
+      Future.successful {
+        serverUtils.getEventsForContractCurrentCount(blockFlow, contractAddress)
+      }
+  }
+
+  val getTxScriptEventsLogic = serverLogic(getTxScriptEvents) { txId =>
     Future.successful {
       serverUtils.getEventsForTxScript(blockFlow, txId)
+    }
+  }
+
+  val getTxScriptEventsCurrentCountLogic = serverLogic(getTxScriptEventsCurrentCount) { txId =>
+    Future.successful {
+      serverUtils.getEventsForTxScriptCurrentCount(blockFlow, txId)
     }
   }
 

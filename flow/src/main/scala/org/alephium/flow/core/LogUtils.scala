@@ -66,4 +66,14 @@ trait LogUtils { Self: FlowUtils =>
       _          <- rec(worldState, LogStatesId(eventKey, start))
     } yield AVector.from(allLogStates)
   }
+
+  def getEventsCurrentCount(
+      chainIndex: ChainIndex,
+      eventKey: Hash
+  ): IOResult[Option[Int]] = {
+    for {
+      worldState <- blockFlow.getBestPersistedWorldState(chainIndex.from)
+      count      <- worldState.logCounterState.getOpt(eventKey)
+    } yield count
+  }
 }

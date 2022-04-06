@@ -610,6 +610,9 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val booleanExamples: List[Example[Boolean]] =
     simpleExample(true)
 
+  implicit val intExamples: List[Example[Int]] =
+    simpleExample(100)
+
   implicit val verifySignatureExamples: List[Example[VerifySignature]] =
     simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
 

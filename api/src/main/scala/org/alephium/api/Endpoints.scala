@@ -440,13 +440,25 @@ trait Endpoints
       .in(counterQuery)
       .in(query[Address.Contract]("contractAddress"))
       .out(jsonBody[Events])
-      .summary("Get events for a contract within a range of counters")
+      .summary("Get events for a contract within a counter range")
+
+  val getContractEventsCurrentCount: BaseEndpoint[Address.Contract, Int] =
+    contractEventsEndpoint.get
+      .in(query[Address.Contract]("contractAddress"))
+      .out(jsonBody[Int])
+      .summary("Get current value of the events counter for a contract")
 
   val getTxScriptEvents: BaseEndpoint[Hash, Events] =
     txScriptEventsEndpoint.get
       .in(query[Hash]("txId"))
       .out(jsonBody[Events])
       .summary("Get events for a TxScript")
+
+  val getTxScriptEventsCurrentCount: BaseEndpoint[Hash, Int] =
+    txScriptEventsEndpoint.get
+      .in(query[Hash]("txId"))
+      .out(jsonBody[Int])
+      .summary("Get current value of the events counter for a TxScript")
 }
 
 object Endpoints {
