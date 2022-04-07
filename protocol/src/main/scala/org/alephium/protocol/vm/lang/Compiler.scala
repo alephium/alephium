@@ -83,8 +83,16 @@ object Compiler {
 
   private def compileStateful[T](input: String, genCode: MultiTxContract => T): Either[Error, T] = {
     try {
+      compileMultiContract(input).map(genCode)
+    } catch {
+      case e: Error => Left(e)
+    }
+  }
+
+  def compileMultiContract[T](input: String): Either[Error, MultiTxContract] = {
+    try {
       fastparse.parse(input, StatefulParser.multiContract(_)) match {
-        case Parsed.Success(multiContract, _) => Right(genCode(multiContract.extendedContracts()))
+        case Parsed.Success(multiContract, _) => Right(multiContract.extendedContracts())
         case failure: Parsed.Failure          => Left(Error.parse(failure))
       }
     } catch {

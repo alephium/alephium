@@ -1756,5 +1756,45 @@ class VMSpec extends AlephiumSpec {
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
     errorMessage.contains(s"Right(TxScriptExeFailed(ContractAssetUnloaded") is true
   }
+
+  it should "work with interface" in new ContractFixture {
+    val foo: String =
+      s"""
+         |Interface Foo {
+         |  event Foo(x: U256)
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+    val bar: String =
+      s"""
+         |TxContract Bar() extends Foo {
+         |  event Bar(x: U256)
+         |  pub fn foo() -> () {
+         |    emit Foo(1)
+         |    emit Bar(2)
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    val barId = createContract(bar, AVector.empty).key
+
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let foo = Foo(#${barId.toHexString})
+         |    foo.foo()
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    val block = callTxScript(main)
+
+    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, block.hash, barId)
+    val logStates    = logStatesOpt.value
+    logStates.states.length is 2
+    logStates.states(0).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 1
+    logStates.states(1).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 2
+  }
 }
 // scalastyle:on file.size.limit no.equal regex
