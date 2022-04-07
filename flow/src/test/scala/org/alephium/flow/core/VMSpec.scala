@@ -1730,5 +1730,31 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     testSimpleScript(main)
   }
+
+  it should "not pay to unloaded contract" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val fooId      = createContract(foo, AVector.empty).key
+    val fooAddress = Address.contract(fooId).toBase58
+
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    transferAlph!(txCaller!(0), @${fooAddress}, ${ALPH.alph(1).v})
+         |  }
+         |}
+         |""".stripMargin
+    val script = Compiler.compileTxScript(main).rightValue
+    val errorMessage =
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+    errorMessage.contains(s"Right(TxScriptExeFailed(ContractAssetUnloaded") is true
+  }
 }
 // scalastyle:on file.size.limit no.equal regex
