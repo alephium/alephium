@@ -210,6 +210,7 @@ object Compiler {
       val contractsTable = multiContract.contracts.map(c => c.ident -> c.funcTable).toMap
       val contract       = multiContract.get(contractIndex)
       StateForContract(
+        contract.isInstanceOf[Ast.TxScript],
         config,
         mutable.HashMap.empty,
         Ast.FuncId.empty,
@@ -221,7 +222,7 @@ object Compiler {
     }
   }
 
-  trait State[Ctx <: StatelessContext] {
+  sealed trait State[Ctx <: StatelessContext] {
     def config: CompilerConfig
     def varTable: mutable.HashMap[String, VarInfo]
     var scope: Ast.FuncId
@@ -441,6 +442,7 @@ object Compiler {
   }
 
   final case class StateForContract(
+      isTxScript: Boolean,
       config: CompilerConfig,
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
@@ -461,7 +463,11 @@ object Compiler {
         getArrayRef(ident).vars.flatMap(genLoadCode)
       } else {
         if (isField(ident)) {
-          Seq(LoadField(varInfo.index))
+          if (isTxScript) {
+            Seq(Placeholder(ident.name, varInfo.tpe.toVal))
+          } else {
+            Seq(LoadField(varInfo.index))
+          }
         } else {
           Seq(LoadLocal(varInfo.index))
         }

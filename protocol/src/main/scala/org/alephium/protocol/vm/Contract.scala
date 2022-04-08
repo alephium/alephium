@@ -44,6 +44,7 @@ final case class Method[Ctx <: StatelessContext](
         serialize(returnLength) ++
         serialize(instrs.length)
     )
+    println(instrs)
     prefix ++ instrs.map(_.toScriptString()).mkString("")
   }
 }

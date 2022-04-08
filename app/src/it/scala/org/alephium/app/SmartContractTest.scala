@@ -612,7 +612,8 @@ object SwapContracts {
       swapContractKey: Hash,
       tokenId: Hash,
       tokenAmount: U256
-  ) = s"""
+  ) =
+    s"""
     |TxScript Main() {
     |  pub payable fn main() -> () {
     |    approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)

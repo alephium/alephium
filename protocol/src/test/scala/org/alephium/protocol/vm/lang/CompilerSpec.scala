@@ -1798,4 +1798,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       contract.funcs.map(_.args.length) is Seq(0, 1, 2, 3)
     }
   }
+
+  it should "compile TxScript" in {
+    val code =
+      s"""
+       |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) {
+       |  pub payable fn main() -> () {
+       |    approveToken!(address, tokenId, tokenAmount)
+       |    let swap = Swap(swapContractKey)
+       |    swap.swapAlph(address, tokenAmount)
+       |  }
+       |}
+       |
+       |Interface Swap {
+       |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> ()
+       |}
+       |""".stripMargin
+    val script = Compiler.compileTxScript(code).rightValue
+    script.toScriptString() is "0101010001000a{address:Address}{tokenId:ByteVec}{tokenAmount:U256}a3{swapContractKey:ByteVec}1700{address:Address}{tokenAmount:U256}16000100"
+  }
 }
