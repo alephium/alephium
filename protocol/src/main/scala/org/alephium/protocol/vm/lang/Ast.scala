@@ -783,8 +783,9 @@ object Ast {
     val events: Seq[EventDef]                  = Seq.empty
     val inheritances: Seq[ContractInheritance] = Seq.empty
 
-    def getFieldsSignature(): String = s"TxScript $name()"
-    def getFieldTypes(): Seq[String] = Seq.empty
+    def getFieldsSignature(): String =
+      s"TxScript ${name}(${fields.map(_.signature).mkString(",")})"
+    def getFieldTypes(): Seq[String] = fields.map(_.tpe.signature)
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)

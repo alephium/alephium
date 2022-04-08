@@ -1135,7 +1135,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "compile contract and txscript" in new Fixture {
+  it should "compile contract" in new Fixture {
     val rawCode =
       s"""
          |TxContract Foo() {
@@ -1154,7 +1154,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.codeHash is code.hash
   }
 
-  it should "compile contract" in new Fixture {
+  it should "compile script" in new Fixture {
     val rawCode =
       s"""
          |TxScript Main(x: U256, y: U256) {
@@ -1170,6 +1170,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     val expectedByteCode = "01010000000004{x:U256}{y:U256}304d"
     result.bytecode is expectedByteCode
     result.codeHash is Hash.hash(expectedByteCode)
+    result.fields is CompileResult.FieldsSig(
+      "TxScript Main(x:U256,y:U256)",
+      AVector("U256", "U256")
+    )
 
     val hardCodedCode =
       s"""
