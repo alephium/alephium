@@ -1800,8 +1800,7 @@ class VMSpec extends AlephiumSpec {
          |$interface
          |""".stripMargin
 
-    intercept[AssertionError](callTxScript(main)).getMessage is
-      "Right(TxScriptExeFailed(InvalidType(ByteVec(ByteString(0)))))"
+    callTxScript(main)
   }
 
   it should "work with interface" in new ContractFixture {

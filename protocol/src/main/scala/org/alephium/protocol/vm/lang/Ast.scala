@@ -978,10 +978,10 @@ object Ast {
       val allInterfaces =
         sortInterfaces(parentsCache, _allInterfaces.map(_.asInstanceOf[ContractInterface]))
 
-      val contractFuncs  = allContracts.flatMap(_.funcs)
+      val _contractFuncs = allContracts.flatMap(_.funcs)
       val interfaceFuncs = allInterfaces.flatMap(_.funcs)
       val isTxContract   = contract.isInstanceOf[TxContract]
-      checkInterfaceFuncs(contractFuncs, interfaceFuncs, isTxContract)
+      val contractFuncs  = checkInterfaceFuncs(_contractFuncs, interfaceFuncs, isTxContract)
 
       val contractEvents = allContracts.flatMap(_.events)
       val events         = allInterfaces.flatMap(_.events) ++ contractEvents
@@ -1006,7 +1006,7 @@ object Ast {
         contractFuncs: Seq[FuncDef[StatefulContext]],
         interfaceFuncs: Seq[FuncDef[StatefulContext]],
         isTxContract: Boolean
-    ): Unit = {
+    ): Seq[FuncDef[StatefulContext]] = {
       val contractFuncSet   = contractFuncs.view.map(f => f.id.name -> f).toMap
       val interfaceFuncsSet = interfaceFuncs.view.map(f => f.id.name -> f).toMap
       if (contractFuncSet.size != contractFuncs.size) {
@@ -1026,6 +1026,14 @@ object Ast {
             throw new Compiler.Error(s"Function ${name} is implemented with wrong signature")
           }
         }
+      }
+
+      if (isTxContract) {
+        val sortedContractFuncSet = interfaceFuncs.map(f => contractFuncSet(f.id.name)) ++
+          contractFuncs.filter(f => !interfaceFuncsSet.contains(f.id.name))
+        sortedContractFuncSet
+      } else {
+        contractFuncs
       }
     }
   }

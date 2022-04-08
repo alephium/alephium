@@ -1781,9 +1781,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |TxContract Foo() extends C {
+           |  pub fn c(x: Bool, y: Bool) -> () {}
            |  pub fn a() -> () {}
            |  pub fn b(x: Bool) -> () {}
-           |  pub fn c(x: Bool, y: Bool) -> () {}
            |  pub fn d(x: Bool, y: Bool, z: Bool) -> () {
            |    a()
            |    b(x)
