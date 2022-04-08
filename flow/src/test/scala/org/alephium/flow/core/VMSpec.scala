@@ -1757,6 +1757,53 @@ class VMSpec extends AlephiumSpec {
     errorMessage.contains(s"Right(TxScriptExeFailed(ContractAssetUnloaded") is true
   }
 
+  it should "test interface failed" in new ContractFixture {
+    val interface =
+      s"""
+         |Interface I {
+         |  pub fn f1() -> U256
+         |  pub fn f2() -> U256
+         |  pub fn f3() -> ByteVec
+         |}
+         |""".stripMargin
+
+    val contract =
+      s"""
+         |TxContract Foo() extends I {
+         |  pub fn f3() -> ByteVec {
+         |    return #00
+         |  }
+         |
+         |  pub fn f2() -> U256 {
+         |    return 2
+         |  }
+         |
+         |  pub fn f1() -> U256 {
+         |    return 1
+         |  }
+         |}
+         |
+         |$interface
+         |""".stripMargin
+
+    val contractId = createContract(contract, AVector.empty).key
+
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let impl = I(#${contractId.toHexString})
+         |    assert!(impl.f1() == 1)
+         |  }
+         |}
+         |
+         |$interface
+         |""".stripMargin
+
+    intercept[AssertionError](callTxScript(main)).getMessage is
+      "Right(TxScriptExeFailed(InvalidType(ByteVec(ByteString(0)))))"
+  }
+
   it should "work with interface" in new ContractFixture {
     val foo: String =
       s"""
