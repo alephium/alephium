@@ -222,7 +222,7 @@ class TransactionSpec
 
       val script =
         s"""
-         |TxScript Main {
+         |TxScript Main() {
          | pub payable fn main() -> () {
          |   verifyTxSignature!(#${pubKey1.toHexString})
          |   transferAlphFromSelf!(@$address1, 1)
@@ -397,7 +397,7 @@ class TransactionSpec
       val script = {
         val raw =
           s"""
-           |TxScript Main {
+           |TxScript Main() {
            |  pub payable fn main() -> () {
            |    verifyTxSignature!(#${pubKey1.toHexString})
            |    transferAlphFromSelf!(@$contractAddress, 1000)

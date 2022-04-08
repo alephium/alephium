@@ -1065,7 +1065,7 @@ object ServerUtils {
     }
 
     val scriptRaw = s"""
-      |TxScript Main {
+      |TxScript Main() {
       |  pub payable fn main() -> () {
       |    approveAlph!(@${address.toBase58}, ${alphAmount.v})
       |    $creation

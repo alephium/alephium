@@ -46,7 +46,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val script =
         s"""
            |// comment
-           |TxScript Foo {
+           |TxScript Foo() {
            |  pub fn bar(a: U256, b: U256) -> (U256) {
            |    return (a + b)
            |  }
@@ -60,7 +60,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val script =
         s"""
-           |TxScript Foo {
+           |TxScript Foo() {
            |  event Add(a: U256, b: U256)
            |
            |  pub fn bar(a: U256, b: U256) -> (U256) {
@@ -202,7 +202,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |
-         |TxScript Bar {
+         |TxScript Bar() {
          |  pub fn bar() -> () {
          |    return foo()
          |  }

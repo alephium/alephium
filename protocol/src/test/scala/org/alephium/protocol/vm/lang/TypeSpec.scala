@@ -62,7 +62,7 @@ trait TypeSignatureFixture extends CompilerConfigFixture.Default {
 
   val scriptStr =
     s"""
-       |TxScript Foo {
+       |TxScript Foo() {
        |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
        |    return b, c, d, e, f
        |  }

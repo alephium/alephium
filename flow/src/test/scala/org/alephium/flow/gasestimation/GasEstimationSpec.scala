@@ -217,7 +217,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
     {
       def simpleScript(i: Int): String = {
         s"""
-          |TxScript Main {
+          |TxScript Main() {
           |  pub fn main() -> () {
           |    let mut c = 0u
           |    let mut d = 0u
@@ -249,7 +249,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       val (pubKey, _) = keypairGen.sample.value
       estimateTxScript(
         s"""
-           |TxScript Main {
+           |TxScript Main() {
            |  pub fn main() -> () {
            |    verifyTxSignature!(#${pubKey.toHexString})
            |  }
@@ -264,7 +264,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       // scalastyle:off no.equal
       estimateTxScript(
         s"""
-           |TxScript Main {
+           |TxScript Main() {
            |  pub fn main() -> () {
            |    assert!(1 == 2)
            |  }

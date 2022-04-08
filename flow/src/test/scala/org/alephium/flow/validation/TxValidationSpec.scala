@@ -787,7 +787,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "charge gas for tx script size" in new ScriptFixture {
     val rawScript =
       s"""
-         |TxScript P2sh {
+         |TxScript P2sh() {
          |  pub fn main() -> () {
          |    return
          |  }
@@ -812,7 +812,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "match generated contract inputs and outputs" in new ScriptFixture {
     val rawScript =
       s"""
-         |TxScript Main {
+         |TxScript Main() {
          |  pub fn main() -> () {
          |    return
          |  }
@@ -840,7 +840,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     info("valid script")
     val rawScript =
       s"""
-         |TxScript Main {
+         |TxScript Main() {
          |  pub fn main() -> () {
          |    return
          |  }
@@ -861,7 +861,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     // scalastyle:off no.equal
     val invalidExecutionRawScript =
       s"""
-         |TxScript Main {
+         |TxScript Main() {
          |  pub fn main() -> () {
          |    assert!(1 == 2)
          |  }
@@ -879,7 +879,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "check script execution flag, inter group" in new ScriptFixture {
     val rawScript =
       s"""
-         |TxScript Main {
+         |TxScript Main() {
          |  pub fn main() -> () {
          |    return
          |  }
