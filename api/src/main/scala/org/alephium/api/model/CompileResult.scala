@@ -16,16 +16,14 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
-
 import org.alephium.protocol.{vm, Hash}
 import org.alephium.protocol.vm.StatefulContext
 import org.alephium.protocol.vm.lang.Ast
 import org.alephium.serde.{serialize, Serde}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Hex}
 
 final case class CompileResult(
-    bytecode: ByteString,
+    bytecode: String,
     codeHash: Hash,
     fields: CompileResult.FieldsSig,
     functions: AVector[CompileResult.FunctionSig],
@@ -38,10 +36,14 @@ object CompileResult {
       contract: T,
       contractAst: Ast.ContractWithState
   ): CompileResult = {
+    val bytecode = contract match {
+      case script: vm.Script[_] => script.toScriptString()
+      case contract             => Hex.toHexString(serialize(contract))
+    }
     val fields =
       FieldsSig(contractAst.getFieldsSignature(), AVector.from(contractAst.getFieldTypes()))
     CompileResult(
-      bytecode = serialize(contract),
+      bytecode = bytecode,
       codeHash = contract.hash,
       fields = fields,
       functions = AVector.from(contractAst.funcs.view.map(FunctionSig.from)),

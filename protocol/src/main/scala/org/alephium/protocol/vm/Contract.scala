@@ -25,7 +25,7 @@ import org.alephium.macros.HashSerde
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractId
 import org.alephium.serde._
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, Hex}
 
 final case class Method[Ctx <: StatelessContext](
     isPublic: Boolean,
@@ -34,7 +34,19 @@ final case class Method[Ctx <: StatelessContext](
     localsLength: Int,
     returnLength: Int,
     instrs: AVector[Instr[Ctx]]
-)
+) {
+  def toScriptString(): String = {
+    val prefix = Hex.toHexString(
+      serialize(isPublic) ++
+        serialize(isPayable) ++
+        serialize(argsLength) ++
+        serialize(localsLength) ++
+        serialize(returnLength) ++
+        serialize(instrs.length)
+    )
+    prefix ++ instrs.map(_.toScriptString()).mkString("")
+  }
+}
 
 object Method {
   implicit val statelessSerde: Serde[Method[StatelessContext]] =
@@ -81,6 +93,10 @@ sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
 
   def getMethod(index: Int): ExeResult[Method[Ctx]] = {
     methods.get(index).toRight(Right(InvalidMethodIndex(index)))
+  }
+
+  def toScriptString(): String = {
+    Hex.toHexString(serialize(methods.length)) ++ methods.map(_.toScriptString()).mkString("")
   }
 }
 

@@ -451,4 +451,28 @@ class ParserSpec extends AlephiumSpec {
       )
     }
   }
+
+  it should "parse TxScript" in {
+    val script =
+      s"""
+         |TxScript Main(x: U256) {
+         |  pub fn main() -> () {
+         |  }
+         |}
+         |""".stripMargin
+    fastparse.parse(script, StatefulParser.txScript(_)).get.value is TxScript(
+      TypeId("Main"),
+      Seq(Argument(Ident("x"), Type.U256, false)),
+      Seq(
+        FuncDef(
+          FuncId("main", false),
+          true,
+          false,
+          Seq.empty,
+          Seq.empty,
+          Seq.empty
+        )
+      )
+    )
+  }
 }

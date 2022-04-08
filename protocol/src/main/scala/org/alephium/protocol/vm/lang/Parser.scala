@@ -268,12 +268,12 @@ object StatefulParser extends Parser[StatefulContext] {
   def statement[_: P]: P[Ast.Statement[StatefulContext]] =
     P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret | emitEvent | loopStmt)
 
-  def rawTxScript[_: P]: P[Ast.TxScript] =
-    P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
-      .map { case (typeId, funcs) => Ast.TxScript(typeId, funcs) }
-  def txScript[_: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
-
   def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
+
+  def rawTxScript[_: P]: P[Ast.TxScript] =
+    P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ contractParams ~ "{" ~ func.rep(1) ~ "}")
+      .map { case (typeId, params, funcs) => Ast.TxScript(typeId, params, funcs) }
+  def txScript[_: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
 
   def contractInheritance[_: P]: P[Ast.ContractInheritance] =
     P(Lexer.typeId ~ P("(" ~ Lexer.ident.rep(0, ",") ~ ")")).map { case (typeId, idents) =>

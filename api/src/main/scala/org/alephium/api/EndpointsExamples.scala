@@ -479,7 +479,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val compileResultExamples: List[Example[CompileResult]] =
     simpleExample(
       CompileResult(
-        bytecode = Hex.unsafe(hexString),
+        bytecode = hexString,
         codeHash = hash,
         fields = CompileResult.FieldsSig(
           signature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",

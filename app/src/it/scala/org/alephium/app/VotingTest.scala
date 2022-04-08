@@ -284,7 +284,7 @@ trait WalletFixture extends CliqueFixture {
     val buildResult = request[BuildContractDeployScriptTxResult](
       buildContract(
         fromPublicKey = wallet.publicKey.toHexString,
-        code = Hex.toHexString(compileResult.bytecode),
+        code = compileResult.bytecode,
         initialFields = initialFields,
         issueTokenAmount = issueTokenAmount
       ),
@@ -309,7 +309,7 @@ trait WalletFixture extends CliqueFixture {
     val buildResult = request[BuildScriptTxResult](
       buildScript(
         fromPublicKey = publicKey,
-        code = Hex.toHexString(compileResult.bytecode)
+        code = compileResult.bytecode
       ),
       restPort
     )

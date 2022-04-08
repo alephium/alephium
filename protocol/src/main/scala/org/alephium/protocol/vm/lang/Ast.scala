@@ -775,10 +775,12 @@ object Ast {
     }
   }
 
-  final case class TxScript(ident: TypeId, funcs: Seq[FuncDef[StatefulContext]])
-      extends ContractWithState {
+  final case class TxScript(
+      ident: TypeId,
+      fields: Seq[Argument],
+      funcs: Seq[FuncDef[StatefulContext]]
+  ) extends ContractWithState {
     val events: Seq[EventDef]                  = Seq.empty
-    val fields: Seq[Argument]                  = Seq.empty
     val inheritances: Seq[ContractInheritance] = Seq.empty
 
     def getFieldsSignature(): String = s"TxScript $name()"

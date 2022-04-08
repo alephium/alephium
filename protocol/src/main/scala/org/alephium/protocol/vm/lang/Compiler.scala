@@ -423,7 +423,7 @@ object Compiler {
         getArrayRef(ident).vars.flatMap(genLoadCode)
       } else {
         if (isField(ident)) {
-          throw Error(s"Loading state by ${ident.name} in a stateless context")
+          Seq(Placeholder(ident.name, varInfo.tpe.toVal))
         } else {
           Seq(LoadLocal(varInfo.index))
         }
