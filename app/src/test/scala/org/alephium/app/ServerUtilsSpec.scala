@@ -33,6 +33,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.serde.serialize
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
@@ -1132,6 +1133,56 @@ class ServerUtilsSpec extends AlephiumSpec {
       result.originalCodeHash isnot result.testCodeHash
       contractState.codeHash is result.testCodeHash
     }
+  }
+
+  it should "compile contract and txscript" in new Fixture {
+    val rawCode =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    assert!(1 != 2)
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(rawCode).rightValue
+
+    val serverUtils = new ServerUtils()
+    val query       = Compile.Contract(rawCode)
+    val result      = serverUtils.compileContract(query).rightValue
+    result.bytecode is "00010a0100000000040d0e304d"
+    result.bytecode is Hex.toHexString(serialize(code))
+    result.codeHash is code.hash
+  }
+
+  it should "compile contract" in new Fixture {
+    val rawCode =
+      s"""
+         |TxScript Main(x: U256, y: U256) {
+         |  pub fn main() -> () {
+         |    assert!(x != y)
+         |  }
+         |}
+         |""".stripMargin
+
+    val serverUtils      = new ServerUtils()
+    val query            = Compile.Script(rawCode)
+    val result           = serverUtils.compileScript(query).rightValue
+    val expectedByteCode = "01010000000004{x:U256}{y:U256}304d"
+    result.bytecode is expectedByteCode
+    result.codeHash is Hash.hash(expectedByteCode)
+
+    val hardCodedCode =
+      s"""
+         |TxScript Main() {
+         |  pub fn main() -> () {
+         |    assert!(1 != 2)
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileTxScript(hardCodedCode).rightValue
+    Hex.toHexString(serialize(code)) is expectedByteCode
+      .replace("{x:U256}", "0d") // bytecode of U256Const1
+      .replace("{y:U256}", "0e") // bytecode of U256Const2
   }
 
   private def generateDestination(

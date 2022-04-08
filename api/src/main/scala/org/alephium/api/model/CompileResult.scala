@@ -36,15 +36,19 @@ object CompileResult {
       contract: T,
       contractAst: Ast.ContractWithState
   ): CompileResult = {
-    val bytecode = contract match {
-      case script: vm.Script[_] => script.toScriptString()
-      case contract             => Hex.toHexString(serialize(contract))
+    val (bytecode, codeHash) = contract match {
+      case script: vm.Script[_] =>
+        val bytecode = script.toScriptString()
+        (bytecode, Hash.hash(bytecode))
+      case contract =>
+        val bytecode = serialize(contract)
+        (Hex.toHexString(bytecode), Hash.hash(bytecode))
     }
     val fields =
       FieldsSig(contractAst.getFieldsSignature(), AVector.from(contractAst.getFieldTypes()))
     CompileResult(
       bytecode = bytecode,
-      codeHash = contract.hash,
+      codeHash = codeHash,
       fields = fields,
       functions = AVector.from(contractAst.funcs.view.map(FunctionSig.from)),
       events = AVector.from(contractAst.events.map(EventSig.from))
