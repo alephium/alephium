@@ -202,6 +202,7 @@ object Compiler {
         immutable.Map(script.ident -> script.funcTable)
       )
 
+    @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def buildFor(
         config: CompilerConfig,
         multiContract: MultiTxContract,
