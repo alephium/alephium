@@ -849,20 +849,31 @@ abstract class RestServerSpec(
   }
 
   it should "get current events count for a contract" in {
-    val urlBase = s"/events/contract/current-count?contractAddress=$dummyContractAddress"
-
-    Get(urlBase).check { response =>
+    val url = s"/events/contract/current-count?contractAddress=$dummyContractAddress"
+    Get(url) check { response =>
       response.code is StatusCode.Ok
       response.body.rightValue is "10"
     }
   }
 
   it should "get current events count for a TxScript" in {
-    val urlBase = s"/events/tx-script/current-count?txId=${dummyTx.id.toHexString}"
+    val blockHash = dummyBlock.hash
+    val url       = s"/events/tx-script/current-count?txId=${dummyTx.id.toHexString}"
 
-    Get(urlBase).check { response =>
-      response.code is StatusCode.Ok
-      response.body.rightValue is "10"
+    servers.foreach { server =>
+      Get(url, server.port) check { response =>
+        val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
+        val rightNode  = server.node.config.broker.chainIndexes.contains(chainIndex)
+
+        if (rightNode) {
+          response.code is StatusCode.Ok
+          response.body.rightValue is "10"
+        } else {
+          response.code is StatusCode.NotFound
+          val error = response.as[ApiError.NotFound]
+          error.detail is s"Transaction ${dummyTx.id.toHexString} not found"
+        }
+      }
     }
   }
 }
