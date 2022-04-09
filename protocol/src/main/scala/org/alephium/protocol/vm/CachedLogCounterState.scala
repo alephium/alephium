@@ -21,16 +21,32 @@ import scala.collection.mutable
 import org.alephium.io._
 import org.alephium.protocol.Hash
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final class CachedLogCounterState(
     val underlying: KeyValueStorage[Hash, Int],
-    val caches: mutable.Map[Hash, Cache[Int]]
-) extends CachedKV[Hash, Int, Cache[Int]] {
+    val caches: mutable.Map[Hash, Cache[Int]],
+    val initialCounts: mutable.Map[Hash, Int] = mutable.Map.empty[Hash, Int]
+) extends CachedKV[Hash, Int, Cache[Int]]
+    with MutableKV.WithInitialValue[Hash, Int, Unit] {
   protected def getOptFromUnderlying(key: Hash): IOResult[Option[Int]] = {
     CachedKV.getOptFromUnderlying(underlying, caches, key)
   }
 
   def persist(): IOResult[KeyValueStorage[Hash, Int]] = {
     CachedKV.persist(underlying, caches)
+  }
+
+  def getInitialValue(key: Hash): IOResult[Option[Int]] = {
+    (initialCounts.get(key): @unchecked) match {
+      case None =>
+        super.getOpt(key).map { countOpt =>
+          val count = countOpt.getOrElse(0)
+          initialCounts.put(key, count)
+          countOpt
+        }
+      case Some(value) =>
+        Right(Some(value))
+    }
   }
 
   def staging(): StagingLogCounterState = new StagingLogCounterState(this, mutable.Map.empty)

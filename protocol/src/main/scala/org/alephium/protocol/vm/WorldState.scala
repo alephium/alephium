@@ -16,8 +16,6 @@
 
 package org.alephium.protocol.vm
 
-import scala.collection.mutable
-
 import akka.util.ByteString
 
 import org.alephium.io._
@@ -347,8 +345,7 @@ object WorldState {
     def contractState: MutableKV[Hash, ContractState, Unit]
     def codeState: MutableKV[Hash, CodeRecord, Unit]
     def logState: MutableKV[LogStatesId, LogStates, Unit]
-    def logCounterState: MutableKV[Hash, Int, Unit]
-    val initialLogCounterCache: mutable.Map[Hash, Int] = mutable.Map.empty
+    def logCounterState: MutableKV[Hash, Int, Unit] with MutableKV.WithInitialValue[Hash, Int, Unit]
 
     def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Unit] = {
       outputState.put(outputRef, output)
@@ -447,38 +444,19 @@ object WorldState {
         eventKey: Hash,
         state: LogState
     ): IOResult[Unit] = {
-      getInitialLogCounter(eventKey).flatMap { counter =>
-        val id = LogStatesId(eventKey, counter)
-        for {
-          logCounter   <- logCounterState.get(eventKey)
-          logStatesOpt <- logState.getOpt(id)
-          _ <- logStatesOpt match {
-            case Some(logStates) =>
-              logState.put(id, logStates.copy(states = logStates.states :+ state))
-            case None =>
-              logState.put(id, LogStates(blockHash, eventKey, AVector(state)))
-          }
-          _ <- logCounterState.put(eventKey, logCounter + 1)
-        } yield ()
-      }
-    }
-
-    def getInitialLogCounter(eventKey: Hash): IOResult[Int] = {
-      (initialLogCounterCache.get(eventKey): @unchecked) match {
-        case None =>
-          logCounterState.getOpt(eventKey).flatMap { counterOpt =>
-            counterOpt match {
-              case Some(counter) =>
-                initialLogCounterCache.put(eventKey, counter)
-                Right(counter)
-              case None =>
-                initialLogCounterCache.put(eventKey, 0)
-                logCounterState.put(eventKey, 0).map(_ => 0)
-            }
-          }
-        case Some(value) =>
-          Right(value)
-      }
+      for {
+        initialCount <- logCounterState.getInitialValue(eventKey).map(_.getOrElse(0))
+        currentCount <- logCounterState.getOpt(eventKey).map(_.getOrElse(0))
+        id = LogStatesId(eventKey, initialCount)
+        logStatesOpt <- logState.getOpt(id)
+        _ <- logStatesOpt match {
+          case Some(logStates) =>
+            logState.put(id, logStates.copy(states = logStates.states :+ state))
+          case None =>
+            logState.put(id, LogStates(blockHash, eventKey, AVector(state)))
+        }
+        _ <- logCounterState.put(eventKey, currentCount + 1)
+      } yield ()
     }
 
     private[WorldState] def getIndex(

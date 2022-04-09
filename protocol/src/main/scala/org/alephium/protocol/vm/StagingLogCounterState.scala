@@ -19,9 +19,21 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 
 import org.alephium.io._
+import org.alephium.io.MutableKV.WithInitialValue
 import org.alephium.protocol.Hash
 
 final class StagingLogCounterState(
     val underlying: CachedLogCounterState,
     val caches: mutable.Map[Hash, Modified[Int]]
-) extends StagingKV[Hash, Int] {}
+) extends StagingKV[Hash, Int]
+    with WithInitialValue[Hash, Int, Unit] {
+  override def getInitialValue(key: Hash): IOResult[Option[Int]] = {
+    underlying.getInitialValue(key).flatMap { countOpt =>
+      if (countOpt.isEmpty) {
+        put(key, 0).map(_ => Some(0))
+      } else {
+        Right(countOpt)
+      }
+    }
+  }
+}
