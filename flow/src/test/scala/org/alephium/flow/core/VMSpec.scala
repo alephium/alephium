@@ -1201,6 +1201,8 @@ class VMSpec extends AlephiumSpec {
       logStates.eventKey is contractId
       logStates.states.length is 2
 
+      getCurentCount(blockFlow, chainIndex.from, contractId).value is 2
+
       val addingLogState = logStates.states(0)
       addingLogState.txId is callingBlock.nonCoinbase.head.id
       addingLogState.index is 0.toByte
@@ -1225,6 +1227,8 @@ class VMSpec extends AlephiumSpec {
       logStates.blockHash is createContractBlock.hash
       logStates.eventKey is createContractTxId
       logStates.states.length is 1
+
+      getCurentCount(blockFlow, chainIndex.from, createContractTxId).value is 1
 
       val createContractLogState = logStates.states(0)
       createContractLogState.txId is createContractBlock.nonCoinbase.head.id
@@ -1258,6 +1262,8 @@ class VMSpec extends AlephiumSpec {
       logStates.blockHash is destroyContractBlock.hash
       logStates.eventKey is destroyContractTxId
       logStates.states.length is 1
+
+      getCurentCount(blockFlow, chainIndex.from, destroyContractTxId).value is 1
 
       val destroyContractLogState = logStates.states(0)
       destroyContractLogState.txId is destroyContractBlock.nonCoinbase.head.id
@@ -1345,6 +1351,8 @@ class VMSpec extends AlephiumSpec {
     logStates.eventKey is contractId
     logStates.states.length is 2
 
+    getCurentCount(blockFlow, chainIndex.from, contractId).value is 2
+
     val testEventLogState1 = logStates.states(0)
     testEventLogState1.txId is callingBlock.nonCoinbase.head.id
     testEventLogState1.index is 0.toByte
@@ -1382,18 +1390,28 @@ class VMSpec extends AlephiumSpec {
     )
   }
 
-  // FIXME: fix all the counter set to 0
   private def getLogStates(
       blockFlow: BlockFlow,
       groupIndex: GroupIndex,
-      counter: Int,
+      count: Int,
       contractId: ContractId
   ): Option[LogStates] = {
-    val logStatesId = LogStatesId(contractId, counter)
+    val logStatesId = LogStatesId(contractId, count)
     (for {
       worldState   <- blockFlow.getBestPersistedWorldState(groupIndex)
       logStatesOpt <- worldState.logState.getOpt(logStatesId)
     } yield logStatesOpt).rightValue
+  }
+
+  private def getCurentCount(
+      blockFlow: BlockFlow,
+      groupIndex: GroupIndex,
+      contractId: ContractId
+  ): Option[Int] = {
+    (for {
+      worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
+      countOpt   <- worldState.logCounterState.getOpt(contractId)
+    } yield countOpt).rightValue
   }
 }
 // scalastyle:on file.size.limit no.equal regex
