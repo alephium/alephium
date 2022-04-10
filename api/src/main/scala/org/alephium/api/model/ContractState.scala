@@ -25,6 +25,7 @@ import org.alephium.util.{AVector, U256}
 final case class ContractState(
     address: Address.Contract,
     bytecode: StatefulContract,
+    artifactId: ArtifactId, // unique id for the contract artifact
     codeHash: Hash,
     fields: AVector[Val] = AVector.empty,
     asset: AssetState
