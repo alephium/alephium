@@ -61,35 +61,30 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def popOpStack(): ExeResult[Val] = opStack.pop()
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackBool(): ExeResult[Val.Bool] =
     popOpStack().flatMap {
       case elem: Val.Bool => Right(elem)
       case elem           => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackI256(): ExeResult[Val.I256] =
     popOpStack().flatMap {
       case elem: Val.I256 => Right(elem)
       case elem           => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackU256(): ExeResult[Val.U256] =
     popOpStack().flatMap {
       case elem: Val.U256 => Right(elem)
       case elem           => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackByteVec(): ExeResult[Val.ByteVec] =
     popOpStack().flatMap {
       case elem: Val.ByteVec => Right(elem)
       case elem              => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackAddress(): ExeResult[Val.Address] =
     popOpStack().flatMap {
       case elem: Val.Address => Right(elem)
