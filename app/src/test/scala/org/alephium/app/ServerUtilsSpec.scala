@@ -1157,7 +1157,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "compile script" in new Fixture {
     val rawCode =
       s"""
-         |TxScript Main(x: U256, y: U256) {
+         |TxScript Main<x: U256, y: U256> {
          |  pub fn main() -> () {
          |    assert!(x != y)
          |  }
@@ -1171,13 +1171,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.bytecode is expectedByteCode
     result.codeHash is Hash.hash(expectedByteCode)
     result.fields is CompileResult.FieldsSig(
-      "TxScript Main(x:U256,y:U256)",
-      AVector("U256", "U256")
+      "TxScript Main()",
+      AVector.empty
     )
 
     val hardCodedCode =
       s"""
-         |TxScript Main() {
+         |TxScript Main {
          |  pub fn main() -> () {
          |    assert!(1 != 2)
          |  }

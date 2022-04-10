@@ -22,7 +22,7 @@ import scala.collection.mutable
 import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.protocol.vm.lang.LogicalOperator.Not
-import org.alephium.util.{discard, AVector, I256, U256}
+import org.alephium.util.{AVector, I256, U256}
 
 // scalastyle:off number.of.methods number.of.types file.size.limit
 object Ast {
@@ -302,12 +302,8 @@ object Ast {
           s"Invalid variable def, expect ${types.length} vars, have ${idents.length} vars"
         )
       }
-      idents.zip(types).foreach {
-        case ((isMutable, ident), tpe: Type.FixedSizeArray) =>
-          state.addVariable(ident, tpe, isMutable)
-          discard(ArrayTransformer.ArrayRef.init(state, tpe, ident.name, isMutable))
-        case ((isMutable, ident), tpe) =>
-          state.addVariable(ident, tpe, isMutable)
+      idents.zip(types).foreach { case ((isMutable, ident), tpe) =>
+        state.addLocalVariable(ident, tpe, isMutable)
       }
     }
 
@@ -315,12 +311,7 @@ object Ast {
       throw Compiler.Error("Cannot define new variable in loop")
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val variables = idents.zip(value.getType(state)).flatMap {
-        case ((_, ident), _: Type.FixedSizeArray) =>
-          state.getArrayRef(ident).vars
-        case ((_, ident), _) => Seq(ident)
-      }
-      value.genCode(state) ++ variables.map(state.genStoreCode).reverse
+      value.genCode(state) ++ idents.flatMap(p => state.genStoreCode(p._2)).reverse
     }
   }
 
@@ -369,7 +360,7 @@ object Ast {
 
     def check(state: Compiler.State[Ctx]): Unit = {
       state.checkArguments(args)
-      ArrayTransformer.initArgVars(state, args)
+      args.foreach(arg => state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable))
       body.foreach(_.check(state))
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
@@ -392,11 +383,14 @@ object Ast {
   }
 
   sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
+    def name: String
     def getVariables(state: Compiler.State[Ctx]): Seq[Ident]
     def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx]
   }
   final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
       extends AssignmentTarget[Ctx] {
+    def name: String = ident.name
+
     def _getType(state: Compiler.State[Ctx]): Type = state.getVariable(ident).tpe
     def getVariables(state: Compiler.State[Ctx]): Seq[Ident] =
       if (getType(state).isArrayType) state.getArrayRef(ident).vars else Seq(ident)
@@ -406,6 +400,8 @@ object Ast {
       ident: Ident,
       indexes: Seq[Ast.Expr[Ctx]]
   ) extends AssignmentTarget[Ctx] {
+    def name: String = ident.name
+
     @scala.annotation.tailrec
     private def elementType(indexes: Seq[Ast.Expr[Ctx]], tpe: Type): Type = {
       if (indexes.isEmpty) {
@@ -415,7 +411,7 @@ object Ast {
           case arrayType: Type.FixedSizeArray =>
             elementType(indexes.drop(1), arrayType.baseType)
           case _ =>
-            throw Compiler.Error("Invalid array element assignment target")
+            throw Compiler.Error(s"Invalid assignment to array: ${ident.name}")
         }
       }
     }
@@ -508,17 +504,18 @@ object Ast {
       if (leftTypes != rightTypes) {
         throw Compiler.Error(s"Assign $rightTypes to $leftTypes")
       }
-      val variables = targets.flatMap(_.getVariables(state))
-      variables.foreach { ident =>
-        if (!state.getVariable(ident).isMutable) {
-          throw Compiler.Error(s"Assign to immutable variable $ident")
+      targets.foreach { target =>
+        target.getVariables(state).foreach { ident =>
+          if (!state.getVariable(ident).isMutable) {
+            throw Compiler.Error(s"Assign to immutable variable: ${target.name}")
+          }
         }
       }
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val variables  = targets.flatMap(_.getVariables(state))
-      val storeCodes = variables.map(state.genStoreCode).reverse
+      val storeCodes = variables.flatMap(state.genStoreCode).reverse
       rhs.genCode(state) ++ storeCodes
     }
   }
@@ -689,6 +686,7 @@ object Ast {
 
   trait Contract[Ctx <: StatelessContext] {
     def ident: TypeId
+    def templateVars: Seq[Argument]
     def fields: Seq[Argument]
     def funcs: Seq[FuncDef[Ctx]]
 
@@ -710,7 +708,8 @@ object Ast {
 
     def check(state: Compiler.State[Ctx]): Unit = {
       state.checkArguments(fields)
-      ArrayTransformer.initArgVars(state, fields)
+      templateVars.foreach(temp => state.addTemplateVariable(temp.ident, temp.tpe))
+      fields.foreach(field => state.addFieldVariable(field.ident, field.tpe, field.isMutable))
     }
 
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]

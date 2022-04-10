@@ -65,11 +65,17 @@ abstract class Parser[Ctx <: StatelessContext] {
     idx
   }
 
+  def arrayIndexConst[_: P]: P[Ast.Expr[Ctx]] = {
+    nonNegativeNum("arrayIndex").map { v =>
+      if (v > 0xff) {
+        throw Compiler.Error(s"Array index too big: ${v}")
+      }
+      Ast.Const[Ctx](Val.U256(U256.unsafe(v)))
+    }
+  }
   def arrayIndex[_: P]: P[Ast.Expr[Ctx]] = {
     P(
-      "[" ~ (nonNegativeNum("arrayIndex").map(v =>
-        Ast.Const[Ctx](Val.U256(U256.unsafe(v)))
-      ) | placeholder) ~ "]"
+      "[" ~ (arrayIndexConst | placeholder) ~ "]"
     )
   }
 
@@ -286,8 +292,10 @@ object StatefulParser extends Parser[StatefulContext] {
   def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
 
   def rawTxScript[_: P]: P[Ast.TxScript] =
-    P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ templateParams ~ "{" ~ func.rep(1) ~ "}")
-      .map { case (typeId, templateVars, funcs) => Ast.TxScript(typeId, templateVars, funcs) }
+    P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ templateParams.? ~ "{" ~ func.rep(1) ~ "}")
+      .map { case (typeId, templateVars, funcs) =>
+        Ast.TxScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
+      }
   def txScript[_: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
 
   def inheritanceTemplateVariable[_: P]: P[Seq[Ast.Ident]] =
