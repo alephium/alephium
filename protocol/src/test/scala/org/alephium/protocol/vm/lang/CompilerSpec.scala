@@ -1830,6 +1830,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
        |}
        |""".stripMargin
     val script = Compiler.compileTxScript(code).rightValue
-    script.toScriptString() is "0101010001000a{address:Address}{tokenId:ByteVec}{tokenAmount:U256}a3{swapContractKey:ByteVec}1700{address:Address}{tokenAmount:U256}16000100"
+    script.toTemplateString() is "0101010001000a{address:Address}{tokenId:ByteVec}{tokenAmount:U256}a3{swapContractKey:ByteVec}1700{address:Address}{tokenAmount:U256}16000100"
   }
 }

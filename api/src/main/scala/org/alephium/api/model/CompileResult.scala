@@ -36,7 +36,7 @@ final case class CompileScriptResult(
 object CompileScriptResult {
   def from(script: StatefulScript, contractAst: Ast.TxScript): CompileScriptResult = {
     CompileScriptResult(
-      script.toScriptString(),
+      script.toTemplateString(),
       functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from))
     )
@@ -63,7 +63,7 @@ object CompileContractResult {
     val bytecode: CompiledContractTrait = if (contractAst.templateVars.isEmpty) {
       SimpleContractByteCode(Hex.toHexString(serialize(contract)))
     } else {
-      TemplateContractByteCode(contract.fieldLength, contract.methods.map(_.toScriptString()))
+      TemplateContractByteCode(contract.fieldLength, contract.methods.map(_.toTemplateString()))
     }
     val fields = CompileResult.FieldsSig(
       contractAst.getFieldsSignature(),

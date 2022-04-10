@@ -35,7 +35,7 @@ final case class Method[Ctx <: StatelessContext](
     returnLength: Int,
     instrs: AVector[Instr[Ctx]]
 ) {
-  def toScriptString(): String = {
+  def toTemplateString(): String = {
     val prefix = Hex.toHexString(
       serialize(isPublic) ++
         serialize(isPayable) ++
@@ -44,7 +44,7 @@ final case class Method[Ctx <: StatelessContext](
         serialize(returnLength) ++
         serialize(instrs.length)
     )
-    prefix ++ instrs.map(_.toScriptString()).mkString("")
+    prefix ++ instrs.map(_.toTemplateString()).mkString("")
   }
 }
 
@@ -95,8 +95,8 @@ sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
     methods.get(index).toRight(Right(InvalidMethodIndex(index)))
   }
 
-  def toScriptString(): String = {
-    Hex.toHexString(serialize(methods.length)) ++ methods.map(_.toScriptString()).mkString("")
+  def toTemplateString(): String = {
+    Hex.toHexString(serialize(methods.length)) ++ methods.map(_.toTemplateString()).mkString("")
   }
 }
 

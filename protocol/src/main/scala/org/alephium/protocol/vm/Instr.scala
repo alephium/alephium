@@ -35,7 +35,7 @@ sealed trait Instr[-Ctx <: StatelessContext] extends GasSchedule {
   def code: Byte
 
   def serialize(): ByteString
-  def toScriptString(): String = util.Hex.toHexString(serialize())
+  def toTemplateString(): String = util.Hex.toHexString(serialize())
 
   // this function needs to charge gas manually
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
@@ -1676,5 +1676,5 @@ final case class Placeholder(name: String, tpe: Val.Type) extends StatelessInstr
       frame: Frame[C]
   ): ExeResult[Unit] = ???
 
-  override def toScriptString(): String = s"{$name:$tpe}"
+  override def toTemplateString(): String = s"{$name:$tpe}"
 }
