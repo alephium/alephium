@@ -40,7 +40,7 @@ class VotingTest extends AlephiumActorSpec {
       allEvents.length is 1
       checkVotingStartedEvent(allEvents.head)
     }
-    checkEventsCurrentCount(contractAddress) is 1
+    val countAfterVotingStarted = getEventsCurrentCount(contractAddress)
 
     val nbYes = voters.size - 1
     val nbNo  = voters.size - nbYes
@@ -48,20 +48,19 @@ class VotingTest extends AlephiumActorSpec {
     voters.drop(nbYes).foreach(wallet => vote(wallet, contractId.toHexString, false, contractCode))
     checkState(nbYes, nbNo, false, true)
 
-    checkEvents(contractAddress, 1) { response =>
+    checkEvents(contractAddress, countAfterVotingStarted) { response =>
       checkVoteCastedEvents(response.events)
     }
-    checkEventsCurrentCount(contractAddress) is 1 + voters.length
+    val countAfterVotingCasted = getEventsCurrentCount(contractAddress)
 
     close(admin, contractId.toHexString, contractCode)
     checkState(nbYes, nbNo, true, true)
 
-    checkEvents(contractAddress, 1 + voters.length) { response =>
+    checkEvents(contractAddress, countAfterVotingCasted) { response =>
       val allEvents = response.events
       allEvents.length is 1
       checkVotingClosedEvent(allEvents.head)
     }
-    checkEventsCurrentCount(contractAddress) is 2 + voters.length
 
     // Check all events for the contract from the beginning
     checkEvents(contractAddress, 0) { response =>
@@ -136,7 +135,7 @@ class VotingTest extends AlephiumActorSpec {
       validate(events)
     }
 
-    def checkEventsCurrentCount(contractAddress: Address): Int = {
+    def getEventsCurrentCount(contractAddress: Address): Int = {
       request[Int](getContractEventsCurrentCount(contractAddress), restPort)
     }
   }

@@ -33,13 +33,14 @@ final class CachedLogCounterState(
   }
 
   def persist(): IOResult[KeyValueStorage[Hash, Int]] = {
+    clearInitialValues()
     CachedKV.persist(underlying, caches)
   }
 
   def getInitialValue(key: Hash): IOResult[Option[Int]] = {
     (initialCounts.get(key): @unchecked) match {
       case None =>
-        super.getOpt(key).map { countOpt =>
+        getOpt(key).map { countOpt =>
           val count = countOpt.getOrElse(0)
           initialCounts.put(key, count)
           countOpt
@@ -49,7 +50,14 @@ final class CachedLogCounterState(
     }
   }
 
-  def staging(): StagingLogCounterState = new StagingLogCounterState(this, mutable.Map.empty)
+  def clearInitialValues(): Unit = {
+    initialCounts.clear()
+  }
+
+  def staging(): StagingLogCounterState = {
+    clearInitialValues()
+    new StagingLogCounterState(this, mutable.Map.empty)
+  }
 }
 
 object CachedLogCounterState {

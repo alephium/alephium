@@ -36,4 +36,14 @@ final class StagingLogCounterState(
       }
     }
   }
+
+  override def rollback(): Unit = {
+    underlying.clearInitialValues()
+    super.rollback()
+  }
+
+  override def commit(): Unit = {
+    underlying.clearInitialValues()
+    super.commit()
+  }
 }

@@ -498,7 +498,16 @@ class ServerUtils(implicit
     wrapResult(
       blockFlow
         .getEvents(chainIndex, eventKey, start, endOpt)
-        .map(_.flatMap(Events.from))
+        .map {
+          _.flatMap { logStates =>
+            val inMainChain = isBlockInMainChain(blockFlow, logStates.blockHash).contains(true)
+            if (inMainChain) {
+              Events.from(logStates)
+            } else {
+              AVector.empty[Event]
+            }
+          }
+        }
         .map { events =>
           Events(chainIndex.from.value, chainIndex.to.value, events)
         }
