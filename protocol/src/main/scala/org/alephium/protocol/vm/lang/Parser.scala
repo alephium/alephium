@@ -216,6 +216,17 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
 
+  def templateParams[_: P]: P[Seq[Ast.Argument]] = P("<" ~ contractArgument.rep(1, ",") ~ ">").map {
+    params =>
+      val mutables = params.filter(_.isMutable)
+      if (mutables.nonEmpty) {
+        throw Compiler.Error(
+          s"Template variables should be immutable: ${mutables.map(_.ident.name).mkString}"
+        )
+      }
+      params
+  }
+
   def eventField[_: P]: P[Ast.EventField] =
     P(Lexer.ident ~ ":").flatMap { case (ident) =>
       parseType(typeId => Type.Contract.global(typeId, ident)).map { tpe =>
@@ -239,8 +250,12 @@ object StatelessParser extends Parser[StatelessContext] {
     P(varDef | assign | funcCall | ifelse | whileStmt | ret | loopStmt)
 
   def assetScript[_: P]: P[Ast.AssetScript] =
-    P(Start ~ Lexer.keyword("AssetScript") ~/ Lexer.typeId ~ "{" ~ func.rep(1) ~ "}")
-      .map { case (typeId, funcs) => Ast.AssetScript(typeId, funcs) }
+    P(
+      Start ~ Lexer.keyword("AssetScript") ~/ Lexer.typeId ~ templateParams.? ~
+        "{" ~ func.rep(1) ~ "}"
+    ).map { case (typeId, templateVars, funcs) =>
+      Ast.AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
+    }
 }
 
 @SuppressWarnings(
@@ -271,26 +286,38 @@ object StatefulParser extends Parser[StatefulContext] {
   def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
 
   def rawTxScript[_: P]: P[Ast.TxScript] =
-    P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ contractParams ~ "{" ~ func.rep(1) ~ "}")
-      .map { case (typeId, params, funcs) => Ast.TxScript(typeId, params, funcs) }
+    P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ templateParams ~ "{" ~ func.rep(1) ~ "}")
+      .map { case (typeId, templateVars, funcs) => Ast.TxScript(typeId, templateVars, funcs) }
   def txScript[_: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
 
+  def inheritanceTemplateVariable[_: P]: P[Seq[Ast.Ident]] =
+    P("<" ~ Lexer.ident.rep(1, ",") ~ ">").?.map(_.getOrElse(Seq.empty))
+  def inheritanceFields[_: P]: P[Seq[Ast.Ident]] =
+    P("(" ~ Lexer.ident.rep(0, ",") ~ ")")
   def contractInheritance[_: P]: P[Ast.ContractInheritance] =
-    P(Lexer.typeId ~ P("(" ~ Lexer.ident.rep(0, ",") ~ ")")).map { case (typeId, idents) =>
-      Ast.ContractInheritance(typeId, idents)
+    P(Lexer.typeId ~ inheritanceTemplateVariable ~ inheritanceFields).map {
+      case (typeId, templateVars, fields) =>
+        Ast.ContractInheritance(typeId, templateVars, fields)
     }
   def contractInheritances[_: P]: P[Seq[Ast.ContractInheritance]] =
     P(Lexer.keyword("extends") ~/ (contractInheritance | interfaceInheritance).rep(1, ","))
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[_: P]: P[Ast.TxContract] =
     P(
-      Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~ contractInheritances.? ~
-        "{" ~ event.rep ~ func.rep ~ "}"
-    ).map { case (typeId, params, contractInheritances, events, funcs) =>
+      Lexer.keyword("TxContract") ~/ Lexer.typeId ~ templateParams.? ~ contractParams ~
+        contractInheritances.? ~ "{" ~ event.rep ~ func.rep ~ "}"
+    ).map { case (typeId, templateVars, fields, contractInheritances, events, funcs) =>
       if (funcs.length < 1) {
         throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
       } else {
-        Ast.TxContract(typeId, params, funcs, events, contractInheritances.getOrElse(Seq.empty))
+        Ast.TxContract(
+          typeId,
+          templateVars.getOrElse(Seq.empty),
+          fields,
+          funcs,
+          events,
+          contractInheritances.getOrElse(Seq.empty)
+        )
       }
     }
   def contract[_: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
@@ -300,7 +327,7 @@ object StatefulParser extends Parser[StatefulContext] {
     P(Lexer.typeId.rep(0, ","))
       .map { typeIds =>
         if (typeIds.length == 1) {
-          Ast.ContractInheritance(typeIds.head, Seq.empty)
+          Ast.ContractInheritance(typeIds.head, Seq.empty, Seq.empty)
         } else {
           throw Compiler.Error(
             s"Interface only supports single inheritance: ${typeIds.map(_.name).mkString(",")}"

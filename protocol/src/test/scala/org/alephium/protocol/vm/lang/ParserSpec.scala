@@ -376,7 +376,7 @@ class ParserSpec extends AlephiumSpec {
   it should "parse contract inheritance" in {
     val code =
       s"""
-         |TxContract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
+         |TxContract Child<a: U256>(x: U256, y: U256) extends Parent0<a>(x), Parent1(x) {
          |  fn foo() -> () {
          |  }
          |}
@@ -384,12 +384,13 @@ class ParserSpec extends AlephiumSpec {
 
     fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
       TypeId("Child"),
+      Seq(Argument(Ident("a"), Type.U256, false)),
       Seq(Argument(Ident("x"), Type.U256, false), Argument(Ident("y"), Type.U256, false)),
       Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
       Seq.empty,
       List(
-        ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
-        ContractInheritance(TypeId("Parent1"), Seq(Ident("x")))
+        ContractInheritance(TypeId("Parent0"), Seq(Ident("a")), Seq(Ident("x"))),
+        ContractInheritance(TypeId("Parent1"), Seq.empty, Seq(Ident("x")))
       )
     )
   }
@@ -407,7 +408,7 @@ class ParserSpec extends AlephiumSpec {
         TypeId("Child"),
         Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
         Seq.empty,
-        Seq(ContractInheritance(TypeId("Parent"), Seq.empty))
+        Seq(ContractInheritance(TypeId("Parent"), Seq.empty, Seq.empty))
       )
     }
 
@@ -436,6 +437,7 @@ class ParserSpec extends AlephiumSpec {
       fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
         TypeId("Child"),
         Seq.empty,
+        Seq.empty,
         Seq(
           FuncDef(
             FuncId("foo", false),
@@ -447,32 +449,38 @@ class ParserSpec extends AlephiumSpec {
           )
         ),
         Seq.empty,
-        Seq(ContractInheritance(TypeId("Parent"), Seq.empty))
+        Seq(ContractInheritance(TypeId("Parent"), Seq.empty, Seq.empty))
       )
     }
   }
 
-  it should "parse TxScript" in {
-    val script =
+  trait ScriptFixture {
+    def script(tpe: String) =
       s"""
-         |TxScript Main(x: U256) {
+         |$tpe Main<x: U256> {
          |  pub fn main() -> () {
          |  }
          |}
          |""".stripMargin
-    fastparse.parse(script, StatefulParser.txScript(_)).get.value is TxScript(
-      TypeId("Main"),
-      Seq(Argument(Ident("x"), Type.U256, false)),
-      Seq(
-        FuncDef(
-          FuncId("main", false),
-          true,
-          false,
-          Seq.empty,
-          Seq.empty,
-          Seq.empty
-        )
+
+    val ident        = TypeId("Main")
+    val templateVars = Seq(Argument(Ident("x"), Type.U256, false))
+    def funcs[C <: StatelessContext] = Seq[FuncDef[C]](
+      FuncDef(
+        FuncId("main", false),
+        true,
+        false,
+        Seq.empty,
+        Seq.empty,
+        Seq.empty
       )
     )
+  }
+
+  it should "parse Script" in new ScriptFixture {
+    fastparse.parse(script("AssetScript"), StatelessParser.assetScript(_)).get.value is
+      AssetScript(ident, templateVars, funcs)
+    fastparse.parse(script("TxScript"), StatefulParser.txScript(_)).get.value is
+      TxScript(ident, templateVars, funcs)
   }
 }

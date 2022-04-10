@@ -716,8 +716,11 @@ object Ast {
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]
   }
 
-  final case class AssetScript(ident: TypeId, funcs: Seq[FuncDef[StatelessContext]])
-      extends Contract[StatelessContext] {
+  final case class AssetScript(
+      ident: TypeId,
+      templateVars: Seq[Argument],
+      funcs: Seq[FuncDef[StatelessContext]]
+  ) extends Contract[StatelessContext] {
     val fields: Seq[Argument] = Seq.empty
 
     def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatelessContext]] = Seq.empty
@@ -734,6 +737,7 @@ object Ast {
     def name: String = ident.name
     def inheritances: Seq[ContractInheritance]
 
+    def templateVars: Seq[Argument]
     def fields: Seq[Argument]
     def events: Seq[EventDef]
 
@@ -777,9 +781,10 @@ object Ast {
 
   final case class TxScript(
       ident: TypeId,
-      fields: Seq[Argument],
+      templateVars: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]]
   ) extends ContractWithState {
+    val fields: Seq[Argument]                  = Seq.empty
     val events: Seq[EventDef]                  = Seq.empty
     val inheritances: Seq[ContractInheritance] = Seq.empty
 
@@ -800,9 +805,14 @@ object Ast {
     }
   }
 
-  final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident])
+  final case class ContractInheritance(
+      parentId: TypeId,
+      templateVars: Seq[Ident],
+      idents: Seq[Ident]
+  )
   final case class TxContract(
       ident: TypeId,
+      templateVars: Seq[Argument],
       fields: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
@@ -827,12 +837,13 @@ object Ast {
       events: Seq[EventDef],
       inheritances: Seq[ContractInheritance]
   ) extends ContractWithState {
-    def fieldError: Compiler.Error =
-      new Compiler.Error(s"Interface ${ident.name} does not contain any fields")
+    def error(tpe: String): Compiler.Error =
+      new Compiler.Error(s"Interface ${ident.name} does not contain any $tpe")
 
-    def fields: Seq[Argument]        = throw fieldError
-    def getFieldsSignature(): String = throw fieldError
-    def getFieldTypes(): Seq[String] = throw fieldError
+    def templateVars: Seq[Argument]  = throw error("template variable")
+    def fields: Seq[Argument]        = throw error("field")
+    def getFieldsSignature(): String = throw error("field")
+    def getFieldTypes(): Seq[String] = throw error("field")
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       throw new Compiler.Error(s"Interface ${ident.name} does not generate code")
@@ -904,7 +915,14 @@ object Ast {
         case contract =>
           val (funcs, events) = MultiTxContract.extractFuncsAndEvents(parentsCache, contract)
           if (contract.isInstanceOf[TxContract]) {
-            TxContract(contract.ident, contract.fields, funcs, events, contract.inheritances)
+            TxContract(
+              contract.ident,
+              contract.templateVars,
+              contract.fields,
+              funcs,
+              events,
+              contract.inheritances
+            )
           } else {
             ContractInterface(contract.ident, funcs, events, contract.inheritances)
           }
