@@ -2987,7 +2987,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "inet-address"
                   }
                 },
                 "example": [
@@ -6001,6 +6002,7 @@
                 "example": {
                   "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                   "bytecode": "00010700000000000118",
+                  "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                   "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                   "fields": [
                     {
@@ -6107,6 +6109,7 @@
                 "group": 0,
                 "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
                 "bytecode": "00010700000000000118",
+                "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                 "initialFields": [
                   {
                     "type": "U256",
@@ -6133,6 +6136,7 @@
                   {
                     "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                     "bytecode": "00010700000000000118",
+                    "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                     "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                     "fields": [
                       {
@@ -6178,8 +6182,7 @@
                   "$ref": "#/components/schemas/TestContractResult"
                 },
                 "example": {
-                  "originalCodeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "testCodeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "artifactId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "returns": [
                     {
                       "type": "U256",
@@ -6191,6 +6194,7 @@
                     {
                       "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                       "bytecode": "00010700000000000118",
+                      "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                       "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                       "fields": [
                         {
@@ -7706,7 +7710,8 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "balance": {
             "type": "string",
@@ -7739,13 +7744,16 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "publicKey": {
-            "type": "string"
+            "type": "string",
+            "format": "public-key"
           },
           "group": {
-            "type": "integer"
+            "type": "integer",
+            "format": "group-index"
           },
           "path": {
             "type": "string"
@@ -7760,7 +7768,8 @@
         "type": "object",
         "properties": {
           "activeAddress": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "addresses": {
             "type": "array",
@@ -7781,7 +7790,8 @@
             "$ref": "#/components/schemas/OutputRef"
           },
           "unlockScript": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           }
         }
       },
@@ -7802,14 +7812,16 @@
             "type": "integer"
           },
           "key": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "alphAmount": {
             "type": "string",
             "format": "uint256"
           },
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "tokens": {
             "type": "array",
@@ -7822,7 +7834,8 @@
             "format": "int64"
           },
           "additionalData": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           },
           "type": {
             "type": "string"
@@ -7927,7 +7940,8 @@
           "peers": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "inet-address"
             }
           },
           "type": {
@@ -7969,7 +7983,8 @@
         "type": "object",
         "properties": {
           "hash": {
-            "type": "string"
+            "type": "string",
+            "format": "block-hash"
           },
           "timestamp": {
             "type": "integer",
@@ -7987,7 +8002,8 @@
           "deps": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "block-hash"
             }
           },
           "transactions": {
@@ -7997,19 +8013,23 @@
             }
           },
           "nonce": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           },
           "version": {
             "type": "integer"
           },
           "depStateHash": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "txsHash": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "target": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           }
         }
       },
@@ -8025,7 +8045,8 @@
         "type": "object",
         "properties": {
           "hash": {
-            "type": "string"
+            "type": "string",
+            "format": "block-hash"
           },
           "timestamp": {
             "type": "integer",
@@ -8043,7 +8064,8 @@
           "deps": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "block-hash"
             }
           }
         }
@@ -8058,7 +8080,8 @@
         "type": "object",
         "properties": {
           "cliqueId": {
-            "type": "string"
+            "type": "string",
+            "format": "clique-id"
           },
           "brokerId": {
             "type": "integer"
@@ -8067,7 +8090,8 @@
             "type": "integer"
           },
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "inet-socket-address"
           }
         }
       },
@@ -8080,10 +8104,12 @@
         "type": "object",
         "properties": {
           "fromPublicKey": {
-            "type": "string"
+            "type": "string",
+            "format": "public-key"
           },
           "bytecode": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           },
           "initialFields": {
             "type": "array",
@@ -8100,7 +8126,8 @@
             "format": "uint256"
           },
           "gas": {
-            "type": "integer"
+            "type": "integer",
+            "format": "gas"
           },
           "gasPrice": {
             "type": "string",
@@ -8127,10 +8154,12 @@
             "type": "string"
           },
           "txId": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "contractAddress": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           }
         }
       },
@@ -8158,12 +8187,14 @@
         "type": "object",
         "properties": {
           "fromAddress": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "fromPublicKeys": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "public-key"
             }
           },
           "destinations": {
@@ -8173,7 +8204,8 @@
             }
           },
           "gas": {
-            "type": "integer"
+            "type": "integer",
+            "format": "gas"
           },
           "gasPrice": {
             "type": "string",
@@ -8194,7 +8226,8 @@
           "keys": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "public-key"
             }
           },
           "mrequired": {
@@ -8209,7 +8242,8 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           }
         }
       },
@@ -8221,10 +8255,12 @@
         "type": "object",
         "properties": {
           "fromPublicKey": {
-            "type": "string"
+            "type": "string",
+            "format": "public-key"
           },
           "bytecode": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           },
           "alphAmount": {
             "type": "string",
@@ -8237,7 +8273,8 @@
             }
           },
           "gas": {
-            "type": "integer"
+            "type": "integer",
+            "format": "gas"
           },
           "gasPrice": {
             "type": "string",
@@ -8260,7 +8297,8 @@
             "type": "string"
           },
           "txId": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "group": {
             "type": "integer"
@@ -8275,17 +8313,20 @@
         "type": "object",
         "properties": {
           "fromPublicKey": {
-            "type": "string"
+            "type": "string",
+            "format": "public-key"
           },
           "toAddress": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "lockTime": {
             "type": "integer",
             "format": "int64"
           },
           "gas": {
-            "type": "integer"
+            "type": "integer",
+            "format": "gas"
           },
           "gasPrice": {
             "type": "string",
@@ -8326,7 +8367,8 @@
         "type": "object",
         "properties": {
           "fromPublicKey": {
-            "type": "string"
+            "type": "string",
+            "format": "public-key"
           },
           "destinations": {
             "type": "array",
@@ -8341,7 +8383,8 @@
             }
           },
           "gas": {
-            "type": "integer"
+            "type": "integer",
+            "format": "gas"
           },
           "gasPrice": {
             "type": "string",
@@ -8367,14 +8410,16 @@
             "type": "string"
           },
           "gasAmount": {
-            "type": "integer"
+            "type": "integer",
+            "format": "gas"
           },
           "gasPrice": {
             "type": "string",
             "format": "uint256"
           },
           "txId": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "fromGroup": {
             "type": "integer"
@@ -8425,7 +8470,8 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           }
         }
       },
@@ -8508,7 +8554,8 @@
         "type": "object",
         "properties": {
           "blockHash": {
-            "type": "string"
+            "type": "string",
+            "format": "block-hash"
           },
           "txIndex": {
             "type": "integer"
@@ -8550,13 +8597,16 @@
         "type": "object",
         "properties": {
           "blockHash": {
-            "type": "string"
+            "type": "string",
+            "format": "block-hash"
           },
           "contractAddress": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "txId": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "eventIndex": {
             "type": "integer"
@@ -8587,14 +8637,16 @@
             "type": "integer"
           },
           "key": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "alphAmount": {
             "type": "string",
             "format": "uint256"
           },
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "tokens": {
             "type": "array",
@@ -8611,6 +8663,7 @@
         "required": [
           "address",
           "bytecode",
+          "artifactId",
           "codeHash",
           "fields",
           "asset"
@@ -8618,13 +8671,20 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "bytecode": {
-            "type": "string"
+            "type": "string",
+            "format": "contract"
+          },
+          "artifactId": {
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "codeHash": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "fields": {
             "type": "array",
@@ -8656,7 +8716,8 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "alphAmount": {
             "type": "string",
@@ -8795,14 +8856,16 @@
             "type": "integer"
           },
           "key": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "alphAmount": {
             "type": "string",
             "format": "uint256"
           },
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "tokens": {
             "type": "array",
@@ -8815,7 +8878,8 @@
             "format": "int64"
           },
           "additionalData": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           }
         }
       },
@@ -8868,7 +8932,8 @@
           "headers": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "block-hash"
             }
           }
         }
@@ -8881,7 +8946,8 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "asset": {
             "$ref": "#/components/schemas/AssetState"
@@ -8900,7 +8966,8 @@
         "type": "object",
         "properties": {
           "cliqueId": {
-            "type": "string"
+            "type": "string",
+            "format": "clique-id"
           },
           "brokerId": {
             "type": "integer"
@@ -8909,7 +8976,8 @@
             "type": "integer"
           },
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "inet-socket-address"
           },
           "isSynced": {
             "type": "boolean"
@@ -8950,7 +9018,8 @@
           "addresses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "address"
             }
           }
         }
@@ -8996,7 +9065,8 @@
             "type": "boolean"
           },
           "externalAddress": {
-            "type": "string"
+            "type": "string",
+            "format": "inet-socket-address"
           }
         }
       },
@@ -9050,7 +9120,8 @@
             "type": "integer"
           },
           "key": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           }
         }
       },
@@ -9064,7 +9135,8 @@
         "type": "object",
         "properties": {
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "inet-address"
           },
           "restPort": {
             "type": "integer"
@@ -9085,7 +9157,8 @@
         "type": "object",
         "properties": {
           "peer": {
-            "type": "string"
+            "type": "string",
+            "format": "inet-address"
           },
           "status": {
             "$ref": "#/components/schemas/PeerStatus"
@@ -9130,7 +9203,8 @@
           "peers": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "inet-address"
             }
           },
           "type": {
@@ -9200,7 +9274,8 @@
         "type": "object",
         "properties": {
           "cliqueId": {
-            "type": "string"
+            "type": "string",
+            "format": "clique-id"
           },
           "nodes": {
             "type": "array",
@@ -9245,7 +9320,8 @@
         "type": "object",
         "properties": {
           "signature": {
-            "type": "string"
+            "type": "string",
+            "format": "signature"
           }
         }
       },
@@ -9277,7 +9353,8 @@
           "signatures": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "signature"
             }
           }
         }
@@ -9293,7 +9370,8 @@
             "type": "string"
           },
           "signature": {
-            "type": "string"
+            "type": "string",
+            "format": "signature"
           }
         }
       },
@@ -9304,14 +9382,16 @@
         "type": "object",
         "properties": {
           "toAddress": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "lockTime": {
             "type": "integer",
             "format": "int64"
           },
           "gas": {
-            "type": "integer"
+            "type": "integer",
+            "format": "gas"
           },
           "gasPrice": {
             "type": "string",
@@ -9332,13 +9412,15 @@
         "type": "object",
         "properties": {
           "txId": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "unsignedTx": {
             "type": "string"
           },
           "gasAmount": {
-            "type": "integer"
+            "type": "integer",
+            "format": "gas"
           },
           "gasPrice": {
             "type": "string",
@@ -9371,6 +9453,7 @@
       "TestContract": {
         "required": [
           "bytecode",
+          "artifactId",
           "initialFields",
           "testArgs"
         ],
@@ -9380,10 +9463,16 @@
             "type": "integer"
           },
           "address": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "bytecode": {
-            "type": "string"
+            "type": "string",
+            "format": "contract"
+          },
+          "artifactId": {
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "initialFields": {
             "type": "array",
@@ -9419,8 +9508,7 @@
       },
       "TestContractResult": {
         "required": [
-          "originalCodeHash",
-          "testCodeHash",
+          "artifactId",
           "returns",
           "gasUsed",
           "contracts",
@@ -9429,11 +9517,9 @@
         ],
         "type": "object",
         "properties": {
-          "originalCodeHash": {
-            "type": "string"
-          },
-          "testCodeHash": {
-            "type": "string"
+          "artifactId": {
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "returns": {
             "type": "array",
@@ -9472,7 +9558,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "amount": {
             "type": "string",
@@ -9512,13 +9599,15 @@
           "inputSignatures": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "byte-string"
             }
           },
           "scriptSignatures": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "byte-string"
             }
           }
         }
@@ -9537,13 +9626,15 @@
           "inputSignatures": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "byte-string"
             }
           },
           "scriptSignatures": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "byte-string"
             }
           }
         }
@@ -9561,7 +9652,8 @@
             }
           },
           "gas": {
-            "type": "integer"
+            "type": "integer",
+            "format": "gas"
           },
           "gasPrice": {
             "type": "string",
@@ -9581,13 +9673,16 @@
         "type": "object",
         "properties": {
           "txId": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "fromGroup": {
-            "type": "integer"
+            "type": "integer",
+            "format": "group-index"
           },
           "toGroup": {
-            "type": "integer"
+            "type": "integer",
+            "format": "group-index"
           }
         }
       },
@@ -9625,7 +9720,8 @@
         "type": "object",
         "properties": {
           "txId": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "fromGroup": {
             "type": "integer"
@@ -9646,10 +9742,12 @@
         "type": "object",
         "properties": {
           "blockHash": {
-            "type": "string"
+            "type": "string",
+            "format": "block-hash"
           },
           "txId": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "eventIndex": {
             "type": "integer"
@@ -9709,7 +9807,8 @@
             "format": "int64"
           },
           "additionalData": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           }
         }
       },
@@ -9751,7 +9850,8 @@
           "peers": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "inet-address"
             }
           },
           "type": {
@@ -9791,7 +9891,8 @@
           "peers": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "inet-address"
             }
           },
           "type": {
@@ -9812,7 +9913,8 @@
         "type": "object",
         "properties": {
           "txId": {
-            "type": "string"
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "version": {
             "type": "integer"
@@ -9821,7 +9923,8 @@
             "type": "integer"
           },
           "scriptOpt": {
-            "type": "string"
+            "type": "string",
+            "format": "script"
           },
           "gasAmount": {
             "type": "integer"
@@ -9877,7 +9980,8 @@
         "type": "object",
         "properties": {
           "value": {
-            "type": "string"
+            "type": "string",
+            "format": "address"
           },
           "type": {
             "type": "string"
@@ -9925,7 +10029,8 @@
         "type": "object",
         "properties": {
           "value": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           },
           "type": {
             "type": "string"
@@ -9972,13 +10077,16 @@
         "type": "object",
         "properties": {
           "data": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           },
           "signature": {
-            "type": "string"
+            "type": "string",
+            "format": "signature"
           },
           "publicKey": {
-            "type": "string"
+            "type": "string",
+            "format": "public-key"
           }
         }
       },
