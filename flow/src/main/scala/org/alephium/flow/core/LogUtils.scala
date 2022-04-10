@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.protocol.vm.{LogStates, LogStatesId, WorldState}
 import org.alephium.util.AVector
@@ -31,8 +31,14 @@ trait LogUtils { Self: FlowUtils =>
       eventKey: Hash,
       start: Int,
       endOpt: Option[Int]
-  ): IOResult[AVector[LogStates]] = {
+  )(isBlockInMainChain: BlockHash => Boolean): IOResult[AVector[LogStates]] = {
     var allLogStates: Seq[LogStates] = Seq.empty
+
+    def appendLogStates(logStates: LogStates): Unit = {
+      if (isBlockInMainChain(logStates.blockHash)) {
+        allLogStates = allLogStates :+ logStates
+      }
+    }
 
     @tailrec
     def rec(worldState: WorldState.Persisted, logStatesId: LogStatesId): IOResult[Unit] = {
@@ -42,15 +48,18 @@ trait LogUtils { Self: FlowUtils =>
           val newCounter = logStatesId.counter + logStates.states.length
           endOpt match {
             case None =>
-              allLogStates = allLogStates :+ logStates
+              appendLogStates(logStates)
               rec(worldState, LogStatesId(eventKey, newCounter))
             case Some(end) =>
               if (end < newCounter) {
-                allLogStates = allLogStates :+ logStates.copy(
-                  states = logStates.states.take(end - logStatesId.counter)
+                appendLogStates(
+                  logStates.copy(
+                    states = logStates.states.take(end - logStatesId.counter)
+                  )
                 )
                 Right(())
               } else {
+                appendLogStates(logStates)
                 rec(worldState, LogStatesId(eventKey, newCounter))
               }
           }

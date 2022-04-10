@@ -356,7 +356,7 @@ object ServerFixture {
         eventKey: Hash,
         start: Int,
         endOpt: Option[Int]
-    ): IOResult[AVector[LogStates]] = {
+    )(isBlockInMainChain: BlockHash => Boolean): IOResult[AVector[LogStates]] = {
       lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
       lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
 
