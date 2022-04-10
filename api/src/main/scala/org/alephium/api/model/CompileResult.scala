@@ -27,7 +27,7 @@ final case class CompileScriptResult(
     functions: AVector[CompileResult.FunctionSig],
     events: AVector[CompileResult.EventSig]
 ) {
-  // this only work for script without template variables
+  // this only works for script without template variables
   def codeHashUnsafe(): Hash = {
     Hash.hash(Hex.unsafe(bytecode))
   }
@@ -49,10 +49,10 @@ final case class CompileContractResult(
     functions: AVector[CompileResult.FunctionSig],
     events: AVector[CompileResult.EventSig]
 ) {
-  // this only work for contract without template variables
+  // this only works for contract without template variables
   def bytecodeUnsafe: String = compiled.asInstanceOf[SimpleContractByteCode].bytecode
 
-  // this only work for contract without template variables
+  // this only works for contract without template variables
   def codeHashUnsafe(): Hash = {
     Hash.hash(Hex.unsafe(compiled.asInstanceOf[SimpleContractByteCode].bytecode))
   }

@@ -136,18 +136,15 @@ object Compiler {
   sealed trait VarInfo {
     def tpe: Type
     def isMutable: Boolean
-    def index: Byte
   }
   object VarInfo {
     final case class Local(tpe: Type, isMutable: Boolean, index: Byte) extends VarInfo
     final case class Field(tpe: Type, isMutable: Boolean, index: Byte) extends VarInfo
     final case class Template(tpe: Type) extends VarInfo {
       def isMutable: Boolean = false
-      def index: Byte        = ???
     }
     final case class ArrayRef(isMutable: Boolean, ref: ArrayTransformer.ArrayRef) extends VarInfo {
-      def tpe: Type   = ref.tpe
-      def index: Byte = ???
+      def tpe: Type = ref.tpe
     }
   }
   trait ContractFunc[Ctx <: StatelessContext] extends FuncInfo[Ctx] {
@@ -371,6 +368,7 @@ object Compiler {
         .filterKeys(_.startsWith(func.name))
         .values
         .filter(_.isInstanceOf[VarInfo.Local])
+        .map(_.asInstanceOf[VarInfo.Local])
         .toSeq
         .sortBy(_.index)
     }
@@ -466,21 +464,19 @@ object Compiler {
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatelessContext]] = {
-      val varInfo = getVariable(ident)
       getVariable(ident) match {
         case _: VarInfo.Field    => throw Error("Script should not have fields")
-        case _: VarInfo.Local    => Seq(LoadLocal(varInfo.index))
-        case _: VarInfo.Template => Seq(Placeholder(ident.name, varInfo.tpe.toVal))
+        case v: VarInfo.Local    => Seq(LoadLocal(v.index))
+        case v: VarInfo.Template => Seq(TemplateVariable(ident.name, v.tpe.toVal))
         case _: VarInfo.ArrayRef => getArrayRef(ident).vars.flatMap(genLoadCode)
       }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genStoreCode(ident: Ast.Ident): Seq[Instr[StatelessContext]] = {
-      val varInfo = getVariable(ident)
       getVariable(ident) match {
         case _: VarInfo.Field      => throw Error("Script should not have fields")
-        case _: VarInfo.Local      => Seq(StoreLocal(varInfo.index))
+        case v: VarInfo.Local      => Seq(StoreLocal(v.index))
         case _: VarInfo.Template   => throw Error(s"Unexpected template variable: ${ident.name}")
         case ref: VarInfo.ArrayRef => ref.ref.vars.flatMap(genStoreCode)
       }
@@ -506,19 +502,18 @@ object Compiler {
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
       val varInfo = getVariable(ident)
       getVariable(ident) match {
-        case _: VarInfo.Field    => Seq(LoadField(varInfo.index))
-        case _: VarInfo.Local    => Seq(LoadLocal(varInfo.index))
-        case _: VarInfo.Template => Seq(Placeholder(ident.name, varInfo.tpe.toVal))
+        case v: VarInfo.Field    => Seq(LoadField(v.index))
+        case v: VarInfo.Local    => Seq(LoadLocal(v.index))
+        case _: VarInfo.Template => Seq(TemplateVariable(ident.name, varInfo.tpe.toVal))
         case _: VarInfo.ArrayRef => getArrayRef(ident).vars.flatMap(genLoadCode)
       }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genStoreCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
-      val varInfo = getVariable(ident)
       getVariable(ident) match {
-        case _: VarInfo.Field      => Seq(StoreField(varInfo.index))
-        case _: VarInfo.Local      => Seq(StoreLocal(varInfo.index))
+        case v: VarInfo.Field      => Seq(StoreField(v.index))
+        case v: VarInfo.Local      => Seq(StoreLocal(v.index))
         case _: VarInfo.Template   => throw Error(s"Unexpected template variable: ${ident.name}")
         case ref: VarInfo.ArrayRef => ref.ref.vars.flatMap(genStoreCode)
       }

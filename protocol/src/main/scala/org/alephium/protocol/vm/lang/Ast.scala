@@ -764,9 +764,6 @@ object Ast {
           Seq(LoadContractFields)
       }
 
-    def getFieldsSignature(): String
-    def getFieldTypes(): Seq[String]
-
     def eventsInfo(): Seq[Compiler.EventInfo] = {
       if (events.distinctBy(_.id).size != events.size) {
         val duplicates = UniqueDef.duplicates(events)
@@ -786,10 +783,6 @@ object Ast {
     val fields: Seq[Argument]                  = Seq.empty
     val events: Seq[EventDef]                  = Seq.empty
     val inheritances: Seq[ContractInheritance] = Seq.empty
-
-    def getFieldsSignature(): String =
-      s"TxScript ${name}(${fields.map(_.signature).mkString(",")})"
-    def getFieldTypes(): Seq[String] = fields.map(_.tpe.signature)
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
