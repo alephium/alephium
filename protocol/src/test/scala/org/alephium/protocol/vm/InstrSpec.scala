@@ -2167,6 +2167,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         case i: LoadContractFields.type => i.gas(3) is gas
         case i: GasSimple               => i.gas().value is gas
         case i: GasFormula              => i.gas(32).value is gas
+        case _: Placeholder             => ???
       }
     }
     def testToByteVec(instr: ToByteVecInstr[_], gas: Int) = instr match {

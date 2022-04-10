@@ -353,11 +353,11 @@ trait Endpoints
       .in(jsonBody[MinerAddresses])
       .summary("Update miner's addresses, but better to use user.conf instead")
 
-  val compileScript: BaseEndpoint[Compile.Script, CompileResult] =
+  val compileScript: BaseEndpoint[Compile.Script, CompileScriptResult] =
     contractsEndpoint.post
       .in("compile-script")
       .in(jsonBody[Compile.Script])
-      .out(jsonBody[CompileResult])
+      .out(jsonBody[CompileScriptResult])
       .summary("Compile a script")
 
   val buildScript: BaseEndpoint[BuildScriptTx, BuildScriptTxResult] =
@@ -367,11 +367,11 @@ trait Endpoints
       .out(jsonBody[BuildScriptTxResult])
       .summary("Build an unsigned script")
 
-  val compileContract: BaseEndpoint[Compile.Contract, CompileResult] =
+  val compileContract: BaseEndpoint[Compile.Contract, CompileContractResult] =
     contractsEndpoint.post
       .in("compile-contract")
       .in(jsonBody[Compile.Contract])
-      .out(jsonBody[CompileResult])
+      .out(jsonBody[CompileContractResult])
       .summary("Compile a smart contract")
 
   val buildContract: BaseEndpoint[BuildContractDeployScriptTx, BuildContractDeployScriptTxResult] =

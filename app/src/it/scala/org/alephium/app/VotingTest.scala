@@ -280,11 +280,11 @@ trait WalletFixture extends CliqueFixture {
       initialFields: Option[AVector[Val]],
       issueTokenAmount: Option[U256]
   ): ContractRef = {
-    val compileResult = request[CompileResult](compileContract(code), restPort)
+    val compileResult = request[CompileContractResult](compileContract(code), restPort)
     val buildResult = request[BuildContractDeployScriptTxResult](
       buildContract(
         fromPublicKey = wallet.publicKey.toHexString,
-        code = compileResult.bytecode,
+        code = compileResult.bytecodeUnsafe,
         initialFields = initialFields,
         issueTokenAmount = issueTokenAmount
       ),
@@ -305,7 +305,7 @@ trait WalletFixture extends CliqueFixture {
   }
 
   def script(publicKey: String, code: String, walletName: String) = {
-    val compileResult = request[CompileResult](compileScript(code), restPort)
+    val compileResult = request[CompileScriptResult](compileScript(code), restPort)
     val buildResult = request[BuildScriptTxResult](
       buildScript(
         fromPublicKey = publicKey,

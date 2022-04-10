@@ -313,10 +313,8 @@ object Compiler {
         case c: Type.Contract =>
           val varType = Type.Contract.local(c.id, ident)
           varTable(sname) = VarInfo.Template(varType)
-          varIndex += 1
         case _ =>
           varTable(sname) = VarInfo.Template(tpe)
-          varIndex += 1
       }
     }
     def addFieldVariable(ident: Ast.Ident, tpe: Type, isMutable: Boolean): Unit = {

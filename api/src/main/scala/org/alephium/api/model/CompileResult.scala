@@ -16,44 +16,78 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.{vm, Hash}
-import org.alephium.protocol.vm.StatefulContext
+import org.alephium.protocol.Hash
+import org.alephium.protocol.vm.{StatefulContext, StatefulContract, StatefulScript}
 import org.alephium.protocol.vm.lang.Ast
-import org.alephium.serde.{serialize, Serde}
+import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex}
 
-final case class CompileResult(
+final case class CompileScriptResult(
     bytecode: String,
-    codeHash: Hash,
+    functions: AVector[CompileResult.FunctionSig],
+    events: AVector[CompileResult.EventSig]
+) {
+  // this only work for script without template variables
+  def codeHashUnsafe(): Hash = {
+    Hash.hash(Hex.unsafe(bytecode))
+  }
+}
+
+object CompileScriptResult {
+  def from(script: StatefulScript, contractAst: Ast.TxScript): CompileScriptResult = {
+    CompileScriptResult(
+      script.toScriptString(),
+      functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
+      events = AVector.from(contractAst.events.map(CompileResult.EventSig.from))
+    )
+  }
+}
+
+final case class CompileContractResult(
+    compiled: CompiledContractTrait,
     fields: CompileResult.FieldsSig,
     functions: AVector[CompileResult.FunctionSig],
     events: AVector[CompileResult.EventSig]
-)
+) {
+  // this only work for contract without template variables
+  def bytecodeUnsafe: String = compiled.asInstanceOf[SimpleContractByteCode].bytecode
 
-object CompileResult {
+  // this only work for contract without template variables
+  def codeHashUnsafe(): Hash = {
+    Hash.hash(Hex.unsafe(compiled.asInstanceOf[SimpleContractByteCode].bytecode))
+  }
+}
 
-  def from[T <: vm.Contract[_]: Serde](
-      contract: T,
-      contractAst: Ast.ContractWithState
-  ): CompileResult = {
-    val (bytecode, codeHash) = contract match {
-      case script: vm.Script[_] =>
-        val bytecode = script.toScriptString()
-        (bytecode, Hash.hash(bytecode))
-      case contract =>
-        val bytecode = serialize(contract)
-        (Hex.toHexString(bytecode), Hash.hash(bytecode))
+object CompileContractResult {
+  def from(contract: StatefulContract, contractAst: Ast.TxContract): CompileContractResult = {
+    val bytecode: CompiledContractTrait = if (contractAst.templateVars.isEmpty) {
+      SimpleContractByteCode(Hex.toHexString(serialize(contract)))
+    } else {
+      TemplateContractByteCode(contract.fieldLength, contract.methods.map(_.toScriptString()))
     }
-    val fields =
-      FieldsSig(contractAst.getFieldsSignature(), AVector.from(contractAst.getFieldTypes()))
-    CompileResult(
-      bytecode = bytecode,
-      codeHash = codeHash,
-      fields = fields,
-      functions = AVector.from(contractAst.funcs.view.map(FunctionSig.from)),
-      events = AVector.from(contractAst.events.map(EventSig.from))
+    val fields = CompileResult.FieldsSig(
+      contractAst.getFieldsSignature(),
+      AVector.from(contractAst.getFieldTypes())
+    )
+    CompileContractResult(
+      bytecode,
+      fields,
+      functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
+      events = AVector.from(contractAst.events.map(CompileResult.EventSig.from))
     )
   }
+}
+
+sealed trait CompiledContractTrait
+final case class TemplateContractByteCode(
+    filedLength: Int,
+    methodsByteCode: AVector[String]
+) extends CompiledContractTrait
+final case class SimpleContractByteCode(
+    bytecode: String
+) extends CompiledContractTrait
+
+object CompileResult {
 
   final case class FieldsSig(signature: String, types: AVector[String])
 

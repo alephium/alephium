@@ -815,7 +815,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode CompilerResult" in new TypeSignatureFixture {
-    val result0 = CompileResult.from(contract, contractAst)
+    val result0 = CompileContractResult.from(contract, contractAst)
     val jsonRaw0 =
       """
         |{
@@ -844,7 +844,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |""".stripMargin
     write(result0).filter(!_.isWhitespace) is jsonRaw0.filter(!_.isWhitespace)
 
-    val result1 = CompileResult.from(script, scriptAst)
+    val result1 = CompileScriptResult.from(script, scriptAst)
     val jsonRaw1 =
       """
         |{

@@ -1125,68 +1125,94 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState.fields is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
     result.returns is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
     if (isPublic.nonEmpty) {
-      contractState.codeHash is compileResult.codeHash
+      contractState.codeHash is compileResult.codeHashUnsafe()
       result.originalCodeHash is result.testCodeHash
       contractState.codeHash is result.originalCodeHash
     } else {
-      contractState.codeHash isnot compileResult.codeHash
+      contractState.codeHash isnot compileResult.codeHashUnsafe()
       result.originalCodeHash isnot result.testCodeHash
       contractState.codeHash is result.testCodeHash
     }
   }
 
   it should "compile contract" in new Fixture {
-    val rawCode =
-      s"""
-         |TxContract Foo() {
-         |  pub fn foo() -> () {
-         |    assert!(1 != 2)
-         |  }
-         |}
-         |""".stripMargin
-    val code = Compiler.compileContract(rawCode).rightValue
+    val expectedMethodByteCode = "010000000004{x:U256}a000304d"
+    val serverUtils            = new ServerUtils()
 
-    val serverUtils = new ServerUtils()
-    val query       = Compile.Contract(rawCode)
-    val result      = serverUtils.compileContract(query).rightValue
-    result.bytecode is "00010a0100000000040d0e304d"
-    result.bytecode is Hex.toHexString(serialize(code))
-    result.codeHash is code.hash
+    {
+      val rawCode =
+        s"""
+           |TxContract Foo<x: U256>(y: U256) {
+           |  pub fn foo() -> () {
+           |    assert!(x != y)
+           |  }
+           |}
+           |""".stripMargin
+      val query  = Compile.Contract(rawCode)
+      val result = serverUtils.compileContract(query).rightValue
+      result.compiled is TemplateContractByteCode(1, AVector(expectedMethodByteCode))
+    }
+
+    {
+      val rawCode =
+        s"""
+           |TxContract Foo(y: U256) {
+           |  pub fn foo() -> () {
+           |    assert!(1 != y)
+           |  }
+           |}
+           |""".stripMargin
+      val code   = Compiler.compileContract(rawCode).rightValue
+      val query  = Compile.Contract(rawCode)
+      val result = serverUtils.compileContract(query).rightValue
+
+      val compiledCode = result.bytecodeUnsafe
+      compiledCode is Hex.toHexString(serialize(code))
+      compiledCode is {
+        val replaced     = expectedMethodByteCode.replace("{x:U256}", "0d") // bytecode of U256Const1
+        val methodLength = Hex.toHexString(IndexedSeq((replaced.length / 2).toByte))
+        s"0101$methodLength" + replaced
+      }
+    }
   }
 
   it should "compile script" in new Fixture {
-    val rawCode =
-      s"""
-         |TxScript Main<x: U256, y: U256> {
-         |  pub fn main() -> () {
-         |    assert!(x != y)
-         |  }
-         |}
-         |""".stripMargin
-
-    val serverUtils      = new ServerUtils()
-    val query            = Compile.Script(rawCode)
-    val result           = serverUtils.compileScript(query).rightValue
     val expectedByteCode = "01010000000004{x:U256}{y:U256}304d"
-    result.bytecode is expectedByteCode
-    result.codeHash is Hash.hash(expectedByteCode)
-    result.fields is CompileResult.FieldsSig(
-      "TxScript Main()",
-      AVector.empty
-    )
+    val serverUtils      = new ServerUtils()
 
-    val hardCodedCode =
-      s"""
-         |TxScript Main {
-         |  pub fn main() -> () {
-         |    assert!(1 != 2)
-         |  }
-         |}
-         |""".stripMargin
-    val code = Compiler.compileTxScript(hardCodedCode).rightValue
-    Hex.toHexString(serialize(code)) is expectedByteCode
-      .replace("{x:U256}", "0d") // bytecode of U256Const1
-      .replace("{y:U256}", "0e") // bytecode of U256Const2
+    {
+      val rawCode =
+        s"""
+           |TxScript Main<x: U256, y: U256> {
+           |  pub fn main() -> () {
+           |    assert!(x != y)
+           |  }
+           |}
+           |""".stripMargin
+
+      val query  = Compile.Script(rawCode)
+      val result = serverUtils.compileScript(query).rightValue
+      result.bytecode is expectedByteCode
+    }
+
+    {
+      val rawCode =
+        s"""
+           |TxScript Main {
+           |  pub fn main() -> () {
+           |    assert!(1 != 2)
+           |  }
+           |}
+           |""".stripMargin
+      val code   = Compiler.compileTxScript(rawCode).rightValue
+      val query  = Compile.Script(rawCode)
+      val result = serverUtils.compileScript(query).rightValue
+
+      result.bytecode is Hex.toHexString(serialize(code))
+      result.bytecode is expectedByteCode
+        .replace("{x:U256}", "0d") // bytecode of U256Const1
+        .replace("{y:U256}", "0e") // bytecode of U256Const2
+    }
   }
 
   private def generateDestination(
