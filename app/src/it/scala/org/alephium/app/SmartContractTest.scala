@@ -548,7 +548,7 @@ object SwapContracts {
     """.stripMargin
 
   def tokenWithdrawTxScript(address: String, tokenContractKey: Hash, tokenAmount: U256) = s"""
-    |TxScript Main() {
+    |TxScript Main {
     |  pub payable fn main() -> () {
     |    let token = Token(#${tokenContractKey.toHexString})
     |    token.withdraw(@${address}, $tokenAmount)
@@ -612,8 +612,7 @@ object SwapContracts {
       swapContractKey: Hash,
       tokenId: Hash,
       tokenAmount: U256
-  ) =
-    s"""
+  ) = s"""
     |TxScript Main() {
     |  pub payable fn main() -> () {
     |    approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
