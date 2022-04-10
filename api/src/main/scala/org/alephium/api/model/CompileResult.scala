@@ -79,10 +79,12 @@ object CompileContractResult {
 }
 
 sealed trait CompiledContractTrait
+@upickle.implicits.key("TemplateContractByteCode")
 final case class TemplateContractByteCode(
     filedLength: Int,
     methodsByteCode: AVector[String]
 ) extends CompiledContractTrait
+@upickle.implicits.key("SimpleContractByteCode")
 final case class SimpleContractByteCode(
     bytecode: String
 ) extends CompiledContractTrait
