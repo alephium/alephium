@@ -589,7 +589,6 @@ trait EndpointsExamples extends ErrorExamples {
     address = Address.contract(anotherContractId),
     bytecode = code,
     artifactId = code.hash,
-    codeHash = code.hash,
     fields = AVector[Val](ValU256(ALPH.alph(2))),
     asset = asset(2)
   )

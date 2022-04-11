@@ -898,7 +898,6 @@ class ServerUtils(implicit
     } yield ContractState(
       Address.contract(contractId),
       contract,
-      contract.hash,
       artifactId,
       state.fields.map(Val.from),
       AssetState.from(contractOutput)

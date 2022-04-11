@@ -1125,7 +1125,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts.length is 1
     contractState.fields is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
     result.returns is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
-    contractState.codeHash is compileResult.codeHashUnsafe()
+    contractState.artifactId is compileResult.codeHashUnsafe()
     result.artifactId is result.artifactId
   }
 
