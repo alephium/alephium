@@ -9341,7 +9341,8 @@
         "type": "object",
         "properties": {
           "bytecode": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           },
           "type": {
             "type": "string"
@@ -9356,7 +9357,8 @@
         "type": "object",
         "properties": {
           "bytecode": {
-            "type": "string"
+            "type": "string",
+            "format": "byte-string"
           },
           "type": {
             "type": "string"

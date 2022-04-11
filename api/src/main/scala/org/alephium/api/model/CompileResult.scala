@@ -16,6 +16,8 @@
 
 package org.alephium.api.model
 
+import akka.util.ByteString
+
 import org.alephium.protocol.Hash
 import org.alephium.protocol.vm.{StatefulContext, StatefulContract, StatefulScript}
 import org.alephium.protocol.vm.lang.Ast
@@ -28,11 +30,11 @@ final case class CompileScriptResult(
     events: AVector[CompileResult.EventSig]
 ) {
   // this only works for script without template variables
-  def bytecodeUnsafe: String = compiled.asInstanceOf[SimpleScriptByteCode].bytecode
+  def bytecodeUnsafe: String = Hex.toHexString(compiled.asInstanceOf[SimpleScriptByteCode].bytecode)
 
   // this only works for script without template variables
   def codeHashUnsafe: Hash = {
-    Hash.hash(Hex.unsafe(compiled.asInstanceOf[SimpleScriptByteCode].bytecode))
+    Hash.hash(compiled.asInstanceOf[SimpleScriptByteCode].bytecode)
   }
 }
 
@@ -43,13 +45,13 @@ final case class TemplateScriptByteCode(
 ) extends CompiledScriptTrait
 @upickle.implicits.key("SimpleScriptByteCode")
 final case class SimpleScriptByteCode(
-    bytecode: String
+    bytecode: ByteString
 ) extends CompiledScriptTrait
 
 object CompileScriptResult {
   def from(script: StatefulScript, scriptAst: Ast.TxScript): CompileScriptResult = {
     val compiled: CompiledScriptTrait = if (scriptAst.templateVars.isEmpty) {
-      SimpleScriptByteCode(script.toTemplateString())
+      SimpleScriptByteCode(serialize(script))
     } else {
       TemplateScriptByteCode(script.toTemplateString())
     }
@@ -68,18 +70,19 @@ final case class CompileContractResult(
     events: AVector[CompileResult.EventSig]
 ) {
   // this only works for contract without template variables
-  def bytecodeUnsafe: String = compiled.asInstanceOf[SimpleContractByteCode].bytecode
+  def bytecodeUnsafe: String =
+    Hex.toHexString(compiled.asInstanceOf[SimpleContractByteCode].bytecode)
 
   // this only works for contract without template variables
   def codeHashUnsafe: Hash = {
-    Hash.hash(Hex.unsafe(compiled.asInstanceOf[SimpleContractByteCode].bytecode))
+    Hash.hash(compiled.asInstanceOf[SimpleContractByteCode].bytecode)
   }
 }
 
 object CompileContractResult {
   def from(contract: StatefulContract, contractAst: Ast.TxContract): CompileContractResult = {
     val bytecode: CompiledContractTrait = if (contractAst.templateVars.isEmpty) {
-      SimpleContractByteCode(Hex.toHexString(serialize(contract)))
+      SimpleContractByteCode(serialize(contract))
     } else {
       TemplateContractByteCode(contract.fieldLength, contract.methods.map(_.toTemplateString()))
     }
@@ -104,7 +107,7 @@ final case class TemplateContractByteCode(
 ) extends CompiledContractTrait
 @upickle.implicits.key("SimpleContractByteCode")
 final case class SimpleContractByteCode(
-    bytecode: String
+    bytecode: ByteString
 ) extends CompiledContractTrait
 
 object CompileResult {
