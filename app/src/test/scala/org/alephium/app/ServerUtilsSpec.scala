@@ -1125,7 +1125,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts.length is 1
     contractState.fields is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
     result.returns is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
-    contractState.artifactId is compileResult.codeHashUnsafe()
+    contractState.artifactId is compileResult.codeHashUnsafe
     result.artifactId is result.artifactId
   }
 
@@ -1186,7 +1186,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       val query  = Compile.Script(rawCode)
       val result = serverUtils.compileScript(query).rightValue
-      result.bytecode is expectedByteCode
+      result.compiled is TemplateScriptByteCode(expectedByteCode)
     }
 
     {
@@ -1202,8 +1202,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       val query  = Compile.Script(rawCode)
       val result = serverUtils.compileScript(query).rightValue
 
-      result.bytecode is Hex.toHexString(serialize(code))
-      result.bytecode is expectedByteCode
+      result.bytecodeUnsafe is Hex.toHexString(serialize(code))
+      result.bytecodeUnsafe is expectedByteCode
         .replace("{x:U256}", "0d") // bytecode of U256Const1
         .replace("{y:U256}", "0e") // bytecode of U256Const2
     }

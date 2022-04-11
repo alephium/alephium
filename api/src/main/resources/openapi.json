@@ -5452,7 +5452,10 @@
                   "$ref": "#/components/schemas/CompileScriptResult"
                 },
                 "example": {
-                  "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "compiled": {
+                    "type": "SimpleScriptByteCode",
+                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                  },
                   "functions": [
                     {
                       "name": "bar",
@@ -8503,14 +8506,14 @@
       },
       "CompileScriptResult": {
         "required": [
-          "bytecode",
+          "compiled",
           "functions",
           "events"
         ],
         "type": "object",
         "properties": {
-          "bytecode": {
-            "type": "string"
+          "compiled": {
+            "$ref": "#/components/schemas/CompiledScriptTrait"
           },
           "functions": {
             "type": "array",
@@ -8533,6 +8536,19 @@
           },
           {
             "$ref": "#/components/schemas/TemplateContractByteCode"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type"
+        }
+      },
+      "CompiledScriptTrait": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SimpleScriptByteCode"
+          },
+          {
+            "$ref": "#/components/schemas/TemplateScriptByteCode"
           }
         ],
         "discriminator": {
@@ -9332,6 +9348,21 @@
           }
         }
       },
+      "SimpleScriptByteCode": {
+        "required": [
+          "bytecode",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "bytecode": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "SubmitMultisig": {
         "required": [
           "unsignedTx",
@@ -9436,6 +9467,21 @@
             "items": {
               "type": "string"
             }
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "TemplateScriptByteCode": {
+        "required": [
+          "templateByteCode",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "templateByteCode": {
+            "type": "string"
           },
           "type": {
             "type": "string"

@@ -850,7 +850,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 =
       """
         |{
-        |  "bytecode": "0101000707060716011602160316041605160602",
+        |  "compiled": {
+        |    "type": "SimpleScriptByteCode",
+        |    "bytecode": "0101000707060716011602160316041605160602"
+        |  },
         |  "functions": [
         |    {
         |      "name": "bar",

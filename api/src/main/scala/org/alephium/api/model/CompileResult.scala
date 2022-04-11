@@ -23,22 +23,40 @@ import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex}
 
 final case class CompileScriptResult(
-    bytecode: String,
+    compiled: CompiledScriptTrait,
     functions: AVector[CompileResult.FunctionSig],
     events: AVector[CompileResult.EventSig]
 ) {
   // this only works for script without template variables
-  def codeHashUnsafe(): Hash = {
-    Hash.hash(Hex.unsafe(bytecode))
+  def bytecodeUnsafe: String = compiled.asInstanceOf[SimpleScriptByteCode].bytecode
+
+  // this only works for script without template variables
+  def codeHashUnsafe: Hash = {
+    Hash.hash(Hex.unsafe(compiled.asInstanceOf[SimpleScriptByteCode].bytecode))
   }
 }
 
+sealed trait CompiledScriptTrait
+@upickle.implicits.key("TemplateScriptByteCode")
+final case class TemplateScriptByteCode(
+    templateByteCode: String
+) extends CompiledScriptTrait
+@upickle.implicits.key("SimpleScriptByteCode")
+final case class SimpleScriptByteCode(
+    bytecode: String
+) extends CompiledScriptTrait
+
 object CompileScriptResult {
-  def from(script: StatefulScript, contractAst: Ast.TxScript): CompileScriptResult = {
+  def from(script: StatefulScript, scriptAst: Ast.TxScript): CompileScriptResult = {
+    val compiled: CompiledScriptTrait = if (scriptAst.templateVars.isEmpty) {
+      SimpleScriptByteCode(script.toTemplateString())
+    } else {
+      TemplateScriptByteCode(script.toTemplateString())
+    }
     CompileScriptResult(
-      script.toTemplateString(),
-      functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
-      events = AVector.from(contractAst.events.map(CompileResult.EventSig.from))
+      compiled = compiled,
+      functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from)),
+      events = AVector.from(scriptAst.events.map(CompileResult.EventSig.from))
     )
   }
 }
@@ -53,7 +71,7 @@ final case class CompileContractResult(
   def bytecodeUnsafe: String = compiled.asInstanceOf[SimpleContractByteCode].bytecode
 
   // this only works for contract without template variables
-  def codeHashUnsafe(): Hash = {
+  def codeHashUnsafe: Hash = {
     Hash.hash(Hex.unsafe(compiled.asInstanceOf[SimpleContractByteCode].bytecode))
   }
 }

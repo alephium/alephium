@@ -687,7 +687,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     request[BuildScriptTxResult](
       buildScript(
         fromPublicKey = publicKey,
-        code = compileResult.bytecode,
+        code = compileResult.bytecodeUnsafe,
         alphAmount,
         gas,
         gasPrice

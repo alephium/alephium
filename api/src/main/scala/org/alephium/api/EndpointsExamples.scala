@@ -479,7 +479,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val compileScriptResultExamples: List[Example[CompileScriptResult]] =
     simpleExample(
       CompileScriptResult(
-        bytecode = hexString,
+        compiled = SimpleScriptByteCode(hexString),
         functions = AVector(
           CompileResult.FunctionSig(
             name = "bar",

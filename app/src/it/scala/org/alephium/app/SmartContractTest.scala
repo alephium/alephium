@@ -129,7 +129,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
       val compileResult = request[CompileScriptResult](compileScript(code), restPort)
       val script = deserialize[StatefulScript](
-        Hex.unsafe(compileResult.bytecode)
+        Hex.unsafe(compileResult.bytecodeUnsafe)
       ).rightValue
 
       val blockFlow    = clique.servers(group.group % 2).node.blockFlow
