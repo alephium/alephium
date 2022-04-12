@@ -6183,6 +6183,7 @@
                   "$ref": "#/components/schemas/TestContractResult"
                 },
                 "example": {
+                  "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
                   "artifactId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "returns": [
                     {
@@ -9548,6 +9549,7 @@
       },
       "TestContractResult": {
         "required": [
+          "address",
           "artifactId",
           "returns",
           "gasUsed",
@@ -9557,6 +9559,10 @@
         ],
         "type": "object",
         "properties": {
+          "address": {
+            "type": "string",
+            "format": "address"
+          },
           "artifactId": {
             "type": "string",
             "format": "32-byte-hash"

@@ -16,9 +16,11 @@
 
 package org.alephium.api.model
 
+import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 
 final case class TestContractResult(
+    address: Address.Contract,
     artifactId: ArtifactId,
     returns: AVector[Val],
     gasUsed: Int,
