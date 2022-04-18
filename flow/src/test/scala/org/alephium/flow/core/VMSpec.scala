@@ -1547,6 +1547,40 @@ class VMSpec extends AlephiumSpec {
     testEventLogState2.fields(3) is Val.Bool(true)
   }
 
+  it should "emit events for at most 8 fields" in new EventFixture {
+    def contractRaw: String =
+      s"""
+         |TxContract Foo(tmp: U256) {
+         |  event Foo(a1: U256, a2: U256, a3: U256, a4: U256, a5: U256, a6: U256, a7: U256, a8: U256)
+         |
+         |  pub fn foo() -> () {
+         |    emit Foo(1, 2, 3, 4, 5, 6, 7, 8)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    def callingScriptRaw: String =
+      s"""
+         |$contractRaw
+         |
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    Foo(#${contractId.toHexString}).foo()
+         |  }
+         |}
+         |""".stripMargin
+
+    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, callingBlock.hash, contractId)
+    val logStates    = logStatesOpt.value
+
+    logStates.blockHash is callingBlock.hash
+    logStates.eventKey is contractId
+    logStates.states.length is 1
+    val logState = logStates.states.head
+    logState.index is 0.toByte
+    logState.fields.map(_.asInstanceOf[Val.U256].v.toIntUnsafe) is AVector.tabulate(8)(_ + 1)
+  }
+
   it should "not compile when emitting events with array field types" in new FlowFixture {
     def contractRaw: String =
       s"""
@@ -1695,7 +1729,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxContract Foo() {
          |  pub fn foo() -> () {
-         |    let bytes = encode!(true, 1, false)
+         |    let bytes = encodeToByteVec!(true, 1, false)
          |    assert!(bytes == #03000102010000)
          |  }
          |}

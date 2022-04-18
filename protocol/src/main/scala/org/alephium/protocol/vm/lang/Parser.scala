@@ -18,7 +18,7 @@ package org.alephium.protocol.vm.lang
 
 import fastparse._
 
-import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
+import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.util.U256
 
 // scalastyle:off number.of.methods
@@ -181,7 +181,12 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
   def eventFields[_: P]: P[Seq[Ast.EventField]] = P("(" ~ eventField.rep(0, ",") ~ ")")
   def event[_: P]: P[Ast.EventDef] = P(Lexer.keyword("event") ~/ Lexer.typeId ~ eventFields)
-    .map { case (typeId, fields) => Ast.EventDef(typeId, fields) }
+    .map { case (typeId, fields) =>
+      if (fields.length >= Instr.allLogInstrs.length) {
+        throw Compiler.Error("Max 8 fields allowed for contract events")
+      }
+      Ast.EventDef(typeId, fields)
+    }
 
   def funcCall[_: P]: P[Ast.FuncCall[Ctx]] =
     callAbs.map { case (funcId, exprs) => Ast.FuncCall(funcId, exprs) }
