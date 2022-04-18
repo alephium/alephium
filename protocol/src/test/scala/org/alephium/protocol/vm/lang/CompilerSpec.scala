@@ -1837,7 +1837,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val bar2: String =
         s"""
-           |TxContract Bar2() extends Foo2, Foo() {
+           |TxContract Bar2() extends Foo2, Foo1() {
            |  fn foo2() -> () {}
            |}
            |$foo1
