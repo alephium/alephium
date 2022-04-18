@@ -734,7 +734,7 @@ object Ast {
   sealed trait ContractWithState extends Contract[StatefulContext] {
     def ident: TypeId
     def name: String = ident.name
-    def inheritances: Seq[ContractInheritance]
+    def inheritances: Seq[Inheritance]
 
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
@@ -797,18 +797,22 @@ object Ast {
     }
   }
 
+  sealed trait Inheritance {
+    def parentId: TypeId
+  }
   final case class ContractInheritance(
       parentId: TypeId,
       templateVars: Seq[Ident],
       idents: Seq[Ident]
-  )
+  )                                                       extends Inheritance
+  final case class InterfaceInheritance(parentId: TypeId) extends Inheritance
   final case class TxContract(
       ident: TypeId,
       templateVars: Seq[Argument],
       fields: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
-      inheritances: Seq[ContractInheritance]
+      inheritances: Seq[Inheritance]
   ) extends ContractWithState {
     def getFieldsSignature(): String =
       s"TxContract ${name}(${fields.map(_.signature).mkString(",")})"
@@ -827,7 +831,7 @@ object Ast {
       ident: TypeId,
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
-      inheritances: Seq[ContractInheritance]
+      inheritances: Seq[InterfaceInheritance]
   ) extends ContractWithState {
     def error(tpe: String): Compiler.Error =
       new Compiler.Error(s"Interface ${ident.name} does not contain any $tpe")
@@ -903,21 +907,21 @@ object Ast {
     def extendedContracts(): MultiTxContract = {
       val parentsCache = buildDependencies()
       val newContracts: Seq[ContractWithState] = contracts.map {
-        case script: TxScript => script
-        case contract =>
-          val (funcs, events) = MultiTxContract.extractFuncsAndEvents(parentsCache, contract)
-          if (contract.isInstanceOf[TxContract]) {
-            TxContract(
-              contract.ident,
-              contract.templateVars,
-              contract.fields,
-              funcs,
-              events,
-              contract.inheritances
-            )
-          } else {
-            ContractInterface(contract.ident, funcs, events, contract.inheritances)
-          }
+        case script: TxScript =>
+          script
+        case c: TxContract =>
+          val (funcs, events) = MultiTxContract.extractFuncsAndEvents(parentsCache, c)
+          TxContract(
+            c.ident,
+            c.templateVars,
+            c.fields,
+            funcs,
+            events,
+            c.inheritances
+          )
+        case i: ContractInterface =>
+          val (funcs, events) = MultiTxContract.extractFuncsAndEvents(parentsCache, i)
+          ContractInterface(i.ident, funcs, events, i.inheritances)
       }
       MultiTxContract(newContracts)
     }
@@ -952,18 +956,18 @@ object Ast {
   object MultiTxContract {
     def checkInheritanceFields(
         contract: ContractWithState,
-        inheritance: ContractInheritance,
+        inheritance: Inheritance,
         parentContract: ContractWithState
     ): Unit = {
-      (contract, parentContract) match {
-        case (c: TxContract, p: TxContract) => _checkInheritanceFields(c, inheritance, p)
-        case _                              => ()
+      inheritance match {
+        case i: ContractInheritance => _checkInheritanceFields(contract, i, parentContract)
+        case _                      => ()
       }
     }
     private def _checkInheritanceFields(
-        contract: TxContract,
+        contract: ContractWithState,
         inheritance: ContractInheritance,
-        parentContract: TxContract
+        parentContract: ContractWithState
     ): Unit = {
       val fields = inheritance.idents.map { ident =>
         contract.fields

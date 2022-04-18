@@ -307,7 +307,7 @@ object StatefulParser extends Parser[StatefulContext] {
       case (typeId, templateVars, fields) =>
         Ast.ContractInheritance(typeId, templateVars, fields)
     }
-  def contractInheritances[_: P]: P[Seq[Ast.ContractInheritance]] =
+  def contractInheritances[_: P]: P[Seq[Ast.Inheritance]] =
     P(Lexer.keyword("extends") ~/ (contractInheritance | interfaceInheritance).rep(1, ","))
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[_: P]: P[Ast.TxContract] =
@@ -331,17 +331,8 @@ object StatefulParser extends Parser[StatefulContext] {
   def contract[_: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def interfaceInheritance[_: P]: P[Ast.ContractInheritance] =
-    P(Lexer.typeId.rep(0, ","))
-      .map { typeIds =>
-        if (typeIds.length == 1) {
-          Ast.ContractInheritance(typeIds.head, Seq.empty, Seq.empty)
-        } else {
-          throw Compiler.Error(
-            s"Interface only supports single inheritance: ${typeIds.map(_.name).mkString(",")}"
-          )
-        }
-      }
+  def interfaceInheritance[_: P]: P[Ast.InterfaceInheritance] =
+    P(Lexer.typeId).map(Ast.InterfaceInheritance)
   def interfaceFunc[_: P]: P[Ast.FuncDef[StatefulContext]] =
     P(Lexer.funcModifier.rep(0) ~ Lexer.keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType)
       .map { case (modifiers, funcId, params, returnType) =>
@@ -356,9 +347,16 @@ object StatefulParser extends Parser[StatefulContext] {
   def rawInterface[_: P]: P[Ast.ContractInterface] =
     P(
       Lexer.keyword("Interface") ~/ Lexer.typeId ~
-        (Lexer.keyword("extends") ~/ interfaceInheritance).? ~
+        (Lexer.keyword("extends") ~/ interfaceInheritance.rep(1, ",")).? ~
         "{" ~ event.rep ~ interfaceFunc.rep ~ "}"
-    ).map { case (typeId, interfaceInheritance, events, funcs) =>
+    ).map { case (typeId, inheritances, events, funcs) =>
+      inheritances match {
+        case Some(parents) if parents.length > 1 =>
+          throw Compiler.Error(
+            s"Interface only supports single inheritance: ${parents.map(_.parentId.name).mkString(",")}"
+          )
+        case _ => ()
+      }
       if (funcs.length < 1) {
         throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
       } else {
@@ -366,7 +364,7 @@ object StatefulParser extends Parser[StatefulContext] {
           typeId,
           funcs,
           events,
-          interfaceInheritance.fold(Seq.empty[Ast.ContractInheritance])(Seq(_))
+          inheritances.getOrElse(Seq.empty)
         )
       }
     }

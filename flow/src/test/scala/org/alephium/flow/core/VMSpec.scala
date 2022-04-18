@@ -1264,13 +1264,19 @@ class VMSpec extends AlephiumSpec {
          |}
          |
          |TxContract Parent0(mut x: U256) extends Grandparent(x) {
+         |  event Parent0(x: U256)
+         |
          |  fn p0() -> () {
+         |    emit Parent0(1)
          |    gp()
          |  }
          |}
          |
          |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+         |  event Parent1(x: U256)
+         |
          |  fn p1() -> () {
+         |    emit Parent1(2)
          |    gp()
          |  }
          |}
@@ -1304,7 +1310,9 @@ class VMSpec extends AlephiumSpec {
         block.hash,
         contractOutputRef.key,
         AVector(
+          LogState(txId, 1, AVector(Val.U256(1))),
           LogState(txId, 0, AVector(Val.U256(1))),
+          LogState(txId, 2, AVector(Val.U256(2))),
           LogState(txId, 0, AVector(Val.U256(2))),
           LogState(txId, 0, AVector(Val.U256(3)))
         )
@@ -1758,7 +1766,7 @@ class VMSpec extends AlephiumSpec {
     errorMessage.contains(s"Right(TxScriptExeFailed(ContractAssetUnloaded") is true
   }
 
-  it should "test interface failed" in new ContractFixture {
+  it should "work with interface" in new ContractFixture {
     val interface =
       s"""
          |Interface I {
@@ -1804,7 +1812,7 @@ class VMSpec extends AlephiumSpec {
     callTxScript(main)
   }
 
-  it should "work with interface" in new ContractFixture {
+  it should "inherit interface events" in new ContractFixture {
     val foo: String =
       s"""
          |Interface Foo {
