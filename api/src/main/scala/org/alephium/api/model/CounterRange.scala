@@ -18,9 +18,7 @@ package org.alephium.api.model
 
 import sttp.tapir.{ValidationError, Validator}
 
-final case class CounterRange(startOpt: Option[Int], endOpt: Option[Int]) {
-  def start: Int = startOpt.getOrElse(0)
-}
+final case class CounterRange(start: Int, endOpt: Option[Int])
 
 object CounterRange {
   val validator: Validator[CounterRange] = Validator.custom { counterRange =>

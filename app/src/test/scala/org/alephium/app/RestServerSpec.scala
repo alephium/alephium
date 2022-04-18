@@ -123,7 +123,7 @@ abstract class RestServerSpec(
     }
     Get(s"/addresses/${dummyContractAddress}/group") check { response =>
       response.code is StatusCode.Ok
-      response.as[Group] is dummyContractGroup
+      response.as[Group] is Group(0)
     }
   }
 
@@ -373,10 +373,9 @@ abstract class RestServerSpec(
             response.code is StatusCode.Ok
             status is dummyTxStatus
           } else {
-            response.code is StatusCode.InternalServerError
-            response.as[ApiError.InternalServerError] is ApiError.InternalServerError(
-              s"${txId.toHexString} belongs to other groups"
-            )
+            val status = response.as[TxStatus]
+            response.code is StatusCode.Ok
+            status is TxNotFound
           }
         }
 

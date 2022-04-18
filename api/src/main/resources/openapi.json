@@ -7172,7 +7172,7 @@
           {
             "name": "start",
             "in": "query",
-            "required": false,
+            "required": true,
             "schema": {
               "type": "integer"
             }

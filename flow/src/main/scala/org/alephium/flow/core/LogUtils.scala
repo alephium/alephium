@@ -17,6 +17,7 @@
 package org.alephium.flow.core
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.IOResult
 import org.alephium.protocol.{BlockHash, Hash}
@@ -32,7 +33,9 @@ trait LogUtils { Self: FlowUtils =>
       start: Int,
       endOpt: Option[Int]
   )(isBlockInMainChain: BlockHash => Boolean): IOResult[AVector[LogStates]] = {
-    var allLogStates: Seq[LogStates] = Seq.empty
+    val end = endOpt.getOrElse(Int.MaxValue)
+
+    var allLogStates: ArrayBuffer[LogStates] = ArrayBuffer.empty
 
     def appendLogStates(logStates: LogStates): Unit = {
       if (isBlockInMainChain(logStates.blockHash)) {
@@ -41,27 +44,24 @@ trait LogUtils { Self: FlowUtils =>
     }
 
     @tailrec
-    def rec(worldState: WorldState.Persisted, logStatesId: LogStatesId): IOResult[Unit] = {
+    def rec(
+        worldState: WorldState.Persisted,
+        logStatesId: LogStatesId
+    ): IOResult[Unit] = {
       worldState.logState.getOpt(logStatesId) match {
         case Right(Some(logStates)) =>
           assume(logStates.states.nonEmpty)
           val newCounter = logStatesId.counter + logStates.states.length
-          endOpt match {
-            case None =>
-              appendLogStates(logStates)
-              rec(worldState, LogStatesId(eventKey, newCounter))
-            case Some(end) =>
-              if (end < newCounter) {
-                appendLogStates(
-                  logStates.copy(
-                    states = logStates.states.take(end - logStatesId.counter)
-                  )
-                )
-                Right(())
-              } else {
-                appendLogStates(logStates)
-                rec(worldState, LogStatesId(eventKey, newCounter))
-              }
+          if (end < newCounter) {
+            appendLogStates(
+              logStates.copy(
+                states = logStates.states.take(end - logStatesId.counter)
+              )
+            )
+            Right(())
+          } else {
+            appendLogStates(logStates)
+            rec(worldState, LogStatesId(eventKey, newCounter))
           }
         case Right(None) =>
           Right(())

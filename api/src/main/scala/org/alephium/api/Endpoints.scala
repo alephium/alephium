@@ -55,10 +55,10 @@ trait Endpoints
       .validate(TimeInterval.validator)
 
   private val counterQuery: EndpointInput[CounterRange] =
-    query[Option[Int]]("start")
+    query[Int]("start")
       .and(query[Option[Int]]("end"))
-      .map { case (fromOpt, toOpt) => CounterRange(fromOpt, toOpt) }(counterQuery =>
-        (counterQuery.startOpt, counterQuery.endOpt)
+      .map { case (start, endOpt) => CounterRange(start, endOpt) }(counterQuery =>
+        (counterQuery.start, counterQuery.endOpt)
       )
       .validate(CounterRange.validator)
 

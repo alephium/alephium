@@ -146,14 +146,13 @@ class ServerUtils(implicit
   }
 
   def getGroupForContract(blockFlow: BlockFlow, contractId: ContractId): Try[Group] = {
-    val failure: Try[Group] = Left(failed("Group not found.")).withRight[Group]
-    brokerConfig.groupRange.foldLeft(failure) { case (prevResult, currentGroup: Int) =>
-      prevResult match {
-        case Right(prevResult) => Right(prevResult)
-        case Left(_) =>
-          getContractGroup(blockFlow, contractId, GroupIndex.unsafe(currentGroup))
+    blockFlow
+      .getGroupForContract(contractId)
+      .map { groupIndex =>
+        Group(groupIndex.value)
       }
-    }
+      .left
+      .map(failed)
   }
 
   def listUnconfirmedTransactions(

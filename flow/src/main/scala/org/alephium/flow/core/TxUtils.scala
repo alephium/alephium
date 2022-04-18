@@ -405,16 +405,16 @@ trait TxUtils { Self: FlowUtils =>
         indexes: AVector[ChainIndex],
         currentRes: Either[String, Option[TxStatus]]
     ): Either[String, Option[TxStatus]] = {
-      if (indexes.isEmpty) {
-        currentRes
-      } else {
-        val index = indexes.head
-        val res   = getTransactionStatus(txId, index)
-        res match {
-          case Right(None) => rec(indexes.tail, res)
-          case Right(_)    => res
-          case Left(_)     => res
-        }
+      indexes.headOption match {
+        case Some(index) =>
+          val res = getTransactionStatus(txId, index)
+          res match {
+            case Right(None) => rec(indexes.tail, res)
+            case Right(_)    => res
+            case Left(_)     => res
+          }
+        case None =>
+          currentRes
       }
     }
     rec(chainIndexes, Right(None))
@@ -424,16 +424,19 @@ trait TxUtils { Self: FlowUtils =>
       txId: Hash,
       chainIndex: ChainIndex
   ): Either[String, Option[TxStatus]] = {
-    for {
-      _ <- checkTxChainIndex(chainIndex, txId)
-      status <- getTxStatus(txId, chainIndex)
-        .map {
-          case Some(status) => Some(status)
-          case None         => if (isInMemPool(txId, chainIndex)) Some(MemPooled) else None
-        }
-        .left
-        .map(_.toString)
-    } yield status
+    if (brokerConfig.contains(chainIndex.from)) {
+      for {
+        status <- getTxStatus(txId, chainIndex)
+          .map {
+            case Some(status) => Some(status)
+            case None         => if (isInMemPool(txId, chainIndex)) Some(MemPooled) else None
+          }
+          .left
+          .map(_.toString)
+      } yield status
+    } else {
+      Right(None)
+    }
   }
 
   def isInMemPool(txId: Hash, chainIndex: ChainIndex): Boolean = {
