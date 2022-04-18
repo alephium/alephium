@@ -672,6 +672,10 @@ class VMSpec extends AlephiumSpec {
          |      migrateWithState!(code, #010000)
          |    }
          |  }
+         |  
+         |  pub fn checkX(expected: Bool) -> () {
+         |    assert!(x == expected)
+         |  }
          |}
          |""".stripMargin
     val (fooId, _) = prepareContract(fooV1, AVector[Val](Val.True))
@@ -685,15 +689,21 @@ class VMSpec extends AlephiumSpec {
          |      migrate!(code)
          |    }
          |  }
+         |  
+         |  pub fn checkX(expected: Bool) -> () {
+         |    assert!(x == expected)
+         |  }
          |}
          |""".stripMargin
     val fooV2Code = Compiler.compileContract(fooV2).rightValue
 
-    def main(changeState: String): String =
+    def main(changeState: String, expected: String): String =
       s"""
          |TxScript Main {
          |  pub payable fn main() -> () {
-         |    Foo(#$fooId).foo(#${Hex.toHexString(serialize(fooV2Code))}, ${changeState})
+         |    let foo = Foo(#$fooId)
+         |    foo.foo(#${Hex.toHexString(serialize(fooV2Code))}, ${changeState})
+         |    foo.checkX(${expected})
          |  }
          |}
          |
@@ -702,7 +712,7 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("migrate without state change")
-      callTxScript(main("false"))
+      callTxScript(main("false", "true"))
       val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractKey = Hash.from(Hex.from(fooId).get).get
       val obj         = worldState.getContractObj(contractKey).rightValue
@@ -713,7 +723,7 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("migrate with state change")
-      callTxScript(main("true"))
+      callTxScript(main("true", "false"))
       val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractKey = Hash.from(Hex.from(fooId).get).get
       val obj         = worldState.getContractObj(contractKey).rightValue
@@ -790,9 +800,9 @@ class VMSpec extends AlephiumSpec {
          |$foo
          |""".stripMargin
     val script = Compiler.compileTxScript(main).rightValue
-    intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage.startsWith(
-      "Left(org.alephium.io.IOError$KeyNotFound: org.alephium.util.AppException: Key ContractOutputRef("
-    ) is true
+    val errorMessage =
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+    errorMessage.startsWith("Right(TxScriptExeFailed(UncaughtKeyNotFoundError") is true
   }
 
   it should "fetch block env" in new ContractFixture {
@@ -1643,11 +1653,11 @@ class VMSpec extends AlephiumSpec {
     val foo: String =
       s"""
          |TxContract Foo() {
-         |  pub payable fn foo(barId: ByteVec) -> () {
+         |  pub fn foo(barId: ByteVec) -> () {
          |    let bar = Bar(barId)
          |    bar.bar(selfContractId!())
          |  }
-         |  pub payable fn xx() -> () {
+         |  pub fn destroy() -> () {
          |    destroySelf!(txCaller!(0))
          |  }
          |}
@@ -1655,9 +1665,9 @@ class VMSpec extends AlephiumSpec {
     val bar: String =
       s"""
          |TxContract Bar() {
-         |  pub payable fn bar(fooId: ByteVec) -> () {
+         |  pub fn bar(fooId: ByteVec) -> () {
          |    let foo = Foo(fooId)
-         |    foo.xx()
+         |    foo.destroy()
          |  }
          |}
          |""".stripMargin
@@ -1677,7 +1687,7 @@ class VMSpec extends AlephiumSpec {
     val script = Compiler.compileTxScript(main).rightValue
     val errorMessage =
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
-    errorMessage.contains(s"Left(org.alephium.io.IOError") is true
+    errorMessage is "Right(TxScriptExeFailed(ContractDestructionShouldNotBeCalledFromSelf))"
   }
 
   it should "encode values" in new ContractFixture {
@@ -1707,13 +1717,17 @@ class VMSpec extends AlephiumSpec {
   it should "load contract fields" in new ContractFixture {
     val foo: String =
       s"""
-         |TxContract Foo(x: Bool, y: U256, z: Bool) {
+         |TxContract Foo(x: Bool, y: [[U256; 2]; 2], z: Bool) {
          |  pub fn foo() -> () {
          |    return
          |  }
          |}
          |""".stripMargin
-    val fooId = createContract(foo, AVector(Val.True, Val.U256(U256.One), Val.False)).key
+    val fooId =
+      createContract(
+        foo,
+        AVector(Val.True, Val.U256(1), Val.U256(2), Val.U256(3), Val.U256(4), Val.False)
+      ).key
     val main: String =
       s"""
          |TxScript Main {
@@ -1721,7 +1735,10 @@ class VMSpec extends AlephiumSpec {
          |    let foo = Foo(#${fooId.toHexString})
          |    let (x, y, z) = foo.loadFields!()
          |    assert!(x == true)
-         |    assert!(y == 1)
+         |    assert!(y[0][0] == 1)
+         |    assert!(y[0][1] == 2)
+         |    assert!(y[1][0] == 3)
+         |    assert!(y[1][1] == 4)
          |    assert!(z == false)
          |  }
          |}
@@ -1747,9 +1764,12 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  pub payable fn main() -> () {
+         |    Foo(#${fooId.toHexString}).foo()
          |    transferAlph!(txCaller!(0), @${fooAddress}, ${ALPH.alph(1).v})
          |  }
          |}
+         |
+         |$foo
          |""".stripMargin
     val script = Compiler.compileTxScript(main).rightValue
     val errorMessage =
