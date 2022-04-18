@@ -1797,5 +1797,39 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         Compiler.compileMultiContract(code).rightValue.contracts(0).asInstanceOf[Ast.TxContract]
       contract.funcs.map(_.args.length) is Seq(0, 1, 2, 3)
     }
+
+    {
+      info("Contract inherits both interface and contract")
+      val foo1: String =
+        s"""
+           |TxContract Foo1() {
+           |  fn foo1() -> () {}
+           |}
+           |""".stripMargin
+      val foo2: String =
+        s"""
+           |Interface Foo2 {
+           |  fn foo2() -> ()
+           |}
+           |""".stripMargin
+      val bar1: String =
+        s"""
+           |TxContract Bar1() extends Foo1(), Foo2 {
+           |  fn foo2() -> () {}
+           |}
+           |$foo1
+           |$foo2
+           |""".stripMargin
+      val bar2: String =
+        s"""
+           |TxContract Bar2() extends Foo2, Foo() {
+           |  fn foo2() -> () {}
+           |}
+           |$foo1
+           |$foo2
+           |""".stripMargin
+      Compiler.compileContract(bar1).isRight is true
+      Compiler.compileContract(bar2).isRight is true
+    }
   }
 }

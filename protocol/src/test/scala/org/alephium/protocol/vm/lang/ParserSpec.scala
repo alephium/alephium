@@ -374,24 +374,56 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse contract inheritance" in {
-    val code =
-      s"""
-         |TxContract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
-         |  fn foo() -> () {
-         |  }
-         |}
-         |""".stripMargin
+    {
+      info("Simple contract inheritance")
+      val code =
+        s"""
+           |TxContract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
+           |  fn foo() -> () {
+           |  }
+           |}
+           |""".stripMargin
 
-    fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
-      TypeId("Child"),
-      Seq(Argument(Ident("x"), Type.U256, false), Argument(Ident("y"), Type.U256, false)),
-      Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
-      Seq.empty,
-      List(
-        ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
-        ContractInheritance(TypeId("Parent1"), Seq(Ident("x")))
+      fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+        TypeId("Child"),
+        Seq(Argument(Ident("x"), Type.U256, false), Argument(Ident("y"), Type.U256, false)),
+        Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
+        Seq.empty,
+        List(
+          ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
+          ContractInheritance(TypeId("Parent1"), Seq(Ident("x")))
+        )
       )
-    )
+    }
+
+    {
+      info("Contract event inheritance")
+      val foo: String =
+        s"""
+             |TxContract Foo() {
+             |  event Foo(x: U256)
+             |  event Foo2(x: U256)
+             |
+             |  pub fn foo() -> () {
+             |    emit Foo(1)
+             |    emit Foo2(2)
+             |  }
+             |}
+             |""".stripMargin
+      val bar: String =
+        s"""
+             |TxContract Bar() extends Foo() {
+             |  pub fn bar() -> () {}
+             |}
+             |$foo
+             |""".stripMargin
+      val extended =
+        fastparse.parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
+      val barContract = extended.contracts(0)
+      val fooContract = extended.contracts(1)
+      fooContract.events.length is 2
+      barContract.events.length is 2
+    }
   }
 
   it should "test contract interface parser" in {
@@ -407,7 +439,7 @@ class ParserSpec extends AlephiumSpec {
         TypeId("Child"),
         Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
         Seq.empty,
-        Seq(ContractInheritance(TypeId("Parent"), Seq.empty))
+        Seq(InterfaceInheritance(TypeId("Parent")))
       )
     }
 
@@ -447,7 +479,7 @@ class ParserSpec extends AlephiumSpec {
           )
         ),
         Seq.empty,
-        Seq(ContractInheritance(TypeId("Parent"), Seq.empty))
+        Seq(InterfaceInheritance(TypeId("Parent")))
       )
     }
   }
