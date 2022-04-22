@@ -102,7 +102,13 @@ object Configs extends StrictLogging {
       Right(NetworkId.AlephiumMainNet)
     } else {
       val id = config.getInt(keyPath)
-      NetworkId.from(id).toRight(s"Invalid chain id: $id")
+      NetworkId.from(id).toRight(s"Invalid chain id: $id").flatMap { networkId =>
+        if (networkId == NetworkId.AlephiumMainNet) {
+          Left("The leman hardfork is not available for mainnet yet")
+        } else {
+          Right(networkId)
+        }
+      }
     }
   }
 
@@ -148,7 +154,7 @@ object Configs extends StrictLogging {
       case Right(config) => config
       case Left(error) =>
         logger.error(error)
-        sys.exit(1)
+        throw new RuntimeException(error)
     }
   }
 
