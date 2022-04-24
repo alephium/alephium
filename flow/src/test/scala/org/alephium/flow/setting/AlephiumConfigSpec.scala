@@ -54,7 +54,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.connectionBufferCapacityInByte is 100000000L
   }
 
-  it should "load mainnet config" in {
+  ignore should "load mainnet config" in {
     val rootPath = Files.tmpDir
     val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
 
@@ -79,12 +79,17 @@ class AlephiumConfigSpec extends AlephiumSpec {
     assertThrows[IllegalArgumentException](config.network.networkId is NetworkId.AlephiumMainNet)
   }
 
-  it should "throw error when use leman hardfork for mainnet" in new AlephiumConfigFixture {
+  it should "throw error when use leman hardfork for mainnet (1)" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", 0),
       ("alephium.network.leman-hard-fork-timestamp", 0)
     )
     intercept[RuntimeException](buildNewConfig()).getMessage is
+      "The leman hardfork is not available for mainnet yet"
+  }
+
+  it should "throw error when use leman hardfork for mainnet (2)" in new AlephiumConfigFixture {
+    Configs.parseNetworkId(ConfigFactory.empty()).leftValue is
       "The leman hardfork is not available for mainnet yet"
   }
 

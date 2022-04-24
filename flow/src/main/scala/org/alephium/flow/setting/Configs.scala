@@ -98,16 +98,17 @@ object Configs extends StrictLogging {
 
   def parseNetworkId(config: Config): Either[String, NetworkId] = {
     val keyPath = "alephium.network.network-id"
-    if (!config.hasPath(keyPath)) {
+    val networkIdEither = if (!config.hasPath(keyPath)) {
       Right(NetworkId.AlephiumMainNet)
     } else {
       val id = config.getInt(keyPath)
-      NetworkId.from(id).toRight(s"Invalid chain id: $id").flatMap { networkId =>
-        if (networkId == NetworkId.AlephiumMainNet) {
-          Left("The leman hardfork is not available for mainnet yet")
-        } else {
-          Right(networkId)
-        }
+      NetworkId.from(id).toRight(s"Invalid chain id: $id")
+    }
+    networkIdEither.flatMap { networkId =>
+      if (networkId == NetworkId.AlephiumMainNet) {
+        Left("The leman hardfork is not available for mainnet yet")
+      } else {
+        Right(networkId)
       }
     }
   }
