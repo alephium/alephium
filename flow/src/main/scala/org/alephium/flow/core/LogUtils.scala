@@ -51,13 +51,8 @@ trait LogUtils { Self: FlowUtils =>
       worldState.logState.getOpt(logStatesId) match {
         case Right(Some(logStates)) =>
           assume(logStates.states.nonEmpty)
-          val newCounter = logStatesId.counter + logStates.states.length
+          val newCounter = logStatesId.counter + 1
           if (end < newCounter) {
-            appendLogStates(
-              logStates.copy(
-                states = logStates.states.take(end - logStatesId.counter)
-              )
-            )
             Right(())
           } else {
             appendLogStates(logStates)

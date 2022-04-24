@@ -1221,7 +1221,7 @@ class VMSpec extends AlephiumSpec {
       val logStatesOpt = getLogStates(blockFlow, chainIndex.from, contractId, 0)
       val logStates    = logStatesOpt.value
 
-      verifyCallingEvents(logStates, callingBlock, result = 10, currentCount = 2)
+      verifyCallingEvents(logStates, callingBlock, result = 10, currentCount = 1)
     }
 
     {
@@ -1359,7 +1359,7 @@ class VMSpec extends AlephiumSpec {
     logStates.eventKey is contractId
     logStates.states.length is 2
 
-    getCurentCount(blockFlow, chainIndex.from, contractId).value is 2
+    getCurentCount(blockFlow, chainIndex.from, contractId).value is 1
 
     val testEventLogState1 = logStates.states(0)
     testEventLogState1.txId is callingBlock.nonCoinbase.head.id
@@ -1388,7 +1388,7 @@ class VMSpec extends AlephiumSpec {
       allLogStates.length is 1
       val logStates = allLogStates.head
 
-      verifyCallingEvents(logStates, callingBlock, result = 10, currentCount = 2)
+      verifyCallingEvents(logStates, callingBlock, result = 10, currentCount = 1)
     }
 
     val secondCallingBlock = simpleScript(blockFlow, chainIndex, callingScript)
@@ -1402,23 +1402,23 @@ class VMSpec extends AlephiumSpec {
       val logStates1 = allLogStates.head
       val logStates2 = allLogStates.last
 
-      verifyCallingEvents(logStates1, callingBlock, result = 10, currentCount = 4)
-      verifyCallingEvents(logStates2, secondCallingBlock, result = 14, currentCount = 4)
+      verifyCallingEvents(logStates1, callingBlock, result = 10, currentCount = 2)
+      verifyCallingEvents(logStates2, secondCallingBlock, result = 14, currentCount = 2)
     }
 
     {
       info("Part of the events emitted from the contract after the second method call")
-      val allLogStates = getEvents(blockFlow, chainIndex, contractId, 0, Some(3))
+      val allLogStates = getEvents(blockFlow, chainIndex, contractId, 0, Some(2))
       allLogStates.length is 2
 
       val logStates1 = allLogStates.head
       val logStates2 = allLogStates.last
 
-      verifyCallingEvents(logStates1, callingBlock, result = 10, currentCount = 4)
+      verifyCallingEvents(logStates1, callingBlock, result = 10, currentCount = 2)
 
       logStates2.blockHash is secondCallingBlock.hash
       logStates2.eventKey is contractId
-      logStates2.states.length is 1
+      logStates2.states.length is 2
 
       val addingLogState = logStates2.states(0)
       addingLogState.txId is secondCallingBlock.nonCoinbase.head.id

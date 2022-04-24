@@ -446,7 +446,6 @@ object WorldState {
     ): IOResult[Unit] = {
       for {
         initialCount <- logCounterState.getInitialValue(eventKey).map(_.getOrElse(0))
-        currentCount <- logCounterState.getOpt(eventKey).map(_.getOrElse(0))
         id = LogStatesId(eventKey, initialCount)
         logStatesOpt <- logState.getOpt(id)
         _ <- logStatesOpt match {
@@ -455,7 +454,7 @@ object WorldState {
           case None =>
             logState.put(id, LogStates(blockHash, eventKey, AVector(state)))
         }
-        _ <- logCounterState.put(eventKey, currentCount + 1)
+        _ <- logCounterState.put(eventKey, initialCount + 1)
       } yield ()
     }
 
