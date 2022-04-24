@@ -31,10 +31,8 @@ trait LogUtils { Self: FlowUtils =>
       chainIndex: ChainIndex,
       eventKey: Hash,
       start: Int,
-      endOpt: Option[Int]
+      end: Int
   )(isBlockInMainChain: BlockHash => Boolean): IOResult[(Option[Int], AVector[LogStates])] = {
-    val end = endOpt.getOrElse(Int.MaxValue)
-
     var allLogStates: ArrayBuffer[LogStates] = ArrayBuffer.empty
     var nextCount                            = start
 

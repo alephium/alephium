@@ -496,7 +496,12 @@ class ServerUtils(implicit
   ): Try[Events] = {
     wrapResult(
       blockFlow
-        .getEvents(chainIndex, eventKey, start, endOpt)(
+        .getEvents(
+          chainIndex,
+          eventKey,
+          start,
+          endOpt.getOrElse(start + CounterRange.MaxCounterRange)
+        )(
           isBlockInMainChain(blockFlow, _).contains(true)
         )
         .map { case (nextCount, logStatesVec) =>

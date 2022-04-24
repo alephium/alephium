@@ -754,10 +754,17 @@ abstract class RestServerSpec(
     info("with start only")
     Get(s"$urlBase&start=$start").check(validResponse)
 
-    info("with invalid start and end")
+    info("with start smaller than end")
     Get(s"$urlBase&start=$end&end=$start").check { response =>
       response.code is StatusCode.BadRequest
       response.body.leftValue is s"""{"detail":"Invalid value (`end` must be larger than `start`)"}"""
+    }
+
+    info("with end larger than (start + MaxCounterRange)")
+    Get(s"$urlBase&start=$start&end=${start + CounterRange.MaxCounterRange + 1}").check {
+      response =>
+        response.code is StatusCode.BadRequest
+        response.body.leftValue is s"""{"detail":"Invalid value (`end` must be smaller than ${start + CounterRange.MaxCounterRange})"}"""
     }
 
     def validResponse(response: Response[Either[String, String]]): Assertion = {

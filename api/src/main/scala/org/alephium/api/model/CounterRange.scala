@@ -21,14 +21,28 @@ import sttp.tapir.{ValidationError, Validator}
 final case class CounterRange(start: Int, endOpt: Option[Int])
 
 object CounterRange {
+  val MaxCounterRange: Int = 100
+
   val validator: Validator[CounterRange] = Validator.custom { counterRange =>
     if (counterRange.start < 0) {
       List(ValidationError.Custom(counterRange, s"`start` must not be negative"))
     } else {
-      if (counterRange.endOpt.exists(_ <= counterRange.start)) {
-        List(ValidationError.Custom(counterRange, s"`end` must be larger than `start`"))
-      } else {
-        List.empty
+      counterRange.endOpt match {
+        case Some(end) =>
+          if (end <= counterRange.start) {
+            List(ValidationError.Custom(counterRange, s"`end` must be larger than `start`"))
+          } else if (end - counterRange.start > MaxCounterRange) {
+            List(
+              ValidationError.Custom(
+                counterRange,
+                s"`end` must be smaller than ${counterRange.start + MaxCounterRange}"
+              )
+            )
+          } else {
+            List.empty
+          }
+        case None =>
+          List.empty
       }
     }
   }
