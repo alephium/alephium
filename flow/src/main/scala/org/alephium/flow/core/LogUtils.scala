@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.IOResult
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.protocol.vm.{LogStates, LogStatesId, WorldState}
 import org.alephium.util.AVector
@@ -32,15 +32,9 @@ trait LogUtils { Self: FlowUtils =>
       eventKey: Hash,
       start: Int,
       end: Int
-  )(isBlockInMainChain: BlockHash => Boolean): IOResult[(Option[Int], AVector[LogStates])] = {
+  ): IOResult[(Option[Int], AVector[LogStates])] = {
     var allLogStates: ArrayBuffer[LogStates] = ArrayBuffer.empty
     var nextCount                            = start
-
-    def appendLogStates(logStates: LogStates): Unit = {
-      if (isBlockInMainChain(logStates.blockHash)) {
-        allLogStates = allLogStates :+ logStates
-      }
-    }
 
     @tailrec
     def rec(
@@ -54,7 +48,7 @@ trait LogUtils { Self: FlowUtils =>
           if (end < nextCount) {
             Right(())
           } else {
-            appendLogStates(logStates)
+            allLogStates = allLogStates :+ logStates
             rec(worldState, LogStatesId(eventKey, nextCount))
           }
         case Right(None) =>

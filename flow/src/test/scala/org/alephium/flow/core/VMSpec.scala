@@ -25,7 +25,7 @@ import org.alephium.crypto.{ED25519, ED25519Signature, SecP256K1, SecP256K1Signa
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToSharedPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
-import org.alephium.protocol.{ALPH, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
@@ -1384,7 +1384,7 @@ class VMSpec extends AlephiumSpec {
     {
       info("All events emitted from the contract after the first method call")
 
-      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0, None)
+      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0)
       nextCount is None
       allLogStates.length is 1
       val logStates = allLogStates.head
@@ -1398,12 +1398,12 @@ class VMSpec extends AlephiumSpec {
     {
       info("All events emitted from the contract after the second method call")
 
-      val (nextCount1, _) = getEvents(blockFlow, chainIndex, contractId, 0, Some(1))
+      val (nextCount1, _) = getEvents(blockFlow, chainIndex, contractId, 0, 1)
       nextCount1.value is 2
-      val (nextCount2, _) = getEvents(blockFlow, chainIndex, contractId, 0, Some(2))
+      val (nextCount2, _) = getEvents(blockFlow, chainIndex, contractId, 0, 2)
       nextCount2 is None
 
-      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0, None)
+      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0)
       nextCount is None
       allLogStates.length is 2
       val logStates1 = allLogStates.head
@@ -1415,7 +1415,7 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("Part of the events emitted from the contract after the second method call")
-      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0, Some(2))
+      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0, 2)
       nextCount is None
       allLogStates.length is 2
 
@@ -1434,12 +1434,6 @@ class VMSpec extends AlephiumSpec {
       addingLogState.fields.length is 2
       addingLogState.fields(0) is Val.U256(U256.unsafe(4))
       addingLogState.fields(1) is Val.U256(U256.unsafe(14))
-    }
-
-    {
-      info("If events are from blocks that are not part of the main chain")
-      getEvents(blockFlow, chainIndex, contractId, 0, None, _ => false)._2.length is 0
-      getEvents(blockFlow, chainIndex, contractId, 0, Some(3), _ => false)._2.length is 0
     }
   }
 
@@ -1479,10 +1473,9 @@ class VMSpec extends AlephiumSpec {
       chainIndex: ChainIndex,
       contractId: ContractId,
       start: Int,
-      endOpt: Option[Int],
-      isBlockInMainChain: BlockHash => Boolean = _ => true
+      end: Int = Int.MaxValue
   ): (Option[Int], AVector[LogStates]) = {
-    blockFlow.getEvents(chainIndex, contractId, start, endOpt)(isBlockInMainChain).rightValue
+    blockFlow.getEvents(chainIndex, contractId, start, end).rightValue
   }
 
   private def getCurentCount(
