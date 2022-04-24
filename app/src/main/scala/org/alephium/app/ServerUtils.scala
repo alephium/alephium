@@ -499,9 +499,13 @@ class ServerUtils(implicit
         .getEvents(chainIndex, eventKey, start, endOpt)(
           isBlockInMainChain(blockFlow, _).contains(true)
         )
-        .map(_.flatMap(Events.from))
-        .map { events =>
-          Events(chainIndex.from.value, chainIndex.to.value, events)
+        .map { case (nextCount, logStatesVec) =>
+          Events(
+            chainIndex.from.value,
+            chainIndex.to.value,
+            logStatesVec.flatMap(Events.from),
+            nextCount
+          )
         }
     )
   }

@@ -1384,7 +1384,8 @@ class VMSpec extends AlephiumSpec {
     {
       info("All events emitted from the contract after the first method call")
 
-      val allLogStates = getEvents(blockFlow, chainIndex, contractId, 0, None)
+      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0, None)
+      nextCount is None
       allLogStates.length is 1
       val logStates = allLogStates.head
 
@@ -1397,7 +1398,13 @@ class VMSpec extends AlephiumSpec {
     {
       info("All events emitted from the contract after the second method call")
 
-      val allLogStates = getEvents(blockFlow, chainIndex, contractId, 0, None)
+      val (nextCount1, _) = getEvents(blockFlow, chainIndex, contractId, 0, Some(1))
+      nextCount1.value is 2
+      val (nextCount2, _) = getEvents(blockFlow, chainIndex, contractId, 0, Some(2))
+      nextCount2 is None
+
+      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0, None)
+      nextCount is None
       allLogStates.length is 2
       val logStates1 = allLogStates.head
       val logStates2 = allLogStates.last
@@ -1408,7 +1415,8 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("Part of the events emitted from the contract after the second method call")
-      val allLogStates = getEvents(blockFlow, chainIndex, contractId, 0, Some(2))
+      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0, Some(2))
+      nextCount is None
       allLogStates.length is 2
 
       val logStates1 = allLogStates.head
@@ -1430,8 +1438,8 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("If events are from blocks that are not part of the main chain")
-      getEvents(blockFlow, chainIndex, contractId, 0, None, _ => false).length is 0
-      getEvents(blockFlow, chainIndex, contractId, 0, Some(3), _ => false).length is 0
+      getEvents(blockFlow, chainIndex, contractId, 0, None, _ => false)._2.length is 0
+      getEvents(blockFlow, chainIndex, contractId, 0, Some(3), _ => false)._2.length is 0
     }
   }
 
@@ -1473,7 +1481,7 @@ class VMSpec extends AlephiumSpec {
       start: Int,
       endOpt: Option[Int],
       isBlockInMainChain: BlockHash => Boolean = _ => true
-  ): AVector[LogStates] = {
+  ): (Option[Int], AVector[LogStates]) = {
     blockFlow.getEvents(chainIndex, contractId, start, endOpt)(isBlockInMainChain).rightValue
   }
 

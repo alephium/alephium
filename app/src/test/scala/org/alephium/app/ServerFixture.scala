@@ -356,23 +356,26 @@ object ServerFixture {
         eventKey: Hash,
         start: Int,
         endOpt: Option[Int]
-    )(isBlockInMainChain: BlockHash => Boolean): IOResult[AVector[LogStates]] = {
+    )(isBlockInMainChain: BlockHash => Boolean): IOResult[(Option[Int], AVector[LogStates])] = {
       lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
       lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
 
       Right(
-        AVector(
-          LogStates(
-            block.hash,
-            eventKey,
-            states = AVector(
-              LogState(
-                txId = dummyTx.id,
-                index = 0,
-                fields = AVector(
-                  vm.Val.U256(U256.unsafe(4)),
-                  vm.Val.Address(address1.lockupScript),
-                  vm.Val.Address(address2.lockupScript)
+        (
+          Some(2),
+          AVector(
+            LogStates(
+              block.hash,
+              eventKey,
+              states = AVector(
+                LogState(
+                  txId = dummyTx.id,
+                  index = 0,
+                  fields = AVector(
+                    vm.Val.U256(U256.unsafe(4)),
+                    vm.Val.Address(address1.lockupScript),
+                    vm.Val.Address(address2.lockupScript)
+                  )
                 )
               )
             )

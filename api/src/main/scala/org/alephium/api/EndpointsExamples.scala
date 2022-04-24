@@ -617,9 +617,9 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
 
   implicit val eventsExamples: List[Example[Events]] =
-    simpleExample(Events(0, 1, events = AVector(event)))
+    simpleExample(Events(0, 1, events = AVector(event), Some(2)))
 
   implicit val eventsVectorExamples: List[Example[AVector[Events]]] =
-    simpleExample(AVector(Events(0, 1, events = AVector(event))))
+    simpleExample(AVector(Events(0, 1, events = AVector(event), Some(3))))
 }
 // scalastyle:on magic.number

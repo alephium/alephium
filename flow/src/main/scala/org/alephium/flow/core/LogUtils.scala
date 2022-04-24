@@ -32,10 +32,11 @@ trait LogUtils { Self: FlowUtils =>
       eventKey: Hash,
       start: Int,
       endOpt: Option[Int]
-  )(isBlockInMainChain: BlockHash => Boolean): IOResult[AVector[LogStates]] = {
+  )(isBlockInMainChain: BlockHash => Boolean): IOResult[(Option[Int], AVector[LogStates])] = {
     val end = endOpt.getOrElse(Int.MaxValue)
 
     var allLogStates: ArrayBuffer[LogStates] = ArrayBuffer.empty
+    var nextCount                            = start
 
     def appendLogStates(logStates: LogStates): Unit = {
       if (isBlockInMainChain(logStates.blockHash)) {
@@ -51,12 +52,12 @@ trait LogUtils { Self: FlowUtils =>
       worldState.logState.getOpt(logStatesId) match {
         case Right(Some(logStates)) =>
           assume(logStates.states.nonEmpty)
-          val newCounter = logStatesId.counter + 1
-          if (end < newCounter) {
+          nextCount = logStatesId.counter + 1
+          if (end < nextCount) {
             Right(())
           } else {
             appendLogStates(logStates)
-            rec(worldState, LogStatesId(eventKey, newCounter))
+            rec(worldState, LogStatesId(eventKey, nextCount))
           }
         case Right(None) =>
           Right(())
@@ -67,8 +68,11 @@ trait LogUtils { Self: FlowUtils =>
 
     for {
       worldState <- blockFlow.getBestPersistedWorldState(chainIndex.from)
-      _          <- rec(worldState, LogStatesId(eventKey, start))
-    } yield AVector.from(allLogStates)
+      _          <- rec(worldState, LogStatesId(eventKey, nextCount))
+    } yield {
+      val nextCountOpt = if (end < nextCount) Some(nextCount) else None
+      (nextCountOpt, AVector.from(allLogStates))
+    }
   }
 
   def getEventsCurrentCount(

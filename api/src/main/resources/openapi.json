@@ -7222,7 +7222,8 @@
                         }
                       ]
                     }
-                  ]
+                  ],
+                  "nextCount": 2
                 }
               }
             }
@@ -7438,7 +7439,8 @@
                         }
                       ]
                     }
-                  ]
+                  ],
+                  "nextCount": 2
                 }
               }
             }
@@ -8624,6 +8626,9 @@
             "items": {
               "$ref": "#/components/schemas/Event"
             }
+          },
+          "nextCount": {
+            "type": "integer"
           }
         }
       },

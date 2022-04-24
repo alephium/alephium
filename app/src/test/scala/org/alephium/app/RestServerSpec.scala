@@ -789,7 +789,8 @@ abstract class RestServerSpec(
         |        }
         |      ]
         |    }
-        |  ]
+        |  ],
+        |  "nextCount": 2
         |}
         |""".stripMargin.filterNot(_.isWhitespace)
     }
@@ -835,7 +836,8 @@ abstract class RestServerSpec(
         |        }
         |      ]
         |    }
-        |  ]
+        |  ],
+        |  "nextCount": 2
         |}
         |""".stripMargin.filterNot(_.isWhitespace)
         } else {
