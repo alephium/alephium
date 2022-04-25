@@ -17,14 +17,15 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.{Address, ChainIndex, ContractId}
+import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.protocol.vm.LogStates
 import org.alephium.util.AVector
 
 final case class Events(
     chainFrom: Int,
     chainTo: Int,
-    events: AVector[Event]
+    events: AVector[Event],
+    nextStart: Int
 )
 
 sealed trait Event {
@@ -73,13 +74,5 @@ object Events {
         )
       }
     }
-  }
-
-  def from(chainIndex: ChainIndex, logStates: LogStates): Events = {
-    Events(chainIndex.from.value, chainIndex.to.value, Events.from(logStates))
-  }
-
-  def empty(chainIndex: ChainIndex): Events = {
-    Events(chainIndex.from.value, chainIndex.to.value, events = AVector.empty)
   }
 }

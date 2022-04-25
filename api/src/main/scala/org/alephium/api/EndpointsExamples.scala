@@ -612,13 +612,16 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val booleanExamples: List[Example[Boolean]] =
     simpleExample(true)
 
+  implicit val intExamples: List[Example[Int]] =
+    simpleExample(100)
+
   implicit val verifySignatureExamples: List[Example[VerifySignature]] =
     simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
 
   implicit val eventsExamples: List[Example[Events]] =
-    simpleExample(Events(0, 1, events = AVector(event)))
+    simpleExample(Events(0, 1, events = AVector(event), 2))
 
   implicit val eventsVectorExamples: List[Example[AVector[Events]]] =
-    simpleExample(AVector(Events(0, 1, events = AVector(event))))
+    simpleExample(AVector(Events(0, 1, events = AVector(event), 3)))
 }
 // scalastyle:on magic.number

@@ -21,11 +21,11 @@ import org.alephium.protocol.vm.Val
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 
-final case class LogStatesId(blockHash: BlockHash, eventKey: Hash)
+final case class LogStatesId(eventKey: Hash, counter: Int)
 
 object LogStatesId {
   implicit val serde: Serde[LogStatesId] =
-    Serde.forProduct2(LogStatesId.apply, id => (id.blockHash, id.eventKey))
+    Serde.forProduct2(LogStatesId.apply, id => (id.eventKey, id.counter))
 }
 
 final case class LogState(

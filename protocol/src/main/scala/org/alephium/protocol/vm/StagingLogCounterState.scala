@@ -19,24 +19,31 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 
 import org.alephium.io._
+import org.alephium.io.MutableKV.WithInitialValue
+import org.alephium.protocol.Hash
 
-final class CachedLogStates(
-    val underlying: KeyValueStorage[LogStatesId, LogStates],
-    val caches: mutable.LinkedHashMap[LogStatesId, Cache[LogStates]]
-) extends CachedKV[LogStatesId, LogStates, Cache[LogStates]] {
-  protected def getOptFromUnderlying(key: LogStatesId): IOResult[Option[LogStates]] = {
-    CachedKV.getOptFromUnderlying(underlying, caches, key)
+final class StagingLogCounterState(
+    val underlying: CachedLogCounterState,
+    val caches: mutable.Map[Hash, Modified[Int]]
+) extends StagingKV[Hash, Int]
+    with WithInitialValue[Hash, Int, Unit] {
+  override def getInitialValue(key: Hash): IOResult[Option[Int]] = {
+    underlying.getInitialValue(key).flatMap { countOpt =>
+      if (countOpt.isEmpty) {
+        put(key, 0).map(_ => Some(0))
+      } else {
+        Right(countOpt)
+      }
+    }
   }
 
-  def persist(): IOResult[KeyValueStorage[LogStatesId, LogStates]] = {
-    CachedKV.persist(underlying, caches)
+  override def rollback(): Unit = {
+    underlying.clearInitialValues()
+    super.rollback()
   }
 
-  def staging(): StagingLogStates = new StagingLogStates(this, mutable.LinkedHashMap.empty)
-}
-
-object CachedLogStates {
-  def from(storage: KeyValueStorage[LogStatesId, LogStates]): CachedLogStates = {
-    new CachedLogStates(storage, mutable.LinkedHashMap.empty)
+  override def commit(): Unit = {
+    underlying.clearInitialValues()
+    super.commit()
   }
 }
