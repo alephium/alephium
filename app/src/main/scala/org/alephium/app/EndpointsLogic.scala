@@ -19,7 +19,6 @@ package org.alephium.app
 import java.io.{StringWriter, Writer}
 import java.net.InetAddress
 
-import scala.annotation.tailrec
 import scala.concurrent._
 
 import akka.pattern.ask
@@ -402,44 +401,28 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
         )
       case (Some(from), None) =>
         Future.successful(
-          searchLocalTransactionStatus(txId, brokerConfig.chainIndexes.filter(_.from == from))
+          serverUtils.searchLocalTransactionStatus(
+            blockFlow,
+            txId,
+            brokerConfig.chainIndexes.filter(_.from == from)
+          )
         )
       case (None, Some(to)) =>
         Future.successful(
-          searchLocalTransactionStatus(txId, brokerConfig.chainIndexes.filter(_.to == to))
+          serverUtils.searchLocalTransactionStatus(
+            blockFlow,
+            txId,
+            brokerConfig.chainIndexes.filter(_.to == to)
+          )
         )
       case (None, None) =>
-        searchLocalTransactionStatus(txId, brokerConfig.chainIndexes) match {
+        serverUtils.searchLocalTransactionStatus(blockFlow, txId, brokerConfig.chainIndexes) match {
           case Right(TxNotFound) =>
             searchTransactionStatusInOtherNodes(txId)
           case other => Future.successful(other)
         }
     }
 
-  }
-
-  private def searchLocalTransactionStatus(
-      txId: Hash,
-      chainIndexes: AVector[ChainIndex]
-  ): Try[TxStatus] = {
-    @tailrec
-    def rec(
-        indexes: AVector[ChainIndex],
-        currentRes: Try[TxStatus]
-    ): Try[TxStatus] = {
-      if (indexes.isEmpty) {
-        currentRes
-      } else {
-        val index = indexes.head
-        val res   = serverUtils.getTransactionStatus(blockFlow, txId, index)
-        res match {
-          case Right(TxNotFound) => rec(indexes.tail, res)
-          case Right(_)          => res
-          case Left(_)           => res
-        }
-      }
-    }
-    rec(chainIndexes, Right(TxNotFound))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
@@ -577,33 +560,35 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
-  val getContractEventsForBlockLogic = serverLogic(getContractEventsForBlock) {
-    case (blockHash, contractAddress) =>
+  val getContractEventsLogic = serverLogic(getContractEvents) {
+    case (counterRange, contractAddress) =>
       Future.successful {
         val contractId = contractAddress.lockupScript.contractId
-        serverUtils.getEventsForBlock(blockFlow, blockHash, contractId)
+        serverUtils.getEventsForContract(
+          blockFlow,
+          counterRange.start,
+          counterRange.endOpt,
+          contractId
+        )
       }
   }
 
-  val getContractEventsWithinBlocksLogic = serverLogic(getContractEventsWithinBlocks) {
-    case (fromBlock, toBlockOpt, contractAddress) =>
+  val getContractEventsCurrentCountLogic = serverLogic(getContractEventsCurrentCount) {
+    contractAddress =>
       Future.successful {
-        val contractId = contractAddress.lockupScript.contractId
-        serverUtils.getContractEventsWithinBlocks(blockFlow, fromBlock, toBlockOpt, contractId)
+        serverUtils.getEventsForContractCurrentCount(blockFlow, contractAddress)
       }
   }
 
-  val getContractEventsWithinTimeIntervalLogic = serverLogic(getContractEventsWithinTimeInterval) {
-    case (timeInterval, contractAddress) =>
-      Future.successful {
-        val contractId = contractAddress.lockupScript.contractId
-        serverUtils.getContractEventsWithinTimeInterval(blockFlow, timeInterval, contractId)
-      }
-  }
-
-  val getTxScriptEventsLogic = serverLogic(getTxScriptEvents) { case (blockHash, txId) =>
+  val getTxScriptEventsLogic = serverLogic(getTxScriptEvents) { txId =>
     Future.successful {
-      serverUtils.getEventsForBlock(blockFlow, blockHash, txId)
+      serverUtils.getEventsForTxScript(blockFlow, txId)
+    }
+  }
+
+  val getTxScriptEventsCurrentCountLogic = serverLogic(getTxScriptEventsCurrentCount) { txId =>
+    Future.successful {
+      serverUtils.getEventsForTxScriptCurrentCount(blockFlow, txId)
     }
   }
 

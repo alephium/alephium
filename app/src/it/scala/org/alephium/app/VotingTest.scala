@@ -18,7 +18,7 @@ package org.alephium.app
 
 import org.alephium.api.model._
 import org.alephium.json.Json._
-import org.alephium.protocol.{ALPH, Hash, PublicKey}
+import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey}
 import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.util._
 import org.alephium.wallet.api.model._
@@ -32,36 +32,62 @@ class VotingTest extends AlephiumActorSpec {
       deployContract(admin, voters, U256.unsafe(voters.size))
     checkState(0, 0, false, false)
 
-    val startVotingTs = TimeStamp.now()
     allocateTokens(admin, voters, contractId.toHexString, contractCode)
     checkState(0, 0, false, true)
 
-    checkEvents(contractAddress, startVotingTs) { events =>
-      val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
-
-      allEvents.length is 1
-      val votingStartedEvent = allEvents.head.asInstanceOf[ContractEvent]
-      votingStartedEvent.eventIndex is 0
-      votingStartedEvent.contractId is contractAddress.lockupScript.contractId
+    checkEvents(contractAddress, 0) { events =>
+      events.length is 1
+      checkVotingStartedEvent(events.head)
     }
+    val countAfterVotingStarted = getEventsCurrentCount(contractAddress)
 
-    val startVoteCastingTs = TimeStamp.now()
-    val nbYes              = voters.size - 1
-    val nbNo               = voters.size - nbYes
+    val nbYes = voters.size - 1
+    val nbNo  = voters.size - nbYes
     voters.take(nbYes).foreach(wallet => vote(wallet, contractId.toHexString, true, contractCode))
     voters.drop(nbYes).foreach(wallet => vote(wallet, contractId.toHexString, false, contractCode))
     checkState(nbYes, nbNo, false, true)
 
-    checkEvents(contractAddress, startVoteCastingTs) { events =>
-      val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
+    checkEvents(contractAddress, countAfterVotingStarted)(checkVoteCastedEvents)
 
+    val countAfterVotingCasted = getEventsCurrentCount(contractAddress)
+
+    close(admin, contractId.toHexString, contractCode)
+    checkState(nbYes, nbNo, true, true)
+
+    checkEvents(contractAddress, countAfterVotingCasted) { events =>
+      events.length is 1
+      checkVotingClosedEvent(events.head)
+    }
+
+    // Check all events for the contract from the beginning
+    checkEvents(contractAddress, 0) { events =>
+      val totalEventsNum = voters.length + 2
+      events.length is totalEventsNum
+
+      checkVotingStartedEvent(events.head)
+      checkVoteCastedEvents(events.tail.take(voters.length))
+      checkVotingClosedEvent(events.last)
+    }
+
+    clique.selfClique().nodes.foreach { peer =>
+      request[Boolean](stopMining, peer.restPort) is true
+    }
+    clique.stop()
+
+    def checkVotingStartedEvent(event: Event) = {
+      val votingStartedEvent = event.asInstanceOf[ContractEvent]
+      votingStartedEvent.eventIndex is 0
+      votingStartedEvent.contractId is contractAddress.lockupScript.contractId
+    }
+
+    def checkVoteCastedEvents(events: AVector[Event]) = {
       val expectedResult = voters.take(nbYes).map { wallet =>
         (1, wallet.activeAddress, true)
       } ++ voters.drop(nbYes).map { wallet =>
         (1, wallet.activeAddress, false)
       }
 
-      val returnedResult = allEvents.map { event =>
+      val returnedResult = events.map { event =>
         val voterAddress = event.fields(0).asInstanceOf[ValAddress]
         val decision     = event.fields(1).asInstanceOf[ValBool]
         (event.eventIndex, voterAddress.value.toBase58, decision.value)
@@ -70,23 +96,11 @@ class VotingTest extends AlephiumActorSpec {
       returnedResult.toSeq is expectedResult.toSeq
     }
 
-    val closeVotingTs = TimeStamp.now()
-    close(admin, contractId.toHexString, contractCode)
-    checkState(nbYes, nbNo, true, true)
-
-    checkEvents(contractAddress, closeVotingTs) { events =>
-      val allEvents = events.fold(AVector.empty[Event])(_ ++ _.events)
-
-      allEvents.length is 1
-      val votingStartedEvent = allEvents.head.asInstanceOf[ContractEvent]
-      votingStartedEvent.eventIndex is 2
-      votingStartedEvent.contractId is contractAddress.lockupScript.contractId
+    def checkVotingClosedEvent(event: Event) = {
+      val votingClosedEvent = event.asInstanceOf[ContractEvent]
+      votingClosedEvent.eventIndex is 2
+      votingClosedEvent.contractId is contractAddress.lockupScript.contractId
     }
-
-    clique.selfClique().nodes.foreach { peer =>
-      request[Boolean](stopMining, peer.restPort) is true
-    }
-    clique.stop()
 
     def checkState(nbYes: Int, nbNo: Int, isClosed: Boolean, isInitialized: Boolean) = {
       val contractState =
@@ -104,23 +118,29 @@ class VotingTest extends AlephiumActorSpec {
       )
     }
 
-    @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-    def checkEvents(
-        contractAddress: Address,
-        startTs: TimeStamp,
-        toTs: TimeStamp = TimeStamp.now()
-    )(
-        validate: (AVector[Events]) => Any
+    def checkEvents(contractAddress: Address, startCount: Int)(
+        validate: (AVector[Event]) => Any
     ) = {
-      import org.alephium.api.UtilJson._
-
-      val events =
-        request[AVector[Events]](
-          getEventsWithinTimeInterval(startTs, toTs, contractAddress),
+      val response =
+        request[Events](
+          getContractEvents(startCount, contractAddress),
           restPort
         )
 
+      // Filter out events from the occasional orphan blocks
+      val events = response.events.filter(event => isBlockInMainChain(event.blockHash))
       validate(events)
+    }
+
+    def isBlockInMainChain(blockHash: BlockHash): Boolean = {
+      request[Boolean](
+        isBlockInMainChain(blockHash.toHexString),
+        restPort
+      )
+    }
+
+    def getEventsCurrentCount(contractAddress: Address): Int = {
+      request[Int](getContractEventsCurrentCount(contractAddress), restPort)
     }
   }
 }

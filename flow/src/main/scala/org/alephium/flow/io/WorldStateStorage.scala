@@ -27,12 +27,13 @@ import org.alephium.protocol.vm.{LogStates, LogStatesId, WorldState}
 trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
   val logStorage: KeyValueStorage[LogStatesId, LogStates]
+  val logCounterStorage: KeyValueStorage[Hash, Int]
 
   override def storageKey(key: BlockHash): ByteString =
     key.bytes ++ ByteString(Storages.trieHashPostfix)
 
   def getPersistedWorldState(hash: BlockHash): IOResult[WorldState.Persisted] = {
-    get(hash).map(_.toPersistedWorldState(trieStorage, logStorage))
+    get(hash).map(_.toPersistedWorldState(trieStorage, logStorage, logCounterStorage))
   }
 
   def getWorldStateHash(hash: BlockHash): IOResult[Hash] = {
@@ -40,7 +41,7 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   }
 
   def getCachedWorldState(hash: BlockHash): IOResult[WorldState.Cached] = {
-    get(hash).map(_.toCachedWorldState(trieStorage, logStorage))
+    get(hash).map(_.toCachedWorldState(trieStorage, logStorage, logCounterStorage))
   }
 
   def putTrie(hash: BlockHash, worldState: WorldState.Persisted): IOResult[Unit] = {
@@ -52,6 +53,7 @@ object WorldStateRockDBStorage {
   def apply(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
       logStorage: KeyValueStorage[LogStatesId, LogStates],
+      logCounterStorage: KeyValueStorage[Hash, Int],
       storage: RocksDBSource,
       cf: ColumnFamily,
       writeOptions: WriteOptions
@@ -59,6 +61,7 @@ object WorldStateRockDBStorage {
     new WorldStateRockDBStorage(
       trieStorage,
       logStorage,
+      logCounterStorage,
       storage,
       cf,
       writeOptions,
@@ -69,18 +72,28 @@ object WorldStateRockDBStorage {
   def apply(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
       logStorage: KeyValueStorage[LogStatesId, LogStates],
+      logCounterStorage: KeyValueStorage[Hash, Int],
       storage: RocksDBSource,
       cf: ColumnFamily,
       writeOptions: WriteOptions,
       readOptions: ReadOptions
   ): WorldStateRockDBStorage = {
-    new WorldStateRockDBStorage(trieStorage, logStorage, storage, cf, writeOptions, readOptions)
+    new WorldStateRockDBStorage(
+      trieStorage,
+      logStorage,
+      logCounterStorage,
+      storage,
+      cf,
+      writeOptions,
+      readOptions
+    )
   }
 }
 
 class WorldStateRockDBStorage(
     val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
     val logStorage: KeyValueStorage[LogStatesId, LogStates],
+    val logCounterStorage: KeyValueStorage[Hash, Int],
     storage: RocksDBSource,
     cf: ColumnFamily,
     writeOptions: WriteOptions,

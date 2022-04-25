@@ -22,6 +22,7 @@ import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
+import org.alephium.flow.core.BlockFlowState
 import org.alephium.flow.model.{PersistedTxId, ReadyTxInfo}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
@@ -542,10 +543,12 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     blockFlow.getMemPool(chainIndex).size is 0
 
     val status = blockFlow.getTxStatus(tx.id, chainIndex).rightValue.get
-    status.chainConfirmations is 1
-    status.fromGroupConfirmations is 1
-    status.toGroupConfirmations is 1
-    val blockHash = status.index.hash
+    status is a[BlockFlowState.Confirmed]
+    val confirmed = status.asInstanceOf[BlockFlowState.Confirmed]
+    confirmed.chainConfirmations is 1
+    confirmed.fromGroupConfirmations is 1
+    confirmed.toGroupConfirmations is 1
+    val blockHash = confirmed.index.hash
     blockFlow.getBestDeps(chainIndex.from).deps.contains(blockHash) is true
   }
 

@@ -37,6 +37,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and publish docker image
+        if: ${{ !contains(steps.get_version.outputs.VERSION, '-') }}
         uses: docker/build-push-action@v2
         with:
           context: docker/release
