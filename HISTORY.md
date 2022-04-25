@@ -2,6 +2,55 @@
 
 ## Unreleased
 
+## 1.3.2
+
+* Fix OpenAPI version
+
+## 1.3.1
+
+* Upgrade Rocksdb to support Apple M1
+
+## 1.3.0
+
+## API changes
+Note: We introduced many breaking API changes, please refer to OpenAPI file or Swagger UI for query and response examples.
+* New endpoints `/events` for contract events. The endpoints are still in beta.
+* New endpoints `/infos/version` for node version purely.
+* Move personalized info from `/infos/self-clique` to a new endpoint `/infos/chain-params`.
+* Path renaming:
+  * `/transactions/decode` -> `/transactions/decode-unsigned-tx`
+  * `/contracts/build-script` -> `/contracts/unsigned-tx/build-script`
+  * `/contracts/build-contract` -> `/contracts/unsigned-tx/build-contract`
+* Query and response format for several endpoints have changed to make them dev friendly.
+
+### New features
+Note: The focus of `1.3.0` was new features for smart contract development.
+* Add loop, multiple return, events, inheritance to Ralph language
+* Log contract events and store them in Rocksdb
+* Support unit tests for smart contracts via API endpoints
+* Improve protocol endpoints to return full data for blocks and transactions.
+
+## All changes
+* Improve mining dispatcher by @polarker in https://github.com/alephium/alephium/pull/524
+* Add loop for Ralph language by @Lbqds in https://github.com/alephium/alephium/pull/525
+* Add unit tests support for smart contracts by @polarker in https://github.com/alephium/alephium/pull/526
+* Add multiple return for Ralph language by @Lbqds in https://github.com/alephium/alephium/pull/529
+* Fix return statement for Ralph language by @Lbqds in https://github.com/alephium/alephium/pull/530
+* Add contract events&logs by @h0ngcha0 in https://github.com/alephium/alephium/pull/531
+* Fix/check function return types by @Lbqds in https://github.com/alephium/alephium/pull/532
+* Improve contract endpoints by @polarker in https://github.com/alephium/alephium/pull/533
+* Support event in contract test by @polarker in https://github.com/alephium/alephium/pull/534
+* Update sbt to 1.6.2 by @tdroxler in https://github.com/alephium/alephium/pull/536
+* Contract endpoints improvements by @polarker in https://github.com/alephium/alephium/pull/535
+* Fix config path in AlephiumConfigSpec by @polarker in https://github.com/alephium/alephium/pull/537
+* Improve protocol endpoints by @tdroxler in https://github.com/alephium/alephium/pull/538
+* Better openapi by @polarker in https://github.com/alephium/alephium/pull/539
+* Improve openapi types by @polarker in https://github.com/alephium/alephium/pull/540
+* Improve val for contracts by @polarker in https://github.com/alephium/alephium/pull/542
+* Contract lifecycle events by @h0ngcha0 in https://github.com/alephium/alephium/pull/543
+* Add contract inheritance by @Lbqds in https://github.com/alephium/alephium/pull/544
+* Fix the order of contract inheritance by @polarker in https://github.com/alephium/alephium/pull/545
+
 ## 1.2.8
 * Improve logging and thread pool for mining controller
 * Send latest mining jobs to new mining connections always

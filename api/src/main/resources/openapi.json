@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "1.3.0"
+    "version": "1.4.0"
   },
   "servers": [
     {
@@ -1449,7 +1449,7 @@
                 "$ref": "#/components/schemas/Sign"
               },
               "example": {
-                "data": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                "data": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
               }
             }
           },
@@ -4840,7 +4840,7 @@
                   "$ref": "#/components/schemas/BuildTransactionResult"
                 },
                 "example": {
-                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
                   "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
@@ -4967,7 +4967,7 @@
                   "unsignedTxs": [
                     {
                       "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                      "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                      "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "gasAmount": 20000,
                       "gasPrice": "100000000000"
                     }
@@ -5061,7 +5061,7 @@
                 "$ref": "#/components/schemas/SubmitTransaction"
               },
               "example": {
-                "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                 "signature": "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
               }
             }
@@ -5166,7 +5166,7 @@
                 "$ref": "#/components/schemas/DecodeTransaction"
               },
               "example": {
-                "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc"
               }
             }
           },
@@ -5451,7 +5451,7 @@
                   "$ref": "#/components/schemas/CompileResult"
                 },
                 "example": {
-                  "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
                     "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
@@ -5585,14 +5585,14 @@
                   "summary": "Default",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                     "alphAmount": "1000000000000",
                     "tokens": [
                       {
@@ -5622,7 +5622,7 @@
                   "$ref": "#/components/schemas/BuildScriptTxResult"
                 },
                 "example": {
-                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "group": 2
                 }
@@ -5726,7 +5726,7 @@
                   "$ref": "#/components/schemas/CompileResult"
                 },
                 "example": {
-                  "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
                     "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
@@ -5860,14 +5860,14 @@
                   "summary": "Default",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                     "initialFields": [
                       {
                         "type": "Bool",
@@ -5899,7 +5899,7 @@
                 },
                 "example": {
                   "group": 2,
-                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
                 }
@@ -6187,6 +6187,8 @@
                   "$ref": "#/components/schemas/TestContractResult"
                 },
                 "example": {
+                  "originalCodeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "testCodeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "returns": [
                     {
                       "type": "U256",
@@ -6504,7 +6506,7 @@
                   "$ref": "#/components/schemas/BuildTransactionResult"
                 },
                 "example": {
-                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
                   "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
@@ -6597,7 +6599,7 @@
                 "$ref": "#/components/schemas/SubmitMultisig"
               },
               "example": {
-                "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                 "signatures": [
                   "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
                 ]
@@ -6704,7 +6706,7 @@
                 "$ref": "#/components/schemas/VerifySignature"
               },
               "example": {
-                "data": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                "data": "35d1b2a520a0da34c5eb8d712aa9cc",
                 "signature": "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b",
                 "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
               }
@@ -9271,6 +9273,8 @@
       },
       "TestContractResult": {
         "required": [
+          "originalCodeHash",
+          "testCodeHash",
           "returns",
           "gasUsed",
           "contracts",
@@ -9279,6 +9283,12 @@
         ],
         "type": "object",
         "properties": {
+          "originalCodeHash": {
+            "type": "string"
+          },
+          "testCodeHash": {
+            "type": "string"
+          },
           "returns": {
             "type": "array",
             "items": {

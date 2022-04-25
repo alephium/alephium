@@ -862,6 +862,8 @@ class ServerUtils(implicit
       val executionResult  = executionResultPair._2
       val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
       TestContractResult(
+        originalCodeHash = testContract.originalCodeHash,
+        testCodeHash = testContract.code.hash,
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
         contracts = postState,

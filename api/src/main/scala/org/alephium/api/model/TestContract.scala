@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
 import org.alephium.api.model.TestContract._
-import org.alephium.protocol.{vm, ALPH}
+import org.alephium.protocol.{vm, ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, AssetOutput, ContractId, GroupIndex}
 import org.alephium.protocol.vm.{ContractState => _, Val => _, _}
@@ -38,18 +38,35 @@ final case class TestContract(
     existingContracts: Option[AVector[ContractState]] = None,
     inputAssets: Option[AVector[TestContract.InputAsset]] = None
 ) {
-  def toComplete: TestContract.Complete =
-    Complete(
-      group.getOrElse(groupDefault),
-      address.getOrElse(addressDefault).contractId,
-      code = bytecode,
-      initialFields,
-      initialAsset.getOrElse(initialAssetDefault),
-      testMethodIndex.getOrElse(testMethodIndexDefault),
-      testArgs,
-      existingContracts.getOrElse(existingContractsDefault),
-      inputAssets.getOrElse(inputAssetsDefault)
-    )
+  def toComplete(): Try[TestContract.Complete] = {
+    val methodIndex = testMethodIndex.getOrElse(testMethodIndexDefault)
+    bytecode.methods.get(methodIndex) match {
+      case Some(method) =>
+        val testCode =
+          if (method.isPublic) {
+            bytecode
+          } else {
+            bytecode.copy(methods =
+              bytecode.methods.replace(methodIndex, method.copy(isPublic = true))
+            )
+          }
+        Right(
+          Complete(
+            group.getOrElse(groupDefault),
+            address.getOrElse(addressDefault).contractId,
+            originalCodeHash = bytecode.hash,
+            code = testCode,
+            initialFields,
+            initialAsset.getOrElse(initialAssetDefault),
+            methodIndex,
+            testArgs,
+            existingContracts.getOrElse(existingContractsDefault),
+            inputAssets.getOrElse(inputAssetsDefault)
+          )
+        )
+      case None => Left(badRequest(s"Invalid method index ${methodIndex}"))
+    }
+  }
 }
 
 object TestContract {
@@ -66,6 +83,7 @@ object TestContract {
   final case class Complete(
       group: Int = groupDefault,
       contractId: ContractId = addressDefault.contractId,
+      originalCodeHash: Hash,
       code: StatefulContract,
       initialFields: AVector[Val] = initialFieldsDefault,
       initialAsset: AssetState = initialAssetDefault,
