@@ -502,12 +502,12 @@ class ServerUtils(implicit
           start,
           endOpt.getOrElse(start + CounterRange.MaxCounterRange)
         )
-        .map { case (nextCount, logStatesVec) =>
+        .map { case (nextStart, logStatesVec) =>
           Events(
             chainIndex.from.value,
             chainIndex.to.value,
             logStatesVec.flatMap(Events.from),
-            nextCount
+            nextStart
           )
         }
     )

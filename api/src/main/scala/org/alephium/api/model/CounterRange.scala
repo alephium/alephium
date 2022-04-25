@@ -42,7 +42,16 @@ object CounterRange {
             List.empty
           }
         case None =>
-          List.empty
+          if (counterRange.start > Int.MaxValue - MaxCounterRange) {
+            List(
+              ValidationError.Custom(
+                counterRange,
+                s"`start` must be smaller than ${Int.MaxValue - MaxCounterRange}"
+              )
+            )
+          } else {
+            List.empty
+          }
       }
     }
   }

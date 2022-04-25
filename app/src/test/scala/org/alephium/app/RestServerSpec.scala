@@ -767,6 +767,12 @@ abstract class RestServerSpec(
         response.body.leftValue is s"""{"detail":"Invalid value (`end` must be smaller than ${start + CounterRange.MaxCounterRange})"}"""
     }
 
+    info("with start larger than (Int.MaxValue - MaxCounterRange)")
+    Get(s"$urlBase&start=${Int.MaxValue - CounterRange.MaxCounterRange + 1}").check { response =>
+      response.code is StatusCode.BadRequest
+      response.body.leftValue is s"""{"detail":"Invalid value (`start` must be smaller than ${Int.MaxValue - CounterRange.MaxCounterRange})"}"""
+    }
+
     def validResponse(response: Response[Either[String, String]]): Assertion = {
       response.code is StatusCode.Ok
       val events = response.body.rightValue
@@ -797,7 +803,7 @@ abstract class RestServerSpec(
         |      ]
         |    }
         |  ],
-        |  "nextCount": 2
+        |  "nextStart": 2
         |}
         |""".stripMargin.filterNot(_.isWhitespace)
     }
@@ -844,7 +850,7 @@ abstract class RestServerSpec(
         |      ]
         |    }
         |  ],
-        |  "nextCount": 2
+        |  "nextStart": 2
         |}
         |""".stripMargin.filterNot(_.isWhitespace)
         } else {

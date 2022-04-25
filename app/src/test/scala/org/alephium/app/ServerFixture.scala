@@ -356,13 +356,13 @@ object ServerFixture {
         eventKey: Hash,
         start: Int,
         end: Int
-    ): IOResult[(Option[Int], AVector[LogStates])] = {
+    ): IOResult[(Int, AVector[LogStates])] = {
       lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
       lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
 
       Right(
         (
-          Some(2),
+          2,
           AVector(
             LogStates(
               block.hash,

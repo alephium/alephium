@@ -7223,7 +7223,7 @@
                       ]
                     }
                   ],
-                  "nextCount": 2
+                  "nextStart": 2
                 }
               }
             }
@@ -7440,7 +7440,7 @@
                       ]
                     }
                   ],
-                  "nextCount": 2
+                  "nextStart": 2
                 }
               }
             }
@@ -8611,7 +8611,8 @@
         "required": [
           "chainFrom",
           "chainTo",
-          "events"
+          "events",
+          "nextStart"
         ],
         "type": "object",
         "properties": {
@@ -8627,7 +8628,7 @@
               "$ref": "#/components/schemas/Event"
             }
           },
-          "nextCount": {
+          "nextStart": {
             "type": "integer"
           }
         }

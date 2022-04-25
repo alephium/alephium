@@ -1385,7 +1385,7 @@ class VMSpec extends AlephiumSpec {
       info("All events emitted from the contract after the first method call")
 
       val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0)
-      nextCount is None
+      nextCount is 1
       allLogStates.length is 1
       val logStates = allLogStates.head
 
@@ -1401,10 +1401,10 @@ class VMSpec extends AlephiumSpec {
       val (nextCount1, _) = getEvents(blockFlow, chainIndex, contractId, 0, 1)
       nextCount1.value is 2
       val (nextCount2, _) = getEvents(blockFlow, chainIndex, contractId, 0, 2)
-      nextCount2 is None
+      nextCount2 is 2
 
       val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0)
-      nextCount is None
+      nextCount is 2
       allLogStates.length is 2
       val logStates1 = allLogStates.head
       val logStates2 = allLogStates.last
@@ -1416,7 +1416,7 @@ class VMSpec extends AlephiumSpec {
     {
       info("Part of the events emitted from the contract after the second method call")
       val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0, 2)
-      nextCount is None
+      nextCount is 2
       allLogStates.length is 2
 
       val logStates1 = allLogStates.head
@@ -1474,7 +1474,7 @@ class VMSpec extends AlephiumSpec {
       contractId: ContractId,
       start: Int,
       end: Int = Int.MaxValue
-  ): (Option[Int], AVector[LogStates]) = {
+  ): (Int, AVector[LogStates]) = {
     blockFlow.getEvents(chainIndex, contractId, start, end).rightValue
   }
 

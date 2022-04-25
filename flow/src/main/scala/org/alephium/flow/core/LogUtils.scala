@@ -32,7 +32,7 @@ trait LogUtils { Self: FlowUtils =>
       eventKey: Hash,
       start: Int,
       end: Int
-  ): IOResult[(Option[Int], AVector[LogStates])] = {
+  ): IOResult[(Int, AVector[LogStates])] = {
     var allLogStates: ArrayBuffer[LogStates] = ArrayBuffer.empty
     var nextCount                            = start
 
@@ -62,8 +62,7 @@ trait LogUtils { Self: FlowUtils =>
       worldState <- blockFlow.getBestPersistedWorldState(chainIndex.from)
       _          <- rec(worldState, LogStatesId(eventKey, nextCount))
     } yield {
-      val nextCountOpt = if (end < nextCount) Some(nextCount) else None
-      (nextCountOpt, AVector.from(allLogStates))
+      (nextCount, AVector.from(allLogStates))
     }
   }
 

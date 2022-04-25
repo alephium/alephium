@@ -25,7 +25,7 @@ final case class Events(
     chainFrom: Int,
     chainTo: Int,
     events: AVector[Event],
-    nextCount: Option[Int]
+    nextStart: Int
 )
 
 sealed trait Event {
