@@ -616,6 +616,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpGet(s"/wallets/${walletName}/miner-addresses")
   }
 
+  def isBlockInMainChain(blockHash: String) = {
+    httpGet(
+      s"/blockflow/is-block-in-main-chain?blockHash=$blockHash"
+    )
+  }
+
   def convertFields(fields: AVector[Val]): String = {
     fields.map(write[Val](_)).mkString("[", ",", "]")
   }

@@ -18,7 +18,7 @@ package org.alephium.app
 
 import org.alephium.api.model._
 import org.alephium.json.Json._
-import org.alephium.protocol.{ALPH, Hash, PublicKey}
+import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey}
 import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.util._
 import org.alephium.wallet.api.model._
@@ -35,10 +35,9 @@ class VotingTest extends AlephiumActorSpec {
     allocateTokens(admin, voters, contractId.toHexString, contractCode)
     checkState(0, 0, false, true)
 
-    checkEvents(contractAddress, 0) { response =>
-      val allEvents = response.events
-      allEvents.length is 1
-      checkVotingStartedEvent(allEvents.head)
+    checkEvents(contractAddress, 0) { events =>
+      events.length is 1
+      checkVotingStartedEvent(events.head)
     }
     val countAfterVotingStarted = getEventsCurrentCount(contractAddress)
 
@@ -48,30 +47,26 @@ class VotingTest extends AlephiumActorSpec {
     voters.drop(nbYes).foreach(wallet => vote(wallet, contractId.toHexString, false, contractCode))
     checkState(nbYes, nbNo, false, true)
 
-    checkEvents(contractAddress, countAfterVotingStarted) { response =>
-      checkVoteCastedEvents(response.events)
-    }
+    checkEvents(contractAddress, countAfterVotingStarted)(checkVoteCastedEvents)
+
     val countAfterVotingCasted = getEventsCurrentCount(contractAddress)
 
     close(admin, contractId.toHexString, contractCode)
     checkState(nbYes, nbNo, true, true)
 
-    checkEvents(contractAddress, countAfterVotingCasted) { response =>
-      val allEvents = response.events
-      allEvents.length is 1
-      checkVotingClosedEvent(allEvents.head)
+    checkEvents(contractAddress, countAfterVotingCasted) { events =>
+      events.length is 1
+      checkVotingClosedEvent(events.head)
     }
 
     // Check all events for the contract from the beginning
-    checkEvents(contractAddress, 0) { response =>
-      val allEvents = response.events
-
+    checkEvents(contractAddress, 0) { events =>
       val totalEventsNum = voters.length + 2
-      allEvents.length is totalEventsNum
+      events.length is totalEventsNum
 
-      checkVotingStartedEvent(allEvents.head)
-      checkVoteCastedEvents(allEvents.tail.take(voters.length))
-      checkVotingClosedEvent(allEvents.last)
+      checkVotingStartedEvent(events.head)
+      checkVoteCastedEvents(events.tail.take(voters.length))
+      checkVotingClosedEvent(events.last)
     }
 
     clique.selfClique().nodes.foreach { peer =>
@@ -123,16 +118,25 @@ class VotingTest extends AlephiumActorSpec {
       )
     }
 
-    def checkEvents(contractAddress: Address, startCounter: Int)(
-        validate: (Events) => Any
+    def checkEvents(contractAddress: Address, startCount: Int)(
+        validate: (AVector[Event]) => Any
     ) = {
-      val events =
+      val response =
         request[Events](
-          getContractEvents(startCounter, contractAddress),
+          getContractEvents(startCount, contractAddress),
           restPort
         )
 
+      // Filter out events from the occasional orphan blocks
+      val events = response.events.filter(event => isBlockInMainChain(event.blockHash))
       validate(events)
+    }
+
+    def isBlockInMainChain(blockHash: BlockHash): Boolean = {
+      request[Boolean](
+        isBlockInMainChain(blockHash.toHexString),
+        restPort
+      )
     }
 
     def getEventsCurrentCount(contractAddress: Address): Int = {
