@@ -28,7 +28,7 @@ final case class BuildScriptTx(
     bytecode: ByteString,
     alphAmount: Option[Amount] = None,
     tokens: Option[AVector[Token]] = None,
-    gas: Option[GasBox] = None,
+    gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     utxosLimit: Option[Int] = None
-) extends UtxoBasedModel
+) extends BuildTxCommon

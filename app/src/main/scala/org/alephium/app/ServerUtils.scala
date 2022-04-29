@@ -185,7 +185,7 @@ class ServerUtils(implicit
         query.fromPublicKey,
         query.utxos,
         query.destinations,
-        query.gas,
+        query.gasAmount,
         query.gasPrice.getOrElse(defaultGasPrice),
         query.utxosLimit.getOrElse(apiConfig.defaultUtxosLimit)
       )
@@ -255,7 +255,7 @@ class ServerUtils(implicit
         query.fromPublicKey,
         query.toAddress,
         query.lockTime,
-        query.gas,
+        query.gasAmount,
         query.gasPrice.getOrElse(defaultGasPrice),
         query.utxosLimit.getOrElse(Int.MaxValue)
       )
@@ -765,7 +765,7 @@ class ServerUtils(implicit
         dustUtxoAmount,
         AVector.empty,
         query.fromPublicKey,
-        query.gas,
+        query.gasAmount,
         query.gasPrice,
         query.utxosLimit
       )
@@ -804,7 +804,7 @@ class ServerUtils(implicit
         alphAmount,
         tokens,
         query.fromPublicKey,
-        query.gas,
+        query.gasAmount,
         query.gasPrice,
         query.utxosLimit
       )

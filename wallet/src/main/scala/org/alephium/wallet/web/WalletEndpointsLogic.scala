@@ -153,13 +153,27 @@ trait WalletEndpointsLogic extends WalletEndpoints {
 
   val sweepActiveAddressLogic = serverLogic(sweepActiveAddress) { case (wallet, sa) =>
     walletService
-      .sweepActiveAddress(wallet, sa.toAddress, sa.lockTime, sa.gas, sa.gasPrice, sa.utxosLimit)
+      .sweepActiveAddress(
+        wallet,
+        sa.toAddress,
+        sa.lockTime,
+        sa.gasAmount,
+        sa.gasPrice,
+        sa.utxosLimit
+      )
       .map(_.map(model.TransferResults.from).left.map(toApiError))
   }
 
   val sweepAllAddressesLogic = serverLogic(sweepAllAddresses) { case (wallet, sa) =>
     walletService
-      .sweepAllAddresses(wallet, sa.toAddress, sa.lockTime, sa.gas, sa.gasPrice, sa.utxosLimit)
+      .sweepAllAddresses(
+        wallet,
+        sa.toAddress,
+        sa.lockTime,
+        sa.gasAmount,
+        sa.gasPrice,
+        sa.utxosLimit
+      )
       .map(_.map(model.TransferResults.from).left.map(toApiError))
   }
 

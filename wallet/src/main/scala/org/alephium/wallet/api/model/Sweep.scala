@@ -16,7 +16,7 @@
 
 package org.alephium.wallet.api.model
 
-import org.alephium.api.model.UtxoBasedModel
+import org.alephium.api.model.BuildTxCommon
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.TimeStamp
@@ -25,7 +25,7 @@ import org.alephium.util.TimeStamp
 final case class Sweep(
     toAddress: Address.Asset,
     lockTime: Option[TimeStamp] = None,
-    gas: Option[GasBox] = None,
+    gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     utxosLimit: Option[Int] = None
-) extends UtxoBasedModel
+) extends BuildTxCommon
