@@ -107,10 +107,10 @@ class RestServer(
       exportBlocksLogic,
       verifySignatureLogic,
       checkHashIndexingLogic,
-      getContractEventsForBlockLogic,
-      getContractEventsWithinBlocksLogic,
-      getContractEventsWithinTimeIntervalLogic,
+      getContractEventsLogic,
+      getContractEventsCurrentCountLogic,
       getTxScriptEventsLogic,
+      getTxScriptEventsCurrentCountLogic,
       metricsLogic
     ).map(route(_)) :+ swaggerUiRoute
 

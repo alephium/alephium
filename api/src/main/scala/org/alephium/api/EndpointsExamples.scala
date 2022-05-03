@@ -70,12 +70,12 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
     .get
-  private val hash =
+  protected val hash =
     Hash.from(Hex.unsafe("798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef")).get
   private val blockHash = BlockHash
     .from(Hex.unsafe("bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"))
     .get
-  val hexString    = "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+  val hexString    = "35d1b2a520a0da34c5eb8d712aa9cc"
   val byteString   = Hex.unsafe(hexString)
   protected val ts = TimeStamp.unsafe(1611041396892L)
   val txId =
@@ -635,13 +635,16 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val booleanExamples: List[Example[Boolean]] =
     simpleExample(true)
 
+  implicit val intExamples: List[Example[Int]] =
+    simpleExample(100)
+
   implicit val verifySignatureExamples: List[Example[VerifySignature]] =
     simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
 
   implicit val eventsExamples: List[Example[Events]] =
-    simpleExample(Events(0, 1, events = AVector(event)))
+    simpleExample(Events(0, 1, events = AVector(event), 2))
 
   implicit val eventsVectorExamples: List[Example[AVector[Events]]] =
-    simpleExample(AVector(Events(0, 1, events = AVector(event))))
+    simpleExample(AVector(Events(0, 1, events = AVector(event), 3)))
 }
 // scalastyle:on magic.number

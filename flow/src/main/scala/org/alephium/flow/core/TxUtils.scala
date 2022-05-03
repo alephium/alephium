@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 
 import TxUtils._
 
-import org.alephium.flow.core.BlockFlowState.{BlockCache, TxStatus}
+import org.alephium.flow.core.BlockFlowState.{BlockCache, Confirmed, MemPooled, TxStatus}
 import org.alephium.flow.core.FlowUtils._
 import org.alephium.flow.core.UtxoSelectionAlgo.{AssetAmounts, ProvidedGas}
 import org.alephium.flow.gasestimation._
@@ -305,7 +305,7 @@ trait TxUtils { Self: FlowUtils =>
       chain.getTxStatusUnsafe(txId).flatMap { chainStatus =>
         val confirmations = chainStatus.confirmations
         if (chainIndex.isIntraGroup) {
-          Some(TxStatus(chainStatus.index, confirmations, confirmations, confirmations))
+          Some(Confirmed(chainStatus.index, confirmations, confirmations, confirmations))
         } else {
           val confirmHash = chainStatus.index.hash
           val fromGroupConfirmations =
@@ -313,7 +313,12 @@ trait TxUtils { Self: FlowUtils =>
           val toGroupConfirmations =
             getToGroupConfirmationsUnsafe(confirmHash, chainIndex)
           Some(
-            TxStatus(chainStatus.index, confirmations, fromGroupConfirmations, toGroupConfirmations)
+            Confirmed(
+              chainStatus.index,
+              confirmations,
+              fromGroupConfirmations,
+              toGroupConfirmations
+            )
           )
         }
       }
@@ -389,6 +394,61 @@ trait TxUtils { Self: FlowUtils =>
       groupView <- getImmutableGroupView(groupIndex)
       failedTxs <- txs.filterE(tx => groupView.getPreOutputs(tx.unsigned.inputs).map(_.isEmpty))
     } yield failedTxs
+  }
+
+  def searchLocalTransactionStatus(
+      txId: Hash,
+      chainIndexes: AVector[ChainIndex]
+  ): Either[String, Option[TxStatus]] = {
+    @tailrec
+    def rec(
+        indexes: AVector[ChainIndex],
+        currentRes: Either[String, Option[TxStatus]]
+    ): Either[String, Option[TxStatus]] = {
+      indexes.headOption match {
+        case Some(index) =>
+          val res = getTransactionStatus(txId, index)
+          res match {
+            case Right(None) => rec(indexes.tail, res)
+            case Right(_)    => res
+            case Left(_)     => res
+          }
+        case None =>
+          currentRes
+      }
+    }
+    rec(chainIndexes, Right(None))
+  }
+
+  def getTransactionStatus(
+      txId: Hash,
+      chainIndex: ChainIndex
+  ): Either[String, Option[TxStatus]] = {
+    if (brokerConfig.contains(chainIndex.from)) {
+      for {
+        status <- getTxStatus(txId, chainIndex)
+          .map {
+            case Some(status) => Some(status)
+            case None         => if (isInMemPool(txId, chainIndex)) Some(MemPooled) else None
+          }
+          .left
+          .map(_.toString)
+      } yield status
+    } else {
+      Right(None)
+    }
+  }
+
+  def isInMemPool(txId: Hash, chainIndex: ChainIndex): Boolean = {
+    Self.blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
+  }
+
+  def checkTxChainIndex(chainIndex: ChainIndex, tx: Hash): Either[String, Unit] = {
+    if (brokerConfig.contains(chainIndex.from)) {
+      Right(())
+    } else {
+      Left(s"${tx.toHexString} belongs to other groups")
+    }
   }
 
   private def checkProvidedGas(gasOpt: Option[GasBox], gasPrice: GasPrice): Either[String, Unit] = {

@@ -581,9 +581,15 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpGet(s"/contracts/${address}/state?group=${group}")
   }
 
-  def getEventsWithinTimeInterval(startTs: TimeStamp, toTs: TimeStamp, address: Address) = {
+  def getContractEvents(start: Int, address: Address) = {
     httpGet(
-      s"/events/contract/within-time-interval?fromTs=${startTs.millis}&toTs=${toTs.millis}&contractAddress=${address.toBase58}"
+      s"/events/contract?start=$start&contractAddress=${address.toBase58}"
+    )
+  }
+
+  def getContractEventsCurrentCount(address: Address) = {
+    httpGet(
+      s"/events/contract/current-count?contractAddress=${address.toBase58}"
     )
   }
 
@@ -608,6 +614,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def getMinerAddresses(walletName: String) = {
     httpGet(s"/wallets/${walletName}/miner-addresses")
+  }
+
+  def isBlockInMainChain(blockHash: String) = {
+    httpGet(
+      s"/blockflow/is-block-in-main-chain?blockHash=$blockHash"
+    )
   }
 
   def convertFields(fields: AVector[Val]): String = {

@@ -1449,7 +1449,7 @@
                 "$ref": "#/components/schemas/Sign"
               },
               "example": {
-                "data": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                "data": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
               }
             }
           },
@@ -4841,7 +4841,7 @@
                   "$ref": "#/components/schemas/BuildTransactionResult"
                 },
                 "example": {
-                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
                   "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
@@ -4968,7 +4968,7 @@
                   "unsignedTxs": [
                     {
                       "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                      "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                      "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "gasAmount": 20000,
                       "gasPrice": "100000000000"
                     }
@@ -5062,7 +5062,7 @@
                 "$ref": "#/components/schemas/SubmitTransaction"
               },
               "example": {
-                "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                 "signature": "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
               }
             }
@@ -5167,7 +5167,7 @@
                 "$ref": "#/components/schemas/DecodeTransaction"
               },
               "example": {
-                "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc"
               }
             }
           },
@@ -5454,7 +5454,7 @@
                 "example": {
                   "compiled": {
                     "type": "SimpleScriptByteCode",
-                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
                   },
                   "functions": [
                     {
@@ -5578,14 +5578,14 @@
                   "summary": "Default",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                     "alphAmount": "1000000000000",
                     "tokens": [
                       {
@@ -5615,7 +5615,7 @@
                   "$ref": "#/components/schemas/BuildScriptTxResult"
                 },
                 "example": {
-                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "group": 2
                 }
@@ -5721,7 +5721,7 @@
                 "example": {
                   "compiled": {
                     "type": "SimpleContractByteCode",
-                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
                   },
                   "fields": {
                     "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
@@ -5855,14 +5855,14 @@
                   "summary": "Default",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13"
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
                   }
                 },
                 "Example1": {
                   "summary": "More settings",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "bytecode": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                     "initialFields": [
                       {
                         "type": "Bool",
@@ -5894,7 +5894,7 @@
                 },
                 "example": {
                   "group": 2,
-                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
                 }
@@ -6502,7 +6502,7 @@
                   "$ref": "#/components/schemas/BuildTransactionResult"
                 },
                 "example": {
-                  "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
                   "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
@@ -6595,7 +6595,7 @@
                 "$ref": "#/components/schemas/SubmitMultisig"
               },
               "example": {
-                "unsignedTx": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                 "signatures": [
                   "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
                 ]
@@ -6702,7 +6702,7 @@
                 "$ref": "#/components/schemas/VerifySignature"
               },
               "example": {
-                "data": "0ecd20654c2e2be708495853e8da35c664247040c00bd10b9b13",
+                "data": "35d1b2a520a0da34c5eb8d712aa9cc",
                 "signature": "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b",
                 "publicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
               }
@@ -7159,20 +7159,28 @@
         }
       }
     },
-    "/events/contract/in-block": {
+    "/events/contract": {
       "get": {
         "tags": [
           "Events"
         ],
-        "summary": "Get events for a contract within a block",
-        "operationId": "getEventsContractIn-block",
+        "summary": "Get events for a contract within a counter range",
+        "operationId": "getEventsContract",
         "parameters": [
           {
-            "name": "block",
+            "name": "start",
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "integer"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
             }
           },
           {
@@ -7212,7 +7220,8 @@
                         }
                       ]
                     }
-                  ]
+                  ],
+                  "nextStart": 2
                 }
               }
             }
@@ -7286,30 +7295,14 @@
         }
       }
     },
-    "/events/contract/within-blocks": {
+    "/events/contract/current-count": {
       "get": {
         "tags": [
           "Events"
         ],
-        "summary": "Get events for a contract within a range of blocks",
-        "operationId": "getEventsContractWithin-blocks",
+        "summary": "Get current value of the events counter for a contract",
+        "operationId": "getEventsContractCurrent-count",
         "parameters": [
-          {
-            "name": "fromBlock",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "toBlock",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "name": "contractAddress",
             "in": "query",
@@ -7324,180 +7317,9 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Events"
-                  }
+                  "type": "integer"
                 },
-                "example": [
-                  {
-                    "chainFrom": 0,
-                    "chainTo": 1,
-                    "events": [
-                      {
-                        "type": "ContractEvent",
-                        "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                        "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
-                        "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
-                        "eventIndex": 1,
-                        "fields": [
-                          {
-                            "type": "Address",
-                            "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
-                          },
-                          {
-                            "type": "U256",
-                            "value": "10"
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          },
-          "400": {
-            "description": "BadRequest",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequest"
-                },
-                "example": {
-                  "detail": "Something bad in the request"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalServerError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalServerError"
-                },
-                "example": {
-                  "detail": "Ouch"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                },
-                "example": {
-                  "resource": "wallet-name",
-                  "detail": "wallet-name not found"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "ServiceUnavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceUnavailable"
-                },
-                "example": {
-                  "detail": "Self clique unsynced"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                },
-                "example": {
-                  "detail": "You shall not pass"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/events/contract/within-time-interval": {
-      "get": {
-        "tags": [
-          "Events"
-        ],
-        "summary": "Get events for a contract within a time interval",
-        "operationId": "getEventsContractWithin-time-interval",
-        "parameters": [
-          {
-            "name": "fromTs",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": "0"
-            }
-          },
-          {
-            "name": "toTs",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": "0"
-            }
-          },
-          {
-            "name": "contractAddress",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Events"
-                  }
-                },
-                "example": [
-                  {
-                    "chainFrom": 0,
-                    "chainTo": 1,
-                    "events": [
-                      {
-                        "type": "ContractEvent",
-                        "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                        "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
-                        "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
-                        "eventIndex": 1,
-                        "fields": [
-                          {
-                            "type": "Address",
-                            "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
-                          },
-                          {
-                            "type": "U256",
-                            "value": "10"
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
+                "example": 100
               }
             }
           },
@@ -7579,14 +7401,6 @@
         "operationId": "getEventsTx-script",
         "parameters": [
           {
-            "name": "block",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "txId",
             "in": "query",
             "required": true,
@@ -7623,8 +7437,106 @@
                         }
                       ]
                     }
-                  ]
+                  ],
+                  "nextStart": 2
                 }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/tx-script/current-count": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Get current value of the events counter for a TxScript",
+        "operationId": "getEventsTx-scriptCurrent-count",
+        "parameters": [
+          {
+            "name": "txId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer"
+                },
+                "example": 100
               }
             }
           },
@@ -8796,7 +8708,8 @@
         "required": [
           "chainFrom",
           "chainTo",
-          "events"
+          "events",
+          "nextStart"
         ],
         "type": "object",
         "properties": {
@@ -8811,6 +8724,9 @@
             "items": {
               "$ref": "#/components/schemas/Event"
             }
+          },
+          "nextStart": {
+            "type": "integer"
           }
         }
       },

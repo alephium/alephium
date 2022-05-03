@@ -27,7 +27,7 @@ import org.alephium.crypto._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToSharedPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
-import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey}
+import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
@@ -1305,7 +1305,7 @@ class VMSpec extends AlephiumSpec {
     val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
     val contractState = worldState.getContractState(contractOutputRef.key).rightValue
     contractState.fields is AVector[Val](Val.U256(3))
-    getLogStates(blockFlow, chainIndex.from, block.hash, contractOutputRef.key).value is
+    getLogStates(blockFlow, chainIndex.from, contractOutputRef.key, 0).value is
       LogStates(
         block.hash,
         contractOutputRef.key,
@@ -1378,30 +1378,41 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
+
+    protected def verifyCallingEvents(
+        logStates: LogStates,
+        block: Block,
+        result: Int,
+        currentCount: Int
+    ) = {
+      logStates.blockHash is block.hash
+      logStates.eventKey is contractId
+      logStates.states.length is 2
+
+      getCurentCount(blockFlow, chainIndex.from, contractId).value is currentCount
+
+      val addingLogState = logStates.states(0)
+      addingLogState.txId is block.nonCoinbase.head.id
+      addingLogState.index is 0.toByte
+      addingLogState.fields.length is 2
+      addingLogState.fields(0) is Val.U256(U256.unsafe(4))
+      addingLogState.fields(1) is Val.U256(U256.unsafe(result))
+
+      val addedLogState = logStates.states(1)
+      addedLogState.txId is block.nonCoinbase.head.id
+      addedLogState.index is 1.toByte
+      addedLogState.fields.length is 0
+    }
   }
 
   it should "emit events and write to the log storage" in new EventFixtureWithContract {
     {
       info("Events emitted from the contract exist in the block")
 
-      val logStatesOpt = getLogStates(blockFlow, chainIndex.from, callingBlock.hash, contractId)
+      val logStatesOpt = getLogStates(blockFlow, chainIndex.from, contractId, 0)
       val logStates    = logStatesOpt.value
 
-      logStates.blockHash is callingBlock.hash
-      logStates.eventKey is contractId
-      logStates.states.length is 2
-
-      val addingLogState = logStates.states(0)
-      addingLogState.txId is callingBlock.nonCoinbase.head.id
-      addingLogState.index is 0.toByte
-      addingLogState.fields.length is 2
-      addingLogState.fields(0) is Val.U256(U256.unsafe(4))
-      addingLogState.fields(1) is Val.U256(U256.unsafe(10))
-
-      val addedLogState = logStates.states(1)
-      addedLogState.txId is callingBlock.nonCoinbase.head.id
-      addedLogState.index is 1.toByte
-      addedLogState.fields.length is 0
+      verifyCallingEvents(logStates, callingBlock, result = 10, currentCount = 1)
     }
 
     {
@@ -1409,12 +1420,14 @@ class VMSpec extends AlephiumSpec {
 
       val createContractTxId = createContractBlock.nonCoinbase.head.id
       val logStatesOpt =
-        getLogStates(blockFlow, chainIndex.from, createContractBlock.hash, createContractTxId)
+        getLogStates(blockFlow, chainIndex.from, createContractTxId, 0)
       val logStates = logStatesOpt.value
 
       logStates.blockHash is createContractBlock.hash
       logStates.eventKey is createContractTxId
       logStates.states.length is 1
+
+      getCurentCount(blockFlow, chainIndex.from, createContractTxId).value is 1
 
       val createContractLogState = logStates.states(0)
       createContractLogState.txId is createContractBlock.nonCoinbase.head.id
@@ -1442,12 +1455,14 @@ class VMSpec extends AlephiumSpec {
 
       val destroyContractTxId = destroyContractBlock.nonCoinbase.head.id
       val logStatesOpt =
-        getLogStates(blockFlow, chainIndex.from, destroyContractBlock.hash, destroyContractTxId)
+        getLogStates(blockFlow, chainIndex.from, destroyContractTxId, 0)
       val logStates = logStatesOpt.value
 
       logStates.blockHash is destroyContractBlock.hash
       logStates.eventKey is destroyContractTxId
       logStates.states.length is 1
+
+      getCurentCount(blockFlow, chainIndex.from, destroyContractTxId).value is 1
 
       val destroyContractLogState = logStates.states(0)
       destroyContractLogState.txId is destroyContractBlock.nonCoinbase.head.id
@@ -1457,17 +1472,25 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("Events emitted from the contract does not exist in the block")
+      info("Events emitted from the contract with wrong counter")
 
-      val wrongBlockId = BlockHash.generate
-      val logStatesOpt1 =
-        getLogStates(blockFlow, chainIndex.from, wrongBlockId, contractId)
-      logStatesOpt1 is None
+      val logStatesOpt1 = getLogStates(blockFlow, chainIndex.from, contractId, 0)
+      val logStates1    = logStatesOpt1.value
+      val newCounter    = logStates1.states.length
+
+      newCounter is 2
+
+      AVector(1, 2, 100).foreach { count =>
+        getLogStates(blockFlow, chainIndex.from, contractId, count) is None
+      }
+    }
+
+    {
+      info("Events emitted from a non-existent contract")
 
       val wrongContractId = Hash.generate
-      val logStatesOpt2 =
-        getLogStates(blockFlow, chainIndex.from, callingBlock.hash, wrongContractId)
-      logStatesOpt2 is None
+      val logStatesOpt    = getLogStates(blockFlow, chainIndex.from, wrongContractId, 0)
+      logStatesOpt is None
     }
   }
 
@@ -1475,7 +1498,7 @@ class VMSpec extends AlephiumSpec {
     implicit override lazy val logConfig: LogConfig =
       LogConfig(enabled = false, contractAddresses = None)
 
-    getLogStates(blockFlow, chainIndex.from, callingBlock.hash, contractId) is None
+    getLogStates(blockFlow, chainIndex.from, contractId, 0) is None
   }
 
   it should "not write to the log storage when logging is enabled but contract is not whitelisted" in new EventFixtureWithContract {
@@ -1484,7 +1507,7 @@ class VMSpec extends AlephiumSpec {
       contractAddresses = Some(AVector(Hash.generate, Hash.generate).map(Address.contract))
     )
 
-    getLogStates(blockFlow, chainIndex.from, callingBlock.hash, contractId) is None
+    getLogStates(blockFlow, chainIndex.from, contractId, 0) is None
   }
 
   it should "emit events with all supported field types" in new EventFixture {
@@ -1520,12 +1543,14 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
 
-    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, callingBlock.hash, contractId)
+    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, contractId, 0)
     val logStates    = logStatesOpt.value
 
     logStates.blockHash is callingBlock.hash
     logStates.eventKey is contractId
     logStates.states.length is 2
+
+    getCurentCount(blockFlow, chainIndex.from, contractId).value is 1
 
     val testEventLogState1 = logStates.states(0)
     testEventLogState1.txId is callingBlock.nonCoinbase.head.id
@@ -1544,6 +1569,63 @@ class VMSpec extends AlephiumSpec {
     testEventLogState2.fields(1) is Val.I256(I256.unsafe(-4))
     testEventLogState2.fields(2) is Val.Address(address.lockupScript)
     testEventLogState2.fields(3) is Val.Bool(true)
+  }
+
+  it should "get all events emitted by a contract" in new EventFixtureWithContract {
+    {
+      info("All events emitted from the contract after the first method call")
+
+      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0)
+      nextCount is 1
+      allLogStates.length is 1
+      val logStates = allLogStates.head
+
+      verifyCallingEvents(logStates, callingBlock, result = 10, currentCount = 1)
+    }
+
+    val secondCallingBlock = simpleScript(blockFlow, chainIndex, callingScript)
+    addAndCheck(blockFlow, secondCallingBlock, 3)
+
+    {
+      info("All events emitted from the contract after the second method call")
+
+      val (nextCount1, _) = getEvents(blockFlow, chainIndex, contractId, 0, 1)
+      nextCount1.value is 2
+      val (nextCount2, _) = getEvents(blockFlow, chainIndex, contractId, 0, 2)
+      nextCount2 is 2
+
+      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0)
+      nextCount is 2
+      allLogStates.length is 2
+      val logStates1 = allLogStates.head
+      val logStates2 = allLogStates.last
+
+      verifyCallingEvents(logStates1, callingBlock, result = 10, currentCount = 2)
+      verifyCallingEvents(logStates2, secondCallingBlock, result = 14, currentCount = 2)
+    }
+
+    {
+      info("Part of the events emitted from the contract after the second method call")
+      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0, 2)
+      nextCount is 2
+      allLogStates.length is 2
+
+      val logStates1 = allLogStates.head
+      val logStates2 = allLogStates.last
+
+      verifyCallingEvents(logStates1, callingBlock, result = 10, currentCount = 2)
+
+      logStates2.blockHash is secondCallingBlock.hash
+      logStates2.eventKey is contractId
+      logStates2.states.length is 2
+
+      val addingLogState = logStates2.states(0)
+      addingLogState.txId is secondCallingBlock.nonCoinbase.head.id
+      addingLogState.index is 0.toByte
+      addingLogState.fields.length is 2
+      addingLogState.fields(0) is Val.U256(U256.unsafe(4))
+      addingLogState.fields(1) is Val.U256(U256.unsafe(14))
+    }
   }
 
   it should "not compile when emitting events with array field types" in new FlowFixture {
@@ -1567,10 +1649,10 @@ class VMSpec extends AlephiumSpec {
   private def getLogStates(
       blockFlow: BlockFlow,
       groupIndex: GroupIndex,
-      blockHash: BlockHash,
-      contractId: ContractId
+      contractId: ContractId,
+      count: Int
   ): Option[LogStates] = {
-    val logStatesId = LogStatesId(blockHash, contractId)
+    val logStatesId = LogStatesId(contractId, count)
     (for {
       worldState   <- blockFlow.getBestPersistedWorldState(groupIndex)
       logStatesOpt <- worldState.logState.getOpt(logStatesId)
@@ -1605,8 +1687,9 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val block = callTxScript(main)
 
-    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, block.hash, contractId)
+    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, contractId, 0)
     val logStates    = logStatesOpt.value
+    logStates.blockHash is block.hash
     logStates.states.length is 2 // one system event, another one emitted event
     val subContractId = logStates.states(1).fields.head.asInstanceOf[Val.ByteVec].bytes
 
@@ -1845,11 +1928,33 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val block = callTxScript(main)
 
-    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, block.hash, barId)
+    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, barId, 0)
     val logStates    = logStatesOpt.value
+    logStates.blockHash is block.hash
     logStates.states.length is 2
     logStates.states(0).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 1
     logStates.states(1).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 2
+  }
+
+  private def getEvents(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      contractId: ContractId,
+      start: Int,
+      end: Int = Int.MaxValue
+  ): (Int, AVector[LogStates]) = {
+    blockFlow.getEvents(chainIndex, contractId, start, end).rightValue
+  }
+
+  private def getCurentCount(
+      blockFlow: BlockFlow,
+      groupIndex: GroupIndex,
+      contractId: ContractId
+  ): Option[Int] = {
+    (for {
+      worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
+      countOpt   <- worldState.logCounterState.getOpt(contractId)
+    } yield countOpt).rightValue
   }
 }
 // scalastyle:on file.size.limit no.equal regex

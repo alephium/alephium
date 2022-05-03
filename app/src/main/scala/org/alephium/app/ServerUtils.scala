@@ -141,16 +141,18 @@ class ServerUtils(implicit
   def getGroup(blockFlow: BlockFlow, query: GetGroup): Try[Group] = query match {
     case GetGroup(assetAddress: Address.Asset) =>
       Right(Group(assetAddress.groupIndex(brokerConfig).value))
-    case GetGroup(Address.Contract(LockupScript.P2C(contractId))) => {
-      val failure: Try[Group] = Left(failed("Group not found.")).withRight[Group]
-      brokerConfig.groupRange.foldLeft(failure) { case (prevResult, currentGroup: Int) =>
-        prevResult match {
-          case Right(prevResult) => Right(prevResult)
-          case Left(_) =>
-            getContractGroup(blockFlow, contractId, GroupIndex.unsafe(currentGroup))
-        }
+    case GetGroup(Address.Contract(LockupScript.P2C(contractId))) =>
+      getGroupForContract(blockFlow, contractId)
+  }
+
+  def getGroupForContract(blockFlow: BlockFlow, contractId: ContractId): Try[Group] = {
+    blockFlow
+      .getGroupForContract(contractId)
+      .map { groupIndex =>
+        Group(groupIndex.value)
       }
-    }
+      .left
+      .map(failed)
   }
 
   def listUnconfirmedTransactions(
@@ -307,34 +309,36 @@ class ServerUtils(implicit
     )
   }
 
-  def convert(status: BlockFlowState.TxStatus): TxStatus =
-    Confirmed(
-      status.index.hash,
-      status.index.index,
-      status.chainConfirmations,
-      status.fromGroupConfirmations,
-      status.toGroupConfirmations
-    )
+  def convert(statusOpt: Option[BlockFlowState.TxStatus]): TxStatus = {
+    statusOpt match {
+      case Some(confirmed: BlockFlowState.Confirmed) =>
+        Confirmed(
+          confirmed.index.hash,
+          confirmed.index.index,
+          confirmed.chainConfirmations,
+          confirmed.fromGroupConfirmations,
+          confirmed.toGroupConfirmations
+        )
+      case Some(BlockFlowState.MemPooled) =>
+        MemPooled
+      case None =>
+        TxNotFound
+    }
+  }
 
   def getTransactionStatus(
       blockFlow: BlockFlow,
       txId: Hash,
       chainIndex: ChainIndex
   ): Try[TxStatus] = {
-    for {
-      _ <- checkTxChainIndex(chainIndex, txId)
-      status <- blockFlow.getTxStatus(txId, chainIndex).left.map(failedInIO).map {
-        case Some(status) => convert(status)
-        case None         => if (isInMemPool(blockFlow, txId, chainIndex)) MemPooled else TxNotFound
-      }
-    } yield status
+    blockFlow.getTransactionStatus(txId, chainIndex).left.map(failed).map(convert)
   }
 
   def decodeUnsignedTransaction(
       unsignedTx: String
   ): Try[UnsignedTransaction] = {
     for {
-      txByteString <- Hex.from(unsignedTx).toRight(badRequest(s"Invalid hex"))
+      txByteString <- Hex.from(unsignedTx).toRight(badRequest("Invalid hex"))
       unsignedTx <- deserialize[UnsignedTransaction](txByteString).left
         .map(serdeError => badRequest(serdeError.getMessage))
       _ <- validateUnsignedTransaction(unsignedTx)
@@ -344,7 +348,7 @@ class ServerUtils(implicit
   def decodeUnlockScript(
       unlockScript: String
   ): Try[UnlockScript] = {
-    Hex.from(unlockScript).toRight(badRequest(s"Invalid hex")).flatMap { unlockScriptBytes =>
+    Hex.from(unlockScript).toRight(badRequest("Invalid hex")).flatMap { unlockScriptBytes =>
       deserialize[UnlockScript](unlockScriptBytes).left
         .map(serdeError => badRequest(serdeError.getMessage))
     }
@@ -354,87 +358,51 @@ class ServerUtils(implicit
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
-  def getEventsForBlock(
+  def getEventsForContract(
       blockFlow: BlockFlow,
-      blockHash: BlockHash,
-      eventKey: Hash
+      start: Int,
+      endOpt: Option[Int],
+      contractId: ContractId
   ): Try[Events] = {
-    val chainIndex = ChainIndex.from(blockHash)
-    if (chainIndex.isIntraGroup) {
-      wrapResult(blockFlow.getEvents(blockHash, eventKey)).map {
-        case Some(logs) => Events.from(chainIndex, logs)
-        case None       => Events.empty(chainIndex)
-      }
-    } else {
-      Right(Events.empty(chainIndex))
-    }
-  }
-
-  def getContractEventsWithinBlocks(
-      blockFlow: BlockFlow,
-      fromBlock: BlockHash,
-      toBlockOpt: Option[BlockHash],
-      contractId: ContractId
-  ): Try[AVector[Events]] = {
     for {
-      timeInterval <- timeIntervalFromBlockRange(blockFlow, fromBlock, toBlockOpt)
-      events       <- getContractEventsWithinTimeInterval(blockFlow, timeInterval, contractId)
-    } yield events
+      groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
+      chainIndex = ChainIndex(groupIndex, groupIndex)
+      result <- getEvents(blockFlow, start, endOpt, chainIndex, contractId)
+    } yield result
   }
 
-  private def timeIntervalFromBlockRange(
+  def getEventsForContractCurrentCount(
       blockFlow: BlockFlow,
-      fromBlock: BlockHash,
-      toBlockOpt: Option[BlockHash]
-  ): Try[TimeInterval] = {
+      contractAddress: Address.Contract
+  ): Try[Int] = {
+    val contractId = contractAddress.lockupScript.contractId
     for {
-      fromTimestamp <- wrapResult(blockFlow.getBlockHeader(fromBlock)).map(_.timestamp)
-      timeInterval <- toBlockOpt match {
-        case Some(toBlock) =>
-          for {
-            toTimestamp <- wrapResult(blockFlow.getBlockHeader(toBlock)).map(_.timestamp)
-            timeInterval <- validateTimeInterval(
-              TimeInterval(fromTimestamp, toTimestamp),
-              "`fromBlock` must be before `toBlock`"
-            )
-          } yield timeInterval
-        case None =>
-          validateTimeInterval(
-            TimeInterval(fromTimestamp, None),
-            "Timestamp for `fromBlock` is in the future"
-          )
-      }
-    } yield timeInterval
+      groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
+      chainIndex = ChainIndex(groupIndex, groupIndex)
+      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId))
+      count    <- countOpt.toRight(notFound(s"Current events count for contract $contractAddress"))
+    } yield count
   }
 
-  private def validateTimeInterval(
-      timeInterval: TimeInterval,
-      errorMsg: String
-  ): Try[TimeInterval] = {
-    if (timeInterval.from >= timeInterval.to) {
-      Left(badRequest(errorMsg))
-    } else {
-      Right(timeInterval)
-    }
-  }
-
-  def getContractEventsWithinTimeInterval(
+  def getEventsForTxScript(
       blockFlow: BlockFlow,
-      timeInterval: TimeInterval,
-      contractId: ContractId
-  ): Try[AVector[Events]] = {
+      txId: Hash
+  ): Try[Events] = {
     for {
-      heightedBlocks <- wrapResult(
-        blockFlow.getHeightedIntraBlocks(timeInterval.from, timeInterval.to)
-      )
-      events <- heightedBlocks.mapE { case (chainIndex, heightedBlocksPerChain) =>
-        heightedBlocksPerChain.foldE(Events.empty(chainIndex)) { case (eventsSoFar, (block, _)) =>
-          getEventsForBlock(blockFlow, block.hash, contractId).map { eventsForBlock =>
-            eventsSoFar.copy(events = eventsSoFar.events ++ eventsForBlock.events)
-          }
-        }
-      }
-    } yield events
+      chainIndex <- getChainIndexForTx(blockFlow, txId)
+      result     <- getEvents(blockFlow, 0, None, chainIndex, txId)
+    } yield result
+  }
+
+  def getEventsForTxScriptCurrentCount(
+      blockFlow: BlockFlow,
+      txId: Hash
+  ): Try[Int] = {
+    for {
+      chainIndex <- getChainIndexForTx(blockFlow, txId)
+      countOpt   <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, txId))
+      count      <- countOpt.toRight(notFound(s"Current events count for TxScript in transaction $txId"))
+    } yield count
   }
 
   def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =
@@ -494,6 +462,56 @@ class ServerUtils(implicit
         .left
         .map(_ => failedInIO)
     } yield ChainInfo(maxHeight)
+
+  def searchLocalTransactionStatus(
+      blockFlow: BlockFlow,
+      txId: Hash,
+      chainIndexes: AVector[ChainIndex]
+  ): Try[TxStatus] = {
+    blockFlow.searchLocalTransactionStatus(txId, chainIndexes).left.map(failed).map(convert)
+  }
+
+  def getChainIndexForTx(
+      blockFlow: BlockFlow,
+      txId: Hash
+  ): Try[ChainIndex] = {
+    searchLocalTransactionStatus(blockFlow, txId, brokerConfig.chainIndexes) match {
+      case Right(Confirmed(blockHash, _, _, _, _)) =>
+        Right(ChainIndex.from(blockHash))
+      case Right(TxNotFound) =>
+        Left(notFound(s"Transaction ${txId.toHexString}"))
+      case Right(MemPooled) =>
+        Left(failed(s"Transaction ${txId.toHexString} still in mempool"))
+      case Left(error) =>
+        Left(error)
+    }
+  }
+
+  private def getEvents(
+      blockFlow: BlockFlow,
+      start: Int,
+      endOpt: Option[Int],
+      chainIndex: ChainIndex,
+      eventKey: Hash
+  ): Try[Events] = {
+    wrapResult(
+      blockFlow
+        .getEvents(
+          chainIndex,
+          eventKey,
+          start,
+          endOpt.getOrElse(start + CounterRange.MaxCounterRange)
+        )
+        .map { case (nextStart, logStatesVec) =>
+          Events(
+            chainIndex.from.value,
+            chainIndex.to.value,
+            logStatesVec.flatMap(Events.from),
+            nextStart
+          )
+        }
+    )
+  }
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
@@ -648,14 +666,6 @@ class ServerUtils(implicit
   def checkHashChainIndex(hash: BlockHash): Try[ChainIndex] = {
     val chainIndex = ChainIndex.from(hash)
     checkChainIndex(chainIndex, hash.toHexString)
-  }
-
-  def checkTxChainIndex(chainIndex: ChainIndex, tx: Hash): Try[Unit] = {
-    if (brokerConfig.contains(chainIndex.from)) {
-      Right(())
-    } else {
-      Left(badRequest(s"${tx.toHexString} belongs to other groups"))
-    }
   }
 
   def execute(f: => Unit): FutureTry[Boolean] =
