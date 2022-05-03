@@ -200,6 +200,7 @@ lazy val app = mainProject("app")
       val baseImageName = "alephium/dev-alephium"
       val versionTag    = version.value.replace('+', '_')
       Seq(
+        ImageName(baseImageName + ":latest"),
         ImageName(baseImageName + ":" + versionTag),
         ImageName(baseImageName + ":" + versionTag + "-jdk17")
       )
