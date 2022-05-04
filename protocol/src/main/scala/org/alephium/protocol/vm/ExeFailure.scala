@@ -27,8 +27,8 @@ trait ExeFailure extends Product {
   def name: String = productPrefix
 }
 
-final case object CodeSizeTooLarge                             extends ExeFailure
-final case object FieldsSizeTooLarge                           extends ExeFailure
+case object CodeSizeTooLarge                                   extends ExeFailure
+case object FieldsSizeTooLarge                                 extends ExeFailure
 case object ExpectStatefulFrame                                extends ExeFailure
 case object InvalidFinalState                                  extends ExeFailure
 case object StackOverflow                                      extends ExeFailure
@@ -55,9 +55,10 @@ case object InvalidFieldLength                                 extends ExeFailur
 case object InvalidFieldType                                   extends ExeFailure
 case object EmptyMethods                                       extends ExeFailure
 final case class InvalidType(v: Val)                           extends ExeFailure
-final case object InvalidMethod                                extends ExeFailure
+case object InvalidMethod                                      extends ExeFailure
 final case class InvalidMethodIndex(index: Int)                extends ExeFailure
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure
+case object InvalidLengthForEncodeInstr                        extends ExeFailure
 case object InsufficientArgs                                   extends ExeFailure
 case object ExternalPrivateMethodCall                          extends ExeFailure
 case object AssertionFailed                                    extends ExeFailure
@@ -86,6 +87,7 @@ case object ExpectAContract                                    extends ExeFailur
 case object OutOfGas                                           extends ExeFailure
 case object ContractPoolOverflow                               extends ExeFailure
 case object ContractFieldOverflow                              extends ExeFailure
+final case class ContractLoadDisallowed(id: ContractId)        extends ExeFailure
 case object ContractAssetAlreadyInUsing                        extends ExeFailure
 case object ContractAssetAlreadyFlushed                        extends ExeFailure
 case object ContractAssetUnloaded                              extends ExeFailure
@@ -95,8 +97,13 @@ final case class NegativeTimeStamp(millis: Long)               extends ExeFailur
 final case class InvalidTarget(value: BigInteger)              extends ExeFailure
 case object InvalidBytesSliceArg                               extends ExeFailure
 case object InvalidBytesSize                                   extends ExeFailure
+case object InvalidSizeForZeros                                extends ExeFailure
 final case class SerdeErrorByteVecToAddress(error: SerdeError) extends ExeFailure
 case object FailedInRecoverEthAddress                          extends ExeFailure
+case object UnexpectedRecursiveCallInMigration                 extends ExeFailure
+
+final case class UncaughtKeyNotFoundError(error: IOError.KeyNotFound) extends ExeFailure
+final case class UncaughtSerdeError(error: IOError.Serde)             extends ExeFailure
 
 final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends ExeFailure
 
@@ -104,8 +111,9 @@ sealed trait IOFailure extends Product {
   def error: IOError
   def name: String = productPrefix
 }
-final case class IOErrorUpdateState(error: IOError)    extends IOFailure
-final case class IOErrorRemoveContract(error: IOError) extends IOFailure
-final case class IOErrorLoadContract(error: IOError)   extends IOFailure
-final case class IOErrorLoadOutputs(error: IOError)    extends IOFailure
-final case class IOErrorWriteLog(error: IOError)       extends IOFailure
+final case class IOErrorUpdateState(error: IOError)     extends IOFailure
+final case class IOErrorRemoveContract(error: IOError)  extends IOFailure
+final case class IOErrorLoadContract(error: IOError)    extends IOFailure
+final case class IOErrorLoadOutputs(error: IOError)     extends IOFailure
+final case class IOErrorMigrateContract(error: IOError) extends IOFailure
+final case class IOErrorWriteLog(error: IOError)        extends IOFailure

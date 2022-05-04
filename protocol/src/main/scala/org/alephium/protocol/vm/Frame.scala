@@ -61,49 +61,34 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def popOpStack(): ExeResult[Val] = opStack.pop()
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackBool(): ExeResult[Val.Bool] =
-    popOpStack().flatMap { elem =>
-      try Right(elem.asInstanceOf[Val.Bool])
-      catch {
-        case _: ClassCastException => failed(InvalidType(elem))
-      }
+    popOpStack().flatMap {
+      case elem: Val.Bool => Right(elem)
+      case elem           => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackI256(): ExeResult[Val.I256] =
-    popOpStack().flatMap { elem =>
-      try Right(elem.asInstanceOf[Val.I256])
-      catch {
-        case _: ClassCastException => failed(InvalidType(elem))
-      }
+    popOpStack().flatMap {
+      case elem: Val.I256 => Right(elem)
+      case elem           => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackU256(): ExeResult[Val.U256] =
-    popOpStack().flatMap { elem =>
-      try Right(elem.asInstanceOf[Val.U256])
-      catch {
-        case _: ClassCastException => failed(InvalidType(elem))
-      }
+    popOpStack().flatMap {
+      case elem: Val.U256 => Right(elem)
+      case elem           => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackByteVec(): ExeResult[Val.ByteVec] =
-    popOpStack().flatMap { elem =>
-      try Right(elem.asInstanceOf[Val.ByteVec])
-      catch {
-        case _: ClassCastException => failed(InvalidType(elem))
-      }
+    popOpStack().flatMap {
+      case elem: Val.ByteVec => Right(elem)
+      case elem              => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackAddress(): ExeResult[Val.Address] =
-    popOpStack().flatMap { elem =>
-      try Right(elem.asInstanceOf[Val.Address])
-      catch {
-        case _: ClassCastException => failed(InvalidType(elem))
-      }
+    popOpStack().flatMap {
+      case elem: Val.Address => Right(elem)
+      case elem              => failed(InvalidType(elem))
     }
 
   @inline
@@ -150,9 +135,14 @@ abstract class Frame[Ctx <: StatelessContext] {
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
-  ): ExeResult[Unit]
+  ): ExeResult[ContractId]
 
   def destroyContract(address: LockupScript): ExeResult[Unit]
+
+  def migrateContract(
+      newContractCode: StatefulContract,
+      newFieldsOpt: Option[AVector[Val]]
+  ): ExeResult[Unit]
 
   def callLocal(index: Byte): ExeResult[Option[Frame[Ctx]]] = {
     advancePC()
@@ -214,9 +204,13 @@ final class StatelessFrame(
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
-  ): ExeResult[Unit]                                          = StatelessFrame.notAllowed
+  ): ExeResult[ContractId]                                    = StatelessFrame.notAllowed
   def destroyContract(address: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
-  def getCallerFrame(): ExeResult[Frame[StatelessContext]]    = StatelessFrame.notAllowed
+  def migrateContract(
+      newContractCode: StatefulContract,
+      newFieldsOpt: Option[AVector[Val]]
+  ): ExeResult[Unit]                                       = StatelessFrame.notAllowed
+  def getCallerFrame(): ExeResult[Frame[StatelessContext]] = StatelessFrame.notAllowed
   def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] =
     StatelessFrame.notAllowed
 }
@@ -233,10 +227,10 @@ final class StatefulFrame(
     val locals: VarVector[Val],
     val returnTo: AVector[Val] => ExeResult[Unit],
     val ctx: StatefulContext,
-    val callerFrameOpt: Option[Frame[StatefulContext]],
+    val callerFrameOpt: Option[StatefulFrame],
     val balanceStateOpt: Option[BalanceState]
 ) extends Frame[StatefulContext] {
-  def getCallerFrame(): ExeResult[Frame[StatefulContext]] = {
+  def getCallerFrame(): ExeResult[StatefulFrame] = {
     callerFrameOpt.toRight(Right(NoCaller))
   }
 
@@ -271,7 +265,7 @@ final class StatefulFrame(
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
-  ): ExeResult[Unit] = {
+  ): ExeResult[ContractId] = {
     for {
       balanceState      <- getBalanceState()
       balances          <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
@@ -283,14 +277,14 @@ final class StatefulFrame(
           Val.Address(LockupScript.p2c(createdContractId))
         )
       )
-    } yield ()
+    } yield createdContractId
   }
 
   def destroyContract(address: LockupScript): ExeResult[Unit] = {
     for {
       contractId   <- obj.getContractId()
       callerFrame  <- getCallerFrame()
-      _            <- checkCallerForContractDestruction(contractId, callerFrame)
+      _            <- callerFrame.checkNonRecursive(contractId, ContractDestructionShouldNotBeCalledFromSelf)
       balanceState <- getBalanceState()
       contractAssets <- balanceState
         .useAll(LockupScript.p2c(contractId))
@@ -306,20 +300,47 @@ final class StatefulFrame(
     }
   }
 
-  private def checkCallerForContractDestruction(
-      contractId: ContractId,
-      callerFrame: Frame[StatefulContext]
+  private def checkNonRecursive(
+      targetContractId: ContractId,
+      error: ExeFailure
   ): ExeResult[Unit] = {
-    if (callerFrame.obj.isScript()) {
+    if (checkNonRecursive(targetContractId)) {
       okay
     } else {
-      callerFrame.obj.getContractId().flatMap { callerContractId =>
-        if (callerContractId == contractId) {
-          failed(ContractDestructionShouldNotBeCalledFromSelf)
+      failed(error)
+    }
+  }
+
+  @tailrec
+  private def checkNonRecursive(
+      targetContractId: ContractId
+  ): Boolean = {
+    obj.contractIdOpt match {
+      case Some(contractId) =>
+        if (contractId == targetContractId) {
+          false
         } else {
-          okay
+          callerFrameOpt match {
+            case Some(frame) => frame.checkNonRecursive(targetContractId)
+            case None        => true
+          }
         }
-      }
+      case None => true // Frame for TxScript
+    }
+  }
+
+  def migrateContract(
+      newContractCode: StatefulContract,
+      newFieldsOpt: Option[AVector[Val]]
+  ): ExeResult[Unit] = {
+    for {
+      contractId  <- obj.getContractId()
+      callerFrame <- getCallerFrame()
+      _           <- callerFrame.checkNonRecursive(contractId, UnexpectedRecursiveCallInMigration)
+      _           <- ctx.migrateContract(contractId, obj, newContractCode, newFieldsOpt)
+      _           <- runReturn() // return immediately as the code is upgraded
+    } yield {
+      pc -= 1
     }
   }
 
@@ -388,7 +409,7 @@ object Frame {
 
   def stateful(
       ctx: StatefulContext,
-      callerFrame: Option[Frame[StatefulContext]],
+      callerFrame: Option[StatefulFrame],
       balanceStateOpt: Option[BalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
@@ -414,7 +435,7 @@ object Frame {
 
   def stateful(
       ctx: StatefulContext,
-      callerFrame: Option[Frame[StatefulContext]],
+      callerFrame: Option[StatefulFrame],
       balanceStateOpt: Option[BalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],

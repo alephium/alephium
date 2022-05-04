@@ -34,6 +34,10 @@ object GasFormula {
   def wordLength(byteLength: Int): Int = (byteLength + 7) / 8
 }
 
+trait UpgradedGasFormula extends GasFormula {
+  def gasDeprecated(size: Int): GasBox
+}
+
 @Gas
 trait GasZero extends GasSimple
 object GasZero {
@@ -91,20 +95,30 @@ object GasHash {
     GasBox.unsafe(GasHash.baseGas + GasHash.extraGasPerWord * GasFormula.wordLength(byteLength))
 }
 
-trait GasBytesEq extends GasFormula {
+trait GasBytesEq extends UpgradedGasFormula {
   def gas(byteLength: Int): GasBox = GasBytesEq.gas(byteLength)
+
+  def gasDeprecated(byteLength: Int): GasBox = GasBytesEq.gasDeprecated(byteLength)
 }
 object GasBytesEq {
-  val gasPerWord: Int              = 1
-  def gas(byteLength: Int): GasBox = GasBox.unsafe(gasPerWord * GasFormula.wordLength(byteLength))
+  val gasPerWord: Int = 1
+  def gas(byteLength: Int): GasBox =
+    GasBox.unsafe(GasVeryLow.gas.value + gasPerWord * GasFormula.wordLength(byteLength))
+
+  def gasDeprecated(byteLength: Int): GasBox =
+    GasBox.unsafe(gasPerWord * GasFormula.wordLength(byteLength))
 }
 
-trait GasBytesConcat extends GasFormula {
+trait GasBytesConcat extends UpgradedGasFormula {
   def gas(byteLength: Int): GasBox = GasBytesConcat.gas(byteLength)
+
+  def gasDeprecated(byteLength: Int): GasBox = GasBytesConcat.gasDeprecated(byteLength)
 }
 object GasBytesConcat {
   val gasPerByte: Int              = 1
-  def gas(byteLength: Int): GasBox = GasBox.unsafe(byteLength * gasPerByte)
+  def gas(byteLength: Int): GasBox = GasBox.unsafe(GasVeryLow.gas.value + byteLength * gasPerByte)
+
+  def gasDeprecated(byteLength: Int): GasBox = GasBox.unsafe(byteLength * gasPerByte)
 }
 
 trait GasBytesSlice extends GasFormula {
@@ -115,6 +129,10 @@ object GasBytesSlice {
   def gas(byteLength: Int): GasBox =
     GasVeryLow.gas.addUnsafe(GasBox.unsafe(byteLength * gasPerByte))
 }
+
+trait GasEncode extends GasBytesSlice
+
+trait GasZeros extends GasBytesEq
 
 @Gas
 trait GasSignature extends GasSimple
@@ -144,6 +162,16 @@ object GasCopyCreate {
 trait GasDestroy extends GasSimple
 object GasDestroy {
   val gas: GasBox = GasSchedule.txInputBaseGas
+}
+
+@Gas
+trait GasMigrate extends GasSimple
+object GasMigrate {
+  val gas: GasBox = GasCreate.gas
+}
+
+trait GasLoadContractFields extends GasFormula {
+  def gas(size: Int): GasBox = GasBox.unsafe((size + 1) * GasBase.gas.value)
 }
 
 @Gas

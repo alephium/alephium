@@ -64,25 +64,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   trait LemanForkFixture extends AllInstrsFixture {
     // format: off
-    val lemanInstrs = AVector(
-      /* Below are instructions for Leman hard fork */
-      ByteVecSlice,
+    val lemanStatelessInstrs = AVector(
+      ByteVecSlice, ByteVecToAddress, Encode, Zeros,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
-      ByteVecToAddress, EthEcRecover
+      EthEcRecover,
+      Log6, Log7, Log8, Log9
     )
+    val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithState, LoadContractFields)
     // format: on
-  }
-
-  it should "derive from LemanInstr" in new LemanForkFixture {
-    lemanInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
-    (statelessInstrs.toSet -- lemanInstrs.toSet).map(_.isInstanceOf[LemanInstr[_]] is false)
-    (statefulInstrs.toSet -- lemanInstrs.toSet).map(_.isInstanceOf[LemanInstr[_]] is false)
-  }
-
-  it should "fail if the fork is not activated yet" in new LemanForkFixture with StatelessFixture {
-    val frame0 = prepareFrame(AVector.empty)(networkConfig) // hardfork is activated
-    lemanInstrs.foreach(instr => instr.runWith(frame0).leftValue isnotE InactiveInstr(instr))
 
     val networkConfig1 = new NetworkConfig {
       override def networkId: model.NetworkId = model.NetworkId.AlephiumMainNet
@@ -90,17 +80,49 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       override def lemanHardForkTimestamp: TimeStamp =
         TimeStamp.now().plusUnsafe(Duration.ofSecondsUnsafe(10))
     }
-    val frame1 = prepareFrame(AVector.empty)(networkConfig1) // hardfork is not activated yet
-    lemanInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
-
     val networkConfig2 = new NetworkConfig {
       override def networkId: model.NetworkId = model.NetworkId.AlephiumMainNet
       override def noPreMineProof: ByteString = ByteString.empty
       override def lemanHardForkTimestamp: TimeStamp =
         TimeStamp.now().minusUnsafe(Duration.ofSecondsUnsafe(10))
     }
+  }
+
+  it should "derive from LemanInstr" in new LemanForkFixture {
+    lemanStatelessInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
+    lemanStatefulInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
+    (statelessInstrs.toSet -- lemanStatelessInstrs.toSet)
+      .map(_.isInstanceOf[LemanInstr[_]] is false)
+    (statefulInstrs.toSet -- lemanStatefulInstrs.toSet)
+      .map(_.isInstanceOf[LemanInstr[_]] is false)
+  }
+
+  it should "fail if the fork is not activated yet for stateless instrs" in new LemanForkFixture
+    with StatelessFixture {
+    val frame0 = prepareFrame(AVector.empty)(networkConfig) // hardfork is activated
+    lemanStatelessInstrs.foreach(instr =>
+      instr.runWith(frame0).leftValue isnotE InactiveInstr(instr)
+    )
+    val frame1 = prepareFrame(AVector.empty)(networkConfig1) // hardfork is not activated yet
+    lemanStatelessInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
     val frame2 = prepareFrame(AVector.empty)(networkConfig2) // hardfork is not activated yet
-    lemanInstrs.foreach(instr => instr.runWith(frame2).leftValue isnotE InactiveInstr(instr))
+    lemanStatelessInstrs.foreach(instr =>
+      instr.runWith(frame2).leftValue isnotE InactiveInstr(instr)
+    )
+  }
+
+  it should "fail if the fork is not activated yet for stateful instrs" in new LemanForkFixture
+    with StatefulFixture {
+    val frame0 = prepareFrame() // hardfork is activated
+    lemanStatefulInstrs.foreach(instr =>
+      instr.runWith(frame0).leftValue isnotE InactiveInstr(instr)
+    )
+    val frame1 = prepareFrame()(networkConfig1) // hardfork is not activated yet
+    lemanStatelessInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
+    val frame2 = prepareFrame()(networkConfig2) // hardfork is not activated yet
+    lemanStatelessInstrs.foreach(instr =>
+      instr.runWith(frame2).leftValue isnotE InactiveInstr(instr)
+    )
   }
 
   trait GenFixture extends ContextGenerators {
@@ -939,6 +961,26 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
+  it should "Encode" in new StatelessInstrFixture {
+    stack.push(Val.True)
+    stack.push(Val.U256(U256.One))
+    stack.push(Val.False)
+    stack.push(Val.U256(U256.MaxValue))
+    Encode.runWith(frame).leftValue isE InvalidLengthForEncodeInstr
+
+    stack.push(Val.U256(U256.unsafe(3)))
+    Encode.runWith(frame) isE ()
+    stack.pop() isE Val.ByteVec(Hex.unsafe("03000102010000"))
+  }
+
+  it should "Zeros" in new StatelessInstrFixture {
+    stack.push(Val.U256(U256.unsafe(4097)))
+    Zeros.runWith(frame).leftValue isE InvalidSizeForZeros
+    stack.push(Val.U256(U256.unsafe(4096)))
+    Zeros.runWith(frame) isE ()
+    stack.pop() isE Val.ByteVec(ByteString.fromArrayUnsafe(Array.fill(4096)(0)))
+  }
+
   it should "ByteVecToAddress" in new StatelessInstrFixture {
     forAll(lockupScriptGen) { lockupScript =>
       val address    = Val.Address(lockupScript)
@@ -1389,6 +1431,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   trait LogFixture extends StatefulInstrFixture {
     def test(instr: LogInstr, n: Int) = {
+      stack.pop(stack.size).isRight is true
       (0 until n).foreach { _ =>
         stack.push(Val.True)
       }
@@ -1404,6 +1447,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
       instr.runWith(frame).leftValue isE StackUnderflow
     }
+  }
+
+  it should "test Log" in new LogFixture {
+    Instr.allLogInstrs.zipWithIndex.foreach { case (log, index) =>
+      test(log, index + 1)
+    }
+    statelessInstrs0.filter(_.isInstanceOf[LogInstr]).length is Instr.allLogInstrs.length
   }
 
   it should "Log1" in new LogFixture {
@@ -1559,8 +1609,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         balanceState: Option[BalanceState] = None,
         contractOutputOpt: Option[(ContractOutput, ContractOutputRef)] = None,
         txEnvOpt: Option[TxEnv] = None,
-        callerFrameOpt: Option[Frame[StatefulContext]] = None
-    ) = {
+        callerFrameOpt: Option[StatefulFrame] = None
+    )(implicit networkConfig: NetworkConfig) = {
       val (obj, ctx) =
         prepareContract(
           contract,
@@ -1919,6 +1969,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           .value + fields.length + contractBytes.length + 200 //TODO where those 200 come from?
       )
       //TODO Test the updated contract, like code, state, and assets
+      frame.opStack.size is 1
+      frame.opStack.pop() isE a[Val.ByteVec] // the new contract id
     }
   }
 
@@ -1965,7 +2017,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val contractOutputRef = ContractOutputRef.unsafe(txId, contractOutput, 0)
 
-    val callerFrame = prepareFrame()
+    val callerFrame = prepareFrame().asInstanceOf[StatefulFrame]
 
     val from = LockupScript.P2C(contractOutputRef.key)
 
@@ -2005,7 +2057,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait CallerFrameFixture extends ContractInstrFixture {
-    val callerFrame         = prepareFrame()
+    val callerFrame         = prepareFrame().asInstanceOf[StatefulFrame]
     override lazy val frame = prepareFrame(callerFrameOpt = Some(callerFrame))
   }
 
@@ -2072,7 +2124,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256Add -> 3, U256Sub -> 3, U256Mul -> 5, U256Div -> 5, U256Mod -> 5, U256Eq -> 3, U256Neq -> 3, U256Lt -> 3, U256Le -> 3, U256Gt -> 3, U256Ge -> 3,
       U256ModAdd -> 8, U256ModSub -> 8, U256ModMul -> 8, U256BitAnd -> 5, U256BitOr -> 5, U256Xor -> 5, U256SHL -> 5, U256SHR -> 5,
       I256ToU256 -> 3, I256ToByteVec -> 5, U256ToI256 -> 3, U256ToByteVec -> 5,
-      ByteVecEq -> 4, ByteVecNeq -> 4, ByteVecSize -> 2, ByteVecConcat -> 1, AddressEq -> 3, AddressNeq -> 3, AddressToByteVec -> 5,
+      ByteVecEq -> 7, ByteVecNeq -> 7, ByteVecSize -> 2, ByteVecConcat -> 1, AddressEq -> 3, AddressNeq -> 3, AddressToByteVec -> 5,
       IsAssetAddress -> 3, IsContractAddress -> 3,
       Jump(int) -> 8, IfTrue(int) -> 8, IfFalse(int) -> 8,
       /* CallLocal(byte) -> ???, */ Return -> 0,
@@ -2080,17 +2132,22 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 54, Keccak256 -> 54, Sha256 -> 54, Sha3 -> 54, VerifyTxSignature -> 2000, VerifySecP256K1 -> 2000, VerifyED25519 -> 2000,
       NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxCaller -> 3, TxCallerSize -> 3,
       VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
-      Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200, ByteVecSlice -> 1,
+      Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200,
+      /* Below are instructions for Leman hard fork */
+      ByteVecSlice -> 1, ByteVecToAddress -> 5, Encode -> 1, Zeros -> 1,
       U256To1Byte -> 1, U256To2Byte -> 1, U256To4Byte -> 1, U256To8Byte -> 1, U256To16Byte -> 2, U256To32Byte -> 4,
       U256From1Byte -> 1, U256From2Byte -> 1, U256From4Byte -> 1, U256From8Byte -> 1, U256From16Byte -> 2, U256From32Byte -> 4,
-      ByteVecToAddress -> 5, EthEcRecover -> 2500
+      EthEcRecover -> 2500,
+      Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
       ApproveAlph -> 30, ApproveToken -> 30, AlphRemaining -> 30, TokenRemaining -> 30, IsPaying -> 30,
       TransferAlph -> 30, TransferAlphFromSelf -> 30, TransferAlphToSelf -> 30, TransferToken -> 30, TransferTokenFromSelf -> 30, TransferTokenToSelf -> 30,
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
-      CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5
+      CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5,
+      /* Below are instructions for Leman hard fork */
+      MigrateSimple -> 32000, MigrateWithState -> 32000, LoadContractFields -> 8
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -2098,15 +2155,18 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     def test(instr: Instr[_], gas: Int) = {
       instr match {
-        case i: ToByteVecInstr[_]     => testToByteVec(i, gas)
-        case _: ByteVecConcat.type    => testByteVecConcatGas(gas)
-        case _: ByteVecSlice.type     => testByteVecSliceGas(gas)
-        case i: U256ToBytesInstr      => testU256ToBytes(i, gas)
-        case i: U256FromBytesInstr    => testU256FromBytes(i, gas)
-        case i: ByteVecToAddress.type => i.gas(33).value is gas
-        case i: LogInstr              => testLog(i, gas)
-        case i: GasSimple             => i.gas().value is gas
-        case i: GasFormula            => i.gas(32).value is gas
+        case i: ToByteVecInstr[_]       => testToByteVec(i, gas)
+        case _: ByteVecConcat.type      => testByteVecConcatGas(gas)
+        case _: ByteVecSlice.type       => testByteVecSliceGas(gas)
+        case _: Encode.type             => testEncode(gas)
+        case i: Zeros.type              => i.gas(33).value is (3 + 5 * gas)
+        case i: U256ToBytesInstr        => testU256ToBytes(i, gas)
+        case i: U256FromBytesInstr      => testU256FromBytes(i, gas)
+        case i: ByteVecToAddress.type   => i.gas(33).value is gas
+        case i: LogInstr                => testLog(i, gas)
+        case i: LoadContractFields.type => i.gas(3) is gas
+        case i: GasSimple               => i.gas().value is gas
+        case i: GasFormula              => i.gas(32).value is gas
       }
     }
     def testToByteVec(instr: ToByteVecInstr[_], gas: Int) = instr match {
@@ -2128,7 +2188,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       frame.pushOpStack(Val.ByteVec(ByteString.fromArrayUnsafe(Array.ofDim[Byte](200)))) isE ()
       val initialGas = frame.ctx.gasRemaining
       ByteVecConcat.runWith(frame) isE ()
-      (initialGas.value - frame.ctx.gasRemaining.value) is (323 * gas)
+      (initialGas.value - frame.ctx.gasRemaining.value) is (326 * gas)
     }
     def testByteVecSliceGas(gas: Int) = {
       val frame = genStatefulFrame()
@@ -2139,12 +2199,26 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ByteVecSlice.runWith(frame) isE ()
       (initialGas.value - frame.ctx.gasRemaining.value) is (GasVeryLow.gas.value + 9 * gas)
     }
+    def testEncode(gas: Int) = {
+      val frame = genStatefulFrame()
+      frame.pushOpStack(Val.True) isE ()
+      frame.pushOpStack(Val.False) isE ()
+      frame.pushOpStack(Val.U256(U256.Zero)) isE ()
+      frame.pushOpStack(Val.U256(U256.unsafe(3)))
+      val initialGas = frame.ctx.gasRemaining
+      Encode.runWith(frame) isE ()
+      (initialGas.value - frame.ctx.gasRemaining.value) is (GasVeryLow.gas.value + 7 * gas)
+    }
     def testLog(instr: LogInstr, gas: Int) = instr match {
       case i: Log1.type => i.gas(1).value is gas
       case i: Log2.type => i.gas(2).value is gas
       case i: Log3.type => i.gas(3).value is gas
       case i: Log4.type => i.gas(4).value is gas
       case i: Log5.type => i.gas(5).value is gas
+      case i: Log6.type => i.gas(6).value is gas
+      case i: Log7.type => i.gas(7).value is gas
+      case i: Log8.type => i.gas(8).value is gas
+      case i: Log9.type => i.gas(9).value is gas
     }
     statelessCases.foreach(test.tupled)
     statefulCases.foreach(test.tupled)
@@ -2178,16 +2252,21 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Blake2b -> 78, Keccak256 -> 79, Sha256 -> 80, Sha3 -> 81, VerifyTxSignature -> 82, VerifySecP256K1 -> 83, VerifyED25519 -> 84,
       NetworkId -> 85, BlockTimeStamp -> 86, BlockTarget -> 87, TxId -> 88, TxCaller -> 89, TxCallerSize -> 90,
       VerifyAbsoluteLocktime -> 91, VerifyRelativeLocktime -> 92,
-      Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97, ByteVecSlice -> 98,
-      U256To1Byte -> 99, U256To2Byte -> 100, U256To4Byte -> 101, U256To8Byte -> 102, U256To16Byte -> 103, U256To32Byte -> 104,
-      U256From1Byte -> 105, U256From2Byte -> 106, U256From4Byte -> 107, U256From8Byte -> 108, U256From16Byte -> 109, U256From32Byte -> 110,
-      ByteVecToAddress -> 111, EthEcRecover -> 112,
+      Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97,
+      /* Below are instructions for Leman hard fork */
+      ByteVecSlice -> 98, ByteVecToAddress -> 99, Encode -> 100, Zeros -> 101,
+      U256To1Byte -> 102, U256To2Byte -> 103, U256To4Byte -> 104, U256To8Byte -> 105, U256To16Byte -> 106, U256To32Byte -> 107,
+      U256From1Byte -> 108, U256From2Byte -> 109, U256From4Byte -> 110, U256From8Byte -> 111, U256From16Byte -> 112, U256From32Byte -> 113,
+      EthEcRecover -> 114,
+      Log6 -> 115, Log7 -> 116, Log8 -> 117, Log9 -> 118,
 
+      // stateful instructions
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
       TransferAlph -> 167, TransferAlphFromSelf -> 168, TransferAlphToSelf -> 169, TransferToken -> 170, TransferTokenFromSelf -> 171, TransferTokenToSelf -> 172,
       CreateContract -> 173, CreateContractWithToken -> 174, CopyCreateContract -> 175, DestroySelf -> 176, SelfContractId -> 177, SelfAddress -> 178,
-      CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185
+      CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185,
+      MigrateSimple -> 186, MigrateWithState -> 187, LoadContractFields -> 188
     )
     // format: on
 
@@ -2225,17 +2304,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       VerifyAbsoluteLocktime, VerifyRelativeLocktime,
       Log1, Log2, Log3, Log4, Log5,
       /* Below are instructions for Leman hard fork */
-      ByteVecSlice,
+      ByteVecSlice, ByteVecToAddress, Encode, Zeros,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
-      ByteVecToAddress, EthEcRecover
+      EthEcRecover,
+      Log6, Log7, Log8, Log9
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
       ApproveAlph, ApproveToken, AlphRemaining, TokenRemaining, IsPaying,
       TransferAlph, TransferAlphFromSelf, TransferAlphToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
-      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash
+      CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
+      /* Below are instructions for Leman hard fork */
+      MigrateSimple, MigrateWithState, LoadContractFields
     )
     // format: on
   }

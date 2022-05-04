@@ -16,7 +16,6 @@
 
 package org.alephium.protocol.vm.lang
 
-import scala.annotation.switch
 import scala.collection.mutable
 
 import org.alephium.protocol.config.CompilerConfig
@@ -202,7 +201,10 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      args.flatMap(_.genCode(state)) ++ state.getFunc(id).genCode(args.flatMap(_.getType(state)))
+      val func = state.getFunc(id)
+      args.flatMap(_.genCode(state)) ++
+        (if (func.isVariadic) Seq(U256Const(Val.U256.unsafe(args.length))) else Seq.empty) ++
+        func.genCode(args.flatMap(_.getType(state)))
     }
   }
 
@@ -471,20 +473,7 @@ object Ast {
       if (argsType.exists(_.isArrayType)) {
         throw Compiler.Error(s"Array type not supported for event ${id.name}")
       }
-      val logOpCode = (args.length: @switch) match {
-        case 0 =>
-          Log1
-        case 1 =>
-          Log2
-        case 2 =>
-          Log3
-        case 3 =>
-          Log4
-        case 4 =>
-          Log5
-        case _ =>
-          throw Compiler.Error(s"Max 4 fields allowed for event ${id.name}")
-      }
+      val logOpCode = Compiler.genLogs(args.length)
       eventIndex ++ args.flatMap(_.genCode(state)) :+ logOpCode
     }
   }
@@ -536,7 +525,9 @@ object Ast {
       val func       = state.getFunc(id)
       val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      args.flatMap(_.genCode(state)) ++ func.genCode(argsType) ++
+      args.flatMap(_.genCode(state)) ++
+        (if (func.isVariadic) Seq(U256Const(Val.U256(U256.unsafe(args.length)))) else Seq.empty) ++
+        func.genCode(argsType) ++
         Seq.fill(ArrayTransformer.flattenTypeLength(returnType))(Pop)
     }
   }
@@ -687,9 +678,16 @@ object Ast {
     def fields: Seq[Argument]
     def funcs: Seq[FuncDef[Ctx]]
 
-    lazy val funcTable: Map[FuncId, Compiler.SimpleFunc[Ctx]] = {
-      val table = Compiler.SimpleFunc.from(funcs).map(f => f.id -> f).toMap
-      if (table.size != funcs.size) {
+    def builtInContractFuncs(): Seq[Compiler.ContractFunc[Ctx]]
+
+    lazy val funcTable: Map[FuncId, Compiler.ContractFunc[Ctx]] = {
+      val builtInFuncs = builtInContractFuncs()
+      var table = Compiler.SimpleFunc
+        .from(funcs)
+        .map(f => f.id -> f)
+        .toMap[FuncId, Compiler.ContractFunc[Ctx]]
+      builtInFuncs.foreach(func => table = table + (FuncId(func.name, isBuiltIn = true) -> func))
+      if (table.size != (funcs.size + builtInFuncs.length)) {
         val duplicates = UniqueDef.duplicates(funcs)
         throw Compiler.Error(s"These functions are defined multiple times: $duplicates")
       }
@@ -708,6 +706,8 @@ object Ast {
       extends Contract[StatelessContext] {
     val fields: Seq[Argument] = Seq.empty
 
+    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatelessContext]] = Seq.empty
+
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
       check(state)
       val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
@@ -722,6 +722,30 @@ object Ast {
 
     def fields: Seq[Argument]
     def events: Seq[EventDef]
+
+    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = Seq(loadFieldsFunc)
+    private val loadFieldsFunc: Compiler.ContractFunc[StatefulContext] =
+      new Compiler.ContractFunc[StatefulContext] {
+        def name: String      = "loadFields"
+        def isPublic: Boolean = true
+
+        lazy val returnType: Seq[Type] = fields.map(_.tpe)
+
+        def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+          if (inputType.isEmpty) {
+            returnType
+          } else {
+            throw Compiler.Error(s"Built-in function loadFields does not need any argument")
+          }
+        }
+
+        def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
+          throw Compiler.Error(s"Built-in function loadFields should be external call")
+        }
+
+        def genExternalCallCode(typeId: TypeId): Seq[Instr[StatefulContext]] =
+          Seq(LoadContractFields)
+      }
 
     def getFieldsSignature(): String
     def getFieldTypes(): Seq[String]

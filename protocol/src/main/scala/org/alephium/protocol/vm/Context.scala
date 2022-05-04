@@ -119,6 +119,14 @@ trait StatelessContext extends CostStrategy {
   def getTxCaller(indexRaw: Val.U256): ExeResult[Val.Address] = {
     getTxPrevOutput(indexRaw).map(output => Val.Address(output.lockupScript))
   }
+
+  def chargeGasWithSizeLeman(gasFormula: UpgradedGasFormula, size: Int): ExeResult[Unit] = {
+    if (getHardFork() >= HardFork.Leman) {
+      this.chargeGas(gasFormula.gas(size))
+    } else {
+      this.chargeGas(gasFormula.gasDeprecated(size))
+    }
+  }
 }
 
 object StatelessContext {
@@ -195,7 +203,10 @@ trait StatefulContext extends StatelessContext with ContractPool {
           .map(_ => discard(generatedOutputs.addOne(contractOutput)))
           .left
           .map(e => Left(IOErrorUpdateState(e)))
-    } yield contractId
+    } yield {
+      blockContractLoad(contractId)
+      contractId
+    }
   }
 
   def destroyContract(
@@ -211,6 +222,29 @@ trait StatefulContext extends StatelessContext with ContractPool {
       _ <- outputBalances.add(address, contractAssets).toRight(Right(InvalidBalances))
       _ <- removeContract(contractId)
     } yield ()
+  }
+
+  def migrateContract(
+      contractId: ContractId,
+      obj: ContractObj[StatefulContext],
+      newContractCode: StatefulContract,
+      newFieldsOpt: Option[AVector[Val]]
+  ): ExeResult[Unit] = {
+    val newFields = newFieldsOpt.getOrElse(AVector.from(obj.fields))
+    for {
+      _ <- chargeFieldSize(newFields.toIterable)
+      _ <-
+        if (newFields.length == newContractCode.fieldLength) { okay }
+        else {
+          failed(InvalidFieldLength)
+        }
+      _ <- worldState
+        .migrateContractUnsafe(contractId, newContractCode, newFields)
+        .left
+        .map(e => Left(IOErrorMigrateContract(e)))
+    } yield {
+      removeContractFromCache(contractId)
+    }
   }
 
   def updateContractAsset(
