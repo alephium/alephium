@@ -1273,13 +1273,19 @@ class VMSpec extends AlephiumSpec {
          |}
          |
          |TxContract Parent0(mut x: U256) extends Grandparent(x) {
+         |  event Parent0(x: U256)
+         |
          |  fn p0() -> () {
+         |    emit Parent0(1)
          |    gp()
          |  }
          |}
          |
          |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+         |  event Parent1(x: U256)
+         |
          |  fn p1() -> () {
+         |    emit Parent1(2)
          |    gp()
          |  }
          |}
@@ -1313,7 +1319,9 @@ class VMSpec extends AlephiumSpec {
         block.hash,
         contractOutputRef.key,
         AVector(
+          LogState(txId, 1, AVector(Val.U256(1))),
           LogState(txId, 0, AVector(Val.U256(1))),
+          LogState(txId, 2, AVector(Val.U256(2))),
           LogState(txId, 0, AVector(Val.U256(2))),
           LogState(txId, 0, AVector(Val.U256(3)))
         )
@@ -1809,6 +1817,92 @@ class VMSpec extends AlephiumSpec {
     val errorMessage =
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
     errorMessage.contains(s"Right(TxScriptExeFailed(ContractAssetUnloaded") is true
+  }
+
+  it should "work with interface" in new ContractFixture {
+    val interface =
+      s"""
+         |Interface I {
+         |  pub fn f1() -> U256
+         |  pub fn f2() -> U256
+         |  pub fn f3() -> ByteVec
+         |}
+         |""".stripMargin
+
+    val contract =
+      s"""
+         |TxContract Foo() extends I {
+         |  pub fn f3() -> ByteVec {
+         |    return #00
+         |  }
+         |
+         |  pub fn f2() -> U256 {
+         |    return 2
+         |  }
+         |
+         |  pub fn f1() -> U256 {
+         |    return 1
+         |  }
+         |}
+         |
+         |$interface
+         |""".stripMargin
+
+    val contractId = createContract(contract, AVector.empty).key
+
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let impl = I(#${contractId.toHexString})
+         |    assert!(impl.f1() == 1)
+         |  }
+         |}
+         |
+         |$interface
+         |""".stripMargin
+
+    callTxScript(main)
+  }
+
+  it should "inherit interface events" in new ContractFixture {
+    val foo: String =
+      s"""
+         |Interface Foo {
+         |  event Foo(x: U256)
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+    val bar: String =
+      s"""
+         |TxContract Bar() extends Foo {
+         |  event Bar(x: U256)
+         |  pub fn foo() -> () {
+         |    emit Foo(1)
+         |    emit Bar(2)
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    val barId = createContract(bar, AVector.empty).key
+
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let foo = Foo(#${barId.toHexString})
+         |    foo.foo()
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    val block = callTxScript(main)
+
+    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, block.hash, barId)
+    val logStates    = logStatesOpt.value
+    logStates.states.length is 2
+    logStates.states(0).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 1
+    logStates.states(1).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 2
   }
 }
 // scalastyle:on file.size.limit no.equal regex

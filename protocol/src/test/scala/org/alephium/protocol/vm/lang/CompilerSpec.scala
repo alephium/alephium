@@ -1433,14 +1433,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
            |
            |  event Add1(a: U256, b: U256)
+           |  event Add2(a: U256, b: U256)
            |
            |  pub fn add(a: U256, b: U256) -> (U256) {
            |    emit Add1(a, b)
            |    emit Add2(a, b)
            |    return (a + b)
            |  }
-           |
-           |  event Add2(a: U256, b: U256)
            |}
            |""".stripMargin
       Compiler.compileContract(contract).isRight is true
@@ -1474,14 +1473,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  event Add1(a: U256, b: U256)
            |  event Add2(a: U256, b: U256)
            |  event Add3(a: U256, b: U256)
+           |  event Add1(b: U256, a: U256)
+           |  event Add2(b: U256, a: U256)
            |
            |  pub fn add(a: U256, b: U256) -> (U256) {
            |    emit Add(a, b)
            |    return (a + b)
            |  }
-           |
-           |  event Add1(b: U256, a: U256)
-           |  event Add2(b: U256, a: U256)
            |}
            |""".stripMargin
       Compiler
@@ -1513,7 +1511,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "test compile contract inheritance" in {
+  it should "test contract inheritance compilation" in {
     val parent =
       s"""
          |TxContract Parent(mut x: U256) {
@@ -1664,36 +1662,174 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
            |  pub fn foo() -> () {
-           |    p0()
-           |    p1()
-           |    gp()
+           |    p0(true, true)
+           |    p1(true, true, true)
+           |    gp(true)
            |  }
            |}
            |
            |TxContract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
-           |  fn gp() -> () {
+           |  fn gp(a: Bool) -> () {
            |    x = x + 1
            |    emit GP(x)
            |  }
            |}
            |
            |TxContract Parent0(mut x: U256) extends Grandparent(x) {
-           |  fn p0() -> () {
-           |    gp()
+           |  fn p0(a: Bool, b: Bool) -> () {
+           |    gp(a)
            |  }
            |}
            |
            |TxContract Parent1(mut x: U256) extends Grandparent(x) {
-           |  fn p1() -> () {
-           |    gp()
+           |  fn p1(a: Bool, b: Bool, c: Bool) -> () {
+           |    gp(a)
            |  }
            |}
            |""".stripMargin
 
       val contract = Compiler.compileContract(code).rightValue
       contract.methodsLength is 4
+      contract.methods.map(_.argsLength) is AVector(0, 1, 2, 3)
+    }
+  }
+
+  it should "test interface compilation" in {
+    {
+      info("Interface should contain at least one function")
+      val foo =
+        s"""
+           |Interface Foo {
+           |}
+           |""".stripMargin
+      val error = Compiler.compileMultiContract(foo).leftValue
+      error.message is "No function definition in TxContract Foo"
+    }
+
+    {
+      info("Interface inheritance should not contain duplicated functions")
+      val foo =
+        s"""
+           |Interface Foo {
+           |  fn foo() -> ()
+           |}
+           |""".stripMargin
+      val bar =
+        s"""
+           |Interface Bar extends Foo {
+           |  fn foo() -> ()
+           |}
+           |
+           |$foo
+           |""".stripMargin
+      val error = Compiler.compileMultiContract(bar).leftValue
+      error.message is "These functions are defined multiple times: foo"
+    }
+
+    {
+      info("Contract should implement interface functions with the same signature")
+      val foo =
+        s"""
+           |Interface Foo {
+           |  fn foo() -> ()
+           |}
+           |""".stripMargin
+      val bar =
+        s"""
+           |TxContract Bar() extends Foo {
+           |  pub fn foo() -> () {
+           |    return
+           |  }
+           |}
+           |
+           |$foo
+           |""".stripMargin
+      val error = Compiler.compileMultiContract(bar).leftValue
+      error.message is "Function foo is implemented with wrong signature"
+    }
+
+    {
+      info("Interface inheritance can be chained")
+      val a =
+        s"""
+           |Interface A {
+           |  pub fn a() -> ()
+           |}
+           |""".stripMargin
+      val b =
+        s"""
+           |Interface B extends A {
+           |  pub fn b(x: Bool) -> ()
+           |}
+           |
+           |$a
+           |""".stripMargin
+      val c =
+        s"""
+           |Interface C extends B {
+           |  pub fn c(x: Bool, y: Bool) -> ()
+           |}
+           |
+           |$b
+           |""".stripMargin
+      val interface =
+        Compiler.compileMultiContract(c).rightValue.contracts(0).asInstanceOf[Ast.ContractInterface]
+      interface.funcs.map(_.args.length) is Seq(0, 1, 2)
+
+      val code =
+        s"""
+           |TxContract Foo() extends C {
+           |  pub fn c(x: Bool, y: Bool) -> () {}
+           |  pub fn a() -> () {}
+           |  pub fn b(x: Bool) -> () {}
+           |  pub fn d(x: Bool, y: Bool, z: Bool) -> () {
+           |    a()
+           |    b(x)
+           |    c(x, y)
+           |  }
+           |}
+           |
+           |$c
+           |""".stripMargin
+      val contract =
+        Compiler.compileMultiContract(code).rightValue.contracts(0).asInstanceOf[Ast.TxContract]
+      contract.funcs.map(_.args.length) is Seq(0, 1, 2, 3)
+    }
+
+    {
+      info("Contract inherits both interface and contract")
+      val foo1: String =
+        s"""
+           |TxContract Foo1() {
+           |  fn foo1() -> () {}
+           |}
+           |""".stripMargin
+      val foo2: String =
+        s"""
+           |Interface Foo2 {
+           |  fn foo2() -> ()
+           |}
+           |""".stripMargin
+      val bar1: String =
+        s"""
+           |TxContract Bar1() extends Foo1(), Foo2 {
+           |  fn foo2() -> () {}
+           |}
+           |$foo1
+           |$foo2
+           |""".stripMargin
+      val bar2: String =
+        s"""
+           |TxContract Bar2() extends Foo2, Foo() {
+           |  fn foo2() -> () {}
+           |}
+           |$foo1
+           |$foo2
+           |""".stripMargin
+      Compiler.compileContract(bar1).isRight is true
+      Compiler.compileContract(bar2).isRight is true
     }
   }
 
