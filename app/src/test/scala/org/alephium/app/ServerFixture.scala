@@ -299,7 +299,7 @@ object ServerFixture {
     ): IOResult[Option[BlockFlowState.TxStatus]] = {
       assume(brokerConfig.contains(chainIndex.from))
       if (chainIndex == blockChainIndex) {
-        Right(Some(BlockFlowState.TxStatus(TxIndex(block.hash, 0), 1, 2, 3)))
+        Right(Some(BlockFlowState.Confirmed(TxIndex(block.hash, 0), 1, 2, 3)))
       } else {
         Right(None)
       }
@@ -326,35 +326,69 @@ object ServerFixture {
       Right(AVector((block.chainIndex, AVector((block, 10)))))
     }
 
+    override def getGroupForContract(contractId: ContractId): Either[String, GroupIndex] = {
+      Right(GroupIndex.unsafe(0))
+    }
+
+    override def searchLocalTransactionStatus(
+        txId: Hash,
+        chainIndexes: AVector[ChainIndex]
+    ): Either[String, Option[BlockFlowState.TxStatus]] = {
+      val blockChainIndex = ChainIndex.from(block.hash, config.broker.groups)
+      if (brokerConfig.chainIndexes.contains(blockChainIndex)) {
+        Right(
+          Some(
+            BlockFlowState.Confirmed(
+              index = TxIndex(block.hash, 0),
+              chainConfirmations = 1,
+              fromGroupConfirmations = 2,
+              toGroupConfirmations = 3
+            )
+          )
+        )
+      } else {
+        Right(None)
+      }
+    }
+
     override def getEvents(
-        blockHash: BlockHash,
-        eventKey: Hash
-    ): IOResult[Option[LogStates]] = {
+        chainIndex: ChainIndex,
+        eventKey: Hash,
+        start: Int,
+        end: Int
+    ): IOResult[(Int, AVector[LogStates])] = {
       lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
       lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
-      lazy val txId = Hash
-        .from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"))
-        .get
 
       Right(
-        Some(
-          LogStates(
-            blockHash,
-            eventKey,
-            states = AVector(
-              LogState(
-                txId = txId,
-                index = 0,
-                fields = AVector(
-                  vm.Val.U256(U256.unsafe(4)),
-                  vm.Val.Address(address1.lockupScript),
-                  vm.Val.Address(address2.lockupScript)
+        (
+          2,
+          AVector(
+            LogStates(
+              block.hash,
+              eventKey,
+              states = AVector(
+                LogState(
+                  txId = dummyTx.id,
+                  index = 0,
+                  fields = AVector(
+                    vm.Val.U256(U256.unsafe(4)),
+                    vm.Val.Address(address1.lockupScript),
+                    vm.Val.Address(address2.lockupScript)
+                  )
                 )
               )
             )
           )
         )
       )
+    }
+
+    override def getEventsCurrentCount(
+        chainIndex: ChainIndex,
+        eventKey: Hash
+    ): IOResult[Option[Int]] = {
+      Right(Some(10))
     }
 
     // scalastyle:off no.equal

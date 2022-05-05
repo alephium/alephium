@@ -18,8 +18,6 @@ package org.alephium.app
 
 import java.net.InetSocketAddress
 
-import sttp.model.StatusCode
-
 import org.alephium.api.model._
 import org.alephium.protocol.model.BrokerInfo
 import org.alephium.util._
@@ -33,7 +31,7 @@ class BroadcastTxTest extends AlephiumActorSpec {
     val restPort1 = clique.getServer(tx.fromGroup).config.network.restPort
     val restPort2 = clique.getServer((tx.fromGroup + 1) % groups0).config.network.restPort
     eventually(request[TxStatus](getTransactionStatus(tx), restPort1) is MemPooled)
-    eventually(requestFailed(getTransactionStatus(tx), restPort2, StatusCode.BadRequest))
+    eventually(request[TxStatus](getTransactionStatus(tx), restPort2) is TxNotFound)
 
     clique.stop()
   }

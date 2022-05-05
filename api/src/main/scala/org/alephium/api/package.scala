@@ -31,6 +31,7 @@ import org.alephium.protocol.vm.ExeResult
 package object api {
   type Try[T] = Either[ApiError[_ <: StatusCode], T]
 
+  def notFound(error: String): ApiError[_ <: StatusCode]   = ApiError.NotFound(error)
   def badRequest(error: String): ApiError[_ <: StatusCode] = ApiError.BadRequest(error)
   def failed(error: String): ApiError[_ <: StatusCode] =
     ApiError.InternalServerError(error)

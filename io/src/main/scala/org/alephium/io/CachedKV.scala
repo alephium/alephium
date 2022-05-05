@@ -27,7 +27,7 @@ abstract class CachedKV[K, V, C >: Modified[V] <: Cache[V]] extends MutableKV[K,
 
   def get(key: K): IOResult[V] = {
     getOpt(key).flatMap {
-      case None        => Left(IOError.keyNotFound(key, "CachedTrie.get"))
+      case None        => Left(IOError.keyNotFound(key, "CachedKV.get"))
       case Some(value) => Right(value)
     }
   }
@@ -80,5 +80,35 @@ abstract class CachedKV[K, V, C >: Modified[V] <: Cache[V]] extends MutableKV[K,
       case true  => discard(caches.addOne(key -> Updated(value)))
       case false => discard(caches.addOne(key -> Inserted(value)))
     }
+  }
+}
+
+object CachedKV {
+  def getOptFromUnderlying[K, V](
+      storage: KeyValueStorage[K, V],
+      caches: mutable.Map[K, Cache[V]],
+      key: K
+  ): IOResult[Option[V]] = {
+    storage.getOpt(key).map { valueOpt =>
+      valueOpt.foreach(value => caches.addOne(key -> Cached(value)))
+      valueOpt
+    }
+  }
+
+  def persist[K, V](
+      storage: KeyValueStorage[K, V],
+      caches: mutable.Map[K, Cache[V]]
+  ): IOResult[KeyValueStorage[K, V]] = {
+    storage
+      .putBatch { putAccumulate =>
+        caches.foreach {
+          case (_, Cached(_))         => Right(())
+          case (key, Updated(value))  => putAccumulate(key, value)
+          case (key, Inserted(value)) => putAccumulate(key, value)
+          case (_, Removed()) =>
+            throw new RuntimeException("Unexpected `Remove` action")
+        }
+      }
+      .map(_ => storage)
   }
 }

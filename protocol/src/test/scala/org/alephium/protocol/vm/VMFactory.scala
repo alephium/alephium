@@ -21,9 +21,10 @@ import org.alephium.protocol.Hash
 
 trait VMFactory extends StorageFixture {
   lazy val cachedWorldState: WorldState.Cached = {
-    val storage = newDBStorage()
-    val trieDb  = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.All)
-    val logDb   = newDB[LogStatesId, LogStates](storage, RocksDBSource.ColumnFamily.Log)
-    WorldState.emptyCached(trieDb, logDb)
+    val storage      = newDBStorage()
+    val trieDb       = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.All)
+    val logDb        = newDB[LogStatesId, LogStates](storage, RocksDBSource.ColumnFamily.Log)
+    val logCounterDb = newDB[Hash, Int](storage, RocksDBSource.ColumnFamily.LogCounter)
+    WorldState.emptyCached(trieDb, logDb, logCounterDb)
   }
 }

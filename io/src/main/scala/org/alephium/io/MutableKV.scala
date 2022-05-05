@@ -21,3 +21,9 @@ trait MutableKV[K, V, T] extends ReadableKV[K, V] {
 
   def put(key: K, value: V): IOResult[T]
 }
+
+object MutableKV {
+  trait WithInitialValue[K, V, T] { Self: MutableKV[K, V, T] =>
+    def getInitialValue(key: K): IOResult[Option[V]]
+  }
+}
