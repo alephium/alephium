@@ -1520,6 +1520,57 @@ class VMSpec extends AlephiumSpec {
     getLogStates(blockFlow, chainIndex.from, contractId, 0) is None
   }
 
+  it should "write script events to log storage" in new EventFixture {
+    override def contractRaw: String =
+      s"""
+         |TxContract Add(x: U256) {
+         |  event Add1(a: U256, b: U256)
+         |  eventWithTxIdIndex Add2(a: U256, b: U256)
+         |  eventWithTxIdIndex Add3(a: U256, b: U256)
+         |
+         |  pub fn add(a: U256, b: U256) -> U256 {
+         |    emit Add1(a, b)
+         |    emit Add2(a, b)
+         |    emit Add3(a, b)
+         |    return a + b
+         |  }
+         |}
+         |""".stripMargin
+
+    override def callingScriptRaw: String =
+      s"""
+         |$contractRaw
+         |
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let contract = Add(#${contractId.toHexString})
+         |    contract.add(1, 2)
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractLogStates = getLogStates(blockFlow, chainIndex.from, contractId, 0).value
+    val txId              = callingBlock.nonCoinbase.head.id
+    contractLogStates.blockHash is callingBlock.hash
+    contractLogStates.eventKey is contractId
+    contractLogStates.states.length is 3
+    val fields = AVector[Val](Val.U256(1), Val.U256(2))
+    contractLogStates.states(0) is LogState(txId, 0, fields)
+    contractLogStates.states(1) is LogState(txId, 1, fields)
+    contractLogStates.states(2) is LogState(txId, 2, fields)
+
+    val scriptLogStates = getLogStates(blockFlow, chainIndex.from, txId, 0).value
+    scriptLogStates.blockHash is callingBlock.hash
+    scriptLogStates.eventKey is txId
+    scriptLogStates.states.length is 2
+
+    val logStatesId = LogStatesId(contractId, 0)
+    scriptLogStates
+      .states(0) is LogState(txId, scriptEventRefIndex, LogStateRef(logStatesId, 1).toFields)
+    scriptLogStates
+      .states(1) is LogState(txId, scriptEventRefIndex, LogStateRef(logStatesId, 2).toFields)
+  }
+
   it should "emit events with all supported field types" in new EventFixture {
     lazy val address = Address.Contract(LockupScript.P2C(Hash.generate))
 

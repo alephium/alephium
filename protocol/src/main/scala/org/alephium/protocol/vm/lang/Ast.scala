@@ -441,7 +441,7 @@ object Ast {
     def name: String                          = id.name
     def getFieldTypeSignatures(): Seq[String] = fields.map(_.tpe.signature)
     def eventCode(index: Int): EventDef.EventCode = {
-      EventDef.EventCode(EventDef.eventTypes * EventDef.eventType(this) + index)
+      EventDef.EventCode(EventDef.eventTypes * index + EventDef.eventType(this))
     }
   }
 
@@ -451,7 +451,8 @@ object Ast {
     val scriptEventType: Int    = 1
 
     final case class EventCode(value: Int) extends AnyVal {
-      def eventIndex: Int = value % eventTypes
+      def eventIndex: Int = value / eventTypes
+      def eventType: Int  = value % eventTypes
     }
 
     def eventType(eventDef: EventDef): Int = {

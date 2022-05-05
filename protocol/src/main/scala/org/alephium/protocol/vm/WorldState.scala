@@ -430,11 +430,17 @@ object WorldState {
         fields: AVector[Val],
         logConfig: LogConfig
     ): IOResult[Unit] = {
-      (blockHashOpt, getIndex(fields)) match {
-        case (Some(blockHash), Some(index)) =>
+      (blockHashOpt, getIndexAndType(fields)) match {
+        case (Some(blockHash), Some((index, tpe))) =>
           if (logConfig.logContractEnabled(Address.contract(contractId))) {
             val state = LogState(txId, index, fields.tail)
-            writeLog(blockHash, contractId, state)
+            writeLog(blockHash, contractId, state).flatMap { case (id, offset) =>
+              if (tpe == EventDef.scriptEventType) {
+                writeScriptLog(blockHash, txId, id, offset)
+              } else {
+                Right(())
+              }
+            }
           } else {
             Right(())
           }
@@ -447,10 +453,10 @@ object WorldState {
         txId: Hash,
         fields: AVector[Val]
     ): IOResult[Unit] = {
-      (blockHashOpt, getIndex(fields)) match {
-        case (Some(blockHash), Some(index)) =>
+      (blockHashOpt, getIndexAndType(fields)) match {
+        case (Some(blockHash), Some((index, _))) =>
           val state = LogState(txId, index, fields.tail)
-          writeLog(blockHash, txId, state)
+          writeLog(blockHash, txId, state).map(_ => ())
         case _ => Right(())
       }
     }
@@ -459,7 +465,7 @@ object WorldState {
         blockHash: BlockHash,
         eventKey: Hash,
         state: LogState
-    ): IOResult[Unit] = {
+    ): IOResult[(LogStatesId, Int)] = {
       for {
         initialCount <- logCounterState.getInitialValue(eventKey).map(_.getOrElse(0))
         id = LogStatesId(eventKey, initialCount)
@@ -471,15 +477,35 @@ object WorldState {
             logState.put(id, LogStates(blockHash, eventKey, AVector(state)))
         }
         _ <- logCounterState.put(eventKey, initialCount + 1)
-      } yield ()
+      } yield (id, logStatesOpt.map(_.states.length).getOrElse(0))
     }
 
-    private[WorldState] def getIndex(
+    private[WorldState] def writeScriptLog(
+        blockHash: BlockHash,
+        txId: Hash,
+        id: LogStatesId,
+        offset: Int
+    ): IOResult[Unit] = {
+      val logRef = LogStateRef(id, offset)
+      val state  = LogState(txId, scriptEventRefIndex, logRef.toFields)
+      writeLog(blockHash, txId, state).map(_ => ())
+    }
+
+    private[WorldState] def getIndexAndType(
         fields: AVector[Val]
-    ): Option[Byte] = {
+    ): Option[(Byte, Int)] = {
       fields.headOption.flatMap {
-        case Val.I256(i) => i.toInt.map(EventDef.EventCode(_).eventIndex.toByte)
-        case _           => None
+        case Val.I256(i) =>
+          i.toInt.map { value =>
+            if (value < 0) {
+              // system event
+              (value.toByte, EventDef.scriptEventType)
+            } else {
+              val eventCode = EventDef.EventCode(value)
+              (eventCode.eventIndex.toByte, eventCode.eventType)
+            }
+          }
+        case _ => None
       }
     }
   }
