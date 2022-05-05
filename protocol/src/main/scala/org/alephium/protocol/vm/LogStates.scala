@@ -67,7 +67,9 @@ final case class LogState(
     txId: Hash,
     index: Byte,
     fields: AVector[Val]
-)
+) {
+  def isRef: Boolean = index == scriptEventRefIndex
+}
 
 object LogState {
   implicit val serde: Serde[LogState] =

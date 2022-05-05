@@ -390,7 +390,7 @@ class ServerUtils(implicit
   ): Try[Events] = {
     for {
       chainIndex <- getChainIndexForTx(blockFlow, txId)
-      result     <- getEvents(blockFlow, 0, None, chainIndex, txId)
+      result     <- getScriptEvents(blockFlow, txId, chainIndex)
     } yield result
   }
 
@@ -485,6 +485,39 @@ class ServerUtils(implicit
       case Left(error) =>
         Left(error)
     }
+  }
+
+  private def getScriptEvents(
+      blockFlow: BlockFlow,
+      txId: Hash,
+      chainIndex: ChainIndex
+  ): Try[Events] = {
+    wrapResult(
+      for {
+        worldState <- blockFlow.getBestPersistedWorldState(chainIndex.from)
+        result     <- blockFlow.getEvents(worldState, txId, 0, CounterRange.MaxCounterRange)
+        (nextStart, logStatesVec) = result
+        logStates <- logStatesVec.mapE { logStates =>
+          logStates.states
+            .mapE { state =>
+              if (state.isRef) {
+                LogStateRef
+                  .fromFields(state.fields)
+                  .toRight(IOError.Other(new Throwable(s"Invalid state ref: ${state.fields}")))
+                  .flatMap(blockFlow.getEventByRef(worldState, _))
+              } else {
+                Right(state)
+              }
+            }
+            .map(states => logStates.copy(states = states))
+        }
+      } yield Events(
+        chainIndex.from.value,
+        chainIndex.to.value,
+        logStates.flatMap(Events.from),
+        nextStart
+      )
+    )
   }
 
   private def getEvents(

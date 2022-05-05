@@ -593,6 +593,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
+  def getScriptEvents(txId: String) = {
+    httpGet(
+      s"/events/tx-script?txId=$txId"
+    )
+  }
+
   def multisig(keys: AVector[String], mrequired: Int) = {
     val body = s"""
         |{
