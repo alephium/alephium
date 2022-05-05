@@ -170,6 +170,19 @@ class I256Spec extends AlephiumSpec {
     }
   }
 
+  it should "convert to int" in {
+    for {
+      x <- numGen
+    } {
+      val value = I256.from(x).get.toInt
+      if (x >= BigInteger.valueOf(Int.MinValue) && x <= BigInteger.valueOf(Int.MaxValue)) {
+        value.get is x.intValue()
+      } else {
+        value is None
+      }
+    }
+  }
+
   it should "convert from Int" in {
     forAll { x: Int =>
       I256.from(x).v.longValue() is x.toLong

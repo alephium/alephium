@@ -186,12 +186,16 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
   def eventFields[_: P]: P[Seq[Ast.EventField]] = P("(" ~ eventField.rep(0, ",") ~ ")")
-  def event[_: P]: P[Ast.EventDef] = P(Lexer.keyword("event") ~/ Lexer.typeId ~ eventFields)
+  def eventDef[_: P]: P[Ast.EventDef]           = P(event | eventWithTxIdIndex)
+  def event[_: P]: P[Ast.Event]                 = P(Lexer.keyword("event") ~/ eventType).map(Ast.Event.tupled)
+  def eventWithTxIdIndex[_: P]: P[Ast.EventWithTxIdIndex] =
+    P(Lexer.keyword("eventWithTxIdIndex") ~/ eventType).map(Ast.EventWithTxIdIndex.tupled)
+  def eventType[_: P]: P[(Ast.TypeId, Seq[Ast.EventField])] = P(Lexer.typeId ~ eventFields)
     .map { case (typeId, fields) =>
       if (fields.length >= Instr.allLogInstrs.length) {
         throw Compiler.Error("Max 8 fields allowed for contract events")
       }
-      Ast.EventDef(typeId, fields)
+      (typeId, fields)
     }
 
   def funcCall[_: P]: P[Ast.FuncCall[Ctx]] =
@@ -318,7 +322,7 @@ object StatefulParser extends Parser[StatefulContext] {
   def rawTxContract[_: P]: P[Ast.TxContract] =
     P(
       Lexer.keyword("TxContract") ~/ Lexer.typeId ~ templateParams.? ~ contractParams ~
-        contractInheritances.? ~ "{" ~ event.rep ~ func.rep ~ "}"
+        contractInheritances.? ~ "{" ~ eventDef.rep ~ func.rep ~ "}"
     ).map { case (typeId, templateVars, fields, contractInheritances, events, funcs) =>
       if (funcs.length < 1) {
         throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")

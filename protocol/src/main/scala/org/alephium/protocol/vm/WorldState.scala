@@ -21,6 +21,7 @@ import akka.util.ByteString
 import org.alephium.io._
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.lang.Ast.EventDef
 import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
 
@@ -477,7 +478,7 @@ object WorldState {
         fields: AVector[Val]
     ): Option[Byte] = {
       fields.headOption.flatMap {
-        case Val.I256(i) => i.toByte
+        case Val.I256(i) => i.toInt.map(EventDef.EventCode(_).eventIndex.toByte)
         case _           => None
       }
     }

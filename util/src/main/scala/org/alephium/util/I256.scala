@@ -89,6 +89,7 @@ class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
   def compare(that: I256): Int = this.v.compareTo(that.v)
 
   def toByte: Option[Byte] = if (v.bitLength() <= 7) Some(v.intValue().toByte) else None
+  def toInt: Option[Int]   = if (v.bitLength() <= 31) Some(v.intValue()) else None
 
   def toBigInt: BigInteger = v
 
