@@ -27,7 +27,7 @@ final case class SweepAddressTransaction(
     unsignedTx: String,
     gasAmount: GasBox,
     gasPrice: GasPrice
-)
+) extends GasInfo
 
 object SweepAddressTransaction {
   def from(unsignedTx: UnsignedTransaction): SweepAddressTransaction = {
