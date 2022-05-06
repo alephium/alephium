@@ -152,16 +152,18 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       .staging()
 
     val logInputs = Gen.listOfN(10, logInputGen).sample.value
+    val fields =
+      AVector[Val](Val.I256(I256.from(0)), Val.I256(I256.from(1))) // the first field is event code
     val logStates = logInputs.map { case (blockHash, txId, contractId) =>
       worldState.writeLogForContract(
         Some(blockHash),
         txId,
         contractId,
-        AVector(Val.I256(I256.unsafe(1))),
+        fields,
         LogConfig(enabled = true, contractAddresses = None)
       )
 
-      LogStates(blockHash, contractId, AVector(LogState(txId, 1, AVector.empty)))
+      LogStates(blockHash, contractId, AVector(LogState(txId, 0, fields.tail)))
     }
 
     val newLogs = worldState.logState.getNewLogs()
