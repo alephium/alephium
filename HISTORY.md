@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### API changes
+* Rename `gas` to `gasAmount` for tx endpoints
+* Add `gasAmount` and `gasPrice` for tx build responses
+* Remove unnecessary `utxosLimit` from tx endpoints
+
 ## 1.3.2
 
 * Fix OpenAPI version
@@ -12,7 +17,7 @@
 
 ## 1.3.0
 
-## API changes
+### API changes
 Note: We introduced many breaking API changes, please refer to OpenAPI file or Swagger UI for query and response examples.
 * New endpoints `/events` for contract events. The endpoints are still in beta.
 * New endpoints `/infos/version` for node version purely.
