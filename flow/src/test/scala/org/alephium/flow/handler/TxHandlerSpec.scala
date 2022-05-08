@@ -552,6 +552,49 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     blockFlow.getBestDeps(chainIndex.from).deps.contains(blockHash) is true
   }
 
+  it should "mine new block for inter-group chain if auto-mine is enabled" in new Fixture {
+    override val configValues =
+      Map(("alephium.broker.broker-num", 1), ("alephium.mempool.auto-mine-for-dev", true))
+    config.mempool.autoMineForDev is true
+
+    val index            = ChainIndex.unsafe(0, 1)
+    val (privKey0, _, _) = genesisKeys(0)
+    val (_, pubKey1, _)  = genesisKeys(1)
+    val genesisAddress0  = getGenesisLockupScript(index.from)
+    val genesisAddress1  = getGenesisLockupScript(index.to)
+    val balance0         = blockFlow.getBalance(genesisAddress0, Int.MaxValue).rightValue._1
+    val balance1         = blockFlow.getBalance(genesisAddress1, Int.MaxValue).rightValue._1
+
+    val block = transfer(blockFlow, privKey0, pubKey1, ALPH.oneAlph)
+    val tx    = block.transactions.head
+    txHandler ! addTx(tx)
+    expectMsg(TxHandler.AddSucceeded(tx.id))
+    blockFlow.getMemPool(index).size is 0
+
+    val status = blockFlow.getTxStatus(tx.id, index).rightValue.get
+    status is a[BlockFlowState.Confirmed]
+    val confirmed = status.asInstanceOf[BlockFlowState.Confirmed]
+    confirmed.chainConfirmations is 1
+    confirmed.fromGroupConfirmations is 1
+    confirmed.toGroupConfirmations is 0
+    val blockHash = confirmed.index.hash
+    blockFlow.getBestDeps(index.from).deps.contains(blockHash) is true
+
+    val balance01 = blockFlow.getBalance(genesisAddress0, Int.MaxValue).rightValue._1
+    val balance11 = blockFlow.getBalance(genesisAddress1, Int.MaxValue).rightValue._1
+    (balance01 < balance0.subUnsafe(ALPH.oneAlph)) is true // due to gas fee
+    balance11 is balance1.addUnsafe(ALPH.oneAlph)
+
+    val block0 = transfer(blockFlow, ChainIndex.unsafe(0, 0))
+    val block1 = transfer(blockFlow, ChainIndex.unsafe(1, 1))
+    addAndCheck(blockFlow, block0)
+    addAndCheck(blockFlow, block1)
+    val balance02 = blockFlow.getBalance(genesisAddress0, Int.MaxValue).rightValue._1
+    val balance12 = blockFlow.getBalance(genesisAddress1, Int.MaxValue).rightValue._1
+    balance02 is balance01.subUnsafe(ALPH.oneAlph)
+    balance12 is balance11.subUnsafe(ALPH.oneAlph)
+  }
+
   trait Fixture extends FlowFixture with TxGenerators {
     // use lazy here because we want to override config values
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
