@@ -207,8 +207,8 @@ object BuiltIn {
       ByteVecSlice
     )
 
-  val encode: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
-    val name: String = "encode"
+  val encodeToByteVec: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
+    val name: String = "encodeToByteVec"
 
     override def isVariadic: Boolean = true
 
@@ -354,7 +354,7 @@ object BuiltIn {
     isContractAddress,
     /* Below are functions for Leman hard fork */
     byteVecSlice,
-    encode,
+    encodeToByteVec,
     zeros,
     u256To1Byte,
     u256To2Byte,

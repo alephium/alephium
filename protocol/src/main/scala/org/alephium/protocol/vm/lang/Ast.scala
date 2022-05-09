@@ -16,7 +16,6 @@
 
 package org.alephium.protocol.vm.lang
 
-import scala.annotation.switch
 import scala.collection.mutable
 
 import org.alephium.protocol.config.CompilerConfig
@@ -470,20 +469,7 @@ object Ast {
       if (argsType.exists(_.isArrayType)) {
         throw Compiler.Error(s"Array type not supported for event ${id.name}")
       }
-      val logOpCode = (args.length: @switch) match {
-        case 0 =>
-          Log1
-        case 1 =>
-          Log2
-        case 2 =>
-          Log3
-        case 3 =>
-          Log4
-        case 4 =>
-          Log5
-        case _ =>
-          throw Compiler.Error(s"Max 4 fields allowed for event ${id.name}")
-      }
+      val logOpCode = Compiler.genLogs(args.length)
       eventIndex ++ args.flatMap(_.genCode(state)) :+ logOpCode
     }
   }

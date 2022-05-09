@@ -519,4 +519,12 @@ object Compiler {
       }
     }
   }
+
+  def genLogs(logFieldLength: Int): LogInstr = {
+    if (logFieldLength >= 0 && logFieldLength < Instr.allLogInstrs.length) {
+      Instr.allLogInstrs(logFieldLength)
+    } else {
+      throw Compiler.Error(s"Max 8 fields allowed for contract events")
+    }
+  }
 }

@@ -61,35 +61,30 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def popOpStack(): ExeResult[Val] = opStack.pop()
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackBool(): ExeResult[Val.Bool] =
     popOpStack().flatMap {
       case elem: Val.Bool => Right(elem)
       case elem           => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackI256(): ExeResult[Val.I256] =
     popOpStack().flatMap {
       case elem: Val.I256 => Right(elem)
       case elem           => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackU256(): ExeResult[Val.U256] =
     popOpStack().flatMap {
       case elem: Val.U256 => Right(elem)
       case elem           => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackByteVec(): ExeResult[Val.ByteVec] =
     popOpStack().flatMap {
       case elem: Val.ByteVec => Right(elem)
       case elem              => failed(InvalidType(elem))
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def popOpStackAddress(): ExeResult[Val.Address] =
     popOpStack().flatMap {
       case elem: Val.Address => Right(elem)
@@ -289,7 +284,7 @@ final class StatefulFrame(
     for {
       contractId   <- obj.getContractId()
       callerFrame  <- getCallerFrame()
-      _            <- checkCallerForContractDestruction(contractId, callerFrame)
+      _            <- callerFrame.checkNonRecursive(contractId, ContractDestructionShouldNotBeCalledFromSelf)
       balanceState <- getBalanceState()
       contractAssets <- balanceState
         .useAll(LockupScript.p2c(contractId))
@@ -305,19 +300,32 @@ final class StatefulFrame(
     }
   }
 
+  private def checkNonRecursive(
+      targetContractId: ContractId,
+      error: ExeFailure
+  ): ExeResult[Unit] = {
+    if (checkNonRecursive(targetContractId)) {
+      okay
+    } else {
+      failed(error)
+    }
+  }
+
   @tailrec
-  private def checkNonRecursive(targetContractId: ContractId): ExeResult[Unit] = {
+  private def checkNonRecursive(
+      targetContractId: ContractId
+  ): Boolean = {
     obj.contractIdOpt match {
       case Some(contractId) =>
         if (contractId == targetContractId) {
-          failed(UnexpectedRecursiveCallInMigration)
+          false
         } else {
           callerFrameOpt match {
             case Some(frame) => frame.checkNonRecursive(targetContractId)
-            case None        => okay
+            case None        => true
           }
         }
-      case None => okay // Frame for TxScript
+      case None => true // Frame for TxScript
     }
   }
 
@@ -328,28 +336,11 @@ final class StatefulFrame(
     for {
       contractId  <- obj.getContractId()
       callerFrame <- getCallerFrame()
-      _           <- callerFrame.checkNonRecursive(contractId)
+      _           <- callerFrame.checkNonRecursive(contractId, UnexpectedRecursiveCallInMigration)
       _           <- ctx.migrateContract(contractId, obj, newContractCode, newFieldsOpt)
       _           <- runReturn() // return immediately as the code is upgraded
     } yield {
       pc -= 1
-    }
-  }
-
-  private def checkCallerForContractDestruction(
-      contractId: ContractId,
-      callerFrame: Frame[StatefulContext]
-  ): ExeResult[Unit] = {
-    if (callerFrame.obj.isScript()) {
-      okay
-    } else {
-      callerFrame.obj.getContractId().flatMap { callerContractId =>
-        if (callerContractId == contractId) {
-          failed(ContractDestructionShouldNotBeCalledFromSelf)
-        } else {
-          okay
-        }
-      }
     }
   }
 

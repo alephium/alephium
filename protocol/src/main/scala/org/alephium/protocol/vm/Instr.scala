@@ -169,6 +169,9 @@ object Instr {
     statefulInstrs0.foreach(instr => table(toCode(instr)) = Some(instr))
     AVector.unsafe(table)
   }
+
+  val allLogInstrs: AVector[LogInstr] =
+    AVector(Log1, Log2, Log3, Log4, Log5, Log6, Log7, Log8, Log9)
 }
 
 sealed trait StatefulInstr          extends Instr[StatefulContext] with GasSchedule                     {}

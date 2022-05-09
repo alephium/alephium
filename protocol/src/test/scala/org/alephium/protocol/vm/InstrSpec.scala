@@ -1450,10 +1450,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "test Log" in new LogFixture {
-    val logInstrs = Seq(Log1, Log2, Log3, Log4, Log5, Log6, Log7, Log8, Log9)
-    logInstrs.zipWithIndex.foreach { case (log, index) =>
+    Instr.allLogInstrs.zipWithIndex.foreach { case (log, index) =>
       test(log, index + 1)
     }
+    statelessInstrs0.filter(_.isInstanceOf[LogInstr]).length is Instr.allLogInstrs.length
   }
 
   it should "Log1" in new LogFixture {

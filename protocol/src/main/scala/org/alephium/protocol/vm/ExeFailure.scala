@@ -102,6 +102,9 @@ final case class SerdeErrorByteVecToAddress(error: SerdeError) extends ExeFailur
 case object FailedInRecoverEthAddress                          extends ExeFailure
 case object UnexpectedRecursiveCallInMigration                 extends ExeFailure
 
+final case class UncaughtKeyNotFoundError(error: IOError.KeyNotFound) extends ExeFailure
+final case class UncaughtSerdeError(error: IOError.Serde)             extends ExeFailure
+
 final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends ExeFailure
 
 sealed trait IOFailure extends Product {

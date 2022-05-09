@@ -1866,4 +1866,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val script = Compiler.compileTxScript(code).rightValue
     script.toTemplateString() is "0101010001000a{address:Address}{tokenId:ByteVec}{tokenAmount:U256}a3{swapContractKey:ByteVec}1700{address:Address}{tokenAmount:U256}16000100"
   }
+
+  it should "compile events with <= 8 fields" in {
+    def code(nineFields: Boolean): String = {
+      val eventStr = if (nineFields) ", a9: U256" else ""
+      val emitStr  = if (nineFields) ", 9" else ""
+      s"""
+         |TxContract Foo(tmp: U256) {
+         |  event Foo(a1: U256, a2: U256, a3: U256, a4: U256, a5: U256, a6: U256, a7: U256, a8: U256 $eventStr)
+         |
+         |  pub fn foo() -> () {
+         |    emit Foo(1, 2, 3, 4, 5, 6, 7, 8 $emitStr)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    }
+    Compiler.compileContract(code(false)).isRight is true
+    Compiler
+      .compileContract(code(true))
+      .leftValue
+      .message is "Max 8 fields allowed for contract events"
+  }
 }
