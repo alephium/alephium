@@ -30,7 +30,7 @@ final case class BuildTransactionResult(
     txId: Hash,
     fromGroup: Int,
     toGroup: Int
-)
+) extends GasInfo
 object BuildTransactionResult {
 
   def from(

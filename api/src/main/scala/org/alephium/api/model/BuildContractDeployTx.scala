@@ -29,7 +29,7 @@ final case class BuildContractDeployScriptTx(
     initialFields: AVector[Val] = AVector.empty,
     alphAmount: Option[Amount] = None,
     issueTokenAmount: Option[Amount] = None,
-    gas: Option[GasBox] = None,
+    gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     utxosLimit: Option[Int] = None
-) extends UtxoBasedModel
+) extends BuildTxCommon

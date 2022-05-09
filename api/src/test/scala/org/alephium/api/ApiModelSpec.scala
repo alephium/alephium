@@ -371,7 +371,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |      "lockTime": 1234
         |    }
         |  ],
-        |  "gas": 1,
+        |  "gasAmount": 1,
         |  "gasPrice": "1",
         |  "utxosLimit": 1024
         |}
@@ -412,7 +412,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |      "lockTime": 1234
         |    }
         |  ],
-        |  "gas": 1,
+        |  "gasAmount": 1,
         |  "gasPrice": "1"
         |}
         """.stripMargin
@@ -452,7 +452,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |      "lockTime": 1234
         |    }
         |  ],
-        |  "gas": 1,
+        |  "gasAmount": 1,
         |  "gasPrice": "1"
         |}
         """.stripMargin
@@ -499,7 +499,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |      "key": "${otxoKey1.toHexString}"
         |    }
         |  ],
-        |  "gas": 1,
+        |  "gasAmount": 1,
         |  "gasPrice": "1"
         |}
         """.stripMargin
@@ -647,7 +647,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       bytecode = ByteString(0, 0),
       initialFields = AVector(Val.True, ValU256(U256.unsafe(123))),
       issueTokenAmount = Some(Amount(1)),
-      gas = Some(GasBox.unsafe(1)),
+      gasAmount = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1)),
       utxosLimit = Some(defaultUtxosLimit)
     )
@@ -658,7 +658,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "bytecode": "0000",
          |  "initialFields":[{"type":"Bool","value":true},{"type":"U256","value":"123"}],
          |  "issueTokenAmount": "1",
-         |  "gas": 1,
+         |  "gasAmount": 1,
          |  "gasPrice": "1",
          |  "utxosLimit": 1024
          |}
@@ -672,6 +672,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val buildContractResult = BuildContractDeployScriptTxResult(
       group = 2,
       unsignedTx = "0000",
+      gasAmount = GasBox.unsafe(1),
+      gasPrice = GasPrice(1),
       txId = txId,
       contractAddress = Address.contract(contractId)
     )
@@ -680,6 +682,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "group": 2,
          |  "unsignedTx": "0000",
+         |  "gasAmount":1,
+         |  "gasPrice":"1",
          |  "txId": "${txId.toHexString}",
          |  "contractAddress": "${Address.contract(contractId).toBase58}"
          |}
@@ -692,7 +696,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val buildScript = BuildScriptTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
-      gas = Some(GasBox.unsafe(1)),
+      gasAmount = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1)),
       utxosLimit = Some(defaultUtxosLimit)
     )
@@ -701,7 +705,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "fromPublicKey": "${publicKey.toHexString}",
          |  "bytecode": "0000",
-         |  "gas": 1,
+         |  "gasAmount": 1,
          |  "gasPrice": "1",
          |  "utxosLimit": 1024
          |}
@@ -713,6 +717,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val txId = Hash.generate
     val buildScriptResult = BuildScriptTxResult(
       unsignedTx = "0000",
+      gasAmount = GasBox.unsafe(1),
+      gasPrice = GasPrice(1),
       txId = txId,
       group = 1
     )
@@ -720,6 +726,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       s"""
          |{
          |  "unsignedTx": "0000",
+         |  "gasAmount":1,
+         |  "gasPrice":"1",
          |  "txId": "${txId.toHexString}",
          |  "group": 1
          |}

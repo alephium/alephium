@@ -562,6 +562,8 @@ trait EndpointsExamples extends ErrorExamples {
       BuildContractDeployScriptTxResult(
         group = 2,
         unsignedTx = hexString,
+        model.minimalGas,
+        model.defaultGasPrice,
         txId = hash,
         contractAddress = Address.contract(contractId)
       )
@@ -571,6 +573,8 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       BuildScriptTxResult(
         unsignedTx = hexString,
+        model.minimalGas,
+        model.defaultGasPrice,
         txId = hash,
         group = 2
       )

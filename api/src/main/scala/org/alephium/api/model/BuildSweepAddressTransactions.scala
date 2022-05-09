@@ -26,7 +26,7 @@ final case class BuildSweepAddressTransactions(
     fromPublicKey: PublicKey,
     toAddress: Address.Asset,
     lockTime: Option[TimeStamp] = None,
-    gas: Option[GasBox] = None,
+    gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     utxosLimit: Option[Int] = None
-) extends UtxoBasedModel
+) extends BuildTxCommon

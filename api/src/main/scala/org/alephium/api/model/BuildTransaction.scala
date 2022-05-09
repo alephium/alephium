@@ -26,9 +26,9 @@ final case class BuildTransaction(
     fromPublicKey: PublicKey,
     destinations: AVector[Destination],
     utxos: Option[AVector[OutputRef]] = None,
-    gas: Option[GasBox] = None,
+    gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     utxosLimit: Option[Int] = None
-) extends UtxoBasedModel {
+) extends BuildTxCommon {
   def fromAddress(): Address.Asset = Address.p2pkh(fromPublicKey)
 }

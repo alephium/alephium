@@ -18,10 +18,14 @@ package org.alephium.api.model
 
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 
-trait UtxoBasedModel {
-  def gas: Option[GasBox]
+trait BuildTxCommon {
+  def gasAmount: Option[GasBox]
 
   def gasPrice: Option[GasPrice]
+}
 
-  def utxosLimit: Option[Int]
+trait GasInfo {
+  def gasAmount: GasBox
+
+  def gasPrice: GasPrice
 }

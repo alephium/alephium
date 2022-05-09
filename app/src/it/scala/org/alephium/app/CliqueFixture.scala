@@ -639,7 +639,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
          |{
          |  "fromPublicKey": "$fromPublicKey",
          |  "bytecode": "$code"
-         |  ${gas.map(g => s""","gas": $g""").getOrElse("")}
+         |  ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
          |  ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
          |  ${initialFields.map(fs => s""","initialFields": ${convertFields(fs)}""").getOrElse("")}
          |  ${issueTokenAmount.map(v => s""","issueTokenAmount": "${v.v}"""").getOrElse("")}
@@ -661,7 +661,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
          {
            "fromPublicKey": "$fromPublicKey",
            "bytecode": "$code"
-           ${gas.map(g => s""","gas": $g""").getOrElse("")}
+           ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
            ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
            ${alphAmount.map(a => s""","alphAmount": "${a.value.v}"""").getOrElse("")}
          }
