@@ -476,11 +476,33 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val compileResultExamples: List[Example[CompileResult]] =
+  implicit val compileScriptResultExamples: List[Example[CompileScriptResult]] =
     simpleExample(
-      CompileResult(
-        bytecode = Hex.unsafe(hexString),
-        codeHash = hash,
+      CompileScriptResult(
+        compiled = SimpleScriptByteCode(byteString),
+        functions = AVector(
+          CompileResult.FunctionSig(
+            name = "bar",
+            signature =
+              "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+            argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+            returnTypes = AVector("U256", "I256", "ByteVec", "Address")
+          )
+        ),
+        events = AVector(
+          CompileResult.EventSig(
+            name = "Bar",
+            signature = "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
+            fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
+          )
+        )
+      )
+    )
+
+  implicit val compileContractResultExamples: List[Example[CompileContractResult]] =
+    simpleExample(
+      CompileContractResult(
+        compiled = SimpleContractByteCode(byteString),
         fields = CompileResult.FieldsSig(
           signature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
           types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
@@ -566,7 +588,7 @@ trait EndpointsExamples extends ErrorExamples {
   private lazy val existingContract = ContractState(
     address = Address.contract(anotherContractId),
     bytecode = code,
-    codeHash = code.hash,
+    artifactId = code.hash,
     fields = AVector[Val](ValU256(ALPH.alph(2))),
     asset = asset(2)
   )
@@ -576,6 +598,7 @@ trait EndpointsExamples extends ErrorExamples {
         group = Some(0),
         address = Some(Address.contract(ContractId.zero)),
         bytecode = code,
+        artifactId = code.hash,
         initialFields = AVector[Val](ValU256(ALPH.oneAlph)),
         initialAsset = Some(asset(1)),
         testMethodIndex = Some(0),
@@ -589,8 +612,8 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val testContractResultExamples: List[Example[TestContractResult]] =
     simpleExample(
       TestContractResult(
-        originalCodeHash = hash,
-        testCodeHash = hash,
+        address = contractAddress,
+        artifactId = hash,
         returns = AVector[Val](ValU256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),

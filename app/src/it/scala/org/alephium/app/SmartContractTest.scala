@@ -56,11 +56,11 @@ class SmartContractTest extends AlephiumActorSpec {
         gas: Option[Int] = Some(100000),
         gasPrice: Option[GasPrice] = None
     ): BuildContractDeployScriptTxResult = {
-      val compileResult = request[CompileResult](compileContract(code), restPort)
+      val compileResult = request[CompileContractResult](compileContract(code), restPort)
       val buildResult = request[BuildContractDeployScriptTxResult](
         buildContract(
           fromPublicKey = publicKey,
-          code = Hex.toHexString(compileResult.bytecode),
+          code = compileResult.bytecodeUnsafe,
           gas,
           gasPrice,
           initialFields = initialFields,
@@ -102,10 +102,10 @@ class SmartContractTest extends AlephiumActorSpec {
       val unlockScript = UnlockScript.p2pkh(PublicKey.from(Hex.unsafe(publicKey)).value)
       val lockupScript = LockupScript.p2pkh(PublicKey.from(Hex.unsafe(publicKey)).value)
 
-      val compileResult = request[CompileResult](compileContract(code), restPort)
+      val compileResult = request[CompileContractResult](compileContract(code), restPort)
       val script = ServerUtils
         .buildContract(
-          Hex.toHexString(compileResult.bytecode),
+          compileResult.bytecodeUnsafe,
           Address.fromBase58(address).value,
           state,
           dustUtxoAmount,
@@ -127,8 +127,10 @@ class SmartContractTest extends AlephiumActorSpec {
       val unlockScript = UnlockScript.p2pkh(PublicKey.from(Hex.unsafe(publicKey)).value)
       val lockupScript = LockupScript.p2pkh(PublicKey.from(Hex.unsafe(publicKey)).value)
 
-      val compileResult = request[CompileResult](compileScript(code), restPort)
-      val script        = deserialize[StatefulScript](compileResult.bytecode).rightValue
+      val compileResult = request[CompileScriptResult](compileScript(code), restPort)
+      val script = deserialize[StatefulScript](
+        Hex.unsafe(compileResult.bytecodeUnsafe)
+      ).rightValue
 
       val blockFlow    = clique.servers(group.group % 2).node.blockFlow
       val allUtxos     = blockFlow.getUsableUtxos(lockupScript, 10000).rightValue
@@ -170,7 +172,7 @@ class SmartContractTest extends AlephiumActorSpec {
          |}
          |""".stripMargin
 
-    val compileResult = request[CompileResult](compileContract(contract), restPort)
+    val compileResult = request[CompileContractResult](compileContract(contract), restPort)
     val validFields = Some(
       AVector[Val](
         Val.True,
@@ -183,7 +185,7 @@ class SmartContractTest extends AlephiumActorSpec {
     unitRequest(
       buildContract(
         publicKey,
-        Hex.toHexString(compileResult.bytecode),
+        compileResult.bytecodeUnsafe,
         initialFields = validFields
       ),
       restPort
@@ -193,7 +195,7 @@ class SmartContractTest extends AlephiumActorSpec {
     requestFailed(
       buildContract(
         publicKey,
-        Hex.toHexString(compileResult.bytecode),
+        compileResult.bytecodeUnsafe,
         initialFields = invalidFields
       ),
       restPort,

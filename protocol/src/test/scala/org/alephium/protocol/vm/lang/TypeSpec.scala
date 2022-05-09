@@ -38,8 +38,6 @@ class TypeSpec extends AlephiumSpec {
     contractAst.events.map(_.getFieldTypeSignatures()) is
       Seq(Seq("Bool", "U256", "ByteVec", "Address"))
 
-    scriptAst.getFieldsSignature() is "TxScript Foo()"
-    scriptAst.getFieldTypes() is Seq.empty
     scriptAst.funcs.map(_.signature) is Seq(
       "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
     )

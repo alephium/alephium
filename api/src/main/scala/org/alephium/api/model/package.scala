@@ -14,17 +14,16 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.api
 
-import org.alephium.protocol.model.Address
-import org.alephium.util.AVector
+import org.alephium.protocol.Hash
 
-final case class TestContractResult(
-    address: Address.Contract,
-    artifactId: ArtifactId,
-    returns: AVector[Val],
-    gasUsed: Int,
-    contracts: AVector[ContractState],
-    txOutputs: AVector[Output],
-    events: AVector[Event]
-)
+package object model {
+  /*
+   * As the introduce of template variables to contract&script, each
+   * contract source file can be used to populate different contract
+   * bytecode for deployment and testing. Therefore, a unique id for
+   * the original source file is helpful for SDK.
+   */
+  type ArtifactId = Hash
+}

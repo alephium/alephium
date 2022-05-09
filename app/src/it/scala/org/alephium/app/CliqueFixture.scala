@@ -695,11 +695,11 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       gas: Option[Int] = None,
       gasPrice: Option[GasPrice] = None
   ): BuildScriptTxResult = {
-    val compileResult = request[CompileResult](compileScript(code), restPort)
+    val compileResult = request[CompileScriptResult](compileScript(code), restPort)
     request[BuildScriptTxResult](
       buildScript(
         fromPublicKey = publicKey,
-        code = Hex.toHexString(compileResult.bytecode),
+        code = compileResult.bytecodeUnsafe,
         alphAmount,
         gas,
         gasPrice

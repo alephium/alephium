@@ -812,19 +812,19 @@ class ServerUtils(implicit
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def compileScript(query: Compile.Script): Try[CompileResult] = {
+  def compileScript(query: Compile.Script): Try[CompileScriptResult] = {
     Compiler
       .compileTxScriptFull(query.code)
-      .map(CompileResult.from[StatefulScript].tupled)
+      .map(CompileScriptResult.from.tupled)
       .left
       .map(error => failed(error.toString))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def compileContract(query: Compile.Contract): Try[CompileResult] = {
+  def compileContract(query: Compile.Contract): Try[CompileContractResult] = {
     Compiler
       .compileContractFull(query.code)
-      .map(CompileResult.from[StatefulContract].tupled)
+      .map(CompileContractResult.from.tupled)
       .left
       .map(error => failed(error.toString))
   }
@@ -836,7 +836,7 @@ class ServerUtils(implicit
   ): Try[ContractState] = {
     for {
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex))
-      state      <- fetchContractState(worldState, address.contractId)
+      state      <- fetchContractState(worldState, address.contractId, Hash.zero)
     } yield state
   }
 
@@ -862,8 +862,8 @@ class ServerUtils(implicit
       val executionResult  = executionResultPair._2
       val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
       TestContractResult(
-        originalCodeHash = testContract.originalCodeHash,
-        testCodeHash = testContract.code.hash,
+        address = Address.contract(testContract.contractId),
+        artifactId = testContract.artifactId,
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
         contracts = postState,
@@ -881,9 +881,13 @@ class ServerUtils(implicit
   ): Try[AVector[ContractState]] = {
     for {
       existingContractsState <- testContract.existingContracts.mapE(contract =>
-        fetchContractState(worldState, contract.id)
+        fetchContractState(worldState, contract.id, contract.artifactId)
       )
-      testContractState <- fetchContractState(worldState, testContract.contractId)
+      testContractState <- fetchContractState(
+        worldState,
+        testContract.contractId,
+        testContract.artifactId
+      )
     } yield existingContractsState ++ AVector(testContractState)
   }
 
@@ -894,7 +898,8 @@ class ServerUtils(implicit
 
   private def fetchContractState(
       worldState: WorldState.AbstractCached,
-      contractId: ContractId
+      contractId: ContractId,
+      artifactId: ArtifactId
   ): Try[ContractState] = {
     val result = for {
       state          <- worldState.getContractState(contractId)
@@ -904,7 +909,7 @@ class ServerUtils(implicit
     } yield ContractState(
       Address.contract(contractId),
       contract,
-      contract.hash,
+      artifactId,
       state.fields.map(Val.from),
       AssetState.from(contractOutput)
     )

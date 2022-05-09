@@ -98,22 +98,37 @@ object TxHandler {
     val memPool    = blockFlow.getMemPool(chainIndex)
     memPool.addNewTx(chainIndex, txTemplate, TimeStamp.now()) match {
       case MemPool.AddedToSharedPool =>
-        try {
-          val (_, minerPubKey) = chainIndex.to.generateKey
-          val miner            = LockupScript.p2pkh(minerPubKey)
-          val flowTemplate     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-          val miningBlob       = MiningBlob.from(flowTemplate)
-          val block            = Miner.mineForDev(chainIndex, miningBlob)
-          validateAndAddBlock(blockFlow, block)
-        } catch {
-          case error: Throwable =>
-            Left(error.getMessage)
-        } finally {
-          memPool.clear()
-        }
+        for {
+          _ <- mineTxForDev(blockFlow, chainIndex)
+          _ <-
+            if (!chainIndex.isIntraGroup) {
+              mineTxForDev(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
+            } else {
+              Right(())
+            }
+        } yield ()
       case _ =>
         memPool.clear()
         Left("Unable to add the tx the mempool: maybe the parent tx is not confirmed")
+    }
+  }
+
+  def mineTxForDev(blockFlow: BlockFlow, chainIndex: ChainIndex)(implicit
+      groupConfig: GroupConfig
+  ): Either[String, Unit] = {
+    val memPool = blockFlow.getMemPool(chainIndex)
+    try {
+      val (_, minerPubKey) = chainIndex.to.generateKey
+      val miner            = LockupScript.p2pkh(minerPubKey)
+      val flowTemplate     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+      val miningBlob       = MiningBlob.from(flowTemplate)
+      val block            = Miner.mineForDev(chainIndex, miningBlob)
+      validateAndAddBlock(blockFlow, block)
+    } catch {
+      case error: Throwable =>
+        Left(error.getMessage)
+    } finally {
+      memPool.clear()
     }
   }
 

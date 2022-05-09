@@ -655,7 +655,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Local variables have the same name: x",
       s"""
          |// duplicated variable name
          |TxContract Foo(x: [U256; 2]) {
@@ -664,7 +665,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Global variable has the same name as local variable: x",
       s"""
          |// assign to immutable array element(contract field)
          |TxContract Foo(x: [U256; 2]) {
@@ -673,7 +675,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Assign to immutable variable: x",
       s"""
          |// assign to immutable array element(local variable)
          |TxContract Foo() {
@@ -683,7 +686,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Assign to immutable variable: x",
       s"""
          |// out of index
          |TxContract Foo() {
@@ -692,7 +696,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return x[1][3]
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Invalid array index: 3, array size: 2",
       s"""
          |// out of index
          |TxContract Foo() {
@@ -702,7 +707,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Invalid array index: 2, array size: 2",
       s"""
          |// invalid array element assignment
          |TxContract Foo() {
@@ -712,7 +718,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Invalid array index: 2, array size: 2",
       s"""
          |// invalid array element assignment
          |TxContract Foo() {
@@ -722,7 +729,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Invalid assignment to array: x",
       s"""
          |// invalid array expression
          |TxContract Foo() {
@@ -732,7 +740,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Expect array type, have: List(U256)", // TODO: improve this error message
       s"""
          |// invalid array expression
          |TxContract Foo() {
@@ -742,7 +751,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Expect array type, have: List(U256)",
       s"""
          |// invalid binary expression(compare array)
          |TxContract Foo() {
@@ -752,7 +762,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return x == y
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for Eq",
       s"""
          |// invalid binary expression(add array)
          |TxContract Foo() {
@@ -760,7 +771,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    let x = [2; 2] + [2; 2]
          |    return
          |  }
-         |}""".stripMargin,
+         |}""".stripMargin ->
+        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for ArithOperator",
       s"""
          |// assign array element with invalid type
          |TxContract Foo() {
@@ -770,9 +782,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin
+         |""".stripMargin ->
+        "Assign List(U256) to List(I256)"
     )
-    codes.foreach(code => Compiler.compileContract(code).isLeft is true)
+    codes.foreach { case (code, error) =>
+      Compiler.compileContract(code).leftValue.message is error
+    }
   }
 
   it should "compile loop failed" in {
@@ -1822,7 +1837,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val bar2: String =
         s"""
-           |TxContract Bar2() extends Foo2, Foo() {
+           |TxContract Bar2() extends Foo2, Foo1() {
            |  fn foo2() -> () {}
            |}
            |$foo1
@@ -1831,6 +1846,25 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler.compileContract(bar1).isRight is true
       Compiler.compileContract(bar2).isRight is true
     }
+  }
+
+  it should "compile TxScript" in {
+    val code =
+      s"""
+       |TxScript Main<address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec> {
+       |  pub payable fn main() -> () {
+       |    approveToken!(address, tokenId, tokenAmount)
+       |    let swap = Swap(swapContractKey)
+       |    swap.swapAlph(address, tokenAmount)
+       |  }
+       |}
+       |
+       |Interface Swap {
+       |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> ()
+       |}
+       |""".stripMargin
+    val script = Compiler.compileTxScript(code).rightValue
+    script.toTemplateString() is "0101010001000a{address:Address}{tokenId:ByteVec}{tokenAmount:U256}a3{swapContractKey:ByteVec}1700{address:Address}{tokenAmount:U256}16000100"
   }
 
   it should "compile events with <= 8 fields" in {

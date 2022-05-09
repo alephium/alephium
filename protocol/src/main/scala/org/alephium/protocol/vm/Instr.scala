@@ -35,6 +35,7 @@ sealed trait Instr[-Ctx <: StatelessContext] extends GasSchedule {
   def code: Byte
 
   def serialize(): ByteString
+  def toTemplateString(): String = util.Hex.toHexString(serialize())
 
   // this function needs to charge gas manually
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
@@ -1670,3 +1671,13 @@ object Log6 extends LemanLogInstr   { val n: Int = 6 }
 object Log7 extends LemanLogInstr   { val n: Int = 7 }
 object Log8 extends LemanLogInstr   { val n: Int = 8 }
 object Log9 extends LemanLogInstr   { val n: Int = 9 }
+
+final case class TemplateVariable(name: String, tpe: Val.Type) extends StatelessInstr {
+  def serialize(): ByteString = ???
+  def code: Byte              = ???
+  def runWith[C <: StatelessContext](
+      frame: Frame[C]
+  ): ExeResult[Unit] = ???
+
+  override def toTemplateString(): String = s"{$name:$tpe}"
+}

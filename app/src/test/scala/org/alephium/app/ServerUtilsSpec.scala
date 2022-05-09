@@ -33,6 +33,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.serde.serialize
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
@@ -800,7 +801,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test AMM contract: add liquidity" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
-      originalCodeHash = AMMContract.swapCode.hash,
+      artifactId = AMMContract.swapCode.hash,
       code = AMMContract.swapCode,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
@@ -849,7 +850,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
-      originalCodeHash = AMMContract.swapProxyCode.hash,
+      artifactId = AMMContract.swapProxyCode.hash,
       code = AMMContract.swapProxyCode,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
@@ -900,7 +901,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test AMM contract: swap token" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
-      originalCodeHash = AMMContract.swapCode.hash,
+      artifactId = AMMContract.swapCode.hash,
       code = AMMContract.swapCode,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
@@ -945,7 +946,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
-      originalCodeHash = AMMContract.swapProxyCode.hash,
+      artifactId = AMMContract.swapProxyCode.hash,
       code = AMMContract.swapProxyCode,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
@@ -996,7 +997,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test AMM contract: swap Alph" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
-      originalCodeHash = AMMContract.swapCode.hash,
+      artifactId = AMMContract.swapCode.hash,
       code = AMMContract.swapCode,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
@@ -1041,7 +1042,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
-      originalCodeHash = AMMContract.swapProxyCode.hash,
+      artifactId = AMMContract.swapProxyCode.hash,
       code = AMMContract.swapProxyCode,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
@@ -1106,6 +1107,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract = TestContract(
       bytecode = code,
+      artifactId = code.hash,
       initialFields = AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))),
       testArgs = AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))
     ).toComplete().rightValue
@@ -1123,14 +1125,87 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts.length is 1
     contractState.fields is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
     result.returns is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
-    if (isPublic.nonEmpty) {
-      contractState.codeHash is compileResult.codeHash
-      result.originalCodeHash is result.testCodeHash
-      contractState.codeHash is result.originalCodeHash
-    } else {
-      contractState.codeHash isnot compileResult.codeHash
-      result.originalCodeHash isnot result.testCodeHash
-      contractState.codeHash is result.testCodeHash
+    contractState.artifactId is compileResult.codeHashUnsafe
+    result.artifactId is result.artifactId
+  }
+
+  it should "compile contract" in new Fixture {
+    val expectedMethodByteCode = "010000000004{x:U256}a000304d"
+    val serverUtils            = new ServerUtils()
+
+    {
+      val rawCode =
+        s"""
+           |TxContract Foo<x: U256>(y: U256) {
+           |  pub fn foo() -> () {
+           |    assert!(x != y)
+           |  }
+           |}
+           |""".stripMargin
+      val query  = Compile.Contract(rawCode)
+      val result = serverUtils.compileContract(query).rightValue
+      result.compiled is TemplateContractByteCode(1, AVector(expectedMethodByteCode))
+    }
+
+    {
+      val rawCode =
+        s"""
+           |TxContract Foo(y: U256) {
+           |  pub fn foo() -> () {
+           |    assert!(1 != y)
+           |  }
+           |}
+           |""".stripMargin
+      val code   = Compiler.compileContract(rawCode).rightValue
+      val query  = Compile.Contract(rawCode)
+      val result = serverUtils.compileContract(query).rightValue
+
+      val compiledCode = result.bytecodeUnsafe
+      compiledCode is Hex.toHexString(serialize(code))
+      compiledCode is {
+        val replaced     = expectedMethodByteCode.replace("{x:U256}", "0d") // bytecode of U256Const1
+        val methodLength = Hex.toHexString(IndexedSeq((replaced.length / 2).toByte))
+        s"0101$methodLength" + replaced
+      }
+    }
+  }
+
+  it should "compile script" in new Fixture {
+    val expectedByteCode = "01010000000004{x:U256}{y:U256}304d"
+    val serverUtils      = new ServerUtils()
+
+    {
+      val rawCode =
+        s"""
+           |TxScript Main<x: U256, y: U256> {
+           |  pub fn main() -> () {
+           |    assert!(x != y)
+           |  }
+           |}
+           |""".stripMargin
+
+      val query  = Compile.Script(rawCode)
+      val result = serverUtils.compileScript(query).rightValue
+      result.compiled is TemplateScriptByteCode(expectedByteCode)
+    }
+
+    {
+      val rawCode =
+        s"""
+           |TxScript Main {
+           |  pub fn main() -> () {
+           |    assert!(1 != 2)
+           |  }
+           |}
+           |""".stripMargin
+      val code   = Compiler.compileTxScript(rawCode).rightValue
+      val query  = Compile.Script(rawCode)
+      val result = serverUtils.compileScript(query).rightValue
+
+      result.bytecodeUnsafe is Hex.toHexString(serialize(code))
+      result.bytecodeUnsafe is expectedByteCode
+        .replace("{x:U256}", "0d") // bytecode of U256Const1
+        .replace("{y:U256}", "0e") // bytecode of U256Const2
     }
   }
 

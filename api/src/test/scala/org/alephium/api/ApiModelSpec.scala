@@ -768,7 +768,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val state = ContractState(
       generateContractAddress(),
       StatefulContract.forSMT.toContract().rightValue,
-      Hash.zero,
+      artifactId = Hash.zero,
       AVector(u256, i256, bool, byteVec, address1),
       AssetState(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
     )
@@ -777,7 +777,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
          |  "bytecode": "00010700000000000118",
-         |  "codeHash": "0000000000000000000000000000000000000000000000000000000000000000",
+         |  "artifactId": "0000000000000000000000000000000000000000000000000000000000000000",
          |  "fields": [
          |    {
          |      "type": "U256",
@@ -815,12 +815,14 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode CompilerResult" in new TypeSignatureFixture {
-    val result0 = CompileResult.from(contract, contractAst)
+    val result0 = CompileContractResult.from(contract, contractAst)
     val jsonRaw0 =
       """
         |{
-        |  "bytecode": "07011d01010707060d05a000a001a003a0046116011602160316041605160602",
-        |  "codeHash":"4106809d4ed811457fad02bc19619ca8f2a4a47a56bca4519a28d3671d9c7241",
+        |  "compiled": {
+        |    "type":"SimpleContractByteCode",
+        |    "bytecode": "07011d01010707060d05a000a001a003a0046116011602160316041605160602"
+        |  },
         |  "fields": {
         |    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])",
         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
@@ -844,15 +846,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |""".stripMargin
     write(result0).filter(!_.isWhitespace) is jsonRaw0.filter(!_.isWhitespace)
 
-    val result1 = CompileResult.from(script, scriptAst)
+    val result1 = CompileScriptResult.from(script, scriptAst)
     val jsonRaw1 =
       """
         |{
-        |  "bytecode": "0101000707060716011602160316041605160602",
-        |  "codeHash":"dc8eec0f7757b68625a09b027c52c3125631cc7dd8d7f40386cbb1c1365b0693",
-        |  "fields": {
-        |    "signature": "TxScript Foo()",
-        |    "types": []
+        |  "compiled": {
+        |    "type": "SimpleScriptByteCode",
+        |    "bytecode": "0101000707060716011602160316041605160602"
         |  },
         |  "functions": [
         |    {

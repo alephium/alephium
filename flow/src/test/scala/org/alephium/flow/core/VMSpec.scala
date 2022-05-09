@@ -207,6 +207,7 @@ class VMSpec extends AlephiumSpec {
 
     def callTxScript(input: String): Block = {
       val script = Compiler.compileTxScript(input).rightValue
+      script.toTemplateString() is Hex.toHexString(serialize(script))
       val block =
         if (script.entryMethod.isPayable) {
           payableCall(blockFlow, chainIndex, script)
@@ -1703,27 +1704,6 @@ class VMSpec extends AlephiumSpec {
     } yield logStatesOpt).rightValue
   }
 
-  private def getEvents(
-      blockFlow: BlockFlow,
-      chainIndex: ChainIndex,
-      contractId: ContractId,
-      start: Int,
-      end: Int = Int.MaxValue
-  ): (Int, AVector[LogStates]) = {
-    blockFlow.getEvents(chainIndex, contractId, start, end).rightValue
-  }
-
-  private def getCurentCount(
-      blockFlow: BlockFlow,
-      groupIndex: GroupIndex,
-      contractId: ContractId
-  ): Option[Int] = {
-    (for {
-      worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
-      countOpt   <- worldState.logCounterState.getOpt(contractId)
-    } yield countOpt).rightValue
-  }
-
   it should "return contract id in contract creation" in new ContractFixture {
     val contract: String =
       s"""
@@ -1750,10 +1730,11 @@ class VMSpec extends AlephiumSpec {
          |
          |$contract
          |""".stripMargin
-    callTxScript(main)
+    val block = callTxScript(main)
 
     val logStatesOpt = getLogStates(blockFlow, chainIndex.from, contractId, 0)
     val logStates    = logStatesOpt.value
+    logStates.blockHash is block.hash
     logStates.states.length is 2 // one system event, another one emitted event
     val subContractId = logStates.states(1).fields.head.asInstanceOf[Val.ByteVec].bytes
 
@@ -2000,13 +1981,35 @@ class VMSpec extends AlephiumSpec {
          |}
          |$foo
          |""".stripMargin
-    callTxScript(main)
+    val block = callTxScript(main)
 
     val logStatesOpt = getLogStates(blockFlow, chainIndex.from, barId, 0)
     val logStates    = logStatesOpt.value
+    logStates.blockHash is block.hash
     logStates.states.length is 2
     logStates.states(0).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 1
     logStates.states(1).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 2
+  }
+
+  private def getEvents(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      contractId: ContractId,
+      start: Int,
+      end: Int = Int.MaxValue
+  ): (Int, AVector[LogStates]) = {
+    blockFlow.getEvents(chainIndex, contractId, start, end).rightValue
+  }
+
+  private def getCurentCount(
+      blockFlow: BlockFlow,
+      groupIndex: GroupIndex,
+      contractId: ContractId
+  ): Option[Int] = {
+    (for {
+      worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
+      countOpt   <- worldState.logCounterState.getOpt(contractId)
+    } yield countOpt).rightValue
   }
 }
 // scalastyle:on file.size.limit no.equal regex

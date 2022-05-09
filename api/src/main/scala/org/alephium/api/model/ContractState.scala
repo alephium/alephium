@@ -16,7 +16,6 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, ContractId, ContractOutput}
 import org.alephium.protocol.vm.{LockupScript, StatefulContract}
 import org.alephium.util.{AVector, U256}
@@ -25,7 +24,7 @@ import org.alephium.util.{AVector, U256}
 final case class ContractState(
     address: Address.Contract,
     bytecode: StatefulContract,
-    codeHash: Hash,
+    artifactId: ArtifactId, // unique id for the contract artifact
     fields: AVector[Val] = AVector.empty,
     asset: AssetState
 ) {
