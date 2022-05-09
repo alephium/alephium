@@ -207,6 +207,24 @@ object BuiltIn {
       ByteVecSlice
     )
 
+  val encodeToByteVec: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
+    val name: String = "encodeToByteVec"
+
+    override def isVariadic: Boolean = true
+
+    def getReturnType(inputType: Seq[Type]): Seq[Type] = Seq(Type.ByteVec)
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(Encode)
+  }
+
+  val zeros: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "zeros",
+      Seq[Type](Type.U256),
+      Seq[Type](Type.ByteVec),
+      Zeros
+    )
+
   val u256To1Byte: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn(
       "u256To1Byte",
@@ -334,8 +352,10 @@ object BuiltIn {
     size,
     isAssetAddress,
     isContractAddress,
-    /* Below are instructions for Leman hard fork */
+    /* Below are functions for Leman hard fork */
     byteVecSlice,
+    encodeToByteVec,
+    zeros,
     u256To1Byte,
     u256To2Byte,
     u256To4Byte,
@@ -429,7 +449,7 @@ object BuiltIn {
     SimpleStatefulBuiltIn(
       "createContract",
       Seq[Type](Type.ByteVec, Type.ByteVec),
-      Seq.empty,
+      Seq[Type](Type.ByteVec),
       CreateContract
     )
 
@@ -437,7 +457,7 @@ object BuiltIn {
     SimpleStatefulBuiltIn(
       "createContractWithToken",
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
-      Seq.empty,
+      Seq[Type](Type.ByteVec),
       CreateContractWithToken
     )
 
@@ -445,7 +465,7 @@ object BuiltIn {
     SimpleStatefulBuiltIn(
       "copyCreateContract",
       Seq[Type](Type.ByteVec, Type.ByteVec),
-      Seq.empty,
+      Seq[Type](Type.ByteVec),
       CopyCreateContract
     )
 
@@ -453,7 +473,7 @@ object BuiltIn {
     SimpleStatefulBuiltIn(
       "copyCreateContractWithToken",
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
-      Seq.empty,
+      Seq[Type](Type.ByteVec),
       CopyCreateContractWithToken
     )
 
@@ -463,6 +483,22 @@ object BuiltIn {
       Seq[Type](Type.Address),
       Seq.empty,
       DestroySelf
+    )
+
+  val migrate: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "migrate",
+      Seq[Type](Type.ByteVec),
+      Seq.empty,
+      MigrateSimple
+    )
+
+  val migrateWithState: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "migrateWithState",
+      Seq[Type](Type.ByteVec, Type.ByteVec),
+      Seq.empty,
+      MigrateWithState
     )
 
   val selfAddress: SimpleStatefulBuiltIn =
@@ -533,6 +569,8 @@ object BuiltIn {
       copyCreateContract,
       copyCreateContractWithToken,
       destroySelf,
+      migrate,
+      migrateWithState,
       selfAddress,
       selfContractId,
       selfTokenId,

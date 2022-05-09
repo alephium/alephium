@@ -51,8 +51,11 @@ object Lexer {
     obj.getClass.getSimpleName.dropRight(1)
   }
 
-  def keyword[_: P](s: String): P[Unit] = s ~ !(letter | digit | "_")
-  def mut[_: P]: P[Boolean]             = P(keyword("mut").?.!).map(_.nonEmpty)
+  def keyword[_: P](s: String): P[Unit] = {
+    require(keywordSet.contains(s))
+    s ~ !(letter | digit | "_")
+  }
+  def mut[_: P]: P[Boolean] = P(keyword("mut").?.!).map(_.nonEmpty)
 
   def lineComment[_: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
   def emptyChars[_: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
@@ -150,6 +153,7 @@ object Lexer {
     "TxContract",
     "AssetScript",
     "TxScript",
+    "Interface",
     "let",
     "mut",
     "fn",

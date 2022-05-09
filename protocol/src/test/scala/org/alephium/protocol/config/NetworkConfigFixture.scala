@@ -35,6 +35,6 @@ trait NetworkConfigFixture { self =>
 
 object NetworkConfigFixture {
   trait Default extends NetworkConfigFixture {
-    val networkId: NetworkId = NetworkId.AlephiumDevNet
+    def networkId: NetworkId = NetworkId.AlephiumDevNet
   }
 }

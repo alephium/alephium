@@ -83,8 +83,16 @@ object Compiler {
 
   private def compileStateful[T](input: String, genCode: MultiTxContract => T): Either[Error, T] = {
     try {
+      compileMultiContract(input).map(genCode)
+    } catch {
+      case e: Error => Left(e)
+    }
+  }
+
+  def compileMultiContract[T](input: String): Either[Error, MultiTxContract] = {
+    try {
       fastparse.parse(input, StatefulParser.multiContract(_)) match {
-        case Parsed.Success(multiContract, _) => Right(genCode(multiContract.extendedContracts()))
+        case Parsed.Success(multiContract, _) => Right(multiContract.extendedContracts())
         case failure: Parsed.Failure          => Left(Error.parse(failure))
       }
     } catch {
@@ -106,6 +114,7 @@ object Compiler {
   trait FuncInfo[-Ctx <: StatelessContext] {
     def name: String
     def isPublic: Boolean
+    def isVariadic: Boolean = false
     def getReturnType(inputType: Seq[Type]): Seq[Type]
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
@@ -125,13 +134,16 @@ object Compiler {
   }
 
   final case class VarInfo(tpe: Type, isMutable: Boolean, index: Byte)
+  trait ContractFunc[Ctx <: StatelessContext] extends FuncInfo[Ctx] {
+    def returnType: Seq[Type]
+  }
   final case class SimpleFunc[Ctx <: StatelessContext](
-      val id: Ast.FuncId,
-      val isPublic: Boolean,
+      id: Ast.FuncId,
+      isPublic: Boolean,
       argsType: Seq[Type],
-      val returnType: Seq[Type],
+      returnType: Seq[Type],
       index: Byte
-  ) extends FuncInfo[Ctx] {
+  ) extends ContractFunc[Ctx] {
     def name: String = id.name
 
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
@@ -214,8 +226,8 @@ object Compiler {
     def varTable: mutable.HashMap[String, VarInfo]
     var scope: Ast.FuncId
     var varIndex: Int
-    def funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]
-    def contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]]
+    def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
+    def contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, ContractFunc[Ctx]]]
     private var freshNameIndex: Int                               = 0
     val arrayRefs: mutable.Map[String, ArrayTransformer.ArrayRef] = mutable.Map.empty
     def eventsInfo: Seq[EventInfo]
@@ -388,13 +400,13 @@ object Compiler {
     }
   }
 
-  type Contract[Ctx <: StatelessContext] = immutable.Map[Ast.FuncId, SimpleFunc[Ctx]]
+  type Contract[Ctx <: StatelessContext] = immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
   final case class StateForScript(
       config: CompilerConfig,
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
       var varIndex: Int,
-      funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[StatelessContext]],
+      funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatelessContext]],
       contractTable: immutable.Map[Ast.TypeId, Contract[StatelessContext]]
   ) extends State[StatelessContext] {
     override def eventsInfo: Seq[EventInfo] = Seq.empty
@@ -433,7 +445,7 @@ object Compiler {
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
       var varIndex: Int,
-      funcIdents: immutable.Map[Ast.FuncId, SimpleFunc[StatefulContext]],
+      funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatefulContext]],
       eventsInfo: Seq[EventInfo],
       contractTable: immutable.Map[Ast.TypeId, Contract[StatefulContext]]
   ) extends State[StatefulContext] {
@@ -463,6 +475,14 @@ object Compiler {
       } else {
         StoreLocal(varInfo.index)
       }
+    }
+  }
+
+  def genLogs(logFieldLength: Int): LogInstr = {
+    if (logFieldLength >= 0 && logFieldLength < Instr.allLogInstrs.length) {
+      Instr.allLogInstrs(logFieldLength)
+    } else {
+      throw Compiler.Error(s"Max 8 fields allowed for contract events")
     }
   }
 }

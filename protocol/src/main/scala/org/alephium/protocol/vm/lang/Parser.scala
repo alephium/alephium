@@ -18,7 +18,7 @@ package org.alephium.protocol.vm.lang
 
 import fastparse._
 
-import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
+import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.util.U256
 
 // scalastyle:off number.of.methods
@@ -181,7 +181,12 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
   def eventFields[_: P]: P[Seq[Ast.EventField]] = P("(" ~ eventField.rep(0, ",") ~ ")")
   def event[_: P]: P[Ast.EventDef] = P(Lexer.keyword("event") ~/ Lexer.typeId ~ eventFields)
-    .map { case (typeId, fields) => Ast.EventDef(typeId, fields) }
+    .map { case (typeId, fields) =>
+      if (fields.length >= Instr.allLogInstrs.length) {
+        throw Compiler.Error("Max 8 fields allowed for contract events")
+      }
+      Ast.EventDef(typeId, fields)
+    }
 
   def funcCall[_: P]: P[Ast.FuncCall[Ctx]] =
     callAbs.map { case (funcId, exprs) => Ast.FuncCall(funcId, exprs) }
@@ -279,31 +284,65 @@ object StatefulParser extends Parser[StatefulContext] {
     P(Lexer.typeId ~ P("(" ~ Lexer.ident.rep(0, ",") ~ ")")).map { case (typeId, idents) =>
       Ast.ContractInheritance(typeId, idents)
     }
-  def contractInheritances[_: P]: P[Seq[Ast.ContractInheritance]] =
-    P(Lexer.keyword("extends") ~/ contractInheritance.rep(1, ","))
+  def contractInheritances[_: P]: P[Seq[Ast.Inheritance]] =
+    P(Lexer.keyword("extends") ~/ (contractInheritance | interfaceInheritance).rep(1, ","))
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[_: P]: P[Ast.TxContract] =
     P(
-      Lexer.keyword(
-        "TxContract"
-      ) ~/ Lexer.typeId ~ contractParams ~ contractInheritances.? ~ "{" ~ P(
-        event | func
-      ).rep ~ "}"
-    ).map { case (typeId, params, contractInheritances, statements) =>
-      val funcs = statements.collect { case func: Ast.FuncDef[_] =>
-        func.asInstanceOf[Ast.FuncDef[StatefulContext]]
-      }
+      Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~ contractInheritances.? ~
+        "{" ~ event.rep ~ func.rep ~ "}"
+    ).map { case (typeId, params, contractInheritances, events, funcs) =>
       if (funcs.length < 1) {
         throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
       } else {
-        val events = statements.collect { case event: Ast.EventDef => event }
         Ast.TxContract(typeId, params, funcs, events, contractInheritances.getOrElse(Seq.empty))
       }
     }
   def contract[_: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  def interfaceInheritance[_: P]: P[Ast.InterfaceInheritance] =
+    P(Lexer.typeId).map(Ast.InterfaceInheritance)
+  def interfaceFunc[_: P]: P[Ast.FuncDef[StatefulContext]] =
+    P(Lexer.funcModifier.rep(0) ~ Lexer.keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType)
+      .map { case (modifiers, funcId, params, returnType) =>
+        if (modifiers.toSet.size != modifiers.length) {
+          throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
+        } else {
+          val isPublic  = modifiers.contains(Lexer.Pub)
+          val isPayable = modifiers.contains(Lexer.Payable)
+          Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, Seq.empty)
+        }
+      }
+  def rawInterface[_: P]: P[Ast.ContractInterface] =
+    P(
+      Lexer.keyword("Interface") ~/ Lexer.typeId ~
+        (Lexer.keyword("extends") ~/ interfaceInheritance.rep(1, ",")).? ~
+        "{" ~ event.rep ~ interfaceFunc.rep ~ "}"
+    ).map { case (typeId, inheritances, events, funcs) =>
+      inheritances match {
+        case Some(parents) if parents.length > 1 =>
+          throw Compiler.Error(
+            s"Interface only supports single inheritance: ${parents.map(_.parentId.name).mkString(",")}"
+          )
+        case _ => ()
+      }
+      if (funcs.length < 1) {
+        throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
+      } else {
+        Ast.ContractInterface(
+          typeId,
+          funcs,
+          events,
+          inheritances.getOrElse(Seq.empty)
+        )
+      }
+    }
+  def interface[_: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
+
   def multiContract[_: P]: P[Ast.MultiTxContract] =
-    P(Start ~ (rawTxScript | rawTxContract).rep(1) ~ End).map(Ast.MultiTxContract.apply)
+    P(Start ~ (rawTxScript | rawTxContract | rawInterface).rep(1) ~ End)
+      .map(Ast.MultiTxContract.apply)
 
   def state[_: P]: P[Seq[Ast.Const[StatefulContext]]] =
     P("[" ~ constOrArray.rep(0, ",") ~ "]").map(_.flatten)

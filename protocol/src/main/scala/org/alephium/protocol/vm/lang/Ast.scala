@@ -16,7 +16,6 @@
 
 package org.alephium.protocol.vm.lang
 
-import scala.annotation.switch
 import scala.collection.mutable
 
 import org.alephium.protocol.config.CompilerConfig
@@ -202,7 +201,10 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      args.flatMap(_.genCode(state)) ++ state.getFunc(id).genCode(args.flatMap(_.getType(state)))
+      val func = state.getFunc(id)
+      args.flatMap(_.genCode(state)) ++
+        (if (func.isVariadic) Seq(U256Const(Val.U256.unsafe(args.length))) else Seq.empty) ++
+        func.genCode(args.flatMap(_.getType(state)))
     }
   }
 
@@ -471,20 +473,7 @@ object Ast {
       if (argsType.exists(_.isArrayType)) {
         throw Compiler.Error(s"Array type not supported for event ${id.name}")
       }
-      val logOpCode = (args.length: @switch) match {
-        case 0 =>
-          Log1
-        case 1 =>
-          Log2
-        case 2 =>
-          Log3
-        case 3 =>
-          Log4
-        case 4 =>
-          Log5
-        case _ =>
-          throw Compiler.Error(s"Max 4 fields allowed for event ${id.name}")
-      }
+      val logOpCode = Compiler.genLogs(args.length)
       eventIndex ++ args.flatMap(_.genCode(state)) :+ logOpCode
     }
   }
@@ -536,7 +525,9 @@ object Ast {
       val func       = state.getFunc(id)
       val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      args.flatMap(_.genCode(state)) ++ func.genCode(argsType) ++
+      args.flatMap(_.genCode(state)) ++
+        (if (func.isVariadic) Seq(U256Const(Val.U256(U256.unsafe(args.length)))) else Seq.empty) ++
+        func.genCode(argsType) ++
         Seq.fill(ArrayTransformer.flattenTypeLength(returnType))(Pop)
     }
   }
@@ -687,9 +678,16 @@ object Ast {
     def fields: Seq[Argument]
     def funcs: Seq[FuncDef[Ctx]]
 
-    lazy val funcTable: Map[FuncId, Compiler.SimpleFunc[Ctx]] = {
-      val table = Compiler.SimpleFunc.from(funcs).map(f => f.id -> f).toMap
-      if (table.size != funcs.size) {
+    def builtInContractFuncs(): Seq[Compiler.ContractFunc[Ctx]]
+
+    lazy val funcTable: Map[FuncId, Compiler.ContractFunc[Ctx]] = {
+      val builtInFuncs = builtInContractFuncs()
+      var table = Compiler.SimpleFunc
+        .from(funcs)
+        .map(f => f.id -> f)
+        .toMap[FuncId, Compiler.ContractFunc[Ctx]]
+      builtInFuncs.foreach(func => table = table + (FuncId(func.name, isBuiltIn = true) -> func))
+      if (table.size != (funcs.size + builtInFuncs.length)) {
         val duplicates = UniqueDef.duplicates(funcs)
         throw Compiler.Error(s"These functions are defined multiple times: $duplicates")
       }
@@ -708,6 +706,8 @@ object Ast {
       extends Contract[StatelessContext] {
     val fields: Seq[Argument] = Seq.empty
 
+    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatelessContext]] = Seq.empty
+
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
       check(state)
       val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
@@ -718,10 +718,34 @@ object Ast {
   sealed trait ContractWithState extends Contract[StatefulContext] {
     def ident: TypeId
     def name: String = ident.name
-    def inheritances: Seq[ContractInheritance]
+    def inheritances: Seq[Inheritance]
 
     def fields: Seq[Argument]
     def events: Seq[EventDef]
+
+    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = Seq(loadFieldsFunc)
+    private val loadFieldsFunc: Compiler.ContractFunc[StatefulContext] =
+      new Compiler.ContractFunc[StatefulContext] {
+        def name: String      = "loadFields"
+        def isPublic: Boolean = true
+
+        lazy val returnType: Seq[Type] = fields.map(_.tpe)
+
+        def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+          if (inputType.isEmpty) {
+            returnType
+          } else {
+            throw Compiler.Error(s"Built-in function loadFields does not need any argument")
+          }
+        }
+
+        def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
+          throw Compiler.Error(s"Built-in function loadFields should be external call")
+        }
+
+        def genExternalCallCode(typeId: TypeId): Seq[Instr[StatefulContext]] =
+          Seq(LoadContractFields)
+      }
 
     def getFieldsSignature(): String
     def getFieldTypes(): Seq[String]
@@ -759,13 +783,17 @@ object Ast {
     }
   }
 
-  final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident])
+  sealed trait Inheritance {
+    def parentId: TypeId
+  }
+  final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident]) extends Inheritance
+  final case class InterfaceInheritance(parentId: TypeId)                    extends Inheritance
   final case class TxContract(
       ident: TypeId,
       fields: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
-      inheritances: Seq[ContractInheritance]
+      inheritances: Seq[Inheritance]
   ) extends ContractWithState {
     def getFieldsSignature(): String =
       s"TxContract ${name}(${fields.map(_.signature).mkString(",")})"
@@ -780,6 +808,24 @@ object Ast {
     }
   }
 
+  final case class ContractInterface(
+      ident: TypeId,
+      funcs: Seq[FuncDef[StatefulContext]],
+      events: Seq[EventDef],
+      inheritances: Seq[InterfaceInheritance]
+  ) extends ContractWithState {
+    def fieldError: Compiler.Error =
+      new Compiler.Error(s"Interface ${ident.name} does not contain any fields")
+
+    def fields: Seq[Argument]        = throw fieldError
+    def getFieldsSignature(): String = throw fieldError
+    def getFieldTypes(): Seq[String] = throw fieldError
+
+    def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
+      throw new Compiler.Error(s"Interface ${ident.name} does not generate code")
+    }
+  }
+
   final case class MultiTxContract(contracts: Seq[ContractWithState]) {
     def get(contractIndex: Int): ContractWithState = {
       if (contractIndex >= 0 && contractIndex < contracts.size) {
@@ -789,29 +835,29 @@ object Ast {
       }
     }
 
-    private def getContract(typeId: TypeId): TxContract = {
+    private def getContract(typeId: TypeId): ContractWithState = {
       contracts.find(_.ident == typeId) match {
-        case Some(contract: TxContract) => contract
-        case Some(_: TxScript)          => throw Compiler.Error(s"Expect contract $typeId, but got script")
-        case None                       => throw Compiler.Error(s"Contract $typeId does not exist")
+        case None                              => throw Compiler.Error(s"Contract $typeId does not exist")
+        case Some(_: TxScript)                 => throw Compiler.Error(s"Expect contract $typeId, but got script")
+        case Some(contract: ContractWithState) => contract
       }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     private def buildDependencies(
-        contract: TxContract,
-        parentsCache: mutable.Map[TypeId, Seq[TxContract]],
+        contract: ContractWithState,
+        parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
         visited: mutable.Set[TypeId]
     ): Unit = {
       if (!visited.add(contract.ident)) {
         throw Compiler.Error(s"Cyclic inheritance detected for contract ${contract.ident.name}")
       }
 
-      val allParents = mutable.Map.empty[TypeId, TxContract]
+      val allParents = mutable.Map.empty[TypeId, ContractWithState]
       contract.inheritances.foreach { inheritance =>
         val parentId       = inheritance.parentId
         val parentContract = getContract(parentId)
-        MultiTxContract.checkInheritance(contract, inheritance, parentContract)
+        MultiTxContract.checkInheritanceFields(contract, inheritance, parentContract)
 
         allParents += parentId -> parentContract
         if (!parentsCache.contains(parentId)) {
@@ -824,28 +870,30 @@ object Ast {
       parentsCache += contract.ident -> allParents.values.toSeq
     }
 
-    private def buildDependencies(): mutable.Map[TypeId, Seq[TxContract]] = {
-      val parentsCache = mutable.Map.empty[TypeId, Seq[TxContract]]
+    private def buildDependencies(): mutable.Map[TypeId, Seq[ContractWithState]] = {
+      val parentsCache = mutable.Map.empty[TypeId, Seq[ContractWithState]]
       val visited      = mutable.Set.empty[TypeId]
       contracts.foreach {
-        case contract: TxContract =>
+        case _: TxScript => ()
+        case contract =>
           if (!parentsCache.contains(contract.ident)) {
             buildDependencies(contract, parentsCache, visited)
           }
-        case _ => ()
       }
       parentsCache
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def extendedContracts(): MultiTxContract = {
       val parentsCache = buildDependencies()
       val newContracts: Seq[ContractWithState] = contracts.map {
-        case contract: TxContract =>
-          val parents = parentsCache(contract.ident).sortBy(_.ident.name)
-          val funcs   = contract.funcs ++ parents.flatMap(_.funcs)
-          val events  = contract.events ++ parents.flatMap(_.events)
-          TxContract(contract.ident, contract.fields, funcs, events, contract.inheritances)
         case script: TxScript => script
+        case c: TxContract =>
+          val (funcs, events) = MultiTxContract.extractFuncsAndEvents(parentsCache, c)
+          TxContract(c.ident, c.fields, funcs, events, c.inheritances)
+        case i: ContractInterface =>
+          val (funcs, events) = MultiTxContract.extractFuncsAndEvents(parentsCache, i)
+          ContractInterface(i.ident, funcs, events, i.inheritances)
       }
       MultiTxContract(newContracts)
     }
@@ -858,6 +906,8 @@ object Ast {
       get(contractIndex) match {
         case script: TxScript => (script.genCode(state), script)
         case _: TxContract    => throw Compiler.Error(s"The code is for TxContract, not for TxScript")
+        case _: ContractInterface =>
+          throw Compiler.Error(s"The code is for Interface, not for TxScript")
       }
     }
 
@@ -869,15 +919,27 @@ object Ast {
       get(contractIndex) match {
         case contract: TxContract => (contract.genCode(state), contract)
         case _: TxScript          => throw Compiler.Error(s"The code is for TxScript, not for TxContract")
+        case _: ContractInterface =>
+          throw Compiler.Error(s"The code is for Interface, not for TxContract")
       }
     }
   }
 
   object MultiTxContract {
-    def checkInheritance(
-        contract: TxContract,
+    def checkInheritanceFields(
+        contract: ContractWithState,
+        inheritance: Inheritance,
+        parentContract: ContractWithState
+    ): Unit = {
+      inheritance match {
+        case i: ContractInheritance => _checkInheritanceFields(contract, i, parentContract)
+        case _                      => ()
+      }
+    }
+    private def _checkInheritanceFields(
+        contract: ContractWithState,
         inheritance: ContractInheritance,
-        parentContract: TxContract
+        parentContract: ContractWithState
     ): Unit = {
       val fields = inheritance.idents.map { ident =>
         contract.fields
@@ -890,6 +952,77 @@ object Ast {
         throw Compiler.Error(
           s"Invalid contract inheritance fields, expect ${parentContract.fields}, have $fields"
         )
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+    def extractFuncsAndEvents(
+        parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
+        contract: ContractWithState
+    ): (Seq[FuncDef[StatefulContext]], Seq[EventDef]) = {
+      val parents = parentsCache(contract.ident)
+      val (_allContracts, _allInterfaces) =
+        (parents :+ contract).partition(_.isInstanceOf[TxContract])
+      val allContracts = _allContracts.sortBy(_.ident.name)
+      val allInterfaces =
+        sortInterfaces(parentsCache, _allInterfaces.map(_.asInstanceOf[ContractInterface]))
+
+      val _contractFuncs = allContracts.flatMap(_.funcs)
+      val interfaceFuncs = allInterfaces.flatMap(_.funcs)
+      val isTxContract   = contract.isInstanceOf[TxContract]
+      val contractFuncs  = checkInterfaceFuncs(_contractFuncs, interfaceFuncs, isTxContract)
+
+      val contractEvents = allContracts.flatMap(_.events)
+      val events         = allInterfaces.flatMap(_.events) ++ contractEvents
+
+      val resultFuncs = if (isTxContract) {
+        contractFuncs
+      } else {
+        require(contractFuncs.isEmpty)
+        interfaceFuncs
+      }
+      (resultFuncs, events)
+    }
+
+    private def sortInterfaces(
+        parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
+        allInterfaces: Seq[ContractInterface]
+    ): Seq[ContractInterface] = {
+      allInterfaces.sortBy(interface => parentsCache(interface.ident).length)
+    }
+
+    private def checkInterfaceFuncs(
+        contractFuncs: Seq[FuncDef[StatefulContext]],
+        interfaceFuncs: Seq[FuncDef[StatefulContext]],
+        isTxContract: Boolean
+    ): Seq[FuncDef[StatefulContext]] = {
+      val contractFuncSet   = contractFuncs.view.map(f => f.id.name -> f).toMap
+      val interfaceFuncsSet = interfaceFuncs.view.map(f => f.id.name -> f).toMap
+      if (contractFuncSet.size != contractFuncs.size) {
+        val duplicates = UniqueDef.duplicates(contractFuncs)
+        throw Compiler.Error(s"These functions are defined multiple times: $duplicates")
+      } else if (interfaceFuncsSet.size != interfaceFuncs.size) {
+        val duplicates = UniqueDef.duplicates(interfaceFuncs)
+        throw Compiler.Error(s"These functions are defined multiple times: $duplicates")
+      } else if (isTxContract) {
+        val unimplemented = interfaceFuncsSet.keys.filter(!contractFuncSet.contains(_))
+        if (unimplemented.nonEmpty) {
+          throw new Compiler.Error(s"Functions are unimplemented: ${unimplemented.mkString(",")}")
+        }
+        interfaceFuncsSet.foreach { case (name, interfaceFunc) =>
+          val contractFunc = contractFuncSet(name)
+          if (contractFunc.copy(body = Seq.empty) != interfaceFunc) {
+            throw new Compiler.Error(s"Function ${name} is implemented with wrong signature")
+          }
+        }
+      }
+
+      if (isTxContract) {
+        val sortedContractFuncSet = interfaceFuncs.map(f => contractFuncSet(f.id.name)) ++
+          contractFuncs.filter(f => !interfaceFuncsSet.contains(f.id.name))
+        sortedContractFuncSet
+      } else {
+        contractFuncs
       }
     }
   }

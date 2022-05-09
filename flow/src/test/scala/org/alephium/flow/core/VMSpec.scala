@@ -34,7 +34,7 @@ import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize, Serde}
 import org.alephium.util._
 
-// scalastyle:off file.size.limit number.of.methods
+// scalastyle:off file.size.limit method.length number.of.methods
 class VMSpec extends AlephiumSpec {
   implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
 
@@ -205,7 +205,7 @@ class VMSpec extends AlephiumSpec {
       contractOutputRef
     }
 
-    def callTxScript(input: String): Unit = {
+    def callTxScript(input: String): Block = {
       val script = Compiler.compileTxScript(input).rightValue
       val block =
         if (script.entryMethod.isPayable) {
@@ -214,6 +214,7 @@ class VMSpec extends AlephiumSpec {
           simpleScript(blockFlow, chainIndex, script)
         }
       addAndCheck(blockFlow, block)
+      block
     }
 
     def callTxScriptMulti(input: Int => String): Block = {
@@ -498,6 +499,7 @@ class VMSpec extends AlephiumSpec {
          |    assert!(size!(byteVec!(false)) == 1)
          |    assert!(size!(byteVec!(@${address.toBase58})) == 33)
          |    assert!(size!(#${bytes0} ++ #${bytes1}) == 64)
+         |    assert!(zeros!(2) == #0000)
          |  }
          |}
          |""".stripMargin
@@ -658,6 +660,79 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
+  it should "migrate contract" in new DestroyFixture {
+    val fooV1 =
+      s"""
+         |TxContract Foo(x: Bool) {
+         |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
+         |    // in practice, we should check the permission for migration
+         |    if (!changeState) {
+         |      migrate!(code)
+         |    } else {
+         |      migrateWithState!(code, #010000)
+         |    }
+         |  }
+         |
+         |  pub fn checkX(expected: Bool) -> () {
+         |    assert!(x == expected)
+         |  }
+         |}
+         |""".stripMargin
+    val (fooId, _) = prepareContract(fooV1, AVector[Val](Val.True))
+    val fooV2 =
+      s"""
+         |TxContract Foo(x: Bool) {
+         |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
+         |    if (changeState) {
+         |      migrateWithState!(code, #010000)
+         |    } else {
+         |      migrate!(code)
+         |    }
+         |  }
+         |
+         |  pub fn checkX(expected: Bool) -> () {
+         |    assert!(x == expected)
+         |  }
+         |}
+         |""".stripMargin
+    val fooV2Code = Compiler.compileContract(fooV2).rightValue
+
+    def main(changeState: String, expected: String): String =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    let foo = Foo(#$fooId)
+         |    foo.foo(#${Hex.toHexString(serialize(fooV2Code))}, ${changeState})
+         |    foo.checkX(${expected})
+         |  }
+         |}
+         |
+         |$fooV1
+         |""".stripMargin
+
+    {
+      info("migrate without state change")
+      callTxScript(main("false", "true"))
+      val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val contractKey = Hash.from(Hex.from(fooId).get).get
+      val obj         = worldState.getContractObj(contractKey).rightValue
+      obj.contractId is contractKey
+      obj.code is fooV2Code.toHalfDecoded()
+      obj.initialFields is AVector[Val](Val.True)
+    }
+
+    {
+      info("migrate with state change")
+      callTxScript(main("true", "false"))
+      val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val contractKey = Hash.from(Hex.from(fooId).get).get
+      val obj         = worldState.getContractObj(contractKey).rightValue
+      obj.contractId is contractKey
+      obj.code is fooV2Code.toHalfDecoded()
+      obj.initialFields is AVector[Val](Val.False)
+    }
+  }
+
   it should "call contract destroy function from another contract" in new DestroyFixture {
     val foo =
       s"""
@@ -725,9 +800,9 @@ class VMSpec extends AlephiumSpec {
          |$foo
          |""".stripMargin
     val script = Compiler.compileTxScript(main).rightValue
-    intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage.startsWith(
-      "Left(org.alephium.io.IOError$KeyNotFound: org.alephium.util.AppException: Key ContractOutputRef("
-    ) is true
+    val errorMessage =
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+    errorMessage.startsWith("Right(TxScriptExeFailed(UncaughtKeyNotFoundError") is true
   }
 
   it should "fetch block env" in new ContractFixture {
@@ -1198,13 +1273,19 @@ class VMSpec extends AlephiumSpec {
          |}
          |
          |TxContract Parent0(mut x: U256) extends Grandparent(x) {
+         |  event Parent0(x: U256)
+         |
          |  fn p0() -> () {
+         |    emit Parent0(1)
          |    gp()
          |  }
          |}
          |
          |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+         |  event Parent1(x: U256)
+         |
          |  fn p1() -> () {
+         |    emit Parent1(2)
          |    gp()
          |  }
          |}
@@ -1238,7 +1319,9 @@ class VMSpec extends AlephiumSpec {
         block.hash,
         contractOutputRef.key,
         AVector(
+          LogState(txId, 1, AVector(Val.U256(1))),
           LogState(txId, 0, AVector(Val.U256(1))),
+          LogState(txId, 2, AVector(Val.U256(2))),
           LogState(txId, 0, AVector(Val.U256(2))),
           LogState(txId, 0, AVector(Val.U256(3)))
         )
@@ -1497,6 +1580,41 @@ class VMSpec extends AlephiumSpec {
     testEventLogState2.fields(3) is Val.Bool(true)
   }
 
+  it should "emit events for at most 8 fields" in new EventFixture {
+    def contractRaw: String =
+      s"""
+         |TxContract Foo(tmp: U256) {
+         |  event Foo(a1: U256, a2: U256, a3: U256, a4: U256, a5: U256, a6: U256, a7: U256, a8: U256)
+         |
+         |  pub fn foo() -> () {
+         |    emit Foo(1, 2, 3, 4, 5, 6, 7, 8)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    def callingScriptRaw: String =
+      s"""
+         |$contractRaw
+         |
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    Foo(#${contractId.toHexString}).foo()
+         |  }
+         |}
+         |""".stripMargin
+
+    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, contractId, 0)
+    val logStates    = logStatesOpt.value
+
+    logStates.blockHash is callingBlock.hash
+    logStates.eventKey is contractId
+    logStates.states.length is 1
+    val logState = logStates.states.head
+    logState.index is 0.toByte
+    logState.fields.map(_.asInstanceOf[Val.U256].v.toIntUnsafe) is AVector.tabulate(8)(_ + 1)
+  }
+
   it should "get all events emitted by a contract" in new EventFixtureWithContract {
     {
       info("All events emitted from the contract after the first method call")
@@ -1604,6 +1722,291 @@ class VMSpec extends AlephiumSpec {
       worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
       countOpt   <- worldState.logCounterState.getOpt(contractId)
     } yield countOpt).rightValue
+  }
+
+  it should "return contract id in contract creation" in new ContractFixture {
+    val contract: String =
+      s"""
+         |TxContract Foo(mut subContractId: ByteVec) {
+         |  event Create(subContractId: ByteVec)
+         |  pub payable fn foo() -> () {
+         |    approveAlph!(txCaller!(0), ${ALPH.nanoAlph(1000).v})
+         |    subContractId = copyCreateContract!(selfContractId!(), #010300)
+         |    emit Create(subContractId)
+         |  }
+         |}
+         |""".stripMargin
+    val contractId =
+      createContractAndCheckState(contract, 2, 2, AVector(Val.ByteVec(ByteString.empty))).key
+
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    approveAlph!(txCaller!(0), ${ALPH.alph(1).v})
+         |    Foo(#${contractId.toHexString}).foo()
+         |  }
+         |}
+         |
+         |$contract
+         |""".stripMargin
+    callTxScript(main)
+
+    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, contractId, 0)
+    val logStates    = logStatesOpt.value
+    logStates.states.length is 2 // one system event, another one emitted event
+    val subContractId = logStates.states(1).fields.head.asInstanceOf[Val.ByteVec].bytes
+
+    val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+    worldState.getContractState(contractId).rightValue.fields is AVector[Val](
+      Val.ByteVec(subContractId)
+    )
+  }
+
+  it should "not load contract just after creation" in new ContractFixture {
+    val contract: String =
+      s"""
+         |TxContract Foo(mut subContractId: ByteVec) {
+         |  pub payable fn foo() -> () {
+         |    approveAlph!(txCaller!(0), ${ALPH.nanoAlph(1000).v})
+         |    subContractId = copyCreateContract!(selfContractId!(), #010300)
+         |    let subContract = Foo(subContractId)
+         |    subContract.foo()
+         |  }
+         |}
+         |""".stripMargin
+    val contractId =
+      createContractAndCheckState(contract, 2, 2, AVector(Val.ByteVec(ByteString.empty))).key
+
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    approveAlph!(txCaller!(0), ${ALPH.alph(1).v})
+         |    Foo(#${contractId.toHexString}).foo()
+         |  }
+         |}
+         |
+         |$contract
+         |""".stripMargin
+    val script = Compiler.compileTxScript(main).rightValue
+    val errorMessage =
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+    errorMessage.contains(s"Right(TxScriptExeFailed(ContractLoadDisallowed") is true
+  }
+
+  it should "not call contract destruction from the same contract" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo(barId: ByteVec) -> () {
+         |    let bar = Bar(barId)
+         |    bar.bar(selfContractId!())
+         |  }
+         |  pub fn destroy() -> () {
+         |    destroySelf!(txCaller!(0))
+         |  }
+         |}
+         |""".stripMargin
+    val bar: String =
+      s"""
+         |TxContract Bar() {
+         |  pub fn bar(fooId: ByteVec) -> () {
+         |    let foo = Foo(fooId)
+         |    foo.destroy()
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(s"$foo\n$bar", AVector.empty).key
+    val barId = createContract(s"$bar\n$foo", AVector.empty).key
+
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    Foo(#${fooId.toHexString}).foo(#${barId.toHexString})
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    val script = Compiler.compileTxScript(main).rightValue
+    val errorMessage =
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+    errorMessage is "Right(TxScriptExeFailed(ContractDestructionShouldNotBeCalledFromSelf))"
+  }
+
+  it should "encode values" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    let bytes = encodeToByteVec!(true, 1, false)
+         |    assert!(bytes == #03000102010000)
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, AVector.empty).key
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    Foo(#${fooId.toHexString}).foo()
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    testSimpleScript(main)
+  }
+
+  it should "load contract fields" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo(x: Bool, y: [[U256; 2]; 2], z: Bool) {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val fooId =
+      createContract(
+        foo,
+        AVector(Val.True, Val.U256(1), Val.U256(2), Val.U256(3), Val.U256(4), Val.False)
+      ).key
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let foo = Foo(#${fooId.toHexString})
+         |    let (x, y, z) = foo.loadFields!()
+         |    assert!(x == true)
+         |    assert!(y[0][0] == 1)
+         |    assert!(y[0][1] == 2)
+         |    assert!(y[1][0] == 3)
+         |    assert!(y[1][1] == 4)
+         |    assert!(z == false)
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    testSimpleScript(main)
+  }
+
+  it should "not pay to unloaded contract" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val fooId      = createContract(foo, AVector.empty).key
+    val fooAddress = Address.contract(fooId).toBase58
+
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    Foo(#${fooId.toHexString}).foo()
+         |    transferAlph!(txCaller!(0), @${fooAddress}, ${ALPH.alph(1).v})
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    val script = Compiler.compileTxScript(main).rightValue
+    val errorMessage =
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+    errorMessage.contains(s"Right(TxScriptExeFailed(ContractAssetUnloaded") is true
+  }
+
+  it should "work with interface" in new ContractFixture {
+    val interface =
+      s"""
+         |Interface I {
+         |  pub fn f1() -> U256
+         |  pub fn f2() -> U256
+         |  pub fn f3() -> ByteVec
+         |}
+         |""".stripMargin
+
+    val contract =
+      s"""
+         |TxContract Foo() extends I {
+         |  pub fn f3() -> ByteVec {
+         |    return #00
+         |  }
+         |
+         |  pub fn f2() -> U256 {
+         |    return 2
+         |  }
+         |
+         |  pub fn f1() -> U256 {
+         |    return 1
+         |  }
+         |}
+         |
+         |$interface
+         |""".stripMargin
+
+    val contractId = createContract(contract, AVector.empty).key
+
+    val main =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let impl = I(#${contractId.toHexString})
+         |    assert!(impl.f1() == 1)
+         |  }
+         |}
+         |
+         |$interface
+         |""".stripMargin
+
+    callTxScript(main)
+  }
+
+  it should "inherit interface events" in new ContractFixture {
+    val foo: String =
+      s"""
+         |Interface Foo {
+         |  event Foo(x: U256)
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+    val bar: String =
+      s"""
+         |TxContract Bar() extends Foo {
+         |  event Bar(x: U256)
+         |  pub fn foo() -> () {
+         |    emit Foo(1)
+         |    emit Bar(2)
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    val barId = createContract(bar, AVector.empty).key
+
+    val main: String =
+      s"""
+         |TxScript Main {
+         |  pub fn main() -> () {
+         |    let foo = Foo(#${barId.toHexString})
+         |    foo.foo()
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(main)
+
+    val logStatesOpt = getLogStates(blockFlow, chainIndex.from, barId, 0)
+    val logStates    = logStatesOpt.value
+    logStates.states.length is 2
+    logStates.states(0).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 1
+    logStates.states(1).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 2
   }
 }
 // scalastyle:on file.size.limit no.equal regex
