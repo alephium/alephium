@@ -308,24 +308,23 @@ object StatefulParser extends Parser[StatefulContext] {
   def inheritanceFields[_: P]: P[Seq[Ast.Ident]] =
     P("(" ~ Lexer.ident.rep(0, ",") ~ ")")
   def contractInheritance[_: P]: P[Ast.ContractInheritance] =
-    P(Lexer.typeId ~ inheritanceTemplateVariable ~ inheritanceFields).map {
-      case (typeId, templateVars, fields) =>
-        Ast.ContractInheritance(typeId, templateVars, fields)
+    P(Lexer.typeId ~ inheritanceFields).map { case (typeId, fields) =>
+      Ast.ContractInheritance(typeId, fields)
     }
   def contractInheritances[_: P]: P[Seq[Ast.Inheritance]] =
     P(Lexer.keyword("extends") ~/ (contractInheritance | interfaceInheritance).rep(1, ","))
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[_: P]: P[Ast.TxContract] =
     P(
-      Lexer.keyword("TxContract") ~/ Lexer.typeId ~ templateParams.? ~ contractParams ~
+      Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~
         contractInheritances.? ~ "{" ~ event.rep ~ func.rep ~ "}"
-    ).map { case (typeId, templateVars, fields, contractInheritances, events, funcs) =>
+    ).map { case (typeId, fields, contractInheritances, events, funcs) =>
       if (funcs.length < 1) {
         throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
       } else {
         Ast.TxContract(
           typeId,
-          templateVars.getOrElse(Seq.empty),
+          Seq.empty,
           fields,
           funcs,
           events,
