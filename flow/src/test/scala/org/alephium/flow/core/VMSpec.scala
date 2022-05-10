@@ -508,6 +508,37 @@ class VMSpec extends AlephiumSpec {
     testSimpleScript(main)
   }
 
+  it should "test CopyCreateContractWithToken instruction" in new ContractFixture {
+    val fooContract =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractOutputRef = createContract(fooContract, AVector.empty)
+    val contractId        = contractOutputRef.key.toHexString
+
+    val encodedState = Hex.toHexString(serialize[AVector[Val]](AVector.empty))
+    val tokenAmount  = ALPH.oneNanoAlph
+    val script =
+      s"""
+         |TxScript Main {
+         |  pub payable fn main() -> () {
+         |    approveAlph!(@$genesisAddress, ${ALPH.alph(1).v})
+         |    copyCreateContractWithToken!(#$contractId, #$encodedState, ${tokenAmount.v})
+         |  }
+         |}
+         |""".stripMargin
+
+    val block          = callTxScript(script)
+    val transaction    = block.nonCoinbase.head
+    val contractOutput = transaction.generatedOutputs(0).asInstanceOf[ContractOutput]
+    val tokenId        = contractOutput.lockupScript.contractId
+    contractOutput.tokens is AVector((tokenId, tokenAmount))
+  }
+
   // scalastyle:off no.equal
   it should "test contract instructions" in new ContractFixture {
     def createContract(input: String): (String, String, String, String) = {

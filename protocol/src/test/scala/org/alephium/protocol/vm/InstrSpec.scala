@@ -71,7 +71,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover,
       Log6, Log7, Log8, Log9
     )
-    val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithState, LoadContractFields)
+    val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken)
     // format: on
 
     val networkConfig1 = new NetworkConfig {
@@ -1941,6 +1941,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   trait CreateContractAbstractFixture extends StatefulInstrFixture {
     val from              = lockupScriptGen.sample.get
     val (tx, prevOutputs) = transactionGenWithPreOutputs().sample.get
+    val fields            = AVector[Val](Val.True)
+    val contractBytes     = serialize(contract)
 
     def balanceState: BalanceState
 
@@ -1954,37 +1956,53 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         )
       )
     )
-  }
+    lazy val fromContractId = frame.obj.contractIdOpt.get
 
-  trait CreateContractFixture extends CreateContractAbstractFixture {
-    val fields        = AVector[Val](Val.True)
-    val contractBytes = serialize(contract)
-
-    def test(instr: CreateContractBase) = {
+    def test(
+        instr: CreateContractAbstract,
+        alphAmount: U256,
+        tokens: AVector[(TokenId, U256)],
+        tokenAmount: Option[U256]
+    ) = {
       val initialGas = context.gasRemaining
       instr.runWith(frame) isE ()
+      val extraGas = instr match {
+        case CreateContract | CreateContractWithToken =>
+          contractBytes.length + 200 // 200 from GasSchedule.callGas
+        case CopyCreateContract | CopyCreateContractWithToken =>
+          801 // 801 from contractLoadGas
+      }
       initialGas.subUnsafe(frame.ctx.gasRemaining) is GasBox.unsafe(
-        instr
-          .gas()
-          .value + fields.length + contractBytes.length + 200 //TODO where those 200 come from?
+        instr.gas().value + fields.length + extraGas
       )
-      //TODO Test the updated contract, like code, state, and assets
       frame.opStack.size is 1
-      frame.opStack.pop() isE a[Val.ByteVec] // the new contract id
+      val contractId    = Hash.from(frame.popOpStackByteVec().rightValue.bytes).get
+      val contractState = frame.ctx.worldState.getContractState(contractId).rightValue
+      contractState.fields is fields
+      val contractOutput =
+        frame.ctx.worldState.getContractAsset(contractState.contractOutputRef).rightValue
+      val allTokens = tokenAmount match {
+        case Some(amount) => tokens :+ (contractId -> amount)
+        case None         => tokens
+      }
+      contractOutput.tokens.toSet is allTokens.toSet
+      contractOutput.amount is alphAmount
+      val contractRecord = frame.ctx.worldState.getContractCode(contractState.codeHash).rightValue
+      contractRecord.code.toContract() isE contract
     }
   }
 
-  it should "CreateContract" in new CreateContractFixture {
+  it should "CreateContract" in new CreateContractAbstractFixture {
     val balanceState =
       BalanceState(Balances.empty, alphBalance(from, ALPH.oneAlph))
 
     stack.push(Val.ByteVec(contractBytes))
     stack.push(Val.ByteVec(serialize(fields)))
 
-    test(CreateContract)
+    test(CreateContract, ALPH.oneAlph, AVector.empty, None)
   }
 
-  it should "CreateContractWithToken" in new CreateContractFixture {
+  it should "CreateContractWithToken" in new CreateContractAbstractFixture {
     val balanceState =
       BalanceState(
         Balances.empty,
@@ -1995,7 +2013,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(serialize(fields)))
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
-    test(CreateContractWithToken)
+    test(
+      CreateContractWithToken,
+      U256.Zero,
+      AVector((tokenId, ALPH.oneAlph)),
+      Some(ALPH.oneNanoAlph)
+    )
   }
 
   it should "CopyCreateContract" in new CreateContractAbstractFixture {
@@ -2006,9 +2029,33 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
     CopyCreateContract.runWith(frame).leftValue isE a[NonExistContract]
 
-    stack.push(Val.ByteVec(frame.obj.contractIdOpt.get.bytes))
+    stack.push(Val.ByteVec(fromContractId.bytes))
     stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
-    CopyCreateContract.runWith(frame) isE ()
+    test(CopyCreateContract, ALPH.oneAlph, AVector.empty, None)
+  }
+
+  it should "CopyCreateContractWithToken" in new CreateContractAbstractFixture {
+    val balanceState =
+      BalanceState(
+        Balances.empty,
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+
+    val state = Val.ByteVec(serialize(AVector[Val](Val.True)))
+    stack.push(Val.ByteVec(serialize(Hash.generate)))
+    stack.push(state)
+    stack.push(Val.U256(ALPH.oneNanoAlph))
+    CopyCreateContractWithToken.runWith(frame).leftValue isE a[NonExistContract]
+
+    stack.push(Val.ByteVec(fromContractId.bytes))
+    stack.push(state)
+    stack.push(Val.U256(ALPH.oneNanoAlph))
+    test(
+      CopyCreateContractWithToken,
+      U256.Zero,
+      AVector((tokenId, ALPH.oneAlph)),
+      Some(ALPH.oneNanoAlph)
+    )
   }
 
   it should "DestroySelf" in new StatefulInstrFixture {
@@ -2147,7 +2194,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
       CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple -> 32000, MigrateWithState -> 32000, LoadContractFields -> 8
+      MigrateSimple -> 32000, MigrateWithState -> 32000, LoadContractFields -> 8, CopyCreateContractWithToken -> 24000
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -2267,7 +2314,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       TransferAlph -> 167, TransferAlphFromSelf -> 168, TransferAlphToSelf -> 169, TransferToken -> 170, TransferTokenFromSelf -> 171, TransferTokenToSelf -> 172,
       CreateContract -> 173, CreateContractWithToken -> 174, CopyCreateContract -> 175, DestroySelf -> 176, SelfContractId -> 177, SelfAddress -> 178,
       CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185,
-      MigrateSimple -> 186, MigrateWithState -> 187, LoadContractFields -> 188
+      MigrateSimple -> 186, MigrateWithState -> 187, LoadContractFields -> 188, CopyCreateContractWithToken -> 189
     )
     // format: on
 
@@ -2318,7 +2365,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
       CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple, MigrateWithState, LoadContractFields
+      MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken
     )
     // format: on
   }

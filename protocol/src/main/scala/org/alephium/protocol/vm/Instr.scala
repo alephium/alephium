@@ -141,7 +141,7 @@ object Instr {
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
     CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
     /* Below are instructions for Leman hard fork */
-    MigrateSimple, MigrateWithState, LoadContractFields
+    MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken
   )
   // format: on
 
@@ -1364,9 +1364,18 @@ object CopyCreateContract extends CopyCreateContractBase {
   }
 }
 
-object CopyCreateContractWithToken extends CopyCreateContractBase {
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    __runWith(frame, issueToken = true)
+object CopyCreateContractWithToken extends CopyCreateContractBase with LemanInstr[StatefulContext] {
+  // We need to overwrite this method because `runWith` is inherited from both `LemanInstr` and `InstrWithSimpleGas`
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstr].runWith(frame)
+
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
+
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.chargeGas(this.gas())
+      _ <- __runWith(frame, issueToken = true)
+    } yield ()
   }
 }
 
