@@ -1130,43 +1130,25 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "compile contract" in new Fixture {
-    val expectedMethodByteCode = "010000000004{x:U256}a000304d"
-    val serverUtils            = new ServerUtils()
+    val serverUtils = new ServerUtils()
+    val rawCode =
+      s"""
+         |TxContract Foo(y: U256) {
+         |  pub fn foo() -> () {
+         |    assert!(1 != y)
+         |  }
+         |}
+         |""".stripMargin
+    val code   = Compiler.compileContract(rawCode).rightValue
+    val query  = Compile.Contract(rawCode)
+    val result = serverUtils.compileContract(query).rightValue
 
-    {
-      val rawCode =
-        s"""
-           |TxContract Foo<x: U256>(y: U256) {
-           |  pub fn foo() -> () {
-           |    assert!(x != y)
-           |  }
-           |}
-           |""".stripMargin
-      val query  = Compile.Contract(rawCode)
-      val result = serverUtils.compileContract(query).rightValue
-      result.compiled is TemplateContractByteCode(1, AVector(expectedMethodByteCode))
-    }
-
-    {
-      val rawCode =
-        s"""
-           |TxContract Foo(y: U256) {
-           |  pub fn foo() -> () {
-           |    assert!(1 != y)
-           |  }
-           |}
-           |""".stripMargin
-      val code   = Compiler.compileContract(rawCode).rightValue
-      val query  = Compile.Contract(rawCode)
-      val result = serverUtils.compileContract(query).rightValue
-
-      val compiledCode = result.bytecodeUnsafe
-      compiledCode is Hex.toHexString(serialize(code))
-      compiledCode is {
-        val replaced     = expectedMethodByteCode.replace("{x:U256}", "0d") // bytecode of U256Const1
-        val methodLength = Hex.toHexString(IndexedSeq((replaced.length / 2).toByte))
-        s"0101$methodLength" + replaced
-      }
+    val compiledCode = result.bytecodeUnsafe
+    compiledCode is Hex.toHexString(serialize(code))
+    compiledCode is {
+      val bytecode     = "0100000000040da000304d"
+      val methodLength = Hex.toHexString(IndexedSeq((bytecode.length / 2).toByte))
+      s"0101$methodLength" + bytecode
     }
   }
 
@@ -1177,7 +1159,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     {
       val rawCode =
         s"""
-           |TxScript Main<x: U256, y: U256> {
+           |TxScript Main(x: U256, y: U256) {
            |  pub fn main() -> () {
            |    assert!(x != y)
            |  }

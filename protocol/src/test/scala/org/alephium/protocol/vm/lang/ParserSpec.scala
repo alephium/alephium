@@ -489,7 +489,7 @@ class ParserSpec extends AlephiumSpec {
   trait ScriptFixture {
     def script(tpe: String) =
       s"""
-         |$tpe Main<x: U256> {
+         |$tpe Main(x: U256) {
          |  pub fn main() -> () {
          |  }
          |}
