@@ -440,36 +440,47 @@ object Ast {
     def signature: String
     def name: String                          = id.name
     def getFieldTypeSignatures(): Seq[String] = fields.map(_.tpe.signature)
-    def eventCode(index: Int): EventDef.EventCode = {
-      EventDef.EventCode(EventDef.eventTypes * index + EventDef.eventType(this))
-    }
+    def eventCode(index: Int): EventDef.EventCode
   }
 
+  // TODO: maybe move the logic of code and index to `flow` module` and test
   object EventDef {
-    private val eventTypes: Int             = 4
+    // System events has negative type value
+    val eventTypes: Int                     = 4
     val contractEventType: Int              = 0
     val contractEventWithTxIdIndexType: Int = 1
 
     final case class EventCode(value: Int) extends AnyVal {
-      def eventIndex: Int = value / eventTypes
-      def eventType: Int  = value % eventTypes
+      def indexAndType: (Byte, Int) = {
+        if (value < 0) {
+          (value.toByte, value)
+        } else {
+          ((value / eventTypes).toByte, value % eventTypes)
+        }
+      }
     }
 
-    def eventType(eventDef: EventDef): Int = {
-      eventDef match {
-        case _: Event              => contractEventType
-        case _: EventWithTxIdIndex => contractEventWithTxIdIndexType
-      }
+    def eventCode(index: Int, tpe: Int): EventCode = {
+      assume(tpe >= 0)
+      EventCode(eventTypes * index + tpe)
     }
   }
 
   final case class Event(id: TypeId, fields: Seq[EventField]) extends EventDef {
     def signature: String = s"event ${id.name}(${fields.map(_.signature).mkString(",")})"
+    def eventCode(index: Int): EventDef.EventCode = {
+      assume(index >= 0)
+      EventDef.eventCode(index, EventDef.contractEventType)
+    }
   }
 
   final case class EventWithTxIdIndex(id: TypeId, fields: Seq[EventField]) extends EventDef {
     def signature: String =
       s"eventWithTxIdIndex ${id.name}(${fields.map(_.signature).mkString(",")})"
+    def eventCode(index: Int): EventDef.EventCode = {
+      assume(index >= 0)
+      EventDef.eventCode(index, EventDef.contractEventWithTxIdIndexType)
+    }
   }
 
   final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
