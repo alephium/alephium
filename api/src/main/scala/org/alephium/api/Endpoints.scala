@@ -121,9 +121,9 @@ trait Endpoints
     eventsEndpoint
       .in("contract")
 
-  private val txScriptEventsEndpoint: BaseEndpoint[Unit, Unit] =
+  private val eventsByTxIdEndpoint: BaseEndpoint[Unit, Unit] =
     eventsEndpoint
-      .in("tx-script")
+      .in("tx-id")
 
   val getNodeInfo: BaseEndpoint[Unit, NodeInfo] =
     infosEndpoint.get
@@ -435,32 +435,25 @@ trait Endpoints
       .in("check-hash-indexing")
       .summary("Check and repair the indexing of block hashes")
 
-  val getContractEvents: BaseEndpoint[(CounterRange, Address.Contract), Events] =
+  val getContractEvents: BaseEndpoint[(Address.Contract, CounterRange), Events] =
     contractEventsEndpoint.get
+      .in(path[Address.Contract]("contractAddress"))
       .in(counterQuery)
-      .in(query[Address.Contract]("contractAddress"))
       .out(jsonBody[Events])
       .summary("Get events for a contract within a counter range")
 
   val getContractEventsCurrentCount: BaseEndpoint[Address.Contract, Int] =
     contractEventsEndpoint.get
+      .in(path[Address.Contract]("contractAddress"))
       .in("current-count")
-      .in(query[Address.Contract]("contractAddress"))
       .out(jsonBody[Int])
       .summary("Get current value of the events counter for a contract")
 
-  val getTxScriptEvents: BaseEndpoint[Hash, Events] =
-    txScriptEventsEndpoint.get
-      .in(query[Hash]("txId"))
+  val getEventsByTxId: BaseEndpoint[Hash, Events] =
+    eventsByTxIdEndpoint.get
+      .in(path[Hash]("txId"))
       .out(jsonBody[Events])
       .summary("Get events for a TxScript")
-
-  val getTxScriptEventsCurrentCount: BaseEndpoint[Hash, Int] =
-    txScriptEventsEndpoint.get
-      .in("current-count")
-      .in(query[Hash]("txId"))
-      .out(jsonBody[Int])
-      .summary("Get current value of the events counter for a TxScript")
 }
 
 object Endpoints {

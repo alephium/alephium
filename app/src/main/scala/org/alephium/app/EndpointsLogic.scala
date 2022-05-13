@@ -561,7 +561,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   val getContractEventsLogic = serverLogic(getContractEvents) {
-    case (counterRange, contractAddress) =>
+    case (contractAddress, counterRange) =>
       Future.successful {
         val contractId = contractAddress.lockupScript.contractId
         serverUtils.getEventsForContract(
@@ -580,15 +580,9 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       }
   }
 
-  val getTxScriptEventsLogic = serverLogic(getTxScriptEvents) { txId =>
+  val getEventsByTxIdLogic = serverLogic(getEventsByTxId) { txId =>
     Future.successful {
-      serverUtils.getEventsForTxScript(blockFlow, txId)
-    }
-  }
-
-  val getTxScriptEventsCurrentCountLogic = serverLogic(getTxScriptEventsCurrentCount) { txId =>
-    Future.successful {
-      serverUtils.getEventsForTxScriptCurrentCount(blockFlow, txId)
+      serverUtils.getEventsForTxId(blockFlow, txId)
     }
   }
 

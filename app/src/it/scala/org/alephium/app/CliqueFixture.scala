@@ -583,19 +583,19 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def getContractEvents(start: Int, address: Address) = {
     httpGet(
-      s"/events/contract?start=$start&contractAddress=${address.toBase58}"
+      s"/events/contract/${address.toBase58}?start=$start"
     )
   }
 
   def getContractEventsCurrentCount(address: Address) = {
     httpGet(
-      s"/events/contract/current-count?contractAddress=${address.toBase58}"
+      s"/events/contract/${address.toBase58}/current-count"
     )
   }
 
-  def getScriptEvents(txId: String) = {
+  def getEventsByTxId(txId: String) = {
     httpGet(
-      s"/events/tx-script?txId=$txId"
+      s"/events/tx-id/$txId"
     )
   }
 

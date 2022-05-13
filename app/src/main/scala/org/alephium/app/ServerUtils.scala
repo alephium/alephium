@@ -384,24 +384,24 @@ class ServerUtils(implicit
     } yield count
   }
 
-  def getEventsForTxScript(
+  def getEventsForTxId(
       blockFlow: BlockFlow,
       txId: Hash
   ): Try[Events] = {
     for {
       chainIndex <- getChainIndexForTx(blockFlow, txId)
-      result     <- getScriptEvents(blockFlow, txId, chainIndex)
+      result     <- getEventsByTxId(blockFlow, txId, chainIndex)
     } yield result
   }
 
-  def getEventsForTxScriptCurrentCount(
+  def getEventsByTxIdCurrentCount(
       blockFlow: BlockFlow,
       txId: Hash
   ): Try[Int] = {
     for {
       chainIndex <- getChainIndexForTx(blockFlow, txId)
       countOpt   <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, txId))
-      count      <- countOpt.toRight(notFound(s"Current events count for TxScript in transaction $txId"))
+      count      <- countOpt.toRight(notFound(s"Current events count for tx id $txId"))
     } yield count
   }
 
@@ -487,7 +487,7 @@ class ServerUtils(implicit
     }
   }
 
-  private def getScriptEvents(
+  private def getEventsByTxId(
       blockFlow: BlockFlow,
       txId: Hash,
       chainIndex: ChainIndex
@@ -924,7 +924,7 @@ class ServerUtils(implicit
     } yield existingContractsState ++ AVector(testContractState)
   }
 
-  private def fetchContractEvents(worldState: WorldState.Staging): AVector[Event] = {
+  private def fetchContractEvents(worldState: WorldState.Staging): AVector[ContractEvent] = {
     val logStates = worldState.logState.getNewLogs()
     logStates.flatMap(Events.from)
   }
