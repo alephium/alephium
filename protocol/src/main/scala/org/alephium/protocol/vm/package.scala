@@ -33,6 +33,6 @@ package object vm {
   //scalastyle:off magic.number
   val createContractEventIndex: Val  = Val.I256(I256.from(-1))
   val destroyContractEventIndex: Val = Val.I256(I256.from(-2))
-  val scriptEventRefIndex: Byte      = -3
+  val eventRefIndex: Byte            = -3
   //scalastyle:on magic.number
 }

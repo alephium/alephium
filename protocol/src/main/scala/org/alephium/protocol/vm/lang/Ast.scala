@@ -446,9 +446,9 @@ object Ast {
   }
 
   object EventDef {
-    private val eventTypes: Int = 4
-    val contractEventType: Int  = 0
-    val scriptEventType: Int    = 1
+    private val eventTypes: Int             = 4
+    val contractEventType: Int              = 0
+    val contractEventWithTxIdIndexType: Int = 1
 
     final case class EventCode(value: Int) extends AnyVal {
       def eventIndex: Int = value / eventTypes
@@ -458,7 +458,7 @@ object Ast {
     def eventType(eventDef: EventDef): Int = {
       eventDef match {
         case _: Event              => contractEventType
-        case _: EventWithTxIdIndex => scriptEventType
+        case _: EventWithTxIdIndex => contractEventWithTxIdIndexType
       }
     }
   }

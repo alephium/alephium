@@ -1566,9 +1566,9 @@ class VMSpec extends AlephiumSpec {
 
     val logStatesId = LogStatesId(contractId, 0)
     scriptLogStates
-      .states(0) is LogState(txId, scriptEventRefIndex, LogStateRef(logStatesId, 1).toFields)
+      .states(0) is LogState(txId, eventRefIndex, LogStateRef(logStatesId, 1).toFields)
     scriptLogStates
-      .states(1) is LogState(txId, scriptEventRefIndex, LogStateRef(logStatesId, 2).toFields)
+      .states(1) is LogState(txId, eventRefIndex, LogStateRef(logStatesId, 2).toFields)
   }
 
   it should "emit events with all supported field types" in new EventFixture {

@@ -262,12 +262,10 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = {
-    val blockId = blockEnv.blockId
-    val result = contractIdOpt match {
-      case Some(contractId) =>
+    val result = (blockEnv.blockId, contractIdOpt) match {
+      case (Some(blockId), Some(contractId)) =>
         worldState.writeLogForContract(blockId, txId, contractId, fields, logConfig)
-      case None =>
-        worldState.writeLogForTxScript(blockId, txId, fields)
+      case _ => Right(())
     }
 
     result.left.map(e => Left(IOErrorWriteLog(e)))

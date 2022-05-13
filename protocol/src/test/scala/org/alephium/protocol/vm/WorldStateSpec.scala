@@ -156,7 +156,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       AVector[Val](Val.I256(I256.from(0)), Val.I256(I256.from(1))) // the first field is event code
     val logStates = logInputs.map { case (blockHash, txId, contractId) =>
       worldState.writeLogForContract(
-        Some(blockHash),
+        blockHash,
         txId,
         contractId,
         fields,
