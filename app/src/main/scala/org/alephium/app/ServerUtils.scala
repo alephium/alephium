@@ -394,17 +394,6 @@ class ServerUtils(implicit
     } yield result
   }
 
-  def getEventsByTxIdCurrentCount(
-      blockFlow: BlockFlow,
-      txId: Hash
-  ): Try[Int] = {
-    for {
-      chainIndex <- getChainIndexForTx(blockFlow, txId)
-      countOpt   <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, txId))
-      count      <- countOpt.toRight(notFound(s"Current events count for tx id $txId"))
-    } yield count
-  }
-
   def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =
     for {
       _ <- checkHashChainIndex(query.hash)
