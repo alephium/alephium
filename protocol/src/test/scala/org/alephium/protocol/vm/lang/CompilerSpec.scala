@@ -1449,12 +1449,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |
            |  event Add1(a: U256, b: U256)
            |  event Add2(a: U256, b: U256)
-           |  eventWithTxIdIndex Add3(a: U256, b: U256)
            |
            |  pub fn add(a: U256, b: U256) -> (U256) {
            |    emit Add1(a, b)
            |    emit Add2(a, b)
-           |    emit Add3(a, b)
            |    return (a + b)
            |  }
            |}

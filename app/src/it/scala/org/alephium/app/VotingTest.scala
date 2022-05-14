@@ -194,7 +194,7 @@ trait VotingFixture extends WalletFixture {
         |) {
         |
         |  event VotingStarted()
-        |  eventWithTxIdIndex VoteCasted(voter: Address, result: Bool)
+        |  event VoteCasted(voter: Address, result: Bool)
         |  event VotingClosed()
         |
         |  pub payable fn allocateTokens() -> () {

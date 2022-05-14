@@ -1504,7 +1504,7 @@ class VMSpec extends AlephiumSpec {
 
   it should "not write to the log storage when logging is disabled" in new EventFixtureWithContract {
     implicit override lazy val logConfig: LogConfig =
-      LogConfig(enabled = false, contractAddresses = None)
+      LogConfig(enabled = false, indexByTxId = false, contractAddresses = None)
 
     getLogStates(blockFlow, chainIndex.from, contractId, 0) is None
   }
@@ -1512,10 +1512,35 @@ class VMSpec extends AlephiumSpec {
   it should "not write to the log storage when logging is enabled but contract is not whitelisted" in new EventFixtureWithContract {
     implicit override lazy val logConfig: LogConfig = LogConfig(
       enabled = true,
+      indexByTxId = true,
       contractAddresses = Some(AVector(Hash.generate, Hash.generate).map(Address.contract))
     )
 
     getLogStates(blockFlow, chainIndex.from, contractId, 0) is None
+  }
+
+  it should "write to the log storage without tx id indexing" in new EventFixtureWithContract {
+    implicit override lazy val logConfig: LogConfig = LogConfig(
+      enabled = true,
+      indexByTxId = false,
+      contractAddresses = None
+    )
+
+    getLogStates(blockFlow, chainIndex.from, contractId, 0) isnot None
+    val txId = callingBlock.nonCoinbase.head.id
+    getLogStatesByTxId(blockFlow, chainIndex.from, txId) is None
+  }
+
+  it should "write to the log storage with tx id indexing" in new EventFixtureWithContract {
+    implicit override lazy val logConfig: LogConfig = LogConfig(
+      enabled = true,
+      indexByTxId = true,
+      contractAddresses = None
+    )
+
+    getLogStates(blockFlow, chainIndex.from, contractId, 0) isnot None
+    val txId = callingBlock.nonCoinbase.head.id
+    getLogStatesByTxId(blockFlow, chainIndex.from, txId) isnot None
   }
 
   it should "write script events to log storage" in new EventFixture {
@@ -1523,13 +1548,11 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxContract Add(x: U256) {
          |  event Add1(a: U256, b: U256)
-         |  eventWithTxIdIndex Add2(a: U256, b: U256)
-         |  eventWithTxIdIndex Add3(a: U256, b: U256)
+         |  event Add2(a: U256, b: U256)
          |
          |  pub fn add(a: U256, b: U256) -> U256 {
          |    emit Add1(a, b)
          |    emit Add2(a, b)
-         |    emit Add3(a, b)
          |    return a + b
          |  }
          |}
@@ -1551,22 +1574,21 @@ class VMSpec extends AlephiumSpec {
     val txId              = callingBlock.nonCoinbase.head.id
     contractLogStates.blockHash is callingBlock.hash
     contractLogStates.eventKey is contractId
-    contractLogStates.states.length is 3
+    contractLogStates.states.length is 2
     val fields = AVector[Val](Val.U256(1), Val.U256(2))
     contractLogStates.states(0) is LogState(txId, 0, fields)
     contractLogStates.states(1) is LogState(txId, 1, fields)
-    contractLogStates.states(2) is LogState(txId, 2, fields)
 
-    val scriptLogStates = getLogStates(blockFlow, chainIndex.from, txId, 0).value
-    scriptLogStates.blockHash is callingBlock.hash
-    scriptLogStates.eventKey is txId
-    scriptLogStates.states.length is 2
+    val txIdLogStates = getLogStates(blockFlow, chainIndex.from, txId, 0).value
+    txIdLogStates.blockHash is callingBlock.hash
+    txIdLogStates.eventKey is txId
+    txIdLogStates.states.length is 2
 
     val logStatesId = LogStatesId(contractId, 0)
-    scriptLogStates
-      .states(0) is LogState(txId, eventRefIndex, LogStateRef(logStatesId, 1).toFields)
-    scriptLogStates
-      .states(1) is LogState(txId, eventRefIndex, LogStateRef(logStatesId, 2).toFields)
+    txIdLogStates
+      .states(0) is LogState(txId, eventRefIndex, LogStateRef(logStatesId, 0).toFields)
+    txIdLogStates
+      .states(1) is LogState(txId, eventRefIndex, LogStateRef(logStatesId, 1).toFields)
   }
 
   it should "emit events with all supported field types" in new EventFixture {
@@ -1747,6 +1769,23 @@ class VMSpec extends AlephiumSpec {
       count: Int
   ): Option[LogStates] = {
     val logStatesId = LogStatesId(contractId, count)
+    getLogStates(blockFlow, groupIndex, logStatesId)
+  }
+
+  private def getLogStatesByTxId(
+      blockFlow: BlockFlow,
+      groupIndex: GroupIndex,
+      txId: Hash
+  ): Option[LogStates] = {
+    val logStatesId = LogStatesId(txId, 0)
+    getLogStates(blockFlow, groupIndex, logStatesId)
+  }
+
+  private def getLogStates(
+      blockFlow: BlockFlow,
+      groupIndex: GroupIndex,
+      logStatesId: LogStatesId
+  ): Option[LogStates] = {
     (for {
       worldState   <- blockFlow.getBestPersistedWorldState(groupIndex)
       logStatesOpt <- worldState.logState.getOpt(logStatesId)

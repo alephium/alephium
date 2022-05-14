@@ -193,11 +193,7 @@ object Compiler {
     }
   }
 
-  final case class EventInfo(
-      code: Ast.EventDef.EventCode,
-      typeId: Ast.TypeId,
-      fieldTypes: Seq[Type]
-  ) {
+  final case class EventInfo(typeId: Ast.TypeId, fieldTypes: Seq[Type]) {
     def checkFieldTypes(argTypes: Seq[Type]): Unit = {
       if (fieldTypes != argTypes) {
         val eventAbi = s"""${typeId.name}${fieldTypes.mkString("(", ", ", ")")}"""

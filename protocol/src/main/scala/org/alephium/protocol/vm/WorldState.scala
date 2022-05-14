@@ -21,7 +21,6 @@ import akka.util.ByteString
 import org.alephium.io._
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.lang.Ast.EventDef
 import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
 
@@ -428,34 +427,19 @@ object WorldState {
         txId: Hash,
         contractId: ContractId,
         fields: AVector[Val],
-        logConfig: LogConfig
+        indexByTxId: Boolean
     ): IOResult[Unit] = {
-      if (logConfig.logContractEnabled(Address.contract(contractId))) {
-        getIndexAndType(fields) match {
-          case Some((index, tpe)) =>
-            writeLogForContract(blockHash, txId, contractId, fields, index, tpe)
-          case _ => Right(())
-        }
-      } else {
-        Right(())
-      }
-    }
-
-    private def writeLogForContract(
-        blockHash: BlockHash,
-        txId: Hash,
-        contractId: ContractId,
-        fields: AVector[Val],
-        index: Byte,
-        tpe: Int
-    ): IOResult[Unit] = {
-      val state = LogState(txId, index, fields.tail)
-      writeLog(blockHash, contractId, state).flatMap { case (id, offset) =>
-        if (tpe == EventDef.contractEventWithTxIdIndexType) {
-          writeLogIndexByTxId(blockHash, txId, id, offset)
-        } else {
-          Right(())
-        }
+      getIndex(fields) match {
+        case Some(index) =>
+          val state = LogState(txId, index, fields.tail)
+          writeLog(blockHash, contractId, state).flatMap { case (id, offset) =>
+            if (indexByTxId) {
+              writeLogIndexByTxId(blockHash, txId, id, offset)
+            } else {
+              Right(())
+            }
+          }
+        case None => Right(())
       }
     }
 
@@ -492,16 +476,12 @@ object WorldState {
       writeLog(blockHash, txId, state).map(_ => ())
     }
 
-    private[WorldState] def getIndexAndType(
+    private[WorldState] def getIndex(
         fields: AVector[Val]
-    ): Option[(Byte, Int)] = {
+    ): Option[Byte] = {
       fields.headOption.flatMap {
-        case Val.I256(i) =>
-          i.toInt.map { value =>
-            val eventCode = EventDef.EventCode(value)
-            eventCode.indexAndType
-          }
-        case _ => None
+        case Val.I256(i) => i.toByte
+        case _           => None
       }
     }
   }

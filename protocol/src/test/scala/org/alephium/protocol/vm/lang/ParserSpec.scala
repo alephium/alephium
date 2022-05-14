@@ -340,7 +340,7 @@ class ParserSpec extends AlephiumSpec {
       info("0 field")
 
       val eventRaw = "event Event()"
-      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is Event(
+      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
         TypeId("Event"),
         Seq()
       )
@@ -350,7 +350,7 @@ class ParserSpec extends AlephiumSpec {
       info("fields of primitive types")
 
       val eventRaw = "event Transfer(from: Address, to: Address, amount: U256)"
-      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is Event(
+      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
         TypeId("Transfer"),
         Seq(
           EventField(Ident("from"), Type.Address),
@@ -364,21 +364,11 @@ class ParserSpec extends AlephiumSpec {
       info("fields of array type")
 
       val eventRaw = "event Participants(addresses: [Address; 3])"
-      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is Event(
+      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
         TypeId("Participants"),
         Seq(
           EventField(Ident("addresses"), Type.FixedSizeArray(Type.Address, 3))
         )
-      )
-    }
-
-    {
-      info("eventWithTxIdIndex")
-
-      val eventRaw = "eventWithTxIdIndex Message(sender: ByteVec)"
-      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventWithTxIdIndex(
-        TypeId("Message"),
-        Seq(EventField(Ident("sender"), Type.ByteVec))
       )
     }
   }

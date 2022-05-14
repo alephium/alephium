@@ -434,53 +434,15 @@ object Ast {
     }
   }
 
-  sealed trait EventDef extends UniqueDef {
-    def id: TypeId
-    def fields: Seq[EventField]
-    def signature: String
-    def name: String                          = id.name
-    def getFieldTypeSignatures(): Seq[String] = fields.map(_.tpe.signature)
-    def eventCode(index: Int): EventDef.EventCode
-  }
+  final case class EventDef(
+      id: TypeId,
+      fields: Seq[EventField]
+  ) extends UniqueDef {
+    def name: String = id.name
 
-  // TODO: maybe move the logic of code and index to `flow` module` and test
-  object EventDef {
-    // System events has negative type value
-    val eventTypes: Int                     = 4
-    val contractEventType: Int              = 0
-    val contractEventWithTxIdIndexType: Int = 1
-
-    final case class EventCode(value: Int) extends AnyVal {
-      def indexAndType: (Byte, Int) = {
-        if (value < 0) {
-          (value.toByte, value)
-        } else {
-          ((value / eventTypes).toByte, value % eventTypes)
-        }
-      }
-    }
-
-    def eventCode(index: Int, tpe: Int): EventCode = {
-      assume(tpe >= 0)
-      EventCode(eventTypes * index + tpe)
-    }
-  }
-
-  final case class Event(id: TypeId, fields: Seq[EventField]) extends EventDef {
     def signature: String = s"event ${id.name}(${fields.map(_.signature).mkString(",")})"
-    def eventCode(index: Int): EventDef.EventCode = {
-      assume(index >= 0)
-      EventDef.eventCode(index, EventDef.contractEventType)
-    }
-  }
 
-  final case class EventWithTxIdIndex(id: TypeId, fields: Seq[EventField]) extends EventDef {
-    def signature: String =
-      s"eventWithTxIdIndex ${id.name}(${fields.map(_.signature).mkString(",")})"
-    def eventCode(index: Int): EventDef.EventCode = {
-      assume(index >= 0)
-      EventDef.eventCode(index, EventDef.contractEventWithTxIdIndexType)
-    }
+    def getFieldTypeSignatures(): Seq[String] = fields.map(_.tpe.signature)
   }
 
   final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
@@ -496,13 +458,19 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val eventCode = Const[Ctx](Val.I256(I256.from(state.getEvent(id).code.value))).genCode(state)
-      val argsType  = args.flatMap(_.getType(state))
+      val eventIndex = {
+        val index = state.eventsInfo.map(_.typeId).indexOf(id)
+        // `check` method ensures that this event is defined
+        assume(index >= 0)
+
+        Const[Ctx](Val.I256(I256.from(index))).genCode(state)
+      }
+      val argsType = args.flatMap(_.getType(state))
       if (argsType.exists(_.isArrayType)) {
         throw Compiler.Error(s"Array type not supported for event ${id.name}")
       }
       val logOpCode = Compiler.genLogs(args.length)
-      eventCode ++ args.flatMap(_.genCode(state)) :+ logOpCode
+      eventIndex ++ args.flatMap(_.genCode(state)) :+ logOpCode
     }
   }
 
@@ -787,9 +755,9 @@ object Ast {
         val duplicates = UniqueDef.duplicates(events)
         throw Compiler.Error(s"These events are defined multiple times: $duplicates")
       }
-      events.view.zipWithIndex.map { case (eventDef, index) =>
-        Compiler.EventInfo(eventDef.eventCode(index), eventDef.id, eventDef.fields.map(_.tpe))
-      }.toSeq
+      events.map { event =>
+        Compiler.EventInfo(event.id, event.fields.map(_.tpe))
+      }
     }
   }
 

@@ -162,7 +162,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         txId,
         contractId,
         fields,
-        LogConfig(enabled = true, contractAddresses = None)
+        false
       )
 
       LogStates(blockHash, contractId, AVector(LogState(txId, 0, fields.tail)))

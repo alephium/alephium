@@ -84,6 +84,7 @@ object TxEnv {
 
 final case class LogConfig(
     enabled: Boolean,
+    indexByTxId: Boolean,
     contractAddresses: Option[AVector[Address.Contract]]
 ) {
   def logContractEnabled(contractAddress: Address.Contract): Boolean = {
@@ -95,7 +96,11 @@ final case class LogConfig(
 
 object LogConfig {
   def disabled(): LogConfig = {
-    LogConfig(enabled = false, contractAddresses = None)
+    LogConfig(enabled = false, indexByTxId = false, contractAddresses = None)
+  }
+
+  def allEnabled(): LogConfig = {
+    LogConfig(enabled = true, indexByTxId = true, contractAddresses = None)
   }
 }
 
@@ -263,8 +268,9 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = {
     val result = (blockEnv.blockId, contractIdOpt) match {
-      case (Some(blockId), Some(contractId)) =>
-        worldState.writeLogForContract(blockId, txId, contractId, fields, logConfig)
+      case (Some(blockId), Some(contractId))
+          if logConfig.logContractEnabled(Address.contract(contractId)) =>
+        worldState.writeLogForContract(blockId, txId, contractId, fields, logConfig.indexByTxId)
       case _ => Right(())
     }
 
