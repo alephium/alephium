@@ -25,7 +25,7 @@ import org.alephium.protocol.model.ReleaseVersion
 
 trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
 
-  def walletEndpoints: List[Endpoint[_, _, _, _]]
+  def walletEndpoints: List[Endpoint[_, _, _, _, _]]
   def port: Int
 
   private lazy val blockflowEndpoints = List(

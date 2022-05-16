@@ -24,7 +24,7 @@ import org.alephium.wallet.api.WalletEndpoints
 
 trait WalletDocumentation extends WalletEndpoints with OpenAPIDocsInterpreter {
 
-  val walletEndpoints: List[Endpoint[_, _, _, _]] = List(
+  val walletEndpoints: List[Endpoint[_, _, _, _, _]] = List(
     createWallet,
     restoreWallet,
     listWallets,

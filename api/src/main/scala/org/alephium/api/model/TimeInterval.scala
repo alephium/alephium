@@ -17,7 +17,7 @@
 package org.alephium.api.model
 
 import sttp.model.StatusCode
-import sttp.tapir.{ValidationError, Validator}
+import sttp.tapir.{ValidationResult, Validator}
 
 import org.alephium.api.ApiError
 import org.alephium.util.{Duration, TimeStamp}
@@ -39,9 +39,9 @@ final case class TimeInterval(from: TimeStamp, toOpt: Option[TimeStamp]) {
 object TimeInterval {
   val validator: Validator[TimeInterval] = Validator.custom { timeInterval =>
     if (timeInterval.from >= timeInterval.to) {
-      List(ValidationError.Custom(timeInterval, s"`fromTs` must be before `toTs`"))
+      ValidationResult.Invalid(Some(s"`fromTs` must be before `toTs`"))
     } else {
-      List.empty
+      ValidationResult.Valid
     }
   }
 

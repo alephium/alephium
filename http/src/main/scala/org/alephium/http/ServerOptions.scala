@@ -22,7 +22,9 @@ import org.alephium.api.DecodeFailureHandler
 
 object ServerOptions extends DecodeFailureHandler {
   val serverOptions: VertxFutureServerOptions =
-    VertxFutureServerOptions.customInterceptors(
-      decodeFailureHandler = myDecodeFailureHandler
-    )
+    VertxFutureServerOptions.customiseInterceptors
+      .decodeFailureHandler(
+        myDecodeFailureHandler
+      )
+      .options
 }

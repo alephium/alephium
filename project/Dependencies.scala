@@ -18,8 +18,8 @@ import sbt._
 
 object Version {
   lazy val akka       = "2.6.18"
-  lazy val tapir      = "0.18.3"
-  lazy val sttp       = "3.3.18"
+  lazy val tapir      = "1.0.0-M9"
+  lazy val sttp       = "3.5.2"
   lazy val prometheus = "0.10.0"
 }
 
@@ -47,12 +47,13 @@ object Dependencies {
   def `scala-reflect`(scalaVersion: String) = "org.scala-lang" % "scala-reflect" % scalaVersion
 
   lazy val `tapir-core`    = "com.softwaremill.sttp.tapir" %% "tapir-core"         % Version.tapir
+  lazy val `tapir-server`  = "com.softwaremill.sttp.tapir" %% "tapir-server"       % Version.tapir
   lazy val `tapir-vertx`   = "com.softwaremill.sttp.tapir" %% "tapir-vertx-server" % Version.tapir
   lazy val `tapir-openapi` = "com.softwaremill.sttp.tapir" %% "tapir-openapi-docs" % Version.tapir
   lazy val `tapir-openapi-model` =
     "com.softwaremill.sttp.tapir" %% "tapir-openapi-model" % Version.tapir
   lazy val `tapir-swagger-ui` =
-    "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui-vertx" % Version.tapir
+    "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui" % Version.tapir
   lazy val `tapir-client` = "com.softwaremill.sttp.tapir" %% "tapir-sttp-client" % Version.tapir
   lazy val `sttp-backend` =
     "com.softwaremill.sttp.client3" %% "async-http-client-backend-future" % Version.sttp

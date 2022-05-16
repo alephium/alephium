@@ -20,6 +20,7 @@ import sttp.model.{Header, StatusCode}
 import sttp.tapir._
 import sttp.tapir.server.interceptor._
 import sttp.tapir.server.interceptor.decodefailure.DefaultDecodeFailureHandler._
+import sttp.tapir.server.model.ValuedEndpointOutput
 
 import org.alephium.api.{alphJsonBody, ApiError}
 
@@ -45,20 +46,25 @@ trait DecodeFailureHandler {
     FailureMessages.combineSourceAndDetail(base, detail)
   }
 
-  val myDecodeFailureHandler = handler.copy(
-    response = failureResponse,
-    respond = respond(
-      _,
-      badRequestOnPathErrorIfPathShapeMatches = true,
-      badRequestOnPathInvalidIfPathShapeMatches = true
-    ),
-    failureMessage = failureMessage
-  )
+  val myDecodeFailureHandler =
+    default.copy(
+      response = failureResponse,
+      respond = respond(
+        _,
+        badRequestOnPathErrorIfPathShapeMatches = true,
+        badRequestOnPathInvalidIfPathShapeMatches = true
+      ),
+      failureMessage = failureMessage
+    )
 
   private def invalidValueMessage[T](ve: ValidationError[T], valueName: String): String =
-    ve match {
-      case c: ValidationError.Custom[T] => c.message
-      case _                            => ValidationMessages.invalidValueMessage(ve, valueName)
+    ve.validator match {
+      case Validator.Custom(_, _) =>
+        ve.customMessage match {
+          case Some(message) => message
+          case None          => ValidationMessages.invalidValueMessage(ve, valueName)
+        }
+      case _ => ValidationMessages.invalidValueMessage(ve, valueName)
     }
 
   private def validationErrorMessage(ve: ValidationError[_]): String =

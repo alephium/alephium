@@ -272,7 +272,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow))
   }
 
-  type BaseServerEndpoint[A, B] = ServerEndpoint[A, ApiError[_ <: StatusCode], B, Any, Future]
+  type BaseServerEndpoint[A, B] = ServerEndpoint[Any, Future]
 
   private def serverLogicRedirect[P, A](
       endpoint: BaseEndpoint[P, A]
