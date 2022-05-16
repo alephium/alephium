@@ -21,7 +21,6 @@ import akka.util.ByteString
 import org.alephium.io._
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.lang.Ast.EventDef
 import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
 
@@ -424,40 +423,23 @@ object WorldState {
     ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = ???
 
     def writeLogForContract(
-        blockHashOpt: Option[BlockHash],
+        blockHash: BlockHash,
         txId: Hash,
         contractId: ContractId,
         fields: AVector[Val],
-        logConfig: LogConfig
+        indexByTxId: Boolean
     ): IOResult[Unit] = {
-      (blockHashOpt, getIndexAndType(fields)) match {
-        case (Some(blockHash), Some((index, tpe))) =>
-          if (logConfig.logContractEnabled(Address.contract(contractId))) {
-            val state = LogState(txId, index, fields.tail)
-            writeLog(blockHash, contractId, state).flatMap { case (id, offset) =>
-              if (tpe == EventDef.scriptEventType) {
-                writeScriptLog(blockHash, txId, id, offset)
-              } else {
-                Right(())
-              }
-            }
-          } else {
-            Right(())
-          }
-        case _ => Right(())
-      }
-    }
-
-    def writeLogForTxScript(
-        blockHashOpt: Option[BlockHash],
-        txId: Hash,
-        fields: AVector[Val]
-    ): IOResult[Unit] = {
-      (blockHashOpt, getIndexAndType(fields)) match {
-        case (Some(blockHash), Some((index, _))) =>
+      getIndex(fields) match {
+        case Some(index) =>
           val state = LogState(txId, index, fields.tail)
-          writeLog(blockHash, txId, state).map(_ => ())
-        case _ => Right(())
+          writeLog(blockHash, contractId, state).flatMap { case (id, offset) =>
+            if (indexByTxId) {
+              writeLogIndexByTxId(blockHash, txId, id, offset)
+            } else {
+              Right(())
+            }
+          }
+        case None => Right(())
       }
     }
 
@@ -476,36 +458,30 @@ object WorldState {
           case None =>
             logState.put(id, LogStates(blockHash, eventKey, AVector(state)))
         }
-        _ <- logCounterState.put(eventKey, initialCount + 1)
+        _ <- logCounterState.put(
+          eventKey,
+          initialCount + 1
+        ) // TODO: optimize this since initialCount is the same for the same block
       } yield (id, logStatesOpt.map(_.states.length).getOrElse(0))
     }
 
-    private[WorldState] def writeScriptLog(
+    private[WorldState] def writeLogIndexByTxId(
         blockHash: BlockHash,
         txId: Hash,
         id: LogStatesId,
         offset: Int
     ): IOResult[Unit] = {
       val logRef = LogStateRef(id, offset)
-      val state  = LogState(txId, scriptEventRefIndex, logRef.toFields)
+      val state  = LogState(txId, eventRefIndex, logRef.toFields)
       writeLog(blockHash, txId, state).map(_ => ())
     }
 
-    private[WorldState] def getIndexAndType(
+    private[WorldState] def getIndex(
         fields: AVector[Val]
-    ): Option[(Byte, Int)] = {
+    ): Option[Byte] = {
       fields.headOption.flatMap {
-        case Val.I256(i) =>
-          i.toInt.map { value =>
-            if (value < 0) {
-              // system event
-              (value.toByte, EventDef.scriptEventType)
-            } else {
-              val eventCode = EventDef.EventCode(value)
-              (eventCode.eventIndex.toByte, eventCode.eventType)
-            }
-          }
-        case _ => None
+        case Val.I256(i) => i.toByte
+        case _           => None
       }
     }
   }

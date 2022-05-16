@@ -16,9 +16,11 @@
 
 package org.alephium.protocol.vm
 
+import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.io.{IOResult, RocksDBSource, StorageFixture}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, I256, U256}
 
@@ -156,11 +158,11 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       AVector[Val](Val.I256(I256.from(0)), Val.I256(I256.from(1))) // the first field is event code
     val logStates = logInputs.map { case (blockHash, txId, contractId) =>
       worldState.writeLogForContract(
-        Some(blockHash),
+        blockHash,
         txId,
         contractId,
         fields,
-        LogConfig(enabled = true, contractAddresses = None)
+        false
       )
 
       LogStates(blockHash, contractId, AVector(LogState(txId, 0, fields.tail)))
@@ -168,6 +170,11 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
     val newLogs = worldState.logState.getNewLogs()
     newLogs is AVector.from(logStates)
+  }
+
+  it should "test the event key of contract creation and destruction" in {
+    createContractEventId.bytes is Hash.zero.bytes.init ++ ByteString(-1)
+    destroyContractEventId.bytes is Hash.zero.bytes.init ++ ByteString(-2)
   }
 
   trait StagingFixture {

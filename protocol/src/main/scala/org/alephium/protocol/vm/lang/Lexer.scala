@@ -166,7 +166,6 @@ object Lexer {
     "pub",
     "payable",
     "event",
-    "eventWithTxIdIndex",
     "emit",
     "loop",
     "extends"

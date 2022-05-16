@@ -16,6 +16,9 @@
 
 package org.alephium.protocol
 
+import akka.util.ByteString
+
+import org.alephium.protocol.model.ContractId
 import org.alephium.util.I256
 
 package object vm {
@@ -30,9 +33,19 @@ package object vm {
   val contractPoolMaxSize: Int  = 16 // upto 16 contracts can be loaded in one tx
   val contractFieldMaxSize: Int = 512
 
+  private def specialContractId(n: Byte): ContractId = {
+    ContractId.unsafe(
+      ByteString.fromArray(
+        Array.tabulate(ContractId.length)(index => if (index == ContractId.length - 1) n else 0)
+      )
+    )
+  }
+
   //scalastyle:off magic.number
-  val createContractEventIndex: Val  = Val.I256(I256.from(-1))
-  val destroyContractEventIndex: Val = Val.I256(I256.from(-2))
-  val scriptEventRefIndex: Byte      = -3
+  val createContractEventId: ContractId  = specialContractId(-1)
+  val createContractEventIndex: Val      = Val.I256(I256.from(-1))
+  val destroyContractEventId: ContractId = specialContractId(-2)
+  val destroyContractEventIndex: Val     = Val.I256(I256.from(-2))
+  val eventRefIndex: Byte                = -3
   //scalastyle:on magic.number
 }
