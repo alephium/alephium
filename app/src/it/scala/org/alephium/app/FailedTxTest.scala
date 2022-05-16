@@ -37,7 +37,7 @@ class FailedTxTest extends AlephiumActorSpec {
     def test() = {
       val (unsignedTx, txId) = {
         val code   = "TxScript Main { pub fn main() -> () {} }"
-        val result = buildScriptWithPort(code, restPort)
+        val result = runScriptWithPort(code, restPort)
         (result.unsignedTx, result.txId)
       }
       val txQuery0 = submitTxQuery(unsignedTx, txId)

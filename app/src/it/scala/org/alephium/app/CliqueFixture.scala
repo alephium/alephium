@@ -657,7 +657,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost("/contracts/unsigned-tx/deploy-contract", Some(query))
   }
 
-  def buildScript(
+  def runScript(
       fromPublicKey: String,
       code: String,
       alphAmount: Option[Amount] = None,
@@ -674,7 +674,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
            ${alphAmount.map(a => s""","alphAmount": "${a.value.v}"""").getOrElse("")}
          }
          """
-    httpPost("/contracts/unsigned-tx/build-script", Some(query))
+    httpPost("/contracts/unsigned-tx/run-script", Some(query))
   }
 
   def submitTxQuery(unsignedTx: String, txId: Hash) = {
@@ -696,7 +696,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     txResult.txId
   }
 
-  def buildScriptWithPort(
+  def runScriptWithPort(
       code: String,
       restPort: Int,
       alphAmount: Option[Amount] = None,
@@ -705,7 +705,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   ): BuildScriptTxResult = {
     val compileResult = request[CompileScriptResult](compileScript(code), restPort)
     request[BuildScriptTxResult](
-      buildScript(
+      runScript(
         fromPublicKey = publicKey,
         code = compileResult.bytecodeTemplate,
         alphAmount,
@@ -723,7 +723,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None
   ): BuildScriptTxResult = {
-    val buildResult = buildScriptWithPort(code, restPort, alphAmount, gas, gasPrice)
+    val buildResult = runScriptWithPort(code, restPort, alphAmount, gas, gasPrice)
     submitTxWithPort(buildResult.unsignedTx, buildResult.txId, restPort)
     buildResult
   }

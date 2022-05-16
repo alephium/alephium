@@ -501,8 +501,8 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.compileScript(query))
   }
 
-  val buildScriptLogic = serverLogic(buildScript) { query =>
-    Future.successful(serverUtils.buildScript(blockFlow, query))
+  val runScriptLogic = serverLogic(runScript) { query =>
+    Future.successful(serverUtils.runScript(blockFlow, query))
   }
 
   val compileContractLogic = serverLogic(compileContract) { query =>

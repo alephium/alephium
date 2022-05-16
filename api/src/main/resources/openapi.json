@@ -5531,13 +5531,13 @@
         }
       }
     },
-    "/contracts/unsigned-tx/build-script": {
+    "/contracts/unsigned-tx/run-script": {
       "post": {
         "tags": [
           "Contracts"
         ],
         "summary": "Build an unsigned script",
-        "operationId": "postContractsUnsigned-txBuild-script",
+        "operationId": "postContractsUnsigned-txRun-script",
         "requestBody": {
           "content": {
             "application/json": {

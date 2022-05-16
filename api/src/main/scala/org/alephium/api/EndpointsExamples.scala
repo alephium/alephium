@@ -539,7 +539,7 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildScriptExamples: List[Example[BuildScriptTx]] = List(
+  implicit val runScriptExamples: List[Example[BuildScriptTx]] = List(
     defaultExample(BuildScriptTx(publicKey, bytecode = byteString)),
     moreSettingsExample(
       BuildScriptTx(
@@ -565,7 +565,7 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildScriptResultExamples: List[Example[BuildScriptTxResult]] =
+  implicit val runScriptResultExamples: List[Example[BuildScriptTxResult]] =
     simpleExample(
       BuildScriptTxResult(
         unsignedTx = hexString,

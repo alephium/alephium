@@ -683,7 +683,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode BuildScriptTx" in {
     val publicKey = PublicKey.generate
-    val buildScript = BuildScriptTx(
+    val runScript = BuildScriptTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
       gasAmount = Some(GasBox.unsafe(1)),
@@ -698,12 +698,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "gasPrice": "1"
          |}
          |""".stripMargin
-    checkData(buildScript, jsonRaw)
+    checkData(runScript, jsonRaw)
   }
 
   it should "encode/decode BuildScriptTxResult" in {
     val txId = Hash.generate
-    val buildScriptResult = BuildScriptTxResult(
+    val runScriptResult = BuildScriptTxResult(
       unsignedTx = "0000",
       gasAmount = GasBox.unsafe(1),
       gasPrice = GasPrice(1),
@@ -720,7 +720,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "group": 1
          |}
          |""".stripMargin
-    checkData(buildScriptResult, jsonRaw)
+    checkData(runScriptResult, jsonRaw)
   }
 
   it should "encode/decode VerifySignature" in {

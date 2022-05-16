@@ -99,7 +99,7 @@ class RestServer(
       minerListAddressesLogic,
       minerUpdateAddressesLogic,
       compileScriptLogic,
-      buildScriptLogic,
+      runScriptLogic,
       compileContractLogic,
       deployContractLogic,
       contractStateLogic,

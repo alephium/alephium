@@ -787,7 +787,7 @@ class ServerUtils(implicit
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
-  def buildScript(blockFlow: BlockFlow, query: BuildScriptTx): Try[BuildScriptTxResult] = {
+  def runScript(blockFlow: BlockFlow, query: BuildScriptTx): Try[BuildScriptTxResult] = {
     val alphAmount = query.alphAmount.map(_.value).getOrElse(U256.Zero)
     val tokens     = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
     for {

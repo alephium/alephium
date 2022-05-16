@@ -85,13 +85,13 @@ class SmartContractTest extends AlephiumActorSpec {
       scriptWithPort(code, restPort, alphAmount, gas, gasPrice)
     }
 
-    def buildScript(
+    def runScript(
         code: String,
         alphAmount: Option[Amount],
         gas: Option[Int],
         gasPrice: Option[GasPrice]
     ): BuildScriptTxResult = {
-      buildScriptWithPort(code, restPort, alphAmount, gas, gasPrice)
+      runScriptWithPort(code, restPort, alphAmount, gas, gasPrice)
     }
 
     def estimateBuildContractGas(
@@ -244,7 +244,7 @@ class SmartContractTest extends AlephiumActorSpec {
     val tokenWithdrawScript = {
       SwapContracts.tokenWithdrawTxScript(address, tokenContractKey, U256.unsafe(1024))
     }
-    val tokenWithdrawTxScriptResult = buildScript(tokenWithdrawScript, None, None, None)
+    val tokenWithdrawTxScriptResult = runScript(tokenWithdrawScript, None, None, None)
 
     val rawUnsignedTx = Hex.from(tokenWithdrawTxScriptResult.unsignedTx).value
     val unsignedTx    = deserialize[UnsignedTransaction](rawUnsignedTx).rightValue
