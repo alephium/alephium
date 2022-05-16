@@ -5807,13 +5807,13 @@
         }
       }
     },
-    "/contracts/unsigned-tx/build-contract": {
+    "/contracts/unsigned-tx/deploy-contract": {
       "post": {
         "tags": [
           "Contracts"
         ],
         "summary": "Build an unsigned contract",
-        "operationId": "postContractsUnsigned-txBuild-contract",
+        "operationId": "postContractsUnsigned-txDeploy-contract",
         "requestBody": {
           "content": {
             "application/json": {

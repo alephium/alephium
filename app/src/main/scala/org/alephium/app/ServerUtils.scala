@@ -742,14 +742,14 @@ class ServerUtils(implicit
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def buildContract(
+  def deployContract(
       blockFlow: BlockFlow,
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
     for {
       code <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
-      script <- buildContractWithParsedState(
+      script <- deployContractWithParsedState(
         code.contract,
         address,
         code.initialFields,
@@ -1047,7 +1047,7 @@ object ServerUtils {
     } yield unsignedTx
   }
 
-  def buildContract(
+  def deployContract(
       codeRaw: String,
       address: Address,
       initialState: Option[String],
@@ -1055,18 +1055,18 @@ object ServerUtils {
       newTokenAmount: Option[U256]
   )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
     parseState(initialState).flatMap { state =>
-      buildContractWithParsedState(codeRaw, address, state, alphAmount, newTokenAmount)
+      deployContractWithParsedState(codeRaw, address, state, alphAmount, newTokenAmount)
     }
   }
 
-  def buildContractWithParsedState(
+  def deployContractWithParsedState(
       contract: StatefulContract,
       address: Address,
       initialFields: AVector[vm.Val],
       alphAmount: U256,
       newTokenAmount: Option[U256]
   )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
-    buildContractWithParsedState(
+    deployContractWithParsedState(
       Hex.toHexString(serialize(contract)),
       address,
       initialFields,
@@ -1075,7 +1075,7 @@ object ServerUtils {
     )
   }
 
-  def buildContractWithParsedState(
+  def deployContractWithParsedState(
       codeRaw: String,
       address: Address,
       initialFields: AVector[vm.Val],

@@ -58,7 +58,7 @@ class SmartContractTest extends AlephiumActorSpec {
     ): BuildDeployContractTxResult = {
       val compileResult = request[CompileContractResult](compileContract(code), restPort)
       val buildResult = request[BuildDeployContractTxResult](
-        buildContract(
+        deployContract(
           fromPublicKey = publicKey,
           code = compileResult.bytecode,
           gas,
@@ -104,7 +104,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
       val compileResult = request[CompileContractResult](compileContract(code), restPort)
       val script = ServerUtils
-        .buildContract(
+        .deployContract(
           compileResult.bytecode,
           Address.fromBase58(address).value,
           state,
@@ -185,7 +185,7 @@ class SmartContractTest extends AlephiumActorSpec {
       )
     )
     unitRequest(
-      buildContract(
+      deployContract(
         publicKey,
         compileResult.bytecode,
         initialFields = validFields
@@ -195,7 +195,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
     val invalidFields = Some(AVector[vm.Val](vm.Val.True))
     requestFailed(
-      buildContract(
+      deployContract(
         publicKey,
         compileResult.bytecode,
         initialFields = invalidFields

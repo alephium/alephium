@@ -634,7 +634,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     fields.map(write[Val](_)).mkString("[", ",", "]")
   }
 
-  def buildContract(
+  def deployContract(
       fromPublicKey: String,
       code: String,
       gas: Option[Int] = Some(100000),
@@ -654,7 +654,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
          |}
          |""".stripMargin
     }
-    httpPost("/contracts/unsigned-tx/build-contract", Some(query))
+    httpPost("/contracts/unsigned-tx/deploy-contract", Some(query))
   }
 
   def buildScript(

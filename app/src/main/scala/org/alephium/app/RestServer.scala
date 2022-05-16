@@ -101,7 +101,7 @@ class RestServer(
       compileScriptLogic,
       buildScriptLogic,
       compileContractLogic,
-      buildContractLogic,
+      deployContractLogic,
       contractStateLogic,
       testContractLogic,
       exportBlocksLogic,
