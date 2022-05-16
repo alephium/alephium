@@ -18,17 +18,41 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.api.{badRequest, Try}
+import org.alephium.protocol.{vm, PublicKey}
+import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
+import org.alephium.serde._
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildDeployContractTx(
     fromPublicKey: PublicKey,
     bytecode: ByteString,
-    initialFields: AVector[Val] = AVector.empty,
     alphAmount: Option[Amount] = None,
     issueTokenAmount: Option[Amount] = None,
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None
 ) extends BuildTxCommon
+
+object BuildDeployContractTx {
+  final case class Code(contract: StatefulContract, initialFields: AVector[vm.Val])
+  object Code {
+    implicit val serde: Serde[Code] = {
+      val _serde: Serde[Code] = Serde.forProduct2(Code.apply, t => (t.contract, t.initialFields))
+
+      _serde.validate(code =>
+        if (code.contract.validate(code.initialFields)) {
+          Right(())
+        } else {
+          Left(
+            s"Invalid field length, expect ${code.contract.fieldLength}, have ${code.initialFields.length}"
+          )
+        }
+      )
+    }
+  }
+
+  def decode(bytecode: ByteString): Try[Code] = {
+    deserialize[Code](bytecode).left.map(serdeError => badRequest(serdeError.getMessage))
+  }
+}

@@ -50,8 +50,10 @@ import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, Block, ChainIndex}
+import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{GasPrice, LockupScript}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
+import org.alephium.serde._
 import org.alephium.util._
 import org.alephium.wallet
 import org.alephium.wallet.api.model._
@@ -637,17 +639,17 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       code: String,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None,
-      initialFields: Option[AVector[Val]] = None,
+      initialFields: Option[AVector[vm.Val]] = None,
       issueTokenAmount: Option[U256] = None
   ) = {
+    val bytecode = code + Hex.toHexString(serialize(initialFields.getOrElse(AVector.empty)))
     val query = {
       s"""
          |{
          |  "fromPublicKey": "$fromPublicKey",
-         |  "bytecode": "$code"
+         |  "bytecode": "$bytecode"
          |  ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
          |  ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
-         |  ${initialFields.map(fs => s""","initialFields": ${convertFields(fs)}""").getOrElse("")}
          |  ${issueTokenAmount.map(v => s""","issueTokenAmount": "${v.v}"""").getOrElse("")}
          |}
          |""".stripMargin

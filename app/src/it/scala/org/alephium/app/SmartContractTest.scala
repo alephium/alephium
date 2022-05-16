@@ -51,7 +51,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
     def contract(
         code: String,
-        initialFields: Option[AVector[Val]],
+        initialFields: Option[AVector[vm.Val]],
         issueTokenAmount: Option[U256],
         gas: Option[Int] = Some(100000),
         gasPrice: Option[GasPrice] = None
@@ -174,12 +174,14 @@ class SmartContractTest extends AlephiumActorSpec {
 
     val compileResult = request[CompileContractResult](compileContract(contract), restPort)
     val validFields = Some(
-      AVector[Val](
-        Val.True,
-        ValI256(I256.unsafe(1000)),
-        ValU256(U256.unsafe(1000)),
-        ValByteVec(ByteString(0, 0)),
-        ValAddress(Address.fromBase58("25HAxb2jhQeLUFcTL8XWpz9m1odVcD2LgscQtuGhRBerR").get)
+      AVector[vm.Val](
+        vm.Val.True,
+        vm.Val.I256(I256.unsafe(1000)),
+        vm.Val.U256(U256.unsafe(1000)),
+        vm.Val.ByteVec(ByteString(0, 0)),
+        vm.Val.Address(
+          Address.fromBase58("25HAxb2jhQeLUFcTL8XWpz9m1odVcD2LgscQtuGhRBerR").get.lockupScript
+        )
       )
     )
     unitRequest(
@@ -191,7 +193,7 @@ class SmartContractTest extends AlephiumActorSpec {
       restPort
     )
 
-    val invalidFields = Some(AVector[Val](Val.True))
+    val invalidFields = Some(AVector[vm.Val](vm.Val.True))
     requestFailed(
       buildContract(
         publicKey,
@@ -210,7 +212,7 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = None,
-        initialFields = Some(AVector[Val](ValU256(U256.unsafe(0)))),
+        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.unsafe(0)))),
         issueTokenAmount = Some(1024)
       )
 
@@ -234,7 +236,7 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = Some(100000),
-        initialFields = Some(AVector[Val](ValU256(U256.unsafe(0)))),
+        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.unsafe(0)))),
         issueTokenAmount = Some(1024)
       )
     val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
@@ -266,7 +268,7 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = Some(100000),
-        initialFields = Some(AVector[Val](ValU256(U256.unsafe(0)))),
+        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.unsafe(0)))),
         issueTokenAmount = Some(1024)
       )
     val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
@@ -278,7 +280,11 @@ class SmartContractTest extends AlephiumActorSpec {
     val swapContractBuildResult = contract(
       SwapContracts.swapContract,
       Some(
-        AVector[Val](ValByteVec(tokenContractKey.bytes), ValU256(U256.Zero), ValU256(U256.Zero))
+        AVector[vm.Val](
+          vm.Val.ByteVec(tokenContractKey.bytes),
+          vm.Val.U256(U256.Zero),
+          vm.Val.U256(U256.Zero)
+        )
       ),
       issueTokenAmount = Some(10000)
     )
@@ -357,7 +363,7 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = Some(100000),
-        initialFields = Some(AVector[Val](ValU256(U256.Zero))),
+        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.Zero))),
         issueTokenAmount = Some(1024)
       )
     val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
@@ -413,7 +419,11 @@ class SmartContractTest extends AlephiumActorSpec {
     val swapContractBuildResult = contract(
       SwapContracts.swapContract,
       Some(
-        AVector[Val](ValByteVec(tokenContractKey.bytes), ValU256(U256.Zero), ValU256(U256.Zero))
+        AVector[vm.Val](
+          vm.Val.ByteVec(tokenContractKey.bytes),
+          vm.Val.U256(U256.Zero),
+          vm.Val.U256(U256.Zero)
+        )
       ),
       issueTokenAmount = Some(10000)
     )

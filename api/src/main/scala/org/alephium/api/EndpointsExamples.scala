@@ -531,7 +531,6 @@ trait EndpointsExamples extends ErrorExamples {
       BuildDeployContractTx(
         publicKey,
         byteString,
-        AVector(Val.True, ValU256(U256.unsafe(123))),
         Some(bigAmount),
         Some(bigAmount),
         Some(model.minimalGas),

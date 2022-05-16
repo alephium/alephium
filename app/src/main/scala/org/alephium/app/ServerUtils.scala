@@ -741,33 +741,18 @@ class ServerUtils(implicit
     } yield validatedUnsignedTx
   }
 
-  private def validateStateLength(
-      contract: StatefulContract,
-      state: AVector[vm.Val]
-  ): Either[String, Unit] = {
-    if (contract.validate(state)) {
-      Right(())
-    } else {
-      Left(s"Invalid state length, expect ${contract.fieldLength}, have ${state.length}")
-    }
-  }
-
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildContract(
       blockFlow: BlockFlow,
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
     for {
-      contract <- deserialize[StatefulContract](query.bytecode).left.map(serdeError =>
-        badRequest(serdeError.getMessage)
-      )
-      state = toVmVal(query.initialFields)
-      _ <- validateStateLength(contract, state).left.map(badRequest)
+      code <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildContractWithParsedState(
-        Hex.toHexString(query.bytecode),
+        code.contract,
         address,
-        state,
+        code.initialFields,
         query.alphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
         query.issueTokenAmount.map(_.value)
       )
@@ -1072,6 +1057,22 @@ object ServerUtils {
     parseState(initialState).flatMap { state =>
       buildContractWithParsedState(codeRaw, address, state, alphAmount, newTokenAmount)
     }
+  }
+
+  def buildContractWithParsedState(
+      contract: StatefulContract,
+      address: Address,
+      initialFields: AVector[vm.Val],
+      alphAmount: U256,
+      newTokenAmount: Option[U256]
+  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
+    buildContractWithParsedState(
+      Hex.toHexString(serialize(contract)),
+      address,
+      initialFields,
+      alphAmount,
+      newTokenAmount
+    )
   }
 
   def buildContractWithParsedState(

@@ -639,7 +639,6 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val buildContract = BuildDeployContractTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
-      initialFields = AVector(Val.True, ValU256(U256.unsafe(123))),
       issueTokenAmount = Some(Amount(1)),
       gasAmount = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1))
@@ -649,7 +648,6 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "fromPublicKey": "${publicKey.toHexString}",
          |  "bytecode": "0000",
-         |  "initialFields":[{"type":"Bool","value":true},{"type":"U256","value":"123"}],
          |  "issueTokenAmount": "1",
          |  "gasAmount": 1,
          |  "gasPrice": "1"

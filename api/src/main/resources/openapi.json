@@ -5833,16 +5833,6 @@
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
-                    "initialFields": [
-                      {
-                        "type": "Bool",
-                        "value": true
-                      },
-                      {
-                        "type": "U256",
-                        "value": "123"
-                      }
-                    ],
                     "alphAmount": "2000000000000000000",
                     "issueTokenAmount": "2000000000000000000",
                     "gasAmount": 20000,
@@ -7881,8 +7871,7 @@
       "BuildDeployContractTx": {
         "required": [
           "fromPublicKey",
-          "bytecode",
-          "initialFields"
+          "bytecode"
         ],
         "type": "object",
         "properties": {
@@ -7893,12 +7882,6 @@
           "bytecode": {
             "type": "string",
             "format": "byte-string"
-          },
-          "initialFields": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Val"
-            }
           },
           "alphAmount": {
             "type": "string",
