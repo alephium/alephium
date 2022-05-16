@@ -658,10 +658,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(buildContract, jsonRaw)
   }
 
-  it should "encode/decode BuildContractDeployScriptTxResult" in {
+  it should "encode/decode BuildDeployContractTxResult" in {
     val txId       = Hash.generate
     val contractId = Hash.generate
-    val buildContractResult = BuildContractDeployScriptTxResult(
+    val buildContractResult = BuildDeployContractTxResult(
       group = 2,
       unsignedTx = "0000",
       gasAmount = GasBox.unsafe(1),

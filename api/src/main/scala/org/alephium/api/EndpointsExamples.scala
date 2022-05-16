@@ -554,9 +554,9 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildContractResultExamples: List[Example[BuildContractDeployScriptTxResult]] =
+  implicit val buildContractResultExamples: List[Example[BuildDeployContractTxResult]] =
     simpleExample(
-      BuildContractDeployScriptTxResult(
+      BuildDeployContractTxResult(
         group = 2,
         unsignedTx = hexString,
         model.minimalGas,

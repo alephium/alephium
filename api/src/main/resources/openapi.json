@@ -5859,7 +5859,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildContractDeployScriptTxResult"
+                  "$ref": "#/components/schemas/BuildDeployContractTxResult"
                 },
                 "example": {
                   "group": 2,
@@ -7878,41 +7878,6 @@
           }
         }
       },
-      "BuildContractDeployScriptTxResult": {
-        "required": [
-          "group",
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "contractAddress"
-        ],
-        "type": "object",
-        "properties": {
-          "group": {
-            "type": "integer"
-          },
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "contractAddress": {
-            "type": "string",
-            "format": "address"
-          }
-        }
-      },
       "BuildDeployContractTx": {
         "required": [
           "fromPublicKey",
@@ -7950,6 +7915,41 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
+          }
+        }
+      },
+      "BuildDeployContractTxResult": {
+        "required": [
+          "group",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "contractAddress"
+        ],
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "integer"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "contractAddress": {
+            "type": "string",
+            "format": "address"
           }
         }
       },

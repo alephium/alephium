@@ -756,7 +756,7 @@ class ServerUtils(implicit
   def buildContract(
       blockFlow: BlockFlow,
       query: BuildDeployContractTx
-  ): Try[BuildContractDeployScriptTxResult] = {
+  ): Try[BuildDeployContractTxResult] = {
     for {
       contract <- deserialize[StatefulContract](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
@@ -780,7 +780,7 @@ class ServerUtils(implicit
         query.gasAmount,
         query.gasPrice
       )
-    } yield BuildContractDeployScriptTxResult.from(utx)
+    } yield BuildDeployContractTxResult.from(utx)
   }
 
   def toVmVal(values: Option[AVector[Val]]): AVector[vm.Val] = {
