@@ -23,13 +23,12 @@ import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildContractDeployScriptTx(
+final case class BuildDeployContractTx(
     fromPublicKey: PublicKey,
     bytecode: ByteString,
     initialFields: AVector[Val] = AVector.empty,
     alphAmount: Option[Amount] = None,
     issueTokenAmount: Option[Amount] = None,
     gasAmount: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
-    utxosLimit: Option[Int] = None
+    gasPrice: Option[GasPrice] = None
 ) extends BuildTxCommon

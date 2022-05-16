@@ -368,8 +368,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         destinations,
         gasOpt = None,
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .rightValue
 
@@ -413,7 +412,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(fromAddress, fromAddressBalance, 2)
 
     val utxos =
-      serverUtils.getUTXOsIncludePool(blockFlow, fromAddress, Some(Int.MaxValue)).rightValue.utxos
+      serverUtils.getUTXOsIncludePool(blockFlow, fromAddress).rightValue.utxos
     val destination1 = generateDestination(chainIndex)
     val destination2 = generateDestination(chainIndex)
     val destinations = AVector(destination1, destination2)
@@ -433,8 +432,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           outputRefsOpt = Some(outputRefs),
           destinations,
           gasOpt = Some(minimalGas),
-          defaultGasPrice,
-          defaultUtxosLimit
+          defaultGasPrice
         )
         .rightValue
     }
@@ -453,8 +451,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = None,
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .rightValue
 
@@ -524,8 +521,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Not enough balance"
@@ -546,8 +542,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Selected UTXOs are not from the same group"
@@ -561,8 +556,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(AVector.empty),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Empty UTXOs"
@@ -581,8 +575,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(GasBox.unsafe(100)),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Provided gas GasBox(100) too small, minimal GasBox(20000)"
@@ -595,8 +588,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(GasBox.unsafe(625001)),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Provided gas GasBox(625001) too large, maximal GasBox(625000)"
@@ -615,8 +607,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        GasPrice(minimalGasPrice.value - 1),
-        defaultUtxosLimit
+        GasPrice(minimalGasPrice.value - 1)
       )
       .leftValue
       .detail is "Gas price GasPrice(999999999) too small, minimal GasPrice(1000000000)"
@@ -629,8 +620,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        GasPrice(ALPH.MaxALPHValue),
-        defaultUtxosLimit
+        GasPrice(ALPH.MaxALPHValue)
       )
       .leftValue
       .detail is "Gas price GasPrice(1000000000000000000000000000) too large, maximal GasPrice(999999999999999999999999999)"
@@ -648,8 +638,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         alphAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "ALPH amount overflow"
@@ -668,8 +657,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         tokenAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is s"Amount overflow for token $tokenId"
@@ -687,8 +675,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Selected UTXOs must be of asset type"
@@ -1252,7 +1239,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    serverUtils.getBalance(blockFlow, GetBalance(address, None)) isE Balance.from(
+    serverUtils.getBalance(blockFlow, GetBalance(address)) isE Balance.from(
       Amount(amount),
       Amount.Zero,
       utxoNum

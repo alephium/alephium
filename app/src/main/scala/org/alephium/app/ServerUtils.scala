@@ -53,8 +53,6 @@ class ServerUtils(implicit
 ) extends StrictLogging {
   import ServerUtils._
 
-  private val defaultUtxosLimit: Int = 5000
-
   def getHeightedBlocks(
       blockFlow: BlockFlow,
       timeInterval: TimeInterval
@@ -91,7 +89,7 @@ class ServerUtils(implicit
   }
 
   def getBalance(blockFlow: BlockFlow, balanceRequest: GetBalance): Try[Balance] = {
-    val utxosLimit = balanceRequest.utxosLimit.getOrElse(defaultUtxosLimit)
+    val utxosLimit = apiConfig.defaultUtxosLimit
     for {
       _ <- checkGroup(balanceRequest.address.lockupScript)
       balance <- blockFlow
@@ -107,10 +105,9 @@ class ServerUtils(implicit
 
   def getUTXOsIncludePool(
       blockFlow: BlockFlow,
-      address: Address.Asset,
-      utxosLimitOpt: Option[Int]
+      address: Address.Asset
   ): Try[UTXOs] = {
-    val utxosLimit = utxosLimitOpt.getOrElse(defaultUtxosLimit)
+    val utxosLimit = apiConfig.defaultUtxosLimit
     for {
       _ <- checkGroup(address.lockupScript)
       utxos <- blockFlow
@@ -186,8 +183,7 @@ class ServerUtils(implicit
         query.utxos,
         query.destinations,
         query.gasAmount,
-        query.gasPrice.getOrElse(defaultGasPrice),
-        query.utxosLimit.getOrElse(apiConfig.defaultUtxosLimit)
+        query.gasPrice.getOrElse(defaultGasPrice)
       )
     } yield {
       BuildTransactionResult.from(unsignedTx)
@@ -207,8 +203,7 @@ class ServerUtils(implicit
         unlockScript,
         query.destinations,
         query.gas,
-        query.gasPrice.getOrElse(defaultGasPrice),
-        query.utxosLimit.getOrElse(apiConfig.defaultUtxosLimit)
+        query.gasPrice.getOrElse(defaultGasPrice)
       )
     } yield {
       BuildTransactionResult.from(unsignedTx)
@@ -256,8 +251,7 @@ class ServerUtils(implicit
         query.toAddress,
         query.lockTime,
         query.gasAmount,
-        query.gasPrice.getOrElse(defaultGasPrice),
-        query.utxosLimit.getOrElse(Int.MaxValue)
+        query.gasPrice.getOrElse(defaultGasPrice)
       )
     } yield {
       BuildSweepAddressTransactionsResult.from(
@@ -574,8 +568,7 @@ class ServerUtils(implicit
       outputRefsOpt: Option[AVector[OutputRef]],
       destinations: AVector[Destination],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice,
-      utxosLimit: Int
+      gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
     val outputInfos = prepareOutputInfos(destinations)
 
@@ -594,7 +587,7 @@ class ServerUtils(implicit
           outputInfos,
           gasOpt,
           gasPrice,
-          utxosLimit
+          apiConfig.defaultUtxosLimit
         )
     }
 
@@ -611,8 +604,7 @@ class ServerUtils(implicit
       toAddress: Address.Asset,
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice,
-      utxosLimit: Int
+      gasPrice: GasPrice
   ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAddress(
       fromPublicKey,
@@ -620,7 +612,7 @@ class ServerUtils(implicit
       lockTimeOpt,
       gasOpt,
       gasPrice,
-      utxosLimit
+      Int.MaxValue
     ) match {
       case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
       case Right(Left(error))        => Left(failed(error))
@@ -634,8 +626,7 @@ class ServerUtils(implicit
       fromUnlockScript: UnlockScript,
       destinations: AVector[Destination],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice,
-      utxosLimit: Int
+      gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
     val outputInfos = prepareOutputInfos(destinations)
 
@@ -645,7 +636,7 @@ class ServerUtils(implicit
       outputInfos,
       gasOpt,
       gasPrice,
-      utxosLimit
+      apiConfig.defaultUtxosLimit
     ) match {
       case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
@@ -718,12 +709,11 @@ class ServerUtils(implicit
       tokens: AVector[(TokenId, U256)],
       fromPublicKey: PublicKey,
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice],
-      utxosLimitOpt: Option[Int]
+      gasPrice: Option[GasPrice]
   ): Try[UnsignedTransaction] = {
     val lockupScript = LockupScript.p2pkh(fromPublicKey)
     val unlockScript = UnlockScript.p2pkh(fromPublicKey)
-    val utxosLimit   = utxosLimitOpt.getOrElse(apiConfig.defaultUtxosLimit)
+    val utxosLimit   = apiConfig.defaultUtxosLimit
     for {
       allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
       allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
@@ -765,7 +755,7 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def buildContract(
       blockFlow: BlockFlow,
-      query: BuildContractDeployScriptTx
+      query: BuildDeployContractTx
   ): Try[BuildContractDeployScriptTxResult] = {
     for {
       contract <- deserialize[StatefulContract](query.bytecode).left.map(serdeError =>
@@ -788,8 +778,7 @@ class ServerUtils(implicit
         AVector.empty,
         query.fromPublicKey,
         query.gasAmount,
-        query.gasPrice,
-        query.utxosLimit
+        query.gasPrice
       )
     } yield BuildContractDeployScriptTxResult.from(utx)
   }
@@ -827,8 +816,7 @@ class ServerUtils(implicit
         tokens,
         query.fromPublicKey,
         query.gasAmount,
-        query.gasPrice,
-        query.utxosLimit
+        query.gasPrice
       )
     } yield BuildScriptTxResult.from(utx)
   }

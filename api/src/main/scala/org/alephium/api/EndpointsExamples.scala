@@ -359,8 +359,7 @@ trait EndpointsExamples extends ErrorExamples {
         moreSettingsDestinations,
         Some(AVector(outputRef)),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice),
-        Some(defaultUtxosLimit)
+        Some(model.defaultGasPrice)
       )
     )
   )
@@ -379,8 +378,7 @@ trait EndpointsExamples extends ErrorExamples {
           address,
           Some(ts),
           Some(model.minimalGas),
-          Some(model.defaultGasPrice),
-          Some(defaultUtxosLimit)
+          Some(model.defaultGasPrice)
         )
       )
     )
@@ -527,18 +525,17 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildContractExamples: List[Example[BuildContractDeployScriptTx]] = List(
-    defaultExample(BuildContractDeployScriptTx(publicKey, bytecode = byteString)),
+  implicit val buildContractExamples: List[Example[BuildDeployContractTx]] = List(
+    defaultExample(BuildDeployContractTx(publicKey, bytecode = byteString)),
     moreSettingsExample(
-      BuildContractDeployScriptTx(
+      BuildDeployContractTx(
         publicKey,
         byteString,
         AVector(Val.True, ValU256(U256.unsafe(123))),
         Some(bigAmount),
         Some(bigAmount),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice),
-        Some(defaultUtxosLimit)
+        Some(model.defaultGasPrice)
       )
     )
   )
@@ -552,8 +549,7 @@ trait EndpointsExamples extends ErrorExamples {
         Some(Amount(model.dustUtxoAmount)),
         Some(tokens),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice),
-        Some(defaultUtxosLimit)
+        Some(model.defaultGasPrice)
       )
     )
   )

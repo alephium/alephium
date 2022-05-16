@@ -204,13 +204,9 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode GetBalance" in {
     val address    = generateAddress()
     val addressStr = address.toBase58
-    val request    = GetBalance(address, None)
+    val request    = GetBalance(address)
     val jsonRaw    = s"""{"address":"$addressStr"}"""
     checkData(request, jsonRaw)
-
-    val request2 = GetBalance(address, Some(10))
-    val jsonRaw2 = s"""{"address":"$addressStr","utxosLimit":10}"""
-    checkData(request2, jsonRaw2)
   }
 
   it should "encode/decode AssetInput" in {
@@ -358,8 +354,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         AVector(Destination(toAddress, Amount(1), None, Some(TimeStamp.unsafe(1234)))),
         None,
         Some(GasBox.unsafe(1)),
-        Some(GasPrice(1)),
-        Some(defaultUtxosLimit)
+        Some(GasPrice(1))
       )
       val jsonRaw = s"""
         |{
@@ -372,8 +367,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |    }
         |  ],
         |  "gasAmount": 1,
-        |  "gasPrice": "1",
-        |  "utxosLimit": 1024
+        |  "gasPrice": "1"
         |}
         """.stripMargin
       checkData(transfer, jsonRaw)
@@ -642,14 +636,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode BuildContract" in {
     val publicKey = PublicKey.generate
-    val buildContract = BuildContractDeployScriptTx(
+    val buildContract = BuildDeployContractTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
       initialFields = AVector(Val.True, ValU256(U256.unsafe(123))),
       issueTokenAmount = Some(Amount(1)),
       gasAmount = Some(GasBox.unsafe(1)),
-      gasPrice = Some(GasPrice(1)),
-      utxosLimit = Some(defaultUtxosLimit)
+      gasPrice = Some(GasPrice(1))
     )
     val jsonRaw =
       s"""
@@ -659,8 +652,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "initialFields":[{"type":"Bool","value":true},{"type":"U256","value":"123"}],
          |  "issueTokenAmount": "1",
          |  "gasAmount": 1,
-         |  "gasPrice": "1",
-         |  "utxosLimit": 1024
+         |  "gasPrice": "1"
          |}
          |""".stripMargin
     checkData(buildContract, jsonRaw)
@@ -697,8 +689,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
       gasAmount = Some(GasBox.unsafe(1)),
-      gasPrice = Some(GasPrice(1)),
-      utxosLimit = Some(defaultUtxosLimit)
+      gasPrice = Some(GasPrice(1))
     )
     val jsonRaw =
       s"""
@@ -706,8 +697,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "fromPublicKey": "${publicKey.toHexString}",
          |  "bytecode": "0000",
          |  "gasAmount": 1,
-         |  "gasPrice": "1",
-         |  "utxosLimit": 1024
+         |  "gasPrice": "1"
          |}
          |""".stripMargin
     checkData(buildScript, jsonRaw)

@@ -140,7 +140,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
       )
 
     walletService.unlockWallet(wrongWalletName, "", None).leftValue is notFound
-    walletService.getBalances(wrongWalletName, None).futureValue.leftValue is notFound
+    walletService.getBalances(wrongWalletName).futureValue.leftValue is notFound
     walletService.getAddresses(wrongWalletName).leftValue is notFound
     walletService.getMinerAddresses(wrongWalletName).leftValue is notFound
     walletService

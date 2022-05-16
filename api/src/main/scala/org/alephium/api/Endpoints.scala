@@ -225,20 +225,18 @@ trait Endpoints
       .out(jsonBody[Boolean])
       .summary("Check if the block is in main chain")
 
-  val getBalance: BaseEndpoint[(Address.Asset, Option[Int]), Balance] =
+  val getBalance: BaseEndpoint[Address.Asset, Balance] =
     addressesEndpoint.get
       .in(path[Address.Asset]("address"))
       .in("balance")
-      .in(query[Option[Int]]("utxosLimit"))
       .out(jsonBodyWithAlph[Balance])
       .summary("Get the balance of an address")
 
   // TODO: query based on token id?
-  val getUTXOs: BaseEndpoint[(Address.Asset, Option[Int]), UTXOs] =
+  val getUTXOs: BaseEndpoint[Address.Asset, UTXOs] =
     addressesEndpoint.get
       .in(path[Address.Asset]("address"))
       .in("utxos")
-      .in(query[Option[Int]]("utxosLimit"))
       .out(jsonBody[UTXOs])
       .summary("Get the UTXOs of an address")
 
@@ -382,10 +380,10 @@ trait Endpoints
       .out(jsonBody[CompileContractResult])
       .summary("Compile a smart contract")
 
-  val buildContract: BaseEndpoint[BuildContractDeployScriptTx, BuildContractDeployScriptTxResult] =
+  val buildContract: BaseEndpoint[BuildDeployContractTx, BuildContractDeployScriptTxResult] =
     contractsUnsignedTxEndpoint.post
       .in("build-contract")
-      .in(jsonBody[BuildContractDeployScriptTx])
+      .in(jsonBody[BuildDeployContractTx])
       .out(jsonBody[BuildContractDeployScriptTxResult])
       .summary("Build an unsigned contract")
 

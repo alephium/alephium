@@ -794,14 +794,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "utxosLimit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -3924,14 +3916,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "utxosLimit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -4051,14 +4035,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "name": "utxosLimit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer"
             }
           }
         ],
@@ -4824,8 +4800,7 @@
                       }
                     ],
                     "gasAmount": 20000,
-                    "gasPrice": "100000000000",
-                    "utxosLimit": 512
+                    "gasPrice": "100000000000"
                   }
                 }
               }
@@ -4948,8 +4923,7 @@
                     "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "lockTime": 1611041396892,
                     "gasAmount": 20000,
-                    "gasPrice": "100000000000",
-                    "utxosLimit": 512
+                    "gasPrice": "100000000000"
                   }
                 }
               }
@@ -5595,8 +5569,7 @@
                       }
                     ],
                     "gasAmount": 20000,
-                    "gasPrice": "100000000000",
-                    "utxosLimit": 512
+                    "gasPrice": "100000000000"
                   }
                 }
               }
@@ -5845,7 +5818,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BuildContractDeployScriptTx"
+                "$ref": "#/components/schemas/BuildDeployContractTx"
               },
               "examples": {
                 "Example0": {
@@ -5873,8 +5846,7 @@
                     "alphAmount": "2000000000000000000",
                     "issueTokenAmount": "2000000000000000000",
                     "gasAmount": 20000,
-                    "gasPrice": "100000000000",
-                    "utxosLimit": 512
+                    "gasPrice": "100000000000"
                   }
                 }
               }
@@ -7906,7 +7878,42 @@
           }
         }
       },
-      "BuildContractDeployScriptTx": {
+      "BuildContractDeployScriptTxResult": {
+        "required": [
+          "group",
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "contractAddress"
+        ],
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "integer"
+          },
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "contractAddress": {
+            "type": "string",
+            "format": "address"
+          }
+        }
+      },
+      "BuildDeployContractTx": {
         "required": [
           "fromPublicKey",
           "bytecode",
@@ -7943,44 +7950,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-          },
-          "utxosLimit": {
-            "type": "integer"
-          }
-        }
-      },
-      "BuildContractDeployScriptTxResult": {
-        "required": [
-          "group",
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "contractAddress"
-        ],
-        "type": "object",
-        "properties": {
-          "group": {
-            "type": "integer"
-          },
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "contractAddress": {
-            "type": "string",
-            "format": "address"
           }
         }
       },
@@ -8031,9 +8000,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-          },
-          "utxosLimit": {
-            "type": "integer"
           }
         }
       },
@@ -8100,9 +8066,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-          },
-          "utxosLimit": {
-            "type": "integer"
           }
         }
       },
@@ -8162,9 +8125,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-          },
-          "utxosLimit": {
-            "type": "integer"
           }
         }
       },
@@ -8220,9 +8180,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-          },
-          "utxosLimit": {
-            "type": "integer"
           }
         }
       },

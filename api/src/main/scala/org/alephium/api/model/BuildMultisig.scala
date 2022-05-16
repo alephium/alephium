@@ -27,6 +27,5 @@ final case class BuildMultisig(
     fromPublicKeys: AVector[PublicKey],
     destinations: AVector[Destination],
     gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
-    utxosLimit: Option[Int] = None
+    gasPrice: Option[GasPrice] = None
 )

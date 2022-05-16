@@ -29,6 +29,5 @@ final case class BuildScriptTx(
     alphAmount: Option[Amount] = None,
     tokens: Option[AVector[Token]] = None,
     gasAmount: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
-    utxosLimit: Option[Int] = None
+    gasPrice: Option[GasPrice] = None
 ) extends BuildTxCommon
