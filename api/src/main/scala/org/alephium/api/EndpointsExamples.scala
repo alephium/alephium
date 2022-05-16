@@ -592,7 +592,7 @@ trait EndpointsExamples extends ErrorExamples {
   private lazy val existingContract = ContractState(
     address = Address.contract(anotherContractId),
     bytecode = code,
-    artifactId = code.hash,
+    codeHash = code.hash,
     fields = AVector[Val](ValU256(ALPH.alph(2))),
     asset = asset(2)
   )
@@ -602,7 +602,6 @@ trait EndpointsExamples extends ErrorExamples {
         group = Some(0),
         address = Some(Address.contract(ContractId.zero)),
         bytecode = code,
-        artifactId = code.hash,
         initialFields = AVector[Val](ValU256(ALPH.oneAlph)),
         initialAsset = Some(asset(1)),
         testMethodIndex = Some(0),
@@ -617,7 +616,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       TestContractResult(
         address = contractAddress,
-        artifactId = hash,
+        codeHash = hash,
         returns = AVector[Val](ValU256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),

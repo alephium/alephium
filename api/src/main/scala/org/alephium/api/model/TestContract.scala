@@ -31,7 +31,6 @@ final case class TestContract(
     group: Option[Int] = None,
     address: Option[Address.Contract] = None,
     bytecode: StatefulContract,
-    artifactId: ArtifactId,
     initialFields: AVector[Val] = TestContract.initialFieldsDefault,
     initialAsset: Option[AssetState] = None,
     testMethodIndex: Option[Int] = None,
@@ -55,7 +54,6 @@ final case class TestContract(
           Complete(
             group.getOrElse(groupDefault),
             address.getOrElse(addressDefault).contractId,
-            artifactId = artifactId,
             code = testCode,
             initialFields,
             initialAsset.getOrElse(initialAssetDefault),
@@ -84,7 +82,6 @@ object TestContract {
   final case class Complete(
       group: Int = groupDefault,
       contractId: ContractId = addressDefault.contractId,
-      artifactId: ArtifactId,
       code: StatefulContract,
       initialFields: AVector[Val] = initialFieldsDefault,
       initialAsset: AssetState = initialAssetDefault,

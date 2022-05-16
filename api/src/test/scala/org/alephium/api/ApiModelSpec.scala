@@ -776,7 +776,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val state = ContractState(
       generateContractAddress(),
       StatefulContract.forSMT.toContract().rightValue,
-      artifactId = Hash.zero,
+      codeHash = Hash.zero,
       AVector(u256, i256, bool, byteVec, address1),
       AssetState(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
     )
@@ -785,7 +785,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
          |  "bytecode": "00010700000000000118",
-         |  "artifactId": "0000000000000000000000000000000000000000000000000000000000000000",
+         |  "codeHash": "0000000000000000000000000000000000000000000000000000000000000000",
          |  "fields": [
          |    {
          |      "type": "U256",

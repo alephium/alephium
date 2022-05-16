@@ -6009,7 +6009,7 @@
                 "example": {
                   "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                   "bytecode": "00010700000000000118",
-                  "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                  "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                   "fields": [
                     {
                       "type": "U256",
@@ -6115,7 +6115,6 @@
                 "group": 0,
                 "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
                 "bytecode": "00010700000000000118",
-                "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                 "initialFields": [
                   {
                     "type": "U256",
@@ -6142,7 +6141,7 @@
                   {
                     "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                     "bytecode": "00010700000000000118",
-                    "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                    "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                     "fields": [
                       {
                         "type": "U256",
@@ -6188,7 +6187,7 @@
                 },
                 "example": {
                   "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
-                  "artifactId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "returns": [
                     {
                       "type": "U256",
@@ -6200,7 +6199,7 @@
                     {
                       "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                       "bytecode": "00010700000000000118",
-                      "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                      "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                       "fields": [
                         {
                           "type": "U256",
@@ -8509,7 +8508,7 @@
         "required": [
           "address",
           "bytecode",
-          "artifactId",
+          "codeHash",
           "fields",
           "asset"
         ],
@@ -8523,7 +8522,7 @@
             "type": "string",
             "format": "contract"
           },
-          "artifactId": {
+          "codeHash": {
             "type": "string",
             "format": "32-byte-hash"
           },
@@ -9317,7 +9316,6 @@
       "TestContract": {
         "required": [
           "bytecode",
-          "artifactId",
           "initialFields",
           "testArgs"
         ],
@@ -9333,10 +9331,6 @@
           "bytecode": {
             "type": "string",
             "format": "contract"
-          },
-          "artifactId": {
-            "type": "string",
-            "format": "32-byte-hash"
           },
           "initialFields": {
             "type": "array",
@@ -9373,7 +9367,7 @@
       "TestContractResult": {
         "required": [
           "address",
-          "artifactId",
+          "codeHash",
           "returns",
           "gasUsed",
           "contracts",
@@ -9386,7 +9380,7 @@
             "type": "string",
             "format": "address"
           },
-          "artifactId": {
+          "codeHash": {
             "type": "string",
             "format": "32-byte-hash"
           },
