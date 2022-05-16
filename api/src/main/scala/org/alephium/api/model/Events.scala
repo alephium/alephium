@@ -24,55 +24,30 @@ import org.alephium.util.AVector
 final case class Events(
     chainFrom: Int,
     chainTo: Int,
-    events: AVector[Event],
+    events: AVector[ContractEvent],
     nextStart: Int
 )
 
-sealed trait Event {
-  def blockHash: BlockHash
-  def txId: Hash
-  def eventIndex: Int
-  def fields: AVector[Val]
-}
-
-@upickle.implicits.key("ContractEvent")
 final case class ContractEvent(
     blockHash: BlockHash,
     contractAddress: Address.Contract,
     txId: Hash,
     eventIndex: Int,
     fields: AVector[Val]
-) extends Event {
+) {
   def contractId: ContractId = contractAddress.contractId
 }
 
-@upickle.implicits.key("TxScriptEvent")
-final case class TxScriptEvent(
-    blockHash: BlockHash,
-    txId: Hash,
-    eventIndex: Int,
-    fields: AVector[Val]
-) extends Event
-
 object Events {
-  def from(logStates: LogStates): AVector[Event] = {
+  def from(logStates: LogStates): AVector[ContractEvent] = {
     logStates.states.map { logState =>
-      if (logStates.eventKey == logState.txId) {
-        TxScriptEvent(
-          logStates.blockHash,
-          logState.txId,
-          logState.index.toInt,
-          logState.fields.map(Val.from)
-        )
-      } else {
-        ContractEvent(
-          logStates.blockHash,
-          Address.contract(logStates.eventKey),
-          logState.txId,
-          logState.index.toInt,
-          logState.fields.map(Val.from)
-        )
-      }
+      ContractEvent(
+        logStates.blockHash,
+        Address.contract(logStates.eventKey),
+        logState.txId,
+        logState.index.toInt,
+        logState.fields.map(Val.from)
+      )
     }
   }
 }

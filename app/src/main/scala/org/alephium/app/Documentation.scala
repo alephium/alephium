@@ -72,8 +72,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     minerUpdateAddresses,
     getContractEvents,
     getContractEventsCurrentCount,
-    getTxScriptEvents,
-    getTxScriptEventsCurrentCount
+    getEventsByTxId
   )
 
   private lazy val servers = List(

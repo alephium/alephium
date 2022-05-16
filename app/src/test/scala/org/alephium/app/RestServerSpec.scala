@@ -745,30 +745,30 @@ abstract class RestServerSpec(
     val blockHash  = dummyBlock.hash
     val start      = 10
     val end        = 100
-    val urlBase    = s"/events/contract?contractAddress=$dummyContractAddress"
+    val urlBase    = s"/events/contract/$dummyContractAddress"
     val chainIndex = ChainIndex.unsafe(0, 0)
 
     info("with valid start and end")
-    Get(s"$urlBase&start=$start&end=$end").check(validResponse)
+    Get(s"$urlBase?start=$start&end=$end").check(validResponse)
 
     info("with start only")
-    Get(s"$urlBase&start=$start").check(validResponse)
+    Get(s"$urlBase?start=$start").check(validResponse)
 
     info("with start smaller than end")
-    Get(s"$urlBase&start=$end&end=$start").check { response =>
+    Get(s"$urlBase?start=$end&end=$start").check { response =>
       response.code is StatusCode.BadRequest
       response.body.leftValue is s"""{"detail":"Invalid value (`end` must be larger than `start`)"}"""
     }
 
     info("with end larger than (start + MaxCounterRange)")
-    Get(s"$urlBase&start=$start&end=${start + CounterRange.MaxCounterRange + 1}").check {
+    Get(s"$urlBase?start=$start&end=${start + CounterRange.MaxCounterRange + 1}").check {
       response =>
         response.code is StatusCode.BadRequest
         response.body.leftValue is s"""{"detail":"Invalid value (`end` must be smaller than ${start + CounterRange.MaxCounterRange})"}"""
     }
 
     info("with start larger than (Int.MaxValue - MaxCounterRange)")
-    Get(s"$urlBase&start=${Int.MaxValue - CounterRange.MaxCounterRange + 1}").check { response =>
+    Get(s"$urlBase?start=${Int.MaxValue - CounterRange.MaxCounterRange + 1}").check { response =>
       response.code is StatusCode.BadRequest
       response.body.leftValue is s"""{"detail":"Invalid value (`start` must be smaller than ${Int.MaxValue - CounterRange.MaxCounterRange})"}"""
     }
@@ -782,7 +782,6 @@ abstract class RestServerSpec(
         |  "chainTo": ${chainIndex.to.value},
         |  "events": [
         |    {
-        |      "type": "ContractEvent",
         |      "blockHash": "${blockHash.toHexString}",
         |      "contractAddress": "${dummyContractAddress}",
         |      "txId": "${dummyTx.id.toHexString}",
@@ -809,13 +808,13 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "get events for a TxScript" in {
+  it should "get events for tx id" in {
     val blockHash = dummyBlock.hash
-    val txId      = dummyTx.id
+    val txId      = Hash.random
 
     servers.foreach { server =>
       Get(
-        s"/events/tx-script?txId=${txId.toHexString}",
+        s"/events/tx-id/${txId.toHexString}",
         server.port
       ) check { response =>
         val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
@@ -830,9 +829,9 @@ abstract class RestServerSpec(
         |  "chainTo": ${chainIndex.to.value},
         |  "events": [
         |    {
-        |      "type": "TxScriptEvent",
         |      "blockHash": "${blockHash.toHexString}",
-        |      "txId": "${txId.toHexString}",
+        |      "contractAddress": "${Address.contract(txId).toBase58}",
+        |      "txId": "${dummyTx.id.toHexString}",
         |      "eventIndex": 0,
         |      "fields": [
         |        {
@@ -863,7 +862,7 @@ abstract class RestServerSpec(
   }
 
   it should "get current events count for a contract" in {
-    val url = s"/events/contract/current-count?contractAddress=$dummyContractAddress"
+    val url = s"/events/contract/$dummyContractAddress/current-count"
     Get(url) check { response =>
       response.code is StatusCode.Ok
       response.body.rightValue is "10"
@@ -872,7 +871,7 @@ abstract class RestServerSpec(
 
   it should "get current events count for a TxScript" in {
     val blockHash = dummyBlock.hash
-    val url       = s"/events/tx-script/current-count?txId=${dummyTx.id.toHexString}"
+    val url       = s"/events/tx-id/${dummyTx.id.toHexString}"
 
     servers.foreach { server =>
       Get(url, server.port) check { response =>
@@ -881,7 +880,9 @@ abstract class RestServerSpec(
 
         if (rightNode) {
           response.code is StatusCode.Ok
-          response.body.rightValue is "10"
+          response.body.rightValue.startsWith(
+            s"""{"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"events":["""
+          ) is true
         } else {
           response.code is StatusCode.NotFound
           val error = response.as[ApiError.NotFound]

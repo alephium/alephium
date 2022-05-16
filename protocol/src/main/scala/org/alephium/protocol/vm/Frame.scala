@@ -271,7 +271,7 @@ final class StatefulFrame(
       balances          <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
       createdContractId <- ctx.createContract(code, balances, fields, tokenAmount)
       _ <- ctx.writeLog(
-        obj.contractIdOpt,
+        Some(createContractEventId),
         AVector(
           createContractEventIndex,
           Val.Address(LockupScript.p2c(createdContractId))
@@ -291,7 +291,7 @@ final class StatefulFrame(
         .toRight(Right(InvalidBalances))
       _ <- ctx.destroyContract(contractId, contractAssets, address)
       _ <- ctx.writeLog(
-        callerFrame.obj.contractIdOpt,
+        Some(destroyContractEventId),
         AVector(destroyContractEventIndex, Val.Address(LockupScript.p2c(contractId)))
       )
       _ <- runReturn()
