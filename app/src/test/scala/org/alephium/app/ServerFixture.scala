@@ -352,7 +352,6 @@ object ServerFixture {
     }
 
     override def getEvents(
-        worldState: WorldState.Persisted,
         eventKey: Hash,
         start: Int,
         end: Int
