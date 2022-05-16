@@ -5452,10 +5452,7 @@
                   "$ref": "#/components/schemas/CompileScriptResult"
                 },
                 "example": {
-                  "compiled": {
-                    "type": "SimpleScriptByteCode",
-                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
-                  },
+                  "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "functions": [
                     {
                       "name": "bar",
@@ -5721,10 +5718,8 @@
                   "$ref": "#/components/schemas/CompileContractResult"
                 },
                 "example": {
-                  "compiled": {
-                    "type": "SimpleContractByteCode",
-                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
-                  },
+                  "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
+                  "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
                     "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
                     "types": [
@@ -8313,15 +8308,20 @@
       },
       "CompileContractResult": {
         "required": [
-          "compiled",
+          "bytecode",
+          "codeHash",
           "fields",
           "functions",
           "events"
         ],
         "type": "object",
         "properties": {
-          "compiled": {
-            "$ref": "#/components/schemas/CompiledContractTrait"
+          "bytecode": {
+            "type": "string"
+          },
+          "codeHash": {
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "fields": {
             "$ref": "#/components/schemas/FieldsSig"
@@ -8342,14 +8342,14 @@
       },
       "CompileScriptResult": {
         "required": [
-          "compiled",
+          "bytecodeTemplate",
           "functions",
           "events"
         ],
         "type": "object",
         "properties": {
-          "compiled": {
-            "$ref": "#/components/schemas/CompiledScriptTrait"
+          "bytecodeTemplate": {
+            "type": "string"
           },
           "functions": {
             "type": "array",
@@ -8363,32 +8363,6 @@
               "$ref": "#/components/schemas/EventSig"
             }
           }
-        }
-      },
-      "CompiledContractTrait": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/SimpleContractByteCode"
-          },
-          {
-            "$ref": "#/components/schemas/TemplateContractByteCode"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type"
-        }
-      },
-      "CompiledScriptTrait": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/SimpleScriptByteCode"
-          },
-          {
-            "$ref": "#/components/schemas/TemplateScriptByteCode"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type"
         }
       },
       "Confirmed": {
@@ -9156,38 +9130,6 @@
           }
         }
       },
-      "SimpleContractByteCode": {
-        "required": [
-          "bytecode",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "bytecode": {
-            "type": "string",
-            "format": "byte-string"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "SimpleScriptByteCode": {
-        "required": [
-          "bytecode",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "bytecode": {
-            "type": "string",
-            "format": "byte-string"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "SubmitMultisig": {
         "required": [
           "unsignedTx",
@@ -9273,43 +9215,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-          }
-        }
-      },
-      "TemplateContractByteCode": {
-        "required": [
-          "filedLength",
-          "methodsByteCode",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "filedLength": {
-            "type": "integer"
-          },
-          "methodsByteCode": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "TemplateScriptByteCode": {
-        "required": [
-          "templateByteCode",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "templateByteCode": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
           }
         }
       },

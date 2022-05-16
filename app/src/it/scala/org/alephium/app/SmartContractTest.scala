@@ -60,7 +60,7 @@ class SmartContractTest extends AlephiumActorSpec {
       val buildResult = request[BuildContractDeployScriptTxResult](
         buildContract(
           fromPublicKey = publicKey,
-          code = compileResult.bytecodeUnsafe,
+          code = compileResult.bytecode,
           gas,
           gasPrice,
           initialFields = initialFields,
@@ -105,7 +105,7 @@ class SmartContractTest extends AlephiumActorSpec {
       val compileResult = request[CompileContractResult](compileContract(code), restPort)
       val script = ServerUtils
         .buildContract(
-          compileResult.bytecodeUnsafe,
+          compileResult.bytecode,
           Address.fromBase58(address).value,
           state,
           dustUtxoAmount,
@@ -129,7 +129,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
       val compileResult = request[CompileScriptResult](compileScript(code), restPort)
       val script = deserialize[StatefulScript](
-        Hex.unsafe(compileResult.bytecodeUnsafe)
+        Hex.unsafe(compileResult.bytecodeTemplate)
       ).rightValue
 
       val blockFlow    = clique.servers(group.group % 2).node.blockFlow
@@ -185,7 +185,7 @@ class SmartContractTest extends AlephiumActorSpec {
     unitRequest(
       buildContract(
         publicKey,
-        compileResult.bytecodeUnsafe,
+        compileResult.bytecode,
         initialFields = validFields
       ),
       restPort
@@ -195,7 +195,7 @@ class SmartContractTest extends AlephiumActorSpec {
     requestFailed(
       buildContract(
         publicKey,
-        compileResult.bytecodeUnsafe,
+        compileResult.bytecode,
         initialFields = invalidFields
       ),
       restPort,

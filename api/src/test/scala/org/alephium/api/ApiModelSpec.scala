@@ -827,10 +827,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw0 =
       """
         |{
-        |  "compiled": {
-        |    "type":"SimpleContractByteCode",
-        |    "bytecode": "07011d01010707060d05a000a001a003a0046116011602160316041605160602"
-        |  },
+        |  "bytecode": "07011d01010707060d05a000a001a003a0046116011602160316041605160602",
+        |  "codeHash": "4106809d4ed811457fad02bc19619ca8f2a4a47a56bca4519a28d3671d9c7241",
         |  "fields": {
         |    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])",
         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
@@ -858,10 +856,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 =
       """
         |{
-        |  "compiled": {
-        |    "type": "SimpleScriptByteCode",
-        |    "bytecode": "0101000707060716011602160316041605160602"
-        |  },
+        |  "bytecodeTemplate": "0101000707060716011602160316041605160602",
         |  "functions": [
         |    {
         |      "name": "bar",

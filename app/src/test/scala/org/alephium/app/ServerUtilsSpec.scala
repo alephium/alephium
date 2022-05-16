@@ -1136,8 +1136,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts.length is 1
     contractState.fields is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
     result.returns is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
-    contractState.codeHash is compileResult.codeHashUnsafe
-    result.codeHash is compileResult.codeHashUnsafe
+    compileResult.codeHash is code.hash
+    result.codeHash is contractState.codeHash
+    if (isPublic.nonEmpty) {
+      contractState.codeHash is compileResult.codeHash
+    } else {
+      contractState.codeHash isnot compileResult.codeHash
+    }
   }
 
   it should "compile contract" in new Fixture {
@@ -1154,7 +1159,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val query  = Compile.Contract(rawCode)
     val result = serverUtils.compileContract(query).rightValue
 
-    val compiledCode = result.bytecodeUnsafe
+    val compiledCode = result.bytecode
     compiledCode is Hex.toHexString(serialize(code))
     compiledCode is {
       val bytecode     = "0100000000040da000304d"
@@ -1179,7 +1184,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       val query  = Compile.Script(rawCode)
       val result = serverUtils.compileScript(query).rightValue
-      result.compiled is TemplateScriptByteCode(expectedByteCode)
+      result.bytecodeTemplate is expectedByteCode
     }
 
     {
@@ -1195,8 +1200,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       val query  = Compile.Script(rawCode)
       val result = serverUtils.compileScript(query).rightValue
 
-      result.bytecodeUnsafe is Hex.toHexString(serialize(code))
-      result.bytecodeUnsafe is expectedByteCode
+      result.bytecodeTemplate is Hex.toHexString(serialize(code))
+      result.bytecodeTemplate is expectedByteCode
         .replace("{x:U256}", "0d") // bytecode of U256Const1
         .replace("{y:U256}", "0e") // bytecode of U256Const2
     }
