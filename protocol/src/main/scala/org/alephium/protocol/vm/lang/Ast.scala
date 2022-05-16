@@ -786,12 +786,8 @@ object Ast {
   sealed trait Inheritance {
     def parentId: TypeId
   }
-  final case class ContractInheritance(
-      parentId: TypeId,
-      templateVars: Seq[Ident],
-      idents: Seq[Ident]
-  )                                                       extends Inheritance
-  final case class InterfaceInheritance(parentId: TypeId) extends Inheritance
+  final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident]) extends Inheritance
+  final case class InterfaceInheritance(parentId: TypeId)                    extends Inheritance
   final case class TxContract(
       ident: TypeId,
       templateVars: Seq[Argument],
