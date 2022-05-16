@@ -483,8 +483,7 @@ class ServerUtils(implicit
   ): Try[Events] = {
     wrapResult(
       for {
-        worldState <- blockFlow.getBestPersistedWorldState(chainIndex.from)
-        result     <- blockFlow.getEvents(worldState, txId, 0, CounterRange.MaxCounterRange)
+        result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
         (nextStart, logStatesVec) = result
         logStates <- logStatesVec.mapE { logStates =>
           logStates.states
@@ -493,7 +492,7 @@ class ServerUtils(implicit
                 LogStateRef
                   .fromFields(state.fields)
                   .toRight(IOError.Other(new Throwable(s"Invalid state ref: ${state.fields}")))
-                  .flatMap(blockFlow.getEventByRef(worldState, _))
+                  .flatMap(blockFlow.getEventByRef(_))
               } else {
                 Right(state)
               }
@@ -519,7 +518,6 @@ class ServerUtils(implicit
     wrapResult(
       blockFlow
         .getEvents(
-          chainIndex,
           eventKey,
           start,
           endOpt.getOrElse(start + CounterRange.MaxCounterRange)

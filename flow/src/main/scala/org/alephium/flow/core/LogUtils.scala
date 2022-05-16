@@ -22,13 +22,12 @@ import scala.collection.mutable.ArrayBuffer
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates, LogStatesId, WorldState}
+import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates, LogStatesId}
 import org.alephium.util.AVector
 
 trait LogUtils { Self: FlowUtils =>
 
   def getEvents(
-      worldState: WorldState.Persisted,
       eventKey: Hash,
       start: Int,
       end: Int
@@ -38,10 +37,9 @@ trait LogUtils { Self: FlowUtils =>
 
     @tailrec
     def rec(
-        worldState: WorldState.Persisted,
         logStatesId: LogStatesId
     ): IOResult[Unit] = {
-      worldState.logState.getOpt(logStatesId) match {
+      logStorage.getOpt(logStatesId) match {
         case Right(Some(logStates)) =>
           assume(logStates.states.nonEmpty)
           nextCount = logStatesId.counter + 1
@@ -49,7 +47,7 @@ trait LogUtils { Self: FlowUtils =>
             Right(())
           } else {
             allLogStates = allLogStates :+ logStates
-            rec(worldState, LogStatesId(eventKey, nextCount))
+            rec(LogStatesId(eventKey, nextCount))
           }
         case Right(None) =>
           Right(())
@@ -58,24 +56,13 @@ trait LogUtils { Self: FlowUtils =>
       }
     }
 
-    rec(worldState, LogStatesId(eventKey, nextCount)).map(_ =>
-      (nextCount, AVector.from(allLogStates))
-    )
+    rec(LogStatesId(eventKey, nextCount)).map(_ => (nextCount, AVector.from(allLogStates)))
   }
 
-  def getEvents(
-      chainIndex: ChainIndex,
-      eventKey: Hash,
-      start: Int,
-      end: Int
-  ): IOResult[(Int, AVector[LogStates])] = {
-    blockFlow
-      .getBestPersistedWorldState(chainIndex.from)
-      .flatMap(getEvents(_, eventKey, start, end))
-  }
-
-  def getEventByRef(worldState: WorldState.Persisted, ref: LogStateRef): IOResult[LogState] = {
-    worldState.logState.getOpt(ref.id) match {
+  def getEventByRef(
+      ref: LogStateRef
+  ): IOResult[LogState] = {
+    logStorage.getOpt(ref.id) match {
       case Right(Some(logStates)) =>
         logStates.states
           .get(ref.offset)
