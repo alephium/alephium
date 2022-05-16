@@ -43,10 +43,18 @@ class VotingTest extends AlephiumActorSpec {
 
     val nbYes = voters.size - 1
     val nbNo  = voters.size - nbYes
-    voters.take(nbYes).foreach(wallet => vote(wallet, contractId.toHexString, true, contractCode))
-    voters.drop(nbYes).foreach(wallet => vote(wallet, contractId.toHexString, false, contractCode))
+    val voteForTxInfos = voters.take(nbYes).map { wallet =>
+      val txId = vote(wallet, contractId.toHexString, true, contractCode).txId
+      (wallet.activeAddress, true, txId)
+    }
+    val voteAgainstTxInfos = voters.drop(nbYes).map { wallet =>
+      val txId = vote(wallet, contractId.toHexString, false, contractCode).txId
+      (wallet.activeAddress, false, txId)
+    }
     checkState(nbYes, nbNo, false, true)
 
+    checkVoteCastedScriptEvents(voteForTxInfos)
+    checkVoteCastedScriptEvents(voteAgainstTxInfos)
     checkEvents(contractAddress, countAfterVotingStarted)(checkVoteCastedEvents)
 
     val countAfterVotingCasted = getEventsCurrentCount(contractAddress)
@@ -74,13 +82,32 @@ class VotingTest extends AlephiumActorSpec {
     }
     clique.stop()
 
-    def checkVotingStartedEvent(event: Event) = {
+    def checkVotingStartedEvent(event: ContractEvent) = {
       val votingStartedEvent = event.asInstanceOf[ContractEvent]
       votingStartedEvent.eventIndex is 0
       votingStartedEvent.contractId is contractAddress.lockupScript.contractId
     }
 
-    def checkVoteCastedEvents(events: AVector[Event]) = {
+    def checkVoteCastedScriptEvents(infos: Seq[(String, Boolean, Hash)]) = {
+      infos.foreach { info =>
+        val (address, choice, txId) = info
+        val response = request[Events](
+          getEventsByTxId(txId.toHexString),
+          restPort
+        )
+
+        val events = response.events.filter(event => isBlockInMainChain(event.blockHash))
+        events.length is 1
+        val event = events.head
+        event.txId is txId
+        event.eventIndex is 1
+        event.fields.length is 2
+        event.fields(0) is ValAddress(Address.fromBase58(address).get)
+        event.fields(1) is ValBool(choice)
+      }
+    }
+
+    def checkVoteCastedEvents(events: AVector[ContractEvent]) = {
       val expectedResult = voters.take(nbYes).map { wallet =>
         (1, wallet.activeAddress, true)
       } ++ voters.drop(nbYes).map { wallet =>
@@ -96,7 +123,7 @@ class VotingTest extends AlephiumActorSpec {
       returnedResult.toSeq is expectedResult.toSeq
     }
 
-    def checkVotingClosedEvent(event: Event) = {
+    def checkVotingClosedEvent(event: ContractEvent) = {
       val votingClosedEvent = event.asInstanceOf[ContractEvent]
       votingClosedEvent.eventIndex is 2
       votingClosedEvent.contractId is contractAddress.lockupScript.contractId
@@ -119,7 +146,7 @@ class VotingTest extends AlephiumActorSpec {
     }
 
     def checkEvents(contractAddress: Address, startCount: Int)(
-        validate: (AVector[Event]) => Any
+        validate: (AVector[ContractEvent]) => Any
     ) = {
       val response =
         request[Events](

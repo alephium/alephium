@@ -182,30 +182,29 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.getUTXOsIncludePool(blockFlow, address, utxosLimit))
   }
 
-  val getGroupLogic = serverLogic(getGroup) { address =>
-    address match {
-      case Address.Asset(_) => Future.successful(serverUtils.getGroup(blockFlow, GetGroup(address)))
-      case Address.Contract(_) =>
-        val failure: Future[Either[ApiError[_ <: StatusCode], Group]] =
-          Future.successful(
-            Left(ApiError.NotFound(s"Group not found. Please check another broker"))
-              .withRight[Group]
-          )
-        brokerConfig.allGroups.take(brokerConfig.brokerNum).fold(failure) {
-          case (prevResult, currentGroup: GroupIndex) =>
-            prevResult flatMap {
-              case Right(_) =>
-                prevResult
-              case _ =>
-                requestFromGroupIndex(
-                  currentGroup,
-                  Future.successful(serverUtils.getGroup(blockFlow, GetGroup(address))),
-                  getGroupLocal,
-                  address
-                )
-            }
-        }
-    }
+  val getGroupLogic = serverLogic(getGroup) {
+    case address @ Address.Asset(_) =>
+      Future.successful(serverUtils.getGroup(blockFlow, GetGroup(address)))
+    case address @ Address.Contract(_) =>
+      val failure: Future[Either[ApiError[_ <: StatusCode], Group]] =
+        Future.successful(
+          Left(ApiError.NotFound(s"Group not found. Please check another broker"))
+            .withRight[Group]
+        )
+      brokerConfig.allGroups.take(brokerConfig.brokerNum).fold(failure) {
+        case (prevResult, currentGroup: GroupIndex) =>
+          prevResult flatMap {
+            case Right(_) =>
+              prevResult
+            case _ =>
+              requestFromGroupIndex(
+                currentGroup,
+                Future.successful(serverUtils.getGroup(blockFlow, GetGroup(address))),
+                getGroupLocal,
+                address
+              )
+          }
+      }
   }
 
   val getGroupLocalLogic = serverLogic(getGroupLocal) { address =>
@@ -561,7 +560,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   val getContractEventsLogic = serverLogic(getContractEvents) {
-    case (counterRange, contractAddress) =>
+    case (contractAddress, counterRange) =>
       Future.successful {
         val contractId = contractAddress.lockupScript.contractId
         serverUtils.getEventsForContract(
@@ -580,15 +579,9 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       }
   }
 
-  val getTxScriptEventsLogic = serverLogic(getTxScriptEvents) { txId =>
+  val getEventsByTxIdLogic = serverLogic(getEventsByTxId) { txId =>
     Future.successful {
-      serverUtils.getEventsForTxScript(blockFlow, txId)
-    }
-  }
-
-  val getTxScriptEventsCurrentCountLogic = serverLogic(getTxScriptEventsCurrentCount) { txId =>
-    Future.successful {
-      serverUtils.getEventsForTxScriptCurrentCount(blockFlow, txId)
+      serverUtils.getEventsForTxId(blockFlow, txId)
     }
   }
 

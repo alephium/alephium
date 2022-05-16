@@ -6239,7 +6239,6 @@
                   ],
                   "events": [
                     {
-                      "type": "ContractEvent",
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                       "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
@@ -7163,14 +7162,22 @@
         }
       }
     },
-    "/events/contract": {
+    "/events/contract/{contractAddress}": {
       "get": {
         "tags": [
           "Events"
         ],
         "summary": "Get events for a contract within a counter range",
-        "operationId": "getEventsContract",
+        "operationId": "getEventsContractContractaddress",
         "parameters": [
+          {
+            "name": "contractAddress",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "start",
             "in": "query",
@@ -7186,14 +7193,6 @@
             "schema": {
               "type": "integer"
             }
-          },
-          {
-            "name": "contractAddress",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "responses": {
@@ -7208,7 +7207,6 @@
                   "chainTo": 1,
                   "events": [
                     {
-                      "type": "ContractEvent",
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                       "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
@@ -7299,17 +7297,17 @@
         }
       }
     },
-    "/events/contract/current-count": {
+    "/events/contract/{contractAddress}/current-count": {
       "get": {
         "tags": [
           "Events"
         ],
         "summary": "Get current value of the events counter for a contract",
-        "operationId": "getEventsContractCurrent-count",
+        "operationId": "getEventsContractContractaddressCurrent-count",
         "parameters": [
           {
             "name": "contractAddress",
-            "in": "query",
+            "in": "path",
             "required": true,
             "schema": {
               "type": "string"
@@ -7396,17 +7394,17 @@
         }
       }
     },
-    "/events/tx-script": {
+    "/events/tx-id/{txId}": {
       "get": {
         "tags": [
           "Events"
         ],
         "summary": "Get events for a TxScript",
-        "operationId": "getEventsTx-script",
+        "operationId": "getEventsTx-idTxid",
         "parameters": [
           {
             "name": "txId",
-            "in": "query",
+            "in": "path",
             "required": true,
             "schema": {
               "type": "string"
@@ -7425,7 +7423,6 @@
                   "chainTo": 1,
                   "events": [
                     {
-                      "type": "ContractEvent",
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                       "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
                       "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
@@ -7444,103 +7441,6 @@
                   ],
                   "nextStart": 2
                 }
-              }
-            }
-          },
-          "400": {
-            "description": "BadRequest",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequest"
-                },
-                "example": {
-                  "detail": "Something bad in the request"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalServerError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalServerError"
-                },
-                "example": {
-                  "detail": "Ouch"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                },
-                "example": {
-                  "resource": "wallet-name",
-                  "detail": "wallet-name not found"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "ServiceUnavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceUnavailable"
-                },
-                "example": {
-                  "detail": "Self clique unsynced"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                },
-                "example": {
-                  "detail": "You shall not pass"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/events/tx-script/current-count": {
-      "get": {
-        "tags": [
-          "Events"
-        ],
-        "summary": "Get current value of the events counter for a TxScript",
-        "operationId": "getEventsTx-scriptCurrent-count",
-        "parameters": [
-          {
-            "name": "txId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "integer"
-                },
-                "example": 100
               }
             }
           },
@@ -8541,8 +8441,7 @@
           "contractAddress",
           "txId",
           "eventIndex",
-          "fields",
-          "type"
+          "fields"
         ],
         "type": "object",
         "properties": {
@@ -8566,9 +8465,6 @@
             "items": {
               "$ref": "#/components/schemas/Val"
             }
-          },
-          "type": {
-            "type": "string"
           }
         }
       },
@@ -8693,19 +8589,6 @@
           "propertyName": "type"
         }
       },
-      "Event": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/ContractEvent"
-          },
-          {
-            "$ref": "#/components/schemas/TxScriptEvent"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type"
-        }
-      },
       "EventSig": {
         "required": [
           "name",
@@ -8746,7 +8629,7 @@
           "events": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Event"
+              "$ref": "#/components/schemas/ContractEvent"
             }
           },
           "nextStart": {
@@ -9531,7 +9414,7 @@
           "events": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Event"
+              "$ref": "#/components/schemas/ContractEvent"
             }
           }
         }
@@ -9714,38 +9597,6 @@
           },
           "toGroup": {
             "type": "integer"
-          }
-        }
-      },
-      "TxScriptEvent": {
-        "required": [
-          "blockHash",
-          "txId",
-          "eventIndex",
-          "fields",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "blockHash": {
-            "type": "string",
-            "format": "block-hash"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "eventIndex": {
-            "type": "integer"
-          },
-          "fields": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Val"
-            }
-          },
-          "type": {
-            "type": "string"
           }
         }
       },

@@ -31,7 +31,7 @@ import org.alephium.flow.gasestimation._
 import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.vm.{eventRefIndex, GasBox, GasPrice, LockupScript}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.serialize
 import org.alephium.util._
@@ -840,12 +840,18 @@ class ServerUtilsSpec extends AlephiumSpec {
       TimeStamp.zero,
       ByteString.empty
     )
-    result0.events.length is 1
+    result0.events.length is 2
     result0.events(0).eventIndex is 0
     result0.events(0).fields is AVector[Val](
       ValAddress(lp),
       ValU256(ALPH.alph(100)),
       ValU256(100)
+    )
+    result0.events(1).eventIndex is eventRefIndex.toInt
+    result0.events(1).fields is AVector[Val](
+      ValByteVec(contractAddress.contractId.bytes),
+      ValI256(I256.unsafe(0)),
+      ValI256(I256.unsafe(0))
     )
 
     val testContract1 = TestContract.Complete(
@@ -940,9 +946,15 @@ class ServerUtilsSpec extends AlephiumSpec {
       TimeStamp.zero,
       ByteString.empty
     )
-    result0.events.length is 1
+    result0.events.length is 2
     result0.events(0).eventIndex is 1
     result0.events(0).fields is AVector[Val](ValAddress(buyer), ValU256(ALPH.alph(10)))
+    result0.events(1).eventIndex is eventRefIndex.toInt
+    result0.events(1).fields is AVector[Val](
+      ValByteVec(contractAddress.contractId.bytes),
+      ValI256(I256.unsafe(0)),
+      ValI256(I256.unsafe(0))
+    )
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
@@ -1036,9 +1048,15 @@ class ServerUtilsSpec extends AlephiumSpec {
       TimeStamp.zero,
       ByteString.empty
     )
-    result0.events.length is 1
+    result0.events.length is 2
     result0.events(0).eventIndex is 2
     result0.events(0).fields is AVector[Val](ValAddress(buyer), ValU256(100))
+    result0.events(1).eventIndex is eventRefIndex.toInt
+    result0.events(1).fields is AVector[Val](
+      ValByteVec(contractAddress.contractId.bytes),
+      ValI256(I256.unsafe(0)),
+      ValI256(I256.unsafe(0))
+    )
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,

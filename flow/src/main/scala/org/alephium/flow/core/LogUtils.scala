@@ -19,16 +19,16 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.io.IOResult
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.protocol.vm.{LogStates, LogStatesId, WorldState}
+import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates, LogStatesId, WorldState}
 import org.alephium.util.AVector
 
 trait LogUtils { Self: FlowUtils =>
 
   def getEvents(
-      chainIndex: ChainIndex,
+      worldState: WorldState.Persisted,
       eventKey: Hash,
       start: Int,
       end: Int
@@ -58,11 +58,30 @@ trait LogUtils { Self: FlowUtils =>
       }
     }
 
-    for {
-      worldState <- blockFlow.getBestPersistedWorldState(chainIndex.from)
-      _          <- rec(worldState, LogStatesId(eventKey, nextCount))
-    } yield {
+    rec(worldState, LogStatesId(eventKey, nextCount)).map(_ =>
       (nextCount, AVector.from(allLogStates))
+    )
+  }
+
+  def getEvents(
+      chainIndex: ChainIndex,
+      eventKey: Hash,
+      start: Int,
+      end: Int
+  ): IOResult[(Int, AVector[LogStates])] = {
+    blockFlow
+      .getBestPersistedWorldState(chainIndex.from)
+      .flatMap(getEvents(_, eventKey, start, end))
+  }
+
+  def getEventByRef(worldState: WorldState.Persisted, ref: LogStateRef): IOResult[LogState] = {
+    worldState.logState.getOpt(ref.id) match {
+      case Right(Some(logStates)) =>
+        logStates.states
+          .get(ref.offset)
+          .toRight(IOError.Other(new Throwable(s"Invalid state ref: $ref")))
+      case Right(None) => Left(IOError.keyNotFound(ref.id, "LogUtils.getEventByRef"))
+      case Left(error) => Left(error)
     }
   }
 

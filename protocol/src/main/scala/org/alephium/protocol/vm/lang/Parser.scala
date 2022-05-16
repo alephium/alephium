@@ -186,7 +186,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
   def eventFields[_: P]: P[Seq[Ast.EventField]] = P("(" ~ eventField.rep(0, ",") ~ ")")
-  def event[_: P]: P[Ast.EventDef] = P(Lexer.keyword("event") ~/ Lexer.typeId ~ eventFields)
+  def eventDef[_: P]: P[Ast.EventDef] = P(Lexer.keyword("event") ~/ Lexer.typeId ~ eventFields)
     .map { case (typeId, fields) =>
       if (fields.length >= Instr.allLogInstrs.length) {
         throw Compiler.Error("Max 8 fields allowed for contract events")
@@ -318,7 +318,7 @@ object StatefulParser extends Parser[StatefulContext] {
   def rawTxContract[_: P]: P[Ast.TxContract] =
     P(
       Lexer.keyword("TxContract") ~/ Lexer.typeId ~ templateParams.? ~ contractParams ~
-        contractInheritances.? ~ "{" ~ event.rep ~ func.rep ~ "}"
+        contractInheritances.? ~ "{" ~ eventDef.rep ~ func.rep ~ "}"
     ).map { case (typeId, templateVars, fields, contractInheritances, events, funcs) =>
       if (funcs.length < 1) {
         throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
@@ -353,7 +353,7 @@ object StatefulParser extends Parser[StatefulContext] {
     P(
       Lexer.keyword("Interface") ~/ Lexer.typeId ~
         (Lexer.keyword("extends") ~/ interfaceInheritance.rep(1, ",")).? ~
-        "{" ~ event.rep ~ interfaceFunc.rep ~ "}"
+        "{" ~ eventDef.rep ~ interfaceFunc.rep ~ "}"
     ).map { case (typeId, inheritances, events, funcs) =>
       inheritances match {
         case Some(parents) if parents.length > 1 =>
