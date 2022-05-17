@@ -380,7 +380,7 @@ trait Endpoints
       .out(jsonBody[CompileContractResult])
       .summary("Compile a smart contract")
 
-  val deployContract: BaseEndpoint[BuildDeployContractTx, BuildDeployContractTxResult] =
+  val buildDeployContractTx: BaseEndpoint[BuildDeployContractTx, BuildDeployContractTxResult] =
     contractsUnsignedTxEndpoint.post
       .in("deploy-contract")
       .in(jsonBody[BuildDeployContractTx])

@@ -174,11 +174,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.getBlockHeader(blockFlow, hash))
   }
 
-  val getBalanceLogic = serverLogic(getBalance) { case (address) =>
+  val getBalanceLogic = serverLogic(getBalance) { address =>
     Future.successful(serverUtils.getBalance(blockFlow, GetBalance(address)))
   }
 
-  val getUTXOsLogic = serverLogic(getUTXOs) { case (address) =>
+  val getUTXOsLogic = serverLogic(getUTXOs) { address =>
     Future.successful(serverUtils.getUTXOsIncludePool(blockFlow, address))
   }
 
@@ -509,8 +509,8 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.compileContract(query))
   }
 
-  val deployContractLogic = serverLogic(deployContract) { query =>
-    Future.successful(serverUtils.deployContract(blockFlow, query))
+  val buildDeployContractTxLogic = serverLogic(buildDeployContractTx) { query =>
+    Future.successful(serverUtils.buildDeployContractTx(blockFlow, query))
   }
 
   val verifySignatureLogic = serverLogic(verifySignature) { query =>

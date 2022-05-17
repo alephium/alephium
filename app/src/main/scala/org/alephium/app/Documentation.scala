@@ -59,7 +59,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     compileScript,
     runScript,
     compileContract,
-    deployContract,
+    buildDeployContractTx,
     contractState,
     testContract,
     buildMultisigAddress,

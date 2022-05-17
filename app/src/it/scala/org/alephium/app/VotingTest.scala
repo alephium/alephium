@@ -30,7 +30,7 @@ class VotingTest extends AlephiumActorSpec {
     val admin  = wallets.head
     val voters = wallets.tail
     val ContractRef(contractId, contractAddress @ Address.Contract(_), contractCode) =
-      deployContract(admin, voters, U256.unsafe(voters.size))
+      buildDeployContractTx(admin, voters, U256.unsafe(voters.size))
     checkState(0, 0, false, false)
 
     allocateTokens(admin, voters, contractId.toHexString, contractCode)
@@ -175,7 +175,7 @@ class VotingTest extends AlephiumActorSpec {
 
 trait VotingFixture extends WalletFixture {
   // scalastyle:off method.length
-  def deployContract(admin: Wallet, voters: Seq[Wallet], tokenAmount: U256): ContractRef = {
+  def buildDeployContractTx(admin: Wallet, voters: Seq[Wallet], tokenAmount: U256): ContractRef = {
     val allocationTransfers = voters.zipWithIndex
       .map { case (_, i) =>
         s"""
@@ -334,7 +334,7 @@ trait WalletFixture extends CliqueFixture {
   ): ContractRef = {
     val compileResult = request[CompileContractResult](compileContract(code), restPort)
     val buildResult = request[BuildDeployContractTxResult](
-      deployContract(
+      buildDeployContractTx(
         fromPublicKey = wallet.publicKey.toHexString,
         code = compileResult.bytecode,
         initialFields = initialFields,

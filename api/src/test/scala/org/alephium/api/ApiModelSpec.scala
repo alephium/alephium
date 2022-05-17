@@ -636,7 +636,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode BuildContract" in {
     val publicKey = PublicKey.generate
-    val deployContract = BuildDeployContractTx(
+    val buildDeployContractTx = BuildDeployContractTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
       issueTokenAmount = Some(Amount(1)),
@@ -653,13 +653,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "gasPrice": "1"
          |}
          |""".stripMargin
-    checkData(deployContract, jsonRaw)
+    checkData(buildDeployContractTx, jsonRaw)
   }
 
   it should "encode/decode BuildDeployContractTxResult" in {
     val txId       = Hash.generate
     val contractId = Hash.generate
-    val deployContractResult = BuildDeployContractTxResult(
+    val buildDeployContractTxResult = BuildDeployContractTxResult(
       group = 2,
       unsignedTx = "0000",
       gasAmount = GasBox.unsafe(1),
@@ -678,7 +678,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "contractAddress": "${Address.contract(contractId).toBase58}"
          |}
          |""".stripMargin
-    checkData(deployContractResult, jsonRaw)
+    checkData(buildDeployContractTxResult, jsonRaw)
   }
 
   it should "encode/decode BuildScriptTx" in {

@@ -525,7 +525,7 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val deployContractExamples: List[Example[BuildDeployContractTx]] = List(
+  implicit val buildDeployContractTxExamples: List[Example[BuildDeployContractTx]] = List(
     defaultExample(BuildDeployContractTx(publicKey, bytecode = byteString)),
     moreSettingsExample(
       BuildDeployContractTx(
@@ -553,7 +553,7 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val deployContractResultExamples: List[Example[BuildDeployContractTxResult]] =
+  implicit val buildDeployContractTxResultExamples: List[Example[BuildDeployContractTxResult]] =
     simpleExample(
       BuildDeployContractTxResult(
         group = 2,
