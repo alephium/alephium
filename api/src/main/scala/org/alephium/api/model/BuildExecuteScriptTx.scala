@@ -14,16 +14,20 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api
+package org.alephium.api.model
 
-import org.alephium.protocol.Hash
+import akka.util.ByteString
 
-package object model {
-  /*
-   * As the introduce of template variables to contract&script, each
-   * contract source file can be used to populate different contract
-   * bytecode for deployment and testing. Therefore, a unique id for
-   * the original source file is helpful for SDK.
-   */
-  type ArtifactId = Hash
-}
+import org.alephium.protocol.PublicKey
+import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.AVector
+
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class BuildExecuteScriptTx(
+    fromPublicKey: PublicKey,
+    bytecode: ByteString,
+    alphAmount: Option[Amount] = None,
+    tokens: Option[AVector[Token]] = None,
+    gasAmount: Option[GasBox] = None,
+    gasPrice: Option[GasPrice] = None
+) extends BuildTxCommon

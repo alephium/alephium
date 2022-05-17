@@ -225,20 +225,18 @@ trait Endpoints
       .out(jsonBody[Boolean])
       .summary("Check if the block is in main chain")
 
-  val getBalance: BaseEndpoint[(Address.Asset, Option[Int]), Balance] =
+  val getBalance: BaseEndpoint[Address.Asset, Balance] =
     addressesEndpoint.get
       .in(path[Address.Asset]("address"))
       .in("balance")
-      .in(query[Option[Int]]("utxosLimit"))
       .out(jsonBodyWithAlph[Balance])
       .summary("Get the balance of an address")
 
   // TODO: query based on token id?
-  val getUTXOs: BaseEndpoint[(Address.Asset, Option[Int]), UTXOs] =
+  val getUTXOs: BaseEndpoint[Address.Asset, UTXOs] =
     addressesEndpoint.get
       .in(path[Address.Asset]("address"))
       .in("utxos")
-      .in(query[Option[Int]]("utxosLimit"))
       .out(jsonBody[UTXOs])
       .summary("Get the UTXOs of an address")
 
@@ -368,11 +366,11 @@ trait Endpoints
       .out(jsonBody[CompileScriptResult])
       .summary("Compile a script")
 
-  val buildScript: BaseEndpoint[BuildScriptTx, BuildScriptTxResult] =
+  val buildExecuteScriptTx: BaseEndpoint[BuildExecuteScriptTx, BuildExecuteScriptTxResult] =
     contractsUnsignedTxEndpoint.post
-      .in("build-script")
-      .in(jsonBody[BuildScriptTx])
-      .out(jsonBody[BuildScriptTxResult])
+      .in("execute-script")
+      .in(jsonBody[BuildExecuteScriptTx])
+      .out(jsonBody[BuildExecuteScriptTxResult])
       .summary("Build an unsigned script")
 
   val compileContract: BaseEndpoint[Compile.Contract, CompileContractResult] =
@@ -382,11 +380,11 @@ trait Endpoints
       .out(jsonBody[CompileContractResult])
       .summary("Compile a smart contract")
 
-  val buildContract: BaseEndpoint[BuildContractDeployScriptTx, BuildContractDeployScriptTxResult] =
+  val buildDeployContractTx: BaseEndpoint[BuildDeployContractTx, BuildDeployContractTxResult] =
     contractsUnsignedTxEndpoint.post
-      .in("build-contract")
-      .in(jsonBody[BuildContractDeployScriptTx])
-      .out(jsonBody[BuildContractDeployScriptTxResult])
+      .in("deploy-contract")
+      .in(jsonBody[BuildDeployContractTx])
+      .out(jsonBody[BuildDeployContractTxResult])
       .summary("Build an unsigned contract")
 
   lazy val contractState: BaseEndpoint[(Address.Contract, GroupIndex), ContractState] =

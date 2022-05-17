@@ -359,8 +359,7 @@ trait EndpointsExamples extends ErrorExamples {
         moreSettingsDestinations,
         Some(AVector(outputRef)),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice),
-        Some(defaultUtxosLimit)
+        Some(model.defaultGasPrice)
       )
     )
   )
@@ -379,8 +378,7 @@ trait EndpointsExamples extends ErrorExamples {
           address,
           Some(ts),
           Some(model.minimalGas),
-          Some(model.defaultGasPrice),
-          Some(defaultUtxosLimit)
+          Some(model.defaultGasPrice)
         )
       )
     )
@@ -479,7 +477,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val compileScriptResultExamples: List[Example[CompileScriptResult]] =
     simpleExample(
       CompileScriptResult(
-        compiled = SimpleScriptByteCode(byteString),
+        bytecodeTemplate = hexString,
         functions = AVector(
           CompileResult.FunctionSig(
             name = "bar",
@@ -502,7 +500,8 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val compileContractResultExamples: List[Example[CompileContractResult]] =
     simpleExample(
       CompileContractResult(
-        compiled = SimpleContractByteCode(byteString),
+        bytecode = hexString,
+        codeHash = hash,
         fields = CompileResult.FieldsSig(
           signature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
           types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
@@ -526,40 +525,37 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildContractExamples: List[Example[BuildContractDeployScriptTx]] = List(
-    defaultExample(BuildContractDeployScriptTx(publicKey, bytecode = byteString)),
+  implicit val buildDeployContractTxExamples: List[Example[BuildDeployContractTx]] = List(
+    defaultExample(BuildDeployContractTx(publicKey, bytecode = byteString)),
     moreSettingsExample(
-      BuildContractDeployScriptTx(
+      BuildDeployContractTx(
         publicKey,
         byteString,
-        AVector(Val.True, ValU256(U256.unsafe(123))),
         Some(bigAmount),
         Some(bigAmount),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice),
-        Some(defaultUtxosLimit)
+        Some(model.defaultGasPrice)
       )
     )
   )
 
-  implicit val buildScriptExamples: List[Example[BuildScriptTx]] = List(
-    defaultExample(BuildScriptTx(publicKey, bytecode = byteString)),
+  implicit val buildExecuteScriptTxExamples: List[Example[BuildExecuteScriptTx]] = List(
+    defaultExample(BuildExecuteScriptTx(publicKey, bytecode = byteString)),
     moreSettingsExample(
-      BuildScriptTx(
+      BuildExecuteScriptTx(
         publicKey,
         byteString,
         Some(Amount(model.dustUtxoAmount)),
         Some(tokens),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice),
-        Some(defaultUtxosLimit)
+        Some(model.defaultGasPrice)
       )
     )
   )
 
-  implicit val buildContractResultExamples: List[Example[BuildContractDeployScriptTxResult]] =
+  implicit val buildDeployContractTxResultExamples: List[Example[BuildDeployContractTxResult]] =
     simpleExample(
-      BuildContractDeployScriptTxResult(
+      BuildDeployContractTxResult(
         group = 2,
         unsignedTx = hexString,
         model.minimalGas,
@@ -569,9 +565,9 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildScriptResultExamples: List[Example[BuildScriptTxResult]] =
+  implicit val buildExecuteScriptTxResultExamples: List[Example[BuildExecuteScriptTxResult]] =
     simpleExample(
-      BuildScriptTxResult(
+      BuildExecuteScriptTxResult(
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,
@@ -583,7 +579,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit lazy val contractStateExamples: List[Example[ContractState]] =
     simpleExample(existingContract)
 
-  private def asset(n: Long) = AssetState(
+  private def asset(n: Long) = AssetState.from(
     ALPH.alph(n),
     AVector(Token(id = Hash.hash(s"token${n}"), amount = ALPH.nanoAlph(n)))
   )
@@ -592,7 +588,7 @@ trait EndpointsExamples extends ErrorExamples {
   private lazy val existingContract = ContractState(
     address = Address.contract(anotherContractId),
     bytecode = code,
-    artifactId = code.hash,
+    codeHash = code.hash,
     fields = AVector[Val](ValU256(ALPH.alph(2))),
     asset = asset(2)
   )
@@ -602,11 +598,10 @@ trait EndpointsExamples extends ErrorExamples {
         group = Some(0),
         address = Some(Address.contract(ContractId.zero)),
         bytecode = code,
-        artifactId = code.hash,
-        initialFields = AVector[Val](ValU256(ALPH.oneAlph)),
+        initialFields = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         initialAsset = Some(asset(1)),
         testMethodIndex = Some(0),
-        testArgs = AVector[Val](ValU256(ALPH.oneAlph)),
+        testArgs = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         existingContracts = Some(AVector(existingContract)),
         inputAssets = Some(AVector(TestContract.InputAsset(address, asset(3))))
       )
@@ -617,7 +612,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       TestContractResult(
         address = contractAddress,
-        artifactId = hash,
+        codeHash = hash,
         returns = AVector[Val](ValU256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),

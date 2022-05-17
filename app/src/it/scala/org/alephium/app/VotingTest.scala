@@ -20,6 +20,7 @@ import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey}
 import org.alephium.protocol.model.{Address, ContractId}
+import org.alephium.protocol.vm
 import org.alephium.util._
 import org.alephium.wallet.api.model._
 
@@ -29,7 +30,7 @@ class VotingTest extends AlephiumActorSpec {
     val admin  = wallets.head
     val voters = wallets.tail
     val ContractRef(contractId, contractAddress @ Address.Contract(_), contractCode) =
-      deployContract(admin, voters, U256.unsafe(voters.size))
+      buildDeployContractTx(admin, voters, U256.unsafe(voters.size))
     checkState(0, 0, false, false)
 
     allocateTokens(admin, voters, contractId.toHexString, contractCode)
@@ -174,7 +175,7 @@ class VotingTest extends AlephiumActorSpec {
 
 trait VotingFixture extends WalletFixture {
   // scalastyle:off method.length
-  def deployContract(admin: Wallet, voters: Seq[Wallet], tokenAmount: U256): ContractRef = {
+  def buildDeployContractTx(admin: Wallet, voters: Seq[Wallet], tokenAmount: U256): ContractRef = {
     val allocationTransfers = voters.zipWithIndex
       .map { case (_, i) =>
         s"""
@@ -232,15 +233,19 @@ trait VotingFixture extends WalletFixture {
         | }
       """.stripMargin
     // scalastyle:on no.equal
-    val votersList: AVector[Val] =
-      AVector.from(voters.map(wallet => ValAddress(Address.fromBase58(wallet.activeAddress).get)))
+    val votersList: AVector[vm.Val] =
+      AVector.from(
+        voters.map(wallet =>
+          vm.Val.Address(Address.fromBase58(wallet.activeAddress).get.lockupScript)
+        )
+      )
     voters.map(wallet => s"@${wallet.activeAddress}").mkString(",")
-    val initialFields = AVector[Val](
-      ValU256(U256.Zero),
-      ValU256(U256.Zero),
-      Val.False,
-      Val.False,
-      ValAddress(Address.fromBase58(admin.activeAddress).get)
+    val initialFields = AVector[vm.Val](
+      vm.Val.U256(U256.Zero),
+      vm.Val.U256(U256.Zero),
+      vm.Val.False,
+      vm.Val.False,
+      vm.Val.Address(Address.fromBase58(admin.activeAddress).get.lockupScript)
     ) ++ votersList
     contract(admin, votingContract, Some(initialFields), Some(tokenAmount))
   }
@@ -324,14 +329,14 @@ trait WalletFixture extends CliqueFixture {
   def contract(
       wallet: Wallet,
       code: String,
-      initialFields: Option[AVector[Val]],
+      initialFields: Option[AVector[vm.Val]],
       issueTokenAmount: Option[U256]
   ): ContractRef = {
     val compileResult = request[CompileContractResult](compileContract(code), restPort)
-    val buildResult = request[BuildContractDeployScriptTxResult](
-      buildContract(
+    val buildResult = request[BuildDeployContractTxResult](
+      buildDeployContractTx(
         fromPublicKey = wallet.publicKey.toHexString,
-        code = compileResult.bytecodeUnsafe,
+        code = compileResult.bytecode,
         initialFields = initialFields,
         issueTokenAmount = issueTokenAmount
       ),
@@ -353,10 +358,10 @@ trait WalletFixture extends CliqueFixture {
 
   def script(publicKey: String, code: String, walletName: String) = {
     val compileResult = request[CompileScriptResult](compileScript(code), restPort)
-    val buildResult = request[BuildScriptTxResult](
-      buildScript(
+    val buildResult = request[BuildExecuteScriptTxResult](
+      buildExecuteScriptTx(
         fromPublicKey = publicKey,
-        code = compileResult.bytecodeUnsafe
+        code = compileResult.bytecodeTemplate
       ),
       restPort
     )

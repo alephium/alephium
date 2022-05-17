@@ -794,14 +794,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "utxosLimit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -3924,14 +3916,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "utxosLimit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -4051,14 +4035,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "name": "utxosLimit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer"
             }
           }
         ],
@@ -4824,8 +4800,7 @@
                       }
                     ],
                     "gasAmount": 20000,
-                    "gasPrice": "100000000000",
-                    "utxosLimit": 512
+                    "gasPrice": "100000000000"
                   }
                 }
               }
@@ -4948,8 +4923,7 @@
                     "toAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "lockTime": 1611041396892,
                     "gasAmount": 20000,
-                    "gasPrice": "100000000000",
-                    "utxosLimit": 512
+                    "gasPrice": "100000000000"
                   }
                 }
               }
@@ -5452,10 +5426,7 @@
                   "$ref": "#/components/schemas/CompileScriptResult"
                 },
                 "example": {
-                  "compiled": {
-                    "type": "SimpleScriptByteCode",
-                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
-                  },
+                  "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "functions": [
                     {
                       "name": "bar",
@@ -5560,18 +5531,18 @@
         }
       }
     },
-    "/contracts/unsigned-tx/build-script": {
+    "/contracts/unsigned-tx/execute-script": {
       "post": {
         "tags": [
           "Contracts"
         ],
         "summary": "Build an unsigned script",
-        "operationId": "postContractsUnsigned-txBuild-script",
+        "operationId": "postContractsUnsigned-txExecute-script",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BuildScriptTx"
+                "$ref": "#/components/schemas/BuildExecuteScriptTx"
               },
               "examples": {
                 "Example0": {
@@ -5598,8 +5569,7 @@
                       }
                     ],
                     "gasAmount": 20000,
-                    "gasPrice": "100000000000",
-                    "utxosLimit": 512
+                    "gasPrice": "100000000000"
                   }
                 }
               }
@@ -5612,7 +5582,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildScriptTxResult"
+                  "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
                 },
                 "example": {
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
@@ -5721,10 +5691,8 @@
                   "$ref": "#/components/schemas/CompileContractResult"
                 },
                 "example": {
-                  "compiled": {
-                    "type": "SimpleContractByteCode",
-                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
-                  },
+                  "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
+                  "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
                     "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
                     "types": [
@@ -5839,18 +5807,18 @@
         }
       }
     },
-    "/contracts/unsigned-tx/build-contract": {
+    "/contracts/unsigned-tx/deploy-contract": {
       "post": {
         "tags": [
           "Contracts"
         ],
         "summary": "Build an unsigned contract",
-        "operationId": "postContractsUnsigned-txBuild-contract",
+        "operationId": "postContractsUnsigned-txDeploy-contract",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BuildContractDeployScriptTx"
+                "$ref": "#/components/schemas/BuildDeployContractTx"
               },
               "examples": {
                 "Example0": {
@@ -5865,21 +5833,10 @@
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
-                    "initialFields": [
-                      {
-                        "type": "Bool",
-                        "value": true
-                      },
-                      {
-                        "type": "U256",
-                        "value": "123"
-                      }
-                    ],
-                    "alphAmount": "2000000000000000000",
+                    "initialAlphAmount": "2000000000000000000",
                     "issueTokenAmount": "2000000000000000000",
                     "gasAmount": 20000,
-                    "gasPrice": "100000000000",
-                    "utxosLimit": 512
+                    "gasPrice": "100000000000"
                   }
                 }
               }
@@ -5892,7 +5849,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildContractDeployScriptTxResult"
+                  "$ref": "#/components/schemas/BuildDeployContractTxResult"
                 },
                 "example": {
                   "group": 2,
@@ -6009,7 +5966,7 @@
                 "example": {
                   "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                   "bytecode": "00010700000000000118",
-                  "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                  "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                   "fields": [
                     {
                       "type": "U256",
@@ -6115,7 +6072,6 @@
                 "group": 0,
                 "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
                 "bytecode": "00010700000000000118",
-                "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                 "initialFields": [
                   {
                     "type": "U256",
@@ -6142,7 +6098,7 @@
                   {
                     "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                     "bytecode": "00010700000000000118",
-                    "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                    "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                     "fields": [
                       {
                         "type": "U256",
@@ -6188,7 +6144,7 @@
                 },
                 "example": {
                   "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
-                  "artifactId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "returns": [
                     {
                       "type": "U256",
@@ -6200,7 +6156,7 @@
                     {
                       "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                       "bytecode": "00010700000000000118",
-                      "artifactId": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                      "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                       "fields": [
                         {
                           "type": "U256",
@@ -7661,8 +7617,7 @@
       },
       "AssetState": {
         "required": [
-          "alphAmount",
-          "tokens"
+          "alphAmount"
         ],
         "type": "object",
         "properties": {
@@ -7912,11 +7867,10 @@
           }
         }
       },
-      "BuildContractDeployScriptTx": {
+      "BuildDeployContractTx": {
         "required": [
           "fromPublicKey",
-          "bytecode",
-          "initialFields"
+          "bytecode"
         ],
         "type": "object",
         "properties": {
@@ -7928,13 +7882,7 @@
             "type": "string",
             "format": "byte-string"
           },
-          "initialFields": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Val"
-            }
-          },
-          "alphAmount": {
+          "initialAlphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -7949,13 +7897,10 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-          },
-          "utxosLimit": {
-            "type": "integer"
           }
         }
       },
-      "BuildContractDeployScriptTxResult": {
+      "BuildDeployContractTxResult": {
         "required": [
           "group",
           "unsignedTx",
@@ -7987,6 +7932,71 @@
           "contractAddress": {
             "type": "string",
             "format": "address"
+          }
+        }
+      },
+      "BuildExecuteScriptTx": {
+        "required": [
+          "fromPublicKey",
+          "bytecode"
+        ],
+        "type": "object",
+        "properties": {
+          "fromPublicKey": {
+            "type": "string",
+            "format": "public-key"
+          },
+          "bytecode": {
+            "type": "string",
+            "format": "byte-string"
+          },
+          "alphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          }
+        }
+      },
+      "BuildExecuteScriptTxResult": {
+        "required": [
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "group"
+        ],
+        "type": "object",
+        "properties": {
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "group": {
+            "type": "integer"
           }
         }
       },
@@ -8037,9 +8047,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-          },
-          "utxosLimit": {
-            "type": "integer"
           }
         }
       },
@@ -8074,74 +8081,6 @@
           }
         }
       },
-      "BuildScriptTx": {
-        "required": [
-          "fromPublicKey",
-          "bytecode"
-        ],
-        "type": "object",
-        "properties": {
-          "fromPublicKey": {
-            "type": "string",
-            "format": "public-key"
-          },
-          "bytecode": {
-            "type": "string",
-            "format": "byte-string"
-          },
-          "alphAmount": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "tokens": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "utxosLimit": {
-            "type": "integer"
-          }
-        }
-      },
-      "BuildScriptTxResult": {
-        "required": [
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "group"
-        ],
-        "type": "object",
-        "properties": {
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "group": {
-            "type": "integer"
-          }
-        }
-      },
       "BuildSweepAddressTransactions": {
         "required": [
           "fromPublicKey",
@@ -8168,9 +8107,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-          },
-          "utxosLimit": {
-            "type": "integer"
           }
         }
       },
@@ -8226,9 +8162,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-          },
-          "utxosLimit": {
-            "type": "integer"
           }
         }
       },
@@ -8314,15 +8247,20 @@
       },
       "CompileContractResult": {
         "required": [
-          "compiled",
+          "bytecode",
+          "codeHash",
           "fields",
           "functions",
           "events"
         ],
         "type": "object",
         "properties": {
-          "compiled": {
-            "$ref": "#/components/schemas/CompiledContractTrait"
+          "bytecode": {
+            "type": "string"
+          },
+          "codeHash": {
+            "type": "string",
+            "format": "32-byte-hash"
           },
           "fields": {
             "$ref": "#/components/schemas/FieldsSig"
@@ -8343,14 +8281,14 @@
       },
       "CompileScriptResult": {
         "required": [
-          "compiled",
+          "bytecodeTemplate",
           "functions",
           "events"
         ],
         "type": "object",
         "properties": {
-          "compiled": {
-            "$ref": "#/components/schemas/CompiledScriptTrait"
+          "bytecodeTemplate": {
+            "type": "string"
           },
           "functions": {
             "type": "array",
@@ -8364,32 +8302,6 @@
               "$ref": "#/components/schemas/EventSig"
             }
           }
-        }
-      },
-      "CompiledContractTrait": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/SimpleContractByteCode"
-          },
-          {
-            "$ref": "#/components/schemas/TemplateContractByteCode"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type"
-        }
-      },
-      "CompiledScriptTrait": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/SimpleScriptByteCode"
-          },
-          {
-            "$ref": "#/components/schemas/TemplateScriptByteCode"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type"
         }
       },
       "Confirmed": {
@@ -8509,7 +8421,7 @@
         "required": [
           "address",
           "bytecode",
-          "artifactId",
+          "codeHash",
           "fields",
           "asset"
         ],
@@ -8523,7 +8435,7 @@
             "type": "string",
             "format": "contract"
           },
-          "artifactId": {
+          "codeHash": {
             "type": "string",
             "format": "32-byte-hash"
           },
@@ -9157,38 +9069,6 @@
           }
         }
       },
-      "SimpleContractByteCode": {
-        "required": [
-          "bytecode",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "bytecode": {
-            "type": "string",
-            "format": "byte-string"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "SimpleScriptByteCode": {
-        "required": [
-          "bytecode",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "bytecode": {
-            "type": "string",
-            "format": "byte-string"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "SubmitMultisig": {
         "required": [
           "unsignedTx",
@@ -9277,49 +9157,9 @@
           }
         }
       },
-      "TemplateContractByteCode": {
-        "required": [
-          "filedLength",
-          "methodsByteCode",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "filedLength": {
-            "type": "integer"
-          },
-          "methodsByteCode": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
-      "TemplateScriptByteCode": {
-        "required": [
-          "templateByteCode",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "templateByteCode": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
       "TestContract": {
         "required": [
-          "bytecode",
-          "artifactId",
-          "initialFields",
-          "testArgs"
+          "bytecode"
         ],
         "type": "object",
         "properties": {
@@ -9333,10 +9173,6 @@
           "bytecode": {
             "type": "string",
             "format": "contract"
-          },
-          "artifactId": {
-            "type": "string",
-            "format": "32-byte-hash"
           },
           "initialFields": {
             "type": "array",
@@ -9373,7 +9209,7 @@
       "TestContractResult": {
         "required": [
           "address",
-          "artifactId",
+          "codeHash",
           "returns",
           "gasUsed",
           "contracts",
@@ -9386,7 +9222,7 @@
             "type": "string",
             "format": "address"
           },
-          "artifactId": {
+          "codeHash": {
             "type": "string",
             "format": "32-byte-hash"
           },
