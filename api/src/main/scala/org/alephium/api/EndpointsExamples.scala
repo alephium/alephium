@@ -579,7 +579,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit lazy val contractStateExamples: List[Example[ContractState]] =
     simpleExample(existingContract)
 
-  private def asset(n: Long) = AssetState(
+  private def asset(n: Long) = AssetState.from(
     ALPH.alph(n),
     AVector(Token(id = Hash.hash(s"token${n}"), amount = ALPH.nanoAlph(n)))
   )
@@ -598,10 +598,10 @@ trait EndpointsExamples extends ErrorExamples {
         group = Some(0),
         address = Some(Address.contract(ContractId.zero)),
         bytecode = code,
-        initialFields = AVector[Val](ValU256(ALPH.oneAlph)),
+        initialFields = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         initialAsset = Some(asset(1)),
         testMethodIndex = Some(0),
-        testArgs = AVector[Val](ValU256(ALPH.oneAlph)),
+        testArgs = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         existingContracts = Some(AVector(existingContract)),
         inputAssets = Some(AVector(TestContract.InputAsset(address, asset(3))))
       )

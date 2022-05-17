@@ -7617,8 +7617,7 @@
       },
       "AssetState": {
         "required": [
-          "alphAmount",
-          "tokens"
+          "alphAmount"
         ],
         "type": "object",
         "properties": {
@@ -9160,9 +9159,7 @@
       },
       "TestContract": {
         "required": [
-          "bytecode",
-          "initialFields",
-          "testArgs"
+          "bytecode"
         ],
         "type": "object",
         "properties": {

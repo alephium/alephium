@@ -31,10 +31,10 @@ final case class TestContract(
     group: Option[Int] = None,
     address: Option[Address.Contract] = None,
     bytecode: StatefulContract,
-    initialFields: AVector[Val] = TestContract.initialFieldsDefault,
+    initialFields: Option[AVector[Val]] = None,
     initialAsset: Option[AssetState] = None,
     testMethodIndex: Option[Int] = None,
-    testArgs: AVector[Val] = TestContract.testArgsDefault,
+    testArgs: Option[AVector[Val]] = None,
     existingContracts: Option[AVector[ContractState]] = None,
     inputAssets: Option[AVector[TestContract.InputAsset]] = None
 ) {
@@ -55,10 +55,10 @@ final case class TestContract(
             group.getOrElse(groupDefault),
             address.getOrElse(addressDefault).contractId,
             code = testCode,
-            initialFields,
+            initialFields.getOrElse(AVector.empty),
             initialAsset.getOrElse(initialAssetDefault),
             methodIndex,
-            testArgs,
+            testArgs.getOrElse(AVector.empty),
             existingContracts.getOrElse(existingContractsDefault),
             inputAssets.getOrElse(inputAssetsDefault)
           )
@@ -101,7 +101,7 @@ object TestContract {
         asset.alphAmount,
         address.lockupScript,
         TimeStamp.zero,
-        asset.tokens.map(token => (token.id, token.amount)),
+        asset.flatTokens.map(token => (token.id, token.amount)),
         ByteString.empty
       )
 
@@ -116,7 +116,7 @@ object TestContract {
         U256Const(vm.Val.U256(alphAmount)),
         ApproveAlph
       )
-      val tokenInstrs = asset.tokens.flatMap[Instr[StatefulContext]] { token =>
+      val tokenInstrs = asset.flatTokens.flatMap[Instr[StatefulContext]] { token =>
         AVector(
           addressConst,
           BytesConst(vm.Val.ByteVec(token.id.bytes)),
