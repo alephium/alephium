@@ -435,7 +435,7 @@ trait Endpoints
       .in("check-hash-indexing")
       .summary("Check and repair the indexing of block hashes")
 
-  val getContractEvents
+  lazy val getContractEvents
       : BaseEndpoint[(Address.Contract, CounterRange, Option[GroupIndex]), Option[Events]] =
     contractEventsEndpoint.get
       .in(path[Address.Contract]("contractAddress"))
@@ -451,7 +451,7 @@ trait Endpoints
       .out(jsonBody[Int])
       .summary("Get current value of the events counter for a contract")
 
-  val getEventsByTxId: BaseEndpoint[(Hash, Option[GroupIndex]), Option[Events]] =
+  lazy val getEventsByTxId: BaseEndpoint[(Hash, Option[GroupIndex]), Option[Events]] =
     eventsByTxIdEndpoint.get
       .in(path[Hash]("txId"))
       .in(query[Option[GroupIndex]]("group"))
