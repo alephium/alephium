@@ -57,7 +57,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     decodeUnsignedTransaction,
     getTransactionStatus,
     compileScript,
-    runScript,
+    buildExecuteScriptTx,
     compileContract,
     buildDeployContractTx,
     contractState,

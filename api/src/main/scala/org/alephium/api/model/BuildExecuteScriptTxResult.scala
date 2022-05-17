@@ -23,18 +23,18 @@ import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
-final case class BuildScriptTxResult(
+final case class BuildExecuteScriptTxResult(
     unsignedTx: String,
     gasAmount: GasBox,
     gasPrice: GasPrice,
     txId: Hash,
     group: Int
 ) extends GasInfo
-object BuildScriptTxResult {
+object BuildExecuteScriptTxResult {
   def from(
       unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildScriptTxResult =
-    BuildScriptTxResult(
+  )(implicit groupConfig: GroupConfig): BuildExecuteScriptTxResult =
+    BuildExecuteScriptTxResult(
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,
       unsignedTx.gasPrice,

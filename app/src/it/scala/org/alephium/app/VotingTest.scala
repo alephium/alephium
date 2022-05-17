@@ -358,8 +358,8 @@ trait WalletFixture extends CliqueFixture {
 
   def script(publicKey: String, code: String, walletName: String) = {
     val compileResult = request[CompileScriptResult](compileScript(code), restPort)
-    val buildResult = request[BuildScriptTxResult](
-      runScript(
+    val buildResult = request[BuildExecuteScriptTxResult](
+      buildExecuteScriptTx(
         fromPublicKey = publicKey,
         code = compileResult.bytecodeTemplate
       ),

@@ -248,11 +248,11 @@ trait ApiModelCodec {
 
   implicit val buildDeployContractTxRW: RW[BuildDeployContractTx] = macroRW
 
-  implicit val runScriptRW: RW[BuildScriptTx] = macroRW
+  implicit val buildExecuteScriptTxRW: RW[BuildExecuteScriptTx] = macroRW
 
   implicit val buildDeployContractTxResultRW: RW[BuildDeployContractTxResult] = macroRW
 
-  implicit val runScriptResultRW: RW[BuildScriptTxResult] = macroRW
+  implicit val buildExecuteScriptTxResultRW: RW[BuildExecuteScriptTxResult] = macroRW
 
   implicit val buildMultisigAddressRW: RW[BuildMultisigAddress] = macroRW
 

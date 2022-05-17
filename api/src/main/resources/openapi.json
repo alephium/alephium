@@ -5531,18 +5531,18 @@
         }
       }
     },
-    "/contracts/unsigned-tx/run-script": {
+    "/contracts/unsigned-tx/execute-script": {
       "post": {
         "tags": [
           "Contracts"
         ],
         "summary": "Build an unsigned script",
-        "operationId": "postContractsUnsigned-txRun-script",
+        "operationId": "postContractsUnsigned-txExecute-script",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BuildScriptTx"
+                "$ref": "#/components/schemas/BuildExecuteScriptTx"
               },
               "examples": {
                 "Example0": {
@@ -5582,7 +5582,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BuildScriptTxResult"
+                  "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
                 },
                 "example": {
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
@@ -7935,6 +7935,71 @@
           }
         }
       },
+      "BuildExecuteScriptTx": {
+        "required": [
+          "fromPublicKey",
+          "bytecode"
+        ],
+        "type": "object",
+        "properties": {
+          "fromPublicKey": {
+            "type": "string",
+            "format": "public-key"
+          },
+          "bytecode": {
+            "type": "string",
+            "format": "byte-string"
+          },
+          "alphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          }
+        }
+      },
+      "BuildExecuteScriptTxResult": {
+        "required": [
+          "unsignedTx",
+          "gasAmount",
+          "gasPrice",
+          "txId",
+          "group"
+        ],
+        "type": "object",
+        "properties": {
+          "unsignedTx": {
+            "type": "string"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "group": {
+            "type": "integer"
+          }
+        }
+      },
       "BuildInfo": {
         "required": [
           "releaseVersion",
@@ -8013,71 +8078,6 @@
           "address": {
             "type": "string",
             "format": "address"
-          }
-        }
-      },
-      "BuildScriptTx": {
-        "required": [
-          "fromPublicKey",
-          "bytecode"
-        ],
-        "type": "object",
-        "properties": {
-          "fromPublicKey": {
-            "type": "string",
-            "format": "public-key"
-          },
-          "bytecode": {
-            "type": "string",
-            "format": "byte-string"
-          },
-          "alphAmount": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "tokens": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          }
-        }
-      },
-      "BuildScriptTxResult": {
-        "required": [
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "group"
-        ],
-        "type": "object",
-        "properties": {
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer",
-            "format": "gas"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "group": {
-            "type": "integer"
           }
         }
       },

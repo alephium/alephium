@@ -539,10 +539,10 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val runScriptExamples: List[Example[BuildScriptTx]] = List(
-    defaultExample(BuildScriptTx(publicKey, bytecode = byteString)),
+  implicit val buildExecuteScriptTxExamples: List[Example[BuildExecuteScriptTx]] = List(
+    defaultExample(BuildExecuteScriptTx(publicKey, bytecode = byteString)),
     moreSettingsExample(
-      BuildScriptTx(
+      BuildExecuteScriptTx(
         publicKey,
         byteString,
         Some(Amount(model.dustUtxoAmount)),
@@ -565,9 +565,9 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val runScriptResultExamples: List[Example[BuildScriptTxResult]] =
+  implicit val buildExecuteScriptTxResultExamples: List[Example[BuildExecuteScriptTxResult]] =
     simpleExample(
-      BuildScriptTxResult(
+      BuildExecuteScriptTxResult(
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,

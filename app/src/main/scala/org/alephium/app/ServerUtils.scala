@@ -787,7 +787,10 @@ class ServerUtils(implicit
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
-  def runScript(blockFlow: BlockFlow, query: BuildScriptTx): Try[BuildScriptTxResult] = {
+  def buildExecuteScriptTx(
+      blockFlow: BlockFlow,
+      query: BuildExecuteScriptTx
+  ): Try[BuildExecuteScriptTxResult] = {
     val alphAmount = query.alphAmount.map(_.value).getOrElse(U256.Zero)
     val tokens     = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
     for {
@@ -803,7 +806,7 @@ class ServerUtils(implicit
         query.gasAmount,
         query.gasPrice
       )
-    } yield BuildScriptTxResult.from(utx)
+    } yield BuildExecuteScriptTxResult.from(utx)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
