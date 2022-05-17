@@ -746,13 +746,23 @@ abstract class RestServerSpec(
     val start      = 10
     val end        = 100
     val urlBase    = s"/events/contract/$dummyContractAddress"
-    val chainIndex = ChainIndex.unsafe(0, 0)
+    val chainIndex = ChainIndex.from(blockHash, groupConfig.groups)
 
     info("with valid start and end")
-    Get(s"$urlBase?start=$start&end=$end").check(validResponse)
+    verifyEventsResponse(
+      s"$urlBase?start=$start&end=$end",
+      s"$urlBase?start=$start&end=$end&group=${chainIndex.from.value}",
+      chainIndex,
+      port
+    )(validResponse)
 
     info("with start only")
-    Get(s"$urlBase?start=$start").check(validResponse)
+    verifyEventsResponse(
+      s"$urlBase?start=$start",
+      s"$urlBase?start=$start&group=${chainIndex.from.value}",
+      chainIndex,
+      port
+    )(validResponse)
 
     info("with start smaller than end")
     Get(s"$urlBase?start=$end&end=$start").check { response =>
@@ -813,53 +823,67 @@ abstract class RestServerSpec(
     val txId      = Hash.random
 
     servers.foreach { server =>
-      Get(
+      val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
+      verifyEventsResponse(
         s"/events/tx-id/${txId.toHexString}",
+        s"/events/tx-id/${txId.toHexString}?group=${chainIndex.from.value}",
+        chainIndex,
         server.port
-      ) check { response =>
-        val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
-        val rightNode  = server.node.config.broker.chainIndexes.contains(chainIndex)
-
-        if (rightNode) {
-          response.code is StatusCode.Ok
-          val events = response.body.rightValue
-          events is s"""
-        |{
-        |  "chainFrom": ${chainIndex.from.value},
-        |  "chainTo": ${chainIndex.to.value},
-        |  "events": [
-        |    {
-        |      "blockHash": "${blockHash.toHexString}",
-        |      "contractAddress": "${Address.contract(txId).toBase58}",
-        |      "txId": "${dummyTx.id.toHexString}",
-        |      "eventIndex": 0,
-        |      "fields": [
-        |        {
-        |          "type": "U256",
-        |          "value": "4"
-        |        },
-        |        {
-        |          "type": "Address",
-        |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
-        |        },
-        |        {
-        |          "type": "Address",
-        |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
-        |        }
-        |      ]
-        |    }
-        |  ],
-        |  "nextStart": 2
-        |}
-        |""".stripMargin.filterNot(_.isWhitespace)
-        } else {
-          response.code is StatusCode.NotFound
-          val error = response.as[ApiError.NotFound]
-          error.detail is s"Transaction ${txId.toHexString} not found"
-        }
+      ) { response =>
+        response.code is StatusCode.Ok
+        val events = response.body.rightValue
+        events is s"""
+            |{
+            |  "chainFrom": ${chainIndex.from.value},
+            |  "chainTo": ${chainIndex.to.value},
+            |  "events": [
+            |    {
+            |      "blockHash": "${blockHash.toHexString}",
+            |      "contractAddress": "${Address.contract(txId).toBase58}",
+            |      "txId": "${dummyTx.id.toHexString}",
+            |      "eventIndex": 0,
+            |      "fields": [
+            |        {
+            |          "type": "U256",
+            |          "value": "4"
+            |        },
+            |        {
+            |          "type": "Address",
+            |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
+            |        },
+            |        {
+            |          "type": "Address",
+            |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
+            |        }
+            |      ]
+            |    }
+            |  ],
+            |  "nextStart": 2
+            |}
+            |""".stripMargin.filterNot(_.isWhitespace)
       }
     }
   }
+
+  // scalastyle:off no.equal
+  def verifyEventsResponse(
+      urlWithoutGroup: String,
+      urlWithGroup: String,
+      chainIndex: ChainIndex,
+      port: Int
+  )(validVerify: Response[Either[String, String]] => Assertion) = {
+    if (nbOfNodes === 1) {
+      AVector(urlWithoutGroup, urlWithGroup).foreach(Get(_, port) check validVerify)
+    } else {
+      Get(urlWithoutGroup, port) check { response =>
+        response.code is StatusCode.BadRequest
+        response.body.leftValue is s"""{"detail":"`group` parameter is required with multiple brokers"}"""
+      }
+
+      Get(s"$urlWithGroup?group=${chainIndex.from.value}", port).check(validVerify)
+    }
+  }
+  // scalastyle:on no.equal
 
   it should "get current events count for a contract" in {
     val url = s"/events/contract/$dummyContractAddress/current-count"
@@ -871,23 +895,19 @@ abstract class RestServerSpec(
 
   it should "get current events count for a TxScript" in {
     val blockHash = dummyBlock.hash
-    val url       = s"/events/tx-id/${dummyTx.id.toHexString}"
 
     servers.foreach { server =>
-      Get(url, server.port) check { response =>
-        val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
-        val rightNode  = server.node.config.broker.chainIndexes.contains(chainIndex)
-
-        if (rightNode) {
-          response.code is StatusCode.Ok
-          response.body.rightValue.startsWith(
-            s"""{"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"events":["""
-          ) is true
-        } else {
-          response.code is StatusCode.NotFound
-          val error = response.as[ApiError.NotFound]
-          error.detail is s"Transaction ${dummyTx.id.toHexString} not found"
-        }
+      val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
+      verifyEventsResponse(
+        s"/events/tx-id/${dummyTx.id.toHexString}",
+        s"/events/tx-id/${dummyTx.id.toHexString}?group=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      ) { response =>
+        response.code is StatusCode.Ok
+        response.body.rightValue.startsWith(
+          s"""{"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"events":["""
+        ) is true
       }
     }
   }
