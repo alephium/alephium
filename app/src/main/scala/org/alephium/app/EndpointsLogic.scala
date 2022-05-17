@@ -275,14 +275,24 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   private def serverLogicRedirect[P, A](
       endpoint: BaseEndpoint[P, A]
-  )(localLogic: P => Future[Either[ApiError[_ <: StatusCode], A]], getIndex: P => GroupIndex) = {
+  )(
+      localLogic: P => Future[Either[ApiError[_ <: StatusCode], A]],
+      getIndex: P => Either[ApiError[_ <: StatusCode], Option[GroupIndex]]
+  ) = {
     serverLogic(endpoint) { params =>
-      requestFromGroupIndex(
-        getIndex(params),
-        localLogic(params),
-        endpoint,
-        params
-      )
+      getIndex(params) match {
+        case Right(Some(groupIndex)) =>
+          requestFromGroupIndex(
+            groupIndex,
+            localLogic(params),
+            endpoint,
+            params
+          )
+        case Right(None) =>
+          localLogic(params)
+        case Left(e) =>
+          Future.successful(Left[ApiError[_ <: StatusCode], A](e))
+      }
     }
   }
 
@@ -330,7 +340,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
             )
         )
       },
-    bt => LockupScript.p2pkh(bt.fromPublicKey).groupIndex(brokerConfig)
+    bt => Right(Some(LockupScript.p2pkh(bt.fromPublicKey).groupIndex(brokerConfig)))
   )
 
   val buildMultisigLogic = serverLogicRedirect(buildMultisig)(
@@ -344,7 +354,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
             )
         )
       },
-    bt => bt.fromAddress.lockupScript.groupIndex(brokerConfig)
+    bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
   )
 
   val buildSweepAddressTransactionsLogic = serverLogicRedirect(buildSweepAddressTransactions)(
@@ -358,7 +368,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
             )
         )
       },
-    bst => LockupScript.p2pkh(bst.fromPublicKey).groupIndex(brokerConfig)
+    bst => Right(Some(LockupScript.p2pkh(bst.fromPublicKey).groupIndex(brokerConfig)))
   )
 
   val submitTransactionLogic =
@@ -559,18 +569,25 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
-  val getContractEventsLogic = serverLogic(getContractEvents) {
-    case (contractAddress, counterRange) =>
-      Future.successful {
-        val contractId = contractAddress.lockupScript.contractId
-        serverUtils.getEventsForContract(
-          blockFlow,
-          counterRange.start,
-          counterRange.endOpt,
-          contractId
-        )
+  val getContractEventsLogic = serverLogicRedirect(getContractEvents)(
+    {
+      case (contractAddress, counterRange, _) => {
+        Future.successful {
+          serverUtils.getEvents(
+            blockFlow,
+            counterRange.start,
+            counterRange.endOpt,
+            contractAddress.lockupScript.contractId
+          )
+        }
       }
-  }
+    },
+    {
+      case (_, _, groupIndexOpt) => {
+        getGroupIndex(groupIndexOpt)
+      }
+    }
+  )
 
   val getContractEventsCurrentCountLogic = serverLogic(getContractEventsCurrentCount) {
     contractAddress =>
@@ -579,11 +596,18 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       }
   }
 
-  val getEventsByTxIdLogic = serverLogic(getEventsByTxId) { txId =>
-    Future.successful {
-      serverUtils.getEventsForTxId(blockFlow, txId)
+  val getEventsByTxIdLogic = serverLogicRedirect(getEventsByTxId)(
+    { case (txId, _) =>
+      Future.successful {
+        serverUtils.getEventsByTxId(blockFlow, txId)
+      }
+    },
+    {
+      case (_, groupIndexOpt) => {
+        getGroupIndex(groupIndexOpt)
+      }
     }
-  }
+  )
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   val metricsLogic = metrics.serverLogic[Future] { _ =>
@@ -675,6 +699,17 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
           }
         }
     }
+
+  private def getGroupIndex(groupIndexOpt: Option[GroupIndex]) = {
+    (brokerConfig.brokerNum, groupIndexOpt) match {
+      case (1, _) =>
+        Right(groupIndexOpt)
+      case (_, Some(groupIndex)) =>
+        Right(Some(groupIndex))
+      case (_, None) =>
+        Left(ApiError.BadRequest("`group` parameter is required with multiple brokers"))
+    }
+  }
 }
 
 object EndpointsLogic {

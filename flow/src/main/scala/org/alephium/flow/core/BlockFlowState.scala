@@ -67,7 +67,7 @@ trait BlockFlowState extends FlowTipsUtil {
     }
   }
 
-  def logStorage: KeyValueStorage[LogStatesId, LogStates] = {
+  val logStorage: KeyValueStorage[LogStatesId, LogStates] = {
     assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
     intraGroupBlockChains.head.worldStateStorage.logStorage
   }

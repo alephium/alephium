@@ -358,19 +358,6 @@ class ServerUtils(implicit
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
-  def getEventsForContract(
-      blockFlow: BlockFlow,
-      start: Int,
-      endOpt: Option[Int],
-      contractId: ContractId
-  ): Try[Events] = {
-    for {
-      groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
-      chainIndex = ChainIndex(groupIndex, groupIndex)
-      result <- getEvents(blockFlow, start, endOpt, chainIndex, contractId)
-    } yield result
-  }
-
   def getEventsForContractCurrentCount(
       blockFlow: BlockFlow,
       contractAddress: Address.Contract
@@ -382,16 +369,6 @@ class ServerUtils(implicit
       countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId))
       count    <- countOpt.toRight(notFound(s"Current events count for contract $contractAddress"))
     } yield count
-  }
-
-  def getEventsForTxId(
-      blockFlow: BlockFlow,
-      txId: Hash
-  ): Try[Events] = {
-    for {
-      chainIndex <- getChainIndexForTx(blockFlow, txId)
-      result     <- getEventsByTxId(blockFlow, txId, chainIndex)
-    } yield result
   }
 
   def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =
@@ -476,11 +453,10 @@ class ServerUtils(implicit
     }
   }
 
-  private def getEventsByTxId(
+  def getEventsByTxId(
       blockFlow: BlockFlow,
-      txId: Hash,
-      chainIndex: ChainIndex
-  ): Try[Events] = {
+      txId: Hash
+  ): Try[Option[Events]] = {
     wrapResult(
       for {
         result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
@@ -499,22 +475,18 @@ class ServerUtils(implicit
             }
             .map(states => logStates.copy(states = states))
         }
-      } yield Events(
-        chainIndex.from.value,
-        chainIndex.to.value,
-        logStates.flatMap(Events.from),
-        nextStart
-      )
+      } yield {
+        Events.from(logStates, nextStart)
+      }
     )
   }
 
-  private def getEvents(
+  def getEvents(
       blockFlow: BlockFlow,
       start: Int,
       endOpt: Option[Int],
-      chainIndex: ChainIndex,
       eventKey: Hash
-  ): Try[Events] = {
+  ): Try[Option[Events]] = {
     wrapResult(
       blockFlow
         .getEvents(
@@ -522,13 +494,10 @@ class ServerUtils(implicit
           start,
           endOpt.getOrElse(start + CounterRange.MaxCounterRange)
         )
-        .map { case (nextStart, logStatesVec) =>
-          Events(
-            chainIndex.from.value,
-            chainIndex.to.value,
-            logStatesVec.flatMap(Events.from),
-            nextStart
-          )
+        .map {
+          case (nextStart, logStatesVec) => {
+            Events.from(logStatesVec, nextStart)
+          }
         }
     )
   }

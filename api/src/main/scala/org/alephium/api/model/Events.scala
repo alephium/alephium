@@ -17,7 +17,8 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.{Address, ContractId}
+import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.{Address, ChainIndex, ContractId}
 import org.alephium.protocol.vm.LogStates
 import org.alephium.util.AVector
 
@@ -47,6 +48,21 @@ object Events {
         logState.txId,
         logState.index.toInt,
         logState.fields.map(Val.from)
+      )
+    }
+  }
+
+  def from(
+      logStatesVec: AVector[LogStates],
+      nextStart: Int
+  )(implicit groupConfig: GroupConfig): Option[Events] = {
+    logStatesVec.headOption.map { logStates =>
+      val chainIndex = ChainIndex.from(logStates.blockHash, groupConfig.groups)
+      Events(
+        chainIndex.from.value,
+        chainIndex.to.value,
+        logStatesVec.flatMap(Events.from),
+        nextStart
       )
     }
   }
