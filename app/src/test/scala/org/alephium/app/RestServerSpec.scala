@@ -349,62 +349,41 @@ abstract class RestServerSpec(
   }
 
   it should "call GET /transactions/status" in {
-    var txChainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+    val chainIndex = ChainIndex.from(dummyBlock.hash, groupConfig.groups)
+
     forAll(hashGen) { txId =>
       servers.foreach { server =>
-        Get(
+        verifyResponse(
           s"/transactions/status?txId=${txId.toHexString}",
+          s"/transactions/status?txId=${txId.toHexString}&fromGroup=${chainIndex.from.value}",
+          chainIndex,
           server.port
-        ) check { response =>
+        ) { response =>
           val status = response.as[TxStatus]
           response.code is StatusCode.Ok
-          txChainIndex = ChainIndex.from(status.asInstanceOf[Confirmed].blockHash)
           status is dummyTxStatus
         }
 
-        val rightNode = server.node.config.broker.contains(txChainIndex.from)
-
-        Get(
-          s"/transactions/status?txId=${txId.toHexString}&fromGroup=${txChainIndex.from.value}&toGroup=${txChainIndex.to.value}",
+        verifyResponse(
+          s"/transactions/status?txId=${txId.toHexString}&toGroup=${chainIndex.to.value}",
+          s"/transactions/status?txId=${txId.toHexString}&fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
+          chainIndex,
           server.port
-        ) check { response =>
-          if (rightNode) {
-            val status = response.as[TxStatus]
-            response.code is StatusCode.Ok
-            status is dummyTxStatus
-          } else {
-            val status = response.as[TxStatus]
-            response.code is StatusCode.Ok
-            status is TxNotFound
-          }
+        ) { response =>
+          val status = response.as[TxStatus]
+          response.code is StatusCode.Ok
+          status is dummyTxStatus
         }
 
-        Get(
-          s"/transactions/status?txId=${txId.toHexString}&fromGroup=${txChainIndex.from.value}",
+        verifyResponse(
+          s"/transactions/status?txId=${txId.toHexString}",
+          s"/transactions/status?txId=${txId.toHexString}&fromGroup=${chainIndex.from.value}",
+          chainIndex,
           server.port
-        ) check { response =>
-          if (rightNode) {
-            val status = response.as[TxStatus]
-            response.code is StatusCode.Ok
-            status is dummyTxStatus
-          } else {
-            response.code is StatusCode.Ok
-            response.as[TxStatus] is TxNotFound
-          }
-        }
-
-        Get(
-          s"/transactions/status?txId=${txId.toHexString}&toGroup=${txChainIndex.to.value}",
-          server.port
-        ) check { response =>
-          if (rightNode) {
-            val status = response.as[TxStatus]
-            response.code is StatusCode.Ok
-            status is dummyTxStatus
-          } else {
-            response.code is StatusCode.Ok
-            response.as[TxStatus] is TxNotFound
-          }
+        ) { response =>
+          val status = response.as[TxStatus]
+          response.code is StatusCode.Ok
+          status is dummyTxStatus
         }
       }
     }
@@ -749,7 +728,7 @@ abstract class RestServerSpec(
     val chainIndex = ChainIndex.from(blockHash, groupConfig.groups)
 
     info("with valid start and end")
-    verifyEventsResponse(
+    verifyResponse(
       s"$urlBase?start=$start&end=$end",
       s"$urlBase?start=$start&end=$end&group=${chainIndex.from.value}",
       chainIndex,
@@ -757,7 +736,7 @@ abstract class RestServerSpec(
     )(validResponse)
 
     info("with start only")
-    verifyEventsResponse(
+    verifyResponse(
       s"$urlBase?start=$start",
       s"$urlBase?start=$start&group=${chainIndex.from.value}",
       chainIndex,
@@ -824,7 +803,7 @@ abstract class RestServerSpec(
 
     servers.foreach { server =>
       val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
-      verifyEventsResponse(
+      verifyResponse(
         s"/events/tx-id/${txId.toHexString}",
         s"/events/tx-id/${txId.toHexString}?group=${chainIndex.from.value}",
         chainIndex,
@@ -866,7 +845,7 @@ abstract class RestServerSpec(
   }
 
   // scalastyle:off no.equal
-  def verifyEventsResponse(
+  def verifyResponse(
       urlWithoutGroup: String,
       urlWithGroup: String,
       chainIndex: ChainIndex,
@@ -898,7 +877,7 @@ abstract class RestServerSpec(
 
     servers.foreach { server =>
       val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
-      verifyEventsResponse(
+      verifyResponse(
         s"/events/tx-id/${dummyTx.id.toHexString}",
         s"/events/tx-id/${dummyTx.id.toHexString}?group=${chainIndex.from.value}",
         chainIndex,

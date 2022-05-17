@@ -393,10 +393,14 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
       _.fromGroup
     )
 
-  val getTransactionStatusLogic = serverLogic(getTransactionStatus) {
-    case (txId, fromGroup, toGroup) =>
+  val getTransactionStatusLogic = serverLogicRedirect(getTransactionStatus)(
+    { case (txId, fromGroup, toGroup) =>
       searchTransactionStatus(txId, fromGroup, toGroup)
-  }
+    },
+    { case (_, fromGroup, _) =>
+      getGroupIndex(fromGroup)
+    }
+  )
 
   private def searchTransactionStatus(
       txId: Hash,
