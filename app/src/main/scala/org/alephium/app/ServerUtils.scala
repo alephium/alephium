@@ -753,7 +753,7 @@ class ServerUtils(implicit
         code.contract,
         address,
         code.initialFields,
-        query.alphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
+        query.initialAlphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
@@ -1063,14 +1063,14 @@ object ServerUtils {
       contract: StatefulContract,
       address: Address,
       initialFields: AVector[vm.Val],
-      alphAmount: U256,
+      initialAlphAmount: U256,
       newTokenAmount: Option[U256]
   )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
     deployContractWithParsedState(
       Hex.toHexString(serialize(contract)),
       address,
       initialFields,
-      alphAmount,
+      initialAlphAmount,
       newTokenAmount
     )
   }
@@ -1079,7 +1079,7 @@ object ServerUtils {
       codeRaw: String,
       address: Address,
       initialFields: AVector[vm.Val],
-      alphAmount: U256,
+      initialAlphAmount: U256,
       newTokenAmount: Option[U256]
   )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
     val stateRaw = Hex.toHexString(serialize(initialFields))
@@ -1091,7 +1091,7 @@ object ServerUtils {
     val scriptRaw = s"""
       |TxScript Main {
       |  pub payable fn main() -> () {
-      |    approveAlph!(@${address.toBase58}, ${alphAmount.v})
+      |    approveAlph!(@${address.toBase58}, ${initialAlphAmount.v})
       |    $creation
       |  }
       |}

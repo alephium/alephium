@@ -5833,7 +5833,7 @@
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
-                    "alphAmount": "2000000000000000000",
+                    "initialAlphAmount": "2000000000000000000",
                     "issueTokenAmount": "2000000000000000000",
                     "gasAmount": 20000,
                     "gasPrice": "100000000000"
@@ -7882,7 +7882,7 @@
             "type": "string",
             "format": "byte-string"
           },
-          "alphAmount": {
+          "initialAlphAmount": {
             "type": "string",
             "format": "uint256"
           },
