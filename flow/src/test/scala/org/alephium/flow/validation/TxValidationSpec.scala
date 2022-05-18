@@ -788,9 +788,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val rawScript =
       s"""
          |TxScript P2sh {
-         |  pub fn main() -> () {
-         |    return
-         |  }
+         |  return
          |}
          |""".stripMargin
 
@@ -813,9 +811,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val rawScript =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    return
-         |  }
+         |  return
          |}
          |""".stripMargin
 
@@ -841,9 +837,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val rawScript =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    return
-         |  }
+         |  return
          |}
          |""".stripMargin
 
@@ -862,9 +856,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val invalidExecutionRawScript =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    assert!(1 == 2)
-         |  }
+         |  assert!(1 == 2)
          |}
          |""".stripMargin
     // scalastyle:on no.equal
@@ -880,9 +872,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val rawScript =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    return
-         |  }
+         |  return
          |}
          |""".stripMargin
 

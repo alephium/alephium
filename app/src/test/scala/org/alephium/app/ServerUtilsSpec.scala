@@ -1163,9 +1163,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val rawCode =
         s"""
            |TxScript Main(x: U256, y: U256) {
-           |  pub fn main() -> () {
-           |    assert!(x != y)
-           |  }
+           |  assert!(x != y)
            |}
            |""".stripMargin
 
@@ -1178,9 +1176,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val rawCode =
         s"""
            |TxScript Main {
-           |  pub fn main() -> () {
-           |    assert!(1 != 2)
-           |  }
+           |  assert!(1 != 2)
            |}
            |""".stripMargin
       val code   = Compiler.compileTxScript(rawCode).rightValue

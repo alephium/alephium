@@ -381,6 +381,22 @@ object Ast {
     }
   }
 
+  object FuncDef {
+    def main(
+        stmts: Seq[Ast.Statement[StatefulContext]],
+        isPayable: Boolean
+    ): FuncDef[StatefulContext] = {
+      FuncDef[StatefulContext](
+        id = FuncId("main", false),
+        isPublic = true,
+        isPayable = isPayable,
+        args = Seq.empty,
+        rtypes = Seq.empty,
+        body = stmts
+      )
+    }
+  }
+
   sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
     def name: String
     def getVariables(state: Compiler.State[Ctx]): Seq[Ident]

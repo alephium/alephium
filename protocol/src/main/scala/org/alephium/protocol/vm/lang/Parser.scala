@@ -297,9 +297,18 @@ object StatefulParser extends Parser[StatefulContext] {
   def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
 
   def rawTxScript[_: P]: P[Ast.TxScript] =
-    P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ templateParams.? ~ "{" ~ func.rep(1) ~ "}")
-      .map { case (typeId, templateVars, funcs) =>
-        Ast.TxScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
+    P(
+      Lexer.keyword(
+        "TxScript"
+      ) ~/ Lexer.typeId ~ templateParams.? ~ Lexer.payable.? ~ "{" ~ statement.rep ~ func
+        .rep(0) ~ "}"
+    )
+      .map { case (typeId, templateVars, payable, mainStmts, funcs) =>
+        Ast.TxScript(
+          typeId,
+          templateVars.getOrElse(Seq.empty),
+          Ast.FuncDef.main(mainStmts, payable.nonEmpty) +: funcs
+        )
       }
   def txScript[_: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
 

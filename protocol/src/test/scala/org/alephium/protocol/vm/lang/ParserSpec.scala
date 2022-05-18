@@ -487,13 +487,8 @@ class ParserSpec extends AlephiumSpec {
   }
 
   trait ScriptFixture {
-    def script(tpe: String) =
-      s"""
-         |$tpe Main(x: U256) {
-         |  pub fn main() -> () {
-         |  }
-         |}
-         |""".stripMargin
+    val payable: Boolean
+    val script: String
 
     val ident        = TypeId("Main")
     val templateVars = Seq(Argument(Ident("x"), Type.U256, false))
@@ -501,7 +496,7 @@ class ParserSpec extends AlephiumSpec {
       FuncDef(
         FuncId("main", false),
         true,
-        false,
+        payable,
         Seq.empty,
         Seq.empty,
         Seq.empty
@@ -509,10 +504,40 @@ class ParserSpec extends AlephiumSpec {
     )
   }
 
-  it should "parse Script" in new ScriptFixture {
-    fastparse.parse(script("AssetScript"), StatelessParser.assetScript(_)).get.value is
+  it should "parse AssetScript" in new ScriptFixture {
+    val payable = false
+    val script  = s"""
+         |AssetScript Main(x: U256) {
+         |  pub fn main() -> () {
+         |  }
+         |}
+         |""".stripMargin
+
+    fastparse.parse(script, StatelessParser.assetScript(_)).get.value is
       AssetScript(ident, templateVars, funcs)
-    fastparse.parse(script("TxScript"), StatefulParser.txScript(_)).get.value is
-      TxScript(ident, templateVars, funcs)
+  }
+
+  abstract class TxScriptFixture(val payable: Boolean) extends ScriptFixture {
+    lazy val payableModifier = if (payable) "payable" else ""
+    lazy val script          = s"""
+         |TxScript Main(x: U256) $payableModifier {
+         |}
+         |""".stripMargin
+
+    def verify() = {
+      fastparse.parse(script, StatefulParser.txScript(_)).get.value is TxScript(
+        ident,
+        templateVars,
+        funcs
+      )
+    }
+  }
+
+  it should "parse payable TxScript" in new TxScriptFixture(true) {
+    verify()
+  }
+
+  it should "parse non payable TxScript" in new TxScriptFixture(false) {
+    verify()
   }
 }

@@ -560,11 +560,9 @@ object SwapContracts {
     """.stripMargin
 
   def tokenWithdrawTxScript(address: String, tokenContractKey: Hash, tokenAmount: U256) = s"""
-    |TxScript Main {
-    |  pub payable fn main() -> () {
-    |    let token = Token(#${tokenContractKey.toHexString})
-    |    token.withdraw(@${address}, $tokenAmount)
-    |  }
+    |TxScript Main payable {
+    |  let token = Token(#${tokenContractKey.toHexString})
+    |  token.withdraw(@${address}, $tokenAmount)
     |}
     |
     |$tokenContract
@@ -607,13 +605,11 @@ object SwapContracts {
       tokenAmount: U256,
       swapContractKey: Hash
   ) = s"""
-    |TxScript Main {
-    |  pub payable fn main() -> () {
-    |    approveAlph!(@${address}, $alphAmount)
-    |    approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
-    |    let swap = Swap(#${swapContractKey.toHexString})
-    |    swap.addLiquidity(@${address}, $alphAmount, $tokenAmount)
-    |  }
+    |TxScript Main payable {
+    |  approveAlph!(@${address}, $alphAmount)
+    |  approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
+    |  let swap = Swap(#${swapContractKey.toHexString})
+    |  swap.addLiquidity(@${address}, $alphAmount, $tokenAmount)
     |}
     |
     |$swapContract
@@ -625,24 +621,20 @@ object SwapContracts {
       tokenId: Hash,
       tokenAmount: U256
   ) = s"""
-    |TxScript Main {
-    |  pub payable fn main() -> () {
-    |    approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
-    |    let swap = Swap(#${swapContractKey.toHexString})
-    |    swap.swapAlph(@${address}, $tokenAmount)
-    |  }
+    |TxScript Main payable {
+    |  approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
+    |  let swap = Swap(#${swapContractKey.toHexString})
+    |  swap.swapAlph(@${address}, $tokenAmount)
     |}
     |
     |$swapContract
     |""".stripMargin
 
   def swapAlphForTokenTxScript(address: String, swapContractKey: Hash, alphAmount: U256) = s"""
-    |TxScript Main {
-    |  pub payable fn main() -> () {
-    |    approveAlph!(@${address}, $alphAmount)
-    |    let swap = Swap(#${swapContractKey.toHexString})
-    |    swap.swapToken(@${address}, $alphAmount)
-    |  }
+    |TxScript Main payable {
+    |  approveAlph!(@${address}, $alphAmount)
+    |  let swap = Swap(#${swapContractKey.toHexString})
+    |  swap.swapToken(@${address}, $alphAmount)
     |}
     |
     |$swapContract

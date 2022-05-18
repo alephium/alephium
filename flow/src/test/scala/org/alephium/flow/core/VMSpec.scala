@@ -57,9 +57,7 @@ class VMSpec extends AlephiumSpec {
     val input =
       s"""
          |TxScript Foo {
-         |  pub fn main() -> () {
-         |    foo(${frameStackMaxSize - 1})
-         |  }
+         |  foo(${frameStackMaxSize - 1})
          |
          |  fn foo(n: U256) -> () {
          |    if (n > 0) {
@@ -118,11 +116,9 @@ class VMSpec extends AlephiumSpec {
          |}
          |
          |TxScript Bar {
-         |  pub fn call() -> () {
-         |    let foo = Foo(#${contractKey0.toHexString})
-         |    foo.add(4)
-         |    return
-         |  }
+         |  let foo = Foo(#${contractKey0.toHexString})
+         |  foo.add(4)
+         |  return
          |}
          |""".stripMargin
   }
@@ -283,11 +279,9 @@ class VMSpec extends AlephiumSpec {
 
     val main =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    let foo = Foo(#${contractId.toHexString})
-         |    foo.foo(@${genesisAddress.toBase58})
-         |  }
+         |TxScript Main payable {
+         |  let foo = Foo(#${contractId.toHexString})
+         |  foo.foo(@${genesisAddress.toBase58})
          |}
          |
          |$input
@@ -348,10 +342,8 @@ class VMSpec extends AlephiumSpec {
     val main =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    let foo = Foo(#${contractKey0.toHexString})
-         |    foo.foo(#${contractKey0.toHexString}, #${contractKey1.toHexString})
-         |  }
+         |  let foo = Foo(#${contractKey0.toHexString})
+         |  foo.foo(#${contractKey0.toHexString}, #${contractKey1.toHexString})
          |}
          |
          |TxContract Foo(mut x: U256) {
@@ -411,19 +403,17 @@ class VMSpec extends AlephiumSpec {
     def expect(out: Int) =
       s"""
          |TxScript Inverse {
-         |  pub fn main() -> () {
-         |    let x = 10973
-         |    let mut y = 1
-         |    let mut i = 0
-         |    while (i <= 8) {
-         |      y = y ⊗ (2 ⊖ x ⊗ y)
-         |      i = i + 1
-         |    }
-         |    let r = x ⊗ y
-         |    assert!(r == $out)
-         |
-         |    test()
+         |  let x = 10973
+         |  let mut y = 1
+         |  let mut i = 0
+         |  while (i <= 8) {
+         |    y = y ⊗ (2 ⊖ x ⊗ y)
+         |    i = i + 1
          |  }
+         |  let r = x ⊗ y
+         |  assert!(r == $out)
+         |
+         |  test()
          |
          |  fn test() -> () {
          |    assert!((33 + 2 - 3) * 5 / 7 % 11 == 0)
@@ -487,21 +477,19 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript ByteVecTest {
-         |  pub fn main() -> () {
-         |    assert!(byteVec!(true) == #${encode(true)})
-         |    assert!(byteVec!(false) == #${encode(false)})
-         |    assert!(byteVec!(${i256}i) == #${encode(i256)})
-         |    assert!(byteVec!(${u256}) == #${encode(u256)})
-         |    assert!(byteVec!(@${address.toBase58}) == #${encode(address.lockupScript)})
-         |    assert!(# ++ #$bytes0 == #$bytes0)
-         |    assert!(#$bytes0 ++ # == #$bytes0)
-         |    assert!((#${bytes0} ++ #${bytes1}) == #${bytes0 ++ bytes1})
-         |    assert!(size!(byteVec!(true)) == 1)
-         |    assert!(size!(byteVec!(false)) == 1)
-         |    assert!(size!(byteVec!(@${address.toBase58})) == 33)
-         |    assert!(size!(#${bytes0} ++ #${bytes1}) == 64)
-         |    assert!(zeros!(2) == #0000)
-         |  }
+         |  assert!(byteVec!(true) == #${encode(true)})
+         |  assert!(byteVec!(false) == #${encode(false)})
+         |  assert!(byteVec!(${i256}i) == #${encode(i256)})
+         |  assert!(byteVec!(${u256}) == #${encode(u256)})
+         |  assert!(byteVec!(@${address.toBase58}) == #${encode(address.lockupScript)})
+         |  assert!(# ++ #$bytes0 == #$bytes0)
+         |  assert!(#$bytes0 ++ # == #$bytes0)
+         |  assert!((#${bytes0} ++ #${bytes1}) == #${bytes0 ++ bytes1})
+         |  assert!(size!(byteVec!(true)) == 1)
+         |  assert!(size!(byteVec!(false)) == 1)
+         |  assert!(size!(byteVec!(@${address.toBase58})) == 33)
+         |  assert!(size!(#${bytes0} ++ #${bytes1}) == 64)
+         |  assert!(zeros!(2) == #0000)
          |}
          |""".stripMargin
 
@@ -524,11 +512,9 @@ class VMSpec extends AlephiumSpec {
     val tokenAmount  = ALPH.oneNanoAlph
     val script =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    approveAlph!(@$genesisAddress, ${ALPH.alph(1).v})
-         |    copyCreateContractWithToken!(#$contractId, #$encodedState, ${tokenAmount.v})
-         |  }
+         |TxScript Main payable {
+         |  approveAlph!(@$genesisAddress, ${ALPH.alph(1).v})
+         |  copyCreateContractWithToken!(#$contractId, #$encodedState, ${tokenAmount.v})
          |}
          |""".stripMargin
 
@@ -597,13 +583,11 @@ class VMSpec extends AlephiumSpec {
 
     def main(state: String) =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    Bar(#$barId).bar(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
-         |    approveAlph!(@$genesisAddress, ${ALPH.alph(1).v})
-         |    copyCreateContract!(#$fooId, #$state)
-         |    assert!(isPaying!(@$genesisAddress) == true)
-         |  }
+         |TxScript Main payable {
+         |  Bar(#$barId).bar(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
+         |  approveAlph!(@$genesisAddress, ${ALPH.alph(1).v})
+         |  copyCreateContract!(#$fooId, #$state)
+         |  assert!(isPaying!(@$genesisAddress) == true)
          |}
          |
          |$bar
@@ -649,10 +633,8 @@ class VMSpec extends AlephiumSpec {
 
     def main(targetAddress: String) =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    Foo(#$fooId).destroy(@$targetAddress)
-         |  }
+         |TxScript Main payable {
+         |  Foo(#$fooId).destroy(@$targetAddress)
          |}
          |
          |$foo
@@ -670,11 +652,9 @@ class VMSpec extends AlephiumSpec {
       info("Destroy a contract twice, this should fail")
       val main =
         s"""
-           |TxScript Main {
-           |  pub payable fn main() -> () {
-           |    Foo(#$fooId).destroy(@${genesisAddress.toBase58})
-           |    Foo(#$fooId).destroy(@${genesisAddress.toBase58})
-           |  }
+           |TxScript Main payable {
+           |  Foo(#$fooId).destroy(@${genesisAddress.toBase58})
+           |  Foo(#$fooId).destroy(@${genesisAddress.toBase58})
            |}
            |
            |$foo
@@ -731,12 +711,10 @@ class VMSpec extends AlephiumSpec {
 
     def main(changeState: String, expected: String): String =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    let foo = Foo(#$fooId)
-         |    foo.foo(#${Hex.toHexString(serialize(fooV2Code))}, ${changeState})
-         |    foo.checkX(${expected})
-         |  }
+         |TxScript Main payable {
+         |  let foo = Foo(#$fooId)
+         |  foo.foo(#${Hex.toHexString(serialize(fooV2Code))}, ${changeState})
+         |  foo.checkX(${expected})
          |}
          |
          |$fooV1
@@ -791,10 +769,8 @@ class VMSpec extends AlephiumSpec {
 
     val main =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    Bar(#$barId).bar(@${genesisAddress.toBase58})
-         |  }
+         |TxScript Main payable {
+         |  Bar(#$barId).bar(@${genesisAddress.toBase58})
          |}
          |
          |$bar
@@ -823,10 +799,8 @@ class VMSpec extends AlephiumSpec {
 
     val main =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    Foo(#$fooId).foo(@${genesisAddress.toBase58})
-         |  }
+         |TxScript Main payable {
+         |  Foo(#$fooId).foo(@${genesisAddress.toBase58})
          |}
          |
          |$foo
@@ -841,11 +815,9 @@ class VMSpec extends AlephiumSpec {
     def main(latestHeader: BlockHeader) =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    assert!(networkId!() == #02)
-         |    assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis})
-         |    assert!(blockTarget!() == ${latestHeader.target.value})
-         |  }
+         |  assert!(networkId!() == #02)
+         |  assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis})
+         |  assert!(blockTarget!() == ${latestHeader.target.value})
          |}
          |""".stripMargin
 
@@ -866,11 +838,9 @@ class VMSpec extends AlephiumSpec {
     def main(index: Int) =
       s"""
          |TxScript TxEnv {
-         |  pub fn main() -> () {
-         |    assert!(txId!() != #${zeroId.toHexString})
-         |    assert!(txCaller!($index) == @${genesisAddress.toBase58})
-         |    assert!(txCallerSize!() == 1)
-         |  }
+         |  assert!(txId!() != #${zeroId.toHexString})
+         |  assert!(txCaller!($index) == @${genesisAddress.toBase58})
+         |  assert!(txCallerSize!() == 1)
          |}
          |""".stripMargin
     testSimpleScript(main(0))
@@ -883,16 +853,14 @@ class VMSpec extends AlephiumSpec {
     val main =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    assert!(blake2b!(#$input) == #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a)
-         |    assert!(blake2b!(#$input) != #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b370)
-         |    assert!(keccak256!(#$input) == #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E3C)
-         |    assert!(keccak256!(#$input) != #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E30)
-         |    assert!(sha256!(#$input) == #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A9A)
-         |    assert!(sha256!(#$input) != #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A90)
-         |    assert!(sha3!(#$input) == #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed743)
-         |    assert!(sha3!(#$input) != #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed740)
-         |  }
+         |  assert!(blake2b!(#$input) == #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a)
+         |  assert!(blake2b!(#$input) != #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b370)
+         |  assert!(keccak256!(#$input) == #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E3C)
+         |  assert!(keccak256!(#$input) != #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E30)
+         |  assert!(sha256!(#$input) == #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A9A)
+         |  assert!(sha256!(#$input) != #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A90)
+         |  assert!(sha3!(#$input) == #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed743)
+         |  assert!(sha3!(#$input) != #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed740)
          |}
          |""".stripMargin
     testSimpleScript(main)
@@ -908,10 +876,8 @@ class VMSpec extends AlephiumSpec {
     def main(p256Sig: String, ed25519Sig: String) =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig)
-         |    verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
-         |  }
+         |  verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig)
+         |  verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
          |}
          |""".stripMargin
     testSimpleScript(main(p256Sig, ed25519Sig))
@@ -923,11 +889,9 @@ class VMSpec extends AlephiumSpec {
     def main(messageHash: ByteString, signature: ByteString, address: ByteString) =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    let address = ethEcRecover!(#${Hex.toHexString(messageHash)},
-         |      #${Hex.toHexString(signature)})
-         |    assert!(address == #${Hex.toHexString(address)})
-         |  }
+         |  let address = ethEcRecover!(#${Hex.toHexString(messageHash)},
+         |    #${Hex.toHexString(signature)})
+         |  assert!(address == #${Hex.toHexString(address)})
          |}
          |""".stripMargin
     testSimpleScript(main(messageHash.bytes, signature, address))
@@ -946,10 +910,8 @@ class VMSpec extends AlephiumSpec {
     def main(absoluteTimeLock: TimeStamp, relativeTimeLock: Duration, txIndex: Int) =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    verifyAbsoluteLocktime!(${absoluteTimeLock.millis})
-         |    verifyRelativeLocktime!(${txIndex}, ${relativeTimeLock.millis})
-         |  }
+         |  verifyAbsoluteLocktime!(${absoluteTimeLock.millis})
+         |  verifyRelativeLocktime!(${txIndex}, ${relativeTimeLock.millis})
          |}
          |""".stripMargin
     testSimpleScript(main(block.timestamp, Duration.unsafe(1), 0))
@@ -972,9 +934,7 @@ class VMSpec extends AlephiumSpec {
       val hex    = Hex.toHexString(IndexedSeq.fill(size)(0xff.toByte))
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    assert!($func($number) == #$hex)
-         |  }
+         |  assert!($func($number) == #$hex)
          |}
          |""".stripMargin
     }
@@ -996,9 +956,7 @@ class VMSpec extends AlephiumSpec {
       val hex    = Hex.toHexString(IndexedSeq.fill(size)(0xff.toByte))
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    assert!($func(#$hex) == $u256)
-         |  }
+         |  assert!($func(#$hex) == $u256)
          |}
          |""".stripMargin
     }
@@ -1018,9 +976,7 @@ class VMSpec extends AlephiumSpec {
     def main(start: Int, end: Int, slice: String): String = {
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    assert!(byteVecSlice!(#$hex, $start, $end) == #$slice)
-         |  }
+         |  assert!(byteVecSlice!(#$hex, $start, $end) == #$slice)
          |}
          |""".stripMargin
     }
@@ -1045,9 +1001,7 @@ class VMSpec extends AlephiumSpec {
       val hex = Hex.toHexString(serialize(address.lockupScript))
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    assert!(byteVecToAddress!(#$hex) == @${address.toBase58})
-         |  }
+         |  assert!(byteVecToAddress!(#$hex) == @${address.toBase58})
          |}
          |""".stripMargin
     }
@@ -1084,13 +1038,10 @@ class VMSpec extends AlephiumSpec {
 
     callTxScript(
       s"""
-         |TxScript Main
+         |TxScript Main payable
          |{
-         |    pub payable fn main() -> ()
-         |    {
-         |        approveAlph!(@${genesisAddress.toBase58}, 1000000)
-         |        Nft(#${tokenId.toHexString}).buy(@${genesisAddress.toBase58})
-         |    }
+         |  approveAlph!(@${genesisAddress.toBase58}, 1000000)
+         |  Nft(#${tokenId.toHexString}).buy(@${genesisAddress.toBase58})
          |}
          |
          |$nftContract
@@ -1112,11 +1063,9 @@ class VMSpec extends AlephiumSpec {
     val tokenId = tokenContractKey
 
     callTxScript(s"""
-                    |TxScript Main {
-                    |  pub payable fn main() -> () {
-                    |    let token = Token(#${tokenContractKey.toHexString})
-                    |    token.withdraw(@${genesisAddress.toBase58}, 1024)
-                    |  }
+                    |TxScript Main payable {
+                    |  let token = Token(#${tokenContractKey.toHexString})
+                    |  token.withdraw(@${genesisAddress.toBase58}, 1024)
                     |}
                     |
                     |$tokenContract
@@ -1137,13 +1086,11 @@ class VMSpec extends AlephiumSpec {
     checkSwapBalance(dustUtxoAmount, 0)
 
     callTxScript(s"""
-                    |TxScript Main {
-                    |  pub payable fn main() -> () {
-                    |    approveAlph!(@${genesisAddress.toBase58}, 10)
-                    |    approveToken!(@${genesisAddress.toBase58}, #${tokenId.toHexString}, 100)
-                    |    let swap = Swap(#${swapContractKey.toHexString})
-                    |    swap.addLiquidity(@${genesisAddress.toBase58}, 10, 100)
-                    |  }
+                    |TxScript Main payable {
+                    |  approveAlph!(@${genesisAddress.toBase58}, 10)
+                    |  approveToken!(@${genesisAddress.toBase58}, #${tokenId.toHexString}, 100)
+                    |  let swap = Swap(#${swapContractKey.toHexString})
+                    |  swap.addLiquidity(@${genesisAddress.toBase58}, 10, 100)
                     |}
                     |
                     |${AMMContract.swapContract}
@@ -1151,12 +1098,10 @@ class VMSpec extends AlephiumSpec {
     checkSwapBalance(dustUtxoAmount + 10, 100)
 
     callTxScript(s"""
-                    |TxScript Main {
-                    |  pub payable fn main() -> () {
-                    |    approveAlph!(@${genesisAddress.toBase58}, 10)
-                    |    let swap = Swap(#${swapContractKey.toHexString})
-                    |    swap.swapToken(@${genesisAddress.toBase58}, 10)
-                    |  }
+                    |TxScript Main payable {
+                    |  approveAlph!(@${genesisAddress.toBase58}, 10)
+                    |  let swap = Swap(#${swapContractKey.toHexString})
+                    |  swap.swapToken(@${genesisAddress.toBase58}, 10)
                     |}
                     |
                     |${AMMContract.swapContract}
@@ -1164,12 +1109,10 @@ class VMSpec extends AlephiumSpec {
     checkSwapBalance(dustUtxoAmount + 20, 50)
 
     callTxScript(s"""
-                    |TxScript Main {
-                    |  pub payable fn main() -> () {
-                    |    approveToken!(@${genesisAddress.toBase58}, #${tokenId.toHexString}, 50)
-                    |    let swap = Swap(#${swapContractKey.toHexString})
-                    |    swap.swapAlph(@${genesisAddress.toBase58}, 50)
-                    |  }
+                    |TxScript Main payable {
+                    |  approveToken!(@${genesisAddress.toBase58}, #${tokenId.toHexString}, 50)
+                    |  let swap = Swap(#${swapContractKey.toHexString})
+                    |  swap.swapAlph(@${genesisAddress.toBase58}, 50)
                     |}
                     |
                     |${AMMContract.swapContract}
@@ -1190,10 +1133,8 @@ class VMSpec extends AlephiumSpec {
 
     val block = callTxScriptMulti(index => s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    let foo = Foo(#${contractKey.toHexString})
-         |    foo.foo($index)
-         |  }
+         |  let foo = Foo(#${contractKey.toHexString})
+         |  foo.foo($index)
          |}
          |
          |$testContract
@@ -1239,11 +1180,9 @@ class VMSpec extends AlephiumSpec {
 
     def main(address: LockupScript.Asset) =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    let foo = Foo(#${contractId.toHexString})
-         |    foo.foo(@${Address.Asset(address).toBase58})
-         |  }
+         |TxScript Main payable {
+         |  let foo = Foo(#${contractId.toHexString})
+         |  foo.foo(@${Address.Asset(address).toBase58})
          |}
          |
          |$testContract
@@ -1330,10 +1269,8 @@ class VMSpec extends AlephiumSpec {
     val script =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    let child = Child(#$contractId)
-         |    child.foo()
-         |  }
+         |  let child = Child(#$contractId)
+         |  child.foo()
          |}
          |$contract
          |""".stripMargin
@@ -1411,12 +1348,10 @@ class VMSpec extends AlephiumSpec {
          |$contractRaw
          |
          |TxScript Bar {
-         |  pub fn call() -> () {
-         |    let foo = Foo(#${contractId.toHexString})
-         |    foo.add(4)
+         |  let foo = Foo(#${contractId.toHexString})
+         |  foo.add(4)
          |
-         |    return
-         |  }
+         |  return
          |}
          |""".stripMargin
 
@@ -1482,10 +1417,8 @@ class VMSpec extends AlephiumSpec {
         s"""
            |$contractRaw
            |
-           |TxScript Main {
-           |  pub payable fn main() -> () {
-           |    Foo(#${contractId.toHexString}).destroy(@${genesisAddress.toBase58})
-           |  }
+           |TxScript Main payable {
+           |  Foo(#${contractId.toHexString}).destroy(@${genesisAddress.toBase58})
            |}
            |""".stripMargin
 
@@ -1594,10 +1527,8 @@ class VMSpec extends AlephiumSpec {
          |$contractRaw
          |
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    let contract = Add(#${contractId.toHexString})
-         |    contract.add(1, 2)
-         |  }
+         |  let contract = Add(#${contractId.toHexString})
+         |  contract.add(1, 2)
          |}
          |""".stripMargin
 
@@ -1646,12 +1577,10 @@ class VMSpec extends AlephiumSpec {
          |$contractRaw
          |
          |TxScript Bar {
-         |  pub fn call() -> () {
-         |    let foo = Foo(#${contractId.toHexString})
-         |    foo.testEventTypes()
+         |  let foo = Foo(#${contractId.toHexString})
+         |  foo.testEventTypes()
          |
-         |    return
-         |  }
+         |  return
          |}
          |""".stripMargin
 
@@ -1701,9 +1630,7 @@ class VMSpec extends AlephiumSpec {
          |$contractRaw
          |
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    Foo(#${contractId.toHexString}).foo()
-         |  }
+         |  Foo(#${contractId.toHexString}).foo()
          |}
          |""".stripMargin
 
@@ -1840,11 +1767,9 @@ class VMSpec extends AlephiumSpec {
 
     val main: String =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    approveAlph!(txCaller!(0), ${ALPH.alph(1).v})
-         |    Foo(#${contractId.toHexString}).foo()
-         |  }
+         |TxScript Main payable {
+         |  approveAlph!(txCaller!(0), ${ALPH.alph(1).v})
+         |  Foo(#${contractId.toHexString}).foo()
          |}
          |
          |$contract
@@ -1880,11 +1805,9 @@ class VMSpec extends AlephiumSpec {
 
     val main: String =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    approveAlph!(txCaller!(0), ${ALPH.alph(1).v})
-         |    Foo(#${contractId.toHexString}).foo()
-         |  }
+         |TxScript Main payable {
+         |  approveAlph!(txCaller!(0), ${ALPH.alph(1).v})
+         |  Foo(#${contractId.toHexString}).foo()
          |}
          |
          |$contract
@@ -1922,10 +1845,8 @@ class VMSpec extends AlephiumSpec {
 
     val main: String =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    Foo(#${fooId.toHexString}).foo(#${barId.toHexString})
-         |  }
+         |TxScript Main payable {
+         |  Foo(#${fooId.toHexString}).foo(#${barId.toHexString})
          |}
          |
          |$foo
@@ -1950,9 +1871,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    Foo(#${fooId.toHexString}).foo()
-         |  }
+         |  Foo(#${fooId.toHexString}).foo()
          |}
          |
          |$foo
@@ -1977,16 +1896,14 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    let foo = Foo(#${fooId.toHexString})
-         |    let (x, y, z) = foo.loadFields!()
-         |    assert!(x == true)
-         |    assert!(y[0][0] == 1)
-         |    assert!(y[0][1] == 2)
-         |    assert!(y[1][0] == 3)
-         |    assert!(y[1][1] == 4)
-         |    assert!(z == false)
-         |  }
+         |  let foo = Foo(#${fooId.toHexString})
+         |  let (x, y, z) = foo.loadFields!()
+         |  assert!(x == true)
+         |  assert!(y[0][0] == 1)
+         |  assert!(y[0][1] == 2)
+         |  assert!(y[1][0] == 3)
+         |  assert!(y[1][1] == 4)
+         |  assert!(z == false)
          |}
          |
          |$foo
@@ -2008,11 +1925,9 @@ class VMSpec extends AlephiumSpec {
 
     val main: String =
       s"""
-         |TxScript Main {
-         |  pub payable fn main() -> () {
-         |    Foo(#${fooId.toHexString}).foo()
-         |    transferAlph!(txCaller!(0), @${fooAddress}, ${ALPH.alph(1).v})
-         |  }
+         |TxScript Main payable {
+         |  Foo(#${fooId.toHexString}).foo()
+         |  transferAlph!(txCaller!(0), @${fooAddress}, ${ALPH.alph(1).v})
          |}
          |
          |$foo
@@ -2057,10 +1972,8 @@ class VMSpec extends AlephiumSpec {
     val main =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    let impl = I(#${contractId.toHexString})
-         |    assert!(impl.f1() == 1)
-         |  }
+         |  let impl = I(#${contractId.toHexString})
+         |  assert!(impl.f1() == 1)
          |}
          |
          |$interface
@@ -2093,10 +2006,8 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  pub fn main() -> () {
-         |    let foo = Foo(#${barId.toHexString})
-         |    foo.foo()
-         |  }
+         |  let foo = Foo(#${barId.toHexString})
+         |  foo.foo()
          |}
          |$foo
          |""".stripMargin
