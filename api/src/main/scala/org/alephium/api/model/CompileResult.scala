@@ -24,8 +24,7 @@ import org.alephium.util.{AVector, Hex}
 
 final case class CompileScriptResult(
     bytecodeTemplate: String,
-    functions: AVector[CompileResult.FunctionSig],
-    events: AVector[CompileResult.EventSig]
+    functions: AVector[CompileResult.FunctionSig]
 )
 
 object CompileScriptResult {
@@ -33,8 +32,7 @@ object CompileScriptResult {
     val bytecodeTemplate = script.toTemplateString()
     CompileScriptResult(
       bytecodeTemplate,
-      functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from)),
-      events = AVector.from(scriptAst.events.map(CompileResult.EventSig.from))
+      functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from))
     )
   }
 }

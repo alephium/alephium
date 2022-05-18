@@ -852,8 +852,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
         |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |    }
-        |  ],
-        |  "events": []
+        |  ]
         |}
         |""".stripMargin
     write(result1).filter(!_.isWhitespace) is jsonRaw1.filter(!_.isWhitespace)

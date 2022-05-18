@@ -5445,18 +5445,6 @@
                         "Address"
                       ]
                     }
-                  ],
-                  "events": [
-                    {
-                      "name": "Bar",
-                      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
-                      "fieldTypes": [
-                        "Bool",
-                        "U256",
-                        "ByteVec",
-                        "Address"
-                      ]
-                    }
                   ]
                 }
               }
@@ -8282,8 +8270,7 @@
       "CompileScriptResult": {
         "required": [
           "bytecodeTemplate",
-          "functions",
-          "events"
+          "functions"
         ],
         "type": "object",
         "properties": {
@@ -8294,12 +8281,6 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FunctionSig"
-            }
-          },
-          "events": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EventSig"
             }
           }
         }

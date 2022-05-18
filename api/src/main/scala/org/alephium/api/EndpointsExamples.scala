@@ -486,13 +486,6 @@ trait EndpointsExamples extends ErrorExamples {
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
           )
-        ),
-        events = AVector(
-          CompileResult.EventSig(
-            name = "Bar",
-            signature = "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
-            fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
-          )
         )
       )
     )
