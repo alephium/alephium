@@ -789,6 +789,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "test AMM contract: add liquidity" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
       code = AMMContract.swapCode,
+      originalCodeHash = AMMContract.swapCode.hash,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState.from(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
       testMethodIndex = 0,
@@ -843,6 +844,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
       code = AMMContract.swapProxyCode,
+      originalCodeHash = AMMContract.swapProxyCode.hash,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
       initialAsset = AssetState(ALPH.alph(1)),
@@ -893,6 +895,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "test AMM contract: swap token" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
       code = AMMContract.swapCode,
+      originalCodeHash = AMMContract.swapCode.hash,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState.from(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
       testMethodIndex = 1,
@@ -943,6 +946,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
       code = AMMContract.swapProxyCode,
+      originalCodeHash = AMMContract.swapProxyCode.hash,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
       initialAsset = AssetState(ALPH.alph(1)),
@@ -993,6 +997,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "test AMM contract: swap Alph" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
       code = AMMContract.swapCode,
+      originalCodeHash = AMMContract.swapCode.hash,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState.from(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
       testMethodIndex = 2,
@@ -1043,6 +1048,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
       code = AMMContract.swapProxyCode,
+      originalCodeHash = AMMContract.swapProxyCode.hash,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
       initialAsset = AssetState(ALPH.alph(1)),
@@ -1125,11 +1131,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.returns is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
     compileResult.codeHash is code.hash
     result.codeHash is contractState.codeHash
-    if (isPublic.nonEmpty) {
-      contractState.codeHash is compileResult.codeHash
-    } else {
-      contractState.codeHash isnot compileResult.codeHash
-    }
+    contractState.codeHash is compileResult.codeHash // We should return the original code hash even when the method is private
   }
 
   it should "compile contract" in new Fixture {
