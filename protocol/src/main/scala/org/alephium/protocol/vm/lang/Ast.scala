@@ -343,6 +343,7 @@ object Ast {
       val payablePrefix = if (isPayable) "payable " else ""
       s"${publicPrefix}${payablePrefix}${name}(${args.map(_.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
     }
+    def getArgNames(): Seq[String]          = args.map(_.ident.name)
     def getArgTypeSignatures(): Seq[String] = args.map(_.tpe.signature)
     def getReturnSignatures(): Seq[String]  = rtypes.map(_.signature)
 
@@ -442,6 +443,7 @@ object Ast {
 
     def signature: String = s"event ${id.name}(${fields.map(_.signature).mkString(",")})"
 
+    def getFieldNames(): Seq[String]          = fields.map(_.ident.name)
     def getFieldTypeSignatures(): Seq[String] = fields.map(_.tpe.signature)
   }
 
@@ -774,6 +776,7 @@ object Ast {
 
     def getTemplateVarsSignature(): String =
       s"TxScript ${name}(${templateVars.map(_.signature).mkString(",")})"
+    def getTemplateVarsNames(): Seq[String] = templateVars.map(_.ident.name)
     def getTemplateVarsTypes(): Seq[String] = templateVars.map(_.tpe.signature)
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
@@ -804,6 +807,7 @@ object Ast {
   ) extends ContractWithState {
     def getFieldsSignature(): String =
       s"TxContract ${name}(${fields.map(_.signature).mkString(",")})"
+    def getFieldNames(): Seq[String] = fields.map(_.ident.name)
     def getFieldTypes(): Seq[String] = fields.map(_.tpe.signature)
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {

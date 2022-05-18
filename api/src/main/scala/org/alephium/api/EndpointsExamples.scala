@@ -480,6 +480,7 @@ trait EndpointsExamples extends ErrorExamples {
         bytecodeTemplate = hexString,
         fields = CompileResult.FieldsSig(
           signature = "TxScript Bar(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+          names = AVector("aa", "bb", "cc", "dd", "ee"),
           types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
         ),
         functions = AVector(
@@ -487,6 +488,7 @@ trait EndpointsExamples extends ErrorExamples {
             name = "bar",
             signature =
               "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+            argNames = AVector("a", "b", "c", "d", "e"),
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
           )
@@ -501,6 +503,7 @@ trait EndpointsExamples extends ErrorExamples {
         codeHash = hash,
         fields = CompileResult.FieldsSig(
           signature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+          names = AVector("aa", "bb", "cc", "dd", "ee"),
           types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
         ),
         functions = AVector(
@@ -508,6 +511,7 @@ trait EndpointsExamples extends ErrorExamples {
             name = "bar",
             signature =
               "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+            argNames = AVector("a", "b", "c", "d", "e"),
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
           )
@@ -516,6 +520,7 @@ trait EndpointsExamples extends ErrorExamples {
           CompileResult.EventSig(
             name = "Bar",
             signature = "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
+            fieldNames = AVector("a", "b", "d", "e"),
             fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
           )
         )

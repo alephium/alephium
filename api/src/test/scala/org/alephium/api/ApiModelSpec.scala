@@ -819,12 +819,14 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "codeHash": "4106809d4ed811457fad02bc19619ca8f2a4a47a56bca4519a28d3671d9c7241",
         |  "fields": {
         |    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])",
+        |    "names": ["aa","bb","cc","dd","ee","ff"],
         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |  },
         |  "functions": [
         |    {
         |      "name": "bar",
         |      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
+        |      "argNames": ["a","b","c","d","e","f"],
         |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
         |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |    }
@@ -833,6 +835,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |    {
         |      "name": "Bar",
         |      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
+        |      "fieldNames":["a","b","d","e"],
         |      "fieldTypes": ["Bool", "U256", "ByteVec", "Address"]
         |    }
         |  ]
@@ -847,12 +850,14 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "bytecodeTemplate": "0101000707060716011602160316041605160602",
         |  "fields": {
         |    "signature": "TxScript Foo(aa:Bool,bb:U256,cc:I256,dd:ByteVec,ee:Address)",
+        |    "names": ["aa","bb","cc","dd","ee"],
         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address"]
         |  },
         |  "functions": [
         |    {
         |      "name": "bar",
         |      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
+        |      "argNames": ["a","b","c","d","e","f"],
         |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
         |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |    }
