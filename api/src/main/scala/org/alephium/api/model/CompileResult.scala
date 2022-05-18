@@ -24,14 +24,20 @@ import org.alephium.util.{AVector, Hex}
 
 final case class CompileScriptResult(
     bytecodeTemplate: String,
+    fields: CompileResult.FieldsSig,
     functions: AVector[CompileResult.FunctionSig]
 )
 
 object CompileScriptResult {
   def from(script: StatefulScript, scriptAst: Ast.TxScript): CompileScriptResult = {
     val bytecodeTemplate = script.toTemplateString()
+    val fields = CompileResult.FieldsSig(
+      scriptAst.getTemplateVarsSignature(),
+      AVector.from(scriptAst.getTemplateVarsTypes())
+    )
     CompileScriptResult(
       bytecodeTemplate,
+      fields = fields,
       functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from))
     )
   }

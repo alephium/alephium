@@ -1158,7 +1158,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "compile script" in new Fixture {
-    val expectedByteCode = "01010000000004{x:U256}{y:U256}304d"
+    val expectedByteCode = "01010000000004{0}{1}304d"
     val serverUtils      = new ServerUtils()
 
     {
@@ -1191,8 +1191,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
       result.bytecodeTemplate is Hex.toHexString(serialize(code))
       result.bytecodeTemplate is expectedByteCode
-        .replace("{x:U256}", "0d") // bytecode of U256Const1
-        .replace("{y:U256}", "0e") // bytecode of U256Const2
+        .replace("{0}", "0d") // bytecode of U256Const1
+        .replace("{1}", "0e") // bytecode of U256Const2
     }
   }
 

@@ -38,6 +38,10 @@ class TypeSpec extends AlephiumSpec {
     contractAst.events.map(_.getFieldTypeSignatures()) is
       Seq(Seq("Bool", "U256", "ByteVec", "Address"))
 
+    scriptAst.getTemplateVarsSignature() is
+      "TxScript Foo(aa:Bool,bb:U256,cc:I256,dd:ByteVec,ee:Address)"
+    scriptAst.getTemplateVarsTypes() is
+      Seq("Bool", "U256", "I256", "ByteVec", "Address")
     scriptAst.funcs.map(_.signature) is Seq(
       "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
     )
@@ -60,11 +64,12 @@ trait TypeSignatureFixture extends CompilerConfigFixture.Default {
 
   val scriptStr =
     s"""
-       |TxScript Foo {
+       |TxScript Foo(aa: Bool, bb: U256, cc: I256, dd: ByteVec, ee: Address) {
        |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
        |    return b, c, d, e, f
        |  }
        |}
        |""".stripMargin
+
   lazy val (script, scriptAst) = Compiler.compileTxScriptFull(scriptStr).toOption.get
 }

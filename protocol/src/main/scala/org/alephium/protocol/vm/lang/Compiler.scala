@@ -140,7 +140,7 @@ object Compiler {
   object VarInfo {
     final case class Local(tpe: Type, isMutable: Boolean, index: Byte) extends VarInfo
     final case class Field(tpe: Type, isMutable: Boolean, index: Byte) extends VarInfo
-    final case class Template(tpe: Type) extends VarInfo {
+    final case class Template(tpe: Type, index: Int) extends VarInfo {
       def isMutable: Boolean = false
     }
     final case class ArrayRef(isMutable: Boolean, ref: ArrayTransformer.ArrayRef) extends VarInfo {
@@ -302,16 +302,16 @@ object Compiler {
       if (scope == Ast.FuncId.empty) name else s"${scope.name}.$name"
     }
 
-    def addTemplateVariable(ident: Ast.Ident, tpe: Type): Unit = {
+    def addTemplateVariable(ident: Ast.Ident, tpe: Type, index: Int): Unit = {
       val sname = checkNewVariable(ident)
       tpe match {
         case _: Type.FixedSizeArray =>
           throw Error("Template variable does not support Array yet")
         case c: Type.Contract =>
           val varType = Type.Contract.local(c.id, ident)
-          varTable(sname) = VarInfo.Template(varType)
+          varTable(sname) = VarInfo.Template(varType, index)
         case _ =>
-          varTable(sname) = VarInfo.Template(tpe)
+          varTable(sname) = VarInfo.Template(tpe, index)
       }
     }
     def addFieldVariable(ident: Ast.Ident, tpe: Type, isMutable: Boolean): Unit = {
@@ -467,7 +467,7 @@ object Compiler {
       getVariable(ident) match {
         case _: VarInfo.Field    => throw Error("Script should not have fields")
         case v: VarInfo.Local    => Seq(LoadLocal(v.index))
-        case v: VarInfo.Template => Seq(TemplateVariable(ident.name, v.tpe.toVal))
+        case v: VarInfo.Template => Seq(TemplateVariable(ident.name, v.tpe.toVal, v.index))
         case _: VarInfo.ArrayRef => getArrayRef(ident).vars.flatMap(genLoadCode)
       }
     }
@@ -504,7 +504,7 @@ object Compiler {
       getVariable(ident) match {
         case v: VarInfo.Field    => Seq(LoadField(v.index))
         case v: VarInfo.Local    => Seq(LoadLocal(v.index))
-        case _: VarInfo.Template => Seq(TemplateVariable(ident.name, varInfo.tpe.toVal))
+        case v: VarInfo.Template => Seq(TemplateVariable(ident.name, varInfo.tpe.toVal, v.index))
         case _: VarInfo.ArrayRef => getArrayRef(ident).vars.flatMap(genLoadCode)
       }
     }

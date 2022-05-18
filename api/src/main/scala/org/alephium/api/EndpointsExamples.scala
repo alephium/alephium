@@ -478,6 +478,10 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       CompileScriptResult(
         bytecodeTemplate = hexString,
+        fields = CompileResult.FieldsSig(
+          signature = "TxScript Bar(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+          types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
+        ),
         functions = AVector(
           CompileResult.FunctionSig(
             name = "bar",

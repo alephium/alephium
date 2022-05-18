@@ -5427,6 +5427,16 @@
                 },
                 "example": {
                   "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
+                  "fields": {
+                    "signature": "TxScript Bar(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+                    "types": [
+                      "Bool",
+                      "U256",
+                      "I256",
+                      "ByteVec",
+                      "Address"
+                    ]
+                  },
                   "functions": [
                     {
                       "name": "bar",
@@ -8270,12 +8280,16 @@
       "CompileScriptResult": {
         "required": [
           "bytecodeTemplate",
+          "fields",
           "functions"
         ],
         "type": "object",
         "properties": {
           "bytecodeTemplate": {
             "type": "string"
+          },
+          "fields": {
+            "$ref": "#/components/schemas/FieldsSig"
           },
           "functions": {
             "type": "array",
