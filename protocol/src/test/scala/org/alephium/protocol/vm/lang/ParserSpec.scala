@@ -517,27 +517,20 @@ class ParserSpec extends AlephiumSpec {
       AssetScript(ident, templateVars, funcs)
   }
 
-  abstract class TxScriptFixture(val payable: Boolean) extends ScriptFixture {
-    lazy val payableModifier = if (payable) "payable" else ""
-    lazy val script          = s"""
+  class TxScriptFixture(val payable: Boolean) extends ScriptFixture {
+    val payableModifier = if (payable) "payable" else ""
+    val script          = s"""
          |TxScript Main(x: U256) $payableModifier {
          |}
          |""".stripMargin
 
-    def verify() = {
-      fastparse.parse(script, StatefulParser.txScript(_)).get.value is TxScript(
-        ident,
-        templateVars,
-        funcs
-      )
-    }
+    fastparse.parse(script, StatefulParser.txScript(_)).get.value is TxScript(
+      ident,
+      templateVars,
+      funcs
+    )
   }
 
-  it should "parse payable TxScript" in new TxScriptFixture(true) {
-    verify()
-  }
-
-  it should "parse non payable TxScript" in new TxScriptFixture(false) {
-    verify()
-  }
+  it should "parse payable TxScript" in new TxScriptFixture(true)
+  it should "parse non payable TxScript" in new TxScriptFixture(false)
 }
