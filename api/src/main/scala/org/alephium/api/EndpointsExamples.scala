@@ -462,7 +462,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       Compile.Script(
         code =
-          s"TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) } }"
+          s"TxScript Main payable { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) }"
       )
     )
 
