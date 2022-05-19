@@ -1162,7 +1162,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     {
       val rawCode =
         s"""
-           |TxScript Main(x: U256, y: U256) {
+           |TxScript Main(x: U256, y: U256) nonPayable {
            |  assert!(x != y)
            |}
            |""".stripMargin
@@ -1175,7 +1175,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     {
       val rawCode =
         s"""
-           |TxScript Main {
+           |TxScript Main nonPayable {
            |  assert!(1 != 2)
            |}
            |""".stripMargin

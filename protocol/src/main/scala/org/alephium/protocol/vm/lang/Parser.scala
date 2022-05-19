@@ -174,14 +174,14 @@ abstract class Parser[Ctx <: StatelessContext] {
     P("->" ~ "(" ~ parseType(Type.Contract.stack).rep(0, ",") ~ ")")
   def func[_: P]: P[Ast.FuncDef[Ctx]] =
     P(
-      Lexer.funcModifier.rep(0) ~ Lexer
+      Lexer.FuncModifier.modifiers.rep(0) ~ Lexer
         .keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ "{" ~ statement.rep ~ "}"
     ).map { case (modifiers, funcId, params, returnType, statements) =>
       if (modifiers.toSet.size != modifiers.length) {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
       } else {
-        val isPublic  = modifiers.contains(Lexer.Pub)
-        val isPayable = modifiers.contains(Lexer.Payable)
+        val isPublic  = modifiers.contains(Lexer.FuncModifier.Pub)
+        val isPayable = modifiers.contains(Lexer.FuncModifier.Payable)
         Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, statements)
       }
     }
@@ -300,14 +300,15 @@ object StatefulParser extends Parser[StatefulContext] {
     P(
       Lexer.keyword(
         "TxScript"
-      ) ~/ Lexer.typeId ~ templateParams.? ~ Lexer.payable.? ~ "{" ~ statement.rep ~ func
+      ) ~/ Lexer.typeId ~ templateParams.? ~ Lexer.TxScriptModifier.modifiers.? ~ "{" ~ statement.rep ~ func
         .rep(0) ~ "}"
     )
       .map { case (typeId, templateVars, payable, mainStmts, funcs) =>
+        val isPayable = !payable.contains(Lexer.TxScriptModifier.NonPayable)
         Ast.TxScript(
           typeId,
           templateVars.getOrElse(Seq.empty),
-          Ast.FuncDef.main(mainStmts, payable.nonEmpty) +: funcs
+          Ast.FuncDef.main(mainStmts, isPayable) +: funcs
         )
       }
   def txScript[_: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
@@ -347,13 +348,17 @@ object StatefulParser extends Parser[StatefulContext] {
   def interfaceInheritance[_: P]: P[Ast.InterfaceInheritance] =
     P(Lexer.typeId).map(Ast.InterfaceInheritance)
   def interfaceFunc[_: P]: P[Ast.FuncDef[StatefulContext]] =
-    P(Lexer.funcModifier.rep(0) ~ Lexer.keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType)
+    P(
+      Lexer.FuncModifier.modifiers.rep(0) ~ Lexer.keyword(
+        "fn"
+      ) ~/ Lexer.funcId ~ funParams ~ returnType
+    )
       .map { case (modifiers, funcId, params, returnType) =>
         if (modifiers.toSet.size != modifiers.length) {
           throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
         } else {
-          val isPublic  = modifiers.contains(Lexer.Pub)
-          val isPayable = modifiers.contains(Lexer.Payable)
+          val isPublic  = modifiers.contains(Lexer.FuncModifier.Pub)
+          val isPayable = modifiers.contains(Lexer.FuncModifier.Payable)
           Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, Seq.empty)
         }
       }

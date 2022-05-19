@@ -517,9 +517,10 @@ class ParserSpec extends AlephiumSpec {
       AssetScript(ident, templateVars, funcs)
   }
 
-  class TxScriptFixture(val payable: Boolean) extends ScriptFixture {
-    val payableModifier = if (payable) "payable" else ""
-    val script          = s"""
+  // scalastyle:off no.equal
+  class TxScriptFixture(payableModifier: String) extends ScriptFixture {
+    val payable = !(payableModifier === "nonPayable")
+    val script  = s"""
          |TxScript Main(x: U256) $payableModifier {
          |}
          |""".stripMargin
@@ -530,7 +531,9 @@ class ParserSpec extends AlephiumSpec {
       funcs
     )
   }
+  // scalastyle:on no.equal
 
-  it should "parse payable TxScript" in new TxScriptFixture(true)
-  it should "parse non payable TxScript" in new TxScriptFixture(false)
+  it should "parse explicit payable TxScript" in new TxScriptFixture("payable")
+  it should "parse implicit payable TxScript" in new TxScriptFixture("")
+  it should "parse non payable TxScript" in new TxScriptFixture("nonPayable")
 }

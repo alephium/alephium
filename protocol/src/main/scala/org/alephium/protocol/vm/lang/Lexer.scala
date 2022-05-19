@@ -142,12 +142,26 @@ object Lexer {
   def opNot[_: P]: P[LogicalOperator] = P("!").map(_ => Not)
 
   sealed trait FuncModifier
-  case object Pub     extends FuncModifier
-  case object Payable extends FuncModifier
 
-  def pub[_: P]: P[FuncModifier]          = keyword("pub").map(_ => Pub)
-  def payable[_: P]: P[FuncModifier]      = keyword("payable").map(_ => Payable)
-  def funcModifier[_: P]: P[FuncModifier] = P(pub | payable)
+  object FuncModifier {
+    case object Pub     extends FuncModifier
+    case object Payable extends FuncModifier
+
+    def pub[_: P]: P[FuncModifier]       = keyword("pub").map(_ => Pub)
+    def payable[_: P]: P[FuncModifier]   = keyword("payable").map(_ => Payable)
+    def modifiers[_: P]: P[FuncModifier] = P(pub | payable)
+  }
+
+  sealed trait TxScriptModifier
+
+  object TxScriptModifier {
+    case object Payable    extends TxScriptModifier
+    case object NonPayable extends TxScriptModifier
+
+    def payable[_: P]: P[TxScriptModifier]    = keyword("payable").map(_ => Payable)
+    def nonPayable[_: P]: P[TxScriptModifier] = keyword("nonPayable").map(_ => NonPayable)
+    def modifiers[_: P]: P[TxScriptModifier]  = P(payable | nonPayable)
+  }
 
   def keywordSet: Set[String] = Set(
     "TxContract",
@@ -165,6 +179,7 @@ object Lexer {
     "while",
     "pub",
     "payable",
+    "nonPayable",
     "event",
     "emit",
     "loop",
