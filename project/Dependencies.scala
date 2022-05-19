@@ -20,7 +20,7 @@ object Version {
   lazy val akka       = "2.6.18"
   lazy val tapir      = "0.18.3"
   lazy val sttp       = "3.3.18"
-  lazy val prometheus = "0.10.0"
+  lazy val prometheus = "0.15.0"
 }
 
 object Dependencies {
