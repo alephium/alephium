@@ -829,6 +829,35 @@ abstract class RestServerSpec(
     }
   }
 
+  // scalastyle:off no.equal
+  it should "get events for contract id with wrong group" in {
+    val blockHash       = dummyBlock.hash
+    val contractId      = Hash.random
+    val contractAddress = Address.Contract(LockupScript.P2C(contractId)).toBase58
+    val chainIndex      = ChainIndex.from(blockHash, groupConfig.groups)
+    val wrongGroup      = (chainIndex.from.value + 1) % groupConfig.groups
+    val url             = s"/events/contract/$contractAddress?start=10&end=100&group=${wrongGroup}"
+
+    if (nbOfNodes === 1) {
+      // Ignore group if it is 1 node setup, since the events are always available
+      Get(url, port).check { response =>
+        response.code is StatusCode.Ok
+        val events = response.body.rightValue
+        events.startsWith(
+          s"""{"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"events":["""
+        ) is true
+      }
+    } else {
+      Get(url, port).check { response =>
+        response.code is StatusCode.NotFound
+        response.body.leftValue.endsWith(
+          s""""detail":"No events for eventKey: ${contractId.toHexString} not found"}"""
+        ) is true
+      }
+    }
+  }
+  // scalastyle:on no.equal
+
   it should "get events for tx id with events" in {
     val blockHash = dummyBlock.hash
     val txId      = Hash.random
@@ -898,6 +927,32 @@ abstract class RestServerSpec(
   }
 
   // scalastyle:off no.equal
+  it should "get events for tx id with wrong group" in {
+    val blockHash  = dummyBlock.hash
+    val txId       = Hash.random
+    val chainIndex = ChainIndex.from(blockHash, groupConfig.groups)
+    val wrongGroup = (chainIndex.from.value + 1) % groupConfig.groups
+    val url        = s"/events/tx-id/${txId.toHexString}?group=${wrongGroup}"
+
+    if (nbOfNodes === 1) {
+      // Ignore group if it is 1 node setup, since the events are always available
+      Get(url, port).check { response =>
+        response.code is StatusCode.Ok
+        val events = response.body.rightValue
+        events.startsWith(
+          s"""{"chainFrom":${chainIndex.from.value},"chainTo":${chainIndex.to.value},"events":["""
+        ) is true
+      }
+    } else {
+      Get(url, port).check { response =>
+        response.code is StatusCode.NotFound
+        response.body.leftValue.endsWith(
+          s""""detail":"No events for txId: ${txId.toHexString} not found"}"""
+        ) is true
+      }
+    }
+  }
+
   def verifyResponse(
       urlWithoutGroup: String,
       urlWithGroup: String,

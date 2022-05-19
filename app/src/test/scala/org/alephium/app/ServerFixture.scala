@@ -365,32 +365,31 @@ object ServerFixture {
         Blake2b.unsafe(hex"aab64e9c814749cea508857b23c7550da30b67216950c461ccac1a14a58661c3"),
         Blake2b.unsafe(hex"e939f9c5d2ad12ea2375dcc5231f5f25db0a2ac8af426f547819e13559aa693e")
       )
+      val isBlackListed           = eventKeysWithoutEvents.contains(eventKey)
+      val blockChainIndex         = ChainIndex.from(block.hash, config.broker.groups)
+      val chainOnCurrentNode      = brokerConfig.chainIndexes.contains(blockChainIndex)
+      val shouldReturnEmptyEvents = !chainOnCurrentNode || isBlackListed
 
-      if (eventKeysWithoutEvents.contains(eventKey)) {
-        Right((0, AVector.empty))
-      } else {
-        Right(
-          (
-            2,
-            AVector(
-              LogStates(
-                block.hash,
-                eventKey,
-                states = AVector(
-                  LogState(
-                    txId = dummyTx.id,
-                    index = 0,
-                    fields = AVector(
-                      vm.Val.U256(U256.unsafe(4)),
-                      vm.Val.Address(address1.lockupScript),
-                      vm.Val.Address(address2.lockupScript)
-                    )
-                  )
-                )
-              )
+      val logStates = LogStates(
+        block.hash,
+        eventKey,
+        states = AVector(
+          LogState(
+            txId = dummyTx.id,
+            index = 0,
+            fields = AVector(
+              vm.Val.U256(U256.unsafe(4)),
+              vm.Val.Address(address1.lockupScript),
+              vm.Val.Address(address2.lockupScript)
             )
           )
         )
+      )
+
+      if (shouldReturnEmptyEvents) {
+        Right((0, AVector.empty))
+      } else {
+        Right((2, AVector(logStates)))
       }
     }
 
