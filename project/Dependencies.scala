@@ -17,7 +17,7 @@
 import sbt._
 
 object Version {
-  lazy val akka       = "2.6.18"
+  lazy val akka       = "2.6.19"
   lazy val tapir      = "0.18.3"
   lazy val sttp       = "3.3.18"
   lazy val prometheus = "0.10.0"
