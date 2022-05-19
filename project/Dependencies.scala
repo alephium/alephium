@@ -28,7 +28,7 @@ object Dependencies {
   lazy val `akka-slf4j` = "com.typesafe.akka" %% "akka-slf4j"   % Version.akka
   lazy val `akka-test`  = "com.typesafe.akka" %% "akka-testkit" % Version.akka % Test
 
-  lazy val vertx = "io.vertx" % "vertx-core" % "4.1.1"
+  lazy val vertx = "io.vertx" % "vertx-core" % "4.1.8"
 
   lazy val `upickle` = "com.lihaoyi" %% "upickle" % "1.4.4"
 
