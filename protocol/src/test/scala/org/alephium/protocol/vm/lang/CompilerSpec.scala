@@ -1877,7 +1877,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
        |}
        |""".stripMargin
     val script = Compiler.compileTxScript(code).rightValue
-    script.toTemplateString() is "0101010001000a{address:Address}{tokenId:ByteVec}{tokenAmount:U256}a3{swapContractKey:ByteVec}1700{address:Address}{tokenAmount:U256}16000100"
+    script.toTemplateString() is "0101010001000a{0}{1}{2}a3{3}1700{0}{2}16000100"
   }
 
   it should "compile events with <= 8 fields" in {
