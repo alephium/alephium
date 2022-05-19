@@ -33,6 +33,7 @@ import org.alephium.api.{ApiError, ApiModel}
 import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
+import org.alephium.crypto.Blake2b
 import org.alephium.flow.handler.{TestUtils, ViewHandler}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
@@ -47,6 +48,7 @@ import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util._
+import org.alephium.util.Hex.HexStringSyntax
 import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
 
@@ -724,7 +726,7 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "get events for a contract within a counter range" in {
+  it should "get events for a contract within a counter range with events" in {
     val blockHash  = dummyBlock.hash
     val start      = 10
     val end        = 100
@@ -801,7 +803,33 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "get events for tx id" in {
+  it should "get events for a contract within a counter range without events" in {
+    val blockHash = dummyBlock.hash
+    val start     = 10
+    val end       = 100
+    // No events for this contractId, see `getEvents` method for `BlockFlowDummy` in `ServerFixture.scala`
+    val contractId =
+      Blake2b.unsafe(hex"e939f9c5d2ad12ea2375dcc5231f5f25db0a2ac8af426f547819e13559aa693e")
+    val contractAddress = Address.Contract(LockupScript.P2C(contractId)).toBase58
+    val urlBase         = s"/events/contract/$contractAddress"
+
+    servers.foreach { server =>
+      val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
+      verifyResponse(
+        s"$urlBase?start=$start&end=$end",
+        s"$urlBase?start=$start&end=$end&group=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      ) { response =>
+        response.code is StatusCode.NotFound
+        response.body.leftValue.endsWith(
+          s""""detail":"No events for eventKey: ${contractId.toHexString} not found"}"""
+        ) is true
+      }
+    }
+  }
+
+  it should "get events for tx id with events" in {
     val blockHash = dummyBlock.hash
     val txId      = Hash.random
 
@@ -844,6 +872,27 @@ abstract class RestServerSpec(
             |  "nextStart": 2
             |}
             |""".stripMargin.filterNot(_.isWhitespace)
+      }
+    }
+  }
+
+  it should "get events for tx id without events" in {
+    val blockHash = dummyBlock.hash
+    // No events for this txId, see `getEvents` method for `BlockFlowDummy` in `ServerFixture.scala`
+    val txId = Blake2b.unsafe(hex"aab64e9c814749cea508857b23c7550da30b67216950c461ccac1a14a58661c3")
+
+    servers.foreach { server =>
+      val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
+      verifyResponse(
+        s"/events/tx-id/${txId.toHexString}",
+        s"/events/tx-id/${txId.toHexString}?group=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      ) { response =>
+        response.code is StatusCode.NotFound
+        response.body.leftValue.endsWith(
+          s""""detail":"No events for txId: ${txId.toHexString} not found"}"""
+        ) is true
       }
     }
   }

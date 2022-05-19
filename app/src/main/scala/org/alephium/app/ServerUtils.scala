@@ -450,29 +450,32 @@ class ServerUtils(implicit
   def getEventsByTxId(
       blockFlow: BlockFlow,
       txId: Hash
-  ): Try[Option[Events]] = {
-    wrapResult(
-      for {
-        result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
-        (nextStart, logStatesVec) = result
-        logStates <- logStatesVec.mapE { logStates =>
-          logStates.states
-            .mapE { state =>
-              if (state.isRef) {
-                LogStateRef
-                  .fromFields(state.fields)
-                  .toRight(IOError.Other(new Throwable(s"Invalid state ref: ${state.fields}")))
-                  .flatMap(blockFlow.getEventByRef(_))
-              } else {
-                Right(state)
+  ): Try[Events] = {
+    for {
+      eventsOpt <- wrapResult(
+        for {
+          result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
+          (nextStart, logStatesVec) = result
+          logStates <- logStatesVec.mapE { logStates =>
+            logStates.states
+              .mapE { state =>
+                if (state.isRef) {
+                  LogStateRef
+                    .fromFields(state.fields)
+                    .toRight(IOError.Other(new Throwable(s"Invalid state ref: ${state.fields}")))
+                    .flatMap(blockFlow.getEventByRef(_))
+                } else {
+                  Right(state)
+                }
               }
-            }
-            .map(states => logStates.copy(states = states))
+              .map(states => logStates.copy(states = states))
+          }
+        } yield {
+          Events.from(logStates, nextStart)
         }
-      } yield {
-        Events.from(logStates, nextStart)
-      }
-    )
+      )
+      events <- eventsOpt.toRight(notFound(s"No events for txId: ${txId.toHexString}"))
+    } yield events
   }
 
   def getEvents(
@@ -480,20 +483,23 @@ class ServerUtils(implicit
       start: Int,
       endOpt: Option[Int],
       eventKey: Hash
-  ): Try[Option[Events]] = {
-    wrapResult(
-      blockFlow
-        .getEvents(
-          eventKey,
-          start,
-          endOpt.getOrElse(start + CounterRange.MaxCounterRange)
-        )
-        .map {
-          case (nextStart, logStatesVec) => {
-            Events.from(logStatesVec, nextStart)
+  ): Try[Events] = {
+    for {
+      eventsOpt <- wrapResult(
+        blockFlow
+          .getEvents(
+            eventKey,
+            start,
+            endOpt.getOrElse(start + CounterRange.MaxCounterRange)
+          )
+          .map {
+            case (nextStart, logStatesVec) => {
+              Events.from(logStatesVec, nextStart)
+            }
           }
-        }
-    )
+      )
+      events <- eventsOpt.toRight(notFound(s"No events for eventKey: ${eventKey.toHexString}"))
+    } yield events
   }
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
