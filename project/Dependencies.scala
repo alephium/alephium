@@ -37,7 +37,7 @@ object Dependencies {
   lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "2.3.1"
   lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.2.3"
   lazy val rocksdb         = "org.rocksdb"                 % "rocksdbjni"      % "6.29.5"
-  lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.2"
+  lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.4"
   lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.15.3"  % Test
   lazy val scalatest       = "org.scalatest"              %% "scalatest"       % "3.2.6"   % Test
   lazy val scalatestplus   = "org.scalatestplus"          %% "scalacheck-1-14" % "3.2.2.0" % Test
