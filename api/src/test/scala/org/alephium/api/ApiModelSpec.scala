@@ -204,13 +204,9 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode GetBalance" in {
     val address    = generateAddress()
     val addressStr = address.toBase58
-    val request    = GetBalance(address, None)
+    val request    = GetBalance(address)
     val jsonRaw    = s"""{"address":"$addressStr"}"""
     checkData(request, jsonRaw)
-
-    val request2 = GetBalance(address, Some(10))
-    val jsonRaw2 = s"""{"address":"$addressStr","utxosLimit":10}"""
-    checkData(request2, jsonRaw2)
   }
 
   it should "encode/decode AssetInput" in {
@@ -358,8 +354,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         AVector(Destination(toAddress, Amount(1), None, Some(TimeStamp.unsafe(1234)))),
         None,
         Some(GasBox.unsafe(1)),
-        Some(GasPrice(1)),
-        Some(defaultUtxosLimit)
+        Some(GasPrice(1))
       )
       val jsonRaw = s"""
         |{
@@ -372,8 +367,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |    }
         |  ],
         |  "gasAmount": 1,
-        |  "gasPrice": "1",
-        |  "utxosLimit": 1024
+        |  "gasPrice": "1"
         |}
         """.stripMargin
       checkData(transfer, jsonRaw)
@@ -642,34 +636,30 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode BuildContract" in {
     val publicKey = PublicKey.generate
-    val buildContract = BuildContractDeployScriptTx(
+    val buildDeployContractTx = BuildDeployContractTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
-      initialFields = AVector(Val.True, ValU256(U256.unsafe(123))),
       issueTokenAmount = Some(Amount(1)),
       gasAmount = Some(GasBox.unsafe(1)),
-      gasPrice = Some(GasPrice(1)),
-      utxosLimit = Some(defaultUtxosLimit)
+      gasPrice = Some(GasPrice(1))
     )
     val jsonRaw =
       s"""
          |{
          |  "fromPublicKey": "${publicKey.toHexString}",
          |  "bytecode": "0000",
-         |  "initialFields":[{"type":"Bool","value":true},{"type":"U256","value":"123"}],
          |  "issueTokenAmount": "1",
          |  "gasAmount": 1,
-         |  "gasPrice": "1",
-         |  "utxosLimit": 1024
+         |  "gasPrice": "1"
          |}
          |""".stripMargin
-    checkData(buildContract, jsonRaw)
+    checkData(buildDeployContractTx, jsonRaw)
   }
 
-  it should "encode/decode BuildContractDeployScriptTxResult" in {
+  it should "encode/decode BuildDeployContractTxResult" in {
     val txId       = Hash.generate
     val contractId = Hash.generate
-    val buildContractResult = BuildContractDeployScriptTxResult(
+    val buildDeployContractTxResult = BuildDeployContractTxResult(
       group = 2,
       unsignedTx = "0000",
       gasAmount = GasBox.unsafe(1),
@@ -688,17 +678,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "contractAddress": "${Address.contract(contractId).toBase58}"
          |}
          |""".stripMargin
-    checkData(buildContractResult, jsonRaw)
+    checkData(buildDeployContractTxResult, jsonRaw)
   }
 
   it should "encode/decode BuildScriptTx" in {
     val publicKey = PublicKey.generate
-    val buildScript = BuildScriptTx(
+    val buildExecuteScriptTx = BuildExecuteScriptTx(
       fromPublicKey = publicKey,
       bytecode = ByteString(0, 0),
       gasAmount = Some(GasBox.unsafe(1)),
-      gasPrice = Some(GasPrice(1)),
-      utxosLimit = Some(defaultUtxosLimit)
+      gasPrice = Some(GasPrice(1))
     )
     val jsonRaw =
       s"""
@@ -706,16 +695,15 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "fromPublicKey": "${publicKey.toHexString}",
          |  "bytecode": "0000",
          |  "gasAmount": 1,
-         |  "gasPrice": "1",
-         |  "utxosLimit": 1024
+         |  "gasPrice": "1"
          |}
          |""".stripMargin
-    checkData(buildScript, jsonRaw)
+    checkData(buildExecuteScriptTx, jsonRaw)
   }
 
   it should "encode/decode BuildScriptTxResult" in {
     val txId = Hash.generate
-    val buildScriptResult = BuildScriptTxResult(
+    val buildExecuteScriptTxResult = BuildExecuteScriptTxResult(
       unsignedTx = "0000",
       gasAmount = GasBox.unsafe(1),
       gasPrice = GasPrice(1),
@@ -732,7 +720,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "group": 1
          |}
          |""".stripMargin
-    checkData(buildScriptResult, jsonRaw)
+    checkData(buildExecuteScriptTxResult, jsonRaw)
   }
 
   it should "encode/decode VerifySignature" in {
@@ -757,7 +745,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 = s"""{"alphAmount": "100"}"""
     checkData(asset1, jsonRaw1)
 
-    val asset2 = AssetState(U256.unsafe(100), AVector(Token(Hash.zero, U256.unsafe(123))))
+    val asset2 = AssetState.from(U256.unsafe(100), AVector(Token(Hash.zero, U256.unsafe(123))))
     val jsonRaw2 =
       s"""
          |{
@@ -776,16 +764,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val state = ContractState(
       generateContractAddress(),
       StatefulContract.forSMT.toContract().rightValue,
-      artifactId = Hash.zero,
+      codeHash = Hash.zero,
       AVector(u256, i256, bool, byteVec, address1),
-      AssetState(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
+      AssetState.from(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
     )
     val jsonRaw =
       s"""
          |{
          |  "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
          |  "bytecode": "00010700000000000118",
-         |  "artifactId": "0000000000000000000000000000000000000000000000000000000000000000",
+         |  "codeHash": "0000000000000000000000000000000000000000000000000000000000000000",
          |  "fields": [
          |    {
          |      "type": "U256",
@@ -827,18 +815,18 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw0 =
       """
         |{
-        |  "compiled": {
-        |    "type":"SimpleContractByteCode",
-        |    "bytecode": "07011d01010707060d05a000a001a003a0046116011602160316041605160602"
-        |  },
+        |  "bytecode": "07011d01010707060d05a000a001a003a0046116011602160316041605160602",
+        |  "codeHash": "4106809d4ed811457fad02bc19619ca8f2a4a47a56bca4519a28d3671d9c7241",
         |  "fields": {
         |    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])",
+        |    "names": ["aa","bb","cc","dd","ee","ff"],
         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |  },
         |  "functions": [
         |    {
         |      "name": "bar",
         |      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
+        |      "argNames": ["a","b","c","d","e","f"],
         |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
         |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |    }
@@ -847,6 +835,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |    {
         |      "name": "Bar",
         |      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
+        |      "fieldNames":["a","b","d","e"],
         |      "fieldTypes": ["Bool", "U256", "ByteVec", "Address"]
         |    }
         |  ]
@@ -858,19 +847,28 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 =
       """
         |{
-        |  "compiled": {
-        |    "type": "SimpleScriptByteCode",
-        |    "bytecode": "0101000707060716011602160316041605160602"
+        |  "bytecodeTemplate": "020101000000010201000707060716011602160316041605160602",
+        |  "fields": {
+        |    "signature": "TxScript Foo(aa:Bool,bb:U256,cc:I256,dd:ByteVec,ee:Address)",
+        |    "names": ["aa","bb","cc","dd","ee"],
+        |    "types": ["Bool", "U256", "I256", "ByteVec", "Address"]
         |  },
         |  "functions": [
         |    {
+        |      "name": "main",
+        |      "signature": "pub payable main()->()",
+        |      "argNames": [],
+        |      "argTypes": [],
+        |      "returnTypes": []
+        |    },
+        |    {
         |      "name": "bar",
         |      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
+        |      "argNames": ["a","b","c","d","e","f"],
         |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
         |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |    }
-        |  ],
-        |  "events": []
+        |  ]
         |}
         |""".stripMargin
     write(result1).filter(!_.isWhitespace) is jsonRaw1.filter(!_.isWhitespace)

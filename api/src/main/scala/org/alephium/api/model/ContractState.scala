@@ -16,34 +16,40 @@
 
 package org.alephium.api.model
 
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{Address, ContractId, ContractOutput}
 import org.alephium.protocol.vm.{LockupScript, StatefulContract}
 import org.alephium.util.{AVector, U256}
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class ContractState(
     address: Address.Contract,
     bytecode: StatefulContract,
-    artifactId: ArtifactId, // unique id for the contract artifact
-    fields: AVector[Val] = AVector.empty,
+    codeHash: Hash,
+    fields: AVector[Val],
     asset: AssetState
 ) {
   def id: ContractId = address.lockupScript.contractId
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class AssetState(alphAmount: U256, tokens: AVector[Token] = AVector.empty) {
+final case class AssetState(alphAmount: U256, tokens: Option[AVector[Token]] = None) {
+  lazy val flatTokens: AVector[Token] = tokens.getOrElse(AVector.empty)
+
   def toContractOutput(contractId: ContractId): ContractOutput = {
     ContractOutput(
       alphAmount,
       LockupScript.p2c(contractId),
-      tokens.map(token => (token.id, token.amount))
+      flatTokens.map(token => (token.id, token.amount))
     )
   }
 }
 
 object AssetState {
+  def from(alphAmount: U256, tokens: AVector[Token]): AssetState = {
+    AssetState(alphAmount, Some(tokens))
+  }
+
   def from(output: ContractOutput): AssetState = {
-    AssetState(output.amount, output.tokens.map(pair => Token(pair._1, pair._2)))
+    AssetState.from(output.amount, output.tokens.map(pair => Token(pair._1, pair._2)))
   }
 }

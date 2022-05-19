@@ -23,7 +23,7 @@ import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
-final case class BuildContractDeployScriptTxResult(
+final case class BuildDeployContractTxResult(
     group: Int,
     unsignedTx: String,
     gasAmount: GasBox,
@@ -32,12 +32,12 @@ final case class BuildContractDeployScriptTxResult(
     contractAddress: Address.Contract
 ) extends GasInfo
 
-object BuildContractDeployScriptTxResult {
+object BuildDeployContractTxResult {
   def from(
       unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildContractDeployScriptTxResult = {
+  )(implicit groupConfig: GroupConfig): BuildDeployContractTxResult = {
     val contractId = TxOutputRef.key(unsignedTx.hash, unsignedTx.fixedOutputs.length)
-    BuildContractDeployScriptTxResult(
+    BuildDeployContractTxResult(
       unsignedTx.fromGroup.value,
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,

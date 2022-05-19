@@ -54,7 +54,8 @@ import org.alephium.wallet.config.WalletConfig
 abstract class RestServerSpec(
     val nbOfNodes: Int,
     val apiKey: Option[ApiKey] = None,
-    val apiKeyEnabled: Boolean = false
+    val apiKeyEnabled: Boolean = false,
+    val utxosLimit: Int = Int.MaxValue
 ) extends RestServerFixture {
   it should "call GET /blockflow" in {
     Get(blockflowFromTo(0, 1)) check { response =>
@@ -103,16 +104,19 @@ abstract class RestServerSpec(
 
   it should "call GET /addresses/<address>/balance" in {
     val group = LockupScript.p2pkh(dummyKey).groupIndex(brokerConfig)
-    Get(s"/addresses/$dummyKeyAddress/balance", getPort(group)) check { response =>
-      response.code is StatusCode.Ok
-      response.as[Balance] is dummyBalance
-    }
-    Get(s"/addresses/$dummyKeyAddress/balance?utxosLimit=0", getPort(group)) check { response =>
-      response.code is StatusCode.Ok
-      response
-        .as[Balance]
-        .warning
-        .get is "Result might not include all utxos and is maybe unprecise"
+    if (utxosLimit > 0) {
+      Get(s"/addresses/$dummyKeyAddress/balance", getPort(group)) check { response =>
+        response.code is StatusCode.Ok
+        response.as[Balance] is dummyBalance
+      }
+    } else {
+      Get(s"/addresses/$dummyKeyAddress/balance", getPort(group)) check { response =>
+        response.code is StatusCode.Ok
+        response
+          .as[Balance]
+          .warning
+          .get is "Result might not include all utxos and is maybe unprecise"
+      }
     }
   }
 
@@ -895,7 +899,8 @@ abstract class RestServerSpec(
 abstract class RestServerApiKeyDisableSpec(
     val apiKey: Option[ApiKey],
     val nbOfNodes: Int = 1,
-    val apiKeyEnabled: Boolean = false
+    val apiKeyEnabled: Boolean = false,
+    val utxosLimit: Int = Int.MaxValue
 ) extends RestServerFixture {
 
   it should "not require api key if disabled" in {
@@ -933,6 +938,7 @@ trait RestServerFixture
   val nbOfNodes: Int
   val apiKey: Option[ApiKey]
   val apiKeyEnabled: Boolean
+  val utxosLimit: Int
 
   implicit val system: ActorSystem  = ActorSystem("rest-server-spec")
   implicit val ec: ExecutionContext = system.dispatcher
@@ -940,7 +946,8 @@ trait RestServerFixture
   override val configValues = {
     Map(
       ("alephium.broker.broker-num", nbOfNodes),
-      ("alephium.api.api-key-enabled", apiKeyEnabled)
+      ("alephium.api.api-key-enabled", apiKeyEnabled),
+      ("alephium.api.default-utxos-limit", utxosLimit)
     ) ++ apiKey
       .map(key => Map(("alephium.api.api-key", key.value)))
       .getOrElse(Map.empty)
@@ -1024,7 +1031,7 @@ trait RestServerFixture
       askTimeout = Duration.ofMinutesUnsafe(1),
       apiConfig.apiKey,
       ALPH.oneAlph,
-      ALPH.MaxTxInputNum * 2
+      utxosLimit
     )
 
     (peer, peerConf)
@@ -1118,3 +1125,4 @@ class RestServerSpecApiKey
       true
     )
 class RestServerSpecApiKeyDisableWithoutApiKey extends RestServerApiKeyDisableSpec(None)
+class RestServerWithZeroUtxosLimit             extends RestServerSpec(nbOfNodes = 1, utxosLimit = 0)

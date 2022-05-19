@@ -174,14 +174,14 @@ abstract class Parser[Ctx <: StatelessContext] {
     P("->" ~ "(" ~ parseType(Type.Contract.stack).rep(0, ",") ~ ")")
   def func[_: P]: P[Ast.FuncDef[Ctx]] =
     P(
-      Lexer.funcModifier.rep(0) ~ Lexer
+      Lexer.FuncModifier.modifiers.rep(0) ~ Lexer
         .keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ "{" ~ statement.rep ~ "}"
     ).map { case (modifiers, funcId, params, returnType, statements) =>
       if (modifiers.toSet.size != modifiers.length) {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
       } else {
-        val isPublic  = modifiers.contains(Lexer.Pub)
-        val isPayable = modifiers.contains(Lexer.Payable)
+        val isPublic  = modifiers.contains(Lexer.FuncModifier.Pub)
+        val isPayable = modifiers.contains(Lexer.FuncModifier.Payable)
         Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, statements)
       }
     }
@@ -297,9 +297,24 @@ object StatefulParser extends Parser[StatefulContext] {
   def contractParams[_: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
 
   def rawTxScript[_: P]: P[Ast.TxScript] =
-    P(Lexer.keyword("TxScript") ~/ Lexer.typeId ~ templateParams.? ~ "{" ~ func.rep(1) ~ "}")
-      .map { case (typeId, templateVars, funcs) =>
-        Ast.TxScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
+    P(
+      Lexer.keyword(
+        "TxScript"
+      ) ~/ Lexer.typeId ~ templateParams.? ~ Lexer.TxScriptModifier.modifiers.? ~ "{" ~ statement
+        .rep(0) ~ func
+        .rep(0) ~ "}"
+    )
+      .map { case (typeId, templateVars, payable, mainStmts, funcs) =>
+        val isPayable = !payable.contains(Lexer.TxScriptModifier.NonPayable)
+        if (mainStmts.isEmpty) {
+          throw Compiler.Error(s"No main statements defined in TxScript ${typeId.name}")
+        } else {
+          Ast.TxScript(
+            typeId,
+            templateVars.getOrElse(Seq.empty),
+            Ast.FuncDef.main(mainStmts, isPayable) +: funcs
+          )
+        }
       }
   def txScript[_: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
 
@@ -338,13 +353,17 @@ object StatefulParser extends Parser[StatefulContext] {
   def interfaceInheritance[_: P]: P[Ast.InterfaceInheritance] =
     P(Lexer.typeId).map(Ast.InterfaceInheritance)
   def interfaceFunc[_: P]: P[Ast.FuncDef[StatefulContext]] =
-    P(Lexer.funcModifier.rep(0) ~ Lexer.keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType)
+    P(
+      Lexer.FuncModifier.modifiers.rep(0) ~ Lexer.keyword(
+        "fn"
+      ) ~/ Lexer.funcId ~ funParams ~ returnType
+    )
       .map { case (modifiers, funcId, params, returnType) =>
         if (modifiers.toSet.size != modifiers.length) {
           throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
         } else {
-          val isPublic  = modifiers.contains(Lexer.Pub)
-          val isPayable = modifiers.contains(Lexer.Payable)
+          val isPublic  = modifiers.contains(Lexer.FuncModifier.Pub)
+          val isPayable = modifiers.contains(Lexer.FuncModifier.Payable)
           Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, Seq.empty)
         }
       }

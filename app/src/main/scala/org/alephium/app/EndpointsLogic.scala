@@ -174,12 +174,12 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.getBlockHeader(blockFlow, hash))
   }
 
-  val getBalanceLogic = serverLogic(getBalance) { case (address, utxosLimit) =>
-    Future.successful(serverUtils.getBalance(blockFlow, GetBalance(address, utxosLimit)))
+  val getBalanceLogic = serverLogic(getBalance) { address =>
+    Future.successful(serverUtils.getBalance(blockFlow, GetBalance(address)))
   }
 
-  val getUTXOsLogic = serverLogic(getUTXOs) { case (address, utxosLimit) =>
-    Future.successful(serverUtils.getUTXOsIncludePool(blockFlow, address, utxosLimit))
+  val getUTXOsLogic = serverLogic(getUTXOs) { address =>
+    Future.successful(serverUtils.getUTXOsIncludePool(blockFlow, address))
   }
 
   val getGroupLogic = serverLogic(getGroup) {
@@ -515,16 +515,16 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.compileScript(query))
   }
 
-  val buildScriptLogic = serverLogic(buildScript) { query =>
-    Future.successful(serverUtils.buildScript(blockFlow, query))
+  val buildExecuteScriptTxLogic = serverLogic(buildExecuteScriptTx) { query =>
+    Future.successful(serverUtils.buildExecuteScriptTx(blockFlow, query))
   }
 
   val compileContractLogic = serverLogic(compileContract) { query =>
     Future.successful(serverUtils.compileContract(query))
   }
 
-  val buildContractLogic = serverLogic(buildContract) { query =>
-    Future.successful(serverUtils.buildContract(blockFlow, query))
+  val buildDeployContractTxLogic = serverLogic(buildDeployContractTx) { query =>
+    Future.successful(serverUtils.buildDeployContractTx(blockFlow, query))
   }
 
   val verifySignatureLogic = serverLogic(verifySignature) { query =>

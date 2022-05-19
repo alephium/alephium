@@ -16,8 +16,6 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
-
 import org.alephium.protocol.Hash
 import org.alephium.protocol.vm.{StatefulContext, StatefulContract, StatefulScript}
 import org.alephium.protocol.vm.lang.Ast
@@ -25,73 +23,47 @@ import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex}
 
 final case class CompileScriptResult(
-    compiled: CompiledScriptTrait,
-    functions: AVector[CompileResult.FunctionSig],
-    events: AVector[CompileResult.EventSig]
-) {
-  // this only works for script without template variables
-  def bytecodeUnsafe: String = Hex.toHexString(compiled.asInstanceOf[SimpleScriptByteCode].bytecode)
-
-  // this only works for script without template variables
-  def codeHashUnsafe: Hash = {
-    Hash.hash(compiled.asInstanceOf[SimpleScriptByteCode].bytecode)
-  }
-}
-
-sealed trait CompiledScriptTrait
-@upickle.implicits.key("TemplateScriptByteCode")
-final case class TemplateScriptByteCode(
-    templateByteCode: String
-) extends CompiledScriptTrait
-@upickle.implicits.key("SimpleScriptByteCode")
-final case class SimpleScriptByteCode(
-    bytecode: ByteString
-) extends CompiledScriptTrait
+    bytecodeTemplate: String,
+    fields: CompileResult.FieldsSig,
+    functions: AVector[CompileResult.FunctionSig]
+)
 
 object CompileScriptResult {
   def from(script: StatefulScript, scriptAst: Ast.TxScript): CompileScriptResult = {
-    val compiled: CompiledScriptTrait = if (scriptAst.templateVars.isEmpty) {
-      SimpleScriptByteCode(serialize(script))
-    } else {
-      TemplateScriptByteCode(script.toTemplateString())
-    }
+    val bytecodeTemplate = script.toTemplateString()
+    val fields = CompileResult.FieldsSig(
+      scriptAst.getTemplateVarsSignature(),
+      AVector.from(scriptAst.getTemplateVarsNames()),
+      AVector.from(scriptAst.getTemplateVarsTypes())
+    )
     CompileScriptResult(
-      compiled = compiled,
-      functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from)),
-      events = AVector.from(scriptAst.events.map(CompileResult.EventSig.from))
+      bytecodeTemplate,
+      fields = fields,
+      functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from))
     )
   }
 }
 
 final case class CompileContractResult(
-    compiled: CompiledContractTrait,
+    bytecode: String,
+    codeHash: Hash,
     fields: CompileResult.FieldsSig,
     functions: AVector[CompileResult.FunctionSig],
     events: AVector[CompileResult.EventSig]
-) {
-  // this only works for contract without template variables
-  def bytecodeUnsafe: String =
-    Hex.toHexString(compiled.asInstanceOf[SimpleContractByteCode].bytecode)
-
-  // this only works for contract without template variables
-  def codeHashUnsafe: Hash = {
-    Hash.hash(compiled.asInstanceOf[SimpleContractByteCode].bytecode)
-  }
-}
+)
 
 object CompileContractResult {
   def from(contract: StatefulContract, contractAst: Ast.TxContract): CompileContractResult = {
-    val bytecode: CompiledContractTrait = if (contractAst.templateVars.isEmpty) {
-      SimpleContractByteCode(serialize(contract))
-    } else {
-      TemplateContractByteCode(contract.fieldLength, contract.methods.map(_.toTemplateString()))
-    }
+    assume(contractAst.templateVars.isEmpty) // Template variable is disabled right now
+    val bytecode = Hex.toHexString(serialize(contract))
     val fields = CompileResult.FieldsSig(
       contractAst.getFieldsSignature(),
+      AVector.from(contractAst.getFieldNames()),
       AVector.from(contractAst.getFieldTypes())
     )
     CompileContractResult(
       bytecode,
+      contract.hash,
       fields,
       functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from))
@@ -99,24 +71,14 @@ object CompileContractResult {
   }
 }
 
-sealed trait CompiledContractTrait
-@upickle.implicits.key("TemplateContractByteCode")
-final case class TemplateContractByteCode(
-    filedLength: Int,
-    methodsByteCode: AVector[String]
-) extends CompiledContractTrait
-@upickle.implicits.key("SimpleContractByteCode")
-final case class SimpleContractByteCode(
-    bytecode: ByteString
-) extends CompiledContractTrait
-
 object CompileResult {
 
-  final case class FieldsSig(signature: String, types: AVector[String])
+  final case class FieldsSig(signature: String, names: AVector[String], types: AVector[String])
 
   final case class FunctionSig(
       name: String,
       signature: String,
+      argNames: AVector[String],
       argTypes: AVector[String],
       returnTypes: AVector[String]
   )
@@ -125,16 +87,27 @@ object CompileResult {
       FunctionSig(
         func.id.name,
         func.signature,
+        AVector.from(func.getArgNames()),
         AVector.from(func.getArgTypeSignatures()),
         AVector.from(func.getReturnSignatures())
       )
     }
   }
 
-  final case class EventSig(name: String, signature: String, fieldTypes: AVector[String])
+  final case class EventSig(
+      name: String,
+      signature: String,
+      fieldNames: AVector[String],
+      fieldTypes: AVector[String]
+  )
   object EventSig {
     def from(event: Ast.EventDef): EventSig = {
-      EventSig(event.name, event.signature, AVector.from(event.getFieldTypeSignatures()))
+      EventSig(
+        event.name,
+        event.signature,
+        AVector.from(event.getFieldNames()),
+        AVector.from(event.getFieldTypeSignatures())
+      )
     }
   }
 }

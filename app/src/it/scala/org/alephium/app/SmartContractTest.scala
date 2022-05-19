@@ -51,16 +51,16 @@ class SmartContractTest extends AlephiumActorSpec {
 
     def contract(
         code: String,
-        initialFields: Option[AVector[Val]],
+        initialFields: Option[AVector[vm.Val]],
         issueTokenAmount: Option[U256],
         gas: Option[Int] = Some(100000),
         gasPrice: Option[GasPrice] = None
-    ): BuildContractDeployScriptTxResult = {
+    ): BuildDeployContractTxResult = {
       val compileResult = request[CompileContractResult](compileContract(code), restPort)
-      val buildResult = request[BuildContractDeployScriptTxResult](
-        buildContract(
+      val buildResult = request[BuildDeployContractTxResult](
+        buildDeployContractTx(
           fromPublicKey = publicKey,
-          code = compileResult.bytecodeUnsafe,
+          code = compileResult.bytecode,
           gas,
           gasPrice,
           initialFields = initialFields,
@@ -81,17 +81,17 @@ class SmartContractTest extends AlephiumActorSpec {
         alphAmount: Option[Amount] = None,
         gas: Option[Int] = Some(100000),
         gasPrice: Option[GasPrice] = None
-    ): BuildScriptTxResult = {
+    ): BuildExecuteScriptTxResult = {
       scriptWithPort(code, restPort, alphAmount, gas, gasPrice)
     }
 
-    def buildScript(
+    def buildExecuteScriptTx(
         code: String,
         alphAmount: Option[Amount],
         gas: Option[Int],
         gasPrice: Option[GasPrice]
-    ): BuildScriptTxResult = {
-      buildScriptWithPort(code, restPort, alphAmount, gas, gasPrice)
+    ): BuildExecuteScriptTxResult = {
+      buildExecuteScriptTxWithPort(code, restPort, alphAmount, gas, gasPrice)
     }
 
     def estimateBuildContractGas(
@@ -104,8 +104,8 @@ class SmartContractTest extends AlephiumActorSpec {
 
       val compileResult = request[CompileContractResult](compileContract(code), restPort)
       val script = ServerUtils
-        .buildContract(
-          compileResult.bytecodeUnsafe,
+        .buildDeployContractTx(
+          compileResult.bytecode,
           Address.fromBase58(address).value,
           state,
           dustUtxoAmount,
@@ -129,7 +129,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
       val compileResult = request[CompileScriptResult](compileScript(code), restPort)
       val script = deserialize[StatefulScript](
-        Hex.unsafe(compileResult.bytecodeUnsafe)
+        Hex.unsafe(compileResult.bytecodeTemplate)
       ).rightValue
 
       val blockFlow    = clique.servers(group.group % 2).node.blockFlow
@@ -174,28 +174,30 @@ class SmartContractTest extends AlephiumActorSpec {
 
     val compileResult = request[CompileContractResult](compileContract(contract), restPort)
     val validFields = Some(
-      AVector[Val](
-        Val.True,
-        ValI256(I256.unsafe(1000)),
-        ValU256(U256.unsafe(1000)),
-        ValByteVec(ByteString(0, 0)),
-        ValAddress(Address.fromBase58("25HAxb2jhQeLUFcTL8XWpz9m1odVcD2LgscQtuGhRBerR").get)
+      AVector[vm.Val](
+        vm.Val.True,
+        vm.Val.I256(I256.unsafe(1000)),
+        vm.Val.U256(U256.unsafe(1000)),
+        vm.Val.ByteVec(ByteString(0, 0)),
+        vm.Val.Address(
+          Address.fromBase58("25HAxb2jhQeLUFcTL8XWpz9m1odVcD2LgscQtuGhRBerR").get.lockupScript
+        )
       )
     )
     unitRequest(
-      buildContract(
+      buildDeployContractTx(
         publicKey,
-        compileResult.bytecodeUnsafe,
+        compileResult.bytecode,
         initialFields = validFields
       ),
       restPort
     )
 
-    val invalidFields = Some(AVector[Val](Val.True))
+    val invalidFields = Some(AVector[vm.Val](vm.Val.True))
     requestFailed(
-      buildContract(
+      buildDeployContractTx(
         publicKey,
-        compileResult.bytecodeUnsafe,
+        compileResult.bytecode,
         initialFields = invalidFields
       ),
       restPort,
@@ -210,7 +212,7 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = None,
-        initialFields = Some(AVector[Val](ValU256(U256.unsafe(0)))),
+        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.unsafe(0)))),
         issueTokenAmount = Some(1024)
       )
 
@@ -234,7 +236,7 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = Some(100000),
-        initialFields = Some(AVector[Val](ValU256(U256.unsafe(0)))),
+        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.unsafe(0)))),
         issueTokenAmount = Some(1024)
       )
     val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
@@ -242,7 +244,7 @@ class SmartContractTest extends AlephiumActorSpec {
     val tokenWithdrawScript = {
       SwapContracts.tokenWithdrawTxScript(address, tokenContractKey, U256.unsafe(1024))
     }
-    val tokenWithdrawTxScriptResult = buildScript(tokenWithdrawScript, None, None, None)
+    val tokenWithdrawTxScriptResult = buildExecuteScriptTx(tokenWithdrawScript, None, None, None)
 
     val rawUnsignedTx = Hex.from(tokenWithdrawTxScriptResult.unsignedTx).value
     val unsignedTx    = deserialize[UnsignedTransaction](rawUnsignedTx).rightValue
@@ -266,7 +268,7 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = Some(100000),
-        initialFields = Some(AVector[Val](ValU256(U256.unsafe(0)))),
+        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.unsafe(0)))),
         issueTokenAmount = Some(1024)
       )
     val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
@@ -278,7 +280,11 @@ class SmartContractTest extends AlephiumActorSpec {
     val swapContractBuildResult = contract(
       SwapContracts.swapContract,
       Some(
-        AVector[Val](ValByteVec(tokenContractKey.bytes), ValU256(U256.Zero), ValU256(U256.Zero))
+        AVector[vm.Val](
+          vm.Val.ByteVec(tokenContractKey.bytes),
+          vm.Val.U256(U256.Zero),
+          vm.Val.U256(U256.Zero)
+        )
       ),
       issueTokenAmount = Some(10000)
     )
@@ -357,7 +363,7 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = Some(100000),
-        initialFields = Some(AVector[Val](ValU256(U256.Zero))),
+        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.Zero))),
         issueTokenAmount = Some(1024)
       )
     val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
@@ -413,7 +419,11 @@ class SmartContractTest extends AlephiumActorSpec {
     val swapContractBuildResult = contract(
       SwapContracts.swapContract,
       Some(
-        AVector[Val](ValByteVec(tokenContractKey.bytes), ValU256(U256.Zero), ValU256(U256.Zero))
+        AVector[vm.Val](
+          vm.Val.ByteVec(tokenContractKey.bytes),
+          vm.Val.U256(U256.Zero),
+          vm.Val.U256(U256.Zero)
+        )
       ),
       issueTokenAmount = Some(10000)
     )
@@ -550,11 +560,9 @@ object SwapContracts {
     """.stripMargin
 
   def tokenWithdrawTxScript(address: String, tokenContractKey: Hash, tokenAmount: U256) = s"""
-    |TxScript Main {
-    |  pub payable fn main() -> () {
-    |    let token = Token(#${tokenContractKey.toHexString})
-    |    token.withdraw(@${address}, $tokenAmount)
-    |  }
+    |TxScript Main payable {
+    |  let token = Token(#${tokenContractKey.toHexString})
+    |  token.withdraw(@${address}, $tokenAmount)
     |}
     |
     |$tokenContract
@@ -597,13 +605,11 @@ object SwapContracts {
       tokenAmount: U256,
       swapContractKey: Hash
   ) = s"""
-    |TxScript Main {
-    |  pub payable fn main() -> () {
-    |    approveAlph!(@${address}, $alphAmount)
-    |    approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
-    |    let swap = Swap(#${swapContractKey.toHexString})
-    |    swap.addLiquidity(@${address}, $alphAmount, $tokenAmount)
-    |  }
+    |TxScript Main payable {
+    |  approveAlph!(@${address}, $alphAmount)
+    |  approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
+    |  let swap = Swap(#${swapContractKey.toHexString})
+    |  swap.addLiquidity(@${address}, $alphAmount, $tokenAmount)
     |}
     |
     |$swapContract
@@ -615,24 +621,20 @@ object SwapContracts {
       tokenId: Hash,
       tokenAmount: U256
   ) = s"""
-    |TxScript Main {
-    |  pub payable fn main() -> () {
-    |    approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
-    |    let swap = Swap(#${swapContractKey.toHexString})
-    |    swap.swapAlph(@${address}, $tokenAmount)
-    |  }
+    |TxScript Main payable {
+    |  approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
+    |  let swap = Swap(#${swapContractKey.toHexString})
+    |  swap.swapAlph(@${address}, $tokenAmount)
     |}
     |
     |$swapContract
     |""".stripMargin
 
   def swapAlphForTokenTxScript(address: String, swapContractKey: Hash, alphAmount: U256) = s"""
-    |TxScript Main {
-    |  pub payable fn main() -> () {
-    |    approveAlph!(@${address}, $alphAmount)
-    |    let swap = Swap(#${swapContractKey.toHexString})
-    |    swap.swapToken(@${address}, $alphAmount)
-    |  }
+    |TxScript Main payable {
+    |  approveAlph!(@${address}, $alphAmount)
+    |  let swap = Swap(#${swapContractKey.toHexString})
+    |  swap.swapToken(@${address}, $alphAmount)
     |}
     |
     |$swapContract
