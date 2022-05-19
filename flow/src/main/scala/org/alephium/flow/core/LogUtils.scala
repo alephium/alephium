@@ -32,7 +32,7 @@ trait LogUtils { Self: FlowUtils =>
       start: Int,
       end: Int
   ): IOResult[(Int, AVector[LogStates])] = {
-    var allLogStates: ArrayBuffer[LogStates] = ArrayBuffer.empty
+    val allLogStates: ArrayBuffer[LogStates] = ArrayBuffer.empty
     var nextCount                            = start
 
     @tailrec
@@ -46,7 +46,7 @@ trait LogUtils { Self: FlowUtils =>
           if (end < nextCount) {
             Right(())
           } else {
-            allLogStates = allLogStates :+ logStates
+            allLogStates += logStates
             rec(LogStatesId(eventKey, nextCount))
           }
         case Right(None) =>

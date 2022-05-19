@@ -451,55 +451,49 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       txId: Hash
   ): Try[Events] = {
-    for {
-      eventsOpt <- wrapResult(
-        for {
-          result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
-          (nextStart, logStatesVec) = result
-          logStates <- logStatesVec.mapE { logStates =>
-            logStates.states
-              .mapE { state =>
-                if (state.isRef) {
-                  LogStateRef
-                    .fromFields(state.fields)
-                    .toRight(IOError.Other(new Throwable(s"Invalid state ref: ${state.fields}")))
-                    .flatMap(blockFlow.getEventByRef(_))
-                } else {
-                  Right(state)
-                }
+    wrapResult(
+      for {
+        result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
+        (nextStart, logStatesVec) = result
+        logStates <- logStatesVec.mapE { logStates =>
+          logStates.states
+            .mapE { state =>
+              if (state.isRef) {
+                LogStateRef
+                  .fromFields(state.fields)
+                  .toRight(IOError.Other(new Throwable(s"Invalid state ref: ${state.fields}")))
+                  .flatMap(blockFlow.getEventByRef(_))
+              } else {
+                Right(state)
               }
-              .map(states => logStates.copy(states = states))
-          }
-        } yield {
-          Events.from(logStates, nextStart)
+            }
+            .map(states => logStates.copy(states = states))
         }
-      )
-      events <- eventsOpt.toRight(notFound(s"No events for txId: ${txId.toHexString}"))
-    } yield events
+      } yield {
+        Events.from(logStates, nextStart)
+      }
+    )
   }
 
-  def getEvents(
+  def getEventsByContractId(
       blockFlow: BlockFlow,
       start: Int,
       endOpt: Option[Int],
-      eventKey: Hash
+      contractId: ContractId
   ): Try[Events] = {
-    for {
-      eventsOpt <- wrapResult(
-        blockFlow
-          .getEvents(
-            eventKey,
-            start,
-            endOpt.getOrElse(start + CounterRange.MaxCounterRange)
-          )
-          .map {
-            case (nextStart, logStatesVec) => {
-              Events.from(logStatesVec, nextStart)
-            }
+    wrapResult(
+      blockFlow
+        .getEvents(
+          contractId,
+          start,
+          endOpt.getOrElse(start + CounterRange.MaxCounterRange)
+        )
+        .map {
+          case (nextStart, logStatesVec) => {
+            Events.from(logStatesVec, nextStart)
           }
-      )
-      events <- eventsOpt.toRight(notFound(s"No events for eventKey: ${eventKey.toHexString}"))
-    } yield events
+        }
+    )
   }
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit

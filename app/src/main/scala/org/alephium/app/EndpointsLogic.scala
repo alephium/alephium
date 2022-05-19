@@ -577,7 +577,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     {
       case (contractAddress, counterRange, _) => {
         Future.successful {
-          serverUtils.getEvents(
+          serverUtils.getEventsByContractId(
             blockFlow,
             counterRange.start,
             counterRange.endOpt,

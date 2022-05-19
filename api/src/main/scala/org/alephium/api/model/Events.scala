@@ -17,14 +17,11 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, ChainIndex, ContractId}
+import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.protocol.vm.LogStates
 import org.alephium.util.AVector
 
 final case class Events(
-    chainFrom: Int,
-    chainTo: Int,
     events: AVector[ContractEvent],
     nextStart: Int
 )
@@ -52,18 +49,10 @@ object Events {
     }
   }
 
-  def from(
-      logStatesVec: AVector[LogStates],
-      nextStart: Int
-  )(implicit groupConfig: GroupConfig): Option[Events] = {
-    logStatesVec.headOption.map { logStates =>
-      val chainIndex = ChainIndex.from(logStates.blockHash, groupConfig.groups)
-      Events(
-        chainIndex.from.value,
-        chainIndex.to.value,
-        logStatesVec.flatMap(Events.from),
-        nextStart
-      )
-    }
+  def from(logStatesVec: AVector[LogStates], nextStart: Int): Events = {
+    Events(
+      logStatesVec.flatMap(Events.from),
+      nextStart
+    )
   }
 }
