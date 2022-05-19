@@ -471,7 +471,13 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   val decodeUnsignedTransactionLogic = serverLogic(decodeUnsignedTransaction) { tx =>
     Future.successful(
-      serverUtils.decodeUnsignedTransaction(tx.unsignedTx).map(UnsignedTx.fromProtocol(_))
+      serverUtils.decodeUnsignedTransaction(tx.unsignedTx).map { unsignedTx =>
+        DecodeUnsignedTxResult(
+          unsignedTx.fromGroup.value,
+          unsignedTx.toGroup.value,
+          UnsignedTx.fromProtocol(unsignedTx)
+        )
+      }
     )
   }
 

@@ -31,6 +31,7 @@ final case class BuildTransactionResult(
     fromGroup: Int,
     toGroup: Int
 ) extends GasInfo
+    with ChainIndexInfo
 object BuildTransactionResult {
 
   def from(

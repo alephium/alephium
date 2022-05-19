@@ -16,4 +16,7 @@
 
 package org.alephium.api.model
 
-final case class DecodeTransaction(unsignedTx: String)
+trait ChainIndexInfo {
+  def fromGroup: Int
+  def toGroup: Int
+}

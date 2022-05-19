@@ -24,13 +24,15 @@ import org.alephium.serde.serialize
 import org.alephium.util.Hex
 
 final case class BuildDeployContractTxResult(
-    group: Int,
+    fromGroup: Int,
+    toGroup: Int,
     unsignedTx: String,
     gasAmount: GasBox,
     gasPrice: GasPrice,
     txId: Hash,
     contractAddress: Address.Contract
 ) extends GasInfo
+    with ChainIndexInfo
 
 object BuildDeployContractTxResult {
   def from(
@@ -39,6 +41,7 @@ object BuildDeployContractTxResult {
     val contractId = TxOutputRef.key(unsignedTx.hash, unsignedTx.fixedOutputs.length)
     BuildDeployContractTxResult(
       unsignedTx.fromGroup.value,
+      unsignedTx.toGroup.value,
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,
       unsignedTx.gasPrice,

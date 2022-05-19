@@ -5138,7 +5138,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DecodeTransaction"
+                "$ref": "#/components/schemas/DecodeUnsignedTx"
               },
               "example": {
                 "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc"
@@ -5152,43 +5152,47 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UnsignedTx"
+                  "$ref": "#/components/schemas/DecodeUnsignedTxResult"
                 },
                 "example": {
-                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "version": 1,
-                  "networkId": 1,
-                  "gasAmount": 20000,
-                  "gasPrice": "100000000000",
-                  "inputs": [
-                    {
-                      "outputRef": {
-                        "hint": 23412,
-                        "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
-                      },
-                      "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
-                    }
-                  ],
-                  "fixedOutputs": [
-                    {
-                      "hint": 1,
-                      "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                      "alphAmount": "2000000000000000000",
-                      "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                      "tokens": [
-                        {
-                          "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                          "amount": "42000000000000000000"
+                  "fromGroup": 1,
+                  "toGroup": 2,
+                  "unsignedTx": {
+                    "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                    "version": 1,
+                    "networkId": 1,
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000",
+                    "inputs": [
+                      {
+                        "outputRef": {
+                          "hint": 23412,
+                          "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                         },
-                        {
-                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                          "amount": "1000000000000000000000"
-                        }
-                      ],
-                      "lockTime": 1611041396892,
-                      "additionalData": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
-                    }
-                  ]
+                        "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                      }
+                    ],
+                    "fixedOutputs": [
+                      {
+                        "hint": 1,
+                        "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "alphAmount": "2000000000000000000",
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                        "tokens": [
+                          {
+                            "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                            "amount": "42000000000000000000"
+                          },
+                          {
+                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                            "amount": "1000000000000000000000"
+                          }
+                        ],
+                        "lockTime": 1611041396892,
+                        "additionalData": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -5597,11 +5601,12 @@
                   "$ref": "#/components/schemas/BuildExecuteScriptTxResult"
                 },
                 "example": {
+                  "fromGroup": 2,
+                  "toGroup": 2,
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
-                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "group": 2
+                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                 }
               }
             }
@@ -5884,7 +5889,8 @@
                   "$ref": "#/components/schemas/BuildDeployContractTxResult"
                 },
                 "example": {
-                  "group": 2,
+                  "fromGroup": 2,
+                  "toGroup": 2,
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
@@ -7946,7 +7952,8 @@
       },
       "BuildDeployContractTxResult": {
         "required": [
-          "group",
+          "fromGroup",
+          "toGroup",
           "unsignedTx",
           "gasAmount",
           "gasPrice",
@@ -7955,7 +7962,10 @@
         ],
         "type": "object",
         "properties": {
-          "group": {
+          "fromGroup": {
+            "type": "integer"
+          },
+          "toGroup": {
             "type": "integer"
           },
           "unsignedTx": {
@@ -8016,14 +8026,21 @@
       },
       "BuildExecuteScriptTxResult": {
         "required": [
+          "fromGroup",
+          "toGroup",
           "unsignedTx",
           "gasAmount",
           "gasPrice",
-          "txId",
-          "group"
+          "txId"
         ],
         "type": "object",
         "properties": {
+          "fromGroup": {
+            "type": "integer"
+          },
+          "toGroup": {
+            "type": "integer"
+          },
           "unsignedTx": {
             "type": "string"
           },
@@ -8038,9 +8055,6 @@
           "txId": {
             "type": "string",
             "format": "32-byte-hash"
-          },
-          "group": {
-            "type": "integer"
           }
         }
       },
@@ -8491,7 +8505,7 @@
           }
         }
       },
-      "DecodeTransaction": {
+      "DecodeUnsignedTx": {
         "required": [
           "unsignedTx"
         ],
@@ -8499,6 +8513,25 @@
         "properties": {
           "unsignedTx": {
             "type": "string"
+          }
+        }
+      },
+      "DecodeUnsignedTxResult": {
+        "required": [
+          "fromGroup",
+          "toGroup",
+          "unsignedTx"
+        ],
+        "type": "object",
+        "properties": {
+          "fromGroup": {
+            "type": "integer"
+          },
+          "toGroup": {
+            "type": "integer"
+          },
+          "unsignedTx": {
+            "$ref": "#/components/schemas/UnsignedTx"
           }
         }
       },

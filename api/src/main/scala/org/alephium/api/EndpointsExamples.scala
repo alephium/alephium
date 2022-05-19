@@ -445,8 +445,11 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val submitMultisigTransactionExamples: List[Example[SubmitMultisig]] =
     simpleExample(SubmitMultisig(unsignedTx = hexString, AVector(signature)))
 
-  implicit val decodeTransactionExamples: List[Example[DecodeTransaction]] =
-    simpleExample(DecodeTransaction(unsignedTx = hexString))
+  implicit val decodeTransactionExamples: List[Example[DecodeUnsignedTx]] =
+    simpleExample(DecodeUnsignedTx(unsignedTx = hexString))
+
+  implicit val decodeUnsignedTxExamples: List[Example[DecodeUnsignedTxResult]] =
+    simpleExample(DecodeUnsignedTxResult(1, 2, unsignedTx))
 
   implicit val txResultExamples: List[Example[TxResult]] =
     simpleExample(TxResult(txId, fromGroup = 2, toGroup = 1))
@@ -558,7 +561,8 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildDeployContractTxResultExamples: List[Example[BuildDeployContractTxResult]] =
     simpleExample(
       BuildDeployContractTxResult(
-        group = 2,
+        fromGroup = 2,
+        toGroup = 2,
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,
@@ -570,11 +574,12 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildExecuteScriptTxResultExamples: List[Example[BuildExecuteScriptTxResult]] =
     simpleExample(
       BuildExecuteScriptTxResult(
+        fromGroup = 2,
+        toGroup = 2,
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,
-        txId = hash,
-        group = 2
+        txId = hash
       )
     )
 

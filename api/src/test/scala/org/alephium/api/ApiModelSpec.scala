@@ -660,7 +660,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val txId       = Hash.generate
     val contractId = Hash.generate
     val buildDeployContractTxResult = BuildDeployContractTxResult(
-      group = 2,
+      fromGroup = 2,
+      toGroup = 2,
       unsignedTx = "0000",
       gasAmount = GasBox.unsafe(1),
       gasPrice = GasPrice(1),
@@ -670,7 +671,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw =
       s"""
          |{
-         |  "group": 2,
+         |  "fromGroup": 2,
+         |  "toGroup": 2,
          |  "unsignedTx": "0000",
          |  "gasAmount":1,
          |  "gasPrice":"1",
@@ -704,20 +706,22 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode BuildScriptTxResult" in {
     val txId = Hash.generate
     val buildExecuteScriptTxResult = BuildExecuteScriptTxResult(
+      fromGroup = 1,
+      toGroup = 1,
       unsignedTx = "0000",
       gasAmount = GasBox.unsafe(1),
       gasPrice = GasPrice(1),
-      txId = txId,
-      group = 1
+      txId = txId
     )
     val jsonRaw =
       s"""
          |{
+         |  "fromGroup": 1,
+         |  "toGroup": 1,
          |  "unsignedTx": "0000",
          |  "gasAmount":1,
          |  "gasPrice":"1",
-         |  "txId": "${txId.toHexString}",
-         |  "group": 1
+         |  "txId": "${txId.toHexString}"
          |}
          |""".stripMargin
     checkData(buildExecuteScriptTxResult, jsonRaw)
