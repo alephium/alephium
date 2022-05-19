@@ -1681,12 +1681,12 @@ object Log7 extends LemanLogInstr   { val n: Int = 7 }
 object Log8 extends LemanLogInstr   { val n: Int = 8 }
 object Log9 extends LemanLogInstr   { val n: Int = 9 }
 
-final case class TemplateVariable(name: String, tpe: Val.Type) extends StatelessInstr {
+final case class TemplateVariable(name: String, tpe: Val.Type, index: Int) extends StatelessInstr {
   def serialize(): ByteString = ???
   def code: Byte              = ???
   def runWith[C <: StatelessContext](
       frame: Frame[C]
   ): ExeResult[Unit] = ???
 
-  override def toTemplateString(): String = s"{$name:$tpe}"
+  override def toTemplateString(): String = s"{$index}"
 }
