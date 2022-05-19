@@ -5427,10 +5427,34 @@
                 },
                 "example": {
                   "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
+                  "fields": {
+                    "signature": "TxScript Bar(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+                    "names": [
+                      "aa",
+                      "bb",
+                      "cc",
+                      "dd",
+                      "ee"
+                    ],
+                    "types": [
+                      "Bool",
+                      "U256",
+                      "I256",
+                      "ByteVec",
+                      "Address"
+                    ]
+                  },
                   "functions": [
                     {
                       "name": "bar",
                       "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+                      "argNames": [
+                        "a",
+                        "b",
+                        "c",
+                        "d",
+                        "e"
+                      ],
                       "argTypes": [
                         "Bool",
                         "U256",
@@ -5441,18 +5465,6 @@
                       "returnTypes": [
                         "U256",
                         "I256",
-                        "ByteVec",
-                        "Address"
-                      ]
-                    }
-                  ],
-                  "events": [
-                    {
-                      "name": "Bar",
-                      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
-                      "fieldTypes": [
-                        "Bool",
-                        "U256",
                         "ByteVec",
                         "Address"
                       ]
@@ -5695,6 +5707,13 @@
                   "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
                     "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+                    "names": [
+                      "aa",
+                      "bb",
+                      "cc",
+                      "dd",
+                      "ee"
+                    ],
                     "types": [
                       "Bool",
                       "U256",
@@ -5707,6 +5726,13 @@
                     {
                       "name": "bar",
                       "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+                      "argNames": [
+                        "a",
+                        "b",
+                        "c",
+                        "d",
+                        "e"
+                      ],
                       "argTypes": [
                         "Bool",
                         "U256",
@@ -5726,6 +5752,12 @@
                     {
                       "name": "Bar",
                       "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
+                      "fieldNames": [
+                        "a",
+                        "b",
+                        "d",
+                        "e"
+                      ],
                       "fieldTypes": [
                         "Bool",
                         "U256",
@@ -8282,24 +8314,21 @@
       "CompileScriptResult": {
         "required": [
           "bytecodeTemplate",
-          "functions",
-          "events"
+          "fields",
+          "functions"
         ],
         "type": "object",
         "properties": {
           "bytecodeTemplate": {
             "type": "string"
           },
+          "fields": {
+            "$ref": "#/components/schemas/FieldsSig"
+          },
           "functions": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FunctionSig"
-            }
-          },
-          "events": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EventSig"
             }
           }
         }
@@ -8505,6 +8534,7 @@
         "required": [
           "name",
           "signature",
+          "fieldNames",
           "fieldTypes"
         ],
         "type": "object",
@@ -8514,6 +8544,12 @@
           },
           "signature": {
             "type": "string"
+          },
+          "fieldNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "fieldTypes": {
             "type": "array",
@@ -8569,12 +8605,19 @@
       "FieldsSig": {
         "required": [
           "signature",
+          "names",
           "types"
         ],
         "type": "object",
         "properties": {
           "signature": {
             "type": "string"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "types": {
             "type": "array",
@@ -8631,6 +8674,7 @@
         "required": [
           "name",
           "signature",
+          "argNames",
           "argTypes",
           "returnTypes"
         ],
@@ -8641,6 +8685,12 @@
           },
           "signature": {
             "type": "string"
+          },
+          "argNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "argTypes": {
             "type": "array",
