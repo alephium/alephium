@@ -300,16 +300,21 @@ object StatefulParser extends Parser[StatefulContext] {
     P(
       Lexer.keyword(
         "TxScript"
-      ) ~/ Lexer.typeId ~ templateParams.? ~ Lexer.TxScriptModifier.modifiers.? ~ "{" ~ statement.rep ~ func
+      ) ~/ Lexer.typeId ~ templateParams.? ~ Lexer.TxScriptModifier.modifiers.? ~ "{" ~ statement
+        .rep(0) ~ func
         .rep(0) ~ "}"
     )
       .map { case (typeId, templateVars, payable, mainStmts, funcs) =>
         val isPayable = !payable.contains(Lexer.TxScriptModifier.NonPayable)
-        Ast.TxScript(
-          typeId,
-          templateVars.getOrElse(Seq.empty),
-          Ast.FuncDef.main(mainStmts, isPayable) +: funcs
-        )
+        if (mainStmts.isEmpty) {
+          throw Compiler.Error(s"No main statements defined in TxScript ${typeId.name}")
+        } else {
+          Ast.TxScript(
+            typeId,
+            templateVars.getOrElse(Seq.empty),
+            Ast.FuncDef.main(mainStmts, isPayable) +: funcs
+          )
+        }
       }
   def txScript[_: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
 

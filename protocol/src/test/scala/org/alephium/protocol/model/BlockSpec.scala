@@ -237,6 +237,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       val script =
         s"""
          |TxScript Foo payable {
+         |  return
          |  pub fn add() -> () {
          |  }
          |}

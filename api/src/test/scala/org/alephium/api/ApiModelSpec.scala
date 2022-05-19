@@ -844,11 +844,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 =
       """
         |{
-        |  "bytecodeTemplate": "0201000000000001000707060716011602160316041605160602",
+        |  "bytecodeTemplate": "020101000000010201000707060716011602160316041605160602",
         |  "functions": [
         |    {
         |      "name": "main",
-        |      "signature": "pub main()->()",
+        |      "signature": "pub payable main()->()",
         |      "argTypes": [],
         |      "returnTypes": []
         |    },

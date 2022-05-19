@@ -47,12 +47,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |// comment
            |TxScript Foo {
+           |  return
            |  pub fn bar(a: U256, b: U256) -> (U256) {
            |    return (a + b)
            |  }
            |}
            |""".stripMargin
       Compiler.compileTxScript(script).isRight is true
+    }
+
+    {
+      info("fail without main statements")
+
+      val script =
+        s"""
+           |TxScript Foo {}
+           |""".stripMargin
+      Compiler
+        .compileTxScript(script)
+        .leftValue
+        .message is "No main statements defined in TxScript Foo"
     }
 
     {
@@ -203,6 +217,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |
          |TxScript Bar {
+         |  return
          |  pub fn bar() -> () {
          |    return foo()
          |  }

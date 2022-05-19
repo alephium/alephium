@@ -499,7 +499,7 @@ class ParserSpec extends AlephiumSpec {
         payable,
         Seq.empty,
         Seq.empty,
-        Seq.empty
+        Seq(Ast.ReturnStmt(List()))
       )
     )
   }
@@ -509,6 +509,7 @@ class ParserSpec extends AlephiumSpec {
     val script  = s"""
          |AssetScript Main(x: U256) {
          |  pub fn main() -> () {
+         |    return
          |  }
          |}
          |""".stripMargin
@@ -522,6 +523,7 @@ class ParserSpec extends AlephiumSpec {
     val payable = !(payableModifier === "nonPayable")
     val script  = s"""
          |TxScript Main(x: U256) $payableModifier {
+         |  return
          |}
          |""".stripMargin
 

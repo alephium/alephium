@@ -42,6 +42,7 @@ class VMSpec extends AlephiumSpec {
     val input =
       s"""
          |TxScript Foo nonPayable {
+         |  return
          |  pub fn foo() -> () {
          |    return
          |  }
