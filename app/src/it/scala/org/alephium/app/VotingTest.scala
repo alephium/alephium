@@ -258,13 +258,11 @@ trait VotingFixture extends WalletFixture {
       contractCode: String
   ): TxResult = {
     val allocationScript = s"""
-        |TxScript TokenAllocation {
-        |    pub payable fn main() -> () {
-        |      let voting = Voting(#${contractId})
-        |      let caller = txCaller!(0)
-        |      approveAlph!(caller, $utxoFee * ${votersWallets.size})
-        |      voting.allocateTokens()
-        |    }
+        |TxScript TokenAllocation payable {
+        |  let voting = Voting(#${contractId})
+        |  let caller = txCaller!(0)
+        |  approveAlph!(caller, $utxoFee * ${votersWallets.size})
+        |  voting.allocateTokens()
         |}
         $contractCode
       """.stripMargin
@@ -278,14 +276,12 @@ trait VotingFixture extends WalletFixture {
       contractCode: String
   ): TxResult = {
     val votingScript = s"""
-      |TxScript VotingScript {
-      |  pub payable fn main() -> () {
-      |    let caller = txCaller!(txCallerSize!() - 1)
-      |    approveToken!(caller, #${contractId}, 1)
-      |    let voting = Voting(#${contractId})
-      |    approveAlph!(caller, $utxoFee)
-      |    voting.vote($choice, caller)
-      |  }
+      |TxScript VotingScript payable {
+      |  let caller = txCaller!(txCallerSize!() - 1)
+      |  approveToken!(caller, #${contractId}, 1)
+      |  let voting = Voting(#${contractId})
+      |  approveAlph!(caller, $utxoFee)
+      |  voting.vote($choice, caller)
       |}
       $contractCode
       """.stripMargin
@@ -294,11 +290,9 @@ trait VotingFixture extends WalletFixture {
 
   def close(adminWallet: Wallet, contractId: String, contractCode: String): TxResult = {
     val closingScript = s"""
-      |TxScript ClosingScript {
-      |  pub payable fn main() -> () {
-      |    let voting = Voting(#${contractId})
-      |    voting.close()
-      |  }
+      |TxScript ClosingScript payable {
+      |  let voting = Voting(#${contractId})
+      |  voting.close()
       |}
       $contractCode
       """.stripMargin

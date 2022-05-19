@@ -487,13 +487,8 @@ class ParserSpec extends AlephiumSpec {
   }
 
   trait ScriptFixture {
-    def script(tpe: String) =
-      s"""
-         |$tpe Main(x: U256) {
-         |  pub fn main() -> () {
-         |  }
-         |}
-         |""".stripMargin
+    val payable: Boolean
+    val script: String
 
     val ident        = TypeId("Main")
     val templateVars = Seq(Argument(Ident("x"), Type.U256, false))
@@ -501,18 +496,46 @@ class ParserSpec extends AlephiumSpec {
       FuncDef(
         FuncId("main", false),
         true,
-        false,
+        payable,
         Seq.empty,
         Seq.empty,
-        Seq.empty
+        Seq(Ast.ReturnStmt(List()))
       )
     )
   }
 
-  it should "parse Script" in new ScriptFixture {
-    fastparse.parse(script("AssetScript"), StatelessParser.assetScript(_)).get.value is
+  it should "parse AssetScript" in new ScriptFixture {
+    val payable = false
+    val script  = s"""
+         |AssetScript Main(x: U256) {
+         |  pub fn main() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    fastparse.parse(script, StatelessParser.assetScript(_)).get.value is
       AssetScript(ident, templateVars, funcs)
-    fastparse.parse(script("TxScript"), StatefulParser.txScript(_)).get.value is
-      TxScript(ident, templateVars, funcs)
   }
+
+  // scalastyle:off no.equal
+  class TxScriptFixture(payableModifier: String) extends ScriptFixture {
+    val payable = !(payableModifier === "nonPayable")
+    val script  = s"""
+         |TxScript Main(x: U256) $payableModifier {
+         |  return
+         |}
+         |""".stripMargin
+
+    fastparse.parse(script, StatefulParser.txScript(_)).get.value is TxScript(
+      ident,
+      templateVars,
+      funcs
+    )
+  }
+  // scalastyle:on no.equal
+
+  it should "parse explicit payable TxScript" in new TxScriptFixture("payable")
+  it should "parse implicit payable TxScript" in new TxScriptFixture("")
+  it should "parse non payable TxScript" in new TxScriptFixture("nonPayable")
 }

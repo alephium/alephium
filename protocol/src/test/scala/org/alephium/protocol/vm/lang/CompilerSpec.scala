@@ -47,12 +47,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |// comment
            |TxScript Foo {
+           |  return
            |  pub fn bar(a: U256, b: U256) -> (U256) {
            |    return (a + b)
            |  }
            |}
            |""".stripMargin
       Compiler.compileTxScript(script).isRight is true
+    }
+
+    {
+      info("fail without main statements")
+
+      val script =
+        s"""
+           |TxScript Foo {}
+           |""".stripMargin
+      Compiler
+        .compileTxScript(script)
+        .leftValue
+        .message is "No main statements defined in TxScript Foo"
     }
 
     {
@@ -203,6 +217,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |
          |TxScript Bar {
+         |  return
          |  pub fn bar() -> () {
          |    return foo()
          |  }
@@ -1851,12 +1866,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "compile TxScript" in {
     val code =
       s"""
-       |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) {
-       |  pub payable fn main() -> () {
-       |    approveToken!(address, tokenId, tokenAmount)
-       |    let swap = Swap(swapContractKey)
-       |    swap.swapAlph(address, tokenAmount)
-       |  }
+       |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) payable {
+       |  approveToken!(address, tokenId, tokenAmount)
+       |  let swap = Swap(swapContractKey)
+       |  swap.swapAlph(address, tokenAmount)
        |}
        |
        |Interface Swap {
@@ -1864,7 +1877,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
        |}
        |""".stripMargin
     val script = Compiler.compileTxScript(code).rightValue
-    script.toTemplateString() is "0101010001000a{address:Address}{tokenId:ByteVec}{tokenAmount:U256}a3{swapContractKey:ByteVec}1700{address:Address}{tokenAmount:U256}16000100"
+    script.toTemplateString() is "0101010001000a{0}{1}{2}a3{3}1700{0}{2}16000100"
   }
 
   it should "compile events with <= 8 fields" in {

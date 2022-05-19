@@ -847,13 +847,20 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 =
       """
         |{
-        |  "bytecodeTemplate": "0101000707060716011602160316041605160602",
+        |  "bytecodeTemplate": "020101000000010201000707060716011602160316041605160602",
         |  "fields": {
         |    "signature": "TxScript Foo(aa:Bool,bb:U256,cc:I256,dd:ByteVec,ee:Address)",
         |    "names": ["aa","bb","cc","dd","ee"],
         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address"]
         |  },
         |  "functions": [
+        |    {
+        |      "name": "main",
+        |      "signature": "pub payable main()->()",
+        |      "argNames": [],
+        |      "argTypes": [],
+        |      "returnTypes": []
+        |    },
         |    {
         |      "name": "bar",
         |      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",

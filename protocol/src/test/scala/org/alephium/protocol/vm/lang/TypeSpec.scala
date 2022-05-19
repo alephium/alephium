@@ -51,6 +51,7 @@ class TypeSpec extends AlephiumSpec {
     scriptAst.getTemplateVarsTypes() is
       Seq("Bool", "U256", "I256", "ByteVec", "Address")
     scriptAst.funcs.map(_.signature) is Seq(
+      "pub payable main()->()",
       "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
     )
     scriptAst.events.map(_.signature) is Seq.empty
@@ -73,6 +74,7 @@ trait TypeSignatureFixture extends CompilerConfigFixture.Default {
   val scriptStr =
     s"""
        |TxScript Foo(aa: Bool, bb: U256, cc: I256, dd: ByteVec, ee: Address) {
+       |  return
        |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
        |    return b, c, d, e, f
        |  }
