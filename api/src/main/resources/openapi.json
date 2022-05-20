@@ -7181,6 +7181,14 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -7191,8 +7199,6 @@
                   "$ref": "#/components/schemas/Events"
                 },
                 "example": {
-                  "chainFrom": 0,
-                  "chainTo": 1,
                   "events": [
                     {
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
@@ -7397,6 +7403,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -7407,8 +7421,6 @@
                   "$ref": "#/components/schemas/Events"
                 },
                 "example": {
-                  "chainFrom": 0,
-                  "chainTo": 1,
                   "events": [
                     {
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
@@ -8561,19 +8573,11 @@
       },
       "Events": {
         "required": [
-          "chainFrom",
-          "chainTo",
           "events",
           "nextStart"
         ],
         "type": "object",
         "properties": {
-          "chainFrom": {
-            "type": "integer"
-          },
-          "chainTo": {
-            "type": "integer"
-          },
           "events": {
             "type": "array",
             "items": {

@@ -1650,7 +1650,7 @@ class VMSpec extends AlephiumSpec {
     {
       info("All events emitted from the contract after the first method call")
 
-      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0)
+      val (nextCount, allLogStates) = getEvents(blockFlow, contractId, 0)
       nextCount is 1
       allLogStates.length is 1
       val logStates = allLogStates.head
@@ -1664,12 +1664,12 @@ class VMSpec extends AlephiumSpec {
     {
       info("All events emitted from the contract after the second method call")
 
-      val (nextCount1, _) = getEvents(blockFlow, chainIndex, contractId, 0, 1)
+      val (nextCount1, _) = getEvents(blockFlow, contractId, 0, 1)
       nextCount1.value is 2
-      val (nextCount2, _) = getEvents(blockFlow, chainIndex, contractId, 0, 2)
+      val (nextCount2, _) = getEvents(blockFlow, contractId, 0, 2)
       nextCount2 is 2
 
-      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0)
+      val (nextCount, allLogStates) = getEvents(blockFlow, contractId, 0)
       nextCount is 2
       allLogStates.length is 2
       val logStates1 = allLogStates.head
@@ -1681,7 +1681,7 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("Part of the events emitted from the contract after the second method call")
-      val (nextCount, allLogStates) = getEvents(blockFlow, chainIndex, contractId, 0, 2)
+      val (nextCount, allLogStates) = getEvents(blockFlow, contractId, 0, 2)
       nextCount is 2
       allLogStates.length is 2
 
@@ -2024,12 +2024,11 @@ class VMSpec extends AlephiumSpec {
 
   private def getEvents(
       blockFlow: BlockFlow,
-      chainIndex: ChainIndex,
       contractId: ContractId,
       start: Int,
       end: Int = Int.MaxValue
   ): (Int, AVector[LogStates]) = {
-    blockFlow.getEvents(chainIndex, contractId, start, end).rightValue
+    blockFlow.getEvents(contractId, start, end).rightValue
   }
 
   private def getCurentCount(

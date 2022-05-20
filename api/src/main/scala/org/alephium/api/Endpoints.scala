@@ -333,6 +333,16 @@ trait Endpoints
       .out(jsonBody[TxStatus])
       .summary("Get tx status")
 
+  lazy val getTransactionStatusLocal
+      : BaseEndpoint[(Hash, Option[GroupIndex], Option[GroupIndex]), TxStatus] =
+    transactionsEndpoint.get
+      .in("local-status")
+      .in(query[Hash]("txId"))
+      .in(query[Option[GroupIndex]]("fromGroup"))
+      .in(query[Option[GroupIndex]]("toGroup"))
+      .out(jsonBody[TxStatus])
+      .summary("Get tx status, only from the local broker")
+
   val decodeUnsignedTransaction: BaseEndpoint[DecodeTransaction, UnsignedTx] =
     transactionsEndpoint.post
       .in("decode-unsigned-tx")
@@ -433,10 +443,12 @@ trait Endpoints
       .in("check-hash-indexing")
       .summary("Check and repair the indexing of block hashes")
 
-  val getContractEvents: BaseEndpoint[(Address.Contract, CounterRange), Events] =
+  lazy val getContractEvents
+      : BaseEndpoint[(Address.Contract, CounterRange, Option[GroupIndex]), Events] =
     contractEventsEndpoint.get
       .in(path[Address.Contract]("contractAddress"))
       .in(counterQuery)
+      .in(query[Option[GroupIndex]]("group"))
       .out(jsonBody[Events])
       .summary("Get events for a contract within a counter range")
 
@@ -447,9 +459,10 @@ trait Endpoints
       .out(jsonBody[Int])
       .summary("Get current value of the events counter for a contract")
 
-  val getEventsByTxId: BaseEndpoint[Hash, Events] =
+  lazy val getEventsByTxId: BaseEndpoint[(Hash, Option[GroupIndex]), Events] =
     eventsByTxIdEndpoint.get
       .in(path[Hash]("txId"))
+      .in(query[Option[GroupIndex]]("group"))
       .out(jsonBody[Events])
       .summary("Get events for a TxScript")
 }

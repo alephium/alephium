@@ -22,8 +22,6 @@ import org.alephium.protocol.vm.LogStates
 import org.alephium.util.AVector
 
 final case class Events(
-    chainFrom: Int,
-    chainTo: Int,
     events: AVector[ContractEvent],
     nextStart: Int
 )
@@ -49,5 +47,12 @@ object Events {
         logState.fields.map(Val.from)
       )
     }
+  }
+
+  def from(logStatesVec: AVector[LogStates], nextStart: Int): Events = {
+    Events(
+      logStatesVec.flatMap(Events.from),
+      nextStart
+    )
   }
 }
