@@ -833,10 +833,7 @@ abstract class RestServerSpec(
 
     if (nbOfNodes === 1) {
       // Ignore group if it is 1 node setup, since the events are always available
-      Get(url, port).check { response =>
-        response.code is StatusCode.Ok
-        response.body.rightValue.startsWith("""{"events":[""") is true
-      }
+      Get(url, port).check(verifyNonEmptyEvents)
     } else {
       Get(url, port).check(verifyEmptyEvents)
     }
@@ -914,41 +911,9 @@ abstract class RestServerSpec(
 
     if (nbOfNodes === 1) {
       // Ignore group if it is 1 node setup, since the events are always available
-      Get(url, port).check { response =>
-        response.code is StatusCode.Ok
-        val events = response.body.rightValue
-        events.startsWith("""{"events":[""") is true
-      }
+      Get(url, port).check(verifyNonEmptyEvents)
     } else {
       Get(url, port).check(verifyEmptyEvents)
-    }
-  }
-
-  def verifyEmptyEvents(response: Response[Either[String, String]]): Assertion = {
-    response.code is StatusCode.Ok
-    response.body.rightValue is s"""
-      |{
-      |  "events": [],
-      |  "nextStart": 0
-      |}
-      |""".stripMargin.filterNot(_.isWhitespace)
-  }
-
-  def verifyResponseWithNodes(
-      urlWithoutGroup: String,
-      urlWithGroup: String,
-      chainIndex: ChainIndex,
-      port: Int
-  )(validVerify: Response[Either[String, String]] => Assertion) = {
-    if (nbOfNodes === 1) {
-      AVector(urlWithoutGroup, urlWithGroup).foreach(Get(_, port).check(validVerify))
-    } else {
-      Get(urlWithoutGroup, port) check { response =>
-        response.code is StatusCode.BadRequest
-        response.body.leftValue is s"""{"detail":"`group` parameter is required with multiple brokers"}"""
-      }
-
-      Get(s"$urlWithGroup?group=${chainIndex.from.value}", port).check(validVerify)
     }
   }
   // scalastyle:on no.equal
@@ -971,12 +936,45 @@ abstract class RestServerSpec(
         s"/events/tx-id/${dummyTx.id.toHexString}?group=${chainIndex.from.value}",
         chainIndex,
         server.port
-      ) { response =>
-        response.code is StatusCode.Ok
-        response.body.rightValue.startsWith("""{"events":[""") is true
-      }
+      )(verifyNonEmptyEvents)
     }
   }
+
+  def verifyNonEmptyEvents(response: Response[Either[String, String]]): Assertion = {
+    response.code is StatusCode.Ok
+    val events = response.body.rightValue
+    events.startsWith(s"""{"events":[{"blockHash":"${dummyBlock.hash.toHexString}""") is true
+  }
+
+  def verifyEmptyEvents(response: Response[Either[String, String]]): Assertion = {
+    response.code is StatusCode.Ok
+    response.body.rightValue is s"""
+      |{
+      |  "events": [],
+      |  "nextStart": 0
+      |}
+      |""".stripMargin.filterNot(_.isWhitespace)
+  }
+
+  // scalastyle:off no.equal
+  def verifyResponseWithNodes(
+      urlWithoutGroup: String,
+      urlWithGroup: String,
+      chainIndex: ChainIndex,
+      port: Int
+  )(validVerify: Response[Either[String, String]] => Assertion) = {
+    if (nbOfNodes === 1) {
+      AVector(urlWithoutGroup, urlWithGroup).foreach(Get(_, port).check(validVerify))
+    } else {
+      Get(urlWithoutGroup, port) check { response =>
+        response.code is StatusCode.BadRequest
+        response.body.leftValue is s"""{"detail":"`group` parameter is required with multiple brokers"}"""
+      }
+
+      Get(s"$urlWithGroup?group=${chainIndex.from.value}", port).check(validVerify)
+    }
+  }
+  // scalastyle:on no.equal
 }
 
 abstract class RestServerApiKeyDisableSpec(
