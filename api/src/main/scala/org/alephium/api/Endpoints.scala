@@ -343,11 +343,11 @@ trait Endpoints
       .out(jsonBody[TxStatus])
       .summary("Get tx status, only from the local broker")
 
-  val decodeUnsignedTransaction: BaseEndpoint[DecodeTransaction, UnsignedTx] =
+  val decodeUnsignedTransaction: BaseEndpoint[DecodeUnsignedTx, DecodeUnsignedTxResult] =
     transactionsEndpoint.post
       .in("decode-unsigned-tx")
-      .in(jsonBody[DecodeTransaction])
-      .out(jsonBody[UnsignedTx])
+      .in(jsonBody[DecodeUnsignedTx])
+      .out(jsonBody[DecodeUnsignedTxResult])
       .summary("Decode an unsigned transaction")
 
   val minerAction: BaseEndpoint[MinerAction, Boolean] =

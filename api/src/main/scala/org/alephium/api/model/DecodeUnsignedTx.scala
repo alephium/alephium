@@ -16,32 +16,10 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.UnsignedTransaction
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.serde.serialize
-import org.alephium.util.Hex
+final case class DecodeUnsignedTx(unsignedTx: String)
 
-final case class BuildExecuteScriptTxResult(
+final case class DecodeUnsignedTxResult(
     fromGroup: Int,
     toGroup: Int,
-    unsignedTx: String,
-    gasAmount: GasBox,
-    gasPrice: GasPrice,
-    txId: Hash
-) extends GasInfo
-    with ChainIndexInfo
-object BuildExecuteScriptTxResult {
-  def from(
-      unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildExecuteScriptTxResult =
-    BuildExecuteScriptTxResult(
-      unsignedTx.fromGroup.value,
-      unsignedTx.toGroup.value,
-      Hex.toHexString(serialize(unsignedTx)),
-      unsignedTx.gasAmount,
-      unsignedTx.gasPrice,
-      unsignedTx.hash
-    )
-}
+    unsignedTx: UnsignedTx
+) extends ChainIndexInfo

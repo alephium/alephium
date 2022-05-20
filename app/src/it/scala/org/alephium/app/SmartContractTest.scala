@@ -141,7 +141,7 @@ class SmartContractTest extends AlephiumActorSpec {
     }
 
     def decodeTx(str: String): UnsignedTx = {
-      request[UnsignedTx](decodeUnsignedTransaction(str), restPort)
+      request[DecodeUnsignedTxResult](decodeUnsignedTransaction(str), restPort).unsignedTx
     }
 
     def verifySpentUTXOs(unsignedTx: String, hashes: Set[String]) = {

@@ -241,7 +241,8 @@ trait ApiModelCodec {
 
   implicit val submitTransactionRW: RW[SubmitTransaction] = macroRW
 
-  implicit val decodeTransactionRW: RW[DecodeTransaction] = macroRW
+  implicit val decodeTransactionRW: RW[DecodeUnsignedTx]             = macroRW
+  implicit val decodeTransactionResultRW: RW[DecodeUnsignedTxResult] = macroRW
 
   implicit val txStatusRW: RW[TxStatus] =
     RW.merge(macroRW[Confirmed], macroRW[MemPooled.type], macroRW[TxNotFound.type])

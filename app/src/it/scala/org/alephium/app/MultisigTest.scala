@@ -46,9 +46,11 @@ class MultisigTest extends AlephiumActorSpec {
     unsignedTx.inputs.length is 2
 
     val decodedTx =
-      request[UnsignedTx](decodeUnsignedTransaction(buildTxResult.unsignedTx), restPort)
+      request[DecodeUnsignedTxResult](decodeUnsignedTransaction(buildTxResult.unsignedTx), restPort)
 
-    decodedTx is UnsignedTx.fromProtocol(unsignedTx)
+    decodedTx.fromGroup is unsignedTx.fromGroup.value
+    decodedTx.toGroup is unsignedTx.toGroup.value
+    decodedTx.unsignedTx is UnsignedTx.fromProtocol(unsignedTx)
 
     val submitTx = submitTransaction(buildTxResult, privateKey)
     request[ApiError.InternalServerError](
@@ -267,9 +269,14 @@ class MultisigTest extends AlephiumActorSpec {
       val unsignedTx =
         deserialize[UnsignedTransaction](Hex.from(buildTxResult.unsignedTx).get).rightValue
       val decodedTx =
-        request[UnsignedTx](decodeUnsignedTransaction(buildTxResult.unsignedTx), restPort)
+        request[DecodeUnsignedTxResult](
+          decodeUnsignedTransaction(buildTxResult.unsignedTx),
+          restPort
+        )
 
-      decodedTx is UnsignedTx.fromProtocol(unsignedTx)
+      decodedTx.fromGroup is unsignedTx.fromGroup.value
+      decodedTx.toGroup is unsignedTx.toGroup.value
+      decodedTx.unsignedTx is UnsignedTx.fromProtocol(unsignedTx)
 
       val submitMultisigTx = signAndSubmitMultisigTransaction(buildTxResult, unlockPrivKeys)
       val multisigTx       = request[TxResult](submitMultisigTx, restPort)
