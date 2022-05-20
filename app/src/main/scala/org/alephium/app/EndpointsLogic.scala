@@ -402,6 +402,11 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   )
 
+  val getTransactionStatusLocalLogic = serverLogic(getTransactionStatusLocal) {
+    case (txId, fromGroup, toGroup) =>
+      searchTransactionStatus(txId, fromGroup, toGroup)
+  }
+
   private def searchTransactionStatus(
       txId: Hash,
       chainFrom: Option[GroupIndex],

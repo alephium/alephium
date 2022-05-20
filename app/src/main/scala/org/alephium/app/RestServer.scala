@@ -94,6 +94,7 @@ class RestServer(
       buildMultisigLogic,
       submitMultisigTransactionLogic,
       getTransactionStatusLogic,
+      getTransactionStatusLocalLogic,
       decodeUnsignedTransactionLogic,
       minerActionLogic,
       minerListAddressesLogic,

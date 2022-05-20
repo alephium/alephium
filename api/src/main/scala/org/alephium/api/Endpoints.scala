@@ -333,6 +333,16 @@ trait Endpoints
       .out(jsonBody[TxStatus])
       .summary("Get tx status")
 
+  lazy val getTransactionStatusLocal
+      : BaseEndpoint[(Hash, Option[GroupIndex], Option[GroupIndex]), TxStatus] =
+    transactionsEndpoint.get
+      .in("local-status")
+      .in(query[Hash]("txId"))
+      .in(query[Option[GroupIndex]]("fromGroup"))
+      .in(query[Option[GroupIndex]]("toGroup"))
+      .out(jsonBody[TxStatus])
+      .summary("Get tx status, only from the local broker")
+
   val decodeUnsignedTransaction: BaseEndpoint[DecodeUnsignedTx, DecodeUnsignedTxResult] =
     transactionsEndpoint.post
       .in("decode-unsigned-tx")
