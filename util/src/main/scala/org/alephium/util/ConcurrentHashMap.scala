@@ -46,9 +46,8 @@ class ConcurrentHashMap[K, V] private (m: JCHashMap[K, V]) extends SimpleMap[K, 
     ()
   }
 
-  def remove(k: K): Unit = {
-    m.remove(k)
-    ()
+  def remove(k: K): Option[V] = {
+    Option(m.remove(k))
   }
 
   def unsafe(key: K): V = ???

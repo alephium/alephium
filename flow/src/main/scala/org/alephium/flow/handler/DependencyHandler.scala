@@ -166,7 +166,7 @@ trait DependencyHandlerState extends IOBaseActor {
   def uponDataProcessed(data: FlowData): Unit = {
     processing.remove(data.hash)
 
-    missingIndex.get(data.hash).foreach { children =>
+    missingIndex.remove(data.hash).foreach { children =>
       children.foreach { child =>
         val childMissing = missing(child)
         childMissing -= data.hash
@@ -176,7 +176,6 @@ trait DependencyHandlerState extends IOBaseActor {
         }
       }
     }
-    missingIndex.remove(data.hash)
 
     pending.remove(data.hash)
     ()
