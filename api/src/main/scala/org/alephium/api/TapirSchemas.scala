@@ -40,7 +40,7 @@ trait TapirSchemasLike {
   implicit val addressSchema: Schema[Address]                  = Schema(SString()).format("address")
   implicit val addressAssetSchema: Schema[Address.Asset]       = Schema(SString()).format("address")
   implicit val addressContractSchema: Schema[Address.Contract] = Schema(SString()).format("address")
-  implicit val byteStringSchema: Schema[ByteString]            = Schema(SString()).format("byte-string")
+  implicit val byteStringSchema: Schema[ByteString]            = Schema(SString()).format("hex-string")
   implicit val pulblicKeySchema: Schema[PublicKey]             = Schema(SString()).format("public-key")
   implicit val groupIndexSchema: Schema[GroupIndex]            = Schema(SInteger()).format("group-index")
   implicit val hashSchema: Schema[Hash]                        = Schema(SString()).format("32-byte-hash")
