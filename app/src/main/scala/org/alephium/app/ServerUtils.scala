@@ -524,7 +524,8 @@ class ServerUtils(implicit
         destination.address.lockupScript,
         destination.alphAmount.value,
         tokensInfo,
-        destination.lockTime
+        destination.lockTime,
+        destination.message
       )
     }
   }

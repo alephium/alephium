@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.model
 
+import akka.util.ByteString
+
 import org.alephium.macros.HashSerde
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
@@ -158,8 +160,14 @@ object UnsignedTransaction {
       changeOutputOpt <- calculateChangeOutput(alphRemainder, tokensRemainder, fromLockupScript)
     } yield {
       var txOutputs = outputs.map {
-        case TxOutputInfo(toLockupScript, amount, tokens, lockTimeOpt) =>
-          TxOutput.asset(amount, toLockupScript, tokens, lockTimeOpt)
+        case TxOutputInfo(toLockupScript, amount, tokens, lockTimeOpt, additionalDataOpt) =>
+          AssetOutput(
+            amount,
+            toLockupScript,
+            lockTimeOpt.getOrElse(TimeStamp.zero),
+            tokens,
+            additionalDataOpt.getOrElse(ByteString.empty)
+          )
       }
 
       changeOutputOpt.foreach { changeOutput =>
@@ -321,6 +329,18 @@ object UnsignedTransaction {
       lockupScript: LockupScript.Asset,
       alphAmount: U256,
       tokens: AVector[(TokenId, U256)],
-      lockTime: Option[TimeStamp]
+      lockTime: Option[TimeStamp],
+      additionalDataOpt: Option[ByteString]
   )
+
+  object TxOutputInfo {
+    def apply(
+        lockupScript: LockupScript.Asset,
+        alphAmount: U256,
+        tokens: AVector[(TokenId, U256)],
+        lockTime: Option[TimeStamp]
+    ): TxOutputInfo = {
+      TxOutputInfo(lockupScript, alphAmount, tokens, lockTime, None)
+    }
+  }
 }

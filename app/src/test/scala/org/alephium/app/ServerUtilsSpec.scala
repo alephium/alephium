@@ -63,6 +63,21 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   trait FlowFixtureWithApi extends FlowFixture with ApiConfigFixture
 
+  it should "send message with tx" in new Fixture {
+    implicit val serverUtils = new ServerUtils
+
+    val (_, fromPublicKey, _) = genesisKeys(0)
+    val message               = Hex.unsafe("FFFF")
+    val destination           = generateDestination(ChainIndex.unsafe(0, 1), message)
+    val buildTransaction = serverUtils
+      .buildTransaction(blockFlow, BuildTransaction(fromPublicKey, AVector(destination)))
+      .rightValue
+    val unsignedTransaction =
+      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+
+    unsignedTransaction.fixedOutputs.head.additionalData is message
+  }
+
   it should "check tx status for intra group txs" in new Fixture {
 
     override val configValues = Map(("alephium.broker.broker-num", 1))
@@ -1194,13 +1209,13 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   private def generateDestination(
       chainIndex: ChainIndex,
-      tokens: (TokenId, U256)*
+      message: ByteString = ByteString.empty
   )(implicit
       groupConfig: GroupConfig
   ): Destination = {
     val address = generateAddress(chainIndex)
     val amount  = Amount(ALPH.oneAlph)
-    Destination(address, amount, Some(AVector.from(tokens).map(p => Token(p._1, p._2))))
+    Destination(address, amount, None, None, Some(message))
   }
 
   private def generateAddress(chainIndex: ChainIndex)(implicit
