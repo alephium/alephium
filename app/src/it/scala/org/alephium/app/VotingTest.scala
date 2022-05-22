@@ -86,13 +86,12 @@ class VotingTest extends AlephiumActorSpec {
     def checkVotingStartedEvent(event: ContractEvent) = {
       val votingStartedEvent = event.asInstanceOf[ContractEvent]
       votingStartedEvent.eventIndex is 0
-      votingStartedEvent.contractId is contractAddress.lockupScript.contractId
     }
 
     def checkVoteCastedScriptEvents(infos: Seq[(String, Boolean, Hash)]) = {
       infos.foreach { info =>
         val (address, choice, txId) = info
-        val response = request[Events](
+        val response = request[ContractEvents](
           getEventsByTxId(txId.toHexString),
           restPort
         )
@@ -121,13 +120,12 @@ class VotingTest extends AlephiumActorSpec {
         (event.eventIndex, voterAddress.value.toBase58, decision.value)
       }
 
-      returnedResult.toSeq is expectedResult.toSeq
+      returnedResult.toSeq is expectedResult
     }
 
     def checkVotingClosedEvent(event: ContractEvent) = {
-      val votingClosedEvent = event.asInstanceOf[ContractEvent]
+      val votingClosedEvent = event
       votingClosedEvent.eventIndex is 2
-      votingClosedEvent.contractId is contractAddress.lockupScript.contractId
     }
 
     def checkState(nbYes: Int, nbNo: Int, isClosed: Boolean, isInitialized: Boolean) = {
@@ -150,7 +148,7 @@ class VotingTest extends AlephiumActorSpec {
         validate: (AVector[ContractEvent]) => Any
     ) = {
       val response =
-        request[Events](
+        request[ContractEvents](
           getContractEvents(startCount, contractAddress),
           restPort
         )

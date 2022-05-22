@@ -450,7 +450,7 @@ class ServerUtils(implicit
   def getEventsByTxId(
       blockFlow: BlockFlow,
       txId: Hash
-  ): Try[Events] = {
+  ): Try[ContractEvents] = {
     wrapResult(
       for {
         result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
@@ -470,7 +470,7 @@ class ServerUtils(implicit
             .map(states => logStates.copy(states = states))
         }
       } yield {
-        Events.from(logStates, nextStart)
+        ContractEvents.from(logStates, nextStart)
       }
     )
   }
@@ -480,7 +480,7 @@ class ServerUtils(implicit
       start: Int,
       endOpt: Option[Int],
       contractId: ContractId
-  ): Try[Events] = {
+  ): Try[ContractEvents] = {
     wrapResult(
       blockFlow
         .getEvents(
@@ -490,7 +490,7 @@ class ServerUtils(implicit
         )
         .map {
           case (nextStart, logStatesVec) => {
-            Events.from(logStatesVec, nextStart)
+            ContractEvents.from(logStatesVec, nextStart)
           }
         }
     )
@@ -859,7 +859,7 @@ class ServerUtils(implicit
 
   private def fetchContractEvents(worldState: WorldState.Staging): AVector[ContractEvent] = {
     val logStates = worldState.logState.getNewLogs()
-    logStates.flatMap(Events.from)
+    logStates.flatMap(ContractEvents.from)
   }
 
   private def fetchContractState(
