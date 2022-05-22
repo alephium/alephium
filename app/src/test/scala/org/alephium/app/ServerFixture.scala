@@ -116,7 +116,7 @@ object ServerFixture {
       outputInfos: AVector[TxOutputInfo]
   ): Transaction = {
     val newOutputs = outputInfos.map {
-      case TxOutputInfo(toLockupScript, amount, tokens, lockTimeOpt) =>
+      case TxOutputInfo(toLockupScript, amount, tokens, lockTimeOpt, _) =>
         TxOutput.asset(amount, toLockupScript, tokens, lockTimeOpt)
     }
     tx.copy(unsigned = tx.unsigned.copy(fixedOutputs = newOutputs))

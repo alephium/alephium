@@ -776,7 +776,6 @@ abstract class RestServerSpec(
         |  "events": [
         |    {
         |      "blockHash": "${blockHash.toHexString}",
-        |      "contractAddress": "${dummyContractAddress}",
         |      "txId": "${dummyTx.id.toHexString}",
         |      "eventIndex": 0,
         |      "fields": [
@@ -860,7 +859,6 @@ abstract class RestServerSpec(
           |    {
           |      "blockHash": "${blockHash.toHexString}",
           |      "contractAddress": "${Address.contract(txId).toBase58}",
-          |      "txId": "${dummyTx.id.toHexString}",
           |      "eventIndex": 0,
           |      "fields": [
           |        {
