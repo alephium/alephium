@@ -60,7 +60,7 @@ class RestServer(
 
   override val maybeApiKey = apiConfig.apiKey
 
-  private val swaggerUiRoute = new SwaggerVertx(openApiJson(openAPI, maybeApiKey.isEmpty)).route
+  private val swaggerUiRoute = new SwaggerVertx(openApiJson(openAPI, maybeApiKey.isEmpty)).route(_)
 
   private val blockFlowRoute: AVector[Router => Route] =
     AVector(

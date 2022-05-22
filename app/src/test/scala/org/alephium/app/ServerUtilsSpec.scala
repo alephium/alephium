@@ -1200,7 +1200,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   ): Destination = {
     val address = generateAddress(chainIndex)
     val amount  = Amount(ALPH.oneAlph)
-    Destination(address, amount, Some(AVector.from(tokens).map(Token.apply.tupled)))
+    Destination(address, amount, Some(AVector.from(tokens).map(p => Token(p._1, p._2))))
   }
 
   private def generateAddress(chainIndex: ChainIndex)(implicit

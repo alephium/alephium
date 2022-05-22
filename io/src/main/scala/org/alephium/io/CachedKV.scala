@@ -34,9 +34,9 @@ abstract class CachedKV[K, V, C >: Modified[V] <: Cache[V]] extends MutableKV[K,
 
   def getOpt(key: K): IOResult[Option[V]] = {
     (caches.get(key): @unchecked) match {
-      case None                    => getOptFromUnderlying(key)
-      case Some(t: ValueExists[V]) => Right(Some(t.value))
-      case Some(Removed())         => Right(None)
+      case None                               => getOptFromUnderlying(key)
+      case Some(t: ValueExists[V] @unchecked) => Right(Some(t.value))
+      case Some(Removed())                    => Right(None)
     }
   }
 
@@ -45,9 +45,9 @@ abstract class CachedKV[K, V, C >: Modified[V] <: Cache[V]] extends MutableKV[K,
   // we don't cache this function as it is usually used for removal
   def exists(key: K): IOResult[Boolean] = {
     (caches.get(key): @unchecked) match {
-      case None                    => underlying.exists(key)
-      case Some(_: ValueExists[V]) => Right(true)
-      case Some(Removed())         => Right(false)
+      case None                               => underlying.exists(key)
+      case Some(_: ValueExists[V] @unchecked) => Right(true)
+      case Some(Removed())                    => Right(false)
     }
   }
 

@@ -342,7 +342,7 @@ val publishSettings = Seq(
 )
 
 val commonSettings = publishSettings ++ Seq(
-  scalaVersion := "2.13.6",
+  scalaVersion := "2.13.8",
   Test / parallelExecution := false,
   scalacOptions ++= Seq(
 //    "-Xdisable-assertions", // TODO: use this properly
@@ -352,7 +352,6 @@ val commonSettings = publishSettings ++ Seq(
     "-explaintypes",
     "-feature",
     "-unchecked",
-    "-Xsource:3",
     "-Xlint:adapted-args",
     "-Xlint:constant",
     "-Xlint:delayedinit-select",
@@ -412,7 +411,9 @@ val wartsCompileExcludes = Seq(
   Wart.Throw,
   Wart.Equals,
   Wart.StringPlusAny,
-  Wart.While
+  Wart.While,
+  Wart.SizeIs,
+  Wart.ScalaApp
 )
 
 val wartsTestExcludes = wartsCompileExcludes ++ Seq(
