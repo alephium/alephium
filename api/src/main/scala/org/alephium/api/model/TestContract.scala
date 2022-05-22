@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
 import org.alephium.api.model.TestContract._
-import org.alephium.protocol.{vm, ALPH, Hash}
+import org.alephium.protocol.{vm, ALPH, BlockHash, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, AssetOutput, ContractId, GroupIndex}
 import org.alephium.protocol.vm.{ContractState => _, Val => _, _}
@@ -29,6 +29,8 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class TestContract(
     group: Option[Int] = None,
+    blockHash: Option[BlockHash] = None,
+    txId: Option[Hash] = None,
     address: Option[Address.Contract] = None,
     bytecode: StatefulContract,
     initialFields: Option[AVector[Val]] = None,
@@ -53,6 +55,8 @@ final case class TestContract(
         Right(
           Complete(
             group.getOrElse(groupDefault),
+            BlockHash.random,
+            Hash.random,
             address.getOrElse(addressDefault).contractId,
             code = testCode,
             originalCodeHash = bytecode.hash,
@@ -82,6 +86,8 @@ object TestContract {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Complete(
       group: Int = groupDefault,
+      blockHash: BlockHash = BlockHash.random,
+      txId: Hash = Hash.random,
       contractId: ContractId = addressDefault.contractId,
       code: StatefulContract,
       originalCodeHash: Hash,

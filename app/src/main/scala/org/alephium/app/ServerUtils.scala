@@ -893,11 +893,11 @@ class ServerUtils(implicit
       networkConfig.networkId,
       TimeStamp.now(),
       consensusConfig.maxMiningTarget,
-      Some(BlockHash.zero)
+      Some(testContract.blockHash)
     )
     val testGasFee = defaultGasPrice * maximalGasPerTx
     val txEnv: TxEnv = TxEnv.mockup(
-      txId = Hash.random,
+      txId = testContract.txId,
       signatures = Stack.popOnly(AVector.empty[Signature]),
       prevOutputs = testContract.inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
