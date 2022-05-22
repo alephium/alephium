@@ -459,11 +459,11 @@ trait Endpoints
       .out(jsonBody[Int])
       .summary("Get current value of the events counter for a contract")
 
-  lazy val getEventsByTxId: BaseEndpoint[(Hash, Option[GroupIndex]), ContractEvents] =
+  lazy val getEventsByTxId: BaseEndpoint[(Hash, Option[GroupIndex]), ContractEventsByTxId] =
     eventsByTxIdEndpoint.get
       .in(path[Hash]("txId"))
       .in(query[Option[GroupIndex]]("group"))
-      .out(jsonBody[ContractEvents])
+      .out(jsonBody[ContractEventsByTxId])
       .summary("Get events for a TxScript")
 }
 

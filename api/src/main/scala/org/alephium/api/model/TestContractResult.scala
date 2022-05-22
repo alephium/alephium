@@ -27,5 +27,5 @@ final case class TestContractResult(
     gasUsed: Int,
     contracts: AVector[ContractState],
     txOutputs: AVector[Output],
-    events: AVector[ContractEvent]
+    events: AVector[ContractEventByTxId]
 )

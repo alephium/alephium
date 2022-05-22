@@ -17,6 +17,7 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.LogStates
 import org.alephium.util.AVector
 
@@ -25,9 +26,21 @@ final case class ContractEvents(
     nextStart: Int
 )
 
+final case class ContractEventsByTxId(
+    events: AVector[ContractEventByTxId],
+    nextStart: Int
+)
+
 final case class ContractEvent(
     blockHash: BlockHash,
     txId: Hash,
+    eventIndex: Int,
+    fields: AVector[Val]
+)
+
+final case class ContractEventByTxId(
+    blockHash: BlockHash,
+    contractAddress: Address.Contract,
     eventIndex: Int,
     fields: AVector[Val]
 )
@@ -47,6 +60,26 @@ object ContractEvents {
   def from(logStatesVec: AVector[LogStates], nextStart: Int): ContractEvents = {
     ContractEvents(
       logStatesVec.flatMap(ContractEvents.from),
+      nextStart
+    )
+  }
+}
+
+object ContractEventsByTxId {
+  def from(logStates: LogStates): AVector[ContractEventByTxId] = {
+    logStates.states.map { logState =>
+      ContractEventByTxId(
+        logStates.blockHash,
+        Address.contract(logStates.eventKey),
+        logState.index.toInt,
+        logState.fields.map(Val.from)
+      )
+    }
+  }
+
+  def from(logStatesVec: AVector[LogStates], nextStart: Int): ContractEventsByTxId = {
+    ContractEventsByTxId(
+      logStatesVec.flatMap(ContractEventsByTxId.from),
       nextStart
     )
   }

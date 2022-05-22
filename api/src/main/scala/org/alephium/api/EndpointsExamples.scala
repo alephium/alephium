@@ -193,6 +193,13 @@ trait EndpointsExamples extends ErrorExamples {
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
 
+  private val eventByTxId = ContractEventByTxId(
+    blockHash,
+    Address.contract(txId),
+    eventIndex = 1,
+    fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
+  )
+
   implicit val minerActionExamples: List[Example[MinerAction]] = List(
     Example[MinerAction](MinerAction.StartMining, Some("Start mining"), None),
     Example[MinerAction](MinerAction.StopMining, Some("Stop mining"), None)
@@ -624,7 +631,7 @@ trait EndpointsExamples extends ErrorExamples {
         contracts = AVector(existingContract),
         txOutputs =
           AVector(ContractOutput(1234, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
-        events = AVector(event)
+        events = AVector(eventByTxId)
       )
     )
 
@@ -648,6 +655,9 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val eventsExamples: List[Example[ContractEvents]] =
     simpleExample(ContractEvents(events = AVector(event), 2))
+
+  implicit val eventsByTxIdExamples: List[Example[ContractEventsByTxId]] =
+    simpleExample(ContractEventsByTxId(events = AVector(eventByTxId), 2))
 
   implicit val eventsVectorExamples: List[Example[AVector[ContractEvents]]] =
     simpleExample(AVector(ContractEvents(events = AVector(event), 3)))
