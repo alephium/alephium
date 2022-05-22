@@ -54,8 +54,8 @@ class VotingTest extends AlephiumActorSpec {
     }
     checkState(nbYes, nbNo, false, true)
 
-    checkVoteCastedScriptEvents(voteForTxInfos)
-    checkVoteCastedScriptEvents(voteAgainstTxInfos)
+    checkVoteCastedEventsByTxId(voteForTxInfos)
+    checkVoteCastedEventsByTxId(voteAgainstTxInfos)
     checkEvents(contractAddress, countAfterVotingStarted)(checkVoteCastedEvents)
 
     val countAfterVotingCasted = getEventsCurrentCount(contractAddress)
@@ -84,14 +84,14 @@ class VotingTest extends AlephiumActorSpec {
     clique.stop()
 
     def checkVotingStartedEvent(event: ContractEvent) = {
-      val votingStartedEvent = event.asInstanceOf[ContractEvent]
+      val votingStartedEvent = event
       votingStartedEvent.eventIndex is 0
     }
 
-    def checkVoteCastedScriptEvents(infos: Seq[(String, Boolean, Hash)]) = {
+    def checkVoteCastedEventsByTxId(infos: Seq[(String, Boolean, Hash)]) = {
       infos.foreach { info =>
         val (address, choice, txId) = info
-        val response = request[ContractEvents](
+        val response = request[ContractEventsByTxId](
           getEventsByTxId(txId.toHexString),
           restPort
         )
@@ -99,7 +99,7 @@ class VotingTest extends AlephiumActorSpec {
         val events = response.events.filter(event => isBlockInMainChain(event.blockHash))
         events.length is 1
         val event = events.head
-        event.txId is txId
+        event.contractAddress is contractAddress
         event.eventIndex is 1
         event.fields.length is 2
         event.fields(0) is ValAddress(Address.fromBase58(address).get)

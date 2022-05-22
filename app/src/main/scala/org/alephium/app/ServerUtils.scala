@@ -455,7 +455,7 @@ class ServerUtils(implicit
       for {
         result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
         (nextStart, logStatesVec) = result
-        logStates <- logStatesVec.mapE { logStates =>
+        events <- logStatesVec.flatMapE { logStates =>
           logStates.states
             .mapE { state =>
               if (state.isRef) {
@@ -463,14 +463,21 @@ class ServerUtils(implicit
                   .fromFields(state.fields)
                   .toRight(IOError.Other(new Throwable(s"Invalid state ref: ${state.fields}")))
                   .flatMap(blockFlow.getEventByRef(_))
+                  .map(p => ContractEventByTxId.from(p._1, p._2, p._3))
               } else {
-                Right(state)
+                Right(
+                  ContractEventByTxId(
+                    logStates.blockHash,
+                    Address.contract(logStates.eventKey),
+                    state.index.toInt,
+                    state.fields.map(Val.from)
+                  )
+                )
               }
             }
-            .map(states => logStates.copy(states = states))
         }
       } yield {
-        ContractEventsByTxId.from(logStates, nextStart)
+        ContractEventsByTxId(events, nextStart)
       }
     )
   }
@@ -861,8 +868,23 @@ class ServerUtils(implicit
   private def fetchContractEvents(
       worldState: WorldState.Staging
   ): AVector[ContractEventByTxId] = {
-    val logStates = worldState.logState.getNewLogs()
-    logStates.flatMap(ContractEventsByTxId.from)
+    val allLogStates = worldState.logState.getNewLogs()
+    allLogStates.flatMap(logStates =>
+      logStates.states.flatMap(state =>
+        if (state.isRef) {
+          AVector.empty
+        } else {
+          AVector(
+            ContractEventByTxId(
+              logStates.blockHash,
+              Address.contract(logStates.eventKey),
+              state.index.toInt,
+              state.fields.map(Val.from)
+            )
+          )
+        }
+      )
+    )
   }
 
   private def fetchContractState(
