@@ -196,16 +196,17 @@ trait DependencyHandlerState extends IOBaseActor {
   private def _removePending(hash: BlockHash): Unit = {
     pending.remove(hash)
 
-    missingIndex.get(hash).foreach { children =>
-      children.foreach(_removePending)
+    missingIndex.remove(hash).foreach { newHashes =>
+      newHashes.foreach(_removePending)
     }
-    missing.get(hash).foreach { deps =>
-      missing -= hash
-      deps.foreach { dep =>
-        val pending = missingIndex(dep)
-        pending -= hash
-        if (pending.isEmpty) {
-          missingIndex.remove(dep)
+
+    missing.remove(hash).foreach { oldHashes =>
+      oldHashes.foreach { oldHash =>
+        missingIndex.get(oldHash).foreach { pending =>
+          pending -= hash
+          if (pending.isEmpty) {
+            missingIndex.remove(oldHash)
+          }
         }
       }
     }
