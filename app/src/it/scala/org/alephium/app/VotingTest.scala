@@ -84,8 +84,7 @@ class VotingTest extends AlephiumActorSpec {
     clique.stop()
 
     def checkVotingStartedEvent(event: ContractEvent) = {
-      val votingStartedEvent = event
-      votingStartedEvent.eventIndex is 0
+      event.eventIndex is 0
     }
 
     def checkVoteCastedEventsByTxId(infos: Seq[(String, Boolean, Hash)]) = {
@@ -124,8 +123,7 @@ class VotingTest extends AlephiumActorSpec {
     }
 
     def checkVotingClosedEvent(event: ContractEvent) = {
-      val votingClosedEvent = event
-      votingClosedEvent.eventIndex is 2
+      event.eventIndex is 2
     }
 
     def checkState(nbYes: Int, nbNo: Int, isClosed: Boolean, isInitialized: Boolean) = {

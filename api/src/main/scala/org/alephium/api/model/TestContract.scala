@@ -55,8 +55,8 @@ final case class TestContract(
         Right(
           Complete(
             group.getOrElse(groupDefault),
-            BlockHash.random,
-            Hash.random,
+            blockHash.getOrElse(BlockHash.random),
+            txId.getOrElse(Hash.random),
             address.getOrElse(addressDefault).contractId,
             code = testCode,
             originalCodeHash = bytecode.hash,

@@ -1131,6 +1131,29 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState.codeHash is compileResult.codeHash // We should return the original code hash even when the method is private
   }
 
+  it should "test with preassigned block hash and tx id" in new Fixture {
+    val contract =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).toOption.get
+
+    val testContract = TestContract(
+      blockHash = Some(BlockHash.random),
+      txId = Some(Hash.random),
+      bytecode = code,
+      initialFields = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))),
+      testArgs = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))))
+    )
+    val testContractComplete = testContract.toComplete().rightValue
+    testContractComplete.blockHash is testContract.blockHash.get
+    testContractComplete.txId is testContract.txId.get
+  }
+
   it should "compile contract" in new Fixture {
     val serverUtils = new ServerUtils()
     val rawCode =
