@@ -367,7 +367,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check gas bounds" in new Fixture {
-    implicit val validator = checkGasBound
+    implicit val validator = checkGasBound(_)
 
     val tx = transactionGen(1, 1).sample.value
     tx.pass()
@@ -388,7 +388,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   it should "check ALPH balance stats" in new Fixture {
     forAll(transactionGenWithPreOutputs()) { case (tx, _) =>
-      implicit val validator = checkOutputStats
+      implicit val validator = checkOutputStats(_)
 
       // balance overflow
       val alphAmount = tx.alphAmountInOutputs.value

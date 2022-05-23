@@ -450,12 +450,12 @@ class ServerUtils(implicit
   def getEventsByTxId(
       blockFlow: BlockFlow,
       txId: Hash
-  ): Try[Events] = {
+  ): Try[ContractEventsByTxId] = {
     wrapResult(
       for {
         result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
         (nextStart, logStatesVec) = result
-        logStates <- logStatesVec.mapE { logStates =>
+        events <- logStatesVec.flatMapE { logStates =>
           logStates.states
             .mapE { state =>
               if (state.isRef) {
@@ -463,14 +463,21 @@ class ServerUtils(implicit
                   .fromFields(state.fields)
                   .toRight(IOError.Other(new Throwable(s"Invalid state ref: ${state.fields}")))
                   .flatMap(blockFlow.getEventByRef(_))
+                  .map(p => ContractEventByTxId.from(p._1, p._2, p._3))
               } else {
-                Right(state)
+                Right(
+                  ContractEventByTxId(
+                    logStates.blockHash,
+                    Address.contract(logStates.eventKey),
+                    state.index.toInt,
+                    state.fields.map(Val.from)
+                  )
+                )
               }
             }
-            .map(states => logStates.copy(states = states))
         }
       } yield {
-        Events.from(logStates, nextStart)
+        ContractEventsByTxId(events, nextStart)
       }
     )
   }
@@ -480,7 +487,7 @@ class ServerUtils(implicit
       start: Int,
       endOpt: Option[Int],
       contractId: ContractId
-  ): Try[Events] = {
+  ): Try[ContractEvents] = {
     wrapResult(
       blockFlow
         .getEvents(
@@ -490,7 +497,7 @@ class ServerUtils(implicit
         )
         .map {
           case (nextStart, logStatesVec) => {
-            Events.from(logStatesVec, nextStart)
+            ContractEvents.from(logStatesVec, nextStart)
           }
         }
     )
@@ -524,7 +531,8 @@ class ServerUtils(implicit
         destination.address.lockupScript,
         destination.alphAmount.value,
         tokensInfo,
-        destination.lockTime
+        destination.lockTime,
+        destination.message
       )
     }
   }
@@ -780,7 +788,7 @@ class ServerUtils(implicit
   def compileScript(query: Compile.Script): Try[CompileScriptResult] = {
     Compiler
       .compileTxScriptFull(query.code)
-      .map(CompileScriptResult.from.tupled)
+      .map(p => CompileScriptResult.from(p._1, p._2))
       .left
       .map(error => failed(error.toString))
   }
@@ -789,7 +797,7 @@ class ServerUtils(implicit
   def compileContract(query: Compile.Contract): Try[CompileContractResult] = {
     Compiler
       .compileContractFull(query.code)
-      .map(CompileContractResult.from.tupled)
+      .map(p => CompileContractResult.from(p._1, p._2))
       .left
       .map(error => failed(error.toString))
   }
@@ -857,9 +865,26 @@ class ServerUtils(implicit
     )
   }
 
-  private def fetchContractEvents(worldState: WorldState.Staging): AVector[ContractEvent] = {
-    val logStates = worldState.logState.getNewLogs()
-    logStates.flatMap(Events.from)
+  private def fetchContractEvents(
+      worldState: WorldState.Staging
+  ): AVector[ContractEventByTxId] = {
+    val allLogStates = worldState.logState.getNewLogs()
+    allLogStates.flatMap(logStates =>
+      logStates.states.flatMap(state =>
+        if (state.isRef) {
+          AVector.empty
+        } else {
+          AVector(
+            ContractEventByTxId(
+              logStates.blockHash,
+              Address.contract(logStates.eventKey),
+              state.index.toInt,
+              state.fields.map(Val.from)
+            )
+          )
+        }
+      )
+    )
   }
 
   private def fetchContractState(
@@ -891,11 +916,11 @@ class ServerUtils(implicit
       networkConfig.networkId,
       TimeStamp.now(),
       consensusConfig.maxMiningTarget,
-      Some(BlockHash.zero)
+      Some(testContract.blockHash)
     )
     val testGasFee = defaultGasPrice * maximalGasPerTx
     val txEnv: TxEnv = TxEnv.mockup(
-      txId = Hash.random,
+      txId = testContract.txId,
       signatures = Stack.popOnly(AVector.empty[Signature]),
       prevOutputs = testContract.inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],

@@ -444,12 +444,12 @@ trait Endpoints
       .summary("Check and repair the indexing of block hashes")
 
   lazy val getContractEvents
-      : BaseEndpoint[(Address.Contract, CounterRange, Option[GroupIndex]), Events] =
+      : BaseEndpoint[(Address.Contract, CounterRange, Option[GroupIndex]), ContractEvents] =
     contractEventsEndpoint.get
       .in(path[Address.Contract]("contractAddress"))
       .in(counterQuery)
       .in(query[Option[GroupIndex]]("group"))
-      .out(jsonBody[Events])
+      .out(jsonBody[ContractEvents])
       .summary("Get events for a contract within a counter range")
 
   val getContractEventsCurrentCount: BaseEndpoint[Address.Contract, Int] =
@@ -459,11 +459,11 @@ trait Endpoints
       .out(jsonBody[Int])
       .summary("Get current value of the events counter for a contract")
 
-  lazy val getEventsByTxId: BaseEndpoint[(Hash, Option[GroupIndex]), Events] =
+  lazy val getEventsByTxId: BaseEndpoint[(Hash, Option[GroupIndex]), ContractEventsByTxId] =
     eventsByTxIdEndpoint.get
       .in(path[Hash]("txId"))
       .in(query[Option[GroupIndex]]("group"))
-      .out(jsonBody[Events])
+      .out(jsonBody[ContractEventsByTxId])
       .summary("Get events for a TxScript")
 }
 

@@ -31,7 +31,7 @@ import org.alephium.flow.gasestimation._
 import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
-import org.alephium.protocol.vm.{eventRefIndex, GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.serialize
 import org.alephium.util._
@@ -62,6 +62,21 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait FlowFixtureWithApi extends FlowFixture with ApiConfigFixture
+
+  it should "send message with tx" in new Fixture {
+    implicit val serverUtils = new ServerUtils
+
+    val (_, fromPublicKey, _) = genesisKeys(0)
+    val message               = Hex.unsafe("FFFF")
+    val destination           = generateDestination(ChainIndex.unsafe(0, 1), message)
+    val buildTransaction = serverUtils
+      .buildTransaction(blockFlow, BuildTransaction(fromPublicKey, AVector(destination)))
+      .rightValue
+    val unsignedTransaction =
+      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+
+    unsignedTransaction.fixedOutputs.head.additionalData is message
+  }
 
   it should "check tx status for intra group txs" in new Fixture {
 
@@ -827,18 +842,12 @@ class ServerUtilsSpec extends AlephiumSpec {
       TimeStamp.zero,
       ByteString.empty
     )
-    result0.events.length is 2
+    result0.events.length is 1
     result0.events(0).eventIndex is 0
     result0.events(0).fields is AVector[Val](
       ValAddress(lp),
       ValU256(ALPH.alph(100)),
       ValU256(100)
-    )
-    result0.events(1).eventIndex is eventRefIndex.toInt
-    result0.events(1).fields is AVector[Val](
-      ValByteVec(contractAddress.contractId.bytes),
-      ValI256(I256.unsafe(0)),
-      ValI256(I256.unsafe(0))
     )
 
     val testContract1 = TestContract.Complete(
@@ -933,15 +942,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       TimeStamp.zero,
       ByteString.empty
     )
-    result0.events.length is 2
+    result0.events.length is 1
     result0.events(0).eventIndex is 1
     result0.events(0).fields is AVector[Val](ValAddress(buyer), ValU256(ALPH.alph(10)))
-    result0.events(1).eventIndex is eventRefIndex.toInt
-    result0.events(1).fields is AVector[Val](
-      ValByteVec(contractAddress.contractId.bytes),
-      ValI256(I256.unsafe(0)),
-      ValI256(I256.unsafe(0))
-    )
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
@@ -1035,15 +1038,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       TimeStamp.zero,
       ByteString.empty
     )
-    result0.events.length is 2
+    result0.events.length is 1
     result0.events(0).eventIndex is 2
     result0.events(0).fields is AVector[Val](ValAddress(buyer), ValU256(100))
-    result0.events(1).eventIndex is eventRefIndex.toInt
-    result0.events(1).fields is AVector[Val](
-      ValByteVec(contractAddress.contractId.bytes),
-      ValI256(I256.unsafe(0)),
-      ValI256(I256.unsafe(0))
-    )
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
@@ -1134,6 +1131,29 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState.codeHash is compileResult.codeHash // We should return the original code hash even when the method is private
   }
 
+  it should "test with preassigned block hash and tx id" in new Fixture {
+    val contract =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).toOption.get
+
+    val testContract = TestContract(
+      blockHash = Some(BlockHash.random),
+      txId = Some(Hash.random),
+      bytecode = code,
+      initialFields = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))),
+      testArgs = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))))
+    )
+    val testContractComplete = testContract.toComplete().rightValue
+    testContractComplete.blockHash is testContract.blockHash.get
+    testContractComplete.txId is testContract.txId.get
+  }
+
   it should "compile contract" in new Fixture {
     val serverUtils = new ServerUtils()
     val rawCode =
@@ -1194,13 +1214,13 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   private def generateDestination(
       chainIndex: ChainIndex,
-      tokens: (TokenId, U256)*
+      message: ByteString = ByteString.empty
   )(implicit
       groupConfig: GroupConfig
   ): Destination = {
     val address = generateAddress(chainIndex)
     val amount  = Amount(ALPH.oneAlph)
-    Destination(address, amount, Some(AVector.from(tokens).map(Token.apply.tupled)))
+    Destination(address, amount, None, None, Some(message))
   }
 
   private def generateAddress(chainIndex: ChainIndex)(implicit

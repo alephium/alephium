@@ -289,7 +289,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "address": "$addressStr",
         |  "tokens": [],
         |  "lockTime": 1234,
-        |  "additionalData": ""
+        |  "message": ""
         |}
         """.stripMargin
       checkData(request, jsonRaw)
@@ -909,7 +909,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "address": "111111111111111111111111111111111",
          |  "tokens": [],
          |  "lockTime": 0,
-         |  "additionalData": ""
+         |  "message": ""
          |}
          |""".stripMargin
     checkData(FixedAssetOutput.fromProtocol(assetOutput, Hash.zero, 0), jsonRaw)
@@ -926,7 +926,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "address": "111111111111111111111111111111111",
          |  "tokens": [],
          |  "lockTime": 0,
-         |  "additionalData": ""
+         |  "message": ""
          |}
          |""".stripMargin
     checkData[Output](Output.from(assetOutput, Hash.zero, 0), assetOutputJson)

@@ -2268,8 +2268,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       case i: Log8.type => i.gas(8).value is gas
       case i: Log9.type => i.gas(9).value is gas
     }
-    statelessCases.foreach(test.tupled)
-    statefulCases.foreach(test.tupled)
+    statelessCases.foreach(p => test(p._1, p._2))
+    statefulCases.foreach(p => test(p._1, p._2))
   }
 
   it should "test bytecode" in new FrameFixture {
@@ -2321,7 +2321,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     def test(instr: Instr[_], code: Int) = instr.code is code.toByte
     allInstrs.length is toCode.size
-    allInstrs.foreach(test.tupled)
+    allInstrs.foreach(p => test(p._1, p._2))
   }
 
   trait AllInstrsFixture {

@@ -188,8 +188,14 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val event = ContractEvent(
     blockHash,
-    Address.contract(txId),
     contractAddress.lockupScript.contractId,
+    eventIndex = 1,
+    fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
+  )
+
+  private val eventByTxId = ContractEventByTxId(
+    blockHash,
+    Address.contract(txId),
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
@@ -625,7 +631,7 @@ trait EndpointsExamples extends ErrorExamples {
         contracts = AVector(existingContract),
         txOutputs =
           AVector(ContractOutput(1234, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
-        events = AVector(event)
+        events = AVector(eventByTxId)
       )
     )
 
@@ -647,10 +653,13 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val verifySignatureExamples: List[Example[VerifySignature]] =
     simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
 
-  implicit val eventsExamples: List[Example[Events]] =
-    simpleExample(Events(events = AVector(event), 2))
+  implicit val eventsExamples: List[Example[ContractEvents]] =
+    simpleExample(ContractEvents(events = AVector(event), 2))
 
-  implicit val eventsVectorExamples: List[Example[AVector[Events]]] =
-    simpleExample(AVector(Events(events = AVector(event), 3)))
+  implicit val eventsByTxIdExamples: List[Example[ContractEventsByTxId]] =
+    simpleExample(ContractEventsByTxId(events = AVector(eventByTxId), 2))
+
+  implicit val eventsVectorExamples: List[Example[AVector[ContractEvents]]] =
+    simpleExample(AVector(ContractEvents(events = AVector(event), 3)))
 }
 // scalastyle:on magic.number

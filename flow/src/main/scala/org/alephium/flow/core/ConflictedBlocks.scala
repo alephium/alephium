@@ -121,9 +121,7 @@ object ConflictedBlocks {
 
     // thread unsafe
     def remove(block: Block): Unit =
-      if (isBlockCached(block)) {
-        blockCache.remove(block.hash)
-
+      blockCache.remove(block.hash).foreach { block =>
         block.transactions.foreach { tx =>
           tx.unsigned.inputs.foreach { input =>
             txCache.get(input.outputRef).foreach { blockHashes =>

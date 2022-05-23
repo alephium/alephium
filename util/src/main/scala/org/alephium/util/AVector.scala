@@ -676,7 +676,7 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 
   override def equals(obj: Any): Boolean =
     obj match {
-      case that: AVector[A] =>
+      case that: AVector[_] =>
         if (length == that.length && ct == that.ct) {
           cfor(0)(_ < length, _ + 1) { i => if (apply(i) != that(i)) return false }
           true
@@ -719,7 +719,7 @@ object AVector {
 
   def apply[@sp A: ClassTag](elems: A*): AVector[A] = {
     val array = Array.ofDim[A](if (elems.length <= defaultSize) defaultSize else elems.length)
-    elems.copyToArray(array)
+    elems.copyToArray(array, 0, elems.length)
     unsafe(array, 0, elems.length, true)
   }
 
