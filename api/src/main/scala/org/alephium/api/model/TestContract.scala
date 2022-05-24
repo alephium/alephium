@@ -98,6 +98,8 @@ object TestContract {
       existingContracts: AVector[ContractState] = existingContractsDefault,
       inputAssets: AVector[TestContract.InputAsset] = inputAssetsDefault
   ) {
+    def codeHash(hash: Hash): Hash = if (hash == code.hash) originalCodeHash else hash
+
     def groupIndex(implicit groupConfig: GroupConfig): Try[GroupIndex] = {
       GroupIndex.from(group).toRight(badRequest("Invalid group index"))
     }

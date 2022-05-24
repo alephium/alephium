@@ -801,6 +801,45 @@ class ServerUtilsSpec extends AlephiumSpec {
     lazy val result1 = serverUtils.runTestContract(testFlow, testContract1).rightValue
   }
 
+  it should "return upgraded contract code hash" in new TestContractFixture {
+    val fooV1Code =
+      s"""
+         |TxContract FooV1() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val fooV1         = Compiler.compileContract(fooV1Code).rightValue
+    val fooV1Bytecode = Hex.toHexString(serialize(fooV1))
+
+    val fooV0Code =
+      s"""
+         |TxContract FooV0() {
+         |  pub fn upgrade0() -> () {
+         |    migrate!(#$fooV1Bytecode)
+         |  }
+         |  fn upgrade1() -> () {
+         |    migrate!(#$fooV1Bytecode)
+         |  }
+         |}
+         |""".stripMargin
+    val fooV0 = Compiler.compileContract(fooV0Code).rightValue
+
+    val testContract0 = TestContract.Complete(
+      code = fooV0,
+      originalCodeHash = fooV0.hash,
+      testMethodIndex = 0
+    )
+    testContract0.code.hash is testContract0.originalCodeHash
+    result0.codeHash is fooV1.hash
+    result0.contracts(0).codeHash is fooV1.hash
+
+    val testContract1 =
+      TestContract(bytecode = fooV0, testMethodIndex = Some(1)).toComplete().rightValue
+    testContract1.code.hash isnot testContract1.originalCodeHash
+    result1.codeHash is fooV1.hash
+    result1.contracts(0).codeHash is fooV1.hash
+  }
+
   it should "test AMM contract: add liquidity" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
       code = AMMContract.swapCode,
