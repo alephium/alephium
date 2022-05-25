@@ -98,7 +98,12 @@ object TestContract {
       existingContracts: AVector[ContractState] = existingContractsDefault,
       inputAssets: AVector[TestContract.InputAsset] = inputAssetsDefault
   ) {
-    def codeHash(hash: Hash): Hash = if (hash == code.hash) originalCodeHash else hash
+    // We return original code hash when testing private methods
+    // We return the new code hash when the test code is migrated
+    def codeHash(hash: Hash): Hash = {
+      val codeMigrated = hash != code.hash
+      if (!codeMigrated) originalCodeHash else hash
+    }
 
     def groupIndex(implicit groupConfig: GroupConfig): Try[GroupIndex] = {
       GroupIndex.from(group).toRight(badRequest("Invalid group index"))
