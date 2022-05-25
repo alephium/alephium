@@ -836,10 +836,10 @@ class ServerUtils(implicit
       val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
       TestContractResult(
         address = Address.contract(testContract.contractId),
-        codeHash = testContract.originalCodeHash,
+        codeHash = postState._2,
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
-        contracts = postState,
+        contracts = postState._1,
         txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, Hash.zero, index)
         },
@@ -851,7 +851,7 @@ class ServerUtils(implicit
   private def fetchContractsState(
       worldState: WorldState.Staging,
       testContract: TestContract.Complete
-  ): Try[AVector[ContractState]] = {
+  ): Try[(AVector[ContractState], Hash)] = {
     for {
       existingContractsState <- testContract.existingContracts.mapE(contract =>
         fetchContractState(worldState, contract.id)
@@ -860,9 +860,13 @@ class ServerUtils(implicit
         worldState,
         testContract.contractId
       )
-    } yield existingContractsState ++ AVector(
-      testContractState.copy(codeHash = testContract.originalCodeHash)
-    )
+    } yield {
+      val codeHash = testContract.codeHash(testContractState.codeHash)
+      val states = existingContractsState ++ AVector(
+        testContractState.copy(codeHash = codeHash)
+      )
+      (states, codeHash)
+    }
   }
 
   private def fetchContractEvents(
