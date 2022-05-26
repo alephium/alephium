@@ -36,7 +36,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
 import org.alephium.protocol.vm.LogConfig
-import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex, TimeStamp}
 
 class AlephiumConfigSpec extends AlephiumSpec {
   import ConfigUtils._
@@ -54,7 +54,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.network.connectionBufferCapacityInByte is 100000000L
   }
 
-  ignore should "load mainnet config" in {
+  it should "load mainnet config" in {
     val rootPath = Files.tmpDir
     val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
 
@@ -68,10 +68,10 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.discovery.bootstrap.head is new InetSocketAddress("bootstrap0.alephium.org", 9973)
     config.genesis.allocations.length is 858
     config.genesis.allocations.sumBy(_.amount.value.v) is ALPH.alph(140000000).v
+    config.network.lemanHardForkTimestamp is TimeStamp.unsafe(9000000000000000000L)
   }
 
-  // Reactivate this once leman hardfork is ready for deployment
-  ignore should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
+  it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", 0),
       ("alephium.network.leman-hard-fork-timestamp", 0)
@@ -79,7 +79,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     assertThrows[IllegalArgumentException](config.network.networkId is NetworkId.AlephiumMainNet)
   }
 
-  it should "throw error when use leman hardfork for mainnet (1)" in new AlephiumConfigFixture {
+  ignore should "throw error when use leman hardfork for mainnet (1)" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.network.network-id", 0),
       ("alephium.network.leman-hard-fork-timestamp", 0)
@@ -88,7 +88,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
       "The leman hardfork is not available for mainnet yet"
   }
 
-  it should "throw error when use leman hardfork for mainnet (2)" in new AlephiumConfigFixture {
+  ignore should "throw error when use leman hardfork for mainnet (2)" in new AlephiumConfigFixture {
     Configs.parseNetworkId(ConfigFactory.empty()).leftValue is
       "The leman hardfork is not available for mainnet yet"
   }
