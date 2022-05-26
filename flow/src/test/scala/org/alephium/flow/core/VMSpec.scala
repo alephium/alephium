@@ -2053,6 +2053,55 @@ class VMSpec extends AlephiumSpec {
     logStates.states(1).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 2
   }
 
+  it should "not be able to transfer assets right after contract is created" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |  }
+         |}
+         |""".stripMargin
+
+    val fooContract     = Compiler.compileContract(foo).rightValue
+    val fooByteCode     = Hex.toHexString(serialize(fooContract))
+    val fooInitialState = Hex.toHexString(serialize(AVector.empty[Val]))
+
+    def createFooContract(transferAlph: Boolean): String = {
+      val maybeTransfer =
+        if (transferAlph) s"transferAlphFromSelf!(contractAddress, ${ALPH.cent(1).v})" else ""
+
+      val bar: String =
+        s"""
+           |TxContract Bar() {
+           |  pub payable fn bar() -> () {
+           |    approveAlph!(@${genesisAddress.toBase58}, ${ALPH.oneAlph.v})
+           |    let contractId = createContract!(#$fooByteCode, #$fooInitialState)
+           |    let contractAddress = contractIdToAddress!(contractId)
+           |
+           |    $maybeTransfer
+           |  }
+           |}
+           |""".stripMargin
+
+      val barContractId = createContract(bar, AVector.empty, initialAlphAmount = ALPH.alph(2)).key
+
+      s"""
+         |TxScript Main payable {
+         |  approveAlph!(@${genesisAddress.toBase58}, ${ALPH.oneAlph.v})
+         |  let bar = Bar(#${barContractId.toHexString})
+         |  bar.bar()
+         |}
+         |
+         |$bar
+         |""".stripMargin
+    }
+
+    callTxScript(createFooContract(false))
+
+    intercept[AssertionError](callTxScript(createFooContract(true))).getMessage is
+      s"Right(TxScriptExeFailed(ContractAssetUnloaded))"
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
