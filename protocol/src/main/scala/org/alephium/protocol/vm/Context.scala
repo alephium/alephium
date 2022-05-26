@@ -107,7 +107,16 @@ object LogConfig {
 trait StatelessContext extends CostStrategy {
   def networkConfig: NetworkConfig
   def blockEnv: BlockEnv
+
   def getHardFork(): HardFork = networkConfig.getHardFork(blockEnv.timeStamp)
+  def checkLemanHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
+    val hardFork = getHardFork()
+    if (hardFork >= HardFork.Leman) {
+      okay
+    } else {
+      failed(InactiveInstr(instr))
+    }
+  }
 
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[Balances]

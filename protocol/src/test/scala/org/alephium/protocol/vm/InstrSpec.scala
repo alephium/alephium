@@ -87,11 +87,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       override def lemanHardForkTimestamp: TimeStamp =
         TimeStamp.now().minusUnsafe(Duration.ofSecondsUnsafe(10))
     }
+
+    def isLemanInstr(instr: Instr[_]): Boolean = {
+      instr.isInstanceOf[LemanInstr[_]] || instr.isInstanceOf[LemanInstrWithSimpleGas[_]]
+    }
   }
 
   it should "derive from LemanInstr" in new LemanForkFixture {
-    lemanStatelessInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
-    lemanStatefulInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
+    lemanStatelessInstrs.foreach(isLemanInstr(_) is true)
+    lemanStatefulInstrs.foreach(isLemanInstr(_) is true)
     (statelessInstrs.toSet -- lemanStatelessInstrs.toSet)
       .map(_.isInstanceOf[LemanInstr[_]] is false)
     (statefulInstrs.toSet -- lemanStatefulInstrs.toSet)
