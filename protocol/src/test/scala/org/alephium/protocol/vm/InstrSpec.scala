@@ -2212,7 +2212,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256To1Byte -> 1, U256To2Byte -> 1, U256To4Byte -> 1, U256To8Byte -> 1, U256To16Byte -> 2, U256To32Byte -> 4,
       U256From1Byte -> 1, U256From2Byte -> 1, U256From4Byte -> 1, U256From8Byte -> 1, U256From16Byte -> 2, U256From32Byte -> 4,
       EthEcRecover -> 2500,
-      Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280
+      Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280,
+      ContractIdToAddress -> 4
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -2334,7 +2335,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256From1Byte -> 108, U256From2Byte -> 109, U256From4Byte -> 110, U256From8Byte -> 111, U256From16Byte -> 112, U256From32Byte -> 113,
       EthEcRecover -> 114,
       Log6 -> 115, Log7 -> 116, Log8 -> 117, Log9 -> 118,
-
+      ContractIdToAddress -> 119,
       // stateful instructions
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -2384,7 +2385,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
       EthEcRecover,
-      Log6, Log7, Log8, Log9
+      Log6, Log7, Log8, Log9,
+      ContractIdToAddress
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
