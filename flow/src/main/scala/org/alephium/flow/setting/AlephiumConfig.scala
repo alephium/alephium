@@ -19,7 +19,6 @@ package org.alephium.flow.setting
 import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.file.Path
-import java.util.{GregorianCalendar, TimeZone}
 
 import scala.collection.immutable.ArraySeq
 
@@ -391,9 +390,7 @@ object AlephiumConfig {
 
   def sanityCheck(config: AlephiumConfig): AlephiumConfig = {
     if (config.network.networkId == NetworkId.AlephiumMainNet) {
-      val calendar = new GregorianCalendar(2022, 4, 30)
-      calendar.setTimeZone(TimeZone.getTimeZone("UTC"))
-      if (config.network.lemanHardForkTimestamp.millis != calendar.getTimeInMillis) {
+      if (config.network.lemanHardForkTimestamp != TimeStamp.unsafe(9000000000000000000L)) {
         throw new IllegalArgumentException("Invalid timestamp for leman hard fork")
       }
     }
