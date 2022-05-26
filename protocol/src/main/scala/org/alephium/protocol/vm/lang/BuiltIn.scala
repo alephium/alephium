@@ -329,6 +329,14 @@ object BuiltIn {
       ByteVecToAddress
     )
 
+  val contractIdToAddress: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "contractIdToAddress",
+      Seq[Type](Type.ByteVec),
+      Seq[Type](Type.Address),
+      ContractIdToAddress
+    )
+
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
@@ -369,7 +377,8 @@ object BuiltIn {
     u256From16Byte,
     u256From32Byte,
     byteVecToAddress,
-    ethEcRecover
+    ethEcRecover,
+    contractIdToAddress
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleStatefulBuiltIn =

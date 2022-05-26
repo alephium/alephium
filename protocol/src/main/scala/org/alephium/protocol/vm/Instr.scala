@@ -132,7 +132,8 @@ object Instr {
     U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
     U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
     EthEcRecover,
-    Log6, Log7, Log8, Log9
+    Log6, Log7, Log8, Log9,
+    ContractIdToAddress
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -812,6 +813,23 @@ case object ByteVecToAddress
     } yield ()
   }
 }
+
+case object ContractIdToAddress
+    extends StatelessInstr
+    with LemanInstr[StatelessContext]
+    with StatelessInstrCompanion0
+    with GasToByte {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      contractIdRaw <- frame.popOpStackByteVec()
+      contractId    <- Hash.from(contractIdRaw.bytes).toRight(Right(InvalidContractId))
+      address = Val.Address(LockupScript.p2c(contractId))
+      _ <- frame.ctx.chargeGasWithSize(this, contractIdRaw.bytes.length)
+      _ <- frame.pushOpStack(address)
+    } yield ()
+  }
+}
+
 case object AddressEq        extends EqT[Val.Address] with AddressStackOps
 case object AddressNeq       extends NeT[Val.Address] with AddressStackOps
 case object AddressToByteVec extends ToByteVecInstr[Val.Address] with AddressStackOps

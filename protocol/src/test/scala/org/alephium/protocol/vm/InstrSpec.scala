@@ -69,7 +69,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
       EthEcRecover,
-      Log6, Log7, Log8, Log9
+      Log6, Log7, Log8, Log9,
+      ContractIdToAddress
     )
     val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken)
     // format: on
@@ -999,6 +1000,32 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val byteVec = Val.ByteVec(ByteString(Gen.listOfN(n, arbitrary[Byte]).sample.get))
       stack.push(byteVec)
       ByteVecToAddress.runWith(frame).leftValue isE a[SerdeErrorByteVecToAddress]
+    }
+  }
+
+  it should "ContractIdToAddress" in new StatelessInstrFixture {
+    val p2cLockupScriptGen: Gen[LockupScript.P2C] = for {
+      group        <- groupIndexGen
+      lockupScript <- p2cLockupGen(group)
+    } yield lockupScript
+
+    forAll(p2cLockupScriptGen) { lockupScript =>
+      val bytes      = lockupScript.contractId.bytes
+      val address    = Val.Address(lockupScript)
+      val initialGas = context.gasRemaining
+
+      stack.push(Val.ByteVec(bytes))
+      ContractIdToAddress.runWith(frame) isE ()
+      stack.size is 1
+      stack.top.get is address
+      initialGas.subUnsafe(context.gasRemaining) is ContractIdToAddress.gas(bytes.length)
+      stack.pop()
+    }
+
+    Seq(31, 33).foreach { n =>
+      val byteVec = Val.ByteVec(ByteString(Gen.listOfN(n, arbitrary[Byte]).sample.get))
+      stack.push(byteVec)
+      ContractIdToAddress.runWith(frame).leftValue isE InvalidContractId
     }
   }
 
