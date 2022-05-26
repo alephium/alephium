@@ -1446,7 +1446,7 @@ class VMSpec extends AlephiumSpec {
       logStates.eventKey is contractId
       logStates.states.length is 2
 
-      getCurentCount(blockFlow, chainIndex.from, contractId).value is currentCount
+      getCurrentCount(blockFlow, chainIndex.from, contractId).value is currentCount
 
       val addingLogState = logStates.states(0)
       addingLogState.txId is block.nonCoinbase.head.id
@@ -1483,7 +1483,7 @@ class VMSpec extends AlephiumSpec {
       logStates.eventKey is createContractEventId
       logStates.states.length is 1
 
-      getCurentCount(blockFlow, chainIndex.from, createContractEventId).value is 1
+      getCurrentCount(blockFlow, chainIndex.from, createContractEventId).value is 1
 
       val createContractLogState = logStates.states(0)
       createContractLogState.txId is createContractBlock.nonCoinbase.head.id
@@ -1515,7 +1515,7 @@ class VMSpec extends AlephiumSpec {
       logStates.eventKey is destroyContractEventId
       logStates.states.length is 1
 
-      getCurentCount(blockFlow, chainIndex.from, destroyContractEventId).value is 1
+      getCurrentCount(blockFlow, chainIndex.from, destroyContractEventId).value is 1
 
       val destroyContractLogState = logStates.states(0)
       destroyContractLogState.txId is destroyContractBlock.nonCoinbase.head.id
@@ -1672,7 +1672,7 @@ class VMSpec extends AlephiumSpec {
     logStates.eventKey is contractId
     logStates.states.length is 2
 
-    getCurentCount(blockFlow, chainIndex.from, contractId).value is 1
+    getCurrentCount(blockFlow, chainIndex.from, contractId).value is 1
 
     val testEventLogState1 = logStates.states(0)
     testEventLogState1.txId is callingBlock.nonCoinbase.head.id
@@ -2160,7 +2160,7 @@ class VMSpec extends AlephiumSpec {
     blockFlow.getEvents(contractId, start, end).rightValue
   }
 
-  private def getCurentCount(
+  private def getCurrentCount(
       blockFlow: BlockFlow,
       groupIndex: GroupIndex,
       contractId: ContractId

@@ -246,12 +246,12 @@ trait StatefulContext extends StatelessContext with ContractPool {
   ): ExeResult[Unit] = {
     val newFields = newFieldsOpt.getOrElse(AVector.from(obj.fields))
     for {
-      _ <- chargeFieldSize(newFields.toIterable)
       _ <-
         if (newFields.length == newContractCode.fieldLength) { okay }
         else {
           failed(InvalidFieldLength)
         }
+      _ <- chargeFieldSize(newFields.toIterable)
       _ <- worldState
         .migrateContractUnsafe(contractId, newContractCode, newFields)
         .left
