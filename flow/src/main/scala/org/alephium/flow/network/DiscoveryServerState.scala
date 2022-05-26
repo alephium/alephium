@@ -189,6 +189,7 @@ trait DiscoveryServerState extends SessionManager {
 
   def unsetUnreachable(remote: InetAddress): Unit = {
     unreachables.remove(remote)
+    ()
   }
 
   def mightReachableSlow(remote: InetSocketAddress): Boolean = {
@@ -395,8 +396,7 @@ trait SessionManager {
   }
 
   def validateSessionId(id: Id, brokerInfo: BrokerInfo): Boolean = {
-    sessions.get(id).exists { session =>
-      sessions.remove(id)
+    sessions.remove(id).exists { session =>
       pendings.remove(brokerInfo.peerId)
       session.remote == brokerInfo.address
     }

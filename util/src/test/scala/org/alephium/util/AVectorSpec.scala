@@ -418,7 +418,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
 
   it should "toIterable" in new Fixture {
     forAll(vectorGen) { vc =>
-      vc.toIterable.toSeq is vc.toArray.toIterable.toSeq
+      vc.toIterable.toSeq is vc.toArray.toSeq
     }
   }
 

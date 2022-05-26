@@ -36,7 +36,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
 import org.alephium.protocol.vm.LogConfig
-import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex, TimeStamp}
 
 class AlephiumConfigSpec extends AlephiumSpec {
   import ConfigUtils._
@@ -68,6 +68,29 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.discovery.bootstrap.head is new InetSocketAddress("bootstrap0.alephium.org", 9973)
     config.genesis.allocations.length is 858
     config.genesis.allocations.sumBy(_.amount.value.v) is ALPH.alph(140000000).v
+    config.network.lemanHardForkTimestamp is TimeStamp.unsafe(9000000000000000000L)
+  }
+
+  it should "throw error when mainnet config has invalid hardfork timestamp" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-id", 0),
+      ("alephium.network.leman-hard-fork-timestamp", 0)
+    )
+    assertThrows[IllegalArgumentException](config.network.networkId is NetworkId.AlephiumMainNet)
+  }
+
+  ignore should "throw error when use leman hardfork for mainnet (1)" in new AlephiumConfigFixture {
+    override val configValues: Map[String, Any] = Map(
+      ("alephium.network.network-id", 0),
+      ("alephium.network.leman-hard-fork-timestamp", 0)
+    )
+    intercept[RuntimeException](buildNewConfig()).getMessage is
+      "The leman hardfork is not available for mainnet yet"
+  }
+
+  ignore should "throw error when use leman hardfork for mainnet (2)" in new AlephiumConfigFixture {
+    Configs.parseNetworkId(ConfigFactory.empty()).leftValue is
+      "The leman hardfork is not available for mainnet yet"
   }
 
   it should "load bootstrap config" in {
@@ -200,6 +223,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
       val address2 = address("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")
       val logConfig = LogConfig(
         enabled = true,
+        indexByTxId = true,
         contractAddresses = Some(AVector(address1, address2))
       )
 
@@ -208,6 +232,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
            |{
            |  event-log {
            |    enabled = true
+           |    index-by-tx-id = true
            |    contract-addresses = [
            |      ${address1.toBase58}
            |      ${address2.toBase58}
@@ -223,15 +248,13 @@ class AlephiumConfigSpec extends AlephiumSpec {
 
     {
       info("Without addresses")
-      val logConfig = LogConfig(
-        enabled = true,
-        contractAddresses = None
-      )
+      val logConfig = LogConfig.allEnabled()
       val configs =
         s"""
            |{
            |  event-log {
            |    enabled = true
+           |    index-by-tx-id = true
            |  }
            |}
            |""".stripMargin

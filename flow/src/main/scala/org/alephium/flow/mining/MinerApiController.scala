@@ -180,11 +180,10 @@ class MinerApiController(allHandlers: AllHandlers)(implicit
   }
 
   def handleSubmittedBlock(hash: BlockHash, succeeded: Boolean): Unit = {
-    submittingBlocks.get(hash).foreach { client =>
+    submittingBlocks.remove(hash).foreach { client =>
       val chainIndex = ChainIndex.from(hash)
       val message    = SubmitResult(chainIndex.from.value, chainIndex.to.value, succeeded)
       client ! ConnectionHandler.Send(ServerMessage.serialize(message))
-      submittingBlocks.remove(hash)
     }
   }
 }

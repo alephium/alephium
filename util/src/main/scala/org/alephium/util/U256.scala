@@ -20,6 +20,8 @@ import java.math.BigInteger
 
 import akka.util.ByteString
 
+// scalastyle:off number.of.methods
+
 class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
   import U256.validate
 
@@ -141,10 +143,12 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
   def toByte: Option[Byte] = if (v.bitLength() <= 7) Some(v.intValue().toByte) else None
 
   def toInt: Option[Int] = try {
-    Some(v.intValueExact())
+    Some(toIntUnsafe)
   } catch {
     case _: ArithmeticException => None
   }
+
+  def toIntUnsafe: Int = v.intValueExact()
 
   def toLong: Option[Long] = try {
     Some(v.longValueExact())
@@ -154,10 +158,12 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
 
   def toBigInt: BigInteger = v
 
+  def toBytes: ByteString = _toBytes(32)
+
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def toBytes: ByteString = {
+  private def _toBytes(size: Int): ByteString = {
     val tmp           = ByteString.fromArrayUnsafe(v.toByteArray)
-    val paddingLength = 32 - tmp.length
+    val paddingLength = size - tmp.length
     if (paddingLength < 0) {
       tmp.tail
     } else if (paddingLength > 0) {
@@ -166,6 +172,9 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
       tmp
     }
   }
+
+  def toFixedSizeBytes(size: Int): Option[ByteString] =
+    Option.when(v.bitLength() <= size * 8)(_toBytes(size))
 
   override def toString: String = v.toString()
 }

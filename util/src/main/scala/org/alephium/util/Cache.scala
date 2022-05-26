@@ -115,9 +115,8 @@ class Cache[K, V](m: Cache.Inner[K, V]) extends SimpleMap[K, V] {
     ()
   }
 
-  def remove(key: K): Unit = {
-    m.remove(key)
-    ()
+  def remove(key: K): Option[V] = {
+    Option(m.remove(key))
   }
 
   def removeIf(p: (K, V) => Boolean): Unit = {

@@ -91,6 +91,7 @@ class FlowCache[K, V](val underlying: ValueSortedMap[BlockHash, V], val capacity
   def evict(): Unit = {
     if (underlying.size > capacity) {
       underlying.remove(underlying.min)
+      ()
     }
   }
 }

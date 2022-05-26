@@ -66,7 +66,7 @@ final case class AssetOutput(
     address: Address.Asset,
     tokens: AVector[Token],
     lockTime: TimeStamp,
-    additionalData: ByteString
+    message: ByteString
 ) extends Output {
   def toProtocol(): model.AssetOutput = {
     model.AssetOutput(
@@ -74,7 +74,7 @@ final case class AssetOutput(
       address.lockupScript,
       lockTime,
       tokens.map { token => (token.id, token.amount) },
-      additionalData
+      message
     )
   }
 }
@@ -103,7 +103,7 @@ final case class FixedAssetOutput(
     address: Address.Asset,
     tokens: AVector[Token],
     lockTime: TimeStamp,
-    additionalData: ByteString
+    message: ByteString
 ) {
   def toProtocol(): model.AssetOutput = {
     model.AssetOutput(
@@ -111,12 +111,12 @@ final case class FixedAssetOutput(
       address.lockupScript,
       lockTime,
       tokens.map { token => (token.id, token.amount) },
-      additionalData
+      message
     )
   }
 
   def upCast(): AssetOutput = {
-    AssetOutput(hint, key, alphAmount, address, tokens, lockTime, additionalData)
+    AssetOutput(hint, key, alphAmount, address, tokens, lockTime, message)
   }
 }
 

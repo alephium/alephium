@@ -18,7 +18,7 @@ package org.alephium.flow.validation
 
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.BlockHash
-import org.alephium.protocol.vm.{ExeFailure, ExeResult}
+import org.alephium.protocol.vm._
 import org.alephium.util.AVector
 
 // scalastyle:off number.of.types
@@ -92,12 +92,18 @@ object ValidationStatus {
   @inline private[validation] def fromExeResult[T](
       result: ExeResult[T],
       wrapper: ExeFailure => InvalidTxStatus
-  ): TxValidationResult[T] =
+  ): TxValidationResult[T] = {
     result match {
       case Right(value)       => validTx(value)
       case Left(Right(error)) => invalidTx(wrapper(error))
-      case Left(Left(error))  => Left(Left(error.error))
+      case Left(Left(error)) =>
+        error.error match {
+          case e: IOError.KeyNotFound => invalidTx(wrapper(UncaughtKeyNotFoundError(e)))
+          case e: IOError.Serde       => invalidTx(wrapper(UncaughtSerdeError(e)))
+          case e                      => Left(Left(e))
+        }
     }
+  }
 
   @inline private[validation] def fromOption[T](
       result: Option[T],

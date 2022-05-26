@@ -18,11 +18,9 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable
 
-import akka.util.ByteString
-
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfig}
-import org.alephium.protocol.model.{NetworkId, TxGenerators, TxOutput}
+import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfigFixture}
+import org.alephium.protocol.model.{TxGenerators, TxOutput}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 import org.alephium.util.Bytes.byteStringOrdering
 
@@ -190,17 +188,13 @@ class BalancesPerLockupSpec extends AlephiumSpec {
     BalancesPerLockup(U256.Zero, mutable.Map.empty, 1).toTxOutput(lockupScript) is Right(None)
   }
 
-  trait Fixture extends TxGenerators {
+  trait Fixture extends TxGenerators with NetworkConfigFixture.Default {
     val tokenId = hashGen.sample.get
 
     implicit override val groupConfig: GroupConfig =
       new GroupConfig {
         override def groups: Int = 3
       }
-    implicit def networkConfig: NetworkConfig = new NetworkConfig {
-      override def networkId: NetworkId       = NetworkId.AlephiumTestNet
-      override def noPreMineProof: ByteString = ByteString.empty
-    }
     implicit override val compilerConfig: CompilerConfig =
       new CompilerConfig {
         override def loopUnrollingLimit: Int = 1000

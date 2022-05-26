@@ -19,18 +19,22 @@ package org.alephium.protocol.config
 import akka.util.ByteString
 
 import org.alephium.protocol.model.NetworkId
+import org.alephium.util.TimeStamp
 
 trait NetworkConfigFixture { self =>
   def networkId: NetworkId
+  def lemanHardForkTimestamp: TimeStamp = TimeStamp.zero
 
   implicit lazy val networkConfig: NetworkConfig = new NetworkConfig {
-    override def networkId: NetworkId       = self.networkId
-    override def noPreMineProof: ByteString = ByteString.empty
+    val networkId: NetworkId       = self.networkId
+    val noPreMineProof: ByteString = ByteString.empty
+    val lemanHardForkTimestamp: TimeStamp =
+      self.lemanHardForkTimestamp // enabled by default for all tests
   }
 }
 
 object NetworkConfigFixture {
   trait Default extends NetworkConfigFixture {
-    val networkId: NetworkId = NetworkId(2)
+    def networkId: NetworkId = NetworkId.AlephiumDevNet
   }
 }

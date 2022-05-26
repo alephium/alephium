@@ -16,13 +16,15 @@
 
 package org.alephium.protocol.vm.lang
 
+import akka.util.ByteString
+
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
 import org.alephium.protocol.vm.lang.ArithOperator._
 import org.alephium.protocol.vm.lang.LogicalOperator._
 import org.alephium.protocol.vm.lang.TestOperator._
-import org.alephium.util.{AlephiumSpec, AVector, I256, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, I256, U256}
 
 class ParserSpec extends AlephiumSpec {
   import Ast._
@@ -83,6 +85,14 @@ class ParserSpec extends AlephiumSpec {
       )
     fastparse.parse("foo(?)", StatefulParser.callExpr(_)).get.value is
       CallExpr(FuncId("foo", false), List(Placeholder[StatefulContext]()))
+    fastparse.parse("# ++ #00", StatefulParser.expr(_)).get.value is
+      Binop[StatefulContext](
+        Concat,
+        Const(Val.ByteVec(ByteString.empty)),
+        Const(Val.ByteVec(Hex.unsafe("00")))
+      )
+    fastparse.parse("let bytes = #", StatefulParser.statement(_)).get.value is
+      VarDef[StatefulContext](Seq((false, Ident("bytes"))), Const(Val.ByteVec(ByteString.empty)))
   }
 
   it should "parse return" in {
@@ -325,12 +335,12 @@ class ParserSpec extends AlephiumSpec {
     )
   }
 
-  it should "parse event" in {
+  it should "parse event definition" in {
     {
       info("0 field")
 
       val eventRaw = "event Event()"
-      fastparse.parse(eventRaw, StatefulParser.event(_)).get.value is EventDef(
+      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
         TypeId("Event"),
         Seq()
       )
@@ -340,7 +350,7 @@ class ParserSpec extends AlephiumSpec {
       info("fields of primitive types")
 
       val eventRaw = "event Transfer(from: Address, to: Address, amount: U256)"
-      fastparse.parse(eventRaw, StatefulParser.event(_)).get.value is EventDef(
+      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
         TypeId("Transfer"),
         Seq(
           EventField(Ident("from"), Type.Address),
@@ -354,7 +364,7 @@ class ParserSpec extends AlephiumSpec {
       info("fields of array type")
 
       val eventRaw = "event Participants(addresses: [Address; 3])"
-      fastparse.parse(eventRaw, StatefulParser.event(_)).get.value is EventDef(
+      fastparse.parse(eventRaw, StatefulParser.eventDef(_)).get.value is EventDef(
         TypeId("Participants"),
         Seq(
           EventField(Ident("addresses"), Type.FixedSizeArray(Type.Address, 3))
@@ -364,23 +374,168 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse contract inheritance" in {
-    val code =
-      s"""
+    {
+      info("Simple contract inheritance")
+      val code =
+        s"""
          |TxContract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
          |  fn foo() -> () {
          |  }
          |}
          |""".stripMargin
 
-    fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
-      TypeId("Child"),
-      Seq(Argument(Ident("x"), Type.U256, false), Argument(Ident("y"), Type.U256, false)),
-      Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
-      Seq.empty,
-      List(
-        ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
-        ContractInheritance(TypeId("Parent1"), Seq(Ident("x")))
+      fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+        TypeId("Child"),
+        Seq.empty,
+        Seq(Argument(Ident("x"), Type.U256, false), Argument(Ident("y"), Type.U256, false)),
+        Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
+        Seq.empty,
+        List(
+          ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
+          ContractInheritance(TypeId("Parent1"), Seq(Ident("x")))
+        )
+      )
+    }
+
+    {
+      info("Contract event inheritance")
+      val foo: String =
+        s"""
+             |TxContract Foo() {
+             |  event Foo(x: U256)
+             |  event Foo2(x: U256)
+             |
+             |  pub fn foo() -> () {
+             |    emit Foo(1)
+             |    emit Foo2(2)
+             |  }
+             |}
+             |""".stripMargin
+      val bar: String =
+        s"""
+             |TxContract Bar() extends Foo() {
+             |  pub fn bar() -> () {}
+             |}
+             |$foo
+             |""".stripMargin
+      val extended =
+        fastparse.parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
+      val barContract = extended.contracts(0)
+      val fooContract = extended.contracts(1)
+      fooContract.events.length is 2
+      barContract.events.length is 2
+    }
+  }
+
+  it should "test contract interface parser" in {
+    {
+      info("Parse interface")
+      val code =
+        s"""
+           |Interface Child extends Parent {
+           |  fn foo() -> ()
+           |}
+           |""".stripMargin
+      fastparse.parse(code, StatefulParser.interface(_)).get.value is ContractInterface(
+        TypeId("Child"),
+        Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
+        Seq.empty,
+        Seq(InterfaceInheritance(TypeId("Parent")))
+      )
+    }
+
+    {
+      info("Interface supports single inheritance")
+      val code =
+        s"""
+           |Interface Child extends Parent0, Parent1 {
+           |  fn foo() -> ()
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](fastparse.parse(code, StatefulParser.interface(_)))
+      error.message is "Interface only supports single inheritance: Parent0,Parent1"
+    }
+
+    {
+      info("Contract inherits interface")
+      val code =
+        s"""
+           |TxContract Child() extends Parent {
+           |  fn foo() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+        TypeId("Child"),
+        Seq.empty,
+        Seq.empty,
+        Seq(
+          FuncDef(
+            FuncId("foo", false),
+            false,
+            false,
+            Seq.empty,
+            Seq.empty,
+            Seq(ReturnStmt(Seq.empty))
+          )
+        ),
+        Seq.empty,
+        Seq(InterfaceInheritance(TypeId("Parent")))
+      )
+    }
+  }
+
+  trait ScriptFixture {
+    val payable: Boolean
+    val script: String
+
+    val ident        = TypeId("Main")
+    val templateVars = Seq(Argument(Ident("x"), Type.U256, false))
+    def funcs[C <: StatelessContext] = Seq[FuncDef[C]](
+      FuncDef(
+        FuncId("main", false),
+        true,
+        payable,
+        Seq.empty,
+        Seq.empty,
+        Seq(Ast.ReturnStmt(List()))
       )
     )
   }
+
+  it should "parse AssetScript" in new ScriptFixture {
+    val payable = false
+    val script  = s"""
+         |AssetScript Main(x: U256) {
+         |  pub fn main() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    fastparse.parse(script, StatelessParser.assetScript(_)).get.value is
+      AssetScript(ident, templateVars, funcs)
+  }
+
+  // scalastyle:off no.equal
+  class TxScriptFixture(payableModifier: String) extends ScriptFixture {
+    val payable = !(payableModifier === "nonPayable")
+    val script  = s"""
+         |TxScript Main(x: U256) $payableModifier {
+         |  return
+         |}
+         |""".stripMargin
+
+    fastparse.parse(script, StatefulParser.txScript(_)).get.value is TxScript(
+      ident,
+      templateVars,
+      funcs
+    )
+  }
+  // scalastyle:on no.equal
+
+  it should "parse explicit payable TxScript" in new TxScriptFixture("payable")
+  it should "parse implicit payable TxScript" in new TxScriptFixture("")
+  it should "parse non payable TxScript" in new TxScriptFixture("nonPayable")
 }

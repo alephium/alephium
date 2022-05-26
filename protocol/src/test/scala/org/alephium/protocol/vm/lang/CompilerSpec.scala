@@ -47,12 +47,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |// comment
            |TxScript Foo {
+           |  return
            |  pub fn bar(a: U256, b: U256) -> (U256) {
            |    return (a + b)
            |  }
            |}
            |""".stripMargin
       Compiler.compileTxScript(script).isRight is true
+    }
+
+    {
+      info("fail without main statements")
+
+      val script =
+        s"""
+           |TxScript Foo {}
+           |""".stripMargin
+      Compiler
+        .compileTxScript(script)
+        .leftValue
+        .message is "No main statements defined in TxScript Foo"
     }
 
     {
@@ -203,6 +217,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |
          |TxScript Bar {
+         |  return
          |  pub fn bar() -> () {
          |    return foo()
          |  }
@@ -655,7 +670,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Local variables have the same name: x",
       s"""
          |// duplicated variable name
          |TxContract Foo(x: [U256; 2]) {
@@ -664,7 +680,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Global variable has the same name as local variable: x",
       s"""
          |// assign to immutable array element(contract field)
          |TxContract Foo(x: [U256; 2]) {
@@ -673,7 +690,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Assign to immutable variable: x",
       s"""
          |// assign to immutable array element(local variable)
          |TxContract Foo() {
@@ -683,7 +701,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Assign to immutable variable: x",
       s"""
          |// out of index
          |TxContract Foo() {
@@ -692,7 +711,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return x[1][3]
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Invalid array index: 3, array size: 2",
       s"""
          |// out of index
          |TxContract Foo() {
@@ -702,7 +722,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Invalid array index: 2, array size: 2",
       s"""
          |// invalid array element assignment
          |TxContract Foo() {
@@ -712,7 +733,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Invalid array index: 2, array size: 2",
       s"""
          |// invalid array element assignment
          |TxContract Foo() {
@@ -722,7 +744,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Invalid assignment to array: x",
       s"""
          |// invalid array expression
          |TxContract Foo() {
@@ -732,7 +755,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Expect array type, have: List(U256)", // TODO: improve this error message
       s"""
          |// invalid array expression
          |TxContract Foo() {
@@ -742,7 +766,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Expect array type, have: List(U256)",
       s"""
          |// invalid binary expression(compare array)
          |TxContract Foo() {
@@ -752,7 +777,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return x == y
          |  }
          |}
-         |""".stripMargin,
+         |""".stripMargin ->
+        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for Eq",
       s"""
          |// invalid binary expression(add array)
          |TxContract Foo() {
@@ -760,7 +786,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    let x = [2; 2] + [2; 2]
          |    return
          |  }
-         |}""".stripMargin,
+         |}""".stripMargin ->
+        "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for ArithOperator",
       s"""
          |// assign array element with invalid type
          |TxContract Foo() {
@@ -770,9 +797,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    return
          |  }
          |}
-         |""".stripMargin
+         |""".stripMargin ->
+        "Assign List(U256) to List(I256)"
     )
-    codes.foreach(code => Compiler.compileContract(code).isLeft is true)
+    codes.foreach { case (code, error) =>
+      Compiler.compileContract(code).leftValue.message is error
+    }
   }
 
   it should "compile loop failed" in {
@@ -1433,14 +1463,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
            |
            |  event Add1(a: U256, b: U256)
+           |  event Add2(a: U256, b: U256)
            |
            |  pub fn add(a: U256, b: U256) -> (U256) {
            |    emit Add1(a, b)
            |    emit Add2(a, b)
            |    return (a + b)
            |  }
-           |
-           |  event Add2(a: U256, b: U256)
            |}
            |""".stripMargin
       Compiler.compileContract(contract).isRight is true
@@ -1474,14 +1503,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  event Add1(a: U256, b: U256)
            |  event Add2(a: U256, b: U256)
            |  event Add3(a: U256, b: U256)
+           |  event Add1(b: U256, a: U256)
+           |  event Add2(b: U256, a: U256)
            |
            |  pub fn add(a: U256, b: U256) -> (U256) {
            |    emit Add(a, b)
            |    return (a + b)
            |  }
-           |
-           |  event Add1(b: U256, a: U256)
-           |  event Add2(b: U256, a: U256)
            |}
            |""".stripMargin
       Compiler
@@ -1513,7 +1541,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "test compile contract inheritance" in {
+  it should "test contract inheritance compilation" in {
     val parent =
       s"""
          |TxContract Parent(mut x: U256) {
@@ -1664,36 +1692,213 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
            |  pub fn foo() -> () {
-           |    p0()
-           |    p1()
-           |    gp()
+           |    p0(true, true)
+           |    p1(true, true, true)
+           |    gp(true)
            |  }
            |}
            |
            |TxContract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
-           |  fn gp() -> () {
+           |  fn gp(a: Bool) -> () {
            |    x = x + 1
            |    emit GP(x)
            |  }
            |}
            |
            |TxContract Parent0(mut x: U256) extends Grandparent(x) {
-           |  fn p0() -> () {
-           |    gp()
+           |  fn p0(a: Bool, b: Bool) -> () {
+           |    gp(a)
            |  }
            |}
            |
            |TxContract Parent1(mut x: U256) extends Grandparent(x) {
-           |  fn p1() -> () {
-           |    gp()
+           |  fn p1(a: Bool, b: Bool, c: Bool) -> () {
+           |    gp(a)
            |  }
            |}
            |""".stripMargin
 
       val contract = Compiler.compileContract(code).rightValue
       contract.methodsLength is 4
+      contract.methods.map(_.argsLength) is AVector(0, 1, 2, 3)
     }
+  }
+
+  it should "test interface compilation" in {
+    {
+      info("Interface should contain at least one function")
+      val foo =
+        s"""
+           |Interface Foo {
+           |}
+           |""".stripMargin
+      val error = Compiler.compileMultiContract(foo).leftValue
+      error.message is "No function definition in TxContract Foo"
+    }
+
+    {
+      info("Interface inheritance should not contain duplicated functions")
+      val foo =
+        s"""
+           |Interface Foo {
+           |  fn foo() -> ()
+           |}
+           |""".stripMargin
+      val bar =
+        s"""
+           |Interface Bar extends Foo {
+           |  fn foo() -> ()
+           |}
+           |
+           |$foo
+           |""".stripMargin
+      val error = Compiler.compileMultiContract(bar).leftValue
+      error.message is "These functions are defined multiple times: foo"
+    }
+
+    {
+      info("Contract should implement interface functions with the same signature")
+      val foo =
+        s"""
+           |Interface Foo {
+           |  fn foo() -> ()
+           |}
+           |""".stripMargin
+      val bar =
+        s"""
+           |TxContract Bar() extends Foo {
+           |  pub fn foo() -> () {
+           |    return
+           |  }
+           |}
+           |
+           |$foo
+           |""".stripMargin
+      val error = Compiler.compileMultiContract(bar).leftValue
+      error.message is "Function foo is implemented with wrong signature"
+    }
+
+    {
+      info("Interface inheritance can be chained")
+      val a =
+        s"""
+           |Interface A {
+           |  pub fn a() -> ()
+           |}
+           |""".stripMargin
+      val b =
+        s"""
+           |Interface B extends A {
+           |  pub fn b(x: Bool) -> ()
+           |}
+           |
+           |$a
+           |""".stripMargin
+      val c =
+        s"""
+           |Interface C extends B {
+           |  pub fn c(x: Bool, y: Bool) -> ()
+           |}
+           |
+           |$b
+           |""".stripMargin
+      val interface =
+        Compiler.compileMultiContract(c).rightValue.contracts(0).asInstanceOf[Ast.ContractInterface]
+      interface.funcs.map(_.args.length) is Seq(0, 1, 2)
+
+      val code =
+        s"""
+           |TxContract Foo() extends C {
+           |  pub fn c(x: Bool, y: Bool) -> () {}
+           |  pub fn a() -> () {}
+           |  pub fn b(x: Bool) -> () {}
+           |  pub fn d(x: Bool, y: Bool, z: Bool) -> () {
+           |    a()
+           |    b(x)
+           |    c(x, y)
+           |  }
+           |}
+           |
+           |$c
+           |""".stripMargin
+      val contract =
+        Compiler.compileMultiContract(code).rightValue.contracts(0).asInstanceOf[Ast.TxContract]
+      contract.funcs.map(_.args.length) is Seq(0, 1, 2, 3)
+    }
+
+    {
+      info("Contract inherits both interface and contract")
+      val foo1: String =
+        s"""
+           |TxContract Foo1() {
+           |  fn foo1() -> () {}
+           |}
+           |""".stripMargin
+      val foo2: String =
+        s"""
+           |Interface Foo2 {
+           |  fn foo2() -> ()
+           |}
+           |""".stripMargin
+      val bar1: String =
+        s"""
+           |TxContract Bar1() extends Foo1(), Foo2 {
+           |  fn foo2() -> () {}
+           |}
+           |$foo1
+           |$foo2
+           |""".stripMargin
+      val bar2: String =
+        s"""
+           |TxContract Bar2() extends Foo2, Foo1() {
+           |  fn foo2() -> () {}
+           |}
+           |$foo1
+           |$foo2
+           |""".stripMargin
+      Compiler.compileContract(bar1).isRight is true
+      Compiler.compileContract(bar2).isRight is true
+    }
+  }
+
+  it should "compile TxScript" in {
+    val code =
+      s"""
+       |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) payable {
+       |  approveToken!(address, tokenId, tokenAmount)
+       |  let swap = Swap(swapContractKey)
+       |  swap.swapAlph(address, tokenAmount)
+       |}
+       |
+       |Interface Swap {
+       |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> ()
+       |}
+       |""".stripMargin
+    val script = Compiler.compileTxScript(code).rightValue
+    script.toTemplateString() is "0101010001000a{0}{1}{2}a3{3}1700{0}{2}16000100"
+  }
+
+  it should "compile events with <= 8 fields" in {
+    def code(nineFields: Boolean): String = {
+      val eventStr = if (nineFields) ", a9: U256" else ""
+      val emitStr  = if (nineFields) ", 9" else ""
+      s"""
+         |TxContract Foo(tmp: U256) {
+         |  event Foo(a1: U256, a2: U256, a3: U256, a4: U256, a5: U256, a6: U256, a7: U256, a8: U256 $eventStr)
+         |
+         |  pub fn foo() -> () {
+         |    emit Foo(1, 2, 3, 4, 5, 6, 7, 8 $emitStr)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    }
+    Compiler.compileContract(code(false)).isRight is true
+    Compiler
+      .compileContract(code(true))
+      .leftValue
+      .message is "Max 8 fields allowed for contract events"
   }
 }

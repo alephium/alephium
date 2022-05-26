@@ -20,7 +20,6 @@ import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.BlockHeader
 import org.alephium.util.{AVector, TimeStamp}
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BlockHeaderEntry(
     hash: BlockHash,
     timestamp: TimeStamp,

@@ -23,7 +23,6 @@ import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model.{Block, BlockDeps, BlockHeader, Nonce, Target}
 import org.alephium.util.{AVector, TimeStamp}
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BlockEntry(
     hash: BlockHash,
     timestamp: TimeStamp,

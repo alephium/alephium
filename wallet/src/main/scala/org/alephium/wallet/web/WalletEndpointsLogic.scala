@@ -86,9 +86,9 @@ trait WalletEndpointsLogic extends WalletEndpoints {
     )
   }
 
-  val getBalancesLogic = serverLogic(getBalances) { case (wallet, utxosLimit) =>
+  val getBalancesLogic = serverLogic(getBalances) { case (wallet) =>
     walletService
-      .getBalances(wallet, utxosLimit)
+      .getBalances(wallet)
       .map(_.map { balances =>
         val totalBalance =
           Amount(balances.map { case (_, amount, _, _) => amount }.fold(U256.Zero) {

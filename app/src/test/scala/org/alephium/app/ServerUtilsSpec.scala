@@ -33,6 +33,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
 import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.serde.serialize
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
@@ -61,6 +62,21 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait FlowFixtureWithApi extends FlowFixture with ApiConfigFixture
+
+  it should "send message with tx" in new Fixture {
+    implicit val serverUtils = new ServerUtils
+
+    val (_, fromPublicKey, _) = genesisKeys(0)
+    val message               = Hex.unsafe("FFFF")
+    val destination           = generateDestination(ChainIndex.unsafe(0, 1), message)
+    val buildTransaction = serverUtils
+      .buildTransaction(blockFlow, BuildTransaction(fromPublicKey, AVector(destination)))
+      .rightValue
+    val unsignedTransaction =
+      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+
+    unsignedTransaction.fixedOutputs.head.additionalData is message
+  }
 
   it should "check tx status for intra group txs" in new Fixture {
 
@@ -367,8 +383,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         destinations,
         gasOpt = None,
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .rightValue
 
@@ -412,7 +427,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(fromAddress, fromAddressBalance, 2)
 
     val utxos =
-      serverUtils.getUTXOsIncludePool(blockFlow, fromAddress, Some(Int.MaxValue)).rightValue.utxos
+      serverUtils.getUTXOsIncludePool(blockFlow, fromAddress).rightValue.utxos
     val destination1 = generateDestination(chainIndex)
     val destination2 = generateDestination(chainIndex)
     val destinations = AVector(destination1, destination2)
@@ -432,8 +447,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           outputRefsOpt = Some(outputRefs),
           destinations,
           gasOpt = Some(minimalGas),
-          defaultGasPrice,
-          defaultUtxosLimit
+          defaultGasPrice
         )
         .rightValue
     }
@@ -452,8 +466,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = None,
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .rightValue
 
@@ -523,8 +536,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Not enough balance"
@@ -545,8 +557,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Selected UTXOs are not from the same group"
@@ -560,8 +571,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(AVector.empty),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Empty UTXOs"
@@ -580,8 +590,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(GasBox.unsafe(100)),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Provided gas GasBox(100) too small, minimal GasBox(20000)"
@@ -594,8 +603,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(GasBox.unsafe(625001)),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Provided gas GasBox(625001) too large, maximal GasBox(625000)"
@@ -614,8 +622,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        GasPrice(minimalGasPrice.value - 1),
-        defaultUtxosLimit
+        GasPrice(minimalGasPrice.value - 1)
       )
       .leftValue
       .detail is "Gas price GasPrice(999999999) too small, minimal GasPrice(1000000000)"
@@ -628,8 +635,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        GasPrice(ALPH.MaxALPHValue),
-        defaultUtxosLimit
+        GasPrice(ALPH.MaxALPHValue)
       )
       .leftValue
       .detail is "Gas price GasPrice(1000000000000000000000000000) too large, maximal GasPrice(999999999999999999999999999)"
@@ -647,8 +653,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         alphAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "ALPH amount overflow"
@@ -667,8 +672,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         tokenAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is s"Amount overflow for token $tokenId"
@@ -686,8 +690,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
-        defaultUtxosLimit
+        defaultGasPrice
       )
       .leftValue
       .detail is "Selected UTXOs must be of asset type"
@@ -798,18 +801,57 @@ class ServerUtilsSpec extends AlephiumSpec {
     lazy val result1 = serverUtils.runTestContract(testFlow, testContract1).rightValue
   }
 
+  it should "return upgraded contract code hash" in new TestContractFixture {
+    val fooV1Code =
+      s"""
+         |TxContract FooV1() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val fooV1         = Compiler.compileContract(fooV1Code).rightValue
+    val fooV1Bytecode = Hex.toHexString(serialize(fooV1))
+
+    val fooV0Code =
+      s"""
+         |TxContract FooV0() {
+         |  pub fn upgrade0() -> () {
+         |    migrate!(#$fooV1Bytecode)
+         |  }
+         |  fn upgrade1() -> () {
+         |    migrate!(#$fooV1Bytecode)
+         |  }
+         |}
+         |""".stripMargin
+    val fooV0 = Compiler.compileContract(fooV0Code).rightValue
+
+    val testContract0 = TestContract.Complete(
+      code = fooV0,
+      originalCodeHash = fooV0.hash,
+      testMethodIndex = 0
+    )
+    testContract0.code.hash is testContract0.originalCodeHash
+    result0.codeHash is fooV1.hash
+    result0.contracts(0).codeHash is fooV1.hash
+
+    val testContract1 =
+      TestContract(bytecode = fooV0, testMethodIndex = Some(1)).toComplete().rightValue
+    testContract1.code.hash isnot testContract1.originalCodeHash
+    result1.codeHash is fooV1.hash
+    result1.contracts(0).codeHash is fooV1.hash
+  }
+
   it should "test AMM contract: add liquidity" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
-      originalCodeHash = AMMContract.swapCode.hash,
       code = AMMContract.swapCode,
+      originalCodeHash = AMMContract.swapCode.hash,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
-      initialAsset = AssetState(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
+      initialAsset = AssetState.from(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
       testMethodIndex = 0,
       testArgs = AVector[Val](ValAddress(lp), ValU256(ALPH.alph(100)), ValU256(100)),
       inputAssets = AVector(
         TestContract.InputAsset(
           lp,
-          AssetState(ALPH.alph(101), AVector(Token(tokenId, 100)))
+          AssetState.from(ALPH.alph(101), AVector(Token(tokenId, 100)))
         )
       )
     )
@@ -821,7 +863,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState.id is ContractId.zero
     contractState.fields is
       AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(110)), ValU256(200))
-    contractState.asset is AssetState(ALPH.alph(110), AVector(Token(tokenId, 200)))
+    contractState.asset is AssetState.from(ALPH.alph(110), AVector(Token(tokenId, 200)))
     result0.txOutputs.length is 2
     result0.txOutputs(0) is ContractOutput(
       result0.txOutputs(0).hint,
@@ -849,8 +891,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
-      originalCodeHash = AMMContract.swapProxyCode.hash,
       code = AMMContract.swapProxyCode,
+      originalCodeHash = AMMContract.swapProxyCode.hash,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
       initialAsset = AssetState(ALPH.alph(1)),
@@ -860,7 +902,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       inputAssets = AVector(
         TestContract.InputAsset(
           lp,
-          AssetState(ALPH.alph(101), AVector(Token(tokenId, 100)))
+          AssetState.from(ALPH.alph(101), AVector(Token(tokenId, 100)))
         )
       )
     )
@@ -871,7 +913,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState1.id is ContractId.zero
     contractState1.fields is
       AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(210)), ValU256(300))
-    contractState1.asset is AssetState(ALPH.alph(210), AVector(Token(tokenId, 300)))
+    contractState1.asset is AssetState.from(ALPH.alph(210), AVector(Token(tokenId, 300)))
     result1.txOutputs.length is 3
     result1.txOutputs(0) is ContractOutput(
       result1.txOutputs(0).hint,
@@ -900,16 +942,16 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test AMM contract: swap token" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
-      originalCodeHash = AMMContract.swapCode.hash,
       code = AMMContract.swapCode,
+      originalCodeHash = AMMContract.swapCode.hash,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
-      initialAsset = AssetState(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
+      initialAsset = AssetState.from(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
       testMethodIndex = 1,
       testArgs = AVector[Val](ValAddress(buyer), ValU256(ALPH.alph(10))),
       inputAssets = AVector(
         TestContract.InputAsset(
           lp,
-          AssetState(ALPH.alph(101), AVector(Token(tokenId, 100)))
+          AssetState.from(ALPH.alph(101), AVector(Token(tokenId, 100)))
         )
       )
     )
@@ -921,7 +963,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState.id is ContractId.zero
     contractState.fields is
       AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(20)), ValU256(50))
-    contractState.asset is AssetState(ALPH.alph(20), AVector(Token(tokenId, 50)))
+    contractState.asset is AssetState.from(ALPH.alph(20), AVector(Token(tokenId, 50)))
     result0.txOutputs.length is 2
     result0.txOutputs(0) is ContractOutput(
       result0.txOutputs(0).hint,
@@ -945,8 +987,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
-      originalCodeHash = AMMContract.swapProxyCode.hash,
       code = AMMContract.swapProxyCode,
+      originalCodeHash = AMMContract.swapProxyCode.hash,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
       initialAsset = AssetState(ALPH.alph(1)),
@@ -956,7 +998,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       inputAssets = AVector(
         TestContract.InputAsset(
           lp,
-          AssetState(ALPH.alph(101), AVector(Token(tokenId, 50)))
+          AssetState.from(ALPH.alph(101), AVector(Token(tokenId, 50)))
         )
       )
     )
@@ -967,7 +1009,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState1.id is ContractId.zero
     contractState1.fields is
       AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100))
-    contractState1.asset is AssetState(ALPH.alph(10), AVector(Token(tokenId, 100)))
+    contractState1.asset is AssetState.from(ALPH.alph(10), AVector(Token(tokenId, 100)))
     result1.txOutputs.length is 3
     result1.txOutputs(0) is ContractOutput(
       result1.txOutputs(0).hint,
@@ -996,16 +1038,16 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "test AMM contract: swap Alph" in new TestContractFixture {
     val testContract0 = TestContract.Complete(
-      originalCodeHash = AMMContract.swapCode.hash,
       code = AMMContract.swapCode,
+      originalCodeHash = AMMContract.swapCode.hash,
       initialFields = AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
-      initialAsset = AssetState(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
+      initialAsset = AssetState.from(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
       testMethodIndex = 2,
       testArgs = AVector[Val](ValAddress(buyer), ValU256(100)),
       inputAssets = AVector(
         TestContract.InputAsset(
           lp,
-          AssetState(ALPH.alph(101), AVector(Token(tokenId, 100)))
+          AssetState.from(ALPH.alph(101), AVector(Token(tokenId, 100)))
         )
       )
     )
@@ -1017,7 +1059,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState.id is ContractId.zero
     contractState.fields is
       AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(5)), ValU256(200))
-    contractState.asset is AssetState(ALPH.alph(5), AVector(Token(tokenId, 200)))
+    contractState.asset is AssetState.from(ALPH.alph(5), AVector(Token(tokenId, 200)))
     result0.txOutputs.length is 2
     result0.txOutputs(0) is ContractOutput(
       result0.txOutputs(0).hint,
@@ -1041,8 +1083,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract1 = TestContract.Complete(
       contractId = testContractId1,
-      originalCodeHash = AMMContract.swapProxyCode.hash,
       code = AMMContract.swapProxyCode,
+      originalCodeHash = AMMContract.swapProxyCode.hash,
       initialFields =
         AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
       initialAsset = AssetState(ALPH.alph(1)),
@@ -1063,7 +1105,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState1.id is ContractId.zero
     contractState1.fields is
       AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100))
-    contractState1.asset is AssetState(ALPH.alph(10), AVector(Token(tokenId, 100)))
+    contractState1.asset is AssetState.from(ALPH.alph(10), AVector(Token(tokenId, 100)))
     result1.txOutputs.length is 3
     result1.txOutputs(0) is ContractOutput(
       result1.txOutputs(0).hint,
@@ -1106,8 +1148,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract = TestContract(
       bytecode = code,
-      initialFields = AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))),
-      testArgs = AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))
+      initialFields = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))),
+      testArgs = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))))
     ).toComplete().rightValue
 
     val serverUtils   = new ServerUtils()
@@ -1123,26 +1165,101 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts.length is 1
     contractState.fields is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
     result.returns is AVector[Val](ValU256(U256.One), ValU256(U256.Zero))
-    if (isPublic.nonEmpty) {
-      contractState.codeHash is compileResult.codeHash
-      result.originalCodeHash is result.testCodeHash
-      contractState.codeHash is result.originalCodeHash
-    } else {
-      contractState.codeHash isnot compileResult.codeHash
-      result.originalCodeHash isnot result.testCodeHash
-      contractState.codeHash is result.testCodeHash
+    compileResult.codeHash is code.hash
+    result.codeHash is contractState.codeHash
+    contractState.codeHash is compileResult.codeHash // We should return the original code hash even when the method is private
+  }
+
+  it should "test with preassigned block hash and tx id" in new Fixture {
+    val contract =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).toOption.get
+
+    val testContract = TestContract(
+      blockHash = Some(BlockHash.random),
+      txId = Some(Hash.random),
+      bytecode = code,
+      initialFields = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))),
+      testArgs = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))))
+    )
+    val testContractComplete = testContract.toComplete().rightValue
+    testContractComplete.blockHash is testContract.blockHash.get
+    testContractComplete.txId is testContract.txId.get
+  }
+
+  it should "compile contract" in new Fixture {
+    val serverUtils = new ServerUtils()
+    val rawCode =
+      s"""
+         |TxContract Foo(y: U256) {
+         |  pub fn foo() -> () {
+         |    assert!(1 != y)
+         |  }
+         |}
+         |""".stripMargin
+    val code   = Compiler.compileContract(rawCode).rightValue
+    val query  = Compile.Contract(rawCode)
+    val result = serverUtils.compileContract(query).rightValue
+
+    val compiledCode = result.bytecode
+    compiledCode is Hex.toHexString(serialize(code))
+    compiledCode is {
+      val bytecode     = "0100000000040da000304d"
+      val methodLength = Hex.toHexString(IndexedSeq((bytecode.length / 2).toByte))
+      s"0101$methodLength" + bytecode
+    }
+  }
+
+  it should "compile script" in new Fixture {
+    val expectedByteCode = "01010000000004{0}{1}304d"
+    val serverUtils      = new ServerUtils()
+
+    {
+      val rawCode =
+        s"""
+           |TxScript Main(x: U256, y: U256) nonPayable {
+           |  assert!(x != y)
+           |}
+           |""".stripMargin
+
+      val query  = Compile.Script(rawCode)
+      val result = serverUtils.compileScript(query).rightValue
+      result.bytecodeTemplate is expectedByteCode
+    }
+
+    {
+      val rawCode =
+        s"""
+           |TxScript Main nonPayable {
+           |  assert!(1 != 2)
+           |}
+           |""".stripMargin
+      val code   = Compiler.compileTxScript(rawCode).rightValue
+      val query  = Compile.Script(rawCode)
+      val result = serverUtils.compileScript(query).rightValue
+
+      result.bytecodeTemplate is Hex.toHexString(serialize(code))
+      result.bytecodeTemplate is expectedByteCode
+        .replace("{0}", "0d") // bytecode of U256Const1
+        .replace("{1}", "0e") // bytecode of U256Const2
     }
   }
 
   private def generateDestination(
       chainIndex: ChainIndex,
-      tokens: (TokenId, U256)*
+      message: ByteString = ByteString.empty
   )(implicit
       groupConfig: GroupConfig
   ): Destination = {
     val address = generateAddress(chainIndex)
     val amount  = Amount(ALPH.oneAlph)
-    Destination(address, amount, Some(AVector.from(tokens).map(Token.apply.tupled)))
+    Destination(address, amount, None, None, Some(message))
   }
 
   private def generateAddress(chainIndex: ChainIndex)(implicit
@@ -1179,7 +1296,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    serverUtils.getBalance(blockFlow, GetBalance(address, None)) isE Balance.from(
+    serverUtils.getBalance(blockFlow, GetBalance(address)) isE Balance.from(
       Amount(amount),
       Amount.Zero,
       utxoNum
