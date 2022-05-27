@@ -266,6 +266,44 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
+  it should "disallow loading upgraded contract in current tx" in new ContractFixture {
+    val fooV1Code =
+      s"""
+         |TxContract FooV1() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val fooV1 = Compiler.compileContract(fooV1Code).rightValue
+
+    val fooV0Code =
+      s"""
+         |TxContract FooV0() {
+         |  pub fn upgrade() -> () {
+         |    migrate!(#${Hex.toHexString(serialize(fooV1))})
+         |  }
+         |}
+         |""".stripMargin
+    val fooContractId = createContract(fooV0Code, AVector.empty).key.toHexString
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let fooV0 = FooV0(#$fooContractId)
+         |  fooV0.upgrade()
+         |  let fooV1 = FooV1(#$fooContractId)
+         |  fooV1.foo()
+         |}
+         |
+         |$fooV0Code
+         |
+         |$fooV1Code
+         |""".stripMargin
+
+    intercept[AssertionError](callTxScript(script)).getMessage.startsWith(
+      "Right(TxScriptExeFailed(ContractLoadDisallowed"
+    ) is true
+  }
+
   it should "not use up contract assets" in new ContractFixture {
     val input =
       """

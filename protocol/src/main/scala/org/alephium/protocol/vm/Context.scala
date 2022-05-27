@@ -248,6 +248,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
         .left
         .map(e => Left(IOErrorMigrateContract(e)))
     } yield {
+      blockContractLoad(contractId)
       removeContractFromCache(contractId)
     }
   }
