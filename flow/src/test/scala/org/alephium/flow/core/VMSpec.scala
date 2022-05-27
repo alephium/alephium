@@ -748,12 +748,21 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val fooV2Code = Compiler.compileContract(fooV2).rightValue
 
-    def main(changeState: String, expected: String): String =
+    def upgrade(changeState: String): String =
       s"""
          |TxScript Main payable {
          |  let foo = Foo(#$fooId)
          |  foo.foo(#${Hex.toHexString(serialize(fooV2Code))}, ${changeState})
-         |  foo.checkX(${expected})
+         |}
+         |
+         |$fooV1
+         |""".stripMargin
+
+    def checkState(expected: String): String =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#$fooId)
+         |  foo.checkX($expected)
          |}
          |
          |$fooV1
@@ -761,7 +770,8 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("migrate without state change")
-      callTxScript(main("false", "true"))
+      callTxScript(upgrade("false"))
+      callTxScript(checkState("true"))
       val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractKey = Hash.from(Hex.from(fooId).get).get
       val obj         = worldState.getContractObj(contractKey).rightValue
@@ -772,7 +782,8 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("migrate with state change")
-      callTxScript(main("true", "false"))
+      callTxScript(upgrade("true"))
+      callTxScript(checkState("false"))
       val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractKey = Hash.from(Hex.from(fooId).get).get
       val obj         = worldState.getContractObj(contractKey).rightValue
