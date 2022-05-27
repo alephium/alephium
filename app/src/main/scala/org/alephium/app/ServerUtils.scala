@@ -30,11 +30,10 @@ import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
-import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{vm, BlockHash, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
@@ -721,6 +720,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
+    val initialAlphAmount = query.initialAlphAmount.map(_.value).getOrElse(minimalAlphInContract)
     for {
       code <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
@@ -728,13 +728,13 @@ class ServerUtils(implicit
         code.contract,
         address,
         code.initialFields,
-        query.initialAlphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
+        initialAlphAmount,
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        dustUtxoAmount,
+        initialAlphAmount,
         AVector.empty,
         query.fromPublicKey,
         query.gasAmount,

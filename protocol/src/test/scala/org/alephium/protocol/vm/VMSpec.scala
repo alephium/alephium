@@ -17,14 +17,14 @@
 package org.alephium.protocol.vm
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.minimalGas
+import org.alephium.protocol.model.{minimalAlphInContract, minimalGas}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -260,7 +260,10 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         def getInitialBalances(): ExeResult[Balances] = {
           Right(
             Balances(
-              ArrayBuffer(address0.lockupScript -> balances0, address1.lockupScript -> balances1)
+              mutable.ArrayBuffer(
+                address0.lockupScript -> balances0,
+                address1.lockupScript -> balances1
+              )
             )
           )
         }
@@ -509,5 +512,54 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val signature = Signature.generate
     val context1  = genStatefulContext(None, signatures = AVector(signature))
     StatefulVM.checkRemainingSignatures(context1).leftValue isE TooManySignatures
+  }
+
+  trait NetworkFixture extends ContextGenerators {
+    val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.PreLeman)
+    val lemanContext    = genStatefulContext(None)(NetworkConfigFixture.Leman)
+
+    val preLemanStatefulVm =
+      new StatefulVM(preLemanContext, Stack.ofCapacity(0), Stack.ofCapacity(0))
+    val lemanStatefulVm =
+      new StatefulVM(lemanContext, Stack.ofCapacity(0), Stack.ofCapacity(0))
+  }
+
+  it should "check the minimal contract balance" in new NetworkFixture {
+    def genBalance(lockupScriptGen: Gen[LockupScript], amount: U256) = {
+      Balances(
+        mutable.ArrayBuffer(
+          lockupScriptGen.sample.get ->
+            BalancesPerLockup(alphAmount = amount, mutable.Map.empty, 0)
+        )
+      )
+    }
+
+    preLemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract)
+    ) isE ()
+    preLemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract - 1)
+    ) isE ()
+    preLemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract)
+    ) isE ()
+    preLemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract - 1)
+    ) isE ()
+
+    lemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract)
+    ) isE ()
+    lemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract - 1)
+    ) isE ()
+    lemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract)
+    ) isE ()
+    lemanStatefulVm
+      .checkContractMinimalBalances(
+        genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract - 1)
+      )
+      .leftValue isE NeedAtLeastOneAlphInContract
   }
 }

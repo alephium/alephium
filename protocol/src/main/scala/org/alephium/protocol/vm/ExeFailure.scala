@@ -80,6 +80,7 @@ case object BalanceOverflow                                    extends ExeFailur
 case object NoAlphBalanceForTheAddress                         extends ExeFailure
 case object NoTokenBalanceForTheAddress                        extends ExeFailure
 case object InvalidBalances                                    extends ExeFailure
+case object NeedAtLeastOneAlphInContract                       extends ExeFailure
 case object UnableToPayGasFee                                  extends ExeFailure
 case object InvalidOutputBalances                              extends ExeFailure
 case object InvalidTokenId                                     extends ExeFailure

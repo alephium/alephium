@@ -164,7 +164,7 @@ class VMSpec extends AlephiumSpec {
         input: String,
         initialState: AVector[Val],
         tokenAmount: Option[U256] = None,
-        initialAlphAmount: U256 = dustUtxoAmount
+        initialAlphAmount: U256 = minimalAlphInContract
     ): ContractOutputRef = {
       val contract = Compiler.compileContract(input).rightValue
       val txScript =
@@ -186,7 +186,7 @@ class VMSpec extends AlephiumSpec {
         numContracts: Int,
         initialState: AVector[Val] = AVector[Val](Val.U256(U256.Zero)),
         tokenAmount: Option[U256] = None,
-        initialAlphAmount: U256 = dustUtxoAmount
+        initialAlphAmount: U256 = minimalAlphInContract
     ): ContractOutputRef = {
       val contractOutputRef = createContract(input, initialState, tokenAmount, initialAlphAmount)
 
@@ -329,7 +329,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     val script = Compiler.compileTxScript(main).rightValue
-    fail(blockFlow, chainIndex, script, EmptyContractAsset)
+    fail(blockFlow, chainIndex, script, NeedAtLeastOneAlphInContract)
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {
@@ -1164,7 +1164,7 @@ class VMSpec extends AlephiumSpec {
       output.tokens.toSeq.toMap.getOrElse(tokenId, U256.Zero) is tokenReserve
     }
 
-    checkSwapBalance(dustUtxoAmount, 0)
+    checkSwapBalance(minimalAlphInContract, 0)
 
     callTxScript(s"""
                     |TxScript Main payable {
@@ -1176,7 +1176,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |${AMMContract.swapContract}
                     |""".stripMargin)
-    checkSwapBalance(dustUtxoAmount + 10, 100)
+    checkSwapBalance(minimalAlphInContract + 10, 100)
 
     callTxScript(s"""
                     |TxScript Main payable {
@@ -1187,7 +1187,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |${AMMContract.swapContract}
                     |""".stripMargin)
-    checkSwapBalance(dustUtxoAmount + 20, 50)
+    checkSwapBalance(minimalAlphInContract + 20, 50)
 
     callTxScript(s"""
                     |TxScript Main payable {
@@ -1198,7 +1198,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |${AMMContract.swapContract}
                     |""".stripMargin)
-    checkSwapBalance(dustUtxoAmount + 10, 100)
+    checkSwapBalance(minimalAlphInContract + 10, 100)
   }
 
   it should "execute tx in random order" in new ContractFixture {
@@ -1242,7 +1242,7 @@ class VMSpec extends AlephiumSpec {
         testContract,
         2,
         2,
-        initialAlphAmount = ALPH.alph(1)
+        initialAlphAmount = ALPH.alph(10)
       ).key
 
     def checkContract(alphReserve: U256, x: Int) = {
@@ -1253,7 +1253,7 @@ class VMSpec extends AlephiumSpec {
       output.amount is alphReserve
     }
 
-    checkContract(ALPH.alph(1), 0)
+    checkContract(ALPH.alph(10), 0)
 
     val block0 = transfer(blockFlow, chainIndex, amount = ALPH.alph(10), numReceivers = 10)
     addAndCheck(blockFlow, block0)
@@ -1301,7 +1301,7 @@ class VMSpec extends AlephiumSpec {
     blockTemplate.transactions.filter(_.scriptExecutionOk == false).length is 5
     val block = mine(blockFlow, blockTemplate)
     addAndCheck0(blockFlow, block)
-    checkContract(ALPH.cent(95), 5)
+    checkContract(ALPH.cent(995), 5)
   }
 
   it should "test contract inheritance" in new ContractFixture {
@@ -2116,14 +2116,17 @@ class VMSpec extends AlephiumSpec {
     val fooInitialState = Hex.toHexString(serialize(AVector.empty[Val]))
 
     def createFooContract(transferAlph: Boolean): String = {
-      val maybeTransfer =
-        if (transferAlph) s"transferAlphFromSelf!(contractAddress, ${ALPH.cent(1).v})" else ""
+      val maybeTransfer = if (transferAlph) {
+        s"transferAlphFromSelf!(contractAddress, ${minimalAlphInContract.v})"
+      } else {
+        ""
+      }
 
       val bar: String =
         s"""
            |TxContract Bar() {
            |  pub payable fn bar() -> () {
-           |    approveAlph!(@${genesisAddress.toBase58}, ${ALPH.oneAlph.v})
+           |    approveAlph!(@${genesisAddress.toBase58}, ${minimalAlphInContract.v})
            |    let contractId = createContract!(#$fooByteCode, #$fooInitialState)
            |    let contractAddress = contractIdToAddress!(contractId)
            |
@@ -2136,7 +2139,7 @@ class VMSpec extends AlephiumSpec {
 
       s"""
          |TxScript Main payable {
-         |  approveAlph!(@${genesisAddress.toBase58}, ${ALPH.oneAlph.v})
+         |  approveAlph!(@${genesisAddress.toBase58}, ${minimalAlphInContract.v})
          |  let bar = Bar(#${barContractId.toHexString})
          |  bar.bar()
          |}

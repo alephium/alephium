@@ -108,7 +108,7 @@ class SmartContractTest extends AlephiumActorSpec {
           compileResult.bytecode,
           Address.fromBase58(address).value,
           state,
-          dustUtxoAmount,
+          minimalAlphInContract,
           issueTokenAmount
         )
         .rightValue
@@ -226,7 +226,7 @@ class SmartContractTest extends AlephiumActorSpec {
     )
 
     gasWithoutScript.addUnsafe(scriptGas) is unsignedTx.gasAmount
-    unsignedTx.gasAmount is GasBox.unsafe(57065)
+    unsignedTx.gasAmount is GasBox.unsafe(57068)
 
     clique.stop()
   }
@@ -370,14 +370,14 @@ class SmartContractTest extends AlephiumActorSpec {
 
     checkUTXOs { currentUTXOs =>
       // Create the token contract
-      //   - dustUtxoAmount of ALPH is sent out    [ALPH.nanoAlph(1000)]
+      //   - one ALPH is deposit into contract     [ALPH.alph(1)]
       //   - Gas fee: defaultGasPrice  * 100000    [ALPH.nanoAlph(10000000)]
       val updatedAmount = ALPH
         .alph(100)
-        .subUnsafe(dustUtxoAmount)
+        .subUnsafe(minimalAlphInContract)
         .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
 
-      updatedAmount is ALPH.nanoAlph(99989999000L)
+      updatedAmount is ALPH.nanoAlph(98990000000L)
 
       currentUTXOs is Set(
         (updatedAmount, noTokens),
@@ -401,13 +401,13 @@ class SmartContractTest extends AlephiumActorSpec {
       //   - 1024 token is received                [token(1024)]
       //   - Gas fee: defaultGasPrice  * 100000    [ALPH.nanoAlph(10000000)]
       val updatedAmount = ALPH
-        .nanoAlph(99989999000L)
+        .nanoAlph(98990000000L)
         .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
 
-      updatedAmount is ALPH.nanoAlph(99979999000L)
+      updatedAmount is ALPH.nanoAlph(98980000000L)
 
       currentUTXOs is Set(
-        (ALPH.nanoAlph(99979999000L), token(1024)),
+        (ALPH.nanoAlph(98980000000L), token(1024)),
         (ALPH.alph(1000), noTokens),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
@@ -434,11 +434,11 @@ class SmartContractTest extends AlephiumActorSpec {
       //   - dustUtxoAmount of ALPH is sent out     [ALPH.nanoAlph(1000)]
       //   - Gas fee: defaultGasPrice  * 100000     [ALPH.nanoAlph(10000000)]
       val updatedAmount = ALPH
-        .nanoAlph(99979999000L)
-        .subUnsafe(dustUtxoAmount)
+        .nanoAlph(98980000000L)
+        .subUnsafe(minimalAlphInContract)
         .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
 
-      updatedAmount is ALPH.nanoAlph(99969998000L)
+      updatedAmount is ALPH.nanoAlph(97970000000L)
 
       currentUTXOs is Set(
         (updatedAmount, token(1024)),
@@ -468,7 +468,7 @@ class SmartContractTest extends AlephiumActorSpec {
       //   - Gas fee: defaultGasPrice  * 100000     [ALPH.nanoAlph(10000000)]
       val updatedAmount = ALPH
         .nanoAlph(
-          99969998000L
+          97970000000L
         ) // from UTXO: 8a28d6a00e58d5cab36b94b12119da550351f71a530842a0d7ca712633cc0b9d
         .addUnsafe(
           ALPH.alph(1000)
@@ -476,10 +476,10 @@ class SmartContractTest extends AlephiumActorSpec {
         .subUnsafe(ALPH.alph(100))
         .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
 
-      updatedAmount is ALPH.nanoAlph(999959998000L)
+      updatedAmount is ALPH.nanoAlph(997960000000L)
 
       currentUTXOs is Set(
-        (ALPH.nanoAlph(999959998000L), token(24)),
+        (ALPH.nanoAlph(997960000000L), token(24)),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
         (ALPH.nanoAlph(888899997244000L), noTokens)
@@ -497,14 +497,14 @@ class SmartContractTest extends AlephiumActorSpec {
       //   - 500 tokens is received                 [token(50)]
       //   - Gas fee: defaultGasPrice  * 100000     [ALPH.nanoAlph(10000000)]
       val updatedAmount = ALPH
-        .nanoAlph(999959998000L)
+        .nanoAlph(997960000000L)
         .subUnsafe(ALPH.alph(100))
         .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
 
-      updatedAmount is ALPH.nanoAlph(899949998000L)
+      updatedAmount is ALPH.nanoAlph(897950000000L)
 
       currentUTXOs is Set(
-        (ALPH.nanoAlph(899949998000L), token(524)),
+        (ALPH.nanoAlph(897950000000L), token(524)),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
         (ALPH.nanoAlph(888899997244000L), noTokens)
@@ -527,14 +527,14 @@ class SmartContractTest extends AlephiumActorSpec {
       //   - 500 tokens is sent out                  [token(50)]
       //   - Gas fee: defaultGasPrice  * 100000      [ALPH.nanoAlph(10000000)]
       val updatedAmount = ALPH
-        .nanoAlph(899949998000L)
+        .nanoAlph(897950000000L)
         .addUnsafe(ALPH.alph(100))
         .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
 
-      updatedAmount is ALPH.nanoAlph(999939998000L)
+      updatedAmount is ALPH.nanoAlph(997940000000L)
 
       currentUTXOs is Set(
-        (ALPH.nanoAlph(999939998000L), token(24)),
+        (ALPH.nanoAlph(997940000000L), token(24)),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
         (ALPH.nanoAlph(888899997244000L), noTokens)

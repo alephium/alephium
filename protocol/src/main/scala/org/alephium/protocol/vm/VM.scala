@@ -176,6 +176,10 @@ object VM {
       initialGas.use(GasCall.fieldsBaseGas(estimatedSize))
     }
   }
+
+  def checkContractMinimalBalanceLeman(pair: (LockupScript, BalancesPerLockup)): Boolean = {
+    pair._1.isAssetType || pair._2.alphAmount >= minimalAlphInContract
+  }
 }
 
 final class StatelessVM(
@@ -296,11 +300,23 @@ final class StatefulVM(
           case Some(_) => okay
           case None    => failed(InvalidBalances)
         }
+        _ <- checkContractMinimalBalances(ctx.outputBalances)
         _ <- outputGeneratedBalances(ctx.outputBalances)
         _ <- ctx.checkAllAssetsFlushed()
       } yield ()
     } else {
       Right(())
+    }
+  }
+
+  def checkContractMinimalBalances(outputBalances: Balances): ExeResult[Unit] = {
+    if (
+      ctx.getHardFork() >= HardFork.Leman &&
+      !outputBalances.all.forall(VM.checkContractMinimalBalanceLeman)
+    ) {
+      failed(NeedAtLeastOneAlphInContract)
+    } else {
+      okay
     }
   }
 
