@@ -266,6 +266,44 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
+  it should "disallow loading upgraded contract in current tx" in new ContractFixture {
+    val fooV1Code =
+      s"""
+         |TxContract FooV1() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val fooV1 = Compiler.compileContract(fooV1Code).rightValue
+
+    val fooV0Code =
+      s"""
+         |TxContract FooV0() {
+         |  pub fn upgrade() -> () {
+         |    migrate!(#${Hex.toHexString(serialize(fooV1))})
+         |  }
+         |}
+         |""".stripMargin
+    val fooContractId = createContract(fooV0Code, AVector.empty).key.toHexString
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let fooV0 = FooV0(#$fooContractId)
+         |  fooV0.upgrade()
+         |  let fooV1 = FooV1(#$fooContractId)
+         |  fooV1.foo()
+         |}
+         |
+         |$fooV0Code
+         |
+         |$fooV1Code
+         |""".stripMargin
+
+    intercept[AssertionError](callTxScript(script)).getMessage.startsWith(
+      "Right(TxScriptExeFailed(ContractLoadDisallowed"
+    ) is true
+  }
+
   it should "not use up contract assets" in new ContractFixture {
     val input =
       """
@@ -710,12 +748,21 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val fooV2Code = Compiler.compileContract(fooV2).rightValue
 
-    def main(changeState: String, expected: String): String =
+    def upgrade(changeState: String): String =
       s"""
          |TxScript Main payable {
          |  let foo = Foo(#$fooId)
          |  foo.foo(#${Hex.toHexString(serialize(fooV2Code))}, ${changeState})
-         |  foo.checkX(${expected})
+         |}
+         |
+         |$fooV1
+         |""".stripMargin
+
+    def checkState(expected: String): String =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#$fooId)
+         |  foo.checkX($expected)
          |}
          |
          |$fooV1
@@ -723,7 +770,8 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("migrate without state change")
-      callTxScript(main("false", "true"))
+      callTxScript(upgrade("false"))
+      callTxScript(checkState("true"))
       val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractKey = Hash.from(Hex.from(fooId).get).get
       val obj         = worldState.getContractObj(contractKey).rightValue
@@ -734,7 +782,8 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("migrate with state change")
-      callTxScript(main("true", "false"))
+      callTxScript(upgrade("true"))
+      callTxScript(checkState("false"))
       val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractKey = Hash.from(Hex.from(fooId).get).get
       val obj         = worldState.getContractObj(contractKey).rightValue
