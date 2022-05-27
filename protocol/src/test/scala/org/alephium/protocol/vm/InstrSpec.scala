@@ -1018,7 +1018,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress.runWith(frame) isE ()
       stack.size is 1
       stack.top.get is address
-      initialGas.subUnsafe(context.gasRemaining) is ContractIdToAddress.gas(bytes.length)
+      initialGas.subUnsafe(context.gasRemaining) is ContractIdToAddress.gas()
       stack.pop()
     }
 
@@ -2213,7 +2213,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256From1Byte -> 1, U256From2Byte -> 1, U256From4Byte -> 1, U256From8Byte -> 1, U256From16Byte -> 2, U256From32Byte -> 4,
       EthEcRecover -> 2500,
       Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280,
-      ContractIdToAddress -> 4
+      ContractIdToAddress -> 5
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */

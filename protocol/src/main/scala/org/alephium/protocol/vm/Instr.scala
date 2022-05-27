@@ -818,13 +818,13 @@ case object ContractIdToAddress
     extends StatelessInstr
     with LemanInstr[StatelessContext]
     with StatelessInstrCompanion0
-    with GasToByte {
+    with GasLow {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       contractIdRaw <- frame.popOpStackByteVec()
       contractId    <- Hash.from(contractIdRaw.bytes).toRight(Right(InvalidContractId))
       address = Val.Address(LockupScript.p2c(contractId))
-      _ <- frame.ctx.chargeGasWithSize(this, contractIdRaw.bytes.length)
+      _ <- frame.ctx.chargeGas(gas())
       _ <- frame.pushOpStack(address)
     } yield ()
   }
