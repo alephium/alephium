@@ -19,8 +19,8 @@ package org.alephium.protocol.config
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.NetworkId
-import org.alephium.util.{Bytes, Duration}
+import org.alephium.protocol.model.{HardFork, NetworkId}
+import org.alephium.util.{Bytes, Duration, TimeStamp}
 
 trait NetworkConfig {
   def networkId: NetworkId
@@ -36,4 +36,14 @@ trait NetworkConfig {
     case _                         => Duration.ofMinutesUnsafe(10)
   }
   //scalastyle:on magic.number
+
+  def lemanHardForkTimestamp: TimeStamp
+
+  def getHardFork(timeStamp: TimeStamp): HardFork = {
+    if (timeStamp >= lemanHardForkTimestamp) {
+      HardFork.Leman
+    } else {
+      HardFork.Mainnet
+    }
+  }
 }

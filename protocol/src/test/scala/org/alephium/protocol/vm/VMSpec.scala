@@ -248,14 +248,14 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val balances1    = BalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext =
-      new StatefulContext {
+      new StatefulContext with NetworkConfigFixture.Default {
         val worldState: WorldState.Staging = cachedWorldState.staging()
         def blockEnv: BlockEnv             = genBlockEnv()
         def txEnv: TxEnv                   = genTxEnv(None, AVector.empty)
         override def txId: Hash            = Hash.zero
         var gasRemaining                   = GasBox.unsafe(100000)
         def nextOutputIndex: Int           = 0
-        def logConfig: LogConfig           = LogConfig(enabled = true, contractAddresses = None)
+        def logConfig: LogConfig           = LogConfig.allEnabled()
 
         def getInitialBalances(): ExeResult[Balances] = {
           Right(

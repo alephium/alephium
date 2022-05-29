@@ -14,18 +14,14 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.protocol.model
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.Address
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
+import org.alephium.util.AlephiumSpec
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildMultisig(
-    fromAddress: Address.Asset,
-    fromPublicKeys: AVector[PublicKey],
-    destinations: AVector[Destination],
-    gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
-)
+class HardForkSpec extends AlephiumSpec {
+  it should "compare hard fork version" in {
+    (HardFork.Leman > HardFork.Mainnet) is true
+    HardFork.Mainnet.version is 0
+    HardFork.Leman.version is 1
+  }
+}

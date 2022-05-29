@@ -37,7 +37,7 @@ trait SimpleMap[K, V] {
 
   def put(key: K, value: V): Unit
 
-  def remove(key: K): Unit
+  def remove(key: K): Option[V]
 
   def keys(): Iterator[K] = underlying.keySet().iterator().asScala
 

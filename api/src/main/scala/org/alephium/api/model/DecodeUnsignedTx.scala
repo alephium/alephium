@@ -16,16 +16,10 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.Address
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
+final case class DecodeUnsignedTx(unsignedTx: String)
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildMultisig(
-    fromAddress: Address.Asset,
-    fromPublicKeys: AVector[PublicKey],
-    destinations: AVector[Destination],
-    gas: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
-)
+final case class DecodeUnsignedTxResult(
+    fromGroup: Int,
+    toGroup: Int,
+    unsignedTx: UnsignedTx
+) extends ChainIndexInfo

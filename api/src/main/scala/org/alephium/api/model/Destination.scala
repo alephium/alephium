@@ -16,6 +16,8 @@
 
 package org.alephium.api.model
 
+import akka.util.ByteString
+
 import org.alephium.protocol.model.Address
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -24,5 +26,6 @@ final case class Destination(
     address: Address.Asset,
     alphAmount: Amount,
     tokens: Option[AVector[Token]] = None,
-    lockTime: Option[TimeStamp] = None
+    lockTime: Option[TimeStamp] = None,
+    message: Option[ByteString] = None
 )

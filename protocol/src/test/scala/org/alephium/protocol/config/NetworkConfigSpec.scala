@@ -14,6 +14,19 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.protocol.config
 
-final case class DecodeTransaction(unsignedTx: String)
+import org.alephium.protocol.model.HardFork
+import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
+
+class NetworkConfigSpec extends AlephiumSpec with NetworkConfigFixture.Default {
+  override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now()
+
+  networkConfig.getHardFork(lemanHardForkTimestamp) is HardFork.Leman
+  networkConfig.getHardFork(
+    lemanHardForkTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+  ) is HardFork.Mainnet
+  networkConfig.getHardFork(
+    lemanHardForkTimestamp.plusUnsafe(Duration.ofSecondsUnsafe(1))
+  ) is HardFork.Leman
+}

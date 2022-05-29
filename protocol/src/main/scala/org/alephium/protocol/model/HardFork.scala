@@ -14,22 +14,12 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.protocol.model
 
-import akka.util.ByteString
-
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
-
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildContractDeployScriptTx(
-    fromPublicKey: PublicKey,
-    bytecode: ByteString,
-    initialFields: AVector[Val] = AVector.empty,
-    alphAmount: Option[Amount] = None,
-    issueTokenAmount: Option[Amount] = None,
-    gasAmount: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None,
-    utxosLimit: Option[Int] = None
-) extends BuildTxCommon
+sealed class HardFork(val version: Int) extends Ordered[HardFork] {
+  def compare(that: HardFork): Int = this.version.compareTo(that.version)
+}
+object HardFork {
+  object Mainnet extends HardFork(0)
+  object Leman   extends HardFork(1)
+}

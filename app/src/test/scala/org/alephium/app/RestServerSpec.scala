@@ -33,6 +33,7 @@ import org.alephium.api.{ApiError, ApiModel}
 import org.alephium.api.UtilJson.avectorReadWriter
 import org.alephium.api.model._
 import org.alephium.app.ServerFixture.NodeDummy
+import org.alephium.crypto.Blake2b
 import org.alephium.flow.handler.{TestUtils, ViewHandler}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
@@ -47,6 +48,7 @@ import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
 import org.alephium.util._
+import org.alephium.util.Hex.HexStringSyntax
 import org.alephium.wallet.WalletApp
 import org.alephium.wallet.config.WalletConfig
 
@@ -54,7 +56,8 @@ import org.alephium.wallet.config.WalletConfig
 abstract class RestServerSpec(
     val nbOfNodes: Int,
     val apiKey: Option[ApiKey] = None,
-    val apiKeyEnabled: Boolean = false
+    val apiKeyEnabled: Boolean = false,
+    val utxosLimit: Int = Int.MaxValue
 ) extends RestServerFixture {
   it should "call GET /blockflow" in {
     Get(blockflowFromTo(0, 1)) check { response =>
@@ -103,16 +106,19 @@ abstract class RestServerSpec(
 
   it should "call GET /addresses/<address>/balance" in {
     val group = LockupScript.p2pkh(dummyKey).groupIndex(brokerConfig)
-    Get(s"/addresses/$dummyKeyAddress/balance", getPort(group)) check { response =>
-      response.code is StatusCode.Ok
-      response.as[Balance] is dummyBalance
-    }
-    Get(s"/addresses/$dummyKeyAddress/balance?utxosLimit=0", getPort(group)) check { response =>
-      response.code is StatusCode.Ok
-      response
-        .as[Balance]
-        .warning
-        .get is "Result might not include all utxos and is maybe unprecise"
+    if (utxosLimit > 0) {
+      Get(s"/addresses/$dummyKeyAddress/balance", getPort(group)) check { response =>
+        response.code is StatusCode.Ok
+        response.as[Balance] is dummyBalance
+      }
+    } else {
+      Get(s"/addresses/$dummyKeyAddress/balance", getPort(group)) check { response =>
+        response.code is StatusCode.Ok
+        response
+          .as[Balance]
+          .warning
+          .get is "Result might not include all utxos and is maybe unprecise"
+      }
     }
   }
 
@@ -349,62 +355,41 @@ abstract class RestServerSpec(
   }
 
   it should "call GET /transactions/status" in {
-    var txChainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+    val chainIndex = ChainIndex.from(dummyBlock.hash, groupConfig.groups)
+
     forAll(hashGen) { txId =>
       servers.foreach { server =>
-        Get(
+        verifyResponseWithNodes(
           s"/transactions/status?txId=${txId.toHexString}",
+          s"/transactions/status?txId=${txId.toHexString}&fromGroup=${chainIndex.from.value}",
+          chainIndex,
           server.port
-        ) check { response =>
+        ) { response =>
           val status = response.as[TxStatus]
           response.code is StatusCode.Ok
-          txChainIndex = ChainIndex.from(status.asInstanceOf[Confirmed].blockHash)
           status is dummyTxStatus
         }
 
-        val rightNode = server.node.config.broker.contains(txChainIndex.from)
-
-        Get(
-          s"/transactions/status?txId=${txId.toHexString}&fromGroup=${txChainIndex.from.value}&toGroup=${txChainIndex.to.value}",
+        verifyResponseWithNodes(
+          s"/transactions/status?txId=${txId.toHexString}&toGroup=${chainIndex.to.value}",
+          s"/transactions/status?txId=${txId.toHexString}&fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
+          chainIndex,
           server.port
-        ) check { response =>
-          if (rightNode) {
-            val status = response.as[TxStatus]
-            response.code is StatusCode.Ok
-            status is dummyTxStatus
-          } else {
-            val status = response.as[TxStatus]
-            response.code is StatusCode.Ok
-            status is TxNotFound
-          }
+        ) { response =>
+          val status = response.as[TxStatus]
+          response.code is StatusCode.Ok
+          status is dummyTxStatus
         }
 
-        Get(
-          s"/transactions/status?txId=${txId.toHexString}&fromGroup=${txChainIndex.from.value}",
+        verifyResponseWithNodes(
+          s"/transactions/status?txId=${txId.toHexString}",
+          s"/transactions/status?txId=${txId.toHexString}&fromGroup=${chainIndex.from.value}",
+          chainIndex,
           server.port
-        ) check { response =>
-          if (rightNode) {
-            val status = response.as[TxStatus]
-            response.code is StatusCode.Ok
-            status is dummyTxStatus
-          } else {
-            response.code is StatusCode.Ok
-            response.as[TxStatus] is TxNotFound
-          }
-        }
-
-        Get(
-          s"/transactions/status?txId=${txId.toHexString}&toGroup=${txChainIndex.to.value}",
-          server.port
-        ) check { response =>
-          if (rightNode) {
-            val status = response.as[TxStatus]
-            response.code is StatusCode.Ok
-            status is dummyTxStatus
-          } else {
-            response.code is StatusCode.Ok
-            response.as[TxStatus] is TxNotFound
-          }
+        ) { response =>
+          val status = response.as[TxStatus]
+          response.code is StatusCode.Ok
+          status is dummyTxStatus
         }
       }
     }
@@ -741,34 +726,44 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "get events for a contract within a counter range" in {
+  it should "get events for a contract within a counter range with events" in {
     val blockHash  = dummyBlock.hash
     val start      = 10
     val end        = 100
-    val urlBase    = s"/events/contract?contractAddress=$dummyContractAddress"
-    val chainIndex = ChainIndex.unsafe(0, 0)
+    val urlBase    = s"/events/contract/$dummyContractAddress"
+    val chainIndex = ChainIndex.from(blockHash, groupConfig.groups)
 
     info("with valid start and end")
-    Get(s"$urlBase&start=$start&end=$end").check(validResponse)
+    verifyResponseWithNodes(
+      s"$urlBase?start=$start&end=$end",
+      s"$urlBase?start=$start&end=$end&group=${chainIndex.from.value}",
+      chainIndex,
+      port
+    )(validResponse)
 
     info("with start only")
-    Get(s"$urlBase&start=$start").check(validResponse)
+    verifyResponseWithNodes(
+      s"$urlBase?start=$start",
+      s"$urlBase?start=$start&group=${chainIndex.from.value}",
+      chainIndex,
+      port
+    )(validResponse)
 
     info("with start smaller than end")
-    Get(s"$urlBase&start=$end&end=$start").check { response =>
+    Get(s"$urlBase?start=$end&end=$start").check { response =>
       response.code is StatusCode.BadRequest
       response.body.leftValue is s"""{"detail":"Invalid value (`end` must be larger than `start`)"}"""
     }
 
     info("with end larger than (start + MaxCounterRange)")
-    Get(s"$urlBase&start=$start&end=${start + CounterRange.MaxCounterRange + 1}").check {
+    Get(s"$urlBase?start=$start&end=${start + CounterRange.MaxCounterRange + 1}").check {
       response =>
         response.code is StatusCode.BadRequest
         response.body.leftValue is s"""{"detail":"Invalid value (`end` must be smaller than ${start + CounterRange.MaxCounterRange})"}"""
     }
 
     info("with start larger than (Int.MaxValue - MaxCounterRange)")
-    Get(s"$urlBase&start=${Int.MaxValue - CounterRange.MaxCounterRange + 1}").check { response =>
+    Get(s"$urlBase?start=${Int.MaxValue - CounterRange.MaxCounterRange + 1}").check { response =>
       response.code is StatusCode.BadRequest
       response.body.leftValue is s"""{"detail":"Invalid value (`start` must be smaller than ${Int.MaxValue - CounterRange.MaxCounterRange})"}"""
     }
@@ -778,13 +773,9 @@ abstract class RestServerSpec(
       val events = response.body.rightValue
       events is s"""
         |{
-        |  "chainFrom": ${chainIndex.from.value},
-        |  "chainTo": ${chainIndex.to.value},
         |  "events": [
         |    {
-        |      "type": "ContractEvent",
         |      "blockHash": "${blockHash.toHexString}",
-        |      "contractAddress": "${dummyContractAddress}",
         |      "txId": "${dummyTx.id.toHexString}",
         |      "eventIndex": 0,
         |      "fields": [
@@ -809,61 +800,124 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "get events for a TxScript" in {
+  it should "get events for a contract within a counter range without events" in {
     val blockHash = dummyBlock.hash
-    val txId      = dummyTx.id
+    val start     = 10
+    val end       = 100
+    // No events for this contractId, see `getEvents` method for `BlockFlowDummy` in `ServerFixture.scala`
+    val contractId =
+      Blake2b.unsafe(hex"e939f9c5d2ad12ea2375dcc5231f5f25db0a2ac8af426f547819e13559aa693e")
+    val contractAddress = Address.Contract(LockupScript.P2C(contractId)).toBase58
+    val urlBase         = s"/events/contract/$contractAddress"
 
     servers.foreach { server =>
-      Get(
-        s"/events/tx-script?txId=${txId.toHexString}",
+      val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
+      verifyResponseWithNodes(
+        s"$urlBase?start=$start&end=$end",
+        s"$urlBase?start=$start&end=$end&group=${chainIndex.from.value}",
+        chainIndex,
         server.port
-      ) check { response =>
-        val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
-        val rightNode  = server.node.config.broker.chainIndexes.contains(chainIndex)
+      )(verifyEmptyEvents)
+    }
+  }
 
-        if (rightNode) {
-          response.code is StatusCode.Ok
-          val events = response.body.rightValue
-          events is s"""
-        |{
-        |  "chainFrom": ${chainIndex.from.value},
-        |  "chainTo": ${chainIndex.to.value},
-        |  "events": [
-        |    {
-        |      "type": "TxScriptEvent",
-        |      "blockHash": "${blockHash.toHexString}",
-        |      "txId": "${txId.toHexString}",
-        |      "eventIndex": 0,
-        |      "fields": [
-        |        {
-        |          "type": "U256",
-        |          "value": "4"
-        |        },
-        |        {
-        |          "type": "Address",
-        |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
-        |        },
-        |        {
-        |          "type": "Address",
-        |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
-        |        }
-        |      ]
-        |    }
-        |  ],
-        |  "nextStart": 2
-        |}
-        |""".stripMargin.filterNot(_.isWhitespace)
-        } else {
-          response.code is StatusCode.NotFound
-          val error = response.as[ApiError.NotFound]
-          error.detail is s"Transaction ${txId.toHexString} not found"
-        }
+  // scalastyle:off no.equal
+  it should "get events for contract id with wrong group" in {
+    val blockHash       = dummyBlock.hash
+    val contractId      = Hash.random
+    val contractAddress = Address.Contract(LockupScript.P2C(contractId)).toBase58
+    val chainIndex      = ChainIndex.from(blockHash, groupConfig.groups)
+    val wrongGroup      = (chainIndex.from.value + 1) % groupConfig.groups
+    val url             = s"/events/contract/$contractAddress?start=10&end=100&group=${wrongGroup}"
+
+    if (nbOfNodes === 1) {
+      // Ignore group if it is 1 node setup, since the events are always available
+      Get(url, port).check(verifyNonEmptyEvents)
+    } else {
+      Get(url, port).check(verifyEmptyEvents)
+    }
+  }
+  // scalastyle:on no.equal
+
+  it should "get events for tx id with events" in {
+    val blockHash = dummyBlock.hash
+    val txId      = Hash.random
+
+    servers.foreach { server =>
+      val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
+      verifyResponseWithNodes(
+        s"/events/tx-id/${txId.toHexString}",
+        s"/events/tx-id/${txId.toHexString}?group=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      ) { response =>
+        response.code is StatusCode.Ok
+        val events = response.body.rightValue
+        events is s"""
+          |{
+          |  "events": [
+          |    {
+          |      "blockHash": "${blockHash.toHexString}",
+          |      "contractAddress": "${Address.contract(txId).toBase58}",
+          |      "eventIndex": 0,
+          |      "fields": [
+          |        {
+          |          "type": "U256",
+          |          "value": "4"
+          |        },
+          |        {
+          |          "type": "Address",
+          |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
+          |        },
+          |        {
+          |          "type": "Address",
+          |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
+          |        }
+          |      ]
+          |    }
+          |  ],
+          |  "nextStart": 2
+          |}
+          |""".stripMargin.filterNot(_.isWhitespace)
       }
     }
   }
 
+  it should "get events for tx id without events" in {
+    val blockHash = dummyBlock.hash
+    // No events for this txId, see `getEvents` method for `BlockFlowDummy` in `ServerFixture.scala`
+    val txId = Blake2b.unsafe(hex"aab64e9c814749cea508857b23c7550da30b67216950c461ccac1a14a58661c3")
+
+    servers.foreach { server =>
+      val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
+      verifyResponseWithNodes(
+        s"/events/tx-id/${txId.toHexString}",
+        s"/events/tx-id/${txId.toHexString}?group=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      )(verifyEmptyEvents)
+    }
+  }
+
+  // scalastyle:off no.equal
+  it should "get events for tx id with wrong group" in {
+    val blockHash  = dummyBlock.hash
+    val txId       = Hash.random
+    val chainIndex = ChainIndex.from(blockHash, groupConfig.groups)
+    val wrongGroup = (chainIndex.from.value + 1) % groupConfig.groups
+    val url        = s"/events/tx-id/${txId.toHexString}?group=${wrongGroup}"
+
+    if (nbOfNodes === 1) {
+      // Ignore group if it is 1 node setup, since the events are always available
+      Get(url, port).check(verifyNonEmptyEvents)
+    } else {
+      Get(url, port).check(verifyEmptyEvents)
+    }
+  }
+  // scalastyle:on no.equal
+
   it should "get current events count for a contract" in {
-    val url = s"/events/contract/current-count?contractAddress=$dummyContractAddress"
+    val url = s"/events/contract/$dummyContractAddress/current-count"
     Get(url) check { response =>
       response.code is StatusCode.Ok
       response.body.rightValue is "10"
@@ -872,30 +926,60 @@ abstract class RestServerSpec(
 
   it should "get current events count for a TxScript" in {
     val blockHash = dummyBlock.hash
-    val url       = s"/events/tx-script/current-count?txId=${dummyTx.id.toHexString}"
 
     servers.foreach { server =>
-      Get(url, server.port) check { response =>
-        val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
-        val rightNode  = server.node.config.broker.chainIndexes.contains(chainIndex)
-
-        if (rightNode) {
-          response.code is StatusCode.Ok
-          response.body.rightValue is "10"
-        } else {
-          response.code is StatusCode.NotFound
-          val error = response.as[ApiError.NotFound]
-          error.detail is s"Transaction ${dummyTx.id.toHexString} not found"
-        }
-      }
+      val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
+      verifyResponseWithNodes(
+        s"/events/tx-id/${dummyTx.id.toHexString}",
+        s"/events/tx-id/${dummyTx.id.toHexString}?group=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      )(verifyNonEmptyEvents)
     }
   }
+
+  def verifyNonEmptyEvents(response: Response[Either[String, String]]): Assertion = {
+    response.code is StatusCode.Ok
+    val events = response.body.rightValue
+    events.startsWith(s"""{"events":[{"blockHash":"${dummyBlock.hash.toHexString}""") is true
+  }
+
+  def verifyEmptyEvents(response: Response[Either[String, String]]): Assertion = {
+    response.code is StatusCode.Ok
+    response.body.rightValue is s"""
+      |{
+      |  "events": [],
+      |  "nextStart": 0
+      |}
+      |""".stripMargin.filterNot(_.isWhitespace)
+  }
+
+  // scalastyle:off no.equal
+  def verifyResponseWithNodes(
+      urlWithoutGroup: String,
+      urlWithGroup: String,
+      chainIndex: ChainIndex,
+      port: Int
+  )(validVerify: Response[Either[String, String]] => Assertion) = {
+    if (nbOfNodes === 1) {
+      AVector(urlWithoutGroup, urlWithGroup).foreach(Get(_, port).check(validVerify))
+    } else {
+      Get(urlWithoutGroup, port) check { response =>
+        response.code is StatusCode.BadRequest
+        response.body.leftValue is s"""{"detail":"`group` parameter is required with multiple brokers"}"""
+      }
+
+      Get(s"$urlWithGroup?group=${chainIndex.from.value}", port).check(validVerify)
+    }
+  }
+  // scalastyle:on no.equal
 }
 
 abstract class RestServerApiKeyDisableSpec(
     val apiKey: Option[ApiKey],
     val nbOfNodes: Int = 1,
-    val apiKeyEnabled: Boolean = false
+    val apiKeyEnabled: Boolean = false,
+    val utxosLimit: Int = Int.MaxValue
 ) extends RestServerFixture {
 
   it should "not require api key if disabled" in {
@@ -933,6 +1017,7 @@ trait RestServerFixture
   val nbOfNodes: Int
   val apiKey: Option[ApiKey]
   val apiKeyEnabled: Boolean
+  val utxosLimit: Int
 
   implicit val system: ActorSystem  = ActorSystem("rest-server-spec")
   implicit val ec: ExecutionContext = system.dispatcher
@@ -940,7 +1025,8 @@ trait RestServerFixture
   override val configValues = {
     Map(
       ("alephium.broker.broker-num", nbOfNodes),
-      ("alephium.api.api-key-enabled", apiKeyEnabled)
+      ("alephium.api.api-key-enabled", apiKeyEnabled),
+      ("alephium.api.default-utxos-limit", utxosLimit)
     ) ++ apiKey
       .map(key => Map(("alephium.api.api-key", key.value)))
       .getOrElse(Map.empty)
@@ -1024,7 +1110,7 @@ trait RestServerFixture
       askTimeout = Duration.ofMinutesUnsafe(1),
       apiConfig.apiKey,
       ALPH.oneAlph,
-      ALPH.MaxTxInputNum * 2
+      utxosLimit
     )
 
     (peer, peerConf)
@@ -1118,3 +1204,4 @@ class RestServerSpecApiKey
       true
     )
 class RestServerSpecApiKeyDisableWithoutApiKey extends RestServerApiKeyDisableSpec(None)
+class RestServerWithZeroUtxosLimit             extends RestServerSpec(nbOfNodes = 1, utxosLimit = 0)

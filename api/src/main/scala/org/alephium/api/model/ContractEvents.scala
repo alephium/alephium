@@ -17,62 +17,61 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.{Address, ContractId}
-import org.alephium.protocol.vm.LogStates
+import org.alephium.protocol.model.Address
+import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates}
 import org.alephium.util.AVector
 
-final case class Events(
-    chainFrom: Int,
-    chainTo: Int,
-    events: AVector[Event],
+final case class ContractEvents(
+    events: AVector[ContractEvent],
     nextStart: Int
 )
 
-sealed trait Event {
-  def blockHash: BlockHash
-  def txId: Hash
-  def eventIndex: Int
-  def fields: AVector[Val]
-}
+final case class ContractEventsByTxId(
+    events: AVector[ContractEventByTxId],
+    nextStart: Int
+)
 
-@upickle.implicits.key("ContractEvent")
 final case class ContractEvent(
     blockHash: BlockHash,
-    contractAddress: Address.Contract,
     txId: Hash,
     eventIndex: Int,
     fields: AVector[Val]
-) extends Event {
-  def contractId: ContractId = contractAddress.contractId
+)
+
+final case class ContractEventByTxId(
+    blockHash: BlockHash,
+    contractAddress: Address.Contract,
+    eventIndex: Int,
+    fields: AVector[Val]
+)
+
+object ContractEventByTxId {
+  def from(blockHash: BlockHash, ref: LogStateRef, logState: LogState): ContractEventByTxId = {
+    ContractEventByTxId(
+      blockHash,
+      Address.contract(ref.id.eventKey),
+      logState.index.toInt,
+      logState.fields.map(Val.from)
+    )
+  }
 }
 
-@upickle.implicits.key("TxScriptEvent")
-final case class TxScriptEvent(
-    blockHash: BlockHash,
-    txId: Hash,
-    eventIndex: Int,
-    fields: AVector[Val]
-) extends Event
-
-object Events {
-  def from(logStates: LogStates): AVector[Event] = {
+object ContractEvents {
+  def from(logStates: LogStates): AVector[ContractEvent] = {
     logStates.states.map { logState =>
-      if (logStates.eventKey == logState.txId) {
-        TxScriptEvent(
-          logStates.blockHash,
-          logState.txId,
-          logState.index.toInt,
-          logState.fields.map(Val.from)
-        )
-      } else {
-        ContractEvent(
-          logStates.blockHash,
-          Address.contract(logStates.eventKey),
-          logState.txId,
-          logState.index.toInt,
-          logState.fields.map(Val.from)
-        )
-      }
+      ContractEvent(
+        logStates.blockHash,
+        logState.txId,
+        logState.index.toInt,
+        logState.fields.map(Val.from)
+      )
     }
+  }
+
+  def from(logStatesVec: AVector[LogStates], nextStart: Int): ContractEvents = {
+    ContractEvents(
+      logStatesVec.flatMap(ContractEvents.from),
+      nextStart
+    )
   }
 }

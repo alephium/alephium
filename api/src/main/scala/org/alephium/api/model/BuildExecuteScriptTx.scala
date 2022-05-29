@@ -16,29 +16,18 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.UnsignedTransaction
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.serde.serialize
-import org.alephium.util.Hex
+import akka.util.ByteString
 
-final case class BuildScriptTxResult(
-    unsignedTx: String,
-    gasAmount: GasBox,
-    gasPrice: GasPrice,
-    txId: Hash,
-    group: Int
-) extends GasInfo
-object BuildScriptTxResult {
-  def from(
-      unsignedTx: UnsignedTransaction
-  )(implicit groupConfig: GroupConfig): BuildScriptTxResult =
-    BuildScriptTxResult(
-      Hex.toHexString(serialize(unsignedTx)),
-      unsignedTx.gasAmount,
-      unsignedTx.gasPrice,
-      unsignedTx.hash,
-      unsignedTx.fromGroup.value
-    )
-}
+import org.alephium.protocol.PublicKey
+import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.AVector
+
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+final case class BuildExecuteScriptTx(
+    fromPublicKey: PublicKey,
+    bytecode: ByteString,
+    alphAmount: Option[Amount] = None,
+    tokens: Option[AVector[Token]] = None,
+    gasAmount: Option[GasBox] = None,
+    gasPrice: Option[GasPrice] = None
+) extends BuildTxCommon

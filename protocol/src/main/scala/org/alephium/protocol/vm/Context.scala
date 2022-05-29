@@ -84,6 +84,7 @@ object TxEnv {
 
 final case class LogConfig(
     enabled: Boolean,
+    indexByTxId: Boolean,
     contractAddresses: Option[AVector[Address.Contract]]
 ) {
   def logContractEnabled(contractAddress: Address.Contract): Boolean = {
@@ -95,12 +96,19 @@ final case class LogConfig(
 
 object LogConfig {
   def disabled(): LogConfig = {
-    LogConfig(enabled = false, contractAddresses = None)
+    LogConfig(enabled = false, indexByTxId = false, contractAddresses = None)
+  }
+
+  def allEnabled(): LogConfig = {
+    LogConfig(enabled = true, indexByTxId = true, contractAddresses = None)
   }
 }
 
 trait StatelessContext extends CostStrategy {
+  def networkConfig: NetworkConfig
   def blockEnv: BlockEnv
+  def getHardFork(): HardFork = networkConfig.getHardFork(blockEnv.timeStamp)
+
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[Balances]
 
@@ -116,6 +124,14 @@ trait StatelessContext extends CostStrategy {
   def getTxCaller(indexRaw: Val.U256): ExeResult[Val.Address] = {
     getTxPrevOutput(indexRaw).map(output => Val.Address(output.lockupScript))
   }
+
+  def chargeGasWithSizeLeman(gasFormula: UpgradedGasFormula, size: Int): ExeResult[Unit] = {
+    if (getHardFork() >= HardFork.Leman) {
+      this.chargeGas(gasFormula.gas(size))
+    } else {
+      this.chargeGas(gasFormula.gasDeprecated(size))
+    }
+  }
 }
 
 object StatelessContext {
@@ -123,14 +139,15 @@ object StatelessContext {
       blockEnv: BlockEnv,
       txEnv: TxEnv,
       txGas: GasBox
-  ): StatelessContext =
+  )(implicit networkConfig: NetworkConfig): StatelessContext =
     new Impl(blockEnv, txEnv, txGas)
 
   final class Impl(
       val blockEnv: BlockEnv,
       val txEnv: TxEnv,
       var gasRemaining: GasBox
-  ) extends StatelessContext {
+  )(implicit val networkConfig: NetworkConfig)
+      extends StatelessContext {
     def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
 
     def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = okay
@@ -191,7 +208,10 @@ trait StatefulContext extends StatelessContext with ContractPool {
           .map(_ => discard(generatedOutputs.addOne(contractOutput)))
           .left
           .map(e => Left(IOErrorUpdateState(e)))
-    } yield contractId
+    } yield {
+      blockContractLoad(contractId)
+      contractId
+    }
   }
 
   def destroyContract(
@@ -209,6 +229,29 @@ trait StatefulContext extends StatelessContext with ContractPool {
     } yield ()
   }
 
+  def migrateContract(
+      contractId: ContractId,
+      obj: ContractObj[StatefulContext],
+      newContractCode: StatefulContract,
+      newFieldsOpt: Option[AVector[Val]]
+  ): ExeResult[Unit] = {
+    val newFields = newFieldsOpt.getOrElse(AVector.from(obj.fields))
+    for {
+      _ <- chargeFieldSize(newFields.toIterable)
+      _ <-
+        if (newFields.length == newContractCode.fieldLength) { okay }
+        else {
+          failed(InvalidFieldLength)
+        }
+      _ <- worldState
+        .migrateContractUnsafe(contractId, newContractCode, newFields)
+        .left
+        .map(e => Left(IOErrorMigrateContract(e)))
+    } yield {
+      removeContractFromCache(contractId)
+    }
+  }
+
   def updateContractAsset(
       contractId: ContractId,
       outputRef: ContractOutputRef,
@@ -224,12 +267,11 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = {
-    val blockId = blockEnv.blockId
-    val result = contractIdOpt match {
-      case Some(contractId) =>
-        worldState.writeLogForContract(blockId, txId, contractId, fields, logConfig)
-      case None =>
-        worldState.writeLogForTxScript(blockId, txId, fields)
+    val result = (blockEnv.blockId, contractIdOpt) match {
+      case (Some(blockId), Some(contractId))
+          if logConfig.logContractEnabled(Address.contract(contractId)) =>
+        worldState.writeLogForContract(blockId, txId, contractId, fields, logConfig.indexByTxId)
+      case _ => Right(())
     }
 
     result.left.map(e => Left(IOErrorWriteLog(e)))
@@ -242,7 +284,7 @@ object StatefulContext {
       txEnv: TxEnv,
       worldState: WorldState.Staging,
       gasRemaining: GasBox
-  )(implicit logConfig: LogConfig): StatefulContext = {
+  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): StatefulContext = {
     new Impl(blockEnv, txEnv, worldState, gasRemaining)
   }
 
@@ -252,7 +294,7 @@ object StatefulContext {
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputs: AVector[AssetOutput]
-  )(implicit logConfig: LogConfig): StatefulContext = {
+  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
@@ -263,7 +305,7 @@ object StatefulContext {
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputsOpt: Option[AVector[AssetOutput]]
-  )(implicit logConfig: LogConfig): ExeResult[StatefulContext] = {
+  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[StatefulContext] = {
     preOutputsOpt match {
       case Some(outputs) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
       case None =>
@@ -280,7 +322,7 @@ object StatefulContext {
       val txEnv: TxEnv,
       val worldState: WorldState.Staging,
       var gasRemaining: GasBox
-  )(implicit val logConfig: LogConfig)
+  )(implicit val networkConfig: NetworkConfig, val logConfig: LogConfig)
       extends StatefulContext {
     def preOutputs: AVector[AssetOutput] = txEnv.prevOutputs
 

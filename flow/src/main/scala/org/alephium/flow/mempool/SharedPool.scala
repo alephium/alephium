@@ -103,8 +103,7 @@ class SharedPool private (
   }
 
   def _remove(txId: Hash): Unit = {
-    txs.get(txId).foreach { tx =>
-      txs.remove(txId)
+    txs.remove(txId).foreach { tx =>
       timestamps.remove(txId)
       sharedTxIndex.remove(tx)
     }

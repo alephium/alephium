@@ -93,10 +93,9 @@ trait WalletEndpoints
       .in(jsonBody[WalletDeletion])
       .summary("Delete your wallet file (can be recovered with your mnemonic)")
 
-  val getBalances: BaseEndpoint[(String, Option[Int]), Balances] =
+  val getBalances: BaseEndpoint[String, Balances] =
     wallet.get
       .in("balances")
-      .in(query[Option[Int]]("utxosLimit"))
       .out(jsonBodyWithAlph[Balances])
       .summary("Get your total balance")
 

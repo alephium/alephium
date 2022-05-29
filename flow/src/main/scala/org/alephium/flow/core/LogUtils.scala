@@ -19,37 +19,35 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
+import org.alephium.io.{IOError, IOResult}
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.protocol.vm.{LogStates, LogStatesId, WorldState}
+import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates, LogStatesId}
 import org.alephium.util.AVector
 
 trait LogUtils { Self: FlowUtils =>
 
   def getEvents(
-      chainIndex: ChainIndex,
       eventKey: Hash,
       start: Int,
       end: Int
   ): IOResult[(Int, AVector[LogStates])] = {
-    var allLogStates: ArrayBuffer[LogStates] = ArrayBuffer.empty
+    val allLogStates: ArrayBuffer[LogStates] = ArrayBuffer.empty
     var nextCount                            = start
 
     @tailrec
     def rec(
-        worldState: WorldState.Persisted,
         logStatesId: LogStatesId
     ): IOResult[Unit] = {
-      worldState.logState.getOpt(logStatesId) match {
+      logStorage.getOpt(logStatesId) match {
         case Right(Some(logStates)) =>
           assume(logStates.states.nonEmpty)
           nextCount = logStatesId.counter + 1
           if (end < nextCount) {
             Right(())
           } else {
-            allLogStates = allLogStates :+ logStates
-            rec(worldState, LogStatesId(eventKey, nextCount))
+            allLogStates += logStates
+            rec(LogStatesId(eventKey, nextCount))
           }
         case Right(None) =>
           Right(())
@@ -58,11 +56,20 @@ trait LogUtils { Self: FlowUtils =>
       }
     }
 
-    for {
-      worldState <- blockFlow.getBestPersistedWorldState(chainIndex.from)
-      _          <- rec(worldState, LogStatesId(eventKey, nextCount))
-    } yield {
-      (nextCount, AVector.from(allLogStates))
+    rec(LogStatesId(eventKey, nextCount)).map(_ => (nextCount, AVector.from(allLogStates)))
+  }
+
+  def getEventByRef(
+      ref: LogStateRef
+  ): IOResult[(BlockHash, LogStateRef, LogState)] = {
+    logStorage.getOpt(ref.id) match {
+      case Right(Some(logStates)) =>
+        logStates.states
+          .get(ref.offset)
+          .map(state => (logStates.blockHash, ref, state))
+          .toRight(IOError.Other(new Throwable(s"Invalid state ref: $ref")))
+      case Right(None) => Left(IOError.keyNotFound(ref.id, "LogUtils.getEventByRef"))
+      case Left(error) => Left(error)
     }
   }
 
