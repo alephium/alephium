@@ -154,16 +154,22 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
   it should "work for invalid data" in new Fixture {
     override val configValues: Map[String, Any] = Map(("alephium.broker.broker-num", 1))
 
+    val n          = 3
     val blockFlow1 = isolatedBlockFlow()
-    val block0     = mineFromMemPool(blockFlow1, ChainIndex.unsafe(0, 0))
-    addAndCheck(blockFlow1, block0)
-    val block1 = mineFromMemPool(blockFlow1, ChainIndex.unsafe(0, 0))
+    val blocks = (0 to n).map { _ =>
+      brokerConfig.chainIndexes.map(mineFromMemPool(blockFlow1, _)).map { block =>
+        addAndCheck(blockFlow1, block)
+        state.addPendingData(block, broker, origin)
+        block
+      }
+    }
 
-    state.addPendingData(block0, broker, origin)
-    state.addPendingData(block1, broker, origin)
-    state.readies is mutable.HashSet(block0.hash)
+    state.readies is mutable.HashSet(blocks.head.map(_.hash).toSeq: _*)
+    state.pending.size is ((n + 1) * brokerConfig.chainNum)
+    state.missing.size is (n * brokerConfig.chainNum)
+    state.missingIndex.size is (n * brokerConfig.chainNum)
 
-    state.uponInvalidData(block0.hash)
+    blocks.head.foreach(block => state.uponInvalidData(block.hash))
     state.pending.isEmpty is true
     state.missing.isEmpty is true
     state.missingIndex.isEmpty is true

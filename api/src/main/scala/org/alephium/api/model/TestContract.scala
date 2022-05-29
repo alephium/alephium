@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
 import org.alephium.api.model.TestContract._
-import org.alephium.protocol.{vm, ALPH, Hash}
+import org.alephium.protocol.{vm, ALPH, BlockHash, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, AssetOutput, ContractId, GroupIndex}
 import org.alephium.protocol.vm.{ContractState => _, Val => _, _}
@@ -29,12 +29,14 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class TestContract(
     group: Option[Int] = None,
+    blockHash: Option[BlockHash] = None,
+    txId: Option[Hash] = None,
     address: Option[Address.Contract] = None,
     bytecode: StatefulContract,
-    initialFields: AVector[Val] = TestContract.initialFieldsDefault,
+    initialFields: Option[AVector[Val]] = None,
     initialAsset: Option[AssetState] = None,
     testMethodIndex: Option[Int] = None,
-    testArgs: AVector[Val] = TestContract.testArgsDefault,
+    testArgs: Option[AVector[Val]] = None,
     existingContracts: Option[AVector[ContractState]] = None,
     inputAssets: Option[AVector[TestContract.InputAsset]] = None
 ) {
@@ -53,13 +55,15 @@ final case class TestContract(
         Right(
           Complete(
             group.getOrElse(groupDefault),
+            blockHash.getOrElse(BlockHash.random),
+            txId.getOrElse(Hash.random),
             address.getOrElse(addressDefault).contractId,
-            originalCodeHash = bytecode.hash,
             code = testCode,
-            initialFields,
+            originalCodeHash = bytecode.hash,
+            initialFields.getOrElse(AVector.empty),
             initialAsset.getOrElse(initialAssetDefault),
             methodIndex,
-            testArgs,
+            testArgs.getOrElse(AVector.empty),
             existingContracts.getOrElse(existingContractsDefault),
             inputAssets.getOrElse(inputAssetsDefault)
           )
@@ -82,9 +86,11 @@ object TestContract {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Complete(
       group: Int = groupDefault,
+      blockHash: BlockHash = BlockHash.random,
+      txId: Hash = Hash.random,
       contractId: ContractId = addressDefault.contractId,
-      originalCodeHash: Hash,
       code: StatefulContract,
+      originalCodeHash: Hash,
       initialFields: AVector[Val] = initialFieldsDefault,
       initialAsset: AssetState = initialAssetDefault,
       testMethodIndex: Int = testMethodIndexDefault,
@@ -92,6 +98,13 @@ object TestContract {
       existingContracts: AVector[ContractState] = existingContractsDefault,
       inputAssets: AVector[TestContract.InputAsset] = inputAssetsDefault
   ) {
+    // We return original code hash when testing private methods
+    // We return the new code hash when the test code is migrated
+    def codeHash(hash: Hash): Hash = {
+      val codeMigrated = hash != code.hash
+      if (!codeMigrated) originalCodeHash else hash
+    }
+
     def groupIndex(implicit groupConfig: GroupConfig): Try[GroupIndex] = {
       GroupIndex.from(group).toRight(badRequest("Invalid group index"))
     }
@@ -103,7 +116,7 @@ object TestContract {
         asset.alphAmount,
         address.lockupScript,
         TimeStamp.zero,
-        asset.tokens.map(token => (token.id, token.amount)),
+        asset.flatTokens.map(token => (token.id, token.amount)),
         ByteString.empty
       )
 
@@ -118,7 +131,7 @@ object TestContract {
         U256Const(vm.Val.U256(alphAmount)),
         ApproveAlph
       )
-      val tokenInstrs = asset.tokens.flatMap[Instr[StatefulContext]] { token =>
+      val tokenInstrs = asset.flatTokens.flatMap[Instr[StatefulContext]] { token =>
         AVector(
           addressConst,
           BytesConst(vm.Val.ByteVec(token.id.bytes)),

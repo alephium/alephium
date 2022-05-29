@@ -18,5 +18,4 @@ package org.alephium.api.model
 
 import org.alephium.protocol.model.Address
 
-@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class GetBalance(address: Address.Asset, utxosLimit: Option[Int] = None)
+final case class GetBalance(address: Address.Asset)

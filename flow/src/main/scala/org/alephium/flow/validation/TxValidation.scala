@@ -32,6 +32,7 @@ trait TxValidation {
   import ValidationStatus._
 
   implicit def groupConfig: GroupConfig
+  implicit def networkConfig: NetworkConfig
   implicit def logConfig: LogConfig
 
   private def validateTxTemplate(
@@ -328,7 +329,7 @@ object TxValidation {
   // scalastyle:off number.of.methods
   class Impl(implicit
       val groupConfig: GroupConfig,
-      networkConfig: NetworkConfig,
+      val networkConfig: NetworkConfig,
       val logConfig: LogConfig
   ) extends TxValidation {
     protected[validation] def checkVersion(tx: Transaction): TxValidationResult[Unit] = {

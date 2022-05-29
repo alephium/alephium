@@ -71,8 +71,7 @@ trait WalletService extends Service {
   ): Either[WalletError, Unit]
   def deleteWallet(wallet: String, password: String): Either[WalletError, Unit]
   def getBalances(
-      wallet: String,
-      utxosLimit: Option[Int]
+      wallet: String
   ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Amount, Option[String])]]]
   def getAddresses(wallet: String): Either[WalletError, Addresses]
   def getAddressInfo(wallet: String, address: Address.Asset): Either[WalletError, AddressInfo]
@@ -327,14 +326,11 @@ object WalletService {
       }(Left.apply)
 
     override def getBalances(
-        wallet: String,
-        utxosLimit: Option[Int]
+        wallet: String
     ): Future[Either[WalletError, AVector[(Address.Asset, Amount, Amount, Option[String])]]] =
       withAddressesFut(wallet) { case (_, addresses) =>
         Future
-          .sequence(
-            addresses.toSeq.map(getBalance(_, utxosLimit))
-          )
+          .sequence(addresses.toSeq.map(getBalance))
           .map(AVector.from(_).mapE(identity))
       }
 
@@ -577,11 +573,10 @@ object WalletService {
     }
 
     private def getBalance(
-        address: Address.Asset,
-        utxosLimit: Option[Int]
+        address: Address.Asset
     ): Future[Either[WalletError, (Address.Asset, Amount, Amount, Option[String])]] = {
       blockFlowClient
-        .fetchBalance(address, utxosLimit)
+        .fetchBalance(address)
         .map(
           _.map { case (amount, lockedAmount, warning) =>
             (address, amount, lockedAmount, warning)

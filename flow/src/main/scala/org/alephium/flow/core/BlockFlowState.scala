@@ -22,7 +22,7 @@ import scala.reflect.ClassTag
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.io.IOResult
+import org.alephium.io.{IOResult, KeyValueStorage}
 import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -65,6 +65,11 @@ trait BlockFlowState extends FlowTipsUtil {
       val genesisBlock = genesisBlocks(group)(group)
       blockchainWithStateBuilder(genesisBlock, updateState)
     }
+  }
+
+  val logStorage: KeyValueStorage[LogStatesId, LogStates] = {
+    assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
+    intraGroupBlockChains.head.worldStateStorage.logStorage
   }
 
   protected[core] val outBlockChains: AVector[AVector[BlockChain]] =

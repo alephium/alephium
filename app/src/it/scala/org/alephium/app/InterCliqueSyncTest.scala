@@ -187,8 +187,9 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     val modifier: ByteString => ByteString = { data =>
       val message = Message.deserialize(data).rightValue
       Message.serialize(message.payload)(new NetworkConfig {
-        override def networkId: NetworkId       = NetworkId.AlephiumMainNet
-        override def noPreMineProof: ByteString = ByteString.empty
+        val networkId: NetworkId              = NetworkId.AlephiumMainNet
+        val noPreMineProof: ByteString        = ByteString.empty
+        val lemanHardForkTimestamp: TimeStamp = TimeStamp.now()
       })
     }
     val server1 =

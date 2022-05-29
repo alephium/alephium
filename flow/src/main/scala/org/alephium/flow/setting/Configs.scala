@@ -148,7 +148,7 @@ object Configs extends StrictLogging {
       case Right(config) => config
       case Left(error) =>
         logger.error(error)
-        sys.exit(1)
+        throw new RuntimeException(error)
     }
   }
 

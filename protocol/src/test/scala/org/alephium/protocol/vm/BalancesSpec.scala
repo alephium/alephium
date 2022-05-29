@@ -19,11 +19,9 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-import akka.util.ByteString
-
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfig}
-import org.alephium.protocol.model.{NetworkId, TxGenerators, TxOutput}
+import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfigFixture}
+import org.alephium.protocol.model.{TxGenerators, TxOutput}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 
 class BalancesSpec extends AlephiumSpec {
@@ -261,7 +259,7 @@ class BalancesSpec extends AlephiumSpec {
     )
   }
 
-  trait Fixture extends TxGenerators {
+  trait Fixture extends TxGenerators with NetworkConfigFixture.Default {
     implicit override val compilerConfig: CompilerConfig =
       new CompilerConfig {
         override def loopUnrollingLimit: Int = 1000
@@ -280,10 +278,5 @@ class BalancesSpec extends AlephiumSpec {
     val lockupScript = lockupScriptGen.sample.get
 
     val balances = Balances(ArrayBuffer((lockupScript, balancesPerLockup)))
-
-    implicit def networkConfig: NetworkConfig = new NetworkConfig {
-      override def networkId: NetworkId       = NetworkId.AlephiumTestNet
-      override def noPreMineProof: ByteString = ByteString.empty
-    }
   }
 }

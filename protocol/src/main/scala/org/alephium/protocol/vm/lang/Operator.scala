@@ -26,7 +26,7 @@ sealed trait Operator {
 sealed trait ArithOperator extends Operator {
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {
     if (argsType.length != 2 || argsType(0) != argsType(1) || !argsType(0).toVal.isNumeric) {
-      throw Compiler.Error(s"Invalid param types $argsType for $this")
+      throw Compiler.Error(s"Invalid param types $argsType for ArithOperator")
     } else {
       Seq(argsType(0))
     }
