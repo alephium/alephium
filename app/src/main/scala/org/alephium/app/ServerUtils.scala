@@ -53,8 +53,6 @@ class ServerUtils(implicit
 ) extends StrictLogging {
   import ServerUtils._
 
-  private val defaultUtxosLimit: Int = 5000
-
   def getHeightedBlocks(
       blockFlow: BlockFlow,
       timeInterval: TimeInterval
@@ -91,7 +89,7 @@ class ServerUtils(implicit
   }
 
   def getBalance(blockFlow: BlockFlow, balanceRequest: GetBalance): Try[Balance] = {
-    val utxosLimit = balanceRequest.utxosLimit.getOrElse(defaultUtxosLimit)
+    val utxosLimit = apiConfig.defaultUtxosLimit
     for {
       _ <- checkGroup(balanceRequest.address.lockupScript)
       balance <- blockFlow
@@ -107,10 +105,9 @@ class ServerUtils(implicit
 
   def getUTXOsIncludePool(
       blockFlow: BlockFlow,
-      address: Address.Asset,
-      utxosLimitOpt: Option[Int]
+      address: Address.Asset
   ): Try[UTXOs] = {
-    val utxosLimit = utxosLimitOpt.getOrElse(defaultUtxosLimit)
+    val utxosLimit = apiConfig.defaultUtxosLimit
     for {
       _ <- checkGroup(address.lockupScript)
       utxos <- blockFlow
@@ -186,8 +183,7 @@ class ServerUtils(implicit
         query.utxos,
         query.destinations,
         query.gasAmount,
-        query.gasPrice.getOrElse(defaultGasPrice),
-        query.utxosLimit.getOrElse(apiConfig.defaultUtxosLimit)
+        query.gasPrice.getOrElse(defaultGasPrice)
       )
     } yield {
       BuildTransactionResult.from(unsignedTx)
@@ -207,8 +203,7 @@ class ServerUtils(implicit
         unlockScript,
         query.destinations,
         query.gas,
-        query.gasPrice.getOrElse(defaultGasPrice),
-        query.utxosLimit.getOrElse(apiConfig.defaultUtxosLimit)
+        query.gasPrice.getOrElse(defaultGasPrice)
       )
     } yield {
       BuildTransactionResult.from(unsignedTx)
@@ -256,8 +251,7 @@ class ServerUtils(implicit
         query.toAddress,
         query.lockTime,
         query.gasAmount,
-        query.gasPrice.getOrElse(defaultGasPrice),
-        query.utxosLimit.getOrElse(Int.MaxValue)
+        query.gasPrice.getOrElse(defaultGasPrice)
       )
     } yield {
       BuildSweepAddressTransactionsResult.from(
@@ -358,19 +352,6 @@ class ServerUtils(implicit
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
-  def getEventsForContract(
-      blockFlow: BlockFlow,
-      start: Int,
-      endOpt: Option[Int],
-      contractId: ContractId
-  ): Try[Events] = {
-    for {
-      groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
-      chainIndex = ChainIndex(groupIndex, groupIndex)
-      result <- getEvents(blockFlow, start, endOpt, chainIndex, contractId)
-    } yield result
-  }
-
   def getEventsForContractCurrentCount(
       blockFlow: BlockFlow,
       contractAddress: Address.Contract
@@ -381,27 +362,6 @@ class ServerUtils(implicit
       chainIndex = ChainIndex(groupIndex, groupIndex)
       countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId))
       count    <- countOpt.toRight(notFound(s"Current events count for contract $contractAddress"))
-    } yield count
-  }
-
-  def getEventsForTxScript(
-      blockFlow: BlockFlow,
-      txId: Hash
-  ): Try[Events] = {
-    for {
-      chainIndex <- getChainIndexForTx(blockFlow, txId)
-      result     <- getEvents(blockFlow, 0, None, chainIndex, txId)
-    } yield result
-  }
-
-  def getEventsForTxScriptCurrentCount(
-      blockFlow: BlockFlow,
-      txId: Hash
-  ): Try[Int] = {
-    for {
-      chainIndex <- getChainIndexForTx(blockFlow, txId)
-      countOpt   <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, txId))
-      count      <- countOpt.toRight(notFound(s"Current events count for TxScript in transaction $txId"))
     } yield count
   }
 
@@ -487,28 +447,58 @@ class ServerUtils(implicit
     }
   }
 
-  private def getEvents(
+  def getEventsByTxId(
+      blockFlow: BlockFlow,
+      txId: Hash
+  ): Try[ContractEventsByTxId] = {
+    wrapResult(
+      for {
+        result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
+        (nextStart, logStatesVec) = result
+        events <- logStatesVec.flatMapE { logStates =>
+          logStates.states
+            .mapE { state =>
+              if (state.isRef) {
+                LogStateRef
+                  .fromFields(state.fields)
+                  .toRight(IOError.Other(new Throwable(s"Invalid state ref: ${state.fields}")))
+                  .flatMap(blockFlow.getEventByRef(_))
+                  .map(p => ContractEventByTxId.from(p._1, p._2, p._3))
+              } else {
+                Right(
+                  ContractEventByTxId(
+                    logStates.blockHash,
+                    Address.contract(logStates.eventKey),
+                    state.index.toInt,
+                    state.fields.map(Val.from)
+                  )
+                )
+              }
+            }
+        }
+      } yield {
+        ContractEventsByTxId(events, nextStart)
+      }
+    )
+  }
+
+  def getEventsByContractId(
       blockFlow: BlockFlow,
       start: Int,
       endOpt: Option[Int],
-      chainIndex: ChainIndex,
-      eventKey: Hash
-  ): Try[Events] = {
+      contractId: ContractId
+  ): Try[ContractEvents] = {
     wrapResult(
       blockFlow
         .getEvents(
-          chainIndex,
-          eventKey,
+          contractId,
           start,
           endOpt.getOrElse(start + CounterRange.MaxCounterRange)
         )
-        .map { case (nextStart, logStatesVec) =>
-          Events(
-            chainIndex.from.value,
-            chainIndex.to.value,
-            logStatesVec.flatMap(Events.from),
-            nextStart
-          )
+        .map {
+          case (nextStart, logStatesVec) => {
+            ContractEvents.from(logStatesVec, nextStart)
+          }
         }
     )
   }
@@ -541,7 +531,8 @@ class ServerUtils(implicit
         destination.address.lockupScript,
         destination.alphAmount.value,
         tokensInfo,
-        destination.lockTime
+        destination.lockTime,
+        destination.message
       )
     }
   }
@@ -552,8 +543,7 @@ class ServerUtils(implicit
       outputRefsOpt: Option[AVector[OutputRef]],
       destinations: AVector[Destination],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice,
-      utxosLimit: Int
+      gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
     val outputInfos = prepareOutputInfos(destinations)
 
@@ -572,7 +562,7 @@ class ServerUtils(implicit
           outputInfos,
           gasOpt,
           gasPrice,
-          utxosLimit
+          apiConfig.defaultUtxosLimit
         )
     }
 
@@ -589,8 +579,7 @@ class ServerUtils(implicit
       toAddress: Address.Asset,
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice,
-      utxosLimit: Int
+      gasPrice: GasPrice
   ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAddress(
       fromPublicKey,
@@ -598,7 +587,7 @@ class ServerUtils(implicit
       lockTimeOpt,
       gasOpt,
       gasPrice,
-      utxosLimit
+      Int.MaxValue
     ) match {
       case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
       case Right(Left(error))        => Left(failed(error))
@@ -612,8 +601,7 @@ class ServerUtils(implicit
       fromUnlockScript: UnlockScript,
       destinations: AVector[Destination],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice,
-      utxosLimit: Int
+      gasPrice: GasPrice
   ): Try[UnsignedTransaction] = {
     val outputInfos = prepareOutputInfos(destinations)
 
@@ -623,7 +611,7 @@ class ServerUtils(implicit
       outputInfos,
       gasOpt,
       gasPrice,
-      utxosLimit
+      apiConfig.defaultUtxosLimit
     ) match {
       case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
@@ -696,12 +684,11 @@ class ServerUtils(implicit
       tokens: AVector[(TokenId, U256)],
       fromPublicKey: PublicKey,
       gas: Option[GasBox],
-      gasPrice: Option[GasPrice],
-      utxosLimitOpt: Option[Int]
+      gasPrice: Option[GasPrice]
   ): Try[UnsignedTransaction] = {
     val lockupScript = LockupScript.p2pkh(fromPublicKey)
     val unlockScript = UnlockScript.p2pkh(fromPublicKey)
-    val utxosLimit   = utxosLimitOpt.getOrElse(apiConfig.defaultUtxosLimit)
+    val utxosLimit   = apiConfig.defaultUtxosLimit
     for {
       allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
       allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
@@ -729,34 +716,19 @@ class ServerUtils(implicit
     } yield validatedUnsignedTx
   }
 
-  private def validateStateLength(
-      contract: StatefulContract,
-      state: AVector[vm.Val]
-  ): Either[String, Unit] = {
-    if (contract.validate(state)) {
-      Right(())
-    } else {
-      Left(s"Invalid state length, expect ${contract.fieldLength}, have ${state.length}")
-    }
-  }
-
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def buildContract(
+  def buildDeployContractTx(
       blockFlow: BlockFlow,
-      query: BuildContractDeployScriptTx
-  ): Try[BuildContractDeployScriptTxResult] = {
+      query: BuildDeployContractTx
+  ): Try[BuildDeployContractTxResult] = {
     for {
-      contract <- deserialize[StatefulContract](query.bytecode).left.map(serdeError =>
-        badRequest(serdeError.getMessage)
-      )
-      state = toVmVal(query.initialFields)
-      _ <- validateStateLength(contract, state).left.map(badRequest)
+      code <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
-      script <- buildContractWithParsedState(
-        Hex.toHexString(query.bytecode),
+      script <- buildDeployContractTxWithParsedState(
+        code.contract,
         address,
-        state,
-        query.alphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
+        code.initialFields,
+        query.initialAlphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
@@ -766,10 +738,9 @@ class ServerUtils(implicit
         AVector.empty,
         query.fromPublicKey,
         query.gasAmount,
-        query.gasPrice,
-        query.utxosLimit
+        query.gasPrice
       )
-    } yield BuildContractDeployScriptTxResult.from(utx)
+    } yield BuildDeployContractTxResult.from(utx)
   }
 
   def toVmVal(values: Option[AVector[Val]]): AVector[vm.Val] = {
@@ -791,7 +762,10 @@ class ServerUtils(implicit
     Right(SignatureSchema.verify(query.data, query.signature, query.publicKey))
   }
 
-  def buildScript(blockFlow: BlockFlow, query: BuildScriptTx): Try[BuildScriptTxResult] = {
+  def buildExecuteScriptTx(
+      blockFlow: BlockFlow,
+      query: BuildExecuteScriptTx
+  ): Try[BuildExecuteScriptTxResult] = {
     val alphAmount = query.alphAmount.map(_.value).getOrElse(U256.Zero)
     val tokens     = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
     for {
@@ -805,26 +779,25 @@ class ServerUtils(implicit
         tokens,
         query.fromPublicKey,
         query.gasAmount,
-        query.gasPrice,
-        query.utxosLimit
+        query.gasPrice
       )
-    } yield BuildScriptTxResult.from(utx)
+    } yield BuildExecuteScriptTxResult.from(utx)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def compileScript(query: Compile.Script): Try[CompileResult] = {
+  def compileScript(query: Compile.Script): Try[CompileScriptResult] = {
     Compiler
       .compileTxScriptFull(query.code)
-      .map(CompileResult.from[StatefulScript].tupled)
+      .map(p => CompileScriptResult.from(p._1, p._2))
       .left
       .map(error => failed(error.toString))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def compileContract(query: Compile.Contract): Try[CompileResult] = {
+  def compileContract(query: Compile.Contract): Try[CompileContractResult] = {
     Compiler
       .compileContractFull(query.code)
-      .map(CompileResult.from[StatefulContract].tupled)
+      .map(p => CompileContractResult.from(p._1, p._2))
       .left
       .map(error => failed(error.toString))
   }
@@ -862,11 +835,11 @@ class ServerUtils(implicit
       val executionResult  = executionResultPair._2
       val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
       TestContractResult(
-        originalCodeHash = testContract.originalCodeHash,
-        testCodeHash = testContract.code.hash,
+        address = Address.contract(testContract.contractId),
+        codeHash = postState._2,
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
-        contracts = postState,
+        contracts = postState._1,
         txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, Hash.zero, index)
         },
@@ -878,18 +851,44 @@ class ServerUtils(implicit
   private def fetchContractsState(
       worldState: WorldState.Staging,
       testContract: TestContract.Complete
-  ): Try[AVector[ContractState]] = {
+  ): Try[(AVector[ContractState], Hash)] = {
     for {
       existingContractsState <- testContract.existingContracts.mapE(contract =>
         fetchContractState(worldState, contract.id)
       )
-      testContractState <- fetchContractState(worldState, testContract.contractId)
-    } yield existingContractsState ++ AVector(testContractState)
+      testContractState <- fetchContractState(
+        worldState,
+        testContract.contractId
+      )
+    } yield {
+      val codeHash = testContract.codeHash(testContractState.codeHash)
+      val states = existingContractsState ++ AVector(
+        testContractState.copy(codeHash = codeHash)
+      )
+      (states, codeHash)
+    }
   }
 
-  private def fetchContractEvents(worldState: WorldState.Staging): AVector[Event] = {
-    val logStates = worldState.logState.getNewLogs()
-    logStates.flatMap(Events.from)
+  private def fetchContractEvents(
+      worldState: WorldState.Staging
+  ): AVector[ContractEventByTxId] = {
+    val allLogStates = worldState.logState.getNewLogs()
+    allLogStates.flatMap(logStates =>
+      logStates.states.flatMap(state =>
+        if (state.isRef) {
+          AVector.empty
+        } else {
+          AVector(
+            ContractEventByTxId(
+              logStates.blockHash,
+              Address.contract(logStates.eventKey),
+              state.index.toInt,
+              state.fields.map(Val.from)
+            )
+          )
+        }
+      )
+    )
   }
 
   private def fetchContractState(
@@ -921,11 +920,11 @@ class ServerUtils(implicit
       networkConfig.networkId,
       TimeStamp.now(),
       consensusConfig.maxMiningTarget,
-      Some(BlockHash.zero)
+      Some(testContract.blockHash)
     )
     val testGasFee = defaultGasPrice * maximalGasPerTx
     val txEnv: TxEnv = TxEnv.mockup(
-      txId = Hash.random,
+      txId = testContract.txId,
       signatures = Stack.popOnly(AVector.empty[Signature]),
       prevOutputs = testContract.inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
@@ -1049,7 +1048,7 @@ object ServerUtils {
     } yield unsignedTx
   }
 
-  def buildContract(
+  def buildDeployContractTx(
       codeRaw: String,
       address: Address,
       initialState: Option[String],
@@ -1057,15 +1056,31 @@ object ServerUtils {
       newTokenAmount: Option[U256]
   )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
     parseState(initialState).flatMap { state =>
-      buildContractWithParsedState(codeRaw, address, state, alphAmount, newTokenAmount)
+      buildDeployContractTxWithParsedState(codeRaw, address, state, alphAmount, newTokenAmount)
     }
   }
 
-  def buildContractWithParsedState(
+  def buildDeployContractTxWithParsedState(
+      contract: StatefulContract,
+      address: Address,
+      initialFields: AVector[vm.Val],
+      initialAlphAmount: U256,
+      newTokenAmount: Option[U256]
+  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
+    buildDeployContractTxWithParsedState(
+      Hex.toHexString(serialize(contract)),
+      address,
+      initialFields,
+      initialAlphAmount,
+      newTokenAmount
+    )
+  }
+
+  def buildDeployContractTxWithParsedState(
       codeRaw: String,
       address: Address,
       initialFields: AVector[vm.Val],
-      alphAmount: U256,
+      initialAlphAmount: U256,
       newTokenAmount: Option[U256]
   )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
     val stateRaw = Hex.toHexString(serialize(initialFields))
@@ -1075,11 +1090,9 @@ object ServerUtils {
     }
 
     val scriptRaw = s"""
-      |TxScript Main {
-      |  pub payable fn main() -> () {
-      |    approveAlph!(@${address.toBase58}, ${alphAmount.v})
-      |    $creation
-      |  }
+      |TxScript Main payable {
+      |  approveAlph!(@${address.toBase58}, ${initialAlphAmount.v})
+      |  $creation
       |}
       |""".stripMargin
 

@@ -188,8 +188,14 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val event = ContractEvent(
     blockHash,
-    Address.contract(txId),
     contractAddress.lockupScript.contractId,
+    eventIndex = 1,
+    fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
+  )
+
+  private val eventByTxId = ContractEventByTxId(
+    blockHash,
+    Address.contract(txId),
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
@@ -359,8 +365,7 @@ trait EndpointsExamples extends ErrorExamples {
         moreSettingsDestinations,
         Some(AVector(outputRef)),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice),
-        Some(defaultUtxosLimit)
+        Some(model.defaultGasPrice)
       )
     )
   )
@@ -379,8 +384,7 @@ trait EndpointsExamples extends ErrorExamples {
           address,
           Some(ts),
           Some(model.minimalGas),
-          Some(model.defaultGasPrice),
-          Some(defaultUtxosLimit)
+          Some(model.defaultGasPrice)
         )
       )
     )
@@ -447,8 +451,11 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val submitMultisigTransactionExamples: List[Example[SubmitMultisig]] =
     simpleExample(SubmitMultisig(unsignedTx = hexString, AVector(signature)))
 
-  implicit val decodeTransactionExamples: List[Example[DecodeTransaction]] =
-    simpleExample(DecodeTransaction(unsignedTx = hexString))
+  implicit val decodeTransactionExamples: List[Example[DecodeUnsignedTx]] =
+    simpleExample(DecodeUnsignedTx(unsignedTx = hexString))
+
+  implicit val decodeUnsignedTxExamples: List[Example[DecodeUnsignedTxResult]] =
+    simpleExample(DecodeUnsignedTxResult(1, 2, unsignedTx))
 
   implicit val txResultExamples: List[Example[TxResult]] =
     simpleExample(TxResult(txId, fromGroup = 2, toGroup = 1))
@@ -464,7 +471,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       Compile.Script(
         code =
-          s"TxScript Main { pub payable fn main() -> () { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) } }"
+          s"TxScript Main payable { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) }"
       )
     )
 
@@ -476,13 +483,13 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val compileResultExamples: List[Example[CompileResult]] =
+  implicit val compileScriptResultExamples: List[Example[CompileScriptResult]] =
     simpleExample(
-      CompileResult(
-        bytecode = Hex.unsafe(hexString),
-        codeHash = hash,
+      CompileScriptResult(
+        bytecodeTemplate = hexString,
         fields = CompileResult.FieldsSig(
-          signature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+          signature = "TxScript Bar(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+          names = AVector("aa", "bb", "cc", "dd", "ee"),
           types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
         ),
         functions = AVector(
@@ -490,6 +497,30 @@ trait EndpointsExamples extends ErrorExamples {
             name = "bar",
             signature =
               "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+            argNames = AVector("a", "b", "c", "d", "e"),
+            argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+            returnTypes = AVector("U256", "I256", "ByteVec", "Address")
+          )
+        )
+      )
+    )
+
+  implicit val compileContractResultExamples: List[Example[CompileContractResult]] =
+    simpleExample(
+      CompileContractResult(
+        bytecode = hexString,
+        codeHash = hash,
+        fields = CompileResult.FieldsSig(
+          signature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+          names = AVector("aa", "bb", "cc", "dd", "ee"),
+          types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
+        ),
+        functions = AVector(
+          CompileResult.FunctionSig(
+            name = "bar",
+            signature =
+              "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+            argNames = AVector("a", "b", "c", "d", "e"),
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
           )
@@ -498,47 +529,46 @@ trait EndpointsExamples extends ErrorExamples {
           CompileResult.EventSig(
             name = "Bar",
             signature = "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
+            fieldNames = AVector("a", "b", "d", "e"),
             fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
           )
         )
       )
     )
 
-  implicit val buildContractExamples: List[Example[BuildContractDeployScriptTx]] = List(
-    defaultExample(BuildContractDeployScriptTx(publicKey, bytecode = byteString)),
+  implicit val buildDeployContractTxExamples: List[Example[BuildDeployContractTx]] = List(
+    defaultExample(BuildDeployContractTx(publicKey, bytecode = byteString)),
     moreSettingsExample(
-      BuildContractDeployScriptTx(
+      BuildDeployContractTx(
         publicKey,
         byteString,
-        AVector(Val.True, ValU256(U256.unsafe(123))),
         Some(bigAmount),
         Some(bigAmount),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice),
-        Some(defaultUtxosLimit)
+        Some(model.defaultGasPrice)
       )
     )
   )
 
-  implicit val buildScriptExamples: List[Example[BuildScriptTx]] = List(
-    defaultExample(BuildScriptTx(publicKey, bytecode = byteString)),
+  implicit val buildExecuteScriptTxExamples: List[Example[BuildExecuteScriptTx]] = List(
+    defaultExample(BuildExecuteScriptTx(publicKey, bytecode = byteString)),
     moreSettingsExample(
-      BuildScriptTx(
+      BuildExecuteScriptTx(
         publicKey,
         byteString,
         Some(Amount(model.dustUtxoAmount)),
         Some(tokens),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice),
-        Some(defaultUtxosLimit)
+        Some(model.defaultGasPrice)
       )
     )
   )
 
-  implicit val buildContractResultExamples: List[Example[BuildContractDeployScriptTxResult]] =
+  implicit val buildDeployContractTxResultExamples: List[Example[BuildDeployContractTxResult]] =
     simpleExample(
-      BuildContractDeployScriptTxResult(
-        group = 2,
+      BuildDeployContractTxResult(
+        fromGroup = 2,
+        toGroup = 2,
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,
@@ -547,21 +577,22 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val buildScriptResultExamples: List[Example[BuildScriptTxResult]] =
+  implicit val buildExecuteScriptTxResultExamples: List[Example[BuildExecuteScriptTxResult]] =
     simpleExample(
-      BuildScriptTxResult(
+      BuildExecuteScriptTxResult(
+        fromGroup = 2,
+        toGroup = 2,
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,
-        txId = hash,
-        group = 2
+        txId = hash
       )
     )
 
   implicit lazy val contractStateExamples: List[Example[ContractState]] =
     simpleExample(existingContract)
 
-  private def asset(n: Long) = AssetState(
+  private def asset(n: Long) = AssetState.from(
     ALPH.alph(n),
     AVector(Token(id = Hash.hash(s"token${n}"), amount = ALPH.nanoAlph(n)))
   )
@@ -580,10 +611,10 @@ trait EndpointsExamples extends ErrorExamples {
         group = Some(0),
         address = Some(Address.contract(ContractId.zero)),
         bytecode = code,
-        initialFields = AVector[Val](ValU256(ALPH.oneAlph)),
+        initialFields = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         initialAsset = Some(asset(1)),
         testMethodIndex = Some(0),
-        testArgs = AVector[Val](ValU256(ALPH.oneAlph)),
+        testArgs = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         existingContracts = Some(AVector(existingContract)),
         inputAssets = Some(AVector(TestContract.InputAsset(address, asset(3))))
       )
@@ -593,14 +624,14 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val testContractResultExamples: List[Example[TestContractResult]] =
     simpleExample(
       TestContractResult(
-        originalCodeHash = hash,
-        testCodeHash = hash,
+        address = contractAddress,
+        codeHash = hash,
         returns = AVector[Val](ValU256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),
         txOutputs =
           AVector(ContractOutput(1234, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
-        events = AVector(event)
+        events = AVector(eventByTxId)
       )
     )
 
@@ -622,10 +653,13 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val verifySignatureExamples: List[Example[VerifySignature]] =
     simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
 
-  implicit val eventsExamples: List[Example[Events]] =
-    simpleExample(Events(0, 1, events = AVector(event), 2))
+  implicit val eventsExamples: List[Example[ContractEvents]] =
+    simpleExample(ContractEvents(events = AVector(event), 2))
 
-  implicit val eventsVectorExamples: List[Example[AVector[Events]]] =
-    simpleExample(AVector(Events(0, 1, events = AVector(event), 3)))
+  implicit val eventsByTxIdExamples: List[Example[ContractEventsByTxId]] =
+    simpleExample(ContractEventsByTxId(events = AVector(eventByTxId), 2))
+
+  implicit val eventsVectorExamples: List[Example[AVector[ContractEvents]]] =
+    simpleExample(AVector(ContractEvents(events = AVector(event), 3)))
 }
 // scalastyle:on magic.number

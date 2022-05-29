@@ -382,6 +382,21 @@ object WorldState {
       } yield ()
     }
 
+    def migrateContractUnsafe(
+        contractId: ContractId,
+        newCode: StatefulContract,
+        newFields: AVector[Val]
+    ): IOResult[Unit] = {
+      for {
+        state            <- getContractState(contractId)
+        _                <- contractState.put(contractId, state.migrate(newCode, newFields))
+        codeRecord       <- codeState.get(state.codeHash)
+        _                <- removeContractCode(state, codeRecord)
+        newCodeRecordOpt <- codeState.getOpt(newCode.hash)
+        _                <- codeState.put(newCode.hash, CodeRecord.from(newCode.toHalfDecoded(), newCodeRecordOpt))
+      } yield ()
+    }
+
     def removeAsset(outputRef: TxOutputRef): IOResult[Unit] = {
       outputState.remove(outputRef)
     }
@@ -408,34 +423,23 @@ object WorldState {
     ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = ???
 
     def writeLogForContract(
-        blockHashOpt: Option[BlockHash],
+        blockHash: BlockHash,
         txId: Hash,
         contractId: ContractId,
         fields: AVector[Val],
-        logConfig: LogConfig
+        indexByTxId: Boolean
     ): IOResult[Unit] = {
-      (blockHashOpt, getIndex(fields)) match {
-        case (Some(blockHash), Some(index)) =>
-          if (logConfig.logContractEnabled(Address.contract(contractId))) {
-            val state = LogState(txId, index, fields.tail)
-            writeLog(blockHash, contractId, state)
-          } else {
-            Right(())
-          }
-        case _ => Right(())
-      }
-    }
-
-    def writeLogForTxScript(
-        blockHashOpt: Option[BlockHash],
-        txId: Hash,
-        fields: AVector[Val]
-    ): IOResult[Unit] = {
-      (blockHashOpt, getIndex(fields)) match {
-        case (Some(blockHash), Some(index)) =>
+      getIndex(fields) match {
+        case Some(index) =>
           val state = LogState(txId, index, fields.tail)
-          writeLog(blockHash, txId, state)
-        case _ => Right(())
+          writeLog(blockHash, contractId, state).flatMap { case (id, offset) =>
+            if (indexByTxId) {
+              writeLogIndexByTxId(blockHash, txId, id, offset)
+            } else {
+              Right(())
+            }
+          }
+        case None => Right(())
       }
     }
 
@@ -443,7 +447,7 @@ object WorldState {
         blockHash: BlockHash,
         eventKey: Hash,
         state: LogState
-    ): IOResult[Unit] = {
+    ): IOResult[(LogStatesId, Int)] = {
       for {
         initialCount <- logCounterState.getInitialValue(eventKey).map(_.getOrElse(0))
         id = LogStatesId(eventKey, initialCount)
@@ -454,8 +458,22 @@ object WorldState {
           case None =>
             logState.put(id, LogStates(blockHash, eventKey, AVector(state)))
         }
-        _ <- logCounterState.put(eventKey, initialCount + 1)
-      } yield ()
+        _ <- logCounterState.put(
+          eventKey,
+          initialCount + 1
+        ) // TODO: optimize this since initialCount is the same for the same block
+      } yield (id, logStatesOpt.map(_.states.length).getOrElse(0))
+    }
+
+    private[WorldState] def writeLogIndexByTxId(
+        blockHash: BlockHash,
+        txId: Hash,
+        id: LogStatesId,
+        offset: Int
+    ): IOResult[Unit] = {
+      val logRef = LogStateRef(id, offset)
+      val state  = LogState(txId, eventRefIndex, logRef.toFields)
+      writeLog(blockHash, txId, state).map(_ => ())
     }
 
     private[WorldState] def getIndex(

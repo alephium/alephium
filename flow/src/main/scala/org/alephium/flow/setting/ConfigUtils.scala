@@ -26,7 +26,7 @@ import org.alephium.crypto.Sha256
 import org.alephium.flow.mining.Miner
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, NetworkId}
-import org.alephium.util.{AVector, Hex, U256}
+import org.alephium.util.{AVector, Hex, TimeStamp, U256}
 
 object ConfigUtils {
 
@@ -35,7 +35,7 @@ object ConfigUtils {
       Hex
         .from(hashInput)
         .flatMap(Sha256.from)
-        .getOrElse(throw new ConfigException.BadValue("Sha256", "oops"))
+        .getOrElse(throw new ConfigException.BadValue("", "Invalid Sha256 hash"))
     }
 
   def parseMiners(
@@ -82,7 +82,7 @@ object ConfigUtils {
     NetworkId
       .from(id)
       .getOrElse(
-        throw new ConfigException.BadValue("", s"invalid chain id: $id")
+        throw new ConfigException.BadValue("", s"Invalid chain id: $id")
       )
   }
 
@@ -100,5 +100,13 @@ object ConfigUtils {
             .from(input)
             .getOrElse(throw new ConfigException.BadValue("amount", s"Invalid amount: $input"))
       }
+  }
+
+  implicit val timeStampReader: ValueReader[TimeStamp] = ValueReader[Long].map { ts =>
+    TimeStamp
+      .from(ts)
+      .getOrElse(
+        throw new ConfigException.BadValue("", s"Invalid timestamp: $ts")
+      )
   }
 }

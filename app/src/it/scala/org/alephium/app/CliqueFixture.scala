@@ -50,8 +50,10 @@ import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.{Address, Block, ChainIndex}
+import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{GasPrice, LockupScript}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
+import org.alephium.serde._
 import org.alephium.util._
 import org.alephium.wallet
 import org.alephium.wallet.api.model._
@@ -556,6 +558,11 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
+  def getTransactionStatusLocal(tx: TxResult) = {
+    httpGet(
+      s"/transactions/local-status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}"
+    )
+  }
   def getTransactionStatus(tx: TxResult) = {
     httpGet(
       s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}"
@@ -583,13 +590,19 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def getContractEvents(start: Int, address: Address) = {
     httpGet(
-      s"/events/contract?start=$start&contractAddress=${address.toBase58}"
+      s"/events/contract/${address.toBase58}?start=$start"
     )
   }
 
   def getContractEventsCurrentCount(address: Address) = {
     httpGet(
-      s"/events/contract/current-count?contractAddress=${address.toBase58}"
+      s"/events/contract/${address.toBase58}/current-count"
+    )
+  }
+
+  def getEventsByTxId(txId: String) = {
+    httpGet(
+      s"/events/tx-id/$txId"
     )
   }
 
@@ -626,30 +639,30 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     fields.map(write[Val](_)).mkString("[", ",", "]")
   }
 
-  def buildContract(
+  def buildDeployContractTx(
       fromPublicKey: String,
       code: String,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None,
-      initialFields: Option[AVector[Val]] = None,
+      initialFields: Option[AVector[vm.Val]] = None,
       issueTokenAmount: Option[U256] = None
   ) = {
+    val bytecode = code + Hex.toHexString(serialize(initialFields.getOrElse(AVector.empty)))
     val query = {
       s"""
          |{
          |  "fromPublicKey": "$fromPublicKey",
-         |  "bytecode": "$code"
+         |  "bytecode": "$bytecode"
          |  ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
          |  ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
-         |  ${initialFields.map(fs => s""","initialFields": ${convertFields(fs)}""").getOrElse("")}
          |  ${issueTokenAmount.map(v => s""","issueTokenAmount": "${v.v}"""").getOrElse("")}
          |}
          |""".stripMargin
     }
-    httpPost("/contracts/unsigned-tx/build-contract", Some(query))
+    httpPost("/contracts/unsigned-tx/deploy-contract", Some(query))
   }
 
-  def buildScript(
+  def buildExecuteScriptTx(
       fromPublicKey: String,
       code: String,
       alphAmount: Option[Amount] = None,
@@ -666,7 +679,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
            ${alphAmount.map(a => s""","alphAmount": "${a.value.v}"""").getOrElse("")}
          }
          """
-    httpPost("/contracts/unsigned-tx/build-script", Some(query))
+    httpPost("/contracts/unsigned-tx/execute-script", Some(query))
   }
 
   def submitTxQuery(unsignedTx: String, txId: Hash) = {
@@ -688,18 +701,18 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     txResult.txId
   }
 
-  def buildScriptWithPort(
+  def buildExecuteScriptTxWithPort(
       code: String,
       restPort: Int,
       alphAmount: Option[Amount] = None,
       gas: Option[Int] = None,
       gasPrice: Option[GasPrice] = None
-  ): BuildScriptTxResult = {
-    val compileResult = request[CompileResult](compileScript(code), restPort)
-    request[BuildScriptTxResult](
-      buildScript(
+  ): BuildExecuteScriptTxResult = {
+    val compileResult = request[CompileScriptResult](compileScript(code), restPort)
+    request[BuildExecuteScriptTxResult](
+      buildExecuteScriptTx(
         fromPublicKey = publicKey,
-        code = Hex.toHexString(compileResult.bytecode),
+        code = compileResult.bytecodeTemplate,
         alphAmount,
         gas,
         gasPrice
@@ -714,8 +727,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       alphAmount: Option[Amount] = None,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None
-  ): BuildScriptTxResult = {
-    val buildResult = buildScriptWithPort(code, restPort, alphAmount, gas, gasPrice)
+  ): BuildExecuteScriptTxResult = {
+    val buildResult = buildExecuteScriptTxWithPort(code, restPort, alphAmount, gas, gasPrice)
     submitTxWithPort(buildResult.unsignedTx, buildResult.txId, restPort)
     buildResult
   }

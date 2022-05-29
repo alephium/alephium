@@ -31,6 +31,10 @@ final case class ContractState private (
     this.copy(fields = newFields)
   }
 
+  def migrate(newCode: StatefulContract, newFields: AVector[Val]): ContractState = {
+    this.copy(codeHash = newCode.hash, fields = newFields)
+  }
+
   def updateOutputRef(ref: ContractOutputRef): ContractState = {
     this.copy(contractOutputRef = ref)
   }

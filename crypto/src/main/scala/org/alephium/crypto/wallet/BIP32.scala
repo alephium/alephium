@@ -50,7 +50,7 @@ object BIP32 {
   def hmacSha512(key: ByteString, data: ByteString): ByteString = {
     val mac = new HMac(new SHA512Digest())
     mac.init(new KeyParameter(key.toArray))
-    mac.update(data.toArray, 0, data.length.toInt)
+    mac.update(data.toArray, 0, data.length)
     val out = new Array[Byte](64)
     mac.doFinal(out, 0)
     ByteString.fromArrayUnsafe(out)

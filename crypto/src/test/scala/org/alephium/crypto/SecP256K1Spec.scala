@@ -119,4 +119,88 @@ class SecP256K1Spec extends AlephiumSpec {
       SecP256K1.verify(message, signature, privateKey.publicKey) is true
     }
   }
+
+  it should "recover ETH addresses for random key pairs" in {
+    (0 until 100).foreach { _ =>
+      val (privateKey, publicKey) = SecP256K1.generatePriPub()
+      val messageHash             = Blake2b.generate.bytes
+      val signature               = SecP256K1.sign(messageHash, privateKey)
+
+      val expected = publicKey.toEthAddress()
+      expected.length is 20
+
+      // 27 and 28 are the v byte for uncompressed and normalized signature
+      Set(27, 28)
+        .map(v => SecP256K1.ethEcRecoverUnsafe(messageHash, signature.bytes ++ ByteString(v)))
+        .contains(expected) is true
+    }
+  }
+
+  it should "recover Ethereum address" in new EthEcRecoverFixture {
+
+    signature.length is 65
+    SecP256K1.ethEcRecoverUnsafe(
+      messageHash.bytes,
+      signature
+    ) is address
+    SecP256K1.ethEcRecover(
+      messageHash.bytes,
+      signature
+    ) is Some(address)
+
+    def fail(
+        hashBytes: ByteString = messageHash.bytes,
+        sigBytes: ByteString = signature,
+        error: String
+    ) = {
+      intercept[IllegalArgumentException](
+        SecP256K1.ethEcRecoverUnsafe(hashBytes, sigBytes)
+      ).getMessage is error
+    }
+
+    fail(hashBytes = ByteString.empty, error = "requirement failed: Invalid message hash length")
+    fail(
+      sigBytes = signature ++ ByteString(0),
+      error = "requirement failed: Invalid sig data length"
+    )
+
+    fail(
+      sigBytes = signature.init ++ ByteString(26),
+      error = "requirement failed: Invalid v, 27/28 expected"
+    )
+    fail(
+      sigBytes = signature.init ++ ByteString(29),
+      error = "requirement failed: Invalid v, 27/28 expected"
+    )
+
+    val zeros = ByteString.fromArray(Array.fill(32)(0))
+    val order = ByteString(SecP256K1.params.getN.toByteArray.tail)
+    fail(
+      sigBytes = zeros ++ signature.drop(32),
+      error = "requirement failed: Invalid r"
+    )
+    fail(
+      sigBytes = order ++ signature.drop(32),
+      error = "requirement failed: Invalid r"
+    )
+    fail(
+      sigBytes = signature.take(32) ++ zeros ++ signature.drop(64),
+      error = "requirement failed: Invalid s"
+    )
+    fail(
+      sigBytes = signature.take(32) ++ order ++ signature.drop(64),
+      error = "requirement failed: Invalid s"
+    )
+  }
+}
+
+trait EthEcRecoverFixture {
+  // test vector from web3j
+  val signature =
+    hex"2c6401216c9031b9a6fb8cbfccab4fcec6c951cdf40e2320108d1856eb532250576865fbcd452bcdc4c57321b619ed7a9cfd38bd973c3e1e0243ac2777fe9d5b1b"
+  val address       = hex"31b26e43651e9371c88af3d36c14cfd938baf4fd"
+  val message       = ByteString("v0G9u7huK4mJb2K1")
+  val messagePrefix = ByteString(s"\u0019Ethereum Signed Message:\n${message.length}")
+  val messageToSign = messagePrefix ++ message
+  val messageHash   = Keccak256.hash(messageToSign)
 }

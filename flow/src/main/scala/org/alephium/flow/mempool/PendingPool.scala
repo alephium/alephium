@@ -70,8 +70,7 @@ class PendingPool(
   }
 
   def _remove(tx: TransactionTemplate): Unit = {
-    if (txs.contains(tx.id)) {
-      txs.remove(tx.id)
+    txs.remove(tx.id).foreach { _ =>
       timestamps.remove(tx.id)
       indexes.remove(tx)
     }

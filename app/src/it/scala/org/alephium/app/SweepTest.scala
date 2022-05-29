@@ -17,7 +17,6 @@
 package org.alephium.app
 
 import org.alephium.api.model._
-import org.alephium.json.Json._
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.defaultGasFee
 import org.alephium.util._

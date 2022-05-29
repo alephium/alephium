@@ -36,8 +36,9 @@ class TxOrderBench {
     override def groups: Int = 4
   }
   implicit val networkConfig: NetworkConfig = new NetworkConfig {
-    override def networkId: NetworkId       = NetworkId(0)
-    override def noPreMineProof: ByteString = ByteString.empty
+    val networkId: NetworkId              = NetworkId(0)
+    val noPreMineProof: ByteString        = ByteString.empty
+    val lemanHardForkTimestamp: TimeStamp = TimeStamp.now()
   }
   val txNum: Int = 2000
   val header: BlockHeader =

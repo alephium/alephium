@@ -57,9 +57,9 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     decodeUnsignedTransaction,
     getTransactionStatus,
     compileScript,
-    buildScript,
+    buildExecuteScriptTx,
     compileContract,
-    buildContract,
+    buildDeployContractTx,
     contractState,
     testContract,
     buildMultisigAddress,
@@ -72,8 +72,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     minerUpdateAddresses,
     getContractEvents,
     getContractEventsCurrentCount,
-    getTxScriptEvents,
-    getTxScriptEventsCurrentCount
+    getEventsByTxId
   )
 
   private lazy val servers = List(
