@@ -245,7 +245,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val address         = generateContractAddress()
       val addressStr      = address.toBase58
       val request: Output = ContractOutput(hint, key, amount, address, tokens)
-      val jsonRaw         = s"""
+      val jsonRaw = s"""
         |{
         |  "type": "ContractOutput",
         |  "hint": $hint,
@@ -947,7 +947,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode UnsignedTx" in {
     val unsignedTx = UnsignedTx.fromProtocol(unsignedTransaction)
-    val jsonRaw    = s"""
+    val jsonRaw = s"""
        |{
        |  "txId": "${unsignedTransaction.hash.toHexString}",
        |  "version": ${unsignedTransaction.version},
@@ -963,7 +963,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode Transaction" in {
-    val tx      = api.Transaction.fromProtocol(transaction)
+    val tx = api.Transaction.fromProtocol(transaction)
     val jsonRaw = s"""
        |{
        |  "unsigned": ${write(tx.unsigned)},
@@ -978,7 +978,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode TransactionTemplate" in {
-    val tx      = api.TransactionTemplate.fromProtocol(transactionTemplate)
+    val tx = api.TransactionTemplate.fromProtocol(transactionTemplate)
     val jsonRaw = s"""
        |{
        |  "unsigned": ${write(tx.unsigned)},

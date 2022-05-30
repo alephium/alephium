@@ -23,7 +23,7 @@ import org.alephium.util.{Bytes, I256, U256, U32}
 //scalastyle:off magic.number
 
 // The design is heavily influenced by Polkadot's SCALE Codec
-@SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+@SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
 object CompactInteger {
   /*
    * unsigned integers are encoded with the first two most significant bits denoting the mode:

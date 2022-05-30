@@ -78,9 +78,9 @@ object DiscoveryServer {
   final case class SendCliqueInfo(cliqueInfo: CliqueInfo)         extends Command
   final case class PeerConfirmed(peerInfo: BrokerInfo)            extends Command
   final case class PeerDenied(peerInfo: BrokerInfo)               extends Command
-  final case class Unreachable(remote: InetSocketAddress)         extends Command with EventStream.Event
-  case object GetUnreachable                                      extends Command
-  case object InitialDiscoveryDone                                extends Command
+  final case class Unreachable(remote: InetSocketAddress) extends Command with EventStream.Event
+  case object GetUnreachable                              extends Command
+  case object InitialDiscoveryDone                        extends Command
 
   sealed trait Event
   final case class NeighborPeers(peers: AVector[BrokerInfo]) extends Event with EventStream.Event

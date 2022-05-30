@@ -160,7 +160,7 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
 
   def toBytes: ByteString = _toBytes(32)
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def _toBytes(size: Int): ByteString = {
     val tmp           = ByteString.fromArrayUnsafe(v.toByteArray)
     val paddingLength = size - tmp.length

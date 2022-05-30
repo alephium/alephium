@@ -548,8 +548,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   ) = {
     val body =
       s"""{"unsignedTx":"${buildTransactionResult.unsignedTx}","signatures":${write(
-        signatures.map(_.toHexString)
-      )}}"""
+          signatures.map(_.toHexString)
+        )}}"""
     httpPost(
       "/multisig/submit",
       Some(

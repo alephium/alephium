@@ -160,7 +160,7 @@ class TxHandler(
     with EventStream.Publisher
     with InterCliqueManager.NodeSyncStatus {
   private val nonCoinbaseValidation = TxValidation.build
-  val maxCapacity: Int              = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
+  val maxCapacity: Int = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
   val fetching: FetchState[Hash] =
     FetchState[Hash](maxCapacity, networkSetting.syncExpiryPeriod, TxHandler.MaxDownloadTimes)
   val txsBuffer: Cache[TransactionTemplate, Unit] =

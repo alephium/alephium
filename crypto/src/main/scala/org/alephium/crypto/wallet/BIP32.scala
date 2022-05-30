@@ -32,7 +32,7 @@ import org.alephium.util.{AVector, Bytes}
 //scalastyle:off magic.number
 object BIP32 {
   def masterKey(prefix: String, seed: ByteString): ExtendedPrivateKey = {
-    val i        = hmacSha512(ByteString.fromArrayUnsafe(prefix.getBytes(StandardCharsets.UTF_8)), seed)
+    val i = hmacSha512(ByteString.fromArrayUnsafe(prefix.getBytes(StandardCharsets.UTF_8)), seed)
     val (il, ir) = i.splitAt(32)
     ExtendedPrivateKey(SecP256K1PrivateKey.unsafe(il), ir, AVector.ofSize(5))
   }

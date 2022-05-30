@@ -36,7 +36,7 @@ class BlocksExporter(blockflow: BlockFlow, rootPath: Path)(implicit groupConfig:
       for {
         i <- 0 until groupConfig.groups
         j <- 0 until groupConfig.groups
-      } yield (ChainIndex.unsafe(i, j))
+      } yield ChainIndex.unsafe(i, j)
     )
 
   def `export`(filename: String): IOResult[Unit] = {
@@ -69,7 +69,7 @@ class BlocksExporter(blockflow: BlockFlow, rootPath: Path)(implicit groupConfig:
   private def fetchChain(chainIndex: ChainIndex): IOResult[AVector[Block]] = {
     for {
       maxHeight <- blockflow.getMaxHeight(chainIndex)
-      blocks <- EitherF.foldTry((0 to maxHeight), AVector.empty[Block]) { case (blocks, height) =>
+      blocks <- EitherF.foldTry(0 to maxHeight, AVector.empty[Block]) { case (blocks, height) =>
         fetchBlocksAt(chainIndex, height).map(newBlocks => blocks ++ newBlocks)
       }
     } yield blocks

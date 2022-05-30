@@ -583,7 +583,7 @@ trait FlowFixture
       numAssets: Int = 2,
       numContracts: Int = 2
   ): Assertion = {
-    val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+    val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     val contractState = worldState.getContractState(key).fold(throw _, identity)
 
     contractState.fields is fields

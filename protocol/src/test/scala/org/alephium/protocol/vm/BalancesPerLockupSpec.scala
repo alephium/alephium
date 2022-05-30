@@ -27,7 +27,7 @@ import org.alephium.util.Bytes.byteStringOrdering
 class BalancesPerLockupSpec extends AlephiumSpec {
 
   it should "tokenVector" in new Fixture {
-    val tokens = mutable.Map((tokenId -> ALPH.oneAlph))
+    val tokens = mutable.Map(tokenId -> ALPH.oneAlph)
     BalancesPerLockup(ALPH.oneAlph, tokens, 1).tokenVector is AVector((tokenId, ALPH.oneAlph))
 
     val tokenIdZero = hashGen.sample.get
@@ -47,7 +47,7 @@ class BalancesPerLockupSpec extends AlephiumSpec {
 
   it should "getTokenAmount" in new Fixture {
     val tokenId2 = hashGen.sample.get
-    val tokens   = mutable.Map((tokenId -> U256.One), (tokenId2 -> U256.Two))
+    val tokens   = mutable.Map(tokenId -> U256.One, tokenId2 -> U256.Two)
 
     val balancesPerLockup = BalancesPerLockup(ALPH.oneAlph, tokens, 1)
 
@@ -76,7 +76,7 @@ class BalancesPerLockupSpec extends AlephiumSpec {
   }
 
   it should "addToken" in new Fixture {
-    val tokens            = mutable.Map((tokenId -> ALPH.oneAlph))
+    val tokens            = mutable.Map(tokenId -> ALPH.oneAlph)
     val balancesPerLockup = BalancesPerLockup(ALPH.oneAlph, tokens, 1)
 
     balancesPerLockup.addToken(tokenId, ALPH.oneAlph) is Some(())
@@ -111,7 +111,7 @@ class BalancesPerLockupSpec extends AlephiumSpec {
   }
 
   it should "subToken" in new Fixture {
-    val tokens            = mutable.Map((tokenId -> ALPH.oneAlph))
+    val tokens            = mutable.Map(tokenId -> ALPH.oneAlph)
     val balancesPerLockup = BalancesPerLockup(ALPH.oneAlph, tokens, 1)
 
     balancesPerLockup.subToken(tokenId, ALPH.oneAlph) is Some(())
@@ -128,50 +128,50 @@ class BalancesPerLockupSpec extends AlephiumSpec {
 
   it should "add" in new Fixture {
     val balancesPerLockup =
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map((tokenId -> ALPH.oneAlph)), 1)
+      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
 
     val tokenId2 = hashGen.sample.get
     val balancesPerLockup2 = BalancesPerLockup(
       ALPH.oneAlph,
-      mutable.Map((tokenId -> ALPH.oneAlph), (tokenId2 -> ALPH.oneAlph)),
+      mutable.Map(tokenId -> ALPH.oneAlph, tokenId2 -> ALPH.oneAlph),
       1
     )
 
     balancesPerLockup.add(balancesPerLockup2) is Some(())
     balancesPerLockup is BalancesPerLockup(
       ALPH.alph(2),
-      mutable.Map((tokenId -> ALPH.alph(2)), (tokenId2 -> ALPH.oneAlph)),
+      mutable.Map(tokenId -> ALPH.alph(2), tokenId2 -> ALPH.oneAlph),
       1
     )
 
     balancesPerLockup.add(BalancesPerLockup(U256.MaxValue, mutable.Map.empty, 1)) is None
     balancesPerLockup.add(
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map((tokenId -> U256.MaxValue)), 1)
+      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> U256.MaxValue), 1)
     ) is None
   }
 
   it should "sub" in new Fixture {
     val balancesPerLockup =
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map((tokenId -> ALPH.oneAlph)), 1)
+      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
 
     val tokenId2 = hashGen.sample.get
     val balancesPerLockup2 =
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map((tokenId -> ALPH.oneAlph)), 1)
+      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
 
     balancesPerLockup.sub(balancesPerLockup2) is Some(())
-    balancesPerLockup is BalancesPerLockup(U256.Zero, mutable.Map((tokenId -> U256.Zero)), 1)
+    balancesPerLockup is BalancesPerLockup(U256.Zero, mutable.Map(tokenId -> U256.Zero), 1)
 
     balancesPerLockup.sub(BalancesPerLockup(U256.MaxValue, mutable.Map.empty, 1)) is None
     balancesPerLockup.sub(
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map((tokenId -> U256.MaxValue)), 1)
+      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> U256.MaxValue), 1)
     ) is None
     balancesPerLockup.sub(
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map((tokenId2 -> ALPH.oneAlph)), 1)
+      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId2 -> ALPH.oneAlph), 1)
     ) is None
   }
 
   it should "toTxOutput" in new Fixture {
-    val tokens = mutable.Map((tokenId -> ALPH.oneAlph))
+    val tokens = mutable.Map(tokenId -> ALPH.oneAlph)
 
     val lockupScript = lockupScriptGen.sample.get
 

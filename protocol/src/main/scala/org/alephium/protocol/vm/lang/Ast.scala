@@ -865,8 +865,8 @@ object Ast {
 
     private def getContract(typeId: TypeId): ContractWithState = {
       contracts.find(_.ident == typeId) match {
-        case None                              => throw Compiler.Error(s"Contract $typeId does not exist")
-        case Some(_: TxScript)                 => throw Compiler.Error(s"Expect contract $typeId, but got script")
+        case None              => throw Compiler.Error(s"Contract $typeId does not exist")
+        case Some(_: TxScript) => throw Compiler.Error(s"Expect contract $typeId, but got script")
         case Some(contract: ContractWithState) => contract
       }
     }
@@ -941,7 +941,7 @@ object Ast {
       val state = Compiler.State.buildFor(config, this, contractIndex)
       get(contractIndex) match {
         case script: TxScript => (script.genCode(state), script)
-        case _: TxContract    => throw Compiler.Error(s"The code is for TxContract, not for TxScript")
+        case _: TxContract => throw Compiler.Error(s"The code is for TxContract, not for TxScript")
         case _: ContractInterface =>
           throw Compiler.Error(s"The code is for Interface, not for TxScript")
       }
@@ -954,7 +954,7 @@ object Ast {
       val state = Compiler.State.buildFor(config, this, contractIndex)
       get(contractIndex) match {
         case contract: TxContract => (contract.genCode(state), contract)
-        case _: TxScript          => throw Compiler.Error(s"The code is for TxScript, not for TxContract")
+        case _: TxScript => throw Compiler.Error(s"The code is for TxScript, not for TxContract")
         case _: ContractInterface =>
           throw Compiler.Error(s"The code is for Interface, not for TxContract")
       }

@@ -92,7 +92,7 @@ object BlocksImporter extends StrictLogging {
     } yield blocks.length
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def validateAndSendBlocks(blocks: AVector[Block], node: Node): Either[String, Unit] = {
     val message = DependencyHandler.AddFlowData(blocks, DataOrigin.Local)
     Right(node.allHandlers.dependencyHandler ! message)

@@ -142,7 +142,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       for {
         groupView <- from(flow.getMutableGroupView(chainIndex.from, block.blockDeps))
         _         <- checkNonCoinbases(chainIndex, block, groupView)
-        _         <- checkCoinbase(chainIndex, block, groupView) // validate non-coinbase first for gas fee
+        _ <- checkCoinbase(chainIndex, block, groupView) // validate non-coinbase first for gas fee
       } yield {
         if (chainIndex.isIntraGroup) Some(groupView.worldState) else None
       }

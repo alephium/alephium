@@ -506,7 +506,7 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse AssetScript" in new ScriptFixture {
     val payable = false
-    val script  = s"""
+    val script = s"""
          |AssetScript Main(x: U256) {
          |  pub fn main() -> () {
          |    return
@@ -521,7 +521,7 @@ class ParserSpec extends AlephiumSpec {
   // scalastyle:off no.equal
   class TxScriptFixture(payableModifier: String) extends ScriptFixture {
     val payable = !(payableModifier === "nonPayable")
-    val script  = s"""
+    val script = s"""
          |TxScript Main(x: U256) $payableModifier {
          |  return
          |}

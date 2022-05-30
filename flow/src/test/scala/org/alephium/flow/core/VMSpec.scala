@@ -1221,8 +1221,8 @@ class VMSpec extends AlephiumSpec {
          |$testContract
          |""".stripMargin)
 
-    val expected      = block.getNonCoinbaseExecutionOrder.fold(0L)(_ * 10 + _)
-    val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+    val expected   = block.getNonCoinbaseExecutionOrder.fold(0L)(_ * 10 + _)
+    val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     val contractState = worldState.getContractState(contractKey).fold(throw _, identity)
     contractState.fields is AVector[Val](Val.U256(U256.unsafe(expected)))
   }

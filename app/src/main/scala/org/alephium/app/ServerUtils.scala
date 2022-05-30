@@ -223,7 +223,7 @@ class ServerUtils(implicit
               val pubHash = Hash.hash(pub.bytes)
               indexes.find { case (hash, _) => hash == pubHash } match {
                 case Some((_, index)) => Right((pub, index))
-                case None             => Left(ApiError.BadRequest(s"Invalid public key: ${pub.toHexString}"))
+                case None => Left(ApiError.BadRequest(s"Invalid public key: ${pub.toHexString}"))
 
               }
             }
@@ -521,7 +521,7 @@ class ServerUtils(implicit
       val tokensInfo = destination.tokens match {
         case Some(tokens) =>
           tokens.map { token =>
-            (token.id -> token.amount)
+            token.id -> token.amount
           }
         case None =>
           AVector.empty[(TokenId, U256)]

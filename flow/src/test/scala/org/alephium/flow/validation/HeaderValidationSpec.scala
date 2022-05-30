@@ -167,7 +167,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     def updateNonceForIndex(modified: BlockHeader): BlockHeader = {
       nonceGen
         .map(nonce => modified.copy(nonce = nonce))
-        .retryUntil { newHeader => (newHeader.chainIndex equals chainIndex) }
+        .retryUntil { newHeader => newHeader.chainIndex equals chainIndex }
         .sample
         .get
     }

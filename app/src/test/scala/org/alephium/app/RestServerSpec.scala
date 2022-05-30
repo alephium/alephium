@@ -280,8 +280,8 @@ abstract class RestServerSpec(
   it should "call POST /transactions/submit" in {
     val tx =
       s"""{"unsignedTx":"${Hex.toHexString(
-        serialize(dummyTx.unsigned)
-      )}","signature":"${dummySignature.toHexString}","publicKey":"dummyKey),"}"""
+          serialize(dummyTx.unsigned)
+        )}","signature":"${dummySignature.toHexString}","publicKey":"dummyKey),"}"""
     Post(s"/transactions/submit", tx) check { response =>
       response.code is StatusCode.Ok
       response.as[TxResult] is dummyTransferResult
@@ -461,8 +461,8 @@ abstract class RestServerSpec(
   it should "call POST /multisig/submit" in {
     val tx =
       s"""{"unsignedTx":"${Hex.toHexString(
-        serialize(dummyTx.unsigned)
-      )}","signatures":["${dummySignature.toHexString}"]}"""
+          serialize(dummyTx.unsigned)
+        )}","signatures":["${dummySignature.toHexString}"]}"""
     Post(s"/multisig/submit", tx) check { response =>
       response.code is StatusCode.Ok
       response.as[TxResult] is dummyTransferResult
@@ -1060,7 +1060,7 @@ trait RestServerFixture
   lazy val blockFlowProbe = TestProbe()
 
   lazy val misbehaviorManagerProbe = TestProbe()
-  lazy val misbehaviorManager      = ActorRefT[MisbehaviorManager.Command](misbehaviorManagerProbe.ref)
+  lazy val misbehaviorManager = ActorRefT[MisbehaviorManager.Command](misbehaviorManagerProbe.ref)
 
   implicit lazy val apiConfig: ApiConfig = ApiConfig.load(newConfig)
 
@@ -1093,7 +1093,7 @@ trait RestServerFixture
     val peerPort = generatePort()
 
     val address = new InetSocketAddress("127.0.0.1", peerPort)
-    //all same port as only `restPort` is used
+    // all same port as only `restPort` is used
     val peer = PeerInfo.unsafe(
       id,
       groupNumPerBroker = config.broker.groupNumPerBroker,

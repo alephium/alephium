@@ -30,12 +30,12 @@ trait NetworkConfig {
 
   def noPreMineProof: ByteString
 
-  //scalastyle:off magic.number
+  // scalastyle:off magic.number
   lazy val coinbaseLockupPeriod: Duration = networkId match {
     case NetworkId.AlephiumMainNet => Duration.ofMinutesUnsafe(500)
     case _                         => Duration.ofMinutesUnsafe(10)
   }
-  //scalastyle:on magic.number
+  // scalastyle:on magic.number
 
   def lemanHardForkTimestamp: TimeStamp
 

@@ -1183,7 +1183,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  //TODO Not sure how to test this one
+  // TODO Not sure how to test this one
   it should "Return" in new StatelessInstrFixture {
     Return.runWith(frame) isE ()
   }
@@ -2107,7 +2107,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.Address(assetGen.sample.get))
 
     DestroySelf.runWith(frame).leftValue isE ContractAssetUnloaded
-    //TODO how to get beyond that state?
+    // TODO how to get beyond that state?
   }
 
   trait ContractInstrFixture extends StatefulInstrFixture {

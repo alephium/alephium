@@ -171,7 +171,7 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "WalletCreationResult" in {
-    val json                 = s"""{"walletName":"$walletName","mnemonic":"${mnemonic.toLongString}"}"""
+    val json = s"""{"walletName":"$walletName","mnemonic":"${mnemonic.toLongString}"}"""
     val walletCreationResult = WalletCreationResult(walletName, mnemonic)
     check(walletCreationResult, json)
   }

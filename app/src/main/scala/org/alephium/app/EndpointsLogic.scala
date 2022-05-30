@@ -443,7 +443,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def searchTransactionStatusInOtherNodes(txId: Hash): FutureTry[TxStatus] = {
     val otherGroupFrom = groupConfig.allGroups.filterNot(brokerConfig.contains)
     if (otherGroupFrom.isEmpty) {
@@ -567,14 +567,14 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   }
 
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
-    //Run the export in background
+    // Run the export in background
     Future.successful(
       blocksExporter
         .export(exportFile.filename)
         .left
         .map(error => logger.error(error.getMessage))
     )
-    //Just validate the filename and return success
+    // Just validate the filename and return success
     Future.successful {
       blocksExporter
         .validateFilename(exportFile.filename)
@@ -755,7 +755,7 @@ object EndpointsLogic {
     )
   }
 
-  //Cannot do this in `BlockCandidate` as `flow.BlockTemplate` isn't accessible in `api`
+  // Cannot do this in `BlockCandidate` as `flow.BlockTemplate` isn't accessible in `api`
   def blockTempateToCandidate(
       chainIndex: ChainIndex,
       template: MiningBlob

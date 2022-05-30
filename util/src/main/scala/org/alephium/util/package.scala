@@ -19,6 +19,6 @@ package org.alephium
 package object util {
   @inline @specialized def discard[E](evaluateForSideEffectOnly: E): Unit = {
     val _ = evaluateForSideEffectOnly
-    () //Return unit to prevent warning due to discarding value
+    () // Return unit to prevent warning due to discarding value
   }
 }

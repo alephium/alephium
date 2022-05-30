@@ -204,12 +204,12 @@ final class StatelessFrame(
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
-  ): ExeResult[ContractId]                                    = StatelessFrame.notAllowed
+  ): ExeResult[ContractId] = StatelessFrame.notAllowed
   def destroyContract(address: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
   def migrateContract(
       newContractCode: StatefulContract,
       newFieldsOpt: Option[AVector[Val]]
-  ): ExeResult[Unit]                                       = StatelessFrame.notAllowed
+  ): ExeResult[Unit] = StatelessFrame.notAllowed
   def getCallerFrame(): ExeResult[Frame[StatelessContext]] = StatelessFrame.notAllowed
   def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] =
     StatelessFrame.notAllowed
@@ -282,9 +282,9 @@ final class StatefulFrame(
 
   def destroyContract(address: LockupScript): ExeResult[Unit] = {
     for {
-      contractId   <- obj.getContractId()
-      callerFrame  <- getCallerFrame()
-      _            <- callerFrame.checkNonRecursive(contractId, ContractDestructionShouldNotBeCalledFromSelf)
+      contractId  <- obj.getContractId()
+      callerFrame <- getCallerFrame()
+      _ <- callerFrame.checkNonRecursive(contractId, ContractDestructionShouldNotBeCalledFromSelf)
       balanceState <- getBalanceState()
       contractAssets <- balanceState
         .useAll(LockupScript.p2c(contractId))

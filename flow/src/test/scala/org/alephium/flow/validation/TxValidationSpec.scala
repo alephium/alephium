@@ -824,8 +824,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.pass()
 
     val contractId = Hash.generate
-    val output     = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
-    val outputRef  = ContractOutputRef.unsafe(output.hint, contractId)
+    val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
+    val outputRef = ContractOutputRef.unsafe(output.hint, contractId)
     tx.copy(contractInputs = AVector(outputRef)).fail(InvalidContractInputs)
 
     tx.copy(generatedOutputs = AVector(assetOutputGen.sample.get)).fail(InvalidGeneratedOutputs)

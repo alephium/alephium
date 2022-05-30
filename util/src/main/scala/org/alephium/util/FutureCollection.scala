@@ -21,10 +21,11 @@ import scala.concurrent.{ExecutionContext, Future}
 @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
 object FutureCollection {
 
-  /** Sequentially executes a async function for each element in a collection.
-    * Will not start the processing of the next element until the previous one finishes.
+  /** Sequentially executes a async function for each element in a collection. Will not start the
+    * processing of the next element until the previous one finishes.
     *
-    * @return A future with the accumulated result of all processed elements.
+    * @return
+    *   A future with the accumulated result of all processed elements.
     */
   def foldSequentialE[I, L, R](
       xs: AVector[I]

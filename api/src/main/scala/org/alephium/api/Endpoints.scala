@@ -253,7 +253,7 @@ trait Endpoints
       .in("groupLocal")
       .out(jsonBody[Group])
       .summary("Get the group of an address. Checks locally for contract addressses")
-  //have to be lazy to let `groupConfig` being initialized
+  // have to be lazy to let `groupConfig` being initialized
   lazy val getHashesAtHeight: BaseEndpoint[(ChainIndex, Int), HashesAtHeight] =
     blockflowEndpoint.get
       .in("hashes")
@@ -262,7 +262,7 @@ trait Endpoints
       .out(jsonBody[HashesAtHeight])
       .summary("Get all block's hashes at given height for given groups")
 
-  //have to be lazy to let `groupConfig` being initialized
+  // have to be lazy to let `groupConfig` being initialized
   lazy val getChainInfo: BaseEndpoint[ChainIndex, ChainInfo] =
     blockflowEndpoint.get
       .in("chain-info")
@@ -270,7 +270,7 @@ trait Endpoints
       .out(jsonBody[ChainInfo])
       .summary("Get infos about the chain from the given groups")
 
-  //have to be lazy to let `groupConfig` being initialized
+  // have to be lazy to let `groupConfig` being initialized
   lazy val listUnconfirmedTransactions: BaseEndpoint[Unit, AVector[UnconfirmedTransactions]] =
     transactionsEndpoint.get
       .in("unconfirmed")

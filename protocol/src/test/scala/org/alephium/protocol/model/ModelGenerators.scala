@@ -347,9 +347,9 @@ trait TxGenerators
       }
 
       val initialBalances = Balances(alphAmount, tokenTable.toMap)
-      val outputNum       = min(alphAmount / minAmount, inputs.length * 2, ALPH.MaxTxOutputNum).v.toInt
-      val splitBalances   = split(initialBalances, outputNum)
-      val selectedIndex   = Gen.choose(0, outputNum - 1).sample.get
+      val outputNum = min(alphAmount / minAmount, inputs.length * 2, ALPH.MaxTxOutputNum).v.toInt
+      val splitBalances = split(initialBalances, outputNum)
+      val selectedIndex = Gen.choose(0, outputNum - 1).sample.get
       val outputs = splitBalances.mapWithIndex[AssetOutput] { case (balance, index) =>
         val lockupScript =
           if (index equals selectedIndex) {

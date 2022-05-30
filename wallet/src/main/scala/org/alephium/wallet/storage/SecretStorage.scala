@@ -189,7 +189,7 @@ object SecretStorage {
     }
   }
 
-  //TODO add some `synchronized` for the state
+  // TODO add some `synchronized` for the state
   private class Impl(file: File, initialState: Option[State], path: AVector[Int])
       extends SecretStorage {
 
@@ -311,9 +311,7 @@ object SecretStorage {
     Using(Source.fromFile(file)("UTF-8")) { source =>
       val rawFile = source.getLines().mkString
       for {
-        secretFile <- Try(read[SecretFile](rawFile)).toEither.left.map(_ =>
-          (CannotParseFile: Error)
-        )
+        secretFile <- Try(read[SecretFile](rawFile)).toEither.left.map(_ => CannotParseFile: Error)
         stateBytes <- AES
           .decrypt(secretFile.toAESEncrytped, password)
           .toEither

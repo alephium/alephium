@@ -52,7 +52,7 @@ object CliqueManager {
       brokerInfo: BrokerInfo,
       connectionType: ConnectionType,
       clientInfo: String
-  )                                               extends Command
+  ) extends Command
   final case class Synced(brokerInfo: BrokerInfo) extends Command
   final case object IsSelfCliqueReady             extends Command
 }

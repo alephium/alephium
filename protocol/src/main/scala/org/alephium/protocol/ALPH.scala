@@ -20,7 +20,7 @@ import org.alephium.protocol.model.Weight
 import org.alephium.util.{Duration, Number, TimeStamp, U256}
 
 object ALPH {
-  //scalastyle:off magic.number
+  // scalastyle:off magic.number
   val CoinInOneALPH: U256     = U256.unsafe(Number.quintillion)
   val CoinInOneCent: U256     = CoinInOneALPH divUnsafe U256.unsafe(100)
   val CoinInOneNanoAlph: U256 = U256.unsafe(Number.billion)
@@ -40,7 +40,7 @@ object ALPH {
   val MaxTxOutputNum: Int    = 256
   val MaxOutputDataSize: Int = 256
   val MaxScriptSigNum: Int   = 32
-  //scalastyle:on magic.number
+  // scalastyle:on magic.number
 
   def alph(amount: U256): Option[U256] = amount.mul(CoinInOneALPH)
 
