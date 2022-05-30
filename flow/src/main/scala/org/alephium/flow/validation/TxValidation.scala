@@ -491,7 +491,7 @@ object TxValidation {
       }
     }
 
-    @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     protected[validation] def getChainIndex(
         tx: TransactionAbstract
     ): TxValidationResult[ChainIndex] = {

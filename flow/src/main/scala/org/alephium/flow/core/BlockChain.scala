@@ -70,7 +70,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       result <- searchByTimestampHeight(height, fromTs, toTs)
     } yield (chainIndex, result)
 
-  //Binary search until we found an height containing blocks within time range
+  // Binary search until we found an height containing blocks within time range
   @tailrec
   private def locateTimeRangedHeight(
       fromTs: TimeStamp,
@@ -84,11 +84,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       val middle = low + (high - low) / 2
       getMainChainBlockByHeight(middle) match {
         case Right(Some(block)) =>
-          if (block.timestamp > toTs) { //search lower
+          if (block.timestamp > toTs) { // search lower
             locateTimeRangedHeight(fromTs, toTs, low, middle - 1)
-          } else if (block.timestamp >= fromTs) { //got you
+          } else if (block.timestamp >= fromTs) { // got you
             Right(Some((middle, block)))
-          } else { //search higher
+          } else { // search higher
             locateTimeRangedHeight(fromTs, toTs, middle + 1, high)
           }
         case Right(None) =>

@@ -173,7 +173,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     with CompilerConfigFixture.Default {
     val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
     val contractId = outputRef.key
-    val output     = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
+    val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
     pool.worldState.createContractUnsafe(
       StatefulContract.forSMT,
       AVector.empty,

@@ -17,6 +17,7 @@
 package org.alephium.crypto
 
 import akka.util.ByteString
+import org.bouncycastle.crypto.digests.Blake3Digest
 
 import org.alephium.serde.RandomBytes
 
@@ -24,23 +25,8 @@ class Blake3(val bytes: ByteString) extends RandomBytes {
   def toByte32: Byte32 = Byte32.unsafe(bytes)
 }
 
-object Blake3 extends HashSchema[Blake3](HashSchema.unsafeBlake3, _.bytes) {
+object Blake3 extends BCHashSchema[Blake3](HashSchema.unsafeBlake3, _.bytes) {
   def length: Int = 32
 
-  def hash(input: Seq[Byte]): Blake3 = {
-    val hasher = Blake3Java.newInstance() // For Thread-safety
-    hasher.update(input.toArray)
-    val res = hasher.digest()
-    unsafe(ByteString.fromArrayUnsafe(res))
-  }
-
-  def doubleHash(input: Seq[Byte]): Blake3 = {
-    val hasher0 = Blake3Java.newInstance() // For Thread-safety
-    hasher0.update(input.toArray)
-    val res0    = hasher0.digest()
-    val hasher1 = Blake3Java.newInstance()
-    hasher1.update(res0)
-    val res1 = hasher1.digest()
-    unsafe(ByteString.fromArrayUnsafe(res1))
-  }
+  def provider(): Blake3Digest = new Blake3Digest(length)
 }

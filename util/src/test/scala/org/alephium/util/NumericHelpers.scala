@@ -45,7 +45,7 @@ trait NumericHelpers {
   def nextInt(from: Int, to: Int): Int = random.nextInt(to - from + 1) + from
   def nextInt(to: Int): Int            = nextInt(0, to)
   def nextLong(from: Long, to: Long): Long = {
-    if (from equals to) from else (random.nextLong() % (to - from) + from)
+    if (from equals to) from else random.nextLong() % (to - from) + from
   }
   def nextLong(to: Long): Long = nextLong(0, to)
   def nextU256(from: U256, to: U256): U256 = {

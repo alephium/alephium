@@ -350,7 +350,7 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   def contract[Unkown: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def interfaceInheritance[Unkown: P]: P[Ast.InterfaceInheritance] =
     P(Lexer.typeId).map(Ast.InterfaceInheritance)
   def interfaceFunc[Unkown: P]: P[Ast.FuncDef[StatefulContext]] =

@@ -35,7 +35,7 @@ object FlowHandler {
       id: RequestId,
       locators: AVector[AVector[BlockHash]],
       peerBrokerInfo: BrokerGroupInfo
-  )                                   extends Command
+  ) extends Command
   case object GetIntraSyncInventories extends Command
 
   sealed trait Event

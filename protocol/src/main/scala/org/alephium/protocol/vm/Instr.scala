@@ -70,7 +70,7 @@ object Instr {
   implicit val statelessSerde: Serde[Instr[StatelessContext]] = new Serde[Instr[StatelessContext]] {
     def serialize(input: Instr[StatelessContext]): ByteString = input.serialize()
 
-    @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def _deserialize(input: ByteString): SerdeResult[Staging[Instr[StatelessContext]]] = {
       for {
         code <- input.headOption.toRight(SerdeError.incompleteData(1, 0))
@@ -84,7 +84,7 @@ object Instr {
   implicit val statefulSerde: Serde[Instr[StatefulContext]] = new Serde[Instr[StatefulContext]] {
     def serialize(input: Instr[StatefulContext]): ByteString = input.serialize()
 
-    @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def _deserialize(input: ByteString): SerdeResult[Staging[Instr[StatefulContext]]] = {
       for {
         code <- input.headOption.toRight(SerdeError.incompleteData(1, 0))
@@ -175,8 +175,8 @@ object Instr {
     AVector(Log1, Log2, Log3, Log4, Log5, Log6, Log7, Log8, Log9)
 }
 
-sealed trait StatefulInstr          extends Instr[StatefulContext] with GasSchedule                     {}
-sealed trait StatelessInstr         extends StatefulInstr with Instr[StatelessContext] with GasSchedule {}
+sealed trait StatefulInstr  extends Instr[StatefulContext] with GasSchedule                     {}
+sealed trait StatelessInstr extends StatefulInstr with Instr[StatelessContext] with GasSchedule {}
 sealed trait StatefulInstrSimpleGas extends StatefulInstr with InstrWithSimpleGas[StatefulContext]
 sealed trait StatelessInstrSimpleGas
     extends StatelessInstr
@@ -856,9 +856,9 @@ case object Zeros
     with LemanInstr[StatelessContext]
     with StatelessInstrCompanion0
     with GasZeros {
-  //scalastyle:off magic.number
+  // scalastyle:off magic.number
   val maxSize: util.U256 = util.U256.unsafe(4096)
-  //scalastyle:on magic.number
+  // scalastyle:on magic.number
 
   @inline def checkSizeRange(size: util.U256): ExeResult[Int] = {
     if (size <= maxSize) Right(size.toIntUnsafe) else failed(InvalidSizeForZeros)
@@ -1066,7 +1066,7 @@ sealed trait GenericVerifySignature[PubKey, Sig]
       publicKey    <- buildPubKey(rawPublicKey).toRight(Right(InvalidPublicKey))
       rawData      <- frame.popOpStackByteVec()
       _            <- if (rawData.bytes.length == 32) okay else failed(SignedDataIsNot32Bytes)
-      _            <- if (verify(rawData.bytes, signature, publicKey)) okay else failed(InvalidSignature)
+      _ <- if (verify(rawData.bytes, signature, publicKey)) okay else failed(InvalidSignature)
     } yield ()
   }
 }

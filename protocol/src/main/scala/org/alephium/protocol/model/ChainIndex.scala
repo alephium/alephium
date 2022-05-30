@@ -83,7 +83,7 @@ object ChainIndex {
     from(hash, config.groups)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def from(hash: BlockHash, groups: Int): ChainIndex = {
     val bytes = hash.bytes
     assume(bytes.length >= 2)

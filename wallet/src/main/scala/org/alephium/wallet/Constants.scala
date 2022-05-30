@@ -21,9 +21,9 @@ import org.alephium.util.AVector
 
 // scalastyle:off magic.number
 object Constants {
-  //As defined in:
-  //https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki
-  //https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+  // As defined in:
+  // https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki
+  // https://github.com/satoshilabs/slips/blob/master/slip-0044.md
   lazy val path: AVector[Int] = {
     val purpose      = 44
     val coinType     = 1234

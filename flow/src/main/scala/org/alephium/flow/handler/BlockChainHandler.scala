@@ -51,9 +51,9 @@ object BlockChainHandler {
   final case class Validate(block: Block, broker: ActorRefT[ChainHandler.Event], origin: DataOrigin)
       extends Command
 
-  sealed trait Event                                                         extends ChainHandler.Event
-  final case class BlockAdded(hash: BlockHash)                               extends Event
-  case object BlockAddingFailed                                              extends Event
+  sealed trait Event                           extends ChainHandler.Event
+  final case class BlockAdded(hash: BlockHash) extends Event
+  case object BlockAddingFailed                extends Event
   final case class InvalidBlock(hash: BlockHash, reason: InvalidBlockStatus) extends Event
 
   val blocksTotal: Gauge = Gauge

@@ -68,7 +68,7 @@ object OpenAPIWriters extends EndpointsExamples {
     )
   }
 
-  //needed because `OpenAPI.openapi` got a default value in tapir and upickle doesnt serialize it for weird reason
+  // needed because `OpenAPI.openapi` got a default value in tapir and upickle doesnt serialize it for weird reason
   final case class MyOpenAPI(
       openapi: String,
       info: Info,
@@ -192,7 +192,7 @@ object OpenAPIWriters extends EndpointsExamples {
   }
 
   private def expandObjExtensions(jsonObject: ujson.Obj): ujson.Obj = {
-    val extensions     = ujson.Obj.from(jsonObject.value.find { case (key, _) => key == "extensions" })
+    val extensions = ujson.Obj.from(jsonObject.value.find { case (key, _) => key == "extensions" })
     val jsonWithoutExt = jsonObject.value.filter { case (key, _) => key != "extensions" }
     ujson.Obj(extensions.objOpt.map(ext => ext ++ jsonWithoutExt).getOrElse(jsonWithoutExt))
   }

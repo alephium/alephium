@@ -28,12 +28,18 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 /** Up to one new token might be issued in each transaction exception for the coinbase transaction
   * The id of the new token will be hash of the first input
   *
-  * @param version the version of the tx
-  * @param networkId the id of the chain which can accept the tx
-  * @param scriptOpt optional script for invoking stateful contracts
-  * @param gasAmount the amount of gas can be used for tx execution
-  * @param inputs a vector of TxInput
-  * @param fixedOutputs a vector of TxOutput. ContractOutput are put in front of AssetOutput
+  * @param version
+  *   the version of the tx
+  * @param networkId
+  *   the id of the chain which can accept the tx
+  * @param scriptOpt
+  *   optional script for invoking stateful contracts
+  * @param gasAmount
+  *   the amount of gas can be used for tx execution
+  * @param inputs
+  *   a vector of TxInput
+  * @param fixedOutputs
+  *   a vector of TxOutput. ContractOutput are put in front of AssetOutput
   */
 @HashSerde
 final case class UnsignedTransaction(

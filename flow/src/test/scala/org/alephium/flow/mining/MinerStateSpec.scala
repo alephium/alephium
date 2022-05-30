@@ -39,7 +39,7 @@ class MinerStateSpec extends AlephiumFlowActorSpec { Spec =>
     implicit override def miningConfig: MiningSetting = config.mining
 
     val allHandlers: AllHandlers = TestUtils.createAllHandlersProbe._1
-    val probes                   = AVector.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(TestProbe())
+    val probes = AVector.fill(brokerConfig.groupNumPerBroker, brokerConfig.groups)(TestProbe())
 
     def updateAndStartTasks(): Unit = {
       val templates = ViewHandler.prepareTemplates(blockFlow, minerAddresses).rightValue

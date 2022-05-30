@@ -33,7 +33,7 @@ class ContextSpec
     lazy val context    = genStatefulContext(None, gasLimit = initialGas)
 
     def createContract(): ContractId = {
-      val output   = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(Hash.zero))).sample.get
+      val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(Hash.zero))).sample.get
       val balances = BalancesPerLockup.from(output)
       context
         .createContract(

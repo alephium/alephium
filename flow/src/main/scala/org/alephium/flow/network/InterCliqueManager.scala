@@ -59,7 +59,7 @@ object InterCliqueManager {
         numBootstrapNodes
       )
     )
-  //scalastyle:on
+  // scalastyle:on
 
   sealed trait Command                     extends CliqueManager.Command
   final case object GetSyncStatuses        extends Command

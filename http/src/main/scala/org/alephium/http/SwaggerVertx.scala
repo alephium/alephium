@@ -61,7 +61,7 @@ class SwaggerVertx(
         ()
       }
 
-    @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     val contentType        = s"application/${openapiFileName.split("\\.").last}"
     val contentDisposition = s"""inline; filename="$openapiFileName""""
     router

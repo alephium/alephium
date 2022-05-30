@@ -44,7 +44,7 @@ class PendingPoolSpec
   }
 
   it should "add/remove tx" in {
-    val tx   = transactionGen().retryUntil(_.chainIndex.from equals dummyIndex).sample.get.toTemplate
+    val tx = transactionGen().retryUntil(_.chainIndex.from equals dummyIndex).sample.get.toTemplate
     val pool = PendingPool.empty(dummyIndex, 10)
     pool.add(tx, now)
     pool.add(tx, now) // for idempotent

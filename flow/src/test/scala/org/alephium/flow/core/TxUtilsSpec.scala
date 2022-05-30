@@ -35,7 +35,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val chainIndex            = ChainIndex.unsafe(0, 0)
     val (genesisPriKey, _, _) = genesisKeys(0)
     val (toPriKey, _)         = chainIndex.from.generateKey
-    val block0                = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
+    val block0 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
     addAndCheck(blockFlow, block0)
     val block1 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
     addAndCheck(blockFlow, block1)
@@ -58,8 +58,8 @@ class TxUtilsSpec extends AlephiumSpec {
     val chainIndex            = ChainIndex.unsafe(0, 1)
     val (genesisPriKey, _, _) = genesisKeys(0)
     val (toPriKey, _)         = chainIndex.from.generateKey
-    val block                 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
-    val tx                    = block.nonCoinbase.head
+    val block = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
+    val tx    = block.nonCoinbase.head
     tx.gasFeeUnsafe is defaultGasFee
     defaultGasFee is ALPH.nanoAlph(20000 * 100)
   }
@@ -110,7 +110,7 @@ class TxUtilsSpec extends AlephiumSpec {
     lazy val (genesisPriKey, genesisPubKey, _) = genesisKeys(chainIndex.from.value)
     lazy val genesisLockup                     = LockupScript.p2pkh(genesisPubKey)
     lazy val genesisChange                     = genesisBalance - ALPH.alph(1) - defaultGasFee
-    lazy val output1                           = TxOutputInfo(genesisLockup, genesisChange, AVector.empty, None)
+    lazy val output1 = TxOutputInfo(genesisLockup, genesisChange, AVector.empty, None)
     lazy val unsignedTx = blockFlow
       .transfer(
         genesisPriKey.publicKey,
@@ -453,8 +453,8 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val inputs = {
         val input1Amount = defaultGasFee.addUnsafe(minimalAlphAmountPerTxOutput(1)).subUnsafe(1)
-        val input1       = input("input1", input1Amount, fromLockupScript, (tokenId2, U256.unsafe(10)))
-        val input2       = input("input2", ALPH.alph(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
+        val input1 = input("input1", input1Amount, fromLockupScript, (tokenId2, U256.unsafe(10)))
+        val input2 = input("input2", ALPH.alph(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
         AVector(input1, input2)
       }
 
@@ -844,7 +844,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     info("With provided Utxos")
 
-    val availableUtxos  = blockFlow.getUTXOsIncludePool(output.lockupScript, Int.MaxValue).rightValue
+    val availableUtxos = blockFlow.getUTXOsIncludePool(output.lockupScript, Int.MaxValue).rightValue
     val availableInputs = availableUtxos.map(_.ref)
     val outputInfo = AVector(
       TxOutputInfo(

@@ -201,16 +201,16 @@ abstract class RestServerSpec(
     Post(
       s"/transactions/build",
       body = s"""
-        |{
-        |  "fromPublicKey": "$dummyKeyHex",
-        |  "destinations": [
-        |    {
-        |      "address": "$dummyToAddress",
-        |      "alphAmount": "1",
-        |      "tokens": []
-        |    }
-        |  ]
-        |}
+                |{
+                |  "fromPublicKey": "$dummyKeyHex",
+                |  "destinations": [
+                |    {
+                |      "address": "$dummyToAddress",
+                |      "alphAmount": "1",
+                |      "tokens": []
+                |    }
+                |  ]
+                |}
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
@@ -224,17 +224,17 @@ abstract class RestServerSpec(
     Post(
       s"/transactions/build",
       body = s"""
-        |{
-        |  "fromPublicKey": "$dummyKeyHex",
-        |  "destinations": [
-        |    {
-        |      "address": "$dummyToAddress",
-        |      "alphAmount": "1",
-        |      "tokens": [],
-        |      "lockTime": "1234"
-        |    }
-        |  ]
-        |}
+                |{
+                |  "fromPublicKey": "$dummyKeyHex",
+                |  "destinations": [
+                |    {
+                |      "address": "$dummyToAddress",
+                |      "alphAmount": "1",
+                |      "tokens": [],
+                |      "lockTime": "1234"
+                |    }
+                |  ]
+                |}
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
@@ -258,16 +258,16 @@ abstract class RestServerSpec(
     Post(
       s"/transactions/build",
       body = s"""
-        |{
-        |  "fromPublicKey": "$dummyKeyHex",
-        |  "destinations": [
-        |    {
-        |      "address": "$dummyToAddress",
-        |      "alphAmount": "1",
-        |      "tokens": []
-        |    }
-        |  ]
-        |}
+                |{
+                |  "fromPublicKey": "$dummyKeyHex",
+                |  "destinations": [
+                |    {
+                |      "address": "$dummyToAddress",
+                |      "alphAmount": "1",
+                |      "tokens": []
+                |    }
+                |  ]
+                |}
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.ServiceUnavailable
@@ -280,8 +280,8 @@ abstract class RestServerSpec(
   it should "call POST /transactions/submit" in {
     val tx =
       s"""{"unsignedTx":"${Hex.toHexString(
-        serialize(dummyTx.unsigned)
-      )}","signature":"${dummySignature.toHexString}","publicKey":"dummyKey),"}"""
+          serialize(dummyTx.unsigned)
+        )}","signature":"${dummySignature.toHexString}","publicKey":"dummyKey),"}"""
     Post(s"/transactions/submit", tx) check { response =>
       response.code is StatusCode.Ok
       response.as[TxResult] is dummyTransferResult
@@ -301,10 +301,10 @@ abstract class RestServerSpec(
     Post(
       s"/transactions/sweep-address/build",
       body = s"""
-        |{
-        |  "fromPublicKey": "$dummyKeyHex",
-        |  "toAddress": "$dummyToAddress"
-        |}
+                |{
+                |  "fromPublicKey": "$dummyKeyHex",
+                |  "toAddress": "$dummyToAddress"
+                |}
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
@@ -317,11 +317,11 @@ abstract class RestServerSpec(
     Post(
       s"/transactions/sweep-address/build",
       body = s"""
-        |{
-        |  "fromPublicKey": "$dummyKeyHex",
-        |  "toAddress": "$dummyToAddress",
-        |  "lockTime": "1234"
-        |}
+                |{
+                |  "fromPublicKey": "$dummyKeyHex",
+                |  "toAddress": "$dummyToAddress",
+                |  "lockTime": "1234"
+                |}
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
@@ -341,10 +341,10 @@ abstract class RestServerSpec(
     Post(
       s"/transactions/sweep-address/build",
       body = s"""
-        |{
-        |  "fromPublicKey": "$dummyKeyHex",
-        |  "toAddress": "$dummyToAddress"
-        |}
+                |{
+                |  "fromPublicKey": "$dummyKeyHex",
+                |  "toAddress": "$dummyToAddress"
+                |}
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.ServiceUnavailable
@@ -405,13 +405,13 @@ abstract class RestServerSpec(
     Post(
       s"/multisig/address",
       body = s"""
-        |{
-        |  "keys": [
-        | "$dummyKeyHex",
-        | "$dummyKeyHex2"
-        |],
-        |  "mrequired": 1
-        |}
+                |{
+                |  "keys": [
+                | "$dummyKeyHex",
+                | "$dummyKeyHex2"
+                |],
+                |  "mrequired": 1
+                |}
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
@@ -435,17 +435,17 @@ abstract class RestServerSpec(
     Post(
       s"/multisig/build",
       body = s"""
-        |{
-        |  "fromAddress": "${address.toBase58}",
-        |  "fromPublicKeys": ["$dummyKeyHex"],
-        |  "destinations": [
-        |    {
-        |      "address": "$dummyToAddress",
-        |      "alphAmount": "1",
-        |      "tokens": []
-        |    }
-        |  ]
-        |}
+                |{
+                |  "fromAddress": "${address.toBase58}",
+                |  "fromPublicKeys": ["$dummyKeyHex"],
+                |  "destinations": [
+                |    {
+                |      "address": "$dummyToAddress",
+                |      "alphAmount": "1",
+                |      "tokens": []
+                |    }
+                |  ]
+                |}
         """.stripMargin
     ) check { response =>
       response.code is StatusCode.Ok
@@ -461,8 +461,8 @@ abstract class RestServerSpec(
   it should "call POST /multisig/submit" in {
     val tx =
       s"""{"unsignedTx":"${Hex.toHexString(
-        serialize(dummyTx.unsigned)
-      )}","signatures":["${dummySignature.toHexString}"]}"""
+          serialize(dummyTx.unsigned)
+        )}","signatures":["${dummySignature.toHexString}"]}"""
     Post(s"/multisig/submit", tx) check { response =>
       response.code is StatusCode.Ok
       response.as[TxResult] is dummyTransferResult
@@ -772,31 +772,31 @@ abstract class RestServerSpec(
       response.code is StatusCode.Ok
       val events = response.body.rightValue
       events is s"""
-        |{
-        |  "events": [
-        |    {
-        |      "blockHash": "${blockHash.toHexString}",
-        |      "txId": "${dummyTx.id.toHexString}",
-        |      "eventIndex": 0,
-        |      "fields": [
-        |        {
-        |          "type": "U256",
-        |          "value": "4"
-        |        },
-        |        {
-        |          "type": "Address",
-        |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
-        |        },
-        |        {
-        |          "type": "Address",
-        |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
-        |        }
-        |      ]
-        |    }
-        |  ],
-        |  "nextStart": 2
-        |}
-        |""".stripMargin.filterNot(_.isWhitespace)
+                   |{
+                   |  "events": [
+                   |    {
+                   |      "blockHash": "${blockHash.toHexString}",
+                   |      "txId": "${dummyTx.id.toHexString}",
+                   |      "eventIndex": 0,
+                   |      "fields": [
+                   |        {
+                   |          "type": "U256",
+                   |          "value": "4"
+                   |        },
+                   |        {
+                   |          "type": "Address",
+                   |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
+                   |        },
+                   |        {
+                   |          "type": "Address",
+                   |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
+                   |        }
+                   |      ]
+                   |    }
+                   |  ],
+                   |  "nextStart": 2
+                   |}
+                   |""".stripMargin.filterNot(_.isWhitespace)
     }
   }
 
@@ -854,31 +854,31 @@ abstract class RestServerSpec(
         response.code is StatusCode.Ok
         val events = response.body.rightValue
         events is s"""
-          |{
-          |  "events": [
-          |    {
-          |      "blockHash": "${blockHash.toHexString}",
-          |      "contractAddress": "${Address.contract(txId).toBase58}",
-          |      "eventIndex": 0,
-          |      "fields": [
-          |        {
-          |          "type": "U256",
-          |          "value": "4"
-          |        },
-          |        {
-          |          "type": "Address",
-          |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
-          |        },
-          |        {
-          |          "type": "Address",
-          |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
-          |        }
-          |      ]
-          |    }
-          |  ],
-          |  "nextStart": 2
-          |}
-          |""".stripMargin.filterNot(_.isWhitespace)
+                     |{
+                     |  "events": [
+                     |    {
+                     |      "blockHash": "${blockHash.toHexString}",
+                     |      "contractAddress": "${Address.contract(txId).toBase58}",
+                     |      "eventIndex": 0,
+                     |      "fields": [
+                     |        {
+                     |          "type": "U256",
+                     |          "value": "4"
+                     |        },
+                     |        {
+                     |          "type": "Address",
+                     |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
+                     |        },
+                     |        {
+                     |          "type": "Address",
+                     |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
+                     |        }
+                     |      ]
+                     |    }
+                     |  ],
+                     |  "nextStart": 2
+                     |}
+                     |""".stripMargin.filterNot(_.isWhitespace)
       }
     }
   }
@@ -947,11 +947,11 @@ abstract class RestServerSpec(
   def verifyEmptyEvents(response: Response[Either[String, String]]): Assertion = {
     response.code is StatusCode.Ok
     response.body.rightValue is s"""
-      |{
-      |  "events": [],
-      |  "nextStart": 0
-      |}
-      |""".stripMargin.filterNot(_.isWhitespace)
+                                   |{
+                                   |  "events": [],
+                                   |  "nextStart": 0
+                                   |}
+                                   |""".stripMargin.filterNot(_.isWhitespace)
   }
 
   // scalastyle:off no.equal
@@ -1060,7 +1060,7 @@ trait RestServerFixture
   lazy val blockFlowProbe = TestProbe()
 
   lazy val misbehaviorManagerProbe = TestProbe()
-  lazy val misbehaviorManager      = ActorRefT[MisbehaviorManager.Command](misbehaviorManagerProbe.ref)
+  lazy val misbehaviorManager = ActorRefT[MisbehaviorManager.Command](misbehaviorManagerProbe.ref)
 
   implicit lazy val apiConfig: ApiConfig = ApiConfig.load(newConfig)
 
@@ -1093,7 +1093,7 @@ trait RestServerFixture
     val peerPort = generatePort()
 
     val address = new InetSocketAddress("127.0.0.1", peerPort)
-    //all same port as only `restPort` is used
+    // all same port as only `restPort` is used
     val peer = PeerInfo.unsafe(
       id,
       groupNumPerBroker = config.broker.groupNumPerBroker,

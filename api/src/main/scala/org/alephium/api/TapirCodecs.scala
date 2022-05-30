@@ -62,7 +62,7 @@ trait TapirCodecs extends ApiModelCodec {
     Codec.int.mapDecode(value =>
       GasBox.from(value) match {
         case Some(gas) => DecodeResult.Value(gas)
-        case None      => DecodeResult.Error(s"$value", new IllegalArgumentException(s"Invalid gas"))
+        case None => DecodeResult.Error(s"$value", new IllegalArgumentException(s"Invalid gas"))
       }
     )(_.value)
 

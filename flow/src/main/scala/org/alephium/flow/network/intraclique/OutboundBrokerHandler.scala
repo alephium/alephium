@@ -50,7 +50,7 @@ object OutboundBrokerHandler {
         blockFlowSynchronizer
       )
     )
-  //scalastyle:on
+  // scalastyle:on
 }
 
 class OutboundBrokerHandler(

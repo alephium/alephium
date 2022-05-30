@@ -55,10 +55,10 @@ object ApiConfig extends StrictLogging {
 
       if ((interface != "127.0.0.1") && apiKeyEnabled && apiKeyOpt.isEmpty) {
         val errorMessage = s"""|
-          |Api key is necessary, please add:
-          |    alephium.api.api-key = ${generateApiKey().value}
-          |to your user.conf.
-          |""".stripMargin
+                               |Api key is necessary, please add:
+                               |    alephium.api.api-key = ${generateApiKey().value}
+                               |to your user.conf.
+                               |""".stripMargin
 
         throw new ConfigException.BadValue("api-key", errorMessage)
       }

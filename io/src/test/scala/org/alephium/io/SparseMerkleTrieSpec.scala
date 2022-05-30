@@ -188,7 +188,7 @@ class SparseMerkleTrieSpec extends AlephiumSpec {
       val (key, value) = generateKV()
       update(trie.put(key, value))
       val trieHash1 = trie.rootHash
-      update(trie.put(key, value)) //idempotent tests
+      update(trie.put(key, value)) // idempotent tests
       val trieHash2 = trie.rootHash
       trieHash2 is trieHash1
       key

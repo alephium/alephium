@@ -102,7 +102,7 @@ trait ServerFixture
       tx: Transaction,
       fromGroup: GroupIndex,
       toGroup: GroupIndex
-  )                                = BuildSweepAddressTransactionsResult.from(tx.unsigned, fromGroup, toGroup)
+  ) = BuildSweepAddressTransactionsResult.from(tx.unsigned, fromGroup, toGroup)
   lazy val dummyTxStatus: TxStatus = Confirmed(dummyBlock.hash, 0, 1, 2, 3)
 }
 
@@ -193,7 +193,7 @@ object ServerFixture {
           s"EventBus-${Random.nextInt()}"
         )
 
-    val discoveryServerDummy                                = system.actorOf(Props(new DiscoveryServerDummy(neighborPeers)))
+    val discoveryServerDummy = system.actorOf(Props(new DiscoveryServerDummy(neighborPeers)))
     val discoveryServer: ActorRefT[DiscoveryServer.Command] = ActorRefT(discoveryServerDummy)
 
     val selfCliqueSynced  = true
@@ -218,7 +218,7 @@ object ServerFixture {
     val txHandler   = ActorRefT[TxHandler.Command](txHandlerRef)
     val allHandlers = _allHandlers.copy(txHandler = txHandler)(config.broker)
 
-    val boostraperDummy                               = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
+    val boostraperDummy = system.actorOf(Props(new BootstrapperDummy(intraCliqueInfo)))
     val bootstrapper: ActorRefT[Bootstrapper.Command] = ActorRefT(boostraperDummy)
 
     override protected def stopSelfOnce(): Future[Unit] = Future.successful(())

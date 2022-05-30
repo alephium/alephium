@@ -41,12 +41,12 @@ class BalanceStateSpec extends AlephiumSpec {
     balanceState is BalanceState(
       Balances(
         ArrayBuffer(
-          (lockupScript, balancesPerLockup.copy(tokenAmounts = mutable.Map((tokenId -> U256.Zero))))
+          (lockupScript, balancesPerLockup.copy(tokenAmounts = mutable.Map(tokenId -> U256.Zero)))
         )
       ),
       Balances(
         ArrayBuffer(
-          (lockupScript, BalancesPerLockup(U256.Zero, mutable.Map((tokenId -> ALPH.oneAlph)), 0))
+          (lockupScript, BalancesPerLockup(U256.Zero, mutable.Map(tokenId -> ALPH.oneAlph), 0))
         )
       )
     )
@@ -109,7 +109,7 @@ class BalanceStateSpec extends AlephiumSpec {
     balanceState is BalanceState.from(
       Balances(
         ArrayBuffer(
-          (lockupScript, balancesPerLockup.copy(tokenAmounts = mutable.Map((tokenId -> U256.Zero))))
+          (lockupScript, balancesPerLockup.copy(tokenAmounts = mutable.Map(tokenId -> U256.Zero)))
         )
       )
     )
@@ -131,7 +131,7 @@ class BalanceStateSpec extends AlephiumSpec {
 
     val tokenId    = hashGen.sample.get
     val scopeDepth = 1
-    val tokens     = mutable.Map((tokenId -> ALPH.oneAlph))
+    val tokens     = mutable.Map(tokenId -> ALPH.oneAlph)
     val balancesPerLockup =
       BalancesPerLockup(ALPH.oneAlph, tokens, scopeDepth)
     val lockupScript = lockupScriptGen.sample.get

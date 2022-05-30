@@ -32,7 +32,7 @@ import org.alephium.wallet.WalletDocumentation
 import org.alephium.wallet.service.WalletService
 import org.alephium.wallet.service.WalletService._
 
-@SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+@SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
 class WalletServer(
     val walletService: WalletService,
     val blockflowFetchMaxAge: Duration,

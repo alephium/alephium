@@ -175,58 +175,58 @@ trait VotingFixture extends WalletFixture {
     val allocationTransfers = voters.zipWithIndex
       .map { case (_, i) =>
         s"""
-          |transferAlph!(admin, voters[$i], $utxoFee)
-          |transferTokenFromSelf!(voters[$i], selfTokenId!(), 1)""".stripMargin
+           |transferAlph!(admin, voters[$i], $utxoFee)
+           |transferTokenFromSelf!(voters[$i], selfTokenId!(), 1)""".stripMargin
       }
       .mkString("\n")
     // scalastyle:off no.equal
     val votingContract = s"""
-        |TxContract Voting(
-        |  mut yes: U256,
-        |  mut no: U256,
-        |  mut isClosed: Bool,
-        |  mut initialized: Bool,
-        |  admin: Address,
-        |  voters: [Address; ${voters.size}]
-        |) {
-        |
-        |  event VotingStarted()
-        |  event VoteCasted(voter: Address, result: Bool)
-        |  event VotingClosed()
-        |
-        |  pub payable fn allocateTokens() -> () {
-        |     assert!(initialized == false)
-        |     assert!(txCaller!(txCallerSize!() - 1) == admin)
-        |     ${allocationTransfers}
-        |     yes = 0
-        |     no = 0
-        |     initialized = true
-        |
-        |     emit VotingStarted()
-        |  }
-        |
-        |  pub payable fn vote(choice: Bool, voter: Address) -> () {
-        |    assert!(initialized == true && isClosed == false)
-        |    transferAlph!(voter, admin, $utxoFee)
-        |    transferTokenToSelf!(voter, selfTokenId!(), 1)
-        |
-        |    emit VoteCasted(voter, choice)
-        |
-        |    if (choice == true) {
-        |       yes = yes + 1
-        |    } else {
-        |       no = no + 1
-        |    }
-        |  }
-        |
-        |   pub fn close() -> () {
-        |     assert!(initialized == true && isClosed == false)
-        |     assert!(txCaller!(txCallerSize!() - 1) == admin)
-        |     isClosed = true
-        |
-        |     emit VotingClosed()
-        |   }
-        | }
+                            |TxContract Voting(
+                            |  mut yes: U256,
+                            |  mut no: U256,
+                            |  mut isClosed: Bool,
+                            |  mut initialized: Bool,
+                            |  admin: Address,
+                            |  voters: [Address; ${voters.size}]
+                            |) {
+                            |
+                            |  event VotingStarted()
+                            |  event VoteCasted(voter: Address, result: Bool)
+                            |  event VotingClosed()
+                            |
+                            |  pub payable fn allocateTokens() -> () {
+                            |     assert!(initialized == false)
+                            |     assert!(txCaller!(txCallerSize!() - 1) == admin)
+                            |     ${allocationTransfers}
+                            |     yes = 0
+                            |     no = 0
+                            |     initialized = true
+                            |
+                            |     emit VotingStarted()
+                            |  }
+                            |
+                            |  pub payable fn vote(choice: Bool, voter: Address) -> () {
+                            |    assert!(initialized == true && isClosed == false)
+                            |    transferAlph!(voter, admin, $utxoFee)
+                            |    transferTokenToSelf!(voter, selfTokenId!(), 1)
+                            |
+                            |    emit VoteCasted(voter, choice)
+                            |
+                            |    if (choice == true) {
+                            |       yes = yes + 1
+                            |    } else {
+                            |       no = no + 1
+                            |    }
+                            |  }
+                            |
+                            |   pub fn close() -> () {
+                            |     assert!(initialized == true && isClosed == false)
+                            |     assert!(txCaller!(txCallerSize!() - 1) == admin)
+                            |     isClosed = true
+                            |
+                            |     emit VotingClosed()
+                            |   }
+                            | }
       """.stripMargin
     // scalastyle:on no.equal
     val votersList: AVector[vm.Val] =
@@ -254,12 +254,12 @@ trait VotingFixture extends WalletFixture {
       contractCode: String
   ): TxResult = {
     val allocationScript = s"""
-        |TxScript TokenAllocation payable {
-        |  let voting = Voting(#${contractId})
-        |  let caller = txCaller!(0)
-        |  approveAlph!(caller, $utxoFee * ${votersWallets.size})
-        |  voting.allocateTokens()
-        |}
+                              |TxScript TokenAllocation payable {
+                              |  let voting = Voting(#${contractId})
+                              |  let caller = txCaller!(0)
+                              |  approveAlph!(caller, $utxoFee * ${votersWallets.size})
+                              |  voting.allocateTokens()
+                              |}
         $contractCode
       """.stripMargin
     script(adminWallet.publicKey.toHexString, allocationScript, adminWallet.creation.walletName)
@@ -272,13 +272,13 @@ trait VotingFixture extends WalletFixture {
       contractCode: String
   ): TxResult = {
     val votingScript = s"""
-      |TxScript VotingScript payable {
-      |  let caller = txCaller!(txCallerSize!() - 1)
-      |  approveToken!(caller, #${contractId}, 1)
-      |  let voting = Voting(#${contractId})
-      |  approveAlph!(caller, $utxoFee)
-      |  voting.vote($choice, caller)
-      |}
+                          |TxScript VotingScript payable {
+                          |  let caller = txCaller!(txCallerSize!() - 1)
+                          |  approveToken!(caller, #${contractId}, 1)
+                          |  let voting = Voting(#${contractId})
+                          |  approveAlph!(caller, $utxoFee)
+                          |  voting.vote($choice, caller)
+                          |}
       $contractCode
       """.stripMargin
     script(voterWallet.publicKey.toHexString, votingScript, voterWallet.creation.walletName)
@@ -286,10 +286,10 @@ trait VotingFixture extends WalletFixture {
 
   def close(adminWallet: Wallet, contractId: String, contractCode: String): TxResult = {
     val closingScript = s"""
-      |TxScript ClosingScript payable {
-      |  let voting = Voting(#${contractId})
-      |  voting.close()
-      |}
+                           |TxScript ClosingScript payable {
+                           |  let voting = Voting(#${contractId})
+                           |  voting.close()
+                           |}
       $contractCode
       """.stripMargin
     script(adminWallet.publicKey.toHexString, closingScript, adminWallet.creation.walletName)

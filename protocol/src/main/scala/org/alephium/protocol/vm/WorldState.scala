@@ -147,7 +147,7 @@ trait WorldState[T, R1, R2, R3] {
     for {
       fixedInputs    <- tx.unsigned.inputs.mapE { input => getOutput(input.outputRef) }
       contractInputs <- tx.contractInputs.mapE { outputRef => getOutput(outputRef) }
-    } yield (fixedInputs ++ contractInputs)
+    } yield fixedInputs ++ contractInputs
   }
 
   def containsAllInputs(tx: TransactionTemplate): IOResult[Boolean] = {
@@ -393,7 +393,7 @@ object WorldState {
         codeRecord       <- codeState.get(state.codeHash)
         _                <- removeContractCode(state, codeRecord)
         newCodeRecordOpt <- codeState.getOpt(newCode.hash)
-        _                <- codeState.put(newCode.hash, CodeRecord.from(newCode.toHalfDecoded(), newCodeRecordOpt))
+        _ <- codeState.put(newCode.hash, CodeRecord.from(newCode.toHalfDecoded(), newCodeRecordOpt))
       } yield ()
     }
 

@@ -100,12 +100,12 @@ class WalletAppSpec
     Put("/wallets", restoreJson(mnemonic, name))
   def unlock(mnemonicPassphrase: Option[String] = None) =
     Post(s"/wallets/$wallet/unlock", unlockJson(mnemonicPassphrase))
-  def lock()                = Post(s"/wallets/$wallet/lock")
-  def delete()              = Delete(s"/wallets/$wallet", passwordJson)
-  def getBalance()          = Get(s"/wallets/$wallet/balances")
-  def getAddresses()        = Get(s"/wallets/$wallet/addresses")
-  def getMinerAddresses()   = Get(s"/wallets/$minerWallet/miner-addresses")
-  def revealMnemonic()      = Post(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
+  def lock()              = Post(s"/wallets/$wallet/lock")
+  def delete()            = Delete(s"/wallets/$wallet", passwordJson)
+  def getBalance()        = Get(s"/wallets/$wallet/balances")
+  def getAddresses()      = Get(s"/wallets/$wallet/addresses")
+  def getMinerAddresses() = Get(s"/wallets/$minerWallet/miner-addresses")
+  def revealMnemonic() = Post(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
   def transfer(amount: Int) = Post(s"/wallets/$wallet/transfer", transferJson(amount))
   def sweepActiveAddress()  = Post(s"/wallets/$wallet/sweep-active-address", sweepJson)
   def sweepAllAddresses()   = Post(s"/wallets/$wallet/sweep-all-addresses", sweepJson)
@@ -156,7 +156,7 @@ class WalletAppSpec
       response.code is StatusCode.Ok
     }
 
-    //Lock is idempotent
+    // Lock is idempotent
     (0 to 10).foreach { _ =>
       lock() check { response =>
         response.code is StatusCode.Ok
@@ -296,7 +296,7 @@ class WalletAppSpec
       ) is s"""{"resource":"$wallet","detail":"$wallet not found"}"""
     }
 
-    //handle passphrase
+    // handle passphrase
     Post("/wallets", passwordWithPassphraseJson(mnemonicPassphrase)) check { response =>
       val result = response.as[WalletCreationResult]
       mnemonic = result.mnemonic

@@ -27,8 +27,8 @@ import akka.util.Timeout
 class ActorRefT[T](val ref: ActorRef) {
   def !(message: T)(implicit sender: ActorRef = Actor.noSender): Unit = ref.!(message)(sender)
   def forward(message: T)(implicit context: ActorContext): Unit       = ref.forward(message)
-  def ask(message: T)(implicit timeout: Timeout): Future[Any]         = akka.pattern.ask(ref, message)
-  def tell(message: T, sender: ActorRef): Unit                        = ref.tell(message, sender)
+  def ask(message: T)(implicit timeout: Timeout): Future[Any] = akka.pattern.ask(ref, message)
+  def tell(message: T, sender: ActorRef): Unit                = ref.tell(message, sender)
 
   override def equals(obj: Any): Boolean =
     obj match {

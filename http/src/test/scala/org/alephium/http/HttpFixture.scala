@@ -96,7 +96,7 @@ trait HttpFixture {
     } else {
       val path = str.split('/')
       if (path.head == "/") {
-        //root path
+        // root path
         (Seq.empty, Map.empty)
       } else {
         val base = Seq.from(path.tail)

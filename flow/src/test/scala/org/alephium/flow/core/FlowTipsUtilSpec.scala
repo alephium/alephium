@@ -182,8 +182,8 @@ class FlowTipsUtilSpec extends AlephiumSpec {
 
   it should "detect tx conflicts" in new FlowFixture {
     val (genesisPriKey, _, _) = genesisKeys(0)
-    val block                 = transfer(blockFlow, genesisPriKey, genesisPriKey.publicKey, ALPH.alph(10))
-    val blockFlow1            = isolatedBlockFlow()
+    val block      = transfer(blockFlow, genesisPriKey, genesisPriKey.publicKey, ALPH.alph(10))
+    val blockFlow1 = isolatedBlockFlow()
     addAndCheck(blockFlow, block)
     addAndCheck(blockFlow1, block)
 

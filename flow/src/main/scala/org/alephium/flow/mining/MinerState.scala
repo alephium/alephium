@@ -54,7 +54,7 @@ trait MinerState {
     miningCounts(fromShift)(to) = miningCounts(fromShift)(to).addUnsafe(count)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   protected def pickTasks(): IndexedSeq[(Int, Int, MiningBlob)] = {
     val minCount   = miningCounts.map(_.min).min
     val countBound = minCount.addUnsafe(miningConfig.nonceStep)
