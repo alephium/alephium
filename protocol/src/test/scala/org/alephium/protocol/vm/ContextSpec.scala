@@ -93,6 +93,9 @@ class ContextSpec
       StatefulContract(0, AVector(Method.forSMT, Method.forSMT))
     context.migrateContract(contractId, obj, newCode, None) isE ()
     context.contractPool.contains(contractId) is false
+    context.contractBlockList.contains(contractId) is true
+
+    context.contractBlockList.remove(contractId)
     val newObj = context.loadContractObj(contractId).rightValue
     newObj.code is newCode.toHalfDecoded()
     newObj.codeHash is newCode.hash
@@ -108,6 +111,9 @@ class ContextSpec
     context.migrateContract(contractId, obj, newCode, None).leftValue isE InvalidFieldLength
     context.migrateContract(contractId, obj, newCode, Some(AVector(Val.True))) isE ()
     context.contractPool.contains(contractId) is false
+    context.contractBlockList.contains(contractId) is true
+
+    context.contractBlockList.remove(contractId)
     val newObj = context.loadContractObj(contractId).rightValue
     newObj.code is newCode.toHalfDecoded()
     newObj.codeHash is newCode.hash

@@ -21,6 +21,8 @@ import java.math.BigInteger
 import scala.language.implicitConversions
 
 import akka.util.ByteString
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.crypto._
@@ -264,6 +266,44 @@ class VMSpec extends AlephiumSpec {
       worldState.contractState.exists(contractKey) isE existed
       worldState.outputState.exists(contractAssetRef) isE existed
     }
+  }
+
+  it should "disallow loading upgraded contract in current tx" in new ContractFixture {
+    val fooV1Code =
+      s"""
+         |TxContract FooV1() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val fooV1 = Compiler.compileContract(fooV1Code).rightValue
+
+    val fooV0Code =
+      s"""
+         |TxContract FooV0() {
+         |  pub fn upgrade() -> () {
+         |    migrate!(#${Hex.toHexString(serialize(fooV1))})
+         |  }
+         |}
+         |""".stripMargin
+    val fooContractId = createContract(fooV0Code, AVector.empty).key.toHexString
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let fooV0 = FooV0(#$fooContractId)
+         |  fooV0.upgrade()
+         |  let fooV1 = FooV1(#$fooContractId)
+         |  fooV1.foo()
+         |}
+         |
+         |$fooV0Code
+         |
+         |$fooV1Code
+         |""".stripMargin
+
+    intercept[AssertionError](callTxScript(script)).getMessage.startsWith(
+      "Right(TxScriptExeFailed(ContractLoadDisallowed"
+    ) is true
   }
 
   it should "not use up contract assets" in new ContractFixture {
@@ -607,6 +647,35 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
+  it should "test contractIdToAddress instruction" in new ContractFixture {
+    def success(): String = {
+      val contractId       = Hash.generate
+      val address: Address = Address.contract(contractId)
+      val addressHex       = Hex.toHexString(serialize(address.lockupScript))
+      s"""
+         |TxScript Main nonPayable {
+         |  let address = contractIdToAddress!(#${contractId.toHexString})
+         |  assert!(byteVecToAddress!(#$addressHex) == address)
+         |}
+         |""".stripMargin
+    }
+
+    testSimpleScript(success())
+
+    def failure(length: Int): String = {
+      val bs         = ByteString(Gen.listOfN(length, arbitrary[Byte]).sample.get)
+      val contractId = new Blake2b(bs)
+      s"""
+         |TxScript Main nonPayable {
+         |  contractIdToAddress!(#${contractId.toHexString})
+         |}
+         |""".stripMargin
+    }
+
+    failSimpleScript(failure(31), InvalidContractId)
+    failSimpleScript(failure(33), InvalidContractId)
+  }
+
   trait DestroyFixture extends ContractFixture {
     def prepareContract(
         contract: String,
@@ -710,12 +779,21 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val fooV2Code = Compiler.compileContract(fooV2).rightValue
 
-    def main(changeState: String, expected: String): String =
+    def upgrade(changeState: String): String =
       s"""
          |TxScript Main payable {
          |  let foo = Foo(#$fooId)
          |  foo.foo(#${Hex.toHexString(serialize(fooV2Code))}, ${changeState})
-         |  foo.checkX(${expected})
+         |}
+         |
+         |$fooV1
+         |""".stripMargin
+
+    def checkState(expected: String): String =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#$fooId)
+         |  foo.checkX($expected)
          |}
          |
          |$fooV1
@@ -723,7 +801,8 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("migrate without state change")
-      callTxScript(main("false", "true"))
+      callTxScript(upgrade("false"))
+      callTxScript(checkState("true"))
       val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractKey = Hash.from(Hex.from(fooId).get).get
       val obj         = worldState.getContractObj(contractKey).rightValue
@@ -734,7 +813,8 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("migrate with state change")
-      callTxScript(main("true", "false"))
+      callTxScript(upgrade("true"))
+      callTxScript(checkState("false"))
       val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractKey = Hash.from(Hex.from(fooId).get).get
       val obj         = worldState.getContractObj(contractKey).rightValue
@@ -2020,6 +2100,55 @@ class VMSpec extends AlephiumSpec {
     logStates.states.length is 2
     logStates.states(0).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 1
     logStates.states(1).fields.head.asInstanceOf[Val.U256].v.toIntUnsafe is 2
+  }
+
+  it should "not be able to transfer assets right after contract is created" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {
+         |  }
+         |}
+         |""".stripMargin
+
+    val fooContract     = Compiler.compileContract(foo).rightValue
+    val fooByteCode     = Hex.toHexString(serialize(fooContract))
+    val fooInitialState = Hex.toHexString(serialize(AVector.empty[Val]))
+
+    def createFooContract(transferAlph: Boolean): String = {
+      val maybeTransfer =
+        if (transferAlph) s"transferAlphFromSelf!(contractAddress, ${ALPH.cent(1).v})" else ""
+
+      val bar: String =
+        s"""
+           |TxContract Bar() {
+           |  pub payable fn bar() -> () {
+           |    approveAlph!(@${genesisAddress.toBase58}, ${ALPH.oneAlph.v})
+           |    let contractId = createContract!(#$fooByteCode, #$fooInitialState)
+           |    let contractAddress = contractIdToAddress!(contractId)
+           |
+           |    $maybeTransfer
+           |  }
+           |}
+           |""".stripMargin
+
+      val barContractId = createContract(bar, AVector.empty, initialAlphAmount = ALPH.alph(2)).key
+
+      s"""
+         |TxScript Main payable {
+         |  approveAlph!(@${genesisAddress.toBase58}, ${ALPH.oneAlph.v})
+         |  let bar = Bar(#${barContractId.toHexString})
+         |  bar.bar()
+         |}
+         |
+         |$bar
+         |""".stripMargin
+    }
+
+    callTxScript(createFooContract(false))
+
+    intercept[AssertionError](callTxScript(createFooContract(true))).getMessage is
+      s"Right(TxScriptExeFailed(ContractAssetUnloaded))"
   }
 
   private def getEvents(

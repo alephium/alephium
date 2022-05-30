@@ -83,6 +83,7 @@ case object InvalidBalances                                    extends ExeFailur
 case object UnableToPayGasFee                                  extends ExeFailure
 case object InvalidOutputBalances                              extends ExeFailure
 case object InvalidTokenId                                     extends ExeFailure
+case object InvalidContractId                                  extends ExeFailure
 case object ExpectAContract                                    extends ExeFailure
 case object OutOfGas                                           extends ExeFailure
 case object ContractPoolOverflow                               extends ExeFailure
