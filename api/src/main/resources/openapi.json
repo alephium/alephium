@@ -5319,11 +5319,15 @@
                   },
                   "Example1": {
                     "summary": "Tx is still in mempool",
-                    "value": "MemPooled"
+                    "value": {
+                      "type": "MemPooled"
+                    }
                   },
                   "Example2": {
                     "summary": "Cannot find tx with the id",
-                    "value": "TxNotFound"
+                    "value": {
+                      "type": "TxNotFound"
+                    }
                   }
                 }
               }
