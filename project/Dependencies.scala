@@ -28,17 +28,17 @@ object Dependencies {
   lazy val `akka-slf4j` = "com.typesafe.akka" %% "akka-slf4j"   % Version.akka
   lazy val `akka-test`  = "com.typesafe.akka" %% "akka-testkit" % Version.akka % Test
 
-  lazy val vertx = "io.vertx" % "vertx-core" % "4.1.8"
+  lazy val vertx = "io.vertx" % "vertx-core" % "4.3.1"
 
-  lazy val `upickle` = "com.lihaoyi" %% "upickle" % "1.6.0"
+  lazy val `upickle` = "com.lihaoyi" %% "upickle" % "2.0.0"
 
   lazy val ficus           = "com.iheart"                 %% "ficus"           % "1.5.2"
-  lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk15on"  % "1.70"
+  lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk18on"  % "1.71"
   lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "2.3.3"
   lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.2.11"
   lazy val rocksdb         = "org.rocksdb"                 % "rocksdbjni"      % "6.29.5"
   lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.5"
-  lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.15.4"  % Test
+  lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.16.0"  % Test
   lazy val scalatest       = "org.scalatest"              %% "scalatest"       % "3.2.12"  % Test
   lazy val scalatestplus   = "org.scalatestplus"          %% "scalacheck-1-14" % "3.2.2.0" % Test
   lazy val weupnp          = "org.bitlet"                  % "weupnp"          % "0.1.4"
