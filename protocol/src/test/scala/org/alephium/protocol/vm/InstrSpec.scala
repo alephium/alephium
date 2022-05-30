@@ -72,7 +72,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6, Log7, Log8, Log9,
       ContractIdToAddress
     )
-    val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken)
+    val lemanStatefulInstrs = AVector(
+      MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken, BurnToken
+    )
     // format: on
 
     val networkConfig1 = new NetworkConfig {
@@ -1831,6 +1833,36 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
+  it should "BurnToken" in new StatefulInstrFixture {
+    val from = lockupScriptGen.sample.get
+    val balanceState = BalanceState.from(
+      tokenBalance(
+        from,
+        tokenId,
+        ALPH.alph(2)
+      )
+    )
+    override lazy val frame = prepareFrame(Some(balanceState))
+
+    stack.push(Val.Address(from))
+    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.U256(ALPH.oneAlph))
+
+    runAndCheckGas(BurnToken)
+
+    frame.balanceStateOpt is Some(
+      BalanceState.from(
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+    )
+
+    stack.push(Val.Address(from))
+    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.U256(ALPH.alph(2)))
+
+    BurnToken.runWith(frame).leftValue isE NotEnoughBalance
+  }
+
   it should "TransferAlph" in new StatefulInstrFixture {
     val from = lockupScriptGen.sample.get
     val to   = lockupScriptGen.sample.get
@@ -2222,7 +2254,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
       CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple -> 32000, MigrateWithState -> 32000, LoadContractFields -> 8, CopyCreateContractWithToken -> 24000
+      MigrateSimple -> 32000, MigrateWithState -> 32000, LoadContractFields -> 8, CopyCreateContractWithToken -> 24000,
+      BurnToken -> 30
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -2343,7 +2376,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract -> 173, CreateContractWithToken -> 174, CopyCreateContract -> 175, DestroySelf -> 176, SelfContractId -> 177, SelfAddress -> 178,
       CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple -> 186, MigrateWithState -> 187, LoadContractFields -> 188, CopyCreateContractWithToken -> 189
+      MigrateSimple -> 186, MigrateWithState -> 187, LoadContractFields -> 188, CopyCreateContractWithToken -> 189,
+      BurnToken -> 190
     )
     // format: on
 
@@ -2395,7 +2429,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
       CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken
+      MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken, BurnToken
     )
     // format: on
   }

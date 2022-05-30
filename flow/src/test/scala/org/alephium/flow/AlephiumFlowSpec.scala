@@ -574,6 +574,21 @@ trait FlowFixture
     print(txOutputs.map(show).mkString("", ";", "\n"))
   }
 
+  def getTokenBalance(
+      blockFlow: BlockFlow,
+      lockupScript: LockupScript.Asset,
+      tokenId: TokenId
+  ): U256 = {
+    brokerConfig.contains(lockupScript.groupIndex) is true
+    val utxos = blockFlow.getUsableUtxos(lockupScript, defaultUtxoLimit).rightValue
+    utxos.fold(U256.Zero) { case (acc, utxo) =>
+      val sum = utxo.output.tokens.fold(U256.Zero) { case (acc, (id, amount)) =>
+        if (tokenId equals id) acc.addUnsafe(amount) else acc
+      }
+      acc.addUnsafe(sum)
+    }
+  }
+
   def checkState(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,

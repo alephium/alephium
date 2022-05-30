@@ -306,6 +306,58 @@ class VMSpec extends AlephiumSpec {
     ) is true
   }
 
+  it should "burn token" in new ContractFixture {
+    val contract =
+      s"""
+         |TxContract Foo() {
+         |  pub payable fn mint() -> () {
+         |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), ${ALPH.alph(2)})
+         |  }
+         |
+         |  pub payable fn burn() -> () {
+         |    burnToken!(@$genesisAddress, selfTokenId!(), ${ALPH.oneAlph})
+         |    burnToken!(selfAddress!(), selfTokenId!(), ${ALPH.oneAlph})
+         |  }
+         |}
+         |""".stripMargin
+    val contractId = createContract(contract, AVector.empty, Some(ALPH.alph(5))).key
+
+    val mint =
+      s"""
+         |TxScript Main payable {
+         |  let foo = Foo(#${contractId.toHexString})
+         |  foo.mint()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+    callTxScript(mint)
+    val worldState0    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+    val contractAsset0 = worldState0.getContractAsset(contractId).rightValue
+    contractAsset0.lockupScript is LockupScript.p2c(contractId)
+    contractAsset0.tokens is AVector(contractId -> ALPH.alph(3))
+    val tokenAmount0 = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
+    tokenAmount0 is ALPH.alph(2)
+
+    val burn =
+      s"""
+         |TxScript Main payable {
+         |  approveToken!(@$genesisAddress, #${contractId.toHexString}, ${ALPH.alph(2)})
+         |  let foo = Foo(#${contractId.toHexString})
+         |  foo.burn()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+    callTxScript(burn)
+    val worldState1    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+    val contractAsset1 = worldState1.getContractAsset(contractId).rightValue
+    contractAsset1.lockupScript is LockupScript.p2c(contractId)
+    contractAsset1.tokens is AVector(contractId -> ALPH.alph(2))
+    val tokenAmount1 = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
+    tokenAmount1 is ALPH.alph(1)
+  }
+
   it should "not use up contract assets" in new ContractFixture {
     val input =
       """

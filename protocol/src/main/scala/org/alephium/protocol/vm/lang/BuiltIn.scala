@@ -454,6 +454,14 @@ object BuiltIn {
       TransferTokenToSelf
     )
 
+  val burnToken: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "burnToken",
+      Seq[Type](Type.Address, Type.ByteVec, Type.U256),
+      Seq.empty,
+      BurnToken
+    )
+
   val createContract: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "createContract",
@@ -573,6 +581,7 @@ object BuiltIn {
       transferToken,
       transferTokenFromSelf,
       transferTokenToSelf,
+      burnToken,
       createContract,
       createContractWithToken,
       copyCreateContract,

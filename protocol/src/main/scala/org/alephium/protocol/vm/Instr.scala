@@ -142,7 +142,7 @@ object Instr {
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
     CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
     /* Below are instructions for Leman hard fork */
-    MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken
+    MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken, BurnToken
   )
   // format: on
 
@@ -1118,6 +1118,32 @@ case object EthEcRecover
 }
 
 sealed trait AssetInstr extends StatefulInstrSimpleGas with GasBalance
+
+sealed trait LemanAssetInstr extends AssetInstr with LemanInstr[StatefulContext] {
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.chargeGas(this)
+      _ <- super[LemanInstr].runWith(frame)
+    } yield ()
+  }
+
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
+}
+
+object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      amount       <- frame.popOpStackU256()
+      tokenIdRaw   <- frame.popOpStackByteVec()
+      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      from         <- frame.popOpStackAddress()
+      balanceState <- frame.getBalanceState()
+      _ <- balanceState
+        .useToken(from.lockupScript, tokenId, amount.v)
+        .toRight(Right(NotEnoughBalance))
+    } yield ()
+  }
+}
 
 object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 {
   @SuppressWarnings(
