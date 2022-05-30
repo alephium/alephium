@@ -178,17 +178,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     ) = {
       val contract =
         s"""
-         |TxContract Foo($xMut x: U256) {
-         |  pub fn add($a: $aType, $b: $bType) -> ($rType) {
-         |    x = a + b
-         |    return (a - b)
-         |  }
-         |
-         |  fn $fname() -> () {
-         |    return
-         |  }
-         |}
-         |""".stripMargin
+           |TxContract Foo($xMut x: U256) {
+           |  pub fn add($a: $aType, $b: $bType) -> ($rType) {
+           |    x = a + b
+           |    return (a - b)
+           |  }
+           |
+           |  fn $fname() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
       Compiler.compileContract(contract).isRight is validity
     }
 
@@ -1866,16 +1866,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "compile TxScript" in {
     val code =
       s"""
-       |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) payable {
-       |  approveToken!(address, tokenId, tokenAmount)
-       |  let swap = Swap(swapContractKey)
-       |  swap.swapAlph(address, tokenAmount)
-       |}
-       |
-       |Interface Swap {
-       |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> ()
-       |}
-       |""".stripMargin
+         |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) payable {
+         |  approveToken!(address, tokenId, tokenAmount)
+         |  let swap = Swap(swapContractKey)
+         |  swap.swapAlph(address, tokenAmount)
+         |}
+         |
+         |Interface Swap {
+         |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> ()
+         |}
+         |""".stripMargin
     val script = Compiler.compileTxScript(code).rightValue
     script.toTemplateString() is "0101010001000a{0}{1}{2}a3{3}1700{0}{2}16000100"
   }

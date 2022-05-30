@@ -236,12 +236,12 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
 
       val script =
         s"""
-         |TxScript Foo payable {
-         |  return
-         |  pub fn add() -> () {
-         |  }
-         |}
-         |""".stripMargin
+           |TxScript Foo payable {
+           |  return
+           |  pub fn add() -> () {
+           |  }
+           |}
+           |""".stripMargin
 
       val transaction = {
         val unsignedTx = unsignedTransaction(
@@ -269,11 +269,11 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       val address = Address.p2pkh(pubKey2).toBase58
       def script(address: String) =
         s"""
-         |TxScript Main payable {
-         |  verifyTxSignature!(#${pubKey2.toHexString})
-         |  transferAlphFromSelf!(@$address, 5)
-         |}
-         |""".stripMargin
+           |TxScript Main payable {
+           |  verifyTxSignature!(#${pubKey2.toHexString})
+           |  transferAlphFromSelf!(@$address, 5)
+           |}
+           |""".stripMargin
 
       val transaction = {
         val unsignedTx = unsignedTransaction(

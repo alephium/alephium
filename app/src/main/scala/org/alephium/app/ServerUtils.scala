@@ -1090,11 +1090,11 @@ object ServerUtils {
     }
 
     val scriptRaw = s"""
-      |TxScript Main payable {
-      |  approveAlph!(@${address.toBase58}, ${initialAlphAmount.v})
-      |  $creation
-      |}
-      |""".stripMargin
+                       |TxScript Main payable {
+                       |  approveAlph!(@${address.toBase58}, ${initialAlphAmount.v})
+                       |  $creation
+                       |}
+                       |""".stripMargin
 
     wrapCompilerResult(Compiler.compileTxScript(scriptRaw))
   }

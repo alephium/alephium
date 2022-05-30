@@ -309,12 +309,12 @@ class VMSpec extends AlephiumSpec {
   it should "not use up contract assets" in new ContractFixture {
     val input =
       """
-         |TxContract Foo() {
-         |  pub payable fn foo(address: Address) -> () {
-         |    transferAlphFromSelf!(address, alphRemaining!(selfAddress!()))
-         |  }
-         |}
-         |""".stripMargin
+        |TxContract Foo() {
+        |  pub payable fn foo(address: Address) -> () {
+        |    transferAlphFromSelf!(address, alphRemaining!(selfAddress!()))
+        |  }
+        |}
+        |""".stripMargin
 
     val contractId = createContractAndCheckState(input, 2, 2, AVector.empty).key
 
@@ -1213,13 +1213,13 @@ class VMSpec extends AlephiumSpec {
     val contractKey = createContractAndCheckState(testContract, 2, 2).key
 
     val block = callTxScriptMulti(index => s"""
-         |TxScript Main nonPayable {
-         |  let foo = Foo(#${contractKey.toHexString})
-         |  foo.foo($index)
-         |}
-         |
-         |$testContract
-         |""".stripMargin)
+                                              |TxScript Main nonPayable {
+                                              |  let foo = Foo(#${contractKey.toHexString})
+                                              |  foo.foo($index)
+                                              |}
+                                              |
+                                              |$testContract
+                                              |""".stripMargin)
 
     val expected   = block.getNonCoinbaseExecutionOrder.fold(0L)(_ * 10 + _)
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
@@ -1230,13 +1230,13 @@ class VMSpec extends AlephiumSpec {
   it should "be able to call a contract multiple times in a block" in new ContractFixture {
     val testContract =
       s"""
-        |TxContract Foo(mut x: U256) {
-        |  pub payable fn foo(address: Address) -> () {
-        |    x = x + 1
-        |    transferAlphFromSelf!(address, ${ALPH.cent(1).v})
-        |  }
-        |}
-        |""".stripMargin
+         |TxContract Foo(mut x: U256) {
+         |  pub payable fn foo(address: Address) -> () {
+         |    x = x + 1
+         |    transferAlphFromSelf!(address, ${ALPH.cent(1).v})
+         |  }
+         |}
+         |""".stripMargin
     val contractId =
       createContractAndCheckState(
         testContract,

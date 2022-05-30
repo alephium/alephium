@@ -551,52 +551,54 @@ class SmartContractTest extends AlephiumActorSpec {
 
 object SwapContracts {
   val tokenContract = s"""
-    |TxContract Token(mut x: U256) {
-    |
-    | pub payable fn withdraw(address: Address, amount: U256) -> () {
-    |   transferTokenFromSelf!(address, selfTokenId!(), amount)
-    | }
-    |}
+                         |TxContract Token(mut x: U256) {
+                         |
+                         | pub payable fn withdraw(address: Address, amount: U256) -> () {
+                         |   transferTokenFromSelf!(address, selfTokenId!(), amount)
+                         | }
+                         |}
     """.stripMargin
 
-  def tokenWithdrawTxScript(address: String, tokenContractKey: Hash, tokenAmount: U256) = s"""
-    |TxScript Main payable {
-    |  let token = Token(#${tokenContractKey.toHexString})
-    |  token.withdraw(@${address}, $tokenAmount)
-    |}
-    |
-    |$tokenContract
-    |""".stripMargin
+  def tokenWithdrawTxScript(address: String, tokenContractKey: Hash, tokenAmount: U256) =
+    s"""
+       |TxScript Main payable {
+       |  let token = Token(#${tokenContractKey.toHexString})
+       |  token.withdraw(@${address}, $tokenAmount)
+       |}
+       |
+       |$tokenContract
+       |""".stripMargin
 
-  val swapContract = s"""
-    |// Simple swap contract purely for testing
-    |
-    |TxContract Swap(tokenId: ByteVec, mut alphReserve: U256, mut tokenReserve: U256) {
-    |
-    |  pub payable fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
-    |    transferAlphToSelf!(lp, alphAmount)
-    |    transferTokenToSelf!(lp, tokenId, tokenAmount)
-    |    alphReserve = alphAmount
-    |    tokenReserve = tokenAmount
-    |  }
-    |
-    |  pub payable fn swapToken(buyer: Address, alphAmount: U256) -> () {
-    |    let tokenAmount = tokenReserve - alphReserve * tokenReserve / (alphReserve + alphAmount)
-    |    transferAlphToSelf!(buyer, alphAmount)
-    |    transferTokenFromSelf!(buyer, tokenId, tokenAmount)
-    |    alphReserve = alphReserve + alphAmount
-    |    tokenReserve = tokenReserve - tokenAmount
-    |  }
-    |
-    |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
-    |    let alphAmount = alphReserve - alphReserve * tokenReserve / (tokenReserve + tokenAmount)
-    |    transferTokenToSelf!(buyer, tokenId, tokenAmount)
-    |    transferAlphFromSelf!(buyer, alphAmount)
-    |    alphReserve = alphReserve - alphAmount
-    |    tokenReserve = tokenReserve + tokenAmount
-    |  }
-    |}
-    |""".stripMargin
+  val swapContract =
+    s"""
+       |// Simple swap contract purely for testing
+       |
+       |TxContract Swap(tokenId: ByteVec, mut alphReserve: U256, mut tokenReserve: U256) {
+       |
+       |  pub payable fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
+       |    transferAlphToSelf!(lp, alphAmount)
+       |    transferTokenToSelf!(lp, tokenId, tokenAmount)
+       |    alphReserve = alphAmount
+       |    tokenReserve = tokenAmount
+       |  }
+       |
+       |  pub payable fn swapToken(buyer: Address, alphAmount: U256) -> () {
+       |    let tokenAmount = tokenReserve - alphReserve * tokenReserve / (alphReserve + alphAmount)
+       |    transferAlphToSelf!(buyer, alphAmount)
+       |    transferTokenFromSelf!(buyer, tokenId, tokenAmount)
+       |    alphReserve = alphReserve + alphAmount
+       |    tokenReserve = tokenReserve - tokenAmount
+       |  }
+       |
+       |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
+       |    let alphAmount = alphReserve - alphReserve * tokenReserve / (tokenReserve + tokenAmount)
+       |    transferTokenToSelf!(buyer, tokenId, tokenAmount)
+       |    transferAlphFromSelf!(buyer, alphAmount)
+       |    alphReserve = alphReserve - alphAmount
+       |    tokenReserve = tokenReserve + tokenAmount
+       |  }
+       |}
+       |""".stripMargin
 
   def addLiquidityTxScript(
       address: String,
@@ -605,15 +607,15 @@ object SwapContracts {
       tokenAmount: U256,
       swapContractKey: Hash
   ) = s"""
-    |TxScript Main payable {
-    |  approveAlph!(@${address}, $alphAmount)
-    |  approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
-    |  let swap = Swap(#${swapContractKey.toHexString})
-    |  swap.addLiquidity(@${address}, $alphAmount, $tokenAmount)
-    |}
-    |
-    |$swapContract
-    |""".stripMargin
+         |TxScript Main payable {
+         |  approveAlph!(@${address}, $alphAmount)
+         |  approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
+         |  let swap = Swap(#${swapContractKey.toHexString})
+         |  swap.addLiquidity(@${address}, $alphAmount, $tokenAmount)
+         |}
+         |
+         |$swapContract
+         |""".stripMargin
 
   def swapTokenForAlphTxScript(
       address: String,
@@ -621,22 +623,23 @@ object SwapContracts {
       tokenId: Hash,
       tokenAmount: U256
   ) = s"""
-    |TxScript Main payable {
-    |  approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
-    |  let swap = Swap(#${swapContractKey.toHexString})
-    |  swap.swapAlph(@${address}, $tokenAmount)
-    |}
-    |
-    |$swapContract
-    |""".stripMargin
+         |TxScript Main payable {
+         |  approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
+         |  let swap = Swap(#${swapContractKey.toHexString})
+         |  swap.swapAlph(@${address}, $tokenAmount)
+         |}
+         |
+         |$swapContract
+         |""".stripMargin
 
-  def swapAlphForTokenTxScript(address: String, swapContractKey: Hash, alphAmount: U256) = s"""
-    |TxScript Main payable {
-    |  approveAlph!(@${address}, $alphAmount)
-    |  let swap = Swap(#${swapContractKey.toHexString})
-    |  swap.swapToken(@${address}, $alphAmount)
-    |}
-    |
-    |$swapContract
-    |""".stripMargin
+  def swapAlphForTokenTxScript(address: String, swapContractKey: Hash, alphAmount: U256) =
+    s"""
+       |TxScript Main payable {
+       |  approveAlph!(@${address}, $alphAmount)
+       |  let swap = Swap(#${swapContractKey.toHexString})
+       |  swap.swapToken(@${address}, $alphAmount)
+       |}
+       |
+       |$swapContract
+       |""".stripMargin
 }

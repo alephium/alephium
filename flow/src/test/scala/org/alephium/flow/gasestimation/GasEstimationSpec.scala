@@ -162,14 +162,14 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
 
       val raw =
         s"""
-         |// comment
-         |AssetScript P2sh {
-         |  pub fn main(pubKey1: ByteVec) -> () {
-         |    verifyAbsoluteLocktime!(1630879601000)
-         |    verifyTxSignature!(pubKey1)
-         |  }
-         |}
-         |""".stripMargin
+           |// comment
+           |AssetScript P2sh {
+           |  pub fn main(pubKey1: ByteVec) -> () {
+           |    verifyAbsoluteLocktime!(1630879601000)
+           |    verifyTxSignature!(pubKey1)
+           |  }
+           |}
+           |""".stripMargin
 
       val script = Compiler.compileAssetScript(raw).rightValue
       val lockup = LockupScript.p2sh(script)
@@ -217,23 +217,23 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
     {
       def simpleScript(i: Int): String = {
         s"""
-          |TxScript Main nonPayable {
-          |  let mut c = 0u
-          |  let mut d = 0u
-          |  let mut e = 0u
-          |  let mut f = 0u
-          |
-          |  let mut i = 0u
-          |  while (i <= $i) {
-          |    c = 50 + 60
-          |    d = 60 - 50
-          |    e = c + d
-          |    f = c * d
-          |
-          |    i = i + 1
-          |  }
-          |}
-          |""".stripMargin
+           |TxScript Main nonPayable {
+           |  let mut c = 0u
+           |  let mut d = 0u
+           |  let mut e = 0u
+           |  let mut f = 0u
+           |
+           |  let mut i = 0u
+           |  while (i <= $i) {
+           |    c = 50 + 60
+           |    d = 60 - 50
+           |    e = c + d
+           |    f = c * d
+           |
+           |    i = i + 1
+           |  }
+           |}
+           |""".stripMargin
       }
 
       estimateTxScript(simpleScript(1)).rightValue is GasBox.unsafe(468)

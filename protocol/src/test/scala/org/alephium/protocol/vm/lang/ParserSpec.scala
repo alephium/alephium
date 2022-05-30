@@ -378,11 +378,11 @@ class ParserSpec extends AlephiumSpec {
       info("Simple contract inheritance")
       val code =
         s"""
-         |TxContract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
-         |  fn foo() -> () {
-         |  }
-         |}
-         |""".stripMargin
+           |TxContract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
+           |  fn foo() -> () {
+           |  }
+           |}
+           |""".stripMargin
 
       fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
         TypeId("Child"),
@@ -401,23 +401,23 @@ class ParserSpec extends AlephiumSpec {
       info("Contract event inheritance")
       val foo: String =
         s"""
-             |TxContract Foo() {
-             |  event Foo(x: U256)
-             |  event Foo2(x: U256)
-             |
-             |  pub fn foo() -> () {
-             |    emit Foo(1)
-             |    emit Foo2(2)
-             |  }
-             |}
-             |""".stripMargin
+           |TxContract Foo() {
+           |  event Foo(x: U256)
+           |  event Foo2(x: U256)
+           |
+           |  pub fn foo() -> () {
+           |    emit Foo(1)
+           |    emit Foo2(2)
+           |  }
+           |}
+           |""".stripMargin
       val bar: String =
         s"""
-             |TxContract Bar() extends Foo() {
-             |  pub fn bar() -> () {}
-             |}
-             |$foo
-             |""".stripMargin
+           |TxContract Bar() extends Foo() {
+           |  pub fn bar() -> () {}
+           |}
+           |$foo
+           |""".stripMargin
       val extended =
         fastparse.parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
       val barContract = extended.contracts(0)
@@ -507,12 +507,12 @@ class ParserSpec extends AlephiumSpec {
   it should "parse AssetScript" in new ScriptFixture {
     val payable = false
     val script = s"""
-         |AssetScript Main(x: U256) {
-         |  pub fn main() -> () {
-         |    return
-         |  }
-         |}
-         |""".stripMargin
+                    |AssetScript Main(x: U256) {
+                    |  pub fn main() -> () {
+                    |    return
+                    |  }
+                    |}
+                    |""".stripMargin
 
     fastparse.parse(script, StatelessParser.assetScript(_)).get.value is
       AssetScript(ident, templateVars, funcs)
@@ -522,10 +522,10 @@ class ParserSpec extends AlephiumSpec {
   class TxScriptFixture(payableModifier: String) extends ScriptFixture {
     val payable = !(payableModifier === "nonPayable")
     val script = s"""
-         |TxScript Main(x: U256) $payableModifier {
-         |  return
-         |}
-         |""".stripMargin
+                    |TxScript Main(x: U256) $payableModifier {
+                    |  return
+                    |}
+                    |""".stripMargin
 
     fastparse.parse(script, StatefulParser.txScript(_)).get.value is TxScript(
       ident,

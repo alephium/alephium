@@ -398,10 +398,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost(
       "/transactions/build",
       Some(s"""
-        |{
-        |  "fromPublicKey": "$fromPubKey",
-        |  "destinations": ${write(destinations)}
-        |}
+              |{
+              |  "fromPublicKey": "$fromPubKey",
+              |  "destinations": ${write(destinations)}
+              |}
         """.stripMargin)
     )
   }
@@ -413,16 +413,16 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       amount: U256
   ) = {
     val body = s"""
-        |{
-        |  "fromAddress": "$fromAddress",
-        |  "fromPublicKeys": ${write(fromPublicKeys)},
-        |  "destinations": [
-        |    {
-        |      "address": "$toAddress",
-        |      "alphAmount": "$amount"
-        |    }
-        |  ]
-        |}
+                  |{
+                  |  "fromAddress": "$fromAddress",
+                  |  "fromPublicKeys": ${write(fromPublicKeys)},
+                  |  "destinations": [
+                  |    {
+                  |      "address": "$toAddress",
+                  |      "alphAmount": "$amount"
+                  |    }
+                  |  ]
+                  |}
         """.stripMargin
 
     httpPost(
@@ -608,19 +608,19 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def multisig(keys: AVector[String], mrequired: Int) = {
     val body = s"""
-        |{
-        |  "keys": ${write(keys)},
-        |  "mrequired": $mrequired
-        |}
+                  |{
+                  |  "keys": ${write(keys)},
+                  |  "mrequired": $mrequired
+                  |}
         """.stripMargin
     httpPost(s"/multisig/address", maybeBody = Some(body))
   }
 
   def decodeUnsignedTransaction(unsignedTx: String) = {
     val body = s"""
-        |{
-        |  "unsignedTx": "$unsignedTx"
-        |}
+                  |{
+                  |  "unsignedTx": "$unsignedTx"
+                  |}
         """.stripMargin
     httpPost(s"/transactions/decode-unsigned-tx", maybeBody = Some(body))
   }
