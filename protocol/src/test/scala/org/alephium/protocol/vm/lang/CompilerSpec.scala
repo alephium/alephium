@@ -1416,6 +1416,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
+        useContractAssets = false,
         argsLength = 0,
         localsLength = 5,
         returnLength = 0,

@@ -374,6 +374,7 @@ object Ast {
       Method[Ctx](
         isPublic,
         isPayable,
+        useContractAssets = isPayable, // FIXME: add syntax for this
         argsLength = ArrayTransformer.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
         returnLength = ArrayTransformer.flattenTypeLength(rtypes),

@@ -246,7 +246,7 @@ final class StatefulFrame(
           contractObj.contractIdOpt match {
             case Some(contractId) =>
               ctx
-                .useContractAsset(contractId)
+                .useContractAssets(contractId)
                 .map { balancesPerLockup =>
                   newFrameBalances.remaining.add(LockupScript.p2c(contractId), balancesPerLockup)
                   Some(newFrameBalances)

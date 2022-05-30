@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm
 
+import scala.annotation.switch
 import scala.collection.mutable
 
 import akka.util.ByteString
@@ -24,12 +25,14 @@ import org.alephium.io.IOError
 import org.alephium.macros.HashSerde
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractId
+import org.alephium.serde
 import org.alephium.serde._
 import org.alephium.util.{AVector, Hex}
 
 final case class Method[Ctx <: StatelessContext](
     isPublic: Boolean,
     isPayable: Boolean,
+    useContractAssets: Boolean,
     argsLength: Int,
     localsLength: Int,
     returnLength: Int,
@@ -38,7 +41,7 @@ final case class Method[Ctx <: StatelessContext](
   def toTemplateString(): String = {
     val prefix = Hex.toHexString(
       serialize(isPublic) ++
-        serialize(isPayable) ++
+        Method.serializeAssetModifier(this) ++
         serialize(argsLength) ++
         serialize(localsLength) ++
         serialize(returnLength) ++
@@ -49,16 +52,66 @@ final case class Method[Ctx <: StatelessContext](
 }
 
 object Method {
-  implicit val statelessSerde: Serde[Method[StatelessContext]] =
-    Serde.forProduct6(
-      Method[StatelessContext],
-      t => (t.isPublic, t.isPayable, t.argsLength, t.localsLength, t.returnLength, t.instrs)
-    )
-  implicit val statefulSerde: Serde[Method[StatefulContext]] =
-    Serde.forProduct6(
-      Method[StatefulContext],
-      t => (t.isPublic, t.isPayable, t.argsLength, t.localsLength, t.returnLength, t.instrs)
-    )
+  private def serializeAssetModifier[Ctx <: StatelessContext](method: Method[Ctx]): ByteString = {
+    (method.isPayable, method.useContractAssets) match {
+      case (false, false) => ByteString(0) // isPayble = false before Leman fork
+      case (true, true)   => ByteString(1) //  isPayable = true before Leman fork
+      case (false, true)  => ByteString(2)
+      case (true, false)  => ByteString(3)
+    }
+  }
+
+  private def deserializeAssetModifier[Ctx <: StatelessContext](
+      input: Byte
+  ): SerdeResult[(Boolean, Boolean)] = {
+    (input: @switch) match {
+      case 0 => Right((false, false))
+      case 1 => Right((true, true))
+      case 2 => Right((false, true))
+      case 3 => Right((true, false))
+      case _ => Left(SerdeError.wrongFormat("Invalid method modifier"))
+    }
+  }
+
+  private def serdeGen[Ctx <: StatelessContext](implicit instrsSerde: Serde[AVector[Instr[Ctx]]]) =
+    new Serde[Method[Ctx]] {
+      override def serialize(method: Method[Ctx]): ByteString = {
+        serde.serialize(method.isPublic) ++
+          Method.serializeAssetModifier(method) ++
+          serde.serialize(method.argsLength) ++
+          serde.serialize(method.localsLength) ++
+          serde.serialize(method.returnLength) ++
+          serde.serialize(method.instrs)
+      }
+
+      def _deserialize(input: ByteString): SerdeResult[Staging[Method[Ctx]]] = {
+        for {
+          isPublicRest      <- serde._deserialize[Boolean](input)
+          assetModifierRest <- serde._deserialize[Byte](isPublicRest.rest)
+          assetModifier     <- Method.deserializeAssetModifier(assetModifierRest.value)
+          argsLengthRest    <- serde._deserialize[Int](assetModifierRest.rest)
+          localsLengthRest  <- serde._deserialize[Int](argsLengthRest.rest)
+          returnLengthRest  <- serde._deserialize[Int](localsLengthRest.rest)
+          instrsRest        <- serde._deserialize[AVector[Instr[Ctx]]](returnLengthRest.rest)
+        } yield {
+          Staging(
+            Method[Ctx](
+              isPublicRest.value,
+              assetModifier._1,
+              assetModifier._2,
+              argsLengthRest.value,
+              localsLengthRest.value,
+              returnLengthRest.value,
+              instrsRest.value
+            ),
+            instrsRest.rest
+          )
+        }
+      }
+    }
+
+  implicit val statelessSerde: Serde[Method[StatelessContext]] = serdeGen[StatelessContext]
+  implicit val statefulSerde: Serde[Method[StatefulContext]]   = serdeGen[StatefulContext]
 
   def validate(method: Method[_]): Boolean =
     method.argsLength >= 0 && method.localsLength >= method.argsLength && method.returnLength >= 0
@@ -67,6 +120,7 @@ object Method {
     Method[StatefulContext](
       isPublic = false,
       isPayable = false,
+      useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -162,6 +216,7 @@ object StatefulScript {
         Method[StatefulContext](
           isPublic = true,
           isPayable = true,
+          useContractAssets = true,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,

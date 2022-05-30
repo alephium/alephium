@@ -61,6 +61,7 @@ trait FrameFixture extends ContextGenerators {
   def baseMethod[Ctx <: StatelessContext](localsLength: Int) = Method[Ctx](
     isPublic = true,
     isPayable = false,
+    useContractAssets = false,
     argsLength = localsLength - 1,
     localsLength,
     returnLength = 0,

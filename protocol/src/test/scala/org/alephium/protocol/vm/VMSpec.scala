@@ -33,6 +33,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val baseMethod = Method[Ctx](
       isPublic = true,
       isPayable = false,
+      useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -107,6 +108,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val baseMethod = Method[StatefulContext](
       isPublic = true,
       isPayable = false,
+      useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -172,6 +174,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 0,
@@ -202,6 +205,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -218,6 +222,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method0 = Method[StatelessContext](
       isPublic = true,
       isPayable = false,
+      useContractAssets = false,
       argsLength = 1,
       localsLength = 1,
       returnLength = 1,
@@ -227,6 +232,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       Method[StatelessContext](
         isPublic = false,
         isPayable = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -279,6 +285,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         Method[StatefulContext](
           isPublic = index equals 0,
           isPayable = true,
+          useContractAssets = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = expected.fold(_ => 0, _.length),
@@ -436,6 +443,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method = Method[StatefulContext](
       isPublic = true,
       isPayable = true,
+      useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -465,6 +473,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 0,

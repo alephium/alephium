@@ -937,6 +937,7 @@ class ServerUtils(implicit
         Method[StatefulContext](
           isPublic = true,
           isPayable = testContract.inputAssets.nonEmpty,
+          useContractAssets = testContract.inputAssets.nonEmpty,
           argsLength = 0,
           localsLength = 0,
           returnLength = returnLength,

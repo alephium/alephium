@@ -572,6 +572,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           val method = Method[StatefulContext](
             isPublic = true,
             isPayable = isPayable,
+            useContractAssets = isPayable,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,

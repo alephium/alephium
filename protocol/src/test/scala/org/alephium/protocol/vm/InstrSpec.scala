@@ -147,6 +147,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val baseMethod = Method[StatelessContext](
         isPublic = true,
         isPayable = false,
+        useContractAssets = false,
         argsLength = 0,
         localsLength = localsLength,
         returnLength = 0,
@@ -1619,6 +1620,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
+        useContractAssets = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
