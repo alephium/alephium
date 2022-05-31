@@ -38,6 +38,8 @@ final case class Method[Ctx <: StatelessContext](
     returnLength: Int,
     instrs: AVector[Instr[Ctx]]
 ) {
+  def usesAssets(): Boolean = isPayable || useContractAssets
+
   def checkModifierPreLeman(): ExeResult[Unit] = {
     if (isPayable == useContractAssets) okay else failed(InvalidMethodModifierBeforeLeman)
   }

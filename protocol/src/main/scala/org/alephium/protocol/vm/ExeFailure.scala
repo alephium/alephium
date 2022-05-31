@@ -104,6 +104,7 @@ case object InvalidSizeForZeros                                extends ExeFailur
 final case class SerdeErrorByteVecToAddress(error: SerdeError) extends ExeFailure
 case object FailedInRecoverEthAddress                          extends ExeFailure
 case object UnexpectedRecursiveCallInMigration                 extends ExeFailure
+case object UnexpectedApprovedAssets                           extends ExeFailure
 
 final case class UncaughtKeyNotFoundError(error: IOError.KeyNotFound) extends ExeFailure
 final case class UncaughtSerdeError(error: IOError.Serde)             extends ExeFailure

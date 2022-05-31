@@ -74,7 +74,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   def prepareStatefulScript(
       script: StatefulScript,
       gasLimit: GasBox = minimalGas
-  ): (ScriptObj[StatefulContext], StatefulContext) = {
+  )(implicit networkConfig: NetworkConfig): (ScriptObj[StatefulContext], StatefulContext) = {
     val obj     = script.toObject
     val context = genStatefulContext(scriptOpt = Some(script), gasLimit = gasLimit)
     obj -> context

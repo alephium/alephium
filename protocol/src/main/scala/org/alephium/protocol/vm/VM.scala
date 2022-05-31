@@ -245,7 +245,7 @@ final class StatefulVM(
       currentFrame: Frame[StatefulContext],
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
-    if (currentFrame.method.isPayable) {
+    if (currentFrame.method.usesAssets()) {
       val resultOpt = for {
         currentBalances  <- currentFrame.balanceStateOpt
         previousBalances <- previousFrame.balanceStateOpt
@@ -290,7 +290,7 @@ final class StatefulVM(
   }
 
   private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
-    if (lastFrame.method.isPayable) {
+    if (lastFrame.method.usesAssets()) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
         _        <- ctx.outputBalances.merge(balances.approved)

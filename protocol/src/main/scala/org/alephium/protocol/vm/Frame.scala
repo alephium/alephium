@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import scala.annotation.{switch, tailrec}
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.model.{ContractId, HardFork}
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Bytes}
@@ -234,7 +234,62 @@ final class StatefulFrame(
     callerFrameOpt.toRight(Right(NoCaller))
   }
 
-  private def getNewFrameBalancesState(
+  def getNewFrameBalancesState(
+      contractObj: ContractObj[StatefulContext],
+      method: Method[StatefulContext]
+  ): ExeResult[Option[BalanceState]] = {
+    if (ctx.getHardFork() >= HardFork.Leman) {
+      getNewFrameBalancesStateSinceLeman(contractObj, method)
+    } else {
+      getNewFrameBalancesStatePreLeman(contractObj, method)
+    }
+  }
+
+  private def getNewFrameBalancesStateSinceLeman(
+      contractObj: ContractObj[StatefulContext],
+      method: Method[StatefulContext]
+  ): ExeResult[Option[BalanceState]] = {
+    if (method.isPayable) {
+      for {
+        currentBalances <- getBalanceState()
+        balanceStateOpt <- {
+          val newFrameBalances = currentBalances.useApproved()
+          contractObj.contractIdOpt match {
+            case Some(contractId) if method.useContractAssets =>
+              ctx
+                .useContractAssets(contractId)
+                .map { balancesPerLockup =>
+                  newFrameBalances.remaining
+                    .add(LockupScript.p2c(contractId), balancesPerLockup)
+                    .map(_ => newFrameBalances)
+                }
+            case _ =>
+              Right(Some(newFrameBalances))
+          }
+        }
+      } yield balanceStateOpt
+    } else if (method.useContractAssets) {
+      contractObj.contractIdOpt match {
+        case Some(contractId) =>
+          ctx
+            .useContractAssets(contractId)
+            .map { balancesPerLockup =>
+              val remaining = Balances.empty
+              remaining
+                .add(LockupScript.p2c(contractId), balancesPerLockup)
+                .map(_ => BalanceState(remaining, Balances.empty))
+            }
+        case _ =>
+          Right(None)
+      }
+    } else {
+      // Note that we don't check there is no approved assets for this branch
+      Right(None)
+    }
+  }
+
+  // TODO: remove this once Leman fork is activated
+  private def getNewFrameBalancesStatePreLeman(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
   ): ExeResult[Option[BalanceState]] = {
