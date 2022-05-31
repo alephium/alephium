@@ -762,7 +762,7 @@ class VMSpec extends AlephiumSpec {
          |    if (!changeState) {
          |      migrate!(code)
          |    } else {
-         |      migrateWithState!(code, #010000)
+         |      migrateWithFields!(code, #010000)
          |    }
          |  }
          |
@@ -777,7 +777,7 @@ class VMSpec extends AlephiumSpec {
          |TxContract Foo(x: Bool) {
          |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
          |    if (changeState) {
-         |      migrateWithState!(code, #010000)
+         |      migrateWithFields!(code, #010000)
          |    } else {
          |      migrate!(code)
          |    }

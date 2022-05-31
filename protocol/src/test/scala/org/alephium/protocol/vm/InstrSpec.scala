@@ -72,7 +72,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6, Log7, Log8, Log9,
       ContractIdToAddress
     )
-    val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken)
+    val lemanStatefulInstrs = AVector(MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken)
     // format: on
 
     val networkConfig1 = new NetworkConfig {
@@ -2280,7 +2280,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
       CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple -> 32000, MigrateWithState -> 32000, LoadContractFields -> 8, CopyCreateContractWithToken -> 24000
+      MigrateSimple -> 32000, MigrateWithFields -> 32000, LoadContractFields -> 8, CopyCreateContractWithToken -> 24000
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -2401,7 +2401,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract -> 173, CreateContractWithToken -> 174, CopyCreateContract -> 175, DestroySelf -> 176, SelfContractId -> 177, SelfAddress -> 178,
       CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple -> 186, MigrateWithState -> 187, LoadContractFields -> 188, CopyCreateContractWithToken -> 189
+      MigrateSimple -> 186, MigrateWithFields -> 187, LoadContractFields -> 188, CopyCreateContractWithToken -> 189
     )
     // format: on
 
@@ -2453,7 +2453,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
       CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken
+      MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken
     )
     // format: on
   }

@@ -152,7 +152,7 @@ object Instr {
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
     CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
     /* Below are instructions for Leman hard fork */
-    MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken
+    MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken
   )
   // format: on
 
@@ -1444,7 +1444,7 @@ object MigrateSimple extends MigrateBase {
   }
 }
 
-object MigrateWithState extends MigrateBase {
+object MigrateWithFields extends MigrateBase {
   def runWithLeman[C <: StatefulContext](
       frame: Frame[C]
   ): ExeResult[Unit] = {

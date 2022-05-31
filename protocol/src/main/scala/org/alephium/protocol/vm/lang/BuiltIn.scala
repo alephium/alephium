@@ -502,12 +502,12 @@ object BuiltIn {
       MigrateSimple
     )
 
-  val migrateWithState: SimpleStatefulBuiltIn =
+  val migrateWithFields: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
-      "migrateWithState",
+      "migrateWithFields",
       Seq[Type](Type.ByteVec, Type.ByteVec),
       Seq.empty,
-      MigrateWithState
+      MigrateWithFields
     )
 
   val selfAddress: SimpleStatefulBuiltIn =
@@ -579,7 +579,7 @@ object BuiltIn {
       copyCreateContractWithToken,
       destroySelf,
       migrate,
-      migrateWithState,
+      migrateWithFields,
       selfAddress,
       selfContractId,
       selfTokenId,
