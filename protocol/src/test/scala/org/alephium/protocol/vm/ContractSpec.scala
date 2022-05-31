@@ -160,12 +160,12 @@ class ContractSpec extends AlephiumSpec {
     serialize(statefulOldMethod0) is hex"010103040500"
     serialize(statefulOldMethod1) is hex"010003040500"
 
-    serialize(statelessMethod0) is hex"010103040500"
-    serialize(statelessMethod1) is hex"010003040500"
+    serialize(statelessMethod0) is serialize(statelessOldMethod0)
+    serialize(statelessMethod1) is serialize(statelessOldMethod1)
     serialize(statelessMethod2) is hex"010303040500"
     serialize(statelessMethod3) is hex"010203040500"
-    serialize(statefulMethod0) is hex"010103040500"
-    serialize(statefulMethod1) is hex"010003040500"
+    serialize(statefulMethod0) is serialize(statefulMethod0)
+    serialize(statefulMethod1) is serialize(statefulOldMethod1)
     serialize(statefulMethod2) is hex"010303040500"
     serialize(statefulMethod3) is hex"010203040500"
   }
