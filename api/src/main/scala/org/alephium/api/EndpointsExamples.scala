@@ -471,15 +471,19 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       Compile.Script(
         code =
-          s"TxScript Main payable { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) }"
+          s"TxScript Main { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) }"
       )
     )
 
   implicit val compileContractExamples: List[Example[Compile.Contract]] =
     simpleExample(
       Compile.Contract(
-        code =
-          "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+        code = """TxContract Foo(bar: ByteVec) {
+                 |  @use(approvedAssets = true, contractAssets = true)
+                 |  pub fn baz(amount: U256) -> () {
+                 |    issueToken!(amount)
+                 |  }
+                 |}""".stripMargin
       )
     )
 
@@ -496,7 +500,7 @@ trait EndpointsExamples extends ErrorExamples {
           CompileResult.FunctionSig(
             name = "bar",
             signature =
-              "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+              "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
             argNames = AVector("a", "b", "c", "d", "e"),
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
@@ -519,7 +523,7 @@ trait EndpointsExamples extends ErrorExamples {
           CompileResult.FunctionSig(
             name = "bar",
             signature =
-              "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+              "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
             argNames = AVector("a", "b", "c", "d", "e"),
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")

@@ -148,8 +148,7 @@ object Lexer {
     case object Payable extends FuncModifier
 
     def pub[Unknown: P]: P[FuncModifier]       = keyword("pub").map(_ => Pub)
-    def payable[Unknown: P]: P[FuncModifier]   = keyword("payable").map(_ => Payable)
-    def modifiers[Unknown: P]: P[FuncModifier] = P(pub | payable)
+    def modifiers[Unknown: P]: P[FuncModifier] = P(pub)
   }
 
   sealed trait TxScriptModifier

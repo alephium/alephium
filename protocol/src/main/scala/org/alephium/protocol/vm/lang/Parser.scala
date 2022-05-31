@@ -19,6 +19,7 @@ package org.alephium.protocol.vm.lang
 import fastparse._
 
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
+import org.alephium.protocol.vm.lang.Ast.{Annotation, Argument, FuncId, Statement}
 import org.alephium.util.U256
 
 // scalastyle:off number.of.methods
@@ -160,7 +161,6 @@ abstract class Parser[Ctx <: StatelessContext] {
       Type.FixedSizeArray(tpe, size)
     }
   }
-
   def funcArgument[Unknown: P]: P[Ast.Argument] =
     P(Lexer.mut ~ Lexer.ident ~ ":").flatMap { case (isMutable, ident) =>
       parseType(typeId => Type.Contract.local(typeId, ident)).map { tpe =>
@@ -173,19 +173,48 @@ abstract class Parser[Ctx <: StatelessContext] {
     P("->" ~ parseType(Type.Contract.stack)).map(tpe => Seq(tpe))
   def bracketReturnType[Unknown: P]: P[Seq[Type]] =
     P("->" ~ "(" ~ parseType(Type.Contract.stack).rep(0, ",") ~ ")")
-  def func[Unknown: P]: P[Ast.FuncDef[Ctx]] =
+  def funcTmp[Unknown: P]: P[FuncDefTmp[Ctx]] =
     P(
-      Lexer.FuncModifier.modifiers.rep(0) ~ Lexer
-        .keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ "{" ~ statement.rep ~ "}"
-    ).map { case (modifiers, funcId, params, returnType, statements) =>
+      annotation.rep(0) ~
+        Lexer.FuncModifier.modifiers.rep(0) ~ Lexer
+          .keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ ("{" ~ statement.rep ~ "}").?
+    ).map { case (annotations, modifiers, funcId, params, returnType, statements) =>
       if (modifiers.toSet.size != modifiers.length) {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
       } else {
-        val isPublic  = modifiers.contains(Lexer.FuncModifier.Pub)
-        val isPayable = modifiers.contains(Lexer.FuncModifier.Payable)
-        Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, statements)
+        val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
+        val (useApprovedAssets, useContractAssets) =
+          Parser.extractAssetModifier(annotations, false, false)
+        FuncDefTmp(
+          Seq.empty,
+          funcId,
+          isPublic,
+          useApprovedAssets,
+          useContractAssets,
+          params,
+          returnType,
+          statements
+        )
       }
     }
+  def func[Unknown: P]: P[Ast.FuncDef[Ctx]] = funcTmp.map { f =>
+    f.body match {
+      case Some(statements) =>
+        Ast.FuncDef(
+          f.annotations,
+          f.id,
+          f.isPublic,
+          f.useApprovedAssets,
+          f.useContractAssets,
+          f.args,
+          f.rtypes,
+          statements
+        )
+      case None =>
+        throw Compiler.Error(s"Function ${f.id.name} does not have function body")
+    }
+  }
+
   def eventFields[Unknown: P]: P[Seq[Ast.EventField]] = P("(" ~ eventField.rep(0, ",") ~ ")")
   def eventDef[Unknown: P]: P[Ast.EventDef] =
     P(Lexer.keyword("event") ~/ Lexer.typeId ~ eventFields)
@@ -246,6 +275,74 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.EventField(ident, tpe)
       }
     }
+
+  def annotationField[Unknown: P]: P[Ast.AnnotationField] =
+    P(Lexer.ident ~ "=" ~ expr).map {
+      case (ident, expr: Ast.Const[_]) =>
+        Ast.AnnotationField(ident, expr.v)
+      case _ =>
+        throw Compiler.Error(s"Expect const value for annotation field, got ${expr}")
+    }
+  def annotationFields[Unknown: P]: P[Seq[Ast.AnnotationField]] =
+    P("(" ~ annotationField.rep(1, ",") ~ ")")
+  def annotation[Unknown: P]: P[Ast.Annotation] =
+    P("@" ~ Lexer.ident ~ annotationFields.?).map { case (id, fieldsOpt) =>
+      Ast.Annotation(id, fieldsOpt.getOrElse(Seq.empty))
+    }
+}
+
+final case class FuncDefTmp[Ctx <: StatelessContext](
+    annotations: Seq[Annotation],
+    id: FuncId,
+    isPublic: Boolean,
+    useApprovedAssets: Boolean,
+    useContractAssets: Boolean,
+    args: Seq[Argument],
+    rtypes: Seq[Type],
+    body: Option[Seq[Statement[Ctx]]]
+)
+
+object Parser {
+  def extractAssetModifier(
+      annotations: Seq[Annotation],
+      useApprovedAssetsDefault: Boolean,
+      useContractAssetsDefault: Boolean
+  ): (Boolean, Boolean) = {
+    if (annotations.exists(_.id.name != "use")) {
+      throw Compiler.Error(s"Generic annotation is not supported yet")
+    } else {
+      val useApprovedAssetsKey = "approvedAssets"
+      val useContractAssetsKey = "contractAssets"
+      if (annotations.nonEmpty) {
+        val useAnnotation = annotations.head
+        val invalidKeys = useAnnotation.fields
+          .filter(f => f.ident.name != useApprovedAssetsKey && f.ident.name != useContractAssetsKey)
+        if (invalidKeys.nonEmpty) {
+          throw Compiler.Error(
+            s"Invalid keys for use annotation: ${invalidKeys.map(_.ident.name).mkString(",")}"
+          )
+        }
+
+        val useApprovedAssets = extractAnnotationBoolean(useAnnotation, useApprovedAssetsKey)
+        val useContractAssets = extractAnnotationBoolean(useAnnotation, useContractAssetsKey)
+        (
+          useApprovedAssets.getOrElse(useApprovedAssetsDefault),
+          useContractAssets.getOrElse(useContractAssetsDefault)
+        )
+      } else {
+        (useApprovedAssetsDefault, useContractAssetsDefault)
+      }
+    }
+  }
+
+  def extractAnnotationBoolean(annotation: Annotation, name: String): Option[Boolean] = {
+    annotation.fields.find(_.ident.name == name).map(_.value) match {
+      case Some(value: Val.Bool) => Some(value.v)
+      case Some(_) =>
+        throw Compiler.Error(s"Expect boolean for ${name} in annotation ${annotation.id.name}")
+      case None => None
+    }
+  }
 }
 
 @SuppressWarnings(
@@ -300,21 +397,23 @@ object StatefulParser extends Parser[StatefulContext] {
 
   def rawTxScript[Unknown: P]: P[Ast.TxScript] =
     P(
-      Lexer.keyword(
-        "TxScript"
-      ) ~/ Lexer.typeId ~ templateParams.? ~ Lexer.TxScriptModifier.modifiers.? ~ "{" ~ statement
-        .rep(0) ~ func
-        .rep(0) ~ "}"
+      annotation.rep ~
+        Lexer.keyword(
+          "TxScript"
+        ) ~/ Lexer.typeId ~ templateParams.? ~ "{" ~ statement
+          .rep(0) ~ func
+          .rep(0) ~ "}"
     )
-      .map { case (typeId, templateVars, payable, mainStmts, funcs) =>
-        val isPayable = !payable.contains(Lexer.TxScriptModifier.NonPayable)
+      .map { case (annotations, typeId, templateVars, mainStmts, funcs) =>
         if (mainStmts.isEmpty) {
           throw Compiler.Error(s"No main statements defined in TxScript ${typeId.name}")
         } else {
+          val (useApprovedAssets, useContractAssets) =
+            Parser.extractAssetModifier(annotations, true, false)
           Ast.TxScript(
             typeId,
             templateVars.getOrElse(Seq.empty),
-            Ast.FuncDef.main(mainStmts, isPayable) +: funcs
+            Ast.FuncDef.main(mainStmts, useApprovedAssets, useContractAssets) +: funcs
           )
         }
       }
@@ -354,21 +453,25 @@ object StatefulParser extends Parser[StatefulContext] {
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def interfaceInheritance[Unknown: P]: P[Ast.InterfaceInheritance] =
     P(Lexer.typeId).map(Ast.InterfaceInheritance)
-  def interfaceFunc[Unknown: P]: P[Ast.FuncDef[StatefulContext]] =
-    P(
-      Lexer.FuncModifier.modifiers.rep(0) ~ Lexer.keyword(
-        "fn"
-      ) ~/ Lexer.funcId ~ funParams ~ returnType
-    )
-      .map { case (modifiers, funcId, params, returnType) =>
-        if (modifiers.toSet.size != modifiers.length) {
-          throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
-        } else {
-          val isPublic  = modifiers.contains(Lexer.FuncModifier.Pub)
-          val isPayable = modifiers.contains(Lexer.FuncModifier.Payable)
-          Ast.FuncDef(funcId, isPublic, isPayable, params, returnType, Seq.empty)
-        }
+  def interfaceFunc[Unknown: P]: P[Ast.FuncDef[StatefulContext]] = {
+    funcTmp.map { f =>
+      f.body match {
+        case None =>
+          Ast.FuncDef(
+            f.annotations,
+            f.id,
+            f.isPublic,
+            f.useApprovedAssets,
+            f.useContractAssets,
+            f.args,
+            f.rtypes,
+            Seq.empty
+          )
+        case _ =>
+          throw Compiler.Error(s"Interface function ${f.id.name} should not have function body")
       }
+    }
+  }
   def rawInterface[Unknown: P]: P[Ast.ContractInterface] =
     P(
       Lexer.keyword("Interface") ~/ Lexer.typeId ~
