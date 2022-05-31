@@ -151,17 +151,6 @@ object Lexer {
     def modifiers[Unknown: P]: P[FuncModifier] = P(pub)
   }
 
-  sealed trait TxScriptModifier
-
-  object TxScriptModifier {
-    case object Payable    extends TxScriptModifier
-    case object NonPayable extends TxScriptModifier
-
-    def payable[Unknown: P]: P[TxScriptModifier]    = keyword("payable").map(_ => Payable)
-    def nonPayable[Unknown: P]: P[TxScriptModifier] = keyword("nonPayable").map(_ => NonPayable)
-    def modifiers[Unknown: P]: P[TxScriptModifier]  = P(payable | nonPayable)
-  }
-
   def keywordSet: Set[String] = Set(
     "TxContract",
     "AssetScript",
@@ -177,8 +166,6 @@ object Lexer {
     "else",
     "while",
     "pub",
-    "payable",
-    "nonPayable",
     "event",
     "emit",
     "loop",

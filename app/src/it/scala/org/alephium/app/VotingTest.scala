@@ -194,7 +194,8 @@ trait VotingFixture extends WalletFixture {
                             |  event VoteCasted(voter: Address, result: Bool)
                             |  event VotingClosed()
                             |
-                            |  pub payable fn allocateTokens() -> () {
+                            |  @use(approvedAssets = true, contractAssets = true)
+                            |  pub fn allocateTokens() -> () {
                             |     assert!(initialized == false)
                             |     assert!(txCaller!(txCallerSize!() - 1) == admin)
                             |     ${allocationTransfers}
@@ -205,7 +206,8 @@ trait VotingFixture extends WalletFixture {
                             |     emit VotingStarted()
                             |  }
                             |
-                            |  pub payable fn vote(choice: Bool, voter: Address) -> () {
+                            |  @use(approvedAssets = true, contractAssets = true)
+                            |  pub fn vote(choice: Bool, voter: Address) -> () {
                             |    assert!(initialized == true && isClosed == false)
                             |    transferAlph!(voter, admin, $utxoFee)
                             |    transferTokenToSelf!(voter, selfTokenId!(), 1)
@@ -254,7 +256,7 @@ trait VotingFixture extends WalletFixture {
       contractCode: String
   ): TxResult = {
     val allocationScript = s"""
-                              |TxScript TokenAllocation payable {
+                              |TxScript TokenAllocation {
                               |  let voting = Voting(#${contractId})
                               |  let caller = txCaller!(0)
                               |  approveAlph!(caller, $utxoFee * ${votersWallets.size})
@@ -272,7 +274,7 @@ trait VotingFixture extends WalletFixture {
       contractCode: String
   ): TxResult = {
     val votingScript = s"""
-                          |TxScript VotingScript payable {
+                          |TxScript VotingScript {
                           |  let caller = txCaller!(txCallerSize!() - 1)
                           |  approveToken!(caller, #${contractId}, 1)
                           |  let voting = Voting(#${contractId})
@@ -286,7 +288,7 @@ trait VotingFixture extends WalletFixture {
 
   def close(adminWallet: Wallet, contractId: String, contractCode: String): TxResult = {
     val closingScript = s"""
-                           |TxScript ClosingScript payable {
+                           |TxScript ClosingScript {
                            |  let voting = Voting(#${contractId})
                            |  voting.close()
                            |}

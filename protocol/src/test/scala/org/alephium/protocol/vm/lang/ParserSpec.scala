@@ -533,7 +533,7 @@ class ParserSpec extends AlephiumSpec {
   }
 
   trait ScriptFixture {
-    val payable: Boolean
+    val useApprovedAssets: Boolean
     val script: String
 
     val ident        = TypeId("Main")
@@ -543,7 +543,7 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         FuncId("main", false),
         true,
-        payable,
+        useApprovedAssets,
         false,
         Seq.empty,
         Seq.empty,
@@ -553,7 +553,7 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse AssetScript" in new ScriptFixture {
-    val payable = false
+    val useApprovedAssets = false
     val script = s"""
                     |AssetScript Main(x: U256) {
                     |  pub fn main() -> () {
@@ -567,9 +567,9 @@ class ParserSpec extends AlephiumSpec {
   }
 
   // scalastyle:off no.equal
-  class TxScriptFixture(useApprovedAssets: Option[Boolean]) extends ScriptFixture {
-    val payable = !useApprovedAssets.contains(false)
-    val annotation = useApprovedAssets match {
+  class TxScriptFixture(useApprovedAssetsOpt: Option[Boolean]) extends ScriptFixture {
+    val useApprovedAssets = !useApprovedAssetsOpt.contains(false)
+    val annotation = useApprovedAssetsOpt match {
       case Some(value) => s"@use(approvedAssets = $value)"
       case None        => ""
     }
@@ -588,7 +588,7 @@ class ParserSpec extends AlephiumSpec {
   }
   // scalastyle:on no.equal
 
-  it should "parse explicit payable TxScript" in new TxScriptFixture(Some(true))
-  it should "parse implicit payable TxScript" in new TxScriptFixture(None)
-  it should "parse non payable TxScript" in new TxScriptFixture(Some(false))
+  it should "parse explicit useApprovedAssets TxScript" in new TxScriptFixture(Some(true))
+  it should "parse implicit useApprovedAssets TxScript" in new TxScriptFixture(None)
+  it should "parse vanilla TxScript" in new TxScriptFixture(Some(false))
 }

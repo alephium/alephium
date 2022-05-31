@@ -553,15 +553,16 @@ object SwapContracts {
   val tokenContract = s"""
                          |TxContract Token(mut x: U256) {
                          |
-                         | pub payable fn withdraw(address: Address, amount: U256) -> () {
-                         |   transferTokenFromSelf!(address, selfTokenId!(), amount)
-                         | }
+                         |  @use(contractAssets = true)
+                         |  pub fn withdraw(address: Address, amount: U256) -> () {
+                         |    transferTokenFromSelf!(address, selfTokenId!(), amount)
+                         |  }
                          |}
     """.stripMargin
 
   def tokenWithdrawTxScript(address: String, tokenContractKey: Hash, tokenAmount: U256) =
     s"""
-       |TxScript Main payable {
+       |TxScript Main {
        |  let token = Token(#${tokenContractKey.toHexString})
        |  token.withdraw(@${address}, $tokenAmount)
        |}
@@ -575,14 +576,16 @@ object SwapContracts {
        |
        |TxContract Swap(tokenId: ByteVec, mut alphReserve: U256, mut tokenReserve: U256) {
        |
-       |  pub payable fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
+       |  @use(approvedAssets = true, contractAssets = true)
+       |  pub fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
        |    transferAlphToSelf!(lp, alphAmount)
        |    transferTokenToSelf!(lp, tokenId, tokenAmount)
        |    alphReserve = alphAmount
        |    tokenReserve = tokenAmount
        |  }
        |
-       |  pub payable fn swapToken(buyer: Address, alphAmount: U256) -> () {
+       |  @use(approvedAssets = true, contractAssets = true)
+       |  pub fn swapToken(buyer: Address, alphAmount: U256) -> () {
        |    let tokenAmount = tokenReserve - alphReserve * tokenReserve / (alphReserve + alphAmount)
        |    transferAlphToSelf!(buyer, alphAmount)
        |    transferTokenFromSelf!(buyer, tokenId, tokenAmount)
@@ -590,7 +593,8 @@ object SwapContracts {
        |    tokenReserve = tokenReserve - tokenAmount
        |  }
        |
-       |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
+       |  @use(approvedAssets = true, contractAssets = true)
+       |  pub fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
        |    let alphAmount = alphReserve - alphReserve * tokenReserve / (tokenReserve + tokenAmount)
        |    transferTokenToSelf!(buyer, tokenId, tokenAmount)
        |    transferAlphFromSelf!(buyer, alphAmount)

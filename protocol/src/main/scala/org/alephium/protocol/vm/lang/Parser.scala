@@ -313,24 +313,26 @@ object Parser {
     } else {
       val useApprovedAssetsKey = "approvedAssets"
       val useContractAssetsKey = "contractAssets"
-      if (annotations.nonEmpty) {
-        val useAnnotation = annotations.head
-        val invalidKeys = useAnnotation.fields
-          .filter(f => f.ident.name != useApprovedAssetsKey && f.ident.name != useContractAssetsKey)
-        if (invalidKeys.nonEmpty) {
-          throw Compiler.Error(
-            s"Invalid keys for use annotation: ${invalidKeys.map(_.ident.name).mkString(",")}"
-          )
-        }
+      annotations.headOption match {
+        case Some(useAnnotation) =>
+          val invalidKeys = useAnnotation.fields
+            .filter(f =>
+              f.ident.name != useApprovedAssetsKey && f.ident.name != useContractAssetsKey
+            )
+          if (invalidKeys.nonEmpty) {
+            throw Compiler.Error(
+              s"Invalid keys for use annotation: ${invalidKeys.map(_.ident.name).mkString(",")}"
+            )
+          }
 
-        val useApprovedAssets = extractAnnotationBoolean(useAnnotation, useApprovedAssetsKey)
-        val useContractAssets = extractAnnotationBoolean(useAnnotation, useContractAssetsKey)
-        (
-          useApprovedAssets.getOrElse(useApprovedAssetsDefault),
-          useContractAssets.getOrElse(useContractAssetsDefault)
-        )
-      } else {
-        (useApprovedAssetsDefault, useContractAssetsDefault)
+          val useApprovedAssets = extractAnnotationBoolean(useAnnotation, useApprovedAssetsKey)
+          val useContractAssets = extractAnnotationBoolean(useAnnotation, useContractAssetsKey)
+          (
+            useApprovedAssets.getOrElse(useApprovedAssetsDefault),
+            useContractAssets.getOrElse(useContractAssetsDefault)
+          )
+        case None =>
+          (useApprovedAssetsDefault, useContractAssetsDefault)
       }
     }
   }

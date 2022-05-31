@@ -907,14 +907,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 25099
+    result1.gasUsed is 18599
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
     contractState1.fields is
       AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(210)), ValU256(300))
     contractState1.asset is AssetState.from(ALPH.alph(210), AVector(Token(tokenId, 300)))
-    result1.txOutputs.length is 3
+    result1.txOutputs.length is 2
     result1.txOutputs(0) is ContractOutput(
       result1.txOutputs(0).hint,
       emptyKey(0),
@@ -922,16 +922,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       contractAddress,
       AVector(Token(tokenId, 300))
     )
-    result1.txOutputs(1) is ContractOutput(
+    result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
-      Amount(1000000000000000000L),
-      Address.contract(testContractId1),
-      AVector.empty
-    )
-    result1.txOutputs(2) is AssetOutput(
-      result1.txOutputs(2).hint,
-      emptyKey(2),
       Amount(937500000000000000L),
       lp,
       AVector.empty,
@@ -1003,14 +996,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 25069
+    result1.gasUsed is 18569
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
     contractState1.fields is
       AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100))
     contractState1.asset is AssetState.from(ALPH.alph(10), AVector(Token(tokenId, 100)))
-    result1.txOutputs.length is 3
+    result1.txOutputs.length is 2
     result1.txOutputs(0) is ContractOutput(
       result1.txOutputs(0).hint,
       emptyKey(0),
@@ -1026,13 +1019,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector.empty,
       TimeStamp.zero,
       ByteString.empty
-    )
-    result1.txOutputs(2) is ContractOutput(
-      result1.txOutputs(2).hint,
-      emptyKey(2),
-      Amount(1000000000000000000L),
-      Address.contract(testContractId1),
-      AVector.empty
     )
   }
 
@@ -1099,14 +1085,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 25030
+    result1.gasUsed is 18530
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
     contractState1.fields is
       AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100))
     contractState1.asset is AssetState.from(ALPH.alph(10), AVector(Token(tokenId, 100)))
-    result1.txOutputs.length is 3
+    result1.txOutputs.length is 2
     result1.txOutputs(0) is ContractOutput(
       result1.txOutputs(0).hint,
       emptyKey(0),
@@ -1122,13 +1108,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector(Token(tokenId, 100)),
       TimeStamp.zero,
       ByteString.empty
-    )
-    result1.txOutputs(2) is ContractOutput(
-      result1.txOutputs(2).hint,
-      emptyKey(2),
-      Amount(1000000000000000000L),
-      Address.contract(testContractId1),
-      AVector.empty
     )
   }
 
@@ -1223,7 +1202,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     {
       val rawCode =
         s"""
-           |TxScript Main(x: U256, y: U256) nonPayable {
+           |@use(approvedAssets = false)
+           |TxScript Main(x: U256, y: U256) {
            |  assert!(x != y)
            |}
            |""".stripMargin
@@ -1236,7 +1216,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     {
       val rawCode =
         s"""
-           |TxScript Main nonPayable {
+           |@use(approvedAssets = false)
+           |TxScript Main {
            |  assert!(1 != 2)
            |}
            |""".stripMargin
