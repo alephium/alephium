@@ -358,6 +358,85 @@ class VMSpec extends AlephiumSpec {
     tokenAmount1 is ALPH.alph(1)
   }
 
+  it should "lock asset" in new ContractFixture {
+    val token =
+      s"""
+         |TxContract Foo() {
+         |  pub payable fn mint() -> () {
+         |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), ${ALPH.alph(10)})
+         |  }
+         |}
+         |""".stripMargin
+
+    val tokenId0    = createContract(token, AVector.empty, ALPH.alph(100)).key
+    val tokenId1    = createContract(token, AVector.empty, ALPH.alph(100)).key
+    val tokenId0Hex = tokenId0.toHexString
+    val tokenId1Hex = tokenId1.toHexString
+
+    val mint =
+      s"""
+         |TxScript Main payable {
+         |  let token0 = Foo(#$tokenId0Hex)
+         |  token0.mint()
+         |  let token1 = Foo(#$tokenId1Hex)
+         |  token1.mint()
+         |}
+         |
+         |$token
+         |""".stripMargin
+    callTxScript(mint)
+
+    val lock =
+      s"""
+         |TxScript Main payable {
+         |  approveToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.alph(3)})
+         |  approveToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.alph(3)})
+         |
+         |  let token0 = Foo(#$tokenId0Hex)
+         |  let token1 = Foo(#$tokenId1Hex)
+         |  let timestamp0 = 1000
+         |  let timestamp1 = 2000
+         |
+         |  lockAlph!(@$genesisAddress, ${ALPH.oneAlph}, timestamp0)
+         |  lockToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp0)
+         |  lockToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp0)
+         |
+         |  lockAlph!(@$genesisAddress, ${ALPH.oneAlph}, timestamp1)
+         |  lockToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp1)
+         |  lockToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp1)
+         |
+         |  let timestamp2 = 3000
+         |  lockToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp2)
+         |  lockToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp2)
+         |}
+         |
+         |$token
+         |""".stripMargin
+
+    val tx = callTxScript(lock).nonCoinbase(0)
+    tx.generatedOutputs(0) is AssetOutput(
+      ALPH.oneAlph,
+      genesisAddress.lockupScript,
+      TimeStamp.unsafe(1000),
+      AVector(tokenId0 -> ALPH.oneAlph, tokenId1 -> ALPH.oneAlph),
+      ByteString.empty
+    )
+    tx.generatedOutputs(1) is AssetOutput(
+      ALPH.oneAlph,
+      genesisAddress.lockupScript,
+      TimeStamp.unsafe(2000),
+      AVector(tokenId0 -> ALPH.oneAlph, tokenId1 -> ALPH.oneAlph),
+      ByteString.empty
+    )
+    tx.generatedOutputs(2) is AssetOutput(
+      dustUtxoAmount,
+      genesisAddress.lockupScript,
+      TimeStamp.unsafe(3000),
+      AVector(tokenId0 -> ALPH.oneAlph, tokenId1 -> ALPH.oneAlph),
+      ByteString.empty
+    )
+  }
+
   it should "not use up contract assets" in new ContractFixture {
     val input =
       """

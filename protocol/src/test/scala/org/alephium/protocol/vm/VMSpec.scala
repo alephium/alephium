@@ -22,9 +22,9 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 import org.scalatest.Assertion
 
-import org.alephium.protocol.{Hash, Signature, SignatureSchema}
+import org.alephium.protocol.{ALPH, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.minimalGas
+import org.alephium.protocol.model.{dustUtxoAmount, minimalGas, AssetOutput, TxOutput}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -265,7 +265,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
           )
         }
 
-        override val outputBalances: Balances = Balances.empty
+        override val outputBalances: OutputBalances = OutputBalances.empty
       }
 
     def testInstrs(
@@ -407,10 +407,10 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     )
 
     val context = pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(98)))
-    context.outputBalances.getAlphAmount(address0.lockupScript).get is 90
-    context.outputBalances.getAlphAmount(address1.lockupScript).get is 11
-    context.outputBalances.getTokenAmount(address0.lockupScript, tokenId).get is 1
-    context.outputBalances.getTokenAmount(address1.lockupScript, tokenId).get is 98
+    context.outputBalances.unlocked.getAlphAmount(address0.lockupScript).get is 90
+    context.outputBalances.unlocked.getAlphAmount(address1.lockupScript).get is 11
+    context.outputBalances.unlocked.getTokenAmount(address0.lockupScript, tokenId).get is 1
+    context.outputBalances.unlocked.getTokenAmount(address1.lockupScript, tokenId).get is 98
   }
 
   it should "not create invalid contract" in new BalancesFixture {
@@ -445,6 +445,43 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     test(contract1, Some(EmptyMethods))
     val contract2 = StatefulContract(-1, AVector.empty)
     test(contract2, Some(InvalidFieldLength))
+  }
+
+  it should "output generated balances" in new BalancesFixture {
+    val context      = mockContext()
+    val vm           = StatefulVM.default(context)
+    val timestamp    = TimeStamp.unsafe(1)
+    val lockupScript = address0.lockupScript.asInstanceOf[LockupScript.Asset]
+    val outputBalances0 = OutputBalances(
+      Balances(ArrayBuffer(lockupScript -> BalancesPerLockup.alph(ALPH.oneNanoAlph))),
+      ArrayBuffer(lockupScript -> LockedBalances.token(tokenId, ALPH.oneAlph, timestamp))
+    )
+    vm.outputGeneratedBalances(outputBalances0).leftValue isE NotEnoughBalance
+
+    val outputBalances1 = OutputBalances(
+      Balances(ArrayBuffer(lockupScript -> BalancesPerLockup.alph(dustUtxoAmount))),
+      ArrayBuffer(lockupScript -> LockedBalances.token(tokenId, ALPH.oneAlph, timestamp))
+    )
+    vm.outputGeneratedBalances(outputBalances1) isE ()
+    context.generatedOutputs is ArrayBuffer[TxOutput](
+      AssetOutput(
+        dustUtxoAmount,
+        lockupScript,
+        TimeStamp.unsafe(1),
+        AVector(tokenId -> ALPH.oneAlph),
+        ByteString.empty
+      )
+    )
+
+    val outputBalances2 = OutputBalances(
+      Balances(
+        ArrayBuffer(
+          lockupScript -> BalancesPerLockup(dustUtxoAmount, mutable.Map(tokenId -> ALPH.oneAlph), 0)
+        )
+      ),
+      ArrayBuffer(lockupScript -> LockedBalances.token(tokenId, ALPH.oneAlph, timestamp))
+    )
+    vm.outputGeneratedBalances(outputBalances2).leftValue isE InvalidOutputBalances
   }
 
   it should "serde instructions" in {

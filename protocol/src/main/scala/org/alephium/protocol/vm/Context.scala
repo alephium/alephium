@@ -157,7 +157,7 @@ object StatelessContext {
 trait StatefulContext extends StatelessContext with ContractPool {
   def worldState: WorldState.Staging
 
-  def outputBalances: Balances
+  def outputBalances: OutputBalances
 
   def logConfig: LogConfig
 
@@ -224,7 +224,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
         case _: LockupScript.Asset => okay
         case _: LockupScript.P2C   => failed(InvalidAddressTypeInContractDestroy)
       }
-      _ <- outputBalances.add(address, contractAssets).toRight(Right(InvalidBalances))
+      _ <- outputBalances.unlocked.add(address, contractAssets).toRight(Right(InvalidBalances))
       _ <- removeContract(contractId)
     } yield ()
   }
@@ -355,6 +355,6 @@ object StatefulContext {
         failed(ExpectNonPayableMethod)
       }
 
-    val outputBalances: Balances = Balances.empty
+    val outputBalances: OutputBalances = OutputBalances.empty
   }
 }

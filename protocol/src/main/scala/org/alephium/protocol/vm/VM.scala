@@ -264,7 +264,7 @@ final class StatefulVM(
       } else {
         val (lockupScript, balancesPerLockup) = current.all(index)
         if (balancesPerLockup.scopeDepth <= 0) {
-          ctx.outputBalances.add(lockupScript, balancesPerLockup)
+          ctx.outputBalances.unlocked.add(lockupScript, balancesPerLockup)
         } else {
           previous.add(lockupScript, balancesPerLockup) match {
             case Some(_) => iter(index + 1)
@@ -288,8 +288,8 @@ final class StatefulVM(
     if (lastFrame.method.isPayable) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
-        _        <- ctx.outputBalances.merge(balances.approved)
-        _        <- ctx.outputBalances.merge(balances.remaining)
+        _        <- ctx.outputBalances.unlocked.merge(balances.approved)
+        _        <- ctx.outputBalances.unlocked.merge(balances.remaining)
       } yield ()
       for {
         _ <- resultOpt match {
@@ -304,13 +304,31 @@ final class StatefulVM(
     }
   }
 
-  private def outputGeneratedBalances(outputBalances: Balances): ExeResult[Unit] = {
-    EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
-      balances.toTxOutput(lockupScript).flatMap {
-        case Some(output) => ctx.generateOutput(output)
-        case None         => Right(())
+  private[vm] def outputGeneratedBalances(outputBalances: OutputBalances): ExeResult[Unit] = {
+    for {
+      _ <- EitherF.foreachTry(outputBalances.locked) { case (lockupScript, balances) =>
+        EitherF.foreachTry(balances.assets) { case (timestamp, lockedAsset) =>
+          val output = lockedAsset.toTxOutput(lockupScript, timestamp)
+          for {
+            _ <-
+              if (lockedAsset.alphAmount.isEmpty) {
+                outputBalances.unlocked
+                  .subAlph(lockupScript, dustUtxoAmount)
+                  .toRight(Right(NotEnoughBalance))
+              } else {
+                Right(())
+              }
+            _ <- ctx.generateOutput(output)
+          } yield ()
+        }
       }
-    }
+      _ <- EitherF.foreachTry(outputBalances.unlocked.all) { case (lockupScript, balances) =>
+        balances.toTxOutput(lockupScript).flatMap {
+          case Some(output) => ctx.generateOutput(output)
+          case None         => Right(())
+        }
+      }
+    } yield ()
   }
 }
 
@@ -430,7 +448,7 @@ object StatefulVM {
     }
   }
 
-  private def default(ctx: StatefulContext): StatefulVM = {
+  private[vm] def default(ctx: StatefulContext): StatefulVM = {
     new StatefulVM(ctx, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
   }
 
