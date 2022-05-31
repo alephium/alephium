@@ -2083,7 +2083,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       if (succeeded) {
         instr.runWith(frame) isE ()
       } else {
-        instr.runWith(frame).leftValue isE InvalidMethodModifier
+        instr.runWith(frame).leftValue isE InvalidMethodModifierBeforeLeman
       }
     }
 

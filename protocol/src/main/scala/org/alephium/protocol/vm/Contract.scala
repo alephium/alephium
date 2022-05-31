@@ -39,7 +39,7 @@ final case class Method[Ctx <: StatelessContext](
     instrs: AVector[Instr[Ctx]]
 ) {
   def checkModifierPreLeman(): ExeResult[Unit] = {
-    if (isPayable == useContractAssets) okay else failed(InvalidMethodModifier)
+    if (isPayable == useContractAssets) okay else failed(InvalidMethodModifierBeforeLeman)
   }
 
   def toTemplateString(): String = {

@@ -583,10 +583,10 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       if (succeeded) {
         vm.execute(obj, 0, AVector.empty) match {
           case Right(res)  => res is ()
-          case Left(error) => error isnotE InvalidMethodModifier
+          case Left(error) => error isnotE InvalidMethodModifierBeforeLeman
         }
       } else {
-        vm.execute(obj, 0, AVector.empty).leftValue isE InvalidMethodModifier
+        vm.execute(obj, 0, AVector.empty).leftValue isE InvalidMethodModifierBeforeLeman
       }
     }
 

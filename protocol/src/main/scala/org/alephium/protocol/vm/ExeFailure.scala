@@ -56,7 +56,7 @@ case object InvalidFieldType                                   extends ExeFailur
 case object EmptyMethods                                       extends ExeFailure
 final case class InvalidType(v: Val)                           extends ExeFailure
 case object InvalidMethod                                      extends ExeFailure
-case object InvalidMethodModifier                              extends ExeFailure
+case object InvalidMethodModifierBeforeLeman                   extends ExeFailure
 final case class InvalidMethodIndex(index: Int)                extends ExeFailure
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure
 case object InvalidLengthForEncodeInstr                        extends ExeFailure
