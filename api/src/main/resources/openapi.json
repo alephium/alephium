@@ -5416,7 +5416,7 @@
                 "$ref": "#/components/schemas/Script"
               },
               "example": {
-                "code": "TxScript Main payable { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y, 1024) }"
+                "code": "TxScript Main { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y, 1024) }"
               }
             }
           },
@@ -5451,7 +5451,7 @@
                   "functions": [
                     {
                       "name": "bar",
-                      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+                      "signature": "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
                       "argNames": [
                         "a",
                         "b",
@@ -5694,7 +5694,7 @@
                 "$ref": "#/components/schemas/Contract"
               },
               "example": {
-                "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+                "code": "TxContract Foo(bar: ByteVec) {\n  @use(approvedAssets = true, contractAssets = true)\n  pub fn baz(amount: U256) -> () {\n    issueToken!(amount)\n  }\n}"
               }
             }
           },
@@ -5730,7 +5730,7 @@
                   "functions": [
                     {
                       "name": "bar",
-                      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+                      "signature": "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
                       "argNames": [
                         "a",
                         "b",
