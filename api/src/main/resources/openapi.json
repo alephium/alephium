@@ -6005,6 +6005,7 @@
                   "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                   "bytecode": "00010700000000000118",
                   "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                  "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
                   "fields": [
                     {
                       "type": "U256",
@@ -6137,6 +6138,7 @@
                     "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                     "bytecode": "00010700000000000118",
                     "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                    "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
                     "fields": [
                       {
                         "type": "U256",
@@ -6195,6 +6197,7 @@
                       "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                       "bytecode": "00010700000000000118",
                       "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                      "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
                       "fields": [
                         {
                           "type": "U256",
@@ -8536,6 +8539,7 @@
           "address",
           "bytecode",
           "codeHash",
+          "initialStateHash",
           "fields",
           "asset"
         ],
@@ -8550,6 +8554,10 @@
             "format": "contract"
           },
           "codeHash": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "initialStateHash": {
             "type": "string",
             "format": "32-byte-hash"
           },
