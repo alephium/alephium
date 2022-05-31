@@ -26,7 +26,7 @@ import org.scalacheck.Gen
 
 import org.alephium.crypto
 import org.alephium.protocol._
-import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model.{ContractOutput, ContractOutputRef, Target, TokenId}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.serde.{serialize, RandomBytes}
@@ -2052,6 +2052,58 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       AVector((tokenId, ALPH.oneAlph)),
       Some(ALPH.oneNanoAlph)
     )
+  }
+
+  it should "check method modifier when creating contract" in new StatefulFixture {
+    val from = lockupScriptGen.sample.get
+
+    val preLemanFrame = (balanceState: BalanceState) =>
+      prepareFrame(Some(balanceState))(NetworkConfigFixture.PreLeman)
+    val lemanFrame =
+      (balanceState: BalanceState) => prepareFrame(Some(balanceState))(NetworkConfigFixture.Leman)
+
+    val contract0 = StatefulContract(0, AVector(Method(true, true, true, 0, 0, 0, AVector.empty)))
+    val contract1 = StatefulContract(0, AVector(Method(true, false, false, 0, 0, 0, AVector.empty)))
+    val contract2 = StatefulContract(0, AVector(Method(true, true, false, 0, 0, 0, AVector.empty)))
+    val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
+
+    def testModifier(
+        instr: Instr[StatefulContext],
+        frameBuilder: BalanceState => Frame[StatefulContext],
+        contract: StatefulContract,
+        succeeded: Boolean
+    ) = {
+      val balanceState = BalanceState(Balances.empty, tokenBalance(from, tokenId, ALPH.oneAlph))
+      val frame        = frameBuilder(balanceState)
+      frame.opStack.push(Val.ByteVec(serialize(contract)))
+      frame.opStack.push(Val.ByteVec(serialize(AVector.empty[Val])))
+      if (instr.isInstanceOf[CreateContractWithToken.type]) {
+        frame.opStack.push(Val.U256(ALPH.oneNanoAlph))
+      }
+      if (succeeded) {
+        instr.runWith(frame) isE ()
+      } else {
+        instr.runWith(frame).leftValue isE InvalidMethodModifier
+      }
+    }
+
+    testModifier(CreateContract, lemanFrame, contract0, true)
+    testModifier(CreateContract, lemanFrame, contract1, true)
+    testModifier(CreateContract, lemanFrame, contract2, true)
+    testModifier(CreateContract, lemanFrame, contract3, true)
+    testModifier(CreateContract, preLemanFrame, contract0, true)
+    testModifier(CreateContract, preLemanFrame, contract1, true)
+    testModifier(CreateContract, preLemanFrame, contract2, false)
+    testModifier(CreateContract, preLemanFrame, contract3, false)
+
+    testModifier(CreateContractWithToken, lemanFrame, contract0, true)
+    testModifier(CreateContractWithToken, lemanFrame, contract1, true)
+    testModifier(CreateContractWithToken, lemanFrame, contract2, true)
+    testModifier(CreateContractWithToken, lemanFrame, contract3, true)
+    testModifier(CreateContractWithToken, preLemanFrame, contract0, true)
+    testModifier(CreateContractWithToken, preLemanFrame, contract1, true)
+    testModifier(CreateContractWithToken, preLemanFrame, contract2, false)
+    testModifier(CreateContractWithToken, preLemanFrame, contract3, false)
   }
 
   it should "CopyCreateContract" in new CreateContractAbstractFixture {

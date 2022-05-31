@@ -1356,6 +1356,7 @@ sealed trait CreateContractBase extends CreateContractAbstract with GasCreate {
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
+      _ <- contractCode.checkAssetsModifier(frame.ctx)
       _ <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
       _ <- StatefulContract.check(contractCode)
     } yield contractCode.toHalfDecoded()

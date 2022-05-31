@@ -24,7 +24,7 @@ import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.{minimalAlphInContract, minimalGas}
+import org.alephium.protocol.model.{minimalAlphInContract, minimalGas, ContractId}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -570,5 +570,33 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract - 1)
       )
       .leftValue isE NeedAtLeastOneAlphInContract
+  }
+
+  it should "check method modifier compatibility" in new NetworkFixture {
+    val contract0 = StatefulContract(0, AVector(Method(true, true, true, 0, 0, 0, AVector.empty)))
+    val contract1 = StatefulContract(0, AVector(Method(true, false, false, 0, 0, 0, AVector.empty)))
+    val contract2 = StatefulContract(0, AVector(Method(true, true, false, 0, 0, 0, AVector.empty)))
+    val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
+
+    def test(vm: StatefulVM, contract: StatefulContract, succeeded: Boolean) = {
+      val obj = StatefulContractObject.from(contract, AVector.empty, ContractId.random)
+      if (succeeded) {
+        vm.execute(obj, 0, AVector.empty) match {
+          case Right(res)  => res is ()
+          case Left(error) => error isnotE InvalidMethodModifier
+        }
+      } else {
+        vm.execute(obj, 0, AVector.empty).leftValue isE InvalidMethodModifier
+      }
+    }
+
+    test(lemanStatefulVm, contract0, true)
+    test(lemanStatefulVm, contract1, true)
+    test(lemanStatefulVm, contract2, true)
+    test(lemanStatefulVm, contract3, true)
+    test(preLemanStatefulVm, contract0, true)
+    test(preLemanStatefulVm, contract1, true)
+    test(preLemanStatefulVm, contract2, false)
+    test(preLemanStatefulVm, contract3, false)
   }
 }

@@ -18,6 +18,7 @@ package org.alephium.protocol.vm
 
 import org.scalatest.Assertion
 
+import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector}
 import org.alephium.util.Hex.HexStringSyntax
@@ -183,6 +184,35 @@ class ContractSpec extends AlephiumSpec {
         Method[StatefulContext](isPublic, isPayable, useContractAssetss, 3, 4, 5, AVector.empty)
       deserialize[Method[StatefulContext]](serialize(statefulMethods)) isE statefulMethods
     }
+  }
+
+  it should "check method modifier compatibility" in new MethodsFixture {
+    statelessMethod0.checkModifierPreLeman() isE ()
+    statelessMethod1.checkModifierPreLeman() isE ()
+    statelessMethod2.checkModifierPreLeman().leftValue isE InvalidMethodModifier
+    statelessMethod3.checkModifierPreLeman().leftValue isE InvalidMethodModifier
+
+    statefulMethod0.checkModifierPreLeman() isE ()
+    statefulMethod1.checkModifierPreLeman() isE ()
+    statefulMethod2.checkModifierPreLeman().leftValue isE InvalidMethodModifier
+    statefulMethod3.checkModifierPreLeman().leftValue isE InvalidMethodModifier
+  }
+
+  trait ContractFixture extends MethodsFixture with ContextGenerators {
+    val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.PreLeman)
+    val lemanContext    = genStatefulContext(None)(NetworkConfigFixture.Leman)
+  }
+
+  it should "check method modifier in contracts" in new ContractFixture {
+    val contracts: Seq[Contract[_]] =
+      Seq(statelessMethod0, statelessMethod1, statelessMethod2, statelessMethod3).map(method =>
+        StatelessScript(AVector(method))
+      )
+    contracts.foreach(_.checkAssetsModifier(lemanContext) isE ())
+    contracts(0).checkAssetsModifier(preLemanContext) isE ()
+    contracts(1).checkAssetsModifier(preLemanContext) isE ()
+    contracts(2).checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifier
+    contracts(3).checkAssetsModifier(preLemanContext).leftValue isE InvalidMethodModifier
   }
 }
 

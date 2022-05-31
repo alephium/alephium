@@ -24,10 +24,10 @@ import akka.util.ByteString
 import org.alephium.io.IOError
 import org.alephium.macros.HashSerde
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.model.{ContractId, HardFork}
 import org.alephium.serde
 import org.alephium.serde._
-import org.alephium.util.{AVector, Hex}
+import org.alephium.util.{AVector, EitherF, Hex}
 
 final case class Method[Ctx <: StatelessContext](
     isPublic: Boolean,
@@ -38,6 +38,10 @@ final case class Method[Ctx <: StatelessContext](
     returnLength: Int,
     instrs: AVector[Instr[Ctx]]
 ) {
+  def checkModifierPreLeman(): ExeResult[Unit] = {
+    if (isPayable == useContractAssets) okay else failed(InvalidMethodModifier)
+  }
+
   def toTemplateString(): String = {
     val prefix = Hex.toHexString(
       serialize(isPublic) ++
@@ -136,6 +140,16 @@ sealed trait Contract[Ctx <: StatelessContext] {
 
   def initialStateHash(fields: AVector[Val]): Hash =
     Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
+
+  def checkAssetsModifier(ctx: StatelessContext): ExeResult[Unit] = {
+    if (ctx.getHardFork() < HardFork.Leman) {
+      EitherF.foreachTry(0 until methodsLength) { methodIndex =>
+        getMethod(methodIndex).flatMap(_.checkModifierPreLeman())
+      }
+    } else {
+      okay
+    }
+  }
 }
 
 sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
