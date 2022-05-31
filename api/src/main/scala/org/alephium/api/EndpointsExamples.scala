@@ -478,12 +478,9 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val compileContractExamples: List[Example[Compile.Contract]] =
     simpleExample(
       Compile.Contract(
-        code = """TxContract Foo(bar: ByteVec) {
-                 |  @use(approvedAssets = true, contractAssets = true)
-                 |  pub fn baz(amount: U256) -> () {
-                 |    issueToken!(amount)
-                 |  }
-                 |}""".stripMargin
+        // Note that we use this weird format to avoid Windows linebreak issue
+        code =
+          "TxContract Foo(bar: ByteVec) {\n@use(approvedAssets = true, contractAssets = true)\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
       )
     )
 

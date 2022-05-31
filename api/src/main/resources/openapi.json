@@ -5694,7 +5694,7 @@
                 "$ref": "#/components/schemas/Contract"
               },
               "example": {
-                "code": "TxContract Foo(bar: ByteVec) {\n  @use(approvedAssets = true, contractAssets = true)\n  pub fn baz(amount: U256) -> () {\n    issueToken!(amount)\n  }\n}"
+                "code": "TxContract Foo(bar: ByteVec) {\n@use(approvedAssets = true, contractAssets = true)\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
               }
             }
           },
