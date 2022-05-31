@@ -633,6 +633,7 @@ trait EndpointsExamples extends ErrorExamples {
         returns = AVector[Val](ValU256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),
+        txInputs = AVector(contractAddress),
         txOutputs =
           AVector(ContractOutput(1234, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
         events = AVector(eventByTxId)

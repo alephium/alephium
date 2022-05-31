@@ -6212,6 +6212,9 @@
                       }
                     }
                   ],
+                  "txInputs": [
+                    "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
+                  ],
                   "txOutputs": [
                     {
                       "type": "ContractOutput",
@@ -9350,6 +9353,7 @@
           "returns",
           "gasUsed",
           "contracts",
+          "txInputs",
           "txOutputs",
           "events"
         ],
@@ -9376,6 +9380,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ContractState"
+            }
+          },
+          "txInputs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "address"
             }
           },
           "txOutputs": {

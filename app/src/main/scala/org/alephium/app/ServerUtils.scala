@@ -840,6 +840,7 @@ class ServerUtils(implicit
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
         contracts = postState._1,
+        txInputs = executionResult.contractPrevOutputs.map(_.lockupScript).map(Address.from),
         txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, Hash.zero, index)
         },
