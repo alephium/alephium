@@ -313,11 +313,13 @@ class VMSpec extends AlephiumSpec {
     val contract =
       s"""
          |TxContract Foo() {
-         |  pub payable fn mint() -> () {
+         |  @use(contractAssets = true)
+         |  pub fn mint() -> () {
          |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), ${ALPH.alph(2)})
          |  }
          |
-         |  pub payable fn burn() -> () {
+         |  @use(approvedAssets = true, contractAssets = true)
+         |  pub fn burn() -> () {
          |    burnToken!(@$genesisAddress, selfTokenId!(), ${ALPH.oneAlph})
          |    burnToken!(selfAddress!(), selfTokenId!(), ${ALPH.oneAlph})
          |  }
@@ -327,7 +329,7 @@ class VMSpec extends AlephiumSpec {
 
     val mint =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  let foo = Foo(#${contractId.toHexString})
          |  foo.mint()
          |}
@@ -344,7 +346,7 @@ class VMSpec extends AlephiumSpec {
 
     val burn =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  approveToken!(@$genesisAddress, #${contractId.toHexString}, ${ALPH.alph(2)})
          |  let foo = Foo(#${contractId.toHexString})
          |  foo.burn()
@@ -365,6 +367,7 @@ class VMSpec extends AlephiumSpec {
     val token =
       s"""
          |TxContract Foo() {
+         |  @use(contractAssets = true)
          |  pub payable fn mint() -> () {
          |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), ${ALPH.alph(10)})
          |  }
@@ -378,7 +381,7 @@ class VMSpec extends AlephiumSpec {
 
     val mint =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  let token0 = Foo(#$tokenId0Hex)
          |  token0.mint()
          |  let token1 = Foo(#$tokenId1Hex)
@@ -391,7 +394,7 @@ class VMSpec extends AlephiumSpec {
 
     val lock =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  approveToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.alph(3)})
          |  approveToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.alph(3)})
          |
@@ -401,16 +404,16 @@ class VMSpec extends AlephiumSpec {
          |  let timestamp1 = 2000
          |
          |  lockAlph!(@$genesisAddress, ${ALPH.oneAlph}, timestamp0)
-         |  lockToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp0)
-         |  lockToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp0)
+         |  lockAlphWithToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp0)
+         |  lockAlphWithToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp0)
          |
          |  lockAlph!(@$genesisAddress, ${ALPH.oneAlph}, timestamp1)
-         |  lockToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp1)
-         |  lockToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp1)
+         |  lockAlphWithToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp1)
+         |  lockAlphWithToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp1)
          |
          |  let timestamp2 = 3000
-         |  lockToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp2)
-         |  lockToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp2)
+         |  lockAlphWithToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp2)
+         |  lockAlphWithToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp2)
          |}
          |
          |$token

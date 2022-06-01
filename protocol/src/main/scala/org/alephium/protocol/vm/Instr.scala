@@ -153,7 +153,7 @@ object Instr {
     CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
     /* Below are instructions for Leman hard fork */
     MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken,
-    LockAlph, LockToken
+    LockAlph, LockAlphWithToken
   )
   // format: on
 
@@ -1129,27 +1129,18 @@ case object EthEcRecover
 
 sealed trait AssetInstr extends StatefulInstrSimpleGas with GasBalance
 
-sealed trait LemanAssetInstr extends AssetInstr with LemanInstr[StatefulContext] {
-  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      _ <- frame.ctx.chargeGas(this)
-      _ <- super[LemanInstr].runWith(frame)
-    } yield ()
-  }
-
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
-}
+sealed trait LemanAssetInstr extends LemanInstrWithSimpleGas[StatefulContext] with GasBalance
 
 object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      amount       <- frame.popOpStackU256()
+      tokenAmount  <- frame.popOpStackU256()
       tokenIdRaw   <- frame.popOpStackByteVec()
       tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
-      from         <- frame.popOpStackAddress()
+      fromAddress  <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
       _ <- balanceState
-        .useToken(from.lockupScript, tokenId, amount.v)
+        .useToken(fromAddress.lockupScript, tokenId, tokenAmount.v)
         .toRight(Right(NotEnoughBalance))
     } yield ()
   }
@@ -1180,31 +1171,33 @@ object LockAlph extends LockAsset {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       timestamp    <- popTimestamp(frame)
-      amount       <- frame.popOpStackU256()
+      alphAmount   <- frame.popOpStackU256()
       lockupScript <- popAssetAddress(frame)
       balanceState <- frame.getBalanceState()
-      _            <- balanceState.useAlph(lockupScript, amount.v).toRight(Right(NotEnoughBalance))
+      _ <- balanceState.useAlph(lockupScript, alphAmount.v).toRight(Right(NotEnoughBalance))
       _ <- frame.ctx.generateOutput(
-        TxOutput.asset(amount.v, lockupScript, AVector.empty, timestamp)
+        TxOutput.asset(alphAmount.v, lockupScript, AVector.empty, timestamp)
       )
     } yield ()
   }
 }
 
-object LockToken extends LockAsset {
+object LockAlphWithToken extends LockAsset {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       timestamp    <- popTimestamp(frame)
-      amount       <- frame.popOpStackU256()
+      tokenAmount  <- frame.popOpStackU256()
       tokenIdRaw   <- frame.popOpStackByteVec()
       tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       alphAmount   <- frame.popOpStackU256()
       lockupScript <- popAssetAddress(frame)
       balanceState <- frame.getBalanceState()
       _ <- balanceState.useAlph(lockupScript, alphAmount.v).toRight(Right(NotEnoughBalance))
-      _ <- balanceState.useToken(lockupScript, tokenId, amount.v).toRight(Right(NotEnoughBalance))
+      _ <- balanceState
+        .useToken(lockupScript, tokenId, tokenAmount.v)
+        .toRight(Right(NotEnoughBalance))
       _ <- frame.ctx.generateOutput(
-        TxOutput.asset(alphAmount.v, lockupScript, AVector(tokenId -> amount.v), timestamp)
+        TxOutput.asset(alphAmount.v, lockupScript, AVector(tokenId -> tokenAmount.v), timestamp)
       )
     } yield ()
   }

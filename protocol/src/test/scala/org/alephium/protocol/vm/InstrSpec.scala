@@ -23,8 +23,8 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
-import org.alephium.crypto
 
+import org.alephium.crypto
 import org.alephium.protocol._
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model.{ContractOutput, ContractOutputRef, Target, TokenId, TxOutput}
@@ -74,7 +74,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
     val lemanStatefulInstrs = AVector(
       MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken,
-      LockAlph, LockToken
+      LockAlph, LockAlphWithToken
     )
     // format: on
 
@@ -1685,10 +1685,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     lazy val stack   = frame.opStack
     lazy val context = frame.ctx
 
-    def runAndCheckGas[I <: StatefulInstrSimpleGas](instr: I) = {
+    def runAndCheckGas[I <: Instr[StatefulContext] with GasSimple](
+        instr: I,
+        extraGasOpt: Option[GasBox] = None
+    ) = {
       val initialGas = context.gasRemaining
       instr.runWith(frame) isE ()
-      initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+      initialGas.subUnsafe(context.gasRemaining) is
+        instr.gas().addUnsafe(extraGasOpt.getOrElse(GasBox.zero))
     }
   }
 
@@ -1882,7 +1886,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
 
     prepareStack(ALPH.oneAlph, 10000)
-    runAndCheckGas(LockAlph)
+    runAndCheckGas(LockAlph, Some(GasSchedule.txOutputBaseGas))
     frame.balanceStateOpt is Some(
       BalanceState.from(alphBalance(assetAddress, ALPH.oneAlph))
     )
@@ -1897,9 +1901,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     LockAlph.runWith(frame).leftValue isE NotEnoughBalance
   }
 
-  it should "LockToken" in new StatefulInstrFixture {
-    val assetAddress        = assetGen.sample.get
-    val balanceState        = BalanceState.from(tokenBalance(assetAddress, tokenId, ALPH.alph(2)))
+  it should "LockAlphWithToken" in new StatefulInstrFixture {
+    val assetAddress = assetGen.sample.get
+    val balanceState = BalanceState.from {
+      val balance = tokenBalance(assetAddress, tokenId, ALPH.alph(2))
+      balance.merge(alphBalance(assetAddress, ALPH.alph(2)))
+      balance
+    }
     override lazy val frame = prepareFrame(Some(balanceState))
 
     def prepareStack(alphAmount: U256, tokenAmount: U256, timestamp: U256) = {
@@ -1911,9 +1919,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
 
     prepareStack(ALPH.oneAlph, ALPH.cent(1), 10000)
-    runAndCheckGas(LockToken)
+    runAndCheckGas(LockAlphWithToken, Some(GasSchedule.txOutputBaseGas))
     frame.balanceStateOpt is Some(
-      BalanceState.from(tokenBalance(assetAddress, tokenId, ALPH.oneAlph))
+      BalanceState.from {
+        val balance = tokenBalance(assetAddress, tokenId, ALPH.cent(199))
+        balance.merge(alphBalance(assetAddress, ALPH.oneAlph))
+        balance
+      }
     )
     frame.ctx.outputBalances.all.isEmpty is true
     frame.ctx.generatedOutputs.head is
@@ -1925,10 +1937,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       )
 
     prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, U256.MaxValue)
-    LockToken.runWith(frame).leftValue isE LockTimeOverflow
+    LockAlphWithToken.runWith(frame).leftValue isE LockTimeOverflow
 
     prepareStack(ALPH.oneAlph, ALPH.alph(2), 10000)
-    LockToken.runWith(frame).leftValue isE NotEnoughBalance
+    LockAlphWithToken.runWith(frame).leftValue isE NotEnoughBalance
   }
 
   it should "TransferAlph" in new StatefulInstrFixture {
@@ -2375,7 +2387,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5,
       /* Below are instructions for Leman hard fork */
       MigrateSimple -> 32000, MigrateWithFields -> 32000, LoadContractFields -> 8, CopyCreateContractWithToken -> 24000,
-      BurnToken -> 30, LockAlph -> 30, LockToken -> 30
+      BurnToken -> 30, LockAlph -> 30, LockAlphWithToken -> 30
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -2497,7 +2509,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185,
       /* Below are instructions for Leman hard fork */
       MigrateSimple -> 186, MigrateWithFields -> 187, LoadContractFields -> 188, CopyCreateContractWithToken -> 189,
-      BurnToken -> 190, LockAlph -> 191, LockToken -> 192
+      BurnToken -> 190, LockAlph -> 191, LockAlphWithToken -> 192
     )
     // format: on
 
@@ -2550,7 +2562,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
       /* Below are instructions for Leman hard fork */
       MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken,
-      LockAlph, LockToken
+      LockAlph, LockAlphWithToken
     )
     // format: on
   }

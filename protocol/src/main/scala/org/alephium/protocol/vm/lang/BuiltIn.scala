@@ -470,12 +470,12 @@ object BuiltIn {
       LockAlph
     )
 
-  val lockToken: SimpleStatefulBuiltIn =
+  val lockAlphWithToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
-      "lockToken",
+      "lockAlphWithToken",
       Seq[Type](Type.Address, Type.ByteVec, Type.U256, Type.U256),
       Seq.empty,
-      LockToken
+      LockAlphWithToken
     )
 
   val createContract: SimpleStatefulBuiltIn =
@@ -599,7 +599,7 @@ object BuiltIn {
       transferTokenToSelf,
       burnToken,
       lockAlph,
-      lockToken,
+      lockAlphWithToken,
       createContract,
       createContractWithToken,
       copyCreateContract,
