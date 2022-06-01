@@ -19,12 +19,12 @@ package org.alephium.protocol.vm
 import scala.annotation.switch
 
 import akka.util.ByteString
-import org.alephium.crypto
 
+import org.alephium.crypto
 import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
-import org.alephium.protocol.model.{AssetOutput, HardFork, TxOutput}
+import org.alephium.protocol.model.{AssetOutput, HardFork}
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
 import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
 import org.alephium.util
@@ -152,8 +152,7 @@ object Instr {
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
     CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
     /* Below are instructions for Leman hard fork */
-    MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken,
-    LockAlph, LockAlphWithToken
+    MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets
   )
   // format: on
 
@@ -1146,7 +1145,7 @@ object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
   }
 }
 
-sealed trait LockAsset extends LemanAssetInstr with StatefulInstrCompanion0 {
+sealed trait LockApprovedAssetsInstr extends LemanAssetInstr with StatefulInstrCompanion0 {
   def popTimestamp[C <: StatefulContext](frame: Frame[C]): ExeResult[TimeStamp] = {
     for {
       timestampU256 <- frame.popOpStackU256()
@@ -1167,38 +1166,14 @@ sealed trait LockAsset extends LemanAssetInstr with StatefulInstrCompanion0 {
   }
 }
 
-object LockAlph extends LockAsset {
+object LockApprovedAssets extends LockApprovedAssetsInstr {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      timestamp    <- popTimestamp(frame)
-      alphAmount   <- frame.popOpStackU256()
+      lockTime     <- popTimestamp(frame)
       lockupScript <- popAssetAddress(frame)
       balanceState <- frame.getBalanceState()
-      _ <- balanceState.useAlph(lockupScript, alphAmount.v).toRight(Right(NotEnoughBalance))
-      _ <- frame.ctx.generateOutput(
-        TxOutput.asset(alphAmount.v, lockupScript, AVector.empty, timestamp)
-      )
-    } yield ()
-  }
-}
-
-object LockAlphWithToken extends LockAsset {
-  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      timestamp    <- popTimestamp(frame)
-      tokenAmount  <- frame.popOpStackU256()
-      tokenIdRaw   <- frame.popOpStackByteVec()
-      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
-      alphAmount   <- frame.popOpStackU256()
-      lockupScript <- popAssetAddress(frame)
-      balanceState <- frame.getBalanceState()
-      _ <- balanceState.useAlph(lockupScript, alphAmount.v).toRight(Right(NotEnoughBalance))
-      _ <- balanceState
-        .useToken(lockupScript, tokenId, tokenAmount.v)
-        .toRight(Right(NotEnoughBalance))
-      _ <- frame.ctx.generateOutput(
-        TxOutput.asset(alphAmount.v, lockupScript, AVector(tokenId -> tokenAmount.v), timestamp)
-      )
+      approved     <- balanceState.useAllApproved(lockupScript).toRight(Right(NoAssetsApproved))
+      _            <- frame.ctx.generateOutput(approved.toLockedTxOutput(lockupScript, lockTime))
     } yield ()
   }
 }

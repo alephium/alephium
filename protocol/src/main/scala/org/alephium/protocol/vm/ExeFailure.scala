@@ -77,6 +77,7 @@ case object ExpectNonPayableMethod                             extends ExeFailur
 case object ExpectStatefulContractObj                          extends ExeFailure
 case object EmptyBalanceForPayableMethod                       extends ExeFailure
 case object NotEnoughBalance                                   extends ExeFailure
+case object NoAssetsApproved                                   extends ExeFailure
 case object BalanceOverflow                                    extends ExeFailure
 case object NoAlphBalanceForTheAddress                         extends ExeFailure
 case object NoTokenBalanceForTheAddress                        extends ExeFailure

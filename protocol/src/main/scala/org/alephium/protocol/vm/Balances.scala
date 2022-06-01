@@ -90,9 +90,7 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
     if (index == -1) {
       None
     } else {
-      val (_, balances) = all(index)
-      all.remove(index)
-      Some(balances)
+      Some(all.remove(index)._2)
     }
   }
 

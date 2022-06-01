@@ -363,19 +363,22 @@ class VMSpec extends AlephiumSpec {
     tokenAmount1 is ALPH.alph(1)
   }
 
-  it should "lock asset" in new ContractFixture {
+  it should "lock assets" in new ContractFixture {
     val token =
       s"""
          |TxContract Foo() {
          |  @use(contractAssets = true)
-         |  pub payable fn mint() -> () {
+         |  pub fn mint() -> () {
          |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), ${ALPH.alph(10)})
          |  }
          |}
          |""".stripMargin
 
-    val tokenId0    = createContract(token, AVector.empty, ALPH.alph(100)).key
-    val tokenId1    = createContract(token, AVector.empty, ALPH.alph(100)).key
+    import org.alephium.protocol.model.tokenIdOrder
+    val _tokenId0   = createContract(token, AVector.empty, ALPH.alph(100)).key
+    val _tokenId1   = createContract(token, AVector.empty, ALPH.alph(100)).key
+    val tokenId0    = if (tokenIdOrder.compare(_tokenId0, _tokenId1) < 0) _tokenId0 else _tokenId1
+    val tokenId1    = if (tokenIdOrder.compare(_tokenId0, _tokenId1) < 0) _tokenId1 else _tokenId0
     val tokenId0Hex = tokenId0.toHexString
     val tokenId1Hex = tokenId1.toHexString
 
@@ -395,25 +398,21 @@ class VMSpec extends AlephiumSpec {
     val lock =
       s"""
          |TxScript Main {
-         |  approveToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.alph(3)})
-         |  approveToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.alph(3)})
-         |
-         |  let token0 = Foo(#$tokenId0Hex)
-         |  let token1 = Foo(#$tokenId1Hex)
          |  let timestamp0 = 1000
          |  let timestamp1 = 2000
-         |
-         |  lockAlph!(@$genesisAddress, ${ALPH.oneAlph}, timestamp0)
-         |  lockAlphWithToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp0)
-         |  lockAlphWithToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp0)
-         |
-         |  lockAlph!(@$genesisAddress, ${ALPH.oneAlph}, timestamp1)
-         |  lockAlphWithToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp1)
-         |  lockAlphWithToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp1)
-         |
          |  let timestamp2 = 3000
-         |  lockAlphWithToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.oneAlph}, timestamp2)
-         |  lockAlphWithToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.oneAlph}, timestamp2)
+         |
+         |  approveAlph!(@$genesisAddress, ${ALPH.cent(1)})
+         |  lockApprovedAssets!(@$genesisAddress, timestamp0)
+         |
+         |  approveAlph!(@$genesisAddress, ${ALPH.cent(2)})
+         |  approveToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.cent(3)})
+         |  lockApprovedAssets!(@$genesisAddress, timestamp1)
+         |
+         |  approveAlph!(@$genesisAddress, ${ALPH.cent(4)})
+         |  approveToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.cent(5)})
+         |  approveToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.cent(6)})
+         |  lockApprovedAssets!(@$genesisAddress, timestamp2)
          |}
          |
          |$token
@@ -421,24 +420,24 @@ class VMSpec extends AlephiumSpec {
 
     val tx = callTxScript(lock).nonCoinbase(0)
     tx.generatedOutputs(0) is AssetOutput(
-      ALPH.oneAlph,
+      ALPH.cent(1),
       genesisAddress.lockupScript,
       TimeStamp.unsafe(1000),
-      AVector(tokenId0 -> ALPH.oneAlph, tokenId1 -> ALPH.oneAlph),
+      AVector.empty,
       ByteString.empty
     )
     tx.generatedOutputs(1) is AssetOutput(
-      ALPH.oneAlph,
+      ALPH.cent(2),
       genesisAddress.lockupScript,
       TimeStamp.unsafe(2000),
-      AVector(tokenId0 -> ALPH.oneAlph, tokenId1 -> ALPH.oneAlph),
+      AVector(tokenId0 -> ALPH.cent(3)),
       ByteString.empty
     )
     tx.generatedOutputs(2) is AssetOutput(
-      dustUtxoAmount,
+      ALPH.cent(4),
       genesisAddress.lockupScript,
       TimeStamp.unsafe(3000),
-      AVector(tokenId0 -> ALPH.oneAlph, tokenId1 -> ALPH.oneAlph),
+      AVector(tokenId0 -> ALPH.cent(5), tokenId1 -> ALPH.cent(6)),
       ByteString.empty
     )
   }

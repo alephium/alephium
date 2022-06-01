@@ -20,7 +20,7 @@ import scala.collection.mutable
 import scala.util.Try
 
 import org.alephium.protocol.model.{TokenId, TxOutput}
-import org.alephium.util.{AVector, U256}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class BalancesPerLockup(
     var alphAmount: U256,
@@ -92,6 +92,11 @@ final case class BalancesPerLockup(
     } else {
       Right(Some(TxOutput.from(alphAmount, tokens, lockupScript)))
     }
+  }
+
+  def toLockedTxOutput(lockupScript: LockupScript.Asset, lockTime: TimeStamp): TxOutput = {
+    val tokens = tokenVector
+    TxOutput.asset(alphAmount, lockupScript, tokens, lockTime)
   }
 }
 

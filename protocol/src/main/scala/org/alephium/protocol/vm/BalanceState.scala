@@ -61,6 +61,10 @@ final case class BalanceState(remaining: Balances, approved: Balances) {
     remaining.useAll(lockupScript)
   }
 
+  def useAllApproved(lockupScript: LockupScript): Option[BalancesPerLockup] = {
+    approved.useAll(lockupScript)
+  }
+
   def useAlph(lockupScript: LockupScript, amount: U256): Option[Unit] = {
     remaining.subAlph(lockupScript, amount)
   }
