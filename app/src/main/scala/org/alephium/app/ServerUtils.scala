@@ -30,11 +30,10 @@ import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
-import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{vm, BlockHash, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
@@ -721,6 +720,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
+    val initialAlphAmount = query.initialAlphAmount.map(_.value).getOrElse(minimalAlphInContract)
     for {
       code <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
@@ -728,13 +728,13 @@ class ServerUtils(implicit
         code.contract,
         address,
         code.initialFields,
-        query.initialAlphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
+        initialAlphAmount,
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        dustUtxoAmount,
+        initialAlphAmount,
         AVector.empty,
         query.fromPublicKey,
         query.gasAmount,
@@ -840,6 +840,7 @@ class ServerUtils(implicit
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
         contracts = postState._1,
+        txInputs = executionResult.contractPrevOutputs.map(_.lockupScript).map(Address.from),
         txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, Hash.zero, index)
         },
@@ -904,6 +905,7 @@ class ServerUtils(implicit
       Address.contract(contractId),
       contract,
       contract.hash,
+      state.initialStateHash,
       state.fields.map(Val.from),
       AssetState.from(contractOutput)
     )
@@ -937,6 +939,7 @@ class ServerUtils(implicit
         Method[StatefulContext](
           isPublic = true,
           isPayable = testContract.inputAssets.nonEmpty,
+          useContractAssets = testContract.inputAssets.nonEmpty,
           argsLength = 0,
           localsLength = 0,
           returnLength = returnLength,
@@ -1090,7 +1093,7 @@ object ServerUtils {
     }
 
     val scriptRaw = s"""
-                       |TxScript Main payable {
+                       |TxScript Main {
                        |  approveAlph!(@${address.toBase58}, ${initialAlphAmount.v})
                        |  $creation
                        |}

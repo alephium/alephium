@@ -162,7 +162,7 @@ trait WorldState[T, R1, R2, R3] {
 }
 
 sealed abstract class MutableWorldState extends WorldState[Unit, Unit, Unit, Unit] {
-  def useContractAsset(contractId: ContractId): IOResult[(ContractOutputRef, ContractOutput)] = {
+  def useContractAssets(contractId: ContractId): IOResult[(ContractOutputRef, ContractOutput)] = {
     for {
       state  <- getContractState(contractId)
       output <- getContractAsset(state.contractOutputRef)

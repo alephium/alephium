@@ -5416,7 +5416,7 @@
                 "$ref": "#/components/schemas/Script"
               },
               "example": {
-                "code": "TxScript Main payable { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y, 1024) }"
+                "code": "TxScript Main { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y, 1024) }"
               }
             }
           },
@@ -5451,7 +5451,7 @@
                   "functions": [
                     {
                       "name": "bar",
-                      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+                      "signature": "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
                       "argNames": [
                         "a",
                         "b",
@@ -5694,7 +5694,7 @@
                 "$ref": "#/components/schemas/Contract"
               },
               "example": {
-                "code": "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+                "code": "TxContract Foo(bar: ByteVec) {\n@use(approvedAssets = true, contractAssets = true)\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
               }
             }
           },
@@ -5730,7 +5730,7 @@
                   "functions": [
                     {
                       "name": "bar",
-                      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+                      "signature": "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
                       "argNames": [
                         "a",
                         "b",
@@ -6005,6 +6005,7 @@
                   "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                   "bytecode": "00010700000000000118",
                   "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                  "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
                   "fields": [
                     {
                       "type": "U256",
@@ -6137,6 +6138,7 @@
                     "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                     "bytecode": "00010700000000000118",
                     "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                    "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
                     "fields": [
                       {
                         "type": "U256",
@@ -6195,6 +6197,7 @@
                       "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                       "bytecode": "00010700000000000118",
                       "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                      "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
                       "fields": [
                         {
                           "type": "U256",
@@ -6211,6 +6214,9 @@
                         ]
                       }
                     }
+                  ],
+                  "txInputs": [
+                    "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
                   ],
                   "txOutputs": [
                     {
@@ -8533,6 +8539,7 @@
           "address",
           "bytecode",
           "codeHash",
+          "initialStateHash",
           "fields",
           "asset"
         ],
@@ -8547,6 +8554,10 @@
             "format": "contract"
           },
           "codeHash": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "initialStateHash": {
             "type": "string",
             "format": "32-byte-hash"
           },
@@ -9350,6 +9361,7 @@
           "returns",
           "gasUsed",
           "contracts",
+          "txInputs",
           "txOutputs",
           "events"
         ],
@@ -9376,6 +9388,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ContractState"
+            }
+          },
+          "txInputs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "address"
             }
           },
           "txOutputs": {

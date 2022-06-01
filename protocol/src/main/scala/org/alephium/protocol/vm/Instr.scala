@@ -19,12 +19,12 @@ package org.alephium.protocol.vm
 import scala.annotation.switch
 
 import akka.util.ByteString
-
 import org.alephium.crypto
+
 import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
-import org.alephium.protocol.model.{AssetOutput, HardFork}
+import org.alephium.protocol.model.{AssetOutput, HardFork, TxOutput}
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
 import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
 import org.alephium.util
@@ -43,18 +43,16 @@ sealed trait Instr[-Ctx <: StatelessContext] extends GasSchedule {
 
 sealed trait LemanInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
-    val hardFork = frame.ctx.getHardFork()
-    if (hardFork >= HardFork.Leman) {
-      runWithLeman(frame)
-    } else {
-      failed(InactiveInstr(this))
-    }
+    for {
+      _ <- frame.ctx.checkLemanHardFork(this)
+      _ <- runWithLeman(frame)
+    } yield ()
   }
 
   def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
-sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends GasSimple {
+sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] with GasSimple {
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
     for {
       _ <- frame.ctx.chargeGas(this)
@@ -64,6 +62,18 @@ sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends GasSimple {
 
   // this function will not need to take care of charge gas
   def _runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+}
+
+sealed trait LemanInstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] with GasSimple {
+  def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkLemanHardFork(this)
+      _ <- frame.ctx.chargeGas(this)
+      _ <- runWithLeman(frame)
+    } yield ()
+  }
+
+  def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
 object Instr {
@@ -142,7 +152,7 @@ object Instr {
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
     CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
     /* Below are instructions for Leman hard fork */
-    MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken, BurnToken,
+    MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken,
     LockAlph, LockToken
   )
   // format: on
@@ -865,7 +875,7 @@ case object Zeros
     if (size <= maxSize) Right(size.toIntUnsafe) else failed(InvalidSizeForZeros)
   }
 
-  override def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       u256 <- frame.popOpStackU256()
       size <- checkSizeRange(u256.v)
@@ -1102,12 +1112,11 @@ case object VerifyED25519
 
 case object EthEcRecover
     extends CryptoInstr
-    with LemanInstr[StatelessContext]
+    with LemanInstrWithSimpleGas[StatelessContext]
     with StatelessInstrCompanion0
     with GasEcRecover {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      _           <- frame.ctx.chargeGas(gas())
       sigBytes    <- frame.popOpStackByteVec()
       messageHash <- frame.popOpStackByteVec()
       address <- SecP256K1
@@ -1175,9 +1184,9 @@ object LockAlph extends LockAsset {
       lockupScript <- popAssetAddress(frame)
       balanceState <- frame.getBalanceState()
       _            <- balanceState.useAlph(lockupScript, amount.v).toRight(Right(NotEnoughBalance))
-      _ <- frame.ctx.outputBalances
-        .addLockedAlph(lockupScript, amount.v, timestamp)
-        .toRight(Right(BalanceOverflow))
+      _ <- frame.ctx.generateOutput(
+        TxOutput.asset(amount.v, lockupScript, AVector.empty, timestamp)
+      )
     } yield ()
   }
 }
@@ -1189,12 +1198,14 @@ object LockToken extends LockAsset {
       amount       <- frame.popOpStackU256()
       tokenIdRaw   <- frame.popOpStackByteVec()
       tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      alphAmount   <- frame.popOpStackU256()
       lockupScript <- popAssetAddress(frame)
       balanceState <- frame.getBalanceState()
+      _ <- balanceState.useAlph(lockupScript, alphAmount.v).toRight(Right(NotEnoughBalance))
       _ <- balanceState.useToken(lockupScript, tokenId, amount.v).toRight(Right(NotEnoughBalance))
-      _ <- frame.ctx.outputBalances
-        .addLockedToken(lockupScript, tokenId, amount.v, timestamp)
-        .toRight(Right(BalanceOverflow))
+      _ <- frame.ctx.generateOutput(
+        TxOutput.asset(alphAmount.v, lockupScript, AVector(tokenId -> amount.v), timestamp)
+      )
     } yield ()
   }
 }
@@ -1296,7 +1307,7 @@ sealed trait Transfer extends AssetInstr {
       from         <- fromThunk
       balanceState <- frame.getBalanceState()
       _            <- balanceState.useAlph(from, amount.v).toRight(Right(NotEnoughBalance))
-      _ <- frame.ctx.outputBalances.unlocked
+      _ <- frame.ctx.outputBalances
         .addAlph(to, amount.v)
         .toRight(Right(BalanceOverflow))
     } yield ()
@@ -1317,7 +1328,7 @@ sealed trait Transfer extends AssetInstr {
       _ <- balanceState
         .useToken(from, tokenId, amount.v)
         .toRight(Right(NotEnoughBalance))
-      _ <- frame.ctx.outputBalances.unlocked
+      _ <- frame.ctx.outputBalances
         .addToken(to, tokenId, amount.v)
         .toRight(Right(BalanceOverflow))
     } yield ()
@@ -1427,6 +1438,7 @@ sealed trait CreateContractBase extends CreateContractAbstract with GasCreate {
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
+      _ <- contractCode.checkAssetsModifier(frame.ctx)
       _ <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
       _ <- StatefulContract.check(contractCode)
     } yield contractCode.toHalfDecoded()
@@ -1462,18 +1474,17 @@ object CopyCreateContract extends CopyCreateContractBase {
   }
 }
 
-object CopyCreateContractWithToken extends CopyCreateContractBase with LemanInstr[StatefulContext] {
+object CopyCreateContractWithToken
+    extends CopyCreateContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
   // We need to overwrite this method because `runWith` is inherited from both `LemanInstr` and `InstrWithSimpleGas`
   override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
-    super[LemanInstr].runWith(frame)
+    super[LemanInstrWithSimpleGas].runWith(frame)
 
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
 
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      _ <- frame.ctx.chargeGas(this.gas())
-      _ <- __runWith(frame, issueToken = true)
-    } yield ()
+    __runWith(frame, issueToken = true)
   }
 }
 
@@ -1489,7 +1500,7 @@ object DestroySelf extends ContractInstr with GasDestroy {
 }
 
 sealed trait MigrateBase
-    extends LemanInstr[StatefulContext]
+    extends LemanInstrWithSimpleGas[StatefulContext]
     with StatefulInstrCompanion0
     with GasMigrate {
   def migrate[C <: StatefulContext](
@@ -1497,7 +1508,6 @@ sealed trait MigrateBase
       newFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = {
     for {
-      _               <- frame.ctx.chargeGas(gas())
       contractCodeRaw <- frame.popOpStackByteVec()
       _               <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
@@ -1516,7 +1526,7 @@ object MigrateSimple extends MigrateBase {
   }
 }
 
-object MigrateWithState extends MigrateBase {
+object MigrateWithFields extends MigrateBase {
   def runWithLeman[C <: StatefulContext](
       frame: Frame[C]
   ): ExeResult[Unit] = {

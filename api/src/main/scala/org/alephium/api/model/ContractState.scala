@@ -25,6 +25,7 @@ final case class ContractState(
     address: Address.Contract,
     bytecode: StatefulContract,
     codeHash: Hash,
+    initialStateHash: Hash,
     fields: AVector[Val],
     asset: AssetState
 ) {

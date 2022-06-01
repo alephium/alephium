@@ -76,7 +76,7 @@ class ContextSpec
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
     context.loadContractObj(contractId).isRight is true
-    context.useContractAsset(contractId).isRight is true
+    context.useContractAssets(contractId).isRight is true
     context.generateOutput(newOutput) isE ()
     context.worldState.getContractAsset(contractId) isE newOutput
     (initialGas.value -

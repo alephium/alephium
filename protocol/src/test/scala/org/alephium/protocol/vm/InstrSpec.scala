@@ -23,11 +23,11 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
-
 import org.alephium.crypto
+
 import org.alephium.protocol._
-import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.model.{ContractOutput, ContractOutputRef, Target, TokenId}
+import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
+import org.alephium.protocol.model.{ContractOutput, ContractOutputRef, Target, TokenId, TxOutput}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.serde.{serialize, RandomBytes}
 import org.alephium.util._
@@ -73,7 +73,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress
     )
     val lemanStatefulInstrs = AVector(
-      MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken, BurnToken,
+      MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken,
       LockAlph, LockToken
     )
     // format: on
@@ -90,11 +90,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       override def lemanHardForkTimestamp: TimeStamp =
         TimeStamp.now().minusUnsafe(Duration.ofSecondsUnsafe(10))
     }
+
+    def isLemanInstr(instr: Instr[_]): Boolean = {
+      instr.isInstanceOf[LemanInstr[_]] || instr.isInstanceOf[LemanInstrWithSimpleGas[_]]
+    }
   }
 
   it should "derive from LemanInstr" in new LemanForkFixture {
-    lemanStatelessInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
-    lemanStatefulInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
+    lemanStatelessInstrs.foreach(isLemanInstr(_) is true)
+    lemanStatefulInstrs.foreach(isLemanInstr(_) is true)
     (statelessInstrs.toSet -- lemanStatelessInstrs.toSet)
       .map(_.isInstanceOf[LemanInstr[_]] is false)
     (statefulInstrs.toSet -- lemanStatefulInstrs.toSet)
@@ -146,6 +150,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val baseMethod = Method[StatelessContext](
         isPublic = true,
         isPayable = false,
+        useContractAssets = false,
         argsLength = 0,
         localsLength = localsLength,
         returnLength = 0,
@@ -1618,6 +1623,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Method[StatefulContext](
         isPublic = true,
         isPayable = false,
+        useContractAssets = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
@@ -1880,10 +1886,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     frame.balanceStateOpt is Some(
       BalanceState.from(alphBalance(assetAddress, ALPH.oneAlph))
     )
-    frame.ctx.outputBalances is OutputBalances(
-      Balances(ArrayBuffer.empty),
-      ArrayBuffer(assetAddress -> LockedBalances.alph(ALPH.oneAlph, TimeStamp.unsafe(10000)))
-    )
+    frame.ctx.outputBalances.all.isEmpty is true
+    frame.ctx.generatedOutputs.head is
+      TxOutput.asset(ALPH.oneAlph, assetAddress, AVector.empty, TimeStamp.unsafe(10000))
 
     prepareStack(ALPH.oneNanoAlph, U256.MaxValue)
     LockAlph.runWith(frame).leftValue isE LockTimeOverflow
@@ -1897,29 +1902,32 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val balanceState        = BalanceState.from(tokenBalance(assetAddress, tokenId, ALPH.alph(2)))
     override lazy val frame = prepareFrame(Some(balanceState))
 
-    def prepareStack(amount: U256, timestamp: U256) = {
+    def prepareStack(alphAmount: U256, tokenAmount: U256, timestamp: U256) = {
       stack.push(Val.Address(assetAddress))
+      stack.push(Val.U256(alphAmount))
       stack.push(Val.ByteVec(tokenId.bytes))
-      stack.push(Val.U256(amount))
+      stack.push(Val.U256(tokenAmount))
       stack.push(Val.U256(timestamp))
     }
 
-    prepareStack(ALPH.oneAlph, 10000)
+    prepareStack(ALPH.oneAlph, ALPH.cent(1), 10000)
     runAndCheckGas(LockToken)
     frame.balanceStateOpt is Some(
       BalanceState.from(tokenBalance(assetAddress, tokenId, ALPH.oneAlph))
     )
-    frame.ctx.outputBalances is OutputBalances(
-      Balances(ArrayBuffer.empty),
-      ArrayBuffer(
-        assetAddress -> LockedBalances.token(tokenId, ALPH.oneAlph, TimeStamp.unsafe(10000))
+    frame.ctx.outputBalances.all.isEmpty is true
+    frame.ctx.generatedOutputs.head is
+      TxOutput.asset(
+        ALPH.oneAlph,
+        assetAddress,
+        AVector(tokenId -> ALPH.cent(1)),
+        TimeStamp.unsafe(10000)
       )
-    )
 
-    prepareStack(ALPH.oneNanoAlph, U256.MaxValue)
+    prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, U256.MaxValue)
     LockToken.runWith(frame).leftValue isE LockTimeOverflow
 
-    prepareStack(ALPH.alph(2), 10000)
+    prepareStack(ALPH.oneAlph, ALPH.alph(2), 10000)
     LockToken.runWith(frame).leftValue isE NotEnoughBalance
   }
 
@@ -1936,9 +1944,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferAlph)
 
-    frame.ctx.outputBalances is OutputBalances(
-      Balances(ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))),
-      ArrayBuffer.empty
+    frame.ctx.outputBalances is Balances(
+      ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
 
     stack.push(Val.Address(from))
@@ -1967,9 +1974,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
     runAndCheckGas(TransferAlphFromSelf)
-    frame.ctx.outputBalances is OutputBalances(
-      Balances(ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))),
-      ArrayBuffer.empty
+    frame.ctx.outputBalances is Balances(
+      ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
   }
 
@@ -1986,9 +1992,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
     runAndCheckGas(TransferAlphToSelf)
-    frame.ctx.outputBalances is OutputBalances(
-      Balances(ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))),
-      ArrayBuffer.empty
+    frame.ctx.outputBalances is Balances(
+      ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
   }
 
@@ -2009,9 +2014,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferToken)
 
-    frame.ctx.outputBalances is OutputBalances(
-      Balances(ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))),
-      ArrayBuffer.empty
+    frame.ctx.outputBalances is Balances(
+      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
 
@@ -2033,9 +2037,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferTokenFromSelf)
 
-    frame.ctx.outputBalances is OutputBalances(
-      Balances(ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))),
-      ArrayBuffer.empty
+    frame.ctx.outputBalances is Balances(
+      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
 
@@ -2057,9 +2060,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferTokenToSelf)
 
-    frame.ctx.outputBalances is OutputBalances(
-      Balances(ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))),
-      ArrayBuffer.empty
+    frame.ctx.outputBalances is Balances(
+      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
 
@@ -2144,6 +2146,58 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       AVector((tokenId, ALPH.oneAlph)),
       Some(ALPH.oneNanoAlph)
     )
+  }
+
+  it should "check method modifier when creating contract" in new StatefulFixture {
+    val from = lockupScriptGen.sample.get
+
+    val preLemanFrame = (balanceState: BalanceState) =>
+      prepareFrame(Some(balanceState))(NetworkConfigFixture.PreLeman)
+    val lemanFrame =
+      (balanceState: BalanceState) => prepareFrame(Some(balanceState))(NetworkConfigFixture.Leman)
+
+    val contract0 = StatefulContract(0, AVector(Method(true, true, true, 0, 0, 0, AVector.empty)))
+    val contract1 = StatefulContract(0, AVector(Method(true, false, false, 0, 0, 0, AVector.empty)))
+    val contract2 = StatefulContract(0, AVector(Method(true, true, false, 0, 0, 0, AVector.empty)))
+    val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
+
+    def testModifier(
+        instr: Instr[StatefulContext],
+        frameBuilder: BalanceState => Frame[StatefulContext],
+        contract: StatefulContract,
+        succeeded: Boolean
+    ) = {
+      val balanceState = BalanceState(Balances.empty, tokenBalance(from, tokenId, ALPH.oneAlph))
+      val frame        = frameBuilder(balanceState)
+      frame.opStack.push(Val.ByteVec(serialize(contract)))
+      frame.opStack.push(Val.ByteVec(serialize(AVector.empty[Val])))
+      if (instr.isInstanceOf[CreateContractWithToken.type]) {
+        frame.opStack.push(Val.U256(ALPH.oneNanoAlph))
+      }
+      if (succeeded) {
+        instr.runWith(frame) isE ()
+      } else {
+        instr.runWith(frame).leftValue isE InvalidMethodModifierBeforeLeman
+      }
+    }
+
+    testModifier(CreateContract, lemanFrame, contract0, true)
+    testModifier(CreateContract, lemanFrame, contract1, true)
+    testModifier(CreateContract, lemanFrame, contract2, true)
+    testModifier(CreateContract, lemanFrame, contract3, true)
+    testModifier(CreateContract, preLemanFrame, contract0, true)
+    testModifier(CreateContract, preLemanFrame, contract1, true)
+    testModifier(CreateContract, preLemanFrame, contract2, false)
+    testModifier(CreateContract, preLemanFrame, contract3, false)
+
+    testModifier(CreateContractWithToken, lemanFrame, contract0, true)
+    testModifier(CreateContractWithToken, lemanFrame, contract1, true)
+    testModifier(CreateContractWithToken, lemanFrame, contract2, true)
+    testModifier(CreateContractWithToken, lemanFrame, contract3, true)
+    testModifier(CreateContractWithToken, preLemanFrame, contract0, true)
+    testModifier(CreateContractWithToken, preLemanFrame, contract1, true)
+    testModifier(CreateContractWithToken, preLemanFrame, contract2, false)
+    testModifier(CreateContractWithToken, preLemanFrame, contract3, false)
   }
 
   it should "CopyCreateContract" in new CreateContractAbstractFixture {
@@ -2320,7 +2374,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
       CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple -> 32000, MigrateWithState -> 32000, LoadContractFields -> 8, CopyCreateContractWithToken -> 24000,
+      MigrateSimple -> 32000, MigrateWithFields -> 32000, LoadContractFields -> 8, CopyCreateContractWithToken -> 24000,
       BurnToken -> 30, LockAlph -> 30, LockToken -> 30
     )
     // format: on
@@ -2442,7 +2496,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract -> 173, CreateContractWithToken -> 174, CopyCreateContract -> 175, DestroySelf -> 176, SelfContractId -> 177, SelfAddress -> 178,
       CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple -> 186, MigrateWithState -> 187, LoadContractFields -> 188, CopyCreateContractWithToken -> 189,
+      MigrateSimple -> 186, MigrateWithFields -> 187, LoadContractFields -> 188, CopyCreateContractWithToken -> 189,
       BurnToken -> 190, LockAlph -> 191, LockToken -> 192
     )
     // format: on
@@ -2495,7 +2549,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
       CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken, BurnToken,
+      MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken,
       LockAlph, LockToken
     )
     // format: on

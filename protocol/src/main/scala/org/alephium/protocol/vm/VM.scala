@@ -113,6 +113,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
   ): ExeResult[Unit] = {
     for {
+      _          <- obj.code.checkAssetsModifier(ctx)
       startFrame <- startFrame(obj, ctx, methodIndex, args, operandStack, returnToOpt)
       _          <- frameStack.push(startFrame)
       _          <- executeFrames()
@@ -175,6 +176,10 @@ object VM {
     } else {
       initialGas.use(GasCall.fieldsBaseGas(estimatedSize))
     }
+  }
+
+  def checkContractMinimalBalanceLeman(pair: (LockupScript, BalancesPerLockup)): Boolean = {
+    pair._1.isAssetType || pair._2.alphAmount >= minimalAlphInContract
   }
 }
 
@@ -240,7 +245,7 @@ final class StatefulVM(
       currentFrame: Frame[StatefulContext],
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
-    if (currentFrame.method.isPayable) {
+    if (currentFrame.method.usesAssets()) {
       val resultOpt = for {
         currentBalances  <- currentFrame.balanceStateOpt
         previousBalances <- previousFrame.balanceStateOpt
@@ -264,7 +269,7 @@ final class StatefulVM(
       } else {
         val (lockupScript, balancesPerLockup) = current.all(index)
         if (balancesPerLockup.scopeDepth <= 0) {
-          ctx.outputBalances.unlocked.add(lockupScript, balancesPerLockup)
+          ctx.outputBalances.add(lockupScript, balancesPerLockup)
         } else {
           previous.add(lockupScript, balancesPerLockup) match {
             case Some(_) => iter(index + 1)
@@ -285,17 +290,18 @@ final class StatefulVM(
   }
 
   private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
-    if (lastFrame.method.isPayable) {
+    if (lastFrame.method.usesAssets()) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
-        _        <- ctx.outputBalances.unlocked.merge(balances.approved)
-        _        <- ctx.outputBalances.unlocked.merge(balances.remaining)
+        _        <- ctx.outputBalances.merge(balances.approved)
+        _        <- ctx.outputBalances.merge(balances.remaining)
       } yield ()
       for {
         _ <- resultOpt match {
           case Some(_) => okay
           case None    => failed(InvalidBalances)
         }
+        _ <- checkContractMinimalBalances(ctx.outputBalances)
         _ <- outputGeneratedBalances(ctx.outputBalances)
         _ <- ctx.checkAllAssetsFlushed()
       } yield ()
@@ -304,31 +310,24 @@ final class StatefulVM(
     }
   }
 
-  private[vm] def outputGeneratedBalances(outputBalances: OutputBalances): ExeResult[Unit] = {
-    for {
-      _ <- EitherF.foreachTry(outputBalances.locked) { case (lockupScript, balances) =>
-        EitherF.foreachTry(balances.assets) { case (timestamp, lockedAsset) =>
-          val output = lockedAsset.toTxOutput(lockupScript, timestamp)
-          for {
-            _ <-
-              if (lockedAsset.alphAmount.isEmpty) {
-                outputBalances.unlocked
-                  .subAlph(lockupScript, dustUtxoAmount)
-                  .toRight(Right(NotEnoughBalance))
-              } else {
-                Right(())
-              }
-            _ <- ctx.generateOutput(output)
-          } yield ()
-        }
+  def checkContractMinimalBalances(outputBalances: Balances): ExeResult[Unit] = {
+    if (
+      ctx.getHardFork() >= HardFork.Leman &&
+      !outputBalances.all.forall(VM.checkContractMinimalBalanceLeman)
+    ) {
+      failed(NeedAtLeastOneAlphInContract)
+    } else {
+      okay
+    }
+  }
+
+  private def outputGeneratedBalances(outputBalances: Balances): ExeResult[Unit] = {
+    EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
+      balances.toTxOutput(lockupScript).flatMap {
+        case Some(output) => ctx.generateOutput(output)
+        case None         => Right(())
       }
-      _ <- EitherF.foreachTry(outputBalances.unlocked.all) { case (lockupScript, balances) =>
-        balances.toTxOutput(lockupScript).flatMap {
-          case Some(output) => ctx.generateOutput(output)
-          case None         => Right(())
-        }
-      }
-    } yield ()
+    }
   }
 }
 

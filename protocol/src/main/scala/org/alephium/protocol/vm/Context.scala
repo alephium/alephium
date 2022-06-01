@@ -107,7 +107,16 @@ object LogConfig {
 trait StatelessContext extends CostStrategy {
   def networkConfig: NetworkConfig
   def blockEnv: BlockEnv
+
   def getHardFork(): HardFork = networkConfig.getHardFork(blockEnv.timeStamp)
+  def checkLemanHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
+    val hardFork = getHardFork()
+    if (hardFork >= HardFork.Leman) {
+      okay
+    } else {
+      failed(InactiveInstr(instr))
+    }
+  }
 
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[Balances]
@@ -157,7 +166,7 @@ object StatelessContext {
 trait StatefulContext extends StatelessContext with ContractPool {
   def worldState: WorldState.Staging
 
-  def outputBalances: OutputBalances
+  def outputBalances: Balances
 
   def logConfig: LogConfig
 
@@ -224,7 +233,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
         case _: LockupScript.Asset => okay
         case _: LockupScript.P2C   => failed(InvalidAddressTypeInContractDestroy)
       }
-      _ <- outputBalances.unlocked.add(address, contractAssets).toRight(Right(InvalidBalances))
+      _ <- outputBalances.add(address, contractAssets).toRight(Right(InvalidBalances))
       _ <- removeContract(contractId)
     } yield ()
   }
@@ -237,12 +246,12 @@ trait StatefulContext extends StatelessContext with ContractPool {
   ): ExeResult[Unit] = {
     val newFields = newFieldsOpt.getOrElse(AVector.from(obj.fields))
     for {
-      _ <- chargeFieldSize(newFields.toIterable)
       _ <-
         if (newFields.length == newContractCode.fieldLength) { okay }
         else {
           failed(InvalidFieldLength)
         }
+      _ <- chargeFieldSize(newFields.toIterable)
       _ <- worldState
         .migrateContractUnsafe(contractId, newContractCode, newFields)
         .left
@@ -355,6 +364,6 @@ object StatefulContext {
         failed(ExpectNonPayableMethod)
       }
 
-    val outputBalances: OutputBalances = OutputBalances.empty
+    val outputBalances: Balances = Balances.empty
   }
 }

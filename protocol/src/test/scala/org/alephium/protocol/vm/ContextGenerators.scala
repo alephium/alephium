@@ -74,7 +74,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   def prepareStatefulScript(
       script: StatefulScript,
       gasLimit: GasBox = minimalGas
-  ): (ScriptObj[StatefulContext], StatefulContext) = {
+  )(implicit networkConfig: NetworkConfig): (ScriptObj[StatefulContext], StatefulContext) = {
     val obj     = script.toObject
     val context = genStatefulContext(scriptOpt = Some(script), gasLimit = gasLimit)
     obj -> context
@@ -106,7 +106,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     val context = new StatefulContext {
       val worldState: WorldState.Staging = cachedWorldState.staging()
       val networkConfig: NetworkConfig   = _networkConfig
-      val outputBalances: OutputBalances = OutputBalances.empty
+      val outputBalances: Balances       = Balances.empty
       def nextOutputIndex: Int           = 0
       def blockEnv: BlockEnv             = genBlockEnv()
       def txEnv: TxEnv                   = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))

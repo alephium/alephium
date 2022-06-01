@@ -23,7 +23,7 @@ import org.alephium.util.U256
  * For each stateful frame, users could put a set of assets.
  * Contracts could move funds, generate outputs by using vm's instructions.
  * `remaining` is the current usable balances
- * `approved` is the balances for payable function call
+ * `approved` is the balances that function call potentially can use
  */
 final case class BalanceState(remaining: Balances, approved: Balances) {
   def approveALPH(lockupScript: LockupScript, amount: U256): Option[Unit] = {

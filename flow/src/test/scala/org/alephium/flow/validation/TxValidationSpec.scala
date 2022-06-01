@@ -572,6 +572,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           val method = Method[StatefulContext](
             isPublic = true,
             isPayable = isPayable,
+            useContractAssets = isPayable,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,
@@ -787,7 +788,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "charge gas for tx script size" in new ScriptFixture {
     val rawScript =
       s"""
-         |TxScript P2sh nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript P2sh {
          |  return
          |}
          |""".stripMargin
@@ -810,7 +812,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "match generated contract inputs and outputs" in new ScriptFixture {
     val rawScript =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  return
          |}
          |""".stripMargin
@@ -836,7 +839,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     info("valid script")
     val rawScript =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  return
          |}
          |""".stripMargin
@@ -871,7 +875,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "check script execution flag, inter group" in new ScriptFixture {
     val rawScript =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  return
          |}
          |""".stripMargin

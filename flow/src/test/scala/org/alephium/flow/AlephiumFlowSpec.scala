@@ -660,7 +660,7 @@ trait FlowFixture
     }
     val scriptRaw =
       s"""
-         |TxScript Foo payable {
+         |TxScript Foo {
          |  approveAlph!(@${address.toBase58}, ${alphAmount.v})
          |  $creation
          |}

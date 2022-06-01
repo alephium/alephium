@@ -236,7 +236,8 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
 
       val script =
         s"""
-           |TxScript Foo payable {
+           |@use(approvedAssets = true, contractAssets = true)
+           |TxScript Foo {
            |  return
            |  pub fn add() -> () {
            |  }
@@ -269,7 +270,8 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       val address = Address.p2pkh(pubKey2).toBase58
       def script(address: String) =
         s"""
-           |TxScript Main payable {
+           |@use(approvedAssets = true, contractAssets = true)
+           |TxScript Main {
            |  verifyTxSignature!(#${pubKey2.toHexString})
            |  transferAlphFromSelf!(@$address, 5)
            |}
