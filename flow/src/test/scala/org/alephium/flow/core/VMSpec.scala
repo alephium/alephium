@@ -2031,7 +2031,7 @@ class VMSpec extends AlephiumSpec {
 
     val contract =
       s"""
-         |TxContract Foo() extends I {
+         |TxContract Foo() implements I {
          |  pub fn f3() -> ByteVec {
          |    return #00
          |  }
@@ -2073,7 +2073,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val bar: String =
       s"""
-         |TxContract Bar() extends Foo {
+         |TxContract Bar() implements Foo {
          |  event Bar(x: U256)
          |  pub fn foo() -> () {
          |    emit Foo(1)
