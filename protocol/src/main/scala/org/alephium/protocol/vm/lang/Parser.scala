@@ -329,13 +329,23 @@ object StatefulParser extends Parser[StatefulContext] {
     }
 
   def interfaceImplementing[Unkown: P]: P[Seq[Ast.Inheritance]] =
-    P(Lexer.keyword("implements") ~/ (interfaceInheritance.rep(1, ",")))
+    P(Lexer.keyword("implements") ~ (interfaceInheritance.rep(1, ",")))
 
   def contractExtending[Unkown: P]: P[Seq[Ast.Inheritance]] =
-    P(Lexer.keyword("extends") ~/ (contractInheritance.rep(1, ",")))
+    P(Lexer.keyword("extends") ~ (contractInheritance.rep(1, ",")))
+
+  def interfaceThenContractInheritances[Unkown: P]: P[Seq[Ast.Inheritance]] =
+    P((interfaceImplementing ~ contractExtending).map {
+      case (interfacesInherited, contractsInherited) => contractsInherited.concat(interfacesInherited)
+    })
+
+  def contractThenInterfaceInheritances[Unkown: P]: P[Seq[Ast.Inheritance]] =
+    P((contractExtending ~ interfaceImplementing).map {
+      case (contractsInherited, interfacesInherited) => contractsInherited.concat(interfacesInherited)
+    })
 
   def contractInheritances[Unkown: P]: P[Seq[Ast.Inheritance]] =
-    P(contractExtending | interfaceImplementing).rep(min = 0, max = 2).map { inh => inh.flatten }
+    P(contractThenInterfaceInheritances | interfaceThenContractInheritances | contractExtending | interfaceImplementing)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[Unkown: P]: P[Ast.TxContract] =
