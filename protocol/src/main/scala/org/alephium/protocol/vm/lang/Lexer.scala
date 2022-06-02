@@ -16,7 +16,9 @@
 
 package org.alephium.protocol.vm.lang
 
-import java.math.BigInteger
+import java.math.{BigDecimal, BigInteger}
+
+import scala.util.control.NonFatal
 
 import fastparse._
 import fastparse.NoWhitespace._
@@ -61,8 +63,16 @@ object Lexer {
   def emptyChars[Unknown: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
 
   def hexNum[Unknown: P]: P[BigInteger] = P("0x") ~ hex.!.map(new BigInteger(_, 16))
-  def decNum[Unknown: P]: P[BigInteger] = P(CharsWhileIn("0-9")).!.map(new BigInteger(_))
-  def num[Unknown: P]: P[BigInteger]    = negatable(P(hexNum | decNum))
+  def decNum[Unknown: P]: P[BigInteger] = P(
+    CharsWhileIn("0-9_") ~ ("." ~ CharsWhileIn("0-9_")).? ~ ("e" ~ CharsWhileIn("0-9")).?
+  ).!.map { input =>
+    try {
+      new BigDecimal(input.replaceAll("_", "")).toBigIntegerExact()
+    } catch {
+      case NonFatal(_) => throw Compiler.Error(s"Invalid number ${input}")
+    }
+  }
+  def num[Unknown: P]: P[BigInteger] = negatable(P(hexNum | decNum))
   def negatable[Unknown: P](p: => P[BigInteger]): P[BigInteger] =
     ("-".?.! ~ p).map {
       case ("-", i) => i.negate()
