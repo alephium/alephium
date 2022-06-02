@@ -61,7 +61,7 @@ final case class MutBalanceState(remaining: MutBalances, approved: MutBalances) 
     remaining.useAll(lockupScript)
   }
 
-  def useAllApproved(lockupScript: LockupScript): Option[BalancesPerLockup] = {
+  def useAllApproved(lockupScript: LockupScript): Option[MutBalancesPerLockup] = {
     approved.useAll(lockupScript)
   }
 

@@ -1845,7 +1845,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "BurnToken" in new StatefulInstrFixture {
     val from = lockupScriptGen.sample.get
-    val balanceState = BalanceState.from(
+    val balanceState = MutBalanceState.from(
       tokenBalance(
         from,
         tokenId,
@@ -1861,7 +1861,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     runAndCheckGas(BurnToken)
 
     frame.balanceStateOpt is Some(
-      BalanceState.from(
+      MutBalanceState.from(
         tokenBalance(from, tokenId, ALPH.oneAlph)
       )
     )
@@ -1875,7 +1875,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "LockApprovedAssets" in new StatefulInstrFixture {
     val assetAddress = assetGen.sample.get
-    val balanceState = BalanceState.from {
+    val balanceState = MutBalanceState.from {
       val balance = tokenBalance(assetAddress, tokenId, ALPH.alph(2))
       balance.merge(alphBalance(assetAddress, ALPH.alph(2)))
       balance
@@ -1892,7 +1892,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     prepareStack(ALPH.oneAlph, ALPH.cent(1), 10000)
     runAndCheckGas(LockApprovedAssets, Some(GasSchedule.txOutputBaseGas))
     frame.balanceStateOpt is Some(
-      BalanceState.from {
+      MutBalanceState.from {
         val balance = tokenBalance(assetAddress, tokenId, ALPH.cent(199))
         balance.merge(alphBalance(assetAddress, ALPH.oneAlph))
         balance
