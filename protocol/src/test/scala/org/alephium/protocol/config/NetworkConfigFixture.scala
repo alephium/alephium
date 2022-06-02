@@ -37,4 +37,16 @@ object NetworkConfigFixture {
   trait Default extends NetworkConfigFixture {
     def networkId: NetworkId = NetworkId.AlephiumDevNet
   }
+
+  val PreLeman = new NetworkConfig {
+    override def networkId: NetworkId              = NetworkId.AlephiumMainNet
+    override def noPreMineProof: ByteString        = ByteString.empty
+    override def lemanHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
+  }
+
+  val Leman = new NetworkConfig {
+    override def networkId: NetworkId              = NetworkId.AlephiumMainNet
+    override def noPreMineProof: ByteString        = ByteString.empty
+    override def lemanHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
+  }
 }

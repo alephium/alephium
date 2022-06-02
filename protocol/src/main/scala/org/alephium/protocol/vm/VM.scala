@@ -55,7 +55,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
   def startPayableFrame(
       obj: ContractObj[Ctx],
       ctx: Ctx,
-      balanceState: BalanceState,
+      balanceState: MutBalanceState,
       method: Method[Ctx],
       args: AVector[Val],
       operandStack: Stack[Val],
@@ -74,7 +74,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       startPayableFrame(
         obj,
         ctx,
-        BalanceState.from(balances),
+        MutBalanceState.from(balances),
         method,
         args,
         operandStack,
@@ -96,7 +96,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       _      <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       frame <- {
         val returnTo = returnToOpt.getOrElse(VM.noReturnTo)
-        if (method.isPayable) {
+        if (method.useApprovedAssets) {
           startPayableFrame(obj, ctx, method, args, operandStack, returnTo)
         } else {
           startNonPayableFrame(obj, ctx, method, args, operandStack, returnTo)
@@ -113,6 +113,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
   ): ExeResult[Unit] = {
     for {
+      _          <- obj.code.checkAssetsModifier(ctx)
       startFrame <- startFrame(obj, ctx, methodIndex, args, operandStack, returnToOpt)
       _          <- frameStack.push(startFrame)
       _          <- executeFrames()
@@ -176,6 +177,10 @@ object VM {
       initialGas.use(GasCall.fieldsBaseGas(estimatedSize))
     }
   }
+
+  def checkContractMinimalBalanceLeman(pair: (LockupScript, MutBalancesPerLockup)): Boolean = {
+    pair._1.isAssetType || pair._2.alphAmount >= minimalAlphInContract
+  }
 }
 
 final class StatelessVM(
@@ -200,7 +205,7 @@ final class StatelessVM(
   def startPayableFrame(
       obj: ContractObj[StatelessContext],
       ctx: StatelessContext,
-      balanceState: BalanceState,
+      balanceState: MutBalanceState,
       method: Method[StatelessContext],
       args: AVector[Val],
       operandStack: Stack[Val],
@@ -228,7 +233,7 @@ final class StatefulVM(
   def startPayableFrame(
       obj: ContractObj[StatefulContext],
       ctx: StatefulContext,
-      balanceState: BalanceState,
+      balanceState: MutBalanceState,
       method: Method[StatefulContext],
       args: AVector[Val],
       operandStack: Stack[Val],
@@ -240,7 +245,7 @@ final class StatefulVM(
       currentFrame: Frame[StatefulContext],
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
-    if (currentFrame.method.isPayable) {
+    if (currentFrame.method.usesAssets()) {
       val resultOpt = for {
         currentBalances  <- currentFrame.balanceStateOpt
         previousBalances <- previousFrame.balanceStateOpt
@@ -256,7 +261,7 @@ final class StatefulVM(
     }
   }
 
-  protected def mergeBack(previous: Balances, current: Balances): Option[Unit] = {
+  protected def mergeBack(previous: MutBalances, current: MutBalances): Option[Unit] = {
     @tailrec
     def iter(index: Int): Option[Unit] = {
       if (index >= current.all.length) {
@@ -285,7 +290,7 @@ final class StatefulVM(
   }
 
   private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
-    if (lastFrame.method.isPayable) {
+    if (lastFrame.method.usesAssets()) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
         _        <- ctx.outputBalances.merge(balances.approved)
@@ -296,6 +301,7 @@ final class StatefulVM(
           case Some(_) => okay
           case None    => failed(InvalidBalances)
         }
+        _ <- checkContractMinimalBalances(ctx.outputBalances)
         _ <- outputGeneratedBalances(ctx.outputBalances)
         _ <- ctx.checkAllAssetsFlushed()
       } yield ()
@@ -304,7 +310,18 @@ final class StatefulVM(
     }
   }
 
-  private def outputGeneratedBalances(outputBalances: Balances): ExeResult[Unit] = {
+  def checkContractMinimalBalances(outputBalances: MutBalances): ExeResult[Unit] = {
+    if (
+      ctx.getHardFork() >= HardFork.Leman &&
+      !outputBalances.all.forall(VM.checkContractMinimalBalanceLeman)
+    ) {
+      failed(LowerThanContractMinimalBalance)
+    } else {
+      okay
+    }
+  }
+
+  private def outputGeneratedBalances(outputBalances: MutBalances): ExeResult[Unit] = {
     EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
       balances.toTxOutput(lockupScript).flatMap {
         case Some(output) => ctx.generateOutput(output)
@@ -430,7 +447,7 @@ object StatefulVM {
     }
   }
 
-  private def default(ctx: StatefulContext): StatefulVM = {
+  private[vm] def default(ctx: StatefulContext): StatefulVM = {
     new StatefulVM(ctx, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
   }
 

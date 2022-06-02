@@ -43,7 +43,8 @@ class VMSpec extends AlephiumSpec {
   it should "not start with private function" in new ContractFixture {
     val input =
       s"""
-         |TxScript Foo nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Foo {
          |  return
          |  pub fn foo() -> () {
          |    return
@@ -59,7 +60,8 @@ class VMSpec extends AlephiumSpec {
   it should "overflow frame stack" in new FlowFixture {
     val input =
       s"""
-         |TxScript Foo nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Foo {
          |  foo(${frameStackMaxSize - 1})
          |
          |  fn foo(n: U256) -> () {
@@ -118,7 +120,8 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |
-         |TxScript Bar nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Bar {
          |  let foo = Foo(#${contractKey0.toHexString})
          |  foo.add(4)
          |  return
@@ -164,7 +167,7 @@ class VMSpec extends AlephiumSpec {
         input: String,
         initialState: AVector[Val],
         tokenAmount: Option[U256] = None,
-        initialAlphAmount: U256 = dustUtxoAmount
+        initialAlphAmount: U256 = minimalAlphInContract
     ): ContractOutputRef = {
       val contract = Compiler.compileContract(input).rightValue
       val txScript =
@@ -186,7 +189,7 @@ class VMSpec extends AlephiumSpec {
         numContracts: Int,
         initialState: AVector[Val] = AVector[Val](Val.U256(U256.Zero)),
         tokenAmount: Option[U256] = None,
-        initialAlphAmount: U256 = dustUtxoAmount
+        initialAlphAmount: U256 = minimalAlphInContract
     ): ContractOutputRef = {
       val contractOutputRef = createContract(input, initialState, tokenAmount, initialAlphAmount)
 
@@ -208,7 +211,7 @@ class VMSpec extends AlephiumSpec {
       val script = Compiler.compileTxScript(input).rightValue
       script.toTemplateString() is Hex.toHexString(serialize(script))
       val block =
-        if (script.entryMethod.isPayable) {
+        if (script.entryMethod.useApprovedAssets) {
           payableCall(blockFlow, chainIndex, script)
         } else {
           simpleScript(blockFlow, chainIndex, script)
@@ -306,11 +309,145 @@ class VMSpec extends AlephiumSpec {
     ) is true
   }
 
+  it should "burn token" in new ContractFixture {
+    val contract =
+      s"""
+         |TxContract Foo() {
+         |  @use(contractAssets = true)
+         |  pub fn mint() -> () {
+         |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), ${ALPH.alph(2)})
+         |  }
+         |
+         |  @use(approvedAssets = true, contractAssets = true)
+         |  pub fn burn() -> () {
+         |    burnToken!(@$genesisAddress, selfTokenId!(), ${ALPH.oneAlph})
+         |    burnToken!(selfAddress!(), selfTokenId!(), ${ALPH.oneAlph})
+         |  }
+         |}
+         |""".stripMargin
+    val contractId = createContract(contract, AVector.empty, Some(ALPH.alph(5))).key
+
+    val mint =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${contractId.toHexString})
+         |  foo.mint()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+    callTxScript(mint)
+    val worldState0    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+    val contractAsset0 = worldState0.getContractAsset(contractId).rightValue
+    contractAsset0.lockupScript is LockupScript.p2c(contractId)
+    contractAsset0.tokens is AVector(contractId -> ALPH.alph(3))
+    val tokenAmount0 = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
+    tokenAmount0 is ALPH.alph(2)
+
+    val burn =
+      s"""
+         |TxScript Main {
+         |  approveToken!(@$genesisAddress, #${contractId.toHexString}, ${ALPH.alph(2)})
+         |  let foo = Foo(#${contractId.toHexString})
+         |  foo.burn()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+    callTxScript(burn)
+    val worldState1    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+    val contractAsset1 = worldState1.getContractAsset(contractId).rightValue
+    contractAsset1.lockupScript is LockupScript.p2c(contractId)
+    contractAsset1.tokens is AVector(contractId -> ALPH.alph(2))
+    val tokenAmount1 = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
+    tokenAmount1 is ALPH.alph(1)
+  }
+
+  it should "lock assets" in new ContractFixture {
+    val token =
+      s"""
+         |TxContract Foo() {
+         |  @use(contractAssets = true)
+         |  pub fn mint() -> () {
+         |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), ${ALPH.alph(10)})
+         |  }
+         |}
+         |""".stripMargin
+
+    import org.alephium.protocol.model.tokenIdOrder
+    val _tokenId0   = createContract(token, AVector.empty, ALPH.alph(100)).key
+    val _tokenId1   = createContract(token, AVector.empty, ALPH.alph(100)).key
+    val tokenId0    = if (tokenIdOrder.compare(_tokenId0, _tokenId1) < 0) _tokenId0 else _tokenId1
+    val tokenId1    = if (tokenIdOrder.compare(_tokenId0, _tokenId1) < 0) _tokenId1 else _tokenId0
+    val tokenId0Hex = tokenId0.toHexString
+    val tokenId1Hex = tokenId1.toHexString
+
+    val mint =
+      s"""
+         |TxScript Main {
+         |  let token0 = Foo(#$tokenId0Hex)
+         |  token0.mint()
+         |  let token1 = Foo(#$tokenId1Hex)
+         |  token1.mint()
+         |}
+         |
+         |$token
+         |""".stripMargin
+    callTxScript(mint)
+
+    val lock =
+      s"""
+         |TxScript Main {
+         |  let timestamp0 = 1000
+         |  let timestamp1 = 2000
+         |  let timestamp2 = 3000
+         |
+         |  approveAlph!(@$genesisAddress, ${ALPH.cent(1)})
+         |  lockApprovedAssets!(@$genesisAddress, timestamp0)
+         |
+         |  approveAlph!(@$genesisAddress, ${ALPH.cent(2)})
+         |  approveToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.cent(3)})
+         |  lockApprovedAssets!(@$genesisAddress, timestamp1)
+         |
+         |  approveAlph!(@$genesisAddress, ${ALPH.cent(4)})
+         |  approveToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.cent(5)})
+         |  approveToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.cent(6)})
+         |  lockApprovedAssets!(@$genesisAddress, timestamp2)
+         |}
+         |
+         |$token
+         |""".stripMargin
+
+    val tx = callTxScript(lock).nonCoinbase(0)
+    tx.generatedOutputs(0) is AssetOutput(
+      ALPH.cent(1),
+      genesisAddress.lockupScript,
+      TimeStamp.unsafe(1000),
+      AVector.empty,
+      ByteString.empty
+    )
+    tx.generatedOutputs(1) is AssetOutput(
+      ALPH.cent(2),
+      genesisAddress.lockupScript,
+      TimeStamp.unsafe(2000),
+      AVector(tokenId0 -> ALPH.cent(3)),
+      ByteString.empty
+    )
+    tx.generatedOutputs(2) is AssetOutput(
+      ALPH.cent(4),
+      genesisAddress.lockupScript,
+      TimeStamp.unsafe(3000),
+      AVector(tokenId0 -> ALPH.cent(5), tokenId1 -> ALPH.cent(6)),
+      ByteString.empty
+    )
+  }
+
   it should "not use up contract assets" in new ContractFixture {
     val input =
       """
         |TxContract Foo() {
-        |  pub payable fn foo(address: Address) -> () {
+        |  @use(contractAssets = true)
+        |  pub fn foo(address: Address) -> () {
         |    transferAlphFromSelf!(address, alphRemaining!(selfAddress!()))
         |  }
         |}
@@ -320,7 +457,7 @@ class VMSpec extends AlephiumSpec {
 
     val main =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  let foo = Foo(#${contractId.toHexString})
          |  foo.foo(@${genesisAddress.toBase58})
          |}
@@ -329,7 +466,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     val script = Compiler.compileTxScript(main).rightValue
-    fail(blockFlow, chainIndex, script, EmptyContractAsset)
+    fail(blockFlow, chainIndex, script, LowerThanContractMinimalBalance)
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {
@@ -382,7 +519,8 @@ class VMSpec extends AlephiumSpec {
 
     val main =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  let foo = Foo(#${contractKey0.toHexString})
          |  foo.foo(#${contractKey0.toHexString}, #${contractKey1.toHexString})
          |}
@@ -443,7 +581,8 @@ class VMSpec extends AlephiumSpec {
     // scalastyle:off no.equal
     def expect(out: Int) =
       s"""
-         |TxScript Inverse nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Inverse {
          |  let x = 10973
          |  let mut y = 1
          |  let mut i = 0
@@ -517,7 +656,8 @@ class VMSpec extends AlephiumSpec {
 
     val main: String =
       s"""
-         |TxScript ByteVecTest nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript ByteVecTest {
          |  assert!(byteVec!(true) == #${encode(true)})
          |  assert!(byteVec!(false) == #${encode(false)})
          |  assert!(byteVec!(${i256}i) == #${encode(i256)})
@@ -553,7 +693,7 @@ class VMSpec extends AlephiumSpec {
     val tokenAmount  = ALPH.oneNanoAlph
     val script =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  approveAlph!(@$genesisAddress, ${ALPH.alph(1).v})
          |  copyCreateContractWithToken!(#$contractId, #$encodedState, ${tokenAmount.v})
          |}
@@ -605,7 +745,8 @@ class VMSpec extends AlephiumSpec {
     val bar =
       s"""
          |TxContract Bar() {
-         |  pub payable fn bar(fooId: ByteVec, fooHash: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barHash: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
+         |  @use(approvedAssets = true)
+         |  pub fn bar(fooId: ByteVec, fooHash: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barHash: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
          |    assert!(selfContractId!() == barId)
          |    assert!(selfAddress!() == barAddress)
          |    assert!(contractInitialStateHash!(fooId) == fooHash)
@@ -624,7 +765,7 @@ class VMSpec extends AlephiumSpec {
 
     def main(state: String) =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  Bar(#$barId).bar(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
          |  approveAlph!(@$genesisAddress, ${ALPH.alph(1).v})
          |  copyCreateContract!(#$fooId, #$state)
@@ -653,7 +794,8 @@ class VMSpec extends AlephiumSpec {
       val address: Address = Address.contract(contractId)
       val addressHex       = Hex.toHexString(serialize(address.lockupScript))
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  let address = contractIdToAddress!(#${contractId.toHexString})
          |  assert!(byteVecToAddress!(#$addressHex) == address)
          |}
@@ -666,7 +808,8 @@ class VMSpec extends AlephiumSpec {
       val bs         = ByteString(Gen.listOfN(length, arbitrary[Byte]).sample.get)
       val contractId = new Blake2b(bs)
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  contractIdToAddress!(#${contractId.toHexString})
          |}
          |""".stripMargin
@@ -692,7 +835,8 @@ class VMSpec extends AlephiumSpec {
     val foo =
       s"""
          |TxContract Foo(mut x: U256) {
-         |  pub payable fn destroy(targetAddress: Address) -> () {
+         |  @use(contractAssets = true)
+         |  pub fn destroy(targetAddress: Address) -> () {
          |    x = x + 1
          |    destroySelf!(targetAddress) // in practice, the contract should check the caller before destruction
          |  }
@@ -703,7 +847,7 @@ class VMSpec extends AlephiumSpec {
 
     def main(targetAddress: String) =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  Foo(#$fooId).destroy(@$targetAddress)
          |}
          |
@@ -722,7 +866,7 @@ class VMSpec extends AlephiumSpec {
       info("Destroy a contract twice, this should fail")
       val main =
         s"""
-           |TxScript Main payable {
+           |TxScript Main {
            |  Foo(#$fooId).destroy(@${genesisAddress.toBase58})
            |  Foo(#$fooId).destroy(@${genesisAddress.toBase58})
            |}
@@ -751,7 +895,7 @@ class VMSpec extends AlephiumSpec {
          |    if (!changeState) {
          |      migrate!(code)
          |    } else {
-         |      migrateWithState!(code, #010000)
+         |      migrateWithFields!(code, #010000)
          |    }
          |  }
          |
@@ -766,7 +910,7 @@ class VMSpec extends AlephiumSpec {
          |TxContract Foo(x: Bool) {
          |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
          |    if (changeState) {
-         |      migrateWithState!(code, #010000)
+         |      migrateWithFields!(code, #010000)
          |    } else {
          |      migrate!(code)
          |    }
@@ -781,7 +925,7 @@ class VMSpec extends AlephiumSpec {
 
     def upgrade(changeState: String): String =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  let foo = Foo(#$fooId)
          |  foo.foo(#${Hex.toHexString(serialize(fooV2Code))}, ${changeState})
          |}
@@ -828,7 +972,8 @@ class VMSpec extends AlephiumSpec {
     val foo =
       s"""
          |TxContract Foo() {
-         |  pub payable fn destroy(targetAddress: Address) -> () {
+         |  @use(contractAssets = true)
+         |  pub fn destroy(targetAddress: Address) -> () {
          |    destroySelf!(targetAddress) // in practice, the contract should check the caller before destruction
          |  }
          |}
@@ -839,7 +984,8 @@ class VMSpec extends AlephiumSpec {
     val bar =
       s"""
          |TxContract Bar() {
-         |  pub payable fn bar(targetAddress: Address) -> () {
+         |  @use(contractAssets = true)
+         |  pub fn bar(targetAddress: Address) -> () {
          |    Foo(#$fooId).destroy(targetAddress) // in practice, the contract should check the caller before destruction
          |  }
          |}
@@ -850,7 +996,7 @@ class VMSpec extends AlephiumSpec {
 
     val main =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  Bar(#$barId).bar(@${genesisAddress.toBase58})
          |}
          |
@@ -865,12 +1011,14 @@ class VMSpec extends AlephiumSpec {
     val foo =
       s"""
          |TxContract Foo() {
-         |  pub payable fn foo(targetAddress: Address) -> () {
+         |  @use(contractAssets = true)
+         |  pub fn foo(targetAddress: Address) -> () {
          |    approveAlph!(selfAddress!(), alphRemaining!(selfAddress!()))
          |    destroy(targetAddress)
          |  }
          |
-         |  pub payable fn destroy(targetAddress: Address) -> () {
+         |  @use(contractAssets = true)
+         |  pub fn destroy(targetAddress: Address) -> () {
          |    destroySelf!(targetAddress) // in practice, the contract should check the caller before destruction
          |  }
          |}
@@ -880,7 +1028,7 @@ class VMSpec extends AlephiumSpec {
 
     val main =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  Foo(#$fooId).foo(@${genesisAddress.toBase58})
          |}
          |
@@ -895,7 +1043,8 @@ class VMSpec extends AlephiumSpec {
   it should "fetch block env" in new ContractFixture {
     def main(latestHeader: BlockHeader) =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  assert!(networkId!() == #02)
          |  assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis})
          |  assert!(blockTarget!() == ${latestHeader.target.value})
@@ -918,7 +1067,8 @@ class VMSpec extends AlephiumSpec {
     val zeroId = Hash.zero
     def main(index: Int) =
       s"""
-         |TxScript TxEnv nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript TxEnv {
          |  assert!(txId!() != #${zeroId.toHexString})
          |  assert!(txCaller!($index) == @${genesisAddress.toBase58})
          |  assert!(txCallerSize!() == 1)
@@ -933,7 +1083,8 @@ class VMSpec extends AlephiumSpec {
     val input = Hex.toHexString(ByteString.fromString("Hello World1"))
     val main =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  assert!(blake2b!(#$input) == #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a)
          |  assert!(blake2b!(#$input) != #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b370)
          |  assert!(keccak256!(#$input) == #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E3C)
@@ -956,7 +1107,8 @@ class VMSpec extends AlephiumSpec {
     val ed25519Sig               = ED25519.sign(Hash.zero.bytes, ed25519Pri).toHexString
     def main(p256Sig: String, ed25519Sig: String) =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig)
          |  verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
          |}
@@ -969,7 +1121,8 @@ class VMSpec extends AlephiumSpec {
   it should "test eth ecrecover" in new ContractFixture with EthEcRecoverFixture {
     def main(messageHash: ByteString, signature: ByteString, address: ByteString) =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  let address = ethEcRecover!(#${Hex.toHexString(messageHash)},
          |    #${Hex.toHexString(signature)})
          |  assert!(address == #${Hex.toHexString(address)})
@@ -990,7 +1143,8 @@ class VMSpec extends AlephiumSpec {
 
     def main(absoluteTimeLock: TimeStamp, relativeTimeLock: Duration, txIndex: Int) =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  verifyAbsoluteLocktime!(${absoluteTimeLock.millis})
          |  verifyRelativeLocktime!(${txIndex}, ${relativeTimeLock.millis})
          |}
@@ -1014,7 +1168,8 @@ class VMSpec extends AlephiumSpec {
       val number = U256.from(genNumber(size)).getOrElse(U256.MaxValue)
       val hex    = Hex.toHexString(IndexedSeq.fill(size)(0xff.toByte))
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  assert!($func($number) == #$hex)
          |}
          |""".stripMargin
@@ -1036,7 +1191,8 @@ class VMSpec extends AlephiumSpec {
       val u256   = U256.from(number).getOrElse(U256.MaxValue)
       val hex    = Hex.toHexString(IndexedSeq.fill(size)(0xff.toByte))
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  assert!($func(#$hex) == $u256)
          |}
          |""".stripMargin
@@ -1056,7 +1212,8 @@ class VMSpec extends AlephiumSpec {
     val hex = "1b6dffea4ac54dbc4bbc65169dd054de826add0c62a85789662d477116304488"
     def main(start: Int, end: Int, slice: String): String = {
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  assert!(byteVecSlice!(#$hex, $start, $end) == #$slice)
          |}
          |""".stripMargin
@@ -1081,7 +1238,8 @@ class VMSpec extends AlephiumSpec {
     def main(address: Address): String = {
       val hex = Hex.toHexString(serialize(address.lockupScript))
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  assert!(byteVecToAddress!(#$hex) == @${address.toBase58})
          |}
          |""".stripMargin
@@ -1099,7 +1257,8 @@ class VMSpec extends AlephiumSpec {
          |// credits to @chloekek
          |TxContract Nft(author: Address, price: U256)
          |{
-         |    pub payable fn buy(buyer: Address) -> ()
+         |    @use(approvedAssets = true, contractAssets = true)
+         |    pub fn buy(buyer: Address) -> ()
          |    {
          |        transferAlph!(buyer, author, price)
          |        transferTokenFromSelf!(buyer, selfTokenId!(), 1)
@@ -1119,7 +1278,7 @@ class VMSpec extends AlephiumSpec {
 
     callTxScript(
       s"""
-         |TxScript Main payable
+         |TxScript Main
          |{
          |  approveAlph!(@${genesisAddress.toBase58}, 1000000)
          |  Nft(#${tokenId.toHexString}).buy(@${genesisAddress.toBase58})
@@ -1134,7 +1293,8 @@ class VMSpec extends AlephiumSpec {
     val tokenContract =
       s"""
          |TxContract Token(mut x: U256) {
-         |  pub payable fn withdraw(address: Address, amount: U256) -> () {
+         |  @use(approvedAssets = true, contractAssets = true)
+         |  pub fn withdraw(address: Address, amount: U256) -> () {
          |    transferTokenFromSelf!(address, selfTokenId!(), amount)
          |  }
          |}
@@ -1144,7 +1304,7 @@ class VMSpec extends AlephiumSpec {
     val tokenId = tokenContractKey
 
     callTxScript(s"""
-                    |TxScript Main payable {
+                    |TxScript Main {
                     |  let token = Token(#${tokenContractKey.toHexString})
                     |  token.withdraw(@${genesisAddress.toBase58}, 1024)
                     |}
@@ -1164,10 +1324,10 @@ class VMSpec extends AlephiumSpec {
       output.tokens.toSeq.toMap.getOrElse(tokenId, U256.Zero) is tokenReserve
     }
 
-    checkSwapBalance(dustUtxoAmount, 0)
+    checkSwapBalance(minimalAlphInContract, 0)
 
     callTxScript(s"""
-                    |TxScript Main payable {
+                    |TxScript Main {
                     |  approveAlph!(@${genesisAddress.toBase58}, 10)
                     |  approveToken!(@${genesisAddress.toBase58}, #${tokenId.toHexString}, 100)
                     |  let swap = Swap(#${swapContractKey.toHexString})
@@ -1176,10 +1336,10 @@ class VMSpec extends AlephiumSpec {
                     |
                     |${AMMContract.swapContract}
                     |""".stripMargin)
-    checkSwapBalance(dustUtxoAmount + 10, 100)
+    checkSwapBalance(minimalAlphInContract + 10, 100)
 
     callTxScript(s"""
-                    |TxScript Main payable {
+                    |TxScript Main {
                     |  approveAlph!(@${genesisAddress.toBase58}, 10)
                     |  let swap = Swap(#${swapContractKey.toHexString})
                     |  swap.swapToken(@${genesisAddress.toBase58}, 10)
@@ -1187,10 +1347,10 @@ class VMSpec extends AlephiumSpec {
                     |
                     |${AMMContract.swapContract}
                     |""".stripMargin)
-    checkSwapBalance(dustUtxoAmount + 20, 50)
+    checkSwapBalance(minimalAlphInContract + 20, 50)
 
     callTxScript(s"""
-                    |TxScript Main payable {
+                    |TxScript Main {
                     |  approveToken!(@${genesisAddress.toBase58}, #${tokenId.toHexString}, 50)
                     |  let swap = Swap(#${swapContractKey.toHexString})
                     |  swap.swapAlph(@${genesisAddress.toBase58}, 50)
@@ -1198,7 +1358,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |${AMMContract.swapContract}
                     |""".stripMargin)
-    checkSwapBalance(dustUtxoAmount + 10, 100)
+    checkSwapBalance(minimalAlphInContract + 10, 100)
   }
 
   it should "execute tx in random order" in new ContractFixture {
@@ -1213,7 +1373,8 @@ class VMSpec extends AlephiumSpec {
     val contractKey = createContractAndCheckState(testContract, 2, 2).key
 
     val block = callTxScriptMulti(index => s"""
-                                              |TxScript Main nonPayable {
+                                              |@use(approvedAssets = false)
+                                              |TxScript Main {
                                               |  let foo = Foo(#${contractKey.toHexString})
                                               |  foo.foo($index)
                                               |}
@@ -1231,7 +1392,8 @@ class VMSpec extends AlephiumSpec {
     val testContract =
       s"""
          |TxContract Foo(mut x: U256) {
-         |  pub payable fn foo(address: Address) -> () {
+         |  @use(contractAssets = true)
+         |  pub fn foo(address: Address) -> () {
          |    x = x + 1
          |    transferAlphFromSelf!(address, ${ALPH.cent(1).v})
          |  }
@@ -1242,7 +1404,7 @@ class VMSpec extends AlephiumSpec {
         testContract,
         2,
         2,
-        initialAlphAmount = ALPH.alph(1)
+        initialAlphAmount = ALPH.alph(10)
       ).key
 
     def checkContract(alphReserve: U256, x: Int) = {
@@ -1253,7 +1415,7 @@ class VMSpec extends AlephiumSpec {
       output.amount is alphReserve
     }
 
-    checkContract(ALPH.alph(1), 0)
+    checkContract(ALPH.alph(10), 0)
 
     val block0 = transfer(blockFlow, chainIndex, amount = ALPH.alph(10), numReceivers = 10)
     addAndCheck(blockFlow, block0)
@@ -1261,7 +1423,7 @@ class VMSpec extends AlephiumSpec {
 
     def main(address: LockupScript.Asset) =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  let foo = Foo(#${contractId.toHexString})
          |  foo.foo(@${Address.Asset(address).toBase58})
          |}
@@ -1301,7 +1463,7 @@ class VMSpec extends AlephiumSpec {
     blockTemplate.transactions.filter(_.scriptExecutionOk == false).length is 5
     val block = mine(blockFlow, blockTemplate)
     addAndCheck0(blockFlow, block)
-    checkContract(ALPH.cent(95), 5)
+    checkContract(ALPH.cent(995), 5)
   }
 
   it should "test contract inheritance" in new ContractFixture {
@@ -1349,7 +1511,8 @@ class VMSpec extends AlephiumSpec {
 
     val script =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  let child = Child(#$contractId)
          |  child.foo()
          |}
@@ -1369,11 +1532,11 @@ class VMSpec extends AlephiumSpec {
         block.hash,
         contractOutputRef.key,
         AVector(
-          LogState(txId, 1, AVector(Val.U256(1))),
           LogState(txId, 0, AVector(Val.U256(1))),
+          LogState(txId, 1, AVector(Val.U256(1))),
           LogState(txId, 2, AVector(Val.U256(2))),
-          LogState(txId, 0, AVector(Val.U256(2))),
-          LogState(txId, 0, AVector(Val.U256(3)))
+          LogState(txId, 1, AVector(Val.U256(2))),
+          LogState(txId, 1, AVector(Val.U256(3)))
         )
       )
   }
@@ -1418,7 +1581,8 @@ class VMSpec extends AlephiumSpec {
          |    return result
          |  }
          |
-         |  pub payable fn destroy(targetAddress: Address) -> () {
+         |  @use(contractAssets = true)
+         |  pub fn destroy(targetAddress: Address) -> () {
          |    destroySelf!(targetAddress)
          |  }
          |}
@@ -1428,7 +1592,8 @@ class VMSpec extends AlephiumSpec {
       s"""
          |$contractRaw
          |
-         |TxScript Bar nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Bar {
          |  let foo = Foo(#${contractId.toHexString})
          |  foo.add(4)
          |
@@ -1446,7 +1611,7 @@ class VMSpec extends AlephiumSpec {
       logStates.eventKey is contractId
       logStates.states.length is 2
 
-      getCurentCount(blockFlow, chainIndex.from, contractId).value is currentCount
+      getCurrentCount(blockFlow, chainIndex.from, contractId).value is currentCount
 
       val addingLogState = logStates.states(0)
       addingLogState.txId is block.nonCoinbase.head.id
@@ -1483,7 +1648,7 @@ class VMSpec extends AlephiumSpec {
       logStates.eventKey is createContractEventId
       logStates.states.length is 1
 
-      getCurentCount(blockFlow, chainIndex.from, createContractEventId).value is 1
+      getCurrentCount(blockFlow, chainIndex.from, createContractEventId).value is 1
 
       val createContractLogState = logStates.states(0)
       createContractLogState.txId is createContractBlock.nonCoinbase.head.id
@@ -1498,7 +1663,7 @@ class VMSpec extends AlephiumSpec {
         s"""
            |$contractRaw
            |
-           |TxScript Main payable {
+           |TxScript Main {
            |  Foo(#${contractId.toHexString}).destroy(@${genesisAddress.toBase58})
            |}
            |""".stripMargin
@@ -1515,7 +1680,7 @@ class VMSpec extends AlephiumSpec {
       logStates.eventKey is destroyContractEventId
       logStates.states.length is 1
 
-      getCurentCount(blockFlow, chainIndex.from, destroyContractEventId).value is 1
+      getCurrentCount(blockFlow, chainIndex.from, destroyContractEventId).value is 1
 
       val destroyContractLogState = logStates.states(0)
       destroyContractLogState.txId is destroyContractBlock.nonCoinbase.head.id
@@ -1607,7 +1772,8 @@ class VMSpec extends AlephiumSpec {
       s"""
          |$contractRaw
          |
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  let contract = Add(#${contractId.toHexString})
          |  contract.add(1, 2)
          |}
@@ -1657,7 +1823,8 @@ class VMSpec extends AlephiumSpec {
       s"""
          |$contractRaw
          |
-         |TxScript Bar nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Bar {
          |  let foo = Foo(#${contractId.toHexString})
          |  foo.testEventTypes()
          |
@@ -1672,7 +1839,7 @@ class VMSpec extends AlephiumSpec {
     logStates.eventKey is contractId
     logStates.states.length is 2
 
-    getCurentCount(blockFlow, chainIndex.from, contractId).value is 1
+    getCurrentCount(blockFlow, chainIndex.from, contractId).value is 1
 
     val testEventLogState1 = logStates.states(0)
     testEventLogState1.txId is callingBlock.nonCoinbase.head.id
@@ -1710,7 +1877,8 @@ class VMSpec extends AlephiumSpec {
       s"""
          |$contractRaw
          |
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  Foo(#${contractId.toHexString}).foo()
          |}
          |""".stripMargin
@@ -1836,7 +2004,8 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxContract Foo(mut subContractId: ByteVec) {
          |  event Create(subContractId: ByteVec)
-         |  pub payable fn foo() -> () {
+         |  @use(approvedAssets = true)
+         |  pub fn foo() -> () {
          |    approveAlph!(txCaller!(0), ${ALPH.nanoAlph(1000).v})
          |    subContractId = copyCreateContract!(selfContractId!(), #010300)
          |    emit Create(subContractId)
@@ -1848,7 +2017,7 @@ class VMSpec extends AlephiumSpec {
 
     val main: String =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  approveAlph!(txCaller!(0), ${ALPH.alph(1).v})
          |  Foo(#${contractId.toHexString}).foo()
          |}
@@ -1873,7 +2042,8 @@ class VMSpec extends AlephiumSpec {
     val contract: String =
       s"""
          |TxContract Foo(mut subContractId: ByteVec) {
-         |  pub payable fn foo() -> () {
+         |  @use(approvedAssets = true)
+         |  pub fn foo() -> () {
          |    approveAlph!(txCaller!(0), ${ALPH.nanoAlph(1000).v})
          |    subContractId = copyCreateContract!(selfContractId!(), #010300)
          |    let subContract = Foo(subContractId)
@@ -1926,7 +2096,7 @@ class VMSpec extends AlephiumSpec {
 
     val main: String =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  Foo(#${fooId.toHexString}).foo(#${barId.toHexString})
          |}
          |
@@ -1951,7 +2121,8 @@ class VMSpec extends AlephiumSpec {
     val fooId = createContract(foo, AVector.empty).key
     val main: String =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  Foo(#${fooId.toHexString}).foo()
          |}
          |
@@ -1976,7 +2147,8 @@ class VMSpec extends AlephiumSpec {
       ).key
     val main: String =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  let foo = Foo(#${fooId.toHexString})
          |  let (x, y, z) = foo.loadFields!()
          |  assert!(x == true)
@@ -2006,7 +2178,7 @@ class VMSpec extends AlephiumSpec {
 
     val main: String =
       s"""
-         |TxScript Main payable {
+         |TxScript Main {
          |  Foo(#${fooId.toHexString}).foo()
          |  transferAlph!(txCaller!(0), @${fooAddress}, ${ALPH.alph(1).v})
          |}
@@ -2052,7 +2224,8 @@ class VMSpec extends AlephiumSpec {
 
     val main =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  let impl = I(#${contractId.toHexString})
          |  assert!(impl.f1() == 1)
          |}
@@ -2086,7 +2259,8 @@ class VMSpec extends AlephiumSpec {
 
     val main: String =
       s"""
-         |TxScript Main nonPayable {
+         |@use(approvedAssets = false)
+         |TxScript Main {
          |  let foo = Foo(#${barId.toHexString})
          |  foo.foo()
          |}
@@ -2116,14 +2290,18 @@ class VMSpec extends AlephiumSpec {
     val fooInitialState = Hex.toHexString(serialize(AVector.empty[Val]))
 
     def createFooContract(transferAlph: Boolean): String = {
-      val maybeTransfer =
-        if (transferAlph) s"transferAlphFromSelf!(contractAddress, ${ALPH.cent(1).v})" else ""
+      val maybeTransfer = if (transferAlph) {
+        s"transferAlphFromSelf!(contractAddress, ${minimalAlphInContract.v})"
+      } else {
+        ""
+      }
 
       val bar: String =
         s"""
            |TxContract Bar() {
-           |  pub payable fn bar() -> () {
-           |    approveAlph!(@${genesisAddress.toBase58}, ${ALPH.oneAlph.v})
+           |  @use(approvedAssets = true, contractAssets = true)
+           |  pub fn bar() -> () {
+           |    approveAlph!(@${genesisAddress.toBase58}, ${minimalAlphInContract.v})
            |    let contractId = createContract!(#$fooByteCode, #$fooInitialState)
            |    let contractAddress = contractIdToAddress!(contractId)
            |
@@ -2135,8 +2313,8 @@ class VMSpec extends AlephiumSpec {
       val barContractId = createContract(bar, AVector.empty, initialAlphAmount = ALPH.alph(2)).key
 
       s"""
-         |TxScript Main payable {
-         |  approveAlph!(@${genesisAddress.toBase58}, ${ALPH.oneAlph.v})
+         |TxScript Main {
+         |  approveAlph!(@${genesisAddress.toBase58}, ${minimalAlphInContract.v})
          |  let bar = Bar(#${barContractId.toHexString})
          |  bar.bar()
          |}
@@ -2160,7 +2338,7 @@ class VMSpec extends AlephiumSpec {
     blockFlow.getEvents(contractId, start, end).rightValue
   }
 
-  private def getCurentCount(
+  private def getCurrentCount(
       blockFlow: BlockFlow,
       groupIndex: GroupIndex,
       contractId: ContractId

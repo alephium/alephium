@@ -16,9 +16,14 @@
 
 package org.alephium.protocol.vm
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import scala.reflect.ClassTag
 
+import org.alephium.protocol.ALPH
+import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
+import org.alephium.protocol.vm.ContractPool.{ContractAssetInUsing}
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class FrameSpec extends AlephiumSpec with FrameFixture {
@@ -55,12 +60,83 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
   it should "popOpStackAddress" in new PopOpStackFixture {
     test[Val.Address](_.popOpStackAddress())
   }
+
+  trait FrameBalanceFixture {
+    def prepareContract() = {
+      val (code, state, contractOutputRef, contractOutput) = generateContract().sample.get
+      cachedWorldState.createContractUnsafe(
+        code,
+        state,
+        contractOutputRef,
+        contractOutput
+      )
+      contractOutputRef.key
+    }
+
+    val from = lockupScriptGen.sample.get
+    def balanceState =
+      MutBalanceState(
+        MutBalances.empty,
+        MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1000))))
+      )
+    def preLemanFrame = {
+      genStatefulFrame(Some(balanceState))(NetworkConfigFixture.PreLeman)
+    }
+    def lemanFrame = {
+      val balanceState =
+        MutBalanceState(
+          MutBalances.empty,
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1000))))
+        )
+      genStatefulFrame(Some(balanceState))(NetworkConfigFixture.Leman)
+    }
+
+    val contract0 = StatefulContract(0, AVector(Method(true, true, true, 0, 0, 0, AVector.empty)))
+    val contract1 = StatefulContract(0, AVector(Method(true, false, false, 0, 0, 0, AVector.empty)))
+    val contract2 = StatefulContract(0, AVector(Method(true, true, false, 0, 0, 0, AVector.empty)))
+    val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
+
+    def test(_frame: => StatefulFrame, contract: StatefulContract, emptyOutput: Boolean) = {
+      val contractId = prepareContract()
+      val method     = contract.methods.head
+      val frame      = _frame
+      frame.balanceStateOpt.get.approved.all.isEmpty is false
+
+      val result = frame
+        .getNewFrameBalancesState(
+          StatefulContractObject.from(contract, AVector.empty, contractId),
+          method
+        )
+
+      result.rightValue.isEmpty is emptyOutput
+      if (!emptyOutput) {
+        if (method.useApprovedAssets) {
+          frame.balanceStateOpt.get.approved.all.isEmpty is true
+        }
+        if (method.useContractAssets) {
+          frame.ctx.assetStatus(contractId) is ContractAssetInUsing
+        }
+      }
+    }
+  }
+
+  it should "calculate frame balances" in new FrameBalanceFixture {
+    test(preLemanFrame, contract0, emptyOutput = false)
+    test(preLemanFrame, contract1, emptyOutput = true)
+    test(preLemanFrame, contract2, emptyOutput = false)
+    test(preLemanFrame, contract3, emptyOutput = true)
+    test(lemanFrame, contract0, emptyOutput = false)
+    test(lemanFrame, contract1, emptyOutput = true)
+    test(lemanFrame, contract2, emptyOutput = false)
+    test(lemanFrame, contract3, emptyOutput = false)
+  }
 }
 
 trait FrameFixture extends ContextGenerators {
   def baseMethod[Ctx <: StatelessContext](localsLength: Int) = Method[Ctx](
     isPublic = true,
-    isPayable = false,
+    useApprovedAssets = false,
+    useContractAssets = false,
     argsLength = localsLength - 1,
     localsLength,
     returnLength = 0,
@@ -82,7 +158,9 @@ trait FrameFixture extends ContextGenerators {
       .rightValue
   }
 
-  def genStatefulFrame(): Frame[StatefulContext] = {
+  def genStatefulFrame(
+      balanceState: Option[MutBalanceState] = None
+  )(implicit networkConfig: NetworkConfig): StatefulFrame = {
     val method         = baseMethod[StatefulContext](2)
     val script         = StatefulScript.unsafe(AVector(method))
     val (obj, context) = prepareStatefulScript(script)
@@ -90,7 +168,7 @@ trait FrameFixture extends ContextGenerators {
       .stateful(
         context,
         None,
-        None,
+        balanceState,
         obj,
         method,
         AVector(Val.True),
@@ -98,6 +176,7 @@ trait FrameFixture extends ContextGenerators {
         _ => okay
       )
       .rightValue
+      .asInstanceOf[StatefulFrame]
   }
 }
 

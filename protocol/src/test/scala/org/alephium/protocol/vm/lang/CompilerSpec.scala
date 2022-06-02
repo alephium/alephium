@@ -1415,7 +1415,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     Compiler.compileContract(code).rightValue.methods.head is
       Method[StatefulContext](
         isPublic = true,
-        isPayable = false,
+        useApprovedAssets = false,
+        useContractAssets = false,
         argsLength = 0,
         localsLength = 5,
         returnLength = 0,
@@ -1866,14 +1867,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "compile TxScript" in {
     val code =
       s"""
-         |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) payable {
+         |@use(approvedAssets = true, contractAssets = true)
+         |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) {
          |  approveToken!(address, tokenId, tokenAmount)
          |  let swap = Swap(swapContractKey)
          |  swap.swapAlph(address, tokenAmount)
          |}
          |
          |Interface Swap {
-         |  pub payable fn swapAlph(buyer: Address, tokenAmount: U256) -> ()
+         |  @use(approvedAssets = true, contractAssets = true)
+         |  pub fn swapAlph(buyer: Address, tokenAmount: U256) -> ()
          |}
          |""".stripMargin
     val script = Compiler.compileTxScript(code).rightValue

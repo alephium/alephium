@@ -39,6 +39,9 @@ object Ast {
     def signature: String = s"${ident.name}:${tpe.signature}"
   }
 
+  final case class AnnotationField(ident: Ident, value: Val)
+  final case class Annotation(id: Ident, fields: Seq[AnnotationField])
+
   object FuncId {
     def empty: FuncId = FuncId("", isBuiltIn = false)
   }
@@ -329,9 +332,11 @@ object Ast {
   }
 
   final case class FuncDef[Ctx <: StatelessContext](
+      annotations: Seq[Annotation],
       id: FuncId,
       isPublic: Boolean,
-      isPayable: Boolean,
+      useApprovedAssets: Boolean,
+      useContractAssets: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
       body: Seq[Statement[Ctx]]
@@ -339,9 +344,20 @@ object Ast {
     def name: String = id.name
 
     def signature: String = {
-      val publicPrefix  = if (isPublic) "pub " else ""
-      val payablePrefix = if (isPayable) "payable " else ""
-      s"${publicPrefix}${payablePrefix}${name}(${args.map(_.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
+      val publicPrefix = if (isPublic) "pub " else ""
+      val assetModifier = {
+        (useApprovedAssets, useContractAssets) match {
+          case (true, true) =>
+            s"@use(approvedAssets=true,contractAssets=true) "
+          case (true, false) =>
+            s"@use(approvedAssets=true) "
+          case (false, true) =>
+            s"@use(contractAssets=true) "
+          case (false, false) =>
+            ""
+        }
+      }
+      s"${assetModifier}${publicPrefix}${name}(${args.map(_.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
     }
     def getArgNames(): Seq[String]          = args.map(_.ident.name)
     def getArgTypeSignatures(): Seq[String] = args.map(_.tpe.signature)
@@ -373,7 +389,8 @@ object Ast {
       val localVars = state.getLocalVars(id)
       Method[Ctx](
         isPublic,
-        isPayable,
+        useApprovedAssets,
+        useContractAssets,
         argsLength = ArrayTransformer.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
         returnLength = ArrayTransformer.flattenTypeLength(rtypes),
@@ -385,12 +402,15 @@ object Ast {
   object FuncDef {
     def main(
         stmts: Seq[Ast.Statement[StatefulContext]],
-        isPayable: Boolean
+        useApprovedAssets: Boolean,
+        useContractAssets: Boolean
     ): FuncDef[StatefulContext] = {
       FuncDef[StatefulContext](
+        Seq.empty,
         id = FuncId("main", false),
         isPublic = true,
-        isPayable = isPayable,
+        useApprovedAssets = useApprovedAssets,
+        useContractAssets = useContractAssets,
         args = Seq.empty,
         rtypes = Seq.empty,
         body = stmts
@@ -881,7 +901,7 @@ object Ast {
         throw Compiler.Error(s"Cyclic inheritance detected for contract ${contract.ident.name}")
       }
 
-      val allParents = mutable.Map.empty[TypeId, ContractWithState]
+      val allParents = mutable.LinkedHashMap.empty[TypeId, ContractWithState]
       contract.inheritances.foreach { inheritance =>
         val parentId       = inheritance.parentId
         val parentContract = getContract(parentId)
@@ -997,9 +1017,8 @@ object Ast {
         contract: ContractWithState
     ): (Seq[FuncDef[StatefulContext]], Seq[EventDef]) = {
       val parents = parentsCache(contract.ident)
-      val (_allContracts, _allInterfaces) =
+      val (allContracts, _allInterfaces) =
         (parents :+ contract).partition(_.isInstanceOf[TxContract])
-      val allContracts = _allContracts.sortBy(_.ident.name)
       val allInterfaces =
         sortInterfaces(parentsCache, _allInterfaces.map(_.asInstanceOf[ContractInterface]))
 

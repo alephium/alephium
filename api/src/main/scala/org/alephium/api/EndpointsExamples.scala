@@ -471,15 +471,16 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       Compile.Script(
         code =
-          s"TxScript Main payable { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) }"
+          s"TxScript Main { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) }"
       )
     )
 
   implicit val compileContractExamples: List[Example[Compile.Contract]] =
     simpleExample(
       Compile.Contract(
+        // Note that we use this weird format to avoid Windows linebreak issue
         code =
-          "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+          "TxContract Foo(bar: ByteVec) {\n@use(approvedAssets = true, contractAssets = true)\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
       )
     )
 
@@ -496,7 +497,7 @@ trait EndpointsExamples extends ErrorExamples {
           CompileResult.FunctionSig(
             name = "bar",
             signature =
-              "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+              "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
             argNames = AVector("a", "b", "c", "d", "e"),
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
@@ -519,7 +520,7 @@ trait EndpointsExamples extends ErrorExamples {
           CompileResult.FunctionSig(
             name = "bar",
             signature =
-              "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+              "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
             argNames = AVector("a", "b", "c", "d", "e"),
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
@@ -602,6 +603,7 @@ trait EndpointsExamples extends ErrorExamples {
     address = Address.contract(anotherContractId),
     bytecode = code,
     codeHash = code.hash,
+    initialStateHash = code.initialStateHash(AVector.empty),
     fields = AVector[Val](ValU256(ALPH.alph(2))),
     asset = asset(2)
   )
@@ -629,6 +631,7 @@ trait EndpointsExamples extends ErrorExamples {
         returns = AVector[Val](ValU256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),
+        txInputs = AVector(contractAddress),
         txOutputs =
           AVector(ContractOutput(1234, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
         events = AVector(eventByTxId)
