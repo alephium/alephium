@@ -728,7 +728,7 @@ class ServerUtils(implicit
         code.contract,
         address,
         code.initialFields,
-        query.initialAlphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
+        initialAlphAmount,
         query.initialTokenAmounts,
         query.issueTokenAmount.map(_.value)
       )
