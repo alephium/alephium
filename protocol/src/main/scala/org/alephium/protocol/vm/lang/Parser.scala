@@ -336,16 +336,20 @@ object StatefulParser extends Parser[StatefulContext] {
 
   def interfaceThenContractInheritances[Unkown: P]: P[Seq[Ast.Inheritance]] =
     P((interfaceImplementing ~ contractExtending).map {
-      case (interfacesInherited, contractsInherited) => contractsInherited.concat(interfacesInherited)
+      case (interfacesInherited, contractsInherited) =>
+        contractsInherited.concat(interfacesInherited)
     })
 
   def contractThenInterfaceInheritances[Unkown: P]: P[Seq[Ast.Inheritance]] =
     P((contractExtending ~ interfaceImplementing).map {
-      case (contractsInherited, interfacesInherited) => contractsInherited.concat(interfacesInherited)
+      case (contractsInherited, interfacesInherited) =>
+        contractsInherited.concat(interfacesInherited)
     })
 
   def contractInheritances[Unkown: P]: P[Seq[Ast.Inheritance]] =
-    P(contractThenInterfaceInheritances | interfaceThenContractInheritances | contractExtending | interfaceImplementing)
+    P(
+      contractThenInterfaceInheritances | interfaceThenContractInheritances | contractExtending | interfaceImplementing
+    )
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[Unkown: P]: P[Ast.TxContract] =
