@@ -328,7 +328,7 @@ object StatefulParser extends Parser[StatefulContext] {
       Ast.ContractInheritance(typeId, fields)
     }
   def contractInheritances[Unkown: P]: P[Seq[Ast.Inheritance]] =
-    P(Lexer.keyword("extends") ~/ (contractInheritance | interfaceInheritance).rep(1, ","))
+    P((Lexer.keyword("extends") ~/ (contractInheritance.rep(1, ","))) | (Lexer.keyword("implements") ~/ (interfaceInheritance.rep(1, ","))))
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[Unkown: P]: P[Ast.TxContract] =
     P(
@@ -371,7 +371,7 @@ object StatefulParser extends Parser[StatefulContext] {
   def rawInterface[Unkown: P]: P[Ast.ContractInterface] =
     P(
       Lexer.keyword("Interface") ~/ Lexer.typeId ~
-        (Lexer.keyword("extends") ~/ interfaceInheritance.rep(1, ",")).? ~
+        (Lexer.keyword("implements") ~/ interfaceInheritance.rep(1, ",")).? ~
         "{" ~ eventDef.rep ~ interfaceFunc.rep ~ "}"
     ).map { case (typeId, inheritances, events, funcs) =>
       inheritances match {

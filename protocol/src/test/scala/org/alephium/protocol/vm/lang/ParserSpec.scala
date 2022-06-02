@@ -432,7 +432,7 @@ class ParserSpec extends AlephiumSpec {
       info("Parse interface")
       val code =
         s"""
-           |Interface Child extends Parent {
+           |Interface Child implements Parent {
            |  fn foo() -> ()
            |}
            |""".stripMargin
@@ -448,7 +448,7 @@ class ParserSpec extends AlephiumSpec {
       info("Interface supports single inheritance")
       val code =
         s"""
-           |Interface Child extends Parent0, Parent1 {
+           |Interface Child implements Parent0, Parent1 {
            |  fn foo() -> ()
            |}
            |""".stripMargin
@@ -460,7 +460,7 @@ class ParserSpec extends AlephiumSpec {
       info("Contract inherits interface")
       val code =
         s"""
-           |TxContract Child() extends Parent {
+           |TxContract Child() implements Parent {
            |  fn foo() -> () {
            |    return
            |  }
