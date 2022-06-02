@@ -117,14 +117,14 @@ trait ContractPool extends CostStrategy {
   }
 
   // note: we don't charge gas here as it's charged by tx input already
-  def useContractAsset(contractId: ContractId): ExeResult[BalancesPerLockup] = {
+  def useContractAssets(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
     for {
       _ <- chargeContractInput()
       balances <- worldState
-        .useContractAsset(contractId)
+        .useContractAssets(contractId)
         .map { case (contractOutputRef, contractAsset) =>
           contractInputs.addOne(contractOutputRef -> contractAsset)
-          BalancesPerLockup.from(contractAsset)
+          MutBalancesPerLockup.from(contractAsset)
         }
         .left
         .map(e => Left(IOErrorLoadContract(e)))

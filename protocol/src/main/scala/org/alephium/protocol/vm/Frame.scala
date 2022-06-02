@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import scala.annotation.{switch, tailrec}
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.model.{ContractId, HardFork}
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Bytes}
@@ -36,9 +36,9 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def getCallerFrame(): ExeResult[Frame[Ctx]]
 
-  def balanceStateOpt: Option[BalanceState]
+  def balanceStateOpt: Option[MutBalanceState]
 
-  def getBalanceState(): ExeResult[BalanceState] =
+  def getBalanceState(): ExeResult[MutBalanceState] =
     balanceStateOpt.toRight(Right(EmptyBalanceForPayableMethod))
 
   def pcMax: Int = method.instrs.length
@@ -199,7 +199,7 @@ final class StatelessFrame(
   }
 
   // the following should not be used in stateless context
-  def balanceStateOpt: Option[BalanceState] = None
+  def balanceStateOpt: Option[MutBalanceState] = None
   def createContract(
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
@@ -228,17 +228,72 @@ final class StatefulFrame(
     val returnTo: AVector[Val] => ExeResult[Unit],
     val ctx: StatefulContext,
     val callerFrameOpt: Option[StatefulFrame],
-    val balanceStateOpt: Option[BalanceState]
+    val balanceStateOpt: Option[MutBalanceState]
 ) extends Frame[StatefulContext] {
   def getCallerFrame(): ExeResult[StatefulFrame] = {
     callerFrameOpt.toRight(Right(NoCaller))
   }
 
-  private def getNewFrameBalancesState(
+  def getNewFrameBalancesState(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
-  ): ExeResult[Option[BalanceState]] = {
-    if (method.isPayable) {
+  ): ExeResult[Option[MutBalanceState]] = {
+    if (ctx.getHardFork() >= HardFork.Leman) {
+      getNewFrameBalancesStateSinceLeman(contractObj, method)
+    } else {
+      getNewFrameBalancesStatePreLeman(contractObj, method)
+    }
+  }
+
+  private def getNewFrameBalancesStateSinceLeman(
+      contractObj: ContractObj[StatefulContext],
+      method: Method[StatefulContext]
+  ): ExeResult[Option[MutBalanceState]] = {
+    if (method.useApprovedAssets) {
+      for {
+        currentBalances <- getBalanceState()
+        balanceStateOpt <- {
+          val newFrameBalances = currentBalances.useApproved()
+          contractObj.contractIdOpt match {
+            case Some(contractId) if method.useContractAssets =>
+              ctx
+                .useContractAssets(contractId)
+                .map { balancesPerLockup =>
+                  newFrameBalances.remaining
+                    .add(LockupScript.p2c(contractId), balancesPerLockup)
+                    .map(_ => newFrameBalances)
+                }
+            case _ =>
+              Right(Some(newFrameBalances))
+          }
+        }
+      } yield balanceStateOpt
+    } else if (method.useContractAssets) {
+      contractObj.contractIdOpt match {
+        case Some(contractId) =>
+          ctx
+            .useContractAssets(contractId)
+            .map { balancesPerLockup =>
+              val remaining = MutBalances.empty
+              remaining
+                .add(LockupScript.p2c(contractId), balancesPerLockup)
+                .map(_ => MutBalanceState(remaining, MutBalances.empty))
+            }
+        case _ =>
+          Right(None)
+      }
+    } else {
+      // Note that we don't check there is no approved assets for this branch
+      Right(None)
+    }
+  }
+
+  // TODO: remove this once Leman fork is activated
+  private def getNewFrameBalancesStatePreLeman(
+      contractObj: ContractObj[StatefulContext],
+      method: Method[StatefulContext]
+  ): ExeResult[Option[MutBalanceState]] = {
+    if (method.useApprovedAssets) {
       for {
         currentBalances <- getBalanceState()
         balanceStateOpt <- {
@@ -246,7 +301,7 @@ final class StatefulFrame(
           contractObj.contractIdOpt match {
             case Some(contractId) =>
               ctx
-                .useContractAsset(contractId)
+                .useContractAssets(contractId)
                 .map { balancesPerLockup =>
                   newFrameBalances.remaining.add(LockupScript.p2c(contractId), balancesPerLockup)
                   Some(newFrameBalances)
@@ -410,7 +465,7 @@ object Frame {
   def stateful(
       ctx: StatefulContext,
       callerFrame: Option[StatefulFrame],
-      balanceStateOpt: Option[BalanceState],
+      balanceStateOpt: Option[MutBalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
       operandStack: Stack[Val],
@@ -436,7 +491,7 @@ object Frame {
   def stateful(
       ctx: StatefulContext,
       callerFrame: Option[StatefulFrame],
-      balanceStateOpt: Option[BalanceState],
+      balanceStateOpt: Option[MutBalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
       args: AVector[Val],

@@ -17,14 +17,14 @@
 package org.alephium.protocol.vm
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.minimalGas
+import org.alephium.protocol.model.{minimalAlphInContract, minimalGas, ContractId}
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -32,7 +32,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   trait BaseFixture[Ctx <: StatelessContext] {
     val baseMethod = Method[Ctx](
       isPublic = true,
-      isPayable = false,
+      useApprovedAssets = false,
+      useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -64,7 +65,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check the entry method of stateless scripts" in new StatelessFixture {
     test1(baseMethod, okay)
-    test1(baseMethod.copy(isPayable = true), failed(ExpectNonPayableMethod))
+    test1(baseMethod.copy(useApprovedAssets = true), failed(ExpectNonPayableMethod))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
     intercept[AssertionError](
       test1(baseMethod.copy(localsLength = -1), okay)
@@ -90,7 +91,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check the entry method of stateful scripts" in new StatefulFixture {
     test1(baseMethod, okay)
-    test1(baseMethod.copy(isPayable = true), failed(InvalidBalances))
+    test1(baseMethod.copy(useApprovedAssets = true), failed(InvalidBalances))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
     intercept[AssertionError](
       test1(baseMethod.copy(localsLength = -1), okay)
@@ -106,7 +107,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   trait Fixture {
     val baseMethod = Method[StatefulContext](
       isPublic = true,
-      isPayable = false,
+      useApprovedAssets = false,
+      useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -171,7 +173,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        isPayable = false,
+        useApprovedAssets = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 0,
@@ -201,7 +204,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        isPayable = false,
+        useApprovedAssets = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -217,7 +221,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   it should "call method" in {
     val method0 = Method[StatelessContext](
       isPublic = true,
-      isPayable = false,
+      useApprovedAssets = false,
+      useContractAssets = false,
       argsLength = 1,
       localsLength = 1,
       returnLength = 1,
@@ -226,7 +231,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method1 =
       Method[StatelessContext](
         isPublic = false,
-        isPayable = false,
+        useApprovedAssets = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -241,11 +247,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   trait BalancesFixture {
     val (_, pubKey0) = SignatureSchema.generatePriPub()
     val address0     = Val.Address(LockupScript.p2pkh(pubKey0))
-    val balances0    = BalancesPerLockup(100, mutable.Map.empty, 0)
+    val balances0    = MutBalancesPerLockup(100, mutable.Map.empty, 0)
     val (_, pubKey1) = SignatureSchema.generatePriPub()
     val address1     = Val.Address(LockupScript.p2pkh(pubKey1))
     val tokenId      = Hash.random
-    val balances1    = BalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
+    val balances1    = MutBalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext =
       new StatefulContext with NetworkConfigFixture.Default {
@@ -257,15 +263,18 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         def nextOutputIndex: Int           = 0
         def logConfig: LogConfig           = LogConfig.allEnabled()
 
-        def getInitialBalances(): ExeResult[Balances] = {
+        def getInitialBalances(): ExeResult[MutBalances] = {
           Right(
-            Balances(
-              ArrayBuffer(address0.lockupScript -> balances0, address1.lockupScript -> balances1)
+            MutBalances(
+              mutable.ArrayBuffer(
+                address0.lockupScript -> balances0,
+                address1.lockupScript -> balances1
+              )
             )
           )
         }
 
-        override val outputBalances: Balances = Balances.empty
+        override val outputBalances: MutBalances = MutBalances.empty
       }
 
     def testInstrs(
@@ -275,7 +284,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       val methods = instrs.mapWithIndex { case (instrs, index) =>
         Method[StatefulContext](
           isPublic = index equals 0,
-          isPayable = true,
+          useApprovedAssets = true,
+          useContractAssets = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = expected.fold(_ => 0, _.length),
@@ -432,7 +442,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
     val method = Method[StatefulContext](
       isPublic = true,
-      isPayable = true,
+      useApprovedAssets = true,
+      useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -461,7 +472,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        isPayable = false,
+        useApprovedAssets = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 0,
@@ -509,5 +521,82 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val signature = Signature.generate
     val context1  = genStatefulContext(None, signatures = AVector(signature))
     StatefulVM.checkRemainingSignatures(context1).leftValue isE TooManySignatures
+  }
+
+  trait NetworkFixture extends ContextGenerators {
+    val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.PreLeman)
+    val lemanContext    = genStatefulContext(None)(NetworkConfigFixture.Leman)
+
+    val preLemanStatefulVm =
+      new StatefulVM(preLemanContext, Stack.ofCapacity(0), Stack.ofCapacity(0))
+    val lemanStatefulVm =
+      new StatefulVM(lemanContext, Stack.ofCapacity(0), Stack.ofCapacity(0))
+  }
+
+  it should "check the minimal contract balance" in new NetworkFixture {
+    def genBalance(lockupScriptGen: Gen[LockupScript], amount: U256) = {
+      MutBalances(
+        mutable.ArrayBuffer(
+          lockupScriptGen.sample.get ->
+            MutBalancesPerLockup(alphAmount = amount, mutable.Map.empty, 0)
+        )
+      )
+    }
+
+    preLemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract)
+    ) isE ()
+    preLemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract - 1)
+    ) isE ()
+    preLemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract)
+    ) isE ()
+    preLemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract - 1)
+    ) isE ()
+
+    lemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract)
+    ) isE ()
+    lemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract - 1)
+    ) isE ()
+    lemanStatefulVm.checkContractMinimalBalances(
+      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract)
+    ) isE ()
+    lemanStatefulVm
+      .checkContractMinimalBalances(
+        genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract - 1)
+      )
+      .leftValue isE LowerThanContractMinimalBalance
+  }
+
+  it should "check method modifier compatibility" in new NetworkFixture {
+    val contract0 = StatefulContract(0, AVector(Method(true, true, true, 0, 0, 0, AVector.empty)))
+    val contract1 = StatefulContract(0, AVector(Method(true, false, false, 0, 0, 0, AVector.empty)))
+    val contract2 = StatefulContract(0, AVector(Method(true, true, false, 0, 0, 0, AVector.empty)))
+    val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
+
+    def test(vm: StatefulVM, contract: StatefulContract, succeeded: Boolean) = {
+      val obj = StatefulContractObject.from(contract, AVector.empty, ContractId.random)
+      if (succeeded) {
+        vm.execute(obj, 0, AVector.empty) match {
+          case Right(res)  => res is ()
+          case Left(error) => error isnotE InvalidMethodModifierBeforeLeman
+        }
+      } else {
+        vm.execute(obj, 0, AVector.empty).leftValue isE InvalidMethodModifierBeforeLeman
+      }
+    }
+
+    test(lemanStatefulVm, contract0, true)
+    test(lemanStatefulVm, contract1, true)
+    test(lemanStatefulVm, contract2, true)
+    test(lemanStatefulVm, contract3, true)
+    test(preLemanStatefulVm, contract0, true)
+    test(preLemanStatefulVm, contract1, true)
+    test(preLemanStatefulVm, contract2, false)
+    test(preLemanStatefulVm, contract3, false)
   }
 }

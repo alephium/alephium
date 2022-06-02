@@ -30,11 +30,10 @@ import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
-import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{vm, BlockHash, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.{deserialize, serialize}
@@ -722,25 +721,39 @@ class ServerUtils(implicit
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
     for {
-      code <- BuildDeployContractTx.decode(query.bytecode)
+      initialAlphAmount <- getInitialAlphAmount(query.initialAlphAmount)
+      code              <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildDeployContractTxWithParsedState(
         code.contract,
         address,
         code.initialFields,
-        query.initialAlphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
+        initialAlphAmount,
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        dustUtxoAmount,
+        initialAlphAmount,
         AVector.empty,
         query.fromPublicKey,
         query.gasAmount,
         query.gasPrice
       )
     } yield BuildDeployContractTxResult.from(utx)
+  }
+
+  def getInitialAlphAmount(amountOption: Option[Amount]): Try[U256] = {
+    amountOption match {
+      case Some(amount) =>
+        if (amount.value >= minimalAlphInContract) { Right(amount.value) }
+        else {
+          val error =
+            s"Expect ${Amount.toAlphString(minimalAlphInContract)} deposit to deploy a new contract"
+          Left(failed(error))
+        }
+      case None => Right(minimalAlphInContract)
+    }
   }
 
   def toVmVal(values: Option[AVector[Val]]): AVector[vm.Val] = {
@@ -840,6 +853,7 @@ class ServerUtils(implicit
         returns = executionOutputs.map(Val.from),
         gasUsed = gasUsed.value,
         contracts = postState._1,
+        txInputs = executionResult.contractPrevOutputs.map(_.lockupScript).map(Address.from),
         txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, Hash.zero, index)
         },
@@ -904,6 +918,7 @@ class ServerUtils(implicit
       Address.contract(contractId),
       contract,
       contract.hash,
+      state.initialStateHash,
       state.fields.map(Val.from),
       AssetState.from(contractOutput)
     )
@@ -936,7 +951,8 @@ class ServerUtils(implicit
       AVector(
         Method[StatefulContext](
           isPublic = true,
-          isPayable = testContract.inputAssets.nonEmpty,
+          useApprovedAssets = testContract.inputAssets.nonEmpty,
+          useContractAssets = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = returnLength,
@@ -1090,7 +1106,7 @@ object ServerUtils {
     }
 
     val scriptRaw = s"""
-                       |TxScript Main payable {
+                       |TxScript Main {
                        |  approveAlph!(@${address.toBase58}, ${initialAlphAmount.v})
                        |  $creation
                        |}

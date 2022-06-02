@@ -769,6 +769,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       generateContractAddress(),
       StatefulContract.forSMT.toContract().rightValue,
       codeHash = Hash.zero,
+      initialStateHash = Hash.zero,
       AVector(u256, i256, bool, byteVec, address1),
       AssetState.from(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
     )
@@ -778,6 +779,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
          |  "bytecode": "00010700000000000118",
          |  "codeHash": "0000000000000000000000000000000000000000000000000000000000000000",
+         |  "initialStateHash": "0000000000000000000000000000000000000000000000000000000000000000",
          |  "fields": [
          |    {
          |      "type": "U256",
@@ -829,7 +831,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "functions": [
         |    {
         |      "name": "bar",
-        |      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
+        |      "signature": "@use(approvedAssets=true, contractAssets=true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
         |      "argNames": ["a","b","c","d","e","f"],
         |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
         |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
@@ -851,7 +853,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 =
       """
         |{
-        |  "bytecodeTemplate": "020101000000010201000707060716011602160316041605160602",
+        |  "bytecodeTemplate": "020103000000010201000707060716011602160316041605160602",
         |  "fields": {
         |    "signature": "TxScript Foo(aa:Bool,bb:U256,cc:I256,dd:ByteVec,ee:Address)",
         |    "names": ["aa","bb","cc","dd","ee"],
@@ -860,7 +862,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "functions": [
         |    {
         |      "name": "main",
-        |      "signature": "pub payable main()->()",
+        |      "signature": "@use(approvedAssets=true) pub main()->()",
         |      "argNames": [],
         |      "argTypes": [],
         |      "returnTypes": []

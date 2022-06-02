@@ -113,6 +113,10 @@ class ParserSpec extends AlephiumSpec {
       .isSuccess is true
   }
 
+  it should "parse annotations" in {
+    fastparse.parse("@use(x = true, y = false)", StatefulParser.annotation(_)).isSuccess is true
+  }
+
   it should "parse functions" in {
     val parsed0 = fastparse
       .parse(
@@ -123,36 +127,54 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed0.id is Ast.FuncId("add", false)
     parsed0.isPublic is false
-    parsed0.isPayable is false
+    parsed0.useApprovedAssets is false
+    parsed0.useContractAssets is false
     parsed0.args.size is 2
     parsed0.rtypes is Seq(Type.U256, Type.U256)
 
     val parsed1 = fastparse
       .parse(
-        "pub payable fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }",
+        """@use(approvedAssets = true)
+          |pub fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }
+          |""".stripMargin,
         StatelessParser.func(_)
       )
       .get
       .value
     parsed1.id is Ast.FuncId("add", false)
     parsed1.isPublic is true
-    parsed1.isPayable is true
+    parsed1.useApprovedAssets is true
+    parsed1.useContractAssets is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
 
     info("Simple return type")
     val parsed2 = fastparse
       .parse(
-        "pub payable fn add(x: U256, y: U256) -> U256 { return x + y }",
+        """@use(approvedAssets = true, contractAssets = true)
+          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
         StatelessParser.func(_)
       )
       .get
       .value
     parsed2.id is Ast.FuncId("add", false)
     parsed2.isPublic is true
-    parsed2.isPayable is true
+    parsed2.useApprovedAssets is true
+    parsed2.useContractAssets is true
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
+
+    info("More use annotation")
+    val parsed3 = fastparse
+      .parse(
+        """@use(contractAssets = true)
+          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
+        StatelessParser.func(_)
+      )
+      .get
+      .value
+    parsed3.useApprovedAssets is false
+    parsed3.useContractAssets is true
   }
 
   it should "parser contract initial states" in {
@@ -388,7 +410,18 @@ class ParserSpec extends AlephiumSpec {
         TypeId("Child"),
         Seq.empty,
         Seq(Argument(Ident("x"), Type.U256, false), Argument(Ident("y"), Type.U256, false)),
-        Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
+        Seq(
+          FuncDef(
+            Seq.empty,
+            FuncId("foo", false),
+            false,
+            false,
+            false,
+            Seq.empty,
+            Seq.empty,
+            Seq.empty
+          )
+        ),
         Seq.empty,
         List(
           ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
@@ -438,7 +471,18 @@ class ParserSpec extends AlephiumSpec {
            |""".stripMargin
       fastparse.parse(code, StatefulParser.interface(_)).get.value is ContractInterface(
         TypeId("Child"),
-        Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
+        Seq(
+          FuncDef(
+            Seq.empty,
+            FuncId("foo", false),
+            false,
+            false,
+            false,
+            Seq.empty,
+            Seq.empty,
+            Seq.empty
+          )
+        ),
         Seq.empty,
         Seq(InterfaceInheritance(TypeId("Parent")))
       )
@@ -472,7 +516,9 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         Seq(
           FuncDef(
+            Seq.empty,
             FuncId("foo", false),
+            false,
             false,
             false,
             Seq.empty,
@@ -487,16 +533,18 @@ class ParserSpec extends AlephiumSpec {
   }
 
   trait ScriptFixture {
-    val payable: Boolean
+    val useApprovedAssets: Boolean
     val script: String
 
     val ident        = TypeId("Main")
     val templateVars = Seq(Argument(Ident("x"), Type.U256, false))
     def funcs[C <: StatelessContext] = Seq[FuncDef[C]](
       FuncDef(
+        Seq.empty,
         FuncId("main", false),
         true,
-        payable,
+        useApprovedAssets,
+        false,
         Seq.empty,
         Seq.empty,
         Seq(Ast.ReturnStmt(List()))
@@ -505,7 +553,7 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse AssetScript" in new ScriptFixture {
-    val payable = false
+    val useApprovedAssets = false
     val script = s"""
                     |AssetScript Main(x: U256) {
                     |  pub fn main() -> () {
@@ -519,10 +567,15 @@ class ParserSpec extends AlephiumSpec {
   }
 
   // scalastyle:off no.equal
-  class TxScriptFixture(payableModifier: String) extends ScriptFixture {
-    val payable = !(payableModifier === "nonPayable")
+  class TxScriptFixture(useApprovedAssetsOpt: Option[Boolean]) extends ScriptFixture {
+    val useApprovedAssets = !useApprovedAssetsOpt.contains(false)
+    val annotation = useApprovedAssetsOpt match {
+      case Some(value) => s"@use(approvedAssets = $value)"
+      case None        => ""
+    }
     val script = s"""
-                    |TxScript Main(x: U256) $payableModifier {
+                    |$annotation
+                    |TxScript Main(x: U256) {
                     |  return
                     |}
                     |""".stripMargin
@@ -535,7 +588,7 @@ class ParserSpec extends AlephiumSpec {
   }
   // scalastyle:on no.equal
 
-  it should "parse explicit payable TxScript" in new TxScriptFixture("payable")
-  it should "parse implicit payable TxScript" in new TxScriptFixture("")
-  it should "parse non payable TxScript" in new TxScriptFixture("nonPayable")
+  it should "parse explicit useApprovedAssets TxScript" in new TxScriptFixture(Some(true))
+  it should "parse implicit useApprovedAssets TxScript" in new TxScriptFixture(None)
+  it should "parse vanilla TxScript" in new TxScriptFixture(Some(false))
 }

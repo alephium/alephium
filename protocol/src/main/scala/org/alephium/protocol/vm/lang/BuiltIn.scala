@@ -454,6 +454,22 @@ object BuiltIn {
       TransferTokenToSelf
     )
 
+  val burnToken: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "burnToken",
+      Seq[Type](Type.Address, Type.ByteVec, Type.U256),
+      Seq.empty,
+      BurnToken
+    )
+
+  val lockApprovedAssets: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "lockApprovedAssets",
+      Seq[Type](Type.Address, Type.U256),
+      Seq.empty,
+      LockApprovedAssets
+    )
+
   val createContract: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "createContract",
@@ -502,12 +518,12 @@ object BuiltIn {
       MigrateSimple
     )
 
-  val migrateWithState: SimpleStatefulBuiltIn =
+  val migrateWithFields: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
-      "migrateWithState",
+      "migrateWithFields",
       Seq[Type](Type.ByteVec, Type.ByteVec),
       Seq.empty,
-      MigrateWithState
+      MigrateWithFields
     )
 
   val selfAddress: SimpleStatefulBuiltIn =
@@ -573,13 +589,15 @@ object BuiltIn {
       transferToken,
       transferTokenFromSelf,
       transferTokenToSelf,
+      burnToken,
+      lockApprovedAssets,
       createContract,
       createContractWithToken,
       copyCreateContract,
       copyCreateContractWithToken,
       destroySelf,
       migrate,
-      migrateWithState,
+      migrateWithFields,
       selfAddress,
       selfContractId,
       selfTokenId,

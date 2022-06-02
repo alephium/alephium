@@ -43,18 +43,16 @@ sealed trait Instr[-Ctx <: StatelessContext] extends GasSchedule {
 
 sealed trait LemanInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
-    val hardFork = frame.ctx.getHardFork()
-    if (hardFork >= HardFork.Leman) {
-      runWithLeman(frame)
-    } else {
-      failed(InactiveInstr(this))
-    }
+    for {
+      _ <- frame.ctx.checkLemanHardFork(this)
+      _ <- runWithLeman(frame)
+    } yield ()
   }
 
   def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
-sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends GasSimple {
+sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] with GasSimple {
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
     for {
       _ <- frame.ctx.chargeGas(this)
@@ -64,6 +62,18 @@ sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends GasSimple {
 
   // this function will not need to take care of charge gas
   def _runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+}
+
+sealed trait LemanInstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] with GasSimple {
+  def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkLemanHardFork(this)
+      _ <- frame.ctx.chargeGas(this)
+      _ <- runWithLeman(frame)
+    } yield ()
+  }
+
+  def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
 object Instr {
@@ -142,7 +152,7 @@ object Instr {
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
     CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
     /* Below are instructions for Leman hard fork */
-    MigrateSimple, MigrateWithState, LoadContractFields, CopyCreateContractWithToken
+    MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets
   )
   // format: on
 
@@ -864,7 +874,7 @@ case object Zeros
     if (size <= maxSize) Right(size.toIntUnsafe) else failed(InvalidSizeForZeros)
   }
 
-  override def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       u256 <- frame.popOpStackU256()
       size <- checkSizeRange(u256.v)
@@ -1101,12 +1111,11 @@ case object VerifyED25519
 
 case object EthEcRecover
     extends CryptoInstr
-    with LemanInstr[StatelessContext]
+    with LemanInstrWithSimpleGas[StatelessContext]
     with StatelessInstrCompanion0
     with GasEcRecover {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      _           <- frame.ctx.chargeGas(gas())
       sigBytes    <- frame.popOpStackByteVec()
       messageHash <- frame.popOpStackByteVec()
       address <- SecP256K1
@@ -1118,6 +1127,56 @@ case object EthEcRecover
 }
 
 sealed trait AssetInstr extends StatefulInstrSimpleGas with GasBalance
+
+sealed trait LemanAssetInstr extends LemanInstrWithSimpleGas[StatefulContext] with GasBalance
+
+object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      tokenAmount  <- frame.popOpStackU256()
+      tokenIdRaw   <- frame.popOpStackByteVec()
+      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      fromAddress  <- frame.popOpStackAddress()
+      balanceState <- frame.getBalanceState()
+      _ <- balanceState
+        .useToken(fromAddress.lockupScript, tokenId, tokenAmount.v)
+        .toRight(Right(NotEnoughBalance))
+    } yield ()
+  }
+}
+
+sealed trait LockApprovedAssetsInstr extends LemanAssetInstr with StatefulInstrCompanion0 {
+  def popTimestamp[C <: StatefulContext](frame: Frame[C]): ExeResult[TimeStamp] = {
+    for {
+      timestampU256 <- frame.popOpStackU256()
+      timestamp     <- timestampU256.v.toLong.map(TimeStamp.unsafe).toRight(Right(LockTimeOverflow))
+    } yield timestamp
+  }
+
+  def popAssetAddress[C <: StatefulContext](frame: Frame[C]): ExeResult[LockupScript.Asset] = {
+    for {
+      address <- frame.popOpStackAddress()
+      lockupScript <-
+        if (address.lockupScript.isAssetType) {
+          Right(address.lockupScript.asInstanceOf[LockupScript.Asset])
+        } else {
+          Left(Right(InvalidAssetAddress))
+        }
+    } yield lockupScript
+  }
+}
+
+object LockApprovedAssets extends LockApprovedAssetsInstr {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      lockTime     <- popTimestamp(frame)
+      lockupScript <- popAssetAddress(frame)
+      balanceState <- frame.getBalanceState()
+      approved     <- balanceState.useAllApproved(lockupScript).toRight(Right(NoAssetsApproved))
+      _            <- frame.ctx.generateOutput(approved.toLockedTxOutput(lockupScript, lockTime))
+    } yield ()
+  }
+}
 
 object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 {
   @SuppressWarnings(
@@ -1347,6 +1406,7 @@ sealed trait CreateContractBase extends CreateContractAbstract with GasCreate {
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
+      _ <- contractCode.checkAssetsModifier(frame.ctx)
       _ <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
       _ <- StatefulContract.check(contractCode)
     } yield contractCode.toHalfDecoded()
@@ -1382,18 +1442,17 @@ object CopyCreateContract extends CopyCreateContractBase {
   }
 }
 
-object CopyCreateContractWithToken extends CopyCreateContractBase with LemanInstr[StatefulContext] {
+object CopyCreateContractWithToken
+    extends CopyCreateContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
   // We need to overwrite this method because `runWith` is inherited from both `LemanInstr` and `InstrWithSimpleGas`
   override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
-    super[LemanInstr].runWith(frame)
+    super[LemanInstrWithSimpleGas].runWith(frame)
 
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
 
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      _ <- frame.ctx.chargeGas(this.gas())
-      _ <- __runWith(frame, issueToken = true)
-    } yield ()
+    __runWith(frame, issueToken = true)
   }
 }
 
@@ -1409,7 +1468,7 @@ object DestroySelf extends ContractInstr with GasDestroy {
 }
 
 sealed trait MigrateBase
-    extends LemanInstr[StatefulContext]
+    extends LemanInstrWithSimpleGas[StatefulContext]
     with StatefulInstrCompanion0
     with GasMigrate {
   def migrate[C <: StatefulContext](
@@ -1417,7 +1476,6 @@ sealed trait MigrateBase
       newFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = {
     for {
-      _               <- frame.ctx.chargeGas(gas())
       contractCodeRaw <- frame.popOpStackByteVec()
       _               <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
@@ -1436,7 +1494,7 @@ object MigrateSimple extends MigrateBase {
   }
 }
 
-object MigrateWithState extends MigrateBase {
+object MigrateWithFields extends MigrateBase {
   def runWithLeman[C <: StatefulContext](
       frame: Frame[C]
   ): ExeResult[Unit] = {

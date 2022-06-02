@@ -34,7 +34,7 @@ class ContextSpec
 
     def createContract(): ContractId = {
       val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(Hash.zero))).sample.get
-      val balances = BalancesPerLockup.from(output)
+      val balances = MutBalancesPerLockup.from(output)
       context
         .createContract(
           StatefulContract.forSMT,
@@ -45,7 +45,9 @@ class ContextSpec
         .rightValue
       val contractId = TxOutputRef.key(context.txId, context.txEnv.fixedOutputs.length)
       context.worldState.getContractState(contractId).isRight is true
-      BalancesPerLockup.from(context.worldState.getContractAsset(contractId).rightValue) is balances
+      MutBalancesPerLockup.from(
+        context.worldState.getContractAsset(contractId).rightValue
+      ) is balances
       context.generatedOutputs.size is 1
 
       context.checkIfBlocked(contractId).leftValue isE ContractLoadDisallowed(contractId)
@@ -76,7 +78,7 @@ class ContextSpec
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
     context.loadContractObj(contractId).isRight is true
-    context.useContractAsset(contractId).isRight is true
+    context.useContractAssets(contractId).isRight is true
     context.generateOutput(newOutput) isE ()
     context.worldState.getContractAsset(contractId) isE newOutput
     (initialGas.value -

@@ -56,6 +56,7 @@ case object InvalidFieldType                                   extends ExeFailur
 case object EmptyMethods                                       extends ExeFailure
 final case class InvalidType(v: Val)                           extends ExeFailure
 case object InvalidMethod                                      extends ExeFailure
+case object InvalidMethodModifierBeforeLeman                   extends ExeFailure
 final case class InvalidMethodIndex(index: Int)                extends ExeFailure
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure
 case object InvalidLengthForEncodeInstr                        extends ExeFailure
@@ -76,10 +77,12 @@ case object ExpectNonPayableMethod                             extends ExeFailur
 case object ExpectStatefulContractObj                          extends ExeFailure
 case object EmptyBalanceForPayableMethod                       extends ExeFailure
 case object NotEnoughBalance                                   extends ExeFailure
+case object NoAssetsApproved                                   extends ExeFailure
 case object BalanceOverflow                                    extends ExeFailure
 case object NoAlphBalanceForTheAddress                         extends ExeFailure
 case object NoTokenBalanceForTheAddress                        extends ExeFailure
 case object InvalidBalances                                    extends ExeFailure
+case object LowerThanContractMinimalBalance                    extends ExeFailure
 case object UnableToPayGasFee                                  extends ExeFailure
 case object InvalidOutputBalances                              extends ExeFailure
 case object InvalidTokenId                                     extends ExeFailure
@@ -102,6 +105,8 @@ case object InvalidSizeForZeros                                extends ExeFailur
 final case class SerdeErrorByteVecToAddress(error: SerdeError) extends ExeFailure
 case object FailedInRecoverEthAddress                          extends ExeFailure
 case object UnexpectedRecursiveCallInMigration                 extends ExeFailure
+case object InvalidAssetAddress                                extends ExeFailure
+case object UnexpectedApprovedAssets                           extends ExeFailure
 
 final case class UncaughtKeyNotFoundError(error: IOError.KeyNotFound) extends ExeFailure
 final case class UncaughtSerdeError(error: IOError.Serde)             extends ExeFailure
