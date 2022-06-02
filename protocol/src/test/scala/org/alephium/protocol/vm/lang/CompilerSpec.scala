@@ -1749,7 +1749,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val bar =
         s"""
-           |Interface Bar implements Foo {
+           |Interface Bar extends Foo {
            |  fn foo() -> ()
            |}
            |
@@ -1791,7 +1791,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val b =
         s"""
-           |Interface B implements A {
+           |Interface B extends A {
            |  pub fn b(x: Bool) -> ()
            |}
            |
@@ -1799,7 +1799,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val c =
         s"""
-           |Interface C implements B {
+           |Interface C extends B {
            |  pub fn c(x: Bool, y: Bool) -> ()
            |}
            |

@@ -67,7 +67,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
 
   def arrayIndexConst[Unknown: P]: P[Ast.Expr[Ctx]] = {
-    nonNegativeNum("arrayIndex").map { v =>
+    (nonNegativeNum("arrayIndex") ~ "u".?).map { v =>
       if (v > 0xff) {
         throw Compiler.Error(s"Array index too big: ${v}")
       }
@@ -493,7 +493,7 @@ object StatefulParser extends Parser[StatefulContext] {
   def rawInterface[Unknown: P]: P[Ast.ContractInterface] =
     P(
       Lexer.keyword("Interface") ~/ Lexer.typeId ~
-        (Lexer.keyword("implements") ~/ interfaceInheritance.rep(1, ",")).? ~
+        (Lexer.keyword("extends") ~/ interfaceInheritance.rep(1, ",")).? ~
         "{" ~ eventDef.rep ~ interfaceFunc.rep ~ "}"
     ).map { case (typeId, inheritances, events, funcs) =>
       inheritances match {

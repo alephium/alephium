@@ -279,7 +279,7 @@ class ParserSpec extends AlephiumSpec {
         Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
         Ast.Placeholder()
       ),
-      "a[0][1]" -> Ast.ArrayElement(
+      "a[0u][1u]" -> Ast.ArrayElement(
         Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
         constantIndex(1)
       ),
@@ -465,7 +465,7 @@ class ParserSpec extends AlephiumSpec {
       info("Parse interface")
       val code =
         s"""
-           |Interface Child implements Parent {
+           |Interface Child extends Parent {
            |  fn foo() -> ()
            |}
            |""".stripMargin
@@ -492,7 +492,7 @@ class ParserSpec extends AlephiumSpec {
       info("Interface supports single inheritance")
       val code =
         s"""
-           |Interface Child implements Parent0, Parent1 {
+           |Interface Child extends Parent0, Parent1 {
            |  fn foo() -> ()
            |}
            |""".stripMargin

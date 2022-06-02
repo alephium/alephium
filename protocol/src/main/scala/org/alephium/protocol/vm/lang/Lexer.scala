@@ -71,7 +71,7 @@ object Lexer {
   def typedNum[Unknown: P]: P[Val] =
     P(num ~ ("i" | "u").?.!)
       .map {
-        case (n, "i") =>
+        case (n, postfix) if Number.isNegative(n) || postfix == "i" =>
           I256.from(n) match {
             case Some(value) => Val.I256(value)
             case None        => throw Compiler.Error(s"Invalid I256 value: $n")

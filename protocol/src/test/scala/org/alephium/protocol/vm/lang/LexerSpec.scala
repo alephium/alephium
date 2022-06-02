@@ -29,8 +29,10 @@ class LexerSpec extends AlephiumSpec {
     val address = Address.p2pkh(PublicKey.generate)
 
     fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
-    fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
     fastparse.parse("5u", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
+    fastparse.parse("5i", Lexer.typedNum(_)).get.value is Val.I256(I256.unsafe(5))
+    fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
+    fastparse.parse("-5", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
     fastparse.parse("0x12", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(18))
     fastparse.parse(s"#$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(
       Hex.from(byte32).get
