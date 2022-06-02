@@ -951,7 +951,7 @@ class ServerUtils(implicit
       AVector(
         Method[StatefulContext](
           isPublic = true,
-          isPayable = testContract.inputAssets.nonEmpty,
+          useApprovedAssets = testContract.inputAssets.nonEmpty,
           useContractAssets = false,
           argsLength = 0,
           localsLength = 0,

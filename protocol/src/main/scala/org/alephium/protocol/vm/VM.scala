@@ -96,7 +96,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       _      <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       frame <- {
         val returnTo = returnToOpt.getOrElse(VM.noReturnTo)
-        if (method.isPayable) {
+        if (method.useApprovedAssets) {
           startPayableFrame(obj, ctx, method, args, operandStack, returnTo)
         } else {
           startNonPayableFrame(obj, ctx, method, args, operandStack, returnTo)

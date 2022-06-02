@@ -590,7 +590,7 @@ object TxValidation {
         tx: Transaction,
         preOutputs: AVector[TxOutput]
     ): TxValidationResult[Unit] = {
-      if (tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)) {
+      if (tx.isEntryMethodPayable) {
         validTx(()) // the balance is validated in VM execution
       } else {
         for {

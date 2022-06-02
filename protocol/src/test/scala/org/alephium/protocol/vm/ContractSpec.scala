@@ -27,7 +27,7 @@ class ContractSpec extends AlephiumSpec {
   trait ScriptFixture[Ctx <: StatelessContext] {
     val method = Method[Ctx](
       isPublic = true,
-      isPayable = false,
+      useApprovedAssets = false,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
@@ -62,13 +62,13 @@ class ContractSpec extends AlephiumSpec {
     pass1(AVector(method, method))
     fail1(AVector.empty)
     fail0(method.copy(isPublic = false))
-    fail0(method.copy(isPayable = true))
+    fail0(method.copy(useApprovedAssets = true))
     fail0(method.copy(argsLength = -1))
     fail0(method.copy(localsLength = -1))
     fail0(method.copy(returnLength = -1))
     fail0(method.copy(argsLength = 1, localsLength = 0))
     pass1(AVector(method, method.copy(isPublic = false)))
-    fail1(AVector(method, method.copy(isPayable = true)))
+    fail1(AVector(method, method.copy(useApprovedAssets = true)))
     fail1(AVector(method, method.copy(argsLength = -1)))
     fail1(AVector(method, method.copy(localsLength = -1)))
     fail1(AVector(method, method.copy(returnLength = -1)))
@@ -108,7 +108,7 @@ class ContractSpec extends AlephiumSpec {
 
     val method = Method[StatefulContext](
       isPublic = true,
-      isPayable = false,
+      useApprovedAssets = false,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
@@ -173,15 +173,31 @@ class ContractSpec extends AlephiumSpec {
   it should "serde methods" in {
     for {
       isPublic           <- Seq(true, false)
-      isPayable          <- Seq(true, false)
+      useApprovedAssets  <- Seq(true, false)
       useContractAssetss <- Seq(true, false)
     } {
       val statelessMethods =
-        Method[StatelessContext](isPublic, isPayable, useContractAssetss, 3, 4, 5, AVector.empty)
+        Method[StatelessContext](
+          isPublic,
+          useApprovedAssets,
+          useContractAssetss,
+          3,
+          4,
+          5,
+          AVector.empty
+        )
       deserialize[Method[StatelessContext]](serialize(statelessMethods)) isE statelessMethods
 
       val statefulMethods =
-        Method[StatefulContext](isPublic, isPayable, useContractAssetss, 3, 4, 5, AVector.empty)
+        Method[StatefulContext](
+          isPublic,
+          useApprovedAssets,
+          useContractAssetss,
+          3,
+          4,
+          5,
+          AVector.empty
+        )
       deserialize[Method[StatefulContext]](serialize(statefulMethods)) isE statefulMethods
     }
   }
@@ -218,7 +234,7 @@ class ContractSpec extends AlephiumSpec {
 
 final case class OldMethod[Ctx <: StatelessContext](
     isPublic: Boolean,
-    isPayable: Boolean,
+    useApprovedAssets: Boolean,
     argsLength: Int,
     localsLength: Int,
     returnLength: Int,
@@ -228,11 +244,11 @@ object OldMethod {
   implicit val statelessSerde: Serde[OldMethod[StatelessContext]] =
     Serde.forProduct6(
       OldMethod[StatelessContext],
-      t => (t.isPublic, t.isPayable, t.argsLength, t.localsLength, t.returnLength, t.instrs)
+      t => (t.isPublic, t.useApprovedAssets, t.argsLength, t.localsLength, t.returnLength, t.instrs)
     )
   implicit val statefulSerde: Serde[OldMethod[StatefulContext]] =
     Serde.forProduct6(
       OldMethod[StatefulContext],
-      t => (t.isPublic, t.isPayable, t.argsLength, t.localsLength, t.returnLength, t.instrs)
+      t => (t.isPublic, t.useApprovedAssets, t.argsLength, t.localsLength, t.returnLength, t.instrs)
     )
 }

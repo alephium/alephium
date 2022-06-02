@@ -69,7 +69,7 @@ object TxEnv {
     def txId: Hash                         = tx.id
     def fixedOutputs: AVector[AssetOutput] = tx.unsigned.fixedOutputs
     def gasFeeUnsafe: U256                 = tx.gasFeeUnsafe
-    def isEntryMethodPayable: Boolean      = tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)
+    def isEntryMethodPayable: Boolean      = tx.isEntryMethodPayable
   }
 
   final case class Mockup(

@@ -249,7 +249,7 @@ final class StatefulFrame(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
   ): ExeResult[Option[MutBalanceState]] = {
-    if (method.isPayable) {
+    if (method.useApprovedAssets) {
       for {
         currentBalances <- getBalanceState()
         balanceStateOpt <- {
@@ -293,7 +293,7 @@ final class StatefulFrame(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
   ): ExeResult[Option[MutBalanceState]] = {
-    if (method.isPayable) {
+    if (method.useApprovedAssets) {
       for {
         currentBalances <- getBalanceState()
         balanceStateOpt <- {

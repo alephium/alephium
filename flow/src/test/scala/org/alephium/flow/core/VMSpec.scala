@@ -211,7 +211,7 @@ class VMSpec extends AlephiumSpec {
       val script = Compiler.compileTxScript(input).rightValue
       script.toTemplateString() is Hex.toHexString(serialize(script))
       val block =
-        if (script.entryMethod.isPayable) {
+        if (script.entryMethod.useApprovedAssets) {
           payableCall(blockFlow, chainIndex, script)
         } else {
           simpleScript(blockFlow, chainIndex, script)

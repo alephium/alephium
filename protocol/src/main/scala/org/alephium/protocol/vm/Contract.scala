@@ -31,17 +31,17 @@ import org.alephium.util.{AVector, EitherF, Hex}
 
 final case class Method[Ctx <: StatelessContext](
     isPublic: Boolean,
-    isPayable: Boolean,
+    useApprovedAssets: Boolean,
     useContractAssets: Boolean,
     argsLength: Int,
     localsLength: Int,
     returnLength: Int,
     instrs: AVector[Instr[Ctx]]
 ) {
-  def usesAssets(): Boolean = isPayable || useContractAssets
+  def usesAssets(): Boolean = useApprovedAssets || useContractAssets
 
   def checkModifierPreLeman(): ExeResult[Unit] = {
-    if (isPayable == useContractAssets) okay else failed(InvalidMethodModifierBeforeLeman)
+    if (useApprovedAssets == useContractAssets) okay else failed(InvalidMethodModifierBeforeLeman)
   }
 
   def toTemplateString(): String = {
@@ -59,7 +59,7 @@ final case class Method[Ctx <: StatelessContext](
 
 object Method {
   private def serializeAssetModifier[Ctx <: StatelessContext](method: Method[Ctx]): ByteString = {
-    (method.isPayable, method.useContractAssets) match {
+    (method.useApprovedAssets, method.useContractAssets) match {
       case (false, false) => ByteString(0) // isPayble = false before Leman fork
       case (true, true)   => ByteString(1) //  isPayable = true before Leman fork
       case (false, true)  => ByteString(2)
@@ -125,7 +125,7 @@ object Method {
   def forSMT: Method[StatefulContext] =
     Method[StatefulContext](
       isPublic = false,
-      isPayable = false,
+      useApprovedAssets = false,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
@@ -187,7 +187,7 @@ object StatelessScript {
   private def validate(methods: AVector[Method[StatelessContext]]): Boolean = {
     methods.nonEmpty &&
     methods.head.isPublic &&
-    methods.forall(m => !m.isPayable && Method.validate(m))
+    methods.forall(m => !m.useApprovedAssets && Method.validate(m))
   }
 
   def from(methods: AVector[Method[StatelessContext]]): Option[StatelessScript] = {
@@ -231,7 +231,7 @@ object StatefulScript {
       AVector(
         Method[StatefulContext](
           isPublic = true,
-          isPayable = true,
+          useApprovedAssets = true,
           useContractAssets = true,
           argsLength = 0,
           localsLength = 0,
