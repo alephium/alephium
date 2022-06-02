@@ -76,8 +76,8 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     val from = lockupScriptGen.sample.get
     def balanceState =
       BalanceState(
-        Balances.empty,
-        Balances(ArrayBuffer(from -> BalancesPerLockup.alph(ALPH.alph(1000))))
+        MutBalances.empty,
+        MutBalances(ArrayBuffer(from -> BalancesPerLockup.alph(ALPH.alph(1000))))
       )
     def preLemanFrame = {
       genStatefulFrame(Some(balanceState))(NetworkConfigFixture.PreLeman)
@@ -85,8 +85,8 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     def lemanFrame = {
       val balanceState =
         BalanceState(
-          Balances.empty,
-          Balances(ArrayBuffer(from -> BalancesPerLockup.alph(ALPH.alph(1000))))
+          MutBalances.empty,
+          MutBalances(ArrayBuffer(from -> BalancesPerLockup.alph(ALPH.alph(1000))))
         )
       genStatefulFrame(Some(balanceState))(NetworkConfigFixture.Leman)
     }

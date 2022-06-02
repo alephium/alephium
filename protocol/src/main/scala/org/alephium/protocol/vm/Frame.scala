@@ -274,10 +274,10 @@ final class StatefulFrame(
           ctx
             .useContractAssets(contractId)
             .map { balancesPerLockup =>
-              val remaining = Balances.empty
+              val remaining = MutBalances.empty
               remaining
                 .add(LockupScript.p2c(contractId), balancesPerLockup)
-                .map(_ => BalanceState(remaining, Balances.empty))
+                .map(_ => BalanceState(remaining, MutBalances.empty))
             }
         case _ =>
           Right(None)

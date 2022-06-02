@@ -425,7 +425,7 @@ object FlowUtils {
   ): Option[Transaction] = {
     if (script.entryMethod.isPayable) {
       for {
-        balances0 <- Balances.from(preOutputs, txTemplate.unsigned.fixedOutputs)
+        balances0 <- MutBalances.from(preOutputs, txTemplate.unsigned.fixedOutputs)
         _         <- balances0.subAlph(preOutputs.head.lockupScript, txTemplate.gasFeeUnsafe)
         outputs   <- balances0.toOutputs()
       } yield {

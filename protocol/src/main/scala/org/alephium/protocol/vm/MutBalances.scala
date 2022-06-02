@@ -22,7 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.alephium.protocol.model.{AssetOutput, TokenId, TxOutput}
 import org.alephium.util.{AVector, U256}
 
-final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
+final case class MutBalances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
   def getBalances(lockupScript: LockupScript): Option[BalancesPerLockup] = {
     all.collectFirst { case (ls, balance) if ls == lockupScript => balance }
   }
@@ -77,12 +77,12 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
     getBalances(lockupScript).flatMap(_.sub(balancesPerLockup))
   }
 
-  def use(): Balances = {
+  def use(): MutBalances = {
     val newAll = all.map { case (lockupScript, balancesPerLockup) =>
       lockupScript -> balancesPerLockup.copy(scopeDepth = balancesPerLockup.scopeDepth + 1)
     }
     all.clear()
-    Balances(newAll)
+    MutBalances(newAll)
   }
 
   def useAll(lockupScript: LockupScript): Option[BalancesPerLockup] = {
@@ -105,7 +105,7 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
     }
   }
 
-  def merge(balances: Balances): Option[Unit] = {
+  def merge(balances: MutBalances): Option[Unit] = {
     @tailrec
     def iter(index: Int): Option[Unit] = {
       if (index >= balances.all.length) {
@@ -142,9 +142,9 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
   // scalastyle:on return
 }
 
-object Balances {
+object MutBalances {
   // TODO: optimize this
-  def from(inputs: AVector[AssetOutput], outputs: AVector[AssetOutput]): Option[Balances] = {
+  def from(inputs: AVector[AssetOutput], outputs: AVector[AssetOutput]): Option[MutBalances] = {
     val inputBalances = inputs.fold(Option(empty)) {
       case (Some(balances), input) =>
         balances.add(input.lockupScript, BalancesPerLockup.from(input)).map(_ => balances)
@@ -159,5 +159,5 @@ object Balances {
   }
 
   // Need to be `def` as it's mutable
-  def empty: Balances = Balances(ArrayBuffer.empty)
+  def empty: MutBalances = MutBalances(ArrayBuffer.empty)
 }

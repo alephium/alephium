@@ -263,9 +263,9 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         def nextOutputIndex: Int           = 0
         def logConfig: LogConfig           = LogConfig.allEnabled()
 
-        def getInitialBalances(): ExeResult[Balances] = {
+        def getInitialBalances(): ExeResult[MutBalances] = {
           Right(
-            Balances(
+            MutBalances(
               mutable.ArrayBuffer(
                 address0.lockupScript -> balances0,
                 address1.lockupScript -> balances1
@@ -274,7 +274,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
           )
         }
 
-        override val outputBalances: Balances = Balances.empty
+        override val outputBalances: MutBalances = MutBalances.empty
       }
 
     def testInstrs(
@@ -535,7 +535,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check the minimal contract balance" in new NetworkFixture {
     def genBalance(lockupScriptGen: Gen[LockupScript], amount: U256) = {
-      Balances(
+      MutBalances(
         mutable.ArrayBuffer(
           lockupScriptGen.sample.get ->
             BalancesPerLockup(alphAmount = amount, mutable.Map.empty, 0)

@@ -24,7 +24,7 @@ import org.alephium.protocol.model.{TxGenerators, TxOutput}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 import org.alephium.util.Bytes.byteStringOrdering
 
-class BalancesPerLockupSpec extends AlephiumSpec {
+class MutBalancesPerLockupSpec extends AlephiumSpec {
 
   it should "tokenVector" in new Fixture {
     val tokens = mutable.Map(tokenId -> ALPH.oneAlph)

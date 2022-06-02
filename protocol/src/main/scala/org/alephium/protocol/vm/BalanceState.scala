@@ -25,7 +25,7 @@ import org.alephium.util.U256
  * `remaining` is the current usable balances
  * `approved` is the balances that function call potentially can use
  */
-final case class BalanceState(remaining: Balances, approved: Balances) {
+final case class BalanceState(remaining: MutBalances, approved: MutBalances) {
   def approveALPH(lockupScript: LockupScript, amount: U256): Option[Unit] = {
     for {
       _ <- remaining.subAlph(lockupScript, amount)
@@ -54,7 +54,7 @@ final case class BalanceState(remaining: Balances, approved: Balances) {
 
   def useApproved(): BalanceState = {
     val toUse = approved.use()
-    BalanceState(toUse, Balances.empty)
+    BalanceState(toUse, MutBalances.empty)
   }
 
   def useAll(lockupScript: LockupScript): Option[BalancesPerLockup] = {
@@ -71,5 +71,5 @@ final case class BalanceState(remaining: Balances, approved: Balances) {
 }
 
 object BalanceState {
-  def from(balances: Balances): BalanceState = BalanceState(balances, Balances.empty)
+  def from(balances: MutBalances): BalanceState = BalanceState(balances, MutBalances.empty)
 }

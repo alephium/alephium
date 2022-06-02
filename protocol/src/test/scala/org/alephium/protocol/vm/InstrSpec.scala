@@ -1630,12 +1630,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val tokenId = Hash.generate
 
-    def alphBalance(lockupScript: LockupScript, amount: U256): Balances = {
-      Balances(ArrayBuffer((lockupScript, BalancesPerLockup.alph(amount))))
+    def alphBalance(lockupScript: LockupScript, amount: U256): MutBalances = {
+      MutBalances(ArrayBuffer((lockupScript, BalancesPerLockup.alph(amount))))
     }
 
-    def tokenBalance(lockupScript: LockupScript, tokenId: TokenId, amount: U256): Balances = {
-      Balances(ArrayBuffer((lockupScript, BalancesPerLockup.token(tokenId, amount))))
+    def tokenBalance(lockupScript: LockupScript, tokenId: TokenId, amount: U256): MutBalances = {
+      MutBalances(ArrayBuffer((lockupScript, BalancesPerLockup.token(tokenId, amount))))
     }
 
     def prepareFrame(
@@ -1850,7 +1850,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferAlph)
 
-    frame.ctx.outputBalances is Balances(
+    frame.ctx.outputBalances is MutBalances(
       ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
 
@@ -1880,7 +1880,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
     runAndCheckGas(TransferAlphFromSelf)
-    frame.ctx.outputBalances is Balances(
+    frame.ctx.outputBalances is MutBalances(
       ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
   }
@@ -1898,7 +1898,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
     runAndCheckGas(TransferAlphToSelf)
-    frame.ctx.outputBalances is Balances(
+    frame.ctx.outputBalances is MutBalances(
       ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
   }
@@ -1920,7 +1920,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferToken)
 
-    frame.ctx.outputBalances is Balances(
+    frame.ctx.outputBalances is MutBalances(
       ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
@@ -1943,7 +1943,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferTokenFromSelf)
 
-    frame.ctx.outputBalances is Balances(
+    frame.ctx.outputBalances is MutBalances(
       ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
@@ -1966,7 +1966,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferTokenToSelf)
 
-    frame.ctx.outputBalances is Balances(
+    frame.ctx.outputBalances is MutBalances(
       ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
@@ -2027,7 +2027,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "CreateContract" in new CreateContractAbstractFixture {
     val balanceState =
-      BalanceState(Balances.empty, alphBalance(from, ALPH.oneAlph))
+      BalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
 
     stack.push(Val.ByteVec(contractBytes))
     stack.push(Val.ByteVec(serialize(fields)))
@@ -2038,7 +2038,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "CreateContractWithToken" in new CreateContractAbstractFixture {
     val balanceState =
       BalanceState(
-        Balances.empty,
+        MutBalances.empty,
         tokenBalance(from, tokenId, ALPH.oneAlph)
       )
 
@@ -2073,7 +2073,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         contract: StatefulContract,
         succeeded: Boolean
     ) = {
-      val balanceState = BalanceState(Balances.empty, tokenBalance(from, tokenId, ALPH.oneAlph))
+      val balanceState = BalanceState(MutBalances.empty, tokenBalance(from, tokenId, ALPH.oneAlph))
       val frame        = frameBuilder(balanceState)
       frame.opStack.push(Val.ByteVec(serialize(contract)))
       frame.opStack.push(Val.ByteVec(serialize(AVector.empty[Val])))
@@ -2108,7 +2108,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "CopyCreateContract" in new CreateContractAbstractFixture {
     val balanceState =
-      BalanceState(Balances.empty, alphBalance(from, ALPH.oneAlph))
+      BalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
 
     stack.push(Val.ByteVec(serialize(Hash.generate)))
     stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
@@ -2122,7 +2122,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "CopyCreateContractWithToken" in new CreateContractAbstractFixture {
     val balanceState =
       BalanceState(
-        Balances.empty,
+        MutBalances.empty,
         tokenBalance(from, tokenId, ALPH.oneAlph)
       )
 

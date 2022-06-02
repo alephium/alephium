@@ -261,7 +261,7 @@ final class StatefulVM(
     }
   }
 
-  protected def mergeBack(previous: Balances, current: Balances): Option[Unit] = {
+  protected def mergeBack(previous: MutBalances, current: MutBalances): Option[Unit] = {
     @tailrec
     def iter(index: Int): Option[Unit] = {
       if (index >= current.all.length) {
@@ -310,7 +310,7 @@ final class StatefulVM(
     }
   }
 
-  def checkContractMinimalBalances(outputBalances: Balances): ExeResult[Unit] = {
+  def checkContractMinimalBalances(outputBalances: MutBalances): ExeResult[Unit] = {
     if (
       ctx.getHardFork() >= HardFork.Leman &&
       !outputBalances.all.forall(VM.checkContractMinimalBalanceLeman)
@@ -321,7 +321,7 @@ final class StatefulVM(
     }
   }
 
-  private def outputGeneratedBalances(outputBalances: Balances): ExeResult[Unit] = {
+  private def outputGeneratedBalances(outputBalances: MutBalances): ExeResult[Unit] = {
     EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
       balances.toTxOutput(lockupScript).flatMap {
         case Some(output) => ctx.generateOutput(output)

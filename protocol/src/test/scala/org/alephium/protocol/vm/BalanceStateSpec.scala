@@ -29,8 +29,10 @@ class BalanceStateSpec extends AlephiumSpec {
   it should "approveALPH" in new Fixture {
     balanceState.approveALPH(lockupScript, ALPH.oneAlph) is Some(())
     balanceState is BalanceState(
-      Balances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero)))),
-      Balances(ArrayBuffer((lockupScript, BalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 0))))
+      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero)))),
+      MutBalances(
+        ArrayBuffer((lockupScript, BalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 0)))
+      )
     )
 
     balanceState.approveALPH(lockupScript, ALPH.oneAlph) is None
@@ -39,12 +41,12 @@ class BalanceStateSpec extends AlephiumSpec {
   it should "approveToken" in new Fixture {
     balanceState.approveToken(lockupScript, tokenId, ALPH.oneAlph) is Some(())
     balanceState is BalanceState(
-      Balances(
+      MutBalances(
         ArrayBuffer(
           (lockupScript, balancesPerLockup.copy(tokenAmounts = mutable.Map(tokenId -> U256.Zero)))
         )
       ),
-      Balances(
+      MutBalances(
         ArrayBuffer(
           (lockupScript, BalancesPerLockup(U256.Zero, mutable.Map(tokenId -> ALPH.oneAlph), 0))
         )
@@ -74,14 +76,14 @@ class BalanceStateSpec extends AlephiumSpec {
     balanceState.approveALPH(lockupScript, ALPH.oneAlph) is Some(())
 
     balanceState.useApproved() is BalanceState.from(
-      Balances(
+      MutBalances(
         ArrayBuffer((lockupScript, BalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, scopeDepth)))
       )
     )
 
     balanceState is BalanceState(
-      Balances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero)))),
-      Balances(ArrayBuffer.empty)
+      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero)))),
+      MutBalances(ArrayBuffer.empty)
     )
   }
 
@@ -89,14 +91,14 @@ class BalanceStateSpec extends AlephiumSpec {
     balanceState.useAll(lockupScript) is Some(balancesPerLockup)
     balanceState.useAll(lockupScript) is None
 
-    balanceState is BalanceState.from(Balances.empty)
+    balanceState is BalanceState.from(MutBalances.empty)
   }
 
   it should "useAlph" in new Fixture {
     balanceState.useAlph(lockupScript, ALPH.oneAlph) is Some(())
 
     balanceState is BalanceState.from(
-      Balances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero))))
+      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero))))
     )
 
     balanceState.useAlph(lockupScript, ALPH.oneAlph) is None
@@ -107,7 +109,7 @@ class BalanceStateSpec extends AlephiumSpec {
     balanceState.useToken(lockupScript, tokenId, ALPH.oneAlph) is Some(())
 
     balanceState is BalanceState.from(
-      Balances(
+      MutBalances(
         ArrayBuffer(
           (lockupScript, balancesPerLockup.copy(tokenAmounts = mutable.Map(tokenId -> U256.Zero)))
         )
@@ -136,7 +138,7 @@ class BalanceStateSpec extends AlephiumSpec {
       BalancesPerLockup(ALPH.oneAlph, tokens, scopeDepth)
     val lockupScript = lockupScriptGen.sample.get
 
-    val remaining = Balances(ArrayBuffer((lockupScript, balancesPerLockup)))
+    val remaining = MutBalances(ArrayBuffer((lockupScript, balancesPerLockup)))
 
     val balanceState = BalanceState.from(remaining)
   }

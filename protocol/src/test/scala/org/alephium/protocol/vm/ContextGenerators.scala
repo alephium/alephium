@@ -106,13 +106,13 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     val context = new StatefulContext {
       val worldState: WorldState.Staging = cachedWorldState.staging()
       val networkConfig: NetworkConfig   = _networkConfig
-      val outputBalances: Balances       = Balances.empty
+      val outputBalances: MutBalances    = MutBalances.empty
       def nextOutputIndex: Int           = 0
       def blockEnv: BlockEnv             = genBlockEnv()
       def txEnv: TxEnv                   = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))
-      def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
-      def logConfig: LogConfig                      = LogConfig.allEnabled()
-      var gasRemaining: GasBox                      = gasLimit
+      def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
+      def logConfig: LogConfig                         = LogConfig.allEnabled()
+      var gasRemaining: GasBox                         = gasLimit
     }
     obj -> context
   }
