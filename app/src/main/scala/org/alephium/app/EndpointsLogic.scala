@@ -566,6 +566,10 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
+  val callContractLogic = serverLogic(callContract) { params: CallContract =>
+    Future.successful(serverUtils.callContract(blockFlow, params))
+  }
+
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
     // Run the export in background
     Future.successful(

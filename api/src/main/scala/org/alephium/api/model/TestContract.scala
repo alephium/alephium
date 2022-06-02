@@ -16,15 +16,13 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
-
 import org.alephium.api.{badRequest, Try}
 import org.alephium.api.model.TestContract._
-import org.alephium.protocol.{vm, ALPH, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, BlockHash, Hash}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, AssetOutput, ContractId, GroupIndex}
+import org.alephium.protocol.model.{Address, ContractId, GroupIndex}
 import org.alephium.protocol.vm.{ContractState => _, Val => _, _}
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class TestContract(
@@ -38,7 +36,7 @@ final case class TestContract(
     testMethodIndex: Option[Int] = None,
     testArgs: Option[AVector[Val]] = None,
     existingContracts: Option[AVector[ContractState]] = None,
-    inputAssets: Option[AVector[TestContract.InputAsset]] = None
+    inputAssets: Option[AVector[InputAsset]] = None
 ) {
   def toComplete(): Try[TestContract.Complete] = {
     val methodIndex = testMethodIndex.getOrElse(testMethodIndexDefault)
@@ -96,7 +94,7 @@ object TestContract {
       testMethodIndex: Int = testMethodIndexDefault,
       testArgs: AVector[Val] = testArgsDefault,
       existingContracts: AVector[ContractState] = existingContractsDefault,
-      inputAssets: AVector[TestContract.InputAsset] = inputAssetsDefault
+      inputAssets: AVector[InputAsset] = inputAssetsDefault
   ) {
     // We return original code hash when testing private methods
     // We return the new code hash when the test code is migrated
@@ -107,39 +105,6 @@ object TestContract {
 
     def groupIndex(implicit groupConfig: GroupConfig): Try[GroupIndex] = {
       GroupIndex.from(group).toRight(badRequest("Invalid group index"))
-    }
-  }
-
-  final case class InputAsset(address: Address.Asset, asset: AssetState) {
-    def toAssetOutput: AssetOutput =
-      AssetOutput(
-        asset.alphAmount,
-        address.lockupScript,
-        TimeStamp.zero,
-        asset.flatTokens.map(token => (token.id, token.amount)),
-        ByteString.empty
-      )
-
-    def approveAll(gasFeeOpt: Option[U256]): AVector[Instr[StatefulContext]] = {
-      val addressConst = AddressConst(vm.Val.Address(address.lockupScript))
-      val alphAmount = gasFeeOpt match {
-        case Some(gasFee) => asset.alphAmount.subUnsafe(gasFee)
-        case None         => asset.alphAmount
-      }
-      val alphInstrs = AVector[Instr[StatefulContext]](
-        addressConst,
-        U256Const(vm.Val.U256(alphAmount)),
-        ApproveAlph
-      )
-      val tokenInstrs = asset.flatTokens.flatMap[Instr[StatefulContext]] { token =>
-        AVector(
-          addressConst,
-          BytesConst(vm.Val.ByteVec(token.id.bytes)),
-          U256Const(vm.Val.U256(token.amount)),
-          ApproveToken
-        )
-      }
-      alphInstrs ++ tokenInstrs
     }
   }
 }
