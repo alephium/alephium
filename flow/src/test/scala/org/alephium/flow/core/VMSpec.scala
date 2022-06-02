@@ -375,12 +375,11 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     import org.alephium.protocol.model.tokenIdOrder
-    val _tokenId0   = createContract(token, AVector.empty, ALPH.alph(100)).key
-    val _tokenId1   = createContract(token, AVector.empty, ALPH.alph(100)).key
-    val tokenId0    = if (tokenIdOrder.compare(_tokenId0, _tokenId1) < 0) _tokenId0 else _tokenId1
-    val tokenId1    = if (tokenIdOrder.compare(_tokenId0, _tokenId1) < 0) _tokenId1 else _tokenId0
-    val tokenId0Hex = tokenId0.toHexString
-    val tokenId1Hex = tokenId1.toHexString
+    val _tokenId0               = createContract(token, AVector.empty, ALPH.alph(100)).key
+    val _tokenId1               = createContract(token, AVector.empty, ALPH.alph(100)).key
+    val Seq(tokenId0, tokenId1) = Seq(_tokenId0, _tokenId1).sorted
+    val tokenId0Hex             = tokenId0.toHexString
+    val tokenId1Hex             = tokenId1.toHexString
 
     val mint =
       s"""
@@ -2203,7 +2202,7 @@ class VMSpec extends AlephiumSpec {
 
     val contract =
       s"""
-         |TxContract Foo() extends I {
+         |TxContract Foo() implements I {
          |  pub fn f3() -> ByteVec {
          |    return #00
          |  }
@@ -2246,7 +2245,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val bar: String =
       s"""
-         |TxContract Bar() extends Foo {
+         |TxContract Bar() implements Foo {
          |  event Bar(x: U256)
          |  pub fn foo() -> () {
          |    emit Foo(1)

@@ -279,7 +279,7 @@ class ParserSpec extends AlephiumSpec {
         Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
         Ast.Placeholder()
       ),
-      "a[0][1]" -> Ast.ArrayElement(
+      "a[0u][1u]" -> Ast.ArrayElement(
         Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
         constantIndex(1)
       ),
@@ -504,7 +504,7 @@ class ParserSpec extends AlephiumSpec {
       info("Contract inherits interface")
       val code =
         s"""
-           |TxContract Child() extends Parent {
+           |TxContract Child() implements Parent {
            |  fn foo() -> () {
            |    return
            |  }

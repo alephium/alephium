@@ -1736,7 +1736,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       val error = Compiler.compileMultiContract(foo).leftValue
-      error.message is "No function definition in TxContract Foo"
+      error.message is "No function definition in Interface Foo"
     }
 
     {
@@ -1769,7 +1769,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val bar =
         s"""
-           |TxContract Bar() extends Foo {
+           |TxContract Bar() implements Foo {
            |  pub fn foo() -> () {
            |    return
            |  }
@@ -1811,7 +1811,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val code =
         s"""
-           |TxContract Foo() extends C {
+           |TxContract Foo() implements C {
            |  pub fn c(x: Bool, y: Bool) -> () {}
            |  pub fn a() -> () {}
            |  pub fn b(x: Bool) -> () {}
@@ -1845,7 +1845,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val bar1: String =
         s"""
-           |TxContract Bar1() extends Foo1(), Foo2 {
+           |TxContract Bar1() extends Foo1() implements Foo2 {
            |  fn foo2() -> () {}
            |}
            |$foo1
@@ -1853,7 +1853,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val bar2: String =
         s"""
-           |TxContract Bar2() extends Foo2, Foo1() {
+           |TxContract Bar2() extends Foo1() implements Foo2 {
            |  fn foo2() -> () {}
            |}
            |$foo1

@@ -67,7 +67,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
 
   def arrayIndexConst[Unknown: P]: P[Ast.Expr[Ctx]] = {
-    nonNegativeNum("arrayIndex").map { v =>
+    (nonNegativeNum("arrayIndex") ~ "u".?).map { v =>
       if (v > 0xff) {
         throw Compiler.Error(s"Array index too big: ${v}")
       }
@@ -429,8 +429,19 @@ object StatefulParser extends Parser[StatefulContext] {
     P(Lexer.typeId ~ inheritanceFields).map { case (typeId, fields) =>
       Ast.ContractInheritance(typeId, fields)
     }
-  def contractInheritances[Unknown: P]: P[Seq[Ast.Inheritance]] =
-    P(Lexer.keyword("extends") ~/ (contractInheritance | interfaceInheritance).rep(1, ","))
+
+  def interfaceImplementing[Unknown: P]: P[Seq[Ast.Inheritance]] =
+    P(Lexer.keyword("implements") ~ (interfaceInheritance.rep(1, ",")))
+
+  def contractExtending[Unknown: P]: P[Seq[Ast.Inheritance]] =
+    P(Lexer.keyword("extends") ~ (contractInheritance.rep(1, ",")))
+
+  def contractInheritances[Unknown: P]: P[Seq[Ast.Inheritance]] = {
+    P(contractExtending.? ~ interfaceImplementing.?).map { case (extendingsOpt, implementingOpt) =>
+      extendingsOpt.getOrElse(Seq.empty) ++ implementingOpt.getOrElse(Seq.empty)
+    }
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[Unknown: P]: P[Ast.TxContract] =
     P(
@@ -488,7 +499,7 @@ object StatefulParser extends Parser[StatefulContext] {
         case _ => ()
       }
       if (funcs.length < 1) {
-        throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
+        throw Compiler.Error(s"No function definition in Interface ${typeId.name}")
       } else {
         Ast.ContractInterface(
           typeId,
