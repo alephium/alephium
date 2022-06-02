@@ -728,7 +728,8 @@ class ServerUtils(implicit
         code.contract,
         address,
         code.initialFields,
-        initialAlphAmount,
+        query.initialAlphAmount.map(_.value).getOrElse(dustUtxoAmount), // TODO: test this
+        query.initialTokenAmounts,
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
@@ -1068,11 +1069,19 @@ object ServerUtils {
       codeRaw: String,
       address: Address,
       initialState: Option[String],
-      alphAmount: U256,
+      initialAlphAmount: U256,
+      initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
   )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
     parseState(initialState).flatMap { state =>
-      buildDeployContractTxWithParsedState(codeRaw, address, state, alphAmount, newTokenAmount)
+      buildDeployContractScriptWithParsedState(
+        codeRaw,
+        address,
+        state,
+        initialAlphAmount,
+        initialTokenAmounts,
+        newTokenAmount
+      )
     }
   }
 
@@ -1081,36 +1090,74 @@ object ServerUtils {
       address: Address,
       initialFields: AVector[vm.Val],
       initialAlphAmount: U256,
+      initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
   )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
-    buildDeployContractTxWithParsedState(
+    buildDeployContractScriptWithParsedState(
       Hex.toHexString(serialize(contract)),
       address,
       initialFields,
       initialAlphAmount,
+      initialTokenAmounts,
       newTokenAmount
     )
   }
 
-  def buildDeployContractTxWithParsedState(
+  def buildDeployContractScriptRawWithParsedState(
       codeRaw: String,
       address: Address,
       initialFields: AVector[vm.Val],
       initialAlphAmount: U256,
+      initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
-  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
-    val stateRaw = Hex.toHexString(serialize(initialFields))
+  ): String = {
+    val stateRaw    = Hex.toHexString(serialize(initialFields))
+    val approveAlph = s"approveAlph!(@${address.toBase58}, ${initialAlphAmount.v})"
     val creation = newTokenAmount match {
       case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
       case None         => s"createContract!(#$codeRaw, #$stateRaw)"
     }
 
-    val scriptRaw = s"""
-                       |TxScript Main {
-                       |  approveAlph!(@${address.toBase58}, ${initialAlphAmount.v})
-                       |  $creation
-                       |}
-                       |""".stripMargin
+    if (initialTokenAmounts.isEmpty) {
+      s"""
+         |TxScript Main {
+         |  $approveAlph
+         |  $creation
+         |}
+         |""".stripMargin
+    } else {
+      val approveTokenStmts = initialTokenAmounts
+        .map { token =>
+          s"approveToken!(@${address.toBase58}, #${token.id.toHexString}, ${token.amount.v})"
+        }
+        .mkString("\n  ")
+
+      s"""
+         |TxScript Main {
+         |  $approveAlph
+         |  $approveTokenStmts
+         |  $creation
+         |}
+         |""".stripMargin
+    }
+  }
+
+  def buildDeployContractScriptWithParsedState(
+      codeRaw: String,
+      address: Address,
+      initialFields: AVector[vm.Val],
+      initialAlphAmount: U256,
+      initialTokenAmounts: AVector[Token],
+      newTokenAmount: Option[U256]
+  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
+    val scriptRaw = buildDeployContractScriptRawWithParsedState(
+      codeRaw,
+      address,
+      initialFields,
+      initialAlphAmount,
+      initialTokenAmounts,
+      newTokenAmount
+    )
 
     wrapCompilerResult(Compiler.compileTxScript(scriptRaw))
   }
