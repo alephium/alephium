@@ -436,16 +436,11 @@ object StatefulParser extends Parser[StatefulContext] {
   def contractExtending[Unknown: P]: P[Seq[Ast.Inheritance]] =
     P(Lexer.keyword("extends") ~ (contractInheritance.rep(1, ",")))
 
-  def contractThenInterfaceInheritances[Unknown: P]: P[Seq[Ast.Inheritance]] =
-    P((contractExtending ~ interfaceImplementing).map {
-      case (contractsInherited, interfacesInherited) =>
-        contractsInherited.concat(interfacesInherited)
-    })
-
-  def contractInheritances[Unknown: P]: P[Seq[Ast.Inheritance]] =
-    P(
-      contractThenInterfaceInheritances | contractExtending | interfaceImplementing
-    )
+  def contractInheritances[Unknown: P]: P[Seq[Ast.Inheritance]] = {
+    P(contractExtending.? ~ interfaceImplementing.?).map { case (extendingsOpt, implementingOpt) =>
+      extendingsOpt.getOrElse(Seq.empty) ++ implementingOpt.getOrElse(Seq.empty)
+    }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[Unknown: P]: P[Ast.TxContract] =
