@@ -55,7 +55,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
   def startPayableFrame(
       obj: ContractObj[Ctx],
       ctx: Ctx,
-      balanceState: BalanceState,
+      balanceState: MutBalanceState,
       method: Method[Ctx],
       args: AVector[Val],
       operandStack: Stack[Val],
@@ -74,7 +74,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       startPayableFrame(
         obj,
         ctx,
-        BalanceState.from(balances),
+        MutBalanceState.from(balances),
         method,
         args,
         operandStack,
@@ -205,7 +205,7 @@ final class StatelessVM(
   def startPayableFrame(
       obj: ContractObj[StatelessContext],
       ctx: StatelessContext,
-      balanceState: BalanceState,
+      balanceState: MutBalanceState,
       method: Method[StatelessContext],
       args: AVector[Val],
       operandStack: Stack[Val],
@@ -233,7 +233,7 @@ final class StatefulVM(
   def startPayableFrame(
       obj: ContractObj[StatefulContext],
       ctx: StatefulContext,
-      balanceState: BalanceState,
+      balanceState: MutBalanceState,
       method: Method[StatefulContext],
       args: AVector[Val],
       operandStack: Stack[Val],

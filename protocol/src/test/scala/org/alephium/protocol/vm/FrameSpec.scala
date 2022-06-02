@@ -75,7 +75,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
 
     val from = lockupScriptGen.sample.get
     def balanceState =
-      BalanceState(
+      MutBalanceState(
         MutBalances.empty,
         MutBalances(ArrayBuffer(from -> BalancesPerLockup.alph(ALPH.alph(1000))))
       )
@@ -84,7 +84,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     }
     def lemanFrame = {
       val balanceState =
-        BalanceState(
+        MutBalanceState(
           MutBalances.empty,
           MutBalances(ArrayBuffer(from -> BalancesPerLockup.alph(ALPH.alph(1000))))
         )
@@ -159,7 +159,7 @@ trait FrameFixture extends ContextGenerators {
   }
 
   def genStatefulFrame(
-      balanceState: Option[BalanceState] = None
+      balanceState: Option[MutBalanceState] = None
   )(implicit networkConfig: NetworkConfig): StatefulFrame = {
     val method         = baseMethod[StatefulContext](2)
     val script         = StatefulScript.unsafe(AVector(method))

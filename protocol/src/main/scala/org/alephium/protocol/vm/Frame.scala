@@ -36,9 +36,9 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def getCallerFrame(): ExeResult[Frame[Ctx]]
 
-  def balanceStateOpt: Option[BalanceState]
+  def balanceStateOpt: Option[MutBalanceState]
 
-  def getBalanceState(): ExeResult[BalanceState] =
+  def getBalanceState(): ExeResult[MutBalanceState] =
     balanceStateOpt.toRight(Right(EmptyBalanceForPayableMethod))
 
   def pcMax: Int = method.instrs.length
@@ -199,7 +199,7 @@ final class StatelessFrame(
   }
 
   // the following should not be used in stateless context
-  def balanceStateOpt: Option[BalanceState] = None
+  def balanceStateOpt: Option[MutBalanceState] = None
   def createContract(
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
@@ -228,7 +228,7 @@ final class StatefulFrame(
     val returnTo: AVector[Val] => ExeResult[Unit],
     val ctx: StatefulContext,
     val callerFrameOpt: Option[StatefulFrame],
-    val balanceStateOpt: Option[BalanceState]
+    val balanceStateOpt: Option[MutBalanceState]
 ) extends Frame[StatefulContext] {
   def getCallerFrame(): ExeResult[StatefulFrame] = {
     callerFrameOpt.toRight(Right(NoCaller))
@@ -237,7 +237,7 @@ final class StatefulFrame(
   def getNewFrameBalancesState(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
-  ): ExeResult[Option[BalanceState]] = {
+  ): ExeResult[Option[MutBalanceState]] = {
     if (ctx.getHardFork() >= HardFork.Leman) {
       getNewFrameBalancesStateSinceLeman(contractObj, method)
     } else {
@@ -248,7 +248,7 @@ final class StatefulFrame(
   private def getNewFrameBalancesStateSinceLeman(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
-  ): ExeResult[Option[BalanceState]] = {
+  ): ExeResult[Option[MutBalanceState]] = {
     if (method.isPayable) {
       for {
         currentBalances <- getBalanceState()
@@ -277,7 +277,7 @@ final class StatefulFrame(
               val remaining = MutBalances.empty
               remaining
                 .add(LockupScript.p2c(contractId), balancesPerLockup)
-                .map(_ => BalanceState(remaining, MutBalances.empty))
+                .map(_ => MutBalanceState(remaining, MutBalances.empty))
             }
         case _ =>
           Right(None)
@@ -292,7 +292,7 @@ final class StatefulFrame(
   private def getNewFrameBalancesStatePreLeman(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
-  ): ExeResult[Option[BalanceState]] = {
+  ): ExeResult[Option[MutBalanceState]] = {
     if (method.isPayable) {
       for {
         currentBalances <- getBalanceState()
@@ -465,7 +465,7 @@ object Frame {
   def stateful(
       ctx: StatefulContext,
       callerFrame: Option[StatefulFrame],
-      balanceStateOpt: Option[BalanceState],
+      balanceStateOpt: Option[MutBalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
       operandStack: Stack[Val],
@@ -491,7 +491,7 @@ object Frame {
   def stateful(
       ctx: StatefulContext,
       callerFrame: Option[StatefulFrame],
-      balanceStateOpt: Option[BalanceState],
+      balanceStateOpt: Option[MutBalanceState],
       obj: ContractObj[StatefulContext],
       method: Method[StatefulContext],
       args: AVector[Val],
