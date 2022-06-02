@@ -327,8 +327,16 @@ object StatefulParser extends Parser[StatefulContext] {
     P(Lexer.typeId ~ inheritanceFields).map { case (typeId, fields) =>
       Ast.ContractInheritance(typeId, fields)
     }
+
+  def interfaceImplementing[Unkown: P]: P[Seq[Ast.Inheritance]] =
+    P(Lexer.keyword("implements") ~/ (interfaceInheritance.rep(1, ",")))
+
+  def contractExtending[Unkown: P]: P[Seq[Ast.Inheritance]] =
+    P(Lexer.keyword("extends") ~/ (contractInheritance.rep(1, ",")))
+
   def contractInheritances[Unkown: P]: P[Seq[Ast.Inheritance]] =
-    P((Lexer.keyword("extends") ~/ (contractInheritance.rep(1, ","))) | (Lexer.keyword("implements") ~/ (interfaceInheritance.rep(1, ","))))
+    P(contractExtending | interfaceImplementing).rep(min = 0, max = 2).map { inh => inh.flatten }
+
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[Unkown: P]: P[Ast.TxContract] =
     P(
@@ -382,7 +390,7 @@ object StatefulParser extends Parser[StatefulContext] {
         case _ => ()
       }
       if (funcs.length < 1) {
-        throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
+        throw Compiler.Error(s"No function definition in Interface ${typeId.name}")
       } else {
         Ast.ContractInterface(
           typeId,
