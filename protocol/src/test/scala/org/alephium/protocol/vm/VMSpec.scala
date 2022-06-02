@@ -569,7 +569,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       .checkContractMinimalBalances(
         genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract - 1)
       )
-      .leftValue isE NeedAtLeastOneAlphInContract
+      .leftValue isE LowerThanContractMinimalBalance
   }
 
   it should "check method modifier compatibility" in new NetworkFixture {

@@ -333,7 +333,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     val script = Compiler.compileTxScript(main).rightValue
-    fail(blockFlow, chainIndex, script, NeedAtLeastOneAlphInContract)
+    fail(blockFlow, chainIndex, script, LowerThanContractMinimalBalance)
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {

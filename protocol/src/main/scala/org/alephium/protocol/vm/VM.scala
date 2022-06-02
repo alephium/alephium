@@ -315,7 +315,7 @@ final class StatefulVM(
       ctx.getHardFork() >= HardFork.Leman &&
       !outputBalances.all.forall(VM.checkContractMinimalBalanceLeman)
     ) {
-      failed(NeedAtLeastOneAlphInContract)
+      failed(LowerThanContractMinimalBalance)
     } else {
       okay
     }

@@ -75,7 +75,7 @@ object Method {
       case 1 => Right((true, true))
       case 2 => Right((false, true))
       case 3 => Right((true, false))
-      case _ => Left(SerdeError.wrongFormat("Invalid method modifier"))
+      case _ => Left(SerdeError.wrongFormat("Invalid assets modifier"))
     }
   }
 
