@@ -1723,7 +1723,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract = Compiler.compileContract(code).rightValue
       contract.methodsLength is 4
-      contract.methods.map(_.argsLength) is AVector(0, 1, 2, 3)
+      contract.methods.map(_.argsLength) is AVector(2, 1, 3, 0)
     }
   }
 
