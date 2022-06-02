@@ -178,7 +178,7 @@ object VM {
     }
   }
 
-  def checkContractMinimalBalanceLeman(pair: (LockupScript, BalancesPerLockup)): Boolean = {
+  def checkContractMinimalBalanceLeman(pair: (LockupScript, MutBalancesPerLockup)): Boolean = {
     pair._1.isAssetType || pair._2.alphAmount >= minimalAlphInContract
   }
 }

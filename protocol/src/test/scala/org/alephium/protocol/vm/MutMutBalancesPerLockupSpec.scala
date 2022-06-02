@@ -24,22 +24,22 @@ import org.alephium.protocol.model.{TxGenerators, TxOutput}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 import org.alephium.util.Bytes.byteStringOrdering
 
-class MutBalancesPerLockupSpec extends AlephiumSpec {
+class MutMutBalancesPerLockupSpec extends AlephiumSpec {
 
   it should "tokenVector" in new Fixture {
     val tokens = mutable.Map(tokenId -> ALPH.oneAlph)
-    BalancesPerLockup(ALPH.oneAlph, tokens, 1).tokenVector is AVector((tokenId, ALPH.oneAlph))
+    MutBalancesPerLockup(ALPH.oneAlph, tokens, 1).tokenVector is AVector((tokenId, ALPH.oneAlph))
 
     val tokenIdZero = hashGen.sample.get
     tokens.addOne((tokenIdZero, U256.Zero))
 
-    BalancesPerLockup(ALPH.oneAlph, tokens, 1).tokenVector is AVector((tokenId, ALPH.oneAlph))
+    MutBalancesPerLockup(ALPH.oneAlph, tokens, 1).tokenVector is AVector((tokenId, ALPH.oneAlph))
 
     tokens.remove(tokenIdZero)
 
     forAll(hashGen) { newTokenId =>
       tokens.addOne((newTokenId, ALPH.oneAlph))
-      BalancesPerLockup(ALPH.oneAlph, tokens, 1).tokenVector is AVector.from(
+      MutBalancesPerLockup(ALPH.oneAlph, tokens, 1).tokenVector is AVector.from(
         tokens.toSeq.sortBy(_._1.bytes)
       )
     }
@@ -49,7 +49,7 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
     val tokenId2 = hashGen.sample.get
     val tokens   = mutable.Map(tokenId -> U256.One, tokenId2 -> U256.Two)
 
-    val balancesPerLockup = BalancesPerLockup(ALPH.oneAlph, tokens, 1)
+    val balancesPerLockup = MutBalancesPerLockup(ALPH.oneAlph, tokens, 1)
 
     balancesPerLockup.getTokenAmount(tokenId) is Some(U256.One)
     balancesPerLockup.getTokenAmount(tokenId2) is Some(U256.Two)
@@ -57,7 +57,7 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
   }
 
   it should "addAlph" in new Fixture {
-    val balancesPerLockup = BalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 1)
+    val balancesPerLockup = MutBalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 1)
 
     var current = ALPH.oneAlph
 
@@ -77,7 +77,7 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
 
   it should "addToken" in new Fixture {
     val tokens            = mutable.Map(tokenId -> ALPH.oneAlph)
-    val balancesPerLockup = BalancesPerLockup(ALPH.oneAlph, tokens, 1)
+    val balancesPerLockup = MutBalancesPerLockup(ALPH.oneAlph, tokens, 1)
 
     balancesPerLockup.addToken(tokenId, ALPH.oneAlph) is Some(())
     balancesPerLockup.getTokenAmount(tokenId) is Some(ALPH.alph(2))
@@ -92,7 +92,7 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
   }
 
   it should "subAlph" in new Fixture {
-    val balancesPerLockup = BalancesPerLockup(U256.HalfMaxValue, mutable.Map.empty, 1)
+    val balancesPerLockup = MutBalancesPerLockup(U256.HalfMaxValue, mutable.Map.empty, 1)
 
     var current = U256.HalfMaxValue
 
@@ -112,7 +112,7 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
 
   it should "subToken" in new Fixture {
     val tokens            = mutable.Map(tokenId -> ALPH.oneAlph)
-    val balancesPerLockup = BalancesPerLockup(ALPH.oneAlph, tokens, 1)
+    val balancesPerLockup = MutBalancesPerLockup(ALPH.oneAlph, tokens, 1)
 
     balancesPerLockup.subToken(tokenId, ALPH.oneAlph) is Some(())
     balancesPerLockup.getTokenAmount(tokenId) is Some(U256.Zero)
@@ -128,45 +128,45 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
 
   it should "add" in new Fixture {
     val balancesPerLockup =
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
+      MutBalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
 
     val tokenId2 = hashGen.sample.get
-    val balancesPerLockup2 = BalancesPerLockup(
+    val balancesPerLockup2 = MutBalancesPerLockup(
       ALPH.oneAlph,
       mutable.Map(tokenId -> ALPH.oneAlph, tokenId2 -> ALPH.oneAlph),
       1
     )
 
     balancesPerLockup.add(balancesPerLockup2) is Some(())
-    balancesPerLockup is BalancesPerLockup(
+    balancesPerLockup is MutBalancesPerLockup(
       ALPH.alph(2),
       mutable.Map(tokenId -> ALPH.alph(2), tokenId2 -> ALPH.oneAlph),
       1
     )
 
-    balancesPerLockup.add(BalancesPerLockup(U256.MaxValue, mutable.Map.empty, 1)) is None
+    balancesPerLockup.add(MutBalancesPerLockup(U256.MaxValue, mutable.Map.empty, 1)) is None
     balancesPerLockup.add(
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> U256.MaxValue), 1)
+      MutBalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> U256.MaxValue), 1)
     ) is None
   }
 
   it should "sub" in new Fixture {
     val balancesPerLockup =
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
+      MutBalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
 
     val tokenId2 = hashGen.sample.get
     val balancesPerLockup2 =
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
+      MutBalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
 
     balancesPerLockup.sub(balancesPerLockup2) is Some(())
-    balancesPerLockup is BalancesPerLockup(U256.Zero, mutable.Map(tokenId -> U256.Zero), 1)
+    balancesPerLockup is MutBalancesPerLockup(U256.Zero, mutable.Map(tokenId -> U256.Zero), 1)
 
-    balancesPerLockup.sub(BalancesPerLockup(U256.MaxValue, mutable.Map.empty, 1)) is None
+    balancesPerLockup.sub(MutBalancesPerLockup(U256.MaxValue, mutable.Map.empty, 1)) is None
     balancesPerLockup.sub(
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> U256.MaxValue), 1)
+      MutBalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> U256.MaxValue), 1)
     ) is None
     balancesPerLockup.sub(
-      BalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId2 -> ALPH.oneAlph), 1)
+      MutBalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId2 -> ALPH.oneAlph), 1)
     ) is None
   }
 
@@ -175,17 +175,17 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
 
     val lockupScript = lockupScriptGen.sample.get
 
-    BalancesPerLockup(ALPH.oneAlph, tokens, 1).toTxOutput(lockupScript) is Right(
+    MutBalancesPerLockup(ALPH.oneAlph, tokens, 1).toTxOutput(lockupScript) is Right(
       Some(TxOutput.from(ALPH.oneAlph, AVector.from(tokens), lockupScript))
     )
-    BalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 1).toTxOutput(lockupScript) is Right(
+    MutBalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 1).toTxOutput(lockupScript) is Right(
       Some(TxOutput.from(ALPH.oneAlph, AVector.empty, lockupScript))
     )
-    BalancesPerLockup(U256.Zero, mutable.Map.empty, 1).toTxOutput(lockupScript) is Right(None)
-    BalancesPerLockup(U256.Zero, tokens, 1).toTxOutput(lockupScript) is Left(
+    MutBalancesPerLockup(U256.Zero, mutable.Map.empty, 1).toTxOutput(lockupScript) is Right(None)
+    MutBalancesPerLockup(U256.Zero, tokens, 1).toTxOutput(lockupScript) is Left(
       Right(InvalidOutputBalances)
     )
-    BalancesPerLockup(U256.Zero, mutable.Map.empty, 1).toTxOutput(lockupScript) is Right(None)
+    MutBalancesPerLockup(U256.Zero, mutable.Map.empty, 1).toTxOutput(lockupScript) is Right(None)
   }
 
   trait Fixture extends TxGenerators with NetworkConfigFixture.Default {

@@ -247,11 +247,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   trait BalancesFixture {
     val (_, pubKey0) = SignatureSchema.generatePriPub()
     val address0     = Val.Address(LockupScript.p2pkh(pubKey0))
-    val balances0    = BalancesPerLockup(100, mutable.Map.empty, 0)
+    val balances0    = MutBalancesPerLockup(100, mutable.Map.empty, 0)
     val (_, pubKey1) = SignatureSchema.generatePriPub()
     val address1     = Val.Address(LockupScript.p2pkh(pubKey1))
     val tokenId      = Hash.random
-    val balances1    = BalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
+    val balances1    = MutBalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext =
       new StatefulContext with NetworkConfigFixture.Default {
@@ -538,7 +538,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       MutBalances(
         mutable.ArrayBuffer(
           lockupScriptGen.sample.get ->
-            BalancesPerLockup(alphAmount = amount, mutable.Map.empty, 0)
+            MutBalancesPerLockup(alphAmount = amount, mutable.Map.empty, 0)
         )
       )
     }

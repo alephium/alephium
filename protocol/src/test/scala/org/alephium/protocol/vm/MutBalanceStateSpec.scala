@@ -31,7 +31,7 @@ class MutBalanceStateSpec extends AlephiumSpec {
     balanceState is MutBalanceState(
       MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero)))),
       MutBalances(
-        ArrayBuffer((lockupScript, BalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 0)))
+        ArrayBuffer((lockupScript, MutBalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 0)))
       )
     )
 
@@ -48,7 +48,7 @@ class MutBalanceStateSpec extends AlephiumSpec {
       ),
       MutBalances(
         ArrayBuffer(
-          (lockupScript, BalancesPerLockup(U256.Zero, mutable.Map(tokenId -> ALPH.oneAlph), 0))
+          (lockupScript, MutBalancesPerLockup(U256.Zero, mutable.Map(tokenId -> ALPH.oneAlph), 0))
         )
       )
     )
@@ -77,7 +77,9 @@ class MutBalanceStateSpec extends AlephiumSpec {
 
     balanceState.useApproved() is MutBalanceState.from(
       MutBalances(
-        ArrayBuffer((lockupScript, BalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, scopeDepth)))
+        ArrayBuffer(
+          (lockupScript, MutBalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, scopeDepth))
+        )
       )
     )
 
@@ -135,7 +137,7 @@ class MutBalanceStateSpec extends AlephiumSpec {
     val scopeDepth = 1
     val tokens     = mutable.Map(tokenId -> ALPH.oneAlph)
     val balancesPerLockup =
-      BalancesPerLockup(ALPH.oneAlph, tokens, scopeDepth)
+      MutBalancesPerLockup(ALPH.oneAlph, tokens, scopeDepth)
     val lockupScript = lockupScriptGen.sample.get
 
     val remaining = MutBalances(ArrayBuffer((lockupScript, balancesPerLockup)))

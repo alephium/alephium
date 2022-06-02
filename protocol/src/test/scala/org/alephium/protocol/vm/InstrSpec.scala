@@ -1631,11 +1631,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val tokenId = Hash.generate
 
     def alphBalance(lockupScript: LockupScript, amount: U256): MutBalances = {
-      MutBalances(ArrayBuffer((lockupScript, BalancesPerLockup.alph(amount))))
+      MutBalances(ArrayBuffer((lockupScript, MutBalancesPerLockup.alph(amount))))
     }
 
     def tokenBalance(lockupScript: LockupScript, tokenId: TokenId, amount: U256): MutBalances = {
-      MutBalances(ArrayBuffer((lockupScript, BalancesPerLockup.token(tokenId, amount))))
+      MutBalances(ArrayBuffer((lockupScript, MutBalancesPerLockup.token(tokenId, amount))))
     }
 
     def prepareFrame(
@@ -1851,7 +1851,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     runAndCheckGas(TransferAlph)
 
     frame.ctx.outputBalances is MutBalances(
-      ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
+      ArrayBuffer((to, MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
 
     stack.push(Val.Address(from))
@@ -1881,7 +1881,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferAlphFromSelf)
     frame.ctx.outputBalances is MutBalances(
-      ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
+      ArrayBuffer((to, MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
   }
 
@@ -1899,7 +1899,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferAlphToSelf)
     frame.ctx.outputBalances is MutBalances(
-      ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
+      ArrayBuffer((to, MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
   }
 
@@ -1921,7 +1921,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     runAndCheckGas(TransferToken)
 
     frame.ctx.outputBalances is MutBalances(
-      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
+      ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
 
@@ -1944,7 +1944,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     runAndCheckGas(TransferTokenFromSelf)
 
     frame.ctx.outputBalances is MutBalances(
-      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
+      ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
 
@@ -1967,7 +1967,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     runAndCheckGas(TransferTokenToSelf)
 
     frame.ctx.outputBalances is MutBalances(
-      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
+      ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
 

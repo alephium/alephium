@@ -22,8 +22,8 @@ import scala.collection.mutable.ArrayBuffer
 import org.alephium.protocol.model.{AssetOutput, TokenId, TxOutput}
 import org.alephium.util.{AVector, U256}
 
-final case class MutBalances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
-  def getBalances(lockupScript: LockupScript): Option[BalancesPerLockup] = {
+final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLockup)]) {
+  def getBalances(lockupScript: LockupScript): Option[MutBalancesPerLockup] = {
     all.collectFirst { case (ls, balance) if ls == lockupScript => balance }
   }
 
@@ -40,7 +40,7 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]
       case Some(balances) =>
         balances.addAlph(amount)
       case None =>
-        all.addOne(lockupScript -> BalancesPerLockup.alph(amount))
+        all.addOne(lockupScript -> MutBalancesPerLockup.alph(amount))
         Some(())
     }
   }
@@ -50,7 +50,7 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]
       case Some(balances) =>
         balances.addToken(tokenId, amount)
       case None =>
-        all.addOne(lockupScript -> BalancesPerLockup.token(tokenId, amount))
+        all.addOne(lockupScript -> MutBalancesPerLockup.token(tokenId, amount))
         Some(())
     }
   }
@@ -63,7 +63,7 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]
     getBalances(lockupScript).flatMap(_.subToken(tokenId, amount))
   }
 
-  def add(lockupScript: LockupScript, balancesPerLockup: BalancesPerLockup): Option[Unit] = {
+  def add(lockupScript: LockupScript, balancesPerLockup: MutBalancesPerLockup): Option[Unit] = {
     getBalances(lockupScript) match {
       case Some(balances) =>
         balances.add(balancesPerLockup)
@@ -73,7 +73,7 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]
     }
   }
 
-  def sub(lockupScript: LockupScript, balancesPerLockup: BalancesPerLockup): Option[Unit] = {
+  def sub(lockupScript: LockupScript, balancesPerLockup: MutBalancesPerLockup): Option[Unit] = {
     getBalances(lockupScript).flatMap(_.sub(balancesPerLockup))
   }
 
@@ -85,7 +85,7 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]
     MutBalances(newAll)
   }
 
-  def useAll(lockupScript: LockupScript): Option[BalancesPerLockup] = {
+  def useAll(lockupScript: LockupScript): Option[MutBalancesPerLockup] = {
     val index = all.indexWhere { case (ls, _) => ls == lockupScript }
     if (index == -1) {
       None
@@ -96,9 +96,9 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]
     }
   }
 
-  def useForNewContract(): Option[BalancesPerLockup] = {
+  def useForNewContract(): Option[MutBalancesPerLockup] = {
     Option.when(all.nonEmpty) {
-      val accumulator = BalancesPerLockup.empty
+      val accumulator = MutBalancesPerLockup.empty
       all.foreach { balances => accumulator.add(balances._2) }
       all.clear()
       accumulator
@@ -147,12 +147,12 @@ object MutBalances {
   def from(inputs: AVector[AssetOutput], outputs: AVector[AssetOutput]): Option[MutBalances] = {
     val inputBalances = inputs.fold(Option(empty)) {
       case (Some(balances), input) =>
-        balances.add(input.lockupScript, BalancesPerLockup.from(input)).map(_ => balances)
+        balances.add(input.lockupScript, MutBalancesPerLockup.from(input)).map(_ => balances)
       case (None, _) => None
     }
     val finalBalances = outputs.fold(inputBalances) {
       case (Some(balances), output) =>
-        balances.sub(output.lockupScript, BalancesPerLockup.from(output)).map(_ => balances)
+        balances.sub(output.lockupScript, MutBalancesPerLockup.from(output)).map(_ => balances)
       case (None, _) => None
     }
     finalBalances

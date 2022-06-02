@@ -197,7 +197,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def createContract(
       code: StatefulContract.HalfDecoded,
-      initialBalances: BalancesPerLockup,
+      initialBalances: MutBalancesPerLockup,
       initialFields: AVector[Val],
       tokenAmount: Option[Val.U256]
   ): ExeResult[Hash] = {
@@ -225,7 +225,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def destroyContract(
       contractId: ContractId,
-      contractAssets: BalancesPerLockup,
+      contractAssets: MutBalancesPerLockup,
       address: LockupScript
   ): ExeResult[Unit] = {
     for {
