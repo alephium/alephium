@@ -901,7 +901,7 @@ object Ast {
         throw Compiler.Error(s"Cyclic inheritance detected for contract ${contract.ident.name}")
       }
 
-      val allParents = mutable.Map.empty[TypeId, ContractWithState]
+      val allParents = mutable.LinkedHashMap.empty[TypeId, ContractWithState]
       contract.inheritances.foreach { inheritance =>
         val parentId       = inheritance.parentId
         val parentContract = getContract(parentId)
@@ -1017,9 +1017,8 @@ object Ast {
         contract: ContractWithState
     ): (Seq[FuncDef[StatefulContext]], Seq[EventDef]) = {
       val parents = parentsCache(contract.ident)
-      val (_allContracts, _allInterfaces) =
+      val (allContracts, _allInterfaces) =
         (parents :+ contract).partition(_.isInstanceOf[TxContract])
-      val allContracts = _allContracts.sortBy(_.ident.name)
       val allInterfaces =
         sortInterfaces(parentsCache, _allInterfaces.map(_.asInstanceOf[ContractInterface]))
 

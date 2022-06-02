@@ -1532,11 +1532,11 @@ class VMSpec extends AlephiumSpec {
         block.hash,
         contractOutputRef.key,
         AVector(
-          LogState(txId, 1, AVector(Val.U256(1))),
           LogState(txId, 0, AVector(Val.U256(1))),
+          LogState(txId, 1, AVector(Val.U256(1))),
           LogState(txId, 2, AVector(Val.U256(2))),
-          LogState(txId, 0, AVector(Val.U256(2))),
-          LogState(txId, 0, AVector(Val.U256(3)))
+          LogState(txId, 1, AVector(Val.U256(2))),
+          LogState(txId, 1, AVector(Val.U256(3)))
         )
       )
   }
