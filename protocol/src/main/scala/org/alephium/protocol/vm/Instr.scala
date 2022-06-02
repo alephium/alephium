@@ -143,7 +143,8 @@ object Instr {
     U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
     EthEcRecover,
     Log6, Log7, Log8, Log9,
-    ContractIdToAddress
+    ContractIdToAddress,
+    LoadLocalByIndex, StoreLocalByIndex
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -152,7 +153,8 @@ object Instr {
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
     CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
     /* Below are instructions for Leman hard fork */
-    MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets
+    MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
+    LoadFieldByIndex, StoreFieldByIndex
   )
   // format: on
 
@@ -359,6 +361,41 @@ final case class StoreLocal(index: Byte) extends OperandStackInstr with GasVeryL
 }
 object StoreLocal extends StatelessInstrCompanion1[Byte]
 
+sealed trait VarIndexInstr[Ctx <: StatelessContext]
+    extends LemanInstrWithSimpleGas[Ctx]
+    with GasVeryLow {
+  def popIndex[C <: Ctx](frame: Frame[C], error: ExeFailure): ExeResult[Byte] = {
+    for {
+      u256 <- frame.popOpStackU256()
+      index <- u256.v.toInt
+        .flatMap(v => if (v > 0xff) None else Some(v))
+        .toRight(Right(error))
+    } yield index.toByte
+  }
+}
+
+case object LoadLocalByIndex extends VarIndexInstr[StatelessContext] with StatelessInstrCompanion0 {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      index <- popIndex(frame, InvalidVarIndex)
+      v     <- frame.getLocalVal(Bytes.toPosInt(index))
+      _     <- frame.pushOpStack(v)
+    } yield ()
+  }
+}
+
+case object StoreLocalByIndex
+    extends VarIndexInstr[StatelessContext]
+    with StatelessInstrCompanion0 {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      index <- popIndex(frame, InvalidVarIndex)
+      v     <- frame.popOpStack()
+      _     <- frame.setLocalVal(Bytes.toPosInt(index), v)
+    } yield ()
+  }
+}
+
 sealed trait FieldInstr extends StatefulInstrSimpleGas with GasSimple {}
 @ByteCode
 final case class LoadField(index: Byte) extends FieldInstr with GasVeryLow {
@@ -382,6 +419,26 @@ final case class StoreField(index: Byte) extends FieldInstr with GasVeryLow {
   }
 }
 object StoreField extends StatefulInstrCompanion1[Byte]
+
+case object LoadFieldByIndex extends VarIndexInstr[StatefulContext] with StatefulInstrCompanion0 {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      index <- popIndex(frame, InvalidFieldIndex)
+      v     <- frame.getField(Bytes.toPosInt(index))
+      _     <- frame.pushOpStack(v)
+    } yield ()
+  }
+}
+
+case object StoreFieldByIndex extends VarIndexInstr[StatefulContext] with StatefulInstrCompanion0 {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      index <- popIndex(frame, InvalidFieldIndex)
+      v     <- frame.popOpStack()
+      _     <- frame.setField(Bytes.toPosInt(index), v)
+    } yield ()
+  }
+}
 
 sealed trait PureStackInstr extends OperandStackInstr with StatelessInstrCompanion0 with GasBase
 
