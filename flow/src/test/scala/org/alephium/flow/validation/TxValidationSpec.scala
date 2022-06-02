@@ -558,7 +558,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   it should "validate token balances" in new Fixture {
     forAll(transactionGenWithPreOutputs(tokensNumGen = Gen.choose(1, 10)), Gen.prob(0.5)) {
-      case ((tx, preOutputs), isPayable) =>
+      case ((tx, preOutputs), useAssets) =>
         implicit val validator = nestedValidator(
           checkTokenBalance(_, preOutputs.map(_.referredOutput)),
           preOutputs
@@ -571,8 +571,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         val invalidTxWithScript = {
           val method = Method[StatefulContext](
             isPublic = true,
-            isPayable = isPayable,
-            useContractAssets = isPayable,
+            useApprovedAssets = useAssets,
+            useContractAssets = useAssets,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,
@@ -583,7 +583,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           invalidTx.updateUnsigned(_.copy(scriptOpt = Some(script)))
         }
 
-        if (!isPayable) {
+        if (!useAssets) {
           invalidTxWithScript.fail(InvalidTokenBalance)
         }
     }

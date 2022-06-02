@@ -32,4 +32,9 @@ object Amount {
   val Zero: Amount = Amount(U256.Zero)
 
   final case class Hint(value: U256)
+
+  def toAlphString(value: U256): String = {
+    val dec = new java.math.BigDecimal(value.v).divide(new java.math.BigDecimal(ALPH.oneAlph.v))
+    s"${dec} ALPH"
+  }
 }

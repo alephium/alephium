@@ -69,7 +69,7 @@ object TxEnv {
     def txId: Hash                         = tx.id
     def fixedOutputs: AVector[AssetOutput] = tx.unsigned.fixedOutputs
     def gasFeeUnsafe: U256                 = tx.gasFeeUnsafe
-    def isEntryMethodPayable: Boolean      = tx.unsigned.scriptOpt.exists(_.entryMethod.isPayable)
+    def isEntryMethodPayable: Boolean      = tx.isEntryMethodPayable
   }
 
   final case class Mockup(
@@ -119,7 +119,7 @@ trait StatelessContext extends CostStrategy {
   }
 
   def txEnv: TxEnv
-  def getInitialBalances(): ExeResult[Balances]
+  def getInitialBalances(): ExeResult[MutBalances]
 
   def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit]
 
@@ -157,7 +157,7 @@ object StatelessContext {
       var gasRemaining: GasBox
   )(implicit val networkConfig: NetworkConfig)
       extends StatelessContext {
-    def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
+    def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
 
     def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = okay
   }
@@ -166,7 +166,7 @@ object StatelessContext {
 trait StatefulContext extends StatelessContext with ContractPool {
   def worldState: WorldState.Staging
 
-  def outputBalances: Balances
+  def outputBalances: MutBalances
 
   def logConfig: LogConfig
 
@@ -197,7 +197,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def createContract(
       code: StatefulContract.HalfDecoded,
-      initialBalances: BalancesPerLockup,
+      initialBalances: MutBalancesPerLockup,
       initialFields: AVector[Val],
       tokenAmount: Option[Val.U256]
   ): ExeResult[Hash] = {
@@ -225,7 +225,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def destroyContract(
       contractId: ContractId,
-      contractAssets: BalancesPerLockup,
+      contractAssets: MutBalancesPerLockup,
       address: LockupScript
   ): ExeResult[Unit] = {
     for {
@@ -350,10 +350,10 @@ object StatefulContext {
         "org.wartremover.warts.Serializable"
       )
     )
-    def getInitialBalances(): ExeResult[Balances] =
+    def getInitialBalances(): ExeResult[MutBalances] =
       if (txEnv.isEntryMethodPayable) {
         for {
-          balances <- Balances
+          balances <- MutBalances
             .from(preOutputs, txEnv.fixedOutputs)
             .toRight(Right(InvalidBalances))
           _ <- balances
@@ -364,6 +364,6 @@ object StatefulContext {
         failed(ExpectNonPayableMethod)
       }
 
-    val outputBalances: Balances = Balances.empty
+    val outputBalances: MutBalances = MutBalances.empty
   }
 }

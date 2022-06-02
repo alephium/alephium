@@ -75,18 +75,18 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
 
     val from = lockupScriptGen.sample.get
     def balanceState =
-      BalanceState(
-        Balances.empty,
-        Balances(ArrayBuffer(from -> BalancesPerLockup.alph(ALPH.alph(1000))))
+      MutBalanceState(
+        MutBalances.empty,
+        MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1000))))
       )
     def preLemanFrame = {
       genStatefulFrame(Some(balanceState))(NetworkConfigFixture.PreLeman)
     }
     def lemanFrame = {
       val balanceState =
-        BalanceState(
-          Balances.empty,
-          Balances(ArrayBuffer(from -> BalancesPerLockup.alph(ALPH.alph(1000))))
+        MutBalanceState(
+          MutBalances.empty,
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1000))))
         )
       genStatefulFrame(Some(balanceState))(NetworkConfigFixture.Leman)
     }
@@ -110,7 +110,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
 
       result.rightValue.isEmpty is emptyOutput
       if (!emptyOutput) {
-        if (method.isPayable) {
+        if (method.useApprovedAssets) {
           frame.balanceStateOpt.get.approved.all.isEmpty is true
         }
         if (method.useContractAssets) {
@@ -135,7 +135,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
 trait FrameFixture extends ContextGenerators {
   def baseMethod[Ctx <: StatelessContext](localsLength: Int) = Method[Ctx](
     isPublic = true,
-    isPayable = false,
+    useApprovedAssets = false,
     useContractAssets = false,
     argsLength = localsLength - 1,
     localsLength,
@@ -159,7 +159,7 @@ trait FrameFixture extends ContextGenerators {
   }
 
   def genStatefulFrame(
-      balanceState: Option[BalanceState] = None
+      balanceState: Option[MutBalanceState] = None
   )(implicit networkConfig: NetworkConfig): StatefulFrame = {
     val method         = baseMethod[StatefulContext](2)
     val script         = StatefulScript.unsafe(AVector(method))

@@ -720,9 +720,9 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
-    val initialAlphAmount = query.initialAlphAmount.map(_.value).getOrElse(minimalAlphInContract)
     for {
-      code <- BuildDeployContractTx.decode(query.bytecode)
+      initialAlphAmount <- getInitialAlphAmount(query.initialAlphAmount)
+      code              <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildDeployContractTxWithParsedState(
         code.contract,
@@ -741,6 +741,19 @@ class ServerUtils(implicit
         query.gasPrice
       )
     } yield BuildDeployContractTxResult.from(utx)
+  }
+
+  def getInitialAlphAmount(amountOption: Option[Amount]): Try[U256] = {
+    amountOption match {
+      case Some(amount) =>
+        if (amount.value >= minimalAlphInContract) { Right(amount.value) }
+        else {
+          val error =
+            s"Expect ${Amount.toAlphString(minimalAlphInContract)} deposit to deploy a new contract"
+          Left(failed(error))
+        }
+      case None => Right(minimalAlphInContract)
+    }
   }
 
   def toVmVal(values: Option[AVector[Val]]): AVector[vm.Val] = {
@@ -938,8 +951,8 @@ class ServerUtils(implicit
       AVector(
         Method[StatefulContext](
           isPublic = true,
-          isPayable = testContract.inputAssets.nonEmpty,
-          useContractAssets = testContract.inputAssets.nonEmpty,
+          useApprovedAssets = testContract.inputAssets.nonEmpty,
+          useContractAssets = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = returnLength,

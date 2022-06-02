@@ -723,6 +723,16 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Too many transaction outputs, maximal value: 256"
   }
 
+  it should "check the minimal amount deposit for contrac creation" in new Fixture {
+    val serverUtils = new ServerUtils
+    serverUtils.getInitialAlphAmount(None) isE minimalAlphInContract
+    serverUtils.getInitialAlphAmount(Some(Amount(minimalAlphInContract))) isE minimalAlphInContract
+    serverUtils
+      .getInitialAlphAmount(Some(Amount(minimalAlphInContract - 1)))
+      .leftValue
+      .detail is "Expect 1 ALPH deposit to deploy a new contract"
+  }
+
   it should "fail when outputs belong to different groups" in new FlowFixtureWithApi {
     val serverUtils = new ServerUtils
 

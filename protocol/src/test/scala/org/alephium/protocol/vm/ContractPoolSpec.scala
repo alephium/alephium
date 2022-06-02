@@ -44,7 +44,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
       val outputRef  = ContractOutputRef.unsafe(output.hint, contractId)
       val method = Method[StatefulContext](
         isPublic = true,
-        isPayable = false,
+        useApprovedAssets = false,
         useContractAssets = false,
         argsLength = 0,
         localsLength = 0,

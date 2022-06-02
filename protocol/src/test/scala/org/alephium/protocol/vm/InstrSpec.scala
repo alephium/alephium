@@ -148,7 +148,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )(implicit networkConfig: NetworkConfig): Frame[StatelessContext] = {
       val baseMethod = Method[StatelessContext](
         isPublic = true,
-        isPayable = false,
+        useApprovedAssets = false,
         useContractAssets = false,
         argsLength = 0,
         localsLength = localsLength,
@@ -1621,7 +1621,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val baseMethod =
       Method[StatefulContext](
         isPublic = true,
-        isPayable = false,
+        useApprovedAssets = false,
         useContractAssets = false,
         argsLength = 0,
         localsLength = 0,
@@ -1632,16 +1632,16 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val tokenId = Hash.generate
 
-    def alphBalance(lockupScript: LockupScript, amount: U256): Balances = {
-      Balances(ArrayBuffer((lockupScript, BalancesPerLockup.alph(amount))))
+    def alphBalance(lockupScript: LockupScript, amount: U256): MutBalances = {
+      MutBalances(ArrayBuffer((lockupScript, MutBalancesPerLockup.alph(amount))))
     }
 
-    def tokenBalance(lockupScript: LockupScript, tokenId: TokenId, amount: U256): Balances = {
-      Balances(ArrayBuffer((lockupScript, BalancesPerLockup.token(tokenId, amount))))
+    def tokenBalance(lockupScript: LockupScript, tokenId: TokenId, amount: U256): MutBalances = {
+      MutBalances(ArrayBuffer((lockupScript, MutBalancesPerLockup.token(tokenId, amount))))
     }
 
     def prepareFrame(
-        balanceState: Option[BalanceState] = None,
+        balanceState: Option[MutBalanceState] = None,
         contractOutputOpt: Option[(ContractOutput, ContractOutputRef)] = None,
         txEnvOpt: Option[TxEnv] = None,
         callerFrameOpt: Option[StatefulFrame] = None
@@ -1724,7 +1724,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "ApproveAlph" in new StatefulInstrFixture {
     val lockupScript        = lockupScriptGen.sample.get
-    val balanceState        = BalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
+    val balanceState        = MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
     override lazy val frame = prepareFrame(Some(balanceState))
 
     frame.balanceStateOpt.get is balanceState
@@ -1733,7 +1733,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(ApproveAlph)
 
-    frame.balanceStateOpt.get is BalanceState(
+    frame.balanceStateOpt.get is MutBalanceState(
       alphBalance(lockupScript, ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)),
       alphBalance(lockupScript, ALPH.oneNanoAlph)
     )
@@ -1742,7 +1742,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "ApproveToken" in new StatefulInstrFixture {
     val lockupScript = lockupScriptGen.sample.get
     val balanceState =
-      BalanceState.from(
+      MutBalanceState.from(
         tokenBalance(lockupScript, tokenId, ALPH.oneAlph)
       )
     override lazy val frame = prepareFrame(Some(balanceState))
@@ -1755,7 +1755,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(ApproveToken)
 
-    frame.balanceStateOpt.get is BalanceState(
+    frame.balanceStateOpt.get is MutBalanceState(
       tokenBalance(lockupScript, tokenId, ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)),
       tokenBalance(lockupScript, tokenId, ALPH.oneNanoAlph)
     )
@@ -1764,7 +1764,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "AlphRemaining" in new StatefulInstrFixture {
     val lockupScript = lockupScriptGen.sample.get
     val balanceState =
-      BalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
+      MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
     override lazy val frame = prepareFrame(Some(balanceState))
 
     stack.push(Val.Address(lockupScript))
@@ -1778,7 +1778,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "TokenRemaining" in new StatefulInstrFixture {
     val lockupScript = lockupScriptGen.sample.get
     val balanceState =
-      BalanceState.from(
+      MutBalanceState.from(
         tokenBalance(lockupScript, tokenId, ALPH.oneAlph)
       )
     override lazy val frame = prepareFrame(Some(balanceState))
@@ -1797,7 +1797,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       info("Alph")
       val lockupScript = lockupScriptGen.sample.get
       val balanceState =
-        BalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
+        MutBalanceState.from(alphBalance(lockupScript, ALPH.oneAlph))
       val frame = prepareFrame(Some(balanceState))
       val stack = frame.opStack
 
@@ -1820,7 +1820,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       info("Token")
       val lockupScript = lockupScriptGen.sample.get
       val balanceState =
-        BalanceState.from(
+        MutBalanceState.from(
           tokenBalance(lockupScript, tokenId, ALPH.oneAlph)
         )
       val frame = prepareFrame(Some(balanceState))
@@ -1922,7 +1922,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val from = lockupScriptGen.sample.get
     val to   = lockupScriptGen.sample.get
     val balanceState =
-      BalanceState.from(alphBalance(from, ALPH.oneAlph))
+      MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
     override lazy val frame = prepareFrame(Some(balanceState))
 
     stack.push(Val.Address(from))
@@ -1931,8 +1931,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferAlph)
 
-    frame.ctx.outputBalances is Balances(
-      ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
+    frame.ctx.outputBalances is MutBalances(
+      ArrayBuffer((to, MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
 
     stack.push(Val.Address(from))
@@ -1953,7 +1953,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val to   = lockupScriptGen.sample.get
 
     val balanceState =
-      BalanceState.from(alphBalance(from, ALPH.oneAlph))
+      MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
     override lazy val frame =
       prepareFrame(Some(balanceState), Some((contractOutput, contractOutputRef)))
 
@@ -1961,8 +1961,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
     runAndCheckGas(TransferAlphFromSelf)
-    frame.ctx.outputBalances is Balances(
-      ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
+    frame.ctx.outputBalances is MutBalances(
+      ArrayBuffer((to, MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
   }
 
@@ -1971,7 +1971,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val to   = LockupScript.P2C(contractOutputRef.key)
 
     val balanceState =
-      BalanceState.from(alphBalance(from, ALPH.oneAlph))
+      MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
     override lazy val frame =
       prepareFrame(Some(balanceState), Some((contractOutput, contractOutputRef)))
 
@@ -1979,8 +1979,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
     runAndCheckGas(TransferAlphToSelf)
-    frame.ctx.outputBalances is Balances(
-      ArrayBuffer((to, BalancesPerLockup.alph(ALPH.oneNanoAlph)))
+    frame.ctx.outputBalances is MutBalances(
+      ArrayBuffer((to, MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
   }
 
@@ -1988,7 +1988,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val from = lockupScriptGen.sample.get
     val to   = lockupScriptGen.sample.get
     val balanceState =
-      BalanceState.from(
+      MutBalanceState.from(
         tokenBalance(from, tokenId, ALPH.oneAlph)
       )
 
@@ -2001,8 +2001,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferToken)
 
-    frame.ctx.outputBalances is Balances(
-      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
+    frame.ctx.outputBalances is MutBalances(
+      ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
 
@@ -2011,7 +2011,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val to   = lockupScriptGen.sample.get
 
     val balanceState =
-      BalanceState.from(
+      MutBalanceState.from(
         tokenBalance(from, tokenId, ALPH.oneAlph)
       )
 
@@ -2024,8 +2024,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferTokenFromSelf)
 
-    frame.ctx.outputBalances is Balances(
-      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
+    frame.ctx.outputBalances is MutBalances(
+      ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
 
@@ -2034,7 +2034,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val to   = LockupScript.P2C(contractOutputRef.key)
 
     val balanceState =
-      BalanceState.from(
+      MutBalanceState.from(
         tokenBalance(from, tokenId, ALPH.oneAlph)
       )
 
@@ -2047,8 +2047,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     runAndCheckGas(TransferTokenToSelf)
 
-    frame.ctx.outputBalances is Balances(
-      ArrayBuffer((to, BalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
+    frame.ctx.outputBalances is MutBalances(
+      ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
   }
 
@@ -2058,7 +2058,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val fields            = AVector[Val](Val.True)
     val contractBytes     = serialize(contract)
 
-    def balanceState: BalanceState
+    def balanceState: MutBalanceState
 
     override lazy val frame = prepareFrame(
       Some(balanceState),
@@ -2108,7 +2108,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "CreateContract" in new CreateContractAbstractFixture {
     val balanceState =
-      BalanceState(Balances.empty, alphBalance(from, ALPH.oneAlph))
+      MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
 
     stack.push(Val.ByteVec(contractBytes))
     stack.push(Val.ByteVec(serialize(fields)))
@@ -2118,8 +2118,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "CreateContractWithToken" in new CreateContractAbstractFixture {
     val balanceState =
-      BalanceState(
-        Balances.empty,
+      MutBalanceState(
+        MutBalances.empty,
         tokenBalance(from, tokenId, ALPH.oneAlph)
       )
 
@@ -2138,10 +2138,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "check method modifier when creating contract" in new StatefulFixture {
     val from = lockupScriptGen.sample.get
 
-    val preLemanFrame = (balanceState: BalanceState) =>
+    val preLemanFrame = (balanceState: MutBalanceState) =>
       prepareFrame(Some(balanceState))(NetworkConfigFixture.PreLeman)
     val lemanFrame =
-      (balanceState: BalanceState) => prepareFrame(Some(balanceState))(NetworkConfigFixture.Leman)
+      (balanceState: MutBalanceState) =>
+        prepareFrame(Some(balanceState))(NetworkConfigFixture.Leman)
 
     val contract0 = StatefulContract(0, AVector(Method(true, true, true, 0, 0, 0, AVector.empty)))
     val contract1 = StatefulContract(0, AVector(Method(true, false, false, 0, 0, 0, AVector.empty)))
@@ -2150,12 +2151,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     def testModifier(
         instr: Instr[StatefulContext],
-        frameBuilder: BalanceState => Frame[StatefulContext],
+        frameBuilder: MutBalanceState => Frame[StatefulContext],
         contract: StatefulContract,
         succeeded: Boolean
     ) = {
-      val balanceState = BalanceState(Balances.empty, tokenBalance(from, tokenId, ALPH.oneAlph))
-      val frame        = frameBuilder(balanceState)
+      val balanceState =
+        MutBalanceState(MutBalances.empty, tokenBalance(from, tokenId, ALPH.oneAlph))
+      val frame = frameBuilder(balanceState)
       frame.opStack.push(Val.ByteVec(serialize(contract)))
       frame.opStack.push(Val.ByteVec(serialize(AVector.empty[Val])))
       if (instr.isInstanceOf[CreateContractWithToken.type]) {
@@ -2189,7 +2191,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "CopyCreateContract" in new CreateContractAbstractFixture {
     val balanceState =
-      BalanceState(Balances.empty, alphBalance(from, ALPH.oneAlph))
+      MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
 
     stack.push(Val.ByteVec(serialize(Hash.generate)))
     stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
@@ -2202,8 +2204,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "CopyCreateContractWithToken" in new CreateContractAbstractFixture {
     val balanceState =
-      BalanceState(
-        Balances.empty,
+      MutBalanceState(
+        MutBalances.empty,
         tokenBalance(from, tokenId, ALPH.oneAlph)
       )
 
@@ -2235,7 +2237,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val from = LockupScript.P2C(contractOutputRef.key)
 
     val balanceState =
-      BalanceState.from(alphBalance(from, ALPH.oneAlph))
+      MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
     override lazy val frame =
       prepareFrame(
         Some(balanceState),
