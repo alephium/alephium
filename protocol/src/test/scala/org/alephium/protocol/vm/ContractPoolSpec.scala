@@ -170,8 +170,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   it should "use contract assets" in new Fixture
     with TxGenerators
     with GroupConfigFixture.Default
-    with NetworkConfigFixture.Default
-    with CompilerConfigFixture.Default {
+    with NetworkConfigFixture.Default {
     val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
     val contractId = outputRef.key
     val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get

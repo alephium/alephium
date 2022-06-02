@@ -83,8 +83,6 @@ class ParserSpec extends AlephiumSpec {
         FuncId("bar", false),
         List(Variable(Ident("x")))
       )
-    fastparse.parse("foo(?)", StatefulParser.callExpr(_)).get.value is
-      CallExpr(FuncId("foo", false), List(Placeholder[StatefulContext]()))
     fastparse.parse("# ++ #00", StatefulParser.expr(_)).get.value is
       Binop[StatefulContext](
         Concat,
@@ -275,10 +273,6 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse array expression" in {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
-      "a[0][?]" -> Ast.ArrayElement(
-        Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
-        Ast.Placeholder()
-      ),
       "a[0u][1u]" -> Ast.ArrayElement(
         Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
         constantIndex(1)
@@ -315,19 +309,8 @@ class ParserSpec extends AlephiumSpec {
         Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0), constantIndex(1)))),
         Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), constantIndex(0))
       ),
-      "a[?][0] = ?" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Ast.Placeholder(), constantIndex(0)))),
-        Ast.Placeholder()
-      ),
       "a, b = foo()" -> Assign(
         Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
-        CallExpr(FuncId("foo", false), Seq.empty)
-      ),
-      "a, b[?] = foo()" -> Assign(
-        Seq(
-          AssignmentSimpleTarget(Ident("a")),
-          AssignmentArrayElementTarget(Ident("b"), Seq(Placeholder()))
-        ),
         CallExpr(FuncId("foo", false), Seq.empty)
       )
     )
@@ -335,26 +318,6 @@ class ParserSpec extends AlephiumSpec {
     stats.foreach { case (str, ast) =>
       checkParseStat(str, ast)
     }
-  }
-
-  it should "parse loop" in {
-    checkParseStat(
-      "loop(0, 4, 1, x[?] = ?)",
-      Ast.Loop[StatelessContext](
-        0,
-        4,
-        1,
-        Ast.Assign(
-          Seq(
-            Ast.AssignmentArrayElementTarget(
-              Ast.Ident("x"),
-              Seq(Ast.Placeholder[StatelessContext]())
-            )
-          ),
-          Ast.Placeholder[StatelessContext]()
-        )
-      )
-    )
   }
 
   it should "parse event definition" in {

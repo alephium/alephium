@@ -16,7 +16,6 @@
 
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.config.CompilerConfigFixture
 import org.alephium.util.AlephiumSpec
 
 class TypeSpec extends AlephiumSpec {
@@ -58,7 +57,7 @@ class TypeSpec extends AlephiumSpec {
   }
 }
 
-trait TypeSignatureFixture extends CompilerConfigFixture.Default {
+trait TypeSignatureFixture {
   val contractStr =
     s"""
        |TxContract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2]) {

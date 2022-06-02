@@ -33,7 +33,6 @@ import org.alephium.util.U256
 abstract class Parser[Ctx <: StatelessContext] {
   implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] => Lexer.emptyChars(ctx) }
 
-  def placeholder[Unknown: P]: P[Ast.Placeholder[Ctx]] = P("?").map(_ => Ast.Placeholder[Ctx]())
   def const[Unknown: P]: P[Ast.Const[Ctx]] =
     P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address).map(Ast.Const.apply[Ctx])
   def createArray1[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
@@ -76,7 +75,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
   def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = {
     P(
-      "[" ~ (arrayIndexConst | placeholder) ~ "]"
+      "[" ~ arrayIndexConst ~ "]"
     )
   }
 
@@ -238,17 +237,6 @@ abstract class Parser[Ctx <: StatelessContext] {
   def whileStmt[Unknown: P]: P[Ast.While[Ctx]] =
     P(Lexer.keyword("while") ~/ expr ~ block).map { case (expr, block) => Ast.While(expr, block) }
 
-  def loopStmt[Unknown: P]: P[Ast.Loop[Ctx]] =
-    P(
-      Lexer.keyword("loop") ~/ "(" ~
-        nonNegativeNum("loop start") ~ "," ~
-        nonNegativeNum("loop end") ~ "," ~
-        Lexer.num.map(_.intValue()) ~ "," ~
-        statement ~ ")"
-    ).map { case (start, end, step, statement) =>
-      Ast.Loop[Ctx](start, end, step, statement)
-    }
-
   def statement[Unknown: P]: P[Ast.Statement[Ctx]]
 
   def contractArgument[Unknown: P]: P[Ast.Argument] =
@@ -356,10 +344,10 @@ object Parser {
 )
 object StatelessParser extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
-    P(placeholder | const | callExpr | contractConv | variable | parenExpr | arrayExpr)
+    P(const | callExpr | contractConv | variable | parenExpr | arrayExpr)
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
-    P(varDef | assign | funcCall | ifelse | whileStmt | ret | loopStmt)
+    P(varDef | assign | funcCall | ifelse | whileStmt | ret)
 
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
@@ -380,7 +368,7 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      placeholder | const | callExpr | contractCallExpr | contractConv | variable | parenExpr | arrayExpr
+      const | callExpr | contractCallExpr | contractConv | variable | parenExpr | arrayExpr
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.ContractCallExpr] =
@@ -393,7 +381,7 @@ object StatefulParser extends Parser[StatefulContext] {
       .map { case (obj, (callId, exprs)) => Ast.ContractCall(obj, callId, exprs) }
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
-    P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret | emitEvent | loopStmt)
+    P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret | emitEvent)
 
   def contractParams[Unknown: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
 

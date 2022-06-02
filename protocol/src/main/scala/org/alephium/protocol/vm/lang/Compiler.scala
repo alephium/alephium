@@ -20,7 +20,6 @@ import scala.collection.{immutable, mutable}
 
 import fastparse.Parsed
 
-import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Ast.MultiTxContract
 import org.alephium.util.AVector
@@ -28,11 +27,11 @@ import org.alephium.util.AVector
 object Compiler {
   def compileAssetScript(
       input: String
-  )(implicit config: CompilerConfig): Either[Error, StatelessScript] =
+  ): Either[Error, StatelessScript] =
     try {
       fastparse.parse(input, StatelessParser.assetScript(_)) match {
         case Parsed.Success(script, _) =>
-          val state = State.buildFor(config, script)
+          val state = State.buildFor(script)
           Right(script.genCode(state))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
@@ -41,45 +40,35 @@ object Compiler {
       case e: Error => Left(e)
     }
 
-  def compileTxScript(input: String)(implicit
-      config: CompilerConfig
-  ): Either[Error, StatefulScript] =
+  def compileTxScript(input: String): Either[Error, StatefulScript] =
     compileTxScript(input, 0)
 
-  def compileTxScript(input: String, index: Int)(implicit
-      config: CompilerConfig
-  ): Either[Error, StatefulScript] =
+  def compileTxScript(input: String, index: Int): Either[Error, StatefulScript] =
     compileTxScriptFull(input, index).map(_._1)
 
-  def compileTxScriptFull(input: String)(implicit
-      config: CompilerConfig
-  ): Either[Error, (StatefulScript, Ast.TxScript)] =
+  def compileTxScriptFull(input: String): Either[Error, (StatefulScript, Ast.TxScript)] =
     compileTxScriptFull(input, 0)
 
-  def compileTxScriptFull(input: String, index: Int)(implicit
-      config: CompilerConfig
+  def compileTxScriptFull(
+      input: String,
+      index: Int
   ): Either[Error, (StatefulScript, Ast.TxScript)] =
-    compileStateful(input, _.genStatefulScript(config, index))
+    compileStateful(input, _.genStatefulScript(index))
 
-  def compileContract(input: String)(implicit
-      config: CompilerConfig
-  ): Either[Error, StatefulContract] =
+  def compileContract(input: String): Either[Error, StatefulContract] =
     compileContract(input, 0)
 
-  def compileContract(input: String, index: Int)(implicit
-      config: CompilerConfig
-  ): Either[Error, StatefulContract] =
+  def compileContract(input: String, index: Int): Either[Error, StatefulContract] =
     compileContractFull(input, index).map(_._1)
 
-  def compileContractFull(input: String)(implicit
-      config: CompilerConfig
-  ): Either[Error, (StatefulContract, Ast.TxContract)] =
+  def compileContractFull(input: String): Either[Error, (StatefulContract, Ast.TxContract)] =
     compileContractFull(input, 0)
 
-  def compileContractFull(input: String, index: Int)(implicit
-      config: CompilerConfig
+  def compileContractFull(
+      input: String,
+      index: Int
   ): Either[Error, (StatefulContract, Ast.TxContract)] =
-    compileStateful(input, _.genStatefulContract(config, index))
+    compileStateful(input, _.genStatefulContract(index))
 
   private def compileStateful[T](input: String, genCode: MultiTxContract => T): Either[Error, T] = {
     try {
@@ -205,9 +194,8 @@ object Compiler {
   object State {
     private val maxVarIndex: Int = 0xff
 
-    def buildFor(config: CompilerConfig, script: Ast.AssetScript): State[StatelessContext] =
+    def buildFor(script: Ast.AssetScript): State[StatelessContext] =
       StateForScript(
-        config,
         mutable.HashMap.empty,
         Ast.FuncId.empty,
         0,
@@ -217,7 +205,6 @@ object Compiler {
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def buildFor(
-        config: CompilerConfig,
         multiContract: MultiTxContract,
         contractIndex: Int
     ): State[StatefulContext] = {
@@ -225,7 +212,6 @@ object Compiler {
       val contract       = multiContract.get(contractIndex)
       StateForContract(
         contract.isInstanceOf[Ast.TxScript],
-        config,
         mutable.HashMap.empty,
         Ast.FuncId.empty,
         0,
@@ -238,7 +224,6 @@ object Compiler {
 
   // scalastyle:off number.of.methods
   sealed trait State[Ctx <: StatelessContext] {
-    def config: CompilerConfig
     def varTable: mutable.HashMap[String, VarInfo]
     var scope: Ast.FuncId
     var varIndex: Int
@@ -448,7 +433,6 @@ object Compiler {
 
   type Contract[Ctx <: StatelessContext] = immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
   final case class StateForScript(
-      config: CompilerConfig,
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
       var varIndex: Int,
@@ -485,7 +469,6 @@ object Compiler {
 
   final case class StateForContract(
       isTxScript: Boolean,
-      config: CompilerConfig,
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
       var varIndex: Int,

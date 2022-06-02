@@ -46,7 +46,6 @@ class ServerUtils(implicit
     consensusConfig: ConsensusConfig,
     networkConfig: NetworkConfig,
     apiConfig: ApiConfig,
-    compilerConfig: CompilerConfig,
     logConfig: LogConfig,
     executionContext: ExecutionContext
 ) extends StrictLogging {
@@ -1070,7 +1069,7 @@ object ServerUtils {
       initialState: Option[String],
       alphAmount: U256,
       newTokenAmount: Option[U256]
-  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
+  ): Try[StatefulScript] = {
     parseState(initialState).flatMap { state =>
       buildDeployContractTxWithParsedState(codeRaw, address, state, alphAmount, newTokenAmount)
     }
@@ -1082,7 +1081,7 @@ object ServerUtils {
       initialFields: AVector[vm.Val],
       initialAlphAmount: U256,
       newTokenAmount: Option[U256]
-  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
+  ): Try[StatefulScript] = {
     buildDeployContractTxWithParsedState(
       Hex.toHexString(serialize(contract)),
       address,
@@ -1098,7 +1097,7 @@ object ServerUtils {
       initialFields: AVector[vm.Val],
       initialAlphAmount: U256,
       newTokenAmount: Option[U256]
-  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
+  ): Try[StatefulScript] = {
     val stateRaw = Hex.toHexString(serialize(initialFields))
     val creation = newTokenAmount match {
       case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"

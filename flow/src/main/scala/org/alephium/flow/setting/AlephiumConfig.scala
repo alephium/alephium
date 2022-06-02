@@ -193,8 +193,6 @@ object Allocation {
 
 final case class GenesisSetting(allocations: AVector[Allocation])
 
-final case class CompilerSetting(loopUnrollingLimit: Int) extends CompilerConfig
-
 final case class AlephiumConfig(
     broker: BrokerSetting,
     consensus: ConsensusSetting,
@@ -204,8 +202,7 @@ final case class AlephiumConfig(
     mempool: MemPoolSetting,
     wallet: WalletSetting,
     node: NodeSetting,
-    genesis: GenesisSetting,
-    compiler: CompilerSetting
+    genesis: GenesisSetting
 ) {
   lazy val genesisBlocks: AVector[AVector[Block]] =
     Configs.loadBlockFlow(genesis.allocations)(
@@ -335,8 +332,7 @@ object AlephiumConfig {
       mempool: MemPoolSetting,
       wallet: WalletSetting,
       node: NodeSetting,
-      genesis: GenesisSetting,
-      compiler: CompilerSetting
+      genesis: GenesisSetting
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
       parseMiners(mining.minerAddresses)(broker).map { minerAddresses =>
@@ -351,8 +347,7 @@ object AlephiumConfig {
           mempool,
           wallet,
           node,
-          genesis,
-          compiler
+          genesis
         )
       } match {
         case Right(value) => value
@@ -372,8 +367,7 @@ object AlephiumConfig {
         as[MemPoolSetting]("mempool"),
         as[WalletSetting]("wallet"),
         as[NodeSetting]("node"),
-        as[GenesisSetting]("genesis"),
-        as[CompilerSetting]("compiler")
+        as[GenesisSetting]("genesis")
       ).toAlephiumConfig
     }
 
