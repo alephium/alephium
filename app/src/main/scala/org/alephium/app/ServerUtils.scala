@@ -1130,7 +1130,7 @@ object ServerUtils {
         .map { token =>
           s"approveToken!(@${address.toBase58}, #${token.id.toHexString}, ${token.amount.v})"
         }
-        .mkString("\n  ")
+        .mkString(s"${System.lineSeparator()}  ")
 
       s"""
          |TxScript Main {
