@@ -132,7 +132,10 @@ object Compiler {
     final case class Template(tpe: Type, index: Int) extends VarInfo {
       def isMutable: Boolean = false
     }
-    final case class ArrayRef(isMutable: Boolean, ref: ArrayTransformer.ArrayRef) extends VarInfo {
+    final case class ArrayRef[Ctx <: StatelessContext](
+        isMutable: Boolean,
+        ref: ArrayTransformer.ArrayRef[Ctx]
+    ) extends VarInfo {
       def tpe: Type = ref.tpe
     }
   }
@@ -194,6 +197,43 @@ object Compiler {
   object State {
     private val maxVarIndex: Int = 0xff
 
+    // scalastyle:off cyclomatic.complexity
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    // we have checked the index type(U256)
+    def getConstantIndex[Ctx <: StatelessContext](index: Ast.Expr[Ctx]): Ast.Expr[Ctx] = {
+      index match {
+        case e: Ast.Const[Ctx @unchecked] => e
+        case Ast.Binop(op: ArithOperator, Ast.Const(Val.U256(l)), Ast.Const(Val.U256(r))) =>
+          op match {
+            case ArithOperator.Add =>
+              Ast.Const(Val.U256(l.add(r).getOrElse(throw Compiler.Error("Invalid array index"))))
+            case ArithOperator.Sub =>
+              Ast.Const(Val.U256(l.sub(r).getOrElse(throw Compiler.Error("Invalid array index"))))
+            case ArithOperator.Mul =>
+              Ast.Const(Val.U256(l.mul(r).getOrElse(throw Compiler.Error("Invalid array index"))))
+            case ArithOperator.Div =>
+              Ast.Const(Val.U256(l.div(r).getOrElse(throw Compiler.Error("Invalid array index"))))
+            case ArithOperator.Mod =>
+              Ast.Const(Val.U256(l.mod(r).getOrElse(throw Compiler.Error("Invalid array index"))))
+            case ArithOperator.ModAdd => Ast.Const(Val.U256(l.modAdd(r)))
+            case ArithOperator.ModSub => Ast.Const(Val.U256(l.modSub(r)))
+            case ArithOperator.ModMul => Ast.Const(Val.U256(l.modMul(r)))
+            case ArithOperator.SHL    => Ast.Const(Val.U256(l.shl(r)))
+            case ArithOperator.SHR    => Ast.Const(Val.U256(l.shr(r)))
+            case ArithOperator.BitAnd => Ast.Const(Val.U256(l.bitAnd(r)))
+            case ArithOperator.BitOr  => Ast.Const(Val.U256(l.bitOr(r)))
+            case ArithOperator.Xor    => Ast.Const(Val.U256(l.xor(r)))
+            case _ =>
+              throw new RuntimeException("Dead branch") // https://github.com/scala/bug/issues/9677
+          }
+        case e @ Ast.Binop(op, left, right) =>
+          val expr = Ast.Binop(op, getConstantIndex(left), getConstantIndex(right))
+          if (expr == e) expr else getConstantIndex(expr)
+        case _ => index
+      }
+    }
+    // scalastyle:on cyclomatic.complexity
+
     def buildFor(script: Ast.AssetScript): State[StatelessContext] =
       StateForScript(
         mutable.HashMap.empty,
@@ -242,22 +282,20 @@ object Compiler {
       Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Recursion")
     )
     def getOrCreateArrayRef(
-        expr: Ast.Expr[Ctx],
-        isMutable: Boolean
-    ): (ArrayTransformer.ArrayRef, Seq[Instr[Ctx]]) = {
+        expr: Ast.Expr[Ctx]
+    ): (ArrayTransformer.ArrayRef[Ctx], Seq[Instr[Ctx]]) = {
       expr match {
         case Ast.ArrayElement(array, index) =>
-          val idx               = Ast.getConstantArrayIndex(index)
-          val (arrayRef, codes) = getOrCreateArrayRef(array, isMutable)
-          val subArrayRef       = arrayRef.subArray(idx)
-          (subArrayRef, codes)
+          val (arrayRef, codes0)    = getOrCreateArrayRef(array)
+          val (codes1, subArrayRef) = arrayRef.subArray(index, this)
+          (subArrayRef, codes0 ++ codes1)
         case Ast.Variable(ident)  => (getArrayRef(ident), Seq.empty)
-        case Ast.ParenExpr(inner) => getOrCreateArrayRef(inner, isMutable)
+        case Ast.ParenExpr(inner) => getOrCreateArrayRef(inner)
         case _ =>
           val arrayType = expr.getType(this)(0).asInstanceOf[Type.FixedSizeArray]
           val arrayRef =
-            ArrayTransformer.init(this, arrayType, freshName(), isMutable, VarInfo.Local)
-          val codes = expr.genCode(this) ++ arrayRef.vars.flatMap(genStoreCode).reverse
+            ArrayTransformer.init(this, arrayType, freshName(), false, true, VarInfo.Local)
+          val codes = expr.genCode(this) ++ arrayRef.genStoreCode(this).reverse.flatten
           (arrayRef, codes)
       }
     }
@@ -265,16 +303,16 @@ object Compiler {
     def addArrayRef(
         ident: Ast.Ident,
         isMutable: Boolean,
-        arrayRef: ArrayTransformer.ArrayRef
+        arrayRef: ArrayTransformer.ArrayRef[Ctx]
     ): Unit = {
       val sname = checkNewVariable(ident)
       varTable(sname) = VarInfo.ArrayRef(isMutable, arrayRef)
     }
 
-    def getArrayRef(ident: Ast.Ident): ArrayTransformer.ArrayRef = {
+    def getArrayRef(ident: Ast.Ident): ArrayTransformer.ArrayRef[Ctx] = {
       getVariable(ident) match {
-        case info: VarInfo.ArrayRef => info.ref
-        case _                      => throw Error(s"Array $ident does not exist")
+        case info: VarInfo.ArrayRef[Ctx @unchecked] => info.ref
+        case _                                      => throw Error(s"Array $ident does not exist")
       }
     }
 
@@ -300,21 +338,22 @@ object Compiler {
       }
     }
     def addFieldVariable(ident: Ast.Ident, tpe: Type, isMutable: Boolean): Unit = {
-      addVariable(ident, tpe, isMutable, VarInfo.Field)
+      addVariable(ident, tpe, isMutable, false, VarInfo.Field)
     }
     def addLocalVariable(ident: Ast.Ident, tpe: Type, isMutable: Boolean): Unit = {
-      addVariable(ident, tpe, isMutable, VarInfo.Local)
+      addVariable(ident, tpe, isMutable, true, VarInfo.Local)
     }
     def addVariable(
         ident: Ast.Ident,
         tpe: Type,
         isMutable: Boolean,
+        isLocal: Boolean,
         varInfoBuild: (Type, Boolean, Byte) => VarInfo
     ): Unit = {
       val sname = checkNewVariable(ident)
       tpe match {
         case t: Type.FixedSizeArray =>
-          ArrayTransformer.init(this, t, ident.name, isMutable, varInfoBuild)
+          ArrayTransformer.init(this, t, ident.name, isMutable, isLocal, varInfoBuild)
           ()
         case c: Type.Contract =>
           val varType = Type.Contract.local(c.id, ident)
@@ -358,9 +397,36 @@ object Compiler {
         .sortBy(_.index)
     }
 
+    def checkArrayIndexType(index: Ast.Expr[Ctx]): Unit = {
+      index.getType(this) match {
+        case Seq(Type.U256) =>
+        case tpe            => throw Compiler.Error(s"Invalid array index type $tpe")
+      }
+    }
+
+    def getAndCheckConstantIndex(index: Ast.Expr[Ctx]): Option[Int] = {
+      State.getConstantIndex(index) match {
+        case Ast.Const(Val.U256(v)) =>
+          val idx = v.toInt.getOrElse(throw Compiler.Error(s"Invalid array index: $v"))
+          checkConstantIndex(idx)
+          Some(idx)
+        case _ => None
+      }
+    }
+
+    def checkConstantIndex(index: Int): Unit = {
+      if (index < 0 || index >= State.maxVarIndex) {
+        throw Error(s"Invalid array index $index")
+      }
+    }
+
     def genLoadCode(ident: Ast.Ident): Seq[Instr[Ctx]]
 
-    def genStoreCode(ident: Ast.Ident): Seq[Instr[Ctx]]
+    def genLoadCode(index: Ast.Expr[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
+
+    def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[Ctx]]]
+
+    def genStoreCode(index: Ast.Expr[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
 
     def getType(ident: Ast.Ident): Type = getVariable(ident).tpe
 
@@ -446,23 +512,52 @@ object Compiler {
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
 
+    private def genVarIndexCode(
+        index: Ast.Expr[StatelessContext],
+        isLocal: Boolean,
+        constantIndex: Byte => Instr[StatelessContext],
+        varIndex: Instr[StatelessContext]
+    ): Seq[Instr[StatelessContext]] = {
+      if (!isLocal) {
+        throw Error(s"Script should not have fields")
+      }
+
+      getAndCheckConstantIndex(index) match {
+        case Some(idx) => Seq(constantIndex(idx.toByte))
+        case None      => index.genCode(this) :+ varIndex
+      }
+    }
+
+    def genLoadCode(
+        index: Ast.Expr[StatelessContext],
+        isLocal: Boolean
+    ): Seq[Instr[StatelessContext]] =
+      genVarIndexCode(index, isLocal, LoadLocal.apply, LoadLocalByIndex)
+
+    def genStoreCode(
+        index: Ast.Expr[StatelessContext],
+        isLocal: Boolean
+    ): Seq[Instr[StatelessContext]] =
+      genVarIndexCode(index, isLocal, StoreLocal.apply, StoreLocalByIndex)
+
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatelessContext]] = {
       getVariable(ident) match {
         case _: VarInfo.Field    => throw Error("Script should not have fields")
         case v: VarInfo.Local    => Seq(LoadLocal(v.index))
         case v: VarInfo.Template => Seq(TemplateVariable(ident.name, v.tpe.toVal, v.index))
-        case _: VarInfo.ArrayRef => getArrayRef(ident).vars.flatMap(genLoadCode)
+        case _: VarInfo.ArrayRef[StatelessContext @unchecked] =>
+          getArrayRef(ident).genLoadCode(this)
       }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def genStoreCode(ident: Ast.Ident): Seq[Instr[StatelessContext]] = {
+    def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[StatelessContext]]] = {
       getVariable(ident) match {
-        case _: VarInfo.Field      => throw Error("Script should not have fields")
-        case v: VarInfo.Local      => Seq(StoreLocal(v.index))
-        case _: VarInfo.Template   => throw Error(s"Unexpected template variable: ${ident.name}")
-        case ref: VarInfo.ArrayRef => ref.ref.vars.flatMap(genStoreCode)
+        case _: VarInfo.Field    => throw Error("Script should not have fields")
+        case v: VarInfo.Local    => Seq(Seq(StoreLocal(v.index)))
+        case _: VarInfo.Template => throw Error(s"Unexpected template variable: ${ident.name}")
+        case ref: VarInfo.ArrayRef[StatelessContext @unchecked] => ref.ref.genStoreCode(this)
       }
     }
   }
@@ -481,6 +576,50 @@ object Compiler {
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
 
+    private def genVarIndexCode(
+        index: Ast.Expr[StatefulContext],
+        isLocal: Boolean,
+        localConstantIndex: Byte => Instr[StatefulContext],
+        fieldConstantIndex: Byte => Instr[StatefulContext],
+        localVarIndex: Instr[StatefulContext],
+        fieldVarIndex: Instr[StatefulContext]
+    ): Seq[Instr[StatefulContext]] = {
+      getAndCheckConstantIndex(index) match {
+        case Some(idx) =>
+          val index = idx.toByte
+          if (isLocal) Seq(localConstantIndex(index)) else Seq(fieldConstantIndex(index))
+        case None =>
+          val loadInstr = if (isLocal) localVarIndex else fieldVarIndex
+          index.genCode(this) :+ loadInstr
+      }
+    }
+
+    def genLoadCode(
+        index: Ast.Expr[StatefulContext],
+        isLocal: Boolean
+    ): Seq[Instr[StatefulContext]] =
+      genVarIndexCode(
+        index,
+        isLocal,
+        LoadLocal.apply,
+        LoadField.apply,
+        LoadLocalByIndex,
+        LoadFieldByIndex
+      )
+
+    def genStoreCode(
+        index: Ast.Expr[StatefulContext],
+        isLocal: Boolean
+    ): Seq[Instr[StatefulContext]] =
+      genVarIndexCode(
+        index,
+        isLocal,
+        StoreLocal.apply,
+        StoreField.apply,
+        StoreLocalByIndex,
+        StoreFieldByIndex
+      )
+
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
       val varInfo = getVariable(ident)
@@ -488,17 +627,17 @@ object Compiler {
         case v: VarInfo.Field    => Seq(LoadField(v.index))
         case v: VarInfo.Local    => Seq(LoadLocal(v.index))
         case v: VarInfo.Template => Seq(TemplateVariable(ident.name, varInfo.tpe.toVal, v.index))
-        case _: VarInfo.ArrayRef => getArrayRef(ident).vars.flatMap(genLoadCode)
+        case _: VarInfo.ArrayRef[StatefulContext @unchecked] => getArrayRef(ident).genLoadCode(this)
       }
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def genStoreCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
+    def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[StatefulContext]]] = {
       getVariable(ident) match {
-        case v: VarInfo.Field      => Seq(StoreField(v.index))
-        case v: VarInfo.Local      => Seq(StoreLocal(v.index))
-        case _: VarInfo.Template   => throw Error(s"Unexpected template variable: ${ident.name}")
-        case ref: VarInfo.ArrayRef => ref.ref.vars.flatMap(genStoreCode)
+        case v: VarInfo.Field    => Seq(Seq(StoreField(v.index)))
+        case v: VarInfo.Local    => Seq(Seq(StoreLocal(v.index)))
+        case _: VarInfo.Template => throw Error(s"Unexpected template variable: ${ident.name}")
+        case ref: VarInfo.ArrayRef[StatefulContext @unchecked] => ref.ref.genStoreCode(this)
       }
     }
   }

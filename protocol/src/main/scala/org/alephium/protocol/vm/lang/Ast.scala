@@ -96,6 +96,7 @@ object Ast {
   final case class ArrayElement[Ctx <: StatelessContext](array: Expr[Ctx], index: Ast.Expr[Ctx])
       extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      state.checkArrayIndexType(index)
       array.getType(state) match {
         case Seq(Type.FixedSizeArray(baseType, _)) => Seq(baseType)
         case tpe =>
@@ -104,14 +105,8 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val idx               = getConstantArrayIndex(index)
-      val (arrayRef, codes) = state.getOrCreateArrayRef(array, isMutable = false)
-      if (arrayRef.isMultiDim()) {
-        codes ++ arrayRef.subArray(idx).vars.flatMap(state.genLoadCode)
-      } else {
-        val ident = arrayRef.getVariable(idx)
-        codes ++ state.genLoadCode(ident)
-      }
+      val (arrayRef, codes) = state.getOrCreateArrayRef(array)
+      codes ++ arrayRef.genLoadCode(index, state)
     }
   }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
@@ -251,7 +246,7 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      value.genCode(state) ++ idents.flatMap(p => state.genStoreCode(p._2)).reverse
+      value.genCode(state) ++ idents.flatMap(p => state.genStoreCode(p._2)).reverse.flatten
     }
   }
 
@@ -357,31 +352,32 @@ object Ast {
   }
 
   sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
-    def name: String
-    def getVariables(state: Compiler.State[Ctx]): Seq[Ident]
+    def ident: Ident
+    def isMutable(state: Compiler.State[Ctx]): Boolean = state.getVariable(ident).isMutable
+    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
   }
   final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
       extends AssignmentTarget[Ctx] {
-    def name: String = ident.name
-
-    def _getType(state: Compiler.State[Ctx]): Type = state.getVariable(ident).tpe
-    def getVariables(state: Compiler.State[Ctx]): Seq[Ident] =
-      if (getType(state).isArrayType) state.getArrayRef(ident).vars else Seq(ident)
+    def _getType(state: Compiler.State[Ctx]): Type                 = state.getVariable(ident).tpe
+    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
   }
   final case class AssignmentArrayElementTarget[Ctx <: StatelessContext](
       ident: Ident,
       indexes: Seq[Ast.Expr[Ctx]]
   ) extends AssignmentTarget[Ctx] {
-    def name: String = ident.name
-
     @scala.annotation.tailrec
-    private def elementType(indexes: Seq[Ast.Expr[Ctx]], tpe: Type): Type = {
+    private def elementType(
+        state: Compiler.State[Ctx],
+        indexes: Seq[Ast.Expr[Ctx]],
+        tpe: Type
+    ): Type = {
       if (indexes.isEmpty) {
         tpe
       } else {
+        state.checkArrayIndexType(indexes(0))
         tpe match {
           case arrayType: Type.FixedSizeArray =>
-            elementType(indexes.drop(1), arrayType.baseType)
+            elementType(state, indexes.drop(1), arrayType.baseType)
           case _ =>
             throw Compiler.Error(s"Invalid assignment to array: ${ident.name}")
         }
@@ -389,17 +385,26 @@ object Ast {
     }
 
     def _getType(state: Compiler.State[Ctx]): Type = {
-      elementType(indexes, state.getVariable(ident).tpe)
+      elementType(state, indexes, state.getVariable(ident).tpe)
     }
 
-    def getVariables(state: Compiler.State[Ctx]): Seq[Ident] = {
-      val arrayRef = state.getArrayRef(ident)
-      val idxes    = indexes.map(getConstantArrayIndex)
-      getType(state) match {
-        case _: Type.FixedSizeArray => arrayRef.subArray(idxes).vars
-        case _                      => Seq(arrayRef.getVariable(idxes))
+    @scala.annotation.tailrec
+    private def genStore(
+        arrayRef: ArrayTransformer.ArrayRef[Ctx],
+        indexes: Seq[Expr[Ctx]],
+        state: Compiler.State[Ctx],
+        checkCodes: Seq[Instr[Ctx]]
+    ): Seq[Seq[Instr[Ctx]]] = {
+      if (indexes.length == 1) {
+        arrayRef.genStoreCode(indexes(0), state) :+ checkCodes
+      } else {
+        val (checkCode, subArrayRef) = arrayRef.subArray(indexes(0), state)
+        genStore(subArrayRef, indexes.drop(1), state, checkCodes ++ checkCode)
       }
     }
+
+    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] =
+      genStore(state.getArrayRef(ident), indexes, state, Seq.empty)
   }
 
   final case class EventDef(
@@ -449,18 +454,14 @@ object Ast {
         throw Compiler.Error(s"Assign $rightTypes to $leftTypes")
       }
       targets.foreach { target =>
-        target.getVariables(state).foreach { ident =>
-          if (!state.getVariable(ident).isMutable) {
-            throw Compiler.Error(s"Assign to immutable variable: ${target.name}")
-          }
+        if (!target.isMutable(state)) {
+          throw Compiler.Error(s"Assign to immutable variable: ${target.ident.name}")
         }
       }
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val variables  = targets.flatMap(_.getVariables(state))
-      val storeCodes = variables.flatMap(state.genStoreCode).reverse
-      rhs.genCode(state) ++ storeCodes
+      rhs.genCode(state) ++ targets.flatMap(_.genStore(state)).reverse.flatten
     }
   }
   final case class FuncCall[Ctx <: StatelessContext](id: FuncId, args: Seq[Expr[Ctx]])

@@ -20,7 +20,6 @@ import fastparse._
 
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.protocol.vm.lang.Ast.{Annotation, Argument, FuncId, Statement}
-import org.alephium.util.U256
 
 // scalastyle:off number.of.methods
 @SuppressWarnings(
@@ -65,19 +64,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     idx
   }
 
-  def arrayIndexConst[Unknown: P]: P[Ast.Expr[Ctx]] = {
-    (nonNegativeNum("arrayIndex") ~ "u".?).map { v =>
-      if (v > 0xff) {
-        throw Compiler.Error(s"Array index too big: ${v}")
-      }
-      Ast.Const[Ctx](Val.U256(U256.unsafe(v)))
-    }
-  }
-  def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = {
-    P(
-      "[" ~ arrayIndexConst ~ "]"
-    )
-  }
+  def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = P("[" ~ expr ~ "]")
 
   // Optimize chained comparisons
   def expr[Unknown: P]: P[Ast.Expr[Ctx]]         = P(chain(andExpr, Lexer.opOr))

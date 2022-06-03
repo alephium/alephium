@@ -930,8 +930,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(13, AVector.empty, AVector(Val.True))
   }
 
-  // FIXME: fix this test
-  ignore should "test contract array fields" in new TestContractMethodFixture {
+  it should "test contract array fields" in new TestContractMethodFixture {
     val code =
       s"""
          |TxContract Foo(
@@ -939,13 +938,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  mut x: U256
          |) {
          |  fn foo0(a: [U256; 2], b: [U256; 2]) -> () {
-         |    loop(0, 2, 1, assert!(a[?] == b[?]))
+         |    let mut i = 0
+         |    while (i < 2) {
+         |      assert!(a[i] == b[i])
+         |      i = i + 1
+         |    }
          |    return
          |  }
          |
          |  pub fn test1(a: [[U256; 2]; 4]) -> () {
          |    array = a
-         |    loop(0, 4, 1, foo0(array[?], a[?]))
+         |    let mut i = 0
+         |    while (i < 4) {
+         |      foo0(array[i], a[i])
+         |      i = i + 1
+         |    }
          |    return
          |  }
          |
@@ -1061,8 +1068,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     codes.foreach(Compiler.compileContract(_).isLeft is true)
   }
 
-  // FIXME: fix this test
-  ignore should "test return multiple values" in new TestContractMethodFixture {
+  it should "test return multiple values" in new TestContractMethodFixture {
     val code: String =
       s"""
          |TxContract Foo(mut array: [U256; 3]) {
@@ -1100,15 +1106,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |
          |  pub fn foo2(value: U256) -> ([U256; 3], U256) {
-         |    loop(0, 3, 1, array[?] = array[?] + value)
+         |    let mut i = 0
+         |    while (i < 3) {
+         |      array[i] = array[i] + value
+         |      i = i + 1
+         |    }
          |    return array, value
          |  }
          |
-         |  pub fn test6() -> (Bool) {
+         |  pub fn test6() -> Bool {
          |    array = [1, 2, 3]
          |    let mut x = [[0; 3]; 3]
          |    let mut y = [0; 3]
-         |    loop(0, 3, 1, x[?], y[?] = foo2(?))
+         |    let mut i = 0
+         |    while (i < 3) {
+         |      x[i], y[i] = foo2(i)
+         |      i = i + 1
+         |    }
          |    return x[0][0] == 1 &&
          |           x[0][1] == 2 &&
          |           x[0][2] == 3 &&
@@ -1130,9 +1144,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn test8() -> () {
          |    let (mut a, mut b, c) = foo3()
          |    assert!(b == 1 && c == 1 && a[0] == 1 && a[1] == 1)
-         |    b = 2
-         |    loop(0, 2, 1, a[?] = ?)
-         |    assert!(b == 2 && a[0] == 0 && a[1] == 1)
+         |    let mut i = 0
+         |    while (i < 2) {
+         |      a[i] = i
+         |      i = i + 1
+         |    }
+         |    assert!(a[0] == 0 && a[1] == 1)
          |    return
          |  }
          |}

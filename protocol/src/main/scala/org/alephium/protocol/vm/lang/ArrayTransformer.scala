@@ -16,8 +16,9 @@
 
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.vm.StatelessContext
+import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Ast.Ident
+import org.alephium.util.U256
 
 object ArrayTransformer {
   @inline def arrayVarName(baseName: String, idx: Int): String = s"_$baseName-$idx"
@@ -27,10 +28,12 @@ object ArrayTransformer {
       tpe: Type.FixedSizeArray,
       baseName: String,
       isMutable: Boolean,
+      isLocal: Boolean,
       varInfoBuild: (Type, Boolean, Byte) => Compiler.VarInfo
-  ): ArrayRef = {
-    val vars = initArrayVars(state, tpe, baseName, isMutable, varInfoBuild)
-    val ref  = ArrayRef(tpe, vars)
+  ): ArrayRef[Ctx] = {
+    val varIndexOffset = Ast.Const[Ctx](Val.U256(U256.unsafe(state.varIndex)))
+    initArrayVars(state, tpe, baseName, isMutable, isLocal, varInfoBuild)
+    val ref = ArrayRef[Ctx](isLocal, tpe, varIndexOffset)
     state.addArrayRef(Ident(baseName), isMutable, ref)
     ref
   }
@@ -41,18 +44,19 @@ object ArrayTransformer {
       tpe: Type.FixedSizeArray,
       baseName: String,
       isMutable: Boolean,
+      isLocal: Boolean,
       varInfoBuild: (Type, Boolean, Byte) => Compiler.VarInfo
-  ): Seq[Ast.Ident] = {
+  ): Unit = {
     tpe.baseType match {
       case baseType: Type.FixedSizeArray =>
-        (0 until tpe.size).flatMap { idx =>
+        (0 until tpe.size).foreach { idx =>
           val newBaseName = arrayVarName(baseName, idx)
-          initArrayVars(state, baseType, newBaseName, isMutable, varInfoBuild)
+          initArrayVars(state, baseType, newBaseName, isMutable, isLocal, varInfoBuild)
         }
       case baseType =>
-        (0 until tpe.size).map { idx =>
+        (0 until tpe.size).foreach { idx =>
           val ident = Ast.Ident(arrayVarName(baseName, idx))
-          state.addVariable(ident, baseType, isMutable, varInfoBuild)
+          state.addVariable(ident, baseType, isMutable, isLocal, varInfoBuild)
           ident
         }
     }
@@ -73,43 +77,94 @@ object ArrayTransformer {
     }
   }
 
-  final case class ArrayRef(tpe: Type.FixedSizeArray, vars: Seq[Ast.Ident]) {
-    def isMultiDim(): Boolean = tpe.size != tpe.flattenSize()
+  final case class ArrayRef[Ctx <: StatelessContext](
+      isLocal: Boolean,
+      tpe: Type.FixedSizeArray,
+      varIndexOffset: Ast.Expr[Ctx]
+  ) {
+    private def checkVarIndex(index: Ast.Expr[Ctx], state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      state.getAndCheckConstantIndex(index) match {
+        case Some(idx) =>
+          checkArrayIndex(idx, tpe.size)
+          Seq.empty[Instr[Ctx]]
+        case _ =>
+          index.genCode(state) ++ Seq(
+            ConstInstr.u256(Val.U256(U256.unsafe(tpe.size))),
+            U256Lt,
+            Assert
+          )
+      }
+    }
 
-    def subArray(index: Int): ArrayRef = {
+    def subArray(
+        index: Ast.Expr[Ctx],
+        state: Compiler.State[Ctx]
+    ): (Seq[Instr[Ctx]], ArrayRef[Ctx]) = {
       tpe.baseType match {
         case baseType: Type.FixedSizeArray =>
-          checkArrayIndex(index, tpe.size)
           val length = baseType.flattenSize()
-          val offset = index * length
-          ArrayRef(baseType, vars.slice(offset, offset + length))
+          val size   = Ast.Binop(ArithOperator.Mul, index, Ast.Const(Val.U256(U256.unsafe(length))))
+          val offset = Ast.Binop(ArithOperator.Add, varIndexOffset, size)
+          val checkCode = checkVarIndex(index, state)
+          (checkCode, ArrayRef(isLocal, baseType, offset))
         case _ =>
           throw Compiler.Error(s"Expect multi-dimension array type, have $tpe")
       }
     }
 
-    @scala.annotation.tailrec
-    def subArray(indexes: Seq[Int]): ArrayRef = {
-      if (indexes.isEmpty) {
-        this
-      } else {
-        subArray(indexes(0)).subArray(indexes.drop(1))
+    def genLoadCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      tpe.baseType match {
+        case _: Type.FixedSizeArray =>
+          (0 until tpe.size).flatMap { index =>
+            val indexAst = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
+            genLoadCode(indexAst, state)
+          }
+        case _ =>
+          (0 until tpe.size).flatMap { index =>
+            val indexAst = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
+            genLoadCode(indexAst, state)
+          }
       }
     }
 
-    @scala.annotation.tailrec
-    def getVariable(indexes: Seq[Int]): Ast.Ident = {
-      assume(indexes.nonEmpty)
-      if (indexes.size == 1) {
-        getVariable(indexes(0))
-      } else {
-        subArray(indexes(0)).getVariable(indexes.drop(1))
+    def genLoadCode(index: Ast.Expr[Ctx], state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      tpe.baseType match {
+        case _: Type.FixedSizeArray =>
+          val (checkCode, array) = subArray(index, state)
+          checkCode ++ array.genLoadCode(state)
+        case _ =>
+          val checkCode = checkVarIndex(index, state)
+          val varIndex  = Ast.Binop(ArithOperator.Add, varIndexOffset, index)
+          checkCode ++ state.genLoadCode(varIndex, isLocal)
       }
     }
 
-    def getVariable(index: Int): Ast.Ident = {
-      checkArrayIndex(index, tpe.size)
-      vars(index)
+    def genStoreCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
+      tpe.baseType match {
+        case _: Type.FixedSizeArray =>
+          (0 until tpe.size) flatMap { index =>
+            val indexExpr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
+            genStoreCode(indexExpr, state)
+          }
+        case _ =>
+          (0 until tpe.size) flatMap { index =>
+            val indexExpr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
+            genStoreCode(indexExpr, state)
+          }
+      }
+    }
+
+    def genStoreCode(index: Ast.Expr[Ctx], state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
+      tpe.baseType match {
+        case _: Type.FixedSizeArray =>
+          val (checkCode, array) = subArray(index, state)
+          // Put the check code at the end to make sure the it executes first
+          array.genStoreCode(state) :+ checkCode
+        case _ =>
+          val checkCode = checkVarIndex(index, state)
+          val varIndex  = Ast.Binop(ArithOperator.Add, varIndexOffset, index)
+          Seq(checkCode ++ state.genStoreCode(varIndex, isLocal))
+      }
     }
   }
 }
