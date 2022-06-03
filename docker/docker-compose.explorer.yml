@@ -22,6 +22,7 @@ services:
       - DB_HOST=postgres
       - BLOCKFLOW_HOST=alephium
       - EXPLORER_HOST=0.0.0.0
+      - ALEPHIUM_API_KEY="<FULLNODE API KEY>"
     depends_on:
       - postgres
       - alephium
