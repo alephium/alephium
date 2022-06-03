@@ -109,6 +109,7 @@ class SmartContractTest extends AlephiumActorSpec {
           Address.fromBase58(address).value,
           state,
           minimalAlphInContract,
+          AVector.empty,
           issueTokenAmount
         )
         .rightValue
