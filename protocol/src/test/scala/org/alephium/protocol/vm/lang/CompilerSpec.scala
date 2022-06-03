@@ -797,7 +797,34 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Assign List(U256) to List(I256)"
+        "Assign List(U256) to List(I256)",
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> U256 {
+         |    let x = [1; 2]
+         |    return x[#00]
+         |  }
+         |}
+         |""".stripMargin ->
+        "Invalid array index type List(ByteVec)",
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let mut x = [1; 2]
+         |    x[-1i] = 0
+         |  }
+         |}
+         |""".stripMargin ->
+        "Invalid array index type List(I256)",
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    let mut x = [1; 2]
+         |    x[1 + 2] = 0
+         |  }
+         |}
+         |""".stripMargin ->
+        "Invalid array index: 3, array size: 2"
     )
     codes.foreach { case (code, error) =>
       Compiler.compileContract(code).leftValue.message is error
@@ -913,6 +940,42 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |           x[0][0] == 3 &&
          |           x[0][1] == 3
          |  }
+         |
+         |  pub fn test14() -> (Bool) {
+         |    let mut x = [[0, 1], [2, 3]]
+         |    let mut i = 0
+         |    let mut j = 0
+         |    while (i < 2) {
+         |      while (j < 2) {
+         |        x[i][j] = x[i][j] + 1
+         |        j = j + 1
+         |      }
+         |      j = 0
+         |      i = i + 1
+         |    }
+         |    return x[0][0] == 1 &&
+         |           x[0][1] == 2 &&
+         |           x[1][0] == 3 &&
+         |           x[1][1] == 4
+         |  }
+         |
+         |  pub fn test15(idx1: U256, idx2: U256, value: U256) -> (U256) {
+         |    let mut x = [[0, 1], [2, 3]]
+         |    x[idx1][idx2] = value
+         |    return x[idx1][idx2]
+         |  }
+         |
+         |  pub fn getConstantIndex() -> (U256) {
+         |    return 2
+         |  }
+         |
+         |  pub fn test17() -> (Bool) {
+         |    let mut x = [1, 2, 3, 4]
+         |    let i = 4
+         |    return x[4 - 2] == 3 &&
+         |           x[i - 2] == 3 &&
+         |           x[getConstantIndex()] == 3
+         |  }
          |}
          |""".stripMargin
 
@@ -928,6 +991,56 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(11, AVector.empty, AVector(Val.True))
     test(12, AVector.empty, AVector(Val.True))
     test(13, AVector.empty, AVector(Val.True))
+    test(14, AVector.empty, AVector(Val.True))
+    test(15, AVector(Val.U256(0), Val.U256(1), Val.U256(5)), AVector(Val.U256(5)))
+    test(17, AVector.empty, AVector(Val.Bool(true)))
+  }
+
+  it should "abort if variable array index is invalid" in {
+    val code =
+      s"""
+         |TxContract Foo(foo: U256, mut array: [[U256; 2]; 3]) {
+         |  pub fn test0() -> () {
+         |    let mut x = [1, 2, 3, 4]
+         |    let mut i = 0
+         |    while (i < 5) {
+         |      x[i] = 0
+         |      i = i + 1
+         |    }
+         |  }
+         |
+         |  pub fn test1(idx1: U256, idx2: U256) -> () {
+         |    let mut x = [[2; 2]; 3]
+         |    x[idx1][idx2] = 0
+         |  }
+         |
+         |  pub fn test2(idx1: U256, idx2: U256) -> () {
+         |    array[idx1][idx2] = 0
+         |  }
+         |
+         |  pub fn test3(idx1: U256, idx2: U256) -> (U256) {
+         |    return array[idx1][idx2]
+         |  }
+         |}
+         |""".stripMargin
+
+    val contract       = Compiler.compileContract(code).rightValue
+    val (obj, context) = prepareContract(contract, AVector.fill(7)(Val.U256(0)))
+
+    def test(methodIndex: Int, args: AVector[Val]) = {
+      StatefulVM
+        .executeWithOutputs(context, obj, args, methodIndex)
+        .leftValue
+        .rightValue is AssertionFailed
+    }
+
+    test(0, AVector.empty)
+    test(1, AVector(Val.U256(0), Val.U256(4)))
+    test(1, AVector(Val.U256(3), Val.U256(0)))
+    test(2, AVector(Val.U256(0), Val.U256(4)))
+    test(2, AVector(Val.U256(3), Val.U256(0)))
+    test(3, AVector(Val.U256(0), Val.U256(4)))
+    test(3, AVector(Val.U256(3), Val.U256(0)))
   }
 
   it should "test contract array fields" in new TestContractMethodFixture {
@@ -978,6 +1091,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    let res = [foo1(); 4]
          |    return x == 4
          |  }
+         |
+         |  pub fn test6() -> () {
+         |    let mut i = 0
+         |    let mut j = 0
+         |    while (i < 4) {
+         |      while (j < 2) {
+         |        array[i][j] = i + j
+         |        j = j + 1
+         |      }
+         |      j = 0
+         |      i = i + 1
+         |    }
+         |
+         |    i = 0
+         |    j = 0
+         |    while (i < 4) {
+         |      while (j < 2) {
+         |        assert!(array[i][j] == i + j)
+         |        j = j + 1
+         |      }
+         |      j = 0
+         |      i = i + 1
+         |    }
+         |  }
          |}
          |""".stripMargin
 
@@ -986,6 +1123,32 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(3, AVector.empty, AVector(Val.True))
     test(4, AVector.empty, AVector(Val.True))
     test(5, AVector.empty, AVector(Val.True))
+    test(6, AVector.empty, AVector.empty)
+  }
+
+  it should "get constant array index" in {
+    def testConstantFolding(before: String, after: String) = {
+      val beforeAst = fastparse.parse(before, StatelessParser.expr(_)).get.value
+      val afterAst  = fastparse.parse(after, StatelessParser.expr(_)).get.value
+      Compiler.State.getConstantIndex(beforeAst) is afterAst
+    }
+
+    testConstantFolding("1 + 1", "2")
+    testConstantFolding("2 / 1", "2")
+    testConstantFolding("2 - 1", "1")
+    testConstantFolding("2 >> 1", "1")
+    testConstantFolding("1 << 1", "2")
+    testConstantFolding("2 % 3", "2")
+    testConstantFolding("2 & 0", "0")
+    testConstantFolding("2 | 1", "3")
+    testConstantFolding("2 ^ 1", "3")
+    testConstantFolding("1 + 2 * 3", "7")
+    testConstantFolding("1 * 4 + 4 * i", "4 + 4 * i")
+    testConstantFolding("foo()", "foo()")
+    testConstantFolding("a + b", "a + b")
+    // TODO: optimize following cases
+    testConstantFolding("2 * 4 + 4 * i - 2 * 3", "8 + 4 * i - 6")
+    testConstantFolding("a + 2 + 3", "a + 2 + 3")
   }
 
   it should "compile return multiple values failed" in {

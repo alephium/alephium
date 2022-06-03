@@ -277,6 +277,13 @@ class ParserSpec extends AlephiumSpec {
         Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
         constantIndex(1)
       ),
+      "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Variable(Ast.Ident("i"))),
+      "a[foo()]" -> Ast
+        .ArrayElement(Variable(Ast.Ident("a")), CallExpr(FuncId("foo", false), Seq.empty)),
+      "a[i + 1]" -> Ast.ArrayElement(
+        Variable(Ast.Ident("a")),
+        Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1))))
+      ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
         Ast.ArrayElement(
@@ -312,6 +319,25 @@ class ParserSpec extends AlephiumSpec {
       "a, b = foo()" -> Assign(
         Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
         CallExpr(FuncId("foo", false), Seq.empty)
+      ),
+      "a[i] = b" -> Assign(
+        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Variable(Ident("i"))))),
+        Ast.Variable(Ast.Ident("b"))
+      ),
+      "a[foo()] = b" -> Assign(
+        Seq(
+          AssignmentArrayElementTarget(Ident("a"), Seq(CallExpr(FuncId("foo", false), Seq.empty)))
+        ),
+        Ast.Variable(Ast.Ident("b"))
+      ),
+      "a[i + 1] = b" -> Assign(
+        Seq(
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            Seq(Binop(ArithOperator.Add, Variable(Ident("i")), Const(Val.U256(U256.unsafe(1)))))
+          )
+        ),
+        Ast.Variable(Ast.Ident("b"))
       )
     )
 
