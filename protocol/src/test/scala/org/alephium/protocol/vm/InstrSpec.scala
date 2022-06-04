@@ -2263,6 +2263,45 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
+  it should "CopyCreateSubContract" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
+
+    stack.push(Val.ByteVec(serialize(Hash.generate)))
+    stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
+    CopyCreateSubContract.runWith(frame).leftValue isE a[NonExistContract]
+
+    stack.push(Val.ByteVec(serialize("nft-01")))
+    stack.push(Val.ByteVec(fromContractId.bytes))
+    stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
+    test(CopyCreateSubContract, ALPH.oneAlph, AVector.empty, None)
+  }
+
+  it should "CopyCreateSubContractWithToken" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(
+        MutBalances.empty,
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+
+    val state = Val.ByteVec(serialize(AVector[Val](Val.True)))
+    stack.push(Val.ByteVec(serialize(Hash.generate)))
+    stack.push(state)
+    stack.push(Val.U256(ALPH.oneNanoAlph))
+    CopyCreateSubContractWithToken.runWith(frame).leftValue isE a[NonExistContract]
+
+    stack.push(Val.ByteVec(serialize("nft-01")))
+    stack.push(Val.ByteVec(fromContractId.bytes))
+    stack.push(state)
+    stack.push(Val.U256(ALPH.oneNanoAlph))
+    test(
+      CopyCreateSubContractWithToken,
+      U256.Zero,
+      AVector((tokenId, ALPH.oneAlph)),
+      Some(ALPH.oneNanoAlph)
+    )
+  }
+
   it should "DestroySelf" in new StatefulInstrFixture {
     val contractOutput = ContractOutput(ALPH.alph(0), p2cGen.sample.get, AVector.empty)
     val txId           = Hash.generate
