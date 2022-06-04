@@ -513,7 +513,7 @@ object BuiltIn {
   val createSubContractWithToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "createSubContractWithToken",
-      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256, Type.ByteVec),
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
       Seq[Type](Type.ByteVec),
       CreateSubContractWithToken
     )
@@ -529,7 +529,7 @@ object BuiltIn {
   val copyCreateSubContractWithToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "copyCreateSubContractWithToken",
-      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256, Type.ByteVec),
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
       Seq[Type](Type.ByteVec),
       CopyCreateSubContractWithToken
     )

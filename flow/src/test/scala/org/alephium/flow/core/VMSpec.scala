@@ -2037,6 +2037,102 @@ class VMSpec extends AlephiumSpec {
     )
   }
 
+  it should "check different variants to create sub contracts" in new ContractFixture {
+    def verify(
+        createContractStmt: String,
+        subContractPath: String,
+        numOfAssets: Int,
+        numOfContracts: Int
+    ) = {
+      val contract: String =
+        s"""
+           |TxContract Bar(mut subContractId: ByteVec) {
+           |  @use(approvedAssets = true)
+           |  pub fn bar() -> () {
+           |    approveAlph!(txCaller!(0), ${ALPH.nanoAlph(1000).v})
+           |    subContractId = $createContractStmt
+           |  }
+           |}
+           |""".stripMargin
+      val contractId =
+        createContractAndCheckState(
+          contract,
+          numOfAssets,
+          numOfContracts,
+          AVector(Val.ByteVec(ByteString.empty))
+        ).key
+
+      val main: String =
+        s"""
+           |TxScript Main {
+           |  approveAlph!(txCaller!(0), ${ALPH.alph(1).v})
+           |  Bar(#${contractId.toHexString}).bar()
+           |}
+           |
+           |$contract
+           |""".stripMargin
+
+      callTxScript(main)
+
+      val subContractId = Hash.doubleHash(contractId.bytes ++ serialize(subContractPath))
+      val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      worldState.getContractState(contractId).rightValue.fields is AVector[Val](
+        Val.ByteVec(subContractId.bytes)
+      )
+    }
+
+    {
+      info("createSubContract and createSubContractWithToken")
+      val foo: String =
+        s"""
+           |TxContract Foo() {
+           |  pub fn foo() -> () {
+           |  }
+           |}
+           |""".stripMargin
+
+      val fooContract     = Compiler.compileContract(foo).rightValue
+      val fooByteCode     = Hex.toHexString(serialize(fooContract))
+      val fooInitialState = Hex.toHexString(serialize(AVector.empty[Val]))
+
+      val subContractPath1 = Hex.toHexString(serialize("nft-01"))
+      verify(
+        s"createSubContract!(#$subContractPath1, #$fooByteCode, #$fooInitialState)",
+        subContractPath = "nft-01",
+        numOfAssets = 2,
+        numOfContracts = 2
+      )
+
+      val subContractPath2 = Hex.toHexString(serialize("nft-02"))
+      verify(
+        s"createSubContractWithToken!(#$subContractPath2, #$fooByteCode, #$fooInitialState, 10)",
+        subContractPath = "nft-02",
+        numOfAssets = 4,
+        numOfContracts = 4
+      )
+    }
+
+    {
+      info("copyCreateSubContract and copyCreateSubContractWithToken")
+
+      val subContractPath3 = Hex.toHexString(serialize("nft-03"))
+      verify(
+        s"copyCreateSubContract!(#$subContractPath3, selfContractId!(), #010300)",
+        subContractPath = "nft-03",
+        numOfAssets = 6,
+        numOfContracts = 6
+      )
+
+      val subContractPath4 = Hex.toHexString(serialize("nft-04"))
+      verify(
+        s"copyCreateSubContractWithToken!(#$subContractPath4, selfContractId!(), #010300, 10)",
+        subContractPath = "nft-04",
+        numOfAssets = 8,
+        numOfContracts = 8
+      )
+    }
+  }
+
   it should "not load contract just after creation" in new ContractFixture {
     val contract: String =
       s"""

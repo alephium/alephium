@@ -618,7 +618,13 @@ trait FlowFixture
     if (chainIndex.isIntraGroup) {
       block.nonCoinbase.foreach { tx =>
         tx.allOutputs.foreachWithIndex { case (output, index) =>
-          val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.id, index))
+          val outputRef = output match {
+            case assetOutput: AssetOutput =>
+              TxOutputRef.from(assetOutput, TxOutputRef.key(tx.id, index))
+            case contractOutput: ContractOutput =>
+              ContractOutputRef.unsafe(contractOutput.hint, contractOutput.lockupScript.contractId)
+          }
+
           worldState.existOutput(outputRef) isE true
         }
       }

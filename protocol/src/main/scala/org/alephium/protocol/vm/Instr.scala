@@ -1404,8 +1404,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
   protected def getContractId[C <: StatefulContext](frame: Frame[C]): ExeResult[Hash] = {
     if (subContract) {
       for {
-        callerFrame      <- frame.getCallerFrame()
-        parentContractId <- callerFrame.obj.getContractId()
+        parentContractId <- frame.obj.getContractId()
         path             <- frame.popOpStackByteVec()
       } yield {
         Hash.doubleHash(parentContractId.bytes ++ path.bytes)
