@@ -209,7 +209,13 @@ trait StatefulContext extends StatelessContext with ContractPool {
       initialBalances.tokenVector
     )
     val outputRef = nextContractOutputRef(contractId, contractOutput)
+
     for {
+      _ <-
+        if (worldState.getContractState(contractId).isLeft) { okay }
+        else {
+          failed(ContractAlreadyExists(contractId))
+        }
       _ <- code.check(initialFields)
       _ <-
         worldState

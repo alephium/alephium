@@ -2079,6 +2079,10 @@ class VMSpec extends AlephiumSpec {
       worldState.getContractState(contractId).rightValue.fields is AVector[Val](
         Val.ByteVec(subContractId.bytes)
       )
+
+      intercept[AssertionError](callTxScript(main)).getMessage.startsWith(
+        s"Right(TxScriptExeFailed(ContractAlreadyExists(${subContractId.toHexString}))"
+      )
     }
 
     {

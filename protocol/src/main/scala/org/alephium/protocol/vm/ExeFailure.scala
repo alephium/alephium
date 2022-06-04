@@ -107,6 +107,7 @@ case object FailedInRecoverEthAddress                          extends ExeFailur
 case object UnexpectedRecursiveCallInMigration                 extends ExeFailure
 case object InvalidAssetAddress                                extends ExeFailure
 case object UnexpectedApprovedAssets                           extends ExeFailure
+final case class ContractAlreadyExists(contractId: ContractId) extends ExeFailure
 
 final case class UncaughtKeyNotFoundError(error: IOError.KeyNotFound) extends ExeFailure
 final case class UncaughtSerdeError(error: IOError.Serde)             extends ExeFailure
