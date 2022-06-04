@@ -2060,6 +2060,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     def balanceState: MutBalanceState
 
+    val callerFrame = prepareFrame().asInstanceOf[StatefulFrame]
     override lazy val frame = prepareFrame(
       Some(balanceState),
       txEnvOpt = Some(
@@ -2068,7 +2069,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           prevOutputs.map(_.referredOutput),
           Stack.ofCapacity[Signature](0)
         )
-      )
+      ),
+      callerFrameOpt = Some(callerFrame)
     )
     lazy val fromContractId = frame.obj.contractIdOpt.get
 
@@ -2085,6 +2087,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           contractBytes.length + 200 // 200 from GasSchedule.callGas
         case CopyCreateContract | CopyCreateContractWithToken =>
           801 // 801 from contractLoadGas
+        case CreateSubContract | CreateSubContractWithToken =>
+          contractBytes.length + 200
+        case CopyCreateSubContract | CopyCreateSubContractWithToken =>
+          801
       }
       initialGas.subUnsafe(frame.ctx.gasRemaining) is GasBox.unsafe(
         instr.gas().value + fields.length + extraGas
@@ -2129,6 +2135,37 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     test(
       CreateContractWithToken,
+      U256.Zero,
+      AVector((tokenId, ALPH.oneAlph)),
+      Some(ALPH.oneNanoAlph)
+    )
+  }
+
+  it should "CreateSubContract" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
+
+    stack.push(Val.ByteVec(serialize("nft-01")))
+    stack.push(Val.ByteVec(contractBytes))
+    stack.push(Val.ByteVec(serialize(fields)))
+
+    test(CreateSubContract, ALPH.oneAlph, AVector.empty, None)
+  }
+
+  it should "CreateSubContractWithToken" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(
+        MutBalances.empty,
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+
+    stack.push(Val.ByteVec(serialize("nft-01")))
+    stack.push(Val.ByteVec(contractBytes))
+    stack.push(Val.ByteVec(serialize(fields)))
+    stack.push(Val.U256(ALPH.oneNanoAlph))
+
+    test(
+      CreateSubContractWithToken,
       U256.Zero,
       AVector((tokenId, ALPH.oneAlph)),
       Some(ALPH.oneNanoAlph)
@@ -2364,7 +2401,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5,
       /* Below are instructions for Leman hard fork */
       MigrateSimple -> 32000, MigrateWithFields -> 32000, LoadContractFields -> 8, CopyCreateContractWithToken -> 24000,
-      BurnToken -> 30, LockApprovedAssets -> 30
+      BurnToken -> 30, LockApprovedAssets -> 30,
+      CreateSubContract -> 32000, CreateSubContractWithToken -> 32000, CopyCreateSubContract -> 24000, CopyCreateSubContractWithToken -> 24000
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -2486,7 +2524,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185,
       /* Below are instructions for Leman hard fork */
       MigrateSimple -> 186, MigrateWithFields -> 187, LoadContractFields -> 188, CopyCreateContractWithToken -> 189,
-      BurnToken -> 190, LockApprovedAssets -> 191
+      BurnToken -> 190, LockApprovedAssets -> 191,
+      CreateSubContract -> 192, CreateSubContractWithToken -> 193, CopyCreateSubContract -> 194, CopyCreateSubContractWithToken -> 195
     )
     // format: on
 
@@ -2538,7 +2577,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
       CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets
+      MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
+      CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken
     )
     // format: on
   }

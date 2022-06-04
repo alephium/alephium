@@ -174,14 +174,14 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def nextOutputIndex: Int
 
-  def nextContractOutputRef(output: ContractOutput): ContractOutputRef =
-    ContractOutputRef.unsafe(txId, output, nextOutputIndex)
+  def nextContractOutputRef(contractId: Hash, output: ContractOutput): ContractOutputRef =
+    ContractOutputRef.unsafe(output.hint, contractId)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def generateOutput(output: TxOutput): ExeResult[Unit] = {
     output match {
       case contractOutput @ ContractOutput(_, LockupScript.P2C(contractId), _) =>
-        val outputRef = nextContractOutputRef(contractOutput)
+        val outputRef = nextContractOutputRef(contractId, contractOutput)
         for {
           _ <- chargeGeneratedOutput()
           _ <- updateContractAsset(contractId, outputRef, contractOutput)
@@ -196,19 +196,19 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def createContract(
+      contractId: Hash,
       code: StatefulContract.HalfDecoded,
       initialBalances: MutBalancesPerLockup,
       initialFields: AVector[Val],
       tokenAmount: Option[Val.U256]
   ): ExeResult[Hash] = {
-    val contractId = TxOutputRef.key(txId, nextOutputIndex)
     tokenAmount.foreach(amount => initialBalances.addToken(contractId, amount.v))
     val contractOutput = ContractOutput(
       initialBalances.alphAmount,
       LockupScript.p2c(contractId),
       initialBalances.tokenVector
     )
-    val outputRef = nextContractOutputRef(contractOutput)
+    val outputRef = nextContractOutputRef(contractId, contractOutput)
     for {
       _ <- code.check(initialFields)
       _ <-

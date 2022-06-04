@@ -502,6 +502,38 @@ object BuiltIn {
       CopyCreateContractWithToken
     )
 
+  val createSubContract: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "createSubContract",
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq[Type](Type.ByteVec),
+      CreateSubContract
+    )
+
+  val createSubContractWithToken: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "createSubContractWithToken",
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256, Type.ByteVec),
+      Seq[Type](Type.ByteVec),
+      CreateSubContractWithToken
+    )
+
+  val copyCreateSubContract: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "copyCreateSubContract",
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq[Type](Type.ByteVec),
+      CopyCreateSubContract
+    )
+
+  val copyCreateSubContractWithToken: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "copyCreateSubContractWithToken",
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256, Type.ByteVec),
+      Seq[Type](Type.ByteVec),
+      CopyCreateSubContractWithToken
+    )
+
   val destroySelf: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "destroySelf",
@@ -595,6 +627,10 @@ object BuiltIn {
       createContractWithToken,
       copyCreateContract,
       copyCreateContractWithToken,
+      createSubContract,
+      createSubContractWithToken,
+      copyCreateSubContract,
+      copyCreateSubContractWithToken,
       destroySelf,
       migrate,
       migrateWithFields,
