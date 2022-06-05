@@ -1817,7 +1817,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "compile TxScript" in {
     val code =
       s"""
-         |@use(approvedAssets = true, contractAssets = true)
+         |@using(preApprovedAssets = true, assetsInContract = true)
          |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) {
          |  approveToken!(address, tokenId, tokenAmount)
          |  let swap = Swap(swapContractKey)
@@ -1825,7 +1825,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |
          |Interface Swap {
-         |  @use(approvedAssets = true, contractAssets = true)
+         |  @using(preApprovedAssets = true, assetsInContract = true)
          |  pub fn swapAlph(buyer: Address, tokenAmount: U256) -> ()
          |}
          |""".stripMargin

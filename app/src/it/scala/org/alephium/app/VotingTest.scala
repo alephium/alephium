@@ -194,7 +194,7 @@ trait VotingFixture extends WalletFixture {
                             |  event VoteCasted(voter: Address, result: Bool)
                             |  event VotingClosed()
                             |
-                            |  @use(approvedAssets = true, contractAssets = true)
+                            |  @using(preApprovedAssets = true, assetsInContract = true)
                             |  pub fn allocateTokens() -> () {
                             |     assert!(initialized == false)
                             |     assert!(txCaller!(txCallerSize!() - 1) == admin)
@@ -206,7 +206,7 @@ trait VotingFixture extends WalletFixture {
                             |     emit VotingStarted()
                             |  }
                             |
-                            |  @use(approvedAssets = true, contractAssets = true)
+                            |  @using(preApprovedAssets = true, assetsInContract = true)
                             |  pub fn vote(choice: Bool, voter: Address) -> () {
                             |    assert!(initialized == true && isClosed == false)
                             |    transferAlph!(voter, admin, $utxoFee)

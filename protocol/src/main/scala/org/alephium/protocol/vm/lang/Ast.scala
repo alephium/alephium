@@ -281,11 +281,11 @@ object Ast {
       val assetModifier = {
         (useApprovedAssets, useContractAssets) match {
           case (true, true) =>
-            s"@use(approvedAssets=true,contractAssets=true) "
+            s"@using(preApprovedAssets=true,assetsInContract=true) "
           case (true, false) =>
-            s"@use(approvedAssets=true) "
+            s"@using(preApprovedAssets=true) "
           case (false, true) =>
-            s"@use(contractAssets=true) "
+            s"@using(assetsInContract=true) "
           case (false, false) =>
             ""
         }
@@ -527,6 +527,7 @@ object Ast {
       elseBranch.body.foreach(_.check(state))
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val ifBranchesIRs = Array.ofDim[Seq[Instr[Ctx]]](ifBranches.length + 1)
       val elseOffsets   = Array.ofDim[Int](ifBranches.length + 1)

@@ -27,7 +27,7 @@ class TypeSpec extends AlephiumSpec {
     contractAst.getFieldTypes() is
       Seq("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]")
     contractAst.funcs.map(_.signature) is Seq(
-      "@use(approvedAssets=true,contractAssets=true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
+      "@using(preApprovedAssets=true,assetsInContract=true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
     )
     contractAst.funcs.map(_.getArgNames()) is
       Seq(Seq("a", "b", "c", "d", "e", "f"))
@@ -50,7 +50,7 @@ class TypeSpec extends AlephiumSpec {
     scriptAst.getTemplateVarsTypes() is
       Seq("Bool", "U256", "I256", "ByteVec", "Address")
     scriptAst.funcs.map(_.signature) is Seq(
-      "@use(approvedAssets=true) pub main()->()",
+      "@using(preApprovedAssets=true) pub main()->()",
       "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
     )
     scriptAst.events.map(_.signature) is Seq.empty
@@ -63,7 +63,7 @@ trait TypeSignatureFixture {
        |TxContract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2]) {
        |  event Bar(a: Bool, b: U256, d: ByteVec, e: Address)
        |
-       |  @use(approvedAssets = true, contractAssets = true)
+       |  @using(preApprovedAssets = true, assetsInContract = true)
        |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
        |    emit Bar(aa, bb, dd, ee)
        |    return b, c, d, e, f
