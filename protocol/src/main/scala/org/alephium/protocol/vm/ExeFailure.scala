@@ -41,6 +41,8 @@ case object SignedDataIsNot32Bytes                             extends ExeFailur
 case object InvalidSignatureFormat                             extends ExeFailure
 case object InvalidSignature                                   extends ExeFailure
 case object InvalidTxInputIndex                                extends ExeFailure
+case object NoTxInput                                          extends ExeFailure
+case object TxInputAddressesAreNotUnique                       extends ExeFailure
 case object LockTimeOverflow                                   extends ExeFailure
 case object AbsoluteLockTimeVerificationFailed                 extends ExeFailure
 case object RelativeLockTimeVerificationFailed                 extends ExeFailure

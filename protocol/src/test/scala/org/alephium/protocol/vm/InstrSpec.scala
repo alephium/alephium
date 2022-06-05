@@ -70,7 +70,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
       EthEcRecover,
       Log6, Log7, Log8, Log9,
-      ContractIdToAddress
+      ContractIdToAddress,
+      UniqueTxInputAddress
     )
     val lemanStatefulInstrs = AVector(
       MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets
@@ -1502,6 +1503,38 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     initialGas.subUnsafe(context.gasRemaining) is TxInputSize.gas()
   }
 
+  it should "UniqueTxInputAddress" in new StatelessInstrFixture {
+    val (tx, prevOut) = transactionGenWithPreOutputs().sample.get
+    val prevOutputs   = prevOut.map(_.referredOutput)
+
+    {
+      info("No tx inputs")
+      val frame =
+        prepareFrame(AVector.empty, txEnv = Some(TxEnv(tx, AVector.empty, Stack.ofCapacity(0))))
+      UniqueTxInputAddress.runWith(frame).leftValue isE NoTxInput
+    }
+
+    {
+      info("Non-unique tx inputs")
+      val frame =
+        prepareFrame(AVector.empty, txEnv = Some(TxEnv(tx, prevOutputs, Stack.ofCapacity(0))))
+      UniqueTxInputAddress.runWith(frame).leftValue isE TxInputAddressesAreNotUnique
+    }
+
+    {
+      info("Unique tx inputs")
+      val outputs = AVector.fill(10)(prevOutputs.head)
+      val frame =
+        prepareFrame(AVector.empty, txEnv = Some(TxEnv(tx, outputs, Stack.ofCapacity(1))))
+
+      val initialGas = frame.ctx.gasRemaining
+      UniqueTxInputAddress.runWith(frame) isE ()
+      frame.opStack.size is 1
+      frame.opStack.top.get is Val.Address(prevOutputs.head.lockupScript)
+      initialGas.subUnsafe(frame.ctx.gasRemaining) is 13
+    }
+  }
+
   trait LogFixture extends StatefulInstrFixture {
     def test(instr: LogInstr, n: Int) = {
       stack.pop(stack.size).isRight is true
@@ -2442,7 +2475,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover -> 2500,
       Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280,
       ContractIdToAddress -> 5,
-      LoadLocalByIndex -> 3, StoreLocalByIndex -> 3
+      LoadLocalByIndex -> 3, StoreLocalByIndex -> 3,
+      UniqueTxInputAddress -> 35
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -2568,6 +2602,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6 -> 115, Log7 -> 116, Log8 -> 117, Log9 -> 118,
       ContractIdToAddress -> 119,
       LoadLocalByIndex -> 120, StoreLocalByIndex -> 121,
+      UniqueTxInputAddress -> 122,
       // stateful instructions
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -2621,7 +2656,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover,
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
-      LoadLocalByIndex, StoreLocalByIndex
+      LoadLocalByIndex, StoreLocalByIndex,
+      UniqueTxInputAddress
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),

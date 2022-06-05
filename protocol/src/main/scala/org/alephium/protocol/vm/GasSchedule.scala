@@ -201,6 +201,16 @@ object GasLog {
   def gas(n: Int): GasBox = GasBox.unsafe(gasBase + gasPerData * n)
 }
 
+trait GasUniqueAddress extends GasFormula {
+  def gas(n: Int): GasBox = GasUniqueAddress.gas(n)
+}
+object GasUniqueAddress {
+  val gasBase: Int       = GasVeryLow.gas.value
+  val gasPerAddress: Int = 1
+
+  def gas(n: Int): GasBox = GasBox.unsafe(gasBase + gasPerAddress * n)
+}
+
 object GasSchedule {
   val callGas: GasBox = GasBox.unsafe(200)
 

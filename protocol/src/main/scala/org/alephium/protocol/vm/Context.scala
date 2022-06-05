@@ -134,6 +134,19 @@ trait StatelessContext extends CostStrategy {
     getTxPrevOutput(indexRaw).map(output => Val.Address(output.lockupScript))
   }
 
+  def getUniqueTxInputAddress(): ExeResult[Val.Address] = {
+    txEnv.prevOutputs.headOption match {
+      case Some(firstInput) =>
+        if (txEnv.prevOutputs.tail.forall(_.lockupScript == firstInput.lockupScript)) {
+          Right(Val.Address(firstInput.lockupScript))
+        } else {
+          failed(TxInputAddressesAreNotUnique)
+        }
+      case None =>
+        failed(NoTxInput)
+    }
+  }
+
   def chargeGasWithSizeLeman(gasFormula: UpgradedGasFormula, size: Int): ExeResult[Unit] = {
     if (getHardFork() >= HardFork.Leman) {
       this.chargeGas(gasFormula.gas(size))
