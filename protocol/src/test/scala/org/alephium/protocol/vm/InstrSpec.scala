@@ -1455,7 +1455,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     initialGas.subUnsafe(context.gasRemaining) is TxId.gas()
   }
 
-  it should "TxCaller" in new StatelessInstrFixture {
+  it should "TxInputAddressAt" in new StatelessInstrFixture {
     val (tx, prevOut) = transactionGenWithPreOutputs().sample.get
     val prevOutputs   = prevOut.map(_.referredOutput)
     override lazy val frame = prepareFrame(
@@ -1472,13 +1472,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val index      = prevOutputs.length - 1
     val initialGas = context.gasRemaining
     stack.push(Val.U256(U256.unsafe(index)))
-    TxCaller.runWith(frame) isE ()
+    TxInputAddressAt.runWith(frame) isE ()
     stack.size is 1
     stack.top.get is Val.Address(prevOutputs.get(index).get.lockupScript)
-    initialGas.subUnsafe(context.gasRemaining) is TxCaller.gas()
+    initialGas.subUnsafe(context.gasRemaining) is TxInputAddressAt.gas()
   }
 
-  it should "TxCallerSize" in new StatelessInstrFixture {
+  it should "TxInputSize" in new StatelessInstrFixture {
     val (tx, prevOut) = transactionGenWithPreOutputs().sample.get
     val prevOutputs   = prevOut.map(_.referredOutput)
     override lazy val frame = prepareFrame(
@@ -1493,10 +1493,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
 
     val initialGas = context.gasRemaining
-    TxCallerSize.runWith(frame) isE ()
+    TxInputSize.runWith(frame) isE ()
     stack.size is 1
     stack.top.get is Val.U256(U256.unsafe(prevOutputs.length))
-    initialGas.subUnsafe(context.gasRemaining) is TxCallerSize.gas()
+    initialGas.subUnsafe(context.gasRemaining) is TxInputSize.gas()
   }
 
   trait LogFixture extends StatefulInstrFixture {
@@ -2408,7 +2408,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* CallLocal(byte) -> ???, */ Return -> 0,
       Assert -> 3,
       Blake2b -> 54, Keccak256 -> 54, Sha256 -> 54, Sha3 -> 54, VerifyTxSignature -> 2000, VerifySecP256K1 -> 2000, VerifyED25519 -> 2000,
-      NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxCaller -> 3, TxCallerSize -> 3,
+      NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxInputAddressAt -> 3, TxInputSize -> 3,
       VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
       Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200,
       /* Below are instructions for Leman hard fork */
@@ -2533,7 +2533,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Jump(int) -> 74, IfTrue(int) -> 75, IfFalse(int) -> 76,
       Assert -> 77,
       Blake2b -> 78, Keccak256 -> 79, Sha256 -> 80, Sha3 -> 81, VerifyTxSignature -> 82, VerifySecP256K1 -> 83, VerifyED25519 -> 84,
-      NetworkId -> 85, BlockTimeStamp -> 86, BlockTarget -> 87, TxId -> 88, TxCaller -> 89, TxCallerSize -> 90,
+      NetworkId -> 85, BlockTimeStamp -> 86, BlockTarget -> 87, TxId -> 88, TxInputAddressAt -> 89, TxInputSize -> 90,
       VerifyAbsoluteLocktime -> 91, VerifyRelativeLocktime -> 92,
       Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97,
       /* Below are instructions for Leman hard fork */
@@ -2587,7 +2587,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CallLocal(byte), Return,
       Assert,
       Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
-      NetworkId, BlockTimeStamp, BlockTarget, TxId, TxCaller, TxCallerSize,
+      NetworkId, BlockTimeStamp, BlockTarget, TxId, TxInputAddressAt, TxInputSize,
       VerifyAbsoluteLocktime, VerifyRelativeLocktime,
       Log1, Log2, Log3, Log4, Log5,
       /* Below are instructions for Leman hard fork */
