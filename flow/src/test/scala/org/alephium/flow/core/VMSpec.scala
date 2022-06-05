@@ -244,6 +244,11 @@ class VMSpec extends AlephiumSpec {
         s"Right(TxScriptExeFailed($failure))"
     }
 
+    def failCallTxScript(script: String, failure: ExeFailure) = {
+      intercept[AssertionError](callTxScript(script)).getMessage is
+        s"Right(TxScriptExeFailed($failure))"
+    }
+
     def fail(blockFlow: BlockFlow, block: Block, failure: ExeFailure): Assertion = {
       intercept[AssertionError](addAndCheck(blockFlow, block)).getMessage is
         s"Right(ExistInvalidTx(TxScriptExeFailed($failure)))"
@@ -2184,10 +2189,7 @@ class VMSpec extends AlephiumSpec {
          |
          |$foo
          |""".stripMargin
-    val script = Compiler.compileTxScript(main).rightValue
-    val errorMessage =
-      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
-    errorMessage.contains(s"Right(TxScriptExeFailed(ContractAssetUnloaded") is true
+    failCallTxScript(main, PayToContractAddressNotInCallerTrace)
   }
 
   it should "work with interface" in new ContractFixture {
@@ -2323,9 +2325,102 @@ class VMSpec extends AlephiumSpec {
     }
 
     callTxScript(createFooContract(false))
+    failCallTxScript(createFooContract(true), PayToContractAddressNotInCallerTrace)
+  }
 
-    intercept[AssertionError](callTxScript(createFooContract(true))).getMessage is
-      s"Right(TxScriptExeFailed(ContractAssetUnloaded))"
+  it should "not transfer assets to arbitrary contract" in new ContractFixture {
+    val randomContract = Address.contract(ContractId.random).toBase58
+
+    {
+      info("Transfer to random contract address in TxScript")
+      val script =
+        s"""
+           |TxScript Main {
+           |  let caller = txInputAddressAt!(0)
+           |  transferAlph!(caller, @${randomContract}, ${ALPH.cent(1)})
+           |}
+           |""".stripMargin
+      failCallTxScript(script, PayToContractAddressNotInCallerTrace)
+    }
+
+    {
+      info("Transfer to random contract address in TxContract")
+
+      val foo: String =
+        s"""
+           |TxContract Foo() {
+           |  @using(assetsInContract = true)
+           |  pub fn foo() -> () {
+           |    transferAlphFromSelf!(@${randomContract}, ${ALPH.cent(1)})
+           |  }
+           |}
+           |""".stripMargin
+      val fooId      = createContract(foo, AVector.empty, initialAlphAmount = ALPH.alph(2)).key
+      val fooAddress = Address.contract(fooId)
+
+      val script =
+        s"""
+           |TxScript Main {
+           |  let caller = txInputAddressAt!(0)
+           |  transferAlph!(caller, @${fooAddress}, ${ALPH.cent(1)})
+           |  let foo = Foo(#${fooId.toHexString})
+           |  foo.foo()
+           |}
+           |
+           |$foo
+           |""".stripMargin
+      failCallTxScript(script, PayToContractAddressNotInCallerTrace)
+    }
+
+    {
+      info("Transfer to one of the caller addresses in TxContract")
+      val foo: String =
+        s"""
+           |TxContract Foo() {
+           |  @using(assetsInContract = true)
+           |  pub fn foo(to: Address) -> () {
+           |    transferAlphFromSelf!(to, ${ALPH.cent(1)})
+           |  }
+           |}
+           |""".stripMargin
+      val fooId = createContract(foo, AVector.empty, initialAlphAmount = ALPH.alph(2)).key
+
+      val bar: String =
+        s"""
+           |TxContract Bar(index: U256, nextBarId: ByteVec) {
+           |  @using(assetsInContract = true)
+           |  pub fn bar(to: Address) -> () {
+           |    if (index == 0) {
+           |      let foo = Foo(#${fooId.toHexString})
+           |      foo.foo(to)
+           |    } else {
+           |      let bar = Bar(nextBarId)
+           |      bar.bar(to)
+           |    }
+           |  }
+           |}
+           |$foo
+           |""".stripMargin
+
+      var lastBarId: ContractId = fooId
+      (0 until 5).foreach { index =>
+        val initialFields =
+          AVector[Val](Val.U256(U256.unsafe(index)), Val.ByteVec(fooId.bytes))
+        val barId = createContract(bar, initialFields, initialAlphAmount = ALPH.alph(2)).key
+        lastBarId = barId
+      }
+
+      val script =
+        s"""
+           |TxScript Main {
+           |  let bar = Bar(#${lastBarId.toHexString})
+           |  bar.bar(@${Address.contract(lastBarId)})
+           |}
+           |
+           |$bar
+           |""".stripMargin
+      callTxScript(script)
+    }
   }
 
   private def getEvents(

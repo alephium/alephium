@@ -39,7 +39,7 @@ abstract class Frame[Ctx <: StatelessContext] {
   def balanceStateOpt: Option[MutBalanceState]
 
   def getBalanceState(): ExeResult[MutBalanceState] =
-    balanceStateOpt.toRight(Right(EmptyBalanceForPayableMethod))
+    balanceStateOpt.toRight(Right(NoBalanceAvailable))
 
   def pcMax: Int = method.instrs.length
 
@@ -139,6 +139,8 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def destroyContract(address: LockupScript): ExeResult[Unit]
 
+  def checkPayToContractAddressInCallerTrace(address: LockupScript.P2C): ExeResult[Unit]
+
   def migrateContract(
       newContractCode: StatefulContract,
       newFieldsOpt: Option[AVector[Val]]
@@ -206,6 +208,8 @@ final class StatelessFrame(
       tokenAmount: Option[Val.U256]
   ): ExeResult[ContractId] = StatelessFrame.notAllowed
   def destroyContract(address: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
+  def checkPayToContractAddressInCallerTrace(address: LockupScript.P2C): ExeResult[Unit] =
+    StatelessFrame.notAllowed
   def migrateContract(
       newContractCode: StatefulContract,
       newFieldsOpt: Option[AVector[Val]]
@@ -381,6 +385,15 @@ final class StatefulFrame(
           }
         }
       case None => true // Frame for TxScript
+    }
+  }
+
+  def checkPayToContractAddressInCallerTrace(address: LockupScript.P2C): ExeResult[Unit] = {
+    val notInCallerStrace = checkNonRecursive(address.contractId)
+    if (notInCallerStrace) {
+      failed(PayToContractAddressNotInCallerTrace)
+    } else {
+      okay
     }
   }
 

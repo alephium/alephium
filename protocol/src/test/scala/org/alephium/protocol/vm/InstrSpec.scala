@@ -27,7 +27,7 @@ import org.scalacheck.Gen
 import org.alephium.crypto
 import org.alephium.protocol._
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
-import org.alephium.protocol.model.{ContractOutput, ContractOutputRef, Target, TokenId, TxOutput}
+import org.alephium.protocol.model.{NetworkId => _, _}
 import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.serde.{serialize, RandomBytes}
 import org.alephium.util._
@@ -137,6 +137,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       group        <- groupIndexGen
       lockupScript <- lockupGen(group)
     } yield lockupScript
+
+    val assetLockupScriptGen: Gen[LockupScript.Asset] =
+      lockupScriptGen.retryUntil(_.isAssetType).map(_.asInstanceOf[LockupScript.Asset])
   }
 
   trait StatelessFixture extends GenFixture {
@@ -1720,6 +1723,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     lazy val stack   = frame.opStack
     lazy val context = frame.ctx
 
+    lazy val contractAddress = LockupScript.p2c(ContractId.random)
+
     def runAndCheckGas[I <: Instr[StatefulContext] with GasSimple](
         instr: I,
         extraGasOpt: Option[GasBox] = None
@@ -1983,7 +1988,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "TransferAlph" in new StatefulInstrFixture {
     val from = lockupScriptGen.sample.get
-    val to   = lockupScriptGen.sample.get
+    val to   = assetLockupScriptGen.sample.get
     val balanceState =
       MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
     override lazy val frame = prepareFrame(Some(balanceState))
@@ -2001,8 +2006,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.Address(from))
     stack.push(Val.Address(to))
     stack.push(Val.U256(ALPH.alph(10)))
-
     TransferAlph.runWith(frame).leftValue isE NotEnoughBalance
+
+    stack.push(Val.Address(from))
+    stack.push(Val.Address(contractAddress))
+    stack.push(Val.U256(ALPH.alph(10)))
+    TransferAlph.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
   }
 
   trait ContractOutputFixture extends StatefulInstrFixture {
@@ -2013,7 +2022,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "TransferAlphFromSelf" in new ContractOutputFixture {
     val from = LockupScript.P2C(contractOutputRef.key)
-    val to   = lockupScriptGen.sample.get
+    val to   = assetLockupScriptGen.sample.get
 
     val balanceState =
       MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
@@ -2027,6 +2036,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     frame.ctx.outputBalances is MutBalances(
       ArrayBuffer((to, MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
     )
+
+    stack.push(Val.Address(contractAddress))
+    stack.push(Val.U256(ALPH.oneNanoAlph))
+    TransferAlphFromSelf.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
   }
 
   it should "TransferAlphToSelf" in new ContractOutputFixture {
@@ -2049,7 +2062,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "TransferToken" in new ContractOutputFixture {
     val from = lockupScriptGen.sample.get
-    val to   = lockupScriptGen.sample.get
+    val to   = assetLockupScriptGen.sample.get
     val balanceState =
       MutBalanceState.from(
         tokenBalance(from, tokenId, ALPH.oneAlph)
@@ -2067,11 +2080,17 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     frame.ctx.outputBalances is MutBalances(
       ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
+
+    stack.push(Val.Address(from))
+    stack.push(Val.Address(contractAddress))
+    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.U256(ALPH.oneNanoAlph))
+    TransferToken.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
   }
 
   it should "TransferTokenFromSelf" in new ContractOutputFixture {
     val from = LockupScript.P2C(contractOutputRef.key)
-    val to   = lockupScriptGen.sample.get
+    val to   = assetLockupScriptGen.sample.get
 
     val balanceState =
       MutBalanceState.from(
@@ -2090,6 +2109,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     frame.ctx.outputBalances is MutBalances(
       ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
     )
+
+    stack.push(Val.Address(contractAddress))
+    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.U256(ALPH.oneNanoAlph))
+    TransferTokenFromSelf.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
   }
 
   it should "TransferTokenToSelf" in new ContractOutputFixture {

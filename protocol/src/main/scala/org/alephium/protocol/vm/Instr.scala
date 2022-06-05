@@ -1321,7 +1321,19 @@ sealed trait Transfer extends AssetInstr {
     frame.obj.getContractId().map(LockupScript.p2c)
   }
 
-  def transferAlph[C <: StatefulContext](
+  def getToAddressFromStack[C <: StatefulContext](frame: Frame[C]): ExeResult[LockupScript] = {
+    frame.popOpStackAddress().flatMap {
+      case Val.Address(asset: LockupScript.Asset) => Right(asset)
+      case Val.Address(contract: LockupScript.P2C) =>
+        if (frame.ctx.getHardFork() < HardFork.Leman) {
+          Right(contract)
+        } else {
+          frame.checkPayToContractAddressInCallerTrace(contract).map(_ => contract)
+        }
+    }
+  }
+
+  @inline def transferAlph[C <: StatefulContext](
       frame: Frame[C],
       fromThunk: => ExeResult[LockupScript],
       toThunk: => ExeResult[LockupScript]
@@ -1338,7 +1350,7 @@ sealed trait Transfer extends AssetInstr {
     } yield ()
   }
 
-  def transferToken[C <: StatefulContext](
+  @inline def transferToken[C <: StatefulContext](
       frame: Frame[C],
       fromThunk: => ExeResult[LockupScript],
       toThunk: => ExeResult[LockupScript]
@@ -1365,7 +1377,7 @@ object TransferAlph extends Transfer with StatefulInstrCompanion0 {
     transferAlph(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
-      frame.popOpStackAddress().map(_.lockupScript)
+      getToAddressFromStack(frame)
     )
   }
 }
@@ -1375,7 +1387,7 @@ object TransferAlphFromSelf extends Transfer with StatefulInstrCompanion0 {
     transferAlph(
       frame,
       getContractLockupScript(frame),
-      frame.popOpStackAddress().map(_.lockupScript)
+      getToAddressFromStack(frame)
     )
   }
 }
@@ -1395,7 +1407,7 @@ object TransferToken extends Transfer with StatefulInstrCompanion0 {
     transferToken(
       frame,
       frame.popOpStackAddress().map(_.lockupScript),
-      frame.popOpStackAddress().map(_.lockupScript)
+      getToAddressFromStack(frame)
     )
   }
 }
@@ -1405,7 +1417,7 @@ object TransferTokenFromSelf extends Transfer with StatefulInstrCompanion0 {
     transferToken(
       frame,
       getContractLockupScript(frame),
-      frame.popOpStackAddress().map(_.lockupScript)
+      getToAddressFromStack(frame)
     )
   }
 }

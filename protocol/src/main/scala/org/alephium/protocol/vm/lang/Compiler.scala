@@ -155,7 +155,7 @@ object Compiler {
       if (inputType == argsType) {
         returnType
       } else {
-        throw Error(s"Invalid args type $inputType for func $name")
+        throw Error(s"Invalid args type $inputType for function $name")
       }
     }
 
