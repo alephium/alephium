@@ -769,7 +769,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       generateContractAddress(),
       StatefulContract.forSMT.toContract().rightValue,
       codeHash = Hash.zero,
-      initialStateHash = Hash.zero,
+      initialStateHash = Some(Hash.zero),
       AVector(u256, i256, bool, byteVec, address1),
       AssetState.from(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
     )

@@ -21,11 +21,12 @@ import org.alephium.protocol.model.{Address, ContractId, ContractOutput}
 import org.alephium.protocol.vm.{LockupScript, StatefulContract}
 import org.alephium.util.{AVector, U256}
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class ContractState(
     address: Address.Contract,
     bytecode: StatefulContract,
     codeHash: Hash,
-    initialStateHash: Hash,
+    initialStateHash: Option[Hash] = None,
     fields: AVector[Val],
     asset: AssetState
 ) {

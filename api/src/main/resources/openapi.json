@@ -8556,7 +8556,6 @@
           "address",
           "bytecode",
           "codeHash",
-          "initialStateHash",
           "fields",
           "asset"
         ],
