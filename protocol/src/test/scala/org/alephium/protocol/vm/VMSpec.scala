@@ -599,4 +599,25 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     test(preLemanStatefulVm, contract2, false)
     test(preLemanStatefulVm, contract3, false)
   }
+
+  it should "preserve stack safety" in new StatefulFixture {
+    {
+      info("No local variables")
+      val method0 =
+        Method[StatefulContext](true, false, false, 0, 0, 0, AVector(ConstTrue, CallLocal(1)))
+      val method1 = Method[StatefulContext](true, false, false, 0, 0, 0, AVector(Pop))
+
+      test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
+    }
+
+    {
+      info("Non-empty local variables")
+
+      val method0 =
+        Method[StatefulContext](true, false, false, 0, 1, 0, AVector(ConstTrue, CallLocal(1)))
+      val method1 = Method[StatefulContext](true, false, false, 0, 0, 0, AVector(Pop))
+
+      test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
+    }
+  }
 }
