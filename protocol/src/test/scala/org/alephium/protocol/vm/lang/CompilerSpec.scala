@@ -1854,4 +1854,107 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       .leftValue
       .message is "Max 8 fields allowed for contract events"
   }
+
+  it should "compile if-else statements" in {
+    {
+      info("Simple if statement")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo() -> () {
+           |    if (true) {
+           |      return
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).rightValue.methods.head.instrs is
+        AVector[Instr[StatefulContext]](ConstTrue, IfFalse(1), Return)
+    }
+
+    {
+      info("Simple if statement without return")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo() -> U256 {
+           |    if (true) {
+           |      return 1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Expect return statement for function foo"
+    }
+
+    {
+      info("Simple if-else statement")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo() -> () {
+           |    if (true) {
+           |      return
+           |    } else {
+           |      return
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).rightValue.methods.head.instrs is
+        AVector[Instr[StatefulContext]](ConstTrue, IfFalse(2), Return, Jump(1), Return)
+    }
+
+    {
+      info("Simple if-else-if statement")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo() -> () {
+           |    if (true) {
+           |      return
+           |    } else if (false) {
+           |      return
+           |    } else {
+           |      return
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).rightValue.methods.head.instrs is
+        AVector[Instr[StatefulContext]](
+          ConstTrue,
+          IfFalse(2),
+          Return,
+          Jump(5),
+          ConstFalse,
+          IfFalse(2),
+          Return,
+          Jump(1),
+          Return
+        )
+    }
+
+    new TestContractMethodFixture {
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  pub fn foo(x: U256) -> (U256) {
+           |    if (x == 1) {
+           |      return 1
+           |    } else if (x == 0) {
+           |      return 10
+           |    } else {
+           |      return 100
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      test(0, AVector(Val.U256(U256.Zero)), AVector(Val.U256(U256.unsafe(10))))
+      test(0, AVector(Val.U256(U256.One)), AVector(Val.U256(U256.unsafe(1))))
+      test(0, AVector(Val.U256(U256.Two)), AVector(Val.U256(U256.unsafe(100))))
+    }
+  }
 }

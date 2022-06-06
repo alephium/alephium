@@ -19,7 +19,7 @@ package org.alephium.protocol.vm.lang
 import fastparse._
 
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
-import org.alephium.protocol.vm.lang.Ast.{Annotation, Argument, FuncId, Statement}
+import org.alephium.protocol.vm.lang.Ast.{Annotation, Argument, ElseBranch, FuncId, Statement}
 
 // scalastyle:off number.of.methods
 @SuppressWarnings(
@@ -214,12 +214,26 @@ abstract class Parser[Ctx <: StatelessContext] {
   def funcCall[Unknown: P]: P[Ast.FuncCall[Ctx]] =
     callAbs.map { case (funcId, exprs) => Ast.FuncCall(funcId, exprs) }
 
-  def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]] = P("{" ~ statement.rep(1) ~ "}")
-  def elseBranch[Unknown: P]: P[Seq[Ast.Statement[Ctx]]] =
-    P((Lexer.keyword("else") ~/ block).?).map(_.fold(Seq.empty[Ast.Statement[Ctx]])(identity))
+  def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]]      = P("{" ~ statement.rep(1) ~ "}")
+  def emptyBlock[Unknown: P]: P[Seq[Ast.Statement[Ctx]]] = P("{" ~ "}").map(_ => Seq.empty)
+  def ifBranch[Unknown: P]: P[Ast.IfBranch[Ctx]] =
+    P(Lexer.keyword("if") ~/ expr ~ block).map { case (condition, body) =>
+      Ast.IfBranch(condition, body)
+    }
+  def elseIfBranch[Unknown: P]: P[Ast.IfBranch[Ctx]] =
+    P(Lexer.keyword("else") ~ ifBranch)
+  def elseBranch[Unknown: P]: P[ElseBranch[Ctx]] =
+    P(Lexer.keyword("else") ~ (block | emptyBlock)).map(Ast.ElseBranch(_))
   def ifelse[Unknown: P]: P[Ast.IfElse[Ctx]] =
-    P(Lexer.keyword("if") ~/ expr ~ block ~ elseBranch)
-      .map { case (expr, ifBranch, elseBranch) => Ast.IfElse(expr, ifBranch, elseBranch) }
+    P(ifBranch ~ elseIfBranch.rep(0) ~ elseBranch.?)
+      .map { case (ifBranch, elseIfBranches, elseBranchOpt) =>
+        if (elseIfBranches.nonEmpty && elseBranchOpt.isEmpty) {
+          throw Compiler.Error(
+            "If ... else if constructs should be terminated with an else statement"
+          )
+        }
+        Ast.IfElse(ifBranch +: elseIfBranches, elseBranchOpt.getOrElse(ElseBranch(Seq.empty)))
+      }
 
   def whileStmt[Unknown: P]: P[Ast.While[Ctx]] =
     P(Lexer.keyword("while") ~/ expr ~ block).map { case (expr, block) => Ast.While(expr, block) }

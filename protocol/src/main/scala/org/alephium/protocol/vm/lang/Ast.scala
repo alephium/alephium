@@ -300,9 +300,9 @@ object Ast {
     private def checkRetTypes(stmt: Option[Statement[Ctx]]): Unit = {
       stmt match {
         case Some(_: ReturnStmt[Ctx]) => // we checked the `rtypes` in `ReturnStmt`
-        case Some(IfElse(_, ifBranch, elseBranch)) =>
-          checkRetTypes(ifBranch.lastOption)
-          checkRetTypes(elseBranch.lastOption)
+        case Some(IfElse(ifBranches, elseBranch)) =>
+          ifBranches.foreach(branch => checkRetTypes(branch.body.lastOption))
+          checkRetTypes(elseBranch.body.lastOption)
         case _ => throw new Compiler.Error(s"Expect return statement for function ${id.name}")
       }
     }
@@ -504,30 +504,54 @@ object Ast {
         Seq.fill[Instr[StatefulContext]](ArrayTransformer.flattenTypeLength(returnType))(Pop)
     }
   }
-  final case class IfElse[Ctx <: StatelessContext](
+  final case class IfBranch[Ctx <: StatelessContext](
       condition: Expr[Ctx],
-      ifBranch: Seq[Statement[Ctx]],
-      elseBranch: Seq[Statement[Ctx]]
+      body: Seq[Statement[Ctx]]
+  )
+  final case class ElseBranch[Ctx <: StatelessContext](
+      body: Seq[Statement[Ctx]]
+  )
+  final case class IfElse[Ctx <: StatelessContext](
+      ifBranches: Seq[IfBranch[Ctx]],
+      elseBranch: ElseBranch[Ctx]
   ) extends Statement[Ctx] {
-    override def check(state: Compiler.State[Ctx]): Unit = {
+    private def checkCondition(state: Compiler.State[Ctx], condition: Expr[Ctx]): Unit = {
       if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid type of condition expr $condition")
-      } else {
-        ifBranch.foreach(_.check(state))
-        elseBranch.foreach(_.check(state))
       }
     }
 
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      ifBranches.foreach(branch => checkCondition(state, branch.condition))
+      ifBranches.foreach(_.body.foreach(_.check(state)))
+      elseBranch.body.foreach(_.check(state))
+    }
+
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val elseIRs  = elseBranch.flatMap(_.genCode(state))
-      val offsetIR = if (elseIRs.nonEmpty) Seq(Jump(elseIRs.length)) else Seq.empty
-      val ifIRs    = ifBranch.flatMap(_.genCode(state)) ++ offsetIR
-      if (ifIRs.length > 0xff || elseIRs.length > 0xff) {
-        // TODO: support long branches
-        throw Compiler.Error(s"Too many instrs for if-else branches")
+      val ifBranchesIRs = Array.ofDim[Seq[Instr[Ctx]]](ifBranches.length + 1)
+      val elseOffsets   = Array.ofDim[Int](ifBranches.length + 1)
+      val elseBodyIRs   = elseBranch.body.flatMap(_.genCode(state))
+      ifBranchesIRs(ifBranches.length) = elseBodyIRs
+      elseOffsets(ifBranches.length) = elseBodyIRs.length
+      ifBranches.zipWithIndex.view.reverse.foreach { case (ifBranch, index) =>
+        val initialOffset    = elseOffsets(index + 1)
+        val notTheLastBranch = index < ifBranches.length - 1 || elseBranch.body.nonEmpty
+
+        val bodyIRsWithoutOffset = ifBranch.body.flatMap(_.genCode(state))
+        val bodyOffsetIR = if (notTheLastBranch) {
+          Seq(Jump(initialOffset))
+        } else {
+          Seq.empty
+        }
+        val bodyIRs = bodyIRsWithoutOffset ++ bodyOffsetIR
+
+        val conditionOffset =
+          if (notTheLastBranch) bodyIRs.length else bodyIRs.length + initialOffset
+        val conditionIRs = Statement.getCondIR(ifBranch.condition, state, conditionOffset)
+        ifBranchesIRs(index) = conditionIRs ++ bodyIRs
+        elseOffsets(index) = initialOffset + bodyIRs.length + conditionIRs.length
       }
-      val condIR = Statement.getCondIR(condition, state, ifIRs.length)
-      condIR ++ ifIRs ++ elseIRs
+      ifBranchesIRs.reduce(_ ++ _)
     }
   }
   final case class While[Ctx <: StatelessContext](condition: Expr[Ctx], body: Seq[Statement[Ctx]])

@@ -111,6 +111,35 @@ class ParserSpec extends AlephiumSpec {
       .isSuccess is true
   }
 
+  it should "parse if-else statements" in {
+    fastparse
+      .parse("if x { return }", StatelessParser.statement(_))
+      .get
+      .value is
+      Ast.IfElse[StatelessContext](
+        Seq(Ast.IfBranch(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty)))),
+        ElseBranch(Seq.empty)
+      )
+
+    val error = intercept[Compiler.Error](
+      fastparse
+        .parse("if x { return } else if y { return }", StatelessParser.statement(_))
+    )
+    error.message is "If ... else if constructs should be terminated with an else statement"
+
+    fastparse
+      .parse("if x { return } else if y { return } else {}", StatelessParser.statement(_))
+      .get
+      .value is
+      Ast.IfElse[StatelessContext](
+        Seq(
+          Ast.IfBranch(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty))),
+          Ast.IfBranch(Variable(Ast.Ident("y")), Seq(ReturnStmt(Seq.empty)))
+        ),
+        ElseBranch(Seq.empty)
+      )
+  }
+
   it should "parse annotations" in {
     fastparse.parse("@use(x = true, y = false)", StatefulParser.annotation(_)).isSuccess is true
   }
