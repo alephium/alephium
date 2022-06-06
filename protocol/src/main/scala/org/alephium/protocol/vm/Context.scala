@@ -28,7 +28,10 @@ final case class BlockEnv(
     timeStamp: TimeStamp,
     target: Target,
     blockId: Option[BlockHash]
-)
+) {
+  def getHardFork()(implicit networkConfig: NetworkConfig): HardFork =
+    networkConfig.getHardFork(timeStamp)
+}
 object BlockEnv {
   def from(header: BlockHeader)(implicit networkConfig: NetworkConfig): BlockEnv =
     BlockEnv(networkConfig.networkId, header.timestamp, header.target, Some(header.hash))
