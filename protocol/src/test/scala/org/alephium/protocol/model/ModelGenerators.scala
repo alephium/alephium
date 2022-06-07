@@ -385,7 +385,7 @@ trait TxGenerators
 
   def transactionGenWithPreOutputs(
       inputsNumGen: Gen[Int] = Gen.choose(1, 10),
-      tokensNumGen: Gen[Int] = Gen.choose(0, 10),
+      tokensNumGen: Gen[Int] = Gen.choose(0, maxTokenPerUtxo),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
       lockupGen: IndexLockupScriptGen = assetLockupGen,
@@ -409,7 +409,7 @@ trait TxGenerators
 
   def transactionGen(
       numInputsGen: Gen[Int] = Gen.choose(1, 10),
-      numTokensGen: Gen[Int] = Gen.choose(0, 10),
+      numTokensGen: Gen[Int] = Gen.choose(0, maxTokenPerUtxo),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
       lockupGen: IndexLockupScriptGen = assetLockupGen

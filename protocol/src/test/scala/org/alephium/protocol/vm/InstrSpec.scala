@@ -78,19 +78,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
     // format: on
 
-    val networkConfig1 = new NetworkConfig {
-      override def networkId: model.NetworkId = model.NetworkId.AlephiumMainNet
-      override def noPreMineProof: ByteString = ByteString.empty
-      override def lemanHardForkTimestamp: TimeStamp =
-        TimeStamp.now().plusUnsafe(Duration.ofSecondsUnsafe(10))
-    }
-    val networkConfig2 = new NetworkConfig {
-      override def networkId: model.NetworkId = model.NetworkId.AlephiumMainNet
-      override def noPreMineProof: ByteString = ByteString.empty
-      override def lemanHardForkTimestamp: TimeStamp =
-        TimeStamp.now().minusUnsafe(Duration.ofSecondsUnsafe(10))
-    }
-
     def isLemanInstr(instr: Instr[_]): Boolean = {
       instr.isInstanceOf[LemanInstr[_]] || instr.isInstanceOf[LemanInstrWithSimpleGas[_]]
     }
@@ -107,30 +94,28 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "fail if the fork is not activated yet for stateless instrs" in new LemanForkFixture
     with StatelessFixture {
-    val frame0 = prepareFrame(AVector.empty)(networkConfig) // hardfork is activated
-    lemanStatelessInstrs.foreach(instr =>
-      instr.runWith(frame0).leftValue isnotE InactiveInstr(instr)
-    )
-    val frame1 = prepareFrame(AVector.empty)(networkConfig1) // hardfork is not activated yet
+    val frame0 = prepareFrame(AVector.empty)(NetworkConfigFixture.Leman) // Leman is activated
+    lemanStatelessInstrs.foreach { instr =>
+      val result = instr.runWith(frame0)
+      if (result.isLeft) {
+        instr.runWith(frame0).leftValue isnotE InactiveInstr(instr)
+      } else {
+        instr is UniqueTxInputAddress
+      }
+    }
+    val frame1 =
+      prepareFrame(AVector.empty)(NetworkConfigFixture.PreLeman) // Leman is not activated yet
     lemanStatelessInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
-    val frame2 = prepareFrame(AVector.empty)(networkConfig2) // hardfork is not activated yet
-    lemanStatelessInstrs.foreach(instr =>
-      instr.runWith(frame2).leftValue isnotE InactiveInstr(instr)
-    )
   }
 
   it should "fail if the fork is not activated yet for stateful instrs" in new LemanForkFixture
     with StatefulFixture {
-    val frame0 = prepareFrame() // hardfork is activated
+    val frame0 = prepareFrame()(NetworkConfigFixture.Leman) // Leman is activated
     lemanStatefulInstrs.foreach(instr =>
       instr.runWith(frame0).leftValue isnotE InactiveInstr(instr)
     )
-    val frame1 = prepareFrame()(networkConfig1) // hardfork is not activated yet
+    val frame1 = prepareFrame()(NetworkConfigFixture.PreLeman) // Leman is not activated yet
     lemanStatelessInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
-    val frame2 = prepareFrame()(networkConfig2) // hardfork is not activated yet
-    lemanStatelessInstrs.foreach(instr =>
-      instr.runWith(frame2).leftValue isnotE InactiveInstr(instr)
-    )
   }
 
   trait GenFixture extends ContextGenerators {
@@ -1504,7 +1489,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "UniqueTxInputAddress" in new StatelessInstrFixture {
-    val (tx, prevOut) = transactionGenWithPreOutputs().sample.get
+    val (tx, prevOut) = transactionGenWithPreOutputs(inputsNumGen = Gen.const(3)).sample.get
     val prevOutputs   = prevOut.map(_.referredOutput)
 
     {

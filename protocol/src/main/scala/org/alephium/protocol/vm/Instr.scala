@@ -1764,7 +1764,7 @@ sealed trait LockTimeInstr extends TxInstr {
     } yield res
   }
 
-  def popDuraton[C <: StatelessContext](frame: Frame[C]): ExeResult[Duration] = {
+  def popDuration[C <: StatelessContext](frame: Frame[C]): ExeResult[Duration] = {
     for {
       u256 <- frame.popOpStackU256()
       res  <- u256.v.toLong.map(Duration.unsafe).toRight(Right(LockTimeOverflow))
@@ -1799,7 +1799,7 @@ object VerifyRelativeLocktime extends LockTimeInstr with GasMid {
 
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      lockDuration    <- popDuraton(frame)
+      lockDuration    <- popDuration(frame)
       prevOutputIndex <- frame.popOpStackU256()
       preOutput       <- frame.ctx.getTxPrevOutput(prevOutputIndex)
       lockUntil       <- getLockUntil(preOutput, lockDuration)
