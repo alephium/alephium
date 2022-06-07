@@ -744,7 +744,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Invalid assignment to array: x",
+        "Expect array type, have: U256",
       s"""
          |// invalid array expression
          |TxContract Foo() {
@@ -755,7 +755,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expect array type, have: List(U256)", // TODO: improve this error message
+        "Expect array type, have: U256", // TODO: improve this error message
       s"""
          |// invalid array expression
          |TxContract Foo() {
@@ -766,7 +766,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expect array type, have: List(U256)",
+        "Expect array type, have: U256",
       s"""
          |// invalid binary expression(compare array)
          |TxContract Foo() {
@@ -976,6 +976,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |           x[i - 2] == 3 &&
          |           x[getConstantIndex()] == 3
          |  }
+         |
+         |  fn check(array: [U256; 4], v: U256) -> () {
+         |    let mut i = 0
+         |    while (i < 4) {
+         |      assert!(array[i] == v + i)
+         |      i = i + 1
+         |    }
+         |  }
+         |
+         |  pub fn test19() -> () {
+         |    let array = [[0, 1, 2, 3], [4, 5, 6, 7]]
+         |    let mut i = 0
+         |    while (i < 2) {
+         |      check(array[i], i * 4)
+         |      i = i + 1
+         |    }
+         |  }
          |}
          |""".stripMargin
 
@@ -994,6 +1011,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(14, AVector.empty, AVector(Val.True))
     test(15, AVector(Val.U256(0), Val.U256(1), Val.U256(5)), AVector(Val.U256(5)))
     test(17, AVector.empty, AVector(Val.Bool(true)))
+    test(19, AVector.empty, AVector.empty)
   }
 
   it should "abort if variable array index is invalid" in {
@@ -1115,6 +1133,31 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |      i = i + 1
          |    }
          |  }
+         |
+         |  fn foo2() -> U256 {
+         |    let v = x
+         |    x = x + 1
+         |    return v
+         |  }
+         |
+         |  pub fn test8() -> () {
+         |    x = 0
+         |    array = [[0; 2]; 4]
+         |    let mut i = 0
+         |    while (i < 4) {
+         |      array[foo2()] = [x; 2]
+         |      i = i + 1
+         |      assert!(x == i)
+         |    }
+         |    assert!(x == 4)
+         |
+         |    i = 0
+         |    while (i < 4) {
+         |      assert!(array[i][0] == i)
+         |      assert!(array[i][1] == i)
+         |      i = i + 1
+         |    }
+         |  }
          |}
          |""".stripMargin
 
@@ -1124,6 +1167,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(4, AVector.empty, AVector(Val.True))
     test(5, AVector.empty, AVector(Val.True))
     test(6, AVector.empty, AVector.empty)
+    test(8, AVector.empty, AVector.empty)
   }
 
   it should "get constant array index" in {

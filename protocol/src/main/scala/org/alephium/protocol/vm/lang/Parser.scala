@@ -92,14 +92,11 @@ abstract class Parser[Ctx <: StatelessContext] {
   def arithExpr0[Unknown: P]: P[Ast.Expr[Ctx]] =
     P(chain(unaryExpr, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
   def unaryExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(arrayElement | (Lexer.opNot ~ arrayElement).map { case (op, expr) =>
+    P(arrayElementOrAtom | (Lexer.opNot ~ arrayElementOrAtom).map { case (op, expr) =>
       Ast.UnaryOp.apply[Ctx](op, expr)
     })
-  def arrayElement[Unknown: P]: P[Ast.Expr[Ctx]] = P(atom ~ arrayIndex.rep(0)).map {
-    case (expr, indexes) =>
-      indexes.foldLeft(expr) { case (acc, index) =>
-        Ast.ArrayElement(acc, index)
-      }
+  def arrayElementOrAtom[Unknown: P]: P[Ast.Expr[Ctx]] = P(atom ~ arrayIndex.rep(0)).map {
+    case (expr, indexes) => if (indexes.nonEmpty) Ast.ArrayElement(expr, indexes) else expr
   }
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
 

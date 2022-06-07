@@ -234,6 +234,22 @@ object Compiler {
     }
     // scalastyle:on cyclomatic.complexity
 
+    def checkConstantIndex(index: Int): Unit = {
+      if (index < 0 || index >= maxVarIndex) {
+        throw Error(s"Invalid array index $index")
+      }
+    }
+
+    def getAndCheckConstantIndex[Ctx <: StatelessContext](index: Ast.Expr[Ctx]): Option[Int] = {
+      State.getConstantIndex(index) match {
+        case Ast.Const(Val.U256(v)) =>
+          val idx = v.toInt.getOrElse(throw Compiler.Error(s"Invalid array index: $v"))
+          checkConstantIndex(idx)
+          Some(idx)
+        case _ => None
+      }
+    }
+
     def buildFor(script: Ast.AssetScript): State[StatelessContext] =
       StateForScript(
         mutable.HashMap.empty,
@@ -269,13 +285,25 @@ object Compiler {
     var varIndex: Int
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, ContractFunc[Ctx]]]
-    private var freshNameIndex: Int = 0
+    private var freshNameIndex: Int              = 0
+    private var arrayIndexVar: Option[Ast.Ident] = None
     def eventsInfo: Seq[EventInfo]
 
     @inline final def freshName(): String = {
       val name = s"_generated#$freshNameIndex"
       freshNameIndex += 1
       name
+    }
+
+    def getArrayIndexVar(): Ast.Ident = {
+      arrayIndexVar match {
+        case Some(ident) => ident
+        case None =>
+          val ident = Ast.Ident(freshName())
+          addLocalVariable(ident, Type.U256, true)
+          arrayIndexVar = Some(ident)
+          ident
+      }
     }
 
     @SuppressWarnings(
@@ -285,10 +313,10 @@ object Compiler {
         expr: Ast.Expr[Ctx]
     ): (ArrayTransformer.ArrayRef[Ctx], Seq[Instr[Ctx]]) = {
       expr match {
-        case Ast.ArrayElement(array, index) =>
-          val (arrayRef, codes0)    = getOrCreateArrayRef(array)
-          val (codes1, subArrayRef) = arrayRef.subArray(index, this)
-          (subArrayRef, codes0 ++ codes1)
+        case Ast.ArrayElement(array, indexes) =>
+          val (arrayRef, codes) = getOrCreateArrayRef(array)
+          val subArrayRef       = arrayRef.subArray(this, indexes)
+          (subArrayRef, codes)
         case Ast.Variable(ident)  => (getArrayRef(ident), Seq.empty)
         case Ast.ParenExpr(inner) => getOrCreateArrayRef(inner)
         case _ =>
@@ -319,6 +347,7 @@ object Compiler {
     def setFuncScope(funcId: Ast.FuncId): Unit = {
       scope = funcId
       varIndex = 0
+      arrayIndexVar = None
     }
 
     protected def scopedName(name: String): String = {
@@ -404,29 +433,40 @@ object Compiler {
       }
     }
 
-    def getAndCheckConstantIndex(index: Ast.Expr[Ctx]): Option[Int] = {
-      State.getConstantIndex(index) match {
-        case Ast.Const(Val.U256(v)) =>
-          val idx = v.toInt.getOrElse(throw Compiler.Error(s"Invalid array index: $v"))
-          checkConstantIndex(idx)
-          Some(idx)
-        case _ => None
+    @scala.annotation.tailrec
+    private def arrayElementType(
+        arrayType: Type.FixedSizeArray,
+        indexes: Seq[Ast.Expr[Ctx]]
+    ): Type = {
+      if (indexes.length == 1) {
+        arrayType.baseType
+      } else {
+        arrayType.baseType match {
+          case baseType: Type.FixedSizeArray => arrayElementType(baseType, indexes.drop(1))
+          case tpe => throw Compiler.Error(s"Expect array type, have: $tpe")
+        }
       }
     }
 
-    def checkConstantIndex(index: Int): Unit = {
-      if (index < 0 || index >= State.maxVarIndex) {
-        throw Error(s"Invalid array index $index")
+    def getArrayElementType(tpe: Type, indexes: Seq[Ast.Expr[Ctx]]): Type = {
+      indexes.foreach(checkArrayIndexType)
+      tpe match {
+        case tpe: Type.FixedSizeArray => arrayElementType(tpe, indexes)
+        case tpe =>
+          throw Compiler.Error(s"Expect array type, have: $tpe")
       }
     }
 
     def genLoadCode(ident: Ast.Ident): Seq[Instr[Ctx]]
 
-    def genLoadCode(index: Ast.Expr[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
+    def genLoadCode(offset: ArrayTransformer.ArrayVarOffset[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
 
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[Ctx]]]
 
-    def genStoreCode(index: Ast.Expr[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
+    def genStoreCode(
+        offset: ArrayTransformer.ArrayVarOffset[Ctx],
+        isLocal: Boolean
+    ): Seq[Instr[Ctx]]
 
     def getType(ident: Ast.Ident): Type = getVariable(ident).tpe
 
@@ -513,7 +553,7 @@ object Compiler {
     }
 
     private def genVarIndexCode(
-        index: Ast.Expr[StatelessContext],
+        offset: ArrayTransformer.ArrayVarOffset[StatelessContext],
         isLocal: Boolean,
         constantIndex: Byte => Instr[StatelessContext],
         varIndex: Instr[StatelessContext]
@@ -522,23 +562,26 @@ object Compiler {
         throw Error(s"Script should not have fields")
       }
 
-      getAndCheckConstantIndex(index) match {
-        case Some(idx) => Seq(constantIndex(idx.toByte))
-        case None      => index.genCode(this) :+ varIndex
+      offset match {
+        case ArrayTransformer.ConstantArrayVarOffset(value) =>
+          State.checkConstantIndex(value)
+          Seq(constantIndex(value.toByte))
+        case ArrayTransformer.VariableArrayVarOffset(instrs) =>
+          instrs :+ varIndex
       }
     }
 
     def genLoadCode(
-        index: Ast.Expr[StatelessContext],
+        offset: ArrayTransformer.ArrayVarOffset[StatelessContext],
         isLocal: Boolean
     ): Seq[Instr[StatelessContext]] =
-      genVarIndexCode(index, isLocal, LoadLocal.apply, LoadLocalByIndex)
+      genVarIndexCode(offset, isLocal, LoadLocal.apply, LoadLocalByIndex)
 
     def genStoreCode(
-        index: Ast.Expr[StatelessContext],
+        offset: ArrayTransformer.ArrayVarOffset[StatelessContext],
         isLocal: Boolean
     ): Seq[Instr[StatelessContext]] =
-      genVarIndexCode(index, isLocal, StoreLocal.apply, StoreLocalByIndex)
+      genVarIndexCode(offset, isLocal, StoreLocal.apply, StoreLocalByIndex)
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatelessContext]] = {
@@ -577,29 +620,30 @@ object Compiler {
     }
 
     private def genVarIndexCode(
-        index: Ast.Expr[StatefulContext],
+        offset: ArrayTransformer.ArrayVarOffset[StatefulContext],
         isLocal: Boolean,
         localConstantIndex: Byte => Instr[StatefulContext],
         fieldConstantIndex: Byte => Instr[StatefulContext],
         localVarIndex: Instr[StatefulContext],
         fieldVarIndex: Instr[StatefulContext]
     ): Seq[Instr[StatefulContext]] = {
-      getAndCheckConstantIndex(index) match {
-        case Some(idx) =>
-          val index = idx.toByte
+      offset match {
+        case ArrayTransformer.ConstantArrayVarOffset(value) =>
+          State.checkConstantIndex(value)
+          val index = value.toByte
           if (isLocal) Seq(localConstantIndex(index)) else Seq(fieldConstantIndex(index))
-        case None =>
-          val loadInstr = if (isLocal) localVarIndex else fieldVarIndex
-          index.genCode(this) :+ loadInstr
+        case ArrayTransformer.VariableArrayVarOffset(instrs) =>
+          val instr = if (isLocal) localVarIndex else fieldVarIndex
+          instrs :+ instr
       }
     }
 
     def genLoadCode(
-        index: Ast.Expr[StatefulContext],
+        offset: ArrayTransformer.ArrayVarOffset[StatefulContext],
         isLocal: Boolean
     ): Seq[Instr[StatefulContext]] =
       genVarIndexCode(
-        index,
+        offset,
         isLocal,
         LoadLocal.apply,
         LoadField.apply,
@@ -608,11 +652,11 @@ object Compiler {
       )
 
     def genStoreCode(
-        index: Ast.Expr[StatefulContext],
+        offset: ArrayTransformer.ArrayVarOffset[StatefulContext],
         isLocal: Boolean
     ): Seq[Instr[StatefulContext]] =
       genVarIndexCode(
-        index,
+        offset,
         isLocal,
         StoreLocal.apply,
         StoreField.apply,
