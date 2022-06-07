@@ -339,7 +339,7 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse any" in {
     checkParseStat(
-      "let res = any(0, 4, 1, ?)",
+      "let res = any(0, 4, 1, ? == 1)",
       Ast.Assign(
         Seq(Ast.AssignmentSimpleTarget(Ast.Ident("res"))),
         Ast.Every[StatelessContext](
@@ -354,7 +354,7 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse every" in {
     checkParseStat(
-      "let res = every(0, 4, 1, ?)",
+      "let res = every(0, 4, 1, ? == 1)",
       Ast.Assign(
         Seq(Ast.AssignmentSimpleTarget(Ast.Ident("res"))),
         Ast.Every[StatelessContext](
