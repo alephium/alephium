@@ -708,6 +708,130 @@ object Ast {
       getStatements(state).flatMap(_.genCode(state))
   }
 
+  final case class Mapping[Ctx <: StatelessContext](
+      start: Int,
+      end: Int,
+      step: Int,
+      body: Expr[Ctx]
+  ) extends Expr[Ctx] {
+    override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] =
+      throw Compiler.Error("Nested iterating is not supported")
+
+    private var _expressionsArray: Option[Ast.CreateArrayExpr[Ctx]] = None
+    private def getExpressionsArray(state: Compiler.State[Ctx]): Ast.CreateArrayExpr[Ctx] = {
+      _expressionsArray match {
+        case Some(exprArray) => exprArray
+        case None =>
+          if (step == 0) throw Compiler.Error("map step cannot be 0")
+          val range = start.until(end, step)
+          if (range.size > state.config.loopUnrollingLimit) {
+            throw Compiler.Error("map range too large")
+          }
+          val exprs = range.map { index =>
+            val placeholderExpr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
+            body.fillPlaceholder(placeholderExpr)
+          }
+          val exprArray = Ast.CreateArrayExpr[Ctx](exprs)
+          _expressionsArray = Some(exprArray)
+          exprArray
+      }
+    }
+
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      getExpressionsArray(state)._getType(state)
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      getExpressionsArray(state).genCode(state)
+    }
+  }
+
+  final case class Any[Ctx <: StatelessContext](
+      start: Int,
+      end: Int,
+      step: Int,
+      body: Expr[Ctx]
+  ) extends Expr[Ctx] {
+    override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] =
+      throw Compiler.Error("Nested iterating is not supported")
+
+    private var _expression: Option[Ast.Expr[Ctx]] = None
+    private def getExpression(state: Compiler.State[Ctx]): Ast.Expr[Ctx] = {
+      _expression match {
+        case Some(expr) => expr
+        case None =>
+          if (step == 0) throw Compiler.Error("map step cannot be 0")
+          val range = start.until(end, step)
+          if (range.size > state.config.loopUnrollingLimit) {
+            throw Compiler.Error("iterating range too large")
+          }
+          val exprs = range.map { index =>
+            val placeholderExpr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
+            body.fillPlaceholder(placeholderExpr)
+          }
+          val expr = exprs match {
+            case head +: tail => 
+              tail.fold(head)((cur, acc) => Binop[Ctx](LogicalOperator.Or, cur, acc))
+            case head +: Nil => head
+            case Nil => throw Compiler.Error("no range to iterate")
+          }
+          _expression = Some(expr)
+          expr
+      }
+    }
+
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      Seq(Type.Bool)
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      getExpression(state).genCode(state)
+    }
+  }
+
+  final case class Every[Ctx <: StatelessContext](
+      start: Int,
+      end: Int,
+      step: Int,
+      body: Expr[Ctx]
+  ) extends Expr[Ctx] {
+    override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] =
+      throw Compiler.Error("Nested iterating is not supported")
+
+    private var _expression: Option[Ast.Expr[Ctx]] = None
+    private def getExpression(state: Compiler.State[Ctx]): Ast.Expr[Ctx] = {
+      _expression match {
+        case Some(expr) => expr
+        case None =>
+          if (step == 0) throw Compiler.Error("map step cannot be 0")
+          val range = start.until(end, step)
+          if (range.size > state.config.loopUnrollingLimit) {
+            throw Compiler.Error("iterating range too large")
+          }
+          val exprs = range.map { index =>
+            val placeholderExpr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
+            body.fillPlaceholder(placeholderExpr)
+          }
+          val expr = exprs match {
+            case head +: tail => 
+              tail.fold(head)((cur, acc) => Binop[Ctx](LogicalOperator.And, cur, acc))
+            case head +: Nil => head
+            case Nil => throw Compiler.Error("no range to iterate")
+          }
+          _expression = Some(expr)
+          expr
+      }
+    }
+
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      Seq(Type.Bool)
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      getExpression(state).genCode(state)
+    }
+  }
+
   trait Contract[Ctx <: StatelessContext] {
     def ident: TypeId
     def templateVars: Seq[Argument]

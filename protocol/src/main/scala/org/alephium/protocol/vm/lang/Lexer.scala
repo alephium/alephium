@@ -179,6 +179,9 @@ object Lexer {
     "event",
     "emit",
     "loop",
+    "map",
+    "every",
+    "any",
     "extends",
     "implements"
   )

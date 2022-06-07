@@ -238,6 +238,39 @@ abstract class Parser[Ctx <: StatelessContext] {
   def whileStmt[Unknown: P]: P[Ast.While[Ctx]] =
     P(Lexer.keyword("while") ~/ expr ~ block).map { case (expr, block) => Ast.While(expr, block) }
 
+  def anyExpr[Unknown: P]: P[Ast.Any[Ctx]] =
+    P(
+      Lexer.keyword("any") ~/ "(" ~
+        nonNegativeNum("any start") ~ "," ~
+        nonNegativeNum("any end") ~ "," ~
+        Lexer.num.map(_.intValue()) ~ "," ~
+        expr ~ ")"
+    ).map { case (start, end, step, expr) =>
+      Ast.Any[Ctx](start, end, step, expr)
+    }
+
+  def everyExpr[Unknown: P]: P[Ast.Every[Ctx]] =
+    P(
+      Lexer.keyword("every") ~/ "(" ~
+        nonNegativeNum("every start") ~ "," ~
+        nonNegativeNum("every end") ~ "," ~
+        Lexer.num.map(_.intValue()) ~ "," ~
+        expr ~ ")"
+    ).map { case (start, end, step, expr) =>
+      Ast.Every[Ctx](start, end, step, expr)
+    }
+
+  def mapExpr[Unknown: P]: P[Ast.Mapping[Ctx]] =
+    P(
+      Lexer.keyword("map") ~/ "(" ~
+        nonNegativeNum("map start") ~ "," ~
+        nonNegativeNum("map end") ~ "," ~
+        Lexer.num.map(_.intValue()) ~ "," ~
+        expr ~ ")"
+    ).map { case (start, end, step, expr) =>
+      Ast.Mapping[Ctx](start, end, step, expr)
+    }
+
   def loopStmt[Unknown: P]: P[Ast.Loop[Ctx]] =
     P(
       Lexer.keyword("loop") ~/ "(" ~
@@ -356,7 +389,7 @@ object Parser {
 )
 object StatelessParser extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
-    P(placeholder | const | callExpr | contractConv | variable | parenExpr | arrayExpr)
+    P(placeholder | const | callExpr | contractConv | variable | parenExpr | arrayExpr | mapExpr | everyExpr | anyExpr)
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
     P(varDef | assign | funcCall | ifelse | whileStmt | ret | loopStmt)
@@ -380,7 +413,7 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      placeholder | const | callExpr | contractCallExpr | contractConv | variable | parenExpr | arrayExpr
+      placeholder | const | callExpr | contractCallExpr | contractConv | variable | parenExpr | arrayExpr | mapExpr | everyExpr | anyExpr
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.ContractCallExpr] =
