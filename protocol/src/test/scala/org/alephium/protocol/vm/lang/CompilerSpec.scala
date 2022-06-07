@@ -1111,6 +1111,32 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
+  it should "all arrays in a function share the same array index variable" in {
+    val code =
+      s"""
+         |TxContract Foo() {
+         |  fn func() -> () {
+         |    let array0 = [0, 1, 2]
+         |    let mut i = 0
+         |    while (i < 3) {
+         |      assert!(array0[i] == i)
+         |      i = i + 1
+         |    }
+         |
+         |    let array1 = [0, 1]
+         |    i = 0
+         |    while (i < 2) {
+         |      assert!(array1[i] == i)
+         |      i = i + 1
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val contract = Compiler.compileContract(code).rightValue
+    contract.methods(0).localsLength is 7
+  }
+
   it should "abort if variable array index is invalid" in {
     val code =
       s"""
