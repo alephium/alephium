@@ -470,7 +470,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     val script = Compiler.compileTxScript(main).rightValue
-    fail(blockFlow, chainIndex, script, LowerThanContractMinimalBalance)
+    fail(blockFlow, chainIndex, script, EmptyContractAsset)
   }
 
   it should "use latest worldstate when call external functions" in new ContractFixture {
@@ -2011,14 +2011,20 @@ class VMSpec extends AlephiumSpec {
          |  event Create(subContractId: ByteVec)
          |  @using(preApprovedAssets = true)
          |  pub fn foo() -> () {
-         |    approveAlph!(txInputAddressAt!(0), ${ALPH.nanoAlph(1000).v})
+         |    approveAlph!(txInputAddressAt!(0), ${minimalAlphInContract})
          |    subContractId = copyCreateContract!(selfContractId!(), #010300)
          |    emit Create(subContractId)
          |  }
          |}
          |""".stripMargin
     val contractId =
-      createContractAndCheckState(contract, 2, 2, AVector(Val.ByteVec(ByteString.empty))).key
+      createContractAndCheckState(
+        contract,
+        2,
+        2,
+        AVector(Val.ByteVec(ByteString.empty)),
+        initialAlphAmount = minimalAlphInContract * 2
+      ).key
 
     val main: String =
       s"""

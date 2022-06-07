@@ -19,12 +19,11 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 
 import akka.util.ByteString
-import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.{minimalAlphInContract, minimalGas, ContractId}
+import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -534,42 +533,34 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   }
 
   it should "check the minimal contract balance" in new NetworkFixture {
-    def genBalance(lockupScriptGen: Gen[LockupScript], amount: U256) = {
-      MutBalances(
-        mutable.ArrayBuffer(
-          lockupScriptGen.sample.get ->
-            MutBalancesPerLockup(alphAmount = amount, mutable.Map.empty, 0)
-        )
+    def genAssetOutput(amount: U256): AssetOutput = {
+      TxOutput.asset(
+        amount,
+        lockupScriptGen.retryUntil(_.isAssetType).sample.get.asInstanceOf[LockupScript.Asset]
+      )
+    }
+    def genContractOutput(amount: U256): ContractOutput = {
+      TxOutput.contract(
+        amount,
+        lockupScriptGen.retryUntil(!_.isAssetType).sample.get.asInstanceOf[LockupScript.P2C]
       )
     }
 
-    preLemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract)
-    ) isE ()
-    preLemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract - 1)
-    ) isE ()
-    preLemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract)
-    ) isE ()
-    preLemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract - 1)
-    ) isE ()
+    val output0 = genAssetOutput(minimalAlphInContract - 1)
+    val output1 = genAssetOutput(minimalAlphInContract)
+    val output2 = genContractOutput(minimalAlphInContract - 1)
+    val output3 = genContractOutput(minimalAlphInContract)
 
-    lemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract)
-    ) isE ()
-    lemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract - 1)
-    ) isE ()
-    lemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract)
-    ) isE ()
-    lemanStatefulVm
-      .checkContractMinimalBalances(
-        genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract - 1)
-      )
-      .leftValue isE LowerThanContractMinimalBalance
+    VM.checkContractAlphAmounts(Seq(output0), HardFork.Mainnet) isE ()
+    VM.checkContractAlphAmounts(Seq(output1), HardFork.Mainnet) isE ()
+    VM.checkContractAlphAmounts(Seq(output2), HardFork.Mainnet) isE ()
+    VM.checkContractAlphAmounts(Seq(output3), HardFork.Mainnet) isE ()
+
+    VM.checkContractAlphAmounts(Seq(output0), HardFork.Leman) isE ()
+    VM.checkContractAlphAmounts(Seq(output1), HardFork.Leman) isE ()
+    VM.checkContractAlphAmounts(Seq(output2), HardFork.Leman).leftValue isE
+      LowerThanContractMinimalBalance
+    VM.checkContractAlphAmounts(Seq(output3), HardFork.Leman) isE ()
   }
 
   it should "check method modifier compatibility" in new NetworkFixture {
