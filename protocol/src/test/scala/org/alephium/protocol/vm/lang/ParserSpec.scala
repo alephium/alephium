@@ -337,6 +337,36 @@ class ParserSpec extends AlephiumSpec {
     }
   }
 
+  it should "parse any" in {
+    checkParseStat(
+      "let res = any(0, 4, 1, ?)",
+      Ast.Assign(
+        Seq(Ast.AssignmentSimpleTarget(Ast.Ident("res"))),
+        Ast.Every[StatelessContext](
+          0,
+          4,
+          1,
+          Ast.Placeholder[StatelessContext]()
+        )
+      )
+    )
+  }
+
+  it should "parse every" in {
+    checkParseStat(
+      "let res = every(0, 4, 1, ?)",
+      Ast.Assign(
+        Seq(Ast.AssignmentSimpleTarget(Ast.Ident("res"))),
+        Ast.Every[StatelessContext](
+          0,
+          4,
+          1,
+          Ast.Placeholder[StatelessContext]()
+        )
+      )
+    )
+  }
+
   it should "parse map" in {
     checkParseStat(
       // "let res = map(0, 4, 1, ? + 1)",

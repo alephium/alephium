@@ -180,6 +180,8 @@ object Lexer {
     "emit",
     "loop",
     "map",
+    "every",
+    "any",
     "extends",
     "implements"
   )
