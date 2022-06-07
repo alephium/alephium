@@ -337,6 +337,22 @@ class ParserSpec extends AlephiumSpec {
     }
   }
 
+  it should "parse map" in {
+    checkParseStat(
+      // "let res = map(0, 4, 1, ? + 1)",
+      "let res = map(0, 4, 1, ?)",
+      Ast.Assign(
+        Seq(Ast.AssignmentSimpleTarget(Ast.Ident("res"))),
+        Ast.Mapping[StatelessContext](
+          0,
+          4,
+          1,
+          Ast.Placeholder[StatelessContext]()
+        )
+      )
+    )
+  }
+
   it should "parse loop" in {
     checkParseStat(
       "loop(0, 4, 1, x[?] = ?)",

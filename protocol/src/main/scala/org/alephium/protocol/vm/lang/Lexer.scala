@@ -179,6 +179,7 @@ object Lexer {
     "event",
     "emit",
     "loop",
+    "map",
     "extends",
     "implements"
   )
