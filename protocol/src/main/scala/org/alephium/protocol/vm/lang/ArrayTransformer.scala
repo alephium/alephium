@@ -169,7 +169,7 @@ object ArrayTransformer {
     ): ArrayVarOffset[Ctx] = {
       assume(indexes.nonEmpty)
       val subArrayRef = subArray(state, indexes.dropRight(1))
-      subArrayRef.offset.add(subArrayRef.calcOffset(state, indexes(indexes.length - 1)))
+      subArrayRef.offset.add(subArrayRef.calcOffset(state, indexes.last))
     }
 
     private def storeArrayIndexVar(

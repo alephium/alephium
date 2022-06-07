@@ -206,15 +206,15 @@ object Compiler {
         case Ast.Binop(op: ArithOperator, Ast.Const(Val.U256(l)), Ast.Const(Val.U256(r))) =>
           op match {
             case ArithOperator.Add =>
-              Ast.Const(Val.U256(l.add(r).getOrElse(throw Compiler.Error("Invalid array index"))))
+              Ast.Const(Val.U256(l.add(r).getOrElse(throw Error(s"Invalid array index ${index}"))))
             case ArithOperator.Sub =>
-              Ast.Const(Val.U256(l.sub(r).getOrElse(throw Compiler.Error("Invalid array index"))))
+              Ast.Const(Val.U256(l.sub(r).getOrElse(throw Error(s"Invalid array index ${index}"))))
             case ArithOperator.Mul =>
-              Ast.Const(Val.U256(l.mul(r).getOrElse(throw Compiler.Error("Invalid array index"))))
+              Ast.Const(Val.U256(l.mul(r).getOrElse(throw Error(s"Invalid array index ${index}"))))
             case ArithOperator.Div =>
-              Ast.Const(Val.U256(l.div(r).getOrElse(throw Compiler.Error("Invalid array index"))))
+              Ast.Const(Val.U256(l.div(r).getOrElse(throw Error(s"Invalid array index ${index}"))))
             case ArithOperator.Mod =>
-              Ast.Const(Val.U256(l.mod(r).getOrElse(throw Compiler.Error("Invalid array index"))))
+              Ast.Const(Val.U256(l.mod(r).getOrElse(throw Error(s"Invalid array index ${index}"))))
             case ArithOperator.ModAdd => Ast.Const(Val.U256(l.modAdd(r)))
             case ArithOperator.ModSub => Ast.Const(Val.U256(l.modSub(r)))
             case ArithOperator.ModMul => Ast.Const(Val.U256(l.modMul(r)))
@@ -241,7 +241,7 @@ object Compiler {
     }
 
     def getAndCheckConstantIndex[Ctx <: StatelessContext](index: Ast.Expr[Ctx]): Option[Int] = {
-      State.getConstantIndex(index) match {
+      getConstantIndex(index) match {
         case Ast.Const(Val.U256(v)) =>
           val idx = v.toInt.getOrElse(throw Compiler.Error(s"Invalid array index: $v"))
           checkConstantIndex(idx)
@@ -448,10 +448,13 @@ object Compiler {
       }
     }
 
-    def getArrayElementType(tpe: Type, indexes: Seq[Ast.Expr[Ctx]]): Type = {
+    def getArrayElementType(array: Ast.Expr[Ctx], indexes: Seq[Ast.Expr[Ctx]]): Type = {
+      getArrayElementType(array.getType(this), indexes)
+    }
+    def getArrayElementType(tpes: Seq[Type], indexes: Seq[Ast.Expr[Ctx]]): Type = {
       indexes.foreach(checkArrayIndexType)
-      tpe match {
-        case tpe: Type.FixedSizeArray => arrayElementType(tpe, indexes)
+      tpes match {
+        case Seq(tpe: Type.FixedSizeArray) => arrayElementType(tpe, indexes)
         case tpe =>
           throw Compiler.Error(s"Expect array type, have: $tpe")
       }

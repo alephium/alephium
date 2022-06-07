@@ -98,10 +98,7 @@ object Ast {
       indexes: Seq[Ast.Expr[Ctx]]
   ) extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      array.getType(state) match {
-        case Seq(tpe) => Seq(state.getArrayElementType(tpe, indexes))
-        case _        => throw Compiler.Error(s"Expect array type, have: $tpe")
-      }
+      Seq(state.getArrayElementType(array, indexes))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -371,7 +368,7 @@ object Ast {
       indexes: Seq[Ast.Expr[Ctx]]
   ) extends AssignmentTarget[Ctx] {
     def _getType(state: Compiler.State[Ctx]): Type =
-      state.getArrayElementType(state.getVariable(ident).tpe, indexes)
+      state.getArrayElementType(Seq(state.getVariable(ident).tpe), indexes)
 
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
       val arrayRef = state.getArrayRef(ident)
