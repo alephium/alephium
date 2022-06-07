@@ -832,186 +832,283 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   trait TestContractMethodFixture {
-    def code: String
-    def fields: AVector[Val] = AVector.empty
-
-    lazy val contract       = Compiler.compileContract(code).rightValue
-    lazy val (obj, context) = prepareContract(contract, fields)
-
-    def test(methodIndex: Int, args: AVector[Val], result: AVector[Val]) = {
+    def test(
+        contractCode: String,
+        initFields: AVector[Val] = AVector.empty,
+        methodIndex: Int = 0,
+        args: AVector[Val] = AVector.empty,
+        result: AVector[Val] = AVector.empty
+    ) = {
+      val contract       = Compiler.compileContract(contractCode).rightValue
+      val (obj, context) = prepareContract(contract, initFields)
       StatefulVM.executeWithOutputs(context, obj, args, methodIndex).rightValue is result
     }
   }
 
   it should "test array" in new TestContractMethodFixture {
-    val code =
-      s"""
-         |TxContract ArrayTest() {
-         |  pub fn test0() -> (Bool) {
-         |    let mut arr1 = [1, 2, 3]
-         |    arr1[0] = 2
-         |    return arr1[0] == 2 && arr1[1] == 2 && arr1[2] == 3
-         |  }
-         |
-         |  pub fn test1(x: U256) -> (U256) {
-         |    return [x; 4][0]
-         |  }
-         |
-         |  pub fn test2(mut x: [Bool; 4]) -> (Bool) {
-         |    x[1] = !x[1]
-         |    return x[1]
-         |  }
-         |
-         |  pub fn test3(mut x: [U256; 4]) -> (Bool) {
-         |    let mut y = x
-         |    y[0] = y[0] + 1
-         |    return y[0] == (x[0] + 1)
-         |  }
-         |
-         |  pub fn test4(x: U256) -> ([U256; 2]) {
-         |    let y = [[x; 2]; 5]
-         |    return y[0]
-         |  }
-         |
-         |  pub fn test5(value: U256) -> ([[U256; 2]; 2]) {
-         |    let x = [[value; 2]; 3]
-         |    let mut y = x
-         |    y[0][0] = y[0][0] + 1
-         |    y[0][1] = y[0][1] + 1
-         |    y[2][0] = y[2][0] + 2
-         |    y[2][1] = y[2][1] + 2
-         |    return [y[0], y[2]]
-         |  }
-         |
-         |  pub fn foo(x: U256) -> ([U256; 4]) {
-         |    return [x; 4]
-         |  }
-         |
-         |  pub fn test7(x: U256) -> (U256) {
-         |    return foo(x)[0]
-         |  }
-         |
-         |  pub fn bar(x: [U256; 4], y: [U256; 4]) -> (U256) {
-         |    return [x, y][0][0]
-         |  }
-         |
-         |  pub fn test9(x: U256) -> (U256) {
-         |    return bar(foo(x), foo(x))
-         |  }
-         |
-         |  pub fn test10() -> (Bool) {
-         |    let mut x = [[4; 2]; 2]
-         |    let y = [3; 2]
-         |    x[0] = y
-         |    return x[0][0] == 3 &&
-         |           x[0][1] == 3 &&
-         |           x[1][0] == 4 &&
-         |           x[1][1] == 4
-         |  }
-         |
-         |  pub fn test11() -> (Bool) {
-         |    let mut x = [[[4; 2]; 2]; 2]
-         |    let y = [3; 2]
-         |    x[1][1] = y
-         |    return x[0][0][0] == 4 &&
-         |           x[0][0][1] == 4 &&
-         |           x[1][1][0] == 3 &&
-         |           x[1][1][1] == 3
-         |  }
-         |
-         |  pub fn test12() -> (Bool) {
-         |    let mut x = [4; 2]
-         |    let y = [x, x]
-         |    x[0] = 3
-         |    return y[0][0] == 4 &&
-         |           y[0][1] == 4 &&
-         |           y[1][0] == 4 &&
-         |           y[1][1] == 4
-         |  }
-         |
-         |  pub fn test13() -> (Bool) {
-         |    let mut x = [[4; 2]; 2]
-         |    let y = [x[0], x[1]]
-         |    x[0] = [3; 2]
-         |    return y[0][0] == 4 &&
-         |           y[0][1] == 4 &&
-         |           y[1][0] == 4 &&
-         |           y[1][1] == 4 &&
-         |           x[0][0] == 3 &&
-         |           x[0][1] == 3
-         |  }
-         |
-         |  pub fn test14() -> (Bool) {
-         |    let mut x = [[0, 1], [2, 3]]
-         |    let mut i = 0
-         |    let mut j = 0
-         |    while (i < 2) {
-         |      while (j < 2) {
-         |        x[i][j] = x[i][j] + 1
-         |        j = j + 1
-         |      }
-         |      j = 0
-         |      i = i + 1
-         |    }
-         |    return x[0][0] == 1 &&
-         |           x[0][1] == 2 &&
-         |           x[1][0] == 3 &&
-         |           x[1][1] == 4
-         |  }
-         |
-         |  pub fn test15(idx1: U256, idx2: U256, value: U256) -> (U256) {
-         |    let mut x = [[0, 1], [2, 3]]
-         |    x[idx1][idx2] = value
-         |    return x[idx1][idx2]
-         |  }
-         |
-         |  pub fn getConstantIndex() -> (U256) {
-         |    return 2
-         |  }
-         |
-         |  pub fn test17() -> (Bool) {
-         |    let mut x = [1, 2, 3, 4]
-         |    let i = 4
-         |    return x[4 - 2] == 3 &&
-         |           x[i - 2] == 3 &&
-         |           x[getConstantIndex()] == 3
-         |  }
-         |
-         |  fn check(array: [U256; 4], v: U256) -> () {
-         |    let mut i = 0
-         |    while (i < 4) {
-         |      assert!(array[i] == v + i)
-         |      i = i + 1
-         |    }
-         |  }
-         |
-         |  pub fn test19() -> () {
-         |    let array = [[0, 1, 2, 3], [4, 5, 6, 7]]
-         |    let mut i = 0
-         |    while (i < 2) {
-         |      check(array[i], i * 4)
-         |      i = i + 1
-         |    }
-         |  }
-         |}
-         |""".stripMargin
+    {
+      info("get array element from array literal")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    assert!([0, 1, 2][2] == 2)
+           |    assert!(foo()[1] == 1)
+           |    assert!([foo(), foo()][0][0] == 0)
+           |  }
+           |
+           |  fn foo() -> ([U256; 3]) {
+           |    return [0, 1, 2]
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
 
-    test(0, AVector.empty, AVector(Val.True))
-    test(1, AVector(Val.U256(3)), AVector(Val.U256(3)))
-    test(2, AVector.fill(4)(Val.True), AVector(Val.False))
-    test(3, AVector.fill(4)(Val.U256(10)), AVector(Val.True))
-    test(4, AVector(Val.U256(4)), AVector.fill(2)(Val.U256(4)))
-    test(5, AVector(Val.U256(1)), AVector(Val.U256(2), Val.U256(2), Val.U256(3), Val.U256(3)))
-    test(7, AVector(Val.U256(3)), AVector(Val.U256(3)))
-    test(9, AVector(Val.U256(3)), AVector(Val.U256(3)))
-    test(10, AVector.empty, AVector(Val.True))
-    test(11, AVector.empty, AVector(Val.True))
-    test(12, AVector.empty, AVector(Val.True))
-    test(13, AVector.empty, AVector(Val.True))
-    test(14, AVector.empty, AVector(Val.True))
-    test(15, AVector(Val.U256(0), Val.U256(1), Val.U256(5)), AVector(Val.U256(5)))
-    test(17, AVector.empty, AVector(Val.Bool(true)))
-    test(19, AVector.empty, AVector.empty)
+    {
+      info("array constant index")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    let array = [1, 2, 3]
+           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("assign array element by constant index")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    let mut array = [0; 3]
+           |    array[0] = 1
+           |    array[1] = 2
+           |    array[2] = 3
+           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("array variable assignment")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    let x = [1, 2, 3]
+           |    let mut y = [0; 3]
+           |    assert!(y[0] == 0 && y[1] == 0 && y[2] == 0)
+           |    y = x
+           |    assert!(y[0] == 1 && y[1] == 2 && y[2] == 3)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("assign array element by variable index")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    let mut array = [0; 3]
+           |    let mut i = 0
+           |    while (i < 3) {
+           |      array[i] = i + 1
+           |      i = i + 1
+           |    }
+           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("array as function params and return values")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test(mut x: [Bool; 2]) -> ([Bool; 2]) {
+           |    x[0] = !x[0]
+           |    x[1] = !x[1]
+           |    return x
+           |  }
+           |}
+           |""".stripMargin
+      test(code, args = AVector(Val.False, Val.True), result = AVector(Val.True, Val.False))
+    }
+
+    {
+      info("get sub array by constant index")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    let array = [[0, 1, 2, 3], [4, 5, 6, 7]]
+           |    check(array[0], 0)
+           |    check(array[1], 4)
+           |  }
+           |
+           |  fn check(array: [U256; 4], v: U256) -> () {
+           |    assert!(
+           |      array[0] == v &&
+           |      array[1] == v + 1 &&
+           |      array[2] == v + 2 &&
+           |      array[3] == v + 3
+           |    )
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("get sub array by variable index")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    let array = [[0, 1, 2, 3], [4, 5, 6, 7]]
+           |    let mut i = 0
+           |    while (i < 2) {
+           |      check(array[i], i * 4)
+           |      i = i + 1
+           |    }
+           |  }
+           |
+           |  fn check(array: [U256; 4], v: U256) -> () {
+           |    let mut i = 0
+           |    while (i < 4) {
+           |      assert!(array[i] == v + i)
+           |      i = i + 1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("assign multi-dim array elements by constant index")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    let mut x = [[0; 2]; 2]
+           |    x[0][0] = 1
+           |    x[0][1] = 2
+           |    x[1][0] = 3
+           |    x[1][1] = 4
+           |    assert!(
+           |      x[0][0] == 1 && x[0][1] == 2 &&
+           |      x[1][0] == 3 && x[1][1] == 4
+           |    )
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("assign multi-dim array elements by variable index")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    let mut x = [[0, 1], [2, 3]]
+           |    let mut i = 0
+           |    let mut j = 0
+           |    while (i < 2) {
+           |      while (j < 2) {
+           |        x[i][j] = x[i][j] + 1
+           |        j = j + 1
+           |      }
+           |      j = 0
+           |      i = i + 1
+           |    }
+           |    assert!(
+           |      x[0][0] == 1 && x[0][1] == 2 &&
+           |      x[1][0] == 3 && x[1][1] == 4
+           |    )
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("assign sub array by constant index")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    let mut x = [[0; 2]; 2]
+           |    x[0] = [0, 1]
+           |    x[1] = [2, 3]
+           |    assert!(
+           |      x[0][0] == 0 && x[0][1] == 1 &&
+           |      x[1][0] == 2 && x[1][1] == 3
+           |    )
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("assign sub array by variable index")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    let mut x = [[0; 2]; 2]
+           |    let mut i = 0
+           |    while (i < 2) {
+           |      x[i] = [i, i + 1]
+           |      i = i + 1
+           |    }
+           |    i = 0
+           |    while (i < 2) {
+           |      assert!(x[i][0] == i)
+           |      assert!(x[i][1] == i + 1)
+           |      i = i + 1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("expression as array index")
+      val code =
+        s"""
+           |TxContract ArrayTest() {
+           |  pub fn test() -> () {
+           |    let mut x = [0, 1, 2, 3]
+           |    let num = 4
+           |    assert!(x[foo()] == 3)
+           |    assert!(x[num / 2] == 2)
+           |    assert!(x[num % 3] == 1)
+           |    assert!(x[num - 4] == 0)
+           |  }
+           |
+           |  fn foo() -> U256 {
+           |    return 3
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
   }
 
   it should "abort if variable array index is invalid" in {
@@ -1062,112 +1159,122 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test contract array fields" in new TestContractMethodFixture {
-    val code =
-      s"""
-         |TxContract Foo(
-         |  mut array: [[U256; 2]; 4],
-         |  mut x: U256
-         |) {
-         |  fn foo0(a: [U256; 2], b: [U256; 2]) -> () {
-         |    let mut i = 0
-         |    while (i < 2) {
-         |      assert!(a[i] == b[i])
-         |      i = i + 1
-         |    }
-         |    return
-         |  }
-         |
-         |  pub fn test1(a: [[U256; 2]; 4]) -> () {
-         |    array = a
-         |    let mut i = 0
-         |    while (i < 4) {
-         |      foo0(array[i], a[i])
-         |      i = i + 1
-         |    }
-         |    return
-         |  }
-         |
-         |  fn foo1() -> (U256) {
-         |    x = x + 1
-         |    return x
-         |  }
-         |
-         |  pub fn test3() -> (Bool) {
-         |    x = 0
-         |    let res = [foo1(), foo1(), foo1(), foo1()]
-         |    return x == 4
-         |  }
-         |
-         |  pub fn test4() -> (Bool) {
-         |    x = 0
-         |    let res = [foo1(), foo1(), foo1(), foo1()][2]
-         |    return x == 4
-         |  }
-         |
-         |  pub fn test5() -> (Bool) {
-         |    x = 0
-         |    let res = [foo1(); 4]
-         |    return x == 4
-         |  }
-         |
-         |  pub fn test6() -> () {
-         |    let mut i = 0
-         |    let mut j = 0
-         |    while (i < 4) {
-         |      while (j < 2) {
-         |        array[i][j] = i + j
-         |        j = j + 1
-         |      }
-         |      j = 0
-         |      i = i + 1
-         |    }
-         |
-         |    i = 0
-         |    j = 0
-         |    while (i < 4) {
-         |      while (j < 2) {
-         |        assert!(array[i][j] == i + j)
-         |        j = j + 1
-         |      }
-         |      j = 0
-         |      i = i + 1
-         |    }
-         |  }
-         |
-         |  fn foo2() -> U256 {
-         |    let v = x
-         |    x = x + 1
-         |    return v
-         |  }
-         |
-         |  pub fn test8() -> () {
-         |    x = 0
-         |    array = [[0; 2]; 4]
-         |    let mut i = 0
-         |    while (i < 4) {
-         |      array[foo2()] = [x; 2]
-         |      i = i + 1
-         |      assert!(x == i)
-         |    }
-         |    assert!(x == 4)
-         |
-         |    i = 0
-         |    while (i < 4) {
-         |      assert!(array[i][0] == i)
-         |      assert!(array[i][1] == i)
-         |      i = i + 1
-         |    }
-         |  }
-         |}
-         |""".stripMargin
+    {
+      info("array fields assignment")
+      val code =
+        s"""
+           |TxContract ArrayTest(mut array: [[U256; 2]; 4]) {
+           |  pub fn test(a: [[U256; 2]; 4]) -> () {
+           |    array = a
+           |    let mut i = 0
+           |    while (i < 4) {
+           |      foo(array[i], a[i])
+           |      i = i + 1
+           |    }
+           |  }
+           |
+           |  fn foo(a: [U256; 2], b:[U256; 2]) -> () {
+           |    let mut i = 0
+           |    while (i < 2) {
+           |      assert!(a[i] == b[i])
+           |      i = i + 1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      val args = AVector.from[Val]((0 until 8).map(Val.U256(_)))
+      test(code, initFields = AVector.fill(8)(Val.U256(0)), args = args)
+    }
 
-    override val fields: AVector[Val] = AVector.fill(9)(Val.U256(0))
-    test(1, AVector.fill(8)(Val.U256(3)), AVector.empty)
-    test(3, AVector.empty, AVector(Val.True))
-    test(4, AVector.empty, AVector(Val.True))
-    test(5, AVector.empty, AVector(Val.True))
-    test(6, AVector.empty, AVector.empty)
-    test(8, AVector.empty, AVector.empty)
+    {
+      info("create array with side effect")
+      val code =
+        s"""
+           |TxContract ArrayTest(mut x: U256) {
+           |  pub fn test() -> () {
+           |    let array0 = [foo(), foo(), foo()]
+           |    assert!(x == 3)
+           |
+           |    let array1 = [foo(), foo(), foo()][0]
+           |    assert!(x == 6)
+           |
+           |    let array2 = [foo(); 3]
+           |    assert!(x == 9)
+           |  }
+           |
+           |  fn foo() -> U256 {
+           |    x = x + 1
+           |    return x
+           |  }
+           |}
+           |""".stripMargin
+      test(code, initFields = AVector(Val.U256(0)))
+    }
+
+    {
+      info("assign array element")
+      val code =
+        s"""
+           |TxContract ArrayTest(mut array: [[U256; 2]; 4]) {
+           |  pub fn test() -> () {
+           |    let mut i = 0
+           |    let mut j = 0
+           |    while (i < 4) {
+           |      while (j < 2) {
+           |        array[i][j] = i + j
+           |        j = j + 1
+           |      }
+           |      j = 0
+           |      i = i + 1
+           |    }
+           |
+           |    i = 0
+           |    j = 0
+           |    while (i < 4) {
+           |      while (j < 2) {
+           |        assert!(array[i][j] == i + j)
+           |        j = j + 1
+           |      }
+           |      j = 0
+           |      i = i + 1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      test(code, initFields = AVector.fill(8)(Val.U256(0)))
+    }
+
+    {
+      info("avoid executing array indexing instructions multiple times")
+      val code =
+        s"""
+           |TxContract Foo(mut array: [[U256; 2]; 4], mut x: U256) {
+           |  pub fn test() -> () {
+           |    let mut i = 0
+           |    while (i < 4) {
+           |      array[foo()] = [x; 2]
+           |      i = i + 1
+           |      assert!(x == i)
+           |    }
+           |    assert!(x == 4)
+           |
+           |    i = 0
+           |    while (i < 4) {
+           |      assert!(array[i][0] == i)
+           |      assert!(array[i][1] == i)
+           |      i = i + 1
+           |    }
+           |  }
+           |
+           |  fn foo() -> U256 {
+           |    let v = x
+           |    x = x + 1
+           |    return v
+           |  }
+           |}
+           |""".stripMargin
+      test(code, initFields = AVector.fill(9)(Val.U256(0)))
+    }
   }
 
   it should "get constant array index" in {
@@ -1276,123 +1383,98 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test return multiple values" in new TestContractMethodFixture {
-    val code: String =
-      s"""
-         |TxContract Foo(mut array: [U256; 3]) {
-         |  fn foo0() -> (U256, U256) {
-         |    return 1, 2
-         |  }
-         |
-         |  pub fn test1() -> (Bool) {
-         |    let mut a = 0
-         |    let mut b = 0
-         |    a, b = foo0()
-         |    return a == 1 && b == 2
-         |  }
-         |
-         |  pub fn test2() -> (Bool) {
-         |    array[0], array[1] = foo0()
-         |    return array[0] == 1 && array[1] == 2
-         |  }
-         |
-         |  pub fn foo1() -> ([U256; 3], [U256; 3], U256) {
-         |    return [1, 2, 3], [4, 5, 6], 7
-         |  }
-         |
-         |  pub fn test4() -> (Bool) {
-         |    let mut i = 0
-         |    let mut x = [[0; 3]; 2]
-         |    x[0], array, i = foo1()
-         |    return x[0][0] == 1 &&
-         |           x[0][1] == 2 &&
-         |           x[0][2] == 3 &&
-         |           array[0] == 4 &&
-         |           array[1] == 5 &&
-         |           array[2] == 6 &&
-         |           i == 7
-         |  }
-         |
-         |  pub fn foo2(value: U256) -> ([U256; 3], U256) {
-         |    let mut i = 0
-         |    while (i < 3) {
-         |      array[i] = array[i] + value
-         |      i = i + 1
-         |    }
-         |    return array, value
-         |  }
-         |
-         |  pub fn test6() -> Bool {
-         |    array = [1, 2, 3]
-         |    let mut x = [[0; 3]; 3]
-         |    let mut y = [0; 3]
-         |    let mut i = 0
-         |    while (i < 3) {
-         |      x[i], y[i] = foo2(i)
-         |      i = i + 1
-         |    }
-         |    return x[0][0] == 1 &&
-         |           x[0][1] == 2 &&
-         |           x[0][2] == 3 &&
-         |           x[1][0] == 2 &&
-         |           x[1][1] == 3 &&
-         |           x[1][2] == 4 &&
-         |           x[2][0] == 4 &&
-         |           x[2][1] == 5 &&
-         |           x[2][2] == 6 &&
-         |           y[0] == 0 &&
-         |           y[1] == 1 &&
-         |           y[2] == 2
-         |  }
-         |
-         |  fn foo3() -> ([U256; 2], U256, U256) {
-         |    return [1; 2], 1, 1
-         |  }
-         |
-         |  pub fn test8() -> () {
-         |    let (mut a, mut b, c) = foo3()
-         |    assert!(b == 1 && c == 1 && a[0] == 1 && a[1] == 1)
-         |    let mut i = 0
-         |    while (i < 2) {
-         |      a[i] = i
-         |      i = i + 1
-         |    }
-         |    assert!(a[0] == 0 && a[1] == 1)
-         |    return
-         |  }
-         |}
-         |""".stripMargin
+    {
+      info("return multiple simple values")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  pub fn test() -> () {
+           |    let (a, b) = foo()
+           |    assert!(a == 1 && b)
+           |  }
+           |
+           |  fn foo() -> (U256, Bool) {
+           |    return 1, true
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
 
-    override val fields = AVector.fill(3)(Val.U256(0))
-    test(1, AVector.empty, AVector(Val.True))
-    test(2, AVector.empty, AVector(Val.True))
-    test(4, AVector.empty, AVector(Val.True))
-    test(6, AVector.empty, AVector(Val.True))
-    test(8, AVector.empty, AVector.empty)
+    {
+      info("test return array and simple values")
+      val code =
+        s"""
+           |TxContract Foo(mut array: [U256; 3]) {
+           |  pub fn test() -> () {
+           |    array = [1, 2, 3]
+           |    let mut x = [[0; 3]; 3]
+           |    let mut y = [0; 3]
+           |    let mut i = 0
+           |    while (i < 3) {
+           |      x[i], y[i] = foo(i)
+           |      i = i + 1
+           |    }
+           |    assert!(
+           |      x[0][0] == 1 && x[0][1] == 2 && x[0][2] == 3 &&
+           |      x[1][0] == 2 && x[1][1] == 3 && x[1][2] == 4 &&
+           |      x[2][0] == 4 && x[2][1] == 5 && x[2][2] == 6 &&
+           |      y[0] == 0 && y[1] == 1 && y[2] == 2
+           |    )
+           |  }
+           |
+           |  pub fn foo(value: U256) -> ([U256; 3], U256) {
+           |    let mut i = 0
+           |    while (i < 3) {
+           |      array[i] = array[i] + value
+           |      i = i + 1
+           |    }
+           |    return array, value
+           |  }
+           |}
+           |""".stripMargin
+      test(code, initFields = AVector.fill(3)(Val.U256(0)))
+    }
+
+    {
+      info("test return multi-dim array and values")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  pub fn test() -> () {
+           |    let (array, i) = foo()
+           |    assert!(
+           |      array[0][0] == 1 && array[0][1] == 2 && array[0][2] == 3 &&
+           |      array[1][0] == 4 && array[1][1] == 5 && array[1][2] == 6 &&
+           |      i == 7
+           |    )
+           |  }
+           |
+           |  fn foo() -> ([[U256; 3]; 2], U256) {
+           |    return [[1, 2, 3], [4, 5, 6]], 7
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
   }
 
   it should "return from if block" in new TestContractMethodFixture {
     val code: String =
       s"""
          |TxContract Foo(mut value: U256) {
-         |  pub fn foo() -> () {
+         |  pub fn test() -> U256 {
          |    if (true) {
          |      value = 1
-         |      return
+         |      return value
          |    }
          |
          |    value = 2
-         |    return
-         |  }
-         |
-         |  pub fn getValue() -> (U256) {
          |    return value
          |  }
          |}
          |""".stripMargin
-
-    override val fields = AVector(Val.U256(0))
-    test(0, AVector.empty, AVector.empty)
-    test(1, AVector.empty, AVector(Val.U256(1)))
+    test(code, initFields = AVector(Val.U256(0)), result = AVector(Val.U256(1)))
   }
 
   it should "generate efficient code for arrays" in {
