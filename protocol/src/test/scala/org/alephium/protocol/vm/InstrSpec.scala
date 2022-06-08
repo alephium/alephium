@@ -469,16 +469,29 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     StoreLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex
   }
 
-  it should "Pop" in new ConstInstrFixture {
+  it should "Pop" in new StatelessInstrFixture {
     val bool: Val = Val.Bool(true)
     stack.push(bool)
 
-    val initialGas = context.gasRemaining
-    Pop.runWith(frame) isE ()
+    runAndCheckGas(Pop)
     stack.size is 0
-    initialGas.subUnsafe(context.gasRemaining) is Pop.gas()
 
     Pop.runWith(frame).leftValue isE StackUnderflow
+  }
+
+  it should "Dup" in new StatelessInstrFixture {
+    stack.size is 0
+    stack.top is None
+    Dup.runWith(frame).leftValue isE StackUnderflow
+
+    val bool: Val = Val.Bool(true)
+    stack.push(bool)
+    stack.top is Some(bool)
+    stack.size is 1
+
+    runAndCheckGas(Dup)
+    stack.top is Some(bool)
+    stack.size is 2
   }
 
   it should "BoolNot" in new StatelessInstrFixture {
@@ -2428,7 +2441,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover -> 2500,
       Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280,
       ContractIdToAddress -> 5,
-      LoadLocalByIndex -> 5, StoreLocalByIndex -> 5
+      LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -2553,7 +2566,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover -> 114,
       Log6 -> 115, Log7 -> 116, Log8 -> 117, Log9 -> 118,
       ContractIdToAddress -> 119,
-      LoadLocalByIndex -> 120, StoreLocalByIndex -> 121,
+      LoadLocalByIndex -> 120, StoreLocalByIndex -> 121, Dup -> 122,
       // stateful instructions
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -2607,7 +2620,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover,
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
-      LoadLocalByIndex, StoreLocalByIndex
+      LoadLocalByIndex, StoreLocalByIndex, Dup
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),

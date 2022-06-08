@@ -1111,11 +1111,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "all arrays in a function share the same array index variable" in {
+  it should "avoid using array index variables whenever possible" in {
     val code =
       s"""
          |TxContract Foo() {
-         |  fn func() -> () {
+         |  fn func0() -> () {
          |    let array0 = [0, 1, 2]
          |    let mut i = 0
          |    while (i < 3) {
@@ -1130,11 +1130,29 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |      i = i + 1
          |    }
          |  }
+         |
+         |  fn func1() -> () {
+         |    let array0 = [[0; 2]; 3]
+         |    let array1 = [[0; 2]; 3]
+         |    let mut i = 0
+         |    while (i < 3) {
+         |      foo(array0[i], array1[i])
+         |      i = i + 1
+         |    }
+         |  }
+         |
+         |  fn foo(a1: [U256; 2], a2: [U256; 2]) -> () {
+         |  }
          |}
          |""".stripMargin
 
     val contract = Compiler.compileContract(code).rightValue
-    contract.methods(0).localsLength is 7
+    contract
+      .methods(0)
+      .localsLength is 6 // access single array element will not use the array index variable
+    contract
+      .methods(1)
+      .localsLength is 14 // all arrays in a function share the same array index variable
   }
 
   it should "abort if variable array index is invalid" in {
@@ -1286,9 +1304,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |
            |    i = 0
            |    while (i < 4) {
-           |      assert!(array[i][0] == i)
-           |      assert!(array[i][1] == i)
+           |      x = 0
+           |      assert!(array[i][foo()] == i)
+           |      assert!(array[i][foo()] == i)
            |      i = i + 1
+           |      assert!(x == 2)
            |    }
            |  }
            |

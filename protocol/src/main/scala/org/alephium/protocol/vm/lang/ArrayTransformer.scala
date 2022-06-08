@@ -152,9 +152,8 @@ object ArrayTransformer {
           checkArrayIndex(idx, tpe.size)
           ConstantArrayVarOffset(idx)
         case None =>
-          val (ident, codes) = storeArrayIndexVar(state, index.genCode(state))
-          val loadCode       = state.genLoadCode(ident)
-          val instrs = codes ++ loadCode ++ loadCode ++ Seq(
+          val instrs = index.genCode(state) ++ Seq(
+            Dup,
             ConstInstr.u256(Val.U256(U256.unsafe(tpe.size))),
             U256Lt,
             Assert

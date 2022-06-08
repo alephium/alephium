@@ -144,7 +144,7 @@ object Instr {
     EthEcRecover,
     Log6, Log7, Log8, Log9,
     ContractIdToAddress,
-    LoadLocalByIndex, StoreLocalByIndex
+    LoadLocalByIndex, StoreLocalByIndex, Dup
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -445,6 +445,22 @@ sealed trait PureStackInstr extends OperandStackInstr with StatelessInstrCompani
 case object Pop extends PureStackInstr {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.opStack.remove(1)
+  }
+}
+
+case object Dup extends PureStackInstr with LemanInstrWithSimpleGas[StatelessContext] {
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstrWithSimpleGas].runWith(frame)
+
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = failed(
+    InactiveInstr(this)
+  )
+
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      value <- frame.opStack.top.toRight(Right(StackUnderflow))
+      _     <- frame.pushOpStack(value)
+    } yield ()
   }
 }
 
