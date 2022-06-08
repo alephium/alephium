@@ -154,7 +154,7 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed0.id is Ast.FuncId("add", false)
     parsed0.isPublic is false
-    parsed0.useApprovedAssets is false
+    parsed0.usePreapprovedAssets is false
     parsed0.useContractAssets is false
     parsed0.args.size is 2
     parsed0.rtypes is Seq(Type.U256, Type.U256)
@@ -170,7 +170,7 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed1.id is Ast.FuncId("add", false)
     parsed1.isPublic is true
-    parsed1.useApprovedAssets is true
+    parsed1.usePreapprovedAssets is true
     parsed1.useContractAssets is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
@@ -186,7 +186,7 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed2.id is Ast.FuncId("add", false)
     parsed2.isPublic is true
-    parsed2.useApprovedAssets is true
+    parsed2.usePreapprovedAssets is true
     parsed2.useContractAssets is true
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
@@ -200,7 +200,7 @@ class ParserSpec extends AlephiumSpec {
       )
       .get
       .value
-    parsed3.useApprovedAssets is false
+    parsed3.usePreapprovedAssets is false
     parsed3.useContractAssets is true
   }
 
@@ -551,7 +551,7 @@ class ParserSpec extends AlephiumSpec {
   }
 
   trait ScriptFixture {
-    val useApprovedAssets: Boolean
+    val usePreapprovedAssets: Boolean
     val script: String
 
     val ident        = TypeId("Main")
@@ -561,7 +561,7 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         FuncId("main", false),
         true,
-        useApprovedAssets,
+        usePreapprovedAssets,
         false,
         Seq.empty,
         Seq.empty,
@@ -571,7 +571,7 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse AssetScript" in new ScriptFixture {
-    val useApprovedAssets = false
+    val usePreapprovedAssets = false
     val script = s"""
                     |AssetScript Main(x: U256) {
                     |  pub fn main() -> () {
@@ -585,9 +585,9 @@ class ParserSpec extends AlephiumSpec {
   }
 
   // scalastyle:off no.equal
-  class TxScriptFixture(useApprovedAssetsOpt: Option[Boolean]) extends ScriptFixture {
-    val useApprovedAssets = !useApprovedAssetsOpt.contains(false)
-    val annotation = useApprovedAssetsOpt match {
+  class TxScriptFixture(usePreapprovedAssetsOpt: Option[Boolean]) extends ScriptFixture {
+    val usePreapprovedAssets = !usePreapprovedAssetsOpt.contains(false)
+    val annotation = usePreapprovedAssetsOpt match {
       case Some(value) => s"@using(preapprovedAssets = $value)"
       case None        => ""
     }
@@ -606,7 +606,7 @@ class ParserSpec extends AlephiumSpec {
   }
   // scalastyle:on no.equal
 
-  it should "parse explicit useApprovedAssets TxScript" in new TxScriptFixture(Some(true))
-  it should "parse implicit useApprovedAssets TxScript" in new TxScriptFixture(None)
+  it should "parse explicit usePreapprovedAssets TxScript" in new TxScriptFixture(Some(true))
+  it should "parse implicit usePreapprovedAssets TxScript" in new TxScriptFixture(None)
   it should "parse vanilla TxScript" in new TxScriptFixture(Some(false))
 }

@@ -950,7 +950,7 @@ class ServerUtils(implicit
       AVector(
         Method[StatefulContext](
           isPublic = true,
-          useApprovedAssets = testContract.inputAssets.nonEmpty,
+          usePreapprovedAssets = testContract.inputAssets.nonEmpty,
           useContractAssets = false,
           argsLength = 0,
           localsLength = 0,

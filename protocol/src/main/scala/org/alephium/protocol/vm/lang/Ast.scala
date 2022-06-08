@@ -268,7 +268,7 @@ object Ast {
       annotations: Seq[Annotation],
       id: FuncId,
       isPublic: Boolean,
-      useApprovedAssets: Boolean,
+      usePreapprovedAssets: Boolean,
       useContractAssets: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
@@ -279,7 +279,7 @@ object Ast {
     def signature: String = {
       val publicPrefix = if (isPublic) "pub " else ""
       val assetModifier = {
-        (useApprovedAssets, useContractAssets) match {
+        (usePreapprovedAssets, useContractAssets) match {
           case (true, true) =>
             s"@using(preapprovedAssets=true,assetsInContract=true) "
           case (true, false) =>
@@ -322,7 +322,7 @@ object Ast {
       val localVars = state.getLocalVars(id)
       Method[Ctx](
         isPublic,
-        useApprovedAssets,
+        usePreapprovedAssets,
         useContractAssets,
         argsLength = ArrayTransformer.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
@@ -335,14 +335,14 @@ object Ast {
   object FuncDef {
     def main(
         stmts: Seq[Ast.Statement[StatefulContext]],
-        useApprovedAssets: Boolean,
+        usePreapprovedAssets: Boolean,
         useContractAssets: Boolean
     ): FuncDef[StatefulContext] = {
       FuncDef[StatefulContext](
         Seq.empty,
         id = FuncId("main", false),
         isPublic = true,
-        useApprovedAssets = useApprovedAssets,
+        usePreapprovedAssets = usePreapprovedAssets,
         useContractAssets = useContractAssets,
         args = Seq.empty,
         rtypes = Seq.empty,

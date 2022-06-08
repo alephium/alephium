@@ -253,7 +253,7 @@ final class StatefulFrame(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
   ): ExeResult[Option[MutBalanceState]] = {
-    if (method.useApprovedAssets) {
+    if (method.usePreapprovedAssets) {
       for {
         currentBalances <- getBalanceState()
         balanceStateOpt <- {
@@ -297,7 +297,7 @@ final class StatefulFrame(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
   ): ExeResult[Option[MutBalanceState]] = {
-    if (method.useApprovedAssets) {
+    if (method.usePreapprovedAssets) {
       for {
         currentBalances <- getBalanceState()
         balanceStateOpt <- {

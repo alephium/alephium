@@ -584,7 +584,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         val invalidTxWithScript = {
           val method = Method[StatefulContext](
             isPublic = true,
-            useApprovedAssets = useAssets,
+            usePreapprovedAssets = useAssets,
             useContractAssets = useAssets,
             argsLength = 0,
             localsLength = 0,

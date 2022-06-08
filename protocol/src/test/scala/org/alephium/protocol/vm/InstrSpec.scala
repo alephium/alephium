@@ -137,7 +137,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )(implicit networkConfig: NetworkConfig): Frame[StatelessContext] = {
       val baseMethod = Method[StatelessContext](
         isPublic = true,
-        useApprovedAssets = false,
+        usePreapprovedAssets = false,
         useContractAssets = false,
         argsLength = 0,
         localsLength = localsLength,
@@ -1678,7 +1678,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val baseMethod =
       Method[StatefulContext](
         isPublic = true,
-        useApprovedAssets = false,
+        usePreapprovedAssets = false,
         useContractAssets = false,
         argsLength = 0,
         localsLength = 0,

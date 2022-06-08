@@ -110,7 +110,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
 
       result.rightValue.isEmpty is emptyOutput
       if (!emptyOutput) {
-        if (method.useApprovedAssets) {
+        if (method.usePreapprovedAssets) {
           frame.balanceStateOpt.get.approved.all.isEmpty is true
         }
         if (method.useContractAssets) {
@@ -135,7 +135,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
 trait FrameFixture extends ContextGenerators {
   def baseMethod[Ctx <: StatelessContext](localsLength: Int) = Method[Ctx](
     isPublic = true,
-    useApprovedAssets = false,
+    usePreapprovedAssets = false,
     useContractAssets = false,
     argsLength = localsLength - 1,
     localsLength,

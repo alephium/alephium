@@ -31,17 +31,21 @@ import org.alephium.util.{AVector, EitherF, Hex}
 
 final case class Method[Ctx <: StatelessContext](
     isPublic: Boolean,
-    useApprovedAssets: Boolean,
+    usePreapprovedAssets: Boolean,
     useContractAssets: Boolean,
     argsLength: Int,
     localsLength: Int,
     returnLength: Int,
     instrs: AVector[Instr[Ctx]]
 ) {
-  def usesAssets(): Boolean = useApprovedAssets || useContractAssets
+  def usesAssets(): Boolean = usePreapprovedAssets || useContractAssets
 
   def checkModifierPreLeman(): ExeResult[Unit] = {
-    if (useApprovedAssets == useContractAssets) okay else failed(InvalidMethodModifierBeforeLeman)
+    if (usePreapprovedAssets == useContractAssets) {
+      okay
+    } else {
+      failed(InvalidMethodModifierBeforeLeman)
+    }
   }
 
   def toTemplateString(): String = {
@@ -59,7 +63,7 @@ final case class Method[Ctx <: StatelessContext](
 
 object Method {
   private def serializeAssetModifier[Ctx <: StatelessContext](method: Method[Ctx]): ByteString = {
-    (method.useApprovedAssets, method.useContractAssets) match {
+    (method.usePreapprovedAssets, method.useContractAssets) match {
       case (false, false) => ByteString(0) // isPayble = false before Leman fork
       case (true, true)   => ByteString(1) //  isPayable = true before Leman fork
       case (false, true)  => ByteString(2)
@@ -125,7 +129,7 @@ object Method {
   def forSMT: Method[StatefulContext] =
     Method[StatefulContext](
       isPublic = false,
-      useApprovedAssets = false,
+      usePreapprovedAssets = false,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
@@ -187,7 +191,7 @@ object StatelessScript {
   private def validate(methods: AVector[Method[StatelessContext]]): Boolean = {
     methods.nonEmpty &&
     methods.head.isPublic &&
-    methods.forall(m => !m.useApprovedAssets && Method.validate(m))
+    methods.forall(m => !m.usePreapprovedAssets && Method.validate(m))
   }
 
   def from(methods: AVector[Method[StatelessContext]]): Option[StatelessScript] = {
@@ -231,7 +235,7 @@ object StatefulScript {
       AVector(
         Method[StatefulContext](
           isPublic = true,
-          useApprovedAssets = true,
+          usePreapprovedAssets = true,
           useContractAssets = true,
           argsLength = 0,
           localsLength = 0,

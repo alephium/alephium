@@ -31,7 +31,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   trait BaseFixture[Ctx <: StatelessContext] {
     val baseMethod = Method[Ctx](
       isPublic = true,
-      useApprovedAssets = false,
+      usePreapprovedAssets = false,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
@@ -64,7 +64,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check the entry method of stateless scripts" in new StatelessFixture {
     test1(baseMethod, okay)
-    test1(baseMethod.copy(useApprovedAssets = true), failed(ExpectNonPayableMethod))
+    test1(baseMethod.copy(usePreapprovedAssets = true), failed(ExpectNonPayableMethod))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
     intercept[AssertionError](
       test1(baseMethod.copy(localsLength = -1), okay)
@@ -90,7 +90,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check the entry method of stateful scripts" in new StatefulFixture {
     test1(baseMethod, okay)
-    test1(baseMethod.copy(useApprovedAssets = true), failed(InvalidBalances))
+    test1(baseMethod.copy(usePreapprovedAssets = true), failed(InvalidBalances))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
     intercept[AssertionError](
       test1(baseMethod.copy(localsLength = -1), okay)
@@ -106,7 +106,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   trait Fixture {
     val baseMethod = Method[StatefulContext](
       isPublic = true,
-      useApprovedAssets = false,
+      usePreapprovedAssets = false,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
@@ -172,7 +172,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        useApprovedAssets = false,
+        usePreapprovedAssets = false,
         useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
@@ -203,7 +203,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        useApprovedAssets = false,
+        usePreapprovedAssets = false,
         useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
@@ -220,7 +220,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   it should "call method" in {
     val method0 = Method[StatelessContext](
       isPublic = true,
-      useApprovedAssets = false,
+      usePreapprovedAssets = false,
       useContractAssets = false,
       argsLength = 1,
       localsLength = 1,
@@ -230,7 +230,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method1 =
       Method[StatelessContext](
         isPublic = false,
-        useApprovedAssets = false,
+        usePreapprovedAssets = false,
         useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
@@ -283,7 +283,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       val methods = instrs.mapWithIndex { case (instrs, index) =>
         Method[StatefulContext](
           isPublic = index equals 0,
-          useApprovedAssets = true,
+          usePreapprovedAssets = true,
           useContractAssets = false,
           argsLength = 0,
           localsLength = 0,
@@ -441,7 +441,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
     val method = Method[StatefulContext](
       isPublic = true,
-      useApprovedAssets = true,
+      usePreapprovedAssets = true,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
@@ -471,7 +471,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        useApprovedAssets = false,
+        usePreapprovedAssets = false,
         useContractAssets = false,
         argsLength = 1,
         localsLength = 1,

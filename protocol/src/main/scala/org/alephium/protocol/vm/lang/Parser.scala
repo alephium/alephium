@@ -169,13 +169,13 @@ abstract class Parser[Ctx <: StatelessContext] {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
       } else {
         val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
-        val (useApprovedAssets, useContractAssets) =
+        val (usePreapprovedAssets, useContractAssets) =
           Parser.extractAssetModifier(annotations, false, false)
         FuncDefTmp(
           Seq.empty,
           funcId,
           isPublic,
-          useApprovedAssets,
+          usePreapprovedAssets,
           useContractAssets,
           params,
           returnType,
@@ -190,7 +190,7 @@ abstract class Parser[Ctx <: StatelessContext] {
           f.annotations,
           f.id,
           f.isPublic,
-          f.useApprovedAssets,
+          f.usePreapprovedAssets,
           f.useContractAssets,
           f.args,
           f.rtypes,
@@ -284,7 +284,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     annotations: Seq[Annotation],
     id: FuncId,
     isPublic: Boolean,
-    useApprovedAssets: Boolean,
+    usePreapprovedAssets: Boolean,
     useContractAssets: Boolean,
     args: Seq[Argument],
     rtypes: Seq[Type],
@@ -294,19 +294,19 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
 object Parser {
   def extractAssetModifier(
       annotations: Seq[Annotation],
-      useApprovedAssetsDefault: Boolean,
+      usePreapprovedAssetsDefault: Boolean,
       useContractAssetsDefault: Boolean
   ): (Boolean, Boolean) = {
     if (annotations.exists(_.id.name != "using")) {
       throw Compiler.Error(s"Generic annotation is not supported yet")
     } else {
-      val useApprovedAssetsKey = "preapprovedAssets"
-      val useContractAssetsKey = "assetsInContract"
+      val usePreapprovedAssetsKey = "preapprovedAssets"
+      val useContractAssetsKey    = "assetsInContract"
       annotations.headOption match {
         case Some(useAnnotation) =>
           val invalidKeys = useAnnotation.fields
             .filter(f =>
-              f.ident.name != useApprovedAssetsKey && f.ident.name != useContractAssetsKey
+              f.ident.name != usePreapprovedAssetsKey && f.ident.name != useContractAssetsKey
             )
           if (invalidKeys.nonEmpty) {
             throw Compiler.Error(
@@ -314,14 +314,15 @@ object Parser {
             )
           }
 
-          val useApprovedAssets = extractAnnotationBoolean(useAnnotation, useApprovedAssetsKey)
+          val usePreapprovedAssets =
+            extractAnnotationBoolean(useAnnotation, usePreapprovedAssetsKey)
           val useContractAssets = extractAnnotationBoolean(useAnnotation, useContractAssetsKey)
           (
-            useApprovedAssets.getOrElse(useApprovedAssetsDefault),
+            usePreapprovedAssets.getOrElse(usePreapprovedAssetsDefault),
             useContractAssets.getOrElse(useContractAssetsDefault)
           )
         case None =>
-          (useApprovedAssetsDefault, useContractAssetsDefault)
+          (usePreapprovedAssetsDefault, useContractAssetsDefault)
       }
     }
   }
@@ -399,12 +400,12 @@ object StatefulParser extends Parser[StatefulContext] {
         if (mainStmts.isEmpty) {
           throw Compiler.Error(s"No main statements defined in TxScript ${typeId.name}")
         } else {
-          val (useApprovedAssets, useContractAssets) =
+          val (usePreapprovedAssets, useContractAssets) =
             Parser.extractAssetModifier(annotations, true, false)
           Ast.TxScript(
             typeId,
             templateVars.getOrElse(Seq.empty),
-            Ast.FuncDef.main(mainStmts, useApprovedAssets, useContractAssets) +: funcs
+            Ast.FuncDef.main(mainStmts, usePreapprovedAssets, useContractAssets) +: funcs
           )
         }
       }
@@ -463,7 +464,7 @@ object StatefulParser extends Parser[StatefulContext] {
             f.annotations,
             f.id,
             f.isPublic,
-            f.useApprovedAssets,
+            f.usePreapprovedAssets,
             f.useContractAssets,
             f.args,
             f.rtypes,
