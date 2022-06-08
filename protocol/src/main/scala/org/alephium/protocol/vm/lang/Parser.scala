@@ -300,7 +300,7 @@ object Parser {
     if (annotations.exists(_.id.name != "using")) {
       throw Compiler.Error(s"Generic annotation is not supported yet")
     } else {
-      val useApprovedAssetsKey = "preApprovedAssets"
+      val useApprovedAssetsKey = "preapprovedAssets"
       val useContractAssetsKey = "assetsInContract"
       annotations.headOption match {
         case Some(useAnnotation) =>

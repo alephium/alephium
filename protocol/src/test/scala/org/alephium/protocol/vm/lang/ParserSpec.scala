@@ -161,7 +161,7 @@ class ParserSpec extends AlephiumSpec {
 
     val parsed1 = fastparse
       .parse(
-        """@using(preApprovedAssets = true)
+        """@using(preapprovedAssets = true)
           |pub fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }
           |""".stripMargin,
         StatelessParser.func(_)
@@ -178,7 +178,7 @@ class ParserSpec extends AlephiumSpec {
     info("Simple return type")
     val parsed2 = fastparse
       .parse(
-        """@using(preApprovedAssets = true, assetsInContract = true)
+        """@using(preapprovedAssets = true, assetsInContract = true)
           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
         StatelessParser.func(_)
       )
@@ -588,7 +588,7 @@ class ParserSpec extends AlephiumSpec {
   class TxScriptFixture(useApprovedAssetsOpt: Option[Boolean]) extends ScriptFixture {
     val useApprovedAssets = !useApprovedAssetsOpt.contains(false)
     val annotation = useApprovedAssetsOpt match {
-      case Some(value) => s"@using(preApprovedAssets = $value)"
+      case Some(value) => s"@using(preapprovedAssets = $value)"
       case None        => ""
     }
     val script = s"""

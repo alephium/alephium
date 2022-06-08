@@ -43,7 +43,7 @@ class VMSpec extends AlephiumSpec {
   it should "not start with private function" in new ContractFixture {
     val input =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Foo {
          |  return
          |  pub fn foo() -> () {
@@ -60,7 +60,7 @@ class VMSpec extends AlephiumSpec {
   it should "overflow frame stack" in new FlowFixture {
     val input =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Foo {
          |  foo(${frameStackMaxSize - 1})
          |
@@ -120,7 +120,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Bar {
          |  let foo = Foo(#${contractKey0.toHexString})
          |  foo.add(4)
@@ -323,7 +323,7 @@ class VMSpec extends AlephiumSpec {
          |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), ${ALPH.alph(2)})
          |  }
          |
-         |  @using(preApprovedAssets = true, assetsInContract = true)
+         |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn burn() -> () {
          |    burnToken!(@$genesisAddress, selfTokenId!(), ${ALPH.oneAlph})
          |    burnToken!(selfAddress!(), selfTokenId!(), ${ALPH.oneAlph})
@@ -523,7 +523,7 @@ class VMSpec extends AlephiumSpec {
 
     val main =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  let foo = Foo(#${contractKey0.toHexString})
          |  foo.foo(#${contractKey0.toHexString}, #${contractKey1.toHexString})
@@ -585,7 +585,7 @@ class VMSpec extends AlephiumSpec {
     // scalastyle:off no.equal
     def expect(out: Int) =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Inverse {
          |  let x = 10973
          |  let mut y = 1
@@ -660,7 +660,7 @@ class VMSpec extends AlephiumSpec {
 
     val main: String =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript ByteVecTest {
          |  assert!(byteVec!(true) == #${encode(true)})
          |  assert!(byteVec!(false) == #${encode(false)})
@@ -749,7 +749,7 @@ class VMSpec extends AlephiumSpec {
     val bar =
       s"""
          |TxContract Bar() {
-         |  @using(preApprovedAssets = true)
+         |  @using(preapprovedAssets = true)
          |  pub fn bar(fooId: ByteVec, fooHash: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barHash: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
          |    assert!(selfContractId!() == barId)
          |    assert!(selfAddress!() == barAddress)
@@ -798,7 +798,7 @@ class VMSpec extends AlephiumSpec {
       val address: Address = Address.contract(contractId)
       val addressHex       = Hex.toHexString(serialize(address.lockupScript))
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  let address = contractIdToAddress!(#${contractId.toHexString})
          |  assert!(byteVecToAddress!(#$addressHex) == address)
@@ -812,7 +812,7 @@ class VMSpec extends AlephiumSpec {
       val bs         = ByteString(Gen.listOfN(length, arbitrary[Byte]).sample.get)
       val contractId = new Blake2b(bs)
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  contractIdToAddress!(#${contractId.toHexString})
          |}
@@ -1047,7 +1047,7 @@ class VMSpec extends AlephiumSpec {
   it should "fetch block env" in new ContractFixture {
     def main(latestHeader: BlockHeader) =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  assert!(networkId!() == #02)
          |  assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis})
@@ -1071,7 +1071,7 @@ class VMSpec extends AlephiumSpec {
     val zeroId = Hash.zero
     def main(index: Int) =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript TxEnv {
          |  assert!(txId!() != #${zeroId.toHexString})
          |  assert!(txInputAddressAt!($index) == @${genesisAddress.toBase58})
@@ -1088,7 +1088,7 @@ class VMSpec extends AlephiumSpec {
     val input = Hex.toHexString(ByteString.fromString("Hello World1"))
     val main =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  assert!(blake2b!(#$input) == #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a)
          |  assert!(blake2b!(#$input) != #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b370)
@@ -1112,7 +1112,7 @@ class VMSpec extends AlephiumSpec {
     val ed25519Sig               = ED25519.sign(Hash.zero.bytes, ed25519Pri).toHexString
     def main(p256Sig: String, ed25519Sig: String) =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig)
          |  verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
@@ -1126,7 +1126,7 @@ class VMSpec extends AlephiumSpec {
   it should "test eth ecrecover" in new ContractFixture with EthEcRecoverFixture {
     def main(messageHash: ByteString, signature: ByteString, address: ByteString) =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  let address = ethEcRecover!(#${Hex.toHexString(messageHash)},
          |    #${Hex.toHexString(signature)})
@@ -1148,7 +1148,7 @@ class VMSpec extends AlephiumSpec {
 
     def main(absoluteTimeLock: TimeStamp, relativeTimeLock: Duration, txIndex: Int) =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  verifyAbsoluteLocktime!(${absoluteTimeLock.millis})
          |  verifyRelativeLocktime!(${txIndex}, ${relativeTimeLock.millis})
@@ -1173,7 +1173,7 @@ class VMSpec extends AlephiumSpec {
       val number = U256.from(genNumber(size)).getOrElse(U256.MaxValue)
       val hex    = Hex.toHexString(IndexedSeq.fill(size)(0xff.toByte))
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  assert!($func($number) == #$hex)
          |}
@@ -1196,7 +1196,7 @@ class VMSpec extends AlephiumSpec {
       val u256   = U256.from(number).getOrElse(U256.MaxValue)
       val hex    = Hex.toHexString(IndexedSeq.fill(size)(0xff.toByte))
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  assert!($func(#$hex) == $u256)
          |}
@@ -1217,7 +1217,7 @@ class VMSpec extends AlephiumSpec {
     val hex = "1b6dffea4ac54dbc4bbc65169dd054de826add0c62a85789662d477116304488"
     def main(start: Int, end: Int, slice: String): String = {
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  assert!(byteVecSlice!(#$hex, $start, $end) == #$slice)
          |}
@@ -1243,7 +1243,7 @@ class VMSpec extends AlephiumSpec {
     def main(address: Address): String = {
       val hex = Hex.toHexString(serialize(address.lockupScript))
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  assert!(byteVecToAddress!(#$hex) == @${address.toBase58})
          |}
@@ -1262,7 +1262,7 @@ class VMSpec extends AlephiumSpec {
          |// credits to @chloekek
          |TxContract Nft(author: Address, price: U256)
          |{
-         |    @using(preApprovedAssets = true, assetsInContract = true)
+         |    @using(preapprovedAssets = true, assetsInContract = true)
          |    pub fn buy(buyer: Address) -> ()
          |    {
          |        transferAlph!(buyer, author, price)
@@ -1298,7 +1298,7 @@ class VMSpec extends AlephiumSpec {
     val tokenContract =
       s"""
          |TxContract Token(mut x: U256) {
-         |  @using(preApprovedAssets = true, assetsInContract = true)
+         |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn withdraw(address: Address, amount: U256) -> () {
          |    transferTokenFromSelf!(address, selfTokenId!(), amount)
          |  }
@@ -1378,7 +1378,7 @@ class VMSpec extends AlephiumSpec {
     val contractKey = createContractAndCheckState(testContract, 2, 2).key
 
     val block = callTxScriptMulti(index => s"""
-                                              |@using(preApprovedAssets = false)
+                                              |@using(preapprovedAssets = false)
                                               |TxScript Main {
                                               |  let foo = Foo(#${contractKey.toHexString})
                                               |  foo.foo($index)
@@ -1516,7 +1516,7 @@ class VMSpec extends AlephiumSpec {
 
     val script =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  let child = Child(#$contractId)
          |  child.foo()
@@ -1597,7 +1597,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |$contractRaw
          |
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Bar {
          |  let foo = Foo(#${contractId.toHexString})
          |  foo.add(4)
@@ -1777,7 +1777,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |$contractRaw
          |
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  let contract = Add(#${contractId.toHexString})
          |  contract.add(1, 2)
@@ -1828,7 +1828,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |$contractRaw
          |
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Bar {
          |  let foo = Foo(#${contractId.toHexString})
          |  foo.testEventTypes()
@@ -1882,7 +1882,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |$contractRaw
          |
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  Foo(#${contractId.toHexString}).foo()
          |}
@@ -2009,7 +2009,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxContract Foo(mut subContractId: ByteVec) {
          |  event Create(subContractId: ByteVec)
-         |  @using(preApprovedAssets = true)
+         |  @using(preapprovedAssets = true)
          |  pub fn foo() -> () {
          |    approveAlph!(txInputAddressAt!(0), ${minimalAlphInContract})
          |    subContractId = copyCreateContract!(selfContractId!(), #010300)
@@ -2053,7 +2053,7 @@ class VMSpec extends AlephiumSpec {
     val contract: String =
       s"""
          |TxContract Foo(mut subContractId: ByteVec) {
-         |  @using(preApprovedAssets = true)
+         |  @using(preapprovedAssets = true)
          |  pub fn foo() -> () {
          |    approveAlph!(txInputAddressAt!(0), ${ALPH.nanoAlph(1000).v})
          |    subContractId = copyCreateContract!(selfContractId!(), #010300)
@@ -2132,7 +2132,7 @@ class VMSpec extends AlephiumSpec {
     val fooId = createContract(foo, AVector.empty).key
     val main: String =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  Foo(#${fooId.toHexString}).foo()
          |}
@@ -2158,7 +2158,7 @@ class VMSpec extends AlephiumSpec {
       ).key
     val main: String =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  let foo = Foo(#${fooId.toHexString})
          |  let (x, y, z) = foo.loadFields!()
@@ -2232,7 +2232,7 @@ class VMSpec extends AlephiumSpec {
 
     val main =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  let impl = I(#${contractId.toHexString})
          |  assert!(impl.f1() == 1)
@@ -2267,7 +2267,7 @@ class VMSpec extends AlephiumSpec {
 
     val main: String =
       s"""
-         |@using(preApprovedAssets = false)
+         |@using(preapprovedAssets = false)
          |TxScript Main {
          |  let foo = Foo(#${barId.toHexString})
          |  foo.foo()
@@ -2307,7 +2307,7 @@ class VMSpec extends AlephiumSpec {
       val bar: String =
         s"""
            |TxContract Bar() {
-           |  @using(preApprovedAssets = true, assetsInContract = true)
+           |  @using(preapprovedAssets = true, assetsInContract = true)
            |  pub fn bar() -> () {
            |    approveAlph!(@${genesisAddress.toBase58}, ${minimalAlphInContract.v})
            |    let contractId = createContract!(#$fooByteCode, #$fooInitialState)

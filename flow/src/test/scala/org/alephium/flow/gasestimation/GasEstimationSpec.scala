@@ -217,7 +217,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
     {
       def simpleScript(i: Int): String = {
         s"""
-           |@using(preApprovedAssets = false)
+           |@using(preapprovedAssets = false)
            |TxScript Main {
            |  let mut c = 0u
            |  let mut d = 0u

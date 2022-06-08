@@ -281,9 +281,9 @@ object Ast {
       val assetModifier = {
         (useApprovedAssets, useContractAssets) match {
           case (true, true) =>
-            s"@using(preApprovedAssets=true,assetsInContract=true) "
+            s"@using(preapprovedAssets=true,assetsInContract=true) "
           case (true, false) =>
-            s"@using(preApprovedAssets=true) "
+            s"@using(preapprovedAssets=true) "
           case (false, true) =>
             s"@using(assetsInContract=true) "
           case (false, false) =>
