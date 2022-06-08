@@ -424,6 +424,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val bool: Val = Val.Bool(true)
     locals.set(0, bool)
+    locals.getUnsafe(0) is bool
 
     stack.push(Val.U256(0))
     runAndCheckGas(LoadLocalByIndex)

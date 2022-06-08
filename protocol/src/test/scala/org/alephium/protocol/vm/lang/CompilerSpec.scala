@@ -1150,7 +1150,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     // format: off
     contract.methods(0) is Method[StatefulContext](
       isPublic = false,
-      useApprovedAssets = false,
+      usePreapprovedAssets = false,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 6,
@@ -1170,7 +1170,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     )
     contract.methods(1) is Method[StatefulContext](
       isPublic = false,
-      useApprovedAssets = false,
+      usePreapprovedAssets = false,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 14,
@@ -2180,9 +2180,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      test(0, AVector(Val.U256(U256.Zero)), AVector(Val.U256(U256.unsafe(10))))
-      test(0, AVector(Val.U256(U256.One)), AVector(Val.U256(U256.unsafe(1))))
-      test(0, AVector(Val.U256(U256.Two)), AVector(Val.U256(U256.unsafe(100))))
+      test(code, args = AVector(Val.U256(U256.Zero)), result = AVector(Val.U256(U256.unsafe(10))))
+      test(code, args = AVector(Val.U256(U256.One)), result = AVector(Val.U256(U256.unsafe(1))))
+      test(code, args = AVector(Val.U256(U256.Two)), result = AVector(Val.U256(U256.unsafe(100))))
     }
   }
 }
