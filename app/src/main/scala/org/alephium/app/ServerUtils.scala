@@ -831,36 +831,41 @@ class ServerUtils(implicit
     for {
       chainIndex <- params.validate()
       _          <- checkGroup(chainIndex.from)
-      persistedWorldState <- params.blockHash match {
-        case Some(hash) => wrapResult(blockFlow.getPersistedWorldState(hash))
-        case None       => wrapResult(blockFlow.getBestPersistedWorldState(chainIndex.from))
-      }
-      worldState = persistedWorldState.cached().staging()
+      blockHash = params.blockHash.getOrElse(
+        blockFlow.getBestDeps(chainIndex.from).uncleHash(chainIndex.from)
+      )
+      worldState <- wrapResult(
+        blockFlow.getPersistedWorldState(blockHash).map(_.cached().staging())
+      )
       contractId = params.contractAddress.contractId
       contractObj <- wrapResult(worldState.getContractObj(contractId))
       returnLength <- wrapExeResult(
         contractObj.code.getMethod(params.methodIndex).map(_.returnLength)
       )
+      txId = params.txId.getOrElse(Hash.random)
       resultPair <- executeContractMethod(
         worldState,
         contractId,
-        Hash.random,
-        BlockHash.random,
+        txId,
+        blockHash,
         params.inputAssets.getOrElse(AVector.empty),
         params.methodIndex,
         params.args.getOrElse(AVector.empty),
         returnLength
       )
       (returns, result) = resultPair
-      contractsState <- result.contractPrevOutputs.mapE(c =>
-        fetchContractState(worldState, c.lockupScript.contractId)
+      contractAddresses = params.existingContracts.getOrElse(
+        AVector.empty
+      ) :+ params.contractAddress
+      contractsState <- contractAddresses.mapE(address =>
+        fetchContractState(worldState, address.contractId)
       )
     } yield {
       CallContractResult(
         contractsState,
         returns.map(Val.from),
         result.generatedOutputs.mapWithIndex { case (output, index) =>
-          Output.from(output, Hash.zero, index)
+          Output.from(output, txId, index)
         },
         maximalGasPerTx.subUnsafe(result.gasBox).value,
         fetchContractEvents(worldState)

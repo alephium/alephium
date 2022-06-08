@@ -799,17 +799,6 @@ class ServerUtilsSpec extends AlephiumSpec {
     val callerAddress = Address.Asset(lockupScript)
     val inputAsset    = InputAsset(callerAddress, AssetState(ALPH.oneAlph))
     val serverUtils   = new ServerUtils()
-    val contractCode =
-      s"""
-         |TxContract Foo(mut value: U256) {
-         |  @use(approvedAssets = true, contractAssets = true)
-         |  pub fn addOne() -> U256 {
-         |    transferAlphToSelf!(txCaller!(0), ${ALPH.oneNanoAlph})
-         |    value = value + 1
-         |    return value
-         |  }
-         |}
-         |""".stripMargin
 
     def executeScript(script: vm.StatefulScript) = {
       val block = payableCall(blockFlow, chainIndex, script)
@@ -817,30 +806,58 @@ class ServerUtilsSpec extends AlephiumSpec {
       block
     }
 
-    def createContract(code: String): (Block, ContractId) = {
+    def createContract(code: String, fields: AVector[vm.Val]): (Block, ContractId) = {
       val contract = Compiler.compileContract(code).rightValue
       val script =
-        contractCreation(contract, AVector(vm.Val.U256(0)), lockupScript, minimalAlphInContract)
+        contractCreation(contract, fields, lockupScript, minimalAlphInContract)
       val block     = executeScript(script)
       val outputRef = TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
       (block, outputRef.key)
     }
 
-    val (createContractBlock, contractId) = createContract(contractCode)
-    val contractAddress                   = Address.contract(contractId)
+    val barCode =
+      s"""
+         |TxContract Bar(mut value: U256) {
+         |  pub fn addOne() -> () {
+         |    value = value + 1
+         |  }
+         |}
+         |""".stripMargin
+
+    val (_, barId) = createContract(barCode, AVector[vm.Val](vm.Val.U256(U256.Zero)))
+    val barAddress = Address.contract(barId)
+    val fooCode =
+      s"""
+         |TxContract Foo(mut value: U256) {
+         |  @use(approvedAssets = true, contractAssets = true)
+         |  pub fn addOne() -> U256 {
+         |    transferAlphToSelf!(txCaller!(0), ${ALPH.oneNanoAlph})
+         |    value = value + 1
+         |    let bar = Bar(#${barId.toHexString})
+         |    bar.addOne()
+         |    return value
+         |  }
+         |}
+         |
+         |$barCode
+         |""".stripMargin
+
+    val (createContractBlock, fooId) =
+      createContract(fooCode, AVector[vm.Val](vm.Val.U256(U256.Zero)))
+    val fooAddress = Address.contract(fooId)
     val callScriptCode =
       s"""
          |@use(approvedAssets = true) TxScript Main {
          |  approveAlph!(@$callerAddress, ${ALPH.oneAlph})
-         |  let foo = Foo(#${contractId.toHexString})
+         |  let foo = Foo(#${fooId.toHexString})
          |  foo.addOne()
          |}
          |
-         |$contractCode
+         |$fooCode
          |""".stripMargin
     val callScript = Compiler.compileTxScript(callScriptCode).rightValue
 
-    def checkContractStates(value: U256, alphAmount: U256) = {
+    def checkContractStates(contractId: ContractId, value: U256, alphAmount: U256) = {
       val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       val contractState = worldState.getContractState(contractId).rightValue
       contractState.fields is AVector[vm.Val](vm.Val.U256(value))
@@ -851,42 +868,52 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "call contract" in new CallContractFixture {
     executeScript(callScript)
-    checkContractStates(U256.unsafe(1), minimalAlphInContract + ALPH.oneNanoAlph)
+    checkContractStates(barId, U256.unsafe(1), minimalAlphInContract)
+    checkContractStates(fooId, U256.unsafe(1), minimalAlphInContract + ALPH.oneNanoAlph)
 
     info("call contract against the latest world state")
     val params0 = CallContract(
       chainIndex.from.value,
-      contractAddress,
+      fooAddress,
       0,
-      Some(AVector(inputAsset))
+      Some(AVector(inputAsset)),
+      existingContracts = Some(AVector(barAddress))
     )
     val callContractResult0 = serverUtils.callContract(blockFlow, params0).rightValue
     callContractResult0.returns is AVector[Val](ValU256(2))
-    callContractResult0.gasUsed is 17126
+    callContractResult0.gasUsed is 23188
     callContractResult0.txOutputs.length is 2
     val contractAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
     callContractResult0.txOutputs(0).alphAmount.value is contractAlphAmount0
 
-    callContractResult0.contractsState.length is 1
-    val contractState0 = callContractResult0.contractsState(0)
-    contractState0.fields is AVector[Val](ValU256(2))
-    contractState0.address is contractAddress
-    contractState0.asset is AssetState(contractAlphAmount0, Some(AVector.empty))
+    callContractResult0.contractsState.length is 2
+    val barState0 = callContractResult0.contractsState(0)
+    barState0.fields is AVector[Val](ValU256(2))
+    barState0.address is barAddress
+    barState0.asset is AssetState(ALPH.oneAlph, Some(AVector.empty))
+    val fooState0 = callContractResult0.contractsState(1)
+    fooState0.fields is AVector[Val](ValU256(2))
+    fooState0.address is fooAddress
+    fooState0.asset is AssetState(contractAlphAmount0, Some(AVector.empty))
 
     info("call contract against the old world state")
     val params1             = params0.copy(blockHash = Some(createContractBlock.hash))
     val callContractResult1 = serverUtils.callContract(blockFlow, params1).rightValue
     callContractResult1.returns is AVector[Val](ValU256(1))
-    callContractResult1.gasUsed is 17126
+    callContractResult1.gasUsed is 23188
     callContractResult1.txOutputs.length is 2
     val contractAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
     callContractResult1.txOutputs(0).alphAmount.value is contractAlphAmount1
 
-    callContractResult1.contractsState.length is 1
-    val contractState1 = callContractResult1.contractsState(0)
-    contractState1.fields is AVector[Val](ValU256(1))
-    contractState1.address is contractAddress
-    contractState1.asset is AssetState(contractAlphAmount1, Some(AVector.empty))
+    callContractResult1.contractsState.length is 2
+    val barState1 = callContractResult1.contractsState(0)
+    barState1.fields is AVector[Val](ValU256(1))
+    barState1.address is barAddress
+    barState1.asset is AssetState(ALPH.oneAlph, Some(AVector.empty))
+    val fooState1 = callContractResult1.contractsState(1)
+    fooState1.fields is AVector[Val](ValU256(1))
+    fooState1.address is fooAddress
+    fooState1.asset is AssetState(contractAlphAmount1, Some(AVector.empty))
   }
 
   trait TestContractFixture extends Fixture {

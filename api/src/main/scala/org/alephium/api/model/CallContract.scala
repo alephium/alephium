@@ -17,7 +17,7 @@
 package org.alephium.api.model
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex}
 import org.alephium.util.AVector
@@ -29,7 +29,9 @@ final case class CallContract(
     methodIndex: Int,
     inputAssets: Option[AVector[InputAsset]] = None,
     args: Option[AVector[Val]] = None,
-    blockHash: Option[BlockHash] = None
+    txId: Option[Hash] = None,
+    blockHash: Option[BlockHash] = None,
+    existingContracts: Option[AVector[Address.Contract]] = None
 ) {
   def validate()(implicit brokerConfig: BrokerConfig): Try[ChainIndex] = {
     for {
@@ -49,11 +51,3 @@ final case class CallContract(
     } yield chainIndex
   }
 }
-
-final case class CallContractResult(
-    contractsState: AVector[ContractState],
-    returns: AVector[Val],
-    txOutputs: AVector[Output],
-    gasUsed: Int,
-    events: AVector[ContractEventByTxId]
-)

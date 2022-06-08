@@ -51,6 +51,14 @@ trait WorldState[T, R1, R2, R3] {
     outputState.get(outputRef)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def getContractOutput(contractOutputRef: ContractOutputRef): IOResult[ContractOutput] = {
+    getOutput(contractOutputRef) match {
+      case Right(_: AssetOutput) => Left(WorldState.expectedContractError)
+      case result                => result.asInstanceOf[IOResult[ContractOutput]]
+    }
+  }
+
   def getOutputOpt(outputRef: TxOutputRef): IOResult[Option[TxOutput]] = {
     outputState.getOpt(outputRef)
   }
@@ -202,7 +210,8 @@ sealed abstract class ImmutableWorldState
 // scalastyle:on
 
 object WorldState {
-  val expectedAssetError: IOError = IOError.Serde(SerdeError.validation("Expect AssetOutput"))
+  val expectedAssetError: IOError    = IOError.Serde(SerdeError.validation("Expect AssetOutput"))
+  val expectedContractError: IOError = IOError.Serde(SerdeError.validation("Expect ContractOutput"))
 
   final case class CodeRecord(code: StatefulContract.HalfDecoded, refCount: Int)
   object CodeRecord {

@@ -8497,9 +8497,20 @@
               "$ref": "#/components/schemas/Val"
             }
           },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
           "blockHash": {
             "type": "string",
             "format": "block-hash"
+          },
+          "existingContracts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "address"
+            }
           }
         }
       },
