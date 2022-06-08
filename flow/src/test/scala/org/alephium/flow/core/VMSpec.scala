@@ -2011,7 +2011,7 @@ class VMSpec extends AlephiumSpec {
          |  event Create(subContractId: ByteVec)
          |  @using(preapprovedAssets = true)
          |  pub fn foo() -> () {
-         |    approveAlph!(txInputAddressAt!(0), ${minimalAlphInContract})
+         |    approveAlph!(callerAddress!(), ${minimalAlphInContract})
          |    subContractId = copyCreateContract!(selfContractId!(), #010300)
          |    emit Create(subContractId)
          |  }
@@ -2055,7 +2055,7 @@ class VMSpec extends AlephiumSpec {
          |TxContract Foo(mut subContractId: ByteVec) {
          |  @using(preapprovedAssets = true)
          |  pub fn foo() -> () {
-         |    approveAlph!(txInputAddressAt!(0), ${ALPH.nanoAlph(1000).v})
+         |    approveAlph!(callerAddress!(), ${ALPH.nanoAlph(1000).v})
          |    subContractId = copyCreateContract!(selfContractId!(), #010300)
          |    let subContract = Foo(subContractId)
          |    subContract.foo()
@@ -2089,7 +2089,7 @@ class VMSpec extends AlephiumSpec {
          |    bar.bar(selfContractId!())
          |  }
          |  pub fn destroy() -> () {
-         |    destroySelf!(txInputAddressAt!(0))
+         |    destroySelf!(callerAddress!())
          |  }
          |}
          |""".stripMargin

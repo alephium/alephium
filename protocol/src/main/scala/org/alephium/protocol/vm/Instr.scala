@@ -1638,9 +1638,8 @@ object CallerContractId extends ContractInstr with GasLow {
 object CallerAddress extends ContractInstr with GasLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      callerFrame <- frame.getCallerFrame()
-      address     <- callerFrame.obj.getAddress()
-      _           <- frame.pushOpStack(address)
+      address <- frame.getCallerAddress()
+      _       <- frame.pushOpStack(address)
     } yield ()
   }
 }

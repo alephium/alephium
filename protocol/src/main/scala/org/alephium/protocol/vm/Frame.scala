@@ -35,6 +35,8 @@ abstract class Frame[Ctx <: StatelessContext] {
   def ctx: Ctx
 
   def getCallerFrame(): ExeResult[Frame[Ctx]]
+  def getCallerAddress(): ExeResult[Val.Address]
+  def getCallAddress(): ExeResult[Val.Address]
 
   def balanceStateOpt: Option[MutBalanceState]
 
@@ -215,6 +217,8 @@ final class StatelessFrame(
       newFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = StatelessFrame.notAllowed
   def getCallerFrame(): ExeResult[Frame[StatelessContext]] = StatelessFrame.notAllowed
+  def getCallerAddress(): ExeResult[Val.Address]           = StatelessFrame.notAllowed
+  def getCallAddress(): ExeResult[Val.Address]             = StatelessFrame.notAllowed
   def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] =
     StatelessFrame.notAllowed
 }
@@ -223,19 +227,35 @@ object StatelessFrame {
   val notAllowed: ExeResult[Nothing] = failed(ExpectStatefulFrame)
 }
 
-final class StatefulFrame(
+final case class StatefulFrame(
     var pc: Int,
-    val obj: ContractObj[StatefulContext],
-    val opStack: Stack[Val],
-    val method: Method[StatefulContext],
-    val locals: VarVector[Val],
-    val returnTo: AVector[Val] => ExeResult[Unit],
-    val ctx: StatefulContext,
-    val callerFrameOpt: Option[StatefulFrame],
-    val balanceStateOpt: Option[MutBalanceState]
+    obj: ContractObj[StatefulContext],
+    opStack: Stack[Val],
+    method: Method[StatefulContext],
+    locals: VarVector[Val],
+    returnTo: AVector[Val] => ExeResult[Unit],
+    ctx: StatefulContext,
+    callerFrameOpt: Option[StatefulFrame],
+    balanceStateOpt: Option[MutBalanceState]
 ) extends Frame[StatefulContext] {
   def getCallerFrame(): ExeResult[StatefulFrame] = {
     callerFrameOpt.toRight(Right(NoCaller))
+  }
+
+  def getCallerAddress(): ExeResult[Val.Address] = {
+    callerFrameOpt match {
+      case Some(frame) => frame.getCallAddress()
+      case None        => ctx.getUniqueTxInputAddress()
+    }
+  }
+
+  def getCallAddress(): ExeResult[Val.Address] = {
+    obj.contractIdOpt match {
+      case Some(contractId) => // frame for contract method
+        Right(Val.Address(LockupScript.p2c(contractId)))
+      case None => // frame for script
+        ctx.getUniqueTxInputAddress()
+    }
   }
 
   def getNewFrameBalancesState(

@@ -2383,12 +2383,17 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   trait ContractInstrFixture extends StatefulInstrFixture {
     override lazy val frame = prepareFrame()
 
-    def test(instr: ContractInstr, value: Val) = {
-      val initialGas = context.gasRemaining
-      instr.runWith(frame)
-      stack.size is 1
-      stack.top.get is value
-      initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+    def test(
+        instr: ContractInstr,
+        value: Val,
+        frame: Frame[StatefulContext] = frame,
+        extraGas: GasBox = GasBox.zero
+    ) = {
+      val initialGas = frame.ctx.gasRemaining
+      instr.runWith(frame) isE ()
+      frame.opStack.size is 1
+      frame.opStack.top.get is value
+      initialGas.subUnsafe(frame.ctx.gasRemaining) is instr.gas().addUnsafe(extraGas)
     }
   }
 
@@ -2410,7 +2415,81 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CallerAddress" in new CallerFrameFixture {
-    test(CallerAddress, Val.Address(LockupScript.p2c(callerFrame.obj.contractIdOpt.get)))
+    import NetworkConfigFixture.{Leman, PreLeman}
+
+    {
+      info("PreLeman: Caller is a contract frame")
+      val callerFrame = prepareFrame()(PreLeman).asInstanceOf[StatefulFrame]
+      val frame       = prepareFrame(callerFrameOpt = Some(callerFrame))(PreLeman)
+      test(CallerAddress, Val.Address(LockupScript.p2c(callerFrame.obj.contractIdOpt.get)), frame)
+    }
+
+    {
+      info("Leman: Caller is a contract frame")
+      val callerFrame = prepareFrame()(Leman).asInstanceOf[StatefulFrame]
+      val frame       = prepareFrame(callerFrameOpt = Some(callerFrame))(Leman)
+      test(CallerAddress, Val.Address(LockupScript.p2c(callerFrame.obj.contractIdOpt.get)), frame)
+    }
+
+    val (script, _)   = prepareStatefulScript(StatefulScript.alwaysFail)
+    val (tx, prevOut) = transactionGenWithPreOutputs(inputsNumGen = Gen.const(3)).sample.get
+    val prevOutputs0  = prevOut.map(_.referredOutput)
+    val prevOutputs1  = AVector.fill(3)(prevOutputs0.head)
+
+    val txEnvWithRandomAddresses = TxEnv(tx, prevOutputs0, Stack.ofCapacity(0))
+    val txEnvWithUniqueAddress   = TxEnv(tx, prevOutputs1, Stack.ofCapacity(0))
+    val uniqueAddress            = Val.Address(prevOutputs0.head.lockupScript)
+
+    {
+      info("PreLeman: Caller is a script frame with unique address in tx env")
+      val callerFrame = prepareFrame(txEnvOpt = Some(txEnvWithUniqueAddress))(PreLeman)
+        .asInstanceOf[StatefulFrame]
+        .copy(obj = script)
+      val frame = prepareFrame(callerFrameOpt = Some(callerFrame))(PreLeman)
+      CallerAddress.runWith(frame).leftValue isE PartiallyEnabledInstr(CallerAddress)
+    }
+
+    {
+      info("Leman: Caller is a script frame with unique address in tx env")
+      val callerFrame = prepareFrame(txEnvOpt = Some(txEnvWithUniqueAddress))
+        .asInstanceOf[StatefulFrame]
+        .copy(obj = script)
+      val frame = prepareFrame(callerFrameOpt = Some(callerFrame))
+      test(CallerAddress, uniqueAddress, frame)
+    }
+
+    {
+      info("Leman: Caller is a script frame with random addresses in tx env")
+      val callerFrame = prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
+        .asInstanceOf[StatefulFrame]
+        .copy(obj = script)
+      val frame = prepareFrame(callerFrameOpt = Some(callerFrame))
+      CallerAddress.runWith(frame).leftValue isE TxInputAddressesAreNotIdentical
+    }
+
+    {
+      info("PreLeman: The current frame is a script frame")
+      val frame = prepareFrame(txEnvOpt = Some(txEnvWithUniqueAddress))(PreLeman)
+        .asInstanceOf[StatefulFrame]
+        .copy(obj = script)
+      CallerAddress.runWith(frame).leftValue isE PartiallyEnabledInstr(CallerAddress)
+    }
+
+    {
+      info("Leman: The current frame is a script frame with unique address in tx env")
+      val frame = prepareFrame(txEnvOpt = Some(txEnvWithUniqueAddress))
+        .asInstanceOf[StatefulFrame]
+        .copy(obj = script)
+      test(CallerAddress, uniqueAddress, frame, extraGas = GasBox.unsafe(6))
+    }
+
+    {
+      info("Leman: The current frame is a script frame with random addresses in tx env")
+      val frame = prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
+        .asInstanceOf[StatefulFrame]
+        .copy(obj = script)
+      CallerAddress.runWith(frame).leftValue isE TxInputAddressesAreNotIdentical
+    }
   }
 
   it should "IsCalledFromTxScript" in new CallerFrameFixture {

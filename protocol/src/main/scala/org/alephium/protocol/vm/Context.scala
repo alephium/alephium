@@ -152,12 +152,21 @@ trait StatelessContext extends CostStrategy {
   }
 
   def getUniqueTxInputAddress(): ExeResult[Val.Address] = {
+    for {
+      _ <-
+        if (getHardFork() >= HardFork.Leman) okay else failed(PartiallyEnabledInstr(CallerAddress))
+      _       <- chargeGas(GasUniqueAddress.gas(txEnv.prevOutputs.length))
+      address <- _getUniqueTxInputAddress()
+    } yield address
+  }
+
+  private def _getUniqueTxInputAddress(): ExeResult[Val.Address] = {
     txEnv.prevOutputs.headOption match {
       case Some(firstInput) =>
         if (txEnv.prevOutputs.tail.forall(_.lockupScript == firstInput.lockupScript)) {
           Right(Val.Address(firstInput.lockupScript))
         } else {
-          failed(TxInputAddressesAreNotUnique)
+          failed(TxInputAddressesAreNotIdentical)
         }
       case None =>
         failed(NoTxInput)

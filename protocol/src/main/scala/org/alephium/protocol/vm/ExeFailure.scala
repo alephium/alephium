@@ -42,7 +42,7 @@ case object InvalidSignatureFormat                             extends ExeFailur
 case object InvalidSignature                                   extends ExeFailure
 case object InvalidTxInputIndex                                extends ExeFailure
 case object NoTxInput                                          extends ExeFailure
-case object TxInputAddressesAreNotUnique                       extends ExeFailure
+case object TxInputAddressesAreNotIdentical                    extends ExeFailure
 case object LockTimeOverflow                                   extends ExeFailure
 case object AbsoluteLockTimeVerificationFailed                 extends ExeFailure
 case object RelativeLockTimeVerificationFailed                 extends ExeFailure
@@ -116,6 +116,8 @@ final case class UncaughtKeyNotFoundError(error: IOError.KeyNotFound) extends Ex
 final case class UncaughtSerdeError(error: IOError.Serde)             extends ExeFailure
 
 final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends ExeFailure
+final case class PartiallyEnabledInstr[-Ctx <: StatelessContext](instr: Instr[Ctx])
+    extends ExeFailure
 
 sealed trait IOFailure extends Product {
   def error: IOError
