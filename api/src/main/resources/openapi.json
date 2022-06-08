@@ -5451,7 +5451,7 @@
                   "functions": [
                     {
                       "name": "bar",
-                      "signature": "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+                      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
                       "argNames": [
                         "a",
                         "b",
@@ -5694,7 +5694,7 @@
                 "$ref": "#/components/schemas/Contract"
               },
               "example": {
-                "code": "TxContract Foo(bar: ByteVec) {\n@use(approvedAssets = true, contractAssets = true)\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+                "code": "TxContract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
               }
             }
           },
@@ -5730,7 +5730,7 @@
                   "functions": [
                     {
                       "name": "bar",
-                      "signature": "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+                      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
                       "argNames": [
                         "a",
                         "b",

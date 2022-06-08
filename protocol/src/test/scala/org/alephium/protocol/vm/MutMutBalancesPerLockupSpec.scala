@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfigFixture}
+import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
 import org.alephium.protocol.model.{TxGenerators, TxOutput}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 import org.alephium.util.Bytes.byteStringOrdering
@@ -194,10 +194,6 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
     implicit override val groupConfig: GroupConfig =
       new GroupConfig {
         override def groups: Int = 3
-      }
-    implicit override val compilerConfig: CompilerConfig =
-      new CompilerConfig {
-        override def loopUnrollingLimit: Int = 1000
       }
   }
 }

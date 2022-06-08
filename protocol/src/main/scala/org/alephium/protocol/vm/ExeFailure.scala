@@ -41,6 +41,8 @@ case object SignedDataIsNot32Bytes                             extends ExeFailur
 case object InvalidSignatureFormat                             extends ExeFailure
 case object InvalidSignature                                   extends ExeFailure
 case object InvalidTxInputIndex                                extends ExeFailure
+case object NoTxInput                                          extends ExeFailure
+case object TxInputAddressesAreNotUnique                       extends ExeFailure
 case object LockTimeOverflow                                   extends ExeFailure
 case object AbsoluteLockTimeVerificationFailed                 extends ExeFailure
 case object RelativeLockTimeVerificationFailed                 extends ExeFailure
@@ -70,12 +72,13 @@ final case class InvalidConversion(from: Val, to: Val.Type)    extends ExeFailur
 final case class SerdeErrorCreateContract(error: SerdeError)   extends ExeFailure
 final case class NonExistContract(contractId: ContractId)      extends ExeFailure
 case object ContractDestructionShouldNotBeCalledFromSelf       extends ExeFailure
+case object PayToContractAddressNotInCallerTrace               extends ExeFailure
 case object InvalidAddressTypeInContractDestroy                extends ExeFailure
 case object NonExistTxInput                                    extends ExeFailure
 case object InvalidContractAddress                             extends ExeFailure
 case object ExpectNonPayableMethod                             extends ExeFailure
 case object ExpectStatefulContractObj                          extends ExeFailure
-case object EmptyBalanceForPayableMethod                       extends ExeFailure
+case object NoBalanceAvailable                                 extends ExeFailure
 case object NotEnoughBalance                                   extends ExeFailure
 case object NoAssetsApproved                                   extends ExeFailure
 case object BalanceOverflow                                    extends ExeFailure

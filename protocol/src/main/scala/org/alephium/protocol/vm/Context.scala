@@ -28,7 +28,10 @@ final case class BlockEnv(
     timeStamp: TimeStamp,
     target: Target,
     blockId: Option[BlockHash]
-)
+) {
+  def getHardFork()(implicit networkConfig: NetworkConfig): HardFork =
+    networkConfig.getHardFork(timeStamp)
+}
 object BlockEnv {
   def from(header: BlockHeader)(implicit networkConfig: NetworkConfig): BlockEnv =
     BlockEnv(networkConfig.networkId, header.timestamp, header.target, Some(header.hash))
@@ -130,8 +133,21 @@ trait StatelessContext extends CostStrategy {
     indexRaw.v.toInt.flatMap(txEnv.prevOutputs.get).toRight(Right(InvalidTxInputIndex))
   }
 
-  def getTxCaller(indexRaw: Val.U256): ExeResult[Val.Address] = {
+  def getTxInputAddressAt(indexRaw: Val.U256): ExeResult[Val.Address] = {
     getTxPrevOutput(indexRaw).map(output => Val.Address(output.lockupScript))
+  }
+
+  def getUniqueTxInputAddress(): ExeResult[Val.Address] = {
+    txEnv.prevOutputs.headOption match {
+      case Some(firstInput) =>
+        if (txEnv.prevOutputs.tail.forall(_.lockupScript == firstInput.lockupScript)) {
+          Right(Val.Address(firstInput.lockupScript))
+        } else {
+          failed(TxInputAddressesAreNotUnique)
+        }
+      case None =>
+        failed(NoTxInput)
+    }
   }
 
   def chargeGasWithSizeLeman(gasFormula: UpgradedGasFormula, size: Int): ExeResult[Unit] = {

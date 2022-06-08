@@ -83,8 +83,6 @@ class ParserSpec extends AlephiumSpec {
         FuncId("bar", false),
         List(Variable(Ident("x")))
       )
-    fastparse.parse("foo(?)", StatefulParser.callExpr(_)).get.value is
-      CallExpr(FuncId("foo", false), List(Placeholder[StatefulContext]()))
     fastparse.parse("# ++ #00", StatefulParser.expr(_)).get.value is
       Binop[StatefulContext](
         Concat,
@@ -113,8 +111,37 @@ class ParserSpec extends AlephiumSpec {
       .isSuccess is true
   }
 
+  it should "parse if-else statements" in {
+    fastparse
+      .parse("if x { return }", StatelessParser.statement(_))
+      .get
+      .value is
+      Ast.IfElse[StatelessContext](
+        Seq(Ast.IfBranch(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty)))),
+        ElseBranch(Seq.empty)
+      )
+
+    val error = intercept[Compiler.Error](
+      fastparse
+        .parse("if x { return } else if y { return }", StatelessParser.statement(_))
+    )
+    error.message is "If ... else if constructs should be terminated with an else statement"
+
+    fastparse
+      .parse("if x { return } else if y { return } else {}", StatelessParser.statement(_))
+      .get
+      .value is
+      Ast.IfElse[StatelessContext](
+        Seq(
+          Ast.IfBranch(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty))),
+          Ast.IfBranch(Variable(Ast.Ident("y")), Seq(ReturnStmt(Seq.empty)))
+        ),
+        ElseBranch(Seq.empty)
+      )
+  }
+
   it should "parse annotations" in {
-    fastparse.parse("@use(x = true, y = false)", StatefulParser.annotation(_)).isSuccess is true
+    fastparse.parse("@using(x = true, y = false)", StatefulParser.annotation(_)).isSuccess is true
   }
 
   it should "parse functions" in {
@@ -127,14 +154,14 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed0.id is Ast.FuncId("add", false)
     parsed0.isPublic is false
-    parsed0.useApprovedAssets is false
+    parsed0.usePreapprovedAssets is false
     parsed0.useContractAssets is false
     parsed0.args.size is 2
     parsed0.rtypes is Seq(Type.U256, Type.U256)
 
     val parsed1 = fastparse
       .parse(
-        """@use(approvedAssets = true)
+        """@using(preapprovedAssets = true)
           |pub fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }
           |""".stripMargin,
         StatelessParser.func(_)
@@ -143,7 +170,7 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed1.id is Ast.FuncId("add", false)
     parsed1.isPublic is true
-    parsed1.useApprovedAssets is true
+    parsed1.usePreapprovedAssets is true
     parsed1.useContractAssets is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
@@ -151,7 +178,7 @@ class ParserSpec extends AlephiumSpec {
     info("Simple return type")
     val parsed2 = fastparse
       .parse(
-        """@use(approvedAssets = true, contractAssets = true)
+        """@using(preapprovedAssets = true, assetsInContract = true)
           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
         StatelessParser.func(_)
       )
@@ -159,7 +186,7 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed2.id is Ast.FuncId("add", false)
     parsed2.isPublic is true
-    parsed2.useApprovedAssets is true
+    parsed2.usePreapprovedAssets is true
     parsed2.useContractAssets is true
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
@@ -167,13 +194,13 @@ class ParserSpec extends AlephiumSpec {
     info("More use annotation")
     val parsed3 = fastparse
       .parse(
-        """@use(contractAssets = true)
+        """@using(assetsInContract = true)
           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
         StatelessParser.func(_)
       )
       .get
       .value
-    parsed3.useApprovedAssets is false
+    parsed3.usePreapprovedAssets is false
     parsed3.useContractAssets is true
   }
 
@@ -275,20 +302,18 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse array expression" in {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
-      "a[0][?]" -> Ast.ArrayElement(
-        Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
-        Ast.Placeholder()
-      ),
-      "a[0u][1u]" -> Ast.ArrayElement(
-        Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
-        constantIndex(1)
+      "a[0u][1u]" -> Ast
+        .ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1))),
+      "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(Variable(Ast.Ident("i")))),
+      "a[foo()]" -> Ast
+        .ArrayElement(Variable(Ast.Ident("a")), Seq(CallExpr(FuncId("foo", false), Seq.empty))),
+      "a[i + 1]" -> Ast.ArrayElement(
+        Variable(Ast.Ident("a")),
+        Seq(Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1)))))
       ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
-        Ast.ArrayElement(
-          Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
-          constantIndex(1)
-        )
+        Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1)))
       ),
       "[a, a]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
       "[a; 2]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
@@ -313,48 +338,36 @@ class ParserSpec extends AlephiumSpec {
       ),
       "a[0][1] = b[0]" -> Assign(
         Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0), constantIndex(1)))),
-        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), constantIndex(0))
-      ),
-      "a[?][0] = ?" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Ast.Placeholder(), constantIndex(0)))),
-        Ast.Placeholder()
+        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), Seq(constantIndex(0)))
       ),
       "a, b = foo()" -> Assign(
         Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
         CallExpr(FuncId("foo", false), Seq.empty)
       ),
-      "a, b[?] = foo()" -> Assign(
+      "a[i] = b" -> Assign(
+        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Variable(Ident("i"))))),
+        Ast.Variable(Ast.Ident("b"))
+      ),
+      "a[foo()] = b" -> Assign(
         Seq(
-          AssignmentSimpleTarget(Ident("a")),
-          AssignmentArrayElementTarget(Ident("b"), Seq(Placeholder()))
+          AssignmentArrayElementTarget(Ident("a"), Seq(CallExpr(FuncId("foo", false), Seq.empty)))
         ),
-        CallExpr(FuncId("foo", false), Seq.empty)
+        Ast.Variable(Ast.Ident("b"))
+      ),
+      "a[i + 1] = b" -> Assign(
+        Seq(
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            Seq(Binop(ArithOperator.Add, Variable(Ident("i")), Const(Val.U256(U256.unsafe(1)))))
+          )
+        ),
+        Ast.Variable(Ast.Ident("b"))
       )
     )
 
     stats.foreach { case (str, ast) =>
       checkParseStat(str, ast)
     }
-  }
-
-  it should "parse loop" in {
-    checkParseStat(
-      "loop(0, 4, 1, x[?] = ?)",
-      Ast.Loop[StatelessContext](
-        0,
-        4,
-        1,
-        Ast.Assign(
-          Seq(
-            Ast.AssignmentArrayElementTarget(
-              Ast.Ident("x"),
-              Seq(Ast.Placeholder[StatelessContext]())
-            )
-          ),
-          Ast.Placeholder[StatelessContext]()
-        )
-      )
-    )
   }
 
   it should "parse event definition" in {
@@ -533,7 +546,7 @@ class ParserSpec extends AlephiumSpec {
   }
 
   trait ScriptFixture {
-    val useApprovedAssets: Boolean
+    val usePreapprovedAssets: Boolean
     val script: String
 
     val ident        = TypeId("Main")
@@ -543,7 +556,7 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         FuncId("main", false),
         true,
-        useApprovedAssets,
+        usePreapprovedAssets,
         false,
         Seq.empty,
         Seq.empty,
@@ -553,7 +566,7 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse AssetScript" in new ScriptFixture {
-    val useApprovedAssets = false
+    val usePreapprovedAssets = false
     val script = s"""
                     |AssetScript Main(x: U256) {
                     |  pub fn main() -> () {
@@ -567,10 +580,10 @@ class ParserSpec extends AlephiumSpec {
   }
 
   // scalastyle:off no.equal
-  class TxScriptFixture(useApprovedAssetsOpt: Option[Boolean]) extends ScriptFixture {
-    val useApprovedAssets = !useApprovedAssetsOpt.contains(false)
-    val annotation = useApprovedAssetsOpt match {
-      case Some(value) => s"@use(approvedAssets = $value)"
+  class TxScriptFixture(usePreapprovedAssetsOpt: Option[Boolean]) extends ScriptFixture {
+    val usePreapprovedAssets = !usePreapprovedAssetsOpt.contains(false)
+    val annotation = usePreapprovedAssetsOpt match {
+      case Some(value) => s"@using(preapprovedAssets = $value)"
       case None        => ""
     }
     val script = s"""
@@ -588,7 +601,7 @@ class ParserSpec extends AlephiumSpec {
   }
   // scalastyle:on no.equal
 
-  it should "parse explicit useApprovedAssets TxScript" in new TxScriptFixture(Some(true))
-  it should "parse implicit useApprovedAssets TxScript" in new TxScriptFixture(None)
+  it should "parse explicit usePreapprovedAssets TxScript" in new TxScriptFixture(Some(true))
+  it should "parse implicit usePreapprovedAssets TxScript" in new TxScriptFixture(None)
   it should "parse vanilla TxScript" in new TxScriptFixture(Some(false))
 }

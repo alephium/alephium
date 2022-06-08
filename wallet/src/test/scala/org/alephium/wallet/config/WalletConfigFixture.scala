@@ -19,13 +19,10 @@ package org.alephium.wallet.config
 import java.net.InetAddress
 import java.nio.file.Files
 
-import org.alephium.protocol.config.{CompilerConfigFixture, GroupConfig, NetworkConfigFixture}
+import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
 import org.alephium.util.{Duration, SocketUtil}
 
-trait WalletConfigFixture
-    extends SocketUtil
-    with NetworkConfigFixture.Default
-    with CompilerConfigFixture.Default {
+trait WalletConfigFixture extends SocketUtil with NetworkConfigFixture.Default {
 
   val host: InetAddress = InetAddress.getByName("127.0.0.1")
   val blockFlowPort     = generatePort()

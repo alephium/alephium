@@ -552,7 +552,7 @@ class TxUtilsSpec extends AlephiumSpec {
         minimalGas,
         defaultGasPrice
       )
-      .leftValue is "Too many tokens in the transaction output, maximal number 64"
+      .leftValue is "Too many tokens in the transaction output, maximal number 4"
   }
 
   it should "fail when there are tokens with zero value in the transaction output" in new UnsignedTransactionFixture {
@@ -776,7 +776,7 @@ class TxUtilsSpec extends AlephiumSpec {
     TxUtils.getFirstOutputTokensNum(0) is 0
     TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo) is maxTokenPerUtxo
     TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 1) is 1
-    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 10) is 10
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 10) is 2
     TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + maxTokenPerUtxo - 1) is maxTokenPerUtxo - 1
     TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo * 10) is maxTokenPerUtxo
   }

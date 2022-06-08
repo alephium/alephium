@@ -1218,7 +1218,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     {
       val rawCode =
         s"""
-           |@use(approvedAssets = false)
+           |@using(preapprovedAssets = false)
            |TxScript Main(x: U256, y: U256) {
            |  assert!(x != y)
            |}
@@ -1232,7 +1232,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     {
       val rawCode =
         s"""
-           |@use(approvedAssets = false)
+           |@using(preapprovedAssets = false)
            |TxScript Main {
            |  assert!(1 != 2)
            |}
