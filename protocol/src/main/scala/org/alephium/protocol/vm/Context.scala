@@ -27,14 +27,28 @@ final case class BlockEnv(
     networkId: NetworkId,
     timeStamp: TimeStamp,
     target: Target,
-    blockId: Option[BlockHash]
+    blockId: Option[BlockHash],
+    hardFork: HardFork
 ) {
-  def getHardFork()(implicit networkConfig: NetworkConfig): HardFork =
-    networkConfig.getHardFork(timeStamp)
+  @inline def getHardFork(): HardFork = hardFork
 }
 object BlockEnv {
+  def apply(
+      networkId: NetworkId,
+      timeStamp: TimeStamp,
+      target: Target,
+      blockId: Option[BlockHash]
+  )(implicit networkConfig: NetworkConfig): BlockEnv =
+    BlockEnv(networkId, timeStamp, target, blockId, networkConfig.getHardFork(timeStamp))
+
   def from(header: BlockHeader)(implicit networkConfig: NetworkConfig): BlockEnv =
-    BlockEnv(networkConfig.networkId, header.timestamp, header.target, Some(header.hash))
+    BlockEnv(
+      networkConfig.networkId,
+      header.timestamp,
+      header.target,
+      Some(header.hash),
+      networkConfig.getHardFork(header.timestamp)
+    )
 }
 
 sealed trait TxEnv {
@@ -111,7 +125,7 @@ trait StatelessContext extends CostStrategy {
   def networkConfig: NetworkConfig
   def blockEnv: BlockEnv
 
-  def getHardFork(): HardFork = networkConfig.getHardFork(blockEnv.timeStamp)
+  @inline def getHardFork(): HardFork = blockEnv.getHardFork()
   def checkLemanHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
     val hardFork = getHardFork()
     if (hardFork >= HardFork.Leman) {
