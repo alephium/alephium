@@ -389,9 +389,11 @@ object StatefulContract {
     }
   }
 
-  def check(contract: StatefulContract): ExeResult[Unit] = {
+  def check(contract: StatefulContract, hardFork: HardFork): ExeResult[Unit] = {
     if (contract.fieldLength < 0) {
       failed(InvalidFieldLength)
+    } else if (hardFork >= HardFork.Leman && contract.fieldLength > 0xff) {
+      failed(TooManyFields)
     } else if (contract.methods.isEmpty) {
       failed(EmptyMethods)
     } else if (!contract.methods.forall(Method.validate)) {

@@ -1494,7 +1494,7 @@ sealed trait CreateContractBase extends CreateContractAbstract with GasCreate {
       )
       _ <- contractCode.checkAssetsModifier(frame.ctx)
       _ <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
-      _ <- StatefulContract.check(contractCode)
+      _ <- StatefulContract.check(contractCode, frame.ctx.getHardFork())
     } yield contractCode.toHalfDecoded()
   }
 }

@@ -19,6 +19,7 @@ package org.alephium.protocol.vm
 import org.scalatest.Assertion
 
 import org.alephium.protocol.config.NetworkConfigFixture
+import org.alephium.protocol.model.HardFork
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector}
 import org.alephium.util.Hex.HexStringSyntax
@@ -101,10 +102,24 @@ class ContractSpec extends AlephiumSpec {
   }
 
   it should "not validate empty scripts" in {
+    def check(contract: StatefulContract, result: Any) = {
+      val result0 = StatefulContract.check(contract, HardFork.Mainnet)
+      val result1 = StatefulContract.check(contract, HardFork.Leman)
+
+      result match {
+        case error: ExeFailure =>
+          result0.leftValue isE error
+          result1.leftValue isE error
+        case _ =>
+          result0 isE ()
+          result1 isE ()
+      }
+    }
+
     val contract0 = StatefulContract(0, AVector.empty)
-    StatefulContract.check(contract0).leftValue isE EmptyMethods
+    check(contract0, EmptyMethods)
     val contract1 = StatefulContract(-1, AVector.empty)
-    StatefulContract.check(contract1).leftValue isE InvalidFieldLength
+    check(contract1, InvalidFieldLength)
 
     val method = Method[StatefulContext](
       isPublic = true,
@@ -116,26 +131,33 @@ class ContractSpec extends AlephiumSpec {
       instrs = AVector.empty
     )
     val contract2 = StatefulContract(0, AVector(method))
-    StatefulContract.check(contract2) isE ()
+    check(contract2, ())
     val contract3 = StatefulContract(0, AVector(method.copy(argsLength = -1)))
-    StatefulContract.check(contract3).leftValue isE InvalidMethod
+    check(contract3, InvalidMethod)
     val contract4 = StatefulContract(0, AVector(method.copy(localsLength = -1)))
-    StatefulContract.check(contract4).leftValue isE InvalidMethod
+    check(contract4, InvalidMethod)
     val contract5 = StatefulContract(0, AVector(method.copy(returnLength = -1)))
-    StatefulContract.check(contract5).leftValue isE InvalidMethod
+    check(contract5, InvalidMethod)
     val contract6 = StatefulContract(0, AVector(method, method.copy(argsLength = -1)))
-    StatefulContract.check(contract6).leftValue isE InvalidMethod
+    check(contract6, InvalidMethod)
     val contract7 = StatefulContract(0, AVector(method, method.copy(localsLength = -1)))
-    StatefulContract.check(contract7).leftValue isE InvalidMethod
+    check(contract7, InvalidMethod)
     val contract8 = StatefulContract(0, AVector(method, method.copy(returnLength = -1)))
-    StatefulContract.check(contract8).leftValue isE InvalidMethod
+    check(contract8, InvalidMethod)
     val contract9 = StatefulContract(0, AVector(method, method))
-    StatefulContract.check(contract9) isE ()
+    check(contract9, ())
     val contract10 = StatefulContract(0, AVector(method.copy(argsLength = 1, localsLength = 0)))
-    StatefulContract.check(contract10).leftValue isE InvalidMethod
+    check(contract10, InvalidMethod)
     val contract11 =
       StatefulContract(0, AVector(method, method.copy(argsLength = 1, localsLength = 0)))
-    StatefulContract.check(contract11).leftValue isE InvalidMethod
+    check(contract11, InvalidMethod)
+
+    info("Check field length")
+    val contract12 = StatefulContract(0xff, AVector(method))
+    check(contract12, ())
+    val contract13 = StatefulContract(0xff + 1, AVector(method))
+    StatefulContract.check(contract13, HardFork.Mainnet) isE ()
+    StatefulContract.check(contract13, HardFork.Leman).leftValue isE TooManyFields
   }
 
   trait MethodsFixture {
