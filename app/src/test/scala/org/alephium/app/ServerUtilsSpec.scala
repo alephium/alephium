@@ -723,7 +723,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "Too many transaction outputs, maximal value: 256"
   }
 
-  it should "check the minimal amount deposit for contrac creation" in new Fixture {
+  it should "check the minimal amount deposit for contract creation" in new Fixture {
     val serverUtils = new ServerUtils
     serverUtils.getInitialAlphAmount(None) isE minimalAlphInContract
     serverUtils.getInitialAlphAmount(Some(Amount(minimalAlphInContract))) isE minimalAlphInContract
@@ -1245,6 +1245,69 @@ class ServerUtilsSpec extends AlephiumSpec {
       result.bytecodeTemplate is expectedByteCode
         .replace("{0}", "0d") // bytecode of U256Const1
         .replace("{1}", "0e") // bytecode of U256Const2
+    }
+  }
+
+  it should "create build deploy contract script" in new Fixture {
+    val rawCode =
+      s"""
+         |TxContract Foo(y: U256) {
+         |  pub fn foo() -> () {
+         |    assert!(1 != y)
+         |  }
+         |}
+         |""".stripMargin
+    val contract          = Compiler.compileContract(rawCode).rightValue
+    val (_, publicKey, _) = genesisKeys(0)
+    val fromAddress       = Address.p2pkh(publicKey)
+
+    {
+      info("With approved tokens")
+      val token1                         = Hash.generate
+      val token2                         = Hash.generate
+      val codeRaw                        = Hex.toHexString(serialize(contract))
+      val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
+      val stateRaw                       = Hex.toHexString(serialize(initialFields))
+
+      ServerUtils
+        .buildDeployContractScriptRawWithParsedState(
+          codeRaw,
+          fromAddress,
+          initialFields,
+          U256.unsafe(10),
+          AVector(Token(token1, U256.unsafe(10)), Token(token2, U256.unsafe(20))),
+          Some(U256.unsafe(50))
+        ) is s"""
+                |TxScript Main {
+                |  approveAlph!(@${fromAddress.toBase58}, 10)
+                |  approveToken!(@${fromAddress.toBase58}, #${token1.toHexString}, 10)
+                |  approveToken!(@${fromAddress.toBase58}, #${token2.toHexString}, 20)
+                |  createContractWithToken!(#$codeRaw, #$stateRaw, 50)
+                |}
+                |""".stripMargin
+
+    }
+
+    {
+      info("Without approved tokens")
+      val codeRaw                        = Hex.toHexString(serialize(contract))
+      val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
+      val stateRaw                       = Hex.toHexString(serialize(initialFields))
+
+      ServerUtils
+        .buildDeployContractScriptRawWithParsedState(
+          codeRaw,
+          fromAddress,
+          initialFields,
+          U256.unsafe(10),
+          AVector.empty,
+          Some(U256.unsafe(50))
+        ) is s"""
+                |TxScript Main {
+                |  approveAlph!(@${fromAddress.toBase58}, 10)
+                |  createContractWithToken!(#$codeRaw, #$stateRaw, 50)
+                |}
+                |""".stripMargin
     }
   }
 
