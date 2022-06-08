@@ -469,12 +469,12 @@ object TxValidation {
         output: TxOutput,
         hardFork: HardFork
     ): Boolean = {
-      val numTokenBound = if (hardFork < HardFork.Leman) {
-        deprecatedMaxTokenPerUtxo
+      val (dustAmount, numTokenBound) = if (hardFork < HardFork.Leman) {
+        (deprecatedDustUtxoAmount, deprecatedMaxTokenPerUtxo)
       } else {
-        maxTokenPerUtxo
+        (dustUtxoAmount, maxTokenPerUtxo)
       }
-      output.amount >= dustUtxoAmount &&
+      output.amount >= dustAmount &&
       output.tokens.length <= numTokenBound &&
       output.tokens.forall(_._2.nonZero)
     }

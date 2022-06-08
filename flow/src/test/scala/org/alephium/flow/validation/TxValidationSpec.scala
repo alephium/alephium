@@ -398,9 +398,20 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       // zero amount
       tx.zeroAlphAmount().fail(InvalidOutputStats)
 
-      // dust amount
-      tx.updateAlphAmount(_ => dustUtxoAmount).pass()
-      tx.updateAlphAmount(_ => dustUtxoAmount - 1).fail(InvalidOutputStats)
+      {
+        info("Check dust amount before leman")
+        implicit val validator = checkOutputStats(_, HardFork.Mainnet)
+        tx.updateAlphAmount(_ => deprecatedDustUtxoAmount).pass()
+        tx.updateAlphAmount(_ => deprecatedDustUtxoAmount - 1).fail(InvalidOutputStats)
+      }
+
+      {
+        info("Check dust amount for leman")
+        dustUtxoAmount is (deprecatedDustUtxoAmount * 1000)
+        implicit val validator = checkOutputStats(_, HardFork.Leman)
+        tx.updateAlphAmount(_ => dustUtxoAmount).pass()
+        tx.updateAlphAmount(_ => dustUtxoAmount - 1).fail(InvalidOutputStats)
+      }
     }
   }
 
