@@ -163,6 +163,7 @@ object ArrayTransformer {
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     private def calcOffset(
         state: Compiler.State[Ctx],
         indexes: Seq[Ast.Expr[Ctx]]

@@ -766,7 +766,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expect array type, have: U256",
+        "Expect array type, have: List(U256)",
       s"""
          |// invalid binary expression(compare array)
          |TxContract Foo() {
