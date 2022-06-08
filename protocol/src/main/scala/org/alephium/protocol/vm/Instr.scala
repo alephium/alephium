@@ -145,7 +145,6 @@ object Instr {
     Log6, Log7, Log8, Log9,
     ContractIdToAddress,
     LoadLocalByIndex, StoreLocalByIndex, Dup,
-    UniqueTxInputAddress
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -1755,19 +1754,6 @@ object TxInputAddressAt extends TxInstr with GasVeryLow {
 object TxInputsSize extends TxInstr with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.U256(util.U256.unsafe(frame.ctx.txEnv.prevOutputs.length)))
-  }
-}
-
-object UniqueTxInputAddress
-    extends LemanInstr[StatelessContext]
-    with StatelessInstrCompanion0
-    with GasUniqueAddress {
-  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      _       <- frame.ctx.chargeGasWithSize(this, frame.ctx.txEnv.prevOutputs.length)
-      address <- frame.ctx.getUniqueTxInputAddress()
-      _       <- frame.pushOpStack(address)
-    } yield ()
   }
 }
 

@@ -1076,7 +1076,6 @@ class VMSpec extends AlephiumSpec {
          |  assert!(txId!() != #${zeroId.toHexString})
          |  assert!(txInputAddressAt!($index) == @${genesisAddress.toBase58})
          |  assert!(txInputsSize!() == 1)
-         |  assert!(uniqueTxInputAddress!() == @${genesisAddress})
          |}
          |""".stripMargin
     testSimpleScript(main(0))
