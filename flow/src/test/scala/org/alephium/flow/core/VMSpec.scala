@@ -2412,7 +2412,7 @@ class VMSpec extends AlephiumSpec {
       var lastBarId: ContractId = fooId
       (0 until 5).foreach { index =>
         val initialFields =
-          AVector[Val](Val.U256(U256.unsafe(index)), Val.ByteVec(fooId.bytes))
+          AVector[Val](Val.U256(U256.unsafe(index)), Val.ByteVec(lastBarId.bytes))
         val barId = createContract(bar, initialFields, initialAlphAmount = ALPH.alph(2)).key
         lastBarId = barId
       }
