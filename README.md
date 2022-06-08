@@ -57,7 +57,7 @@ Use the following command to build a single runnable JAR :
 
 The resulting assembly file will appear in `/app/target/scala-2.13/` directory.
 
-### Univeral Zip distribution
+### Universal Zip distribution
 
 Use the following command to build a zip distribution including launch scripts:
 
@@ -86,7 +86,7 @@ There are two kinds of tests:
 
 Have a look at our contribution guide described in [CONTRIBUTING.md](CONTRIBUTING.md)
 
-[codecov-badge]: https://codecov.io/gh/polarker/alephium/branch/master/graph/badge.svg?token=TAMKL8CWO3
-[codecov-link]: https://codecov.io/gh/polarker/alephium
+[codecov-badge]: https://codecov.io/gh/alephium/alephium/branch/master/graph/badge.svg?token=0CK4HQ910R
+[codecov-link]: https://codecov.io/gh/alephium/alephium
 [discord-badge]: https://img.shields.io/discord/747741246667227157?logo=discord
 [discord-link]: https://discord.gg/JErgRBfRSB
