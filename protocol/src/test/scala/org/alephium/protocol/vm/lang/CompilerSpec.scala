@@ -1936,6 +1936,24 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         )
     }
 
+    {
+      info("Invalid if-else-if statement")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo() -> () {
+           |    if (true) {
+           |      return
+           |    } else if (false) {
+           |      return
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "If ... else if constructs should be terminated with an else statement"
+    }
+
     new TestContractMethodFixture {
       val code =
         s"""

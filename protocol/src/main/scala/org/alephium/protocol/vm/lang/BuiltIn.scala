@@ -106,8 +106,8 @@ object BuiltIn {
     SimpleStatelessBuiltIn("txId", Seq.empty, Seq(Type.ByteVec), TxId)
   val txInputAddressAt: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("txInputAddressAt", Seq(Type.U256), Seq(Type.Address), TxInputAddressAt)
-  val txInputSize: SimpleStatelessBuiltIn =
-    SimpleStatelessBuiltIn("txInputSize", Seq.empty, Seq(Type.U256), TxInputSize)
+  val txInputsSize: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("txInputsSize", Seq.empty, Seq(Type.U256), TxInputsSize)
   val uniqueTxInputAddress: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn(
       "uniqueTxInputAddress",
@@ -358,7 +358,7 @@ object BuiltIn {
     blockTarget,
     txId,
     txInputAddressAt,
-    txInputSize,
+    txInputsSize,
     uniqueTxInputAddress,
     verifyAbsoluteLocktime,
     verifyRelativeLocktime,

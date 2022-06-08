@@ -197,7 +197,7 @@ trait VotingFixture extends WalletFixture {
                             |  @using(preApprovedAssets = true, assetsInContract = true)
                             |  pub fn allocateTokens() -> () {
                             |     assert!(initialized == false)
-                            |     assert!(txInputAddressAt!(txInputSize!() - 1) == admin)
+                            |     assert!(txInputAddressAt!(txInputsSize!() - 1) == admin)
                             |     ${allocationTransfers}
                             |     yes = 0
                             |     no = 0
@@ -223,7 +223,7 @@ trait VotingFixture extends WalletFixture {
                             |
                             |   pub fn close() -> () {
                             |     assert!(initialized == true && isClosed == false)
-                            |     assert!(txInputAddressAt!(txInputSize!() - 1) == admin)
+                            |     assert!(txInputAddressAt!(txInputsSize!() - 1) == admin)
                             |     isClosed = true
                             |
                             |     emit VotingClosed()
@@ -275,7 +275,7 @@ trait VotingFixture extends WalletFixture {
   ): TxResult = {
     val votingScript = s"""
                           |TxScript VotingScript {
-                          |  let caller = txInputAddressAt!(txInputSize!() - 1)
+                          |  let caller = txInputAddressAt!(txInputsSize!() - 1)
                           |  approveToken!(caller, #${contractId}, 1)
                           |  let voting = Voting(#${contractId})
                           |  approveAlph!(caller, $utxoFee)

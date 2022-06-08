@@ -134,7 +134,7 @@ object Instr {
     CallLocal, Return,
     Assert,
     Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
-    NetworkId, BlockTimeStamp, BlockTarget, TxId, TxInputAddressAt, TxInputSize,
+    NetworkId, BlockTimeStamp, BlockTarget, TxId, TxInputAddressAt, TxInputsSize,
     VerifyAbsoluteLocktime, VerifyRelativeLocktime,
     Log1, Log2, Log3, Log4, Log5,
     /* Below are instructions for Leman hard fork */
@@ -1737,7 +1737,7 @@ object TxInputAddressAt extends TxInstr with GasVeryLow {
   }
 }
 
-object TxInputSize extends TxInstr with GasVeryLow {
+object TxInputsSize extends TxInstr with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.U256(util.U256.unsafe(frame.ctx.txEnv.prevOutputs.length)))
   }
