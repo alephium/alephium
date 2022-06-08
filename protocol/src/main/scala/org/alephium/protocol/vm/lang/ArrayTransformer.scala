@@ -31,9 +31,9 @@ object ArrayTransformer {
       isLocal: Boolean,
       varInfoBuild: (Type, Boolean, Byte) => Compiler.VarInfo
   ): ArrayRef[Ctx] = {
-    val varIndexOffset = Ast.Const[Ctx](Val.U256(U256.unsafe(state.varIndex)))
+    val offset = ConstantArrayVarOffset[Ctx](state.varIndex)
     initArrayVars(state, tpe, baseName, isMutable, isLocal, varInfoBuild)
-    val ref = ArrayRef[Ctx](isLocal, tpe, varIndexOffset)
+    val ref = ArrayRef[Ctx](isLocal, tpe, offset)
     state.addArrayRef(Ident(baseName), isMutable, ref)
     ref
   }
@@ -57,7 +57,6 @@ object ArrayTransformer {
         (0 until tpe.size).foreach { idx =>
           val ident = Ast.Ident(arrayVarName(baseName, idx))
           state.addVariable(ident, baseType, isMutable, isLocal, varInfoBuild)
-          ident
         }
     }
   }
@@ -77,94 +76,162 @@ object ArrayTransformer {
     }
   }
 
+  sealed trait ArrayVarOffset[Ctx <: StatelessContext] {
+    def add(offset: ArrayVarOffset[Ctx]): ArrayVarOffset[Ctx]
+    def add(value: Int): ArrayVarOffset[Ctx]              = add(ConstantArrayVarOffset[Ctx](value))
+    def add(instrs: Seq[Instr[Ctx]]): ArrayVarOffset[Ctx] = add(VariableArrayVarOffset[Ctx](instrs))
+  }
+
+  final case class ConstantArrayVarOffset[Ctx <: StatelessContext](value: Int)
+      extends ArrayVarOffset[Ctx] {
+    def add(offset: ArrayVarOffset[Ctx]): ArrayVarOffset[Ctx] = offset match {
+      case ConstantArrayVarOffset(v) => ConstantArrayVarOffset(value + v)
+      case VariableArrayVarOffset(instrs) =>
+        if (value == 0) {
+          offset
+        } else {
+          VariableArrayVarOffset(
+            instrs ++ Seq[Instr[Ctx]](ConstInstr.u256(Val.U256(U256.unsafe(value))), U256Add)
+          )
+        }
+    }
+  }
+
+  final case class VariableArrayVarOffset[Ctx <: StatelessContext](instrs: Seq[Instr[Ctx]])
+      extends ArrayVarOffset[Ctx] {
+    def add(offset: ArrayVarOffset[Ctx]): ArrayVarOffset[Ctx] = offset match {
+      case ConstantArrayVarOffset(v) =>
+        if (v == 0) {
+          this
+        } else {
+          VariableArrayVarOffset(
+            instrs ++ Seq[Instr[Ctx]](ConstInstr.u256(Val.U256(U256.unsafe(v))), U256Add)
+          )
+        }
+      case VariableArrayVarOffset(codes) => VariableArrayVarOffset(instrs ++ codes :+ U256Add)
+    }
+  }
+
   final case class ArrayRef[Ctx <: StatelessContext](
       isLocal: Boolean,
       tpe: Type.FixedSizeArray,
-      varIndexOffset: Ast.Expr[Ctx]
+      offset: ArrayVarOffset[Ctx]
   ) {
-    private def checkVarIndex(index: Ast.Expr[Ctx], state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      state.getAndCheckConstantIndex(index) match {
+    @scala.annotation.tailrec
+    def subArray(state: Compiler.State[Ctx], indexes: Seq[Ast.Expr[Ctx]]): ArrayRef[Ctx] = {
+      if (indexes.isEmpty) {
+        this
+      } else {
+        subArray(state, indexes(0)).subArray(state, indexes.drop(1))
+      }
+    }
+
+    private def subArray(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): ArrayRef[Ctx] = {
+      val (baseType, flattenSize) = tpe.baseType match {
+        case baseType: Type.FixedSizeArray =>
+          val length = baseType.flattenSize()
+          (baseType, length)
+        case _ =>
+          throw Compiler.Error(s"Expect multi-dimension array type, have $tpe")
+      }
+      val newOffset = calcOffset(state, index) match {
+        case ConstantArrayVarOffset(value) =>
+          offset.add(value * flattenSize)
+        case VariableArrayVarOffset(instrs) =>
+          offset.add(instrs ++ Seq(ConstInstr.u256(Val.U256.unsafe(flattenSize)), U256Mul))
+      }
+      ArrayRef(isLocal, baseType, newOffset)
+    }
+
+    private def calcOffset(
+        state: Compiler.State[Ctx],
+        index: Ast.Expr[Ctx]
+    ): ArrayVarOffset[Ctx] = {
+      Compiler.State.getAndCheckConstantIndex(index) match {
         case Some(idx) =>
           checkArrayIndex(idx, tpe.size)
-          Seq.empty[Instr[Ctx]]
-        case _ =>
-          index.genCode(state) ++ Seq(
+          ConstantArrayVarOffset(idx)
+        case None =>
+          val instrs = index.genCode(state) ++ Seq(
+            Dup,
             ConstInstr.u256(Val.U256(U256.unsafe(tpe.size))),
             U256Lt,
             Assert
           )
+          VariableArrayVarOffset(instrs)
       }
     }
 
-    def subArray(
-        index: Ast.Expr[Ctx],
-        state: Compiler.State[Ctx]
-    ): (Seq[Instr[Ctx]], ArrayRef[Ctx]) = {
-      tpe.baseType match {
-        case baseType: Type.FixedSizeArray =>
-          val length = baseType.flattenSize()
-          val size   = Ast.Binop(ArithOperator.Mul, index, Ast.Const(Val.U256(U256.unsafe(length))))
-          val offset = Ast.Binop(ArithOperator.Add, varIndexOffset, size)
-          val checkCode = checkVarIndex(index, state)
-          (checkCode, ArrayRef(isLocal, baseType, offset))
-        case _ =>
-          throw Compiler.Error(s"Expect multi-dimension array type, have $tpe")
-      }
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+    private def calcOffset(
+        state: Compiler.State[Ctx],
+        indexes: Seq[Ast.Expr[Ctx]]
+    ): ArrayVarOffset[Ctx] = {
+      assume(indexes.nonEmpty)
+      val subArrayRef = subArray(state, indexes.dropRight(1))
+      subArrayRef.offset.add(subArrayRef.calcOffset(state, indexes.last))
+    }
+
+    private def storeArrayIndexVar(
+        state: Compiler.State[Ctx],
+        instrs: Seq[Instr[Ctx]]
+    ): (Ast.Ident, Seq[Instr[Ctx]]) = {
+      val ident = state.getArrayIndexVar()
+      (ident, instrs ++ state.genStoreCode(ident).flatten)
     }
 
     def genLoadCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      tpe.baseType match {
-        case _: Type.FixedSizeArray =>
-          (0 until tpe.size).flatMap { index =>
-            val indexAst = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
-            genLoadCode(indexAst, state)
+      val flattenSize = tpe.flattenSize()
+      offset match {
+        case VariableArrayVarOffset(instrs) =>
+          val (ident, codes) = storeArrayIndexVar(state, instrs)
+          val loadCodes = (0 until flattenSize).flatMap { idx =>
+            val calcOffsetCode = state.genLoadCode(ident) ++ Seq(
+              ConstInstr.u256(Val.U256(U256.unsafe(idx))),
+              U256Add
+            )
+            state.genLoadCode(VariableArrayVarOffset(calcOffsetCode), isLocal)
           }
-        case _ =>
-          (0 until tpe.size).flatMap { index =>
-            val indexAst = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
-            genLoadCode(indexAst, state)
-          }
-      }
-    }
-
-    def genLoadCode(index: Ast.Expr[Ctx], state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      tpe.baseType match {
-        case _: Type.FixedSizeArray =>
-          val (checkCode, array) = subArray(index, state)
-          checkCode ++ array.genLoadCode(state)
-        case _ =>
-          val checkCode = checkVarIndex(index, state)
-          val varIndex  = Ast.Binop(ArithOperator.Add, varIndexOffset, index)
-          checkCode ++ state.genLoadCode(varIndex, isLocal)
+          codes ++ loadCodes
+        case ConstantArrayVarOffset(value) =>
+          (0 until flattenSize).flatMap(idx =>
+            state.genLoadCode(
+              ConstantArrayVarOffset(value + idx),
+              isLocal
+            )
+          )
       }
     }
 
     def genStoreCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-      tpe.baseType match {
-        case _: Type.FixedSizeArray =>
-          (0 until tpe.size) flatMap { index =>
-            val indexExpr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
-            genStoreCode(indexExpr, state)
+      val flattenSize = tpe.flattenSize()
+      offset match {
+        case VariableArrayVarOffset(instrs) =>
+          val (ident, codes) = storeArrayIndexVar(state, instrs)
+          val storeCodes = (0 until flattenSize) map { idx =>
+            val calcOffsetCode = state.genLoadCode(ident) ++ Seq(
+              ConstInstr.u256(Val.U256(U256.unsafe(idx))),
+              U256Add
+            )
+            state.genStoreCode(VariableArrayVarOffset(calcOffsetCode), isLocal)
           }
-        case _ =>
-          (0 until tpe.size) flatMap { index =>
-            val indexExpr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
-            genStoreCode(indexExpr, state)
+          storeCodes :+ codes
+        case ConstantArrayVarOffset(value) =>
+          (0 until flattenSize) map { idx =>
+            state.genStoreCode(ConstantArrayVarOffset(value + idx), isLocal)
           }
       }
     }
 
-    def genStoreCode(index: Ast.Expr[Ctx], state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-      tpe.baseType match {
-        case _: Type.FixedSizeArray =>
-          val (checkCode, array) = subArray(index, state)
-          // Put the check code at the end to make sure the it executes first
-          array.genStoreCode(state) :+ checkCode
-        case _ =>
-          val checkCode = checkVarIndex(index, state)
-          val varIndex  = Ast.Binop(ArithOperator.Add, varIndexOffset, index)
-          Seq(checkCode ++ state.genStoreCode(varIndex, isLocal))
-      }
+    def genLoadCode(state: Compiler.State[Ctx], indexes: Seq[Ast.Expr[Ctx]]): Seq[Instr[Ctx]] = {
+      state.genLoadCode(calcOffset(state, indexes), isLocal)
+    }
+
+    def genStoreCode(
+        state: Compiler.State[Ctx],
+        indexes: Seq[Ast.Expr[Ctx]]
+    ): Seq[Seq[Instr[Ctx]]] = {
+      Seq(state.genStoreCode(calcOffset(state, indexes), isLocal))
     }
   }
 }

@@ -144,7 +144,7 @@ object Instr {
     EthEcRecover,
     Log6, Log7, Log8, Log9,
     ContractIdToAddress,
-    LoadLocalByIndex, StoreLocalByIndex,
+    LoadLocalByIndex, StoreLocalByIndex, Dup,
     UniqueTxInputAddress
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
@@ -364,14 +364,14 @@ object StoreLocal extends StatelessInstrCompanion1[Byte]
 
 sealed trait VarIndexInstr[Ctx <: StatelessContext]
     extends LemanInstrWithSimpleGas[Ctx]
-    with GasVeryLow {
-  def popIndex[C <: Ctx](frame: Frame[C], error: ExeFailure): ExeResult[Byte] = {
+    with GasLow {
+  def popIndex[C <: Ctx](frame: Frame[C], error: ExeFailure): ExeResult[Int] = {
     for {
       u256 <- frame.popOpStackU256()
       index <- u256.v.toInt
         .flatMap(v => if (v > 0xff) None else Some(v))
         .toRight(Right(error))
-    } yield index.toByte
+    } yield index
   }
 }
 
@@ -379,7 +379,7 @@ case object LoadLocalByIndex extends VarIndexInstr[StatelessContext] with Statel
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       index <- popIndex(frame, InvalidVarIndex)
-      v     <- frame.getLocalVal(Bytes.toPosInt(index))
+      v     <- frame.getLocalVal(index)
       _     <- frame.pushOpStack(v)
     } yield ()
   }
@@ -392,7 +392,7 @@ case object StoreLocalByIndex
     for {
       index <- popIndex(frame, InvalidVarIndex)
       v     <- frame.popOpStack()
-      _     <- frame.setLocalVal(Bytes.toPosInt(index), v)
+      _     <- frame.setLocalVal(index, v)
     } yield ()
   }
 }
@@ -425,7 +425,7 @@ case object LoadFieldByIndex extends VarIndexInstr[StatefulContext] with Statefu
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       index <- popIndex(frame, InvalidFieldIndex)
-      v     <- frame.getField(Bytes.toPosInt(index))
+      v     <- frame.getField(index)
       _     <- frame.pushOpStack(v)
     } yield ()
   }
@@ -436,7 +436,7 @@ case object StoreFieldByIndex extends VarIndexInstr[StatefulContext] with Statef
     for {
       index <- popIndex(frame, InvalidFieldIndex)
       v     <- frame.popOpStack()
-      _     <- frame.setField(Bytes.toPosInt(index), v)
+      _     <- frame.setField(index, v)
     } yield ()
   }
 }
@@ -446,6 +446,22 @@ sealed trait PureStackInstr extends OperandStackInstr with StatelessInstrCompani
 case object Pop extends PureStackInstr {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.opStack.remove(1)
+  }
+}
+
+case object Dup extends PureStackInstr with LemanInstrWithSimpleGas[StatelessContext] {
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstrWithSimpleGas].runWith(frame)
+
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = failed(
+    InactiveInstr(this)
+  )
+
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      value <- frame.opStack.top.toRight(Right(StackUnderflow))
+      _     <- frame.pushOpStack(value)
+    } yield ()
   }
 }
 

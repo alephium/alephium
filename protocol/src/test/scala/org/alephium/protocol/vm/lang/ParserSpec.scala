@@ -302,23 +302,18 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse array expression" in {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
-      "a[0u][1u]" -> Ast.ArrayElement(
-        Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
-        constantIndex(1)
-      ),
-      "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Variable(Ast.Ident("i"))),
+      "a[0u][1u]" -> Ast
+        .ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1))),
+      "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(Variable(Ast.Ident("i")))),
       "a[foo()]" -> Ast
-        .ArrayElement(Variable(Ast.Ident("a")), CallExpr(FuncId("foo", false), Seq.empty)),
+        .ArrayElement(Variable(Ast.Ident("a")), Seq(CallExpr(FuncId("foo", false), Seq.empty))),
       "a[i + 1]" -> Ast.ArrayElement(
         Variable(Ast.Ident("a")),
-        Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1))))
+        Seq(Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1)))))
       ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
-        Ast.ArrayElement(
-          Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
-          constantIndex(1)
-        )
+        Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1)))
       ),
       "[a, a]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
       "[a; 2]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
@@ -343,7 +338,7 @@ class ParserSpec extends AlephiumSpec {
       ),
       "a[0][1] = b[0]" -> Assign(
         Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0), constantIndex(1)))),
-        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), constantIndex(0))
+        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), Seq(constantIndex(0)))
       ),
       "a, b = foo()" -> Assign(
         Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),

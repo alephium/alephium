@@ -430,10 +430,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.size is 1
     stack.top.get is bool
 
-    stack.push(Val.U256(2))
+    stack.push(Val.U256(1)) isE ()
     LoadLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex
-    stack.push(Val.U256(0xff + 1))
-    LoadLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex
+    stack.push(Val.U256(0xff)) isE ()
+    LoadLocalByIndex.popIndex(frame, InvalidVarIndex) isE 0xff
+    stack.push(Val.U256(0xff + 1)) isE ()
+    LoadLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex
   }
 
   it should "StoreLocalByIndex" in new StatelessInstrFixture {
@@ -449,20 +451,36 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(1))
     StoreLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex
     stack.push(bool)
+    stack.push(Val.U256(0xff))
+    StoreLocalByIndex.popIndex(frame, InvalidVarIndex) isE 0xff
+    stack.push(bool)
     stack.push(Val.U256(0xff + 1))
-    StoreLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex
+    StoreLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex
   }
 
-  it should "Pop" in new ConstInstrFixture {
+  it should "Pop" in new StatelessInstrFixture {
     val bool: Val = Val.Bool(true)
     stack.push(bool)
 
-    val initialGas = context.gasRemaining
-    Pop.runWith(frame) isE ()
+    runAndCheckGas(Pop)
     stack.size is 0
-    initialGas.subUnsafe(context.gasRemaining) is Pop.gas()
 
     Pop.runWith(frame).leftValue isE StackUnderflow
+  }
+
+  it should "Dup" in new StatelessInstrFixture {
+    stack.size is 0
+    stack.top is None
+    Dup.runWith(frame).leftValue isE StackUnderflow
+
+    val bool: Val = Val.Bool(true)
+    stack.push(bool)
+    stack.top is Some(bool)
+    stack.size is 1
+
+    runAndCheckGas(Dup)
+    stack.top is Some(bool)
+    stack.size is 2
   }
 
   it should "BoolNot" in new StatelessInstrFixture {
@@ -1783,8 +1801,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(Val.U256(1))
     LoadFieldByIndex.runWith(frame).leftValue isE InvalidFieldIndex
+    stack.push(Val.U256(0xff))
+    LoadFieldByIndex.popIndex(frame, InvalidFieldIndex) isE 0xff
     stack.push(Val.U256(0xff + 1))
-    LoadFieldByIndex.runWith(frame).leftValue isE InvalidFieldIndex
+    LoadFieldByIndex.popIndex(frame, InvalidFieldIndex).leftValue isE InvalidFieldIndex
   }
 
   it should "StoreFieldByIndex" in new StatefulInstrFixture {
@@ -1798,8 +1818,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(1))
     StoreFieldByIndex.runWith(frame).leftValue isE InvalidFieldIndex
     stack.push(Val.False)
+    stack.push(Val.U256(0xff))
+    StoreFieldByIndex.popIndex(frame, InvalidFieldIndex) isE 0xff
+    stack.push(Val.False)
     stack.push(Val.U256(0xff + 1))
-    StoreFieldByIndex.runWith(frame).leftValue isE InvalidFieldIndex
+    StoreFieldByIndex.popIndex(frame, InvalidFieldIndex).leftValue isE InvalidFieldIndex
   }
 
   it should "CallExternal(byte)" in new StatefulInstrFixture {
@@ -2460,7 +2483,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover -> 2500,
       Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280,
       ContractIdToAddress -> 5,
-      LoadLocalByIndex -> 3, StoreLocalByIndex -> 3,
+      LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2,
       UniqueTxInputAddress -> 35
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
@@ -2472,7 +2495,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Leman hard fork */
       MigrateSimple -> 32000, MigrateWithFields -> 32000, LoadContractFields -> 8, CopyCreateContractWithToken -> 24000,
       BurnToken -> 30, LockApprovedAssets -> 30,
-      LoadFieldByIndex -> 3, StoreFieldByIndex -> 3
+      LoadFieldByIndex -> 5, StoreFieldByIndex -> 5
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -2586,8 +2609,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover -> 114,
       Log6 -> 115, Log7 -> 116, Log8 -> 117, Log9 -> 118,
       ContractIdToAddress -> 119,
-      LoadLocalByIndex -> 120, StoreLocalByIndex -> 121,
-      UniqueTxInputAddress -> 122,
+      LoadLocalByIndex -> 120, StoreLocalByIndex -> 121, Dup -> 122,
+      UniqueTxInputAddress -> 123,
       // stateful instructions
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -2641,7 +2664,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover,
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
-      LoadLocalByIndex, StoreLocalByIndex,
+      LoadLocalByIndex, StoreLocalByIndex, Dup,
       UniqueTxInputAddress
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(

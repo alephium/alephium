@@ -93,20 +93,22 @@ object Ast {
       case _ => throw Compiler.Error(s"Invalid array index $index")
     }
   }
-  final case class ArrayElement[Ctx <: StatelessContext](array: Expr[Ctx], index: Ast.Expr[Ctx])
-      extends Expr[Ctx] {
+  final case class ArrayElement[Ctx <: StatelessContext](
+      array: Expr[Ctx],
+      indexes: Seq[Ast.Expr[Ctx]]
+  ) extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      state.checkArrayIndexType(index)
-      array.getType(state) match {
-        case Seq(Type.FixedSizeArray(baseType, _)) => Seq(baseType)
-        case tpe =>
-          throw Compiler.Error(s"Expect array type, have: $tpe")
-      }
+      Seq(state.getArrayElementType(array, indexes))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val (arrayRef, codes) = state.getOrCreateArrayRef(array)
-      codes ++ arrayRef.genLoadCode(index, state)
+      getType(state) match {
+        case Seq(_: Type.FixedSizeArray) =>
+          codes ++ arrayRef.subArray(state, indexes).genLoadCode(state)
+        case _ =>
+          codes ++ arrayRef.genLoadCode(state, indexes)
+      }
     }
   }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
@@ -365,46 +367,16 @@ object Ast {
       ident: Ident,
       indexes: Seq[Ast.Expr[Ctx]]
   ) extends AssignmentTarget[Ctx] {
-    @scala.annotation.tailrec
-    private def elementType(
-        state: Compiler.State[Ctx],
-        indexes: Seq[Ast.Expr[Ctx]],
-        tpe: Type
-    ): Type = {
-      if (indexes.isEmpty) {
-        tpe
-      } else {
-        state.checkArrayIndexType(indexes(0))
-        tpe match {
-          case arrayType: Type.FixedSizeArray =>
-            elementType(state, indexes.drop(1), arrayType.baseType)
-          case _ =>
-            throw Compiler.Error(s"Invalid assignment to array: ${ident.name}")
-        }
+    def _getType(state: Compiler.State[Ctx]): Type =
+      state.getArrayElementType(Seq(state.getVariable(ident).tpe), indexes)
+
+    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
+      val arrayRef = state.getArrayRef(ident)
+      getType(state) match {
+        case _: Type.FixedSizeArray => arrayRef.subArray(state, indexes).genStoreCode(state)
+        case _                      => arrayRef.genStoreCode(state, indexes)
       }
     }
-
-    def _getType(state: Compiler.State[Ctx]): Type = {
-      elementType(state, indexes, state.getVariable(ident).tpe)
-    }
-
-    @scala.annotation.tailrec
-    private def genStore(
-        arrayRef: ArrayTransformer.ArrayRef[Ctx],
-        indexes: Seq[Expr[Ctx]],
-        state: Compiler.State[Ctx],
-        checkCodes: Seq[Instr[Ctx]]
-    ): Seq[Seq[Instr[Ctx]]] = {
-      if (indexes.length == 1) {
-        arrayRef.genStoreCode(indexes(0), state) :+ checkCodes
-      } else {
-        val (checkCode, subArrayRef) = arrayRef.subArray(indexes(0), state)
-        genStore(subArrayRef, indexes.drop(1), state, checkCodes ++ checkCode)
-      }
-    }
-
-    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] =
-      genStore(state.getArrayRef(ident), indexes, state, Seq.empty)
   }
 
   final case class EventDef(
