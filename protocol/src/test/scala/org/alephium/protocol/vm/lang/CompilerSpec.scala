@@ -1147,12 +1147,50 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
 
     val contract = Compiler.compileContract(code).rightValue
-    contract
-      .methods(0)
-      .localsLength is 6 // access single array element will not use the array index variable
-    contract
-      .methods(1)
-      .localsLength is 14 // all arrays in a function share the same array index variable
+    // format: off
+    contract.methods(0) is Method[StatefulContext](
+      isPublic = false,
+      useApprovedAssets = false,
+      useContractAssets = false,
+      argsLength = 0,
+      localsLength = 6,
+      returnLength = 0,
+      instrs = AVector[Instr[StatefulContext]](
+        U256Const0, U256Const1, U256Const2, StoreLocal(2), StoreLocal(1), StoreLocal(0),
+        U256Const0, StoreLocal(3),
+        LoadLocal(3), U256Const3, U256Lt, IfFalse(14),
+        LoadLocal(3), Dup, U256Const3, U256Lt, Assert, LoadLocalByIndex, LoadLocal(3), U256Eq, Assert,
+        LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-18),
+        U256Const0, U256Const1, StoreLocal(5), StoreLocal(4),
+        U256Const0, StoreLocal(3),
+        LoadLocal(3), U256Const2, U256Lt, IfFalse(16),
+        LoadLocal(3), Dup, U256Const2, U256Lt, Assert, U256Const4, U256Add, LoadLocalByIndex, LoadLocal(3), U256Eq, Assert,
+        LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-20)
+      )
+    )
+    contract.methods(1) is Method[StatefulContext](
+      isPublic = false,
+      useApprovedAssets = false,
+      useContractAssets = false,
+      argsLength = 0,
+      localsLength = 14,
+      returnLength = 0,
+      instrs = AVector[Instr[StatefulContext]](
+        U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, StoreLocal(5), StoreLocal(4), StoreLocal(3), StoreLocal(2), StoreLocal(1), StoreLocal(0),
+        U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, U256Const0, StoreLocal(11), StoreLocal(10), StoreLocal(9), StoreLocal(8), StoreLocal(7), StoreLocal(6),
+        U256Const0, StoreLocal(12),
+        LoadLocal(12), U256Const3, U256Lt, IfFalse(40),
+        LoadLocal(12), Dup, U256Const3, U256Lt, Assert, U256Const2, U256Mul, StoreLocal(13),
+        LoadLocal(13), U256Const0, U256Add, LoadLocalByIndex,
+        LoadLocal(13), U256Const1, U256Add, LoadLocalByIndex,
+        LoadLocal(12), Dup, U256Const3, U256Lt, Assert, U256Const2, U256Mul, U256Const(Val.U256(6)), U256Add, StoreLocal(13),
+        LoadLocal(13), U256Const0, U256Add, LoadLocalByIndex,
+        LoadLocal(13), U256Const1, U256Add, LoadLocalByIndex,
+        CallLocal(2),
+        LoadLocal(12), U256Const1, U256Add, StoreLocal(12), Jump(-44)
+      )
+    )
+    // format: on
   }
 
   it should "abort if variable array index is invalid" in {
