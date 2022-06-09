@@ -295,11 +295,11 @@ trait Endpoints
         "Build unsigned transactions to send all unlocked balanced of one address to another address"
       )
 
-  val submitTransaction: BaseEndpoint[SubmitTransaction, TxResult] =
+  val submitTransaction: BaseEndpoint[SubmitTransaction, SubmitTxResult] =
     transactionsEndpoint.post
       .in("submit")
       .in(jsonBody[SubmitTransaction])
-      .out(jsonBody[TxResult])
+      .out(jsonBody[SubmitTxResult])
       .summary("Submit a signed transaction")
 
   val buildMultisigAddress: BaseEndpoint[BuildMultisigAddress, BuildMultisigAddressResult] =
@@ -316,11 +316,11 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult])
       .summary("Build a multisig unsigned transaction")
 
-  val submitMultisigTransaction: BaseEndpoint[SubmitMultisig, TxResult] =
+  val submitMultisigTransaction: BaseEndpoint[SubmitMultisig, SubmitTxResult] =
     multisigEndpoint.post
       .in("submit")
       .in(jsonBody[SubmitMultisig])
-      .out(jsonBody[TxResult])
+      .out(jsonBody[SubmitTxResult])
       .summary("Submit a multi-signed transaction")
 
   lazy val getTransactionStatus

@@ -457,8 +457,8 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val decodeUnsignedTxExamples: List[Example[DecodeUnsignedTxResult]] =
     simpleExample(DecodeUnsignedTxResult(1, 2, unsignedTx))
 
-  implicit val txResultExamples: List[Example[TxResult]] =
-    simpleExample(TxResult(txId, fromGroup = 2, toGroup = 1))
+  implicit val txResultExamples: List[Example[SubmitTxResult]] =
+    simpleExample(SubmitTxResult(txId, fromGroup = 2, toGroup = 1))
 
   implicit val txStatusExamples: List[Example[TxStatus]] =
     List[Example[TxStatus]](
