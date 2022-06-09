@@ -62,6 +62,17 @@ trait CostStrategy {
     updateGas(VM.checkCodeSize(gasRemaining, codeBytes))
   }
 
+  def chargeHash(byteLength: Int): ExeResult[Unit] = {
+    chargeGas(GasHash.gas(byteLength))
+  }
+
+  def chargeDoubleHash(byteLength: Int): ExeResult[Unit] = {
+    for {
+      _ <- chargeHash(byteLength)
+      _ <- chargeHash(32)
+    } yield ()
+  }
+
   @inline private def updateGas(f: => ExeResult[GasBox]): ExeResult[Unit] = {
     f.map(gasRemaining = _)
   }

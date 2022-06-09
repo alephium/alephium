@@ -34,16 +34,17 @@ class ContextSpec
 
     def createContract(): ContractId = {
       val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(Hash.zero))).sample.get
-      val balances = MutBalancesPerLockup.from(output)
+      val balances   = MutBalancesPerLockup.from(output)
+      val contractId = TxOutputRef.key(context.txId, context.txEnv.fixedOutputs.length)
       context
         .createContract(
+          contractId,
           StatefulContract.forSMT,
           balances,
           AVector.empty,
           None
         )
         .rightValue
-      val contractId = TxOutputRef.key(context.txId, context.txEnv.fixedOutputs.length)
       context.worldState.getContractState(contractId).isRight is true
       MutBalancesPerLockup.from(
         context.worldState.getContractAsset(contractId).rightValue

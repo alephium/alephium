@@ -18,6 +18,7 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, Signature}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
@@ -212,14 +213,14 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def nextOutputIndex: Int
 
-  def nextContractOutputRef(output: ContractOutput): ContractOutputRef =
-    ContractOutputRef.unsafe(txId, output, nextOutputIndex)
+  def nextContractOutputRef(contractId: Hash, output: ContractOutput): ContractOutputRef =
+    ContractOutputRef.unsafe(output.hint, contractId)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def generateOutput(output: TxOutput): ExeResult[Unit] = {
     output match {
       case contractOutput @ ContractOutput(_, LockupScript.P2C(contractId), _) =>
-        val outputRef = nextContractOutputRef(contractOutput)
+        val outputRef = nextContractOutputRef(contractId, contractOutput)
         for {
           _ <- chargeGeneratedOutput()
           _ <- updateContractAsset(contractId, outputRef, contractOutput)
@@ -234,20 +235,30 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def createContract(
+      contractId: Hash,
       code: StatefulContract.HalfDecoded,
       initialBalances: MutBalancesPerLockup,
       initialFields: AVector[Val],
       tokenAmount: Option[Val.U256]
   ): ExeResult[Hash] = {
-    val contractId = TxOutputRef.key(txId, nextOutputIndex)
     tokenAmount.foreach(amount => initialBalances.addToken(contractId, amount.v))
     val contractOutput = ContractOutput(
       initialBalances.alphAmount,
       LockupScript.p2c(contractId),
       initialBalances.tokenVector
     )
-    val outputRef = nextContractOutputRef(contractOutput)
+    val outputRef = nextContractOutputRef(contractId, contractOutput)
+
     for {
+      _ <-
+        worldState.getContractState(contractId) match {
+          case Left(_: IOError.KeyNotFound) =>
+            okay
+          case Left(otherIOError) =>
+            ioFailed(IOErrorLoadContract(otherIOError))
+          case Right(_) =>
+            Left(Right(ContractAlreadyExists(contractId)))
+        }
       _ <- code.check(initialFields)
       _ <-
         worldState

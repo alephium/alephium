@@ -134,6 +134,7 @@ abstract class Frame[Ctx <: StatelessContext] {
   def methodFrame(index: Int): ExeResult[Frame[Ctx]]
 
   def createContract(
+      contractId: Hash,
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
@@ -205,6 +206,7 @@ final class StatelessFrame(
   // the following should not be used in stateless context
   def balanceStateOpt: Option[MutBalanceState] = None
   def createContract(
+      contractId: Hash,
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
@@ -341,22 +343,23 @@ final case class StatefulFrame(
   }
 
   def createContract(
+      contractId: Hash,
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenAmount: Option[Val.U256]
   ): ExeResult[ContractId] = {
     for {
-      balanceState      <- getBalanceState()
-      balances          <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
-      createdContractId <- ctx.createContract(code, balances, fields, tokenAmount)
+      balanceState <- getBalanceState()
+      balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
+      _            <- ctx.createContract(contractId, code, balances, fields, tokenAmount)
       _ <- ctx.writeLog(
         Some(createContractEventId),
         AVector(
           createContractEventIndex,
-          Val.Address(LockupScript.p2c(createdContractId))
+          Val.Address(LockupScript.p2c(contractId))
         )
       )
-    } yield createdContractId
+    } yield contractId
   }
 
   def destroyContract(address: LockupScript): ExeResult[Unit] = {

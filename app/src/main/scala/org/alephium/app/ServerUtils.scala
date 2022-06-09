@@ -918,7 +918,7 @@ class ServerUtils(implicit
       Address.contract(contractId),
       contract,
       contract.hash,
-      state.initialStateHash,
+      Some(state.initialStateHash),
       state.fields.map(Val.from),
       AssetState.from(contractOutput)
     )

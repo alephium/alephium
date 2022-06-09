@@ -24,7 +24,7 @@ import org.alephium.crypto
 import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
-import org.alephium.protocol.model.AssetOutput
+import org.alephium.protocol.model.{AssetOutput, TxOutputRef}
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
 import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
 import org.alephium.util
@@ -154,6 +154,7 @@ object Instr {
     CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
     /* Below are instructions for Leman hard fork */
     MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
+    CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
     LoadFieldByIndex, StoreFieldByIndex
   )
   // format: on
@@ -1454,6 +1455,9 @@ sealed trait ContractInstr
     with GasSimple {}
 
 sealed trait CreateContractAbstract extends ContractInstr {
+  def subContract: Boolean
+  def copyCreate: Boolean
+
   @inline protected def getTokenAmount[C <: StatefulContext](
       frame: Frame[C],
       issueToken: Boolean
@@ -1461,9 +1465,41 @@ sealed trait CreateContractAbstract extends ContractInstr {
     if (issueToken) frame.popOpStackU256().map(Some(_)) else Right(None)
   }
 
-  def prepareContractCode[C <: StatefulContext](
+  protected def prepareContractCode[C <: StatefulContext](
       frame: Frame[C]
-  ): ExeResult[StatefulContract.HalfDecoded]
+  ): ExeResult[StatefulContract.HalfDecoded] = {
+    if (copyCreate) {
+      for {
+        contractId  <- frame.popContractId()
+        contractObj <- frame.ctx.loadContractObj(contractId)
+      } yield contractObj.code
+    } else {
+      for {
+        contractCodeRaw <- frame.popOpStackByteVec()
+        contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
+          Right(SerdeErrorCreateContract(e))
+        )
+        _ <- contractCode.checkAssetsModifier(frame.ctx)
+        _ <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
+        _ <- StatefulContract.check(contractCode, frame.ctx.getHardFork())
+      } yield contractCode.toHalfDecoded()
+    }
+  }
+
+  protected def getContractId[C <: StatefulContext](frame: Frame[C]): ExeResult[Hash] = {
+    if (subContract) {
+      for {
+        parentContractId <- frame.obj.getContractId()
+        path             <- frame.popOpStackByteVec()
+        subContractIdPreImage = parentContractId.bytes ++ path.bytes
+        _ <- frame.ctx.chargeDoubleHash(subContractIdPreImage.length)
+      } yield {
+        Hash.doubleHash(subContractIdPreImage)
+      }
+    } else {
+      Right(TxOutputRef.key(frame.ctx.txId, frame.ctx.nextOutputIndex))
+    }
+  }
 
   def __runWith[C <: StatefulContext](frame: Frame[C], issueToken: Boolean): ExeResult[Unit] = {
     for {
@@ -1471,7 +1507,8 @@ sealed trait CreateContractAbstract extends ContractInstr {
       fields        <- frame.popFields()
       _             <- frame.ctx.chargeFieldSize(fields.toIterable)
       contractCode  <- prepareContractCode(frame)
-      newContractId <- frame.createContract(contractCode, fields, tokenAmount)
+      newContractId <- getContractId(frame)
+      _             <- frame.createContract(newContractId, contractCode, fields, tokenAmount)
       _ <-
         if (frame.ctx.getHardFork().isLemanEnabled()) {
           frame.pushOpStack(Val.ByteVec(newContractId.bytes))
@@ -1483,19 +1520,8 @@ sealed trait CreateContractAbstract extends ContractInstr {
 }
 
 sealed trait CreateContractBase extends CreateContractAbstract with GasCreate {
-  def prepareContractCode[C <: StatefulContext](
-      frame: Frame[C]
-  ): ExeResult[StatefulContract.HalfDecoded] = {
-    for {
-      contractCodeRaw <- frame.popOpStackByteVec()
-      contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
-        Right(SerdeErrorCreateContract(e))
-      )
-      _ <- contractCode.checkAssetsModifier(frame.ctx)
-      _ <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
-      _ <- StatefulContract.check(contractCode, frame.ctx.getHardFork())
-    } yield contractCode.toHalfDecoded()
-  }
+  def subContract: Boolean = false
+  def copyCreate: Boolean  = false
 }
 
 object CreateContract extends CreateContractBase {
@@ -1511,14 +1537,8 @@ object CreateContractWithToken extends CreateContractBase {
 }
 
 sealed trait CopyCreateContractBase extends CreateContractAbstract with GasCopyCreate {
-  def prepareContractCode[C <: StatefulContext](
-      frame: Frame[C]
-  ): ExeResult[StatefulContract.HalfDecoded] = {
-    for {
-      contractId  <- frame.popContractId()
-      contractObj <- frame.ctx.loadContractObj(contractId)
-    } yield contractObj.code
-  }
+  def subContract: Boolean = false
+  def copyCreate: Boolean  = true
 }
 
 object CopyCreateContract extends CopyCreateContractBase {
@@ -1529,6 +1549,69 @@ object CopyCreateContract extends CopyCreateContractBase {
 
 object CopyCreateContractWithToken
     extends CopyCreateContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
+  // We need to overwrite this method because `runWith` is inherited from both `LemanInstr` and `InstrWithSimpleGas`
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstrWithSimpleGas].runWith(frame)
+
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
+
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, issueToken = true)
+  }
+}
+
+sealed trait CreateSubContractBase extends CreateContractAbstract with GasCreate {
+  def subContract: Boolean = true
+  def copyCreate: Boolean  = false
+}
+
+object CreateSubContract
+    extends CreateSubContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstrWithSimpleGas].runWith(frame)
+
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
+
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, issueToken = false)
+  }
+}
+
+object CreateSubContractWithToken
+    extends CreateSubContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstrWithSimpleGas].runWith(frame)
+
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
+
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, issueToken = true)
+  }
+}
+
+sealed trait CopyCreateSubContractBase extends CreateContractAbstract with GasCopyCreate {
+  def subContract: Boolean = true
+  def copyCreate: Boolean  = true
+}
+
+object CopyCreateSubContract
+    extends CopyCreateSubContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstrWithSimpleGas].runWith(frame)
+
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
+
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, issueToken = false)
+  }
+}
+
+object CopyCreateSubContractWithToken
+    extends CopyCreateSubContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
   // We need to overwrite this method because `runWith` is inherited from both `LemanInstr` and `InstrWithSimpleGas`
   override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =

@@ -2050,6 +2050,117 @@ class VMSpec extends AlephiumSpec {
     )
   }
 
+  trait SubContractFixture extends ContractFixture {
+    val subContractRaw: String =
+      s"""
+         |TxContract SubContract() {
+         |  pub fn call() -> () {
+         |  }
+         |}
+         |""".stripMargin
+    val subContractInitialState = Hex.toHexString(serialize(AVector.empty[Val]))
+
+    // scalastyle:off method.length
+    def verify(
+        createContractStmt: String,
+        subContractPath: String,
+        numOfAssets: Int,
+        numOfContracts: Int
+    ) = {
+      val contractRaw: String =
+        s"""
+           |TxContract Contract(mut subContractId: ByteVec) {
+           |  @using(preapprovedAssets = true)
+           |  pub fn createSubContract() -> () {
+           |    approveAlph!(callerAddress!(), ${ALPH.oneAlph.v})
+           |    subContractId = $createContractStmt
+           |  }
+           |}
+           |""".stripMargin
+
+      val contractId =
+        createContractAndCheckState(
+          contractRaw,
+          numOfAssets,
+          numOfContracts,
+          AVector(Val.ByteVec(ByteString.empty))
+        ).key
+
+      val createSubContractRaw: String =
+        s"""
+           |TxScript Main {
+           |  approveAlph!(callerAddress!(), ${ALPH.alph(1).v})
+           |  Contract(#${contractId.toHexString}).createSubContract()
+           |}
+           |$contractRaw
+           |""".stripMargin
+
+      callTxScript(createSubContractRaw)
+
+      val subContractId = Hash.doubleHash(contractId.bytes ++ serialize(subContractPath))
+      val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      worldState.getContractState(contractId).rightValue.fields is AVector[Val](
+        Val.ByteVec(subContractId.bytes)
+      )
+
+      intercept[AssertionError](callTxScript(createSubContractRaw)).getMessage.startsWith(
+        s"Right(TxScriptExeFailed(ContractAlreadyExists(${subContractId.toHexString}))"
+      )
+
+      val callSubContractRaw: String =
+        s"""
+           |TxScript Main {
+           |  SubContract(#${subContractId.toHexString}).call()
+           |}
+           |$subContractRaw
+           |""".stripMargin
+
+      callTxScript(callSubContractRaw)
+    }
+    // scalastyle:on method.length
+  }
+
+  it should "check createSubContract and createSubContractWithToken" in new SubContractFixture {
+    val subContract         = Compiler.compileContract(subContractRaw).rightValue
+    val subContractByteCode = Hex.toHexString(serialize(subContract))
+
+    val subContractPath1 = Hex.toHexString(serialize("nft-01"))
+    verify(
+      s"createSubContract!(#$subContractPath1, #$subContractByteCode, #$subContractInitialState)",
+      subContractPath = "nft-01",
+      numOfAssets = 2,
+      numOfContracts = 2
+    )
+
+    val subContractPath2 = Hex.toHexString(serialize("nft-02"))
+    verify(
+      s"createSubContractWithToken!(#$subContractPath2, #$subContractByteCode, #$subContractInitialState, 10)",
+      subContractPath = "nft-02",
+      numOfAssets = 5,
+      numOfContracts = 4
+    )
+  }
+
+  it should "check copyCreateSubContract and copyCreateSubContractWithToken" in new SubContractFixture {
+    val subContractId = createContractAndCheckState(subContractRaw, 2, 2, AVector.empty).key
+
+    val subContractPath1 = Hex.toHexString(serialize("nft-01"))
+    verify(
+      s"copyCreateSubContract!(#$subContractPath1, #${subContractId.toHexString}, #$subContractInitialState)",
+      subContractPath = "nft-01",
+      numOfAssets = 3,
+      numOfContracts = 3
+    )
+
+    val subContractPath2 = Hex.toHexString(serialize("nft-02"))
+    verify(
+      s"copyCreateSubContractWithToken!(#$subContractPath2, #${subContractId.toHexString}, #$subContractInitialState, 10)",
+      subContractPath = "nft-02",
+      numOfAssets = 6,
+      numOfContracts = 5
+    )
+  }
+
   it should "not load contract just after creation" in new ContractFixture {
     val contract: String =
       s"""
