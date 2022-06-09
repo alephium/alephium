@@ -35,9 +35,9 @@ class TxUtilsSpec extends AlephiumSpec {
     val chainIndex            = ChainIndex.unsafe(0, 0)
     val (genesisPriKey, _, _) = genesisKeys(0)
     val (toPriKey, _)         = chainIndex.from.generateKey
-    val block0 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
+    val block0 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = dustUtxoAmount * 2)
     addAndCheck(blockFlow, block0)
-    val block1 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
+    val block1 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = dustUtxoAmount)
     addAndCheck(blockFlow, block1)
 
     blockFlow
@@ -45,7 +45,7 @@ class TxUtilsSpec extends AlephiumSpec {
         toPriKey.publicKey,
         getGenesisLockupScript(chainIndex),
         None,
-        minimalGasFee / 2,
+        dustUtxoAmount,
         None,
         minimalGasPrice,
         defaultUtxoLimit
@@ -58,7 +58,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val chainIndex            = ChainIndex.unsafe(0, 1)
     val (genesisPriKey, _, _) = genesisKeys(0)
     val (toPriKey, _)         = chainIndex.from.generateKey
-    val block = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
+    val block = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = dustUtxoAmount)
     val tx    = block.nonCoinbase.head
     tx.gasFeeUnsafe is defaultGasFee
     defaultGasFee is ALPH.nanoAlph(20000 * 100)

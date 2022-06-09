@@ -469,12 +469,12 @@ object TxValidation {
         output: TxOutput,
         hardFork: HardFork
     ): Boolean = {
-      val numTokenBound = if (hardFork < HardFork.Leman) {
-        deprecatedMaxTokenPerUtxo
+      val (dustAmount, numTokenBound) = if (hardFork.isLemanEnabled()) {
+        (dustUtxoAmount, maxTokenPerUtxo)
       } else {
-        maxTokenPerUtxo
+        (deprecatedDustUtxoAmount, deprecatedMaxTokenPerUtxo)
       }
-      output.amount >= dustUtxoAmount &&
+      output.amount >= dustAmount &&
       output.tokens.length <= numTokenBound &&
       output.tokens.forall(_._2.nonZero)
     }
@@ -606,20 +606,26 @@ object TxValidation {
         tx: Transaction,
         preOutputs: AVector[TxOutput]
     ): TxValidationResult[Unit] = {
-      if (tx.isEntryMethodPayable) {
-        validTx(()) // the balance is validated in VM execution
-      } else {
-        for {
-          inputBalances  <- computeTokenBalances(preOutputs)
-          outputBalances <- computeTokenBalances(tx.allOutputs)
-          _ <- {
-            val ok = outputBalances.forall { case (tokenId, balance) =>
-              inputBalances.contains(tokenId) && inputBalances(tokenId) == balance
+      for {
+        inputBalances  <- computeTokenBalances(preOutputs)
+        outputBalances <- computeTokenBalances(tx.allOutputs)
+        _ <- {
+          val ok = {
+            if (tx.isEntryMethodPayable) {
+              // Token balance is validated in VM execution, but let's double check here
+              outputBalances.forall { case (tokenId, balance) =>
+                // either new token or no inflation
+                !inputBalances.contains(tokenId) || inputBalances(tokenId) >= balance
+              }
+            } else {
+              outputBalances.forall { case (tokenId, balance) =>
+                inputBalances.contains(tokenId) && inputBalances(tokenId) == balance
+              }
             }
-            if (ok) validTx(()) else invalidTx(InvalidTokenBalance)
           }
-        } yield ()
-      }
+          if (ok) validTx(()) else invalidTx(InvalidTokenBalance)
+        }
+      } yield ()
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))

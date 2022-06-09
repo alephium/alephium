@@ -675,6 +675,8 @@ class VMSpec extends AlephiumSpec {
          |  assert!(size!(byteVec!(@${address.toBase58})) == 33)
          |  assert!(size!(#${bytes0} ++ #${bytes1}) == 64)
          |  assert!(zeros!(2) == #0000)
+         |  assert!(nullAddress!() == @${Address.contract(ContractId.zero)})
+         |  assert!(nullAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq)
          |}
          |""".stripMargin
 
@@ -1074,9 +1076,8 @@ class VMSpec extends AlephiumSpec {
          |@using(preapprovedAssets = false)
          |TxScript TxEnv {
          |  assert!(txId!() != #${zeroId.toHexString})
-         |  assert!(txInputAddressAt!($index) == @${genesisAddress.toBase58})
+         |  assert!(txInputAddress!($index) == @${genesisAddress.toBase58})
          |  assert!(txInputsSize!() == 1)
-         |  assert!(uniqueTxInputAddress!() == @${genesisAddress})
          |}
          |""".stripMargin
     testSimpleScript(main(0))
@@ -2011,7 +2012,7 @@ class VMSpec extends AlephiumSpec {
          |  event Create(subContractId: ByteVec)
          |  @using(preapprovedAssets = true)
          |  pub fn foo() -> () {
-         |    approveAlph!(txInputAddressAt!(0), ${minimalAlphInContract})
+         |    approveAlph!(callerAddress!(), ${minimalAlphInContract})
          |    subContractId = copyCreateContract!(selfContractId!(), #010300)
          |    emit Create(subContractId)
          |  }
@@ -2029,7 +2030,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  approveAlph!(txInputAddressAt!(0), ${ALPH.alph(1).v})
+         |  approveAlph!(callerAddress!(), ${ALPH.alph(1).v})
          |  Foo(#${contractId.toHexString}).foo()
          |}
          |
@@ -2055,7 +2056,7 @@ class VMSpec extends AlephiumSpec {
          |TxContract Foo(mut subContractId: ByteVec) {
          |  @using(preapprovedAssets = true)
          |  pub fn foo() -> () {
-         |    approveAlph!(txInputAddressAt!(0), ${ALPH.nanoAlph(1000).v})
+         |    approveAlph!(callerAddress!(), ${ALPH.nanoAlph(1000).v})
          |    subContractId = copyCreateContract!(selfContractId!(), #010300)
          |    let subContract = Foo(subContractId)
          |    subContract.foo()
@@ -2068,7 +2069,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  approveAlph!(txInputAddressAt!(0), ${ALPH.alph(1).v})
+         |  approveAlph!(callerAddress!(), ${ALPH.alph(1).v})
          |  Foo(#${contractId.toHexString}).foo()
          |}
          |
@@ -2089,7 +2090,7 @@ class VMSpec extends AlephiumSpec {
          |    bar.bar(selfContractId!())
          |  }
          |  pub fn destroy() -> () {
-         |    destroySelf!(txInputAddressAt!(0))
+         |    destroySelf!(callerAddress!())
          |  }
          |}
          |""".stripMargin
@@ -2191,7 +2192,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  Foo(#${fooId.toHexString}).foo()
-         |  transferAlph!(txInputAddressAt!(0), @${fooAddress}, ${ALPH.alph(1).v})
+         |  transferAlph!(callerAddress!(), @${fooAddress}, ${ALPH.alph(1).v})
          |}
          |
          |$foo
@@ -2343,7 +2344,7 @@ class VMSpec extends AlephiumSpec {
       val script =
         s"""
            |TxScript Main {
-           |  let caller = txInputAddressAt!(0)
+           |  let caller = callerAddress!()
            |  transferAlph!(caller, @${randomContract}, ${ALPH.cent(1)})
            |}
            |""".stripMargin
@@ -2368,7 +2369,7 @@ class VMSpec extends AlephiumSpec {
       val script =
         s"""
            |TxScript Main {
-           |  let caller = txInputAddressAt!(0)
+           |  let caller = callerAddress!()
            |  transferAlph!(caller, @${fooAddress}, ${ALPH.cent(1)})
            |  let foo = Foo(#${fooId.toHexString})
            |  foo.foo()

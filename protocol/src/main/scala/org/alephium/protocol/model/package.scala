@@ -47,7 +47,8 @@ package object model {
   val maximalScriptSize: Int = 12 * 1024 // 12KB
   val maximalFieldSize: Int  = 3 * 1024  // 3KB
 
-  val dustUtxoAmount: U256           = ALPH.nanoAlph(1000)
+  val dustUtxoAmount: U256           = ALPH.nanoAlph(1000000)
+  val deprecatedDustUtxoAmount: U256 = ALPH.nanoAlph(1000)
   val maxTokenPerUtxo: Int           = 4
   val deprecatedMaxTokenPerUtxo: Int = 64
 

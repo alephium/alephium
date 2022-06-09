@@ -104,6 +104,15 @@ abstract class Parser[Ctx <: StatelessContext] {
     P("(" ~ expr ~ ")").map(Ast.ParenExpr.apply[Ctx])
 
   def ret[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
+    P(normalRet.rep(1)).map { returnStmts =>
+      if (returnStmts.length > 1) {
+        throw Compiler.Error("Consecutive return statements are not allowed")
+      } else {
+        returnStmts(0)
+      }
+    }
+
+  def normalRet[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
     P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.ReturnStmt.apply[Ctx])
 
   def ident[Unknown: P]: P[(Boolean, Ast.Ident)] = P(Lexer.mut ~ Lexer.ident)
