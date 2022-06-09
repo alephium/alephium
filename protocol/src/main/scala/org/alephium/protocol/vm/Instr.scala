@@ -134,7 +134,7 @@ object Instr {
     CallLocal, Return,
     Assert,
     Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
-    NetworkId, BlockTimeStamp, BlockTarget, TxId, TxInputAddressAt, TxInputsSize,
+    NetworkId, BlockTimeStamp, BlockTarget, TxId, TxInputAddress, TxInputsSize,
     VerifyAbsoluteLocktime, VerifyRelativeLocktime,
     Log1, Log2, Log3, Log4, Log5,
     /* Below are instructions for Leman hard fork */
@@ -1834,7 +1834,7 @@ object TxId extends TxInstr with GasVeryLow {
   }
 }
 
-object TxInputAddressAt extends TxInstr with GasVeryLow {
+object TxInputAddress extends TxInstr with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       _           <- TxInstr.checkScriptFrameForLeman(frame)
