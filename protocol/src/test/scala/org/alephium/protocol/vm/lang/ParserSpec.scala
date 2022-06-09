@@ -97,6 +97,8 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("return x, y", StatelessParser.ret(_)).isSuccess is true
     fastparse.parse("return x + y", StatelessParser.ret(_)).isSuccess is true
     fastparse.parse("return (x + y)", StatelessParser.ret(_)).isSuccess is true
+    intercept[Compiler.Error](fastparse.parse("return return", StatelessParser.ret(_))).message is
+      "Consecutive return statements are not allowed"
   }
 
   it should "parse statements" in {
