@@ -43,6 +43,7 @@ case object InvalidSignature                                   extends ExeFailur
 case object InvalidTxInputIndex                                extends ExeFailure
 case object NoTxInput                                          extends ExeFailure
 case object TxInputAddressesAreNotIdentical                    extends ExeFailure
+case object AccessTxInputAddressInContract                     extends ExeFailure
 case object LockTimeOverflow                                   extends ExeFailure
 case object AbsoluteLockTimeVerificationFailed                 extends ExeFailure
 case object RelativeLockTimeVerificationFailed                 extends ExeFailure

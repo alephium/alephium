@@ -1735,6 +1735,16 @@ object BlockTarget extends BlockInstr {
 
 sealed trait TxInstr extends StatelessInstrSimpleGas with StatelessInstrCompanion0
 
+object TxInstr {
+  def checkScriptFrameForLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    if (frame.ctx.getHardFork() >= HardFork.Leman && !frame.obj.isScript()) {
+      failed(AccessTxInputAddressInContract)
+    } else {
+      okay
+    }
+  }
+}
+
 object TxId extends TxInstr with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.ByteVec(frame.ctx.txId.bytes))
@@ -1744,6 +1754,7 @@ object TxId extends TxInstr with GasVeryLow {
 object TxInputAddressAt extends TxInstr with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
+      _           <- TxInstr.checkScriptFrameForLeman(frame)
       callerIndex <- frame.popOpStackU256()
       caller      <- frame.ctx.getTxInputAddressAt(callerIndex)
       _           <- frame.pushOpStack(caller)
@@ -1753,7 +1764,10 @@ object TxInputAddressAt extends TxInstr with GasVeryLow {
 
 object TxInputsSize extends TxInstr with GasVeryLow {
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.pushOpStack(Val.U256(util.U256.unsafe(frame.ctx.txEnv.prevOutputs.length)))
+    for {
+      _ <- TxInstr.checkScriptFrameForLeman(frame)
+      _ <- frame.pushOpStack(Val.U256(util.U256.unsafe(frame.ctx.txEnv.prevOutputs.length)))
+    } yield ()
   }
 }
 

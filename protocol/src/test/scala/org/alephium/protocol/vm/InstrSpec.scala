@@ -1457,48 +1457,62 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     initialGas.subUnsafe(context.gasRemaining) is TxId.gas()
   }
 
-  it should "TxInputAddressAt" in new StatelessInstrFixture {
-    val (tx, prevOut) = transactionGenWithPreOutputs().sample.get
-    val prevOutputs   = prevOut.map(_.referredOutput)
-    override lazy val frame = prepareFrame(
-      AVector.empty,
-      txEnv = Some(
-        TxEnv(
-          tx,
-          prevOutputs,
-          Stack.ofCapacity[Signature](0)
-        )
-      )
-    )
+  trait TxEnvFixture extends StatefulInstrFixture {
+    val (script, _)   = prepareStatefulScript(StatefulScript.alwaysFail)
+    val (tx, prevOut) = transactionGenWithPreOutputs(inputsNumGen = Gen.const(3)).sample.get
+    val prevOutputs0  = prevOut.map(_.referredOutput)
+    val prevOutputs1  = AVector.fill(3)(prevOutputs0.head)
 
-    val index      = prevOutputs.length - 1
+    val txEnvWithRandomAddresses = TxEnv(tx, prevOutputs0, Stack.ofCapacity(0))
+    val txEnvWithUniqueAddress   = TxEnv(tx, prevOutputs1, Stack.ofCapacity(0))
+    val uniqueAddress            = Val.Address(prevOutputs0.head.lockupScript)
+  }
+
+  it should "TxInputAddressAt" in new TxEnvFixture {
+    override lazy val frame = prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
+      .asInstanceOf[StatefulFrame]
+      .copy(obj = script)
+
+    val index      = prevOutputs0.length - 1
     val initialGas = context.gasRemaining
     stack.push(Val.U256(U256.unsafe(index)))
     TxInputAddressAt.runWith(frame) isE ()
     stack.size is 1
-    stack.top.get is Val.Address(prevOutputs.get(index).get.lockupScript)
+    stack.top.get is Val.Address(prevOutputs0.get(index).get.lockupScript)
     initialGas.subUnsafe(context.gasRemaining) is TxInputAddressAt.gas()
+
+    val contractFrame = prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
+    TxInputAddressAt.runWith(contractFrame).leftValue isE AccessTxInputAddressInContract
   }
 
-  it should "TxInputsSize" in new StatelessInstrFixture {
-    val (tx, prevOut) = transactionGenWithPreOutputs().sample.get
-    val prevOutputs   = prevOut.map(_.referredOutput)
-    override lazy val frame = prepareFrame(
-      AVector.empty,
-      txEnv = Some(
-        TxEnv(
-          tx,
-          prevOutputs,
-          Stack.ofCapacity[Signature](0)
-        )
-      )
-    )
+  it should "TxInputsSize" in new TxEnvFixture {
+    override lazy val frame = prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
+      .asInstanceOf[StatefulFrame]
+      .copy(obj = script)
 
     val initialGas = context.gasRemaining
     TxInputsSize.runWith(frame) isE ()
     stack.size is 1
-    stack.top.get is Val.U256(U256.unsafe(prevOutputs.length))
+    stack.top.get is Val.U256(U256.unsafe(prevOutputs0.length))
     initialGas.subUnsafe(context.gasRemaining) is TxInputsSize.gas()
+
+    val contractFrame = prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
+    TxInputsSize.runWith(contractFrame).leftValue isE AccessTxInputAddressInContract
+  }
+
+  it should "test TxInstr.checkScriptFrameForLeman" in new TxEnvFixture {
+    import NetworkConfigFixture.{Leman, PreLeman}
+    val lemanContractFrame    = prepareFrame()(Leman)
+    val lemanScriptFrame      = lemanContractFrame.asInstanceOf[StatefulFrame].copy(obj = script)
+    val preLemanContractFrame = prepareFrame()(PreLeman)
+    val preLemanScriptFrame   = preLemanContractFrame.asInstanceOf[StatefulFrame].copy(obj = script)
+
+    TxInstr
+      .checkScriptFrameForLeman(lemanContractFrame)
+      .leftValue isE AccessTxInputAddressInContract
+    TxInstr.checkScriptFrameForLeman(lemanScriptFrame) isE ()
+    TxInstr.checkScriptFrameForLeman(preLemanContractFrame) isE ()
+    TxInstr.checkScriptFrameForLeman(preLemanScriptFrame) isE ()
   }
 
   trait LogFixture extends StatefulInstrFixture {
@@ -2376,7 +2390,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(CallerContractId, Val.ByteVec(callerFrame.obj.contractIdOpt.get.bytes))
   }
 
-  it should "CallerAddress" in new CallerFrameFixture {
+  it should "CallerAddress" in new CallerFrameFixture with TxEnvFixture {
     import NetworkConfigFixture.{Leman, PreLeman}
 
     {
@@ -2392,15 +2406,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val frame       = prepareFrame(callerFrameOpt = Some(callerFrame))(Leman)
       test(CallerAddress, Val.Address(LockupScript.p2c(callerFrame.obj.contractIdOpt.get)), frame)
     }
-
-    val (script, _)   = prepareStatefulScript(StatefulScript.alwaysFail)
-    val (tx, prevOut) = transactionGenWithPreOutputs(inputsNumGen = Gen.const(3)).sample.get
-    val prevOutputs0  = prevOut.map(_.referredOutput)
-    val prevOutputs1  = AVector.fill(3)(prevOutputs0.head)
-
-    val txEnvWithRandomAddresses = TxEnv(tx, prevOutputs0, Stack.ofCapacity(0))
-    val txEnvWithUniqueAddress   = TxEnv(tx, prevOutputs1, Stack.ofCapacity(0))
-    val uniqueAddress            = Val.Address(prevOutputs0.head.lockupScript)
 
     {
       info("PreLeman: Caller is a script frame with unique address in tx env")
