@@ -2072,7 +2072,7 @@ class VMSpec extends AlephiumSpec {
            |TxContract Contract(mut subContractId: ByteVec) {
            |  @using(preapprovedAssets = true)
            |  pub fn createSubContract() -> () {
-           |    approveAlph!(txInputAddress!(0), ${ALPH.oneAlph.v})
+           |    approveAlph!(callerAddress!(), ${ALPH.oneAlph.v})
            |    subContractId = $createContractStmt
            |  }
            |}
@@ -2089,7 +2089,7 @@ class VMSpec extends AlephiumSpec {
       val createSubContractRaw: String =
         s"""
            |TxScript Main {
-           |  approveAlph!(txInputAddress!(0), ${ALPH.alph(1).v})
+           |  approveAlph!(callerAddress!(), ${ALPH.alph(1).v})
            |  Contract(#${contractId.toHexString}).createSubContract()
            |}
            |$contractRaw
