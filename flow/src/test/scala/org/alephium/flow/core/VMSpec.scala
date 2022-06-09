@@ -2030,7 +2030,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  approveAlph!(txInputAddress!(0), ${ALPH.alph(1).v})
+         |  approveAlph!(callerAddress!(), ${ALPH.alph(1).v})
          |  Foo(#${contractId.toHexString}).foo()
          |}
          |
@@ -2069,7 +2069,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  approveAlph!(txInputAddress!(0), ${ALPH.alph(1).v})
+         |  approveAlph!(callerAddress!(), ${ALPH.alph(1).v})
          |  Foo(#${contractId.toHexString}).foo()
          |}
          |
@@ -2192,7 +2192,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  Foo(#${fooId.toHexString}).foo()
-         |  transferAlph!(txInputAddress!(0), @${fooAddress}, ${ALPH.alph(1).v})
+         |  transferAlph!(callerAddress!(), @${fooAddress}, ${ALPH.alph(1).v})
          |}
          |
          |$foo
@@ -2344,7 +2344,7 @@ class VMSpec extends AlephiumSpec {
       val script =
         s"""
            |TxScript Main {
-           |  let caller = txInputAddress!(0)
+           |  let caller = callerAddress!()
            |  transferAlph!(caller, @${randomContract}, ${ALPH.cent(1)})
            |}
            |""".stripMargin
@@ -2369,7 +2369,7 @@ class VMSpec extends AlephiumSpec {
       val script =
         s"""
            |TxScript Main {
-           |  let caller = txInputAddress!(0)
+           |  let caller = callerAddress!()
            |  transferAlph!(caller, @${fooAddress}, ${ALPH.cent(1)})
            |  let foo = Foo(#${fooId.toHexString})
            |  foo.foo()
