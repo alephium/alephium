@@ -18,6 +18,7 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable.ArrayBuffer
 
+import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, Signature}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
@@ -212,9 +213,13 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
     for {
       _ <-
-        if (worldState.getContractState(contractId).isLeft) { okay }
-        else {
-          failed(ContractAlreadyExists(contractId))
+        worldState.getContractState(contractId) match {
+          case Left(_: IOError.KeyNotFound) =>
+            okay
+          case Left(otherIOError) =>
+            ioFailed(IOErrorLoadContract(otherIOError))
+          case Right(_) =>
+            Left(Right(ContractAlreadyExists(contractId)))
         }
       _ <- code.check(initialFields)
       _ <-

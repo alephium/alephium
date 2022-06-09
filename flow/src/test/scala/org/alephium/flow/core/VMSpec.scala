@@ -2049,7 +2049,7 @@ class VMSpec extends AlephiumSpec {
            |TxContract Bar(mut subContractId: ByteVec) {
            |  @use(approvedAssets = true)
            |  pub fn bar() -> () {
-           |    approveAlph!(txCaller!(0), ${ALPH.nanoAlph(1000).v})
+           |    approveAlph!(txCaller!(0), ${ALPH.oneAlph.v})
            |    subContractId = $createContractStmt
            |  }
            |}
