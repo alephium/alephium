@@ -197,7 +197,7 @@ trait VotingFixture extends WalletFixture {
                             |  @using(preapprovedAssets = true, assetsInContract = true)
                             |  pub fn allocateTokens() -> () {
                             |     assert!(initialized == false)
-                            |     assert!(txInputAddressAt!(txInputsSize!() - 1) == admin)
+                            |     assert!(txInputAddress!(txInputsSize!() - 1) == admin)
                             |     ${allocationTransfers}
                             |     yes = 0
                             |     no = 0
@@ -223,7 +223,7 @@ trait VotingFixture extends WalletFixture {
                             |
                             |   pub fn close() -> () {
                             |     assert!(initialized == true && isClosed == false)
-                            |     assert!(txInputAddressAt!(txInputsSize!() - 1) == admin)
+                            |     assert!(txInputAddress!(txInputsSize!() - 1) == admin)
                             |     isClosed = true
                             |
                             |     emit VotingClosed()
@@ -258,7 +258,7 @@ trait VotingFixture extends WalletFixture {
     val allocationScript = s"""
                               |TxScript TokenAllocation {
                               |  let voting = Voting(#${contractId})
-                              |  let caller = txInputAddressAt!(0)
+                              |  let caller = txInputAddress!(0)
                               |  approveAlph!(caller, $utxoFee * ${votersWallets.size})
                               |  voting.allocateTokens()
                               |}
@@ -275,7 +275,7 @@ trait VotingFixture extends WalletFixture {
   ): TxResult = {
     val votingScript = s"""
                           |TxScript VotingScript {
-                          |  let caller = txInputAddressAt!(txInputsSize!() - 1)
+                          |  let caller = txInputAddress!(txInputsSize!() - 1)
                           |  approveToken!(caller, #${contractId}, 1)
                           |  let voting = Voting(#${contractId})
                           |  approveAlph!(caller, $utxoFee)

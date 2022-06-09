@@ -1074,7 +1074,7 @@ class VMSpec extends AlephiumSpec {
          |@using(preapprovedAssets = false)
          |TxScript TxEnv {
          |  assert!(txId!() != #${zeroId.toHexString})
-         |  assert!(txInputAddressAt!($index) == @${genesisAddress.toBase58})
+         |  assert!(txInputAddress!($index) == @${genesisAddress.toBase58})
          |  assert!(txInputsSize!() == 1)
          |}
          |""".stripMargin
@@ -2028,7 +2028,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  approveAlph!(txInputAddressAt!(0), ${ALPH.alph(1).v})
+         |  approveAlph!(txInputAddress!(0), ${ALPH.alph(1).v})
          |  Foo(#${contractId.toHexString}).foo()
          |}
          |
@@ -2067,7 +2067,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  approveAlph!(txInputAddressAt!(0), ${ALPH.alph(1).v})
+         |  approveAlph!(txInputAddress!(0), ${ALPH.alph(1).v})
          |  Foo(#${contractId.toHexString}).foo()
          |}
          |
@@ -2190,7 +2190,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  Foo(#${fooId.toHexString}).foo()
-         |  transferAlph!(txInputAddressAt!(0), @${fooAddress}, ${ALPH.alph(1).v})
+         |  transferAlph!(txInputAddress!(0), @${fooAddress}, ${ALPH.alph(1).v})
          |}
          |
          |$foo
@@ -2342,7 +2342,7 @@ class VMSpec extends AlephiumSpec {
       val script =
         s"""
            |TxScript Main {
-           |  let caller = txInputAddressAt!(0)
+           |  let caller = txInputAddress!(0)
            |  transferAlph!(caller, @${randomContract}, ${ALPH.cent(1)})
            |}
            |""".stripMargin
@@ -2367,7 +2367,7 @@ class VMSpec extends AlephiumSpec {
       val script =
         s"""
            |TxScript Main {
-           |  let caller = txInputAddressAt!(0)
+           |  let caller = txInputAddress!(0)
            |  transferAlph!(caller, @${fooAddress}, ${ALPH.cent(1)})
            |  let foo = Foo(#${fooId.toHexString})
            |  foo.foo()
