@@ -1488,7 +1488,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
       for {
         parentContractId <- frame.obj.getContractId()
         path             <- frame.popOpStackByteVec()
-        subContractIdPreImage = parentContractId.bytes ++ path.bytes
+        subContractIdPreImage = path.bytes ++ parentContractId.bytes
         _ <- frame.ctx.chargeDoubleHash(subContractIdPreImage.length)
       } yield {
         Hash.doubleHash(subContractIdPreImage)

@@ -2075,7 +2075,14 @@ class VMSpec extends AlephiumSpec {
            |    approveAlph!(callerAddress!(), ${ALPH.oneAlph.v})
            |    subContractId = $createContractStmt
            |  }
+           |
+           |  pub fn callSubContract(path: ByteVec) -> () {
+           |    let subContractIdCalculated = subContractId!(path)
+           |    assert!(subContractIdCalculated == subContractId)
+           |    SubContract(subContractIdCalculated).call()
+           |  }
            |}
+           |$subContractRaw
            |""".stripMargin
 
       val contractId =
@@ -2097,7 +2104,7 @@ class VMSpec extends AlephiumSpec {
 
       callTxScript(createSubContractRaw)
 
-      val subContractId = Hash.doubleHash(contractId.bytes ++ serialize(subContractPath))
+      val subContractId = Hash.doubleHash(serialize(subContractPath) ++ contractId.bytes)
       val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       worldState.getContractState(contractId).rightValue.fields is AVector[Val](
         Val.ByteVec(subContractId.bytes)
@@ -2107,12 +2114,13 @@ class VMSpec extends AlephiumSpec {
         s"Right(TxScriptExeFailed(ContractAlreadyExists(${subContractId.toHexString}))"
       )
 
+      val subContractPathHex = Hex.toHexString(serialize(subContractPath))
       val callSubContractRaw: String =
         s"""
            |TxScript Main {
-           |  SubContract(#${subContractId.toHexString}).call()
+           |  Contract(#${contractId.toHexString}).callSubContract(#${subContractPathHex})
            |}
-           |$subContractRaw
+           |$contractRaw
            |""".stripMargin
 
       callTxScript(callSubContractRaw)

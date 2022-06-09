@@ -618,6 +618,22 @@ object BuiltIn {
       ContractCodeHash
     )
 
+  val subContractId: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] {
+    def name: String = "subContractId"
+
+    def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+      if (inputType == Seq(Type.ByteVec)) {
+        Seq(Type.ByteVec)
+      } else {
+        throw Error(s"Invalid argument type for subContractId, ByteVec expected")
+      }
+    }
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
+      Seq(SelfContractId, ByteVecConcat, Blake2b, Blake2b)
+    }
+  }
+
   val statefulFuncs: Map[String, FuncInfo[StatefulContext]] =
     statelessFuncs ++ Seq(
       approveAlph,
@@ -653,6 +669,7 @@ object BuiltIn {
       callerInitialStateHash,
       callerCodeHash,
       contractInitialStateHash,
-      contractCodeHash
+      contractCodeHash,
+      subContractId
     ).map(f => f.name -> f)
 }
