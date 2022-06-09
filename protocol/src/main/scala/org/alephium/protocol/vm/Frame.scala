@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import scala.annotation.{switch, tailrec}
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{ContractId, HardFork}
+import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Bytes}
@@ -262,7 +262,7 @@ final case class StatefulFrame(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
   ): ExeResult[Option[MutBalanceState]] = {
-    if (ctx.getHardFork() >= HardFork.Leman) {
+    if (ctx.getHardFork().isLemanEnabled()) {
       getNewFrameBalancesStateSinceLeman(contractObj, method)
     } else {
       getNewFrameBalancesStatePreLeman(contractObj, method)
@@ -578,10 +578,10 @@ object Frame {
       // already validated in script validation and contract creation
       assume(method.localsLength >= args.length)
       if (method.localsLength == 0) {
-        if (ctx.getHardFork() < HardFork.Leman) {
-          Right(frameBuilder(operandStack, VarVector.emptyVal))
-        } else {
+        if (ctx.getHardFork().isLemanEnabled()) {
           Right(frameBuilder(operandStack.remainingStack(), VarVector.emptyVal))
+        } else {
+          Right(frameBuilder(operandStack, VarVector.emptyVal))
         }
       } else {
         operandStack.reserveForVars(method.localsLength).map { case (localsVector, newStack) =>

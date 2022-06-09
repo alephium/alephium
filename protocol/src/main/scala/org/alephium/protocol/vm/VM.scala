@@ -183,7 +183,7 @@ object VM {
       case output: ContractOutput => output.amount >= minimalAlphInContract
       case _                      => true
     }
-    if (hardFork >= HardFork.Leman && !allChecked) {
+    if (hardFork.isLemanEnabled() && !allChecked) {
       failed(LowerThanContractMinimalBalance)
     } else {
       okay

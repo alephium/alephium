@@ -127,8 +127,7 @@ trait StatelessContext extends CostStrategy {
 
   @inline def getHardFork(): HardFork = blockEnv.getHardFork()
   def checkLemanHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
-    val hardFork = getHardFork()
-    if (hardFork >= HardFork.Leman) {
+    if (getHardFork().isLemanEnabled()) {
       okay
     } else {
       failed(InactiveInstr(instr))
@@ -154,7 +153,7 @@ trait StatelessContext extends CostStrategy {
   def getUniqueTxInputAddress(): ExeResult[Val.Address] = {
     for {
       _ <-
-        if (getHardFork() >= HardFork.Leman) okay else failed(PartiallyEnabledInstr(CallerAddress))
+        if (getHardFork().isLemanEnabled()) okay else failed(PartiallyEnabledInstr(CallerAddress))
       _       <- chargeGas(GasUniqueAddress.gas(txEnv.prevOutputs.length))
       address <- _getUniqueTxInputAddress()
     } yield address
@@ -174,7 +173,7 @@ trait StatelessContext extends CostStrategy {
   }
 
   def chargeGasWithSizeLeman(gasFormula: UpgradedGasFormula, size: Int): ExeResult[Unit] = {
-    if (getHardFork() >= HardFork.Leman) {
+    if (getHardFork().isLemanEnabled()) {
       this.chargeGas(gasFormula.gas(size))
     } else {
       this.chargeGas(gasFormula.gasDeprecated(size))

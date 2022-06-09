@@ -18,6 +18,8 @@ package org.alephium.protocol.model
 
 sealed class HardFork(val version: Int) extends Ordered[HardFork] {
   def compare(that: HardFork): Int = this.version.compareTo(that.version)
+
+  def isLemanEnabled(): Boolean = this >= HardFork.Leman
 }
 object HardFork {
   object Mainnet extends HardFork(0)

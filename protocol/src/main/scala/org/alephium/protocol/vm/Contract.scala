@@ -148,12 +148,12 @@ sealed trait Contract[Ctx <: StatelessContext] {
     Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
 
   def checkAssetsModifier(ctx: StatelessContext): ExeResult[Unit] = {
-    if (ctx.getHardFork() < HardFork.Leman) {
+    if (ctx.getHardFork().isLemanEnabled()) {
+      okay
+    } else {
       EitherF.foreachTry(0 until methodsLength) { methodIndex =>
         getMethod(methodIndex).flatMap(_.checkModifierPreLeman())
       }
-    } else {
-      okay
     }
   }
 }
@@ -392,7 +392,7 @@ object StatefulContract {
   def check(contract: StatefulContract, hardFork: HardFork): ExeResult[Unit] = {
     if (contract.fieldLength < 0) {
       failed(InvalidFieldLength)
-    } else if (hardFork >= HardFork.Leman && contract.fieldLength > 0xff) {
+    } else if (hardFork.isLemanEnabled() && contract.fieldLength > 0xff) {
       failed(TooManyFields)
     } else if (contract.methods.isEmpty) {
       failed(EmptyMethods)

@@ -24,7 +24,7 @@ import org.alephium.crypto
 import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
-import org.alephium.protocol.model.{AssetOutput, HardFork}
+import org.alephium.protocol.model.AssetOutput
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
 import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
 import org.alephium.util
@@ -1341,10 +1341,10 @@ sealed trait Transfer extends AssetInstr {
     frame.popOpStackAddress().flatMap {
       case Val.Address(asset: LockupScript.Asset) => Right(asset)
       case Val.Address(contract: LockupScript.P2C) =>
-        if (frame.ctx.getHardFork() < HardFork.Leman) {
-          Right(contract)
-        } else {
+        if (frame.ctx.getHardFork().isLemanEnabled()) {
           frame.checkPayToContractAddressInCallerTrace(contract).map(_ => contract)
+        } else {
+          Right(contract)
         }
     }
   }
@@ -1473,7 +1473,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
       contractCode  <- prepareContractCode(frame)
       newContractId <- frame.createContract(contractCode, fields, tokenAmount)
       _ <-
-        if (frame.ctx.getHardFork() >= HardFork.Leman) {
+        if (frame.ctx.getHardFork().isLemanEnabled()) {
           frame.pushOpStack(Val.ByteVec(newContractId.bytes))
         } else {
           okay
@@ -1737,7 +1737,7 @@ sealed trait TxInstr extends StatelessInstrSimpleGas with StatelessInstrCompanio
 
 object TxInstr {
   def checkScriptFrameForLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    if (frame.ctx.getHardFork() >= HardFork.Leman && !frame.obj.isScript()) {
+    if (frame.ctx.getHardFork().isLemanEnabled() && !frame.obj.isScript()) {
       failed(AccessTxInputAddressInContract)
     } else {
       okay
