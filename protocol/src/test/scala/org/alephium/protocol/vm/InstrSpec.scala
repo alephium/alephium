@@ -1468,7 +1468,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val uniqueAddress            = Val.Address(prevOutputs0.head.lockupScript)
   }
 
-  it should "TxInputAddress" in new TxEnvFixture {
+  it should "TxInputAddressAt" in new TxEnvFixture {
     override lazy val frame = prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
       .asInstanceOf[StatefulFrame]
       .copy(obj = script)
@@ -1476,13 +1476,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val index      = prevOutputs0.length - 1
     val initialGas = context.gasRemaining
     stack.push(Val.U256(U256.unsafe(index)))
-    TxInputAddress.runWith(frame) isE ()
+    TxInputAddressAt.runWith(frame) isE ()
     stack.size is 1
     stack.top.get is Val.Address(prevOutputs0.get(index).get.lockupScript)
-    initialGas.subUnsafe(context.gasRemaining) is TxInputAddress.gas()
+    initialGas.subUnsafe(context.gasRemaining) is TxInputAddressAt.gas()
 
     val contractFrame = prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
-    TxInputAddress.runWith(contractFrame).leftValue isE AccessTxInputAddressInContract
+    TxInputAddressAt.runWith(contractFrame).leftValue isE AccessTxInputAddressInContract
   }
 
   it should "TxInputsSize" in new TxEnvFixture {
@@ -2607,7 +2607,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* CallLocal(byte) -> ???, */ Return -> 0,
       Assert -> 3,
       Blake2b -> 54, Keccak256 -> 54, Sha256 -> 54, Sha3 -> 54, VerifyTxSignature -> 2000, VerifySecP256K1 -> 2000, VerifyED25519 -> 2000,
-      NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxInputAddress -> 3, TxInputsSize -> 3,
+      NetworkId -> 3, BlockTimeStamp -> 3, BlockTarget -> 3, TxId -> 3, TxInputAddressAt -> 3, TxInputsSize -> 3,
       VerifyAbsoluteLocktime -> 5, VerifyRelativeLocktime -> 8,
       Log1 -> 120, Log2 -> 140, Log3 -> 160, Log4 -> 180, Log5 -> 200,
       /* Below are instructions for Leman hard fork */
@@ -2733,7 +2733,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Jump(int) -> 74, IfTrue(int) -> 75, IfFalse(int) -> 76,
       Assert -> 77,
       Blake2b -> 78, Keccak256 -> 79, Sha256 -> 80, Sha3 -> 81, VerifyTxSignature -> 82, VerifySecP256K1 -> 83, VerifyED25519 -> 84,
-      NetworkId -> 85, BlockTimeStamp -> 86, BlockTarget -> 87, TxId -> 88, TxInputAddress -> 89, TxInputsSize -> 90,
+      NetworkId -> 85, BlockTimeStamp -> 86, BlockTarget -> 87, TxId -> 88, TxInputAddressAt -> 89, TxInputsSize -> 90,
       VerifyAbsoluteLocktime -> 91, VerifyRelativeLocktime -> 92,
       Log1 -> 93, Log2 -> 94, Log3 -> 95, Log4 -> 96, Log5 -> 97,
       /* Below are instructions for Leman hard fork */
@@ -2788,7 +2788,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CallLocal(byte), Return,
       Assert,
       Blake2b, Keccak256, Sha256, Sha3, VerifyTxSignature, VerifySecP256K1, VerifyED25519,
-      NetworkId, BlockTimeStamp, BlockTarget, TxId, TxInputAddress, TxInputsSize,
+      NetworkId, BlockTimeStamp, BlockTarget, TxId, TxInputAddressAt, TxInputsSize,
       VerifyAbsoluteLocktime, VerifyRelativeLocktime,
       Log1, Log2, Log3, Log4, Log5,
       /* Below are instructions for Leman hard fork */

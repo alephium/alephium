@@ -106,7 +106,7 @@ object BuiltIn {
   val txId: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("txId", Seq.empty, Seq(Type.ByteVec), TxId)
   val txInputAddress: SimpleStatelessBuiltIn =
-    SimpleStatelessBuiltIn("txInputAddress", Seq(Type.U256), Seq(Type.Address), TxInputAddress)
+    SimpleStatelessBuiltIn("txInputAddress", Seq(Type.U256), Seq(Type.Address), TxInputAddressAt)
   val txInputsSize: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("txInputsSize", Seq.empty, Seq(Type.U256), TxInputsSize)
   val verifyAbsoluteLocktime: SimpleStatelessBuiltIn =
