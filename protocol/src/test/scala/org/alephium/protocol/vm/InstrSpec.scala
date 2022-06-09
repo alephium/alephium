@@ -70,21 +70,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
       EthEcRecover,
       Log6, Log7, Log8, Log9,
-      ContractIdToAddress
+      ContractIdToAddress,
+      LoadLocalByIndex, StoreLocalByIndex, Dup
     )
     val lemanStatefulInstrs = AVector(
-      MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets
+      MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
+      CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
+      LoadFieldByIndex, StoreFieldByIndex
     )
     // format: on
-
-    def isLemanInstr(instr: Instr[_]): Boolean = {
-      instr.isInstanceOf[LemanInstr[_]] || instr.isInstanceOf[LemanInstrWithSimpleGas[_]]
-    }
   }
 
-  it should "derive from LemanInstr" in new LemanForkFixture {
-    lemanStatelessInstrs.foreach(isLemanInstr(_) is true)
-    lemanStatefulInstrs.foreach(isLemanInstr(_) is true)
+  it should "check all LemanInstr" in new LemanForkFixture {
+    lemanStatelessInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
+    lemanStatefulInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
     (statelessInstrs.toSet -- lemanStatelessInstrs.toSet)
       .map(_.isInstanceOf[LemanInstr[_]] is false)
     (statefulInstrs.toSet -- lemanStatefulInstrs.toSet)

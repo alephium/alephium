@@ -64,8 +64,12 @@ sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] wit
   def _runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
-sealed trait LemanInstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] with GasSimple {
-  def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+sealed trait LemanInstrWithSimpleGas[-Ctx <: StatelessContext]
+    extends LemanInstr[Ctx]
+    with GasSimple {
+  def _runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = ???
+
+  override def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
     for {
       _ <- frame.ctx.checkLemanHardFork(this)
       _ <- frame.ctx.chargeGas(this)
@@ -450,13 +454,6 @@ case object Pop extends PureStackInstr {
 }
 
 case object Dup extends PureStackInstr with LemanInstrWithSimpleGas[StatelessContext] {
-  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
-    super[LemanInstrWithSimpleGas].runWith(frame)
-
-  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = failed(
-    InactiveInstr(this)
-  )
-
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       value <- frame.opStack.top.toRight(Right(StackUnderflow))
@@ -1550,12 +1547,6 @@ object CopyCreateContract extends CopyCreateContractBase {
 object CopyCreateContractWithToken
     extends CopyCreateContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
-  // We need to overwrite this method because `runWith` is inherited from both `LemanInstr` and `InstrWithSimpleGas`
-  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
-    super[LemanInstrWithSimpleGas].runWith(frame)
-
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
-
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, issueToken = true)
   }
@@ -1569,11 +1560,6 @@ sealed trait CreateSubContractBase extends CreateContractAbstract with GasCreate
 object CreateSubContract
     extends CreateSubContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
-  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
-    super[LemanInstrWithSimpleGas].runWith(frame)
-
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
-
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, issueToken = false)
   }
@@ -1582,11 +1568,6 @@ object CreateSubContract
 object CreateSubContractWithToken
     extends CreateSubContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
-  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
-    super[LemanInstrWithSimpleGas].runWith(frame)
-
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
-
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, issueToken = true)
   }
@@ -1600,11 +1581,6 @@ sealed trait CopyCreateSubContractBase extends CreateContractAbstract with GasCo
 object CopyCreateSubContract
     extends CopyCreateSubContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
-  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
-    super[LemanInstrWithSimpleGas].runWith(frame)
-
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
-
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, issueToken = false)
   }
@@ -1613,12 +1589,6 @@ object CopyCreateSubContract
 object CopyCreateSubContractWithToken
     extends CopyCreateSubContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
-  // We need to overwrite this method because `runWith` is inherited from both `LemanInstr` and `InstrWithSimpleGas`
-  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
-    super[LemanInstrWithSimpleGas].runWith(frame)
-
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
-
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, issueToken = true)
   }
