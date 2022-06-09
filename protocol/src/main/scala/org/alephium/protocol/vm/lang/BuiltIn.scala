@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm.lang
 
+import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
 import org.alephium.util.AVector
@@ -337,6 +338,14 @@ object BuiltIn {
       ContractIdToAddress
     )
 
+  val nullAddress: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "nullAddress",
+      Seq.empty,
+      Seq[Type](Type.Address),
+      AddressConst(Val.Address(LockupScript.p2c(ContractId.zero)))
+    )
+
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
@@ -378,7 +387,8 @@ object BuiltIn {
     u256From32Byte,
     byteVecToAddress,
     ethEcRecover,
-    contractIdToAddress
+    contractIdToAddress,
+    nullAddress
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleStatefulBuiltIn =
