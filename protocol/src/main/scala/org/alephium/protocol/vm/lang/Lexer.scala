@@ -23,6 +23,7 @@ import scala.util.control.NonFatal
 import fastparse._
 import fastparse.NoWhitespace._
 
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{LockupScript, Val}
 import org.alephium.protocol.vm.Val.ByteVec
@@ -64,10 +65,14 @@ object Lexer {
 
   def hexNum[Unknown: P]: P[BigInteger] = P("0x") ~ hex.!.map(new BigInteger(_, 16))
   def decNum[Unknown: P]: P[BigInteger] = P(
-    CharsWhileIn("0-9_") ~ ("." ~ CharsWhileIn("0-9_")).? ~ ("e" ~ CharsWhileIn("0-9")).?
-  ).!.map { input =>
+    (CharsWhileIn("0-9_") ~ ("." ~ CharsWhileIn("0-9_")).? ~
+      ("e" ~ "-".? ~ CharsWhileIn("0-9")).?).! ~
+      CharsWhileIn(" ", 0) ~ keyword("alph").?.!
+  ).map { case (input, unit) =>
     try {
-      new BigDecimal(input.replaceAll("_", "")).toBigIntegerExact()
+      var num = new BigDecimal(input.replaceAll("_", ""))
+      if (unit == "alph") num = num.multiply(new BigDecimal(ALPH.oneAlph.toBigInt))
+      num.toBigIntegerExact()
     } catch {
       case NonFatal(_) => throw Compiler.Error(s"Invalid number ${input}")
     }
@@ -180,7 +185,8 @@ object Lexer {
     "emit",
     "loop",
     "extends",
-    "implements"
+    "implements",
+    "alph"
   )
 
   val primTpes: Map[String, Type] =

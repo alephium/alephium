@@ -320,13 +320,13 @@ class VMSpec extends AlephiumSpec {
          |TxContract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn mint() -> () {
-         |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), ${ALPH.alph(2)})
+         |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), 2 alph)
          |  }
          |
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn burn() -> () {
-         |    burnToken!(@$genesisAddress, selfTokenId!(), ${ALPH.oneAlph})
-         |    burnToken!(selfAddress!(), selfTokenId!(), ${ALPH.oneAlph})
+         |    burnToken!(@$genesisAddress, selfTokenId!(), 1 alph)
+         |    burnToken!(selfAddress!(), selfTokenId!(), 1 alph)
          |  }
          |}
          |""".stripMargin
@@ -374,7 +374,7 @@ class VMSpec extends AlephiumSpec {
          |TxContract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn mint() -> () {
-         |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), ${ALPH.alph(10)})
+         |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), 10 alph)
          |  }
          |}
          |""".stripMargin
@@ -406,16 +406,16 @@ class VMSpec extends AlephiumSpec {
          |  let timestamp1 = 2000
          |  let timestamp2 = 3000
          |
-         |  approveAlph!(@$genesisAddress, ${ALPH.cent(1)})
+         |  approveAlph!(@$genesisAddress, 0.01 alph)
          |  lockApprovedAssets!(@$genesisAddress, timestamp0)
          |
-         |  approveAlph!(@$genesisAddress, ${ALPH.cent(2)})
-         |  approveToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.cent(3)})
+         |  approveAlph!(@$genesisAddress, 0.02 alph)
+         |  approveToken!(@$genesisAddress, #$tokenId0Hex, 0.03 alph)
          |  lockApprovedAssets!(@$genesisAddress, timestamp1)
          |
-         |  approveAlph!(@$genesisAddress, ${ALPH.cent(4)})
-         |  approveToken!(@$genesisAddress, #$tokenId0Hex, ${ALPH.cent(5)})
-         |  approveToken!(@$genesisAddress, #$tokenId1Hex, ${ALPH.cent(6)})
+         |  approveAlph!(@$genesisAddress, 0.04 alph)
+         |  approveToken!(@$genesisAddress, #$tokenId0Hex, 0.05 alph)
+         |  approveToken!(@$genesisAddress, #$tokenId1Hex, 0.06 alph)
          |  lockApprovedAssets!(@$genesisAddress, timestamp2)
          |}
          |
@@ -700,7 +700,7 @@ class VMSpec extends AlephiumSpec {
     val script =
       s"""
          |TxScript Main {
-         |  approveAlph!(@$genesisAddress, ${ALPH.alph(1).v})
+         |  approveAlph!(@$genesisAddress, 1 alph)
          |  copyCreateContractWithToken!(#$contractId, #$encodedState, ${tokenAmount.v})
          |}
          |""".stripMargin
@@ -773,7 +773,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  Bar(#$barId).bar(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
-         |  approveAlph!(@$genesisAddress, ${ALPH.alph(1).v})
+         |  approveAlph!(@$genesisAddress, 1 alph)
          |  copyCreateContract!(#$fooId, #$state)
          |  assert!(isPaying!(@$genesisAddress) == true)
          |}
@@ -2030,7 +2030,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  approveAlph!(callerAddress!(), ${ALPH.alph(1).v})
+         |  approveAlph!(callerAddress!(), 1 alph)
          |  Foo(#${contractId.toHexString}).foo()
          |}
          |
@@ -2072,7 +2072,7 @@ class VMSpec extends AlephiumSpec {
            |TxContract Contract(mut subContractId: ByteVec) {
            |  @using(preapprovedAssets = true)
            |  pub fn createSubContract() -> () {
-           |    approveAlph!(callerAddress!(), ${ALPH.oneAlph.v})
+           |    approveAlph!(callerAddress!(), 1 alph)
            |    subContractId = $createContractStmt
            |  }
            |
@@ -2096,7 +2096,7 @@ class VMSpec extends AlephiumSpec {
       val createSubContractRaw: String =
         s"""
            |TxScript Main {
-           |  approveAlph!(callerAddress!(), ${ALPH.alph(1).v})
+           |  approveAlph!(callerAddress!(), 1 alph)
            |  Contract(#${contractId.toHexString}).createSubContract()
            |}
            |$contractRaw
@@ -2188,7 +2188,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  approveAlph!(callerAddress!(), ${ALPH.alph(1).v})
+         |  approveAlph!(callerAddress!(), 1 alph)
          |  Foo(#${contractId.toHexString}).foo()
          |}
          |
@@ -2311,7 +2311,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  Foo(#${fooId.toHexString}).foo()
-         |  transferAlph!(callerAddress!(), @${fooAddress}, ${ALPH.alph(1).v})
+         |  transferAlph!(callerAddress!(), @${fooAddress}, 1 alph)
          |}
          |
          |$foo
@@ -2464,7 +2464,7 @@ class VMSpec extends AlephiumSpec {
         s"""
            |TxScript Main {
            |  let caller = callerAddress!()
-           |  transferAlph!(caller, @${randomContract}, ${ALPH.cent(1)})
+           |  transferAlph!(caller, @${randomContract}, 0.01 alph)
            |}
            |""".stripMargin
       failCallTxScript(script, PayToContractAddressNotInCallerTrace)
@@ -2478,7 +2478,7 @@ class VMSpec extends AlephiumSpec {
            |TxContract Foo() {
            |  @using(assetsInContract = true)
            |  pub fn foo() -> () {
-           |    transferAlphFromSelf!(@${randomContract}, ${ALPH.cent(1)})
+           |    transferAlphFromSelf!(@${randomContract}, 0.01 alph)
            |  }
            |}
            |""".stripMargin
@@ -2489,7 +2489,7 @@ class VMSpec extends AlephiumSpec {
         s"""
            |TxScript Main {
            |  let caller = callerAddress!()
-           |  transferAlph!(caller, @${fooAddress}, ${ALPH.cent(1)})
+           |  transferAlph!(caller, @${fooAddress}, 0.01 alph)
            |  let foo = Foo(#${fooId.toHexString})
            |  foo.foo()
            |}
@@ -2506,7 +2506,7 @@ class VMSpec extends AlephiumSpec {
            |TxContract Foo() {
            |  @using(assetsInContract = true)
            |  pub fn foo(to: Address) -> () {
-           |    transferAlphFromSelf!(to, ${ALPH.cent(1)})
+           |    transferAlphFromSelf!(to, 0.01 alph)
            |  }
            |}
            |""".stripMargin
