@@ -1406,8 +1406,10 @@ sealed trait CreateContractAbstract extends ContractInstr {
       for {
         parentContractId <- frame.obj.getContractId()
         path             <- frame.popOpStackByteVec()
+        subContractIdPreImage = parentContractId.bytes ++ path.bytes
+        _ <- frame.ctx.chargeDoubleHash(subContractIdPreImage.length)
       } yield {
-        Hash.doubleHash(parentContractId.bytes ++ path.bytes)
+        Hash.doubleHash(subContractIdPreImage)
       }
     } else {
       Right(TxOutputRef.key(frame.ctx.txId, frame.ctx.nextOutputIndex))
@@ -1479,14 +1481,28 @@ sealed trait CreateSubContractBase extends CreateContractAbstract with GasCreate
   def copyCreate: Boolean  = false
 }
 
-object CreateSubContract extends CreateSubContractBase {
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+object CreateSubContract
+    extends CreateSubContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstrWithSimpleGas].runWith(frame)
+
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
+
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, issueToken = false)
   }
 }
 
-object CreateSubContractWithToken extends CreateSubContractBase {
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+object CreateSubContractWithToken
+    extends CreateSubContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstrWithSimpleGas].runWith(frame)
+
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
+
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, issueToken = true)
   }
 }
@@ -1496,8 +1512,15 @@ sealed trait CopyCreateSubContractBase extends CreateContractAbstract with GasCo
   def copyCreate: Boolean  = true
 }
 
-object CopyCreateSubContract extends CopyCreateSubContractBase {
-  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+object CopyCreateSubContract
+    extends CopyCreateSubContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
+  override def runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstrWithSimpleGas].runWith(frame)
+
+  def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = failed(InactiveInstr(this))
+
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, issueToken = false)
   }
 }
