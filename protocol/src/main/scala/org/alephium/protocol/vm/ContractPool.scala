@@ -50,14 +50,14 @@ trait ContractPool extends CostStrategy {
   }
 
   def blockContractLoad(contractId: ContractId): Unit = {
-    if (getHardFork() >= HardFork.Leman) {
+    if (getHardFork().isLemanEnabled()) {
       contractBlockList.add(contractId)
       ()
     }
   }
 
   def checkIfBlocked(contractId: ContractId): ExeResult[Unit] = {
-    if (getHardFork() >= HardFork.Leman && contractBlockList.contains(contractId)) {
+    if (getHardFork().isLemanEnabled() && contractBlockList.contains(contractId)) {
       failed(ContractLoadDisallowed(contractId))
     } else {
       okay

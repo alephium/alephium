@@ -32,7 +32,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, SignatureSchema}
-import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.{Address, CliqueId, NetworkId, TxGenerators}
 import org.alephium.serde.serialize
 import org.alephium.util.{discard, AlephiumFutureSpec, AVector, Duration, Hex, U256}
@@ -417,8 +417,7 @@ object WalletAppSpec extends {
 
   class BlockFlowServerMock(address: InetAddress, port: Int)(implicit
       val groupConfig: GroupConfig,
-      val networkConfig: NetworkConfig,
-      val compilerConfig: CompilerConfig
+      val networkConfig: NetworkConfig
   ) extends TxGenerators
       with ApiModelCodec
       with ScalaFutures {

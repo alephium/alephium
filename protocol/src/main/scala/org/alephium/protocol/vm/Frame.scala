@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import scala.annotation.{switch, tailrec}
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{ContractId, HardFork}
+import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Bytes}
@@ -35,11 +35,13 @@ abstract class Frame[Ctx <: StatelessContext] {
   def ctx: Ctx
 
   def getCallerFrame(): ExeResult[Frame[Ctx]]
+  def getCallerAddress(): ExeResult[Val.Address]
+  def getCallAddress(): ExeResult[Val.Address]
 
   def balanceStateOpt: Option[MutBalanceState]
 
   def getBalanceState(): ExeResult[MutBalanceState] =
-    balanceStateOpt.toRight(Right(EmptyBalanceForPayableMethod))
+    balanceStateOpt.toRight(Right(NoBalanceAvailable))
 
   def pcMax: Int = method.instrs.length
 
@@ -140,6 +142,8 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def destroyContract(address: LockupScript): ExeResult[Unit]
 
+  def checkPayToContractAddressInCallerTrace(address: LockupScript.P2C): ExeResult[Unit]
+
   def migrateContract(
       newContractCode: StatefulContract,
       newFieldsOpt: Option[AVector[Val]]
@@ -208,11 +212,15 @@ final class StatelessFrame(
       tokenAmount: Option[Val.U256]
   ): ExeResult[ContractId] = StatelessFrame.notAllowed
   def destroyContract(address: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
+  def checkPayToContractAddressInCallerTrace(address: LockupScript.P2C): ExeResult[Unit] =
+    StatelessFrame.notAllowed
   def migrateContract(
       newContractCode: StatefulContract,
       newFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = StatelessFrame.notAllowed
   def getCallerFrame(): ExeResult[Frame[StatelessContext]] = StatelessFrame.notAllowed
+  def getCallerAddress(): ExeResult[Val.Address]           = StatelessFrame.notAllowed
+  def getCallAddress(): ExeResult[Val.Address]             = StatelessFrame.notAllowed
   def callExternal(index: Byte): ExeResult[Option[Frame[StatelessContext]]] =
     StatelessFrame.notAllowed
 }
@@ -221,26 +229,42 @@ object StatelessFrame {
   val notAllowed: ExeResult[Nothing] = failed(ExpectStatefulFrame)
 }
 
-final class StatefulFrame(
+final case class StatefulFrame(
     var pc: Int,
-    val obj: ContractObj[StatefulContext],
-    val opStack: Stack[Val],
-    val method: Method[StatefulContext],
-    val locals: VarVector[Val],
-    val returnTo: AVector[Val] => ExeResult[Unit],
-    val ctx: StatefulContext,
-    val callerFrameOpt: Option[StatefulFrame],
-    val balanceStateOpt: Option[MutBalanceState]
+    obj: ContractObj[StatefulContext],
+    opStack: Stack[Val],
+    method: Method[StatefulContext],
+    locals: VarVector[Val],
+    returnTo: AVector[Val] => ExeResult[Unit],
+    ctx: StatefulContext,
+    callerFrameOpt: Option[StatefulFrame],
+    balanceStateOpt: Option[MutBalanceState]
 ) extends Frame[StatefulContext] {
   def getCallerFrame(): ExeResult[StatefulFrame] = {
     callerFrameOpt.toRight(Right(NoCaller))
+  }
+
+  def getCallerAddress(): ExeResult[Val.Address] = {
+    callerFrameOpt match {
+      case Some(frame) => frame.getCallAddress()
+      case None        => ctx.getUniqueTxInputAddress()
+    }
+  }
+
+  def getCallAddress(): ExeResult[Val.Address] = {
+    obj.contractIdOpt match {
+      case Some(contractId) => // frame for contract method
+        Right(Val.Address(LockupScript.p2c(contractId)))
+      case None => // frame for script
+        ctx.getUniqueTxInputAddress()
+    }
   }
 
   def getNewFrameBalancesState(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
   ): ExeResult[Option[MutBalanceState]] = {
-    if (ctx.getHardFork() >= HardFork.Leman) {
+    if (ctx.getHardFork().isLemanEnabled()) {
       getNewFrameBalancesStateSinceLeman(contractObj, method)
     } else {
       getNewFrameBalancesStatePreLeman(contractObj, method)
@@ -251,7 +275,7 @@ final class StatefulFrame(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
   ): ExeResult[Option[MutBalanceState]] = {
-    if (method.useApprovedAssets) {
+    if (method.usePreapprovedAssets) {
       for {
         currentBalances <- getBalanceState()
         balanceStateOpt <- {
@@ -295,7 +319,7 @@ final class StatefulFrame(
       contractObj: ContractObj[StatefulContext],
       method: Method[StatefulContext]
   ): ExeResult[Option[MutBalanceState]] = {
-    if (method.useApprovedAssets) {
+    if (method.usePreapprovedAssets) {
       for {
         currentBalances <- getBalanceState()
         balanceStateOpt <- {
@@ -387,6 +411,15 @@ final class StatefulFrame(
     }
   }
 
+  def checkPayToContractAddressInCallerTrace(address: LockupScript.P2C): ExeResult[Unit] = {
+    val notInCallerStrace = checkNonRecursive(address.contractId)
+    if (notInCallerStrace) {
+      failed(PayToContractAddressNotInCallerTrace)
+    } else {
+      okay
+    }
+  }
+
   def migrateContract(
       newContractCode: StatefulContract,
       newFieldsOpt: Option[AVector[Val]]
@@ -451,7 +484,7 @@ object Frame {
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatelessContext]] = {
-    build(operandStack, method, new StatelessFrame(0, obj, _, method, _, returnTo, ctx))
+    build(ctx, operandStack, method, new StatelessFrame(0, obj, _, method, _, returnTo, ctx))
   }
 
   def stateless(
@@ -462,7 +495,7 @@ object Frame {
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatelessContext]] = {
-    build(operandStack, method, args, new StatelessFrame(0, obj, _, method, _, returnTo, ctx))
+    build(ctx, operandStack, method, args, new StatelessFrame(0, obj, _, method, _, returnTo, ctx))
   }
 
   def stateful(
@@ -475,6 +508,7 @@ object Frame {
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatefulContext]] = {
     build(
+      ctx,
       operandStack,
       method,
       new StatefulFrame(
@@ -502,6 +536,7 @@ object Frame {
       returnTo: AVector[Val] => ExeResult[Unit]
   ): ExeResult[Frame[StatefulContext]] = {
     build(
+      ctx,
       operandStack,
       method,
       args,
@@ -521,18 +556,20 @@ object Frame {
 
   @inline
   private def build[Ctx <: StatelessContext](
+      ctx: Ctx,
       operandStack: Stack[Val],
       method: Method[Ctx],
       frameBuilder: (Stack[Val], VarVector[Val]) => Frame[Ctx]
   ): ExeResult[Frame[Ctx]] = {
     operandStack.pop(method.argsLength) match {
-      case Right(args) => build(operandStack, method, args, frameBuilder)
+      case Right(args) => build(ctx, operandStack, method, args, frameBuilder)
       case _           => failed(InsufficientArgs)
     }
   }
 
   @inline
   private def build[Ctx <: StatelessContext](
+      ctx: Ctx,
       operandStack: Stack[Val],
       method: Method[Ctx],
       args: AVector[Val],
@@ -544,7 +581,11 @@ object Frame {
       // already validated in script validation and contract creation
       assume(method.localsLength >= args.length)
       if (method.localsLength == 0) {
-        Right(frameBuilder(operandStack, VarVector.emptyVal))
+        if (ctx.getHardFork().isLemanEnabled()) {
+          Right(frameBuilder(operandStack.remainingStack(), VarVector.emptyVal))
+        } else {
+          Right(frameBuilder(operandStack, VarVector.emptyVal))
+        }
       } else {
         operandStack.reserveForVars(method.localsLength).map { case (localsVector, newStack) =>
           args.foreachWithIndex((v, index) => localsVector.setUnsafe(index, v))

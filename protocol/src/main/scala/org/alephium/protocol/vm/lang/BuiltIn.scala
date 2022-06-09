@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm.lang
 
+import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
 import org.alephium.util.AVector
@@ -104,10 +105,10 @@ object BuiltIn {
     SimpleStatelessBuiltIn("blockTarget", Seq.empty, Seq(Type.U256), BlockTarget)
   val txId: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("txId", Seq.empty, Seq(Type.ByteVec), TxId)
-  val txCaller: SimpleStatelessBuiltIn =
-    SimpleStatelessBuiltIn("txCaller", Seq(Type.U256), Seq(Type.Address), TxCaller)
-  val txCallerSize: SimpleStatelessBuiltIn =
-    SimpleStatelessBuiltIn("txCallerSize", Seq.empty, Seq(Type.U256), TxCallerSize)
+  val txInputAddress: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("txInputAddress", Seq(Type.U256), Seq(Type.Address), TxInputAddressAt)
+  val txInputsSize: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn("txInputsSize", Seq.empty, Seq(Type.U256), TxInputsSize)
   val verifyAbsoluteLocktime: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn(
       "verifyAbsoluteLocktime",
@@ -337,6 +338,14 @@ object BuiltIn {
       ContractIdToAddress
     )
 
+  val nullAddress: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "nullAddress",
+      Seq.empty,
+      Seq[Type](Type.Address),
+      AddressConst(Val.Address(LockupScript.p2c(ContractId.zero)))
+    )
+
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
@@ -350,8 +359,8 @@ object BuiltIn {
     blockTimeStamp,
     blockTarget,
     txId,
-    txCaller,
-    txCallerSize,
+    txInputAddress,
+    txInputsSize,
     verifyAbsoluteLocktime,
     verifyRelativeLocktime,
     toI256,
@@ -378,7 +387,8 @@ object BuiltIn {
     u256From32Byte,
     byteVecToAddress,
     ethEcRecover,
-    contractIdToAddress
+    contractIdToAddress,
+    nullAddress
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleStatefulBuiltIn =

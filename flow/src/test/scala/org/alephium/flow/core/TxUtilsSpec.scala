@@ -35,9 +35,9 @@ class TxUtilsSpec extends AlephiumSpec {
     val chainIndex            = ChainIndex.unsafe(0, 0)
     val (genesisPriKey, _, _) = genesisKeys(0)
     val (toPriKey, _)         = chainIndex.from.generateKey
-    val block0 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
+    val block0 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = dustUtxoAmount * 2)
     addAndCheck(blockFlow, block0)
-    val block1 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
+    val block1 = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = dustUtxoAmount)
     addAndCheck(blockFlow, block1)
 
     blockFlow
@@ -45,7 +45,7 @@ class TxUtilsSpec extends AlephiumSpec {
         toPriKey.publicKey,
         getGenesisLockupScript(chainIndex),
         None,
-        minimalGasFee / 2,
+        dustUtxoAmount,
         None,
         minimalGasPrice,
         defaultUtxoLimit
@@ -58,7 +58,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val chainIndex            = ChainIndex.unsafe(0, 1)
     val (genesisPriKey, _, _) = genesisKeys(0)
     val (toPriKey, _)         = chainIndex.from.generateKey
-    val block = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = minimalGasFee)
+    val block = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = dustUtxoAmount)
     val tx    = block.nonCoinbase.head
     tx.gasFeeUnsafe is defaultGasFee
     defaultGasFee is ALPH.nanoAlph(20000 * 100)
@@ -552,7 +552,7 @@ class TxUtilsSpec extends AlephiumSpec {
         minimalGas,
         defaultGasPrice
       )
-      .leftValue is "Too many tokens in the transaction output, maximal number 64"
+      .leftValue is "Too many tokens in the transaction output, maximal number 4"
   }
 
   it should "fail when there are tokens with zero value in the transaction output" in new UnsignedTransactionFixture {
@@ -776,7 +776,7 @@ class TxUtilsSpec extends AlephiumSpec {
     TxUtils.getFirstOutputTokensNum(0) is 0
     TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo) is maxTokenPerUtxo
     TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 1) is 1
-    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 10) is 10
+    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 10) is 2
     TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + maxTokenPerUtxo - 1) is maxTokenPerUtxo - 1
     TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo * 10) is maxTokenPerUtxo
   }

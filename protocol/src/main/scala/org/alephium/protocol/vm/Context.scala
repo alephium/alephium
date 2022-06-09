@@ -28,11 +28,28 @@ final case class BlockEnv(
     networkId: NetworkId,
     timeStamp: TimeStamp,
     target: Target,
-    blockId: Option[BlockHash]
-)
+    blockId: Option[BlockHash],
+    hardFork: HardFork
+) {
+  @inline def getHardFork(): HardFork = hardFork
+}
 object BlockEnv {
+  def apply(
+      networkId: NetworkId,
+      timeStamp: TimeStamp,
+      target: Target,
+      blockId: Option[BlockHash]
+  )(implicit networkConfig: NetworkConfig): BlockEnv =
+    BlockEnv(networkId, timeStamp, target, blockId, networkConfig.getHardFork(timeStamp))
+
   def from(header: BlockHeader)(implicit networkConfig: NetworkConfig): BlockEnv =
-    BlockEnv(networkConfig.networkId, header.timestamp, header.target, Some(header.hash))
+    BlockEnv(
+      networkConfig.networkId,
+      header.timestamp,
+      header.target,
+      Some(header.hash),
+      networkConfig.getHardFork(header.timestamp)
+    )
 }
 
 sealed trait TxEnv {
@@ -109,10 +126,9 @@ trait StatelessContext extends CostStrategy {
   def networkConfig: NetworkConfig
   def blockEnv: BlockEnv
 
-  def getHardFork(): HardFork = networkConfig.getHardFork(blockEnv.timeStamp)
+  @inline def getHardFork(): HardFork = blockEnv.getHardFork()
   def checkLemanHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
-    val hardFork = getHardFork()
-    if (hardFork >= HardFork.Leman) {
+    if (getHardFork().isLemanEnabled()) {
       okay
     } else {
       failed(InactiveInstr(instr))
@@ -131,12 +147,34 @@ trait StatelessContext extends CostStrategy {
     indexRaw.v.toInt.flatMap(txEnv.prevOutputs.get).toRight(Right(InvalidTxInputIndex))
   }
 
-  def getTxCaller(indexRaw: Val.U256): ExeResult[Val.Address] = {
+  def getTxInputAddressAt(indexRaw: Val.U256): ExeResult[Val.Address] = {
     getTxPrevOutput(indexRaw).map(output => Val.Address(output.lockupScript))
   }
 
+  def getUniqueTxInputAddress(): ExeResult[Val.Address] = {
+    for {
+      _ <-
+        if (getHardFork().isLemanEnabled()) okay else failed(PartiallyEnabledInstr(CallerAddress))
+      _       <- chargeGas(GasUniqueAddress.gas(txEnv.prevOutputs.length))
+      address <- _getUniqueTxInputAddress()
+    } yield address
+  }
+
+  private def _getUniqueTxInputAddress(): ExeResult[Val.Address] = {
+    txEnv.prevOutputs.headOption match {
+      case Some(firstInput) =>
+        if (txEnv.prevOutputs.tail.forall(_.lockupScript == firstInput.lockupScript)) {
+          Right(Val.Address(firstInput.lockupScript))
+        } else {
+          failed(TxInputAddressesAreNotIdentical)
+        }
+      case None =>
+        failed(NoTxInput)
+    }
+  }
+
   def chargeGasWithSizeLeman(gasFormula: UpgradedGasFormula, size: Int): ExeResult[Unit] = {
-    if (getHardFork() >= HardFork.Leman) {
+    if (getHardFork().isLemanEnabled()) {
       this.chargeGas(gasFormula.gas(size))
     } else {
       this.chargeGas(gasFormula.gasDeprecated(size))

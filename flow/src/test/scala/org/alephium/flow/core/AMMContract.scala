@@ -16,12 +16,9 @@
 
 package org.alephium.flow.core
 
-import org.alephium.flow.setting.CompilerSetting
 import org.alephium.protocol.vm.lang.Compiler
 
 object AMMContract {
-  implicit private val compilerConfig = CompilerSetting(1000)
-
   lazy val swapContract =
     s"""
        |// Simple swap contract purely for testing
@@ -31,7 +28,7 @@ object AMMContract {
        |  event SwapToken(buyer: Address, alphAmount: U256)
        |  event SwapAlph(buyer: Address, tokenAmount: U256)
        |
-       |  @use(approvedAssets = true, contractAssets = true)
+       |  @using(preapprovedAssets = true, assetsInContract = true)
        |  pub fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
        |    emit AddLiquidity(lp, alphAmount, tokenAmount)
        |
@@ -41,7 +38,7 @@ object AMMContract {
        |    tokenReserve = tokenReserve + tokenAmount
        |  }
        |
-       |  @use(approvedAssets = true, contractAssets = true)
+       |  @using(preapprovedAssets = true, assetsInContract = true)
        |  pub fn swapToken(buyer: Address, alphAmount: U256) -> () {
        |    emit SwapToken(buyer, alphAmount)
        |
@@ -52,7 +49,7 @@ object AMMContract {
        |    tokenReserve = tokenReserve - tokenAmount
        |  }
        |
-       |  @use(approvedAssets = true, contractAssets = true)
+       |  @using(preapprovedAssets = true, assetsInContract = true)
        |  pub fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
        |    emit SwapAlph(buyer, tokenAmount)
        |
@@ -69,20 +66,20 @@ object AMMContract {
   lazy val swapProxyContract: String =
     s"""
        |TxContract SwapProxy(swapContractId: ByteVec, tokenId: ByteVec) {
-       |  @use(approvedAssets = true)
+       |  @using(preapprovedAssets = true)
        |  pub fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
        |    approveAlph!(lp, alphAmount)
        |    approveToken!(lp, tokenId, tokenAmount)
        |    Swap(swapContractId).addLiquidity(lp, alphAmount, tokenAmount)
        |  }
        |
-       |  @use(approvedAssets = true)
+       |  @using(preapprovedAssets = true)
        |  pub fn swapToken(buyer: Address, alphAmount: U256) -> () {
        |    approveAlph!(buyer, alphAmount)
        |    Swap(swapContractId).swapToken(buyer, alphAmount)
        |  }
        |
-       |  @use(approvedAssets = true)
+       |  @using(preapprovedAssets = true)
        |  pub fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
        |    approveToken!(buyer, tokenId, tokenAmount)
        |    Swap(swapContractId).swapAlph(buyer, tokenAmount)
