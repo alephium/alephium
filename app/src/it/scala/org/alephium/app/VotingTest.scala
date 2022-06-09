@@ -19,7 +19,7 @@ package org.alephium.app
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey}
-import org.alephium.protocol.model.{Address, ContractId}
+import org.alephium.protocol.model.{dustUtxoAmount, Address, ContractId}
 import org.alephium.protocol.vm
 import org.alephium.util._
 import org.alephium.wallet.api.model._
@@ -175,7 +175,7 @@ trait VotingFixture extends WalletFixture {
     val allocationTransfers = voters.zipWithIndex
       .map { case (_, i) =>
         s"""
-           |transferAlph!(admin, voters[$i], $utxoFee)
+           |transferAlph!(admin, voters[$i], $dustAmount)
            |transferTokenFromSelf!(voters[$i], selfTokenId!(), 1)""".stripMargin
       }
       .mkString("\n")
@@ -197,7 +197,7 @@ trait VotingFixture extends WalletFixture {
                             |  @using(preapprovedAssets = true, assetsInContract = true)
                             |  pub fn allocateTokens() -> () {
                             |     assert!(initialized == false)
-                            |     assert!(txInputAddress!(txInputsSize!() - 1) == admin)
+                            |     assert!(callerAddress!() == admin)
                             |     ${allocationTransfers}
                             |     yes = 0
                             |     no = 0
@@ -209,7 +209,7 @@ trait VotingFixture extends WalletFixture {
                             |  @using(preapprovedAssets = true, assetsInContract = true)
                             |  pub fn vote(choice: Bool, voter: Address) -> () {
                             |    assert!(initialized == true && isClosed == false)
-                            |    transferAlph!(voter, admin, $utxoFee)
+                            |    transferAlph!(voter, admin, $dustAmount)
                             |    transferTokenToSelf!(voter, selfTokenId!(), 1)
                             |
                             |    emit VoteCasted(voter, choice)
@@ -223,7 +223,7 @@ trait VotingFixture extends WalletFixture {
                             |
                             |   pub fn close() -> () {
                             |     assert!(initialized == true && isClosed == false)
-                            |     assert!(txInputAddress!(txInputsSize!() - 1) == admin)
+                            |     assert!(callerAddress!() == admin)
                             |     isClosed = true
                             |
                             |     emit VotingClosed()
@@ -258,8 +258,8 @@ trait VotingFixture extends WalletFixture {
     val allocationScript = s"""
                               |TxScript TokenAllocation {
                               |  let voting = Voting(#${contractId})
-                              |  let caller = txInputAddress!(0)
-                              |  approveAlph!(caller, $utxoFee * ${votersWallets.size})
+                              |  let caller = callerAddress!()
+                              |  approveAlph!(caller, $dustAmount * ${votersWallets.size})
                               |  voting.allocateTokens()
                               |}
         $contractCode
@@ -275,10 +275,10 @@ trait VotingFixture extends WalletFixture {
   ): TxResult = {
     val votingScript = s"""
                           |TxScript VotingScript {
-                          |  let caller = txInputAddress!(txInputsSize!() - 1)
+                          |  let caller = callerAddress!()
                           |  approveToken!(caller, #${contractId}, 1)
                           |  let voting = Voting(#${contractId})
-                          |  approveAlph!(caller, $utxoFee)
+                          |  approveAlph!(caller, $dustAmount)
                           |  voting.vote($choice, caller)
                           |}
       $contractCode
@@ -424,7 +424,7 @@ trait WalletFixture extends CliqueFixture {
   wallets.foreach(wallet =>
     request[Balance](getBalance(wallet.activeAddress), restPort).balance.value is walletsBalance
   )
-  val utxoFee = "50000000000000"
+  val dustAmount = dustUtxoAmount.toString()
 }
 
 final case class ContractRef(contractId: ContractId, contractAddress: Address, code: String)
