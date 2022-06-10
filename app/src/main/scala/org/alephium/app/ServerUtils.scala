@@ -826,6 +826,53 @@ class ServerUtils(implicit
     } yield state
   }
 
+  def callContract(blockFlow: BlockFlow, params: CallContract): Try[CallContractResult] = {
+    for {
+      chainIndex <- params.validate()
+      _          <- checkGroup(chainIndex.from)
+      blockHash = params.worldStateBlockHash.getOrElse(
+        blockFlow.getBestDeps(chainIndex.from).uncleHash(chainIndex.from)
+      )
+      worldState <- wrapResult(
+        blockFlow.getPersistedWorldState(blockHash).map(_.cached().staging())
+      )
+      contractId = params.address.contractId
+      contractObj <- wrapResult(worldState.getContractObj(contractId))
+      returnLength <- wrapExeResult(
+        contractObj.code.getMethod(params.methodIndex).map(_.returnLength)
+      )
+      txId = params.txId.getOrElse(Hash.random)
+      resultPair <- executeContractMethod(
+        worldState,
+        contractId,
+        txId,
+        blockHash,
+        params.inputAssets.getOrElse(AVector.empty),
+        params.methodIndex,
+        params.args.getOrElse(AVector.empty),
+        returnLength
+      )
+      (returns, result) = resultPair
+      contractAddresses = params.existingContracts.getOrElse(
+        AVector.empty
+      ) :+ params.address
+      contractsState <- contractAddresses.mapE(address =>
+        fetchContractState(worldState, address.contractId)
+      )
+    } yield {
+      CallContractResult(
+        returns.map(Val.from),
+        maximalGasPerTx.subUnsafe(result.gasBox).value,
+        contractsState,
+        result.contractPrevOutputs.map(_.lockupScript).map(Address.from),
+        result.generatedOutputs.mapWithIndex { case (output, index) =>
+          Output.from(output, txId, index)
+        },
+        fetchContractEvents(worldState)
+      )
+    }
+  }
+
   def runTestContract(
       blockFlow: BlockFlow,
       testContract: TestContract.Complete
@@ -841,8 +888,17 @@ class ServerUtils(implicit
           .getMethod(testContract.testMethodIndex)
           .map(_.returnLength)
       )
-      executionResultPair <- executeTestContract(worldState, contractId, testContract, returnLength)
-      postState           <- fetchContractsState(worldState, testContract)
+      executionResultPair <- executeContractMethod(
+        worldState,
+        contractId,
+        testContract.txId,
+        testContract.blockHash,
+        testContract.inputAssets,
+        testContract.testMethodIndex,
+        testContract.testArgs,
+        returnLength
+      )
+      postState <- fetchContractsState(worldState, testContract)
     } yield {
       val executionOutputs = executionResultPair._1
       val executionResult  = executionResultPair._2
@@ -925,23 +981,27 @@ class ServerUtils(implicit
     wrapResult(result)
   }
 
-  private def executeTestContract(
+  private def executeContractMethod(
       worldState: WorldState.Staging,
       contractId: ContractId,
-      testContract: TestContract.Complete,
+      txId: Hash,
+      blockHash: BlockHash,
+      inputAssets: AVector[TestInputAsset],
+      methodIndex: Int,
+      args: AVector[Val],
       returnLength: Int
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val blockEnv = BlockEnv(
       networkConfig.networkId,
       TimeStamp.now(),
       consensusConfig.maxMiningTarget,
-      Some(testContract.blockHash)
+      Some(blockHash)
     )
     val testGasFee = defaultGasPrice * maximalGasPerTx
     val txEnv: TxEnv = TxEnv.mockup(
-      txId = testContract.txId,
+      txId = txId,
       signatures = Stack.popOnly(AVector.empty[Signature]),
-      prevOutputs = testContract.inputAssets.map(_.toAssetOutput),
+      prevOutputs = inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
       gasFeeUnsafe = testGasFee,
       isEntryMethodPayable = true
@@ -951,12 +1011,13 @@ class ServerUtils(implicit
       AVector(
         Method[StatefulContext](
           isPublic = true,
-          usePreapprovedAssets = testContract.inputAssets.nonEmpty,
+          usePreapprovedAssets = inputAssets.nonEmpty,
           useContractAssets = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = returnLength,
-          instrs = approveAsset(testContract, testGasFee) ++ callExternal(testContract, contractId)
+          instrs =
+            approveAsset(inputAssets, testGasFee) ++ callExternal(args, methodIndex, contractId)
         )
       )
     )
@@ -964,23 +1025,24 @@ class ServerUtils(implicit
   }
 
   private def approveAsset(
-      testContract: TestContract.Complete,
+      inputAssets: AVector[TestInputAsset],
       gasFee: U256
   ): AVector[Instr[StatefulContext]] = {
-    testContract.inputAssets.flatMapWithIndex { (asset, index) =>
+    inputAssets.flatMapWithIndex { (asset, index) =>
       val gasFeeOpt = if (index == 0) Some(gasFee) else None
       asset.approveAll(gasFeeOpt)
     }
   }
 
   private def callExternal(
-      testContract: TestContract.Complete,
+      args: AVector[Val],
+      methodIndex: Int,
       contractId: ContractId
   ): AVector[Instr[StatefulContext]] = {
-    toVmVal(testContract.testArgs).map(_.toConstInstr: Instr[StatefulContext]) ++
+    toVmVal(args).map(_.toConstInstr: Instr[StatefulContext]) ++
       AVector[Instr[StatefulContext]](
         BytesConst(vm.Val.ByteVec(contractId.bytes)),
-        CallExternal(testContract.testMethodIndex.toByte)
+        CallExternal(methodIndex.toByte)
       )
   }
 

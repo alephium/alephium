@@ -412,6 +412,13 @@ trait Endpoints
       .out(jsonBody[TestContractResult])
       .summary("Test contract")
 
+  lazy val callContract: BaseEndpoint[CallContract, CallContractResult] =
+    contractsEndpoint.post
+      .in("call-contract")
+      .in(jsonBody[CallContract])
+      .out(jsonBody[CallContractResult])
+      .summary("Call contract")
+
   val exportBlocks: BaseEndpoint[ExportFile, Unit] =
     baseEndpoint.post
       .in("export-blocks")

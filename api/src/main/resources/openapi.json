@@ -6136,8 +6136,8 @@
                     }
                   ]
                 },
-                "testMethodIndex": 0,
-                "testArgs": [
+                "methodIndex": 0,
+                "args": [
                   {
                     "type": "U256",
                     "value": "1000000000000000000"
@@ -6232,6 +6232,203 @@
                     {
                       "type": "ContractOutput",
                       "hint": 1234,
+                      "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "alphAmount": "1000000000000000000",
+                      "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                      "tokens": [
+                        {
+                          "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                          "amount": "42000000000000000000"
+                        },
+                        {
+                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                          "amount": "1000000000000000000000"
+                        }
+                      ]
+                    }
+                  ],
+                  "events": [
+                    {
+                      "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
+                      "eventIndex": 1,
+                      "fields": [
+                        {
+                          "type": "Address",
+                          "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                        },
+                        {
+                          "type": "U256",
+                          "value": "10"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contracts/call-contract": {
+      "post": {
+        "tags": [
+          "Contracts"
+        ],
+        "summary": "Call contract",
+        "operationId": "postContractsCall-contract",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallContract"
+              },
+              "example": {
+                "group": 0,
+                "worldStateBlockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
+                "methodIndex": 0,
+                "args": [
+                  {
+                    "type": "U256",
+                    "value": "0"
+                  }
+                ],
+                "existingContracts": [
+                  "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
+                ],
+                "inputAssets": [
+                  {
+                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                    "asset": {
+                      "alphAmount": "3000000000000000000",
+                      "tokens": [
+                        {
+                          "id": "20aa1fcc865087d7788302d087e4bc76691218ce5d5013dd1cedaabfac19cca4",
+                          "amount": "3000000000"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallContractResult"
+                },
+                "example": {
+                  "returns": [
+                    {
+                      "type": "U256",
+                      "value": "0"
+                    }
+                  ],
+                  "gasUsed": 20000,
+                  "contracts": [
+                    {
+                      "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
+                      "bytecode": "00010700000000000118",
+                      "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                      "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
+                      "fields": [
+                        {
+                          "type": "U256",
+                          "value": "2000000000000000000"
+                        }
+                      ],
+                      "asset": {
+                        "alphAmount": "2000000000000000000",
+                        "tokens": [
+                          {
+                            "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                            "amount": "2000000000"
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "txInputs": [
+                    "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
+                  ],
+                  "txOutputs": [
+                    {
+                      "type": "ContractOutput",
+                      "hint": 1,
                       "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                       "alphAmount": "1000000000000000000",
                       "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
@@ -8277,6 +8474,100 @@
           }
         }
       },
+      "CallContract": {
+        "required": [
+          "group",
+          "address",
+          "methodIndex"
+        ],
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "integer"
+          },
+          "worldStateBlockHash": {
+            "type": "string",
+            "format": "block-hash"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "address": {
+            "type": "string",
+            "format": "address"
+          },
+          "methodIndex": {
+            "type": "integer"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "existingContracts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "address"
+            }
+          },
+          "inputAssets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestInputAsset"
+            }
+          }
+        }
+      },
+      "CallContractResult": {
+        "required": [
+          "returns",
+          "gasUsed",
+          "contracts",
+          "txInputs",
+          "txOutputs",
+          "events"
+        ],
+        "type": "object",
+        "properties": {
+          "returns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "gasUsed": {
+            "type": "integer"
+          },
+          "contracts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractState"
+            }
+          },
+          "txInputs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "address"
+            }
+          },
+          "txOutputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Output"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractEventByTxId"
+            }
+          }
+        }
+      },
       "ChainInfo": {
         "required": [
           "currentHeight"
@@ -8838,22 +9129,6 @@
           }
         }
       },
-      "InputAsset": {
-        "required": [
-          "address",
-          "asset"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string",
-            "format": "address"
-          },
-          "asset": {
-            "$ref": "#/components/schemas/AssetState"
-          }
-        }
-      },
       "InterCliquePeerInfo": {
         "required": [
           "cliqueId",
@@ -9367,10 +9642,10 @@
           "initialAsset": {
             "$ref": "#/components/schemas/AssetState"
           },
-          "testMethodIndex": {
+          "methodIndex": {
             "type": "integer"
           },
-          "testArgs": {
+          "args": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Val"
@@ -9385,7 +9660,7 @@
           "inputAssets": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/InputAsset"
+              "$ref": "#/components/schemas/TestInputAsset"
             }
           }
         }
@@ -9444,6 +9719,22 @@
             "items": {
               "$ref": "#/components/schemas/ContractEventByTxId"
             }
+          }
+        }
+      },
+      "TestInputAsset": {
+        "required": [
+          "address",
+          "asset"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "format": "address"
+          },
+          "asset": {
+            "$ref": "#/components/schemas/AssetState"
           }
         }
       },

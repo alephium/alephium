@@ -105,6 +105,7 @@ class RestServer(
       buildDeployContractTxLogic,
       contractStateLogic,
       testContractLogic,
+      callContractLogic,
       exportBlocksLogic,
       verifySignatureLogic,
       checkHashIndexingLogic,

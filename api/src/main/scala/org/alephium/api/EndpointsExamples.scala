@@ -616,10 +616,10 @@ trait EndpointsExamples extends ErrorExamples {
         bytecode = code,
         initialFields = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         initialAsset = Some(asset(1)),
-        testMethodIndex = Some(0),
-        testArgs = Some(AVector[Val](ValU256(ALPH.oneAlph))),
+        methodIndex = Some(0),
+        args = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         existingContracts = Some(AVector(existingContract)),
-        inputAssets = Some(AVector(TestContract.InputAsset(address, asset(3))))
+        inputAssets = Some(AVector(TestInputAsset(address, asset(3))))
       )
     )
   }
@@ -638,6 +638,34 @@ trait EndpointsExamples extends ErrorExamples {
         events = AVector(eventByTxId)
       )
     )
+
+  implicit val callContractExamples: List[Example[CallContract]] = {
+    simpleExample(
+      CallContract(
+        group = 0,
+        worldStateBlockHash = Some(blockHash),
+        txId = Some(txId),
+        address = Address.contract(ContractId.zero),
+        methodIndex = 0,
+        args = Some(AVector[Val](ValU256(U256.Zero))),
+        existingContracts = Some(AVector(contractAddress)),
+        inputAssets = Some(AVector(TestInputAsset(address, asset(3))))
+      )
+    )
+  }
+
+  implicit val callContractResultExamples: List[Example[CallContractResult]] = {
+    simpleExample(
+      CallContractResult(
+        returns = AVector[Val](ValU256(U256.Zero)),
+        gasUsed = 20000,
+        contracts = AVector(existingContract),
+        txInputs = AVector(contractAddress),
+        txOutputs = AVector(ContractOutput(1, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
+        events = AVector(eventByTxId)
+      )
+    )
+  }
 
   implicit val exportFileExamples: List[Example[ExportFile]] =
     simpleExample(ExportFile("exported-blocks-file"))
