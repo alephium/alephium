@@ -728,7 +728,7 @@ class ServerUtils(implicit
         address,
         code.initialFields,
         initialAlphAmount,
-        query.initialTokenAmounts,
+        query.initialTokenAmounts.getOrElse(AVector.empty),
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(

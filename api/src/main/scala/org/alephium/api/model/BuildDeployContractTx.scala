@@ -29,7 +29,7 @@ final case class BuildDeployContractTx(
     fromPublicKey: PublicKey,
     bytecode: ByteString,
     initialAlphAmount: Option[Amount] = None,
-    initialTokenAmounts: AVector[Token] = AVector.empty,
+    initialTokenAmounts: Option[AVector[Token]] = None,
     issueTokenAmount: Option[Amount] = None,
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None
