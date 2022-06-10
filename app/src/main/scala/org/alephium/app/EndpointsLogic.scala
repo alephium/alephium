@@ -371,7 +371,9 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   )
 
   val submitTransactionLogic =
-    serverLogicRedirectWith[SubmitTransaction, TransactionTemplate, TxResult](submitTransaction)(
+    serverLogicRedirectWith[SubmitTransaction, TransactionTemplate, SubmitTxResult](
+      submitTransaction
+    )(
       tx => serverUtils.createTxTemplate(tx),
       tx =>
         withSyncedClique {
@@ -381,7 +383,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     )
 
   val submitMultisigTransactionLogic =
-    serverLogicRedirectWith[SubmitMultisig, TransactionTemplate, TxResult](
+    serverLogicRedirectWith[SubmitMultisig, TransactionTemplate, SubmitTxResult](
       submitMultisigTransaction
     )(
       tx => serverUtils.createMultisigTxTemplate(tx),

@@ -137,7 +137,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       amount: U256,
       privateKey: String,
       restPort: Int
-  ): TxResult = eventually {
+  ): SubmitTxResult = eventually {
     val destinations = AVector(Destination(Address.asset(toAddress).get, Amount(amount)))
     transfer(fromPubKey, destinations, privateKey, restPort)
   }
@@ -147,11 +147,11 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       destinations: AVector[Destination],
       privateKey: String,
       restPort: Int
-  ): TxResult = eventually {
+  ): SubmitTxResult = eventually {
     val buildTx    = buildTransaction(fromPubKey, destinations)
     val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
     val submitTx   = submitTransaction(unsignedTx, privateKey)
-    val res        = request[TxResult](submitTx, restPort)
+    val res        = request[SubmitTxResult](submitTx, restPort)
     res
   }
 
@@ -176,7 +176,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     block
   }
 
-  def confirmTx(tx: TxResult, restPort: Int): Assertion = eventually {
+  def confirmTx(tx: SubmitTxResult, restPort: Int): Assertion = eventually {
     val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
     checkConfirmations(txStatus)
   }
@@ -558,12 +558,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def getTransactionStatusLocal(tx: TxResult) = {
+  def getTransactionStatusLocal(tx: SubmitTxResult) = {
     httpGet(
       s"/transactions/local-status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}"
     )
   }
-  def getTransactionStatus(tx: TxResult) = {
+  def getTransactionStatus(tx: SubmitTxResult) = {
     httpGet(
       s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}"
     )
@@ -693,7 +693,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def submitTxWithPort(unsignedTx: String, txId: Hash, restPort: Int): Hash = {
-    val txResult = request[TxResult](
+    val txResult = request[SubmitTxResult](
       submitTxQuery(unsignedTx, txId),
       restPort
     )
@@ -795,7 +795,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     }
   }
 
-  def checkTx(tx: TxResult, port: Int, status: TxStatus): Assertion = {
+  def checkTx(tx: SubmitTxResult, port: Int, status: TxStatus): Assertion = {
     eventually(
       request[TxStatus](getTransactionStatus(tx), port) is status
     )

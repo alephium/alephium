@@ -53,7 +53,7 @@ trait BlockFlowClient {
       tx: String,
       signature: Signature,
       fromGroup: Int
-  ): Future[Either[ApiError[_ <: StatusCode], TxResult]]
+  ): Future[Either[ApiError[_ <: StatusCode], SubmitTxResult]]
 }
 
 object BlockFlowClient {
@@ -159,7 +159,7 @@ object BlockFlowClient {
         tx: String,
         signature: Signature,
         fromGroup: Int
-    ): Future[Either[ApiError[_ <: StatusCode], TxResult]] = {
+    ): Future[Either[ApiError[_ <: StatusCode], SubmitTxResult]] = {
       requestFromGroup(
         GroupIndex.unsafe(fromGroup),
         submitTransaction,

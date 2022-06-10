@@ -262,7 +262,7 @@ class ServerUtils(implicit
 
   def submitTransaction(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
-  ): FutureTry[TxResult] = {
+  ): FutureTry[SubmitTxResult] = {
     publishTx(txHandler, tx)
   }
 
@@ -503,11 +503,11 @@ class ServerUtils(implicit
 
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
-  ): FutureTry[TxResult] = {
+  ): FutureTry[SubmitTxResult] = {
     val message = TxHandler.AddToGrandPool(AVector(tx))
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
-        Right(TxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
+        Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
       case TxHandler.AddFailed(_, reason) =>
         logger.warn(s"Failed in adding tx: $reason")
         Left(failed(reason))

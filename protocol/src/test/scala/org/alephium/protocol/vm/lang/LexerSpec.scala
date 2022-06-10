@@ -43,6 +43,10 @@ class LexerSpec extends AlephiumSpec {
       I256.unsafe(ALPH.cent(512).toBigInt.negate())
     )
     fastparse.parse("1_000_000", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(1000000))
+    fastparse.parse("1alph", Lexer.typedNum(_)).get.value is Val.U256(ALPH.oneAlph)
+    fastparse.parse("1 alph", Lexer.typedNum(_)).get.value is Val.U256(ALPH.oneAlph)
+    fastparse.parse("0.01 alph", Lexer.typedNum(_)).get.value is Val.U256(ALPH.cent(1))
+    fastparse.parse("1e-18 alph", Lexer.typedNum(_)).get.value is Val.U256(U256.One)
 
     fastparse.parse(s"#$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(
       Hex.from(byte32).get

@@ -92,7 +92,7 @@ trait ServerFixture
       dummyTx.unsigned.hash.bytes,
       PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey.toHexString))
     )
-  lazy val dummyTransferResult = TxResult(
+  lazy val dummyTransferResult = SubmitTxResult(
     dummyTx.id,
     dummyTx.fromGroup.value,
     dummyTx.toGroup.value

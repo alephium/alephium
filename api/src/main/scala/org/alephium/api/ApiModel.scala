@@ -291,7 +291,7 @@ trait ApiModelCodec {
   implicit val callContractRW: ReadWriter[CallContract]             = macroRW
   implicit val callContractResultRW: ReadWriter[CallContractResult] = macroRW
 
-  implicit val txResultRW: RW[TxResult] = macroRW
+  implicit val txResultRW: RW[SubmitTxResult] = macroRW
 
   implicit val getHashesAtHeightRW: RW[GetHashesAtHeight] = macroRW
 
