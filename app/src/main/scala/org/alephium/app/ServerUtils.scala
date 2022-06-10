@@ -837,7 +837,7 @@ class ServerUtils(implicit
       worldState <- wrapResult(
         blockFlow.getPersistedWorldState(blockHash).map(_.cached().staging())
       )
-      contractId = params.contractAddress.contractId
+      contractId = params.address.contractId
       contractObj <- wrapResult(worldState.getContractObj(contractId))
       returnLength <- wrapExeResult(
         contractObj.code.getMethod(params.methodIndex).map(_.returnLength)
@@ -856,18 +856,19 @@ class ServerUtils(implicit
       (returns, result) = resultPair
       contractAddresses = params.existingContracts.getOrElse(
         AVector.empty
-      ) :+ params.contractAddress
+      ) :+ params.address
       contractsState <- contractAddresses.mapE(address =>
         fetchContractState(worldState, address.contractId)
       )
     } yield {
       CallContractResult(
-        contractsState,
         returns.map(Val.from),
+        maximalGasPerTx.subUnsafe(result.gasBox).value,
+        contractsState,
+        result.contractPrevOutputs.map(_.lockupScript).map(Address.from),
         result.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, txId, index)
         },
-        maximalGasPerTx.subUnsafe(result.gasBox).value,
         fetchContractEvents(worldState)
       )
     }
@@ -986,7 +987,7 @@ class ServerUtils(implicit
       contractId: ContractId,
       txId: Hash,
       blockHash: BlockHash,
-      inputAssets: AVector[InputAsset],
+      inputAssets: AVector[TestInputAsset],
       methodIndex: Int,
       args: AVector[Val],
       returnLength: Int
@@ -1025,7 +1026,7 @@ class ServerUtils(implicit
   }
 
   private def approveAsset(
-      inputAssets: AVector[InputAsset],
+      inputAssets: AVector[TestInputAsset],
       gasFee: U256
   ): AVector[Instr[StatefulContext]] = {
     inputAssets.flatMapWithIndex { (asset, index) =>

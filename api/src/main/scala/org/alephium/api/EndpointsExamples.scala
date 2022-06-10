@@ -616,10 +616,10 @@ trait EndpointsExamples extends ErrorExamples {
         bytecode = code,
         initialFields = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         initialAsset = Some(asset(1)),
-        testMethodIndex = Some(0),
-        testArgs = Some(AVector[Val](ValU256(ALPH.oneAlph))),
+        methodIndex = Some(0),
+        args = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         existingContracts = Some(AVector(existingContract)),
-        inputAssets = Some(AVector(InputAsset(address, asset(3))))
+        inputAssets = Some(AVector(TestInputAsset(address, asset(3))))
       )
     )
   }
@@ -643,11 +643,13 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       CallContract(
         group = 0,
-        contractAddress = Address.contract(ContractId.zero),
+        blockHash = Some(blockHash),
+        txId = Some(txId),
+        address = Address.contract(ContractId.zero),
         methodIndex = 0,
-        inputAssets = Some(AVector(InputAsset(address, asset(3)))),
         args = Some(AVector[Val](ValU256(U256.Zero))),
-        blockHash = Some(blockHash)
+        existingContracts = Some(AVector(contractAddress)),
+        inputAssets = Some(AVector(TestInputAsset(address, asset(3))))
       )
     )
   }
@@ -655,10 +657,11 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val callContractResultExamples: List[Example[CallContractResult]] = {
     simpleExample(
       CallContractResult(
-        contractsState = AVector(existingContract),
         returns = AVector[Val](ValU256(U256.Zero)),
-        txOutputs = AVector(ContractOutput(1, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
         gasUsed = 20000,
+        contracts = AVector(existingContract),
+        txInputs = AVector(contractAddress),
+        txOutputs = AVector(ContractOutput(1, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
         events = AVector(eventByTxId)
       )
     )

@@ -6136,8 +6136,8 @@
                     }
                   ]
                 },
-                "testMethodIndex": 0,
-                "testArgs": [
+                "methodIndex": 0,
+                "args": [
                   {
                     "type": "U256",
                     "value": "1000000000000000000"
@@ -6352,8 +6352,19 @@
               },
               "example": {
                 "group": 0,
-                "contractAddress": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
+                "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
                 "methodIndex": 0,
+                "args": [
+                  {
+                    "type": "U256",
+                    "value": "0"
+                  }
+                ],
+                "existingContracts": [
+                  "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
+                ],
                 "inputAssets": [
                   {
                     "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
@@ -6367,14 +6378,7 @@
                       ]
                     }
                   }
-                ],
-                "args": [
-                  {
-                    "type": "U256",
-                    "value": "0"
-                  }
-                ],
-                "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                ]
               }
             }
           },
@@ -6388,7 +6392,14 @@
                   "$ref": "#/components/schemas/CallContractResult"
                 },
                 "example": {
-                  "contractsState": [
+                  "returns": [
+                    {
+                      "type": "U256",
+                      "value": "0"
+                    }
+                  ],
+                  "gasUsed": 20000,
+                  "contracts": [
                     {
                       "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
                       "bytecode": "00010700000000000118",
@@ -6411,11 +6422,8 @@
                       }
                     }
                   ],
-                  "returns": [
-                    {
-                      "type": "U256",
-                      "value": "0"
-                    }
+                  "txInputs": [
+                    "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
                   ],
                   "txOutputs": [
                     {
@@ -6436,7 +6444,6 @@
                       ]
                     }
                   ],
-                  "gasUsed": 20000,
                   "events": [
                     {
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
@@ -8470,7 +8477,7 @@
       "CallContract": {
         "required": [
           "group",
-          "contractAddress",
+          "address",
           "methodIndex"
         ],
         "type": "object",
@@ -8478,18 +8485,20 @@
           "group": {
             "type": "integer"
           },
-          "contractAddress": {
+          "blockHash": {
+            "type": "string",
+            "format": "block-hash"
+          },
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "address": {
             "type": "string",
             "format": "address"
           },
           "methodIndex": {
             "type": "integer"
-          },
-          "inputAssets": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/InputAsset"
-            }
           },
           "args": {
             "type": "array",
@@ -8497,43 +8506,52 @@
               "$ref": "#/components/schemas/Val"
             }
           },
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "blockHash": {
-            "type": "string",
-            "format": "block-hash"
-          },
           "existingContracts": {
             "type": "array",
             "items": {
               "type": "string",
               "format": "address"
             }
+          },
+          "inputAssets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestInputAsset"
+            }
           }
         }
       },
       "CallContractResult": {
         "required": [
-          "contractsState",
           "returns",
-          "txOutputs",
           "gasUsed",
+          "contracts",
+          "txInputs",
+          "txOutputs",
           "events"
         ],
         "type": "object",
         "properties": {
-          "contractsState": {
+          "returns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "gasUsed": {
+            "type": "integer"
+          },
+          "contracts": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ContractState"
             }
           },
-          "returns": {
+          "txInputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Val"
+              "type": "string",
+              "format": "address"
             }
           },
           "txOutputs": {
@@ -8541,9 +8559,6 @@
             "items": {
               "$ref": "#/components/schemas/Output"
             }
-          },
-          "gasUsed": {
-            "type": "integer"
           },
           "events": {
             "type": "array",
@@ -9115,22 +9130,6 @@
           }
         }
       },
-      "InputAsset": {
-        "required": [
-          "address",
-          "asset"
-        ],
-        "type": "object",
-        "properties": {
-          "address": {
-            "type": "string",
-            "format": "address"
-          },
-          "asset": {
-            "$ref": "#/components/schemas/AssetState"
-          }
-        }
-      },
       "InterCliquePeerInfo": {
         "required": [
           "cliqueId",
@@ -9624,10 +9623,10 @@
           "initialAsset": {
             "$ref": "#/components/schemas/AssetState"
           },
-          "testMethodIndex": {
+          "methodIndex": {
             "type": "integer"
           },
-          "testArgs": {
+          "args": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Val"
@@ -9642,7 +9641,7 @@
           "inputAssets": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/InputAsset"
+              "$ref": "#/components/schemas/TestInputAsset"
             }
           }
         }
@@ -9701,6 +9700,22 @@
             "items": {
               "$ref": "#/components/schemas/ContractEventByTxId"
             }
+          }
+        }
+      },
+      "TestInputAsset": {
+        "required": [
+          "address",
+          "asset"
+        ],
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "format": "address"
+          },
+          "asset": {
+            "$ref": "#/components/schemas/AssetState"
           }
         }
       },

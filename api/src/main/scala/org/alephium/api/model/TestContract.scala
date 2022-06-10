@@ -33,21 +33,21 @@ final case class TestContract(
     bytecode: StatefulContract,
     initialFields: Option[AVector[Val]] = None,
     initialAsset: Option[AssetState] = None,
-    testMethodIndex: Option[Int] = None,
-    testArgs: Option[AVector[Val]] = None,
+    methodIndex: Option[Int] = None,
+    args: Option[AVector[Val]] = None,
     existingContracts: Option[AVector[ContractState]] = None,
-    inputAssets: Option[AVector[InputAsset]] = None
+    inputAssets: Option[AVector[TestInputAsset]] = None
 ) {
   def toComplete(): Try[TestContract.Complete] = {
-    val methodIndex = testMethodIndex.getOrElse(testMethodIndexDefault)
-    bytecode.methods.get(methodIndex) match {
+    val testMethodIndex = methodIndex.getOrElse(testMethodIndexDefault)
+    bytecode.methods.get(testMethodIndex) match {
       case Some(method) =>
         val testCode =
           if (method.isPublic) {
             bytecode
           } else {
             bytecode.copy(methods =
-              bytecode.methods.replace(methodIndex, method.copy(isPublic = true))
+              bytecode.methods.replace(testMethodIndex, method.copy(isPublic = true))
             )
           }
         Right(
@@ -60,13 +60,13 @@ final case class TestContract(
             originalCodeHash = bytecode.hash,
             initialFields.getOrElse(AVector.empty),
             initialAsset.getOrElse(initialAssetDefault),
-            methodIndex,
-            testArgs.getOrElse(AVector.empty),
+            testMethodIndex,
+            args.getOrElse(AVector.empty),
             existingContracts.getOrElse(existingContractsDefault),
             inputAssets.getOrElse(inputAssetsDefault)
           )
         )
-      case None => Left(badRequest(s"Invalid method index ${methodIndex}"))
+      case None => Left(badRequest(s"Invalid method index ${testMethodIndex}"))
     }
   }
 }
@@ -78,7 +78,7 @@ object TestContract {
   val testMethodIndexDefault: Int                      = 0
   val testArgsDefault: AVector[Val]                    = AVector.empty
   val existingContractsDefault: AVector[ContractState] = AVector.empty
-  val inputAssetsDefault: AVector[InputAsset]          = AVector.empty
+  val inputAssetsDefault: AVector[TestInputAsset]      = AVector.empty
   val initialAssetDefault: AssetState                  = AssetState(ALPH.alph(1))
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -94,7 +94,7 @@ object TestContract {
       testMethodIndex: Int = testMethodIndexDefault,
       testArgs: AVector[Val] = testArgsDefault,
       existingContracts: AVector[ContractState] = existingContractsDefault,
-      inputAssets: AVector[InputAsset] = inputAssetsDefault
+      inputAssets: AVector[TestInputAsset] = inputAssetsDefault
   ) {
     // We return original code hash when testing private methods
     // We return the new code hash when the test code is migrated

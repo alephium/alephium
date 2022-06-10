@@ -23,7 +23,7 @@ import org.alephium.protocol.vm
 import org.alephium.protocol.vm._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-final case class InputAsset(address: Address.Asset, asset: AssetState) {
+final case class TestInputAsset(address: Address.Asset, asset: AssetState) {
   def toAssetOutput: AssetOutput =
     AssetOutput(
       asset.alphAmount,

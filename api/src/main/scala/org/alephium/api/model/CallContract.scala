@@ -25,13 +25,13 @@ import org.alephium.util.AVector
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class CallContract(
     group: Int,
-    contractAddress: Address.Contract,
-    methodIndex: Int,
-    inputAssets: Option[AVector[InputAsset]] = None,
-    args: Option[AVector[Val]] = None,
-    txId: Option[Hash] = None,
     blockHash: Option[BlockHash] = None,
-    existingContracts: Option[AVector[Address.Contract]] = None
+    txId: Option[Hash] = None,
+    address: Address.Contract,
+    methodIndex: Int,
+    args: Option[AVector[Val]] = None,
+    existingContracts: Option[AVector[Address.Contract]] = None,
+    inputAssets: Option[AVector[TestInputAsset]] = None
 ) {
   def validate()(implicit brokerConfig: BrokerConfig): Try[ChainIndex] = {
     for {

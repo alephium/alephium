@@ -797,7 +797,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val chainIndex    = ChainIndex.unsafe(0, 0)
     val lockupScript  = getGenesisLockupScript(chainIndex)
     val callerAddress = Address.Asset(lockupScript)
-    val inputAsset    = InputAsset(callerAddress, AssetState(ALPH.oneAlph))
+    val inputAsset    = TestInputAsset(callerAddress, AssetState(ALPH.oneAlph))
     val serverUtils   = new ServerUtils()
 
     def executeScript(script: vm.StatefulScript) = {
@@ -873,10 +873,10 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     info("call contract against the latest world state")
     val params0 = CallContract(
-      chainIndex.from.value,
-      fooAddress,
-      0,
-      Some(AVector(inputAsset)),
+      group = chainIndex.from.value,
+      address = fooAddress,
+      methodIndex = 0,
+      inputAssets = Some(AVector(inputAsset)),
       existingContracts = Some(AVector(barAddress))
     )
     val callContractResult0 = serverUtils.callContract(blockFlow, params0).rightValue
@@ -886,12 +886,12 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contractAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
     callContractResult0.txOutputs(0).alphAmount.value is contractAlphAmount0
 
-    callContractResult0.contractsState.length is 2
-    val barState0 = callContractResult0.contractsState(0)
+    callContractResult0.contracts.length is 2
+    val barState0 = callContractResult0.contracts(0)
     barState0.fields is AVector[Val](ValU256(2))
     barState0.address is barAddress
     barState0.asset is AssetState(ALPH.oneAlph, Some(AVector.empty))
-    val fooState0 = callContractResult0.contractsState(1)
+    val fooState0 = callContractResult0.contracts(1)
     fooState0.fields is AVector[Val](ValU256(2))
     fooState0.address is fooAddress
     fooState0.asset is AssetState(contractAlphAmount0, Some(AVector.empty))
@@ -905,12 +905,12 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contractAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
     callContractResult1.txOutputs(0).alphAmount.value is contractAlphAmount1
 
-    callContractResult1.contractsState.length is 2
-    val barState1 = callContractResult1.contractsState(0)
+    callContractResult1.contracts.length is 2
+    val barState1 = callContractResult1.contracts(0)
     barState1.fields is AVector[Val](ValU256(1))
     barState1.address is barAddress
     barState1.asset is AssetState(ALPH.oneAlph, Some(AVector.empty))
-    val fooState1 = callContractResult1.contractsState(1)
+    val fooState1 = callContractResult1.contracts(1)
     fooState1.fields is AVector[Val](ValU256(1))
     fooState1.address is fooAddress
     fooState1.asset is AssetState(contractAlphAmount1, Some(AVector.empty))
@@ -967,7 +967,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.contracts(0).codeHash is fooV1.hash
 
     val testContract1 =
-      TestContract(bytecode = fooV0, testMethodIndex = Some(1)).toComplete().rightValue
+      TestContract(bytecode = fooV0, methodIndex = Some(1)).toComplete().rightValue
     testContract1.code.hash isnot testContract1.originalCodeHash
     result1.codeHash is fooV1.hash
     result1.contracts(0).codeHash is fooV1.hash
@@ -982,7 +982,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       testMethodIndex = 0,
       testArgs = AVector[Val](ValAddress(lp), ValU256(ALPH.alph(100)), ValU256(100)),
       inputAssets = AVector(
-        InputAsset(
+        TestInputAsset(
           lp,
           AssetState.from(ALPH.alph(101), AVector(Token(tokenId, 100)))
         )
@@ -1034,7 +1034,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       testArgs = AVector[Val](ValAddress(lp), ValU256(ALPH.alph(100)), ValU256(100)),
       existingContracts = result0.contracts,
       inputAssets = AVector(
-        InputAsset(
+        TestInputAsset(
           lp,
           AssetState.from(ALPH.alph(101), AVector(Token(tokenId, 100)))
         )
@@ -1077,7 +1077,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       testMethodIndex = 1,
       testArgs = AVector[Val](ValAddress(buyer), ValU256(ALPH.alph(10))),
       inputAssets = AVector(
-        InputAsset(
+        TestInputAsset(
           lp,
           AssetState.from(ALPH.alph(101), AVector(Token(tokenId, 100)))
         )
@@ -1125,7 +1125,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       testArgs = AVector[Val](ValAddress(buyer), ValU256(50)),
       existingContracts = result0.contracts,
       inputAssets = AVector(
-        InputAsset(
+        TestInputAsset(
           lp,
           AssetState.from(ALPH.alph(101), AVector(Token(tokenId, 50)))
         )
@@ -1168,7 +1168,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       testMethodIndex = 2,
       testArgs = AVector[Val](ValAddress(buyer), ValU256(100)),
       inputAssets = AVector(
-        InputAsset(
+        TestInputAsset(
           lp,
           AssetState.from(ALPH.alph(101), AVector(Token(tokenId, 100)))
         )
@@ -1216,7 +1216,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       testArgs = AVector[Val](ValAddress(buyer), ValU256(ALPH.alph(5))),
       existingContracts = result0.contracts,
       inputAssets = AVector(
-        InputAsset(
+        TestInputAsset(
           lp,
           AssetState(ALPH.alph(101))
         )
@@ -1267,7 +1267,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testContract = TestContract(
       bytecode = code,
       initialFields = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))),
-      testArgs = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))))
+      args = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))))
     ).toComplete().rightValue
 
     val serverUtils   = new ServerUtils()
@@ -1304,7 +1304,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       txId = Some(Hash.random),
       bytecode = code,
       initialFields = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))),
-      testArgs = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))))
+      args = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))))
     )
     val testContractComplete = testContract.toComplete().rightValue
     testContractComplete.blockHash is testContract.blockHash.get

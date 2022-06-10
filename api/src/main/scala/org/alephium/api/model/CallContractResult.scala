@@ -16,12 +16,14 @@
 
 package org.alephium.api.model
 
+import org.alephium.protocol.model.Address
 import org.alephium.util.AVector
 
 final case class CallContractResult(
-    contractsState: AVector[ContractState],
     returns: AVector[Val],
-    txOutputs: AVector[Output],
     gasUsed: Int,
+    contracts: AVector[ContractState],
+    txInputs: AVector[Address],
+    txOutputs: AVector[Output],
     events: AVector[ContractEventByTxId]
 )
