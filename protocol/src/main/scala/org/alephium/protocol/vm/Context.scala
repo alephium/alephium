@@ -358,24 +358,6 @@ object StatefulContext {
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
 
-  def build(
-      blockEnv: BlockEnv,
-      tx: TransactionAbstract,
-      gasRemaining: GasBox,
-      worldState: WorldState.Staging,
-      preOutputsOpt: Option[AVector[AssetOutput]]
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[StatefulContext] = {
-    preOutputsOpt match {
-      case Some(outputs) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
-      case None =>
-        worldState.getPreOutputsForAssetInputs(tx) match {
-          case Right(Some(outputs)) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
-          case Right(None)          => failed(NonExistTxInput)
-          case Left(error)          => ioFailed(IOErrorLoadOutputs(error))
-        }
-    }
-  }
-
   final class Impl(
       val blockEnv: BlockEnv,
       val txEnv: TxEnv,
