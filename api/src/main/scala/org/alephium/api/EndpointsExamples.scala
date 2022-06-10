@@ -544,7 +544,7 @@ trait EndpointsExamples extends ErrorExamples {
         publicKey,
         byteString,
         Some(bigAmount),
-        tokens,
+        Some(tokens),
         Some(bigAmount),
         Some(model.minimalGas),
         Some(model.defaultGasPrice)

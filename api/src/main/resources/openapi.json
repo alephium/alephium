@@ -8130,8 +8130,7 @@
       "BuildDeployContractTx": {
         "required": [
           "fromPublicKey",
-          "bytecode",
-          "initialTokenAmounts"
+          "bytecode"
         ],
         "type": "object",
         "properties": {
