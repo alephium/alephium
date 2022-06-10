@@ -830,7 +830,7 @@ class ServerUtils(implicit
     for {
       chainIndex <- params.validate()
       _          <- checkGroup(chainIndex.from)
-      blockHash = params.blockHash.getOrElse(
+      blockHash = params.worldStateBlockHash.getOrElse(
         blockFlow.getBestDeps(chainIndex.from).uncleHash(chainIndex.from)
       )
       worldState <- wrapResult(

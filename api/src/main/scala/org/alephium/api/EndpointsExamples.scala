@@ -643,7 +643,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       CallContract(
         group = 0,
-        blockHash = Some(blockHash),
+        worldStateBlockHash = Some(blockHash),
         txId = Some(txId),
         address = Address.contract(ContractId.zero),
         methodIndex = 0,

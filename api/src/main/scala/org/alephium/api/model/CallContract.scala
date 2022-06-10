@@ -25,7 +25,7 @@ import org.alephium.util.AVector
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class CallContract(
     group: Int,
-    blockHash: Option[BlockHash] = None,
+    worldStateBlockHash: Option[BlockHash] = None,
     txId: Option[Hash] = None,
     address: Address.Contract,
     methodIndex: Int,
@@ -43,8 +43,8 @@ final case class CallContract(
         }
       chainIndex = ChainIndex.unsafe(group, group)
       _ <-
-        if (blockHash.map(ChainIndex.from).getOrElse(chainIndex) != chainIndex) {
-          Left(badRequest(s"Invalid block hash $blockHash"))
+        if (worldStateBlockHash.map(ChainIndex.from).getOrElse(chainIndex) != chainIndex) {
+          Left(badRequest(s"Invalid block hash $worldStateBlockHash"))
         } else {
           Right(())
         }

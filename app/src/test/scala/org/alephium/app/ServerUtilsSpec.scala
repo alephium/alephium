@@ -897,7 +897,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     fooState0.asset is AssetState(contractAlphAmount0, Some(AVector.empty))
 
     info("call contract against the old world state")
-    val params1             = params0.copy(blockHash = Some(createContractBlock.hash))
+    val params1             = params0.copy(worldStateBlockHash = Some(createContractBlock.hash))
     val callContractResult1 = serverUtils.callContract(blockFlow, params1).rightValue
     callContractResult1.returns is AVector[Val](ValU256(1))
     callContractResult1.gasUsed is 23189
