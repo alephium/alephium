@@ -321,7 +321,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode TxResult" in {
     val hash    = Hash.generate
-    val result  = TxResult(hash, 0, 1)
+    val result  = SubmitTxResult(hash, 0, 1)
     val jsonRaw = s"""{"txId":"${hash.toHexString}","fromGroup":0,"toGroup":1}"""
     checkData(result, jsonRaw)
   }

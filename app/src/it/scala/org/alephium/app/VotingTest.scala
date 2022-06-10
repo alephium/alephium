@@ -254,7 +254,7 @@ trait VotingFixture extends WalletFixture {
       votersWallets: Seq[Wallet],
       contractId: String,
       contractCode: String
-  ): TxResult = {
+  ): SubmitTxResult = {
     val allocationScript = s"""
                               |TxScript TokenAllocation {
                               |  let voting = Voting(#${contractId})
@@ -272,7 +272,7 @@ trait VotingFixture extends WalletFixture {
       contractId: String,
       choice: Boolean,
       contractCode: String
-  ): TxResult = {
+  ): SubmitTxResult = {
     val votingScript = s"""
                           |TxScript VotingScript {
                           |  let caller = callerAddress!()
@@ -286,7 +286,7 @@ trait VotingFixture extends WalletFixture {
     script(voterWallet.publicKey.toHexString, votingScript, voterWallet.creation.walletName)
   }
 
-  def close(adminWallet: Wallet, contractId: String, contractCode: String): TxResult = {
+  def close(adminWallet: Wallet, contractId: String, contractCode: String): SubmitTxResult = {
     val closingScript = s"""
                            |TxScript ClosingScript {
                            |  let voting = Voting(#${contractId})
@@ -303,10 +303,10 @@ trait WalletFixture extends CliqueFixture {
   val clique                = bootClique(1)
   val activeAddressesGroup  = 0
   val genesisWalletName     = "genesis-wallet"
-  def submitTx(unsignedTx: String, txId: Hash, walletName: String): TxResult = {
+  def submitTx(unsignedTx: String, txId: Hash, walletName: String): SubmitTxResult = {
     val signature =
       request[SignResult](sign(walletName, s"${txId.toHexString}"), restPort).signature
-    val tx = request[TxResult](
+    val tx = request[SubmitTxResult](
       submitTransaction(s"""
           {
             "unsignedTx": "$unsignedTx",

@@ -284,7 +284,7 @@ abstract class RestServerSpec(
         )}","signature":"${dummySignature.toHexString}","publicKey":"dummyKey),"}"""
     Post(s"/transactions/submit", tx) check { response =>
       response.code is StatusCode.Ok
-      response.as[TxResult] is dummyTransferResult
+      response.as[SubmitTxResult] is dummyTransferResult
     }
 
     interCliqueSynced = false
@@ -465,7 +465,7 @@ abstract class RestServerSpec(
         )}","signatures":["${dummySignature.toHexString}"]}"""
     Post(s"/multisig/submit", tx) check { response =>
       response.code is StatusCode.Ok
-      response.as[TxResult] is dummyTransferResult
+      response.as[SubmitTxResult] is dummyTransferResult
     }
   }
 

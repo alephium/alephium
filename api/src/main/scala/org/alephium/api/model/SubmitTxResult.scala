@@ -18,4 +18,4 @@ package org.alephium.api.model
 
 import org.alephium.protocol.Hash
 
-final case class TxResult(txId: Hash, fromGroup: Int, toGroup: Int)
+final case class SubmitTxResult(txId: Hash, fromGroup: Int, toGroup: Int)

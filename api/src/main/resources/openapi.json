@@ -5048,7 +5048,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TxResult"
+                  "$ref": "#/components/schemas/SubmitTxResult"
                 },
                 "example": {
                   "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
@@ -6621,7 +6621,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TxResult"
+                  "$ref": "#/components/schemas/SubmitTxResult"
                 },
                 "example": {
                   "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
@@ -9260,6 +9260,26 @@
           }
         }
       },
+      "SubmitTxResult": {
+        "required": [
+          "txId",
+          "fromGroup",
+          "toGroup"
+        ],
+        "type": "object",
+        "properties": {
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "fromGroup": {
+            "type": "integer"
+          },
+          "toGroup": {
+            "type": "integer"
+          }
+        }
+      },
       "Sweep": {
         "required": [
           "toAddress"
@@ -9585,26 +9605,6 @@
         "properties": {
           "type": {
             "type": "string"
-          }
-        }
-      },
-      "TxResult": {
-        "required": [
-          "txId",
-          "fromGroup",
-          "toGroup"
-        ],
-        "type": "object",
-        "properties": {
-          "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
-          },
-          "fromGroup": {
-            "type": "integer"
-          },
-          "toGroup": {
-            "type": "integer"
           }
         }
       },
