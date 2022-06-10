@@ -254,7 +254,6 @@ trait TxGenerators
     with TxInputGenerators
     with TokenGenerators {
   implicit def networkConfig: NetworkConfig
-  implicit def compilerConfig: CompilerConfig
 
   lazy val createdHeightGen: Gen[Int] = Gen.choose(ALPH.GenesisHeight, Int.MaxValue)
 
@@ -386,7 +385,7 @@ trait TxGenerators
 
   def transactionGenWithPreOutputs(
       inputsNumGen: Gen[Int] = Gen.choose(1, 10),
-      tokensNumGen: Gen[Int] = Gen.choose(0, 10),
+      tokensNumGen: Gen[Int] = Gen.choose(0, maxTokenPerUtxo),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
       lockupGen: IndexLockupScriptGen = assetLockupGen,
@@ -410,7 +409,7 @@ trait TxGenerators
 
   def transactionGen(
       numInputsGen: Gen[Int] = Gen.choose(1, 10),
-      numTokensGen: Gen[Int] = Gen.choose(0, 10),
+      numTokensGen: Gen[Int] = Gen.choose(0, maxTokenPerUtxo),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
       lockupGen: IndexLockupScriptGen = assetLockupGen
@@ -553,7 +552,6 @@ trait NoIndexModelGenerators
     with GroupConfigFixture.Default
     with ConsensusConfigFixture.Default
     with NetworkConfigFixture.Default
-    with CompilerConfigFixture.Default
 
 object ModelGenerators {
   final case class ScriptPair(

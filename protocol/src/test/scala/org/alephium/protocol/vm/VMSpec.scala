@@ -19,12 +19,11 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 
 import akka.util.ByteString
-import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.{minimalAlphInContract, minimalGas, ContractId}
+import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -32,7 +31,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   trait BaseFixture[Ctx <: StatelessContext] {
     val baseMethod = Method[Ctx](
       isPublic = true,
-      useApprovedAssets = false,
+      usePreapprovedAssets = false,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
@@ -65,7 +64,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check the entry method of stateless scripts" in new StatelessFixture {
     test1(baseMethod, okay)
-    test1(baseMethod.copy(useApprovedAssets = true), failed(ExpectNonPayableMethod))
+    test1(baseMethod.copy(usePreapprovedAssets = true), failed(ExpectNonPayableMethod))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
     intercept[AssertionError](
       test1(baseMethod.copy(localsLength = -1), okay)
@@ -91,7 +90,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check the entry method of stateful scripts" in new StatefulFixture {
     test1(baseMethod, okay)
-    test1(baseMethod.copy(useApprovedAssets = true), failed(InvalidBalances))
+    test1(baseMethod.copy(usePreapprovedAssets = true), failed(InvalidBalances))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
     intercept[AssertionError](
       test1(baseMethod.copy(localsLength = -1), okay)
@@ -107,7 +106,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   trait Fixture {
     val baseMethod = Method[StatefulContext](
       isPublic = true,
-      useApprovedAssets = false,
+      usePreapprovedAssets = false,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
@@ -173,7 +172,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        useApprovedAssets = false,
+        usePreapprovedAssets = false,
         useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
@@ -204,7 +203,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        useApprovedAssets = false,
+        usePreapprovedAssets = false,
         useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
@@ -221,7 +220,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   it should "call method" in {
     val method0 = Method[StatelessContext](
       isPublic = true,
-      useApprovedAssets = false,
+      usePreapprovedAssets = false,
       useContractAssets = false,
       argsLength = 1,
       localsLength = 1,
@@ -231,7 +230,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method1 =
       Method[StatelessContext](
         isPublic = false,
-        useApprovedAssets = false,
+        usePreapprovedAssets = false,
         useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
@@ -284,7 +283,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       val methods = instrs.mapWithIndex { case (instrs, index) =>
         Method[StatefulContext](
           isPublic = index equals 0,
-          useApprovedAssets = true,
+          usePreapprovedAssets = true,
           useContractAssets = false,
           argsLength = 0,
           localsLength = 0,
@@ -442,7 +441,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
     val method = Method[StatefulContext](
       isPublic = true,
-      useApprovedAssets = true,
+      usePreapprovedAssets = true,
       useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
@@ -472,7 +471,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        useApprovedAssets = false,
+        usePreapprovedAssets = false,
         useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
@@ -534,42 +533,34 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   }
 
   it should "check the minimal contract balance" in new NetworkFixture {
-    def genBalance(lockupScriptGen: Gen[LockupScript], amount: U256) = {
-      MutBalances(
-        mutable.ArrayBuffer(
-          lockupScriptGen.sample.get ->
-            MutBalancesPerLockup(alphAmount = amount, mutable.Map.empty, 0)
-        )
+    def genAssetOutput(amount: U256): AssetOutput = {
+      TxOutput.asset(
+        amount,
+        lockupScriptGen.retryUntil(_.isAssetType).sample.get.asInstanceOf[LockupScript.Asset]
+      )
+    }
+    def genContractOutput(amount: U256): ContractOutput = {
+      TxOutput.contract(
+        amount,
+        lockupScriptGen.retryUntil(!_.isAssetType).sample.get.asInstanceOf[LockupScript.P2C]
       )
     }
 
-    preLemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract)
-    ) isE ()
-    preLemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract - 1)
-    ) isE ()
-    preLemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract)
-    ) isE ()
-    preLemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract - 1)
-    ) isE ()
+    val output0 = genAssetOutput(minimalAlphInContract - 1)
+    val output1 = genAssetOutput(minimalAlphInContract)
+    val output2 = genContractOutput(minimalAlphInContract - 1)
+    val output3 = genContractOutput(minimalAlphInContract)
 
-    lemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract)
-    ) isE ()
-    lemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(_.isAssetType), minimalAlphInContract - 1)
-    ) isE ()
-    lemanStatefulVm.checkContractMinimalBalances(
-      genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract)
-    ) isE ()
-    lemanStatefulVm
-      .checkContractMinimalBalances(
-        genBalance(lockupScriptGen.retryUntil(!_.isAssetType), minimalAlphInContract - 1)
-      )
-      .leftValue isE LowerThanContractMinimalBalance
+    VM.checkContractAlphAmounts(Seq(output0), HardFork.Mainnet) isE ()
+    VM.checkContractAlphAmounts(Seq(output1), HardFork.Mainnet) isE ()
+    VM.checkContractAlphAmounts(Seq(output2), HardFork.Mainnet) isE ()
+    VM.checkContractAlphAmounts(Seq(output3), HardFork.Mainnet) isE ()
+
+    VM.checkContractAlphAmounts(Seq(output0), HardFork.Leman) isE ()
+    VM.checkContractAlphAmounts(Seq(output1), HardFork.Leman) isE ()
+    VM.checkContractAlphAmounts(Seq(output2), HardFork.Leman).leftValue isE
+      LowerThanContractMinimalBalance
+    VM.checkContractAlphAmounts(Seq(output3), HardFork.Leman) isE ()
   }
 
   it should "check method modifier compatibility" in new NetworkFixture {
@@ -598,5 +589,26 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     test(preLemanStatefulVm, contract1, true)
     test(preLemanStatefulVm, contract2, false)
     test(preLemanStatefulVm, contract3, false)
+  }
+
+  it should "preserve stack safety" in new StatefulFixture {
+    {
+      info("No local variables")
+      val method0 =
+        Method[StatefulContext](true, false, false, 0, 0, 0, AVector(ConstTrue, CallLocal(1)))
+      val method1 = Method[StatefulContext](true, false, false, 0, 0, 0, AVector(Pop))
+
+      test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
+    }
+
+    {
+      info("Non-empty local variables")
+
+      val method0 =
+        Method[StatefulContext](true, false, false, 0, 1, 0, AVector(ConstTrue, CallLocal(1)))
+      val method1 = Method[StatefulContext](true, false, false, 0, 0, 0, AVector(Pop))
+
+      test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
+    }
   }
 }

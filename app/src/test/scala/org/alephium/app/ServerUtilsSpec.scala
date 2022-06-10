@@ -829,9 +829,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooCode =
       s"""
          |TxContract Foo(mut value: U256) {
-         |  @use(approvedAssets = true, contractAssets = true)
+         |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn addOne() -> U256 {
-         |    transferAlphToSelf!(txCaller!(0), ${ALPH.oneNanoAlph})
+         |    transferAlphToSelf!(@$callerAddress, ${ALPH.oneNanoAlph})
          |    value = value + 1
          |    let bar = Bar(#${barId.toHexString})
          |    bar.addOne()
@@ -847,7 +847,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooAddress = Address.contract(fooId)
     val callScriptCode =
       s"""
-         |@use(approvedAssets = true) TxScript Main {
+         |@using(preapprovedAssets = true) TxScript Main {
          |  approveAlph!(@$callerAddress, ${ALPH.oneAlph})
          |  let foo = Foo(#${fooId.toHexString})
          |  foo.addOne()
@@ -881,7 +881,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
     val callContractResult0 = serverUtils.callContract(blockFlow, params0).rightValue
     callContractResult0.returns is AVector[Val](ValU256(2))
-    callContractResult0.gasUsed is 23188
+    callContractResult0.gasUsed is 23189
     callContractResult0.txOutputs.length is 2
     val contractAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
     callContractResult0.txOutputs(0).alphAmount.value is contractAlphAmount0
@@ -900,7 +900,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val params1             = params0.copy(blockHash = Some(createContractBlock.hash))
     val callContractResult1 = serverUtils.callContract(blockFlow, params1).rightValue
     callContractResult1.returns is AVector[Val](ValU256(1))
-    callContractResult1.gasUsed is 23188
+    callContractResult1.gasUsed is 23189
     callContractResult1.txOutputs.length is 2
     val contractAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
     callContractResult1.txOutputs(0).alphAmount.value is contractAlphAmount1
@@ -1341,7 +1341,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     {
       val rawCode =
         s"""
-           |@use(approvedAssets = false)
+           |@using(preapprovedAssets = false)
            |TxScript Main(x: U256, y: U256) {
            |  assert!(x != y)
            |}
@@ -1355,7 +1355,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     {
       val rawCode =
         s"""
-           |@use(approvedAssets = false)
+           |@using(preapprovedAssets = false)
            |TxScript Main {
            |  assert!(1 != 2)
            |}

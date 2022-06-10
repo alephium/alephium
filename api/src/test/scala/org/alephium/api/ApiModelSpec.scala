@@ -769,7 +769,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       generateContractAddress(),
       StatefulContract.forSMT.toContract().rightValue,
       codeHash = Hash.zero,
-      initialStateHash = Hash.zero,
+      initialStateHash = Some(Hash.zero),
       AVector(u256, i256, bool, byteVec, address1),
       AssetState.from(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
     )
@@ -831,7 +831,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "functions": [
         |    {
         |      "name": "bar",
-        |      "signature": "@use(approvedAssets=true, contractAssets=true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
+        |      "signature": "@using(preapprovedAssets=true,assetsInContract=true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
         |      "argNames": ["a","b","c","d","e","f"],
         |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
         |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
@@ -862,7 +862,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "functions": [
         |    {
         |      "name": "main",
-        |      "signature": "@use(approvedAssets=true) pub main()->()",
+        |      "signature": "@using(preapprovedAssets=true) pub main()->()",
         |      "argNames": [],
         |      "argTypes": [],
         |      "returnTypes": []

@@ -480,7 +480,7 @@ trait EndpointsExamples extends ErrorExamples {
       Compile.Contract(
         // Note that we use this weird format to avoid Windows linebreak issue
         code =
-          "TxContract Foo(bar: ByteVec) {\n@use(approvedAssets = true, contractAssets = true)\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+          "TxContract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
       )
     )
 
@@ -497,7 +497,7 @@ trait EndpointsExamples extends ErrorExamples {
           CompileResult.FunctionSig(
             name = "bar",
             signature =
-              "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+              "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
             argNames = AVector("a", "b", "c", "d", "e"),
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
@@ -520,7 +520,7 @@ trait EndpointsExamples extends ErrorExamples {
           CompileResult.FunctionSig(
             name = "bar",
             signature =
-              "@use(approvedAssets = true, contractAssets = true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+              "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
             argNames = AVector("a", "b", "c", "d", "e"),
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
@@ -604,7 +604,7 @@ trait EndpointsExamples extends ErrorExamples {
     address = Address.contract(anotherContractId),
     bytecode = code,
     codeHash = code.hash,
-    initialStateHash = code.initialStateHash(AVector.empty),
+    initialStateHash = Some(code.initialStateHash(AVector.empty)),
     fields = AVector[Val](ValU256(ALPH.alph(2))),
     asset = asset(2)
   )

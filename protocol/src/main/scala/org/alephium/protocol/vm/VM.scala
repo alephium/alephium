@@ -96,7 +96,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       _      <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       frame <- {
         val returnTo = returnToOpt.getOrElse(VM.noReturnTo)
-        if (method.useApprovedAssets) {
+        if (method.usePreapprovedAssets) {
           startPayableFrame(obj, ctx, method, args, operandStack, returnTo)
         } else {
           startNonPayableFrame(obj, ctx, method, args, operandStack, returnTo)
@@ -178,8 +178,16 @@ object VM {
     }
   }
 
-  def checkContractMinimalBalanceLeman(pair: (LockupScript, MutBalancesPerLockup)): Boolean = {
-    pair._1.isAssetType || pair._2.alphAmount >= minimalAlphInContract
+  def checkContractAlphAmounts(outputs: Iterable[TxOutput], hardFork: HardFork): ExeResult[Unit] = {
+    val allChecked = outputs.forall {
+      case output: ContractOutput => output.amount >= minimalAlphInContract
+      case _                      => true
+    }
+    if (hardFork.isLemanEnabled() && !allChecked) {
+      failed(LowerThanContractMinimalBalance)
+    } else {
+      okay
+    }
   }
 }
 
@@ -301,23 +309,11 @@ final class StatefulVM(
           case Some(_) => okay
           case None    => failed(InvalidBalances)
         }
-        _ <- checkContractMinimalBalances(ctx.outputBalances)
         _ <- outputGeneratedBalances(ctx.outputBalances)
         _ <- ctx.checkAllAssetsFlushed()
       } yield ()
     } else {
       Right(())
-    }
-  }
-
-  def checkContractMinimalBalances(outputBalances: MutBalances): ExeResult[Unit] = {
-    if (
-      ctx.getHardFork() >= HardFork.Leman &&
-      !outputBalances.all.forall(VM.checkContractMinimalBalanceLeman)
-    ) {
-      failed(LowerThanContractMinimalBalance)
-    } else {
-      okay
     }
   }
 
@@ -429,6 +425,7 @@ object StatefulVM {
   private def prepareResult(context: StatefulContext): ExeResult[TxScriptExecution] = {
     for {
       _ <- checkRemainingSignatures(context)
+      _ <- VM.checkContractAlphAmounts(context.generatedOutputs, context.getHardFork())
     } yield {
       TxScriptExecution(
         context.gasRemaining,

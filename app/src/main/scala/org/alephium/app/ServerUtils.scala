@@ -46,7 +46,6 @@ class ServerUtils(implicit
     consensusConfig: ConsensusConfig,
     networkConfig: NetworkConfig,
     apiConfig: ApiConfig,
-    compilerConfig: CompilerConfig,
     logConfig: LogConfig,
     executionContext: ExecutionContext
 ) extends StrictLogging {
@@ -975,7 +974,7 @@ class ServerUtils(implicit
       Address.contract(contractId),
       contract,
       contract.hash,
-      state.initialStateHash,
+      Some(state.initialStateHash),
       state.fields.map(Val.from),
       AssetState.from(contractOutput)
     )
@@ -1012,7 +1011,7 @@ class ServerUtils(implicit
       AVector(
         Method[StatefulContext](
           isPublic = true,
-          useApprovedAssets = inputAssets.nonEmpty,
+          usePreapprovedAssets = inputAssets.nonEmpty,
           useContractAssets = false,
           argsLength = 0,
           localsLength = 0,
@@ -1134,7 +1133,7 @@ object ServerUtils {
       initialAlphAmount: U256,
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
-  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
+  ): Try[StatefulScript] = {
     parseState(initialState).flatMap { state =>
       buildDeployContractScriptWithParsedState(
         codeRaw,
@@ -1154,7 +1153,7 @@ object ServerUtils {
       initialAlphAmount: U256,
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
-  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
+  ): Try[StatefulScript] = {
     buildDeployContractScriptWithParsedState(
       Hex.toHexString(serialize(contract)),
       address,
@@ -1211,7 +1210,7 @@ object ServerUtils {
       initialAlphAmount: U256,
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
-  )(implicit compilerConfig: CompilerConfig): Try[StatefulScript] = {
+  ): Try[StatefulScript] = {
     val scriptRaw = buildDeployContractScriptRawWithParsedState(
       codeRaw,
       address,

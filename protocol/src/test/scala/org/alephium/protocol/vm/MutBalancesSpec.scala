@@ -20,7 +20,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfigFixture}
+import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
 import org.alephium.protocol.model.{TxGenerators, TxOutput}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 
@@ -260,11 +260,6 @@ class MutBalancesSpec extends AlephiumSpec {
   }
 
   trait Fixture extends TxGenerators with NetworkConfigFixture.Default {
-    implicit override val compilerConfig: CompilerConfig =
-      new CompilerConfig {
-        override def loopUnrollingLimit: Int = 1000
-      }
-
     implicit override val groupConfig: GroupConfig =
       new GroupConfig {
         override def groups: Int = 3

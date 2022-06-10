@@ -22,7 +22,7 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
 trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
-  def genBlockEnv(): BlockEnv = {
+  def genBlockEnv()(implicit networkConfig: NetworkConfig): BlockEnv = {
     BlockEnv(NetworkId.AlephiumDevNet, TimeStamp.now(), Target.Max, Some(BlockHash.generate))
   }
 
