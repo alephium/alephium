@@ -654,7 +654,7 @@ trait FlowFixture
       code: StatefulContract,
       initialState: AVector[Val],
       lockupScript: LockupScript.Asset,
-      alphAmount: U256,
+      attoAlphAmount: U256,
       newTokenAmount: Option[U256] = None
   ): StatefulScript = {
     val address  = Address.Asset(lockupScript)
@@ -667,7 +667,7 @@ trait FlowFixture
     val scriptRaw =
       s"""
          |TxScript Foo {
-         |  approveAlph!(@${address.toBase58}, ${alphAmount.v})
+         |  approveAlph!(@${address.toBase58}, ${attoAlphAmount.v})
          |  $creation
          |}
          |""".stripMargin

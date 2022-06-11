@@ -78,20 +78,20 @@ class SmartContractTest extends AlephiumActorSpec {
 
     def script(
         code: String,
-        alphAmount: Option[Amount] = None,
+        attoAlphAmount: Option[Amount] = None,
         gas: Option[Int] = Some(100000),
         gasPrice: Option[GasPrice] = None
     ): BuildExecuteScriptTxResult = {
-      scriptWithPort(code, restPort, alphAmount, gas, gasPrice)
+      scriptWithPort(code, restPort, attoAlphAmount, gas, gasPrice)
     }
 
     def buildExecuteScriptTx(
         code: String,
-        alphAmount: Option[Amount],
+        attoAlphAmount: Option[Amount],
         gas: Option[Int],
         gasPrice: Option[GasPrice]
     ): BuildExecuteScriptTxResult = {
-      buildExecuteScriptTxWithPort(code, restPort, alphAmount, gas, gasPrice)
+      buildExecuteScriptTxWithPort(code, restPort, attoAlphAmount, gas, gasPrice)
     }
 
     def estimateBuildContractGas(
@@ -578,28 +578,28 @@ object SwapContracts {
        |TxContract Swap(tokenId: ByteVec, mut alphReserve: U256, mut tokenReserve: U256) {
        |
        |  @using(preapprovedAssets = true, assetsInContract = true)
-       |  pub fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
-       |    transferAlphToSelf!(lp, alphAmount)
+       |  pub fn addLiquidity(lp: Address, attoAlphAmount: U256, tokenAmount: U256) -> () {
+       |    transferAlphToSelf!(lp, attoAlphAmount)
        |    transferTokenToSelf!(lp, tokenId, tokenAmount)
-       |    alphReserve = alphAmount
+       |    alphReserve = attoAlphAmount
        |    tokenReserve = tokenAmount
        |  }
        |
        |  @using(preapprovedAssets = true, assetsInContract = true)
-       |  pub fn swapToken(buyer: Address, alphAmount: U256) -> () {
-       |    let tokenAmount = tokenReserve - alphReserve * tokenReserve / (alphReserve + alphAmount)
-       |    transferAlphToSelf!(buyer, alphAmount)
+       |  pub fn swapToken(buyer: Address, attoAlphAmount: U256) -> () {
+       |    let tokenAmount = tokenReserve - alphReserve * tokenReserve / (alphReserve + attoAlphAmount)
+       |    transferAlphToSelf!(buyer, attoAlphAmount)
        |    transferTokenFromSelf!(buyer, tokenId, tokenAmount)
-       |    alphReserve = alphReserve + alphAmount
+       |    alphReserve = alphReserve + attoAlphAmount
        |    tokenReserve = tokenReserve - tokenAmount
        |  }
        |
        |  @using(preapprovedAssets = true, assetsInContract = true)
        |  pub fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
-       |    let alphAmount = alphReserve - alphReserve * tokenReserve / (tokenReserve + tokenAmount)
+       |    let attoAlphAmount = alphReserve - alphReserve * tokenReserve / (tokenReserve + tokenAmount)
        |    transferTokenToSelf!(buyer, tokenId, tokenAmount)
-       |    transferAlphFromSelf!(buyer, alphAmount)
-       |    alphReserve = alphReserve - alphAmount
+       |    transferAlphFromSelf!(buyer, attoAlphAmount)
+       |    alphReserve = alphReserve - attoAlphAmount
        |    tokenReserve = tokenReserve + tokenAmount
        |  }
        |}
@@ -607,16 +607,16 @@ object SwapContracts {
 
   def addLiquidityTxScript(
       address: String,
-      alphAmount: U256,
+      attoAlphAmount: U256,
       tokenId: Hash,
       tokenAmount: U256,
       swapContractKey: Hash
   ) = s"""
          |TxScript Main {
-         |  approveAlph!(@${address}, $alphAmount)
+         |  approveAlph!(@${address}, $attoAlphAmount)
          |  approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
          |  let swap = Swap(#${swapContractKey.toHexString})
-         |  swap.addLiquidity(@${address}, $alphAmount, $tokenAmount)
+         |  swap.addLiquidity(@${address}, $attoAlphAmount, $tokenAmount)
          |}
          |
          |$swapContract
@@ -637,12 +637,12 @@ object SwapContracts {
          |$swapContract
          |""".stripMargin
 
-  def swapAlphForTokenTxScript(address: String, swapContractKey: Hash, alphAmount: U256) =
+  def swapAlphForTokenTxScript(address: String, swapContractKey: Hash, attoAlphAmount: U256) =
     s"""
        |TxScript Main {
-       |  approveAlph!(@${address}, $alphAmount)
+       |  approveAlph!(@${address}, $attoAlphAmount)
        |  let swap = Swap(#${swapContractKey.toHexString})
-       |  swap.swapToken(@${address}, $alphAmount)
+       |  swap.swapToken(@${address}, $attoAlphAmount)
        |}
        |
        |$swapContract

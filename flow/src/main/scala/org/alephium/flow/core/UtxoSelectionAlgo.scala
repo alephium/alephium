@@ -230,12 +230,12 @@ object UtxoSelectionAlgo extends StrictLogging {
         alphFoundResult <- selectForAlph(amounts.alph, sortedUtxos, dustAmount)(asset =>
           Some(asset.output.amount)
         )
-        (alphAmountWithoutGas, utxosForAlph, remainingUtxos) = alphFoundResult
+        (attoAlphAmountWithoutGas, utxosForAlph, remainingUtxos) = alphFoundResult
         tokensFoundResult <- selectForTokens(amounts.tokens, utxosForAlph, remainingUtxos)
       } yield {
         val (foundUtxos, restOfUtxos, _) = tokensFoundResult
-        val alphAmountWithoutGas         = foundUtxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
-        SelectedSoFar(alphAmountWithoutGas, foundUtxos, restOfUtxos)
+        val attoAlphAmountWithoutGas     = foundUtxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
+        SelectedSoFar(attoAlphAmountWithoutGas, foundUtxos, restOfUtxos)
       }
     }
 

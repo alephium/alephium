@@ -86,7 +86,7 @@ class WalletAppSpec
       case Some(pass) => passwordWithPassphraseJson(pass)
     }
   def transferJson(amount: Int) =
-    s"""{"destinations":[{"address":"$transferAddress","alphAmount":"$amount","tokens":[]}]}"""
+    s"""{"destinations":[{"address":"$transferAddress","attoAlphAmount":"$amount","tokens":[]}]}"""
   val sweepJson                                 = s"""{"toAddress":"$transferAddress"}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic, name: String) =
@@ -443,7 +443,7 @@ object WalletAppSpec extends {
     router.route().path("/transactions/build").handler(BodyHandler.create()).handler { ctx =>
       val buildTransaction = read[BuildTransaction](ctx.getBodyAsString())
       val amount = buildTransaction.destinations.fold(U256.Zero) { (acc, destination) =>
-        acc.addUnsafe(destination.alphAmount.value)
+        acc.addUnsafe(destination.attoAlphAmount.value)
       }
       val unsignedTx = transactionGen().sample.get.unsigned
 

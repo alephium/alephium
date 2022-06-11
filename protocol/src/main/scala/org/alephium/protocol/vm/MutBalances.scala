@@ -28,7 +28,7 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLocku
   }
 
   def getAttoAlphAmount(lockupScript: LockupScript): Option[U256] = {
-    getBalances(lockupScript).map(_.alphAmount)
+    getBalances(lockupScript).map(_.attoAlphAmount)
   }
 
   def getTokenAmount(lockupScript: LockupScript, tokenId: TokenId): Option[U256] = {

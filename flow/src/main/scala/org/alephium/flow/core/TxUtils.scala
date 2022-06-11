@@ -144,7 +144,7 @@ trait TxUtils { Self: FlowUtils =>
     val totalAmountsE = for {
       _                   <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
       _                   <- checkProvidedGas(gasOpt, gasPrice)
-      totalAttoAlphAmount <- checkTotalAttoAlphAmount(outputInfos.map(_.alphAmount))
+      totalAttoAlphAmount <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         outputInfos.flatMap(_.tokens)
       )
@@ -207,7 +207,7 @@ trait TxUtils { Self: FlowUtils =>
         _ <- checkUTXOsInSameGroup(utxoRefs)
         _ <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
         _ <- checkProvidedGas(gasOpt, gasPrice)
-        _ <- checkTotalAttoAlphAmount(outputInfos.map(_.alphAmount))
+        _ <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
         _ <- UnsignedTransaction.calculateTotalAmountPerToken(
           outputInfos.flatMap(_.tokens)
         )

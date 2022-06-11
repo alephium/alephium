@@ -26,7 +26,7 @@ import org.alephium.util.AVector
 final case class BuildExecuteScriptTx(
     fromPublicKey: PublicKey,
     bytecode: ByteString,
-    alphAmount: Option[Amount] = None,
+    attoAlphAmount: Option[Amount] = None,
     tokens: Option[AVector[Token]] = None,
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None

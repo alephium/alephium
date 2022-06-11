@@ -24,28 +24,28 @@ object AMMContract {
        |// Simple swap contract purely for testing
        |
        |TxContract Swap(tokenId: ByteVec, mut alphReserve: U256, mut tokenReserve: U256) {
-       |  event AddLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256)
-       |  event SwapToken(buyer: Address, alphAmount: U256)
+       |  event AddLiquidity(lp: Address, attoAlphAmount: U256, tokenAmount: U256)
+       |  event SwapToken(buyer: Address, attoAlphAmount: U256)
        |  event SwapAlph(buyer: Address, tokenAmount: U256)
        |
        |  @using(preapprovedAssets = true, assetsInContract = true)
-       |  pub fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
-       |    emit AddLiquidity(lp, alphAmount, tokenAmount)
+       |  pub fn addLiquidity(lp: Address, attoAlphAmount: U256, tokenAmount: U256) -> () {
+       |    emit AddLiquidity(lp, attoAlphAmount, tokenAmount)
        |
-       |    transferAlphToSelf!(lp, alphAmount)
+       |    transferAlphToSelf!(lp, attoAlphAmount)
        |    transferTokenToSelf!(lp, tokenId, tokenAmount)
-       |    alphReserve = alphReserve + alphAmount
+       |    alphReserve = alphReserve + attoAlphAmount
        |    tokenReserve = tokenReserve + tokenAmount
        |  }
        |
        |  @using(preapprovedAssets = true, assetsInContract = true)
-       |  pub fn swapToken(buyer: Address, alphAmount: U256) -> () {
-       |    emit SwapToken(buyer, alphAmount)
+       |  pub fn swapToken(buyer: Address, attoAlphAmount: U256) -> () {
+       |    emit SwapToken(buyer, attoAlphAmount)
        |
-       |    let tokenAmount = tokenReserve - alphReserve * tokenReserve / (alphReserve + alphAmount)
-       |    transferAlphToSelf!(buyer, alphAmount)
+       |    let tokenAmount = tokenReserve - alphReserve * tokenReserve / (alphReserve + attoAlphAmount)
+       |    transferAlphToSelf!(buyer, attoAlphAmount)
        |    transferTokenFromSelf!(buyer, tokenId, tokenAmount)
-       |    alphReserve = alphReserve + alphAmount
+       |    alphReserve = alphReserve + attoAlphAmount
        |    tokenReserve = tokenReserve - tokenAmount
        |  }
        |
@@ -53,10 +53,10 @@ object AMMContract {
        |  pub fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
        |    emit SwapAlph(buyer, tokenAmount)
        |
-       |    let alphAmount = alphReserve - alphReserve * tokenReserve / (tokenReserve + tokenAmount)
+       |    let attoAlphAmount = alphReserve - alphReserve * tokenReserve / (tokenReserve + tokenAmount)
        |    transferTokenToSelf!(buyer, tokenId, tokenAmount)
-       |    transferAlphFromSelf!(buyer, alphAmount)
-       |    alphReserve = alphReserve - alphAmount
+       |    transferAlphFromSelf!(buyer, attoAlphAmount)
+       |    alphReserve = alphReserve - attoAlphAmount
        |    tokenReserve = tokenReserve + tokenAmount
        |  }
        |}
@@ -67,16 +67,16 @@ object AMMContract {
     s"""
        |TxContract SwapProxy(swapContractId: ByteVec, tokenId: ByteVec) {
        |  @using(preapprovedAssets = true)
-       |  pub fn addLiquidity(lp: Address, alphAmount: U256, tokenAmount: U256) -> () {
-       |    approveAlph!(lp, alphAmount)
+       |  pub fn addLiquidity(lp: Address, attoAlphAmount: U256, tokenAmount: U256) -> () {
+       |    approveAlph!(lp, attoAlphAmount)
        |    approveToken!(lp, tokenId, tokenAmount)
-       |    Swap(swapContractId).addLiquidity(lp, alphAmount, tokenAmount)
+       |    Swap(swapContractId).addLiquidity(lp, attoAlphAmount, tokenAmount)
        |  }
        |
        |  @using(preapprovedAssets = true)
-       |  pub fn swapToken(buyer: Address, alphAmount: U256) -> () {
-       |    approveAlph!(buyer, alphAmount)
-       |    Swap(swapContractId).swapToken(buyer, alphAmount)
+       |  pub fn swapToken(buyer: Address, attoAlphAmount: U256) -> () {
+       |    approveAlph!(buyer, attoAlphAmount)
+       |    Swap(swapContractId).swapToken(buyer, attoAlphAmount)
        |  }
        |
        |  @using(preapprovedAssets = true)

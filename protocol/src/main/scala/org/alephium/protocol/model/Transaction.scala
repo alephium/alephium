@@ -96,7 +96,7 @@ final case class Transaction(
     }
   }
 
-  lazy val alphAmountInOutputs: Option[U256] = {
+  lazy val attoAlphAmountInOutputs: Option[U256] = {
     val sum1Opt =
       unsigned.fixedOutputs
         .foldE(U256.Zero)((sum, output) => sum.add(output.amount).toRight(()))

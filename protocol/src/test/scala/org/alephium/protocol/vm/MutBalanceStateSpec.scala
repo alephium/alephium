@@ -29,7 +29,7 @@ class MutBalanceStateSpec extends AlephiumSpec {
   it should "approveALPH" in new Fixture {
     balanceState.approveALPH(lockupScript, ALPH.oneAlph) is Some(())
     balanceState is MutBalanceState(
-      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero)))),
+      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(attoAlphAmount = U256.Zero)))),
       MutBalances(
         ArrayBuffer((lockupScript, MutBalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 0)))
       )
@@ -84,7 +84,7 @@ class MutBalanceStateSpec extends AlephiumSpec {
     )
 
     balanceState is MutBalanceState(
-      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero)))),
+      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(attoAlphAmount = U256.Zero)))),
       MutBalances(ArrayBuffer.empty)
     )
   }
@@ -100,7 +100,7 @@ class MutBalanceStateSpec extends AlephiumSpec {
     balanceState.useAlph(lockupScript, ALPH.oneAlph) is Some(())
 
     balanceState is MutBalanceState.from(
-      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero))))
+      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(attoAlphAmount = U256.Zero))))
     )
 
     balanceState.useAlph(lockupScript, ALPH.oneAlph) is None

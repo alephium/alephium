@@ -419,7 +419,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
                   |  "destinations": [
                   |    {
                   |      "address": "$toAddress",
-                  |      "alphAmount": "$amount"
+                  |      "attoAlphAmount": "$amount"
                   |    }
                   |  ]
                   |}
@@ -470,7 +470,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def transferWallet(walletName: String, address: String, amount: U256) = {
     httpPost(
       s"/wallets/${walletName}/transfer",
-      Some(s"""{"destinations":[{"address":"${address}","alphAmount":"${amount}","tokens":[]}]}""")
+      Some(
+        s"""{"destinations":[{"address":"${address}","attoAlphAmount":"${amount}","tokens":[]}]}"""
+      )
     )
   }
 
@@ -665,7 +667,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def buildExecuteScriptTx(
       fromPublicKey: String,
       code: String,
-      alphAmount: Option[Amount] = None,
+      attoAlphAmount: Option[Amount] = None,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None
   ) = {
@@ -676,7 +678,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
            "bytecode": "$code"
            ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
            ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
-           ${alphAmount.map(a => s""","alphAmount": "${a.value.v}"""").getOrElse("")}
+           ${attoAlphAmount.map(a => s""","attoAlphAmount": "${a.value.v}"""").getOrElse("")}
          }
          """
     httpPost("/contracts/unsigned-tx/execute-script", Some(query))
@@ -704,7 +706,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def buildExecuteScriptTxWithPort(
       code: String,
       restPort: Int,
-      alphAmount: Option[Amount] = None,
+      attoAlphAmount: Option[Amount] = None,
       gas: Option[Int] = None,
       gasPrice: Option[GasPrice] = None
   ): BuildExecuteScriptTxResult = {
@@ -713,7 +715,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       buildExecuteScriptTx(
         fromPublicKey = publicKey,
         code = compileResult.bytecodeTemplate,
-        alphAmount,
+        attoAlphAmount,
         gas,
         gasPrice
       ),
@@ -724,11 +726,11 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def scriptWithPort(
       code: String,
       restPort: Int,
-      alphAmount: Option[Amount] = None,
+      attoAlphAmount: Option[Amount] = None,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None
   ): BuildExecuteScriptTxResult = {
-    val buildResult = buildExecuteScriptTxWithPort(code, restPort, alphAmount, gas, gasPrice)
+    val buildResult = buildExecuteScriptTxWithPort(code, restPort, attoAlphAmount, gas, gasPrice)
     submitTxWithPort(buildResult.unsignedTx, buildResult.txId, restPort)
     buildResult
   }

@@ -1967,8 +1967,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
     override lazy val frame = prepareFrame(Some(balanceState))
 
-    def prepareStack(alphAmount: U256, tokenAmount: U256, timestamp: U256) = {
-      balanceState.approveALPH(assetAddress, alphAmount)
+    def prepareStack(attoAlphAmount: U256, tokenAmount: U256, timestamp: U256) = {
+      balanceState.approveALPH(assetAddress, attoAlphAmount)
       balanceState.approveToken(assetAddress, tokenId, tokenAmount)
       stack.push(Val.Address(assetAddress))
       stack.push(Val.U256(timestamp))
@@ -2180,7 +2180,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     def test(
         instr: CreateContractAbstract,
-        alphAmount: U256,
+        attoAlphAmount: U256,
         tokens: AVector[(TokenId, U256)],
         tokenAmount: Option[U256],
         expectedContractId: Option[Hash] = None
@@ -2213,7 +2213,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         case None         => tokens
       }
       contractOutput.tokens.toSet is allTokens.toSet
-      contractOutput.amount is alphAmount
+      contractOutput.amount is attoAlphAmount
       val contractRecord = frame.ctx.worldState.getContractCode(contractState.codeHash).rightValue
       contractRecord.code.toContract() isE contract
     }

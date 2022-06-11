@@ -527,7 +527,7 @@ class ServerUtils(implicit
 
       TxOutputInfo(
         destination.address.lockupScript,
-        destination.alphAmount.value,
+        destination.attoAlphAmount.value,
         tokensInfo,
         destination.lockTime,
         destination.message
@@ -779,8 +779,8 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildExecuteScriptTx
   ): Try[BuildExecuteScriptTxResult] = {
-    val alphAmount = query.alphAmount.map(_.value).getOrElse(U256.Zero)
-    val tokens     = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
+    val attoAlphAmount = query.attoAlphAmount.map(_.value).getOrElse(U256.Zero)
+    val tokens = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
     for {
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
@@ -788,7 +788,7 @@ class ServerUtils(implicit
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        alphAmount,
+        attoAlphAmount,
         tokens,
         query.fromPublicKey,
         query.gasAmount,

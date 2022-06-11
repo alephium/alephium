@@ -615,9 +615,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  mut alphReserve: U256,
          |  mut btcReserve: U256
          |) {
-         |  pub fn exchange(alphAmount: U256) -> (U256) {
-         |    let tokenAmount = btcReserve * alphAmount / (alphReserve + alphAmount)
-         |    alphReserve = alphReserve + alphAmount
+         |  pub fn exchange(attoAlphAmount: U256) -> (U256) {
+         |    let tokenAmount = btcReserve * attoAlphAmount / (alphReserve + attoAlphAmount)
+         |    alphReserve = alphReserve + attoAlphAmount
          |    btcReserve = btcReserve - tokenAmount
          |    return tokenAmount
          |  }

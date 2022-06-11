@@ -110,7 +110,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
 
       val senderBalanceWithGas =
-        genesisBalance - destination1.alphAmount.value - destination2.alphAmount.value
+        genesisBalance - destination1.attoAlphAmount.value - destination2.attoAlphAmount.value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
       checkDestinationBalance(destination1)
@@ -168,7 +168,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
 
       val senderBalanceWithGas =
-        genesisBalance - destination1.alphAmount.value - destination2.alphAmount.value
+        genesisBalance - destination1.attoAlphAmount.value - destination2.attoAlphAmount.value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
       checkAddressBalance(destination1.address, U256.unsafe(0), 0)
@@ -642,16 +642,16 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "not create transaction with overflowing ALPH amount" in new MultipleUtxos {
-    val alphAmountOverflowDestinations = AVector(
+    val attoAlphAmountOverflowDestinations = AVector(
       destination1,
-      destination2.copy(alphAmount = Amount(ALPH.MaxALPHValue))
+      destination2.copy(attoAlphAmount = Amount(ALPH.MaxALPHValue))
     )
     serverUtils
       .prepareUnsignedTransaction(
         blockFlow,
         fromPublicKey,
         outputRefsOpt = None,
-        alphAmountOverflowDestinations,
+        attoAlphAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
         defaultGasPrice
       )
@@ -859,12 +859,12 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
     val callScript = Compiler.compileTxScript(callScriptCode).rightValue
 
-    def checkContractStates(contractId: ContractId, value: U256, alphAmount: U256) = {
+    def checkContractStates(contractId: ContractId, value: U256, attoAlphAmount: U256) = {
       val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       val contractState = worldState.getContractState(contractId).rightValue
       contractState.fields is AVector[vm.Val](vm.Val.U256(value))
       val contractOutput = worldState.getContractAsset(contractState.contractOutputRef).rightValue
-      contractOutput.amount is alphAmount
+      contractOutput.amount is attoAlphAmount
     }
   }
 
@@ -886,7 +886,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     callContractResult0.gasUsed is 23189
     callContractResult0.txOutputs.length is 2
     val contractAttoAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
-    callContractResult0.txOutputs(0).alphAmount.value is contractAttoAlphAmount0
+    callContractResult0.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount0
 
     callContractResult0.contracts.length is 2
     val barState0 = callContractResult0.contracts(0)
@@ -905,7 +905,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     callContractResult1.gasUsed is 23189
     callContractResult1.txOutputs.length is 2
     val contractAttoAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
-    callContractResult1.txOutputs(0).alphAmount.value is contractAttoAlphAmount1
+    callContractResult1.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount1
 
     callContractResult1.contracts.length is 2
     val barState1 = callContractResult1.contracts(0)
@@ -1492,6 +1492,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    checkAddressBalance(destination.address, destination.alphAmount.value, utxoNum)
+    checkAddressBalance(destination.address, destination.attoAlphAmount.value, utxoNum)
   }
 }

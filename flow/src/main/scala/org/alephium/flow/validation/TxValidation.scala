@@ -480,7 +480,7 @@ object TxValidation {
     }
 
     protected[validation] def checkAlphOutputAmount(tx: Transaction): TxValidationResult[U256] = {
-      tx.alphAmountInOutputs match {
+      tx.attoAlphAmountInOutputs match {
         case Some(total) => validTx(total)
         case None        => invalidTx(BalanceOverFlow)
       }
@@ -592,7 +592,7 @@ object TxValidation {
     ): TxValidationResult[Unit] = {
       val inputSum = preOutputs.fold(coinbaseNetReward.getOrElse(U256.Zero))(_ addUnsafe _.amount)
       val result = for {
-        outputSum <- tx.alphAmountInOutputs
+        outputSum <- tx.attoAlphAmountInOutputs
         allOutSum <- outputSum.add(tx.gasFeeUnsafe) // safe after gas bound check
       } yield allOutSum == inputSum
       result match {

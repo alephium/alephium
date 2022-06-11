@@ -26,7 +26,7 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 final case class TestInputAsset(address: Address.Asset, asset: AssetState) {
   def toAssetOutput: AssetOutput =
     AssetOutput(
-      asset.alphAmount,
+      asset.attoAlphAmount,
       address.lockupScript,
       TimeStamp.zero,
       asset.flatTokens.map(token => (token.id, token.amount)),
@@ -35,13 +35,13 @@ final case class TestInputAsset(address: Address.Asset, asset: AssetState) {
 
   def approveAll(gasFeeOpt: Option[U256]): AVector[Instr[StatefulContext]] = {
     val addressConst = AddressConst(vm.Val.Address(address.lockupScript))
-    val alphAmount = gasFeeOpt match {
-      case Some(gasFee) => asset.alphAmount.subUnsafe(gasFee)
-      case None         => asset.alphAmount
+    val attoAlphAmount = gasFeeOpt match {
+      case Some(gasFee) => asset.attoAlphAmount.subUnsafe(gasFee)
+      case None         => asset.attoAlphAmount
     }
     val alphInstrs = AVector[Instr[StatefulContext]](
       addressConst,
-      U256Const(vm.Val.U256(alphAmount)),
+      U256Const(vm.Val.U256(attoAlphAmount)),
       ApproveAlph
     )
     val tokenInstrs = asset.flatTokens.flatMap[Instr[StatefulContext]] { token =>

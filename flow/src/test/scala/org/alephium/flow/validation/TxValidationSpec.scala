@@ -391,8 +391,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       implicit val validator = checkOutputStats(_, HardFork.Leman)
 
       // balance overflow
-      val alphAmount = tx.alphAmountInOutputs.value
-      val delta      = U256.MaxValue - alphAmount + 1
+      val attoAlphAmount = tx.attoAlphAmountInOutputs.value
+      val delta          = U256.MaxValue - attoAlphAmount + 1
       tx.addAttoAlphAmount(delta).fail(BalanceOverFlow)
 
       // zero amount

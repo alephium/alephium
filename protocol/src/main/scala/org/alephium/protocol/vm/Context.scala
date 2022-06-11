@@ -243,7 +243,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
   ): ExeResult[Hash] = {
     tokenAmount.foreach(amount => initialBalances.addToken(contractId, amount.v))
     val contractOutput = ContractOutput(
-      initialBalances.alphAmount,
+      initialBalances.attoAlphAmount,
       LockupScript.p2c(contractId),
       initialBalances.tokenVector
     )
