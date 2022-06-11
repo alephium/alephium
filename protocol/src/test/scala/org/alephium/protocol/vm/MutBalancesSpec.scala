@@ -31,9 +31,9 @@ class MutBalancesSpec extends AlephiumSpec {
     balances.getBalances(lockupScriptGen.sample.get) is None
   }
 
-  it should "getAlphAmount" in new Fixture {
-    balances.getAlphAmount(lockupScript) is Some(balancesPerLockup.alphAmount)
-    balances.getAlphAmount(lockupScriptGen.sample.get) is None
+  it should "getAttoAlphAmount" in new Fixture {
+    balances.getAttoAlphAmount(lockupScript) is Some(balancesPerLockup.alphAmount)
+    balances.getAttoAlphAmount(lockupScriptGen.sample.get) is None
   }
 
   it should "getTokenAmount" in new Fixture {

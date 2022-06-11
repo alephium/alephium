@@ -725,10 +725,12 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "check the minimal amount deposit for contract creation" in new Fixture {
     val serverUtils = new ServerUtils
-    serverUtils.getInitialAlphAmount(None) isE minimalAlphInContract
-    serverUtils.getInitialAlphAmount(Some(Amount(minimalAlphInContract))) isE minimalAlphInContract
+    serverUtils.getInitialAttoAlphAmount(None) isE minimalAlphInContract
+    serverUtils.getInitialAttoAlphAmount(
+      Some(Amount(minimalAlphInContract))
+    ) isE minimalAlphInContract
     serverUtils
-      .getInitialAlphAmount(Some(Amount(minimalAlphInContract - 1)))
+      .getInitialAttoAlphAmount(Some(Amount(minimalAlphInContract - 1)))
       .leftValue
       .detail is "Expect 1 ALPH deposit to deploy a new contract"
   }
@@ -883,8 +885,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     callContractResult0.returns is AVector[Val](ValU256(2))
     callContractResult0.gasUsed is 23189
     callContractResult0.txOutputs.length is 2
-    val contractAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
-    callContractResult0.txOutputs(0).alphAmount.value is contractAlphAmount0
+    val contractAttoAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
+    callContractResult0.txOutputs(0).alphAmount.value is contractAttoAlphAmount0
 
     callContractResult0.contracts.length is 2
     val barState0 = callContractResult0.contracts(0)
@@ -894,7 +896,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooState0 = callContractResult0.contracts(1)
     fooState0.fields is AVector[Val](ValU256(2))
     fooState0.address is fooAddress
-    fooState0.asset is AssetState(contractAlphAmount0, Some(AVector.empty))
+    fooState0.asset is AssetState(contractAttoAlphAmount0, Some(AVector.empty))
 
     info("call contract against the old world state")
     val params1             = params0.copy(worldStateBlockHash = Some(createContractBlock.hash))
@@ -902,8 +904,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     callContractResult1.returns is AVector[Val](ValU256(1))
     callContractResult1.gasUsed is 23189
     callContractResult1.txOutputs.length is 2
-    val contractAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
-    callContractResult1.txOutputs(0).alphAmount.value is contractAlphAmount1
+    val contractAttoAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
+    callContractResult1.txOutputs(0).alphAmount.value is contractAttoAlphAmount1
 
     callContractResult1.contracts.length is 2
     val barState1 = callContractResult1.contracts(0)
@@ -913,7 +915,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooState1 = callContractResult1.contracts(1)
     fooState1.fields is AVector[Val](ValU256(1))
     fooState1.address is fooAddress
-    fooState1.asset is AssetState(contractAlphAmount1, Some(AVector.empty))
+    fooState1.asset is AssetState(contractAttoAlphAmount1, Some(AVector.empty))
   }
 
   trait TestContractFixture extends Fixture {

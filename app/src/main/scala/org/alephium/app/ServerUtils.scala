@@ -720,21 +720,21 @@ class ServerUtils(implicit
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
     for {
-      initialAlphAmount <- getInitialAlphAmount(query.initialAlphAmount)
-      code              <- BuildDeployContractTx.decode(query.bytecode)
+      initialAttoAlphAmount <- getInitialAttoAlphAmount(query.initialAttoAlphAmount)
+      code                  <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildDeployContractTxWithParsedState(
         code.contract,
         address,
         code.initialFields,
-        initialAlphAmount,
+        initialAttoAlphAmount,
         query.initialTokenAmounts.getOrElse(AVector.empty),
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        initialAlphAmount,
+        initialAttoAlphAmount,
         AVector.empty,
         query.fromPublicKey,
         query.gasAmount,
@@ -743,7 +743,7 @@ class ServerUtils(implicit
     } yield BuildDeployContractTxResult.from(utx)
   }
 
-  def getInitialAlphAmount(amountOption: Option[Amount]): Try[U256] = {
+  def getInitialAttoAlphAmount(amountOption: Option[Amount]): Try[U256] = {
     amountOption match {
       case Some(amount) =>
         if (amount.value >= minimalAlphInContract) { Right(amount.value) }
@@ -1130,7 +1130,7 @@ object ServerUtils {
       codeRaw: String,
       address: Address,
       initialState: Option[String],
-      initialAlphAmount: U256,
+      initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
@@ -1139,7 +1139,7 @@ object ServerUtils {
         codeRaw,
         address,
         state,
-        initialAlphAmount,
+        initialAttoAlphAmount,
         initialTokenAmounts,
         newTokenAmount
       )
@@ -1150,7 +1150,7 @@ object ServerUtils {
       contract: StatefulContract,
       address: Address,
       initialFields: AVector[vm.Val],
-      initialAlphAmount: U256,
+      initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
@@ -1158,7 +1158,7 @@ object ServerUtils {
       Hex.toHexString(serialize(contract)),
       address,
       initialFields,
-      initialAlphAmount,
+      initialAttoAlphAmount,
       initialTokenAmounts,
       newTokenAmount
     )
@@ -1168,12 +1168,12 @@ object ServerUtils {
       codeRaw: String,
       address: Address,
       initialFields: AVector[vm.Val],
-      initialAlphAmount: U256,
+      initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
   ): String = {
     val stateRaw    = Hex.toHexString(serialize(initialFields))
-    val approveAlph = s"approveAlph!(@${address.toBase58}, ${initialAlphAmount.v})"
+    val approveAlph = s"approveAlph!(@${address.toBase58}, ${initialAttoAlphAmount.v})"
     val creation = newTokenAmount match {
       case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
       case None         => s"createContract!(#$codeRaw, #$stateRaw)"
@@ -1207,7 +1207,7 @@ object ServerUtils {
       codeRaw: String,
       address: Address,
       initialFields: AVector[vm.Val],
-      initialAlphAmount: U256,
+      initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
@@ -1215,7 +1215,7 @@ object ServerUtils {
       codeRaw,
       address,
       initialFields,
-      initialAlphAmount,
+      initialAttoAlphAmount,
       initialTokenAmounts,
       newTokenAmount
     )

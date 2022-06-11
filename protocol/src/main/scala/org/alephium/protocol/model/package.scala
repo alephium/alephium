@@ -54,7 +54,7 @@ package object model {
 
   val minimalAlphInContract: U256 = ALPH.oneAlph
 
-  def minimalAlphAmountPerTxOutput(tokenNum: Int): U256 = {
+  def minimalAttoAlphAmountPerTxOutput(tokenNum: Int): U256 = {
     ALPH.nanoAlph(100 * tokenNum.toLong).addUnsafe(dustUtxoAmount)
   }
   // scalastyle:on magic.number

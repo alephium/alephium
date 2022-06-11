@@ -416,8 +416,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     )
 
     val context = pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(98)))
-    context.outputBalances.getAlphAmount(address0.lockupScript).get is 90
-    context.outputBalances.getAlphAmount(address1.lockupScript).get is 11
+    context.outputBalances.getAttoAlphAmount(address0.lockupScript).get is 90
+    context.outputBalances.getAttoAlphAmount(address1.lockupScript).get is 11
     context.outputBalances.getTokenAmount(address0.lockupScript, tokenId).get is 1
     context.outputBalances.getTokenAmount(address1.lockupScript, tokenId).get is 98
   }
@@ -551,16 +551,16 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val output2 = genContractOutput(minimalAlphInContract - 1)
     val output3 = genContractOutput(minimalAlphInContract)
 
-    VM.checkContractAlphAmounts(Seq(output0), HardFork.Mainnet) isE ()
-    VM.checkContractAlphAmounts(Seq(output1), HardFork.Mainnet) isE ()
-    VM.checkContractAlphAmounts(Seq(output2), HardFork.Mainnet) isE ()
-    VM.checkContractAlphAmounts(Seq(output3), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output0), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output1), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output2), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output3), HardFork.Mainnet) isE ()
 
-    VM.checkContractAlphAmounts(Seq(output0), HardFork.Leman) isE ()
-    VM.checkContractAlphAmounts(Seq(output1), HardFork.Leman) isE ()
-    VM.checkContractAlphAmounts(Seq(output2), HardFork.Leman).leftValue isE
+    VM.checkContractAttoAlphAmounts(Seq(output0), HardFork.Leman) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output1), HardFork.Leman) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output2), HardFork.Leman).leftValue isE
       LowerThanContractMinimalBalance
-    VM.checkContractAlphAmounts(Seq(output3), HardFork.Leman) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output3), HardFork.Leman) isE ()
   }
 
   it should "check method modifier compatibility" in new NetworkFixture {

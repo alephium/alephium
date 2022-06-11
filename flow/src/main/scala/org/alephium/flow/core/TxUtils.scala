@@ -142,13 +142,13 @@ trait TxUtils { Self: FlowUtils =>
       utxosLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
-      _               <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
-      _               <- checkProvidedGas(gasOpt, gasPrice)
-      totalAlphAmount <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
+      _                   <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
+      _                   <- checkProvidedGas(gasOpt, gasPrice)
+      totalAttoAlphAmount <- checkTotalAttoAlphAmount(outputInfos.map(_.alphAmount))
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         outputInfos.flatMap(_.tokens)
       )
-    } yield (totalAlphAmount, totalAmountPerToken)
+    } yield (totalAttoAlphAmount, totalAmountPerToken)
 
     totalAmountsE match {
       case Right((totalAmount, totalAmountPerToken)) =>
@@ -207,7 +207,7 @@ trait TxUtils { Self: FlowUtils =>
         _ <- checkUTXOsInSameGroup(utxoRefs)
         _ <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
         _ <- checkProvidedGas(gasOpt, gasPrice)
-        _ <- checkTotalAlphAmount(outputInfos.map(_.alphAmount))
+        _ <- checkTotalAttoAlphAmount(outputInfos.map(_.alphAmount))
         _ <- UnsignedTransaction.calculateTotalAmountPerToken(
           outputInfos.flatMap(_.tokens)
         )
@@ -542,7 +542,7 @@ object TxUtils {
       gasPrice: GasPrice
   ): Either[String, (AVector[TxOutputInfo], GasBox)] = {
     for {
-      totalAmount <- checkTotalAlphAmount(utxos.map(_.amount))
+      totalAmount <- checkTotalAttoAlphAmount(utxos.map(_.amount))
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         utxos.flatMap(_.tokens)
       )
@@ -552,7 +552,7 @@ object TxUtils {
       totalAmountWithoutGas <- totalAmount
         .sub(gasPrice * gas)
         .toRight("Not enough balance for gas fee")
-      amountRequiredForExtraOutputs <- minimalAlphAmountPerTxOutput(maxTokenPerUtxo)
+      amountRequiredForExtraOutputs <- minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo)
         .mul(U256.unsafe(extraNumOfOutputs))
         .toRight("Too many tokens")
       amountOfFirstOutput <- totalAmountWithoutGas
@@ -560,7 +560,7 @@ object TxUtils {
         .toRight("Not enough ALPH balance for transaction outputs")
       firstOutputTokensNum = getFirstOutputTokensNum(totalAmountPerToken.length)
       _ <- amountOfFirstOutput
-        .sub(minimalAlphAmountPerTxOutput(firstOutputTokensNum))
+        .sub(minimalAttoAlphAmountPerTxOutput(firstOutputTokensNum))
         .toRight("Not enough ALPH balance for transaction outputs")
     } yield {
       val firstTokens  = totalAmountPerToken.take(firstOutputTokensNum)
@@ -569,7 +569,7 @@ object TxUtils {
       val restOfOutputs = restOfTokens.map { tokens =>
         TxOutputInfo(
           toLockupScript,
-          minimalAlphAmountPerTxOutput(maxTokenPerUtxo),
+          minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo),
           tokens,
           lockTimeOpt
         )
@@ -590,7 +590,7 @@ object TxUtils {
     }
   }
 
-  private[core] def checkTotalAlphAmount(
+  private[core] def checkTotalAttoAlphAmount(
       amounts: AVector[U256]
   ): Either[String, U256] = {
     amounts.foldE(U256.Zero) { case (acc, amount) =>

@@ -178,7 +178,10 @@ object VM {
     }
   }
 
-  def checkContractAlphAmounts(outputs: Iterable[TxOutput], hardFork: HardFork): ExeResult[Unit] = {
+  def checkContractAttoAlphAmounts(
+      outputs: Iterable[TxOutput],
+      hardFork: HardFork
+  ): ExeResult[Unit] = {
     val allChecked = outputs.forall {
       case output: ContractOutput => output.amount >= minimalAlphInContract
       case _                      => true
@@ -425,7 +428,7 @@ object StatefulVM {
   private def prepareResult(context: StatefulContext): ExeResult[TxScriptExecution] = {
     for {
       _ <- checkRemainingSignatures(context)
-      _ <- VM.checkContractAlphAmounts(context.generatedOutputs, context.getHardFork())
+      _ <- VM.checkContractAttoAlphAmounts(context.generatedOutputs, context.getHardFork())
     } yield {
       TxScriptExecution(
         context.gasRemaining,

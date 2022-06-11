@@ -27,7 +27,7 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLocku
     all.collectFirst { case (ls, balance) if ls == lockupScript => balance }
   }
 
-  def getAlphAmount(lockupScript: LockupScript): Option[U256] = {
+  def getAttoAlphAmount(lockupScript: LockupScript): Option[U256] = {
     getBalances(lockupScript).map(_.alphAmount)
   }
 

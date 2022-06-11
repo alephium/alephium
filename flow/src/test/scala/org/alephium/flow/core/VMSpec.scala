@@ -167,11 +167,11 @@ class VMSpec extends AlephiumSpec {
         input: String,
         initialState: AVector[Val],
         tokenAmount: Option[U256] = None,
-        initialAlphAmount: U256 = minimalAlphInContract
+        initialAttoAlphAmount: U256 = minimalAlphInContract
     ): ContractOutputRef = {
       val contract = Compiler.compileContract(input).rightValue
       val txScript =
-        contractCreation(contract, initialState, genesisLockup, initialAlphAmount, tokenAmount)
+        contractCreation(contract, initialState, genesisLockup, initialAttoAlphAmount, tokenAmount)
       val block = payableCall(blockFlow, chainIndex, txScript)
 
       val contractOutputRef =
@@ -189,9 +189,10 @@ class VMSpec extends AlephiumSpec {
         numContracts: Int,
         initialState: AVector[Val] = AVector[Val](Val.U256(U256.Zero)),
         tokenAmount: Option[U256] = None,
-        initialAlphAmount: U256 = minimalAlphInContract
+        initialAttoAlphAmount: U256 = minimalAlphInContract
     ): ContractOutputRef = {
-      val contractOutputRef = createContract(input, initialState, tokenAmount, initialAlphAmount)
+      val contractOutputRef =
+        createContract(input, initialState, tokenAmount, initialAttoAlphAmount)
 
       val contractKey = contractOutputRef.key
       checkState(
@@ -1422,7 +1423,7 @@ class VMSpec extends AlephiumSpec {
         testContract,
         2,
         2,
-        initialAlphAmount = ALPH.alph(10)
+        initialAttoAlphAmount = ALPH.alph(10)
       ).key
 
     def checkContract(alphReserve: U256, x: Int) = {
@@ -2036,7 +2037,7 @@ class VMSpec extends AlephiumSpec {
         2,
         2,
         AVector(Val.ByteVec(ByteString.empty)),
-        initialAlphAmount = minimalAlphInContract * 2
+        initialAttoAlphAmount = minimalAlphInContract * 2
       ).key
 
     val main: String =
@@ -2450,7 +2451,8 @@ class VMSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      val barContractId = createContract(bar, AVector.empty, initialAlphAmount = ALPH.alph(2)).key
+      val barContractId =
+        createContract(bar, AVector.empty, initialAttoAlphAmount = ALPH.alph(2)).key
 
       s"""
          |TxScript Main {
@@ -2494,7 +2496,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      val fooId      = createContract(foo, AVector.empty, initialAlphAmount = ALPH.alph(2)).key
+      val fooId      = createContract(foo, AVector.empty, initialAttoAlphAmount = ALPH.alph(2)).key
       val fooAddress = Address.contract(fooId)
 
       val script =
@@ -2522,7 +2524,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |""".stripMargin
-      val fooId = createContract(foo, AVector.empty, initialAlphAmount = ALPH.alph(2)).key
+      val fooId = createContract(foo, AVector.empty, initialAttoAlphAmount = ALPH.alph(2)).key
 
       val bar: String =
         s"""
@@ -2545,7 +2547,7 @@ class VMSpec extends AlephiumSpec {
       (0 until 5).foreach { index =>
         val initialFields =
           AVector[Val](Val.U256(U256.unsafe(index)), Val.ByteVec(lastBarId.bytes))
-        val barId = createContract(bar, initialFields, initialAlphAmount = ALPH.alph(2)).key
+        val barId = createContract(bar, initialFields, initialAttoAlphAmount = ALPH.alph(2)).key
         lastBarId = barId
       }
 

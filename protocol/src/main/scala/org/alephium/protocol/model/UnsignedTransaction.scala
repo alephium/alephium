@@ -251,7 +251,7 @@ object UnsignedTransaction {
     } else if (tokensRemainder.length > maxTokenPerUtxo) {
       Left(s"Too many tokens in the change output, maximal number $maxTokenPerUtxo")
     } else {
-      if (alphRemainder > minimalAlphAmountPerTxOutput(tokensRemainder.length)) {
+      if (alphRemainder > minimalAttoAlphAmountPerTxOutput(tokensRemainder.length)) {
         Right(Some(TxOutput.asset(alphRemainder, tokensRemainder, fromLockupScript)))
       } else {
         Left("Not enough ALPH for change output")
@@ -264,7 +264,7 @@ object UnsignedTransaction {
   ): Either[String, Unit] = {
     check(
       failCondition = outputs.exists { output =>
-        output.alphAmount < minimalAlphAmountPerTxOutput(output.tokens.length)
+        output.alphAmount < minimalAttoAlphAmountPerTxOutput(output.tokens.length)
       },
       "Not enough ALPH for transaction output"
     )

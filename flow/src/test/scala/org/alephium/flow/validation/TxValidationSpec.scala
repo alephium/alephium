@@ -126,15 +126,15 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
 
     implicit class RichTx(tx: Transaction) {
-      def addAlphAmount(delta: U256): Transaction = {
-        updateAlphAmount(_ + delta)
+      def addAttoAlphAmount(delta: U256): Transaction = {
+        updateAttoAlphAmount(_ + delta)
       }
 
-      def zeroAlphAmount(): Transaction = {
-        updateAlphAmount(_ => 0)
+      def zeroAttoAlphAmount(): Transaction = {
+        updateAttoAlphAmount(_ => 0)
       }
 
-      def updateAlphAmount(f: U256 => U256): Transaction = {
+      def updateAttoAlphAmount(f: U256 => U256): Transaction = {
         updateRandomFixedOutputs(output => output.copy(amount = f(output.amount)))
       }
 
@@ -393,24 +393,24 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       // balance overflow
       val alphAmount = tx.alphAmountInOutputs.value
       val delta      = U256.MaxValue - alphAmount + 1
-      tx.addAlphAmount(delta).fail(BalanceOverFlow)
+      tx.addAttoAlphAmount(delta).fail(BalanceOverFlow)
 
       // zero amount
-      tx.zeroAlphAmount().fail(InvalidOutputStats)
+      tx.zeroAttoAlphAmount().fail(InvalidOutputStats)
 
       {
         info("Check dust amount before leman")
         implicit val validator = checkOutputStats(_, HardFork.Mainnet)
-        tx.updateAlphAmount(_ => deprecatedDustUtxoAmount).pass()
-        tx.updateAlphAmount(_ => deprecatedDustUtxoAmount - 1).fail(InvalidOutputStats)
+        tx.updateAttoAlphAmount(_ => deprecatedDustUtxoAmount).pass()
+        tx.updateAttoAlphAmount(_ => deprecatedDustUtxoAmount - 1).fail(InvalidOutputStats)
       }
 
       {
         info("Check dust amount for leman")
         dustUtxoAmount is (deprecatedDustUtxoAmount * 1000)
         implicit val validator = checkOutputStats(_, HardFork.Leman)
-        tx.updateAlphAmount(_ => dustUtxoAmount).pass()
-        tx.updateAlphAmount(_ => dustUtxoAmount - 1).fail(InvalidOutputStats)
+        tx.updateAttoAlphAmount(_ => dustUtxoAmount).pass()
+        tx.updateAttoAlphAmount(_ => dustUtxoAmount - 1).fail(InvalidOutputStats)
       }
     }
   }
@@ -559,7 +559,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         preOutputs
       )
 
-      tx.addAlphAmount(1).fail(InvalidAlphBalance)
+      tx.addAttoAlphAmount(1).fail(InvalidAlphBalance)
     }
   }
 

@@ -400,7 +400,7 @@ class TxUtilsSpec extends AlephiumSpec {
       }
 
       val outputs = {
-        info(s"minimalAlphAmountPerTxOutput is ${minimalAlphAmountPerTxOutput(1)}")
+        info(s"minimalAttoAlphAmountPerTxOutput is ${minimalAttoAlphAmountPerTxOutput(1)}")
         val output1 =
           output(LockupScript.p2pkh(toPubKey), ALPH.nanoAlph(900), (tokenId2, U256.unsafe(11)))
         AVector(output1)
@@ -427,7 +427,7 @@ class TxUtilsSpec extends AlephiumSpec {
       }
 
       val outputs = {
-        info(s"minimalAlphAmountPerTxOutput is ${minimalAlphAmountPerTxOutput(0)}")
+        info(s"minimalAttoAlphAmountPerTxOutput is ${minimalAttoAlphAmountPerTxOutput(0)}")
         val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.nanoAlph(900))
         AVector(output1)
       }
@@ -452,7 +452,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val tokenId2 = Hash.hash("tokenId2")
 
       val inputs = {
-        val input1Amount = defaultGasFee.addUnsafe(minimalAlphAmountPerTxOutput(1)).subUnsafe(1)
+        val input1Amount = defaultGasFee.addUnsafe(minimalAttoAlphAmountPerTxOutput(1)).subUnsafe(1)
         val input1 = input("input1", input1Amount, fromLockupScript, (tokenId2, U256.unsafe(10)))
         val input2 = input("input2", ALPH.alph(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
         AVector(input1, input2)
@@ -485,7 +485,7 @@ class TxUtilsSpec extends AlephiumSpec {
     {
       info("without tokens")
       val inputs = {
-        val input1Amount = defaultGasFee.addUnsafe(minimalAlphAmountPerTxOutput(0)).subUnsafe(1)
+        val input1Amount = defaultGasFee.addUnsafe(minimalAttoAlphAmountPerTxOutput(0)).subUnsafe(1)
         val input1       = input("input1", input1Amount, fromLockupScript)
         val input2       = input("input2", ALPH.alph(3), fromLockupScript)
         AVector(input1, input2)
@@ -651,7 +651,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     def verifyExtraOutput(output: TxOutputInfo) = {
-      output.alphAmount is minimalAlphAmountPerTxOutput(maxTokenPerUtxo)
+      output.alphAmount is minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo)
       output.tokens.length is maxTokenPerUtxo
     }
 
@@ -688,7 +688,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
         outputs(0).alphAmount is ALPH
           .alph(3)
-          .subUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo))
+          .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo))
           .subUnsafe(defaultGasPrice * gas)
         outputs(0).tokens.length is 1
 
@@ -710,7 +710,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
         outputs(0).alphAmount is ALPH
           .alph(3)
-          .subUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+          .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
           .subUnsafe(defaultGasPrice * gas)
         outputs(0).tokens.length is 1
 
@@ -733,7 +733,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
         outputs(0).alphAmount is ALPH
           .alph(3)
-          .subUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+          .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
           .subUnsafe(defaultGasPrice * gas)
         outputs(0).tokens.length is maxTokenPerUtxo
 
@@ -745,10 +745,10 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     {
-      info("The amount in the first output is below minimalAlphAmountPerTxOutput(tokens)")
-      val alphAmount = minimalAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
+      info("The amount in the first output is below minimalAttoAlphAmountPerTxOutput(tokens)")
+      val alphAmount = minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
         .addUnsafe(defaultGasPrice * GasEstimation.sweepAddress(1, 3))
-        .addUnsafe(minimalAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+        .addUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
 
       val tokens = AVector.tabulate(3 * maxTokenPerUtxo - 1) { i =>
         val tokenId = Hash.hash(s"tokenId$i")
@@ -758,7 +758,7 @@ class TxUtilsSpec extends AlephiumSpec {
       Test(tokens, alphAmount).success { case (outputs, gas) =>
         outputs.length is 3
 
-        outputs(0).alphAmount is minimalAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
+        outputs(0).alphAmount is minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
         outputs(0).tokens.length is maxTokenPerUtxo - 1
 
         verifyExtraOutput(outputs(1))
