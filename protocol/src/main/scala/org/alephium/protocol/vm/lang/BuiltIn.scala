@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.model.{dustUtxoAmount, ContractId}
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
 import org.alephium.util.AVector
@@ -346,6 +346,14 @@ object BuiltIn {
       AddressConst(Val.Address(LockupScript.p2c(ContractId.zero)))
     )
 
+  val dustAmount: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "dustAmount",
+      Seq.empty,
+      Seq[Type](Type.U256),
+      U256Const(Val.U256(dustUtxoAmount))
+    )
+
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
@@ -388,7 +396,8 @@ object BuiltIn {
     byteVecToAddress,
     ethEcRecover,
     contractIdToAddress,
-    nullAddress
+    nullAddress,
+    dustAmount
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleStatefulBuiltIn =
