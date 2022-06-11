@@ -1084,6 +1084,18 @@ class VMSpec extends AlephiumSpec {
     failSimpleScript(main(1), InvalidTxInputIndex)
   }
 
+  it should "test dust amount" in new ContractFixture {
+    val main =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  assert!(dustAmount!() == 0.001 alph)
+         |  assert!(dustAmount!() == $dustUtxoAmount)
+         |}
+         |""".stripMargin
+    testSimpleScript(main)
+  }
+
   // scalastyle:off regex
   it should "test hash built-ins" in new ContractFixture {
     val input = Hex.toHexString(ByteString.fromString("Hello World1"))
