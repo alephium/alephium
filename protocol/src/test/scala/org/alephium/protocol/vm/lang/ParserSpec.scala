@@ -140,6 +140,15 @@ class ParserSpec extends AlephiumSpec {
     fastparse
       .parse("if x >= 1 { y = y + x } else { y = 0 }", StatelessParser.statement(_))
       .isSuccess is true
+
+    fastparse
+      .parse("while true { x = x + 1 }", StatelessParser.statement(_))
+      .get
+      .value is a[Ast.While[StatelessContext]]
+    fastparse
+      .parse("for let mut i = 0; i < 10; i = i + 1 { x = x + 1 }", StatelessParser.statement(_))
+      .get
+      .value is a[Ast.ForLoop[StatelessContext]]
   }
 
   it should "parse if-else statements" in {

@@ -497,6 +497,64 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     )
   }
 
+  it should "check types for for loop" in {
+    def code(
+        initialize: String = "let mut i = 0",
+        condition: String = "i < 10",
+        update: String = "i = i + 1",
+        body: String = "return"
+    ): String =
+      s"""
+         |TxContract ForLoop() {
+         |  pub fn test() -> () {
+         |    for $initialize; $condition; $update {
+         |      $body
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContract(code()).isRight is true
+    Compiler.compileContract(code(initialize = "true")).isLeft is true
+    Compiler.compileContract(code(condition = "1")).leftValue.message is
+      "Invalid condition type: Const(U256(1))"
+    Compiler.compileContract(code(update = "true")).isLeft is true
+    Compiler.compileContract(code(body = "")).isLeft is true
+  }
+
+  it should "test for loop" in new Fixture {
+    test(
+      s"""
+         |TxContract ForLoop() {
+         |  pub fn main() -> (U256) {
+         |    let mut x = 1
+         |    for let mut i = 1; i < 5; i = i + 1 {
+         |      x = x * i
+         |    }
+         |    return x
+         |  }
+         |}
+         |""".stripMargin,
+      AVector.empty,
+      AVector(Val.U256(U256.unsafe(24)))
+    )
+    test(
+      s"""
+         |TxContract ForLoop() {
+         |  pub fn main() -> (U256) {
+         |    let mut x = 5
+         |    for let mut done = false; !done; done = done {
+         |      x = x + x - 3
+         |      if x % 5 == 0 { done = true }
+         |    }
+         |    return x
+         |  }
+         |}
+         |""".stripMargin,
+      AVector.empty,
+      AVector(Val.U256(U256.unsafe(35)))
+    )
+  }
+
   it should "test the following typical examples" in new Fixture {
     test(
       s"""

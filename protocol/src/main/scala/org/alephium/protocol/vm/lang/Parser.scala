@@ -266,6 +266,11 @@ abstract class Parser[Ctx <: StatelessContext] {
   def whileStmt[Unknown: P]: P[Ast.While[Ctx]] =
     P(Lexer.keyword("while") ~/ expr ~ block).map { case (expr, block) => Ast.While(expr, block) }
 
+  def forLoopStmt[Unknown: P]: P[Ast.ForLoop[Ctx]] =
+    P(Lexer.keyword("for") ~/ statement ~ ";" ~ expr ~ ";" ~ statement ~ block).map {
+      case (initialize, condition, update, body) => Ast.ForLoop(initialize, condition, update, body)
+    }
+
   def statement[Unknown: P]: P[Ast.Statement[Ctx]]
 
   def contractArgument[Unknown: P]: P[Ast.Argument] =
@@ -377,7 +382,7 @@ object StatelessParser extends Parser[StatelessContext] {
     P(const | callExpr | contractConv | variable | parenExpr | arrayExpr)
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
-    P(varDef | assign | funcCall | ifelse | whileStmt | ret)
+    P(varDef | assign | funcCall | ifelse | whileStmt | forLoopStmt | ret)
 
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
@@ -413,7 +418,9 @@ object StatefulParser extends Parser[StatefulContext] {
       }
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
-    P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret | emitEvent)
+    P(
+      varDef | assign | funcCall | contractCall | ifelse | whileStmt | forLoopStmt | ret | emitEvent
+    )
 
   def contractParams[Unknown: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
 

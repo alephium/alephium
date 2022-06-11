@@ -610,9 +610,8 @@ object Ast {
     override def check(state: Compiler.State[Ctx]): Unit = {
       if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid type of condition expr $condition")
-      } else {
-        body.foreach(_.check(state))
       }
+      body.foreach(_.check(state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -624,6 +623,31 @@ object Ast {
         throw Compiler.Error(s"Too many instrs for if-else branches")
       }
       condIR ++ bodyIR :+ Jump(-whileLen)
+    }
+  }
+  final case class ForLoop[Ctx <: StatelessContext](
+      initialize: Statement[Ctx],
+      condition: Expr[Ctx],
+      update: Statement[Ctx],
+      body: Seq[Statement[Ctx]]
+  ) extends Statement[Ctx] {
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      initialize.check(state)
+      if (condition.getType(state) != Seq(Type.Bool)) {
+        throw Compiler.Error(s"Invalid condition type: $condition")
+      }
+      body.foreach(_.check(state))
+      update.check(state)
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val initializeIR   = initialize.genCode(state)
+      val bodyIR         = body.flatMap(_.genCode(state))
+      val updateIR       = update.genCode(state)
+      val fullBodyLength = bodyIR.length + updateIR.length + 1
+      val condIR         = Statement.getCondIR(condition, state, fullBodyLength)
+      val jumpLength     = condIR.length + fullBodyLength
+      initializeIR ++ condIR ++ bodyIR ++ updateIR :+ Jump(-jumpLength)
     }
   }
   final case class ReturnStmt[Ctx <: StatelessContext](exprs: Seq[Expr[Ctx]])
