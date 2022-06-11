@@ -51,6 +51,11 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse(s"#$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(
       Hex.from(byte32).get
     )
+    fastparse.parse(s"""#"xyz"""", Lexer.bytes(_)).get.value is Val.ByteVec(
+      Hex.unsafe("78797a")
+    )
+    intercept[Compiler.Error](fastparse.parse(s"""#"ffff"""", Lexer.bytes(_)).get.value).message is
+      "Hex string `ffff` does not need to be quoted"
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is Val.Address(
       address.lockupScript
     )

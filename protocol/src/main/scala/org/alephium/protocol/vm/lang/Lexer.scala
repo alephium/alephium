@@ -20,6 +20,7 @@ import java.math.{BigDecimal, BigInteger}
 
 import scala.util.control.NonFatal
 
+import akka.util.ByteString
 import fastparse._
 import fastparse.NoWhitespace._
 
@@ -98,6 +99,13 @@ object Lexer {
           }
       }
 
+  def stringBytes[Unknown: P]: P[Val.ByteVec] =
+    P("\"" ~ CharsWhile(!"\\\n\"".contains(_)).! ~ "\"").map { input =>
+      Hex.from(input) match {
+        case Some(_) => throw Compiler.Error(s"Hex string `${input}` does not need to be quoted")
+        case None    => Val.ByteVec(ByteString.fromString(input))
+      }
+    }
   def bytesInternal[Unknown: P]: P[Val.ByteVec] =
     P(CharsWhileIn("0-9a-zA-Z", 0)).!.map { string =>
       Hex.from(string) match {
@@ -109,7 +117,7 @@ object Lexer {
           }
       }
     }
-  def bytes[Unknown: P]: P[Val.ByteVec] = P("#" ~ bytesInternal)
+  def bytes[Unknown: P]: P[Val.ByteVec] = P("#" ~ (stringBytes | bytesInternal))
   def contractAddress[Unknown: P]: P[Val.ByteVec] =
     addressInternal.map {
       case Val.Address(LockupScript.P2C(contractId)) => Val.ByteVec(contractId.bytes)
