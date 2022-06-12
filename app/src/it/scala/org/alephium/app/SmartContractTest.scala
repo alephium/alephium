@@ -611,38 +611,38 @@ object SwapContracts {
       tokenId: Hash,
       tokenAmount: U256,
       swapContractKey: Hash
-  ) = s"""
-         |TxScript Main {
-         |  approveAlph!(@${address}, $attoAlphAmount)
-         |  approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
-         |  let swap = Swap(#${swapContractKey.toHexString})
-         |  swap.addLiquidity(@${address}, $attoAlphAmount, $tokenAmount)
-         |}
-         |
-         |$swapContract
-         |""".stripMargin
+  ) =
+    s"""
+       |TxScript Main {
+       |  let swap = Swap(#${swapContractKey.toHexString})
+       |  swap.addLiquidity{
+       |    @$address: [$attoAlphAmount, #${tokenId.toHexString}: $tokenAmount]
+       |  }(@$address, $attoAlphAmount, $tokenAmount)
+       |}
+       |
+       |$swapContract
+       |""".stripMargin
 
   def swapTokenForAlphTxScript(
       address: String,
       swapContractKey: Hash,
       tokenId: Hash,
       tokenAmount: U256
-  ) = s"""
-         |TxScript Main {
-         |  approveToken!(@${address}, #${tokenId.toHexString}, $tokenAmount)
-         |  let swap = Swap(#${swapContractKey.toHexString})
-         |  swap.swapAlph(@${address}, $tokenAmount)
-         |}
-         |
-         |$swapContract
-         |""".stripMargin
+  ) =
+    s"""
+       |TxScript Main {
+       |  let swap = Swap(#${swapContractKey.toHexString})
+       |  swap.swapAlph{@$address: [#${tokenId.toHexString}: $tokenAmount]}(@$address, $tokenAmount)
+       |}
+       |
+       |$swapContract
+       |""".stripMargin
 
   def swapAlphForTokenTxScript(address: String, swapContractKey: Hash, attoAlphAmount: U256) =
     s"""
        |TxScript Main {
-       |  approveAlph!(@${address}, $attoAlphAmount)
        |  let swap = Swap(#${swapContractKey.toHexString})
-       |  swap.swapToken(@${address}, $attoAlphAmount)
+       |  swap.swapToken{@$address: $attoAlphAmount}(@$address, $attoAlphAmount)
        |}
        |
        |$swapContract

@@ -849,10 +849,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooAddress = Address.contract(fooId)
     val callScriptCode =
       s"""
-         |@using(preapprovedAssets = true) TxScript Main {
-         |  approveAlph!(@$callerAddress, ${ALPH.oneAlph})
+         |@using(preapprovedAssets = true)
+         |TxScript Main {
          |  let foo = Foo(#${fooId.toHexString})
-         |  foo.addOne()
+         |  foo.addOne{@$callerAddress: 1 alph}()
          |}
          |
          |$fooCode
@@ -1043,7 +1043,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 18599
+    result1.gasUsed is 18598
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero

@@ -68,21 +68,19 @@ object AMMContract {
        |TxContract SwapProxy(swapContractId: ByteVec, tokenId: ByteVec) {
        |  @using(preapprovedAssets = true)
        |  pub fn addLiquidity(lp: Address, attoAlphAmount: U256, tokenAmount: U256) -> () {
-       |    approveAlph!(lp, attoAlphAmount)
-       |    approveToken!(lp, tokenId, tokenAmount)
-       |    Swap(swapContractId).addLiquidity(lp, attoAlphAmount, tokenAmount)
+       |    Swap(swapContractId).addLiquidity{
+       |      lp: [attoAlphAmount, tokenId: tokenAmount]
+       |    }(lp, attoAlphAmount, tokenAmount)
        |  }
        |
        |  @using(preapprovedAssets = true)
        |  pub fn swapToken(buyer: Address, attoAlphAmount: U256) -> () {
-       |    approveAlph!(buyer, attoAlphAmount)
-       |    Swap(swapContractId).swapToken(buyer, attoAlphAmount)
+       |    Swap(swapContractId).swapToken{buyer: attoAlphAmount}(buyer, attoAlphAmount)
        |  }
        |
        |  @using(preapprovedAssets = true)
        |  pub fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
-       |    approveToken!(buyer, tokenId, tokenAmount)
-       |    Swap(swapContractId).swapAlph(buyer, tokenAmount)
+       |    Swap(swapContractId).swapAlph{buyer: [tokenId: tokenAmount]}(buyer, tokenAmount)
        |  }
        |}
        |
