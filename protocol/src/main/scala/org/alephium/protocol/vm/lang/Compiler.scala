@@ -104,6 +104,7 @@ object Compiler {
     def name: String
     def isPublic: Boolean
     def isVariadic: Boolean = false
+    def usePreapprovedAssets: Boolean
     def getReturnType(inputType: Seq[Type]): Seq[Type]
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
@@ -145,6 +146,7 @@ object Compiler {
   final case class SimpleFunc[Ctx <: StatelessContext](
       id: Ast.FuncId,
       isPublic: Boolean,
+      usePreapprovedAssets: Boolean,
       argsType: Seq[Type],
       returnType: Seq[Type],
       index: Byte
@@ -177,6 +179,7 @@ object Compiler {
         new SimpleFunc[Ctx](
           func.id,
           func.isPublic,
+          func.usePreapprovedAssets,
           func.args.map(_.tpe),
           func.rtypes,
           index.toByte

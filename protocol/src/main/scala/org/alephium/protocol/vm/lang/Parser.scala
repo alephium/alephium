@@ -42,10 +42,30 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
   def arrayExpr[Unknown: P]: P[Ast.Expr[Ctx]]    = P(createArray1 | createArray2)
   def variable[Unknown: P]: P[Ast.Variable[Ctx]] = P(Lexer.ident).map(Ast.Variable.apply[Ctx])
-  def callAbs[Unknown: P]: P[(Ast.FuncId, Seq[Ast.Expr[Ctx]])] =
-    P(Lexer.funcId ~ "(" ~ expr.rep(0, ",") ~ ")")
+
+  def alphAmount[Unknown: P]: P[Ast.Expr[Ctx]]                   = expr
+  def tokenAmount[Unknown: P]: P[(Ast.Expr[Ctx], Ast.Expr[Ctx])] = P(expr ~ ":" ~ expr)
+  def amountList[Unknown: P]: P[(Option[Ast.Expr[Ctx]], Seq[(Ast.Expr[Ctx], Ast.Expr[Ctx])])] =
+    P("[" ~ (alphAmount ~ ",").? ~ tokenAmount.rep(0, ",") ~ "]")
+  def amountSimple[Unknown: P]: P[(Option[Ast.Expr[Ctx]], Seq[(Ast.Expr[Ctx], Ast.Expr[Ctx])])] =
+    P(alphAmount).map(amount => (Some(amount), Seq.empty))
+  def approveAssetPerAddress[Unknown: P]: P[Ast.ApproveAsset[Ctx]] =
+    P(expr ~ ":" ~ (amountList | amountSimple)).map { case (address, amounts) =>
+      val node = Ast.ApproveAsset(address, amounts._1, amounts._2)
+      if (node.approveCount == 0) {
+        throw Compiler.Error(s"Empty asset for address: ${address}")
+      }
+      node
+    }
+  def approveAssets[Unknown: P]: P[Seq[Ast.ApproveAsset[Ctx]]] =
+    P("{" ~ approveAssetPerAddress.rep(1, ",") ~ ",".? ~ "}")
+  def callAbs[Unknown: P]: P[(Ast.FuncId, Seq[Ast.ApproveAsset[Ctx]], Seq[Ast.Expr[Ctx]])] =
+    P(Lexer.funcId ~ approveAssets.? ~ "(" ~ expr.rep(0, ",") ~ ")").map {
+      case (funcId, approveAssets, arguments) =>
+        (funcId, approveAssets.getOrElse(Seq.empty), arguments)
+    }
   def callExpr[Unknown: P]: P[Ast.CallExpr[Ctx]] =
-    callAbs.map { case (funcId, expr) => Ast.CallExpr(funcId, expr) }
+    callAbs.map { case (funcId, approveAssets, expr) => Ast.CallExpr(funcId, approveAssets, expr) }
   def contractConv[Unknown: P]: P[Ast.ContractConv[Ctx]] =
     P(Lexer.typeId ~ "(" ~ expr ~ ")").map { case (typeId, expr) => Ast.ContractConv(typeId, expr) }
 
@@ -218,7 +238,9 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
 
   def funcCall[Unknown: P]: P[Ast.FuncCall[Ctx]] =
-    callAbs.map { case (funcId, exprs) => Ast.FuncCall(funcId, exprs) }
+    callAbs.map { case (funcId, approveAssets, exprs) =>
+      Ast.FuncCall(funcId, approveAssets, exprs)
+    }
 
   def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]]      = P("{" ~ statement.rep(1) ~ "}")
   def emptyBlock[Unknown: P]: P[Seq[Ast.Statement[Ctx]]] = P("{" ~ "}").map(_ => Seq.empty)
@@ -380,13 +402,15 @@ object StatefulParser extends Parser[StatefulContext] {
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.ContractCallExpr] =
-    P((contractConv | variable) ~ "." ~ callAbs).map { case (obj, (callId, exprs)) =>
-      Ast.ContractCallExpr(obj, callId, exprs)
+    P((contractConv | variable) ~ "." ~ callAbs).map { case (obj, (callId, approveAssets, exprs)) =>
+      Ast.ContractCallExpr(obj, callId, approveAssets, exprs)
     }
 
   def contractCall[Unknown: P]: P[Ast.ContractCall] =
     P((contractConv | variable) ~ "." ~ callAbs)
-      .map { case (obj, (callId, exprs)) => Ast.ContractCall(obj, callId, exprs) }
+      .map { case (obj, (callId, approveAssets, exprs)) =>
+        Ast.ContractCall(obj, callId, approveAssets, exprs)
+      }
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(varDef | assign | funcCall | contractCall | ifelse | whileStmt | ret | emitEvent)

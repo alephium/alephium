@@ -2029,9 +2029,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |@using(preapprovedAssets = true, assetsInContract = true)
          |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) {
-         |  approveToken!(address, tokenId, tokenAmount)
          |  let swap = Swap(swapContractKey)
-         |  swap.swapAlph(address, tokenAmount)
+         |  swap.swapAlph{
+         |    address: [tokenId: tokenAmount]
+         |  }(address, tokenAmount)
          |}
          |
          |Interface Swap {
@@ -2040,7 +2041,60 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     val script = Compiler.compileTxScript(code).rightValue
-    script.toTemplateString() is "0101010001000a{0}{1}{2}a3{3}1700{0}{2}16000100"
+    script.toTemplateString() is "0101010001000a{3}1700{0}{1}{2}a3{0}{2}16000100"
+  }
+
+  it should "use braces syntax for functions that uses preapproved assets" in {
+    def code(usePreapprovedAssets: Boolean): String =
+      s"""
+         |TxScript Main(fooContractId: ByteVec, amount: U256) {
+         |  let foo = Foo(fooContractId)
+         |  foo.foo{callerAddress!(): amount}()
+         |}
+         |
+         |Interface Foo {
+         |  @using(preapprovedAssets = ${usePreapprovedAssets})
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+    Compiler.compileTxScript(code(true)).isRight is true
+    Compiler.compileTxScript(code(false)).leftValue.message is
+      "Function `foo` does not use preapproved assets"
+  }
+
+  it should "check types for braces syntax" in {
+    def code(
+        address: String = "Address",
+        amount: String = "U256",
+        tokenId: String = "ByteVec",
+        tokenAmount: String = "U256"
+    ): String =
+      s"""
+         |TxScript Main(
+         |  fooContractId: ByteVec,
+         |  address: ${address},
+         |  amount: ${amount},
+         |  tokenId: ${tokenId},
+         |  tokenAmount: ${tokenAmount}
+         |) {
+         |  let foo = Foo(fooContractId)
+         |  foo.foo{address: [amount, tokenId: tokenAmount]}()
+         |}
+         |
+         |Interface Foo {
+         |  @using(preapprovedAssets = true)
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+    Compiler.compileTxScript(code()).isRight is true
+    Compiler.compileTxScript(code(address = "Bool")).leftValue.message is
+      "Invalid address type: Variable(Ident(address))"
+    Compiler.compileTxScript(code(amount = "Bool")).leftValue.message is
+      "Invalid amount type: Some(Variable(Ident(amount)))"
+    Compiler.compileTxScript(code(tokenId = "Bool")).leftValue.message is
+      "Invalid token amount type: List((Variable(Ident(tokenId)),Variable(Ident(tokenAmount))))"
+    Compiler.compileTxScript(code(tokenAmount = "Bool")).leftValue.message is
+      "Invalid token amount type: List((Variable(Ident(tokenId)),Variable(Ident(tokenAmount))))"
   }
 
   it should "compile events with <= 8 fields" in {

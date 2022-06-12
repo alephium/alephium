@@ -45,6 +45,62 @@ object Ast {
     def empty: FuncId = FuncId("", isBuiltIn = false)
   }
 
+  final case class ApproveAsset[Ctx <: StatelessContext](
+      address: Expr[Ctx],
+      attoAlphAmountOpt: Option[Expr[Ctx]],
+      tokenAmounts: Seq[(Expr[Ctx], Expr[Ctx])]
+  ) {
+    lazy val approveCount = (if (attoAlphAmountOpt.isEmpty) 0 else 1) + tokenAmounts.length
+
+    def check(state: Compiler.State[Ctx]): Unit = {
+      if (address.getType(state) != Seq(Type.Address)) {
+        throw Compiler.Error(s"Invalid address type: ${address}")
+      }
+      if (attoAlphAmountOpt.exists(_.getType(state) != Seq(Type.U256))) {
+        throw Compiler.Error(s"Invalid amount type: ${attoAlphAmountOpt}")
+      }
+      if (
+        tokenAmounts
+          .exists(p =>
+            (p._1.getType(state), p._2.getType(state)) != (Seq(Type.ByteVec), Seq(Type.U256))
+          )
+      ) {
+        throw Compiler.Error(s"Invalid token amount type: ${tokenAmounts}")
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      assume(approveCount >= 1)
+      val approveAlph: Seq[Instr[Ctx]] = attoAlphAmountOpt match {
+        case Some(amount) => amount.genCode(state) :+ ApproveAlph.asInstanceOf[Instr[Ctx]]
+        case None         => Seq.empty
+      }
+      val approveTokens: Seq[Instr[Ctx]] = tokenAmounts.flatMap { case (tokenId, amount) =>
+        tokenId.genCode(state) ++ amount.genCode(state) :+ ApproveToken.asInstanceOf[Instr[Ctx]]
+      }
+      address.genCode(state) ++ Seq.fill(approveCount - 1)(Dup) ++ approveAlph ++ approveTokens
+    }
+  }
+
+  trait ApproveAssets[Ctx <: StatelessContext] {
+    def approveAssets: Seq[ApproveAsset[Ctx]]
+
+    def checkApproveAssets(state: Compiler.State[Ctx]): Unit = {
+      approveAssets.foreach(_.check(state))
+    }
+
+    def genApproveCode(
+        state: Compiler.State[Ctx],
+        func: Compiler.FuncInfo[Ctx]
+    ): Seq[Instr[Ctx]] = {
+      if (approveAssets.nonEmpty && !func.usePreapprovedAssets) {
+        throw Compiler.Error(s"Function `${func.name}` does not use preapproved assets")
+      }
+      approveAssets.flatMap(_.genCode(state))
+    }
+  }
+
   trait Typed[Ctx <: StatelessContext, T] {
     var tpe: Option[T] = None
     protected def _getType(state: Compiler.State[Ctx]): T
@@ -154,16 +210,22 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       address.genCode(state)
   }
-  final case class CallExpr[Ctx <: StatelessContext](id: FuncId, args: Seq[Expr[Ctx]])
-      extends Expr[Ctx] {
+  final case class CallExpr[Ctx <: StatelessContext](
+      id: FuncId,
+      approveAssets: Seq[ApproveAsset[Ctx]],
+      args: Seq[Expr[Ctx]]
+  ) extends Expr[Ctx]
+      with ApproveAssets[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
       funcInfo.getReturnType(args.flatMap(_.getType(state)))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val func = state.getFunc(id)
-      args.flatMap(_.genCode(state)) ++
+      genApproveCode(state, func) ++
+        args.flatMap(_.genCode(state)) ++
         (if (func.isVariadic) Seq(U256Const(Val.U256.unsafe(args.length))) else Seq.empty) ++
         func.genCode(args.flatMap(_.getType(state)))
     }
@@ -192,17 +254,23 @@ object Ast {
   final case class ContractCallExpr(
       obj: Expr[StatefulContext],
       callId: FuncId,
+      approveAssets: Seq[ApproveAsset[StatefulContext]],
       args: Seq[Expr[StatefulContext]]
   ) extends Expr[StatefulContext]
-      with ContractCallBase {
-    override def _getType(state: Compiler.State[StatefulContext]): Seq[Type] =
+      with ContractCallBase
+      with ApproveAssets[StatefulContext] {
+    override def _getType(state: Compiler.State[StatefulContext]): Seq[Type] = {
+      checkApproveAssets(state)
       _getTypeBase(state)
+    }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     override def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
       val contract = obj.getType(state)(0).asInstanceOf[Type.Contract]
-      args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
-        state.getFunc(contract.id, callId).genExternalCallCode(contract.id)
+      val func     = state.getFunc(contract.id, callId)
+      genApproveCode(state, func) ++
+        args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
+        func.genExternalCallCode(contract.id)
     }
   }
   final case class ParenExpr[Ctx <: StatelessContext](expr: Expr[Ctx]) extends Expr[Ctx] {
@@ -436,9 +504,14 @@ object Ast {
       rhs.genCode(state) ++ targets.flatMap(_.genStore(state)).reverse.flatten
     }
   }
-  final case class FuncCall[Ctx <: StatelessContext](id: FuncId, args: Seq[Expr[Ctx]])
-      extends Statement[Ctx] {
+  final case class FuncCall[Ctx <: StatelessContext](
+      id: FuncId,
+      approveAssets: Seq[ApproveAsset[Ctx]],
+      args: Seq[Expr[Ctx]]
+  ) extends Statement[Ctx]
+      with ApproveAssets[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
+      checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
       funcInfo.getReturnType(args.flatMap(_.getType(state)))
       ()
@@ -448,7 +521,8 @@ object Ast {
       val func       = state.getFunc(id)
       val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      args.flatMap(_.genCode(state)) ++
+      genApproveCode(state, func) ++
+        args.flatMap(_.genCode(state)) ++
         (if (func.isVariadic) Seq(U256Const(Val.U256(U256.unsafe(args.length)))) else Seq.empty) ++
         func.genCode(argsType) ++
         Seq.fill(ArrayTransformer.flattenTypeLength(returnType))(Pop)
@@ -457,10 +531,13 @@ object Ast {
   final case class ContractCall(
       obj: Expr[StatefulContext],
       callId: FuncId,
+      approveAssets: Seq[ApproveAsset[StatefulContext]],
       args: Seq[Expr[StatefulContext]]
   ) extends Statement[StatefulContext]
-      with ContractCallBase {
+      with ContractCallBase
+      with ApproveAssets[StatefulContext] {
     override def check(state: Compiler.State[StatefulContext]): Unit = {
+      checkApproveAssets(state)
       _getTypeBase(state)
       ()
     }
@@ -471,7 +548,8 @@ object Ast {
       val func       = state.getFunc(contract.id, callId)
       val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
+      genApproveCode(state, func) ++
+        args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
         func.genExternalCallCode(contract.id) ++
         Seq.fill[Instr[StatefulContext]](ArrayTransformer.flattenTypeLength(returnType))(Pop)
     }
@@ -618,8 +696,9 @@ object Ast {
     def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = Seq(loadFieldsFunc)
     private val loadFieldsFunc: Compiler.ContractFunc[StatefulContext] =
       new Compiler.ContractFunc[StatefulContext] {
-        def name: String      = "loadFields"
-        def isPublic: Boolean = true
+        def name: String                  = "loadFields"
+        def isPublic: Boolean             = true
+        def usePreapprovedAssets: Boolean = false
 
         lazy val returnType: Seq[Type] = fields.map(_.tpe)
 
