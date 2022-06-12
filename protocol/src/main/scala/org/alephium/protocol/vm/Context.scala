@@ -317,11 +317,11 @@ trait StatefulContext extends StatelessContext with ContractPool {
       output: ContractOutput
   ): ExeResult[Unit] = {
     for {
+      _ <- markAssetFlushed(contractId)
       _ <- worldState
         .updateContract(contractId, outputRef, output)
         .left
         .map(e => Left(IOErrorUpdateState(e)))
-      _ <- markAssetFlushed(contractId)
     } yield ()
   }
 

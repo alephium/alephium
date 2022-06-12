@@ -824,9 +824,11 @@ class VMSpec extends AlephiumSpec {
   trait DestroyFixture extends ContractFixture {
     def prepareContract(
         contract: String,
-        initialState: AVector[Val] = AVector.empty
+        initialState: AVector[Val] = AVector.empty,
+        initialAttoAlphAmount: U256 = minimalAlphInContract
     ): (String, ContractOutputRef) = {
-      val contractId       = createContract(contract, initialState).key
+      val contractId =
+        createContract(contract, initialState, initialAttoAlphAmount = initialAttoAlphAmount).key
       val worldState       = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractAssetRef = worldState.getContractState(contractId).rightValue.contractOutputRef
       contractId.toHexString -> contractAssetRef
@@ -886,6 +888,29 @@ class VMSpec extends AlephiumSpec {
       callTxScript(main(genesisAddress.toBase58))
       checkContractState(fooId, fooAssetRef, false)
     }
+  }
+
+  it should "not destroy a contract after approving assets" in new DestroyFixture {
+    val foo =
+      s"""
+         |TxContract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn destroy(targetAddress: Address) -> () {
+         |    approveAlph!(selfAddress!(), 2 alph)
+         |    destroySelf!(targetAddress)
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, AVector.empty, initialAttoAlphAmount = ALPH.alph(10)).key
+
+    val main =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooId.toHexString}).destroy(@$genesisAddress)
+         |}
+         |$foo
+         |""".stripMargin
+    failCallTxScript(main, ContractAssetAlreadyFlushed)
   }
 
   it should "migrate contract" in new DestroyFixture {
