@@ -166,10 +166,10 @@ object UtxoSelectionAlgo extends StrictLogging {
                 GasEstimation.estimate(txScript, txScriptGasEstimator)
             }
             scriptGasFee = gasPrice * scriptGas
-            totalAlphAmount <- scriptGasFee
+            totalAttoAlphAmount <- scriptGasFee
               .add(amounts.alph)
               .toRight("ALPH balance overflow with estimated script gas")
-            amountsWithScriptGas = AssetAmounts(totalAlphAmount, amounts.tokens)
+            amountsWithScriptGas = AssetAmounts(totalAttoAlphAmount, amounts.tokens)
             utxos <- selectUtxos(
               amountsWithScriptGas,
               sortedUtxos,
@@ -230,12 +230,12 @@ object UtxoSelectionAlgo extends StrictLogging {
         alphFoundResult <- selectForAlph(amounts.alph, sortedUtxos, dustAmount)(asset =>
           Some(asset.output.amount)
         )
-        (alphAmountWithoutGas, utxosForAlph, remainingUtxos) = alphFoundResult
+        (attoAlphAmountWithoutGas, utxosForAlph, remainingUtxos) = alphFoundResult
         tokensFoundResult <- selectForTokens(amounts.tokens, utxosForAlph, remainingUtxos)
       } yield {
         val (foundUtxos, restOfUtxos, _) = tokensFoundResult
-        val alphAmountWithoutGas         = foundUtxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
-        SelectedSoFar(alphAmountWithoutGas, foundUtxos, restOfUtxos)
+        val attoAlphAmountWithoutGas     = foundUtxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
+        SelectedSoFar(attoAlphAmountWithoutGas, foundUtxos, restOfUtxos)
       }
     }
 
@@ -323,7 +323,7 @@ object UtxoSelectionAlgo extends StrictLogging {
         unlockScript: UnlockScript,
         txOutputsLength: Int,
         selectedSoFar: SelectedSoFar,
-        totalAlphAmount: U256,
+        totalAttoAlphAmount: U256,
         assetScriptGasEstimator: AssetScriptGasEstimator
     ): Either[String, SelectedSoFar] = {
       val selectedUTXOs       = selectedSoFar.selected
@@ -346,7 +346,7 @@ object UtxoSelectionAlgo extends StrictLogging {
         estimatedGas match {
           case Right(gas) =>
             val gasFee = gasPrice * gas
-            if (validate(sum, totalAlphAmount.addUnsafe(gasFee), dustAmount)) {
+            if (validate(sum, totalAttoAlphAmount.addUnsafe(gasFee), dustAmount)) {
               Right((sum, index))
             } else {
               if (index == restOfUtxos.length) {

@@ -69,7 +69,7 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
         case None =>
           balancesPerLockup.addAlph(amount) is None
       }
-      balancesPerLockup.alphAmount is current
+      balancesPerLockup.attoAlphAmount is current
     }
 
     balancesPerLockup.addAlph(U256.MaxValue) is None
@@ -104,7 +104,7 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
         case None =>
           balancesPerLockup.subAlph(amount) is None
       }
-      balancesPerLockup.alphAmount is current
+      balancesPerLockup.attoAlphAmount is current
     }
 
     balancesPerLockup.subAlph(U256.MaxValue) is None

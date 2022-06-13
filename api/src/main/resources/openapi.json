@@ -1032,7 +1032,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "alphAmount": "2000000000000000000"
+                        "attoAlphAmount": "2000000000000000000"
                       }
                     ]
                   }
@@ -1043,7 +1043,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "alphAmount": "2000000000000000000",
+                        "attoAlphAmount": "2000000000000000000",
                         "tokens": [
                           {
                             "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -3450,7 +3450,7 @@
                                 {
                                   "hint": 1,
                                   "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                                  "alphAmount": "2000000000000000000",
+                                  "attoAlphAmount": "2000000000000000000",
                                   "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                                   "tokens": [
                                     {
@@ -3479,7 +3479,7 @@
                                 "type": "AssetOutput",
                                 "hint": 1,
                                 "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                                "alphAmount": "2000000000000000000",
+                                "attoAlphAmount": "2000000000000000000",
                                 "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                                 "tokens": [
                                   {
@@ -3498,7 +3498,7 @@
                                 "type": "ContractOutput",
                                 "hint": 1,
                                 "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                                "alphAmount": "2000000000000000000",
+                                "attoAlphAmount": "2000000000000000000",
                                 "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
                                 "tokens": [
                                   {
@@ -3656,7 +3656,7 @@
                           {
                             "hint": 1,
                             "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                            "alphAmount": "2000000000000000000",
+                            "attoAlphAmount": "2000000000000000000",
                             "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                             "tokens": [
                               {
@@ -3685,7 +3685,7 @@
                           "type": "AssetOutput",
                           "hint": 1,
                           "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                          "alphAmount": "2000000000000000000",
+                          "attoAlphAmount": "2000000000000000000",
                           "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                           "tokens": [
                             {
@@ -3704,7 +3704,7 @@
                           "type": "ContractOutput",
                           "hint": 1,
                           "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                          "alphAmount": "2000000000000000000",
+                          "attoAlphAmount": "2000000000000000000",
                           "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
                           "tokens": [
                             {
@@ -4646,7 +4646,7 @@
                             {
                               "hint": 1,
                               "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                              "alphAmount": "2000000000000000000",
+                              "attoAlphAmount": "2000000000000000000",
                               "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                               "tokens": [
                                 {
@@ -4767,7 +4767,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "alphAmount": "2000000000000000000"
+                        "attoAlphAmount": "2000000000000000000"
                       }
                     ]
                   }
@@ -4779,7 +4779,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "alphAmount": "2000000000000000000",
+                        "attoAlphAmount": "2000000000000000000",
                         "tokens": [
                           {
                             "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -5176,7 +5176,7 @@
                       {
                         "hint": 1,
                         "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                        "alphAmount": "2000000000000000000",
+                        "attoAlphAmount": "2000000000000000000",
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                         "tokens": [
                           {
@@ -5573,7 +5573,7 @@
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
-                    "alphAmount": "1000000000000000",
+                    "attoAlphAmount": "1000000000000000",
                     "tokens": [
                       {
                         "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -5870,7 +5870,7 @@
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
                     "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
-                    "initialAlphAmount": "2000000000000000000",
+                    "initialAttoAlphAmount": "2000000000000000000",
                     "initialTokenAmounts": [
                       {
                         "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -6023,7 +6023,7 @@
                     }
                   ],
                   "asset": {
-                    "alphAmount": "2000000000000000000",
+                    "attoAlphAmount": "2000000000000000000",
                     "tokens": [
                       {
                         "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
@@ -6128,7 +6128,7 @@
                   }
                 ],
                 "initialAsset": {
-                  "alphAmount": "1000000000000000000",
+                  "attoAlphAmount": "1000000000000000000",
                   "tokens": [
                     {
                       "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -6156,7 +6156,7 @@
                       }
                     ],
                     "asset": {
-                      "alphAmount": "2000000000000000000",
+                      "attoAlphAmount": "2000000000000000000",
                       "tokens": [
                         {
                           "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
@@ -6170,7 +6170,7 @@
                   {
                     "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "asset": {
-                      "alphAmount": "3000000000000000000",
+                      "attoAlphAmount": "3000000000000000000",
                       "tokens": [
                         {
                           "id": "20aa1fcc865087d7788302d087e4bc76691218ce5d5013dd1cedaabfac19cca4",
@@ -6215,7 +6215,7 @@
                         }
                       ],
                       "asset": {
-                        "alphAmount": "2000000000000000000",
+                        "attoAlphAmount": "2000000000000000000",
                         "tokens": [
                           {
                             "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
@@ -6233,7 +6233,7 @@
                       "type": "ContractOutput",
                       "hint": 1234,
                       "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                      "alphAmount": "1000000000000000000",
+                      "attoAlphAmount": "1000000000000000000",
                       "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
                       "tokens": [
                         {
@@ -6369,7 +6369,7 @@
                   {
                     "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "asset": {
-                      "alphAmount": "3000000000000000000",
+                      "attoAlphAmount": "3000000000000000000",
                       "tokens": [
                         {
                           "id": "20aa1fcc865087d7788302d087e4bc76691218ce5d5013dd1cedaabfac19cca4",
@@ -6412,7 +6412,7 @@
                         }
                       ],
                       "asset": {
-                        "alphAmount": "2000000000000000000",
+                        "attoAlphAmount": "2000000000000000000",
                         "tokens": [
                           {
                             "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
@@ -6430,7 +6430,7 @@
                       "type": "ContractOutput",
                       "hint": 1,
                       "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                      "alphAmount": "1000000000000000000",
+                      "attoAlphAmount": "1000000000000000000",
                       "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
                       "tokens": [
                         {
@@ -6665,7 +6665,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "alphAmount": "2000000000000000000"
+                        "attoAlphAmount": "2000000000000000000"
                       }
                     ]
                   }
@@ -6680,7 +6680,7 @@
                     "destinations": [
                       {
                         "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "alphAmount": "2000000000000000000",
+                        "attoAlphAmount": "2000000000000000000",
                         "tokens": [
                           {
                             "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
@@ -7832,7 +7832,7 @@
         "required": [
           "hint",
           "key",
-          "alphAmount",
+          "attoAlphAmount",
           "address",
           "tokens",
           "lockTime",
@@ -7848,7 +7848,7 @@
             "type": "string",
             "format": "32-byte-hash"
           },
-          "alphAmount": {
+          "attoAlphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -7877,11 +7877,11 @@
       },
       "AssetState": {
         "required": [
-          "alphAmount"
+          "attoAlphAmount"
         ],
         "type": "object",
         "properties": {
-          "alphAmount": {
+          "attoAlphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -8142,7 +8142,7 @@
             "type": "string",
             "format": "hex-string"
           },
-          "initialAlphAmount": {
+          "initialAttoAlphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -8220,7 +8220,7 @@
             "type": "string",
             "format": "hex-string"
           },
-          "alphAmount": {
+          "attoAlphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -8808,7 +8808,7 @@
         "required": [
           "hint",
           "key",
-          "alphAmount",
+          "attoAlphAmount",
           "address",
           "tokens",
           "type"
@@ -8822,7 +8822,7 @@
             "type": "string",
             "format": "32-byte-hash"
           },
-          "alphAmount": {
+          "attoAlphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -8911,7 +8911,7 @@
       "Destination": {
         "required": [
           "address",
-          "alphAmount"
+          "attoAlphAmount"
         ],
         "type": "object",
         "properties": {
@@ -8919,7 +8919,7 @@
             "type": "string",
             "format": "address"
           },
-          "alphAmount": {
+          "attoAlphAmount": {
             "type": "string",
             "format": "uint256"
           },
@@ -9027,7 +9027,7 @@
         "required": [
           "hint",
           "key",
-          "alphAmount",
+          "attoAlphAmount",
           "address",
           "tokens",
           "lockTime",
@@ -9042,7 +9042,7 @@
             "type": "string",
             "format": "32-byte-hash"
           },
-          "alphAmount": {
+          "attoAlphAmount": {
             "type": "string",
             "format": "uint256"
           },

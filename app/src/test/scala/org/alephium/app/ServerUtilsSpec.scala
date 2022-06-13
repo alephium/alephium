@@ -110,7 +110,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
 
       val senderBalanceWithGas =
-        genesisBalance - destination1.alphAmount.value - destination2.alphAmount.value
+        genesisBalance - destination1.attoAlphAmount.value - destination2.attoAlphAmount.value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
       checkDestinationBalance(destination1)
@@ -168,7 +168,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
 
       val senderBalanceWithGas =
-        genesisBalance - destination1.alphAmount.value - destination2.alphAmount.value
+        genesisBalance - destination1.attoAlphAmount.value - destination2.attoAlphAmount.value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
       checkAddressBalance(destination1.address, U256.unsafe(0), 0)
@@ -642,16 +642,16 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "not create transaction with overflowing ALPH amount" in new MultipleUtxos {
-    val alphAmountOverflowDestinations = AVector(
+    val attoAlphAmountOverflowDestinations = AVector(
       destination1,
-      destination2.copy(alphAmount = Amount(ALPH.MaxALPHValue))
+      destination2.copy(attoAlphAmount = Amount(ALPH.MaxALPHValue))
     )
     serverUtils
       .prepareUnsignedTransaction(
         blockFlow,
         fromPublicKey,
         outputRefsOpt = None,
-        alphAmountOverflowDestinations,
+        attoAlphAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
         defaultGasPrice
       )
@@ -725,10 +725,12 @@ class ServerUtilsSpec extends AlephiumSpec {
 
   it should "check the minimal amount deposit for contract creation" in new Fixture {
     val serverUtils = new ServerUtils
-    serverUtils.getInitialAlphAmount(None) isE minimalAlphInContract
-    serverUtils.getInitialAlphAmount(Some(Amount(minimalAlphInContract))) isE minimalAlphInContract
+    serverUtils.getInitialAttoAlphAmount(None) isE minimalAlphInContract
+    serverUtils.getInitialAttoAlphAmount(
+      Some(Amount(minimalAlphInContract))
+    ) isE minimalAlphInContract
     serverUtils
-      .getInitialAlphAmount(Some(Amount(minimalAlphInContract - 1)))
+      .getInitialAttoAlphAmount(Some(Amount(minimalAlphInContract - 1)))
       .leftValue
       .detail is "Expect 1 ALPH deposit to deploy a new contract"
   }
@@ -847,22 +849,22 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooAddress = Address.contract(fooId)
     val callScriptCode =
       s"""
-         |@using(preapprovedAssets = true) TxScript Main {
-         |  approveAlph!(@$callerAddress, ${ALPH.oneAlph})
+         |@using(preapprovedAssets = true)
+         |TxScript Main {
          |  let foo = Foo(#${fooId.toHexString})
-         |  foo.addOne()
+         |  foo.addOne{@$callerAddress -> 1 alph}()
          |}
          |
          |$fooCode
          |""".stripMargin
     val callScript = Compiler.compileTxScript(callScriptCode).rightValue
 
-    def checkContractStates(contractId: ContractId, value: U256, alphAmount: U256) = {
+    def checkContractStates(contractId: ContractId, value: U256, attoAlphAmount: U256) = {
       val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       val contractState = worldState.getContractState(contractId).rightValue
       contractState.fields is AVector[vm.Val](vm.Val.U256(value))
       val contractOutput = worldState.getContractAsset(contractState.contractOutputRef).rightValue
-      contractOutput.amount is alphAmount
+      contractOutput.amount is attoAlphAmount
     }
   }
 
@@ -883,8 +885,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     callContractResult0.returns is AVector[Val](ValU256(2))
     callContractResult0.gasUsed is 23189
     callContractResult0.txOutputs.length is 2
-    val contractAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
-    callContractResult0.txOutputs(0).alphAmount.value is contractAlphAmount0
+    val contractAttoAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
+    callContractResult0.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount0
 
     callContractResult0.contracts.length is 2
     val barState0 = callContractResult0.contracts(0)
@@ -894,7 +896,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooState0 = callContractResult0.contracts(1)
     fooState0.fields is AVector[Val](ValU256(2))
     fooState0.address is fooAddress
-    fooState0.asset is AssetState(contractAlphAmount0, Some(AVector.empty))
+    fooState0.asset is AssetState(contractAttoAlphAmount0, Some(AVector.empty))
 
     info("call contract against the old world state")
     val params1             = params0.copy(worldStateBlockHash = Some(createContractBlock.hash))
@@ -902,8 +904,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     callContractResult1.returns is AVector[Val](ValU256(1))
     callContractResult1.gasUsed is 23189
     callContractResult1.txOutputs.length is 2
-    val contractAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
-    callContractResult1.txOutputs(0).alphAmount.value is contractAlphAmount1
+    val contractAttoAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
+    callContractResult1.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount1
 
     callContractResult1.contracts.length is 2
     val barState1 = callContractResult1.contracts(0)
@@ -913,7 +915,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooState1 = callContractResult1.contracts(1)
     fooState1.fields is AVector[Val](ValU256(1))
     fooState1.address is fooAddress
-    fooState1.asset is AssetState(contractAlphAmount1, Some(AVector.empty))
+    fooState1.asset is AssetState(contractAttoAlphAmount1, Some(AVector.empty))
   }
 
   trait TestContractFixture extends Fixture {
@@ -1041,7 +1043,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 18599
+    result1.gasUsed is 18598
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
@@ -1392,6 +1394,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
       val stateRaw                       = Hex.toHexString(serialize(initialFields))
 
+      val expected =
+        s"""
+           |TxScript Main {
+           |  createContractWithToken!{@$fromAddress -> 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, 50)
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
@@ -1400,15 +1409,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           U256.unsafe(10),
           AVector(Token(token1, U256.unsafe(10)), Token(token2, U256.unsafe(20))),
           Some(U256.unsafe(50))
-        ) is s"""
-                |TxScript Main {
-                |  approveAlph!(@${fromAddress.toBase58}, 10)
-                |  approveToken!(@${fromAddress.toBase58}, #${token1.toHexString}, 10)
-                |  approveToken!(@${fromAddress.toBase58}, #${token2.toHexString}, 20)
-                |  createContractWithToken!(#$codeRaw, #$stateRaw, 50)
-                |}
-                |""".stripMargin
-
+        ) is expected
     }
 
     {
@@ -1417,6 +1418,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
       val stateRaw                       = Hex.toHexString(serialize(initialFields))
 
+      val expected =
+        s"""
+           |TxScript Main {
+           |  createContractWithToken!{@$fromAddress -> 10}(#$codeRaw, #$stateRaw, 50)
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
@@ -1425,12 +1433,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           U256.unsafe(10),
           AVector.empty,
           Some(U256.unsafe(50))
-        ) is s"""
-                |TxScript Main {
-                |  approveAlph!(@${fromAddress.toBase58}, 10)
-                |  createContractWithToken!(#$codeRaw, #$stateRaw, 50)
-                |}
-                |""".stripMargin
+        ) is expected
     }
   }
 
@@ -1490,6 +1493,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    checkAddressBalance(destination.address, destination.alphAmount.value, utxoNum)
+    checkAddressBalance(destination.address, destination.attoAlphAmount.value, utxoNum)
   }
 }

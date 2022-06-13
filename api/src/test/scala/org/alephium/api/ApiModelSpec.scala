@@ -250,7 +250,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  "type": "ContractOutput",
                        |  "hint": $hint,
                        |  "key": "${key.toHexString}",
-                       |  "alphAmount": "$amountStr",
+                       |  "attoAlphAmount": "$amountStr",
                        |  "address": "$addressStr",
                        |  "tokens": [
                        |    {
@@ -285,7 +285,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  "type": "AssetOutput",
                        |  "hint": $hint,
                        |  "key": "${key.toHexString}",
-                       |  "alphAmount": "$amountStr",
+                       |  "attoAlphAmount": "$amountStr",
                        |  "address": "$addressStr",
                        |  "tokens": [],
                        |  "lockTime": 1234,
@@ -340,7 +340,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  "destinations": [
                        |    {
                        |      "address": "${toAddress.toBase58}",
-                       |      "alphAmount": "1"
+                       |      "attoAlphAmount": "1"
                        |    }
                        |  ]
                        |}
@@ -362,7 +362,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  "destinations": [
                        |    {
                        |      "address": "${toAddress.toBase58}",
-                       |      "alphAmount": "1",
+                       |      "attoAlphAmount": "1",
                        |      "lockTime": 1234
                        |    }
                        |  ],
@@ -396,7 +396,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  "destinations": [
                        |    {
                        |      "address": "${toAddress.toBase58}",
-                       |      "alphAmount": "1",
+                       |      "attoAlphAmount": "1",
                        |      "tokens": [
                        |        {
                        |          "id": "${tokenId1.toHexString}",
@@ -436,7 +436,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  "destinations": [
                        |    {
                        |      "address": "${toAddress.toBase58}",
-                       |      "alphAmount": "1",
+                       |      "attoAlphAmount": "1",
                        |      "tokens": [
                        |        {
                        |          "id": "${tokenId1.toHexString}",
@@ -477,7 +477,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  "destinations": [
                        |    {
                        |      "address": "${toAddress.toBase58}",
-                       |      "alphAmount": "1",
+                       |      "attoAlphAmount": "1",
                        |      "tokens": [
                        |        {
                        |          "id": "${tokenId1.toHexString}",
@@ -746,14 +746,14 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode AssetState" in {
     val asset1   = AssetState(U256.unsafe(100))
-    val jsonRaw1 = s"""{"alphAmount": "100"}"""
+    val jsonRaw1 = s"""{"attoAlphAmount": "100"}"""
     checkData(asset1, jsonRaw1)
 
     val asset2 = AssetState.from(U256.unsafe(100), AVector(Token(Hash.zero, U256.unsafe(123))))
     val jsonRaw2 =
       s"""
          |{
-         |  "alphAmount": "100",
+         |  "attoAlphAmount": "100",
          |  "tokens":[{"id": "0000000000000000000000000000000000000000000000000000000000000000","amount":"123"}]
          |}""".stripMargin
     checkData(asset2, jsonRaw2)
@@ -803,7 +803,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |    }
          |  ],
          |  "asset": {
-         |    "alphAmount": "1000000000000000000",
+         |    "attoAlphAmount": "1000000000000000000",
          |    "tokens": [
          |      {
          |        "id": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -907,7 +907,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "hint": -383063803,
          |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
-         |  "alphAmount": "1000000000000000000",
+         |  "attoAlphAmount": "1000000000000000000",
          |  "address": "111111111111111111111111111111111",
          |  "tokens": [],
          |  "lockTime": 0,
@@ -924,7 +924,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "type": "AssetOutput",
          |  "hint": -383063803,
          |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
-         |  "alphAmount": "1000000000000000000",
+         |  "attoAlphAmount": "1000000000000000000",
          |  "address": "111111111111111111111111111111111",
          |  "tokens": [],
          |  "lockTime": 0,
@@ -939,7 +939,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "type": "ContractOutput",
          |  "hint": -383063804,
          |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
-         |  "alphAmount": "1000000000000000000",
+         |  "attoAlphAmount": "1000000000000000000",
          |  "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
          |  "tokens": []
          |}

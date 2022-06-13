@@ -64,13 +64,14 @@ class ContextSpec
     context.generatedOutputs.size is 1
   }
 
-  it should "generate contract output when the contract is not loaded" in new Fixture {
+  it should "not generate contract output when the contract is not loaded" in new Fixture {
     val contractId = createContract()
+    val oldOutput  = context.worldState.getContractAsset(contractId).rightValue
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
     context.generateOutput(newOutput).leftValue isE ContractAssetUnloaded
     initialGas.use(GasSchedule.txOutputBaseGas) isE context.gasRemaining
-    context.worldState.getContractAsset(contractId) isE newOutput
+    context.worldState.getContractAsset(contractId) isE oldOutput
     context.generatedOutputs.size is 1
   }
 

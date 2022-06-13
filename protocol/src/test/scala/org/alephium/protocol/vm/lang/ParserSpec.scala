@@ -56,33 +56,72 @@ class ParserSpec extends AlephiumSpec {
         Binop(And, Variable(Ident("x")), Variable(Ident("y"))),
         Variable(Ident("z"))
       )
+  }
+
+  it should "parse function" in {
+    info("Function")
     fastparse.parse("foo(x)", StatelessParser.expr(_)).get.value is
-      CallExpr[StatelessContext](FuncId("foo", false), List(Variable(Ident("x"))))
+      CallExpr[StatelessContext](FuncId("foo", false), Seq.empty, List(Variable(Ident("x"))))
     fastparse.parse("Foo(x)", StatelessParser.expr(_)).get.value is
       ContractConv[StatelessContext](Ast.TypeId("Foo"), Variable(Ident("x")))
     fastparse.parse("foo!(x)", StatelessParser.expr(_)).get.value is
-      CallExpr[StatelessContext](FuncId("foo", true), List(Variable(Ident("x"))))
+      CallExpr[StatelessContext](FuncId("foo", true), Seq.empty, List(Variable(Ident("x"))))
     fastparse.parse("foo(x + y) + bar!(x + y)", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,
         CallExpr(
           FuncId("foo", false),
+          Seq.empty,
           List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
         ),
-        CallExpr(FuncId("bar", true), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+        CallExpr(
+          FuncId("bar", true),
+          Seq.empty,
+          List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
+        )
       )
+    fastparse
+      .parse("foo{ x -> 1e-18 alph, token: 2; y -> 3 }(z)", StatefulParser.expr(_))
+      .get
+      .value is
+      CallExpr[StatefulContext](
+        FuncId("foo", false),
+        Seq(
+          Ast.ApproveAsset(
+            Variable(Ident("x")),
+            Some(Const(Val.U256(U256.One))),
+            Seq(Variable(Ident("token")) -> Const(Val.U256(U256.Two)))
+          ),
+          Ast.ApproveAsset(Variable(Ident("y")), Some(Const(Val.U256(U256.unsafe(3)))), Seq.empty)
+        ),
+        List(Variable(Ident("z")))
+      )
+
+    info("Braces syntax")
+    fastparse.parse("{ x -> 1 alph }", StatelessParser.approveAssets(_)).isSuccess is true
+    fastparse.parse("{ x -> tokenId: 2 }", StatelessParser.approveAssets(_)).isSuccess is true
+    fastparse
+      .parse("{ x -> 1 alph, tokenId: 2; y -> 3 }", StatelessParser.approveAssets(_))
+      .isSuccess is true
+
+    info("Contract call")
     fastparse.parse("x.bar(x)", StatefulParser.contractCallExpr(_)).get.value is
       ContractCallExpr(
         Variable(Ident("x")),
         FuncId("bar", false),
+        Seq.empty,
         List(Variable(Ident("x")))
       )
-    fastparse.parse("Foo(x).bar(x)", StatefulParser.contractCallExpr(_)).get.value is
+    fastparse.parse("Foo(x).bar{ z -> 1 }(x)", StatefulParser.contractCallExpr(_)).get.value is
       ContractCallExpr(
         ContractConv[StatefulContext](Ast.TypeId("Foo"), Variable(Ident("x"))),
         FuncId("bar", false),
+        Seq(Ast.ApproveAsset(Variable(Ident("z")), Some(Const(Val.U256(U256.One))), Seq.empty)),
         List(Variable(Ident("x")))
       )
+  }
+
+  it should "parse ByteVec" in {
     fastparse.parse("# ++ #00", StatefulParser.expr(_)).get.value is
       Binop[StatefulContext](
         Concat,
@@ -111,6 +150,15 @@ class ParserSpec extends AlephiumSpec {
     fastparse
       .parse("if x >= 1 { y = y + x } else { y = 0 }", StatelessParser.statement(_))
       .isSuccess is true
+
+    fastparse
+      .parse("while true { x = x + 1 }", StatelessParser.statement(_))
+      .get
+      .value is a[Ast.While[StatelessContext]]
+    fastparse
+      .parse("for let mut i = 0; i < 10; i = i + 1 { x = x + 1 }", StatelessParser.statement(_))
+      .get
+      .value is a[Ast.ForLoop[StatelessContext]]
   }
 
   it should "parse if-else statements" in {
@@ -286,15 +334,15 @@ class ParserSpec extends AlephiumSpec {
     val states: List[(String, Ast.Statement[StatelessContext])] = List(
       "let (a, b) = foo()" -> Ast.VarDef(
         Seq((false, Ast.Ident("a")), (false, Ast.Ident("b"))),
-        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let (a, mut b) = foo()" -> Ast.VarDef(
         Seq((false, Ast.Ident("a")), (true, Ast.Ident("b"))),
-        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let (mut a, mut b) = foo()" -> Ast.VarDef(
         Seq((true, Ast.Ident("a")), (true, Ast.Ident("b"))),
-        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       )
     )
     states.foreach { case (code, ast) =>
@@ -308,7 +356,10 @@ class ParserSpec extends AlephiumSpec {
         .ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1))),
       "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(Variable(Ast.Ident("i")))),
       "a[foo()]" -> Ast
-        .ArrayElement(Variable(Ast.Ident("a")), Seq(CallExpr(FuncId("foo", false), Seq.empty))),
+        .ArrayElement(
+          Variable(Ast.Ident("a")),
+          Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+        ),
       "a[i + 1]" -> Ast.ArrayElement(
         Variable(Ast.Ident("a")),
         Seq(Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1)))))
@@ -344,7 +395,7 @@ class ParserSpec extends AlephiumSpec {
       ),
       "a, b = foo()" -> Assign(
         Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
-        CallExpr(FuncId("foo", false), Seq.empty)
+        CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "a[i] = b" -> Assign(
         Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Variable(Ident("i"))))),
@@ -352,7 +403,10 @@ class ParserSpec extends AlephiumSpec {
       ),
       "a[foo()] = b" -> Assign(
         Seq(
-          AssignmentArrayElementTarget(Ident("a"), Seq(CallExpr(FuncId("foo", false), Seq.empty)))
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+          )
         ),
         Ast.Variable(Ast.Ident("b"))
       ),

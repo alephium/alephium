@@ -178,7 +178,10 @@ object VM {
     }
   }
 
-  def checkContractAlphAmounts(outputs: Iterable[TxOutput], hardFork: HardFork): ExeResult[Unit] = {
+  def checkContractAttoAlphAmounts(
+      outputs: Iterable[TxOutput],
+      hardFork: HardFork
+  ): ExeResult[Unit] = {
     val allChecked = outputs.forall {
       case output: ContractOutput => output.amount >= minimalAlphInContract
       case _                      => true
@@ -385,21 +388,8 @@ object StatefulVM {
       script: StatefulScript,
       gasRemaining: GasBox
   )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
-    runTxScript(worldState, blockEnv, tx, Some(preOutputs), script, gasRemaining)
-  }
-
-  def runTxScript(
-      worldState: WorldState.Staging,
-      blockEnv: BlockEnv,
-      tx: TransactionAbstract,
-      preOutputsOpt: Option[AVector[AssetOutput]],
-      script: StatefulScript,
-      gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
-    for {
-      context <- StatefulContext.build(blockEnv, tx, gasRemaining, worldState, preOutputsOpt)
-      result  <- runTxScript(context, script)
-    } yield result
+    val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
+    runTxScript(context, script)
   }
 
   def runTxScript(
@@ -425,7 +415,7 @@ object StatefulVM {
   private def prepareResult(context: StatefulContext): ExeResult[TxScriptExecution] = {
     for {
       _ <- checkRemainingSignatures(context)
-      _ <- VM.checkContractAlphAmounts(context.generatedOutputs, context.getHardFork())
+      _ <- VM.checkContractAttoAlphAmounts(context.generatedOutputs, context.getHardFork())
     } yield {
       TxScriptExecution(
         context.gasRemaining,

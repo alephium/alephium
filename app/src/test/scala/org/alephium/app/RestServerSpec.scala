@@ -206,7 +206,7 @@ abstract class RestServerSpec(
                 |  "destinations": [
                 |    {
                 |      "address": "$dummyToAddress",
-                |      "alphAmount": "1",
+                |      "attoAlphAmount": "1",
                 |      "tokens": []
                 |    }
                 |  ]
@@ -229,7 +229,7 @@ abstract class RestServerSpec(
                 |  "destinations": [
                 |    {
                 |      "address": "$dummyToAddress",
-                |      "alphAmount": "1",
+                |      "attoAlphAmount": "1",
                 |      "tokens": [],
                 |      "lockTime": "1234"
                 |    }
@@ -263,7 +263,7 @@ abstract class RestServerSpec(
                 |  "destinations": [
                 |    {
                 |      "address": "$dummyToAddress",
-                |      "alphAmount": "1",
+                |      "attoAlphAmount": "1",
                 |      "tokens": []
                 |    }
                 |  ]
@@ -441,7 +441,7 @@ abstract class RestServerSpec(
                 |  "destinations": [
                 |    {
                 |      "address": "$dummyToAddress",
-                |      "alphAmount": "1",
+                |      "attoAlphAmount": "1",
                 |      "tokens": []
                 |    }
                 |  ]

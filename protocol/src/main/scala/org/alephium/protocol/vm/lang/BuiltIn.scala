@@ -48,21 +48,28 @@ object BuiltIn {
     override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq(instr)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class SimpleStatelessBuiltIn(
       name: String,
       argsType: Seq[Type],
       returnType: Seq[Type],
-      instr: Instr[StatelessContext]
+      instr: Instr[StatelessContext],
+      usePreapprovedAssets: Boolean = false
   ) extends SimpleBuiltIn[StatelessContext]
 
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class SimpleStatefulBuiltIn(
       name: String,
       argsType: Seq[Type],
       returnType: Seq[Type],
-      instr: Instr[StatefulContext]
+      instr: Instr[StatefulContext],
+      usePreapprovedAssets: Boolean = false
   ) extends SimpleBuiltIn[StatefulContext]
 
-  sealed abstract class GenericStatelessBuiltIn(val name: String) extends BuiltIn[StatelessContext]
+  sealed abstract class GenericStatelessBuiltIn(val name: String)
+      extends BuiltIn[StatelessContext] {
+    def usePreapprovedAssets: Boolean = false
+  }
 
   val blake2b: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("blake2b", Seq(Type.ByteVec), Seq(Type.ByteVec), Blake2b)
@@ -211,7 +218,8 @@ object BuiltIn {
   val encodeToByteVec: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
     val name: String = "encodeToByteVec"
 
-    override def isVariadic: Boolean = true
+    override def isVariadic: Boolean  = true
+    def usePreapprovedAssets: Boolean = false
 
     def getReturnType(inputType: Seq[Type]): Seq[Type] = Seq(Type.ByteVec)
 
@@ -486,7 +494,8 @@ object BuiltIn {
       "lockApprovedAssets",
       Seq[Type](Type.Address, Type.U256),
       Seq.empty,
-      LockApprovedAssets
+      LockApprovedAssets,
+      usePreapprovedAssets = true
     )
 
   val createContract: SimpleStatefulBuiltIn =
@@ -494,7 +503,8 @@ object BuiltIn {
       "createContract",
       Seq[Type](Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
-      CreateContract
+      CreateContract,
+      usePreapprovedAssets = true
     )
 
   val createContractWithToken: SimpleStatefulBuiltIn =
@@ -502,7 +512,8 @@ object BuiltIn {
       "createContractWithToken",
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
       Seq[Type](Type.ByteVec),
-      CreateContractWithToken
+      CreateContractWithToken,
+      usePreapprovedAssets = true
     )
 
   val copyCreateContract: SimpleStatefulBuiltIn =
@@ -510,7 +521,8 @@ object BuiltIn {
       "copyCreateContract",
       Seq[Type](Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
-      CopyCreateContract
+      CopyCreateContract,
+      usePreapprovedAssets = true
     )
 
   val copyCreateContractWithToken: SimpleStatefulBuiltIn =
@@ -518,7 +530,8 @@ object BuiltIn {
       "copyCreateContractWithToken",
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
       Seq[Type](Type.ByteVec),
-      CopyCreateContractWithToken
+      CopyCreateContractWithToken,
+      usePreapprovedAssets = true
     )
 
   val createSubContract: SimpleStatefulBuiltIn =
@@ -526,7 +539,8 @@ object BuiltIn {
       "createSubContract",
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
-      CreateSubContract
+      CreateSubContract,
+      usePreapprovedAssets = true
     )
 
   val createSubContractWithToken: SimpleStatefulBuiltIn =
@@ -534,7 +548,8 @@ object BuiltIn {
       "createSubContractWithToken",
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
       Seq[Type](Type.ByteVec),
-      CreateSubContractWithToken
+      CreateSubContractWithToken,
+      usePreapprovedAssets = true
     )
 
   val copyCreateSubContract: SimpleStatefulBuiltIn =
@@ -542,7 +557,8 @@ object BuiltIn {
       "copyCreateSubContract",
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
-      CopyCreateSubContract
+      CopyCreateSubContract,
+      usePreapprovedAssets = true
     )
 
   val copyCreateSubContractWithToken: SimpleStatefulBuiltIn =
@@ -550,7 +566,8 @@ object BuiltIn {
       "copyCreateSubContractWithToken",
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
       Seq[Type](Type.ByteVec),
-      CopyCreateSubContractWithToken
+      CopyCreateSubContractWithToken,
+      usePreapprovedAssets = true
     )
 
   val destroySelf: SimpleStatefulBuiltIn =
@@ -628,7 +645,8 @@ object BuiltIn {
     )
 
   val subContractId: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] {
-    def name: String = "subContractId"
+    def name: String                  = "subContractId"
+    def usePreapprovedAssets: Boolean = false
 
     def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType == Seq(Type.ByteVec)) {

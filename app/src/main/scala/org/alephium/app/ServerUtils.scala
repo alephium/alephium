@@ -527,7 +527,7 @@ class ServerUtils(implicit
 
       TxOutputInfo(
         destination.address.lockupScript,
-        destination.alphAmount.value,
+        destination.attoAlphAmount.value,
         tokensInfo,
         destination.lockTime,
         destination.message
@@ -720,21 +720,21 @@ class ServerUtils(implicit
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
     for {
-      initialAlphAmount <- getInitialAlphAmount(query.initialAlphAmount)
-      code              <- BuildDeployContractTx.decode(query.bytecode)
+      initialAttoAlphAmount <- getInitialAttoAlphAmount(query.initialAttoAlphAmount)
+      code                  <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildDeployContractTxWithParsedState(
         code.contract,
         address,
         code.initialFields,
-        initialAlphAmount,
+        initialAttoAlphAmount,
         query.initialTokenAmounts.getOrElse(AVector.empty),
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        initialAlphAmount,
+        initialAttoAlphAmount,
         AVector.empty,
         query.fromPublicKey,
         query.gasAmount,
@@ -743,7 +743,7 @@ class ServerUtils(implicit
     } yield BuildDeployContractTxResult.from(utx)
   }
 
-  def getInitialAlphAmount(amountOption: Option[Amount]): Try[U256] = {
+  def getInitialAttoAlphAmount(amountOption: Option[Amount]): Try[U256] = {
     amountOption match {
       case Some(amount) =>
         if (amount.value >= minimalAlphInContract) { Right(amount.value) }
@@ -779,8 +779,8 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildExecuteScriptTx
   ): Try[BuildExecuteScriptTxResult] = {
-    val alphAmount = query.alphAmount.map(_.value).getOrElse(U256.Zero)
-    val tokens     = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
+    val attoAlphAmount = query.attoAlphAmount.map(_.value).getOrElse(U256.Zero)
+    val tokens = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
     for {
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
@@ -788,7 +788,7 @@ class ServerUtils(implicit
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        alphAmount,
+        attoAlphAmount,
         tokens,
         query.fromPublicKey,
         query.gasAmount,
@@ -1130,7 +1130,7 @@ object ServerUtils {
       codeRaw: String,
       address: Address,
       initialState: Option[String],
-      initialAlphAmount: U256,
+      initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
@@ -1139,7 +1139,7 @@ object ServerUtils {
         codeRaw,
         address,
         state,
-        initialAlphAmount,
+        initialAttoAlphAmount,
         initialTokenAmounts,
         newTokenAmount
       )
@@ -1150,7 +1150,7 @@ object ServerUtils {
       contract: StatefulContract,
       address: Address,
       initialFields: AVector[vm.Val],
-      initialAlphAmount: U256,
+      initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
@@ -1158,7 +1158,7 @@ object ServerUtils {
       Hex.toHexString(serialize(contract)),
       address,
       initialFields,
-      initialAlphAmount,
+      initialAttoAlphAmount,
       initialTokenAmounts,
       newTokenAmount
     )
@@ -1168,46 +1168,41 @@ object ServerUtils {
       codeRaw: String,
       address: Address,
       initialFields: AVector[vm.Val],
-      initialAlphAmount: U256,
+      initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
   ): String = {
-    val stateRaw    = Hex.toHexString(serialize(initialFields))
-    val approveAlph = s"approveAlph!(@${address.toBase58}, ${initialAlphAmount.v})"
-    val creation = newTokenAmount match {
-      case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
-      case None         => s"createContract!(#$codeRaw, #$stateRaw)"
+    val stateRaw = Hex.toHexString(serialize(initialFields))
+    def toCreate(approveAssets: String): String = newTokenAmount match {
+      case Some(amount) =>
+        s"createContractWithToken!$approveAssets(#$codeRaw, #$stateRaw, ${amount.v})"
+      case None => s"createContract!$approveAssets(#$codeRaw, #$stateRaw)"
     }
 
-    if (initialTokenAmounts.isEmpty) {
-      s"""
-         |TxScript Main {
-         |  $approveAlph
-         |  $creation
-         |}
-         |""".stripMargin
+    val create = if (initialTokenAmounts.isEmpty) {
+      val approveAssets = s"{@$address -> ${initialAttoAlphAmount.v}}"
+      toCreate(approveAssets)
     } else {
-      val approveTokenStmts = initialTokenAmounts
+      val approveTokens = initialTokenAmounts
         .map { token =>
-          s"approveToken!(@${address.toBase58}, #${token.id.toHexString}, ${token.amount.v})"
+          s"#${token.id.toHexString}: ${token.amount.v}"
         }
-        .mkString(s"${System.lineSeparator()}  ")
-
-      s"""
-         |TxScript Main {
-         |  $approveAlph
-         |  $approveTokenStmts
-         |  $creation
-         |}
-         |""".stripMargin
+        .mkString(", ")
+      val approveAssets = s"{@$address -> ${initialAttoAlphAmount.v}, $approveTokens}"
+      toCreate(approveAssets)
     }
+    s"""
+       |TxScript Main {
+       |  $create
+       |}
+       |""".stripMargin
   }
 
   def buildDeployContractScriptWithParsedState(
       codeRaw: String,
       address: Address,
       initialFields: AVector[vm.Val],
-      initialAlphAmount: U256,
+      initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
@@ -1215,7 +1210,7 @@ object ServerUtils {
       codeRaw,
       address,
       initialFields,
-      initialAlphAmount,
+      initialAttoAlphAmount,
       initialTokenAmounts,
       newTokenAmount
     )

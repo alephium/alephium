@@ -41,7 +41,7 @@ final case class MutBalanceState(remaining: MutBalances, approved: MutBalances) 
   }
 
   def alphRemaining(lockupScript: LockupScript): Option[U256] = {
-    remaining.getBalances(lockupScript).map(_.alphAmount)
+    remaining.getBalances(lockupScript).map(_.attoAlphAmount)
   }
 
   def tokenRemaining(lockupScript: LockupScript, tokenId: TokenId): Option[U256] = {

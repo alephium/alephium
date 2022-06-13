@@ -497,6 +497,68 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     )
   }
 
+  it should "check types for for loop" in {
+    def code(
+        initialize: String = "let mut i = 0",
+        condition: String = "i < 10",
+        update: String = "i = i + 1",
+        body: String = "return"
+    ): String =
+      s"""
+         |TxContract ForLoop() {
+         |  pub fn test() -> () {
+         |    for $initialize; $condition; $update {
+         |      $body
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContract(code()).isRight is true
+    Compiler.compileContract(code(initialize = "true")).isLeft is true
+    Compiler.compileContract(code(condition = "1")).leftValue.message is
+      "Invalid condition type: Const(U256(1))"
+    Compiler.compileContract(code(update = "true")).isLeft is true
+    Compiler.compileContract(code(body = "")).isLeft is true
+    Compiler.compileContract(code(initialize = "")).leftValue.message is
+      "No initialize statement in for loop"
+    Compiler.compileContract(code(update = "")).leftValue.message is
+      "No update statement in for loop"
+  }
+
+  it should "test for loop" in new Fixture {
+    test(
+      s"""
+         |TxContract ForLoop() {
+         |  pub fn main() -> (U256) {
+         |    let mut x = 1
+         |    for let mut i = 1; i < 5; i = i + 1 {
+         |      x = x * i
+         |    }
+         |    return x
+         |  }
+         |}
+         |""".stripMargin,
+      AVector.empty,
+      AVector(Val.U256(U256.unsafe(24)))
+    )
+    test(
+      s"""
+         |TxContract ForLoop() {
+         |  pub fn main() -> (U256) {
+         |    let mut x = 5
+         |    for let mut done = false; !done; done = done {
+         |      x = x + x - 3
+         |      if x % 5 == 0 { done = true }
+         |    }
+         |    return x
+         |  }
+         |}
+         |""".stripMargin,
+      AVector.empty,
+      AVector(Val.U256(U256.unsafe(35)))
+    )
+  }
+
   it should "test the following typical examples" in new Fixture {
     test(
       s"""
@@ -615,9 +677,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  mut alphReserve: U256,
          |  mut btcReserve: U256
          |) {
-         |  pub fn exchange(alphAmount: U256) -> (U256) {
-         |    let tokenAmount = btcReserve * alphAmount / (alphReserve + alphAmount)
-         |    alphReserve = alphReserve + alphAmount
+         |  pub fn exchange(attoAlphAmount: U256) -> (U256) {
+         |    let tokenAmount = btcReserve * attoAlphAmount / (alphReserve + attoAlphAmount)
+         |    alphReserve = alphReserve + attoAlphAmount
          |    btcReserve = btcReserve - tokenAmount
          |    return tokenAmount
          |  }
@@ -2029,9 +2091,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |@using(preapprovedAssets = true, assetsInContract = true)
          |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) {
-         |  approveToken!(address, tokenId, tokenAmount)
          |  let swap = Swap(swapContractKey)
-         |  swap.swapAlph(address, tokenAmount)
+         |  swap.swapAlph{
+         |    address -> tokenId: tokenAmount
+         |  }(address, tokenAmount)
          |}
          |
          |Interface Swap {
@@ -2040,7 +2103,71 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     val script = Compiler.compileTxScript(code).rightValue
-    script.toTemplateString() is "0101010001000a{0}{1}{2}a3{3}1700{0}{2}16000100"
+    script.toTemplateString() is "0101010001000a{3}1700{0}{1}{2}a3{0}{2}16000100"
+  }
+
+  it should "use braces syntax for functions that uses preapproved assets" in {
+    def code(
+        bracesPart: String = "{callerAddress!() -> amount}",
+        usePreapprovedAssets: Boolean = true,
+        useAssetsInContract: Boolean = false
+    ): String =
+      s"""
+         |TxScript Main(fooContractId: ByteVec, amount: U256) {
+         |  let foo = Foo(fooContractId)
+         |  foo.foo${bracesPart}()
+         |}
+         |
+         |Interface Foo {
+         |  @using(preapprovedAssets = $usePreapprovedAssets, assetsInContract = $useAssetsInContract)
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+    Compiler.compileTxScript(code()).isRight is true
+    Compiler.compileTxScript(code(bracesPart = "")).leftValue.message is
+      "Function `foo` needs preapproved assets, please use braces syntax"
+    Compiler.compileTxScript(code(usePreapprovedAssets = false)).leftValue.message is
+      "Function `foo` does not use preapproved assets"
+    Compiler
+      .compileTxScript(code(usePreapprovedAssets = false, useAssetsInContract = true))
+      .leftValue
+      .message is
+      "Function `foo` does not use preapproved assets"
+  }
+
+  it should "check types for braces syntax" in {
+    def code(
+        address: String = "Address",
+        amount: String = "U256",
+        tokenId: String = "ByteVec",
+        tokenAmount: String = "U256"
+    ): String =
+      s"""
+         |TxScript Main(
+         |  fooContractId: ByteVec,
+         |  address: ${address},
+         |  amount: ${amount},
+         |  tokenId: ${tokenId},
+         |  tokenAmount: ${tokenAmount}
+         |) {
+         |  let foo = Foo(fooContractId)
+         |  foo.foo{address -> amount, tokenId: tokenAmount}()
+         |}
+         |
+         |Interface Foo {
+         |  @using(preapprovedAssets = true)
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+    Compiler.compileTxScript(code()).isRight is true
+    Compiler.compileTxScript(code(address = "Bool")).leftValue.message is
+      "Invalid address type: Variable(Ident(address))"
+    Compiler.compileTxScript(code(amount = "Bool")).leftValue.message is
+      "Invalid amount type: Some(Variable(Ident(amount)))"
+    Compiler.compileTxScript(code(tokenId = "Bool")).leftValue.message is
+      "Invalid token amount type: List((Variable(Ident(tokenId)),Variable(Ident(tokenAmount))))"
+    Compiler.compileTxScript(code(tokenAmount = "Bool")).leftValue.message is
+      "Invalid token amount type: List((Variable(Ident(tokenId)),Variable(Ident(tokenAmount))))"
   }
 
   it should "compile events with <= 8 fields" in {

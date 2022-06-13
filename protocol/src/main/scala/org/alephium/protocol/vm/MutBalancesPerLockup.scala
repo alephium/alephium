@@ -23,7 +23,7 @@ import org.alephium.protocol.model.{TokenId, TxOutput}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class MutBalancesPerLockup(
-    var alphAmount: U256,
+    var attoAlphAmount: U256,
     tokenAmounts: mutable.Map[TokenId, U256],
     scopeDepth: Int
 ) {
@@ -35,7 +35,7 @@ final case class MutBalancesPerLockup(
   def getTokenAmount(tokenId: TokenId): Option[U256] = tokenAmounts.get(tokenId)
 
   def addAlph(amount: U256): Option[Unit] = {
-    alphAmount.add(amount).map(alphAmount = _)
+    attoAlphAmount.add(amount).map(attoAlphAmount = _)
   }
 
   def addToken(tokenId: TokenId, amount: U256): Option[Unit] = {
@@ -49,7 +49,7 @@ final case class MutBalancesPerLockup(
   }
 
   def subAlph(amount: U256): Option[Unit] = {
-    alphAmount.sub(amount).map(alphAmount = _)
+    attoAlphAmount.sub(amount).map(attoAlphAmount = _)
   }
 
   def subToken(tokenId: TokenId, amount: U256): Option[Unit] = {
@@ -60,7 +60,8 @@ final case class MutBalancesPerLockup(
 
   def add(another: MutBalancesPerLockup): Option[Unit] =
     Try {
-      alphAmount = alphAmount.add(another.alphAmount).getOrElse(throw MutBalancesPerLockup.error)
+      attoAlphAmount =
+        attoAlphAmount.add(another.attoAlphAmount).getOrElse(throw MutBalancesPerLockup.error)
       another.tokenAmounts.foreach { case (tokenId, amount) =>
         tokenAmounts.get(tokenId) match {
           case Some(currentAmount) =>
@@ -74,7 +75,8 @@ final case class MutBalancesPerLockup(
 
   def sub(another: MutBalancesPerLockup): Option[Unit] =
     Try {
-      alphAmount = alphAmount.sub(another.alphAmount).getOrElse(throw MutBalancesPerLockup.error)
+      attoAlphAmount =
+        attoAlphAmount.sub(another.attoAlphAmount).getOrElse(throw MutBalancesPerLockup.error)
       another.tokenAmounts.foreach { case (tokenId, amount) =>
         tokenAmounts.get(tokenId) match {
           case Some(currentAmount) =>
@@ -87,16 +89,16 @@ final case class MutBalancesPerLockup(
 
   def toTxOutput(lockupScript: LockupScript): ExeResult[Option[TxOutput]] = {
     val tokens = tokenVector
-    if (alphAmount.isZero) {
+    if (attoAlphAmount.isZero) {
       if (tokens.isEmpty) Right(None) else failed(InvalidOutputBalances)
     } else {
-      Right(Some(TxOutput.from(alphAmount, tokens, lockupScript)))
+      Right(Some(TxOutput.from(attoAlphAmount, tokens, lockupScript)))
     }
   }
 
   def toLockedTxOutput(lockupScript: LockupScript.Asset, lockTime: TimeStamp): TxOutput = {
     val tokens = tokenVector
-    TxOutput.asset(alphAmount, lockupScript, tokens, lockTime)
+    TxOutput.asset(attoAlphAmount, lockupScript, tokens, lockTime)
   }
 }
 

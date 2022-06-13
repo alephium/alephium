@@ -180,10 +180,10 @@ object Lexer {
     "if",
     "else",
     "while",
+    "for",
     "pub",
     "event",
     "emit",
-    "loop",
     "extends",
     "implements",
     "alph"

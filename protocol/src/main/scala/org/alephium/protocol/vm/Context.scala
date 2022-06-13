@@ -243,7 +243,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
   ): ExeResult[Hash] = {
     tokenAmount.foreach(amount => initialBalances.addToken(contractId, amount.v))
     val contractOutput = ContractOutput(
-      initialBalances.alphAmount,
+      initialBalances.attoAlphAmount,
       LockupScript.p2c(contractId),
       initialBalances.tokenVector
     )
@@ -317,11 +317,11 @@ trait StatefulContext extends StatelessContext with ContractPool {
       output: ContractOutput
   ): ExeResult[Unit] = {
     for {
+      _ <- markAssetFlushed(contractId)
       _ <- worldState
         .updateContract(contractId, outputRef, output)
         .left
         .map(e => Left(IOErrorUpdateState(e)))
-      _ <- markAssetFlushed(contractId)
     } yield ()
   }
 
@@ -356,24 +356,6 @@ object StatefulContext {
   )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
     apply(blockEnv, txEnv, worldState, gasRemaining)
-  }
-
-  def build(
-      blockEnv: BlockEnv,
-      tx: TransactionAbstract,
-      gasRemaining: GasBox,
-      worldState: WorldState.Staging,
-      preOutputsOpt: Option[AVector[AssetOutput]]
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[StatefulContext] = {
-    preOutputsOpt match {
-      case Some(outputs) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
-      case None =>
-        worldState.getPreOutputsForAssetInputs(tx) match {
-          case Right(Some(outputs)) => Right(apply(blockEnv, tx, gasRemaining, worldState, outputs))
-          case Right(None)          => failed(NonExistTxInput)
-          case Left(error)          => ioFailed(IOErrorLoadOutputs(error))
-        }
-    }
   }
 
   final class Impl(
