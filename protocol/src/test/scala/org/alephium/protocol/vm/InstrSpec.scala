@@ -74,7 +74,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadLocalByIndex, StoreLocalByIndex, Dup
     )
     val lemanStatefulInstrs = AVector(
-      MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
+      MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
       LoadFieldByIndex, StoreFieldByIndex
     )
@@ -2625,7 +2625,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract -> 32000, CreateContractWithToken -> 32000, CopyCreateContract -> 24000, DestroySelf -> 2000, SelfContractId -> 3, SelfAddress -> 3,
       CallerContractId -> 5, CallerAddress -> 5, IsCalledFromTxScript -> 5, CallerInitialStateHash -> 5, CallerCodeHash -> 5, ContractInitialStateHash -> 5, ContractCodeHash -> 5,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple -> 32000, MigrateWithFields -> 32000, LoadContractFields -> 8, CopyCreateContractWithToken -> 24000,
+      MigrateSimple -> 32000, MigrateWithFields -> 32000, CopyCreateContractWithToken -> 24000,
       BurnToken -> 30, LockApprovedAssets -> 30,
       CreateSubContract -> 32000, CreateSubContractWithToken -> 32000, CopyCreateSubContract -> 24000, CopyCreateSubContractWithToken -> 24000,
       LoadFieldByIndex -> 5, StoreFieldByIndex -> 5
@@ -2636,19 +2636,18 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     def test(instr: Instr[_], gas: Int) = {
       instr match {
-        case i: ToByteVecInstr[_]       => testToByteVec(i, gas)
-        case _: ByteVecConcat.type      => testByteVecConcatGas(gas)
-        case _: ByteVecSlice.type       => testByteVecSliceGas(gas)
-        case _: Encode.type             => testEncode(gas)
-        case i: Zeros.type              => i.gas(33).value is (3 + 5 * gas)
-        case i: U256ToBytesInstr        => testU256ToBytes(i, gas)
-        case i: U256FromBytesInstr      => testU256FromBytes(i, gas)
-        case i: ByteVecToAddress.type   => i.gas(33).value is gas
-        case i: LogInstr                => testLog(i, gas)
-        case i: LoadContractFields.type => i.gas(3) is gas
-        case i: GasSimple               => i.gas().value is gas
-        case i: GasFormula              => i.gas(32).value is gas
-        case _: TemplateVariable        => ???
+        case i: ToByteVecInstr[_]     => testToByteVec(i, gas)
+        case _: ByteVecConcat.type    => testByteVecConcatGas(gas)
+        case _: ByteVecSlice.type     => testByteVecSliceGas(gas)
+        case _: Encode.type           => testEncode(gas)
+        case i: Zeros.type            => i.gas(33).value is (3 + 5 * gas)
+        case i: U256ToBytesInstr      => testU256ToBytes(i, gas)
+        case i: U256FromBytesInstr    => testU256FromBytes(i, gas)
+        case i: ByteVecToAddress.type => i.gas(33).value is gas
+        case i: LogInstr              => testLog(i, gas)
+        case i: GasSimple             => i.gas().value is gas
+        case i: GasFormula            => i.gas(32).value is gas
+        case _: TemplateVariable      => ???
       }
     }
     def testToByteVec(instr: ToByteVecInstr[_], gas: Int) = instr match {
@@ -2750,10 +2749,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract -> 173, CreateContractWithToken -> 174, CopyCreateContract -> 175, DestroySelf -> 176, SelfContractId -> 177, SelfAddress -> 178,
       CallerContractId -> 179, CallerAddress -> 180, IsCalledFromTxScript -> 181, CallerInitialStateHash -> 182, CallerCodeHash -> 183, ContractInitialStateHash -> 184, ContractCodeHash -> 185,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple -> 186, MigrateWithFields -> 187, LoadContractFields -> 188, CopyCreateContractWithToken -> 189,
-      BurnToken -> 190, LockApprovedAssets -> 191,
-      CreateSubContract -> 192, CreateSubContractWithToken -> 193, CopyCreateSubContract -> 194, CopyCreateSubContractWithToken -> 195,
-      LoadFieldByIndex -> 196, StoreFieldByIndex -> 197
+      MigrateSimple -> 186, MigrateWithFields -> 187, CopyCreateContractWithToken -> 188,
+      BurnToken -> 189, LockApprovedAssets -> 190,
+      CreateSubContract -> 191, CreateSubContractWithToken -> 192, CopyCreateSubContract -> 193, CopyCreateSubContractWithToken -> 194,
+      LoadFieldByIndex -> 195, StoreFieldByIndex -> 196
     )
     // format: on
 
@@ -2806,7 +2805,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
       CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
       /* Below are instructions for Leman hard fork */
-      MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
+      MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
       LoadFieldByIndex, StoreFieldByIndex
     )

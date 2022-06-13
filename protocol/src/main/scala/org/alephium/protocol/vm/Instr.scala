@@ -157,7 +157,7 @@ object Instr {
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
     CallerContractId, CallerAddress, IsCalledFromTxScript, CallerInitialStateHash, CallerCodeHash, ContractInitialStateHash, ContractCodeHash,
     /* Below are instructions for Leman hard fork */
-    MigrateSimple, MigrateWithFields, LoadContractFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
+    MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
     CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
     LoadFieldByIndex, StoreFieldByIndex
   )
@@ -1637,24 +1637,6 @@ object MigrateWithFields extends MigrateBase {
       frame: Frame[C]
   ): ExeResult[Unit] = {
     frame.popFields().flatMap(newFields => migrate(frame, Some(newFields)))
-  }
-}
-
-object LoadContractFields
-    extends StatefulInstr
-    with LemanInstr[StatefulContext]
-    with StatefulInstrCompanion0
-    with GasLoadContractFields {
-  def runWithLeman[C <: StatefulContext](
-      frame: Frame[C]
-  ): ExeResult[Unit] = {
-    for {
-      contractId  <- frame.popContractId()
-      contractObj <- frame.ctx.loadContractObj(contractId) // gas for the load is reduced
-      _           <- frame.ctx.chargeGasWithSize(this, contractObj.initialFields.length)
-    } yield {
-      contractObj.initialFields.foreach(frame.pushOpStack)
-    }
   }
 }
 

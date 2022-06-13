@@ -717,30 +717,7 @@ object Ast {
     def fields: Seq[Argument]
     def events: Seq[EventDef]
 
-    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = Seq(loadFieldsFunc)
-    private val loadFieldsFunc: Compiler.ContractFunc[StatefulContext] =
-      new Compiler.ContractFunc[StatefulContext] {
-        def name: String                  = "loadFields"
-        def isPublic: Boolean             = true
-        def usePreapprovedAssets: Boolean = false
-
-        lazy val returnType: Seq[Type] = fields.map(_.tpe)
-
-        def getReturnType(inputType: Seq[Type]): Seq[Type] = {
-          if (inputType.isEmpty) {
-            returnType
-          } else {
-            throw Compiler.Error(s"Built-in function loadFields does not need any argument")
-          }
-        }
-
-        def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
-          throw Compiler.Error(s"Built-in function loadFields should be external call")
-        }
-
-        def genExternalCallCode(typeId: TypeId): Seq[Instr[StatefulContext]] =
-          Seq(LoadContractFields)
-      }
+    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = Seq.empty
 
     def eventsInfo(): Seq[Compiler.EventInfo] = {
       if (events.distinctBy(_.id).size != events.size) {
