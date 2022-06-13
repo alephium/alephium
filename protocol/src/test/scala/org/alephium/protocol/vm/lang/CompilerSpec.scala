@@ -519,6 +519,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       "Invalid condition type: Const(U256(1))"
     Compiler.compileContract(code(update = "true")).isLeft is true
     Compiler.compileContract(code(body = "")).isLeft is true
+    Compiler.compileContract(code(initialize = "")).leftValue.message is
+      "No initialize statement in for loop"
+    Compiler.compileContract(code(update = "")).leftValue.message is
+      "No update statement in for loop"
   }
 
   it should "test for loop" in new Fixture {

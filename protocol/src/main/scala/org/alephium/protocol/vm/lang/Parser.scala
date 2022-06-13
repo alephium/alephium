@@ -267,8 +267,15 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.keyword("while") ~/ expr ~ block).map { case (expr, block) => Ast.While(expr, block) }
 
   def forLoopStmt[Unknown: P]: P[Ast.ForLoop[Ctx]] =
-    P(Lexer.keyword("for") ~/ statement ~ ";" ~ expr ~ ";" ~ statement ~ block).map {
-      case (initialize, condition, update, body) => Ast.ForLoop(initialize, condition, update, body)
+    P(Lexer.keyword("for") ~/ statement.? ~ ";" ~ expr ~ ";" ~ statement.? ~ block).map {
+      case (initializeOpt, condition, updateOpt, body) =>
+        if (initializeOpt.isEmpty) {
+          throw Compiler.Error("No initialize statement in for loop")
+        }
+        if (updateOpt.isEmpty) {
+          throw Compiler.Error("No update statement in for loop")
+        }
+        Ast.ForLoop(initializeOpt.get, condition, updateOpt.get, body)
     }
 
   def statement[Unknown: P]: P[Ast.Statement[Ctx]]
