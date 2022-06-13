@@ -891,26 +891,31 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "not destroy a contract after approving assets" in new DestroyFixture {
-    val foo =
+    def buildFoo(useAssetsInContract: Boolean) =
       s"""
          |TxContract Foo() {
-         |  @using(assetsInContract = true)
+         |  @using(assetsInContract = $useAssetsInContract)
          |  pub fn destroy(targetAddress: Address) -> () {
          |    approveAlph!(selfAddress!(), 2 alph)
          |    destroySelf!(targetAddress)
          |  }
          |}
          |""".stripMargin
-    val fooId = createContract(foo, AVector.empty, initialAttoAlphAmount = ALPH.alph(10)).key
-
-    val main =
+    def main(fooId: Hash, foo: String) =
       s"""
          |TxScript Main {
          |  Foo(#${fooId.toHexString}).destroy(@$genesisAddress)
          |}
          |$foo
          |""".stripMargin
-    failCallTxScript(main, ContractAssetAlreadyFlushed)
+    def test(useAssetsInContract: Boolean, error: ExeFailure) = {
+      val foo   = buildFoo(useAssetsInContract)
+      val fooId = createContract(foo, AVector.empty, initialAttoAlphAmount = ALPH.alph(10)).key
+      failCallTxScript(main(fooId, foo), error)
+    }
+
+    test(useAssetsInContract = true, ContractAssetAlreadyFlushed)
+    test(useAssetsInContract = false, NoBalanceAvailable)
   }
 
   it should "migrate contract" in new DestroyFixture {

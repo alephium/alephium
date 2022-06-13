@@ -79,7 +79,7 @@ class ParserSpec extends AlephiumSpec {
         )
       )
     fastparse
-      .parse("foo{ x: [1e-18 alph, token: 2e-18 alph], y: 3 }(z)", StatefulParser.expr(_))
+      .parse("foo{ x: [1e-18 alph, token: 2], y: 3 }(z)", StatefulParser.expr(_))
       .get
       .value is
       CallExpr[StatefulContext](
