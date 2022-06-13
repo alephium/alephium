@@ -1394,6 +1394,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
       val stateRaw                       = Hex.toHexString(serialize(initialFields))
 
+      val expected =
+        s"""
+           |TxScript Main {
+           |  createContractWithToken!{@$fromAddress: [10, #${token1.toHexString}: 10, #${token2.toHexString}: 20]}(#$codeRaw, #$stateRaw, 50)
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
@@ -1402,15 +1409,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           U256.unsafe(10),
           AVector(Token(token1, U256.unsafe(10)), Token(token2, U256.unsafe(20))),
           Some(U256.unsafe(50))
-        ) is s"""
-                |TxScript Main {
-                |  approveAlph!(@${fromAddress.toBase58}, 10)
-                |  approveToken!(@${fromAddress.toBase58}, #${token1.toHexString}, 10)
-                |  approveToken!(@${fromAddress.toBase58}, #${token2.toHexString}, 20)
-                |  createContractWithToken!(#$codeRaw, #$stateRaw, 50)
-                |}
-                |""".stripMargin
-
+        ) is expected
     }
 
     {
@@ -1419,6 +1418,13 @@ class ServerUtilsSpec extends AlephiumSpec {
       val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
       val stateRaw                       = Hex.toHexString(serialize(initialFields))
 
+      val expected =
+        s"""
+           |TxScript Main {
+           |  createContractWithToken!{@$fromAddress: 10}(#$codeRaw, #$stateRaw, 50)
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(expected).isRight is true
       ServerUtils
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
@@ -1427,12 +1433,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           U256.unsafe(10),
           AVector.empty,
           Some(U256.unsafe(50))
-        ) is s"""
-                |TxScript Main {
-                |  approveAlph!(@${fromAddress.toBase58}, 10)
-                |  createContractWithToken!(#$codeRaw, #$stateRaw, 50)
-                |}
-                |""".stripMargin
+        ) is expected
     }
   }
 

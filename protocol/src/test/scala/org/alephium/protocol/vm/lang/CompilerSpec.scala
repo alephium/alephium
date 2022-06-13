@@ -2107,11 +2107,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "use braces syntax for functions that uses preapproved assets" in {
-    def code(usePreapprovedAssets: Boolean): String =
+    def code(
+        bracesPart: String = "{callerAddress!(): amount}",
+        usePreapprovedAssets: Boolean = true
+    ): String =
       s"""
          |TxScript Main(fooContractId: ByteVec, amount: U256) {
          |  let foo = Foo(fooContractId)
-         |  foo.foo{callerAddress!(): amount}()
+         |  foo.foo${bracesPart}()
          |}
          |
          |Interface Foo {
@@ -2119,8 +2122,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn foo() -> ()
          |}
          |""".stripMargin
-    Compiler.compileTxScript(code(true)).isRight is true
-    Compiler.compileTxScript(code(false)).leftValue.message is
+    Compiler.compileTxScript(code()).isRight is true
+    Compiler.compileTxScript(code(bracesPart = "")).leftValue.message is
+      "Function `foo` needs preapproved assets, please use braces syntax"
+    Compiler.compileTxScript(code(usePreapprovedAssets = false)).leftValue.message is
       "Function `foo` does not use preapproved assets"
   }
 

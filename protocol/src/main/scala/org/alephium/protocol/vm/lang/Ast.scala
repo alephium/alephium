@@ -94,8 +94,14 @@ object Ast {
         state: Compiler.State[Ctx],
         func: Compiler.FuncInfo[Ctx]
     ): Seq[Instr[Ctx]] = {
-      if (approveAssets.nonEmpty && !func.usePreapprovedAssets) {
-        throw Compiler.Error(s"Function `${func.name}` does not use preapproved assets")
+      (approveAssets.nonEmpty, func.usePreapprovedAssets) match {
+        case (true, false) =>
+          throw Compiler.Error(s"Function `${func.name}` does not use preapproved assets")
+        case (false, true) =>
+          throw Compiler.Error(
+            s"Function `${func.name}` needs preapproved assets, please use braces syntax"
+          )
+        case _ => ()
       }
       approveAssets.flatMap(_.genCode(state))
     }

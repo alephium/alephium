@@ -748,7 +748,7 @@ class VMSpec extends AlephiumSpec {
     val bar =
       s"""
          |TxContract Bar() {
-         |  @using(preapprovedAssets = true)
+         |  @using(assetsInContract = true)
          |  pub fn bar(fooId: ByteVec, fooHash: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barHash: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
          |    assert!(selfContractId!() == barId)
          |    assert!(selfAddress!() == barAddress)
@@ -1331,7 +1331,7 @@ class VMSpec extends AlephiumSpec {
     val tokenContract =
       s"""
          |TxContract Token(mut x: U256) {
-         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  @using(assetsInContract = true)
          |  pub fn withdraw(address: Address, amount: U256) -> () {
          |    transferTokenFromSelf!(address, selfTokenId!(), amount)
          |  }
@@ -2103,7 +2103,6 @@ class VMSpec extends AlephiumSpec {
            |TxContract Contract(mut subContractId: ByteVec) {
            |  @using(preapprovedAssets = true)
            |  pub fn createSubContract() -> () {
-           |    approveAlph!(callerAddress!(), 1 alph)
            |    subContractId = $createContractStmt
            |  }
            |
@@ -2164,7 +2163,7 @@ class VMSpec extends AlephiumSpec {
 
     val subContractPath1 = Hex.toHexString(serialize("nft-01"))
     verify(
-      s"createSubContract!(#$subContractPath1, #$subContractByteCode, #$subContractInitialState)",
+      s"createSubContract!{callerAddress!(): 1 alph}(#$subContractPath1, #$subContractByteCode, #$subContractInitialState)",
       subContractPath = "nft-01",
       numOfAssets = 2,
       numOfContracts = 2
@@ -2172,7 +2171,7 @@ class VMSpec extends AlephiumSpec {
 
     val subContractPath2 = Hex.toHexString(serialize("nft-02"))
     verify(
-      s"createSubContractWithToken!(#$subContractPath2, #$subContractByteCode, #$subContractInitialState, 10)",
+      s"createSubContractWithToken!{callerAddress!(): 1 alph}(#$subContractPath2, #$subContractByteCode, #$subContractInitialState, 10)",
       subContractPath = "nft-02",
       numOfAssets = 5,
       numOfContracts = 4
@@ -2184,7 +2183,7 @@ class VMSpec extends AlephiumSpec {
 
     val subContractPath1 = Hex.toHexString(serialize("nft-01"))
     verify(
-      s"copyCreateSubContract!(#$subContractPath1, #${subContractId.toHexString}, #$subContractInitialState)",
+      s"copyCreateSubContract!{callerAddress!(): 1 alph}(#$subContractPath1, #${subContractId.toHexString}, #$subContractInitialState)",
       subContractPath = "nft-01",
       numOfAssets = 3,
       numOfContracts = 3
@@ -2192,7 +2191,7 @@ class VMSpec extends AlephiumSpec {
 
     val subContractPath2 = Hex.toHexString(serialize("nft-02"))
     verify(
-      s"copyCreateSubContractWithToken!(#$subContractPath2, #${subContractId.toHexString}, #$subContractInitialState, 10)",
+      s"copyCreateSubContractWithToken!{callerAddress!(): 1 alph}(#$subContractPath2, #${subContractId.toHexString}, #$subContractInitialState, 10)",
       subContractPath = "nft-02",
       numOfAssets = 6,
       numOfContracts = 5
@@ -2209,7 +2208,7 @@ class VMSpec extends AlephiumSpec {
          |      callerAddress!(): ${ALPH.nanoAlph(1000).v}
          |    }(selfContractId!(), #010300)
          |    let subContract = Foo(subContractId)
-         |    subContract.foo()
+         |    subContract.foo{callerAddress!(): ${ALPH.nanoAlph(1000).v}}()
          |  }
          |}
          |""".stripMargin

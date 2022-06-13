@@ -1172,35 +1172,30 @@ object ServerUtils {
       initialTokenAmounts: AVector[Token],
       newTokenAmount: Option[U256]
   ): String = {
-    val stateRaw    = Hex.toHexString(serialize(initialFields))
-    val approveAlph = s"approveAlph!(@${address.toBase58}, ${initialAttoAlphAmount.v})"
-    val creation = newTokenAmount match {
-      case Some(amount) => s"createContractWithToken!(#$codeRaw, #$stateRaw, ${amount.v})"
-      case None         => s"createContract!(#$codeRaw, #$stateRaw)"
+    val stateRaw = Hex.toHexString(serialize(initialFields))
+    def toCreate(approveAssets: String): String = newTokenAmount match {
+      case Some(amount) =>
+        s"createContractWithToken!$approveAssets(#$codeRaw, #$stateRaw, ${amount.v})"
+      case None => s"createContract!$approveAssets(#$codeRaw, #$stateRaw)"
     }
 
-    if (initialTokenAmounts.isEmpty) {
-      s"""
-         |TxScript Main {
-         |  $approveAlph
-         |  $creation
-         |}
-         |""".stripMargin
+    val create = if (initialTokenAmounts.isEmpty) {
+      val approveAssets = s"{@$address: ${initialAttoAlphAmount.v}}"
+      toCreate(approveAssets)
     } else {
-      val approveTokenStmts = initialTokenAmounts
+      val approveTokens = initialTokenAmounts
         .map { token =>
-          s"approveToken!(@${address.toBase58}, #${token.id.toHexString}, ${token.amount.v})"
+          s"#${token.id.toHexString}: ${token.amount.v}"
         }
-        .mkString(s"${System.lineSeparator()}  ")
-
-      s"""
-         |TxScript Main {
-         |  $approveAlph
-         |  $approveTokenStmts
-         |  $creation
-         |}
-         |""".stripMargin
+        .mkString(", ")
+      val approveAssets = s"{@$address: [${initialAttoAlphAmount.v}, $approveTokens]}"
+      toCreate(approveAssets)
     }
+    s"""
+       |TxScript Main {
+       |  $create
+       |}
+       |""".stripMargin
   }
 
   def buildDeployContractScriptWithParsedState(
