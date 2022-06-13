@@ -266,6 +266,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def whileStmt[Unknown: P]: P[Ast.While[Ctx]] =
     P(Lexer.keyword("while") ~/ expr ~ block).map { case (expr, block) => Ast.While(expr, block) }
 
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def forLoopStmt[Unknown: P]: P[Ast.ForLoop[Ctx]] =
     P(Lexer.keyword("for") ~/ statement.? ~ ";" ~ expr ~ ";" ~ statement.? ~ block).map {
       case (initializeOpt, condition, updateOpt, body) =>

@@ -2292,39 +2292,6 @@ class VMSpec extends AlephiumSpec {
     testSimpleScript(main)
   }
 
-  it should "load contract fields" in new ContractFixture {
-    val foo: String =
-      s"""
-         |TxContract Foo(x: Bool, y: [[U256; 2]; 2], z: Bool) {
-         |  pub fn foo() -> () {
-         |    return
-         |  }
-         |}
-         |""".stripMargin
-    val fooId =
-      createContract(
-        foo,
-        AVector(Val.True, Val.U256(1), Val.U256(2), Val.U256(3), Val.U256(4), Val.False)
-      ).key
-    val main: String =
-      s"""
-         |@using(preapprovedAssets = false)
-         |TxScript Main {
-         |  let foo = Foo(#${fooId.toHexString})
-         |  let (x, y, z) = foo.loadFields!()
-         |  assert!(x == true)
-         |  assert!(y[0][0] == 1)
-         |  assert!(y[0][1] == 2)
-         |  assert!(y[1][0] == 3)
-         |  assert!(y[1][1] == 4)
-         |  assert!(z == false)
-         |}
-         |
-         |$foo
-         |""".stripMargin
-    testSimpleScript(main)
-  }
-
   it should "not pay to unloaded contract" in new ContractFixture {
     val foo: String =
       s"""
