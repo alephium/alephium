@@ -56,7 +56,9 @@ class ParserSpec extends AlephiumSpec {
         Binop(And, Variable(Ident("x")), Variable(Ident("y"))),
         Variable(Ident("z"))
       )
+  }
 
+  it should "parse function" in {
     info("Function")
     fastparse.parse("foo(x)", StatelessParser.expr(_)).get.value is
       CallExpr[StatelessContext](FuncId("foo", false), Seq.empty, List(Variable(Ident("x"))))
@@ -79,7 +81,7 @@ class ParserSpec extends AlephiumSpec {
         )
       )
     fastparse
-      .parse("foo{ x: [1e-18 alph, token: 2], y: 3 }(z)", StatefulParser.expr(_))
+      .parse("foo{ x -> 1e-18 alph, token: 2; y -> 3 }(z)", StatefulParser.expr(_))
       .get
       .value is
       CallExpr[StatefulContext](
@@ -95,6 +97,13 @@ class ParserSpec extends AlephiumSpec {
         List(Variable(Ident("z")))
       )
 
+    info("Braces syntax")
+    fastparse.parse("{ x -> 1 alph }", StatelessParser.approveAssets(_)).isSuccess is true
+    fastparse.parse("{ x -> tokenId: 2 }", StatelessParser.approveAssets(_)).isSuccess is true
+    fastparse
+      .parse("{ x -> 1 alph, tokenId: 2; y -> 3 }", StatelessParser.approveAssets(_))
+      .isSuccess is true
+
     info("Contract call")
     fastparse.parse("x.bar(x)", StatefulParser.contractCallExpr(_)).get.value is
       ContractCallExpr(
@@ -103,15 +112,16 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         List(Variable(Ident("x")))
       )
-    fastparse.parse("Foo(x).bar{ z: 1 }(x)", StatefulParser.contractCallExpr(_)).get.value is
+    fastparse.parse("Foo(x).bar{ z -> 1 }(x)", StatefulParser.contractCallExpr(_)).get.value is
       ContractCallExpr(
         ContractConv[StatefulContext](Ast.TypeId("Foo"), Variable(Ident("x"))),
         FuncId("bar", false),
         Seq(Ast.ApproveAsset(Variable(Ident("z")), Some(Const(Val.U256(U256.One))), Seq.empty)),
         List(Variable(Ident("x")))
       )
+  }
 
-    info("ByteVec")
+  it should "parse ByteVec" in {
     fastparse.parse("# ++ #00", StatefulParser.expr(_)).get.value is
       Binop[StatefulContext](
         Concat,

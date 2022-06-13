@@ -46,11 +46,11 @@ abstract class Parser[Ctx <: StatelessContext] {
   def alphAmount[Unknown: P]: P[Ast.Expr[Ctx]]                   = expr
   def tokenAmount[Unknown: P]: P[(Ast.Expr[Ctx], Ast.Expr[Ctx])] = P(expr ~ ":" ~ expr)
   def amountList[Unknown: P]: P[(Option[Ast.Expr[Ctx]], Seq[(Ast.Expr[Ctx], Ast.Expr[Ctx])])] =
-    P("[" ~ (alphAmount ~ ",").? ~ tokenAmount.rep(0, ",") ~ "]")
+    P((alphAmount ~ ",").? ~ tokenAmount.rep(1, ","))
   def amountSimple[Unknown: P]: P[(Option[Ast.Expr[Ctx]], Seq[(Ast.Expr[Ctx], Ast.Expr[Ctx])])] =
     P(alphAmount).map(amount => (Some(amount), Seq.empty))
   def approveAssetPerAddress[Unknown: P]: P[Ast.ApproveAsset[Ctx]] =
-    P(expr ~ ":" ~ (amountList | amountSimple)).map { case (address, amounts) =>
+    P(expr ~ "->" ~ (amountList | amountSimple)).map { case (address, amounts) =>
       val node = Ast.ApproveAsset(address, amounts._1, amounts._2)
       if (node.approveCount == 0) {
         throw Compiler.Error(s"Empty asset for address: ${address}")
@@ -58,7 +58,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       node
     }
   def approveAssets[Unknown: P]: P[Seq[Ast.ApproveAsset[Ctx]]] =
-    P("{" ~ approveAssetPerAddress.rep(1, ",") ~ ",".? ~ "}")
+    P("{" ~ approveAssetPerAddress.rep(1, ";") ~ ";".? ~ "}")
   def callAbs[Unknown: P]: P[(Ast.FuncId, Seq[Ast.ApproveAsset[Ctx]], Seq[Ast.Expr[Ctx]])] =
     P(Lexer.funcId ~ approveAssets.? ~ "(" ~ expr.rep(0, ",") ~ ")").map {
       case (funcId, approveAssets, arguments) =>

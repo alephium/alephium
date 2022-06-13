@@ -2093,7 +2093,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) {
          |  let swap = Swap(swapContractKey)
          |  swap.swapAlph{
-         |    address: [tokenId: tokenAmount]
+         |    address -> tokenId: tokenAmount
          |  }(address, tokenAmount)
          |}
          |
@@ -2108,7 +2108,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
   it should "use braces syntax for functions that uses preapproved assets" in {
     def code(
-        bracesPart: String = "{callerAddress!(): amount}",
+        bracesPart: String = "{callerAddress!() -> amount}",
         usePreapprovedAssets: Boolean = true,
         useAssetsInContract: Boolean = false
     ): String =
@@ -2151,7 +2151,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  tokenAmount: ${tokenAmount}
          |) {
          |  let foo = Foo(fooContractId)
-         |  foo.foo{address: [amount, tokenId: tokenAmount]}()
+         |  foo.foo{address -> amount, tokenId: tokenAmount}()
          |}
          |
          |Interface Foo {

@@ -852,7 +852,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |@using(preapprovedAssets = true)
          |TxScript Main {
          |  let foo = Foo(#${fooId.toHexString})
-         |  foo.addOne{@$callerAddress: 1 alph}()
+         |  foo.addOne{@$callerAddress -> 1 alph}()
          |}
          |
          |$fooCode
@@ -1397,7 +1397,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress: [10, #${token1.toHexString}: 10, #${token2.toHexString}: 20]}(#$codeRaw, #$stateRaw, 50)
+           |  createContractWithToken!{@$fromAddress -> 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
@@ -1421,7 +1421,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress: 10}(#$codeRaw, #$stateRaw, 50)
+           |  createContractWithToken!{@$fromAddress -> 10}(#$codeRaw, #$stateRaw, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true

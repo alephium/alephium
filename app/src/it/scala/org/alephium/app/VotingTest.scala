@@ -255,12 +255,13 @@ trait VotingFixture extends WalletFixture {
       contractId: String,
       contractCode: String
   ): SubmitTxResult = {
-    val allocationScript = s"""
-                              |TxScript TokenAllocation {
-                              |  let voting = Voting(#${contractId})
-                              |  let caller = callerAddress!()
-                              |  voting.allocateTokens{caller: $dustAmount * ${votersWallets.size}}()
-                              |}
+    val allocationScript =
+      s"""
+         |TxScript TokenAllocation {
+         |  let voting = Voting(#${contractId})
+         |  let caller = callerAddress!()
+         |  voting.allocateTokens{caller -> $dustAmount * ${votersWallets.size}}()
+         |}
         $contractCode
       """.stripMargin
     script(adminWallet.publicKey.toHexString, allocationScript, adminWallet.creation.walletName)
@@ -276,7 +277,7 @@ trait VotingFixture extends WalletFixture {
                           |TxScript VotingScript {
                           |  let caller = callerAddress!()
                           |  let voting = Voting(#$contractId)
-                          |  voting.vote{caller: [$dustAmount, #$contractId: 1]}($choice, caller)
+                          |  voting.vote{caller -> $dustAmount, #$contractId: 1}($choice, caller)
                           |}
       $contractCode
       """.stripMargin

@@ -616,7 +616,7 @@ object SwapContracts {
        |TxScript Main {
        |  let swap = Swap(#${swapContractKey.toHexString})
        |  swap.addLiquidity{
-       |    @$address: [$attoAlphAmount, #${tokenId.toHexString}: $tokenAmount]
+       |    @$address -> $attoAlphAmount, #${tokenId.toHexString}: $tokenAmount
        |  }(@$address, $attoAlphAmount, $tokenAmount)
        |}
        |
@@ -632,7 +632,7 @@ object SwapContracts {
     s"""
        |TxScript Main {
        |  let swap = Swap(#${swapContractKey.toHexString})
-       |  swap.swapAlph{@$address: [#${tokenId.toHexString}: $tokenAmount]}(@$address, $tokenAmount)
+       |  swap.swapAlph{@$address -> #${tokenId.toHexString}: $tokenAmount}(@$address, $tokenAmount)
        |}
        |
        |$swapContract
@@ -642,7 +642,7 @@ object SwapContracts {
     s"""
        |TxScript Main {
        |  let swap = Swap(#${swapContractKey.toHexString})
-       |  swap.swapToken{@$address: $attoAlphAmount}(@$address, $attoAlphAmount)
+       |  swap.swapToken{@$address -> $attoAlphAmount}(@$address, $attoAlphAmount)
        |}
        |
        |$swapContract

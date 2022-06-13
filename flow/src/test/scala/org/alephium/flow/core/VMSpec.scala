@@ -354,7 +354,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  let foo = Foo(#${contractId.toHexString})
-         |  foo.burn{@$genesisAddress: [#${contractId.toHexString}: 2 alph]}()
+         |  foo.burn{@$genesisAddress -> #${contractId.toHexString}: 2 alph}()
          |}
          |
          |$contract
@@ -406,14 +406,14 @@ class VMSpec extends AlephiumSpec {
          |  let timestamp1 = 2000
          |  let timestamp2 = 3000
          |
-         |  lockApprovedAssets!{ @$genesisAddress: 0.01 alph }(@$genesisAddress, timestamp0)
+         |  lockApprovedAssets!{ @$genesisAddress -> 0.01 alph }(@$genesisAddress, timestamp0)
          |
          |  lockApprovedAssets!{
-         |    @$genesisAddress: [0.02 alph, #$tokenId0Hex: 0.03 alph]
+         |    @$genesisAddress -> 0.02 alph, #$tokenId0Hex: 0.03 alph
          |  }(@$genesisAddress, timestamp1)
          |
          |  lockApprovedAssets!{
-         |    @$genesisAddress: [0.04 alph, #$tokenId0Hex: 0.05 alph, #$tokenId1Hex: 0.06 alph]
+         |    @$genesisAddress -> 0.04 alph, #$tokenId0Hex: 0.05 alph, #$tokenId1Hex: 0.06 alph
          |  }(@$genesisAddress, timestamp2)
          |}
          |
@@ -698,7 +698,7 @@ class VMSpec extends AlephiumSpec {
     val script =
       s"""
          |TxScript Main {
-         |  copyCreateContractWithToken!{ @$genesisAddress: 1 alph }(#$contractId, #$encodedState, ${tokenAmount.v})
+         |  copyCreateContractWithToken!{ @$genesisAddress -> 1 alph }(#$contractId, #$encodedState, ${tokenAmount.v})
          |}
          |""".stripMargin
 
@@ -770,7 +770,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  Bar(#$barId).bar(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
-         |  copyCreateContract!{ @$genesisAddress: 1 alph }(#$fooId, #$state)
+         |  copyCreateContract!{ @$genesisAddress -> 1 alph }(#$fooId, #$state)
          |  assert!(isPaying!(@$genesisAddress) == true)
          |}
          |
@@ -1324,7 +1324,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main
          |{
-         |  Nft(#${tokenId.toHexString}).buy{@$genesisAddress: 1000000}(@${genesisAddress.toBase58})
+         |  Nft(#${tokenId.toHexString}).buy{@$genesisAddress -> 1000000}(@${genesisAddress.toBase58})
          |}
          |
          |$nftContract
@@ -1373,7 +1373,7 @@ class VMSpec extends AlephiumSpec {
                     |TxScript Main {
                     |  let swap = Swap(#${swapContractKey.toHexString})
                     |  swap.addLiquidity{
-                    |   @$genesisAddress: [10, #${tokenId.toHexString}: 100]
+                    |   @$genesisAddress -> 10, #${tokenId.toHexString}: 100
                     |  }(@${genesisAddress.toBase58}, 10, 100)
                     |}
                     |
@@ -1384,7 +1384,7 @@ class VMSpec extends AlephiumSpec {
     callTxScript(s"""
                     |TxScript Main {
                     |  let swap = Swap(#${swapContractKey.toHexString})
-                    |  swap.swapToken{@$genesisAddress: 10}(@${genesisAddress.toBase58}, 10)
+                    |  swap.swapToken{@$genesisAddress -> 10}(@${genesisAddress.toBase58}, 10)
                     |}
                     |
                     |${AMMContract.swapContract}
@@ -1395,7 +1395,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  let swap = Swap(#${swapContractKey.toHexString})
-         |  swap.swapAlph{@$genesisAddress: [#${tokenId.toHexString}: 50]}(@$genesisAddress, 50)
+         |  swap.swapAlph{@$genesisAddress -> #${tokenId.toHexString}: 50}(@$genesisAddress, 50)
          |}
          |
          |${AMMContract.swapContract}
@@ -2050,7 +2050,7 @@ class VMSpec extends AlephiumSpec {
          |
          |  @using(preapprovedAssets = true)
          |  pub fn foo() -> () {
-         |    subContractId = copyCreateContract!{callerAddress!(): $minimalAlphInContract}(selfContractId!(), #010300)
+         |    subContractId = copyCreateContract!{callerAddress!() -> $minimalAlphInContract}(selfContractId!(), #010300)
          |    emit Create(subContractId)
          |  }
          |}
@@ -2067,7 +2067,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  Foo(#${contractId.toHexString}).foo{callerAddress!(): 1 alph}()
+         |  Foo(#${contractId.toHexString}).foo{callerAddress!() -> 1 alph}()
          |}
          |
          |$contract
@@ -2131,7 +2131,7 @@ class VMSpec extends AlephiumSpec {
       val createSubContractRaw: String =
         s"""
            |TxScript Main {
-           |  Contract(#${contractId.toHexString}).createSubContract{callerAddress!(): 1 alph}()
+           |  Contract(#${contractId.toHexString}).createSubContract{callerAddress!() -> 1 alph}()
            |}
            |$contractRaw
            |""".stripMargin
@@ -2168,7 +2168,7 @@ class VMSpec extends AlephiumSpec {
 
     val subContractPath1 = Hex.toHexString(serialize("nft-01"))
     verify(
-      s"createSubContract!{callerAddress!(): 1 alph}(#$subContractPath1, #$subContractByteCode, #$subContractInitialState)",
+      s"createSubContract!{callerAddress!() -> 1 alph}(#$subContractPath1, #$subContractByteCode, #$subContractInitialState)",
       subContractPath = "nft-01",
       numOfAssets = 2,
       numOfContracts = 2
@@ -2176,7 +2176,7 @@ class VMSpec extends AlephiumSpec {
 
     val subContractPath2 = Hex.toHexString(serialize("nft-02"))
     verify(
-      s"createSubContractWithToken!{callerAddress!(): 1 alph}(#$subContractPath2, #$subContractByteCode, #$subContractInitialState, 10)",
+      s"createSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath2, #$subContractByteCode, #$subContractInitialState, 10)",
       subContractPath = "nft-02",
       numOfAssets = 5,
       numOfContracts = 4
@@ -2188,7 +2188,7 @@ class VMSpec extends AlephiumSpec {
 
     val subContractPath1 = Hex.toHexString(serialize("nft-01"))
     verify(
-      s"copyCreateSubContract!{callerAddress!(): 1 alph}(#$subContractPath1, #${subContractId.toHexString}, #$subContractInitialState)",
+      s"copyCreateSubContract!{callerAddress!() -> 1 alph}(#$subContractPath1, #${subContractId.toHexString}, #$subContractInitialState)",
       subContractPath = "nft-01",
       numOfAssets = 3,
       numOfContracts = 3
@@ -2196,7 +2196,7 @@ class VMSpec extends AlephiumSpec {
 
     val subContractPath2 = Hex.toHexString(serialize("nft-02"))
     verify(
-      s"copyCreateSubContractWithToken!{callerAddress!(): 1 alph}(#$subContractPath2, #${subContractId.toHexString}, #$subContractInitialState, 10)",
+      s"copyCreateSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath2, #${subContractId.toHexString}, #$subContractInitialState, 10)",
       subContractPath = "nft-02",
       numOfAssets = 6,
       numOfContracts = 5
@@ -2210,10 +2210,10 @@ class VMSpec extends AlephiumSpec {
          |  @using(preapprovedAssets = true)
          |  pub fn foo() -> () {
          |    subContractId = copyCreateContract!{
-         |      callerAddress!(): ${ALPH.nanoAlph(1000).v}
+         |      callerAddress!() -> ${ALPH.nanoAlph(1000).v}
          |    }(selfContractId!(), #010300)
          |    let subContract = Foo(subContractId)
-         |    subContract.foo{callerAddress!(): ${ALPH.nanoAlph(1000).v}}()
+         |    subContract.foo{callerAddress!() -> ${ALPH.nanoAlph(1000).v}}()
          |  }
          |}
          |""".stripMargin
@@ -2223,7 +2223,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  Foo(#${contractId.toHexString}).foo{callerAddress!(): 1 alph}()
+         |  Foo(#${contractId.toHexString}).foo{callerAddress!() -> 1 alph}()
          |}
          |
          |$contract
@@ -2430,7 +2430,7 @@ class VMSpec extends AlephiumSpec {
            |TxContract Bar() {
            |  @using(preapprovedAssets = true, assetsInContract = true)
            |  pub fn bar() -> () {
-           |    let contractId = createContract!{@$genesisAddress: $minimalAlphInContract}(#$fooByteCode, #$fooInitialState)
+           |    let contractId = createContract!{@$genesisAddress -> $minimalAlphInContract}(#$fooByteCode, #$fooInitialState)
            |    let contractAddress = contractIdToAddress!(contractId)
            |
            |    $maybeTransfer
@@ -2444,7 +2444,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  let bar = Bar(#${barContractId.toHexString})
-         |  bar.bar{@$genesisAddress: $minimalAlphInContract}()
+         |  bar.bar{@$genesisAddress -> $minimalAlphInContract}()
          |}
          |
          |$bar
