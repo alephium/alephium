@@ -16,7 +16,8 @@
 
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.vm.StatefulContext
+import org.alephium.protocol.vm.{Instr, SelfAddress, StatefulContext}
+import org.alephium.protocol.vm.lang.BuiltIn.SimpleStatefulBuiltIn
 import org.alephium.util.AlephiumSpec
 
 class BuiltInSpec extends AlephiumSpec {
@@ -34,5 +35,15 @@ class BuiltInSpec extends AlephiumSpec {
         BuiltIn.copyCreateSubContract,
         BuiltIn.copyCreateSubContractWithToken
       )
+  }
+
+  it should "check all functions that can use assets in contract" in {
+    BuiltIn.statelessFuncs.values.count(_.useAssetsInContract) is 0
+    BuiltIn.statefulFuncs.values
+      .filter(_.useAssetsInContract)
+      .toSet
+      .map((f: Compiler.FuncInfo[StatefulContext]) =>
+        f.asInstanceOf[SimpleStatefulBuiltIn].instr.asInstanceOf[Instr[_]]
+      ) is Ast.ContractAssets.contractAssetsInstrs.-(SelfAddress)
   }
 }
