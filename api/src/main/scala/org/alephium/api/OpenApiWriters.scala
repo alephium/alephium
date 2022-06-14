@@ -20,8 +20,8 @@ import scala.collection.immutable.ListMap
 import scala.collection.mutable.LinkedHashMap
 import scala.util.Try
 
-import sttp.tapir.apispec._
-import sttp.tapir.openapi._
+import sttp.apispec._
+import sttp.apispec.openapi._
 
 import org.alephium.json.Json._
 
@@ -122,6 +122,8 @@ object OpenAPIWriters extends EndpointsExamples {
   implicit val writerReference: Writer[Reference]           = macroW[Reference]
   implicit val writerHeader: Writer[Header]                 = macroW[Header]
   implicit val writerExample: Writer[Example]               = expandExtensions(macroW[Example])
+  implicit val writerLink: Writer[Link]                     = expandExtensions(macroW[Link])
+  implicit val writerCallback: Writer[Callback]             = expandExtensions(macroW[Callback])
   implicit val writerResponse: Writer[Response]             = expandExtensions(macroW[Response])
   implicit val writerEncoding: Writer[Encoding]             = expandExtensions(macroW[Encoding])
   implicit val writerMediaType: Writer[MediaType]           = expandExtensions(macroW[MediaType])
@@ -133,8 +135,9 @@ object OpenAPIWriters extends EndpointsExamples {
     writer[ujson.Value].comap { (responses: ListMap[ResponsesKey, ReferenceOr[Response]]) =>
       {
         val fields = responses.map {
-          case (ResponsesDefaultKey, r)    => ("default", writeJs(r))
-          case (ResponsesCodeKey(code), r) => (code.toString, writeJs(r))
+          case (ResponsesDefaultKey, r)      => ("default", writeJs(r))
+          case (ResponsesCodeKey(code), r)   => (code.toString, writeJs(r))
+          case (ResponsesRangeKey(range), r) => (range.toString, writeJs(r))
         }
         ujson.Obj.from(fields.toSeq)
       }

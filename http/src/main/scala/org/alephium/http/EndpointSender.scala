@@ -40,8 +40,9 @@ trait EndpointSender extends BaseEndpoint with SttpClientInterpreter {
       params: I,
       uri: Uri
   ): Request[Either[ApiError[_ <: StatusCode], O], Any] = {
-    toRequest(endpoint.endpoint, Some(uri))
-      .apply((maybeApiKey, params))
+    toSecureRequest(endpoint.endpoint, Some(uri))
+      .apply(maybeApiKey)
+      .apply(params)
       .mapResponse(handleDecodeFailures)
   }
 

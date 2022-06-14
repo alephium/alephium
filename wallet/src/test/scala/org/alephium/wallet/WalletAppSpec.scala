@@ -441,7 +441,7 @@ object WalletAppSpec extends {
     }
 
     router.route().path("/transactions/build").handler(BodyHandler.create()).handler { ctx =>
-      val buildTransaction = read[BuildTransaction](ctx.getBodyAsString())
+      val buildTransaction = read[BuildTransaction](ctx.body().asString())
       val amount = buildTransaction.destinations.fold(U256.Zero) { (acc, destination) =>
         acc.addUnsafe(destination.attoAlphAmount.value)
       }
@@ -473,7 +473,7 @@ object WalletAppSpec extends {
       .path("/transactions/sweep-address/build")
       .handler(BodyHandler.create())
       .handler { ctx =>
-        val _          = read[BuildSweepAddressTransactions](ctx.getBodyAsString())
+        val _          = read[BuildSweepAddressTransactions](ctx.body().asString())
         val unsignedTx = transactionGen().sample.get.unsigned
         complete(
           ctx,
@@ -483,7 +483,7 @@ object WalletAppSpec extends {
       }
 
     router.route().path("/transactions/submit").handler(BodyHandler.create()).handler { ctx =>
-      val _ = read[SubmitTransaction](ctx.getBodyAsString())
+      val _ = read[SubmitTransaction](ctx.body().asString())
       complete(ctx, SubmitTxResult(Hash.generate, 0, 0))
     }
 

@@ -16,7 +16,7 @@
 
 package org.alephium.api.model
 
-import sttp.tapir.{ValidationError, Validator}
+import sttp.tapir.{ValidationResult, Validator}
 
 final case class CounterRange(start: Int, endOpt: Option[Int])
 
@@ -25,32 +25,26 @@ object CounterRange {
 
   val validator: Validator[CounterRange] = Validator.custom { counterRange =>
     if (counterRange.start < 0) {
-      List(ValidationError.Custom(counterRange, s"`start` must not be negative"))
+      ValidationResult.Invalid(s"`start` must not be negative")
     } else {
       counterRange.endOpt match {
         case Some(end) =>
           if (end <= counterRange.start) {
-            List(ValidationError.Custom(counterRange, s"`end` must be larger than `start`"))
+            ValidationResult.Invalid(s"`end` must be larger than `start`")
           } else if (end - counterRange.start > MaxCounterRange) {
-            List(
-              ValidationError.Custom(
-                counterRange,
-                s"`end` must be smaller than ${counterRange.start + MaxCounterRange}"
-              )
+            ValidationResult.Invalid(
+              s"`end` must be smaller than ${counterRange.start + MaxCounterRange}"
             )
           } else {
-            List.empty
+            ValidationResult.Valid
           }
         case None =>
           if (counterRange.start > Int.MaxValue - MaxCounterRange) {
-            List(
-              ValidationError.Custom(
-                counterRange,
-                s"`start` must be smaller than ${Int.MaxValue - MaxCounterRange}"
-              )
+            ValidationResult.Invalid(
+              s"`start` must be smaller than ${Int.MaxValue - MaxCounterRange}"
             )
           } else {
-            List.empty
+            ValidationResult.Valid
           }
       }
     }

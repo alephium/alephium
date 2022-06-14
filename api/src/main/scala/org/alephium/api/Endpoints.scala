@@ -22,7 +22,7 @@ import com.typesafe.scalalogging.StrictLogging
 import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.EndpointIO.Example
-import sttp.tapir.EndpointOutput.OneOfMapping
+import sttp.tapir.EndpointOutput.OneOfVariant
 import sttp.tapir.generic.auto._
 
 import org.alephium.api.TapirCodecs
@@ -481,8 +481,8 @@ object Endpoints {
       matcher: PartialFunction[Any, Boolean]
   )(implicit
       examples: List[Example[T]]
-  ): OneOfMapping[T] = {
-    oneOfMappingValueMatcher(apiError.statusCode, jsonBody[T].description(apiError.description))(
+  ): OneOfVariant[T] = {
+    oneOfVariantValueMatcher(apiError.statusCode, jsonBody[T].description(apiError.description))(
       matcher
     )
   }
