@@ -660,4 +660,16 @@ class ParserSpec extends AlephiumSpec {
   it should "parse explicit usePreapprovedAssets TxScript" in new TxScriptFixture(Some(true))
   it should "parse implicit usePreapprovedAssets TxScript" in new TxScriptFixture(None)
   it should "parse vanilla TxScript" in new TxScriptFixture(Some(false))
+
+  it should "parse script fields" in {
+    def script(fields: String) =
+      s"""
+         |TxScript Main$fields {
+         |  return
+         |}
+         |""".stripMargin
+    fastparse.parse(script(""), StatefulParser.txScript(_)).isSuccess is true
+    fastparse.parse(script("()"), StatefulParser.txScript(_)).isSuccess is true
+    fastparse.parse(script("(x: U256)"), StatefulParser.txScript(_)).isSuccess is true
+  }
 }
