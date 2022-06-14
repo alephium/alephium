@@ -1017,9 +1017,7 @@ class VMSpec extends AlephiumSpec {
     val bar =
       s"""
          |TxContract Bar() {
-         |  @using(assetsInContract = true)
          |  pub fn bar(targetAddress: Address) -> () {
-         |    transferAlphToSelf!(selfAddress!(), 0) // dirty hack
          |    Foo(#$fooId).destroy(targetAddress) // in practice, the contract should check the caller before destruction
          |  }
          |}
