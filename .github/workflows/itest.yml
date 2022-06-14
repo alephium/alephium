@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         os: [ macos-latest, windows-latest, ubuntu-latest ]
-        java: [ '1.8', '11' ]
+        java: [ '11' ]
     steps:
       - uses: actions/checkout@v2
       - uses: olafurpg/setup-scala@v10
