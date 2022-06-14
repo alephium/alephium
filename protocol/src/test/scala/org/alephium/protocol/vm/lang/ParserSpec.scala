@@ -205,7 +205,7 @@ class ParserSpec extends AlephiumSpec {
     parsed0.id is Ast.FuncId("add", false)
     parsed0.isPublic is false
     parsed0.usePreapprovedAssets is false
-    parsed0.useContractAssets is false
+    parsed0.useAssetsInContract is false
     parsed0.args.size is 2
     parsed0.rtypes is Seq(Type.U256, Type.U256)
 
@@ -221,7 +221,7 @@ class ParserSpec extends AlephiumSpec {
     parsed1.id is Ast.FuncId("add", false)
     parsed1.isPublic is true
     parsed1.usePreapprovedAssets is true
-    parsed1.useContractAssets is false
+    parsed1.useAssetsInContract is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
 
@@ -237,7 +237,7 @@ class ParserSpec extends AlephiumSpec {
     parsed2.id is Ast.FuncId("add", false)
     parsed2.isPublic is true
     parsed2.usePreapprovedAssets is true
-    parsed2.useContractAssets is true
+    parsed2.useAssetsInContract is true
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
 
@@ -251,7 +251,7 @@ class ParserSpec extends AlephiumSpec {
       .get
       .value
     parsed3.usePreapprovedAssets is false
-    parsed3.useContractAssets is true
+    parsed3.useAssetsInContract is true
   }
 
   it should "parser contract initial states" in {

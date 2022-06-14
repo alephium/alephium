@@ -2089,7 +2089,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "compile TxScript" in {
     val code =
       s"""
-         |@using(preapprovedAssets = true, assetsInContract = true)
+         |@using(preapprovedAssets = true, assetsInContract = false)
          |TxScript Main(address: Address, tokenId: ByteVec, tokenAmount: U256, swapContractKey: ByteVec) {
          |  let swap = Swap(swapContractKey)
          |  swap.swapAlph{
@@ -2103,7 +2103,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     val script = Compiler.compileTxScript(code).rightValue
-    script.toTemplateString() is "0101010001000a{3}1700{0}{1}{2}a3{0}{2}16000100"
+    script.toTemplateString() is "0101030001000a{3}1700{0}{1}{2}a3{0}{2}16000100"
   }
 
   it should "use braces syntax for functions that uses preapproved assets" in {
@@ -2133,6 +2133,29 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       .leftValue
       .message is
       "Function `foo` does not use preapproved assets"
+  }
+
+  it should "check if contract assets is used in the function" in {
+    def code(useAssetsInContract: Boolean = false, instr: String = "return"): String =
+      s"""
+         |TxContract Foo() {
+         |  @using(assetsInContract = $useAssetsInContract)
+         |  fn foo() -> () {
+         |    $instr
+         |  }
+         |}
+         |""".stripMargin
+    Compiler.compileContract(code()).isRight is true
+    Compiler
+      .compileContract(code(true, "transferAlphFromSelf!(callerAddress!(), 1 alph)"))
+      .isRight is true
+    Compiler
+      .compileContract(code(false, "transferAlphFromSelf!(callerAddress!(), 1 alph)"))
+      .isRight is true
+    Compiler
+      .compileContract(code(true))
+      .leftValue
+      .message is "Function `foo` does not use contract assets, but its annotation of contract assets is turn on"
   }
 
   it should "check types for braces syntax" in {

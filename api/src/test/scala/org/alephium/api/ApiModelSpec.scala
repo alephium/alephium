@@ -821,8 +821,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw0 =
       """
         |{
-        |  "bytecode": "07011d01010707060d05a000a001a003a0046116011602160316041605160602",
-        |  "codeHash": "4106809d4ed811457fad02bc19619ca8f2a4a47a56bca4519a28d3671d9c7241",
+        |  "bytecode": "0701402901010707061005a000a001a003a00461b413c40de0b6b3a7640000a916011602160316041605160602",
+        |  "codeHash": "eff62a4b2d4d4936a84e360c916a398d80d5000497ccd4afbd80bfe254d62096",
         |  "fields": {
         |    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])",
         |    "names": ["aa","bb","cc","dd","ee","ff"],

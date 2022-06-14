@@ -106,6 +106,29 @@ object Ast {
       approveAssets.flatMap(_.genCode(state))
     }
   }
+  object ContractAssets {
+    val contractAssetsInstrs: Set[Instr[_]] =
+      Set(
+        TransferAlphFromSelf,
+        TransferTokenFromSelf,
+        TransferAlphToSelf,
+        TransferTokenToSelf,
+        DestroySelf,
+        SelfAddress
+      )
+
+    def checkCodeUsingContractAssets[Ctx <: StatelessContext](
+        instrs: Seq[Instr[Ctx]],
+        useAssetsInContract: Boolean,
+        funcName: String
+    ): Unit = {
+      if (useAssetsInContract && !instrs.exists(contractAssetsInstrs.contains(_))) {
+        throw Compiler.Error(
+          s"Function `$funcName` does not use contract assets, but its annotation of contract assets is turn on"
+        )
+      }
+    }
+  }
 
   trait Typed[Ctx <: StatelessContext, T] {
     var tpe: Option[T] = None
@@ -345,7 +368,7 @@ object Ast {
       id: FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
-      useContractAssets: Boolean,
+      useAssetsInContract: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
       body: Seq[Statement[Ctx]]
@@ -355,7 +378,7 @@ object Ast {
     def signature: String = {
       val publicPrefix = if (isPublic) "pub " else ""
       val assetModifier = {
-        (usePreapprovedAssets, useContractAssets) match {
+        (usePreapprovedAssets, useAssetsInContract) match {
           case (true, true) =>
             s"@using(preapprovedAssets=true,assetsInContract=true) "
           case (true, false) =>
@@ -396,10 +419,11 @@ object Ast {
 
       val instrs    = body.flatMap(_.genCode(state))
       val localVars = state.getLocalVars(id)
+      ContractAssets.checkCodeUsingContractAssets(instrs, useAssetsInContract, id.name)
       Method[Ctx](
         isPublic,
         usePreapprovedAssets,
-        useContractAssets,
+        useAssetsInContract,
         argsLength = ArrayTransformer.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
         returnLength = ArrayTransformer.flattenTypeLength(rtypes),
@@ -412,14 +436,14 @@ object Ast {
     def main(
         stmts: Seq[Ast.Statement[StatefulContext]],
         usePreapprovedAssets: Boolean,
-        useContractAssets: Boolean
+        useAssetsInContract: Boolean
     ): FuncDef[StatefulContext] = {
       FuncDef[StatefulContext](
         Seq.empty,
         id = FuncId("main", false),
         isPublic = true,
         usePreapprovedAssets = usePreapprovedAssets,
-        useContractAssets = useContractAssets,
+        useAssetsInContract = useAssetsInContract,
         args = Seq.empty,
         rtypes = Seq.empty,
         body = stmts
