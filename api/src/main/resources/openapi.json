@@ -794,18 +794,6 @@
             "schema": {
               "type": "string"
             }
-<<<<<<< HEAD
-=======
-          },
-          {
-            "name": "utxosLimit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
->>>>>>> dev/feature/tapir-1-0
           }
         ],
         "responses": {
@@ -3929,18 +3917,6 @@
             "schema": {
               "type": "string"
             }
-<<<<<<< HEAD
-=======
-          },
-          {
-            "name": "utxosLimit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
->>>>>>> dev/feature/tapir-1-0
           }
         ],
         "responses": {
@@ -4061,18 +4037,6 @@
             "schema": {
               "type": "string"
             }
-<<<<<<< HEAD
-=======
-          },
-          {
-            "name": "utxosLimit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
->>>>>>> dev/feature/tapir-1-0
           }
         ],
         "responses": {
@@ -5196,7 +5160,6 @@
                 "schema": {
                   "$ref": "#/components/schemas/DecodeUnsignedTxResult"
                 },
-<<<<<<< HEAD
                 "example": {
                   "fromGroup": 1,
                   "toGroup": 2,
@@ -5235,47 +5198,6 @@
                         "message": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
                       }
                     ]
-=======
-                "examples": {
-                  "Example": {
-                    "summary": "Default",
-                    "value": {
-                      "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                      "version": 1,
-                      "networkId": 1,
-                      "gasAmount": 20000,
-                      "gasPrice": "100000000000",
-                      "inputs": [
-                        {
-                          "outputRef": {
-                            "hint": 23412,
-                            "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
-                          },
-                          "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
-                        }
-                      ],
-                      "fixedOutputs": [
-                        {
-                          "hint": 1,
-                          "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                          "alphAmount": "2000000000000000000",
-                          "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                          "tokens": [
-                            {
-                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
-                              "amount": "42000000000000000000"
-                            },
-                            {
-                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
-                              "amount": "1000000000000000000000"
-                            }
-                          ],
-                          "lockTime": 1611041396892,
-                          "additionalData": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
-                        }
-                      ]
-                    }
->>>>>>> dev/feature/tapir-1-0
                   }
                 }
               }
@@ -6672,15 +6594,15 @@
               }
             }
           },
-          "500": {
-            "description": "InternalServerError",
+          "401": {
+            "description": "Unauthorized",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InternalServerError"
+                  "$ref": "#/components/schemas/Unauthorized"
                 },
                 "example": {
-                  "detail": "Ouch"
+                  "detail": "You shall not pass"
                 }
               }
             }
@@ -6699,6 +6621,19 @@
               }
             }
           },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
           "503": {
             "description": "ServiceUnavailable",
             "content": {
@@ -6708,19 +6643,6 @@
                 },
                 "example": {
                   "detail": "Self clique unsynced"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                },
-                "example": {
-                  "detail": "You shall not pass"
                 }
               }
             }
@@ -7494,7 +7416,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer"
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -7716,7 +7639,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer"
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -7818,107 +7742,6 @@
           }
         }
       }
-<<<<<<< HEAD
-=======
-    },
-    "/events/tx-script/current-count": {
-      "get": {
-        "tags": [
-          "Events"
-        ],
-        "summary": "Get current value of the events counter for a TxScript",
-        "operationId": "getEventsTx-scriptCurrent-count",
-        "parameters": [
-          {
-            "name": "txId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "example": 100
-              }
-            }
-          },
-          "400": {
-            "description": "BadRequest",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequest"
-                },
-                "example": {
-                  "detail": "Something bad in the request"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unauthorized"
-                },
-                "example": {
-                  "detail": "You shall not pass"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "NotFound",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFound"
-                },
-                "example": {
-                  "resource": "wallet-name",
-                  "detail": "wallet-name not found"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "InternalServerError",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalServerError"
-                },
-                "example": {
-                  "detail": "Ouch"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "ServiceUnavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceUnavailable"
-                },
-                "example": {
-                  "detail": "Self clique unsynced"
-                }
-              }
-            }
-          }
-        }
-      }
->>>>>>> dev/feature/tapir-1-0
     }
   },
   "components": {
@@ -8364,13 +8187,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-<<<<<<< HEAD
-=======
-          },
-          "utxosLimit": {
-            "type": "integer",
-            "format": "int32"
->>>>>>> dev/feature/tapir-1-0
           }
         }
       },
@@ -8386,17 +8202,13 @@
         ],
         "type": "object",
         "properties": {
-<<<<<<< HEAD
           "fromGroup": {
-            "type": "integer"
-          },
-          "toGroup": {
-            "type": "integer"
-=======
-          "group": {
             "type": "integer",
             "format": "int32"
->>>>>>> dev/feature/tapir-1-0
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
           },
           "unsignedTx": {
             "type": "string"
@@ -8466,10 +8278,12 @@
         "type": "object",
         "properties": {
           "fromGroup": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           },
           "toGroup": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           },
           "unsignedTx": {
             "type": "string"
@@ -8535,13 +8349,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-<<<<<<< HEAD
-=======
-          },
-          "utxosLimit": {
-            "type": "integer",
-            "format": "int32"
->>>>>>> dev/feature/tapir-1-0
           }
         }
       },
@@ -8573,57 +8380,7 @@
         "properties": {
           "address": {
             "type": "string",
-<<<<<<< HEAD
             "format": "address"
-=======
-            "format": "uint256"
-          },
-          "tokens": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
-          },
-          "gasAmount": {
-            "type": "integer"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "utxosLimit": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "BuildScriptTxResult": {
-        "required": [
-          "unsignedTx",
-          "gasAmount",
-          "gasPrice",
-          "txId",
-          "group"
-        ],
-        "type": "object",
-        "properties": {
-          "unsignedTx": {
-            "type": "string"
-          },
-          "gasAmount": {
-            "type": "integer"
-          },
-          "gasPrice": {
-            "type": "string",
-            "format": "uint256"
-          },
-          "txId": {
-            "type": "string"
-          },
-          "group": {
-            "type": "integer",
-            "format": "int32"
->>>>>>> dev/feature/tapir-1-0
           }
         }
       },
@@ -8653,13 +8410,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-<<<<<<< HEAD
-=======
-          },
-          "utxosLimit": {
-            "type": "integer",
-            "format": "int32"
->>>>>>> dev/feature/tapir-1-0
           }
         }
       },
@@ -8717,13 +8467,6 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
-<<<<<<< HEAD
-=======
-          },
-          "utxosLimit": {
-            "type": "integer",
-            "format": "int32"
->>>>>>> dev/feature/tapir-1-0
           }
         }
       },
@@ -8772,7 +8515,8 @@
         "type": "object",
         "properties": {
           "group": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           },
           "worldStateBlockHash": {
             "type": "string",
@@ -8787,7 +8531,8 @@
             "format": "address"
           },
           "methodIndex": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           },
           "args": {
             "type": "array",
@@ -8828,7 +8573,8 @@
             }
           },
           "gasUsed": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           },
           "contracts": {
             "type": "array",
@@ -9057,7 +8803,8 @@
             "format": "address"
           },
           "eventIndex": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           },
           "fields": {
             "type": "array",
@@ -9081,7 +8828,8 @@
             }
           },
           "nextStart": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -9099,7 +8847,8 @@
             }
           },
           "nextStart": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -9198,10 +8947,12 @@
         "type": "object",
         "properties": {
           "fromGroup": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           },
           "toGroup": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           },
           "unsignedTx": {
             "$ref": "#/components/schemas/UnsignedTx"
@@ -9256,26 +9007,6 @@
           }
         }
       },
-<<<<<<< HEAD
-=======
-      "Event": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/ContractEvent"
-          },
-          {
-            "$ref": "#/components/schemas/TxScriptEvent"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "type",
-          "mapping": {
-            "ContractEvent": "#/components/schemas/ContractEvent",
-            "TxScriptEvent": "#/components/schemas/TxScriptEvent"
-          }
-        }
-      },
->>>>>>> dev/feature/tapir-1-0
       "EventSig": {
         "required": [
           "name",
@@ -9296,41 +9027,12 @@
             "items": {
               "type": "string"
             }
-<<<<<<< HEAD
-=======
-          }
-        }
-      },
-      "Events": {
-        "required": [
-          "chainFrom",
-          "chainTo",
-          "events",
-          "nextStart"
-        ],
-        "type": "object",
-        "properties": {
-          "chainFrom": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "chainTo": {
-            "type": "integer",
-            "format": "int32"
->>>>>>> dev/feature/tapir-1-0
           },
           "fieldTypes": {
             "type": "array",
             "items": {
               "type": "string"
             }
-<<<<<<< HEAD
-=======
-          },
-          "nextStart": {
-            "type": "integer",
-            "format": "int32"
->>>>>>> dev/feature/tapir-1-0
           }
         }
       },
@@ -9924,10 +9626,12 @@
             "format": "32-byte-hash"
           },
           "fromGroup": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           },
           "toGroup": {
-            "type": "integer"
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -10020,14 +9724,9 @@
           "initialAsset": {
             "$ref": "#/components/schemas/AssetState"
           },
-<<<<<<< HEAD
           "methodIndex": {
-            "type": "integer"
-=======
-          "testMethodIndex": {
             "type": "integer",
             "format": "int32"
->>>>>>> dev/feature/tapir-1-0
           },
           "args": {
             "type": "array",
@@ -10285,61 +9984,6 @@
           }
         }
       },
-<<<<<<< HEAD
-=======
-      "TxResult": {
-        "required": [
-          "txId",
-          "fromGroup",
-          "toGroup"
-        ],
-        "type": "object",
-        "properties": {
-          "txId": {
-            "type": "string"
-          },
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "TxScriptEvent": {
-        "required": [
-          "blockHash",
-          "txId",
-          "eventIndex",
-          "fields",
-          "type"
-        ],
-        "type": "object",
-        "properties": {
-          "blockHash": {
-            "type": "string"
-          },
-          "txId": {
-            "type": "string"
-          },
-          "eventIndex": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "fields": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Val"
-            }
-          },
-          "type": {
-            "type": "string"
-          }
-        }
-      },
->>>>>>> dev/feature/tapir-1-0
       "TxStatus": {
         "oneOf": [
           {

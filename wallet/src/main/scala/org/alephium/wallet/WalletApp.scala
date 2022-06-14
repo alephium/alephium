@@ -98,7 +98,7 @@ class WalletApp(config: WalletConfig)(implicit
           )
         // scalastyle:on magic.number
 
-        routes.foreach(route => route(router).handler(CorsHandler.create(".*.")))
+        routes.foreach(route => route(router))
         for {
           binding <- server.listen(port, "127.0.0.1").asScala
         } yield {
