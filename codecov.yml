@@ -1,5 +1,12 @@
 coverage:
   range: 70..90
+  status:
+    project:
+      default:
+        threshold: 0.1%
+    patch:
+      default:
+        threshold: 0.1%
 ignore:
   - "benchmark"
   - "tools"
