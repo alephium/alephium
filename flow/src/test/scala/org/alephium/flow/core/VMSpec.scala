@@ -2551,6 +2551,38 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
+  it should "test the special case (1)" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    bar{selfAddress!() -> 0.1 alph}()
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn bar() -> () {
+         |    transferAlphToSelf!(selfAddress!(), 0.1 alph)
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, AVector.empty, initialAttoAlphAmount = ALPH.alph(2)).key
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.foo()
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+
+    val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+    worldState.getContractAsset(fooId).rightValue.amount is ALPH.alph(2)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
