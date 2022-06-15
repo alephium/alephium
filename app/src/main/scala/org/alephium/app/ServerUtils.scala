@@ -898,7 +898,9 @@ class ServerUtils(implicit
         testContract.testArgs,
         returnLength
       )
-      postState <- fetchContractsState(worldState, testContract)
+      events = fetchContractEvents(worldState)
+      contractIds <- getCreatedAndDestroyedContractIds(events)
+      postState   <- fetchContractsState(worldState, testContract, contractIds._1, contractIds._2)
     } yield {
       val executionOutputs = executionResultPair._1
       val executionResult  = executionResultPair._2
@@ -913,19 +915,44 @@ class ServerUtils(implicit
         txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, Hash.zero, index)
         },
-        events = fetchContractEvents(worldState)
+        events = events
       )
+    }
+  }
+
+  private def getCreatedAndDestroyedContractIds(
+      events: AVector[ContractEventByTxId]
+  ): Try[(AVector[ContractId], AVector[ContractId])] = {
+    events.foldE((AVector.empty[ContractId], AVector.empty[ContractId])) {
+      case ((createdIds, destroyedIds), event) =>
+        event.contractAddress match {
+          case Address.Contract(LockupScript.P2C(vm.createContractEventId)) =>
+            event.getContractId() match {
+              case Some(contractId) => Right((createdIds :+ contractId, destroyedIds))
+              case None             => Left(failed(s"invalid create contract event $event"))
+            }
+          case Address.Contract(LockupScript.P2C(vm.destroyContractEventId)) =>
+            event.getContractId() match {
+              case Some(contractId) => Right((createdIds, destroyedIds :+ contractId))
+              case None             => Left(failed(s"invalid destroy contract event $event"))
+            }
+          case _ => Right((createdIds, destroyedIds))
+        }
     }
   }
 
   private def fetchContractsState(
       worldState: WorldState.Staging,
-      testContract: TestContract.Complete
+      testContract: TestContract.Complete,
+      createdContractIds: AVector[ContractId],
+      destroyedContractIds: AVector[ContractId]
   ): Try[(AVector[ContractState], Hash)] = {
+    val contractIds = testContract.existingContracts.fold(createdContractIds) {
+      case (ids, contractState) =>
+        if (destroyedContractIds.contains(contractState.id)) ids else ids :+ contractState.id
+    }
     for {
-      existingContractsState <- testContract.existingContracts.mapE(contract =>
-        fetchContractState(worldState, contract.id)
-      )
+      existingContractsState <- contractIds.mapE(id => fetchContractState(worldState, id))
       testContractState <- fetchContractState(
         worldState,
         testContract.contractId
