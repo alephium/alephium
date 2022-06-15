@@ -21,11 +21,13 @@ import java.math.BigInteger
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALPH, BlockHash}
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model.Target
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait ChainDifficultyAdjustment {
   implicit def consensusConfig: ConsensusSetting
+  implicit def networkConfig: NetworkConfig
 
   def getHeight(hash: BlockHash): IOResult[Int]
 
@@ -44,12 +46,28 @@ trait ChainDifficultyAdjustment {
     } yield timestampNow.deltaUnsafe(timestampLast)
   }
 
-  final def calIceAgeTarget(currentTarget: Target, timestamp: TimeStamp): Target = {
-    if (timestamp.isBefore(ALPH.DifficultyBombEnabledTimestamp)) {
+  final def calIceAgeTarget(
+      currentTarget: Target,
+      timestamp: TimeStamp
+  ): Target = {
+    val hardFork = networkConfig.getHardFork(timestamp)
+    if (hardFork.isLemanEnabled()) {
+      calIceAgeTarget(currentTarget, timestamp, ALPH.LemanDifficultyBombEnabledTimestamp)
+    } else {
+      calIceAgeTarget(currentTarget, timestamp, ALPH.PreLemanDifficultyBombEnabledTimestamp)
+    }
+  }
+
+  final def calIceAgeTarget(
+      currentTarget: Target,
+      timestamp: TimeStamp,
+      difficultyBombEnabledTimestamp: TimeStamp
+  ): Target = {
+    if (timestamp.isBefore(difficultyBombEnabledTimestamp)) {
       currentTarget
     } else {
       val periodCount = timestamp
-        .deltaUnsafe(ALPH.DifficultyBombEnabledTimestamp)
+        .deltaUnsafe(difficultyBombEnabledTimestamp)
         .millis / ALPH.ExpDiffPeriod.millis
       Target.unsafe(currentTarget.value.shiftRight(periodCount.toInt))
     }

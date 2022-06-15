@@ -112,6 +112,10 @@ object MutBalancesPerLockup {
     MutBalancesPerLockup(amount, mutable.Map.empty, 0)
   }
 
+  protected[vm] def alph(amount: U256, scopeDepth: Int): MutBalancesPerLockup = {
+    MutBalancesPerLockup(amount, mutable.Map.empty, scopeDepth)
+  }
+
   def token(id: TokenId, amount: U256): MutBalancesPerLockup = {
     MutBalancesPerLockup(U256.Zero, mutable.Map(id -> amount), 0)
   }

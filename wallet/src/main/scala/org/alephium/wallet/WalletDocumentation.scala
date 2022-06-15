@@ -16,15 +16,15 @@
 
 package org.alephium.wallet
 
+import sttp.apispec.openapi.OpenAPI
 import sttp.tapir.Endpoint
 import sttp.tapir.docs.openapi.OpenAPIDocsInterpreter
-import sttp.tapir.openapi.OpenAPI
 
 import org.alephium.wallet.api.WalletEndpoints
 
 trait WalletDocumentation extends WalletEndpoints with OpenAPIDocsInterpreter {
 
-  val walletEndpoints: List[Endpoint[_, _, _, _]] = List(
+  val walletEndpoints: List[Endpoint[_, _, _, _, _]] = List(
     createWallet,
     restoreWallet,
     listWallets,

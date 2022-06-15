@@ -748,7 +748,7 @@ class VMSpec extends AlephiumSpec {
     val bar =
       s"""
          |TxContract Bar() {
-         |  @using(assetsInContract = true)
+         |  @using(preapprovedAssets = true)
          |  pub fn bar(fooId: ByteVec, fooHash: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barHash: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
          |    assert!(selfContractId!() == barId)
          |    assert!(selfAddress!() == barAddress)
@@ -756,7 +756,8 @@ class VMSpec extends AlephiumSpec {
          |    assert!(contractInitialStateHash!(barId) == barHash)
          |    Foo(#$fooId).foo(fooId, fooHash, fooCodeHash, barId, barHash, barCodeHash, barAddress)
          |    assert!(isCalledFromTxScript!() == true)
-         |    assert!(isPaying!(@$genesisAddress) == false)
+         |    assert!(isPaying!(@$genesisAddress) == true)
+         |    assert!(isPaying!(selfAddress!()) == false)
          |    assert!(isAssetAddress!(@$genesisAddress) == true)
          |    assert!(isContractAddress!(@$genesisAddress) == false)
          |  }
@@ -769,7 +770,7 @@ class VMSpec extends AlephiumSpec {
     def main(state: String) =
       s"""
          |TxScript Main {
-         |  Bar(#$barId).bar(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
+         |  Bar(#$barId).bar{ @$genesisAddress -> 1 alph }(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
          |  copyCreateContract!{ @$genesisAddress -> 1 alph }(#$fooId, #$state)
          |  assert!(isPaying!(@$genesisAddress) == true)
          |}
@@ -1016,7 +1017,6 @@ class VMSpec extends AlephiumSpec {
     val bar =
       s"""
          |TxContract Bar() {
-         |  @using(assetsInContract = true)
          |  pub fn bar(targetAddress: Address) -> () {
          |    Foo(#$fooId).destroy(targetAddress) // in practice, the contract should check the caller before destruction
          |  }
@@ -2428,7 +2428,7 @@ class VMSpec extends AlephiumSpec {
       val bar: String =
         s"""
            |TxContract Bar() {
-           |  @using(preapprovedAssets = true, assetsInContract = true)
+           |  @using(preapprovedAssets = true, assetsInContract = $transferAlph)
            |  pub fn bar() -> () {
            |    let contractId = createContract!{@$genesisAddress -> $minimalAlphInContract}(#$fooByteCode, #$fooInitialState)
            |    let contractAddress = contractIdToAddress!(contractId)
@@ -2522,6 +2522,7 @@ class VMSpec extends AlephiumSpec {
            |      foo.foo(to)
            |    } else {
            |      let bar = Bar(nextBarId)
+           |      transferAlphFromSelf!(selfAddress!(), 0) // dirty hack
            |      bar.bar(to)
            |    }
            |  }
@@ -2548,6 +2549,38 @@ class VMSpec extends AlephiumSpec {
            |""".stripMargin
       callTxScript(script)
     }
+  }
+
+  it should "test the special case (1)" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    bar{selfAddress!() -> 0.1 alph}()
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn bar() -> () {
+         |    transferAlphToSelf!(selfAddress!(), 0.1 alph)
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, AVector.empty, initialAttoAlphAmount = ALPH.alph(2)).key
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.foo()
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+
+    val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+    worldState.getContractAsset(fooId).rightValue.amount is ALPH.alph(2)
   }
 
   private def getEvents(

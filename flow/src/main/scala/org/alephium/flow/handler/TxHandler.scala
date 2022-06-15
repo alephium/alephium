@@ -78,7 +78,7 @@ object TxHandler {
 
   // scalastyle:off magic.number
   private val highPriceUntil: TimeStamp =
-    ALPH.LaunchTimestamp.plusUnsafe(Duration.ofDaysUnsafe(365))
+    ALPH.LaunchTimestamp.plusUnsafe(ALPH.OneAndHalfYear)
   // scalastyle:off magic.number
   def checkHighGasPrice(tx: TransactionTemplate): Boolean = {
     checkHighGasPrice(TimeStamp.now(), tx)

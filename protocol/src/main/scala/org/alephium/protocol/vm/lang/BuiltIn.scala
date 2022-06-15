@@ -54,7 +54,8 @@ object BuiltIn {
       argsType: Seq[Type],
       returnType: Seq[Type],
       instr: Instr[StatelessContext],
-      usePreapprovedAssets: Boolean = false
+      usePreapprovedAssets: Boolean = false,
+      useAssetsInContract: Boolean = false
   ) extends SimpleBuiltIn[StatelessContext]
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -63,12 +64,14 @@ object BuiltIn {
       argsType: Seq[Type],
       returnType: Seq[Type],
       instr: Instr[StatefulContext],
-      usePreapprovedAssets: Boolean = false
+      usePreapprovedAssets: Boolean = false,
+      useAssetsInContract: Boolean = false
   ) extends SimpleBuiltIn[StatefulContext]
 
   sealed abstract class GenericStatelessBuiltIn(val name: String)
       extends BuiltIn[StatelessContext] {
     def usePreapprovedAssets: Boolean = false
+    def useAssetsInContract: Boolean  = false
   }
 
   val blake2b: SimpleStatelessBuiltIn =
@@ -220,6 +223,7 @@ object BuiltIn {
 
     override def isVariadic: Boolean  = true
     def usePreapprovedAssets: Boolean = false
+    def useAssetsInContract: Boolean  = false
 
     def getReturnType(inputType: Seq[Type]): Seq[Type] = Seq(Type.ByteVec)
 
@@ -446,7 +450,8 @@ object BuiltIn {
       "transferAlphFromSelf",
       Seq[Type](Type.Address, Type.U256),
       Seq.empty,
-      TransferAlphFromSelf
+      TransferAlphFromSelf,
+      useAssetsInContract = true
     )
 
   val transferAlphToSelf: SimpleStatefulBuiltIn =
@@ -454,7 +459,8 @@ object BuiltIn {
       "transferAlphToSelf",
       Seq[Type](Type.Address, Type.U256),
       Seq.empty,
-      TransferAlphToSelf
+      TransferAlphToSelf,
+      useAssetsInContract = true
     )
 
   val transferToken: SimpleStatefulBuiltIn =
@@ -470,7 +476,8 @@ object BuiltIn {
       "transferTokenFromSelf",
       Seq[Type](Type.Address, Type.ByteVec, Type.U256),
       Seq.empty,
-      TransferTokenFromSelf
+      TransferTokenFromSelf,
+      useAssetsInContract = true
     )
 
   val transferTokenToSelf: SimpleStatefulBuiltIn =
@@ -478,7 +485,8 @@ object BuiltIn {
       "transferTokenToSelf",
       Seq[Type](Type.Address, Type.ByteVec, Type.U256),
       Seq.empty,
-      TransferTokenToSelf
+      TransferTokenToSelf,
+      useAssetsInContract = true
     )
 
   val burnToken: SimpleStatefulBuiltIn =
@@ -575,7 +583,8 @@ object BuiltIn {
       "destroySelf",
       Seq[Type](Type.Address),
       Seq.empty,
-      DestroySelf
+      DestroySelf,
+      useAssetsInContract = true
     )
 
   val migrate: SimpleStatefulBuiltIn =
@@ -647,6 +656,7 @@ object BuiltIn {
   val subContractId: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] {
     def name: String                  = "subContractId"
     def usePreapprovedAssets: Boolean = false
+    def useAssetsInContract: Boolean  = false
 
     def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType == Seq(Type.ByteVec)) {

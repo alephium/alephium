@@ -227,7 +227,7 @@ final class StatelessVM(
 }
 
 final class StatefulVM(
-    ctx: StatefulContext,
+    val ctx: StatefulContext,
     frameStack: Stack[Frame[StatefulContext]],
     operandStack: Stack[Val]
 ) extends VM(ctx, frameStack, operandStack) {
@@ -252,21 +252,54 @@ final class StatefulVM(
   ): ExeResult[Frame[StatefulContext]] =
     Frame.stateful(ctx, None, Some(balanceState), obj, method, args, operandStack, returnTo)
 
-  protected def switchBackFrame(
+  protected[vm] def switchBackFrame(
+      currentFrame: Frame[StatefulContext],
+      previousFrame: Frame[StatefulContext]
+  ): ExeResult[Unit] = {
+    if (ctx.getHardFork().isLemanEnabled()) {
+      switchBackFrameLeman(currentFrame, previousFrame)
+    } else {
+      switchBackFramePreLeman(currentFrame, previousFrame)
+    }
+  }
+
+  private def wrap(resultOpt: Option[Unit]): ExeResult[Unit] = {
+    resultOpt match {
+      case Some(_) => okay
+      case None    => failed(BalanceErrorWhenSwitchingBackFrame)
+    }
+  }
+
+  protected def switchBackFrameLeman(
+      currentFrame: Frame[StatefulContext],
+      previousFrame: Frame[StatefulContext]
+  ): ExeResult[Unit] = {
+    (currentFrame.balanceStateOpt, previousFrame.balanceStateOpt) match {
+      case (None, _) => okay
+      case (Some(currentBalances), None) =>
+        wrap(for {
+          _ <- ctx.outputBalances.merge(currentBalances.remaining)
+          _ <- ctx.outputBalances.merge(currentBalances.approved)
+        } yield ())
+      case (Some(currentBalances), Some(previousBalances)) =>
+        wrap(for {
+          _ <- mergeBack(previousBalances.remaining, currentBalances.remaining)
+          _ <- mergeBack(previousBalances.remaining, currentBalances.approved)
+        } yield ())
+    }
+  }
+
+  protected def switchBackFramePreLeman(
       currentFrame: Frame[StatefulContext],
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
     if (currentFrame.method.usesAssets()) {
-      val resultOpt = for {
+      wrap(for {
         currentBalances  <- currentFrame.balanceStateOpt
         previousBalances <- previousFrame.balanceStateOpt
         _                <- mergeBack(previousBalances.remaining, currentBalances.remaining)
         _                <- mergeBack(previousBalances.remaining, currentBalances.approved)
-      } yield ()
-      resultOpt match {
-        case Some(_) => okay
-        case None    => failed(InvalidBalances)
-      }
+      } yield ())
     } else {
       okay
     }

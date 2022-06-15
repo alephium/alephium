@@ -68,7 +68,7 @@ abstract class RestServerSpec(
     Get(blockflowFromTo(10, 0)) check { response =>
       response.code is StatusCode.BadRequest
       response.as[ApiError.BadRequest] is ApiError.BadRequest(
-        """Invalid value (`fromTs` must be before `toTs`)"""
+        """Invalid value (expected value to pass validation: `fromTs` must be before `toTs`, but was: TimeInterval(TimeStamp(10ms),Some(TimeStamp(0ms))))"""
       )
     }
   }
@@ -752,20 +752,20 @@ abstract class RestServerSpec(
     info("with start smaller than end")
     Get(s"$urlBase?start=$end&end=$start").check { response =>
       response.code is StatusCode.BadRequest
-      response.body.leftValue is s"""{"detail":"Invalid value (`end` must be larger than `start`)"}"""
+      response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `end` must be larger than `start`, but was: CounterRange(100,Some(10)))"}"""
     }
 
     info("with end larger than (start + MaxCounterRange)")
     Get(s"$urlBase?start=$start&end=${start + CounterRange.MaxCounterRange + 1}").check {
       response =>
         response.code is StatusCode.BadRequest
-        response.body.leftValue is s"""{"detail":"Invalid value (`end` must be smaller than ${start + CounterRange.MaxCounterRange})"}"""
+        response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `end` must be smaller than 110, but was: CounterRange(10,Some(111)))"}"""
     }
 
     info("with start larger than (Int.MaxValue - MaxCounterRange)")
     Get(s"$urlBase?start=${Int.MaxValue - CounterRange.MaxCounterRange + 1}").check { response =>
       response.code is StatusCode.BadRequest
-      response.body.leftValue is s"""{"detail":"Invalid value (`start` must be smaller than ${Int.MaxValue - CounterRange.MaxCounterRange})"}"""
+      response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `start` must be smaller than 2147483547, but was: CounterRange(2147483548,None))"}"""
     }
 
     def validResponse(response: Response[Either[String, String]]): Assertion = {

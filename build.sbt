@@ -115,6 +115,7 @@ lazy val api = project("api")
     libraryDependencies ++= Seq(
       `scala-logging`,
       `tapir-core`,
+      `tapir-server`,
       `tapir-openapi`,
       `tapir-openapi-model`
     )

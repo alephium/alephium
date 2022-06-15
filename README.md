@@ -33,7 +33,7 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
 
 The following dependencies must be installed in order to run the JAR deliverable:
 
-- java (11, 17 are recommended)
+- java (11+)
 
 ### Running
 
@@ -46,7 +46,7 @@ You can obtain our latest single JAR distribution from the GitHub releases and s
 ### Requirements
 
 In order to build the project from source the following dependencies must be installed on your system:
-- java (11, 17 are recommended)
+- java (11+)
 - [SBT](https://docs.scala-lang.org/getting-started/sbt-track/getting-started-with-scala-and-sbt-on-the-command-line.html)
 
 ### Single JAR

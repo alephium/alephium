@@ -527,7 +527,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     TxHandler.checkHighGasPrice(tx) is true
     TxHandler.checkHighGasPrice(lowGasPriceTx) is false
     TxHandler.checkHighGasPrice(
-      ALPH.LaunchTimestamp.plusUnsafe(Duration.ofDaysUnsafe(366)),
+      ALPH.LaunchTimestamp.plusUnsafe(Duration.ofDaysUnsafe(366 + 365 / 2)),
       lowGasPriceTx
     ) is true
   }

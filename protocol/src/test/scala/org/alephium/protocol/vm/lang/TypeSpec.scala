@@ -66,6 +66,7 @@ trait TypeSignatureFixture {
        |  @using(preapprovedAssets = true, assetsInContract = true)
        |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
        |    emit Bar(aa, bb, dd, ee)
+       |    transferAlphToSelf!(callerAddress!(), 1 alph)
        |    return b, c, d, e, f
        |  }
        |}

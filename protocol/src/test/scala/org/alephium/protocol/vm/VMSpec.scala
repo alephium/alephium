@@ -17,12 +17,13 @@
 package org.alephium.protocol.vm
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 import akka.util.ByteString
 import org.scalatest.Assertion
 
-import org.alephium.protocol.{Hash, Signature, SignatureSchema}
-import org.alephium.protocol.config.NetworkConfigFixture
+import org.alephium.protocol.{ALPH, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util._
@@ -609,6 +610,136 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       val method1 = Method[StatefulContext](true, false, false, 0, 0, 0, AVector(Pop))
 
       test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
+    }
+  }
+
+  class SwitchBackFixture(network: NetworkConfig) extends FrameFixture with NetworkFixture {
+    val vm   = if (network.lemanHardForkTimestamp.isZero()) lemanStatefulVm else preLemanStatefulVm
+    val from = lockupScriptGen.sample.get
+    var expectedBalance: U256 = ALPH.alph(0)
+    def addAndCheckBalance(delta: U256) = {
+      expectedBalance = expectedBalance + delta
+      vm.ctx.outputBalances.getBalances(from) match {
+        case None           => expectedBalance is U256.Zero
+        case Some(balances) => balances.attoAlphAmount is expectedBalance
+      }
+    }
+
+    def frameWithoutBalances = genStatefulFrame(None)(network)
+    def frameWithRemainingDepth0 = genStatefulFrame(
+      Some(
+        MutBalanceState(
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1), 0))),
+          MutBalances.empty
+        )
+      ),
+      usePreapprovedAssets = true
+    )(network)
+    def frameWithRemainingDepth1 = genStatefulFrame(
+      Some(
+        MutBalanceState(
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1), 1))),
+          MutBalances.empty
+        )
+      ),
+      usePreapprovedAssets = true
+    )(network)
+    def frameWithApprovedDepth0 = genStatefulFrame(
+      Some(
+        MutBalanceState(
+          MutBalances.empty,
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(2), 0)))
+        )
+      ),
+      usePreapprovedAssets = true
+    )(network)
+    def frameWithApprovedDepth1 = genStatefulFrame(
+      Some(
+        MutBalanceState(
+          MutBalances.empty,
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(2), 1)))
+        )
+      ),
+      usePreapprovedAssets = true
+    )(network)
+    def allFrames = Seq(
+      frameWithoutBalances,
+      frameWithRemainingDepth0,
+      frameWithRemainingDepth1,
+      frameWithApprovedDepth0,
+      frameWithApprovedDepth1
+    )
+  }
+
+  it should "switch back frames properly: Leman" in new SwitchBackFixture(
+    NetworkConfigFixture.Leman
+  ) {
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames) {
+      vm.switchBackFrame(frameWithoutBalances, previousFrame) isE ()
+      addAndCheckBalance(0)
+    }
+
+    for (previousFrame <- allFrames) {
+      vm.switchBackFrame(frameWithRemainingDepth0, previousFrame) isE ()
+      addAndCheckBalance(ALPH.alph(1))
+    }
+    vm.switchBackFrame(frameWithRemainingDepth1, frameWithoutBalances) isE ()
+    addAndCheckBalance(ALPH.alph(1))
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithRemainingDepth1, previousFrame) isE ()
+      addAndCheckBalance(0)
+    }
+
+    for (previousFrame <- allFrames) {
+      vm.switchBackFrame(frameWithApprovedDepth0, previousFrame) isE ()
+      addAndCheckBalance(ALPH.alph(2))
+    }
+    vm.switchBackFrame(frameWithApprovedDepth1, frameWithoutBalances) isE ()
+    addAndCheckBalance(ALPH.alph(2))
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithApprovedDepth1, previousFrame) isE ()
+      addAndCheckBalance(0)
+    }
+  }
+
+  it should "switch back frames properly: PreLeman" in new SwitchBackFixture(
+    NetworkConfigFixture.PreLeman
+  ) {
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames) {
+      vm.switchBackFrame(frameWithoutBalances, previousFrame) isE ()
+      addAndCheckBalance(0)
+    }
+
+    vm.switchBackFrame(frameWithRemainingDepth0, frameWithoutBalances)
+      .leftValue isE BalanceErrorWhenSwitchingBackFrame
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithRemainingDepth0, previousFrame) isE ()
+      addAndCheckBalance(ALPH.alph(1))
+    }
+    vm.switchBackFrame(frameWithRemainingDepth1, frameWithoutBalances)
+      .leftValue isE BalanceErrorWhenSwitchingBackFrame
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithRemainingDepth1, previousFrame) isE ()
+      addAndCheckBalance(0)
+    }
+
+    vm.switchBackFrame(frameWithApprovedDepth0, frameWithoutBalances)
+      .leftValue isE BalanceErrorWhenSwitchingBackFrame
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithApprovedDepth0, previousFrame) isE ()
+      addAndCheckBalance(ALPH.alph(2))
+    }
+    vm.switchBackFrame(frameWithApprovedDepth1, frameWithoutBalances)
+      .leftValue isE BalanceErrorWhenSwitchingBackFrame
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithApprovedDepth1, previousFrame) isE ()
+      addAndCheckBalance(0)
     }
   }
 }

@@ -289,7 +289,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
 
   def templateParams[Unknown: P]: P[Seq[Ast.Argument]] =
-    P("(" ~ contractArgument.rep(1, ",") ~ ")").map { params =>
+    P("(" ~ contractArgument.rep(0, ",") ~ ")").map { params =>
       val mutables = params.filter(_.isMutable)
       if (mutables.nonEmpty) {
         throw Compiler.Error(

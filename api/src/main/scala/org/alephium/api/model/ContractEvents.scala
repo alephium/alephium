@@ -17,8 +17,8 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.Address
-import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates}
+import org.alephium.protocol.model.{Address, ContractId}
+import org.alephium.protocol.vm.{LockupScript, LogState, LogStateRef, LogStates}
 import org.alephium.util.AVector
 
 final case class ContractEvents(
@@ -43,7 +43,14 @@ final case class ContractEventByTxId(
     contractAddress: Address.Contract,
     eventIndex: Int,
     fields: AVector[Val]
-)
+) {
+  def getContractId(): Option[ContractId] = {
+    fields.get(0).flatMap {
+      case ValAddress(Address.Contract(LockupScript.P2C(id))) => Some(id)
+      case _                                                  => None
+    }
+  }
+}
 
 object ContractEventByTxId {
   def from(blockHash: BlockHash, ref: LogStateRef, logState: LogState): ContractEventByTxId = {

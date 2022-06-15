@@ -133,10 +133,14 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
 }
 
 trait FrameFixture extends ContextGenerators {
-  def baseMethod[Ctx <: StatelessContext](localsLength: Int) = Method[Ctx](
+  def baseMethod[Ctx <: StatelessContext](
+      localsLength: Int,
+      usePreapprovedAssets: Boolean = false,
+      useAssetsInContract: Boolean = false
+  ) = Method[Ctx](
     isPublic = true,
-    usePreapprovedAssets = false,
-    useContractAssets = false,
+    usePreapprovedAssets = usePreapprovedAssets,
+    useContractAssets = useAssetsInContract,
     argsLength = localsLength - 1,
     localsLength,
     returnLength = 0,
@@ -159,9 +163,15 @@ trait FrameFixture extends ContextGenerators {
   }
 
   def genStatefulFrame(
-      balanceState: Option[MutBalanceState] = None
+      balanceState: Option[MutBalanceState] = None,
+      usePreapprovedAssets: Boolean = false,
+      useAssetsInContract: Boolean = false
   )(implicit networkConfig: NetworkConfig): StatefulFrame = {
-    val method         = baseMethod[StatefulContext](2)
+    val method = baseMethod[StatefulContext](
+      2,
+      usePreapprovedAssets = usePreapprovedAssets,
+      useAssetsInContract = useAssetsInContract
+    )
     val script         = StatefulScript.unsafe(AVector(method))
     val (obj, context) = prepareStatefulScript(script)
     Frame
