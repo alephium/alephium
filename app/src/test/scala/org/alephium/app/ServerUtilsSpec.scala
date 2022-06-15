@@ -918,6 +918,72 @@ class ServerUtilsSpec extends AlephiumSpec {
     fooState1.asset is AssetState(contractAttoAlphAmount1, Some(AVector.empty))
   }
 
+  "the test contract endpoint" should "handle create and destroy contracts properly" in new Fixture {
+    val (_, pubKey)  = SignatureSchema.generatePriPub()
+    val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
+    val foo =
+      s"""
+         |TxContract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn destroy() -> () {
+         |    destroySelf!(@$assetAddress)
+         |  }
+         |}
+         |""".stripMargin
+
+    val fooContract         = Compiler.compileContract(foo).rightValue
+    val fooByteCode         = Hex.toHexString(serialize(fooContract))
+    val encodedState        = Hex.toHexString(serialize(AVector.empty[vm.Val]))
+    val createContractPath  = "00"
+    val destroyContractPath = "11"
+    val bar =
+      s"""
+         |TxContract Bar() {
+         |  @using(assetsInContract = true)
+         |  pub fn bar() -> () {
+         |    createSubContract!{selfAddress!() -> 1 alph}(#$createContractPath, #$fooByteCode, #$encodedState)
+         |    Foo(subContractId!(#$destroyContractPath)).destroy()
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+
+    val barContract   = Compiler.compileContract(bar).rightValue
+    val barContractId = Hash.random
+    val destroyedFooContractId =
+      Hash.doubleHash(Hex.unsafe(destroyContractPath) ++ barContractId.bytes)
+    val existingContract = ContractState(
+      Address.contract(destroyedFooContractId),
+      fooContract,
+      fooContract.hash,
+      None,
+      AVector.empty[Val],
+      AssetState(ALPH.oneAlph)
+    )
+    val testContractParams = TestContract(
+      address = Some(Address.contract(barContractId)),
+      bytecode = barContract,
+      initialAsset = Some(AssetState(ALPH.alph(10))),
+      existingContracts = Some(AVector(existingContract)),
+      inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
+    )
+
+    val testFlow    = BlockFlow.emptyUnsafe(config)
+    val serverUtils = new ServerUtils()
+    val createdFooContractId =
+      Hash.doubleHash(Hex.unsafe(createContractPath) ++ barContractId.bytes)
+
+    val result =
+      serverUtils.runTestContract(testFlow, testContractParams.toComplete().rightValue).rightValue
+    result.contracts.length is 2
+    result.contracts(0).address is Address.contract(createdFooContractId)
+    result.contracts(1).address is Address.contract(barContractId)
+    val assetOutput = result.txOutputs(1)
+    assetOutput.address is assetAddress
+    assetOutput.attoAlphAmount is Amount(ALPH.alph(2).subUnsafe(defaultGasPrice * maximalGasPerTx))
+  }
+
   trait TestContractFixture extends Fixture {
     val tokenId         = Hash.random
     val (_, pubKey)     = SignatureSchema.generatePriPub()
