@@ -25,6 +25,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.{ALPH, BlockHash}
+import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Target
 import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
@@ -36,6 +37,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val emission        = Emission(Test.groupConfig, blockTargetTime)
       ConsensusSetting(blockTargetTime, blockTargetTime, 18, 25, emission)
     }
+    implicit override def networkConfig: NetworkConfig = NetworkConfigFixture.Leman
 
     val chainInfo =
       mutable.HashMap.empty[BlockHash, (Int, TimeStamp)] // block hash -> (height, timestamp)
@@ -163,18 +165,28 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
   it should "decrease the target when difficulty bomb enabled" in new MockFixture {
     val currentTarget = consensusConfig.maxMiningTarget
-    val timestamp0    = ALPH.DifficultyBombEnabledTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    val timestamp0 =
+      ALPH.LemanDifficultyBombEnabledTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
     calIceAgeTarget(currentTarget, timestamp0) is currentTarget
+
+    calIceAgeTarget(
+      currentTarget,
+      ALPH.PreLemanDifficultyBombEnabledTimestamp.plusUnsafe(ALPH.ExpDiffPeriod)
+    ) is currentTarget
+    calIceAgeTarget(
+      currentTarget,
+      ALPH.LemanDifficultyBombEnabledTimestamp.plusUnsafe(ALPH.ExpDiffPeriod)
+    ) isnot currentTarget
 
     (0 until 20).foreach { i =>
       val period    = ALPH.ExpDiffPeriod.timesUnsafe(i.toLong)
-      val timestamp = ALPH.DifficultyBombEnabledTimestamp.plusUnsafe(period)
+      val timestamp = ALPH.LemanDifficultyBombEnabledTimestamp.plusUnsafe(period)
       val target    = calIceAgeTarget(currentTarget, timestamp)
       target is Target.unsafe(currentTarget.value.shiftRight(i))
     }
 
     val period     = ALPH.ExpDiffPeriod.timesUnsafe(256)
-    val timestamp1 = ALPH.DifficultyBombEnabledTimestamp.plusUnsafe(period)
+    val timestamp1 = ALPH.LemanDifficultyBombEnabledTimestamp.plusUnsafe(period)
     calIceAgeTarget(currentTarget, timestamp1) is Target.Zero
   }
 

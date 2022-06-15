@@ -32,9 +32,11 @@ object ALPH {
   val GenesisTimestamp: TimeStamp = TimeStamp.unsafe(1231006505000L) // BTC genesis timestamp
   val LaunchTimestamp: TimeStamp  = TimeStamp.unsafe(1636379973000L) // 2021-11-08T11:20:06+00:00
 
-  val OneYear: Duration                         = Duration.ofDaysUnsafe(365)
-  val DifficultyBombEnabledTimestamp: TimeStamp = LaunchTimestamp.plusUnsafe(OneYear)
-  val ExpDiffPeriod: Duration                   = Duration.ofDaysUnsafe(30)
+  val OneYear: Duration                                 = Duration.ofDaysUnsafe(365)
+  val OneAndHalfYear: Duration                          = Duration.ofDaysUnsafe(365 + 365 / 2)
+  val LemanDifficultyBombEnabledTimestamp: TimeStamp    = LaunchTimestamp.plusUnsafe(OneAndHalfYear)
+  val PreLemanDifficultyBombEnabledTimestamp: TimeStamp = LaunchTimestamp.plusUnsafe(OneYear)
+  val ExpDiffPeriod: Duration                           = Duration.ofDaysUnsafe(30)
 
   val MaxTxInputNum: Int     = 256
   val MaxTxOutputNum: Int    = 256
