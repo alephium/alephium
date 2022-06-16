@@ -25,6 +25,7 @@ import akka.actor.ActorSystem
 
 import org.alephium.api.model.{Amount, Destination}
 import org.alephium.crypto.wallet.Mnemonic
+import org.alephium.http.EndpointSender
 import org.alephium.protocol.{Generators, Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.model.{Address, TxGenerators}
 import org.alephium.protocol.vm.LockupScript
@@ -282,11 +283,14 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     implicit val system: ActorSystem =
       ActorSystem(s"wallet-service-spec-${Random.nextInt()}")
     implicit val executionContext = scala.concurrent.ExecutionContext.Implicits.global
+    lazy val endpointSender       = new EndpointSender(config.blockflow.apiKey)
+
     lazy val blockFlowClient =
       BlockFlowClient.apply(
         config.blockflow.uri,
         config.blockflow.blockflowFetchMaxAge,
-        config.blockflow.apiKey
+        config.blockflow.apiKey,
+        endpointSender
       )
 
     lazy val walletService: WalletService =

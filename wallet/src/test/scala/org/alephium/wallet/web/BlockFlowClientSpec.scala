@@ -16,6 +16,8 @@
 
 package org.alephium.wallet.web
 
+import scala.concurrent.ExecutionContext
+
 import org.scalatest.Inside
 import sttp.client3._
 
@@ -31,7 +33,8 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
   it should "correclty create an sttp request" in new Fixture {
     val destinations       = AVector(Destination(toAddress, value, None, None))
     val buildTransactionIn = BuildTransaction(publicKey, destinations, None, None)
-    val request = createRequest(buildTransaction, buildTransactionIn, uri"http://127.0.0.1:1234")
+    val request =
+      endpointSender.createRequest(buildTransaction, buildTransactionIn, uri"http://127.0.0.1:1234")
     request.uri is uri"http://127.0.0.1:1234/transactions/build"
 
     inside(request.body) { case body: StringBody =>
@@ -39,7 +42,9 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
     }
   }
 
-  trait Fixture extends Endpoints with LockupScriptGenerators with EndpointSender {
+  trait Fixture extends Endpoints with LockupScriptGenerators {
+    implicit val executionContext: ExecutionContext =
+      scala.concurrent.ExecutionContext.Implicits.global
     implicit val groupConfig: GroupConfig = new GroupConfig { val groups = 4 }
     val groupIndex                        = GroupIndex.unsafe(0)
     val (script, publicKey, _)            = addressGen(groupIndex).sample.get
@@ -47,5 +52,6 @@ class BlockFlowClientSpec() extends AlephiumSpec with Inside {
     val value                             = Amount(U256.unsafe(1000))
     val blockflowFetchMaxAge              = Duration.unsafe(1000)
     val maybeApiKey                       = None
+    val endpointSender                    = new EndpointSender(maybeApiKey)
   }
 }
