@@ -28,6 +28,7 @@ import io.vertx.ext.web._
 import io.vertx.ext.web.handler.CorsHandler
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
+import org.alephium.http.EndpointSender
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.{AVector, Service}
 import org.alephium.wallet.config.WalletConfig
@@ -43,11 +44,16 @@ class WalletApp(config: WalletConfig)(implicit
     override def groups: Int = config.blockflow.groups
   }
 
+  private val endpointSender: EndpointSender = new EndpointSender(
+    config.blockflow.apiKey
+  )
+
   val blockFlowClient: BlockFlowClient =
     BlockFlowClient.apply(
       config.blockflow.uri,
       config.blockflow.blockflowFetchMaxAge,
-      config.blockflow.apiKey
+      config.blockflow.apiKey,
+      endpointSender
     )
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -62,11 +68,11 @@ class WalletApp(config: WalletConfig)(implicit
       config.apiKey
     )
 
-  val routes: AVector[Router => Route] = walletServer.routes :+ walletServer.docsRoute
+  val routes: AVector[Router => Route] = walletServer.routes ++ walletServer.docsRoute
 
   private val bindingPromise: Promise[HttpServer] = Promise()
 
-  override val subServices: ArraySeq[Service] = ArraySeq(walletService)
+  override val subServices: ArraySeq[Service] = ArraySeq(walletService, endpointSender)
 
   protected def startSelfOnce(): Future[Unit] = {
     config.port match {

@@ -26,7 +26,6 @@ import akka.util.Timeout
 import io.prometheus.client.CollectorRegistry
 import io.prometheus.client.exporter.common.TextFormat
 import sttp.model.{StatusCode, Uri}
-import sttp.tapir.client.sttp.SttpClientInterpreter
 import sttp.tapir.server.ServerEndpoint
 
 import org.alephium.api.{ApiError, Endpoints, Try}
@@ -51,10 +50,11 @@ import org.alephium.serde._
 import org.alephium.util._
 
 // scalastyle:off method.length
-trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterpreter {
+trait EndpointsLogic extends Endpoints {
   def node: Node
   def miner: ActorRefT[Miner.Command]
   def blocksExporter: BlocksExporter
+  def endpointSender: EndpointSender
 
   private lazy val blockFlow: BlockFlow                        = node.blockFlow
   private lazy val txHandler: ActorRefT[TxHandler.Command]     = node.allHandlers.txHandler
@@ -698,7 +698,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
         uriFromGroup(groupIndex).flatMap {
           case Left(error) => Future.successful(Left(error))
           case Right(uri) =>
-            send(endpoint, params, uri)
+            endpointSender.send(endpoint, params, uri)
         }
     }
 
