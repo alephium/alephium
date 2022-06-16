@@ -250,6 +250,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   ) = {
     new ItConfigFixture with StoragesFixture {
       override val configValues = Map(
+        ("alephium.network.leman-hard-fork-timestamp", "1643500800000"),
         ("alephium.network.bind-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.coordinator-address", s"127.0.0.1:$masterPort"),
