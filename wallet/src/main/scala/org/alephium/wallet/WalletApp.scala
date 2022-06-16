@@ -62,7 +62,7 @@ class WalletApp(config: WalletConfig)(implicit
       config.apiKey
     )
 
-  val routes: AVector[Router => Route] = walletServer.routes :+ walletServer.docsRoute
+  val routes: AVector[Router => Route] = walletServer.routes ++ walletServer.docsRoute
 
   private val bindingPromise: Promise[HttpServer] = Promise()
 

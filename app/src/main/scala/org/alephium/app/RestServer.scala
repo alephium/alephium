@@ -31,7 +31,7 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.flow.client.Node
 import org.alephium.flow.mining.Miner
-import org.alephium.http.{ServerOptions, SwaggerVertx}
+import org.alephium.http.{ServerOptions, SwaggerUI}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.util._
 import org.alephium.wallet.web.WalletServer
@@ -60,7 +60,7 @@ class RestServer(
 
   override val maybeApiKey = apiConfig.apiKey
 
-  private val swaggerUiRoute = new SwaggerVertx(openApiJson(openAPI, maybeApiKey.isEmpty)).route(_)
+  private val swaggerUiRoute = SwaggerUI(openApiJson(openAPI, maybeApiKey.isEmpty)).map(route(_))
 
   private val blockFlowRoute: AVector[Router => Route] =
     AVector(
@@ -113,7 +113,7 @@ class RestServer(
       getContractEventsCurrentCountLogic,
       getEventsByTxIdLogic,
       metricsLogic
-    ).map(route(_)) :+ swaggerUiRoute
+    ).map(route(_)) ++ swaggerUiRoute
 
   val routes: AVector[Router => Route] =
     walletServer.map(wallet => wallet.routes).getOrElse(AVector.empty) ++ blockFlowRoute
