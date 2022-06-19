@@ -68,7 +68,7 @@ object Target {
   }
   // scalastyle:on magic.number
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def fromCompactBitsUnsafe(bits: ByteString): BigInteger = {
     assume(bits.length == 4)
     val size: Int            = Bytes.toPosInt(bits(0))
@@ -80,7 +80,7 @@ object Target {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def toCompactBitsUnsafe(value: BigInteger): ByteString = {
     val size: Int = (value.bitLength() + 7) / 8
     val mantissa = if (size <= 3) {
@@ -99,7 +99,7 @@ object Target {
     val selfWeight         = 2 * groupConfig.groups + 1
     val selfWeightedTarget = newTarget.value.multiply(BigInteger.valueOf(selfWeight.toLong))
     val totalDepsTarget    = depTargets.fold(BigInteger.ZERO)(_ add _.value)
-    val average            = (selfWeightedTarget add totalDepsTarget).divide(groupConfig.targetAverageCount)
+    val average = (selfWeightedTarget add totalDepsTarget).divide(groupConfig.targetAverageCount)
     Target.unsafe(average)
   }
 

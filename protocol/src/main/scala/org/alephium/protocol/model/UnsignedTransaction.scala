@@ -28,12 +28,18 @@ import org.alephium.util.{AVector, TimeStamp, U256}
 /** Up to one new token might be issued in each transaction exception for the coinbase transaction
   * The id of the new token will be hash of the first input
   *
-  * @param version the version of the tx
-  * @param networkId the id of the chain which can accept the tx
-  * @param scriptOpt optional script for invoking stateful contracts
-  * @param gasAmount the amount of gas can be used for tx execution
-  * @param inputs a vector of TxInput
-  * @param fixedOutputs a vector of TxOutput. ContractOutput are put in front of AssetOutput
+  * @param version
+  *   the version of the tx
+  * @param networkId
+  *   the id of the chain which can accept the tx
+  * @param scriptOpt
+  *   optional script for invoking stateful contracts
+  * @param gasAmount
+  *   the amount of gas can be used for tx execution
+  * @param inputs
+  *   a vector of TxInput
+  * @param fixedOutputs
+  *   a vector of TxOutput. ContractOutput are put in front of AssetOutput
   */
 @HashSerde
 final case class UnsignedTransaction(
@@ -212,10 +218,12 @@ object UnsignedTransaction {
       gasFee: U256
   ): Either[String, U256] = {
     for {
-      inputSum     <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight "Input amount overflow")
-      outputAmount <- outputs.foldE(U256.Zero)(_ add _.alphAmount toRight "Output amount overflow")
-      remainder0   <- inputSum.sub(outputAmount).toRight("Not enough balance")
-      remainder    <- remainder0.sub(gasFee).toRight("Not enough balance for gas fee")
+      inputSum <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight "Input amount overflow")
+      outputAmount <- outputs.foldE(U256.Zero)(
+        _ add _.attoAlphAmount toRight "Output amount overflow"
+      )
+      remainder0 <- inputSum.sub(outputAmount).toRight("Not enough balance")
+      remainder  <- remainder0.sub(gasFee).toRight("Not enough balance for gas fee")
     } yield remainder
   }
 
@@ -245,7 +253,7 @@ object UnsignedTransaction {
     } else if (tokensRemainder.length > maxTokenPerUtxo) {
       Left(s"Too many tokens in the change output, maximal number $maxTokenPerUtxo")
     } else {
-      if (alphRemainder > minimalAlphAmountPerTxOutput(tokensRemainder.length)) {
+      if (alphRemainder > minimalAttoAlphAmountPerTxOutput(tokensRemainder.length)) {
         Right(Some(TxOutput.asset(alphRemainder, tokensRemainder, fromLockupScript)))
       } else {
         Left("Not enough ALPH for change output")
@@ -258,7 +266,7 @@ object UnsignedTransaction {
   ): Either[String, Unit] = {
     check(
       failCondition = outputs.exists { output =>
-        output.alphAmount < minimalAlphAmountPerTxOutput(output.tokens.length)
+        output.attoAlphAmount < minimalAttoAlphAmountPerTxOutput(output.tokens.length)
       },
       "Not enough ALPH for transaction output"
     )
@@ -327,7 +335,7 @@ object UnsignedTransaction {
 
   final case class TxOutputInfo(
       lockupScript: LockupScript.Asset,
-      alphAmount: U256,
+      attoAlphAmount: U256,
       tokens: AVector[(TokenId, U256)],
       lockTime: Option[TimeStamp],
       additionalDataOpt: Option[ByteString]
@@ -336,11 +344,11 @@ object UnsignedTransaction {
   object TxOutputInfo {
     def apply(
         lockupScript: LockupScript.Asset,
-        alphAmount: U256,
+        attoAlphAmount: U256,
         tokens: AVector[(TokenId, U256)],
         lockTime: Option[TimeStamp]
     ): TxOutputInfo = {
-      TxOutputInfo(lockupScript, alphAmount, tokens, lockTime, None)
+      TxOutputInfo(lockupScript, attoAlphAmount, tokens, lockTime, None)
     }
   }
 }

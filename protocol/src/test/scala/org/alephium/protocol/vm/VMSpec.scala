@@ -22,9 +22,9 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 import org.scalatest.Assertion
 
-import org.alephium.protocol.{Hash, Signature, SignatureSchema}
-import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.minimalGas
+import org.alephium.protocol.{ALPH, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
+import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -32,7 +32,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   trait BaseFixture[Ctx <: StatelessContext] {
     val baseMethod = Method[Ctx](
       isPublic = true,
-      isPayable = false,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -64,7 +65,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check the entry method of stateless scripts" in new StatelessFixture {
     test1(baseMethod, okay)
-    test1(baseMethod.copy(isPayable = true), failed(ExpectNonPayableMethod))
+    test1(baseMethod.copy(usePreapprovedAssets = true), failed(ExpectNonPayableMethod))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
     intercept[AssertionError](
       test1(baseMethod.copy(localsLength = -1), okay)
@@ -90,7 +91,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check the entry method of stateful scripts" in new StatefulFixture {
     test1(baseMethod, okay)
-    test1(baseMethod.copy(isPayable = true), failed(InvalidBalances))
+    test1(baseMethod.copy(usePreapprovedAssets = true), failed(InvalidBalances))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
     intercept[AssertionError](
       test1(baseMethod.copy(localsLength = -1), okay)
@@ -106,7 +107,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   trait Fixture {
     val baseMethod = Method[StatefulContext](
       isPublic = true,
-      isPayable = false,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -171,7 +173,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        isPayable = false,
+        usePreapprovedAssets = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 0,
@@ -201,7 +204,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        isPayable = false,
+        usePreapprovedAssets = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -217,7 +221,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   it should "call method" in {
     val method0 = Method[StatelessContext](
       isPublic = true,
-      isPayable = false,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
       argsLength = 1,
       localsLength = 1,
       returnLength = 1,
@@ -226,7 +231,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method1 =
       Method[StatelessContext](
         isPublic = false,
-        isPayable = false,
+        usePreapprovedAssets = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
@@ -241,11 +247,11 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   trait BalancesFixture {
     val (_, pubKey0) = SignatureSchema.generatePriPub()
     val address0     = Val.Address(LockupScript.p2pkh(pubKey0))
-    val balances0    = BalancesPerLockup(100, mutable.Map.empty, 0)
+    val balances0    = MutBalancesPerLockup(100, mutable.Map.empty, 0)
     val (_, pubKey1) = SignatureSchema.generatePriPub()
     val address1     = Val.Address(LockupScript.p2pkh(pubKey1))
     val tokenId      = Hash.random
-    val balances1    = BalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
+    val balances1    = MutBalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext =
       new StatefulContext with NetworkConfigFixture.Default {
@@ -257,15 +263,18 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         def nextOutputIndex: Int           = 0
         def logConfig: LogConfig           = LogConfig.allEnabled()
 
-        def getInitialBalances(): ExeResult[Balances] = {
+        def getInitialBalances(): ExeResult[MutBalances] = {
           Right(
-            Balances(
-              ArrayBuffer(address0.lockupScript -> balances0, address1.lockupScript -> balances1)
+            MutBalances(
+              mutable.ArrayBuffer(
+                address0.lockupScript -> balances0,
+                address1.lockupScript -> balances1
+              )
             )
           )
         }
 
-        override val outputBalances: Balances = Balances.empty
+        override val outputBalances: MutBalances = MutBalances.empty
       }
 
     def testInstrs(
@@ -275,7 +284,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       val methods = instrs.mapWithIndex { case (instrs, index) =>
         Method[StatefulContext](
           isPublic = index equals 0,
-          isPayable = true,
+          usePreapprovedAssets = true,
+          useContractAssets = false,
           argsLength = 0,
           localsLength = 0,
           returnLength = expected.fold(_ => 0, _.length),
@@ -407,8 +417,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     )
 
     val context = pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(98)))
-    context.outputBalances.getAlphAmount(address0.lockupScript).get is 90
-    context.outputBalances.getAlphAmount(address1.lockupScript).get is 11
+    context.outputBalances.getAttoAlphAmount(address0.lockupScript).get is 90
+    context.outputBalances.getAttoAlphAmount(address1.lockupScript).get is 11
     context.outputBalances.getTokenAmount(address0.lockupScript, tokenId).get is 1
     context.outputBalances.getTokenAmount(address1.lockupScript, tokenId).get is 98
   }
@@ -432,7 +442,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
     val method = Method[StatefulContext](
       isPublic = true,
-      isPayable = true,
+      usePreapprovedAssets = true,
+      useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -461,7 +472,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val method =
       Method[StatefulContext](
         isPublic = true,
-        isPayable = false,
+        usePreapprovedAssets = false,
+        useContractAssets = false,
         argsLength = 1,
         localsLength = 1,
         returnLength = 0,
@@ -509,5 +521,225 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val signature = Signature.generate
     val context1  = genStatefulContext(None, signatures = AVector(signature))
     StatefulVM.checkRemainingSignatures(context1).leftValue isE TooManySignatures
+  }
+
+  trait NetworkFixture extends ContextGenerators {
+    val preLemanContext = genStatefulContext(None)(NetworkConfigFixture.PreLeman)
+    val lemanContext    = genStatefulContext(None)(NetworkConfigFixture.Leman)
+
+    val preLemanStatefulVm =
+      new StatefulVM(preLemanContext, Stack.ofCapacity(0), Stack.ofCapacity(0))
+    val lemanStatefulVm =
+      new StatefulVM(lemanContext, Stack.ofCapacity(0), Stack.ofCapacity(0))
+  }
+
+  it should "check the minimal contract balance" in new NetworkFixture {
+    def genAssetOutput(amount: U256): AssetOutput = {
+      TxOutput.asset(
+        amount,
+        lockupScriptGen.retryUntil(_.isAssetType).sample.get.asInstanceOf[LockupScript.Asset]
+      )
+    }
+    def genContractOutput(amount: U256): ContractOutput = {
+      TxOutput.contract(
+        amount,
+        lockupScriptGen.retryUntil(!_.isAssetType).sample.get.asInstanceOf[LockupScript.P2C]
+      )
+    }
+
+    val output0 = genAssetOutput(minimalAlphInContract - 1)
+    val output1 = genAssetOutput(minimalAlphInContract)
+    val output2 = genContractOutput(minimalAlphInContract - 1)
+    val output3 = genContractOutput(minimalAlphInContract)
+
+    VM.checkContractAttoAlphAmounts(Seq(output0), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output1), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output2), HardFork.Mainnet) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output3), HardFork.Mainnet) isE ()
+
+    VM.checkContractAttoAlphAmounts(Seq(output0), HardFork.Leman) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output1), HardFork.Leman) isE ()
+    VM.checkContractAttoAlphAmounts(Seq(output2), HardFork.Leman).leftValue isE
+      LowerThanContractMinimalBalance
+    VM.checkContractAttoAlphAmounts(Seq(output3), HardFork.Leman) isE ()
+  }
+
+  it should "check method modifier compatibility" in new NetworkFixture {
+    val contract0 = StatefulContract(0, AVector(Method(true, true, true, 0, 0, 0, AVector.empty)))
+    val contract1 = StatefulContract(0, AVector(Method(true, false, false, 0, 0, 0, AVector.empty)))
+    val contract2 = StatefulContract(0, AVector(Method(true, true, false, 0, 0, 0, AVector.empty)))
+    val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
+
+    def test(vm: StatefulVM, contract: StatefulContract, succeeded: Boolean) = {
+      val obj = StatefulContractObject.from(contract, AVector.empty, ContractId.random)
+      if (succeeded) {
+        vm.execute(obj, 0, AVector.empty) match {
+          case Right(res)  => res is ()
+          case Left(error) => error isnotE InvalidMethodModifierBeforeLeman
+        }
+      } else {
+        vm.execute(obj, 0, AVector.empty).leftValue isE InvalidMethodModifierBeforeLeman
+      }
+    }
+
+    test(lemanStatefulVm, contract0, true)
+    test(lemanStatefulVm, contract1, true)
+    test(lemanStatefulVm, contract2, true)
+    test(lemanStatefulVm, contract3, true)
+    test(preLemanStatefulVm, contract0, true)
+    test(preLemanStatefulVm, contract1, true)
+    test(preLemanStatefulVm, contract2, false)
+    test(preLemanStatefulVm, contract3, false)
+  }
+
+  it should "preserve stack safety" in new StatefulFixture {
+    {
+      info("No local variables")
+      val method0 =
+        Method[StatefulContext](true, false, false, 0, 0, 0, AVector(ConstTrue, CallLocal(1)))
+      val method1 = Method[StatefulContext](true, false, false, 0, 0, 0, AVector(Pop))
+
+      test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
+    }
+
+    {
+      info("Non-empty local variables")
+
+      val method0 =
+        Method[StatefulContext](true, false, false, 0, 1, 0, AVector(ConstTrue, CallLocal(1)))
+      val method1 = Method[StatefulContext](true, false, false, 0, 0, 0, AVector(Pop))
+
+      test3(StatefulScript.unsafe(AVector(method0, method1)), failed(StackUnderflow))
+    }
+  }
+
+  class SwitchBackFixture(network: NetworkConfig) extends FrameFixture with NetworkFixture {
+    val vm   = if (network.lemanHardForkTimestamp.isZero()) lemanStatefulVm else preLemanStatefulVm
+    val from = lockupScriptGen.sample.get
+    var expectedBalance: U256 = ALPH.alph(0)
+    def addAndCheckBalance(delta: U256) = {
+      expectedBalance = expectedBalance + delta
+      vm.ctx.outputBalances.getBalances(from) match {
+        case None           => expectedBalance is U256.Zero
+        case Some(balances) => balances.attoAlphAmount is expectedBalance
+      }
+    }
+
+    def frameWithoutBalances = genStatefulFrame(None)(network)
+    def frameWithRemainingDepth0 = genStatefulFrame(
+      Some(
+        MutBalanceState(
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1), 0))),
+          MutBalances.empty
+        )
+      ),
+      usePreapprovedAssets = true
+    )(network)
+    def frameWithRemainingDepth1 = genStatefulFrame(
+      Some(
+        MutBalanceState(
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(1), 1))),
+          MutBalances.empty
+        )
+      ),
+      usePreapprovedAssets = true
+    )(network)
+    def frameWithApprovedDepth0 = genStatefulFrame(
+      Some(
+        MutBalanceState(
+          MutBalances.empty,
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(2), 0)))
+        )
+      ),
+      usePreapprovedAssets = true
+    )(network)
+    def frameWithApprovedDepth1 = genStatefulFrame(
+      Some(
+        MutBalanceState(
+          MutBalances.empty,
+          MutBalances(ArrayBuffer(from -> MutBalancesPerLockup.alph(ALPH.alph(2), 1)))
+        )
+      ),
+      usePreapprovedAssets = true
+    )(network)
+    def allFrames = Seq(
+      frameWithoutBalances,
+      frameWithRemainingDepth0,
+      frameWithRemainingDepth1,
+      frameWithApprovedDepth0,
+      frameWithApprovedDepth1
+    )
+  }
+
+  it should "switch back frames properly: Leman" in new SwitchBackFixture(
+    NetworkConfigFixture.Leman
+  ) {
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames) {
+      vm.switchBackFrame(frameWithoutBalances, previousFrame) isE ()
+      addAndCheckBalance(0)
+    }
+
+    for (previousFrame <- allFrames) {
+      vm.switchBackFrame(frameWithRemainingDepth0, previousFrame) isE ()
+      addAndCheckBalance(ALPH.alph(1))
+    }
+    vm.switchBackFrame(frameWithRemainingDepth1, frameWithoutBalances) isE ()
+    addAndCheckBalance(ALPH.alph(1))
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithRemainingDepth1, previousFrame) isE ()
+      addAndCheckBalance(0)
+    }
+
+    for (previousFrame <- allFrames) {
+      vm.switchBackFrame(frameWithApprovedDepth0, previousFrame) isE ()
+      addAndCheckBalance(ALPH.alph(2))
+    }
+    vm.switchBackFrame(frameWithApprovedDepth1, frameWithoutBalances) isE ()
+    addAndCheckBalance(ALPH.alph(2))
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithApprovedDepth1, previousFrame) isE ()
+      addAndCheckBalance(0)
+    }
+  }
+
+  it should "switch back frames properly: PreLeman" in new SwitchBackFixture(
+    NetworkConfigFixture.PreLeman
+  ) {
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames) {
+      vm.switchBackFrame(frameWithoutBalances, previousFrame) isE ()
+      addAndCheckBalance(0)
+    }
+
+    vm.switchBackFrame(frameWithRemainingDepth0, frameWithoutBalances)
+      .leftValue isE BalanceErrorWhenSwitchingBackFrame
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithRemainingDepth0, previousFrame) isE ()
+      addAndCheckBalance(ALPH.alph(1))
+    }
+    vm.switchBackFrame(frameWithRemainingDepth1, frameWithoutBalances)
+      .leftValue isE BalanceErrorWhenSwitchingBackFrame
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithRemainingDepth1, previousFrame) isE ()
+      addAndCheckBalance(0)
+    }
+
+    vm.switchBackFrame(frameWithApprovedDepth0, frameWithoutBalances)
+      .leftValue isE BalanceErrorWhenSwitchingBackFrame
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithApprovedDepth0, previousFrame) isE ()
+      addAndCheckBalance(ALPH.alph(2))
+    }
+    vm.switchBackFrame(frameWithApprovedDepth1, frameWithoutBalances)
+      .leftValue isE BalanceErrorWhenSwitchingBackFrame
+    addAndCheckBalance(0)
+    for (previousFrame <- allFrames.tail) {
+      vm.switchBackFrame(frameWithApprovedDepth1, previousFrame) isE ()
+      addAndCheckBalance(0)
+    }
   }
 }

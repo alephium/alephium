@@ -56,7 +56,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       prepareWorldState(preOutputs)
       for {
         chainIndex <- getChainIndex(tx)
-        _          <- checkStateless(chainIndex, tx, checkDoubleSpending = true)
+        _          <- checkStateless(chainIndex, tx, checkDoubleSpending = true, HardFork.Leman)
         _ <- checkStateful(
           chainIndex,
           tx,
@@ -126,15 +126,15 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
 
     implicit class RichTx(tx: Transaction) {
-      def addAlphAmount(delta: U256): Transaction = {
-        updateAlphAmount(_ + delta)
+      def addAttoAlphAmount(delta: U256): Transaction = {
+        updateAttoAlphAmount(_ + delta)
       }
 
-      def zeroAlphAmount(): Transaction = {
-        updateAlphAmount(_ => 0)
+      def zeroAttoAlphAmount(): Transaction = {
+        updateAttoAlphAmount(_ => 0)
       }
 
-      def updateAlphAmount(f: U256 => U256): Transaction = {
+      def updateAttoAlphAmount(f: U256 => U256): Transaction = {
         updateRandomFixedOutputs(output => output.copy(amount = f(output.amount)))
       }
 
@@ -388,26 +388,37 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   it should "check ALPH balance stats" in new Fixture {
     forAll(transactionGenWithPreOutputs()) { case (tx, _) =>
-      implicit val validator = checkOutputStats(_)
+      implicit val validator = checkOutputStats(_, HardFork.Leman)
 
       // balance overflow
-      val alphAmount = tx.alphAmountInOutputs.value
-      val delta      = U256.MaxValue - alphAmount + 1
-      tx.addAlphAmount(delta).fail(BalanceOverFlow)
+      val attoAlphAmount = tx.attoAlphAmountInOutputs.value
+      val delta          = U256.MaxValue - attoAlphAmount + 1
+      tx.addAttoAlphAmount(delta).fail(BalanceOverFlow)
 
       // zero amount
-      tx.zeroAlphAmount().fail(InvalidOutputStats)
+      tx.zeroAttoAlphAmount().fail(InvalidOutputStats)
 
-      // dust amount
-      tx.updateAlphAmount(_ => dustUtxoAmount).pass()
-      tx.updateAlphAmount(_ => dustUtxoAmount - 1).fail(InvalidOutputStats)
+      {
+        info("Check dust amount before leman")
+        implicit val validator = checkOutputStats(_, HardFork.Mainnet)
+        tx.updateAttoAlphAmount(_ => deprecatedDustUtxoAmount).pass()
+        tx.updateAttoAlphAmount(_ => deprecatedDustUtxoAmount - 1).fail(InvalidOutputStats)
+      }
+
+      {
+        info("Check dust amount for leman")
+        dustUtxoAmount is (deprecatedDustUtxoAmount * 1000)
+        implicit val validator = checkOutputStats(_, HardFork.Leman)
+        tx.updateAttoAlphAmount(_ => dustUtxoAmount).pass()
+        tx.updateAttoAlphAmount(_ => dustUtxoAmount - 1).fail(InvalidOutputStats)
+      }
     }
   }
 
   it should "check non-zero token amount for outputs" in new Fixture {
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
       whenever(tx.unsigned.fixedOutputs.nonEmpty) {
-        implicit val validator = nestedValidator(checkOutputStats, preOutputs)
+        implicit val validator = nestedValidator(checkOutputStats(_, HardFork.Leman), preOutputs)
 
         tx.zeroTokenAmount().fail(InvalidOutputStats)
       }
@@ -415,10 +426,23 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check the number of tokens for outputs" in new Fixture {
-    implicit val validator = checkOutputStats _
+    {
+      info("Leman hardfork")
+      implicit val validator = checkOutputStats(_, HardFork.Leman)
 
-    forAll(transactionGen(numTokensGen = maxTokenPerUtxo + 1))(_.fail(InvalidOutputStats))
-    forAll(transactionGen(numTokensGen = maxTokenPerUtxo))(_.pass())
+      forAll(transactionGen(numTokensGen = maxTokenPerUtxo + 1))(_.fail(InvalidOutputStats))
+      forAll(transactionGen(numTokensGen = maxTokenPerUtxo))(_.pass())
+    }
+
+    {
+      info("Pre-Leman hardfork")
+      implicit val validator = checkOutputStats(_, HardFork.Mainnet)
+
+      forAll(transactionGen(numTokensGen = deprecatedMaxTokenPerUtxo + 1))(
+        _.fail(InvalidOutputStats)
+      )
+      forAll(transactionGen(numTokensGen = deprecatedMaxTokenPerUtxo))(_.pass())
+    }
   }
 
   it should "check the inputs indexes" in new Fixture {
@@ -535,7 +559,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         preOutputs
       )
 
-      tx.addAlphAmount(1).fail(InvalidAlphBalance)
+      tx.addAttoAlphAmount(1).fail(InvalidAlphBalance)
     }
   }
 
@@ -558,7 +582,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   it should "validate token balances" in new Fixture {
     forAll(transactionGenWithPreOutputs(tokensNumGen = Gen.choose(1, 10)), Gen.prob(0.5)) {
-      case ((tx, preOutputs), isPayable) =>
+      case ((tx, preOutputs), useAssets) =>
         implicit val validator = nestedValidator(
           checkTokenBalance(_, preOutputs.map(_.referredOutput)),
           preOutputs
@@ -571,7 +595,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         val invalidTxWithScript = {
           val method = Method[StatefulContext](
             isPublic = true,
-            isPayable = isPayable,
+            usePreapprovedAssets = useAssets,
+            useContractAssets = useAssets,
             argsLength = 0,
             localsLength = 0,
             returnLength = 0,
@@ -582,7 +607,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           invalidTx.updateUnsigned(_.copy(scriptOpt = Some(script)))
         }
 
-        if (!isPayable) {
+        if (!useAssets) {
           invalidTxWithScript.fail(InvalidTokenBalance)
         }
     }
@@ -787,7 +812,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "charge gas for tx script size" in new ScriptFixture {
     val rawScript =
       s"""
-         |TxScript P2sh nonPayable {
+         |@using(preapprovedAssets = false)
+         |TxScript P2sh {
          |  return
          |}
          |""".stripMargin
@@ -810,7 +836,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "match generated contract inputs and outputs" in new ScriptFixture {
     val rawScript =
       s"""
-         |TxScript Main nonPayable {
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
          |  return
          |}
          |""".stripMargin
@@ -824,8 +851,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.pass()
 
     val contractId = Hash.generate
-    val output     = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
-    val outputRef  = ContractOutputRef.unsafe(output.hint, contractId)
+    val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
+    val outputRef = ContractOutputRef.unsafe(output.hint, contractId)
     tx.copy(contractInputs = AVector(outputRef)).fail(InvalidContractInputs)
 
     tx.copy(generatedOutputs = AVector(assetOutputGen.sample.get)).fail(InvalidGeneratedOutputs)
@@ -836,7 +863,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     info("valid script")
     val rawScript =
       s"""
-         |TxScript Main nonPayable {
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
          |  return
          |}
          |""".stripMargin
@@ -871,7 +899,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   it should "check script execution flag, inter group" in new ScriptFixture {
     val rawScript =
       s"""
-         |TxScript Main nonPayable {
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
          |  return
          |}
          |""".stripMargin

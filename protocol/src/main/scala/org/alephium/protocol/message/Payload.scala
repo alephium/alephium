@@ -35,7 +35,7 @@ sealed trait Payload extends Product with Serializable {
 
 object Payload {
 
-  //scalastyle:off cyclomatic.complexity
+  // scalastyle:off cyclomatic.complexity
   def serialize(payload: Payload): ByteString = {
     val (code, data: ByteString) = payload match {
       case x: Hello           => (Hello, Hello.serialize(x))
@@ -57,12 +57,12 @@ object Payload {
     }
     intSerde.serialize(Code.toInt(code)) ++ data
   }
-  //scalastyle:on cyclomatic.complexity
+  // scalastyle:on cyclomatic.complexity
 
   val deserializerCode: Deserializer[Code] =
     intSerde.validateGet(Code.fromInt, c => s"Invalid code $c")
 
-  //scalastyle:off cyclomatic.complexity
+  // scalastyle:off cyclomatic.complexity
   def _deserialize(
       input: ByteString
   )(implicit config: GroupConfig): SerdeResult[Staging[Payload]] = {
@@ -87,7 +87,7 @@ object Payload {
       }
     }
   }
-  //scalastyle:on cyclomatic.complexity
+  // scalastyle:on cyclomatic.complexity
 
   def deserialize(input: ByteString)(implicit config: GroupConfig): SerdeResult[Payload] =
     _deserialize(input).flatMap { case Staging(output, rest) =>

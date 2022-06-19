@@ -27,7 +27,8 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
   val keyGen = groupIndexGen.flatMap(publicKeyGen)
   val dummyMethod = Method[StatelessContext](
     isPublic = true,
-    isPayable = false,
+    usePreapprovedAssets = false,
+    useContractAssets = false,
     argsLength = 0,
     localsLength = 0,
     returnLength = 0,

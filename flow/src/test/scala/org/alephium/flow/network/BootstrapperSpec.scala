@@ -35,24 +35,24 @@ class BootstrapperSpec extends AlephiumActorSpec {
       ("alephium.network.external-address", s"127.0.0.1:9972")
     )
 
-    //Peer connects
+    // Peer connects
     bootstrapper ! connected
 
-    //Broker info is full,
+    // Broker info is full,
     cliqueManagerProbe.send(bootstrapper, Bootstrapper.ForwardConnection)
     tcpControllerProbe.expectMsg(TcpController.WorkFor(cliqueManagerProbe.ref))
 
-    //CliqueManager is now responsible for new connection
+    // CliqueManager is now responsible for new connection
     bootstrapper ! connected
     cliqueManagerProbe.expectMsg(connected)
     expectMsgType[Tcp.Register]
     expectMsg(Tcp.ResumeReading)
 
-    //Receiving IntraCliqueInfo
+    // Receiving IntraCliqueInfo
     bootstrapper ! Bootstrapper.SendIntraCliqueInfo(intraCliqueInfo)
     cliqueManagerProbe.expectMsg(CliqueManager.Start(cliqueInfo))
 
-    //Answering IntraCliqueInfo request
+    // Answering IntraCliqueInfo request
     bootstrapper ! Bootstrapper.GetIntraCliqueInfo
     expectMsg(intraCliqueInfo)
     getPersistedKey() isE Some(intraCliqueInfo.priKey)

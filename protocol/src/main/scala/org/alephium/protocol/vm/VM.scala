@@ -55,7 +55,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
   def startPayableFrame(
       obj: ContractObj[Ctx],
       ctx: Ctx,
-      balanceState: BalanceState,
+      balanceState: MutBalanceState,
       method: Method[Ctx],
       args: AVector[Val],
       operandStack: Stack[Val],
@@ -74,7 +74,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       startPayableFrame(
         obj,
         ctx,
-        BalanceState.from(balances),
+        MutBalanceState.from(balances),
         method,
         args,
         operandStack,
@@ -96,7 +96,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       _      <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       frame <- {
         val returnTo = returnToOpt.getOrElse(VM.noReturnTo)
-        if (method.isPayable) {
+        if (method.usePreapprovedAssets) {
           startPayableFrame(obj, ctx, method, args, operandStack, returnTo)
         } else {
           startNonPayableFrame(obj, ctx, method, args, operandStack, returnTo)
@@ -113,6 +113,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       returnToOpt: Option[AVector[Val] => ExeResult[Unit]]
   ): ExeResult[Unit] = {
     for {
+      _          <- obj.code.checkAssetsModifier(ctx)
       startFrame <- startFrame(obj, ctx, methodIndex, args, operandStack, returnToOpt)
       _          <- frameStack.push(startFrame)
       _          <- executeFrames()
@@ -176,6 +177,21 @@ object VM {
       initialGas.use(GasCall.fieldsBaseGas(estimatedSize))
     }
   }
+
+  def checkContractAttoAlphAmounts(
+      outputs: Iterable[TxOutput],
+      hardFork: HardFork
+  ): ExeResult[Unit] = {
+    val allChecked = outputs.forall {
+      case output: ContractOutput => output.amount >= minimalAlphInContract
+      case _                      => true
+    }
+    if (hardFork.isLemanEnabled() && !allChecked) {
+      failed(LowerThanContractMinimalBalance)
+    } else {
+      okay
+    }
+  }
 }
 
 final class StatelessVM(
@@ -200,7 +216,7 @@ final class StatelessVM(
   def startPayableFrame(
       obj: ContractObj[StatelessContext],
       ctx: StatelessContext,
-      balanceState: BalanceState,
+      balanceState: MutBalanceState,
       method: Method[StatelessContext],
       args: AVector[Val],
       operandStack: Stack[Val],
@@ -211,7 +227,7 @@ final class StatelessVM(
 }
 
 final class StatefulVM(
-    ctx: StatefulContext,
+    val ctx: StatefulContext,
     frameStack: Stack[Frame[StatefulContext]],
     operandStack: Stack[Val]
 ) extends VM(ctx, frameStack, operandStack) {
@@ -228,7 +244,7 @@ final class StatefulVM(
   def startPayableFrame(
       obj: ContractObj[StatefulContext],
       ctx: StatefulContext,
-      balanceState: BalanceState,
+      balanceState: MutBalanceState,
       method: Method[StatefulContext],
       args: AVector[Val],
       operandStack: Stack[Val],
@@ -236,27 +252,60 @@ final class StatefulVM(
   ): ExeResult[Frame[StatefulContext]] =
     Frame.stateful(ctx, None, Some(balanceState), obj, method, args, operandStack, returnTo)
 
-  protected def switchBackFrame(
+  protected[vm] def switchBackFrame(
       currentFrame: Frame[StatefulContext],
       previousFrame: Frame[StatefulContext]
   ): ExeResult[Unit] = {
-    if (currentFrame.method.isPayable) {
-      val resultOpt = for {
+    if (ctx.getHardFork().isLemanEnabled()) {
+      switchBackFrameLeman(currentFrame, previousFrame)
+    } else {
+      switchBackFramePreLeman(currentFrame, previousFrame)
+    }
+  }
+
+  private def wrap(resultOpt: Option[Unit]): ExeResult[Unit] = {
+    resultOpt match {
+      case Some(_) => okay
+      case None    => failed(BalanceErrorWhenSwitchingBackFrame)
+    }
+  }
+
+  protected def switchBackFrameLeman(
+      currentFrame: Frame[StatefulContext],
+      previousFrame: Frame[StatefulContext]
+  ): ExeResult[Unit] = {
+    (currentFrame.balanceStateOpt, previousFrame.balanceStateOpt) match {
+      case (None, _) => okay
+      case (Some(currentBalances), None) =>
+        wrap(for {
+          _ <- ctx.outputBalances.merge(currentBalances.remaining)
+          _ <- ctx.outputBalances.merge(currentBalances.approved)
+        } yield ())
+      case (Some(currentBalances), Some(previousBalances)) =>
+        wrap(for {
+          _ <- mergeBack(previousBalances.remaining, currentBalances.remaining)
+          _ <- mergeBack(previousBalances.remaining, currentBalances.approved)
+        } yield ())
+    }
+  }
+
+  protected def switchBackFramePreLeman(
+      currentFrame: Frame[StatefulContext],
+      previousFrame: Frame[StatefulContext]
+  ): ExeResult[Unit] = {
+    if (currentFrame.method.usesAssets()) {
+      wrap(for {
         currentBalances  <- currentFrame.balanceStateOpt
         previousBalances <- previousFrame.balanceStateOpt
         _                <- mergeBack(previousBalances.remaining, currentBalances.remaining)
         _                <- mergeBack(previousBalances.remaining, currentBalances.approved)
-      } yield ()
-      resultOpt match {
-        case Some(_) => okay
-        case None    => failed(InvalidBalances)
-      }
+      } yield ())
     } else {
       okay
     }
   }
 
-  protected def mergeBack(previous: Balances, current: Balances): Option[Unit] = {
+  protected def mergeBack(previous: MutBalances, current: MutBalances): Option[Unit] = {
     @tailrec
     def iter(index: Int): Option[Unit] = {
       if (index >= current.all.length) {
@@ -285,7 +334,7 @@ final class StatefulVM(
   }
 
   private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
-    if (lastFrame.method.isPayable) {
+    if (lastFrame.method.usesAssets()) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
         _        <- ctx.outputBalances.merge(balances.approved)
@@ -304,7 +353,7 @@ final class StatefulVM(
     }
   }
 
-  private def outputGeneratedBalances(outputBalances: Balances): ExeResult[Unit] = {
+  private def outputGeneratedBalances(outputBalances: MutBalances): ExeResult[Unit] = {
     EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
       balances.toTxOutput(lockupScript).flatMap {
         case Some(output) => ctx.generateOutput(output)
@@ -372,21 +421,8 @@ object StatefulVM {
       script: StatefulScript,
       gasRemaining: GasBox
   )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
-    runTxScript(worldState, blockEnv, tx, Some(preOutputs), script, gasRemaining)
-  }
-
-  def runTxScript(
-      worldState: WorldState.Staging,
-      blockEnv: BlockEnv,
-      tx: TransactionAbstract,
-      preOutputsOpt: Option[AVector[AssetOutput]],
-      script: StatefulScript,
-      gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
-    for {
-      context <- StatefulContext.build(blockEnv, tx, gasRemaining, worldState, preOutputsOpt)
-      result  <- runTxScript(context, script)
-    } yield result
+    val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
+    runTxScript(context, script)
   }
 
   def runTxScript(
@@ -412,6 +448,7 @@ object StatefulVM {
   private def prepareResult(context: StatefulContext): ExeResult[TxScriptExecution] = {
     for {
       _ <- checkRemainingSignatures(context)
+      _ <- VM.checkContractAttoAlphAmounts(context.generatedOutputs, context.getHardFork())
     } yield {
       TxScriptExecution(
         context.gasRemaining,
@@ -430,7 +467,7 @@ object StatefulVM {
     }
   }
 
-  private def default(ctx: StatefulContext): StatefulVM = {
+  private[vm] def default(ctx: StatefulContext): StatefulVM = {
     new StatefulVM(ctx, Stack.ofCapacity(frameStackMaxSize), Stack.ofCapacity(opStackMaxSize))
   }
 

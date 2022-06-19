@@ -25,6 +25,7 @@ import akka.actor.ActorSystem
 
 import org.alephium.api.model.{Amount, Destination}
 import org.alephium.crypto.wallet.Mnemonic
+import org.alephium.http.EndpointSender
 import org.alephium.protocol.{Generators, Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.model.{Address, TxGenerators}
 import org.alephium.protocol.vm.LockupScript
@@ -66,7 +67,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     minerAddresses2.foreach(address => newMinerAddresses.contains(address))
   }
 
-  //Regression test as we had one bug with this mnemonic and the way we were getting the private keys from the secret storage
+  // Regression test as we had one bug with this mnemonic and the way we were getting the private keys from the secret storage
   it should "correctly derive miner addresses" in new Fixture {
     val mnemonic = Mnemonic
       .from(
@@ -80,7 +81,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
 
     val minerAddresses = walletService.getMinerAddresses(walletName).rightValue
 
-    minerAddresses.length is 2 //was equal to 4 before the fix
+    minerAddresses.length is 2 // was equal to 4 before the fix
   }
 
   it should "fail to start if secret dir path is invalid" in new Fixture {
@@ -151,7 +152,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     walletService.deriveNextMinerAddresses(wrongWalletName).leftValue is notFound
     walletService.changeActiveAddress(wrongWalletName, address).leftValue is notFound
 
-    //We curently  do an optimist lock
+    // We curently  do an optimist lock
     walletService.lockWallet(wrongWalletName) isE ()
   }
 
@@ -282,11 +283,14 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     implicit val system: ActorSystem =
       ActorSystem(s"wallet-service-spec-${Random.nextInt()}")
     implicit val executionContext = scala.concurrent.ExecutionContext.Implicits.global
+    lazy val endpointSender       = new EndpointSender(config.blockflow.apiKey)
+
     lazy val blockFlowClient =
       BlockFlowClient.apply(
         config.blockflow.uri,
         config.blockflow.blockflowFetchMaxAge,
-        config.blockflow.apiKey
+        config.blockflow.apiKey,
+        endpointSender
       )
 
     lazy val walletService: WalletService =

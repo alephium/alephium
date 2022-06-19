@@ -62,8 +62,8 @@ class DiscoveryServerSpec
         val candidates = (1 to groups).filter(groups % _ equals 0)
         candidates(Random.nextInt(candidates.size))
       }
-      val groupNumPerBroker                           = groups / brokerNum
-      val addresses                                   = AVector.fill(brokerNum)(new InetSocketAddress("127.0.0.1", generatePort()))
+      val groupNumPerBroker = groups / brokerNum
+      val addresses = AVector.fill(brokerNum)(new InetSocketAddress("127.0.0.1", generatePort()))
       val (discoveryPrivateKey0, discoveryPublicKey0) = SignatureSchema.generatePriPub()
       val clique =
         CliqueInfo.unsafe(

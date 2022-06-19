@@ -32,7 +32,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, SignatureSchema}
-import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.{Address, CliqueId, NetworkId, TxGenerators}
 import org.alephium.serde.serialize
 import org.alephium.util.{discard, AlephiumFutureSpec, AVector, Duration, Hex, U256}
@@ -86,7 +86,7 @@ class WalletAppSpec
       case Some(pass) => passwordWithPassphraseJson(pass)
     }
   def transferJson(amount: Int) =
-    s"""{"destinations":[{"address":"$transferAddress","alphAmount":"$amount","tokens":[]}]}"""
+    s"""{"destinations":[{"address":"$transferAddress","attoAlphAmount":"$amount","tokens":[]}]}"""
   val sweepJson                                 = s"""{"toAddress":"$transferAddress"}"""
   def changeActiveAddressJson(address: Address) = s"""{"address":"${address.toBase58}"}"""
   def restoreJson(mnemonic: Mnemonic, name: String) =
@@ -100,12 +100,12 @@ class WalletAppSpec
     Put("/wallets", restoreJson(mnemonic, name))
   def unlock(mnemonicPassphrase: Option[String] = None) =
     Post(s"/wallets/$wallet/unlock", unlockJson(mnemonicPassphrase))
-  def lock()                = Post(s"/wallets/$wallet/lock")
-  def delete()              = Delete(s"/wallets/$wallet", passwordJson)
-  def getBalance()          = Get(s"/wallets/$wallet/balances")
-  def getAddresses()        = Get(s"/wallets/$wallet/addresses")
-  def getMinerAddresses()   = Get(s"/wallets/$minerWallet/miner-addresses")
-  def revealMnemonic()      = Post(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
+  def lock()              = Post(s"/wallets/$wallet/lock")
+  def delete()            = Delete(s"/wallets/$wallet", passwordJson)
+  def getBalance()        = Get(s"/wallets/$wallet/balances")
+  def getAddresses()      = Get(s"/wallets/$wallet/addresses")
+  def getMinerAddresses() = Get(s"/wallets/$minerWallet/miner-addresses")
+  def revealMnemonic() = Post(s"/wallets/$wallet/reveal-mnemonic", maybeBody = Some(passwordJson))
   def transfer(amount: Int) = Post(s"/wallets/$wallet/transfer", transferJson(amount))
   def sweepActiveAddress()  = Post(s"/wallets/$wallet/sweep-active-address", sweepJson)
   def sweepAllAddresses()   = Post(s"/wallets/$wallet/sweep-all-addresses", sweepJson)
@@ -156,7 +156,7 @@ class WalletAppSpec
       response.code is StatusCode.Ok
     }
 
-    //Lock is idempotent
+    // Lock is idempotent
     (0 to 10).foreach { _ =>
       lock() check { response =>
         response.code is StatusCode.Ok
@@ -296,7 +296,7 @@ class WalletAppSpec
       ) is s"""{"resource":"$wallet","detail":"$wallet not found"}"""
     }
 
-    //handle passphrase
+    // handle passphrase
     Post("/wallets", passwordWithPassphraseJson(mnemonicPassphrase)) check { response =>
       val result = response.as[WalletCreationResult]
       mnemonic = result.mnemonic
@@ -417,8 +417,7 @@ object WalletAppSpec extends {
 
   class BlockFlowServerMock(address: InetAddress, port: Int)(implicit
       val groupConfig: GroupConfig,
-      val networkConfig: NetworkConfig,
-      val compilerConfig: CompilerConfig
+      val networkConfig: NetworkConfig
   ) extends TxGenerators
       with ApiModelCodec
       with ScalaFutures {
@@ -442,9 +441,9 @@ object WalletAppSpec extends {
     }
 
     router.route().path("/transactions/build").handler(BodyHandler.create()).handler { ctx =>
-      val buildTransaction = read[BuildTransaction](ctx.getBodyAsString())
+      val buildTransaction = read[BuildTransaction](ctx.body().asString())
       val amount = buildTransaction.destinations.fold(U256.Zero) { (acc, destination) =>
-        acc.addUnsafe(destination.alphAmount.value)
+        acc.addUnsafe(destination.attoAlphAmount.value)
       }
       val unsignedTx = transactionGen().sample.get.unsigned
 
@@ -474,7 +473,7 @@ object WalletAppSpec extends {
       .path("/transactions/sweep-address/build")
       .handler(BodyHandler.create())
       .handler { ctx =>
-        val _          = read[BuildSweepAddressTransactions](ctx.getBodyAsString())
+        val _          = read[BuildSweepAddressTransactions](ctx.body().asString())
         val unsignedTx = transactionGen().sample.get.unsigned
         complete(
           ctx,
@@ -484,8 +483,8 @@ object WalletAppSpec extends {
       }
 
     router.route().path("/transactions/submit").handler(BodyHandler.create()).handler { ctx =>
-      val _ = read[SubmitTransaction](ctx.getBodyAsString())
-      complete(ctx, TxResult(Hash.generate, 0, 0))
+      val _ = read[SubmitTransaction](ctx.body().asString())
+      complete(ctx, SubmitTxResult(Hash.generate, 0, 0))
     }
 
     router.route().path("/infos/chain-params").handler { ctx =>

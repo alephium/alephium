@@ -180,7 +180,7 @@ object DiscoveryMessage {
         avectorSerde(implicitly[ClassTag[BrokerInfo]], BrokerInfo.unsafeSerde)
       Serde.forProduct1[AVector[BrokerInfo], Neighbors](
         Neighbors.apply,
-        t => (t.peers)
+        t => t.peers
       )(brokersSerde)
     }
 

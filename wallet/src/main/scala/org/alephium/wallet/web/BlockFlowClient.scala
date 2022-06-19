@@ -19,7 +19,6 @@ package org.alephium.wallet.web
 import scala.concurrent.{ExecutionContext, Future}
 
 import sttp.model.{StatusCode, Uri}
-import sttp.tapir.client.sttp._
 
 import org.alephium.api.{ApiError, Endpoints}
 import org.alephium.api.model._
@@ -53,31 +52,31 @@ trait BlockFlowClient {
       tx: String,
       signature: Signature,
       fromGroup: Int
-  ): Future[Either[ApiError[_ <: StatusCode], TxResult]]
+  ): Future[Either[ApiError[_ <: StatusCode], SubmitTxResult]]
 }
 
 object BlockFlowClient {
   def apply(
       defaultUri: Uri,
       blockflowFetchMaxAge: Duration,
-      maybeApiKey: Option[ApiKey]
+      maybeApiKey: Option[ApiKey],
+      endpointSender: EndpointSender
   )(implicit
       groupConfig: GroupConfig,
       executionContext: ExecutionContext
   ): BlockFlowClient =
-    new Impl(defaultUri, blockflowFetchMaxAge, maybeApiKey)
+    new Impl(defaultUri, blockflowFetchMaxAge, maybeApiKey, endpointSender)
 
   private class Impl(
       defaultUri: Uri,
       val blockflowFetchMaxAge: Duration,
-      val maybeApiKey: Option[ApiKey]
+      val maybeApiKey: Option[ApiKey],
+      endpointSender: EndpointSender
   )(implicit
       val groupConfig: GroupConfig,
       executionContext: ExecutionContext
   ) extends BlockFlowClient
-      with Endpoints
-      with EndpointSender
-      with SttpClientInterpreter {
+      with Endpoints {
 
     private def uriFromGroup(
         fromGroup: GroupIndex
@@ -100,7 +99,7 @@ object BlockFlowClient {
       uriFromGroup(fromGroup).flatMap {
         _.fold(
           e => Future.successful(Left(e)),
-          uri => send(endpoint, params, uri)
+          uri => endpointSender.send(endpoint, params, uri)
         )
       }
     }
@@ -159,7 +158,7 @@ object BlockFlowClient {
         tx: String,
         signature: Signature,
         fromGroup: Int
-    ): Future[Either[ApiError[_ <: StatusCode], TxResult]] = {
+    ): Future[Either[ApiError[_ <: StatusCode], SubmitTxResult]] = {
       requestFromGroup(
         GroupIndex.unsafe(fromGroup),
         submitTransaction,
@@ -169,7 +168,7 @@ object BlockFlowClient {
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     private def fetchSelfClique(): Future[Either[ApiError[_ <: StatusCode], SelfClique]] = {
-      send(getSelfClique, (), defaultUri)
+      endpointSender.send(getSelfClique, (), defaultUri)
     }
   }
 }

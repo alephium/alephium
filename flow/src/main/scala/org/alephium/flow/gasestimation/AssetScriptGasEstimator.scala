@@ -111,7 +111,7 @@ object AssetScriptGasEstimator {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def getChainIndex(
       tx: UnsignedTransaction
   )(implicit config: GroupConfig): Either[String, ChainIndex] = {

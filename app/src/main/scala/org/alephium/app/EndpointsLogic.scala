@@ -26,7 +26,6 @@ import akka.util.Timeout
 import io.prometheus.client.CollectorRegistry
 import io.prometheus.client.exporter.common.TextFormat
 import sttp.model.{StatusCode, Uri}
-import sttp.tapir.client.sttp.SttpClientInterpreter
 import sttp.tapir.server.ServerEndpoint
 
 import org.alephium.api.{ApiError, Endpoints, Try}
@@ -44,17 +43,18 @@ import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{BrokerConfig, CompilerConfig, GroupConfig}
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.serde._
 import org.alephium.util._
 
 // scalastyle:off method.length
-trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterpreter {
+trait EndpointsLogic extends Endpoints {
   def node: Node
   def miner: ActorRefT[Miner.Command]
   def blocksExporter: BlocksExporter
+  def endpointSender: EndpointSender
 
   private lazy val blockFlow: BlockFlow                        = node.blockFlow
   private lazy val txHandler: ActorRefT[TxHandler.Command]     = node.allHandlers.txHandler
@@ -67,7 +67,6 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   implicit lazy val groupConfig: GroupConfig         = brokerConfig
   implicit lazy val networkConfig: NetworkSetting    = node.config.network
   implicit lazy val consenseConfig: ConsensusSetting = node.config.consensus
-  implicit lazy val compilerConfig: CompilerConfig   = node.config.compiler
   implicit lazy val logConfig: LogConfig             = node.config.node.logConfig
   implicit lazy val askTimeout: Timeout              = Timeout(apiConfig.askTimeout.asScala)
 
@@ -271,7 +270,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow))
   }
 
-  type BaseServerEndpoint[A, B] = ServerEndpoint[A, ApiError[_ <: StatusCode], B, Any, Future]
+  type BaseServerEndpoint[A, B] = ServerEndpoint[Any, Future]
 
   private def serverLogicRedirect[P, A](
       endpoint: BaseEndpoint[P, A]
@@ -372,7 +371,9 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
   )
 
   val submitTransactionLogic =
-    serverLogicRedirectWith[SubmitTransaction, TransactionTemplate, TxResult](submitTransaction)(
+    serverLogicRedirectWith[SubmitTransaction, TransactionTemplate, SubmitTxResult](
+      submitTransaction
+    )(
       tx => serverUtils.createTxTemplate(tx),
       tx =>
         withSyncedClique {
@@ -382,7 +383,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     )
 
   val submitMultisigTransactionLogic =
-    serverLogicRedirectWith[SubmitMultisig, TransactionTemplate, TxResult](
+    serverLogicRedirectWith[SubmitMultisig, TransactionTemplate, SubmitTxResult](
       submitMultisigTransaction
     )(
       tx => serverUtils.createMultisigTxTemplate(tx),
@@ -443,7 +444,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
 
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def searchTransactionStatusInOtherNodes(txId: Hash): FutureTry[TxStatus] = {
     val otherGroupFrom = groupConfig.allGroups.filterNot(brokerConfig.contains)
     if (otherGroupFrom.isEmpty) {
@@ -566,15 +567,19 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
     }
   }
 
+  val callContractLogic = serverLogic(callContract) { params: CallContract =>
+    Future.successful(serverUtils.callContract(blockFlow, params))
+  }
+
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
-    //Run the export in background
+    // Run the export in background
     Future.successful(
       blocksExporter
         .export(exportFile.filename)
         .left
         .map(error => logger.error(error.getMessage))
     )
-    //Just validate the filename and return success
+    // Just validate the filename and return success
     Future.successful {
       blocksExporter
         .validateFilename(exportFile.filename)
@@ -693,7 +698,7 @@ trait EndpointsLogic extends Endpoints with EndpointSender with SttpClientInterp
         uriFromGroup(groupIndex).flatMap {
           case Left(error) => Future.successful(Left(error))
           case Right(uri) =>
-            send(endpoint, params, uri)
+            endpointSender.send(endpoint, params, uri)
         }
     }
 
@@ -755,7 +760,7 @@ object EndpointsLogic {
     )
   }
 
-  //Cannot do this in `BlockCandidate` as `flow.BlockTemplate` isn't accessible in `api`
+  // Cannot do this in `BlockCandidate` as `flow.BlockTemplate` isn't accessible in `api`
   def blockTempateToCandidate(
       chainIndex: ChainIndex,
       template: MiningBlob

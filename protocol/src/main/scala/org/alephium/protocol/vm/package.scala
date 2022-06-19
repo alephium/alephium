@@ -41,11 +41,11 @@ package object vm {
     )
   }
 
-  //scalastyle:off magic.number
+  // scalastyle:off magic.number
   val createContractEventId: ContractId  = specialContractId(-1)
   val createContractEventIndex: Val      = Val.I256(I256.from(-1))
   val destroyContractEventId: ContractId = specialContractId(-2)
   val destroyContractEventIndex: Val     = Val.I256(I256.from(-2))
   val eventRefIndex: Byte                = -3
-  //scalastyle:on magic.number
+  // scalastyle:on magic.number
 }

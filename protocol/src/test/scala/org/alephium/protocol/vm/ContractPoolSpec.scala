@@ -44,7 +44,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
       val outputRef  = ContractOutputRef.unsafe(output.hint, contractId)
       val method = Method[StatefulContext](
         isPublic = true,
-        isPayable = false,
+        usePreapprovedAssets = false,
+        useContractAssets = false,
         argsLength = 0,
         localsLength = 0,
         returnLength = 0,
@@ -169,11 +170,10 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   it should "use contract assets" in new Fixture
     with TxGenerators
     with GroupConfigFixture.Default
-    with NetworkConfigFixture.Default
-    with CompilerConfigFixture.Default {
+    with NetworkConfigFixture.Default {
     val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
     val contractId = outputRef.key
-    val output     = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
+    val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
     pool.worldState.createContractUnsafe(
       StatefulContract.forSMT,
       AVector.empty,
@@ -183,7 +183,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
 
     pool.gasRemaining is initialGas
     pool.worldState.getOutputOpt(outputRef).rightValue.nonEmpty is true
-    pool.useContractAsset(contractId).isRight is true
+    pool.useContractAssets(contractId).isRight is true
     initialGas.use(GasSchedule.txInputBaseGas) isE pool.gasRemaining
     pool.worldState.getOutputOpt(outputRef) isE None
   }

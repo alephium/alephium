@@ -68,7 +68,7 @@ object SecP256K1PrivateKey
 class SecP256K1PublicKey(val bytes: ByteString) extends PublicKey {
   lazy val unsafePoint: ECPoint = SecP256K1.point(bytes)
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def toEthAddress(): ByteString = {
     val keyEncoded = ByteString(unsafePoint.getEncoded(false)).tail
     Keccak256.hash(keyEncoded).bytes.drop(12)
@@ -173,11 +173,13 @@ object SecP256K1
     }
   }
 
-  /** Recover and return the eth address that generated the signature.
-    * The code is adapted from ETH Besu client.
+  /** Recover and return the eth address that generated the signature. The code is adapted from ETH
+    * Besu client.
     *
-    * @param messageHash hash of the data that was signed
-    * @param sigBytes 65 bytes for (r 32Bytes, s 32Bytes, v 1Byte)
+    * @param messageHash
+    *   hash of the data that was signed
+    * @param sigBytes
+    *   65 bytes for (r 32Bytes, s 32Bytes, v 1Byte)
     * @return
     */
   def ethEcRecover(
@@ -193,7 +195,7 @@ object SecP256K1
 
   // scalastyle:off method.length
   @SuppressWarnings(
-    Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.TraversableOps")
+    Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.IterableOps")
   )
   private[crypto] def ethEcRecoverUnsafe(
       messageHash: ByteString,

@@ -21,10 +21,12 @@ import org.alephium.protocol.model.{Address, ContractId, ContractOutput}
 import org.alephium.protocol.vm.{LockupScript, StatefulContract}
 import org.alephium.util.{AVector, U256}
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class ContractState(
     address: Address.Contract,
     bytecode: StatefulContract,
     codeHash: Hash,
+    initialStateHash: Option[Hash] = None,
     fields: AVector[Val],
     asset: AssetState
 ) {
@@ -32,12 +34,12 @@ final case class ContractState(
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class AssetState(alphAmount: U256, tokens: Option[AVector[Token]] = None) {
+final case class AssetState(attoAlphAmount: U256, tokens: Option[AVector[Token]] = None) {
   lazy val flatTokens: AVector[Token] = tokens.getOrElse(AVector.empty)
 
   def toContractOutput(contractId: ContractId): ContractOutput = {
     ContractOutput(
-      alphAmount,
+      attoAlphAmount,
       LockupScript.p2c(contractId),
       flatTokens.map(token => (token.id, token.amount))
     )
@@ -45,8 +47,8 @@ final case class AssetState(alphAmount: U256, tokens: Option[AVector[Token]] = N
 }
 
 object AssetState {
-  def from(alphAmount: U256, tokens: AVector[Token]): AssetState = {
-    AssetState(alphAmount, Some(tokens))
+  def from(attoAlphAmount: U256, tokens: AVector[Token]): AssetState = {
+    AssetState(attoAlphAmount, Some(tokens))
   }
 
   def from(output: ContractOutput): AssetState = {

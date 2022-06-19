@@ -137,7 +137,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       amount: U256,
       privateKey: String,
       restPort: Int
-  ): TxResult = eventually {
+  ): SubmitTxResult = eventually {
     val destinations = AVector(Destination(Address.asset(toAddress).get, Amount(amount)))
     transfer(fromPubKey, destinations, privateKey, restPort)
   }
@@ -147,11 +147,11 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       destinations: AVector[Destination],
       privateKey: String,
       restPort: Int
-  ): TxResult = eventually {
+  ): SubmitTxResult = eventually {
     val buildTx    = buildTransaction(fromPubKey, destinations)
     val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
     val submitTx   = submitTransaction(unsignedTx, privateKey)
-    val res        = request[TxResult](submitTx, restPort)
+    val res        = request[SubmitTxResult](submitTx, restPort)
     res
   }
 
@@ -176,7 +176,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     block
   }
 
-  def confirmTx(tx: TxResult, restPort: Int): Assertion = eventually {
+  def confirmTx(tx: SubmitTxResult, restPort: Int): Assertion = eventually {
     val txStatus = request[TxStatus](getTransactionStatus(tx), restPort)
     checkConfirmations(txStatus)
   }
@@ -250,6 +250,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   ) = {
     new ItConfigFixture with StoragesFixture {
       override val configValues = Map(
+        ("alephium.network.leman-hard-fork-timestamp", "1643500800000"),
         ("alephium.network.bind-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.internal-address", s"127.0.0.1:$publicPort"),
         ("alephium.network.coordinator-address", s"127.0.0.1:$masterPort"),
@@ -398,10 +399,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost(
       "/transactions/build",
       Some(s"""
-        |{
-        |  "fromPublicKey": "$fromPubKey",
-        |  "destinations": ${write(destinations)}
-        |}
+              |{
+              |  "fromPublicKey": "$fromPubKey",
+              |  "destinations": ${write(destinations)}
+              |}
         """.stripMargin)
     )
   }
@@ -413,16 +414,16 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       amount: U256
   ) = {
     val body = s"""
-        |{
-        |  "fromAddress": "$fromAddress",
-        |  "fromPublicKeys": ${write(fromPublicKeys)},
-        |  "destinations": [
-        |    {
-        |      "address": "$toAddress",
-        |      "alphAmount": "$amount"
-        |    }
-        |  ]
-        |}
+                  |{
+                  |  "fromAddress": "$fromAddress",
+                  |  "fromPublicKeys": ${write(fromPublicKeys)},
+                  |  "destinations": [
+                  |    {
+                  |      "address": "$toAddress",
+                  |      "attoAlphAmount": "$amount"
+                  |    }
+                  |  ]
+                  |}
         """.stripMargin
 
     httpPost(
@@ -470,7 +471,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def transferWallet(walletName: String, address: String, amount: U256) = {
     httpPost(
       s"/wallets/${walletName}/transfer",
-      Some(s"""{"destinations":[{"address":"${address}","alphAmount":"${amount}","tokens":[]}]}""")
+      Some(
+        s"""{"destinations":[{"address":"${address}","attoAlphAmount":"${amount}","tokens":[]}]}"""
+      )
     )
   }
 
@@ -548,8 +551,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   ) = {
     val body =
       s"""{"unsignedTx":"${buildTransactionResult.unsignedTx}","signatures":${write(
-        signatures.map(_.toHexString)
-      )}}"""
+          signatures.map(_.toHexString)
+        )}}"""
     httpPost(
       "/multisig/submit",
       Some(
@@ -558,12 +561,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def getTransactionStatusLocal(tx: TxResult) = {
+  def getTransactionStatusLocal(tx: SubmitTxResult) = {
     httpGet(
       s"/transactions/local-status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}"
     )
   }
-  def getTransactionStatus(tx: TxResult) = {
+  def getTransactionStatus(tx: SubmitTxResult) = {
     httpGet(
       s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup}&toGroup=${tx.toGroup}"
     )
@@ -608,19 +611,19 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def multisig(keys: AVector[String], mrequired: Int) = {
     val body = s"""
-        |{
-        |  "keys": ${write(keys)},
-        |  "mrequired": $mrequired
-        |}
+                  |{
+                  |  "keys": ${write(keys)},
+                  |  "mrequired": $mrequired
+                  |}
         """.stripMargin
     httpPost(s"/multisig/address", maybeBody = Some(body))
   }
 
   def decodeUnsignedTransaction(unsignedTx: String) = {
     val body = s"""
-        |{
-        |  "unsignedTx": "$unsignedTx"
-        |}
+                  |{
+                  |  "unsignedTx": "$unsignedTx"
+                  |}
         """.stripMargin
     httpPost(s"/transactions/decode-unsigned-tx", maybeBody = Some(body))
   }
@@ -665,7 +668,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def buildExecuteScriptTx(
       fromPublicKey: String,
       code: String,
-      alphAmount: Option[Amount] = None,
+      attoAlphAmount: Option[Amount] = None,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None
   ) = {
@@ -676,7 +679,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
            "bytecode": "$code"
            ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
            ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
-           ${alphAmount.map(a => s""","alphAmount": "${a.value.v}"""").getOrElse("")}
+           ${attoAlphAmount.map(a => s""","attoAlphAmount": "${a.value.v}"""").getOrElse("")}
          }
          """
     httpPost("/contracts/unsigned-tx/execute-script", Some(query))
@@ -693,7 +696,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def submitTxWithPort(unsignedTx: String, txId: Hash, restPort: Int): Hash = {
-    val txResult = request[TxResult](
+    val txResult = request[SubmitTxResult](
       submitTxQuery(unsignedTx, txId),
       restPort
     )
@@ -704,7 +707,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def buildExecuteScriptTxWithPort(
       code: String,
       restPort: Int,
-      alphAmount: Option[Amount] = None,
+      attoAlphAmount: Option[Amount] = None,
       gas: Option[Int] = None,
       gasPrice: Option[GasPrice] = None
   ): BuildExecuteScriptTxResult = {
@@ -713,7 +716,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       buildExecuteScriptTx(
         fromPublicKey = publicKey,
         code = compileResult.bytecodeTemplate,
-        alphAmount,
+        attoAlphAmount,
         gas,
         gasPrice
       ),
@@ -724,11 +727,11 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def scriptWithPort(
       code: String,
       restPort: Int,
-      alphAmount: Option[Amount] = None,
+      attoAlphAmount: Option[Amount] = None,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None
   ): BuildExecuteScriptTxResult = {
-    val buildResult = buildExecuteScriptTxWithPort(code, restPort, alphAmount, gas, gasPrice)
+    val buildResult = buildExecuteScriptTxWithPort(code, restPort, attoAlphAmount, gas, gasPrice)
     submitTxWithPort(buildResult.unsignedTx, buildResult.txId, restPort)
     buildResult
   }
@@ -795,7 +798,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     }
   }
 
-  def checkTx(tx: TxResult, port: Int, status: TxStatus): Assertion = {
+  def checkTx(tx: SubmitTxResult, port: Int, status: TxStatus): Assertion = {
     eventually(
       request[TxStatus](getTransactionStatus(tx), port) is status
     )

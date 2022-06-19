@@ -57,19 +57,19 @@ class MultisigTest extends AlephiumActorSpec {
       submitTx,
       restPort
     ).detail is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${NotEnoughSignature}: ${Hex
-      .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey)))))}"
+        .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey)))))}"
 
     submitFailedMultisigTransaction(
       buildTxResult,
       AVector(privateKey)
     ) is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${NotEnoughSignature}: ${Hex
-      .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey)))))}"
+        .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey)))))}"
 
     submitFailedMultisigTransaction(
       buildTxResult,
       AVector(privateKey3)
     ) is s"Failed in validating tx ${buildTxResult.txId.toHexString} due to ${InvalidSignature}: ${Hex
-      .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey3)))))}"
+        .toHexString(serialize(TransactionTemplate.from(unsignedTx, PrivateKey.unsafe(Hex.unsafe(privateKey3)))))}"
 
     submitSuccessfulMultisigTransaction(buildTxResult, AVector(privateKey, privateKey3))
 
@@ -209,7 +209,7 @@ class MultisigTest extends AlephiumActorSpec {
     val submitMultisigTx =
       submitMultisigTransaction(buildTxResult, AVector(signature1, signature2))
 
-    val multisigTx = request[TxResult](submitMultisigTx, restPort)
+    val multisigTx = request[SubmitTxResult](submitMultisigTx, restPort)
 
     confirmTx(multisigTx, restPort)
 
@@ -279,7 +279,7 @@ class MultisigTest extends AlephiumActorSpec {
       decodedTx.unsignedTx is UnsignedTx.fromProtocol(unsignedTx)
 
       val submitMultisigTx = signAndSubmitMultisigTransaction(buildTxResult, unlockPrivKeys)
-      val multisigTx       = request[TxResult](submitMultisigTx, restPort)
+      val multisigTx       = request[SubmitTxResult](submitMultisigTx, restPort)
 
       confirmTx(multisigTx, restPort)
 

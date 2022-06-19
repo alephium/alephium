@@ -23,9 +23,9 @@ import org.alephium.util.U256
  * For each stateful frame, users could put a set of assets.
  * Contracts could move funds, generate outputs by using vm's instructions.
  * `remaining` is the current usable balances
- * `approved` is the balances for payable function call
+ * `approved` is the balances that function call potentially can use
  */
-final case class BalanceState(remaining: Balances, approved: Balances) {
+final case class MutBalanceState(remaining: MutBalances, approved: MutBalances) {
   def approveALPH(lockupScript: LockupScript, amount: U256): Option[Unit] = {
     for {
       _ <- remaining.subAlph(lockupScript, amount)
@@ -41,7 +41,7 @@ final case class BalanceState(remaining: Balances, approved: Balances) {
   }
 
   def alphRemaining(lockupScript: LockupScript): Option[U256] = {
-    remaining.getBalances(lockupScript).map(_.alphAmount)
+    remaining.getBalances(lockupScript).map(_.attoAlphAmount)
   }
 
   def tokenRemaining(lockupScript: LockupScript, tokenId: TokenId): Option[U256] = {
@@ -52,13 +52,17 @@ final case class BalanceState(remaining: Balances, approved: Balances) {
     remaining.all.exists(_._1 == lockupScript)
   }
 
-  def useApproved(): BalanceState = {
+  def useApproved(): MutBalanceState = {
     val toUse = approved.use()
-    BalanceState(toUse, Balances.empty)
+    MutBalanceState(toUse, MutBalances.empty)
   }
 
-  def useAll(lockupScript: LockupScript): Option[BalancesPerLockup] = {
+  def useAll(lockupScript: LockupScript): Option[MutBalancesPerLockup] = {
     remaining.useAll(lockupScript)
+  }
+
+  def useAllApproved(lockupScript: LockupScript): Option[MutBalancesPerLockup] = {
+    approved.useAll(lockupScript)
   }
 
   def useAlph(lockupScript: LockupScript, amount: U256): Option[Unit] = {
@@ -70,6 +74,6 @@ final case class BalanceState(remaining: Balances, approved: Balances) {
   }
 }
 
-object BalanceState {
-  def from(balances: Balances): BalanceState = BalanceState(balances, Balances.empty)
+object MutBalanceState {
+  def from(balances: MutBalances): MutBalanceState = MutBalanceState(balances, MutBalances.empty)
 }

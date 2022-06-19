@@ -28,7 +28,7 @@ import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.json.Json._
 import org.alephium.json.Json.{ReadWriter => RW}
-import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey, Signature}
+import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{Address, CliqueId, GroupIndex, NetworkId, Nonce}
@@ -95,9 +95,7 @@ trait ApiModelCodec {
 
   implicit val amountHintReader: Reader[Amount.Hint] = amountReader.map(_.hint)
   implicit val amountHintWriter: Writer[Amount.Hint] = StringWriter.comap[Amount.Hint] { amount =>
-    val dec =
-      new java.math.BigDecimal(amount.value.v).divide(new java.math.BigDecimal(ALPH.oneAlph.v))
-    s"${dec} ALPH"
+    Amount.toAlphString(amount.value)
   }
 
   implicit val publicKeyWriter: Writer[PublicKey] = bytesWriter
@@ -284,13 +282,16 @@ trait ApiModelCodec {
   implicit val statefulContractWriter: Writer[StatefulContract] =
     StringWriter.comap(contract => Hex.toHexString(serialize(contract)))
 
-  implicit val assetRW: ReadWriter[AssetState]                               = macroRW
-  implicit val existingContractRW: ReadWriter[ContractState]                 = macroRW
-  implicit val testContractInputAssetRW: ReadWriter[TestContract.InputAsset] = macroRW
-  implicit val testContractRW: ReadWriter[TestContract]                      = macroRW
-  implicit val testContractResultRW: ReadWriter[TestContractResult]          = macroRW
+  implicit val assetRW: ReadWriter[AssetState]                      = macroRW
+  implicit val existingContractRW: ReadWriter[ContractState]        = macroRW
+  implicit val testContractInputAssetRW: ReadWriter[TestInputAsset] = macroRW
+  implicit val testContractRW: ReadWriter[TestContract]             = macroRW
+  implicit val testContractResultRW: ReadWriter[TestContractResult] = macroRW
 
-  implicit val txResultRW: RW[TxResult] = macroRW
+  implicit val callContractRW: ReadWriter[CallContract]             = macroRW
+  implicit val callContractResultRW: ReadWriter[CallContractResult] = macroRW
+
+  implicit val txResultRW: RW[SubmitTxResult] = macroRW
 
   implicit val getHashesAtHeightRW: RW[GetHashesAtHeight] = macroRW
 

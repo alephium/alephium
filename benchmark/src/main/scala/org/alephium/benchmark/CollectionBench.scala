@@ -73,7 +73,7 @@ class CollectionBench {
   }
 
   @Benchmark
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def filterVector(): Int = {
     val vc: Vector[Int] = vector.filter(_ % 2 == 0)
     vc.last

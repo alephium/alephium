@@ -73,34 +73,36 @@ object AlephiumActorSpec {
   lazy val debugConfig: Config   = config("DEBUG")
 
   def config(logLevel: String): Config =
-    ConfigFactory.parseString(s"""
-      |akka {
-      |  loglevel = "$logLevel"
-      |  loggers = ["akka.testkit.TestEventListener"]
-      |  logging-filter = "akka.event.slf4j.Slf4jLoggingFilter"
-      |
-      |  io.tcp.trace-logging = off
-      |
-      |  actor {
-      |    debug {
-      |      unhandled = on
-      |    }
-      |
-      |    guardian-supervisor-strategy = "org.alephium.util.DefaultStrategy"
-      |
-      |    default-dispatcher {
-      |      executor = "fork-join-executor"
-      |      throughput = 1
-      |    }
-      |
-      |    mining-dispatcher {
-      |      parallelism-min = 1
-      |      parallelism-max = 4
-      |      parallelism-factor = 0.5
-      |    }
-      |  }
-      |}
-    """.stripMargin)
+    ConfigFactory.parseString(
+      s"""
+         |akka {
+         |  loglevel = "$logLevel"
+         |  loggers = ["akka.testkit.TestEventListener"]
+         |  logging-filter = "akka.event.slf4j.Slf4jLoggingFilter"
+         |
+         |  io.tcp.trace-logging = off
+         |
+         |  actor {
+         |    debug {
+         |      unhandled = on
+         |    }
+         |
+         |    guardian-supervisor-strategy = "org.alephium.util.DefaultStrategy"
+         |
+         |    default-dispatcher {
+         |      executor = "fork-join-executor"
+         |      throughput = 1
+         |    }
+         |
+         |    mining-dispatcher {
+         |      parallelism-min = 1
+         |      parallelism-max = 4
+         |      parallelism-factor = 0.5
+         |    }
+         |  }
+         |}
+    """.stripMargin
+    )
 }
 
 trait ActorKit {

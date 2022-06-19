@@ -16,11 +16,14 @@
 
 package org.alephium.protocol.vm.lang
 
-import java.math.BigInteger
+import java.math.{BigDecimal, BigInteger}
+
+import scala.util.control.NonFatal
 
 import fastparse._
 import fastparse.NoWhitespace._
 
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{LockupScript, Val}
 import org.alephium.protocol.vm.Val.ByteVec
@@ -31,18 +34,18 @@ import org.alephium.util._
 
 // scalastyle:off number.of.methods
 object Lexer {
-  def lowercase[Unkown: P]: P[Unit] = P(CharIn("a-z"))
-  def uppercase[Unkown: P]: P[Unit] = P(CharIn("A-Z"))
-  def digit[Unkown: P]: P[Unit]     = P(CharIn("0-9"))
-  def hex[Unkown: P]: P[Unit]       = P(CharsWhileIn("0-9a-fA-F"))
-  def letter[Unkown: P]: P[Unit]    = P(lowercase | uppercase)
-  def newline[Unkown: P]: P[Unit]   = P(NoTrace(StringIn("\r\n", "\n")))
+  def lowercase[Unknown: P]: P[Unit] = P(CharIn("a-z"))
+  def uppercase[Unknown: P]: P[Unit] = P(CharIn("A-Z"))
+  def digit[Unknown: P]: P[Unit]     = P(CharIn("0-9"))
+  def hex[Unknown: P]: P[Unit]       = P(CharsWhileIn("0-9a-fA-F"))
+  def letter[Unknown: P]: P[Unit]    = P(lowercase | uppercase)
+  def newline[Unknown: P]: P[Unit]   = P(NoTrace(StringIn("\r\n", "\n")))
 
-  def ident[Unkown: P]: P[Ast.Ident] =
+  def ident[Unknown: P]: P[Ast.Ident] =
     P(lowercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.Ident)
-  def typeId[Unkown: P]: P[Ast.TypeId] =
+  def typeId[Unknown: P]: P[Ast.TypeId] =
     P(uppercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.TypeId)
-  def funcId[Unkown: P]: P[Ast.FuncId] =
+  def funcId[Unknown: P]: P[Ast.FuncId] =
     P(ident ~ "!".?.!).map { case (id, postfix) =>
       Ast.FuncId(id.name, postfix.nonEmpty)
     }
@@ -51,27 +54,39 @@ object Lexer {
     obj.getClass.getSimpleName.dropRight(1)
   }
 
-  def keyword[Unkown: P](s: String): P[Unit] = {
+  def keyword[Unknown: P](s: String): P[Unit] = {
     require(keywordSet.contains(s))
     s ~ !(letter | digit | "_")
   }
-  def mut[Unkown: P]: P[Boolean] = P(keyword("mut").?.!).map(_.nonEmpty)
+  def mut[Unknown: P]: P[Boolean] = P(keyword("mut").?.!).map(_.nonEmpty)
 
-  def lineComment[Unkown: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
-  def emptyChars[Unkown: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
+  def lineComment[Unknown: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
+  def emptyChars[Unknown: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
 
-  def hexNum[Unkown: P]: P[BigInteger] = P("0x") ~ hex.!.map(new BigInteger(_, 16))
-  def decNum[Unkown: P]: P[BigInteger] = P(CharsWhileIn("0-9")).!.map(new BigInteger(_))
-  def num[Unkown: P]: P[BigInteger]    = negatable(P(hexNum | decNum))
-  def negatable[Unkown: P](p: => P[BigInteger]): P[BigInteger] =
+  def hexNum[Unknown: P]: P[BigInteger] = P("0x") ~ hex.!.map(new BigInteger(_, 16))
+  def decNum[Unknown: P]: P[BigInteger] = P(
+    (CharsWhileIn("0-9_") ~ ("." ~ CharsWhileIn("0-9_")).? ~
+      ("e" ~ "-".? ~ CharsWhileIn("0-9")).?).! ~
+      CharsWhileIn(" ", 0) ~ keyword("alph").?.!
+  ).map { case (input, unit) =>
+    try {
+      var num = new BigDecimal(input.replaceAll("_", ""))
+      if (unit == "alph") num = num.multiply(new BigDecimal(ALPH.oneAlph.toBigInt))
+      num.toBigIntegerExact()
+    } catch {
+      case NonFatal(_) => throw Compiler.Error(s"Invalid number ${input}")
+    }
+  }
+  def num[Unknown: P]: P[BigInteger] = negatable(P(hexNum | decNum))
+  def negatable[Unknown: P](p: => P[BigInteger]): P[BigInteger] =
     ("-".?.! ~ p).map {
       case ("-", i) => i.negate()
       case (_, i)   => i
     }
-  def typedNum[Unkown: P]: P[Val] =
+  def typedNum[Unknown: P]: P[Val] =
     P(num ~ ("i" | "u").?.!)
       .map {
-        case (n, "i") =>
+        case (n, postfix) if Number.isNegative(n) || postfix == "i" =>
           I256.from(n) match {
             case Some(value) => Val.I256(value)
             case None        => throw Compiler.Error(s"Invalid I256 value: $n")
@@ -83,25 +98,25 @@ object Lexer {
           }
       }
 
-  def bytesInternal[Unkown: P]: P[Val.ByteVec] =
+  def bytesInternal[Unknown: P]: P[Val.ByteVec] =
     P(CharsWhileIn("0-9a-zA-Z", 0)).!.map { string =>
       Hex.from(string) match {
         case Some(bytes) => ByteVec(bytes)
         case None =>
           Address.extractLockupScript(string) match {
             case Some(LockupScript.P2C(contractId)) => ByteVec(contractId.bytes)
-            case _                                  => throw Compiler.Error(s"Invalid byteVec: $string")
+            case _ => throw Compiler.Error(s"Invalid byteVec: $string")
           }
       }
     }
-  def bytes[Unkown: P]: P[Val.ByteVec] = P("#" ~ bytesInternal)
-  def contractAddress[Unkown: P]: P[Val.ByteVec] =
+  def bytes[Unknown: P]: P[Val.ByteVec] = P("#" ~ bytesInternal)
+  def contractAddress[Unknown: P]: P[Val.ByteVec] =
     addressInternal.map {
       case Val.Address(LockupScript.P2C(contractId)) => Val.ByteVec(contractId.bytes)
-      case addr                                      => throw Compiler.Error(s"Invalid contract address: #@${addr.toBase58}")
+      case addr => throw Compiler.Error(s"Invalid contract address: #@${addr.toBase58}")
     }
 
-  def addressInternal[Unkown: P]: P[Val.Address] =
+  def addressInternal[Unknown: P]: P[Val.Address] =
     P(CharsWhileIn("0-9a-zA-Z")).!.map { input =>
       val lockupScriptOpt = Address.extractLockupScript(input)
       lockupScriptOpt match {
@@ -109,37 +124,37 @@ object Lexer {
         case None               => throw Compiler.Error(s"Invalid address: $input")
       }
     }
-  def address[Unkown: P]: P[Val.Address] = P("@" ~ addressInternal)
+  def address[Unknown: P]: P[Val.Address] = P("@" ~ addressInternal)
 
-  def bool[Unkown: P]: P[Val.Bool] =
+  def bool[Unknown: P]: P[Val.Bool] =
     P(keyword("true") | keyword("false")).!.map {
       case "true" => Val.Bool(true)
       case _      => Val.Bool(false)
     }
 
-  def opByteVecAdd[Unkown: P]: P[Operator] = P("++").map(_ => Concat)
-  def opAdd[Unkown: P]: P[Operator]        = P("+").map(_ => Add)
-  def opSub[Unkown: P]: P[Operator]        = P("-").map(_ => Sub)
-  def opMul[Unkown: P]: P[Operator]        = P("*").map(_ => Mul)
-  def opDiv[Unkown: P]: P[Operator]        = P("/").map(_ => Div)
-  def opMod[Unkown: P]: P[Operator]        = P("%").map(_ => Mod)
-  def opModAdd[Unkown: P]: P[Operator]     = P("⊕" | "`+`").map(_ => ModAdd)
-  def opModSub[Unkown: P]: P[Operator]     = P("⊖" | "`-`").map(_ => ModSub)
-  def opModMul[Unkown: P]: P[Operator]     = P("⊗" | "`*`").map(_ => ModMul)
-  def opSHL[Unkown: P]: P[Operator]        = P("<<").map(_ => SHL)
-  def opSHR[Unkown: P]: P[Operator]        = P(">>").map(_ => SHR)
-  def opBitAnd[Unkown: P]: P[Operator]     = P("&").map(_ => BitAnd)
-  def opXor[Unkown: P]: P[Operator]        = P("^").map(_ => Xor)
-  def opBitOr[Unkown: P]: P[Operator]      = P("|").map(_ => BitOr)
-  def opEq[Unkown: P]: P[TestOperator]     = P("==").map(_ => Eq)
-  def opNe[Unkown: P]: P[TestOperator]     = P("!=").map(_ => Ne)
-  def opLt[Unkown: P]: P[TestOperator]     = P("<").map(_ => Lt)
-  def opLe[Unkown: P]: P[TestOperator]     = P("<=").map(_ => Le)
-  def opGt[Unkown: P]: P[TestOperator]     = P(">").map(_ => Gt)
-  def opGe[Unkown: P]: P[TestOperator]     = P(">=").map(_ => Ge)
-  def opAnd[Unkown: P]: P[LogicalOperator] = P("&&").map(_ => And)
-  def opOr[Unkown: P]: P[LogicalOperator]  = P("||").map(_ => Or)
-  def opNot[Unkown: P]: P[LogicalOperator] = P("!").map(_ => Not)
+  def opByteVecAdd[Unknown: P]: P[Operator] = P("++").map(_ => Concat)
+  def opAdd[Unknown: P]: P[Operator]        = P("+").map(_ => Add)
+  def opSub[Unknown: P]: P[Operator]        = P("-").map(_ => Sub)
+  def opMul[Unknown: P]: P[Operator]        = P("*").map(_ => Mul)
+  def opDiv[Unknown: P]: P[Operator]        = P("/").map(_ => Div)
+  def opMod[Unknown: P]: P[Operator]        = P("%").map(_ => Mod)
+  def opModAdd[Unknown: P]: P[Operator]     = P("⊕" | "`+`").map(_ => ModAdd)
+  def opModSub[Unknown: P]: P[Operator]     = P("⊖" | "`-`").map(_ => ModSub)
+  def opModMul[Unknown: P]: P[Operator]     = P("⊗" | "`*`").map(_ => ModMul)
+  def opSHL[Unknown: P]: P[Operator]        = P("<<").map(_ => SHL)
+  def opSHR[Unknown: P]: P[Operator]        = P(">>").map(_ => SHR)
+  def opBitAnd[Unknown: P]: P[Operator]     = P("&").map(_ => BitAnd)
+  def opXor[Unknown: P]: P[Operator]        = P("^").map(_ => Xor)
+  def opBitOr[Unknown: P]: P[Operator]      = P("|").map(_ => BitOr)
+  def opEq[Unknown: P]: P[TestOperator]     = P("==").map(_ => Eq)
+  def opNe[Unknown: P]: P[TestOperator]     = P("!=").map(_ => Ne)
+  def opLt[Unknown: P]: P[TestOperator]     = P("<").map(_ => Lt)
+  def opLe[Unknown: P]: P[TestOperator]     = P("<=").map(_ => Le)
+  def opGt[Unknown: P]: P[TestOperator]     = P(">").map(_ => Gt)
+  def opGe[Unknown: P]: P[TestOperator]     = P(">=").map(_ => Ge)
+  def opAnd[Unknown: P]: P[LogicalOperator] = P("&&").map(_ => And)
+  def opOr[Unknown: P]: P[LogicalOperator]  = P("||").map(_ => Or)
+  def opNot[Unknown: P]: P[LogicalOperator] = P("!").map(_ => Not)
 
   sealed trait FuncModifier
 
@@ -147,20 +162,8 @@ object Lexer {
     case object Pub     extends FuncModifier
     case object Payable extends FuncModifier
 
-    def pub[Unkown: P]: P[FuncModifier]       = keyword("pub").map(_ => Pub)
-    def payable[Unkown: P]: P[FuncModifier]   = keyword("payable").map(_ => Payable)
-    def modifiers[Unkown: P]: P[FuncModifier] = P(pub | payable)
-  }
-
-  sealed trait TxScriptModifier
-
-  object TxScriptModifier {
-    case object Payable    extends TxScriptModifier
-    case object NonPayable extends TxScriptModifier
-
-    def payable[Unkown: P]: P[TxScriptModifier]    = keyword("payable").map(_ => Payable)
-    def nonPayable[Unkown: P]: P[TxScriptModifier] = keyword("nonPayable").map(_ => NonPayable)
-    def modifiers[Unkown: P]: P[TxScriptModifier]  = P(payable | nonPayable)
+    def pub[Unknown: P]: P[FuncModifier]       = keyword("pub").map(_ => Pub)
+    def modifiers[Unknown: P]: P[FuncModifier] = P(pub)
   }
 
   def keywordSet: Set[String] = Set(
@@ -177,13 +180,13 @@ object Lexer {
     "if",
     "else",
     "while",
+    "for",
     "pub",
-    "payable",
-    "nonPayable",
     "event",
     "emit",
-    "loop",
-    "extends"
+    "extends",
+    "implements",
+    "alph"
   )
 
   val primTpes: Map[String, Type] =

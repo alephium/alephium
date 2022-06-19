@@ -22,7 +22,7 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
 trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
-  def genBlockEnv(): BlockEnv = {
+  def genBlockEnv()(implicit networkConfig: NetworkConfig): BlockEnv = {
     BlockEnv(NetworkId.AlephiumDevNet, TimeStamp.now(), Target.Max, Some(BlockHash.generate))
   }
 
@@ -74,7 +74,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   def prepareStatefulScript(
       script: StatefulScript,
       gasLimit: GasBox = minimalGas
-  ): (ScriptObj[StatefulContext], StatefulContext) = {
+  )(implicit networkConfig: NetworkConfig): (ScriptObj[StatefulContext], StatefulContext) = {
     val obj     = script.toObject
     val context = genStatefulContext(scriptOpt = Some(script), gasLimit = gasLimit)
     obj -> context
@@ -104,15 +104,15 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
 
     val obj = halfDecoded.toObjectUnsafe(contractOutputRef.key, fields)
     val context = new StatefulContext {
-      val worldState: WorldState.Staging            = cachedWorldState.staging()
-      val networkConfig: NetworkConfig              = _networkConfig
-      val outputBalances: Balances                  = Balances.empty
-      def nextOutputIndex: Int                      = 0
-      def blockEnv: BlockEnv                        = genBlockEnv()
-      def txEnv: TxEnv                              = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))
-      def getInitialBalances(): ExeResult[Balances] = failed(ExpectNonPayableMethod)
-      def logConfig: LogConfig                      = LogConfig.allEnabled()
-      var gasRemaining: GasBox                      = gasLimit
+      val worldState: WorldState.Staging = cachedWorldState.staging()
+      val networkConfig: NetworkConfig   = _networkConfig
+      val outputBalances: MutBalances    = MutBalances.empty
+      def nextOutputIndex: Int           = 0
+      def blockEnv: BlockEnv             = genBlockEnv()
+      def txEnv: TxEnv                   = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))
+      def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
+      def logConfig: LogConfig                         = LogConfig.allEnabled()
+      var gasRemaining: GasBox                         = gasLimit
     }
     obj -> context
   }

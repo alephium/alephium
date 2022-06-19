@@ -14,18 +14,16 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.api.model
 
-trait CompilerConfigFixture { self =>
-  def loopUnrollingLimit: Int
+import org.alephium.protocol.model.Address
+import org.alephium.util.AVector
 
-  implicit lazy val compilerConfig: CompilerConfig = new CompilerConfig {
-    override def loopUnrollingLimit: Int = self.loopUnrollingLimit
-  }
-}
-
-object CompilerConfigFixture {
-  trait Default extends CompilerConfigFixture {
-    val loopUnrollingLimit: Int = 1000
-  }
-}
+final case class CallContractResult(
+    returns: AVector[Val],
+    gasUsed: Int,
+    contracts: AVector[ContractState],
+    txInputs: AVector[Address],
+    txOutputs: AVector[Output],
+    events: AVector[ContractEventByTxId]
+)

@@ -25,14 +25,14 @@ import sttp.tapir.server.vertx.VertxFutureServerInterpreter
 import org.alephium.api.ApiError
 import org.alephium.api.OpenAPIWriters.openApiJson
 import org.alephium.api.model.ApiKey
-import org.alephium.http.{ServerOptions, SwaggerVertx}
+import org.alephium.http.{ServerOptions, SwaggerUI}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.{AVector, Duration}
 import org.alephium.wallet.WalletDocumentation
 import org.alephium.wallet.service.WalletService
 import org.alephium.wallet.service.WalletService._
 
-@SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+@SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
 class WalletServer(
     val walletService: WalletService,
     val blockflowFetchMaxAge: Duration,
@@ -43,10 +43,6 @@ class WalletServer(
     with VertxFutureServerInterpreter {
 
   override val vertxFutureServerOptions = ServerOptions.serverOptions
-
-  lazy val docsRoute: Router => Route = new SwaggerVertx(
-    openApiJson(walletOpenAPI, maybeApiKey.isEmpty)
-  ).route
 
   val routes: AVector[Router => Route] = AVector(
     createWalletLogic,
@@ -69,6 +65,8 @@ class WalletServer(
     listWalletsLogic,
     getWalletLogic
   ).map(route(_))
+
+  lazy val docsRoute = SwaggerUI(openApiJson(walletOpenAPI, maybeApiKey.isEmpty)).map(route(_))
 }
 
 object WalletServer {

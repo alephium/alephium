@@ -78,7 +78,7 @@ object TxHandler {
 
   // scalastyle:off magic.number
   private val highPriceUntil: TimeStamp =
-    ALPH.LaunchTimestamp.plusUnsafe(Duration.ofDaysUnsafe(365))
+    ALPH.LaunchTimestamp.plusUnsafe(ALPH.OneAndHalfYear)
   // scalastyle:off magic.number
   def checkHighGasPrice(tx: TransactionTemplate): Boolean = {
     checkHighGasPrice(TimeStamp.now(), tx)
@@ -160,7 +160,7 @@ class TxHandler(
     with EventStream.Publisher
     with InterCliqueManager.NodeSyncStatus {
   private val nonCoinbaseValidation = TxValidation.build
-  val maxCapacity: Int              = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
+  val maxCapacity: Int = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
   val fetching: FetchState[Hash] =
     FetchState[Hash](maxCapacity, networkSetting.syncExpiryPeriod, TxHandler.MaxDownloadTimes)
   val txsBuffer: Cache[TransactionTemplate, Unit] =

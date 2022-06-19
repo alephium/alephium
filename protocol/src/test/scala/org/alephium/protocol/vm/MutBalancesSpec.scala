@@ -20,20 +20,20 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfigFixture}
+import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
 import org.alephium.protocol.model.{TxGenerators, TxOutput}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 
-class BalancesSpec extends AlephiumSpec {
+class MutBalancesSpec extends AlephiumSpec {
 
   it should "getBalances" in new Fixture {
     balances.getBalances(lockupScript) is Some(balancesPerLockup)
     balances.getBalances(lockupScriptGen.sample.get) is None
   }
 
-  it should "getAlphAmount" in new Fixture {
-    balances.getAlphAmount(lockupScript) is Some(balancesPerLockup.alphAmount)
-    balances.getAlphAmount(lockupScriptGen.sample.get) is None
+  it should "getAttoAlphAmount" in new Fixture {
+    balances.getAttoAlphAmount(lockupScript) is Some(balancesPerLockup.attoAlphAmount)
+    balances.getAttoAlphAmount(lockupScriptGen.sample.get) is None
   }
 
   it should "getTokenAmount" in new Fixture {
@@ -44,16 +44,16 @@ class BalancesSpec extends AlephiumSpec {
   it should "addAmount" in new Fixture {
     balances.addAlph(lockupScript, ALPH.oneAlph) is Some(())
 
-    balances is Balances(
-      ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = ALPH.alph(2))))
+    balances is MutBalances(
+      ArrayBuffer((lockupScript, balancesPerLockup.copy(attoAlphAmount = ALPH.alph(2))))
     )
 
     val lockupScript2 = lockupScriptGen.sample.get
     balances.addAlph(lockupScript2, ALPH.oneAlph) is Some(())
-    balances is Balances(
+    balances is MutBalances(
       ArrayBuffer(
-        (lockupScript, balancesPerLockup.copy(alphAmount = ALPH.alph(2))),
-        (lockupScript2, BalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 0))
+        (lockupScript, balancesPerLockup.copy(attoAlphAmount = ALPH.alph(2))),
+        (lockupScript2, MutBalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 0))
       )
     )
 
@@ -63,11 +63,11 @@ class BalancesSpec extends AlephiumSpec {
   it should "addToken" in new Fixture {
     balances.addToken(lockupScript, tokenId, ALPH.oneAlph) is Some(())
 
-    balances is Balances(
+    balances is MutBalances(
       ArrayBuffer(
         (
           lockupScript,
-          balancesPerLockup.copy(tokenAmounts = mutable.Map((tokenId -> ALPH.alph(2))))
+          balancesPerLockup.copy(tokenAmounts = mutable.Map(tokenId -> ALPH.alph(2)))
         )
       )
     )
@@ -75,12 +75,12 @@ class BalancesSpec extends AlephiumSpec {
     val tokenId2 = hashGen.sample.get
 
     balances.addToken(lockupScript, tokenId2, ALPH.oneAlph) is Some(())
-    balances is Balances(
+    balances is MutBalances(
       ArrayBuffer(
         (
           lockupScript,
           balancesPerLockup.copy(tokenAmounts =
-            mutable.Map((tokenId -> ALPH.alph(2)), (tokenId2 -> ALPH.alph(1)))
+            mutable.Map(tokenId -> ALPH.alph(2), tokenId2 -> ALPH.alph(1))
           )
         )
       )
@@ -88,15 +88,15 @@ class BalancesSpec extends AlephiumSpec {
 
     val lockupScript2 = lockupScriptGen.sample.get
     balances.addToken(lockupScript2, tokenId, ALPH.oneAlph) is Some(())
-    balances is Balances(
+    balances is MutBalances(
       ArrayBuffer(
         (
           lockupScript,
           balancesPerLockup.copy(tokenAmounts =
-            mutable.Map((tokenId -> ALPH.alph(2)), (tokenId2 -> ALPH.alph(1)))
+            mutable.Map(tokenId -> ALPH.alph(2), tokenId2 -> ALPH.alph(1))
           )
         ),
-        (lockupScript2, BalancesPerLockup(U256.Zero, mutable.Map((tokenId -> ALPH.alph(1))), 0))
+        (lockupScript2, MutBalancesPerLockup(U256.Zero, mutable.Map(tokenId -> ALPH.alph(1)), 0))
       )
     )
 
@@ -106,8 +106,8 @@ class BalancesSpec extends AlephiumSpec {
   it should "subAlph" in new Fixture {
     balances.subAlph(lockupScript, ALPH.oneAlph) is Some(())
 
-    balances is Balances(
-      ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero)))
+    balances is MutBalances(
+      ArrayBuffer((lockupScript, balancesPerLockup.copy(attoAlphAmount = U256.Zero)))
     )
 
     balances.subAlph(lockupScript, U256.MaxValue) is None
@@ -119,11 +119,11 @@ class BalancesSpec extends AlephiumSpec {
   it should "subToken" in new Fixture {
     balances.subToken(lockupScript, tokenId, ALPH.oneAlph) is Some(())
 
-    balances is Balances(
+    balances is MutBalances(
       ArrayBuffer(
         (
           lockupScript,
-          balancesPerLockup.copy(tokenAmounts = mutable.Map((tokenId -> U256.Zero)))
+          balancesPerLockup.copy(tokenAmounts = mutable.Map(tokenId -> U256.Zero))
         )
       )
     )
@@ -142,13 +142,13 @@ class BalancesSpec extends AlephiumSpec {
 
     balances.add(lockupScript, balancesPerLockup) is Some(())
 
-    balances is Balances(
+    balances is MutBalances(
       ArrayBuffer(
         (
           lockupScript,
           balancesPerLockup.copy(
-            alphAmount = ALPH.alph(2),
-            tokenAmounts = mutable.Map((tokenId -> ALPH.alph(2)))
+            attoAlphAmount = ALPH.alph(2),
+            tokenAmounts = mutable.Map(tokenId -> ALPH.alph(2))
           )
         )
       )
@@ -157,12 +157,15 @@ class BalancesSpec extends AlephiumSpec {
     val lockupScript2 = lockupScriptGen.sample.get
     balances.add(lockupScript2, balancesPerLockup) is Some(())
 
-    balances is Balances(
+    balances is MutBalances(
       ArrayBuffer(
         (
           lockupScript,
           balancesPerLockup
-            .copy(alphAmount = ALPH.alph(2), tokenAmounts = mutable.Map((tokenId -> ALPH.alph(2))))
+            .copy(
+              attoAlphAmount = ALPH.alph(2),
+              tokenAmounts = mutable.Map(tokenId -> ALPH.alph(2))
+            )
         ),
         (lockupScript2, balancesPerLockup)
       )
@@ -173,13 +176,13 @@ class BalancesSpec extends AlephiumSpec {
 
     balances.sub(lockupScript, balancesPerLockup) is Some(())
 
-    balances is Balances(
+    balances is MutBalances(
       ArrayBuffer(
         (
           lockupScript,
           balancesPerLockup.copy(
-            alphAmount = U256.Zero,
-            tokenAmounts = mutable.Map((tokenId -> U256.Zero))
+            attoAlphAmount = U256.Zero,
+            tokenAmounts = mutable.Map(tokenId -> U256.Zero)
           )
         )
       )
@@ -191,11 +194,11 @@ class BalancesSpec extends AlephiumSpec {
 
   it should "use" in new Fixture {
 
-    balances.use() is Balances(
+    balances.use() is MutBalances(
       ArrayBuffer((lockupScript, balancesPerLockup.copy(scopeDepth = scopeDepth + 1)))
     )
 
-    balances is Balances(ArrayBuffer.empty)
+    balances is MutBalances(ArrayBuffer.empty)
   }
 
   it should "useAll" in new Fixture {
@@ -204,50 +207,52 @@ class BalancesSpec extends AlephiumSpec {
 
     balances.useAll(lockupScript2) is Some(balancesPerLockup)
 
-    balances is Balances(ArrayBuffer((lockupScript, balancesPerLockup)))
+    balances is MutBalances(ArrayBuffer((lockupScript, balancesPerLockup)))
 
     balances.useAll(lockupScript2) is None
 
     balances.useAll(lockupScript) is Some(balancesPerLockup)
 
-    balances is Balances(ArrayBuffer.empty)
+    balances is MutBalances(ArrayBuffer.empty)
   }
 
   it should "merge" in new Fixture {
 
     val lockupScript2 = lockupScriptGen.sample.get
-    val balances2     = Balances(ArrayBuffer((lockupScript2, balancesPerLockup)))
+    val balances2     = MutBalances(ArrayBuffer((lockupScript2, balancesPerLockup)))
 
     balances.merge(balances2)
 
-    balances is Balances(
+    balances is MutBalances(
       ArrayBuffer((lockupScript, balancesPerLockup), (lockupScript2, balancesPerLockup))
     )
 
     balances.merge(balances2)
 
-    balances is Balances(
+    balances is MutBalances(
       ArrayBuffer(
         (lockupScript, balancesPerLockup),
         (
           lockupScript2,
           balancesPerLockup.copy(
-            alphAmount = ALPH.alph(2),
-            tokenAmounts = mutable.Map((tokenId -> ALPH.alph(2)))
+            attoAlphAmount = ALPH.alph(2),
+            tokenAmounts = mutable.Map(tokenId -> ALPH.alph(2))
           )
         )
       )
     )
 
     val balances3 =
-      Balances(ArrayBuffer((lockupScript2, balancesPerLockup.copy(alphAmount = U256.MaxValue))))
+      MutBalances(
+        ArrayBuffer((lockupScript2, balancesPerLockup.copy(attoAlphAmount = U256.MaxValue)))
+      )
 
     balances.merge(balances3) is None
   }
 
   it should "toOutputs" in new Fixture {
     val lockupScript2 = lockupScriptGen.sample.get
-    val balances2     = Balances(ArrayBuffer((lockupScript2, balancesPerLockup)))
+    val balances2     = MutBalances(ArrayBuffer((lockupScript2, balancesPerLockup)))
 
     balances.merge(balances2)
 
@@ -260,11 +265,6 @@ class BalancesSpec extends AlephiumSpec {
   }
 
   trait Fixture extends TxGenerators with NetworkConfigFixture.Default {
-    implicit override val compilerConfig: CompilerConfig =
-      new CompilerConfig {
-        override def loopUnrollingLimit: Int = 1000
-      }
-
     implicit override val groupConfig: GroupConfig =
       new GroupConfig {
         override def groups: Int = 3
@@ -272,11 +272,11 @@ class BalancesSpec extends AlephiumSpec {
 
     val tokenId    = hashGen.sample.get
     val scopeDepth = 1
-    val tokens     = mutable.Map((tokenId -> ALPH.oneAlph))
+    val tokens     = mutable.Map(tokenId -> ALPH.oneAlph)
     val balancesPerLockup =
-      BalancesPerLockup(ALPH.oneAlph, tokens, scopeDepth)
+      MutBalancesPerLockup(ALPH.oneAlph, tokens, scopeDepth)
     val lockupScript = lockupScriptGen.sample.get
 
-    val balances = Balances(ArrayBuffer((lockupScript, balancesPerLockup)))
+    val balances = MutBalances(ArrayBuffer((lockupScript, balancesPerLockup)))
   }
 }

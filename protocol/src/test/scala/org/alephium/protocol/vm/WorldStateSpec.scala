@@ -22,7 +22,7 @@ import org.scalacheck.Gen
 import org.alephium.io.{IOResult, RocksDBSource, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, I256, U256}
+import org.alephium.util.{AlephiumSpec, AVector, I256}
 
 class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with StorageFixture {
   def generateAsset: Gen[(TxOutputRef, TxOutput)] = {
@@ -33,23 +33,11 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     } yield (assetOutputRef, assetOutput)
   }
 
-  def generateContract
-      : Gen[(StatefulContract.HalfDecoded, AVector[Val], ContractOutputRef, ContractOutput)] = {
-    lazy val counterStateGen: Gen[AVector[Val]] =
-      Gen.choose(0L, Long.MaxValue / 1000).map(n => AVector(Val.U256(U256.unsafe(n))))
-    for {
-      groupIndex    <- groupIndexGen
-      outputRef     <- contractOutputRefGen(groupIndex)
-      output        <- contractOutputGen(scriptGen = p2cLockupGen(groupIndex))
-      contractState <- counterStateGen
-    } yield (counterContract.toHalfDecoded(), contractState, outputRef, output)
-  }
-
   // scalastyle:off method.length
   def test[T, R1, R2, R3](initialWorldState: WorldState[T, R1, R2, R3]) = {
     val (assetOutputRef, assetOutput)                    = generateAsset.sample.get
-    val (code, state, contractOutputRef, contractOutput) = generateContract.sample.get
-    val (_, _, contractOutputRef1, contractOutput1)      = generateContract.sample.get
+    val (code, state, contractOutputRef, contractOutput) = generateContract().sample.get
+    val (_, _, contractOutputRef1, contractOutput1)      = generateContract().sample.get
     val contractId                                       = contractOutputRef.key
     val contractId1                                      = contractOutputRef1.key
 
@@ -186,7 +174,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     )
     val staging = worldState.staging()
 
-    val (code, state, contractOutputRef, contractOutput) = generateContract.sample.get
+    val (code, state, contractOutputRef, contractOutput) = generateContract().sample.get
 
     val contractId  = contractOutputRef.key
     val contractObj = code.toObjectUnsafe(contractId, state)

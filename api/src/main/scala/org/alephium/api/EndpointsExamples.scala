@@ -457,8 +457,8 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val decodeUnsignedTxExamples: List[Example[DecodeUnsignedTxResult]] =
     simpleExample(DecodeUnsignedTxResult(1, 2, unsignedTx))
 
-  implicit val txResultExamples: List[Example[TxResult]] =
-    simpleExample(TxResult(txId, fromGroup = 2, toGroup = 1))
+  implicit val txResultExamples: List[Example[SubmitTxResult]] =
+    simpleExample(SubmitTxResult(txId, fromGroup = 2, toGroup = 1))
 
   implicit val txStatusExamples: List[Example[TxStatus]] =
     List[Example[TxStatus]](
@@ -471,15 +471,16 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       Compile.Script(
         code =
-          s"TxScript Main payable { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) }"
+          s"TxScript Main { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) }"
       )
     )
 
   implicit val compileContractExamples: List[Example[Compile.Contract]] =
     simpleExample(
       Compile.Contract(
+        // Note that we use this weird format to avoid Windows linebreak issue
         code =
-          "TxContract Foo(bar: ByteVec) {\npub payable fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+          "TxContract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
       )
     )
 
@@ -496,7 +497,7 @@ trait EndpointsExamples extends ErrorExamples {
           CompileResult.FunctionSig(
             name = "bar",
             signature =
-              "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+              "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
             argNames = AVector("a", "b", "c", "d", "e"),
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
@@ -519,7 +520,7 @@ trait EndpointsExamples extends ErrorExamples {
           CompileResult.FunctionSig(
             name = "bar",
             signature =
-              "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
+              "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
             argNames = AVector("a", "b", "c", "d", "e"),
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
@@ -543,6 +544,7 @@ trait EndpointsExamples extends ErrorExamples {
         publicKey,
         byteString,
         Some(bigAmount),
+        Some(tokens),
         Some(bigAmount),
         Some(model.minimalGas),
         Some(model.defaultGasPrice)
@@ -602,6 +604,7 @@ trait EndpointsExamples extends ErrorExamples {
     address = Address.contract(anotherContractId),
     bytecode = code,
     codeHash = code.hash,
+    initialStateHash = Some(code.initialStateHash(AVector.empty)),
     fields = AVector[Val](ValU256(ALPH.alph(2))),
     asset = asset(2)
   )
@@ -613,10 +616,10 @@ trait EndpointsExamples extends ErrorExamples {
         bytecode = code,
         initialFields = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         initialAsset = Some(asset(1)),
-        testMethodIndex = Some(0),
-        testArgs = Some(AVector[Val](ValU256(ALPH.oneAlph))),
+        methodIndex = Some(0),
+        args = Some(AVector[Val](ValU256(ALPH.oneAlph))),
         existingContracts = Some(AVector(existingContract)),
-        inputAssets = Some(AVector(TestContract.InputAsset(address, asset(3))))
+        inputAssets = Some(AVector(TestInputAsset(address, asset(3))))
       )
     )
   }
@@ -629,11 +632,40 @@ trait EndpointsExamples extends ErrorExamples {
         returns = AVector[Val](ValU256(ALPH.oneAlph)),
         gasUsed = 20000,
         contracts = AVector(existingContract),
+        txInputs = AVector(contractAddress),
         txOutputs =
           AVector(ContractOutput(1234, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
         events = AVector(eventByTxId)
       )
     )
+
+  implicit val callContractExamples: List[Example[CallContract]] = {
+    simpleExample(
+      CallContract(
+        group = 0,
+        worldStateBlockHash = Some(blockHash),
+        txId = Some(txId),
+        address = Address.contract(ContractId.zero),
+        methodIndex = 0,
+        args = Some(AVector[Val](ValU256(U256.Zero))),
+        existingContracts = Some(AVector(contractAddress)),
+        inputAssets = Some(AVector(TestInputAsset(address, asset(3))))
+      )
+    )
+  }
+
+  implicit val callContractResultExamples: List[Example[CallContractResult]] = {
+    simpleExample(
+      CallContractResult(
+        returns = AVector[Val](ValU256(U256.Zero)),
+        gasUsed = 20000,
+        contracts = AVector(existingContract),
+        txInputs = AVector(contractAddress),
+        txOutputs = AVector(ContractOutput(1, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
+        events = AVector(eventByTxId)
+      )
+    )
+  }
 
   implicit val exportFileExamples: List[Example[ExportFile]] =
     simpleExample(ExportFile("exported-blocks-file"))

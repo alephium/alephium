@@ -36,7 +36,7 @@ class FailedTxTest extends AlephiumActorSpec {
 
     def test() = {
       val (unsignedTx, txId) = {
-        val code   = "TxScript Main nonPayable { return }"
+        val code   = "@using(preapprovedAssets = false) TxScript Main { return }"
         val result = buildExecuteScriptTxWithPort(code, restPort)
         (result.unsignedTx, result.txId)
       }

@@ -23,5 +23,8 @@ class HardForkSpec extends AlephiumSpec {
     (HardFork.Leman > HardFork.Mainnet) is true
     HardFork.Mainnet.version is 0
     HardFork.Leman.version is 1
+
+    HardFork.Leman.isLemanEnabled() is true
+    HardFork.Mainnet.isLemanEnabled() is false
   }
 }

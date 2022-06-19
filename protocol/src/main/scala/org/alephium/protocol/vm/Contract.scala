@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm
 
+import scala.annotation.switch
 import scala.collection.mutable
 
 import akka.util.ByteString
@@ -23,22 +24,34 @@ import akka.util.ByteString
 import org.alephium.io.IOError
 import org.alephium.macros.HashSerde
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.model.{ContractId, HardFork}
+import org.alephium.serde
 import org.alephium.serde._
-import org.alephium.util.{AVector, Hex}
+import org.alephium.util.{AVector, EitherF, Hex}
 
 final case class Method[Ctx <: StatelessContext](
     isPublic: Boolean,
-    isPayable: Boolean,
+    usePreapprovedAssets: Boolean,
+    useContractAssets: Boolean,
     argsLength: Int,
     localsLength: Int,
     returnLength: Int,
     instrs: AVector[Instr[Ctx]]
 ) {
+  def usesAssets(): Boolean = usePreapprovedAssets || useContractAssets
+
+  def checkModifierPreLeman(): ExeResult[Unit] = {
+    if (usePreapprovedAssets == useContractAssets) {
+      okay
+    } else {
+      failed(InvalidMethodModifierBeforeLeman)
+    }
+  }
+
   def toTemplateString(): String = {
     val prefix = Hex.toHexString(
       serialize(isPublic) ++
-        serialize(isPayable) ++
+        Method.serializeAssetModifier(this) ++
         serialize(argsLength) ++
         serialize(localsLength) ++
         serialize(returnLength) ++
@@ -49,16 +62,66 @@ final case class Method[Ctx <: StatelessContext](
 }
 
 object Method {
-  implicit val statelessSerde: Serde[Method[StatelessContext]] =
-    Serde.forProduct6(
-      Method[StatelessContext],
-      t => (t.isPublic, t.isPayable, t.argsLength, t.localsLength, t.returnLength, t.instrs)
-    )
-  implicit val statefulSerde: Serde[Method[StatefulContext]] =
-    Serde.forProduct6(
-      Method[StatefulContext],
-      t => (t.isPublic, t.isPayable, t.argsLength, t.localsLength, t.returnLength, t.instrs)
-    )
+  private def serializeAssetModifier[Ctx <: StatelessContext](method: Method[Ctx]): ByteString = {
+    (method.usePreapprovedAssets, method.useContractAssets) match {
+      case (false, false) => ByteString(0) // isPayble = false before Leman fork
+      case (true, true)   => ByteString(1) //  isPayable = true before Leman fork
+      case (false, true)  => ByteString(2)
+      case (true, false)  => ByteString(3)
+    }
+  }
+
+  private def deserializeAssetModifier[Ctx <: StatelessContext](
+      input: Byte
+  ): SerdeResult[(Boolean, Boolean)] = {
+    (input: @switch) match {
+      case 0 => Right((false, false))
+      case 1 => Right((true, true))
+      case 2 => Right((false, true))
+      case 3 => Right((true, false))
+      case _ => Left(SerdeError.wrongFormat("Invalid assets modifier"))
+    }
+  }
+
+  private def serdeGen[Ctx <: StatelessContext](implicit instrsSerde: Serde[AVector[Instr[Ctx]]]) =
+    new Serde[Method[Ctx]] {
+      override def serialize(method: Method[Ctx]): ByteString = {
+        serde.serialize(method.isPublic) ++
+          Method.serializeAssetModifier(method) ++
+          serde.serialize(method.argsLength) ++
+          serde.serialize(method.localsLength) ++
+          serde.serialize(method.returnLength) ++
+          serde.serialize(method.instrs)
+      }
+
+      def _deserialize(input: ByteString): SerdeResult[Staging[Method[Ctx]]] = {
+        for {
+          isPublicRest      <- serde._deserialize[Boolean](input)
+          assetModifierRest <- serde._deserialize[Byte](isPublicRest.rest)
+          assetModifier     <- Method.deserializeAssetModifier(assetModifierRest.value)
+          argsLengthRest    <- serde._deserialize[Int](assetModifierRest.rest)
+          localsLengthRest  <- serde._deserialize[Int](argsLengthRest.rest)
+          returnLengthRest  <- serde._deserialize[Int](localsLengthRest.rest)
+          instrsRest        <- serde._deserialize[AVector[Instr[Ctx]]](returnLengthRest.rest)
+        } yield {
+          Staging(
+            Method[Ctx](
+              isPublicRest.value,
+              assetModifier._1,
+              assetModifier._2,
+              argsLengthRest.value,
+              localsLengthRest.value,
+              returnLengthRest.value,
+              instrsRest.value
+            ),
+            instrsRest.rest
+          )
+        }
+      }
+    }
+
+  implicit val statelessSerde: Serde[Method[StatelessContext]] = serdeGen[StatelessContext]
+  implicit val statefulSerde: Serde[Method[StatefulContext]]   = serdeGen[StatefulContext]
 
   def validate(method: Method[_]): Boolean =
     method.argsLength >= 0 && method.localsLength >= method.argsLength && method.returnLength >= 0
@@ -66,7 +129,8 @@ object Method {
   def forSMT: Method[StatefulContext] =
     Method[StatefulContext](
       isPublic = false,
-      isPayable = false,
+      usePreapprovedAssets = false,
+      useContractAssets = false,
       argsLength = 0,
       localsLength = 0,
       returnLength = 0,
@@ -82,6 +146,16 @@ sealed trait Contract[Ctx <: StatelessContext] {
 
   def initialStateHash(fields: AVector[Val]): Hash =
     Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
+
+  def checkAssetsModifier(ctx: StatelessContext): ExeResult[Unit] = {
+    if (ctx.getHardFork().isLemanEnabled()) {
+      okay
+    } else {
+      EitherF.foreachTry(0 until methodsLength) { methodIndex =>
+        getMethod(methodIndex).flatMap(_.checkModifierPreLeman())
+      }
+    }
+  }
 }
 
 sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
@@ -117,7 +191,7 @@ object StatelessScript {
   private def validate(methods: AVector[Method[StatelessContext]]): Boolean = {
     methods.nonEmpty &&
     methods.head.isPublic &&
-    methods.forall(m => !m.isPayable && Method.validate(m))
+    methods.forall(m => !m.usePreapprovedAssets && Method.validate(m))
   }
 
   def from(methods: AVector[Method[StatelessContext]]): Option[StatelessScript] = {
@@ -161,7 +235,8 @@ object StatefulScript {
       AVector(
         Method[StatefulContext](
           isPublic = true,
-          isPayable = true,
+          usePreapprovedAssets = true,
+          useContractAssets = true,
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,
@@ -314,9 +389,11 @@ object StatefulContract {
     }
   }
 
-  def check(contract: StatefulContract): ExeResult[Unit] = {
+  def check(contract: StatefulContract, hardFork: HardFork): ExeResult[Unit] = {
     if (contract.fieldLength < 0) {
       failed(InvalidFieldLength)
+    } else if (hardFork.isLemanEnabled() && contract.fieldLength > 0xff) {
+      failed(TooManyFields)
     } else if (contract.methods.isEmpty) {
       failed(EmptyMethods)
     } else if (!contract.methods.forall(Method.validate)) {

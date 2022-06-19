@@ -249,7 +249,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   it should "not mark tx seen when receive TxsResponse" in new Fixture
     with NoIndexModelGeneratorsLike {
     val chainIndexGen = Gen.const(chainIndex)
-    val txs           = AVector.fill(10)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
+    val txs = AVector.fill(10)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     brokerHandler ! BaseBrokerHandler.Received(TxsResponse(RequestId.random(), txs))
     allHandlerProbes.txHandler.expectMsg(TxHandler.AddToSharedPool(txs))
     txs.foreach { tx =>
@@ -307,7 +307,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "handle TxsRequest" in new Fixture with NoIndexModelGeneratorsLike {
     val chainIndexGen = Gen.const(chainIndex)
-    val txs           = AVector.fill(4)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
+    val txs = AVector.fill(4)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     txs.foreach { tx =>
       val mempool = blockFlow.getMemPool(chainIndex)
       mempool.addNewTx(chainIndex, tx, TimeStamp.now())
@@ -331,8 +331,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "handle TxsResponse" in new Fixture with NoIndexModelGeneratorsLike {
     val chainIndexGen = Gen.const(chainIndex)
-    val txs           = AVector.fill(4)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
-    val response      = TxsResponse(RequestId.random(), txs)
+    val txs = AVector.fill(4)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
+    val response = TxsResponse(RequestId.random(), txs)
     brokerHandler ! BaseBrokerHandler.Received(response)
     allHandlerProbes.txHandler.expectMsg(TxHandler.AddToSharedPool(txs))
 

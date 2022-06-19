@@ -18,7 +18,6 @@ package org.alephium.protocol.vm.lang
 
 import scala.collection.mutable
 
-import org.alephium.protocol.config.CompilerConfig
 import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.protocol.vm.lang.LogicalOperator.Not
 import org.alephium.util.{AVector, I256, U256}
@@ -39,8 +38,96 @@ object Ast {
     def signature: String = s"${ident.name}:${tpe.signature}"
   }
 
+  final case class AnnotationField(ident: Ident, value: Val)
+  final case class Annotation(id: Ident, fields: Seq[AnnotationField])
+
   object FuncId {
     def empty: FuncId = FuncId("", isBuiltIn = false)
+  }
+
+  final case class ApproveAsset[Ctx <: StatelessContext](
+      address: Expr[Ctx],
+      attoAlphAmountOpt: Option[Expr[Ctx]],
+      tokenAmounts: Seq[(Expr[Ctx], Expr[Ctx])]
+  ) {
+    lazy val approveCount = (if (attoAlphAmountOpt.isEmpty) 0 else 1) + tokenAmounts.length
+
+    def check(state: Compiler.State[Ctx]): Unit = {
+      if (address.getType(state) != Seq(Type.Address)) {
+        throw Compiler.Error(s"Invalid address type: ${address}")
+      }
+      if (attoAlphAmountOpt.exists(_.getType(state) != Seq(Type.U256))) {
+        throw Compiler.Error(s"Invalid amount type: ${attoAlphAmountOpt}")
+      }
+      if (
+        tokenAmounts
+          .exists(p =>
+            (p._1.getType(state), p._2.getType(state)) != (Seq(Type.ByteVec), Seq(Type.U256))
+          )
+      ) {
+        throw Compiler.Error(s"Invalid token amount type: ${tokenAmounts}")
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      assume(approveCount >= 1)
+      val approveAlph: Seq[Instr[Ctx]] = attoAlphAmountOpt match {
+        case Some(amount) => amount.genCode(state) :+ ApproveAlph.asInstanceOf[Instr[Ctx]]
+        case None         => Seq.empty
+      }
+      val approveTokens: Seq[Instr[Ctx]] = tokenAmounts.flatMap { case (tokenId, amount) =>
+        tokenId.genCode(state) ++ amount.genCode(state) :+ ApproveToken.asInstanceOf[Instr[Ctx]]
+      }
+      address.genCode(state) ++ Seq.fill(approveCount - 1)(Dup) ++ approveAlph ++ approveTokens
+    }
+  }
+
+  trait ApproveAssets[Ctx <: StatelessContext] {
+    def approveAssets: Seq[ApproveAsset[Ctx]]
+
+    def checkApproveAssets(state: Compiler.State[Ctx]): Unit = {
+      approveAssets.foreach(_.check(state))
+    }
+
+    def genApproveCode(
+        state: Compiler.State[Ctx],
+        func: Compiler.FuncInfo[Ctx]
+    ): Seq[Instr[Ctx]] = {
+      (approveAssets.nonEmpty, func.usePreapprovedAssets) match {
+        case (true, false) =>
+          throw Compiler.Error(s"Function `${func.name}` does not use preapproved assets")
+        case (false, true) =>
+          throw Compiler.Error(
+            s"Function `${func.name}` needs preapproved assets, please use braces syntax"
+          )
+        case _ => ()
+      }
+      approveAssets.flatMap(_.genCode(state))
+    }
+  }
+  object ContractAssets {
+    val contractAssetsInstrs: Set[Instr[_]] =
+      Set(
+        TransferAlphFromSelf,
+        TransferTokenFromSelf,
+        TransferAlphToSelf,
+        TransferTokenToSelf,
+        DestroySelf,
+        SelfAddress
+      )
+
+    def checkCodeUsingContractAssets[Ctx <: StatelessContext](
+        instrs: Seq[Instr[Ctx]],
+        useAssetsInContract: Boolean,
+        funcName: String
+    ): Unit = {
+      if (useAssetsInContract && !instrs.exists(contractAssetsInstrs.contains(_))) {
+        throw Compiler.Error(
+          s"Function `$funcName` does not use contract assets, but its annotation of contract assets is turn on"
+        )
+      }
+    }
   }
 
   trait Typed[Ctx <: StatelessContext, T] {
@@ -58,11 +145,8 @@ object Ast {
 
   sealed trait Expr[Ctx <: StatelessContext] extends Typed[Ctx, Seq[Type]] {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
-    def fillPlaceholder(expr: Ast.Const[Ctx]): Expr[Ctx]
   }
   final case class Const[Ctx <: StatelessContext](v: Val) extends Expr[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] = this
-
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.fromVal(v.tpe))
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -71,11 +155,6 @@ object Ast {
   }
   final case class CreateArrayExpr[Ctx <: StatelessContext](elements: Seq[Expr[Ctx]])
       extends Expr[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] = {
-      val newElements = elements.map(_.fillPlaceholder(expr))
-      if (newElements == elements) this else CreateArrayExpr(newElements)
-    }
-
     override def _getType(state: Compiler.State[Ctx]): Seq[Type.FixedSizeArray] = {
       assume(elements.nonEmpty)
       val baseType = elements(0).getType(state)
@@ -96,40 +175,28 @@ object Ast {
     index match {
       case Ast.Const(Val.U256(v)) =>
         v.toInt.getOrElse(throw Compiler.Error(s"Invalid array index $v"))
-      case _: Ast.Placeholder[Ctx] => throw Compiler.Error("Placeholder only allowed in loop")
-      case _                       => throw Compiler.Error(s"Invalid array index $index")
+      case _ => throw Compiler.Error(s"Invalid array index $index")
     }
   }
-  final case class ArrayElement[Ctx <: StatelessContext](array: Expr[Ctx], index: Ast.Expr[Ctx])
-      extends Expr[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] = {
-      val newArray = array.fillPlaceholder(expr)
-      val newIndex = index.fillPlaceholder(expr)
-      if (newArray == array && newIndex == index) this else ArrayElement(newArray, newIndex)
-    }
-
+  final case class ArrayElement[Ctx <: StatelessContext](
+      array: Expr[Ctx],
+      indexes: Seq[Ast.Expr[Ctx]]
+  ) extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      array.getType(state) match {
-        case Seq(Type.FixedSizeArray(baseType, _)) => Seq(baseType)
-        case tpe =>
-          throw Compiler.Error(s"Expect array type, have: $tpe")
-      }
+      Seq(state.getArrayElementType(array, indexes))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val idx               = getConstantArrayIndex(index)
-      val (arrayRef, codes) = state.getOrCreateArrayRef(array, isMutable = false)
-      if (arrayRef.isMultiDim()) {
-        codes ++ arrayRef.subArray(idx).vars.flatMap(state.genLoadCode)
-      } else {
-        val ident = arrayRef.getVariable(idx)
-        codes ++ state.genLoadCode(ident)
+      val (arrayRef, codes) = state.getOrCreateArrayRef(array)
+      getType(state) match {
+        case Seq(_: Type.FixedSizeArray) =>
+          codes ++ arrayRef.subArray(state, indexes).genLoadCode(state)
+        case _ =>
+          codes ++ arrayRef.genLoadCode(state, indexes)
       }
     }
   }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] = this
-
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(state.getType(id))
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -138,11 +205,6 @@ object Ast {
   }
   final case class UnaryOp[Ctx <: StatelessContext](op: Operator, expr: Expr[Ctx])
       extends Expr[Ctx] {
-    override def fillPlaceholder(const: Const[Ctx]): Expr[Ctx] = {
-      val newExpr = expr.fillPlaceholder(const)
-      if (newExpr == expr) this else UnaryOp(op, newExpr)
-    }
-
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       op.getReturnType(expr.getType(state))
     }
@@ -153,12 +215,6 @@ object Ast {
   }
   final case class Binop[Ctx <: StatelessContext](op: Operator, left: Expr[Ctx], right: Expr[Ctx])
       extends Expr[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] = {
-      val newLeft  = left.fillPlaceholder(expr)
-      val newRight = right.fillPlaceholder(expr)
-      if (newLeft == left && newRight == right) this else Binop(op, newLeft, newRight)
-    }
-
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       op.getReturnType(left.getType(state) ++ right.getType(state))
     }
@@ -171,11 +227,6 @@ object Ast {
   }
   final case class ContractConv[Ctx <: StatelessContext](contractType: TypeId, address: Expr[Ctx])
       extends Expr[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] = {
-      val newAddress = address.fillPlaceholder(expr)
-      if (newAddress == address) this else ContractConv(contractType, newAddress)
-    }
-
     override protected def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       state.checkContractType(contractType)
       if (address.getType(state) != Seq(Type.ByteVec)) {
@@ -188,21 +239,22 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       address.genCode(state)
   }
-  final case class CallExpr[Ctx <: StatelessContext](id: FuncId, args: Seq[Expr[Ctx]])
-      extends Expr[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] = {
-      val newArgs = args.map(_.fillPlaceholder(expr))
-      if (newArgs == args) this else CallExpr(id, newArgs)
-    }
-
+  final case class CallExpr[Ctx <: StatelessContext](
+      id: FuncId,
+      approveAssets: Seq[ApproveAsset[Ctx]],
+      args: Seq[Expr[Ctx]]
+  ) extends Expr[Ctx]
+      with ApproveAssets[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
       funcInfo.getReturnType(args.flatMap(_.getType(state)))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val func = state.getFunc(id)
-      args.flatMap(_.genCode(state)) ++
+      genApproveCode(state, func) ++
+        args.flatMap(_.genCode(state)) ++
         (if (func.isVariadic) Seq(U256Const(Val.U256.unsafe(args.length))) else Seq.empty) ++
         func.genCode(args.flatMap(_.getType(state)))
     }
@@ -231,48 +283,34 @@ object Ast {
   final case class ContractCallExpr(
       obj: Expr[StatefulContext],
       callId: FuncId,
+      approveAssets: Seq[ApproveAsset[StatefulContext]],
       args: Seq[Expr[StatefulContext]]
   ) extends Expr[StatefulContext]
-      with ContractCallBase {
-    override def fillPlaceholder(expr: Const[StatefulContext]): Expr[StatefulContext] = {
-      val newObj  = obj.fillPlaceholder(expr)
-      val newArgs = args.map(_.fillPlaceholder(expr))
-      if (newObj == obj && newArgs == args) this else ContractCallExpr(newObj, callId, newArgs)
-    }
-
-    override def _getType(state: Compiler.State[StatefulContext]): Seq[Type] =
+      with ContractCallBase
+      with ApproveAssets[StatefulContext] {
+    override def _getType(state: Compiler.State[StatefulContext]): Seq[Type] = {
+      checkApproveAssets(state)
       _getTypeBase(state)
+    }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     override def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
       val contract = obj.getType(state)(0).asInstanceOf[Type.Contract]
-      args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
-        state.getFunc(contract.id, callId).genExternalCallCode(contract.id)
+      val func     = state.getFunc(contract.id, callId)
+      genApproveCode(state, func) ++
+        args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
+        func.genExternalCallCode(contract.id)
     }
   }
   final case class ParenExpr[Ctx <: StatelessContext](expr: Expr[Ctx]) extends Expr[Ctx] {
-    override def fillPlaceholder(const: Const[Ctx]): Expr[Ctx] = {
-      val newExpr = expr.fillPlaceholder(const)
-      if (newExpr == expr) this else ParenExpr(newExpr)
-    }
-
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] =
       expr.getType(state: Compiler.State[Ctx])
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       expr.genCode(state)
   }
-  final case class Placeholder[Ctx <: StatelessContext]() extends Expr[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Expr[Ctx] = expr
-
-    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.U256)
-
-    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
-      throw Compiler.Error("Placeholder only allowed in loop")
-  }
 
   sealed trait Statement[Ctx <: StatelessContext] {
-    def fillPlaceholder(expr: Ast.Const[Ctx]): Statement[Ctx]
     def check(state: Compiler.State[Ctx]): Unit
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
@@ -306,11 +344,8 @@ object Ast {
       }
     }
 
-    override def fillPlaceholder(expr: Ast.Const[Ctx]): Statement[Ctx] =
-      throw Compiler.Error("Cannot define new variable in loop")
-
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      value.genCode(state) ++ idents.flatMap(p => state.genStoreCode(p._2)).reverse
+      value.genCode(state) ++ idents.flatMap(p => state.genStoreCode(p._2)).reverse.flatten
     }
   }
 
@@ -329,9 +364,11 @@ object Ast {
   }
 
   final case class FuncDef[Ctx <: StatelessContext](
+      annotations: Seq[Annotation],
       id: FuncId,
       isPublic: Boolean,
-      isPayable: Boolean,
+      usePreapprovedAssets: Boolean,
+      useAssetsInContract: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
       body: Seq[Statement[Ctx]]
@@ -339,9 +376,20 @@ object Ast {
     def name: String = id.name
 
     def signature: String = {
-      val publicPrefix  = if (isPublic) "pub " else ""
-      val payablePrefix = if (isPayable) "payable " else ""
-      s"${publicPrefix}${payablePrefix}${name}(${args.map(_.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
+      val publicPrefix = if (isPublic) "pub " else ""
+      val assetModifier = {
+        (usePreapprovedAssets, useAssetsInContract) match {
+          case (true, true) =>
+            s"@using(preapprovedAssets=true,assetsInContract=true) "
+          case (true, false) =>
+            s"@using(preapprovedAssets=true) "
+          case (false, true) =>
+            s"@using(assetsInContract=true) "
+          case (false, false) =>
+            ""
+        }
+      }
+      s"${assetModifier}${publicPrefix}${name}(${args.map(_.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
     }
     def getArgNames(): Seq[String]          = args.map(_.ident.name)
     def getArgTypeSignatures(): Seq[String] = args.map(_.tpe.signature)
@@ -351,9 +399,9 @@ object Ast {
     private def checkRetTypes(stmt: Option[Statement[Ctx]]): Unit = {
       stmt match {
         case Some(_: ReturnStmt[Ctx]) => // we checked the `rtypes` in `ReturnStmt`
-        case Some(IfElse(_, ifBranch, elseBranch)) =>
-          checkRetTypes(ifBranch.lastOption)
-          checkRetTypes(elseBranch.lastOption)
+        case Some(IfElse(ifBranches, elseBranch)) =>
+          ifBranches.foreach(branch => checkRetTypes(branch.body.lastOption))
+          checkRetTypes(elseBranch.body.lastOption)
         case _ => throw new Compiler.Error(s"Expect return statement for function ${id.name}")
       }
     }
@@ -371,9 +419,11 @@ object Ast {
 
       val instrs    = body.flatMap(_.genCode(state))
       val localVars = state.getLocalVars(id)
+      ContractAssets.checkCodeUsingContractAssets(instrs, useAssetsInContract, id.name)
       Method[Ctx](
         isPublic,
-        isPayable,
+        usePreapprovedAssets,
+        useAssetsInContract,
         argsLength = ArrayTransformer.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
         returnLength = ArrayTransformer.flattenTypeLength(rtypes),
@@ -385,12 +435,15 @@ object Ast {
   object FuncDef {
     def main(
         stmts: Seq[Ast.Statement[StatefulContext]],
-        isPayable: Boolean
+        usePreapprovedAssets: Boolean,
+        useAssetsInContract: Boolean
     ): FuncDef[StatefulContext] = {
       FuncDef[StatefulContext](
+        Seq.empty,
         id = FuncId("main", false),
         isPublic = true,
-        isPayable = isPayable,
+        usePreapprovedAssets = usePreapprovedAssets,
+        useAssetsInContract = useAssetsInContract,
         args = Seq.empty,
         rtypes = Seq.empty,
         body = stmts
@@ -399,55 +452,28 @@ object Ast {
   }
 
   sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
-    def name: String
-    def getVariables(state: Compiler.State[Ctx]): Seq[Ident]
-    def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx]
+    def ident: Ident
+    def isMutable(state: Compiler.State[Ctx]): Boolean = state.getVariable(ident).isMutable
+    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
   }
   final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
       extends AssignmentTarget[Ctx] {
-    def name: String = ident.name
-
-    def _getType(state: Compiler.State[Ctx]): Type = state.getVariable(ident).tpe
-    def getVariables(state: Compiler.State[Ctx]): Seq[Ident] =
-      if (getType(state).isArrayType) state.getArrayRef(ident).vars else Seq(ident)
-    def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx] = this
+    def _getType(state: Compiler.State[Ctx]): Type                 = state.getVariable(ident).tpe
+    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
   }
   final case class AssignmentArrayElementTarget[Ctx <: StatelessContext](
       ident: Ident,
       indexes: Seq[Ast.Expr[Ctx]]
   ) extends AssignmentTarget[Ctx] {
-    def name: String = ident.name
+    def _getType(state: Compiler.State[Ctx]): Type =
+      state.getArrayElementType(Seq(state.getVariable(ident).tpe), indexes)
 
-    @scala.annotation.tailrec
-    private def elementType(indexes: Seq[Ast.Expr[Ctx]], tpe: Type): Type = {
-      if (indexes.isEmpty) {
-        tpe
-      } else {
-        tpe match {
-          case arrayType: Type.FixedSizeArray =>
-            elementType(indexes.drop(1), arrayType.baseType)
-          case _ =>
-            throw Compiler.Error(s"Invalid assignment to array: ${ident.name}")
-        }
-      }
-    }
-
-    def _getType(state: Compiler.State[Ctx]): Type = {
-      elementType(indexes, state.getVariable(ident).tpe)
-    }
-
-    def getVariables(state: Compiler.State[Ctx]): Seq[Ident] = {
+    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
       val arrayRef = state.getArrayRef(ident)
-      val idxes    = indexes.map(getConstantArrayIndex)
       getType(state) match {
-        case _: Type.FixedSizeArray => arrayRef.subArray(idxes).vars
-        case _                      => Seq(arrayRef.getVariable(idxes))
+        case _: Type.FixedSizeArray => arrayRef.subArray(state, indexes).genStoreCode(state)
+        case _                      => arrayRef.genStoreCode(state, indexes)
       }
-    }
-
-    def fillPlaceholder(expr: Const[Ctx]): AssignmentTarget[Ctx] = {
-      val newIndexes = indexes.map(_.fillPlaceholder(expr))
-      if (newIndexes == indexes) this else AssignmentArrayElementTarget(ident, newIndexes)
     }
   }
 
@@ -465,11 +491,6 @@ object Ast {
 
   final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
       extends Statement[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] = {
-      val newArgs = args.map(_.fillPlaceholder(expr))
-      if (newArgs == args) this else EmitEvent(id, newArgs)
-    }
-
     override def check(state: Compiler.State[Ctx]): Unit = {
       val eventInfo = state.getEvent(id)
       eventInfo.checkFieldTypes(args.flatMap(_.getType(state)))
@@ -496,12 +517,6 @@ object Ast {
       targets: Seq[AssignmentTarget[Ctx]],
       rhs: Expr[Ctx]
   ) extends Statement[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] = {
-      val newTargets = targets.map(_.fillPlaceholder(expr))
-      val newRhs     = rhs.fillPlaceholder(expr)
-      if (newTargets == targets && newRhs == rhs) this else Assign(newTargets, newRhs)
-    }
-
     override def check(state: Compiler.State[Ctx]): Unit = {
       val leftTypes  = targets.map(_.getType(state))
       val rightTypes = rhs.getType(state)
@@ -509,28 +524,24 @@ object Ast {
         throw Compiler.Error(s"Assign $rightTypes to $leftTypes")
       }
       targets.foreach { target =>
-        target.getVariables(state).foreach { ident =>
-          if (!state.getVariable(ident).isMutable) {
-            throw Compiler.Error(s"Assign to immutable variable: ${target.name}")
-          }
+        if (!target.isMutable(state)) {
+          throw Compiler.Error(s"Assign to immutable variable: ${target.ident.name}")
         }
       }
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val variables  = targets.flatMap(_.getVariables(state))
-      val storeCodes = variables.flatMap(state.genStoreCode).reverse
-      rhs.genCode(state) ++ storeCodes
+      rhs.genCode(state) ++ targets.flatMap(_.genStore(state)).reverse.flatten
     }
   }
-  final case class FuncCall[Ctx <: StatelessContext](id: FuncId, args: Seq[Expr[Ctx]])
-      extends Statement[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] = {
-      val newArgs = args.map(_.fillPlaceholder(expr))
-      if (newArgs == args) this else FuncCall(id, newArgs)
-    }
-
+  final case class FuncCall[Ctx <: StatelessContext](
+      id: FuncId,
+      approveAssets: Seq[ApproveAsset[Ctx]],
+      args: Seq[Expr[Ctx]]
+  ) extends Statement[Ctx]
+      with ApproveAssets[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
+      checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
       funcInfo.getReturnType(args.flatMap(_.getType(state)))
       ()
@@ -540,7 +551,8 @@ object Ast {
       val func       = state.getFunc(id)
       val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      args.flatMap(_.genCode(state)) ++
+      genApproveCode(state, func) ++
+        args.flatMap(_.genCode(state)) ++
         (if (func.isVariadic) Seq(U256Const(Val.U256(U256.unsafe(args.length)))) else Seq.empty) ++
         func.genCode(argsType) ++
         Seq.fill(ArrayTransformer.flattenTypeLength(returnType))(Pop)
@@ -549,16 +561,13 @@ object Ast {
   final case class ContractCall(
       obj: Expr[StatefulContext],
       callId: FuncId,
+      approveAssets: Seq[ApproveAsset[StatefulContext]],
       args: Seq[Expr[StatefulContext]]
   ) extends Statement[StatefulContext]
-      with ContractCallBase {
-    override def fillPlaceholder(expr: Const[StatefulContext]): Statement[StatefulContext] = {
-      val newObj  = obj.fillPlaceholder(expr)
-      val newArgs = args.map(_.fillPlaceholder(expr))
-      if (newObj == obj && newArgs == args) this else ContractCall(newObj, callId, newArgs)
-    }
-
+      with ContractCallBase
+      with ApproveAssets[StatefulContext] {
     override def check(state: Compiler.State[StatefulContext]): Unit = {
+      checkApproveAssets(state)
       _getTypeBase(state)
       ()
     }
@@ -569,66 +578,70 @@ object Ast {
       val func       = state.getFunc(contract.id, callId)
       val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
-      args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
+      genApproveCode(state, func) ++
+        args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
         func.genExternalCallCode(contract.id) ++
         Seq.fill[Instr[StatefulContext]](ArrayTransformer.flattenTypeLength(returnType))(Pop)
     }
   }
-  final case class IfElse[Ctx <: StatelessContext](
+  final case class IfBranch[Ctx <: StatelessContext](
       condition: Expr[Ctx],
-      ifBranch: Seq[Statement[Ctx]],
-      elseBranch: Seq[Statement[Ctx]]
+      body: Seq[Statement[Ctx]]
+  )
+  final case class ElseBranch[Ctx <: StatelessContext](
+      body: Seq[Statement[Ctx]]
+  )
+  final case class IfElse[Ctx <: StatelessContext](
+      ifBranches: Seq[IfBranch[Ctx]],
+      elseBranch: ElseBranch[Ctx]
   ) extends Statement[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] = {
-      val newCondition  = condition.fillPlaceholder(expr)
-      val newIfBranch   = ifBranch.map(_.fillPlaceholder(expr))
-      val newElseBranch = elseBranch.map(_.fillPlaceholder(expr))
-      if (
-        newCondition == condition &&
-        newIfBranch == ifBranch &&
-        newElseBranch == elseBranch
-      ) {
-        this
-      } else {
-        IfElse(newCondition, newIfBranch, newElseBranch)
+    private def checkCondition(state: Compiler.State[Ctx], condition: Expr[Ctx]): Unit = {
+      if (condition.getType(state) != Seq(Type.Bool)) {
+        throw Compiler.Error(s"Invalid type of condition expr $condition")
       }
     }
 
     override def check(state: Compiler.State[Ctx]): Unit = {
-      if (condition.getType(state) != Seq(Type.Bool)) {
-        throw Compiler.Error(s"Invalid type of condition expr $condition")
-      } else {
-        ifBranch.foreach(_.check(state))
-        elseBranch.foreach(_.check(state))
-      }
+      ifBranches.foreach(branch => checkCondition(state, branch.condition))
+      ifBranches.foreach(_.body.foreach(_.check(state)))
+      elseBranch.body.foreach(_.check(state))
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val elseIRs  = elseBranch.flatMap(_.genCode(state))
-      val offsetIR = if (elseIRs.nonEmpty) Seq(Jump(elseIRs.length)) else Seq.empty
-      val ifIRs    = ifBranch.flatMap(_.genCode(state)) ++ offsetIR
-      if (ifIRs.length > 0xff || elseIRs.length > 0xff) {
-        // TODO: support long branches
-        throw Compiler.Error(s"Too many instrs for if-else branches")
+      val ifBranchesIRs = Array.ofDim[Seq[Instr[Ctx]]](ifBranches.length + 1)
+      val elseOffsets   = Array.ofDim[Int](ifBranches.length + 1)
+      val elseBodyIRs   = elseBranch.body.flatMap(_.genCode(state))
+      ifBranchesIRs(ifBranches.length) = elseBodyIRs
+      elseOffsets(ifBranches.length) = elseBodyIRs.length
+      ifBranches.zipWithIndex.view.reverse.foreach { case (ifBranch, index) =>
+        val initialOffset    = elseOffsets(index + 1)
+        val notTheLastBranch = index < ifBranches.length - 1 || elseBranch.body.nonEmpty
+
+        val bodyIRsWithoutOffset = ifBranch.body.flatMap(_.genCode(state))
+        val bodyOffsetIR = if (notTheLastBranch) {
+          Seq(Jump(initialOffset))
+        } else {
+          Seq.empty
+        }
+        val bodyIRs = bodyIRsWithoutOffset ++ bodyOffsetIR
+
+        val conditionOffset =
+          if (notTheLastBranch) bodyIRs.length else bodyIRs.length + initialOffset
+        val conditionIRs = Statement.getCondIR(ifBranch.condition, state, conditionOffset)
+        ifBranchesIRs(index) = conditionIRs ++ bodyIRs
+        elseOffsets(index) = initialOffset + bodyIRs.length + conditionIRs.length
       }
-      val condIR = Statement.getCondIR(condition, state, ifIRs.length)
-      condIR ++ ifIRs ++ elseIRs
+      ifBranchesIRs.reduce(_ ++ _)
     }
   }
   final case class While[Ctx <: StatelessContext](condition: Expr[Ctx], body: Seq[Statement[Ctx]])
       extends Statement[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] = {
-      val newCondition = condition.fillPlaceholder(expr)
-      val newBody      = body.map(_.fillPlaceholder(expr))
-      if (newCondition == condition && newBody == body) this else While(newCondition, newBody)
-    }
-
     override def check(state: Compiler.State[Ctx]): Unit = {
       if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid type of condition expr $condition")
-      } else {
-        body.foreach(_.check(state))
       }
+      body.foreach(_.check(state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -642,50 +655,38 @@ object Ast {
       condIR ++ bodyIR :+ Jump(-whileLen)
     }
   }
+  final case class ForLoop[Ctx <: StatelessContext](
+      initialize: Statement[Ctx],
+      condition: Expr[Ctx],
+      update: Statement[Ctx],
+      body: Seq[Statement[Ctx]]
+  ) extends Statement[Ctx] {
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      initialize.check(state)
+      if (condition.getType(state) != Seq(Type.Bool)) {
+        throw Compiler.Error(s"Invalid condition type: $condition")
+      }
+      body.foreach(_.check(state))
+      update.check(state)
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val initializeIR   = initialize.genCode(state)
+      val bodyIR         = body.flatMap(_.genCode(state))
+      val updateIR       = update.genCode(state)
+      val fullBodyLength = bodyIR.length + updateIR.length + 1
+      val condIR         = Statement.getCondIR(condition, state, fullBodyLength)
+      val jumpLength     = condIR.length + fullBodyLength
+      initializeIR ++ condIR ++ bodyIR ++ updateIR :+ Jump(-jumpLength)
+    }
+  }
   final case class ReturnStmt[Ctx <: StatelessContext](exprs: Seq[Expr[Ctx]])
       extends Statement[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] =
-      throw Compiler.Error("Cannot return in loop")
-
     override def check(state: Compiler.State[Ctx]): Unit = {
       state.checkReturn(exprs.flatMap(_.getType(state)))
     }
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       exprs.flatMap(_.genCode(state)) :+ Return
-  }
-  final case class Loop[Ctx <: StatelessContext](
-      start: Int,
-      end: Int,
-      step: Int,
-      body: Statement[Ctx]
-  ) extends Statement[Ctx] {
-    override def fillPlaceholder(expr: Const[Ctx]): Statement[Ctx] =
-      throw Compiler.Error("Nested loops are not supported")
-
-    private var _statements: Option[Seq[Statement[Ctx]]] = None
-    private def getStatements(state: Compiler.State[Ctx]): Seq[Statement[Ctx]] = {
-      _statements match {
-        case Some(stats) => stats
-        case None =>
-          if (step == 0) throw Compiler.Error("loop step cannot be 0")
-          val range = start.until(end, step)
-          if (range.size > state.config.loopUnrollingLimit) {
-            throw Compiler.Error("loop range too large")
-          }
-          val stats = range.map { index =>
-            val expr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
-            body.fillPlaceholder(expr)
-          }
-          _statements = Some(stats)
-          stats
-      }
-    }
-
-    override def check(state: Compiler.State[Ctx]): Unit =
-      getStatements(state).foreach(_.check(state))
-
-    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
-      getStatements(state).flatMap(_.genCode(state))
   }
 
   trait Contract[Ctx <: StatelessContext] {
@@ -746,29 +747,7 @@ object Ast {
     def fields: Seq[Argument]
     def events: Seq[EventDef]
 
-    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = Seq(loadFieldsFunc)
-    private val loadFieldsFunc: Compiler.ContractFunc[StatefulContext] =
-      new Compiler.ContractFunc[StatefulContext] {
-        def name: String      = "loadFields"
-        def isPublic: Boolean = true
-
-        lazy val returnType: Seq[Type] = fields.map(_.tpe)
-
-        def getReturnType(inputType: Seq[Type]): Seq[Type] = {
-          if (inputType.isEmpty) {
-            returnType
-          } else {
-            throw Compiler.Error(s"Built-in function loadFields does not need any argument")
-          }
-        }
-
-        def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
-          throw Compiler.Error(s"Built-in function loadFields should be external call")
-        }
-
-        def genExternalCallCode(typeId: TypeId): Seq[Instr[StatefulContext]] =
-          Seq(LoadContractFields)
-      }
+    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = Seq.empty
 
     def eventsInfo(): Seq[Compiler.EventInfo] = {
       if (events.distinctBy(_.id).size != events.size) {
@@ -865,8 +844,8 @@ object Ast {
 
     private def getContract(typeId: TypeId): ContractWithState = {
       contracts.find(_.ident == typeId) match {
-        case None                              => throw Compiler.Error(s"Contract $typeId does not exist")
-        case Some(_: TxScript)                 => throw Compiler.Error(s"Expect contract $typeId, but got script")
+        case None              => throw Compiler.Error(s"Contract $typeId does not exist")
+        case Some(_: TxScript) => throw Compiler.Error(s"Expect contract $typeId, but got script")
         case Some(contract: ContractWithState) => contract
       }
     }
@@ -881,7 +860,7 @@ object Ast {
         throw Compiler.Error(s"Cyclic inheritance detected for contract ${contract.ident.name}")
       }
 
-      val allParents = mutable.Map.empty[TypeId, ContractWithState]
+      val allParents = mutable.LinkedHashMap.empty[TypeId, ContractWithState]
       contract.inheritances.foreach { inheritance =>
         val parentId       = inheritance.parentId
         val parentContract = getContract(parentId)
@@ -934,27 +913,21 @@ object Ast {
       MultiTxContract(newContracts)
     }
 
-    def genStatefulScript(
-        config: CompilerConfig,
-        contractIndex: Int
-    ): (StatefulScript, TxScript) = {
-      val state = Compiler.State.buildFor(config, this, contractIndex)
+    def genStatefulScript(contractIndex: Int): (StatefulScript, TxScript) = {
+      val state = Compiler.State.buildFor(this, contractIndex)
       get(contractIndex) match {
         case script: TxScript => (script.genCode(state), script)
-        case _: TxContract    => throw Compiler.Error(s"The code is for TxContract, not for TxScript")
+        case _: TxContract => throw Compiler.Error(s"The code is for TxContract, not for TxScript")
         case _: ContractInterface =>
           throw Compiler.Error(s"The code is for Interface, not for TxScript")
       }
     }
 
-    def genStatefulContract(
-        config: CompilerConfig,
-        contractIndex: Int
-    ): (StatefulContract, TxContract) = {
-      val state = Compiler.State.buildFor(config, this, contractIndex)
+    def genStatefulContract(contractIndex: Int): (StatefulContract, TxContract) = {
+      val state = Compiler.State.buildFor(this, contractIndex)
       get(contractIndex) match {
         case contract: TxContract => (contract.genCode(state), contract)
-        case _: TxScript          => throw Compiler.Error(s"The code is for TxScript, not for TxContract")
+        case _: TxScript => throw Compiler.Error(s"The code is for TxScript, not for TxContract")
         case _: ContractInterface =>
           throw Compiler.Error(s"The code is for Interface, not for TxContract")
       }
@@ -997,9 +970,8 @@ object Ast {
         contract: ContractWithState
     ): (Seq[FuncDef[StatefulContext]], Seq[EventDef]) = {
       val parents = parentsCache(contract.ident)
-      val (_allContracts, _allInterfaces) =
+      val (allContracts, _allInterfaces) =
         (parents :+ contract).partition(_.isInstanceOf[TxContract])
-      val allContracts = _allContracts.sortBy(_.ident.name)
       val allInterfaces =
         sortInterfaces(parentsCache, _allInterfaces.map(_.asInstanceOf[ContractInterface]))
 

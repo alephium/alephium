@@ -33,19 +33,22 @@ class ContextSpec
     lazy val context    = genStatefulContext(None, gasLimit = initialGas)
 
     def createContract(): ContractId = {
-      val output   = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(Hash.zero))).sample.get
-      val balances = BalancesPerLockup.from(output)
+      val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(Hash.zero))).sample.get
+      val balances   = MutBalancesPerLockup.from(output)
+      val contractId = TxOutputRef.key(context.txId, context.txEnv.fixedOutputs.length)
       context
         .createContract(
+          contractId,
           StatefulContract.forSMT,
           balances,
           AVector.empty,
           None
         )
         .rightValue
-      val contractId = TxOutputRef.key(context.txId, context.txEnv.fixedOutputs.length)
       context.worldState.getContractState(contractId).isRight is true
-      BalancesPerLockup.from(context.worldState.getContractAsset(contractId).rightValue) is balances
+      MutBalancesPerLockup.from(
+        context.worldState.getContractAsset(contractId).rightValue
+      ) is balances
       context.generatedOutputs.size is 1
 
       context.checkIfBlocked(contractId).leftValue isE ContractLoadDisallowed(contractId)
@@ -61,13 +64,14 @@ class ContextSpec
     context.generatedOutputs.size is 1
   }
 
-  it should "generate contract output when the contract is not loaded" in new Fixture {
+  it should "not generate contract output when the contract is not loaded" in new Fixture {
     val contractId = createContract()
+    val oldOutput  = context.worldState.getContractAsset(contractId).rightValue
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
     context.generateOutput(newOutput).leftValue isE ContractAssetUnloaded
     initialGas.use(GasSchedule.txOutputBaseGas) isE context.gasRemaining
-    context.worldState.getContractAsset(contractId) isE newOutput
+    context.worldState.getContractAsset(contractId) isE oldOutput
     context.generatedOutputs.size is 1
   }
 
@@ -76,7 +80,7 @@ class ContextSpec
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
     context.loadContractObj(contractId).isRight is true
-    context.useContractAsset(contractId).isRight is true
+    context.useContractAssets(contractId).isRight is true
     context.generateOutput(newOutput) isE ()
     context.worldState.getContractAsset(contractId) isE newOutput
     (initialGas.value -
@@ -93,6 +97,9 @@ class ContextSpec
       StatefulContract(0, AVector(Method.forSMT, Method.forSMT))
     context.migrateContract(contractId, obj, newCode, None) isE ()
     context.contractPool.contains(contractId) is false
+    context.contractBlockList.contains(contractId) is true
+
+    context.contractBlockList.remove(contractId)
     val newObj = context.loadContractObj(contractId).rightValue
     newObj.code is newCode.toHalfDecoded()
     newObj.codeHash is newCode.hash
@@ -108,6 +115,9 @@ class ContextSpec
     context.migrateContract(contractId, obj, newCode, None).leftValue isE InvalidFieldLength
     context.migrateContract(contractId, obj, newCode, Some(AVector(Val.True))) isE ()
     context.contractPool.contains(contractId) is false
+    context.contractBlockList.contains(contractId) is true
+
+    context.contractBlockList.remove(contractId)
     val newObj = context.loadContractObj(contractId).rightValue
     newObj.code is newCode.toHalfDecoded()
     newObj.codeHash is newCode.hash

@@ -20,17 +20,19 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{CompilerConfig, GroupConfig, NetworkConfigFixture}
+import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
 import org.alephium.protocol.model.TxGenerators
 import org.alephium.util.{AlephiumSpec, U256}
 
-class BalanceStateSpec extends AlephiumSpec {
+class MutBalanceStateSpec extends AlephiumSpec {
 
   it should "approveALPH" in new Fixture {
     balanceState.approveALPH(lockupScript, ALPH.oneAlph) is Some(())
-    balanceState is BalanceState(
-      Balances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero)))),
-      Balances(ArrayBuffer((lockupScript, BalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 0))))
+    balanceState is MutBalanceState(
+      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(attoAlphAmount = U256.Zero)))),
+      MutBalances(
+        ArrayBuffer((lockupScript, MutBalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 0)))
+      )
     )
 
     balanceState.approveALPH(lockupScript, ALPH.oneAlph) is None
@@ -38,15 +40,15 @@ class BalanceStateSpec extends AlephiumSpec {
 
   it should "approveToken" in new Fixture {
     balanceState.approveToken(lockupScript, tokenId, ALPH.oneAlph) is Some(())
-    balanceState is BalanceState(
-      Balances(
+    balanceState is MutBalanceState(
+      MutBalances(
         ArrayBuffer(
-          (lockupScript, balancesPerLockup.copy(tokenAmounts = mutable.Map((tokenId -> U256.Zero))))
+          (lockupScript, balancesPerLockup.copy(tokenAmounts = mutable.Map(tokenId -> U256.Zero)))
         )
       ),
-      Balances(
+      MutBalances(
         ArrayBuffer(
-          (lockupScript, BalancesPerLockup(U256.Zero, mutable.Map((tokenId -> ALPH.oneAlph)), 0))
+          (lockupScript, MutBalancesPerLockup(U256.Zero, mutable.Map(tokenId -> ALPH.oneAlph), 0))
         )
       )
     )
@@ -73,15 +75,17 @@ class BalanceStateSpec extends AlephiumSpec {
   it should "useApproved" in new Fixture {
     balanceState.approveALPH(lockupScript, ALPH.oneAlph) is Some(())
 
-    balanceState.useApproved() is BalanceState.from(
-      Balances(
-        ArrayBuffer((lockupScript, BalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, scopeDepth)))
+    balanceState.useApproved() is MutBalanceState.from(
+      MutBalances(
+        ArrayBuffer(
+          (lockupScript, MutBalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, scopeDepth))
+        )
       )
     )
 
-    balanceState is BalanceState(
-      Balances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero)))),
-      Balances(ArrayBuffer.empty)
+    balanceState is MutBalanceState(
+      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(attoAlphAmount = U256.Zero)))),
+      MutBalances(ArrayBuffer.empty)
     )
   }
 
@@ -89,14 +93,14 @@ class BalanceStateSpec extends AlephiumSpec {
     balanceState.useAll(lockupScript) is Some(balancesPerLockup)
     balanceState.useAll(lockupScript) is None
 
-    balanceState is BalanceState.from(Balances.empty)
+    balanceState is MutBalanceState.from(MutBalances.empty)
   }
 
   it should "useAlph" in new Fixture {
     balanceState.useAlph(lockupScript, ALPH.oneAlph) is Some(())
 
-    balanceState is BalanceState.from(
-      Balances(ArrayBuffer((lockupScript, balancesPerLockup.copy(alphAmount = U256.Zero))))
+    balanceState is MutBalanceState.from(
+      MutBalances(ArrayBuffer((lockupScript, balancesPerLockup.copy(attoAlphAmount = U256.Zero))))
     )
 
     balanceState.useAlph(lockupScript, ALPH.oneAlph) is None
@@ -106,10 +110,10 @@ class BalanceStateSpec extends AlephiumSpec {
   it should "useToken" in new Fixture {
     balanceState.useToken(lockupScript, tokenId, ALPH.oneAlph) is Some(())
 
-    balanceState is BalanceState.from(
-      Balances(
+    balanceState is MutBalanceState.from(
+      MutBalances(
         ArrayBuffer(
-          (lockupScript, balancesPerLockup.copy(tokenAmounts = mutable.Map((tokenId -> U256.Zero))))
+          (lockupScript, balancesPerLockup.copy(tokenAmounts = mutable.Map(tokenId -> U256.Zero)))
         )
       )
     )
@@ -124,20 +128,15 @@ class BalanceStateSpec extends AlephiumSpec {
         override def groups: Int = 3
       }
 
-    implicit override val compilerConfig: CompilerConfig =
-      new CompilerConfig {
-        override def loopUnrollingLimit: Int = 1000
-      }
-
     val tokenId    = hashGen.sample.get
     val scopeDepth = 1
-    val tokens     = mutable.Map((tokenId -> ALPH.oneAlph))
+    val tokens     = mutable.Map(tokenId -> ALPH.oneAlph)
     val balancesPerLockup =
-      BalancesPerLockup(ALPH.oneAlph, tokens, scopeDepth)
+      MutBalancesPerLockup(ALPH.oneAlph, tokens, scopeDepth)
     val lockupScript = lockupScriptGen.sample.get
 
-    val remaining = Balances(ArrayBuffer((lockupScript, balancesPerLockup)))
+    val remaining = MutBalances(ArrayBuffer((lockupScript, balancesPerLockup)))
 
-    val balanceState = BalanceState.from(remaining)
+    val balanceState = MutBalanceState.from(remaining)
   }
 }

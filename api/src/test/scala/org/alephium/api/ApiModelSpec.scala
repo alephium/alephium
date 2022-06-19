@@ -74,20 +74,20 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   def blockEntryJson(blockEntry: BlockEntry): String = {
     s"""
-      |{
-      |  "hash":"${blockEntry.hash.toHexString}",
-      |  "timestamp":${blockEntry.timestamp.millis},
-      |  "chainFrom":${blockEntry.chainFrom},
-      |  "chainTo":${blockEntry.chainTo},
-      |  "height":${blockEntry.height},
-      |  "deps":${write(blockEntry.deps.map(_.toHexString))},
-      |  "transactions":${write(blockEntry.transactions)},
-      |  "nonce":"${Hex.toHexString(blockEntry.nonce)}",
-      |  "version":${blockEntry.version},
-      |  "depStateHash":"${blockEntry.depStateHash.toHexString}",
-      |  "txsHash":"${blockEntry.txsHash.toHexString}",
-      |  "target":"${Hex.toHexString(blockEntry.target)}"
-      |}""".stripMargin
+       |{
+       |  "hash":"${blockEntry.hash.toHexString}",
+       |  "timestamp":${blockEntry.timestamp.millis},
+       |  "chainFrom":${blockEntry.chainFrom},
+       |  "chainTo":${blockEntry.chainTo},
+       |  "height":${blockEntry.height},
+       |  "deps":${write(blockEntry.deps.map(_.toHexString))},
+       |  "transactions":${write(blockEntry.transactions)},
+       |  "nonce":"${Hex.toHexString(blockEntry.nonce)}",
+       |  "version":${blockEntry.version},
+       |  "depStateHash":"${blockEntry.depStateHash.toHexString}",
+       |  "txsHash":"${blockEntry.txsHash.toHexString}",
+       |  "target":"${Hex.toHexString(blockEntry.target)}"
+       |}""".stripMargin
   }
   def parseFail[A: Reader](jsonRaw: String): String = {
     scala.util.Try(read[A](jsonRaw)).toEither.swap.rightValue.getMessage
@@ -245,24 +245,24 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val address         = generateContractAddress()
       val addressStr      = address.toBase58
       val request: Output = ContractOutput(hint, key, amount, address, tokens)
-      val jsonRaw         = s"""
-        |{
-        |  "type": "ContractOutput",
-        |  "hint": $hint,
-        |  "key": "${key.toHexString}",
-        |  "alphAmount": "$amountStr",
-        |  "address": "$addressStr",
-        |  "tokens": [
-        |    {
-        |      "id": "${tokenId1.toHexString}",
-        |      "amount": "42"
-        |    },
-        |    {
-        |      "id": "${tokenId2.toHexString}",
-        |      "amount": "1000"
-        |    }
-        |  ]
-        |}
+      val jsonRaw = s"""
+                       |{
+                       |  "type": "ContractOutput",
+                       |  "hint": $hint,
+                       |  "key": "${key.toHexString}",
+                       |  "attoAlphAmount": "$amountStr",
+                       |  "address": "$addressStr",
+                       |  "tokens": [
+                       |    {
+                       |      "id": "${tokenId1.toHexString}",
+                       |      "amount": "42"
+                       |    },
+                       |    {
+                       |      "id": "${tokenId2.toHexString}",
+                       |      "amount": "1000"
+                       |    }
+                       |  ]
+                       |}
         """.stripMargin
       checkData(request, jsonRaw)
     }
@@ -281,16 +281,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
           ByteString.empty
         )
       val jsonRaw = s"""
-        |{
-        |  "type": "AssetOutput",
-        |  "hint": $hint,
-        |  "key": "${key.toHexString}",
-        |  "alphAmount": "$amountStr",
-        |  "address": "$addressStr",
-        |  "tokens": [],
-        |  "lockTime": 1234,
-        |  "message": ""
-        |}
+                       |{
+                       |  "type": "AssetOutput",
+                       |  "hint": $hint,
+                       |  "key": "${key.toHexString}",
+                       |  "attoAlphAmount": "$amountStr",
+                       |  "address": "$addressStr",
+                       |  "tokens": [],
+                       |  "lockTime": 1234,
+                       |  "message": ""
+                       |}
         """.stripMargin
       checkData(request, jsonRaw)
     }
@@ -321,7 +321,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode TxResult" in {
     val hash    = Hash.generate
-    val result  = TxResult(hash, 0, 1)
+    val result  = SubmitTxResult(hash, 0, 1)
     val jsonRaw = s"""{"txId":"${hash.toHexString}","fromGroup":0,"toGroup":1}"""
     checkData(result, jsonRaw)
   }
@@ -335,15 +335,15 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val transfer =
         BuildTransaction(fromPublicKey, AVector(Destination(toAddress, Amount(1))))
       val jsonRaw = s"""
-        |{
-        |  "fromPublicKey": "${fromPublicKey.toHexString}",
-        |  "destinations": [
-        |    {
-        |      "address": "${toAddress.toBase58}",
-        |      "alphAmount": "1"
-        |    }
-        |  ]
-        |}
+                       |{
+                       |  "fromPublicKey": "${fromPublicKey.toHexString}",
+                       |  "destinations": [
+                       |    {
+                       |      "address": "${toAddress.toBase58}",
+                       |      "attoAlphAmount": "1"
+                       |    }
+                       |  ]
+                       |}
         """.stripMargin
       checkData(transfer, jsonRaw)
     }
@@ -357,18 +357,18 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         Some(GasPrice(1))
       )
       val jsonRaw = s"""
-        |{
-        |  "fromPublicKey": "${fromPublicKey.toHexString}",
-        |  "destinations": [
-        |    {
-        |      "address": "${toAddress.toBase58}",
-        |      "alphAmount": "1",
-        |      "lockTime": 1234
-        |    }
-        |  ],
-        |  "gasAmount": 1,
-        |  "gasPrice": "1"
-        |}
+                       |{
+                       |  "fromPublicKey": "${fromPublicKey.toHexString}",
+                       |  "destinations": [
+                       |    {
+                       |      "address": "${toAddress.toBase58}",
+                       |      "attoAlphAmount": "1",
+                       |      "lockTime": 1234
+                       |    }
+                       |  ],
+                       |  "gasAmount": 1,
+                       |  "gasPrice": "1"
+                       |}
         """.stripMargin
       checkData(transfer, jsonRaw)
     }
@@ -391,24 +391,24 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         Some(GasPrice(1))
       )
       val jsonRaw = s"""
-        |{
-        |  "fromPublicKey": "${fromPublicKey.toHexString}",
-        |  "destinations": [
-        |    {
-        |      "address": "${toAddress.toBase58}",
-        |      "alphAmount": "1",
-        |      "tokens": [
-        |        {
-        |          "id": "${tokenId1.toHexString}",
-        |          "amount": "10"
-        |        }
-        |      ],
-        |      "lockTime": 1234
-        |    }
-        |  ],
-        |  "gasAmount": 1,
-        |  "gasPrice": "1"
-        |}
+                       |{
+                       |  "fromPublicKey": "${fromPublicKey.toHexString}",
+                       |  "destinations": [
+                       |    {
+                       |      "address": "${toAddress.toBase58}",
+                       |      "attoAlphAmount": "1",
+                       |      "tokens": [
+                       |        {
+                       |          "id": "${tokenId1.toHexString}",
+                       |          "amount": "10"
+                       |        }
+                       |      ],
+                       |      "lockTime": 1234
+                       |    }
+                       |  ],
+                       |  "gasAmount": 1,
+                       |  "gasPrice": "1"
+                       |}
         """.stripMargin
       checkData(transfer, jsonRaw)
     }
@@ -431,24 +431,24 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         Some(GasPrice(1))
       )
       val jsonRaw = s"""
-        |{
-        |  "fromPublicKey": "${fromPublicKey.toHexString}",
-        |  "destinations": [
-        |    {
-        |      "address": "${toAddress.toBase58}",
-        |      "alphAmount": "1",
-        |      "tokens": [
-        |        {
-        |          "id": "${tokenId1.toHexString}",
-        |          "amount": "10"
-        |        }
-        |      ],
-        |      "lockTime": 1234
-        |    }
-        |  ],
-        |  "gasAmount": 1,
-        |  "gasPrice": "1"
-        |}
+                       |{
+                       |  "fromPublicKey": "${fromPublicKey.toHexString}",
+                       |  "destinations": [
+                       |    {
+                       |      "address": "${toAddress.toBase58}",
+                       |      "attoAlphAmount": "1",
+                       |      "tokens": [
+                       |        {
+                       |          "id": "${tokenId1.toHexString}",
+                       |          "amount": "10"
+                       |        }
+                       |      ],
+                       |      "lockTime": 1234
+                       |    }
+                       |  ],
+                       |  "gasAmount": 1,
+                       |  "gasPrice": "1"
+                       |}
         """.stripMargin
       checkData(transfer, jsonRaw)
     }
@@ -472,30 +472,30 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         Some(GasPrice(1))
       )
       val jsonRaw = s"""
-        |{
-        |  "fromPublicKey": "${fromPublicKey.toHexString}",
-        |  "destinations": [
-        |    {
-        |      "address": "${toAddress.toBase58}",
-        |      "alphAmount": "1",
-        |      "tokens": [
-        |        {
-        |          "id": "${tokenId1.toHexString}",
-        |          "amount": "10"
-        |        }
-        |      ],
-        |      "lockTime": 1234
-        |    }
-        |  ],
-        |  "utxos": [
-        |    {
-        |      "hint": 1,
-        |      "key": "${otxoKey1.toHexString}"
-        |    }
-        |  ],
-        |  "gasAmount": 1,
-        |  "gasPrice": "1"
-        |}
+                       |{
+                       |  "fromPublicKey": "${fromPublicKey.toHexString}",
+                       |  "destinations": [
+                       |    {
+                       |      "address": "${toAddress.toBase58}",
+                       |      "attoAlphAmount": "1",
+                       |      "tokens": [
+                       |        {
+                       |          "id": "${tokenId1.toHexString}",
+                       |          "amount": "10"
+                       |        }
+                       |      ],
+                       |      "lockTime": 1234
+                       |    }
+                       |  ],
+                       |  "utxos": [
+                       |    {
+                       |      "hint": 1,
+                       |      "key": "${otxoKey1.toHexString}"
+                       |    }
+                       |  ],
+                       |  "gasAmount": 1,
+                       |  "gasPrice": "1"
+                       |}
         """.stripMargin
       checkData(transfer, jsonRaw)
     }
@@ -735,25 +735,25 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val verifySignature =
       VerifySignature(data, signature, publicKey)
     val jsonRaw = s"""
-        |{
-        |  "data": "${Hex.toHexString(data)}",
-        |  "signature": "${signature.toHexString}",
-        |  "publicKey": "${publicKey.toHexString}"
-        |}
+                     |{
+                     |  "data": "${Hex.toHexString(data)}",
+                     |  "signature": "${signature.toHexString}",
+                     |  "publicKey": "${publicKey.toHexString}"
+                     |}
         """.stripMargin
     checkData(verifySignature, jsonRaw)
   }
 
   it should "encode/decode AssetState" in {
     val asset1   = AssetState(U256.unsafe(100))
-    val jsonRaw1 = s"""{"alphAmount": "100"}"""
+    val jsonRaw1 = s"""{"attoAlphAmount": "100"}"""
     checkData(asset1, jsonRaw1)
 
     val asset2 = AssetState.from(U256.unsafe(100), AVector(Token(Hash.zero, U256.unsafe(123))))
     val jsonRaw2 =
       s"""
          |{
-         |  "alphAmount": "100",
+         |  "attoAlphAmount": "100",
          |  "tokens":[{"id": "0000000000000000000000000000000000000000000000000000000000000000","amount":"123"}]
          |}""".stripMargin
     checkData(asset2, jsonRaw2)
@@ -769,6 +769,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       generateContractAddress(),
       StatefulContract.forSMT.toContract().rightValue,
       codeHash = Hash.zero,
+      initialStateHash = Some(Hash.zero),
       AVector(u256, i256, bool, byteVec, address1),
       AssetState.from(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
     )
@@ -778,6 +779,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
          |  "bytecode": "00010700000000000118",
          |  "codeHash": "0000000000000000000000000000000000000000000000000000000000000000",
+         |  "initialStateHash": "0000000000000000000000000000000000000000000000000000000000000000",
          |  "fields": [
          |    {
          |      "type": "U256",
@@ -801,7 +803,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |    }
          |  ],
          |  "asset": {
-         |    "alphAmount": "1000000000000000000",
+         |    "attoAlphAmount": "1000000000000000000",
          |    "tokens": [
          |      {
          |        "id": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -819,8 +821,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw0 =
       """
         |{
-        |  "bytecode": "07011d01010707060d05a000a001a003a0046116011602160316041605160602",
-        |  "codeHash": "4106809d4ed811457fad02bc19619ca8f2a4a47a56bca4519a28d3671d9c7241",
+        |  "bytecode": "0701402901010707061005a000a001a003a00461b413c40de0b6b3a7640000a916011602160316041605160602",
+        |  "codeHash": "eff62a4b2d4d4936a84e360c916a398d80d5000497ccd4afbd80bfe254d62096",
         |  "fields": {
         |    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])",
         |    "names": ["aa","bb","cc","dd","ee","ff"],
@@ -829,7 +831,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "functions": [
         |    {
         |      "name": "bar",
-        |      "signature": "pub payable bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
+        |      "signature": "@using(preapprovedAssets=true,assetsInContract=true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])",
         |      "argNames": ["a","b","c","d","e","f"],
         |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
         |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
@@ -851,7 +853,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 =
       """
         |{
-        |  "bytecodeTemplate": "020101000000010201000707060716011602160316041605160602",
+        |  "bytecodeTemplate": "020103000000010201000707060716011602160316041605160602",
         |  "fields": {
         |    "signature": "TxScript Foo(aa:Bool,bb:U256,cc:I256,dd:ByteVec,ee:Address)",
         |    "names": ["aa","bb","cc","dd","ee"],
@@ -860,7 +862,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "functions": [
         |    {
         |      "name": "main",
-        |      "signature": "pub payable main()->()",
+        |      "signature": "@using(preapprovedAssets=true) pub main()->()",
         |      "argNames": [],
         |      "argTypes": [],
         |      "returnTypes": []
@@ -905,7 +907,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "hint": -383063803,
          |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
-         |  "alphAmount": "1000000000000000000",
+         |  "attoAlphAmount": "1000000000000000000",
          |  "address": "111111111111111111111111111111111",
          |  "tokens": [],
          |  "lockTime": 0,
@@ -922,7 +924,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "type": "AssetOutput",
          |  "hint": -383063803,
          |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
-         |  "alphAmount": "1000000000000000000",
+         |  "attoAlphAmount": "1000000000000000000",
          |  "address": "111111111111111111111111111111111",
          |  "tokens": [],
          |  "lockTime": 0,
@@ -937,7 +939,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "type": "ContractOutput",
          |  "hint": -383063804,
          |  "key": "9f0e444c69f77a49bd0be89db92c38fe713e0963165cca12faf5712d7657120f",
-         |  "alphAmount": "1000000000000000000",
+         |  "attoAlphAmount": "1000000000000000000",
          |  "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
          |  "tokens": []
          |}
@@ -947,44 +949,45 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode UnsignedTx" in {
     val unsignedTx = UnsignedTx.fromProtocol(unsignedTransaction)
-    val jsonRaw    = s"""
-       |{
-       |  "txId": "${unsignedTransaction.hash.toHexString}",
-       |  "version": ${unsignedTransaction.version},
-       |  "networkId": ${unsignedTransaction.networkId.id},
-       |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},
-       |  "gasAmount": ${defaultGas.value},
-       |  "gasPrice": "${defaultGasPrice.value}",
-       |  "inputs": ${write(unsignedTx.inputs)},
-       |  "fixedOutputs": ${write(unsignedTx.fixedOutputs)}
-       |}""".stripMargin
+    val jsonRaw =
+      s"""
+         |{
+         |  "txId": "${unsignedTransaction.hash.toHexString}",
+         |  "version": ${unsignedTransaction.version},
+         |  "networkId": ${unsignedTransaction.networkId.id},
+         |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},
+         |  "gasAmount": ${defaultGas.value},
+         |  "gasPrice": "${defaultGasPrice.value}",
+         |  "inputs": ${write(unsignedTx.inputs)},
+         |  "fixedOutputs": ${write(unsignedTx.fixedOutputs)}
+         |}""".stripMargin
 
     checkData(unsignedTx, jsonRaw)
   }
 
   it should "encode/decode Transaction" in {
-    val tx      = api.Transaction.fromProtocol(transaction)
+    val tx = api.Transaction.fromProtocol(transaction)
     val jsonRaw = s"""
-       |{
-       |  "unsigned": ${write(tx.unsigned)},
-       |  "scriptExecutionOk": ${tx.scriptExecutionOk},
-       |  "contractInputs": ${write(tx.contractInputs)},
-       |  "generatedOutputs": ${write(tx.generatedOutputs)},
-       |  "inputSignatures": ${write(tx.inputSignatures)},
-       |  "scriptSignatures": ${write(tx.scriptSignatures)}
-       |}""".stripMargin
+                     |{
+                     |  "unsigned": ${write(tx.unsigned)},
+                     |  "scriptExecutionOk": ${tx.scriptExecutionOk},
+                     |  "contractInputs": ${write(tx.contractInputs)},
+                     |  "generatedOutputs": ${write(tx.generatedOutputs)},
+                     |  "inputSignatures": ${write(tx.inputSignatures)},
+                     |  "scriptSignatures": ${write(tx.scriptSignatures)}
+                     |}""".stripMargin
 
     checkData(tx, jsonRaw)
   }
 
   it should "encode/decode TransactionTemplate" in {
-    val tx      = api.TransactionTemplate.fromProtocol(transactionTemplate)
+    val tx = api.TransactionTemplate.fromProtocol(transactionTemplate)
     val jsonRaw = s"""
-       |{
-       |  "unsigned": ${write(tx.unsigned)},
-       |  "inputSignatures": ${write(tx.inputSignatures)},
-       |  "scriptSignatures": ${write(tx.scriptSignatures)}
-       |}""".stripMargin
+                     |{
+                     |  "unsigned": ${write(tx.unsigned)},
+                     |  "inputSignatures": ${write(tx.inputSignatures)},
+                     |  "scriptSignatures": ${write(tx.scriptSignatures)}
+                     |}""".stripMargin
 
     checkData(tx, jsonRaw)
   }

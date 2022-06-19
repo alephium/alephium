@@ -96,7 +96,7 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "Transfer" in {
-    val json     = s"""{"destinations":[{"address":"$address","alphAmount":"$balance"}]}"""
+    val json     = s"""{"destinations":[{"address":"$address","attoAlphAmount":"$balance"}]}"""
     val transfer = Transfer(AVector(Destination(address, balance)))
     check(transfer, json)
   }
@@ -171,7 +171,7 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   }
 
   it should "WalletCreationResult" in {
-    val json                 = s"""{"walletName":"$walletName","mnemonic":"${mnemonic.toLongString}"}"""
+    val json = s"""{"walletName":"$walletName","mnemonic":"${mnemonic.toLongString}"}"""
     val walletCreationResult = WalletCreationResult(walletName, mnemonic)
     check(walletCreationResult, json)
   }

@@ -20,7 +20,7 @@ import org.alephium.protocol.model.Weight
 import org.alephium.util.{Duration, Number, TimeStamp, U256}
 
 object ALPH {
-  //scalastyle:off magic.number
+  // scalastyle:off magic.number
   val CoinInOneALPH: U256     = U256.unsafe(Number.quintillion)
   val CoinInOneCent: U256     = CoinInOneALPH divUnsafe U256.unsafe(100)
   val CoinInOneNanoAlph: U256 = U256.unsafe(Number.billion)
@@ -32,15 +32,17 @@ object ALPH {
   val GenesisTimestamp: TimeStamp = TimeStamp.unsafe(1231006505000L) // BTC genesis timestamp
   val LaunchTimestamp: TimeStamp  = TimeStamp.unsafe(1636379973000L) // 2021-11-08T11:20:06+00:00
 
-  val OneYear: Duration                         = Duration.ofDaysUnsafe(365)
-  val DifficultyBombEnabledTimestamp: TimeStamp = LaunchTimestamp.plusUnsafe(OneYear)
-  val ExpDiffPeriod: Duration                   = Duration.ofDaysUnsafe(30)
+  val OneYear: Duration                                 = Duration.ofDaysUnsafe(365)
+  val OneAndHalfYear: Duration                          = Duration.ofDaysUnsafe(365 + 365 / 2)
+  val LemanDifficultyBombEnabledTimestamp: TimeStamp    = LaunchTimestamp.plusUnsafe(OneAndHalfYear)
+  val PreLemanDifficultyBombEnabledTimestamp: TimeStamp = LaunchTimestamp.plusUnsafe(OneYear)
+  val ExpDiffPeriod: Duration                           = Duration.ofDaysUnsafe(30)
 
   val MaxTxInputNum: Int     = 256
   val MaxTxOutputNum: Int    = 256
   val MaxOutputDataSize: Int = 256
   val MaxScriptSigNum: Int   = 32
-  //scalastyle:on magic.number
+  // scalastyle:on magic.number
 
   def alph(amount: U256): Option[U256] = amount.mul(CoinInOneALPH)
 

@@ -70,7 +70,7 @@ class SharedPool private (
     _add(tx, timeStamp) != 0
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def _add(tx: TransactionTemplate, timeStamp: TimeStamp): Int = {
     if (isFull()) {
       val lowestWeightTxId = txs.min

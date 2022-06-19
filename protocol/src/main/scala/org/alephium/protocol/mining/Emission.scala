@@ -49,7 +49,7 @@ class Emission(blockTargetTime: Duration)(implicit groupConfig: GroupConfig) {
     .divUnsafe(U256.unsafe(yearsUntilStable))
     .toBigInt
     .longValue()
-  val blocksToDropAboutOneCent: Long        = blocksInAboutOneYearPerChain / yearlyCentsDropUntilStable
+  val blocksToDropAboutOneCent: Long = blocksInAboutOneYearPerChain / yearlyCentsDropUntilStable
   val durationToDropAboutOnceCent: Duration = blockTargetTime.timesUnsafe(blocksToDropAboutOneCent)
 
   def shareReward(amount: U256): U256 =
@@ -204,14 +204,14 @@ object Emission {
   def apply(groupConfig: GroupConfig, blockTargetTime: Duration): Emission =
     new Emission(blockTargetTime)(groupConfig)
 
-  //scalastyle:off magic.number
+  // scalastyle:off magic.number
   private[mining] val initialMaxReward: U256         = ALPH.alph(60)
   private[mining] val stableMaxReward: U256          = ALPH.alph(20)
   private[mining] val lowHashRateInitialReward: U256 = initialMaxReward.divUnsafe(U256.unsafe(2))
 
   val yearsUntilStable: Int   = 4
   val yearsUntilNoReward: Int = 82
-  //scalastyle:on magic.number
+  // scalastyle:on magic.number
 
   sealed trait RewardType {
     def miningReward: U256
@@ -257,8 +257,8 @@ object Emission {
   ): U256 = {
     val stepRank     = Emission.rank(hashRate)
     val stepHashRate = Emission.stepHashRate(stepRank)
-    val baseReward   = Emission.baseReward(stepRank, startRank, endRank, startReward, phaseRewardGap)
-    val deltaReward  = Emission.deltaReward(hashRate.value, stepHashRate, stepReward)
+    val baseReward  = Emission.baseReward(stepRank, startRank, endRank, startReward, phaseRewardGap)
+    val deltaReward = Emission.deltaReward(hashRate.value, stepHashRate, stepReward)
     assume(stepRank >= startRank && stepRank < endRank)
     U256.unsafe(baseReward.add(deltaReward))
   }

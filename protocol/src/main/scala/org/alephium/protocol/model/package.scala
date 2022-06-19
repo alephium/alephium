@@ -26,7 +26,7 @@ package object model {
 
   val cliqueIdLength: Int = PublicKey.length
 
-  //scalastyle:off magic.number
+  // scalastyle:off magic.number
   val minimalGas: GasBox        = GasBox.unsafe(20000)
   val minimalGasPrice: GasPrice = GasPrice(ALPH.nanoAlph(1))
   val minimalGasFee: U256       = minimalGasPrice * minimalGas
@@ -47,13 +47,17 @@ package object model {
   val maximalScriptSize: Int = 12 * 1024 // 12KB
   val maximalFieldSize: Int  = 3 * 1024  // 3KB
 
-  val dustUtxoAmount: U256 = ALPH.nanoAlph(1000)
-  val maxTokenPerUtxo: Int = 64
+  val dustUtxoAmount: U256           = ALPH.nanoAlph(1000000)
+  val deprecatedDustUtxoAmount: U256 = ALPH.nanoAlph(1000)
+  val maxTokenPerUtxo: Int           = 4
+  val deprecatedMaxTokenPerUtxo: Int = 64
 
-  def minimalAlphAmountPerTxOutput(tokenNum: Int): U256 = {
+  val minimalAlphInContract: U256 = ALPH.oneAlph
+
+  def minimalAttoAlphAmountPerTxOutput(tokenNum: Int): U256 = {
     ALPH.nanoAlph(100 * tokenNum.toLong).addUnsafe(dustUtxoAmount)
   }
-  //scalastyle:on magic.number
+  // scalastyle:on magic.number
 
   type TokenId = Hash
   val TokenId: Hash.type = Hash

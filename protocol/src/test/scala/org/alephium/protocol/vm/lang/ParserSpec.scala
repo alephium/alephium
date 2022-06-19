@@ -56,35 +56,72 @@ class ParserSpec extends AlephiumSpec {
         Binop(And, Variable(Ident("x")), Variable(Ident("y"))),
         Variable(Ident("z"))
       )
+  }
+
+  it should "parse function" in {
+    info("Function")
     fastparse.parse("foo(x)", StatelessParser.expr(_)).get.value is
-      CallExpr[StatelessContext](FuncId("foo", false), List(Variable(Ident("x"))))
+      CallExpr[StatelessContext](FuncId("foo", false), Seq.empty, List(Variable(Ident("x"))))
     fastparse.parse("Foo(x)", StatelessParser.expr(_)).get.value is
       ContractConv[StatelessContext](Ast.TypeId("Foo"), Variable(Ident("x")))
     fastparse.parse("foo!(x)", StatelessParser.expr(_)).get.value is
-      CallExpr[StatelessContext](FuncId("foo", true), List(Variable(Ident("x"))))
+      CallExpr[StatelessContext](FuncId("foo", true), Seq.empty, List(Variable(Ident("x"))))
     fastparse.parse("foo(x + y) + bar!(x + y)", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,
         CallExpr(
           FuncId("foo", false),
+          Seq.empty,
           List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
         ),
-        CallExpr(FuncId("bar", true), List(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))))
+        CallExpr(
+          FuncId("bar", true),
+          Seq.empty,
+          List(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
+        )
       )
+    fastparse
+      .parse("foo{ x -> 1e-18 alph, token: 2; y -> 3 }(z)", StatefulParser.expr(_))
+      .get
+      .value is
+      CallExpr[StatefulContext](
+        FuncId("foo", false),
+        Seq(
+          Ast.ApproveAsset(
+            Variable(Ident("x")),
+            Some(Const(Val.U256(U256.One))),
+            Seq(Variable(Ident("token")) -> Const(Val.U256(U256.Two)))
+          ),
+          Ast.ApproveAsset(Variable(Ident("y")), Some(Const(Val.U256(U256.unsafe(3)))), Seq.empty)
+        ),
+        List(Variable(Ident("z")))
+      )
+
+    info("Braces syntax")
+    fastparse.parse("{ x -> 1 alph }", StatelessParser.approveAssets(_)).isSuccess is true
+    fastparse.parse("{ x -> tokenId: 2 }", StatelessParser.approveAssets(_)).isSuccess is true
+    fastparse
+      .parse("{ x -> 1 alph, tokenId: 2; y -> 3 }", StatelessParser.approveAssets(_))
+      .isSuccess is true
+
+    info("Contract call")
     fastparse.parse("x.bar(x)", StatefulParser.contractCallExpr(_)).get.value is
       ContractCallExpr(
         Variable(Ident("x")),
         FuncId("bar", false),
+        Seq.empty,
         List(Variable(Ident("x")))
       )
-    fastparse.parse("Foo(x).bar(x)", StatefulParser.contractCallExpr(_)).get.value is
+    fastparse.parse("Foo(x).bar{ z -> 1 }(x)", StatefulParser.contractCallExpr(_)).get.value is
       ContractCallExpr(
         ContractConv[StatefulContext](Ast.TypeId("Foo"), Variable(Ident("x"))),
         FuncId("bar", false),
+        Seq(Ast.ApproveAsset(Variable(Ident("z")), Some(Const(Val.U256(U256.One))), Seq.empty)),
         List(Variable(Ident("x")))
       )
-    fastparse.parse("foo(?)", StatefulParser.callExpr(_)).get.value is
-      CallExpr(FuncId("foo", false), List(Placeholder[StatefulContext]()))
+  }
+
+  it should "parse ByteVec" in {
     fastparse.parse("# ++ #00", StatefulParser.expr(_)).get.value is
       Binop[StatefulContext](
         Concat,
@@ -99,6 +136,8 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("return x, y", StatelessParser.ret(_)).isSuccess is true
     fastparse.parse("return x + y", StatelessParser.ret(_)).isSuccess is true
     fastparse.parse("return (x + y)", StatelessParser.ret(_)).isSuccess is true
+    intercept[Compiler.Error](fastparse.parse("return return", StatelessParser.ret(_))).message is
+      "Consecutive return statements are not allowed"
   }
 
   it should "parse statements" in {
@@ -111,6 +150,48 @@ class ParserSpec extends AlephiumSpec {
     fastparse
       .parse("if x >= 1 { y = y + x } else { y = 0 }", StatelessParser.statement(_))
       .isSuccess is true
+
+    fastparse
+      .parse("while true { x = x + 1 }", StatelessParser.statement(_))
+      .get
+      .value is a[Ast.While[StatelessContext]]
+    fastparse
+      .parse("for let mut i = 0; i < 10; i = i + 1 { x = x + 1 }", StatelessParser.statement(_))
+      .get
+      .value is a[Ast.ForLoop[StatelessContext]]
+  }
+
+  it should "parse if-else statements" in {
+    fastparse
+      .parse("if x { return }", StatelessParser.statement(_))
+      .get
+      .value is
+      Ast.IfElse[StatelessContext](
+        Seq(Ast.IfBranch(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty)))),
+        ElseBranch(Seq.empty)
+      )
+
+    val error = intercept[Compiler.Error](
+      fastparse
+        .parse("if x { return } else if y { return }", StatelessParser.statement(_))
+    )
+    error.message is "If ... else if constructs should be terminated with an else statement"
+
+    fastparse
+      .parse("if x { return } else if y { return } else {}", StatelessParser.statement(_))
+      .get
+      .value is
+      Ast.IfElse[StatelessContext](
+        Seq(
+          Ast.IfBranch(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty))),
+          Ast.IfBranch(Variable(Ast.Ident("y")), Seq(ReturnStmt(Seq.empty)))
+        ),
+        ElseBranch(Seq.empty)
+      )
+  }
+
+  it should "parse annotations" in {
+    fastparse.parse("@using(x = true, y = false)", StatefulParser.annotation(_)).isSuccess is true
   }
 
   it should "parse functions" in {
@@ -123,36 +204,54 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed0.id is Ast.FuncId("add", false)
     parsed0.isPublic is false
-    parsed0.isPayable is false
+    parsed0.usePreapprovedAssets is false
+    parsed0.useAssetsInContract is false
     parsed0.args.size is 2
     parsed0.rtypes is Seq(Type.U256, Type.U256)
 
     val parsed1 = fastparse
       .parse(
-        "pub payable fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }",
+        """@using(preapprovedAssets = true)
+          |pub fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }
+          |""".stripMargin,
         StatelessParser.func(_)
       )
       .get
       .value
     parsed1.id is Ast.FuncId("add", false)
     parsed1.isPublic is true
-    parsed1.isPayable is true
+    parsed1.usePreapprovedAssets is true
+    parsed1.useAssetsInContract is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
 
     info("Simple return type")
     val parsed2 = fastparse
       .parse(
-        "pub payable fn add(x: U256, y: U256) -> U256 { return x + y }",
+        """@using(preapprovedAssets = true, assetsInContract = true)
+          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
         StatelessParser.func(_)
       )
       .get
       .value
     parsed2.id is Ast.FuncId("add", false)
     parsed2.isPublic is true
-    parsed2.isPayable is true
+    parsed2.usePreapprovedAssets is true
+    parsed2.useAssetsInContract is true
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
+
+    info("More use annotation")
+    val parsed3 = fastparse
+      .parse(
+        """@using(assetsInContract = true)
+          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
+        StatelessParser.func(_)
+      )
+      .get
+      .value
+    parsed3.usePreapprovedAssets is false
+    parsed3.useAssetsInContract is true
   }
 
   it should "parser contract initial states" in {
@@ -235,15 +334,15 @@ class ParserSpec extends AlephiumSpec {
     val states: List[(String, Ast.Statement[StatelessContext])] = List(
       "let (a, b) = foo()" -> Ast.VarDef(
         Seq((false, Ast.Ident("a")), (false, Ast.Ident("b"))),
-        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let (a, mut b) = foo()" -> Ast.VarDef(
         Seq((false, Ast.Ident("a")), (true, Ast.Ident("b"))),
-        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let (mut a, mut b) = foo()" -> Ast.VarDef(
         Seq((true, Ast.Ident("a")), (true, Ast.Ident("b"))),
-        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty)
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       )
     )
     states.foreach { case (code, ast) =>
@@ -253,20 +352,21 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse array expression" in {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
-      "a[0][?]" -> Ast.ArrayElement(
-        Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
-        Ast.Placeholder()
-      ),
-      "a[0][1]" -> Ast.ArrayElement(
-        Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
-        constantIndex(1)
+      "a[0u][1u]" -> Ast
+        .ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1))),
+      "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(Variable(Ast.Ident("i")))),
+      "a[foo()]" -> Ast
+        .ArrayElement(
+          Variable(Ast.Ident("a")),
+          Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+        ),
+      "a[i + 1]" -> Ast.ArrayElement(
+        Variable(Ast.Ident("a")),
+        Seq(Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1)))))
       ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
-        Ast.ArrayElement(
-          Ast.ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
-          constantIndex(1)
-        )
+        Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1)))
       ),
       "[a, a]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
       "[a; 2]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
@@ -291,48 +391,39 @@ class ParserSpec extends AlephiumSpec {
       ),
       "a[0][1] = b[0]" -> Assign(
         Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0), constantIndex(1)))),
-        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), constantIndex(0))
-      ),
-      "a[?][0] = ?" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Ast.Placeholder(), constantIndex(0)))),
-        Ast.Placeholder()
+        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), Seq(constantIndex(0)))
       ),
       "a, b = foo()" -> Assign(
         Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
-        CallExpr(FuncId("foo", false), Seq.empty)
+        CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)
       ),
-      "a, b[?] = foo()" -> Assign(
+      "a[i] = b" -> Assign(
+        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Variable(Ident("i"))))),
+        Ast.Variable(Ast.Ident("b"))
+      ),
+      "a[foo()] = b" -> Assign(
         Seq(
-          AssignmentSimpleTarget(Ident("a")),
-          AssignmentArrayElementTarget(Ident("b"), Seq(Placeholder()))
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+          )
         ),
-        CallExpr(FuncId("foo", false), Seq.empty)
+        Ast.Variable(Ast.Ident("b"))
+      ),
+      "a[i + 1] = b" -> Assign(
+        Seq(
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            Seq(Binop(ArithOperator.Add, Variable(Ident("i")), Const(Val.U256(U256.unsafe(1)))))
+          )
+        ),
+        Ast.Variable(Ast.Ident("b"))
       )
     )
 
     stats.foreach { case (str, ast) =>
       checkParseStat(str, ast)
     }
-  }
-
-  it should "parse loop" in {
-    checkParseStat(
-      "loop(0, 4, 1, x[?] = ?)",
-      Ast.Loop[StatelessContext](
-        0,
-        4,
-        1,
-        Ast.Assign(
-          Seq(
-            Ast.AssignmentArrayElementTarget(
-              Ast.Ident("x"),
-              Seq(Ast.Placeholder[StatelessContext]())
-            )
-          ),
-          Ast.Placeholder[StatelessContext]()
-        )
-      )
-    )
   }
 
   it should "parse event definition" in {
@@ -378,17 +469,28 @@ class ParserSpec extends AlephiumSpec {
       info("Simple contract inheritance")
       val code =
         s"""
-         |TxContract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
-         |  fn foo() -> () {
-         |  }
-         |}
-         |""".stripMargin
+           |TxContract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
+           |  fn foo() -> () {
+           |  }
+           |}
+           |""".stripMargin
 
       fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
         TypeId("Child"),
         Seq.empty,
         Seq(Argument(Ident("x"), Type.U256, false), Argument(Ident("y"), Type.U256, false)),
-        Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
+        Seq(
+          FuncDef(
+            Seq.empty,
+            FuncId("foo", false),
+            false,
+            false,
+            false,
+            Seq.empty,
+            Seq.empty,
+            Seq.empty
+          )
+        ),
         Seq.empty,
         List(
           ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
@@ -401,23 +503,23 @@ class ParserSpec extends AlephiumSpec {
       info("Contract event inheritance")
       val foo: String =
         s"""
-             |TxContract Foo() {
-             |  event Foo(x: U256)
-             |  event Foo2(x: U256)
-             |
-             |  pub fn foo() -> () {
-             |    emit Foo(1)
-             |    emit Foo2(2)
-             |  }
-             |}
-             |""".stripMargin
+           |TxContract Foo() {
+           |  event Foo(x: U256)
+           |  event Foo2(x: U256)
+           |
+           |  pub fn foo() -> () {
+           |    emit Foo(1)
+           |    emit Foo2(2)
+           |  }
+           |}
+           |""".stripMargin
       val bar: String =
         s"""
-             |TxContract Bar() extends Foo() {
-             |  pub fn bar() -> () {}
-             |}
-             |$foo
-             |""".stripMargin
+           |TxContract Bar() extends Foo() {
+           |  pub fn bar() -> () {}
+           |}
+           |$foo
+           |""".stripMargin
       val extended =
         fastparse.parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
       val barContract = extended.contracts(0)
@@ -438,7 +540,18 @@ class ParserSpec extends AlephiumSpec {
            |""".stripMargin
       fastparse.parse(code, StatefulParser.interface(_)).get.value is ContractInterface(
         TypeId("Child"),
-        Seq(FuncDef(FuncId("foo", false), false, false, Seq.empty, Seq.empty, Seq.empty)),
+        Seq(
+          FuncDef(
+            Seq.empty,
+            FuncId("foo", false),
+            false,
+            false,
+            false,
+            Seq.empty,
+            Seq.empty,
+            Seq.empty
+          )
+        ),
         Seq.empty,
         Seq(InterfaceInheritance(TypeId("Parent")))
       )
@@ -460,7 +573,7 @@ class ParserSpec extends AlephiumSpec {
       info("Contract inherits interface")
       val code =
         s"""
-           |TxContract Child() extends Parent {
+           |TxContract Child() implements Parent {
            |  fn foo() -> () {
            |    return
            |  }
@@ -472,7 +585,9 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         Seq(
           FuncDef(
+            Seq.empty,
             FuncId("foo", false),
+            false,
             false,
             false,
             Seq.empty,
@@ -487,16 +602,18 @@ class ParserSpec extends AlephiumSpec {
   }
 
   trait ScriptFixture {
-    val payable: Boolean
+    val usePreapprovedAssets: Boolean
     val script: String
 
     val ident        = TypeId("Main")
     val templateVars = Seq(Argument(Ident("x"), Type.U256, false))
     def funcs[C <: StatelessContext] = Seq[FuncDef[C]](
       FuncDef(
+        Seq.empty,
         FuncId("main", false),
         true,
-        payable,
+        usePreapprovedAssets,
+        false,
         Seq.empty,
         Seq.empty,
         Seq(Ast.ReturnStmt(List()))
@@ -505,27 +622,32 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse AssetScript" in new ScriptFixture {
-    val payable = false
-    val script  = s"""
-         |AssetScript Main(x: U256) {
-         |  pub fn main() -> () {
-         |    return
-         |  }
-         |}
-         |""".stripMargin
+    val usePreapprovedAssets = false
+    val script = s"""
+                    |AssetScript Main(x: U256) {
+                    |  pub fn main() -> () {
+                    |    return
+                    |  }
+                    |}
+                    |""".stripMargin
 
     fastparse.parse(script, StatelessParser.assetScript(_)).get.value is
       AssetScript(ident, templateVars, funcs)
   }
 
   // scalastyle:off no.equal
-  class TxScriptFixture(payableModifier: String) extends ScriptFixture {
-    val payable = !(payableModifier === "nonPayable")
-    val script  = s"""
-         |TxScript Main(x: U256) $payableModifier {
-         |  return
-         |}
-         |""".stripMargin
+  class TxScriptFixture(usePreapprovedAssetsOpt: Option[Boolean]) extends ScriptFixture {
+    val usePreapprovedAssets = !usePreapprovedAssetsOpt.contains(false)
+    val annotation = usePreapprovedAssetsOpt match {
+      case Some(value) => s"@using(preapprovedAssets = $value)"
+      case None        => ""
+    }
+    val script = s"""
+                    |$annotation
+                    |TxScript Main(x: U256) {
+                    |  return
+                    |}
+                    |""".stripMargin
 
     fastparse.parse(script, StatefulParser.txScript(_)).get.value is TxScript(
       ident,
@@ -535,7 +657,19 @@ class ParserSpec extends AlephiumSpec {
   }
   // scalastyle:on no.equal
 
-  it should "parse explicit payable TxScript" in new TxScriptFixture("payable")
-  it should "parse implicit payable TxScript" in new TxScriptFixture("")
-  it should "parse non payable TxScript" in new TxScriptFixture("nonPayable")
+  it should "parse explicit usePreapprovedAssets TxScript" in new TxScriptFixture(Some(true))
+  it should "parse implicit usePreapprovedAssets TxScript" in new TxScriptFixture(None)
+  it should "parse vanilla TxScript" in new TxScriptFixture(Some(false))
+
+  it should "parse script fields" in {
+    def script(fields: String) =
+      s"""
+         |TxScript Main$fields {
+         |  return
+         |}
+         |""".stripMargin
+    fastparse.parse(script(""), StatefulParser.txScript(_)).isSuccess is true
+    fastparse.parse(script("()"), StatefulParser.txScript(_)).isSuccess is true
+    fastparse.parse(script("(x: U256)"), StatefulParser.txScript(_)).isSuccess is true
+  }
 }

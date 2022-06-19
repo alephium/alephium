@@ -48,7 +48,7 @@ object UnlockScript {
             serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(P2PKH))
           case Staging(1, content) => p2mpkhSerde._deserialize(content)
           case Staging(2, content) => p2shSerde._deserialize(content)
-          case Staging(n, _)       => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
+          case Staging(n, _) => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
         }
       }
     }

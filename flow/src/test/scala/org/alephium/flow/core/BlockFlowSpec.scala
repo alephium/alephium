@@ -384,7 +384,7 @@ class BlockFlowSpec extends AlephiumSpec {
       consensusConfig.emission.lowHashRateInitialRewardPerChain,
       consensusConfig.emission.stableMaxRewardPerChain
     ).min
-    (block.coinbase.alphAmountInOutputs.get > minimalReward.subUnsafe(defaultGasFee)) is true
+    (block.coinbase.attoAlphAmountInOutputs.get > minimalReward.subUnsafe(defaultGasFee)) is true
   }
 
   it should "reduce target gradually and reach a stable target eventually" in new FlowFixture {
@@ -610,7 +610,7 @@ class BlockFlowSpec extends AlephiumSpec {
         toPrivateKey.publicKey,
         toLockupScript,
         None,
-        ALPH.nanoAlph(1000),
+        dustUtxoAmount,
         None,
         defaultGasPrice,
         defaultUtxoLimit
@@ -624,7 +624,7 @@ class BlockFlowSpec extends AlephiumSpec {
           toPrivateKey.publicKey,
           toLockupScript,
           None,
-          ALPH.nanoAlph(1000),
+          dustUtxoAmount,
           None,
           defaultGasPrice,
           defaultUtxoLimit
@@ -635,8 +635,8 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "handle sequential txs" in new FlowFixture {
-    override val configValues                   = Map(("alephium.broker.broker-num", 1))
-    val fromGroup                               = GroupIndex.unsafe(Random.nextInt(groupConfig.groups))
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+    val fromGroup             = GroupIndex.unsafe(Random.nextInt(groupConfig.groups))
     val (fromPriKey, fromPubKey, initialAmount) = genesisKeys(fromGroup.value)
     val fromLockup                              = LockupScript.p2pkh(fromPubKey)
     val theMemPool                              = blockFlow.getMemPool(fromGroup)

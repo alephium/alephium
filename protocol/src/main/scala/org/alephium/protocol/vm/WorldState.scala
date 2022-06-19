@@ -51,6 +51,14 @@ trait WorldState[T, R1, R2, R3] {
     outputState.get(outputRef)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def getContractOutput(contractOutputRef: ContractOutputRef): IOResult[ContractOutput] = {
+    getOutput(contractOutputRef) match {
+      case Right(_: AssetOutput) => Left(WorldState.expectedContractError)
+      case result                => result.asInstanceOf[IOResult[ContractOutput]]
+    }
+  }
+
   def getOutputOpt(outputRef: TxOutputRef): IOResult[Option[TxOutput]] = {
     outputState.getOpt(outputRef)
   }
@@ -147,7 +155,7 @@ trait WorldState[T, R1, R2, R3] {
     for {
       fixedInputs    <- tx.unsigned.inputs.mapE { input => getOutput(input.outputRef) }
       contractInputs <- tx.contractInputs.mapE { outputRef => getOutput(outputRef) }
-    } yield (fixedInputs ++ contractInputs)
+    } yield fixedInputs ++ contractInputs
   }
 
   def containsAllInputs(tx: TransactionTemplate): IOResult[Boolean] = {
@@ -162,7 +170,7 @@ trait WorldState[T, R1, R2, R3] {
 }
 
 sealed abstract class MutableWorldState extends WorldState[Unit, Unit, Unit, Unit] {
-  def useContractAsset(contractId: ContractId): IOResult[(ContractOutputRef, ContractOutput)] = {
+  def useContractAssets(contractId: ContractId): IOResult[(ContractOutputRef, ContractOutput)] = {
     for {
       state  <- getContractState(contractId)
       output <- getContractAsset(state.contractOutputRef)
@@ -202,7 +210,8 @@ sealed abstract class ImmutableWorldState
 // scalastyle:on
 
 object WorldState {
-  val expectedAssetError: IOError = IOError.Serde(SerdeError.validation("Expect AssetOutput"))
+  val expectedAssetError: IOError    = IOError.Serde(SerdeError.validation("Expect AssetOutput"))
+  val expectedContractError: IOError = IOError.Serde(SerdeError.validation("Expect ContractOutput"))
 
   final case class CodeRecord(code: StatefulContract.HalfDecoded, refCount: Int)
   object CodeRecord {
@@ -393,7 +402,7 @@ object WorldState {
         codeRecord       <- codeState.get(state.codeHash)
         _                <- removeContractCode(state, codeRecord)
         newCodeRecordOpt <- codeState.getOpt(newCode.hash)
-        _                <- codeState.put(newCode.hash, CodeRecord.from(newCode.toHalfDecoded(), newCodeRecordOpt))
+        _ <- codeState.put(newCode.hash, CodeRecord.from(newCode.toHalfDecoded(), newCodeRecordOpt))
       } yield ()
     }
 

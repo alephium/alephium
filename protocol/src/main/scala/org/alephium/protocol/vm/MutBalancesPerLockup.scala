@@ -20,10 +20,10 @@ import scala.collection.mutable
 import scala.util.Try
 
 import org.alephium.protocol.model.{TokenId, TxOutput}
-import org.alephium.util.{AVector, U256}
+import org.alephium.util.{AVector, TimeStamp, U256}
 
-final case class BalancesPerLockup(
-    var alphAmount: U256,
+final case class MutBalancesPerLockup(
+    var attoAlphAmount: U256,
     tokenAmounts: mutable.Map[TokenId, U256],
     scopeDepth: Int
 ) {
@@ -35,7 +35,7 @@ final case class BalancesPerLockup(
   def getTokenAmount(tokenId: TokenId): Option[U256] = tokenAmounts.get(tokenId)
 
   def addAlph(amount: U256): Option[Unit] = {
-    alphAmount.add(amount).map(alphAmount = _)
+    attoAlphAmount.add(amount).map(attoAlphAmount = _)
   }
 
   def addToken(tokenId: TokenId, amount: U256): Option[Unit] = {
@@ -49,7 +49,7 @@ final case class BalancesPerLockup(
   }
 
   def subAlph(amount: U256): Option[Unit] = {
-    alphAmount.sub(amount).map(alphAmount = _)
+    attoAlphAmount.sub(amount).map(attoAlphAmount = _)
   }
 
   def subToken(tokenId: TokenId, amount: U256): Option[Unit] = {
@@ -58,57 +58,68 @@ final case class BalancesPerLockup(
     }
   }
 
-  def add(another: BalancesPerLockup): Option[Unit] =
+  def add(another: MutBalancesPerLockup): Option[Unit] =
     Try {
-      alphAmount = alphAmount.add(another.alphAmount).getOrElse(throw BalancesPerLockup.error)
+      attoAlphAmount =
+        attoAlphAmount.add(another.attoAlphAmount).getOrElse(throw MutBalancesPerLockup.error)
       another.tokenAmounts.foreach { case (tokenId, amount) =>
         tokenAmounts.get(tokenId) match {
           case Some(currentAmount) =>
             tokenAmounts(tokenId) =
-              currentAmount.add(amount).getOrElse(throw BalancesPerLockup.error)
+              currentAmount.add(amount).getOrElse(throw MutBalancesPerLockup.error)
           case None =>
             tokenAmounts(tokenId) = amount
         }
       }
     }.toOption
 
-  def sub(another: BalancesPerLockup): Option[Unit] =
+  def sub(another: MutBalancesPerLockup): Option[Unit] =
     Try {
-      alphAmount = alphAmount.sub(another.alphAmount).getOrElse(throw BalancesPerLockup.error)
+      attoAlphAmount =
+        attoAlphAmount.sub(another.attoAlphAmount).getOrElse(throw MutBalancesPerLockup.error)
       another.tokenAmounts.foreach { case (tokenId, amount) =>
         tokenAmounts.get(tokenId) match {
           case Some(currentAmount) =>
             tokenAmounts(tokenId) =
-              currentAmount.sub(amount).getOrElse(throw BalancesPerLockup.error)
-          case None => throw BalancesPerLockup.error
+              currentAmount.sub(amount).getOrElse(throw MutBalancesPerLockup.error)
+          case None => throw MutBalancesPerLockup.error
         }
       }
     }.toOption
 
   def toTxOutput(lockupScript: LockupScript): ExeResult[Option[TxOutput]] = {
     val tokens = tokenVector
-    if (alphAmount.isZero) {
+    if (attoAlphAmount.isZero) {
       if (tokens.isEmpty) Right(None) else failed(InvalidOutputBalances)
     } else {
-      Right(Some(TxOutput.from(alphAmount, tokens, lockupScript)))
+      Right(Some(TxOutput.from(attoAlphAmount, tokens, lockupScript)))
     }
+  }
+
+  def toLockedTxOutput(lockupScript: LockupScript.Asset, lockTime: TimeStamp): TxOutput = {
+    val tokens = tokenVector
+    TxOutput.asset(attoAlphAmount, lockupScript, tokens, lockTime)
   }
 }
 
-object BalancesPerLockup {
+object MutBalancesPerLockup {
   val error: ArithmeticException = new ArithmeticException("Balance amount")
 
   // Need to be `def` as it's mutable
-  def empty: BalancesPerLockup = BalancesPerLockup(U256.Zero, mutable.Map.empty, 0)
+  def empty: MutBalancesPerLockup = MutBalancesPerLockup(U256.Zero, mutable.Map.empty, 0)
 
-  def alph(amount: U256): BalancesPerLockup = {
-    BalancesPerLockup(amount, mutable.Map.empty, 0)
+  def alph(amount: U256): MutBalancesPerLockup = {
+    MutBalancesPerLockup(amount, mutable.Map.empty, 0)
   }
 
-  def token(id: TokenId, amount: U256): BalancesPerLockup = {
-    BalancesPerLockup(U256.Zero, mutable.Map(id -> amount), 0)
+  protected[vm] def alph(amount: U256, scopeDepth: Int): MutBalancesPerLockup = {
+    MutBalancesPerLockup(amount, mutable.Map.empty, scopeDepth)
   }
 
-  def from(output: TxOutput): BalancesPerLockup =
-    BalancesPerLockup(output.amount, mutable.Map.from(output.tokens.toIterable), 0)
+  def token(id: TokenId, amount: U256): MutBalancesPerLockup = {
+    MutBalancesPerLockup(U256.Zero, mutable.Map(id -> amount), 0)
+  }
+
+  def from(output: TxOutput): MutBalancesPerLockup =
+    MutBalancesPerLockup(output.amount, mutable.Map.from(output.tokens.toIterable), 0)
 }

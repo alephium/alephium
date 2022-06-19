@@ -26,7 +26,7 @@ import org.alephium.wallet.api.WalletEndpoints
 import org.alephium.wallet.api.model
 import org.alephium.wallet.service.WalletService
 
-@SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+@SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
 trait WalletEndpointsLogic extends WalletEndpoints {
 
   import WalletServer.toApiError

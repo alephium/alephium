@@ -22,13 +22,13 @@ import scala.collection.mutable.ArrayBuffer
 import org.alephium.protocol.model.{AssetOutput, TokenId, TxOutput}
 import org.alephium.util.{AVector, U256}
 
-final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
-  def getBalances(lockupScript: LockupScript): Option[BalancesPerLockup] = {
+final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLockup)]) {
+  def getBalances(lockupScript: LockupScript): Option[MutBalancesPerLockup] = {
     all.collectFirst { case (ls, balance) if ls == lockupScript => balance }
   }
 
-  def getAlphAmount(lockupScript: LockupScript): Option[U256] = {
-    getBalances(lockupScript).map(_.alphAmount)
+  def getAttoAlphAmount(lockupScript: LockupScript): Option[U256] = {
+    getBalances(lockupScript).map(_.attoAlphAmount)
   }
 
   def getTokenAmount(lockupScript: LockupScript, tokenId: TokenId): Option[U256] = {
@@ -40,7 +40,7 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
       case Some(balances) =>
         balances.addAlph(amount)
       case None =>
-        all.addOne(lockupScript -> BalancesPerLockup.alph(amount))
+        all.addOne(lockupScript -> MutBalancesPerLockup.alph(amount))
         Some(())
     }
   }
@@ -50,7 +50,7 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
       case Some(balances) =>
         balances.addToken(tokenId, amount)
       case None =>
-        all.addOne(lockupScript -> BalancesPerLockup.token(tokenId, amount))
+        all.addOne(lockupScript -> MutBalancesPerLockup.token(tokenId, amount))
         Some(())
     }
   }
@@ -63,7 +63,7 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
     getBalances(lockupScript).flatMap(_.subToken(tokenId, amount))
   }
 
-  def add(lockupScript: LockupScript, balancesPerLockup: BalancesPerLockup): Option[Unit] = {
+  def add(lockupScript: LockupScript, balancesPerLockup: MutBalancesPerLockup): Option[Unit] = {
     getBalances(lockupScript) match {
       case Some(balances) =>
         balances.add(balancesPerLockup)
@@ -73,39 +73,37 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
     }
   }
 
-  def sub(lockupScript: LockupScript, balancesPerLockup: BalancesPerLockup): Option[Unit] = {
+  def sub(lockupScript: LockupScript, balancesPerLockup: MutBalancesPerLockup): Option[Unit] = {
     getBalances(lockupScript).flatMap(_.sub(balancesPerLockup))
   }
 
-  def use(): Balances = {
+  def use(): MutBalances = {
     val newAll = all.map { case (lockupScript, balancesPerLockup) =>
       lockupScript -> balancesPerLockup.copy(scopeDepth = balancesPerLockup.scopeDepth + 1)
     }
     all.clear()
-    Balances(newAll)
+    MutBalances(newAll)
   }
 
-  def useAll(lockupScript: LockupScript): Option[BalancesPerLockup] = {
+  def useAll(lockupScript: LockupScript): Option[MutBalancesPerLockup] = {
     val index = all.indexWhere { case (ls, _) => ls == lockupScript }
     if (index == -1) {
       None
     } else {
-      val (_, balances) = all(index)
-      all.remove(index)
-      Some(balances)
+      Some(all.remove(index)._2)
     }
   }
 
-  def useForNewContract(): Option[BalancesPerLockup] = {
+  def useForNewContract(): Option[MutBalancesPerLockup] = {
     Option.when(all.nonEmpty) {
-      val accumulator = BalancesPerLockup.empty
+      val accumulator = MutBalancesPerLockup.empty
       all.foreach { balances => accumulator.add(balances._2) }
       all.clear()
       accumulator
     }
   }
 
-  def merge(balances: Balances): Option[Unit] = {
+  def merge(balances: MutBalances): Option[Unit] = {
     @tailrec
     def iter(index: Int): Option[Unit] = {
       if (index >= balances.all.length) {
@@ -142,22 +140,22 @@ final case class Balances(all: ArrayBuffer[(LockupScript, BalancesPerLockup)]) {
   // scalastyle:on return
 }
 
-object Balances {
+object MutBalances {
   // TODO: optimize this
-  def from(inputs: AVector[AssetOutput], outputs: AVector[AssetOutput]): Option[Balances] = {
+  def from(inputs: AVector[AssetOutput], outputs: AVector[AssetOutput]): Option[MutBalances] = {
     val inputBalances = inputs.fold(Option(empty)) {
       case (Some(balances), input) =>
-        balances.add(input.lockupScript, BalancesPerLockup.from(input)).map(_ => balances)
+        balances.add(input.lockupScript, MutBalancesPerLockup.from(input)).map(_ => balances)
       case (None, _) => None
     }
     val finalBalances = outputs.fold(inputBalances) {
       case (Some(balances), output) =>
-        balances.sub(output.lockupScript, BalancesPerLockup.from(output)).map(_ => balances)
+        balances.sub(output.lockupScript, MutBalancesPerLockup.from(output)).map(_ => balances)
       case (None, _) => None
     }
     finalBalances
   }
 
   // Need to be `def` as it's mutable
-  def empty: Balances = Balances(ArrayBuffer.empty)
+  def empty: MutBalances = MutBalances(ArrayBuffer.empty)
 }

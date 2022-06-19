@@ -16,8 +16,10 @@
 
 package org.alephium.http
 
+import scala.collection.immutable.ArraySeq
 import scala.concurrent._
 
+import com.typesafe.scalalogging.StrictLogging
 import sttp.client3.Request
 import sttp.client3.asynchttpclient.future.AsyncHttpClientFutureBackend
 import sttp.model.{StatusCode, Uri}
@@ -26,22 +28,35 @@ import sttp.tapir.client.sttp.SttpClientInterpreter
 
 import org.alephium.api.{ApiError, BaseEndpoint}
 import org.alephium.api.model.ApiKey
+import org.alephium.util.Service
 import org.alephium.util.Utils.getStackTrace
 
 // scalastyle:off method.length
-trait EndpointSender extends BaseEndpoint with SttpClientInterpreter {
+class EndpointSender(val maybeApiKey: Option[ApiKey])(implicit
+    val executionContext: ExecutionContext
+) extends BaseEndpoint
+    with SttpClientInterpreter
+    with Service
+    with StrictLogging {
 
   private val backend = AsyncHttpClientFutureBackend()
 
-  val maybeApiKey: Option[ApiKey]
+  protected def startSelfOnce(): Future[Unit] = Future.unit
+
+  protected def stopSelfOnce(): Future[Unit] = {
+    backend.close()
+  }
+
+  override def subServices: ArraySeq[Service] = ArraySeq.empty
 
   def createRequest[I, O](
       endpoint: BaseEndpoint[I, O],
       params: I,
       uri: Uri
   ): Request[Either[ApiError[_ <: StatusCode], O], Any] = {
-    toRequest(endpoint.endpoint, Some(uri))
-      .apply((maybeApiKey, params))
+    toSecureRequest(endpoint.endpoint, Some(uri))
+      .apply(maybeApiKey)
+      .apply(params)
       .mapResponse(handleDecodeFailures)
   }
 

@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm.lang
 
 import org.alephium.crypto.Byte32
-import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.Val
 import org.alephium.protocol.vm.lang.ArithOperator._
@@ -29,9 +29,25 @@ class LexerSpec extends AlephiumSpec {
     val address = Address.p2pkh(PublicKey.generate)
 
     fastparse.parse("5", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
-    fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
     fastparse.parse("5u", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(5))
+    fastparse.parse("5i", Lexer.typedNum(_)).get.value is Val.I256(I256.unsafe(5))
+    fastparse.parse("-5i", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
+    fastparse.parse("-5", Lexer.typedNum(_)).get.value is Val.I256(I256.from(-5))
     fastparse.parse("0x12", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(18))
+    fastparse.parse("5e18", Lexer.typedNum(_)).get.value is Val.U256(ALPH.alph(5))
+    fastparse.parse("5.12e18", Lexer.typedNum(_)).get.value is Val.U256(ALPH.cent(512))
+    fastparse.parse("-5e18", Lexer.typedNum(_)).get.value is Val.I256(
+      I256.unsafe(ALPH.alph(5).toBigInt.negate())
+    )
+    fastparse.parse("-5.12e18", Lexer.typedNum(_)).get.value is Val.I256(
+      I256.unsafe(ALPH.cent(512).toBigInt.negate())
+    )
+    fastparse.parse("1_000_000", Lexer.typedNum(_)).get.value is Val.U256(U256.unsafe(1000000))
+    fastparse.parse("1alph", Lexer.typedNum(_)).get.value is Val.U256(ALPH.oneAlph)
+    fastparse.parse("1 alph", Lexer.typedNum(_)).get.value is Val.U256(ALPH.oneAlph)
+    fastparse.parse("0.01 alph", Lexer.typedNum(_)).get.value is Val.U256(ALPH.cent(1))
+    fastparse.parse("1e-18 alph", Lexer.typedNum(_)).get.value is Val.U256(U256.One)
+
     fastparse.parse(s"#$byte32", Lexer.bytes(_)).get.value is Val.ByteVec(
       Hex.from(byte32).get
     )

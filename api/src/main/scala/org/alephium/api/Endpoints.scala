@@ -22,7 +22,7 @@ import com.typesafe.scalalogging.StrictLogging
 import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.EndpointIO.Example
-import sttp.tapir.EndpointOutput.OneOfMapping
+import sttp.tapir.EndpointOutput.OneOfVariant
 import sttp.tapir.generic.auto._
 
 import org.alephium.api.TapirCodecs
@@ -253,7 +253,7 @@ trait Endpoints
       .in("groupLocal")
       .out(jsonBody[Group])
       .summary("Get the group of an address. Checks locally for contract addressses")
-  //have to be lazy to let `groupConfig` being initialized
+  // have to be lazy to let `groupConfig` being initialized
   lazy val getHashesAtHeight: BaseEndpoint[(ChainIndex, Int), HashesAtHeight] =
     blockflowEndpoint.get
       .in("hashes")
@@ -262,7 +262,7 @@ trait Endpoints
       .out(jsonBody[HashesAtHeight])
       .summary("Get all block's hashes at given height for given groups")
 
-  //have to be lazy to let `groupConfig` being initialized
+  // have to be lazy to let `groupConfig` being initialized
   lazy val getChainInfo: BaseEndpoint[ChainIndex, ChainInfo] =
     blockflowEndpoint.get
       .in("chain-info")
@@ -270,7 +270,7 @@ trait Endpoints
       .out(jsonBody[ChainInfo])
       .summary("Get infos about the chain from the given groups")
 
-  //have to be lazy to let `groupConfig` being initialized
+  // have to be lazy to let `groupConfig` being initialized
   lazy val listUnconfirmedTransactions: BaseEndpoint[Unit, AVector[UnconfirmedTransactions]] =
     transactionsEndpoint.get
       .in("unconfirmed")
@@ -295,11 +295,11 @@ trait Endpoints
         "Build unsigned transactions to send all unlocked balanced of one address to another address"
       )
 
-  val submitTransaction: BaseEndpoint[SubmitTransaction, TxResult] =
+  val submitTransaction: BaseEndpoint[SubmitTransaction, SubmitTxResult] =
     transactionsEndpoint.post
       .in("submit")
       .in(jsonBody[SubmitTransaction])
-      .out(jsonBody[TxResult])
+      .out(jsonBody[SubmitTxResult])
       .summary("Submit a signed transaction")
 
   val buildMultisigAddress: BaseEndpoint[BuildMultisigAddress, BuildMultisigAddressResult] =
@@ -316,11 +316,11 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult])
       .summary("Build a multisig unsigned transaction")
 
-  val submitMultisigTransaction: BaseEndpoint[SubmitMultisig, TxResult] =
+  val submitMultisigTransaction: BaseEndpoint[SubmitMultisig, SubmitTxResult] =
     multisigEndpoint.post
       .in("submit")
       .in(jsonBody[SubmitMultisig])
-      .out(jsonBody[TxResult])
+      .out(jsonBody[SubmitTxResult])
       .summary("Submit a multi-signed transaction")
 
   lazy val getTransactionStatus
@@ -412,6 +412,13 @@ trait Endpoints
       .out(jsonBody[TestContractResult])
       .summary("Test contract")
 
+  lazy val callContract: BaseEndpoint[CallContract, CallContractResult] =
+    contractsEndpoint.post
+      .in("call-contract")
+      .in(jsonBody[CallContract])
+      .out(jsonBody[CallContractResult])
+      .summary("Call contract")
+
   val exportBlocks: BaseEndpoint[ExportFile, Unit] =
     baseEndpoint.post
       .in("export-blocks")
@@ -474,8 +481,8 @@ object Endpoints {
       matcher: PartialFunction[Any, Boolean]
   )(implicit
       examples: List[Example[T]]
-  ): OneOfMapping[T] = {
-    oneOfMappingValueMatcher(apiError.statusCode, jsonBody[T].description(apiError.description))(
+  ): OneOfVariant[T] = {
+    oneOfVariantValueMatcher(apiError.statusCode, jsonBody[T].description(apiError.description))(
       matcher
     )
   }
