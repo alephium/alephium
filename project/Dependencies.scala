@@ -21,7 +21,7 @@ object Version {
   lazy val tapir      = "1.0.0"
   lazy val sttp       = "3.5.2"
   lazy val apispec    = "0.2.1"
-  lazy val prometheus = "0.15.0"
+  lazy val prometheus = "0.16.0"
 }
 
 object Dependencies {
