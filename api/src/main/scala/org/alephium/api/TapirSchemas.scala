@@ -20,8 +20,8 @@ import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
 import akka.util.ByteString
-import sttp.tapir.Schema
-import sttp.tapir.SchemaType.{SArray, SInteger, SString}
+import sttp.tapir.{FieldName, Schema}
+import sttp.tapir.SchemaType.{SArray, SInteger, SProduct, SProductField, SString}
 
 import org.alephium.api.model.{Amount, Script}
 import org.alephium.crypto.wallet.Mnemonic
@@ -57,7 +57,22 @@ trait TapirSchemasLike {
   implicit val bigIntegerSchema: Schema[BigInteger]   = Schema(SString()).format("bigint")
   implicit val inetAddressSchema: Schema[InetAddress] = Schema(SString()).format("inet-address")
   implicit val inetSocketAddressSchema: Schema[InetSocketAddress] =
-    Schema(SString()).format("inet-socket-address")
+    Schema[InetSocketAddress](
+      SProduct(
+        List(
+          SProductField(
+            FieldName("addr"),
+            Schema.schemaForString,
+            inetAddr => Some(inetAddr.getAddress().getHostAddress())
+          ),
+          SProductField(
+            FieldName("port"),
+            Schema.schemaForInt,
+            inetAddr => Some(inetAddr.getPort())
+          )
+        )
+      )
+    ).format("inet-socket-address")
   implicit val cliqueIdSchema: Schema[CliqueId]          = Schema(SString()).format("clique-id")
   implicit val mnemonicSchema: Schema[Mnemonic]          = Schema(SString())
   implicit val mnemonicSizeSchema: Schema[Mnemonic.Size] = Schema(SInteger())

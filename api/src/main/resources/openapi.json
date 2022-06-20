@@ -8146,7 +8146,20 @@
             "format": "int32"
           },
           "address": {
-            "type": "string",
+            "required": [
+              "addr",
+              "port"
+            ],
+            "type": "object",
+            "properties": {
+              "addr": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer",
+                "format": "int32"
+              }
+            },
             "format": "inet-socket-address"
           }
         }
@@ -9209,7 +9222,20 @@
             "format": "int32"
           },
           "address": {
-            "type": "string",
+            "required": [
+              "addr",
+              "port"
+            ],
+            "type": "object",
+            "properties": {
+              "addr": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer",
+                "format": "int32"
+              }
+            },
             "format": "inet-socket-address"
           },
           "isSynced": {
@@ -9302,7 +9328,20 @@
             "type": "boolean"
           },
           "externalAddress": {
-            "type": "string",
+            "required": [
+              "addr",
+              "port"
+            ],
+            "type": "object",
+            "properties": {
+              "addr": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer",
+                "format": "int32"
+              }
+            },
             "format": "inet-socket-address"
           }
         }
