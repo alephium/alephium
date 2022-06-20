@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "1.4.1"
+    "version": "1.4.2"
   },
   "servers": [
     {
