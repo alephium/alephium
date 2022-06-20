@@ -502,7 +502,14 @@ object WalletAppSpec extends {
     }
 
     router.route().path("/addresses/:address/balance").handler { ctx =>
-      complete(ctx, Balance.from(Amount(ALPH.alph(42)), Amount(ALPH.alph(21)), None, None, 1))
+      val tokens       = AVector(Token(Hash.hash("token1"), U256.One))
+      val lockedTokens = AVector(Token(Hash.hash("token2"), U256.Two))
+
+      complete(
+        ctx,
+        Balance
+          .from(Amount(ALPH.alph(42)), Amount(ALPH.alph(21)), Some(tokens), Some(lockedTokens), 1)
+      )
     }
 
     private val server = vertx.createHttpServer().requestHandler(router)

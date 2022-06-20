@@ -56,13 +56,11 @@ object Balance {
       balance_locked_utxoNum: (U256, U256, AVector[(Hash, U256)], AVector[(Hash, U256)], Int),
       utxosLimit: Int
   ): Balance = {
-    val balance       = Amount(balance_locked_utxoNum._1)
-    val lockedBalance = Amount(balance_locked_utxoNum._2)
-    val tokenBalances =
-      balance_locked_utxoNum._3.map(tokenBalance => Token(tokenBalance._1, tokenBalance._2))
-    val lockedTokenBalances =
-      balance_locked_utxoNum._4.map(tokenBalance => Token(tokenBalance._1, tokenBalance._2))
-    val utxoNum = balance_locked_utxoNum._5
+    val balance             = Amount(balance_locked_utxoNum._1)
+    val lockedBalance       = Amount(balance_locked_utxoNum._2)
+    val tokenBalances       = getTokenBalances(balance_locked_utxoNum._3)
+    val lockedTokenBalances = getTokenBalances(balance_locked_utxoNum._4)
+    val utxoNum             = balance_locked_utxoNum._5
     val warning =
       Option.when(utxosLimit == utxoNum)(
         "Result might not include all utxos and is maybe unprecise"
@@ -71,10 +69,15 @@ object Balance {
     Balance.from(
       balance,
       lockedBalance,
-      Option.when(tokenBalances.nonEmpty)(tokenBalances),
-      Option.when(lockedTokenBalances.nonEmpty)(lockedTokenBalances),
+      tokenBalances,
+      lockedTokenBalances,
       utxoNum,
       warning
     )
+  }
+
+  private def getTokenBalances(balances: AVector[(Hash, U256)]): Option[AVector[Token]] = {
+    val tokenBalances = balances.map(tokenBalance => Token(tokenBalance._1, tokenBalance._2))
+    Option.when(tokenBalances.nonEmpty)(tokenBalances)
   }
 }
