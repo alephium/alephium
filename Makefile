@@ -25,6 +25,14 @@ test-all: clean format unit-test integration-test
 publish-local:
 	sbt publishLocal
 
+# make release version=x.y.z
+release:
+	project/version.sh $(version)
+#	git add -A && git commit -m "$(version)"
+#	git tag v$(version)
+#	git push cheng v$(version)
+#	git push cheng master
+
 run:
 	sbt app/run
 
