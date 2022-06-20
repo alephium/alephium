@@ -307,9 +307,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode Balance" in {
     val amount   = Amount(ALPH.alph(100))
     val locked   = Amount(ALPH.alph(50))
-    val response = Balance(amount, amount.hint, locked, locked.hint, 1)
+    val tokenId1 = Hash.hash("token1")
+    val tokenId2 = Hash.hash("token2")
+    val tokens =
+      AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
+    val response = Balance(amount, amount.hint, locked, locked.hint, Some(tokens), 1)
     val jsonRaw =
-      """{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","utxoNum":1}"""
+      s"""{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","tokenBalances":[{"id":"${tokenId1.toHexString}","amount":"42"},{"id":"${tokenId2.toHexString}","amount":"1000"}],"utxoNum":1}"""
     checkData(response, jsonRaw, dropWhiteSpace = false)
   }
 

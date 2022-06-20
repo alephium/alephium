@@ -502,7 +502,7 @@ object WalletAppSpec extends {
     }
 
     router.route().path("/addresses/:address/balance").handler { ctx =>
-      complete(ctx, Balance.from(Amount(ALPH.alph(42)), Amount(ALPH.alph(21)), 1))
+      complete(ctx, Balance.from(Amount(ALPH.alph(42)), Amount(ALPH.alph(21)), None, 1))
     }
 
     private val server = vertx.createHttpServer().requestHandler(router)

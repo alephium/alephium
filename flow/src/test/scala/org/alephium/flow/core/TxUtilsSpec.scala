@@ -17,11 +17,13 @@
 package org.alephium.flow.core
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.mempool.MemPool
+import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey}
 import org.alephium.protocol.model._
@@ -794,7 +796,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val newBlock = block.copy(transactions = AVector(newTx))
     addAndUpdateView(blockFlow, newBlock)
 
-    val (balance, lockedBalance, numOfUtxos) =
+    val (balance, lockedBalance, _, numOfUtxos) =
       blockFlow.getBalance(output.lockupScript, Int.MaxValue).rightValue
     balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
     lockedBalance is 0
@@ -930,6 +932,29 @@ class TxUtilsSpec extends AlephiumSpec {
     unsignedTxs.foreach { unsignedTx =>
       val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
       txValidation.validateTxOnlyForTest(sweepTx, blockFlow) isE ()
+    }
+  }
+
+  it should "calculate balances correctly" in new TxGenerators with AlephiumConfigFixture {
+    val assetOutputsGen = Gen.listOf(assetOutputGen(GroupIndex.unsafe(0))()).map(AVector.from)
+
+    forAll(assetOutputsGen) { assetOutputs =>
+      val (attoAlphBalance, attoAlphLockedBalance, tokenBalances) =
+        TxUtils.getBalance(assetOutputs)
+
+      attoAlphBalance is U256.unsafe(assetOutputs.sumBy(_.amount.v))
+      attoAlphLockedBalance is U256.Zero
+
+      val expectedTokenBalances: AVector[(TokenId, U256)] = AVector.from(
+        assetOutputs
+          .flatMap(_.tokens)
+          .groupBy(_._1)
+          .map { case (tokenId, tokensPerId) =>
+            (tokenId, U256.unsafe(tokensPerId.sumBy(_._2.v)))
+          }
+      )
+
+      tokenBalances.sorted is expectedTokenBalances.sorted
     }
   }
 

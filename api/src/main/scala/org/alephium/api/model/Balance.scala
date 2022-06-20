@@ -16,6 +16,8 @@
 
 package org.alephium.api.model
 
+import org.alephium.protocol.Hash
+import org.alephium.util.AVector
 import org.alephium.util.U256
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -24,6 +26,7 @@ final case class Balance(
     balanceHint: Amount.Hint,
     lockedBalance: Amount,
     lockedBalanceHint: Amount.Hint,
+    tokenBalances: Option[AVector[Token]],
     utxoNum: Int,
     warning: Option[String] = None
 )
@@ -33,6 +36,7 @@ object Balance {
   def from(
       balance: Amount,
       lockedBalance: Amount,
+      tokens: Option[AVector[Token]],
       utxoNum: Int,
       warning: Option[String] = None
   ): Balance = Balance(
@@ -40,23 +44,30 @@ object Balance {
     balance.hint,
     lockedBalance,
     lockedBalance.hint,
+    tokens,
     utxoNum,
     warning
   )
 
-  def from(balance_locked_utxoNum: (U256, U256, Int), utxosLimit: Int): Balance = {
-    val warning =
-      Option.when(utxosLimit == balance_locked_utxoNum._3)(
-        "Result might not include all utxos and is maybe unprecise"
-      )
-
+  def from(
+      balance_locked_utxoNum: (U256, U256, AVector[(Hash, U256)], Int),
+      utxosLimit: Int
+  ): Balance = {
     val balance       = Amount(balance_locked_utxoNum._1)
     val lockedBalance = Amount(balance_locked_utxoNum._2)
+    val tokenBalances =
+      balance_locked_utxoNum._3.map(tokenBalance => Token(tokenBalance._1, tokenBalance._2))
+    val utxoNum = balance_locked_utxoNum._4
+    val warning =
+      Option.when(utxosLimit == utxoNum)(
+        "Result might not include all utxos and is maybe unprecise"
+      )
 
     Balance.from(
       balance,
       lockedBalance,
-      balance_locked_utxoNum._3,
+      Option.when(tokenBalances.nonEmpty)(tokenBalances),
+      utxoNum,
       warning
     )
   }
