@@ -604,7 +604,7 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block)
     val lockedBalance = ALPH.alph(1) - defaultGasFee
     blockFlow.getBalance(toLockupScript, Int.MaxValue) is Right(
-      (lockedBalance, lockedBalance, AVector.empty[(Hash, U256)], 1)
+      (lockedBalance, lockedBalance, AVector.empty[(Hash, U256)], AVector.empty[(Hash, U256)], 1)
     )
 
     blockFlow
@@ -672,7 +672,13 @@ class BlockFlowSpec extends AlephiumSpec {
       val balance = initialAmount - (ALPH.oneAlph + defaultGasFee).mulUnsafe(txCount)
       blockFlow
         .getBalance(fromLockup, Int.MaxValue)
-        .rightValue is ((balance, U256.Zero, AVector.empty[(Hash, U256)], 1))
+        .rightValue is ((
+        balance,
+        U256.Zero,
+        AVector.empty[(Hash, U256)],
+        AVector.empty[(Hash, U256)],
+        1
+      ))
 
       tx
     }

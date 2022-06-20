@@ -27,6 +27,7 @@ final case class Balance(
     lockedBalance: Amount,
     lockedBalanceHint: Amount.Hint,
     tokenBalances: Option[AVector[Token]],
+    lockedTokenBalances: Option[AVector[Token]],
     utxoNum: Int,
     warning: Option[String] = None
 )
@@ -36,7 +37,8 @@ object Balance {
   def from(
       balance: Amount,
       lockedBalance: Amount,
-      tokens: Option[AVector[Token]],
+      tokenBalances: Option[AVector[Token]],
+      lockedTokenBalances: Option[AVector[Token]],
       utxoNum: Int,
       warning: Option[String] = None
   ): Balance = Balance(
@@ -44,20 +46,23 @@ object Balance {
     balance.hint,
     lockedBalance,
     lockedBalance.hint,
-    tokens,
+    tokenBalances,
+    lockedTokenBalances,
     utxoNum,
     warning
   )
 
   def from(
-      balance_locked_utxoNum: (U256, U256, AVector[(Hash, U256)], Int),
+      balance_locked_utxoNum: (U256, U256, AVector[(Hash, U256)], AVector[(Hash, U256)], Int),
       utxosLimit: Int
   ): Balance = {
     val balance       = Amount(balance_locked_utxoNum._1)
     val lockedBalance = Amount(balance_locked_utxoNum._2)
     val tokenBalances =
       balance_locked_utxoNum._3.map(tokenBalance => Token(tokenBalance._1, tokenBalance._2))
-    val utxoNum = balance_locked_utxoNum._4
+    val lockedTokenBalances =
+      balance_locked_utxoNum._4.map(tokenBalance => Token(tokenBalance._1, tokenBalance._2))
+    val utxoNum = balance_locked_utxoNum._5
     val warning =
       Option.when(utxosLimit == utxoNum)(
         "Result might not include all utxos and is maybe unprecise"
@@ -67,6 +72,7 @@ object Balance {
       balance,
       lockedBalance,
       Option.when(tokenBalances.nonEmpty)(tokenBalances),
+      Option.when(lockedTokenBalances.nonEmpty)(lockedTokenBalances),
       utxoNum,
       warning
     )

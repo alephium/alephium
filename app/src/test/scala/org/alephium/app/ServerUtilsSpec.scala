@@ -1552,6 +1552,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       Amount(amount),
       Amount.Zero,
       None,
+      None,
       utxoNum
     )
   }

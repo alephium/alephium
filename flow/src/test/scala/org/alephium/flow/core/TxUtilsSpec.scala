@@ -796,7 +796,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val newBlock = block.copy(transactions = AVector(newTx))
     addAndUpdateView(blockFlow, newBlock)
 
-    val (balance, lockedBalance, _, numOfUtxos) =
+    val (balance, lockedBalance, _, _, numOfUtxos) =
       blockFlow.getBalance(output.lockupScript, Int.MaxValue).rightValue
     balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
     lockedBalance is 0
@@ -936,16 +936,18 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "calculate balances correctly" in new TxGenerators with AlephiumConfigFixture {
-    val assetOutputsGen = Gen.listOf(assetOutputGen(GroupIndex.unsafe(0))()).map(AVector.from)
+    val now          = TimeStamp.now()
+    val timestampGen = Gen.oneOf(Seq(TimeStamp.zero, now.plusHoursUnsafe(1)))
+    val assetOutputsGen = Gen
+      .listOf(
+        assetOutputGen(GroupIndex.unsafe(0))(
+          timestampGen = timestampGen
+        )
+      )
+      .map(AVector.from)
 
-    forAll(assetOutputsGen) { assetOutputs =>
-      val (attoAlphBalance, attoAlphLockedBalance, tokenBalances) =
-        TxUtils.getBalance(assetOutputs)
-
-      attoAlphBalance is U256.unsafe(assetOutputs.sumBy(_.amount.v))
-      attoAlphLockedBalance is U256.Zero
-
-      val expectedTokenBalances: AVector[(TokenId, U256)] = AVector.from(
+    def getTokenBalances(assetOutputs: AVector[AssetOutput]): AVector[(TokenId, U256)] = {
+      AVector.from(
         assetOutputs
           .flatMap(_.tokens)
           .groupBy(_._1)
@@ -953,8 +955,19 @@ class TxUtilsSpec extends AlephiumSpec {
             (tokenId, U256.unsafe(tokensPerId.sumBy(_._2.v)))
           }
       )
+    }
 
+    forAll(assetOutputsGen) { assetOutputs =>
+      val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, lockedTokenBalances) =
+        TxUtils.getBalance(assetOutputs)
+
+      attoAlphBalance is U256.unsafe(assetOutputs.sumBy(_.amount.v))
+      attoAlphLockedBalance is U256.unsafe(assetOutputs.filter(_.lockTime > now).sumBy(_.amount.v))
+
+      val expectedTokenBalances       = getTokenBalances(assetOutputs)
+      val expectedLockedTokenBalances = getTokenBalances(assetOutputs.filter(_.lockTime > now))
       tokenBalances.sorted is expectedTokenBalances.sorted
+      lockedTokenBalances.sorted is expectedLockedTokenBalances.sorted
     }
   }
 

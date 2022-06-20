@@ -311,9 +311,12 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val tokenId2 = Hash.hash("token2")
     val tokens =
       AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
-    val response = Balance(amount, amount.hint, locked, locked.hint, Some(tokens), 1)
+    val tokenId3     = Hash.hash("token3")
+    val lockedTokens = AVector(Token(tokenId3, U256.unsafe(1)))
+    val response =
+      Balance(amount, amount.hint, locked, locked.hint, Some(tokens), Some(lockedTokens), 1)
     val jsonRaw =
-      s"""{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","tokenBalances":[{"id":"${tokenId1.toHexString}","amount":"42"},{"id":"${tokenId2.toHexString}","amount":"1000"}],"utxoNum":1}"""
+      s"""{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","tokenBalances":[{"id":"${tokenId1.toHexString}","amount":"42"},{"id":"${tokenId2.toHexString}","amount":"1000"}],"lockedTokenBalances":[{"id":"${tokenId3.toHexString}","amount":"1"}],"utxoNum":1}"""
     checkData(response, jsonRaw, dropWhiteSpace = false)
   }
 

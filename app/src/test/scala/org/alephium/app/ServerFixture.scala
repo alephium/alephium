@@ -68,7 +68,7 @@ trait ServerFixture
     EndpointsLogic.selfCliqueFrom(dummyIntraCliqueInfo, true, true)
   lazy val dummyBlockEntry      = BlockEntry.from(dummyBlock, 1)
   lazy val dummyNeighborPeers   = NeighborPeers(AVector.empty)
-  lazy val dummyBalance         = Balance.from(Amount.Zero, Amount.Zero, None, 0)
+  lazy val dummyBalance         = Balance.from(Amount.Zero, Amount.Zero, None, None, 0)
   lazy val dummyGroup           = Group(Gen.choose(0, brokerConfig.groups - 1).sample.get)
   lazy val dummyContract        = counterContract
   lazy val dummyContractGroup   = Group(brokerConfig.groups - 1)
@@ -244,8 +244,8 @@ object ServerFixture {
     override def getBalance(
         lockupScript: LockupScript.Asset,
         utxosLimit: Int
-    ): IOResult[(U256, U256, AVector[(Hash, U256)], Int)] =
-      Right((U256.Zero, U256.Zero, AVector.empty, 0))
+    ): IOResult[(U256, U256, AVector[(Hash, U256)], AVector[(Hash, U256)], Int)] =
+      Right((U256.Zero, U256.Zero, AVector.empty, AVector.empty, 0))
 
     override def getUTXOsIncludePool(
         lockupScript: LockupScript.Asset,
