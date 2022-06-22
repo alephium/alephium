@@ -26,8 +26,8 @@ final case class Balance(
     balanceHint: Amount.Hint,
     lockedBalance: Amount,
     lockedBalanceHint: Amount.Hint,
-    tokenBalances: Option[AVector[Token]],
-    lockedTokenBalances: Option[AVector[Token]],
+    tokenBalances: Option[AVector[Token]] = None,
+    lockedTokenBalances: Option[AVector[Token]] = None,
     utxoNum: Int,
     warning: Option[String] = None
 )

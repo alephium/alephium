@@ -305,19 +305,31 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode Balance" in {
-    val amount   = Amount(ALPH.alph(100))
-    val locked   = Amount(ALPH.alph(50))
-    val tokenId1 = Hash.hash("token1")
-    val tokenId2 = Hash.hash("token2")
-    val tokens =
-      AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
-    val tokenId3     = Hash.hash("token3")
-    val lockedTokens = AVector(Token(tokenId3, U256.unsafe(1)))
-    val response =
-      Balance(amount, amount.hint, locked, locked.hint, Some(tokens), Some(lockedTokens), 1)
-    val jsonRaw =
-      s"""{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","tokenBalances":[{"id":"${tokenId1.toHexString}","amount":"42"},{"id":"${tokenId2.toHexString}","amount":"1000"}],"lockedTokenBalances":[{"id":"${tokenId3.toHexString}","amount":"1"}],"utxoNum":1}"""
-    checkData(response, jsonRaw, dropWhiteSpace = false)
+    val amount = Amount(ALPH.alph(100))
+    val locked = Amount(ALPH.alph(50))
+
+    {
+      info("with token balances")
+      val tokenId1 = Hash.hash("token1")
+      val tokenId2 = Hash.hash("token2")
+      val tokens =
+        AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
+      val tokenId3     = Hash.hash("token3")
+      val lockedTokens = AVector(Token(tokenId3, U256.unsafe(1)))
+      val response =
+        Balance(amount, amount.hint, locked, locked.hint, Some(tokens), Some(lockedTokens), 1)
+      val jsonRaw =
+        s"""{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","tokenBalances":[{"id":"${tokenId1.toHexString}","amount":"42"},{"id":"${tokenId2.toHexString}","amount":"1000"}],"lockedTokenBalances":[{"id":"${tokenId3.toHexString}","amount":"1"}],"utxoNum":1}"""
+      checkData(response, jsonRaw, dropWhiteSpace = false)
+    }
+
+    {
+      info("without token balances")
+      val response = Balance(amount, amount.hint, locked, locked.hint, None, None, 1)
+      val jsonRaw =
+        s"""{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","utxoNum":1}"""
+      checkData(response, jsonRaw, dropWhiteSpace = false)
+    }
   }
 
   it should "encode/decode Group" in {
