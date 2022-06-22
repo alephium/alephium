@@ -102,6 +102,8 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
             initialBalance.balance.value - (transferAmount + defaultGasFee) * numberOfAddresses
           ),
           Amount.Zero,
+          None,
+          None,
           1
         )
     }

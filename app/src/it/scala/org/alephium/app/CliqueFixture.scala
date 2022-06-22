@@ -96,7 +96,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   val password = "password"
 
-  val initialBalance = Balance.from(Amount(genesisBalance), Amount.Zero, 1)
+  val initialBalance = Balance.from(Amount(genesisBalance), Amount.Zero, None, None, 1)
   val transferAmount = ALPH.alph(1)
 
   val defaultMasterPort     = generatePort()
