@@ -42,6 +42,8 @@ class MiningTest extends AlephiumActorSpec {
         Balance.from(
           Amount(initialBalance.balance.value - transferAmount - defaultGasFee),
           Amount.Zero,
+          None,
+          None,
           1
         )
     }
@@ -53,6 +55,8 @@ class MiningTest extends AlephiumActorSpec {
         Balance.from(
           Amount(initialBalance.balance.value - (transferAmount + defaultGasFee) * 2),
           Amount.Zero,
+          None,
+          None,
           1
         )
     }
@@ -99,6 +103,8 @@ class MiningTest extends AlephiumActorSpec {
         Balance.from(
           Amount(initialBalance.balance.value - (transferAmount + defaultGasFee) * n),
           Amount.Zero,
+          None,
+          None,
           1
         )
     }

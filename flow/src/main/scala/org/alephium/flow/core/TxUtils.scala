@@ -17,6 +17,7 @@
 package org.alephium.flow.core
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 import TxUtils._
 
@@ -69,18 +70,19 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   // return the total balance, the locked balance, and the number of all utxos
-  def getBalance(lockupScript: LockupScript.Asset, utxosLimit: Int): IOResult[(U256, U256, Int)] = {
+  def getBalance(
+      lockupScript: LockupScript.Asset,
+      utxosLimit: Int
+  ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
-    val currentTs = TimeStamp.now()
-
     getUTXOsIncludePool(lockupScript, utxosLimit).map { utxos =>
-      val balance = utxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
-      val lockedBalance = utxos.fold(U256.Zero) { case (acc, utxo) =>
-        if (utxo.output.lockTime > currentTs) acc addUnsafe utxo.output.amount else acc
-      }
-      (balance, lockedBalance, utxos.length)
+      val utxosNum = utxos.length
+
+      val (attoAlphBalance, attoAlphBlockedBalance, tokenBalances, tokenLockedBalances) =
+        TxUtils.getBalance(utxos.map(_.output))
+      (attoAlphBalance, attoAlphBlockedBalance, tokenBalances, tokenLockedBalances, utxosNum)
     }
   }
 
@@ -577,6 +579,51 @@ object TxUtils {
 
       (firstOutput +: restOfOutputs, gas)
     }
+  }
+
+  class TokenBalances(balances: mutable.Map[TokenId, U256]) {
+    def addToken(tokenId: TokenId, amount: U256): Option[Unit] = {
+      balances.get(tokenId) match {
+        case Some(currentAmount) =>
+          currentAmount.add(amount).map(balances(tokenId) = _)
+        case None =>
+          balances(tokenId) = amount
+          Some(())
+      }
+    }
+
+    def getBalances(): AVector[(TokenId, U256)] = AVector.from(balances)
+  }
+
+  def getBalance(
+      outputs: AVector[AssetOutput]
+  ): (U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)]) = {
+    var attoAlphBalance: U256       = U256.Zero
+    var attoAlphLockedBalance: U256 = U256.Zero
+    val tokenBalances               = new TokenBalances(mutable.Map.empty)
+    val tokenLockedBalances         = new TokenBalances(mutable.Map.empty)
+    val currentTs                   = TimeStamp.now()
+
+    outputs.foreach { output =>
+      attoAlphBalance.add(output.amount).map(attoAlphBalance = _)
+      output.tokens.foreach { case (tokenId, amount) =>
+        tokenBalances.addToken(tokenId, amount)
+      }
+
+      if (output.lockTime > currentTs) {
+        attoAlphLockedBalance.add(output.amount).map(attoAlphLockedBalance = _)
+        output.tokens.foreach { case (tokenId, amount) =>
+          tokenLockedBalances.addToken(tokenId, amount)
+        }
+      }
+    }
+
+    (
+      attoAlphBalance,
+      attoAlphLockedBalance,
+      tokenBalances.getBalances(),
+      tokenLockedBalances.getBalances()
+    )
   }
 
   private[core] def getFirstOutputTokensNum(tokensNum: Int): Int = {

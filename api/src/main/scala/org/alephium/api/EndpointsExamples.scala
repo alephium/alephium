@@ -86,6 +86,8 @@ trait EndpointsExamples extends ErrorExamples {
     Token(Hash.hash("token1"), alph(42).value),
     Token(Hash.hash("token2"), alph(1000).value)
   )
+  private val lockedTokens = AVector(Token(Hash.hash("token3"), alph(65).value))
+
   val defaultDestinations = AVector(Destination(address, bigAmount, None, None))
   val moreSettingsDestinations = AVector(
     Destination(address, bigAmount, Some(tokens), Some(ts))
@@ -324,7 +326,16 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val balanceExamples: List[Example[Balance]] = List(
     defaultExample(
-      Balance(balance, balance.hint, halfBalance, halfBalance.hint, utxoNum = 3, None)
+      Balance(
+        balance,
+        balance.hint,
+        halfBalance,
+        halfBalance.hint,
+        Some(tokens),
+        Some(lockedTokens),
+        utxoNum = 3,
+        None
+      )
     ),
     moreSettingsExample(
       Balance(
@@ -332,6 +343,8 @@ trait EndpointsExamples extends ErrorExamples {
         balance.hint,
         halfBalance,
         halfBalance.hint,
+        Some(tokens),
+        Some(lockedTokens),
         utxoNum = 3,
         Some("Result might not include all utxos and is maybe unprecise")
       )

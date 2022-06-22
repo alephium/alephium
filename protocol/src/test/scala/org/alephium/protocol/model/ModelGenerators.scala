@@ -261,14 +261,16 @@ trait TxGenerators
       _amountGen: Gen[U256] = amountGen(1),
       _tokensGen: Gen[Map[TokenId, U256]] = tokensGen(1, Gen.choose(1, 5)),
       scriptGen: Gen[LockupScript.Asset] = assetLockupGen(groupIndex),
-      dataGen: Gen[ByteString] = dataGen
+      dataGen: Gen[ByteString] = dataGen,
+      timestampGen: Gen[TimeStamp] = Gen.const(TimeStamp.zero)
   ): Gen[AssetOutput] = {
     for {
       amount         <- _amountGen
       tokens         <- _tokensGen
       lockupScript   <- scriptGen
+      timestamp      <- timestampGen
       additionalData <- dataGen
-    } yield AssetOutput(amount, lockupScript, TimeStamp.zero, AVector.from(tokens), additionalData)
+    } yield AssetOutput(amount, lockupScript, timestamp, AVector.from(tokens), additionalData)
   }
 
   def contractOutputGen(

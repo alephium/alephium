@@ -3935,6 +3935,22 @@
                       "balanceHint": "10 ALPH",
                       "lockedBalance": "5000000000000000000",
                       "lockedBalanceHint": "5 ALPH",
+                      "tokenBalances": [
+                        {
+                          "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                          "amount": "42000000000000000000"
+                        },
+                        {
+                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                          "amount": "1000000000000000000000"
+                        }
+                      ],
+                      "lockedTokenBalances": [
+                        {
+                          "id": "20aa1fcc865087d7788302d087e4bc76691218ce5d5013dd1cedaabfac19cca4",
+                          "amount": "65000000000000000000"
+                        }
+                      ],
                       "utxoNum": 3
                     }
                   },
@@ -3945,6 +3961,22 @@
                       "balanceHint": "10 ALPH",
                       "lockedBalance": "5000000000000000000",
                       "lockedBalanceHint": "5 ALPH",
+                      "tokenBalances": [
+                        {
+                          "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                          "amount": "42000000000000000000"
+                        },
+                        {
+                          "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                          "amount": "1000000000000000000000"
+                        }
+                      ],
+                      "lockedTokenBalances": [
+                        {
+                          "id": "20aa1fcc865087d7788302d087e4bc76691218ce5d5013dd1cedaabfac19cca4",
+                          "amount": "65000000000000000000"
+                        }
+                      ],
                       "utxoNum": 3,
                       "warning": "Result might not include all utxos and is maybe unprecise"
                     }
@@ -7944,6 +7976,18 @@
           "lockedBalanceHint": {
             "type": "string",
             "format": "x.x ALPH"
+          },
+          "tokenBalances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "lockedTokenBalances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
           },
           "utxoNum": {
             "type": "integer",

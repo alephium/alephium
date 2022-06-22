@@ -1551,6 +1551,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils.getBalance(blockFlow, GetBalance(address)) isE Balance.from(
       Amount(amount),
       Amount.Zero,
+      None,
+      None,
       utxoNum
     )
   }
