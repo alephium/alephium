@@ -581,7 +581,7 @@ object TxUtils {
     }
   }
 
-  class TokenBalances(val balances: mutable.Map[TokenId, U256]) {
+  class TokenBalances(balances: mutable.Map[TokenId, U256]) {
     def addToken(tokenId: TokenId, amount: U256): Option[Unit] = {
       balances.get(tokenId) match {
         case Some(currentAmount) =>

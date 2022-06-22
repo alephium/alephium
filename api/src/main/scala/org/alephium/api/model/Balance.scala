@@ -53,14 +53,14 @@ object Balance {
   )
 
   def from(
-      balance_locked_utxoNum: (U256, U256, AVector[(Hash, U256)], AVector[(Hash, U256)], Int),
+      balanceLockedUtxoNum: (U256, U256, AVector[(Hash, U256)], AVector[(Hash, U256)], Int),
       utxosLimit: Int
   ): Balance = {
-    val balance             = Amount(balance_locked_utxoNum._1)
-    val lockedBalance       = Amount(balance_locked_utxoNum._2)
-    val tokenBalances       = getTokenBalances(balance_locked_utxoNum._3)
-    val lockedTokenBalances = getTokenBalances(balance_locked_utxoNum._4)
-    val utxoNum             = balance_locked_utxoNum._5
+    val balance             = Amount(balanceLockedUtxoNum._1)
+    val lockedBalance       = Amount(balanceLockedUtxoNum._2)
+    val tokenBalances       = getTokenBalances(balanceLockedUtxoNum._3)
+    val lockedTokenBalances = getTokenBalances(balanceLockedUtxoNum._4)
+    val utxoNum             = balanceLockedUtxoNum._5
     val warning =
       Option.when(utxosLimit == utxoNum)(
         "Result might not include all utxos and is maybe unprecise"
