@@ -35,7 +35,7 @@ object BuiltIn {
   sealed trait SimpleBuiltIn[-Ctx <: StatelessContext] extends BuiltIn[Ctx] {
     def argsType: Seq[Type]
     def returnType: Seq[Type]
-    def instr: Instr[Ctx]
+    def instrs: Seq[Instr[Ctx]]
 
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType == argsType) {
@@ -45,28 +45,64 @@ object BuiltIn {
       }
     }
 
-    override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq(instr)
+    override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = instrs
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class SimpleStatelessBuiltIn(
       name: String,
       argsType: Seq[Type],
       returnType: Seq[Type],
-      instr: Instr[StatelessContext],
-      usePreapprovedAssets: Boolean = false,
-      useAssetsInContract: Boolean = false
+      instrs: Seq[Instr[StatelessContext]],
+      usePreapprovedAssets: Boolean,
+      useAssetsInContract: Boolean
   ) extends SimpleBuiltIn[StatelessContext]
-
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  object SimpleStatelessBuiltIn {
+    def apply(
+        name: String,
+        argsType: Seq[Type],
+        returnType: Seq[Type],
+        instr: Instr[StatelessContext],
+        usePreapprovedAssets: Boolean = false,
+        useAssetsInContract: Boolean = false
+    ): SimpleStatelessBuiltIn =
+      SimpleStatelessBuiltIn(
+        name,
+        argsType,
+        returnType,
+        Seq(instr),
+        usePreapprovedAssets,
+        useAssetsInContract
+      )
+  }
+
   final case class SimpleStatefulBuiltIn(
       name: String,
       argsType: Seq[Type],
       returnType: Seq[Type],
-      instr: Instr[StatefulContext],
-      usePreapprovedAssets: Boolean = false,
-      useAssetsInContract: Boolean = false
+      instrs: Seq[Instr[StatefulContext]],
+      usePreapprovedAssets: Boolean,
+      useAssetsInContract: Boolean
   ) extends SimpleBuiltIn[StatefulContext]
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  object SimpleStatefulBuiltIn {
+    def apply(
+        name: String,
+        argsType: Seq[Type],
+        returnType: Seq[Type],
+        instr: Instr[StatefulContext],
+        usePreapprovedAssets: Boolean = false,
+        useAssetsInContract: Boolean = false
+    ): SimpleStatefulBuiltIn =
+      SimpleStatefulBuiltIn(
+        name,
+        argsType,
+        returnType,
+        Seq(instr),
+        usePreapprovedAssets,
+        useAssetsInContract
+      )
+  }
 
   sealed abstract class GenericStatelessBuiltIn(val name: String)
       extends BuiltIn[StatelessContext] {
@@ -373,6 +409,16 @@ object BuiltIn {
       U256Const(Val.U256(dustUtxoAmount))
     )
 
+  val panic: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "panic",
+      Seq.empty,
+      Seq[Type](Type.Panic),
+      Seq(ConstFalse, Assert),
+      usePreapprovedAssets = false,
+      useAssetsInContract = false
+    )
+
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
@@ -417,7 +463,8 @@ object BuiltIn {
     contractIdToAddress,
     nullAddress,
     dustAmount,
-    assertWithErrorCode
+    assertWithErrorCode,
+    panic
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleStatefulBuiltIn =

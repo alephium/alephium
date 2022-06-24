@@ -92,4 +92,9 @@ object Type {
     final class GlobalVar(val id: Ast.TypeId, val variable: Ast.Ident) extends Contract
     final class Stack(val id: Ast.TypeId)                              extends Contract
   }
+
+  // The naming is more specific than Bottom or Nothing
+  case object Panic extends Type {
+    def toVal: Val.Type = throw new RuntimeException("Unable to convert Bottom type to Val type")
+  }
 }
