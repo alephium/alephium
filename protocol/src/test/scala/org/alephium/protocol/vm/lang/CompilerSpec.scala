@@ -232,7 +232,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "check function return types" in {
-    val failed = Seq(
+    val noReturnCases = Seq(
       s"""
          |TxContract Foo() {
          |  fn foo() -> (U256) {
@@ -271,10 +271,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     )
-    failed.foreach { code =>
+    noReturnCases.foreach { code =>
       Compiler.compileContract(code).leftValue is Compiler.Error(
         "Expect return statement for function foo"
       )
+    }
+
+    val invalidReturnCases = Seq(
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    return 1
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> (U256) {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    )
+    invalidReturnCases.foreach { code =>
+      Compiler.compileContract(code).leftValue.message.startsWith("Invalid return types:") is true
     }
 
     val succeed = Seq(
