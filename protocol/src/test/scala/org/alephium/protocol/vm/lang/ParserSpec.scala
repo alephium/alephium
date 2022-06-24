@@ -168,7 +168,7 @@ class ParserSpec extends AlephiumSpec {
       .get
       .value is a[Ast.While[StatelessContext]]
     fastparse
-      .parse("for let mut i = 0; i < 10; i = i + 1 { x = x + 1 }", StatelessParser.statement(_))
+      .parse("for (let mut i = 0; i < 10; i = i + 1) { x = x + 1 }", StatelessParser.statement(_))
       .get
       .value is a[Ast.ForLoop[StatelessContext]]
   }

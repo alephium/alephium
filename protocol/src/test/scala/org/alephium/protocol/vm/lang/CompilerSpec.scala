@@ -540,7 +540,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     )
   }
 
-  it should "check types for for loop" in {
+  it should "check types for for-loop" in {
     def code(
         initialize: String = "let mut i = 0",
         condition: String = "i < 10",
@@ -550,7 +550,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract ForLoop() {
          |  pub fn test() -> () {
-         |    for $initialize; $condition; $update {
+         |    for ($initialize; $condition; $update) {
          |      $body
          |    }
          |  }
@@ -574,7 +574,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |TxContract ForLoop() {
          |  pub fn main() -> (U256) {
          |    let mut x = 1
-         |    for let mut i = 1; i < 5; i = i + 1 {
+         |    for (let mut i = 1; i < 5; i = i + 1) {
          |      x = x * i
          |    }
          |    return x
@@ -589,7 +589,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |TxContract ForLoop() {
          |  pub fn main() -> (U256) {
          |    let mut x = 5
-         |    for let mut done = false; !done; done = done {
+         |    for (let mut done = false; !done; done = done) {
          |      x = x + x - 3
          |      if x % 5 == 0 { done = true }
          |    }
