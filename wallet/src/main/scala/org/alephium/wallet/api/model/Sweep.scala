@@ -19,6 +19,7 @@ package org.alephium.wallet.api.model
 import org.alephium.api.model.BuildTxCommon
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.protocol.BlockHash
 import org.alephium.util.TimeStamp
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -27,5 +28,6 @@ final case class Sweep(
     lockTime: Option[TimeStamp] = None,
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
-    utxosLimit: Option[Int] = None
+    utxosLimit: Option[Int] = None,
+    targetBlockHash: Option[BlockHash] = None
 ) extends BuildTxCommon

@@ -85,6 +85,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
       blockFlow
         .transfer(
+          None,
           lockup,
           unlock,
           output,

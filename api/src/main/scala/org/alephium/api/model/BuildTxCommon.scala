@@ -16,12 +16,15 @@
 
 package org.alephium.api.model
 
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 
 trait BuildTxCommon {
   def gasAmount: Option[GasBox]
 
   def gasPrice: Option[GasPrice]
+
+  def targetBlockHash: Option[BlockHash]
 }
 
 trait GasInfo {

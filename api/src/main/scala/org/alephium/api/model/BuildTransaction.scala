@@ -16,7 +16,7 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
+import org.alephium.protocol.{BlockHash, PublicKey}
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
@@ -27,7 +27,8 @@ final case class BuildTransaction(
     destinations: AVector[Destination],
     utxos: Option[AVector[OutputRef]] = None,
     gasAmount: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
+    gasPrice: Option[GasPrice] = None,
+    targetBlockHash: Option[BlockHash] = None
 ) extends BuildTxCommon {
   def fromAddress(): Address.Asset = Address.p2pkh(fromPublicKey)
 }

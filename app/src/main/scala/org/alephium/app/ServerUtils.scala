@@ -181,7 +181,8 @@ class ServerUtils(implicit
         query.utxos,
         query.destinations,
         query.gasAmount,
-        query.gasPrice.getOrElse(defaultGasPrice)
+        query.gasPrice.getOrElse(defaultGasPrice),
+        query.targetBlockHash
       )
     } yield {
       BuildTransactionResult.from(unsignedTx)
@@ -201,7 +202,8 @@ class ServerUtils(implicit
         unlockScript,
         query.destinations,
         query.gas,
-        query.gasPrice.getOrElse(defaultGasPrice)
+        query.gasPrice.getOrElse(defaultGasPrice),
+        None
       )
     } yield {
       BuildTransactionResult.from(unsignedTx)
@@ -249,7 +251,8 @@ class ServerUtils(implicit
         query.toAddress,
         query.lockTime,
         query.gasAmount,
-        query.gasPrice.getOrElse(defaultGasPrice)
+        query.gasPrice.getOrElse(defaultGasPrice),
+        query.targetBlockHash
       )
     } yield {
       BuildSweepAddressTransactionsResult.from(
@@ -541,7 +544,32 @@ class ServerUtils(implicit
       outputRefsOpt: Option[AVector[OutputRef]],
       destinations: AVector[Destination],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      targetBlockHashOpt: Option[BlockHash]
+  ): Try[UnsignedTransaction] = {
+    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
+    val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
+    prepareUnsignedTransaction(
+      blockFlow,
+      fromLockupScript,
+      fromUnlockScript,
+      outputRefsOpt,
+      destinations,
+      gasOpt,
+      gasPrice,
+      targetBlockHashOpt
+    )
+  }
+
+  def prepareUnsignedTransaction(
+      blockFlow: BlockFlow,
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      outputRefsOpt: Option[AVector[OutputRef]],
+      destinations: AVector[Destination],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice,
+      targetBlockHashOpt: Option[BlockHash]
   ): Try[UnsignedTransaction] = {
     val outputInfos = prepareOutputInfos(destinations)
 
@@ -550,13 +578,23 @@ class ServerUtils(implicit
         val allAssetType = outputRefs.forall(outputRef => Hint.unsafe(outputRef.hint).isAssetType)
         if (allAssetType) {
           val assetOutputRefs = outputRefs.map(_.unsafeToAssetOutputRef())
-          blockFlow.transfer(fromPublicKey, assetOutputRefs, outputInfos, gasOpt, gasPrice)
+          blockFlow.transfer(
+            targetBlockHashOpt,
+            fromLockupScript,
+            fromUnlockScript,
+            assetOutputRefs,
+            outputInfos,
+            gasOpt,
+            gasPrice
+          )
         } else {
           Right(Left("Selected UTXOs must be of asset type"))
         }
       case None =>
         blockFlow.transfer(
-          fromPublicKey,
+          targetBlockHashOpt,
+          fromLockupScript,
+          fromUnlockScript,
           outputInfos,
           gasOpt,
           gasPrice,
@@ -577,9 +615,11 @@ class ServerUtils(implicit
       toAddress: Address.Asset,
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      targetBlockHashOpt: Option[BlockHash]
   ): Try[AVector[UnsignedTransaction]] = {
     blockFlow.sweepAddress(
+      targetBlockHashOpt,
       fromPublicKey,
       toAddress.lockupScript,
       lockTimeOpt,
@@ -599,22 +639,19 @@ class ServerUtils(implicit
       fromUnlockScript: UnlockScript,
       destinations: AVector[Destination],
       gasOpt: Option[GasBox],
-      gasPrice: GasPrice
+      gasPrice: GasPrice,
+      targetBlockHashOpt: Option[BlockHash]
   ): Try[UnsignedTransaction] = {
-    val outputInfos = prepareOutputInfos(destinations)
-
-    blockFlow.transfer(
+    prepareUnsignedTransaction(
+      blockFlow,
       fromLockupScript,
       fromUnlockScript,
-      outputInfos,
+      None,
+      destinations,
       gasOpt,
       gasPrice,
-      apiConfig.defaultUtxosLimit
-    ) match {
-      case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
-      case Right(Left(error))                => Left(failed(error))
-      case Left(error)                       => failed(error)
-    }
+      targetBlockHashOpt
+    )
   }
 
   def checkGroup(lockupScript: LockupScript.Asset): Try[Unit] = {

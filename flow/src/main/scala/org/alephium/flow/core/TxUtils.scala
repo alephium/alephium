@@ -37,12 +37,13 @@ trait TxUtils { Self: FlowUtils =>
   // We call getUsableUtxosOnce multiple times until the resulted tx does not change
   // In this way, we can guarantee that no concurrent utxos operations are making trouble
   def getUsableUtxos(
+      targetBlockHashOpt: Option[BlockHash],
       lockupScript: LockupScript.Asset,
       maxUtxosToRead: Int
   ): IOResult[AVector[AssetOutputInfo]] = {
     @tailrec
     def iter(lastTryOpt: Option[AVector[AssetOutputInfo]]): IOResult[AVector[AssetOutputInfo]] = {
-      getUsableUtxosOnce(lockupScript, maxUtxosToRead) match {
+      getUsableUtxosOnce(targetBlockHashOpt, lockupScript, maxUtxosToRead) match {
         case Right(utxos) =>
           lastTryOpt match {
             case Some(lastTry) if isSame(utxos, lastTry) => Right(utxos)
@@ -54,14 +55,22 @@ trait TxUtils { Self: FlowUtils =>
     iter(None)
   }
 
+  def getUsableUtxos(
+      lockupScript: LockupScript.Asset,
+      maxUtxosToRead: Int
+  ): IOResult[AVector[AssetOutputInfo]] = {
+    getUsableUtxos(None, lockupScript, maxUtxosToRead)
+  }
+
   def getUsableUtxosOnce(
+      targetBlockHashOpt: Option[BlockHash],
       lockupScript: LockupScript.Asset,
       maxUtxosToRead: Int
   ): IOResult[AVector[AssetOutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
     for {
-      groupView <- getImmutableGroupViewIncludePool(groupIndex)
+      groupView <- getImmutableGroupViewIncludePool(groupIndex, targetBlockHashOpt)
       outputs   <- groupView.getRelevantUtxos(lockupScript, maxUtxosToRead)
     } yield {
       val currentTs = TimeStamp.now()
@@ -125,6 +134,7 @@ trait TxUtils { Self: FlowUtils =>
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
     transfer(
+      None,
       fromLockupScript,
       fromUnlockScript,
       outputInfos,
@@ -136,6 +146,7 @@ trait TxUtils { Self: FlowUtils =>
 
   // scalastyle:off method.length
   def transfer(
+      targetBlockHashOpt: Option[BlockHash],
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       outputInfos: AVector[TxOutputInfo],
@@ -154,7 +165,7 @@ trait TxUtils { Self: FlowUtils =>
 
     totalAmountsE match {
       case Right((totalAmount, totalAmountPerToken)) =>
-        getUsableUtxos(fromLockupScript, utxosLimit)
+        getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit)
           .map { utxos =>
             UtxoSelectionAlgo
               .Build(dustUtxoAmount, ProvidedGas(gasOpt, gasPrice))
@@ -188,9 +199,31 @@ trait TxUtils { Self: FlowUtils =>
         Right(Left(e))
     }
   }
-
   def transfer(
       fromPublicKey: PublicKey,
+      utxoRefs: AVector[AssetOutputRef],
+      outputInfos: AVector[TxOutputInfo],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice
+  ): IOResult[Either[String, UnsignedTransaction]] = {
+    val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
+    val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
+
+    transfer(
+      None,
+      fromLockupScript,
+      fromUnlockScript,
+      utxoRefs,
+      outputInfos,
+      gasOpt,
+      gasPrice
+    )
+  }
+
+  def transfer(
+      targetBlockHashOpt: Option[BlockHash],
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
       utxoRefs: AVector[AssetOutputRef],
       outputInfos: AVector[TxOutputInfo],
       gasOpt: Option[GasBox],
@@ -201,9 +234,6 @@ trait TxUtils { Self: FlowUtils =>
     } else {
       val groupIndex = utxoRefs.head.hint.groupIndex
       assume(brokerConfig.contains(groupIndex))
-
-      val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
-      val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
 
       val checkResult = for {
         _ <- checkUTXOsInSameGroup(utxoRefs)
@@ -217,7 +247,7 @@ trait TxUtils { Self: FlowUtils =>
 
       checkResult match {
         case Right(()) =>
-          getImmutableGroupViewIncludePool(groupIndex)
+          getImmutableGroupViewIncludePool(groupIndex, targetBlockHashOpt)
             .flatMap(_.getPrevAssetOutputs(utxoRefs))
             .map { utxosOpt =>
               val outputScripts = fromLockupScript +: outputInfos.map(_.lockupScript)
@@ -249,6 +279,7 @@ trait TxUtils { Self: FlowUtils =>
   // scalastyle:on method.length
 
   def sweepAddress(
+      targetBlockHashOpt: Option[BlockHash],
       fromPublicKey: PublicKey,
       toLockupScript: LockupScript.Asset,
       lockTimeOpt: Option[TimeStamp],
@@ -263,7 +294,7 @@ trait TxUtils { Self: FlowUtils =>
 
     checkResult match {
       case Right(()) =>
-        getUsableUtxos(fromLockupScript, utxosLimit).map { allUtxos =>
+        getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit).map { allUtxos =>
           // Sweep as much as we can, taking maximalGasPerTx into consideration
           // Gas for ALPH.MaxTxInputNum P2PKH inputs exceeds maximalGasPerTx
           val groupedUtxos = allUtxos.groupedWithRemainder(ALPH.MaxTxInputNum / 2)
@@ -553,7 +584,7 @@ object TxUtils {
       gas = gasOpt.getOrElse(GasEstimation.sweepAddress(utxos.length, extraNumOfOutputs + 1))
       totalAmountWithoutGas <- totalAmount
         .sub(gasPrice * gas)
-        .toRight("Not enough balance for gas fee")
+        .toRight("Not enough balance for gas fee in Sweeping")
       amountRequiredForExtraOutputs <- minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo)
         .mul(U256.unsafe(extraNumOfOutputs))
         .toRight("Too many tokens")
