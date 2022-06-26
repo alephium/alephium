@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 openapi_json="api/src/main/resources/openapi.json"
 new_version=$1
 branch_name=$(git rev-parse --abbrev-ref HEAD)
@@ -9,8 +11,13 @@ if ! [[ "${new_version}" =~ [0-9]+.[0-9]+.[0-9].* ]]; then
   exit 1
 fi
 
-if [[ "${branch_name}" != 'master' ]]; then
+if ! [[ "${branch_name}" == 'master' || "${branch_name}" =~ [0-9]+.[0-9]+.x ]]; then
   echo "You are not on the right branch"
+  exit 1
+fi
+
+if [[ ! -z $(git status --porcelain) ]]; then
+  echo "The branch has uncommitted changes"
   exit 1
 fi
 
@@ -22,3 +29,8 @@ else
   echo "Unsupported system $OSTYPE"
   exit 1
 fi
+
+git add -A && git commit -m "${new_version}"
+git tag v$new_version
+git push origin v$new_version
+git push origin $branch_name:$branch_name
