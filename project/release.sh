@@ -9,7 +9,7 @@ if ! [[ "${new_version}" =~ [0-9]+.[0-9]+.[0-9].* ]]; then
   exit 1
 fi
 
-if [[ "${branch_name}" != 'master' ]]; then
+if ! [[ "${branch_name}" == 'master' || "${branch_name}" =~ [0-9]+.[0-9]+.x ]]; then
   echo "You are not on the right branch"
   exit 1
 fi
@@ -22,3 +22,8 @@ else
   echo "Unsupported system $OSTYPE"
   exit 1
 fi
+
+git add -A && git commit -m "$(version)"
+git tag v$(version)
+git push origin v$(version)
+git push origin ${branch_name}:${branch_name}
