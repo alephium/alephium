@@ -520,22 +520,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       failed(StackUnderflow) // no signature in the stack
   }
 
-  it should "converse values" in new Fixture {
-    test(
-      s"""
-         |TxContract Conversion() {
-         |  pub fn main() -> () {
-         |    let mut x = 5u
-         |    let mut y = 5i
-         |    x = u256!(y)
-         |    y = i256!(x)
-         |  }
-         |}
-         |""".stripMargin,
-      AVector.empty
-    )
-  }
-
   it should "test while" in new Fixture {
     test(
       s"""

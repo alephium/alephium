@@ -667,21 +667,36 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript ByteVecTest {
-         |  assert!(byteVec!(true) == #${encode(true)})
-         |  assert!(byteVec!(false) == #${encode(false)})
-         |  assert!(byteVec!(${i256}i) == #${encode(i256)})
-         |  assert!(byteVec!(${u256}) == #${encode(u256)})
-         |  assert!(byteVec!(@${address.toBase58}) == #${encode(address.lockupScript)})
+         |  assert!(toByteVec!(true) == #${encode(true)})
+         |  assert!(toByteVec!(false) == #${encode(false)})
+         |  assert!(toByteVec!(${i256}i) == #${encode(i256)})
+         |  assert!(toByteVec!(${u256}) == #${encode(u256)})
+         |  assert!(toByteVec!(@${address.toBase58}) == #${encode(address.lockupScript)})
          |  assert!(# ++ #$bytes0 == #$bytes0)
          |  assert!(#$bytes0 ++ # == #$bytes0)
          |  assert!((#${bytes0} ++ #${bytes1}) == #${bytes0 ++ bytes1})
-         |  assert!(size!(byteVec!(true)) == 1)
-         |  assert!(size!(byteVec!(false)) == 1)
-         |  assert!(size!(byteVec!(@${address.toBase58})) == 33)
+         |  assert!(size!(toByteVec!(true)) == 1)
+         |  assert!(size!(toByteVec!(false)) == 1)
+         |  assert!(size!(toByteVec!(@${address.toBase58})) == 33)
          |  assert!(size!(#${bytes0} ++ #${bytes1}) == 64)
          |  assert!(zeros!(2) == #0000)
          |  assert!(nullAddress!() == @${Address.contract(ContractId.zero)})
          |  assert!(nullAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq)
+         |}
+         |""".stripMargin
+
+    testSimpleScript(main)
+  }
+
+  it should "test conversion functions" in new ContractFixture {
+    val main: String =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript ByteVecTest {
+         |  assert!(toI256!(1) == 1i)
+         |  assert!(toU256!(1i) == 1)
+         |  assert!(toByteVec!(true) == #01)
+         |  assert!(toByteVec!(false) == #00)
          |}
          |""".stripMargin
 
@@ -2197,7 +2212,7 @@ class VMSpec extends AlephiumSpec {
          |  event TestEvent2(a: U256, b: I256, c: Address, d: Bool)
          |
          |  pub fn testEventTypes() -> (U256) {
-         |    emit TestEvent1(4, -5i, @${address.toBase58}, byteVec!(@${address.toBase58}))
+         |    emit TestEvent1(4, -5i, @${address.toBase58}, toByteVec!(@${address.toBase58}))
          |    let b = true
          |    emit TestEvent2(5, -4i, @${address.toBase58}, b)
          |    return result + 1
