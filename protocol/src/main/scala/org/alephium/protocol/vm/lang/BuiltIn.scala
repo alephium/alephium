@@ -150,7 +150,7 @@ object BuiltIn {
     }
   }
 
-  val toI256: ConversionBuiltIn = new ConversionBuiltIn("i256") {
+  val toI256: ConversionBuiltIn = new ConversionBuiltIn("toI256") {
     val validTypes: AVector[Type] = AVector(Type.U256)
 
     override def toType: Type = Type.I256
@@ -162,7 +162,7 @@ object BuiltIn {
       }
     }
   }
-  val toU256: ConversionBuiltIn = new ConversionBuiltIn("u256") {
+  val toU256: ConversionBuiltIn = new ConversionBuiltIn("toU256") {
     val validTypes: AVector[Type] = AVector(Type.I256)
 
     override def toType: Type = Type.U256
@@ -175,7 +175,7 @@ object BuiltIn {
     }
   }
 
-  val toByteVec: ConversionBuiltIn = new ConversionBuiltIn("byteVec") {
+  val toByteVec: ConversionBuiltIn = new ConversionBuiltIn("toByteVec") {
     val validTypes: AVector[Type] = AVector(Type.Bool, Type.I256, Type.U256, Type.Address)
 
     override def toType: Type = Type.ByteVec

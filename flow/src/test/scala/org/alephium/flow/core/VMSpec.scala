@@ -681,6 +681,21 @@ class VMSpec extends AlephiumSpec {
     testSimpleScript(main)
   }
 
+  it should "test conversion functions" in new ContractFixture {
+    val main: String =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript ByteVecTest {
+         |  assert!(toI256!(1) == 1i)
+         |  assert!(toU256!(1i) == 1)
+         |  assert!(toByteVec!(true) == #01)
+         |  assert!(toByteVec!(false) == #00)
+         |}
+         |""".stripMargin
+
+    testSimpleScript(main)
+  }
+
   it should "test CopyCreateContractWithToken instruction" in new ContractFixture {
     val fooContract =
       s"""
