@@ -2608,7 +2608,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val script = Compiler.compileTxScript(main).rightValue
     intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage is
-      "Right(TxScriptExeFailed(AssertionFailedWithErrorCode(U256(0))))"
+      s"Right(TxScriptExeFailed(AssertionFailedWithErrorCode(Some($fooId),0)))"
   }
 
   private def getEvents(

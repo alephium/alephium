@@ -205,7 +205,9 @@ object Ast {
   }
   final case class EnumFieldSelector[Ctx <: StatelessContext](enumId: TypeId, field: Ident)
       extends Expr[Ctx] {
-    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.U256)
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] =
+      Seq(state.getVariable(EnumDef.fieldIdent(enumId, field)).tpe)
+
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val ident = EnumDef.fieldIdent(enumId, field)
       state.genLoadCode(ident)
@@ -495,7 +497,7 @@ object Ast {
     def name: String = ident.name
   }
 
-  final case class EnumField(ident: Ident, value: Val.U256) extends UniqueDef {
+  final case class EnumField(ident: Ident, value: Val) extends UniqueDef {
     def name: String = ident.name
   }
   final case class EnumDef(id: TypeId, fields: Seq[EnumField]) extends UniqueDef {
@@ -798,7 +800,7 @@ object Ast {
     val inheritances: Seq[ContractInheritance] = Seq.empty
 
     def error(tpe: String): Compiler.Error =
-      new Compiler.Error(s"TxScript ${ident.name} does not contain any $tpe")
+      new Compiler.Error(s"TxScript ${ident.name} should not contain any $tpe")
     def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
     def enums: Seq[EnumDef]               = throw error("enum")
     def getTemplateVarsSignature(): String =
@@ -849,7 +851,7 @@ object Ast {
         e.fields.foreach(field =>
           state.addConstantVariable(
             EnumDef.fieldIdent(e.id, field.ident),
-            Type.U256,
+            Type.fromVal(field.value.tpe),
             Seq(field.value.toConstInstr)
           )
         )

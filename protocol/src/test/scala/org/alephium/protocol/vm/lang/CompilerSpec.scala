@@ -2452,15 +2452,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val bar =
         s"""
            |TxContract Bar() extends Foo() {
-           |  enum BarErrorCodes {
-           |    Error0 = 0
-           |    Error1 = 1
+           |  enum BarValues {
+           |    Value0 = #00
+           |    Value1 = #01
            |  }
            |  pub fn bar() -> () {
            |    assert!(FooErrorCodes.Error0 == 0)
            |    assert!(FooErrorCodes.Error1 == 1)
-           |    assert!(BarErrorCodes.Error0 == 0)
-           |    assert!(BarErrorCodes.Error1 == 1)
+           |    assert!(BarValues.Value0 == #00)
+           |    assert!(BarValues.Value1 == #01)
            |  }
            |}
            |$foo

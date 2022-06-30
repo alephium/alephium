@@ -1073,9 +1073,15 @@ case object AssertWithErrorCode
     with GasVeryLow {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      errorCode <- frame.popOpStackU256()
-      predicate <- frame.popOpStackBool()
-      _         <- if (predicate.v) okay else failed(AssertionFailedWithErrorCode(errorCode))
+      errorCodeU256 <- frame.popOpStackU256()
+      errorCode     <- errorCodeU256.v.toInt.toRight(Right(InvalidErrorCode(errorCodeU256.v)))
+      predicate     <- frame.popOpStackBool()
+      _ <-
+        if (predicate.v) {
+          okay
+        } else {
+          failed(AssertionFailedWithErrorCode(frame.obj.contractIdOpt, errorCode))
+        }
     } yield ()
   }
 }

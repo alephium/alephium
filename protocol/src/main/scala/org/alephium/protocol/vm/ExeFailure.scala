@@ -21,6 +21,7 @@ import java.math.BigInteger
 import org.alephium.io.IOError
 import org.alephium.protocol.model.ContractId
 import org.alephium.serde.SerdeError
+import org.alephium.util.U256
 
 // scalastyle:off number.of.types
 trait ExeFailure extends Product {
@@ -67,7 +68,6 @@ case object InvalidLengthForEncodeInstr                        extends ExeFailur
 case object InsufficientArgs                                   extends ExeFailure
 case object ExternalPrivateMethodCall                          extends ExeFailure
 case object AssertionFailed                                    extends ExeFailure
-final case class AssertionFailedWithErrorCode(code: Val.U256)  extends ExeFailure
 case object InvalidInstrOffset                                 extends ExeFailure
 case object PcOverflow                                         extends ExeFailure
 case object NonEmptyReturnForMainFunction                      extends ExeFailure
@@ -121,6 +121,10 @@ final case class UncaughtSerdeError(error: IOError.Serde)             extends Ex
 
 final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends ExeFailure
 final case class PartiallyEnabledInstr[-Ctx <: StatelessContext](instr: Instr[Ctx])
+    extends ExeFailure
+
+final case class InvalidErrorCode(errorCode: U256) extends ExeFailure
+final case class AssertionFailedWithErrorCode(contractIdOpt: Option[ContractId], errorCode: Int)
     extends ExeFailure
 
 sealed trait IOFailure extends Product {

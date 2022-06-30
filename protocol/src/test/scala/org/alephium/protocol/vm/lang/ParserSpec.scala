@@ -520,11 +520,25 @@ class ParserSpec extends AlephiumSpec {
       val definition =
         s"""
            |enum ErrorCodes {
-           |  Error = 0i
+           |  Error0 = 0
+           |  Error1 = #00
            |}
            |""".stripMargin
       val error = intercept[Compiler.Error](fastparse.parse(definition, StatefulParser.enumDef(_)))
-      error.message is "Expect U256 type for enum field"
+      error.message is "Fields have different types in Enum ErrorCodes"
+    }
+
+    {
+      info("Invalid enum field values")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = 0
+           |  Error1 = 0
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](fastparse.parse(definition, StatefulParser.enumDef(_)))
+      error.message is "Fields have the same value in Enum ErrorCodes"
     }
 
     {

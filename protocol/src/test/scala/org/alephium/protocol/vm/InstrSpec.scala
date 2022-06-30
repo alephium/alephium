@@ -1248,21 +1248,32 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
-  it should "AssertWithErrorCode" in new StatelessInstrFixture {
-    forAll(arbitrary[Boolean], arbitrary[U256]) { case (boolean, u256) =>
-      val initialGas = context.gasRemaining
-      val cond       = Val.Bool(boolean)
-      val code       = Val.U256(u256)
+  it should "AssertWithErrorCode" in {
+    new StatelessInstrFixture {
+      stack.push(Val.Bool(true))
+      stack.push(Val.U256(U256.Zero))
+      runAndCheckGas(AssertWithErrorCode)
+    }
 
-      stack.push(cond)
-      stack.push(code)
+    new StatelessInstrFixture {
+      stack.push(Val.Bool(false))
+      stack.push(Val.U256(U256.MaxValue))
+      AssertWithErrorCode.runWith(frame).leftValue isE InvalidErrorCode(U256.MaxValue)
+    }
 
-      if (boolean) {
-        AssertWithErrorCode.runWith(frame) isE ()
-      } else {
-        AssertWithErrorCode.runWith(frame).leftValue isE AssertionFailedWithErrorCode(code)
-      }
-      initialGas.subUnsafe(context.gasRemaining) is AssertWithErrorCode.gas()
+    new StatelessInstrFixture {
+      stack.push(Val.Bool(false))
+      stack.push(Val.U256(U256.Zero))
+      AssertWithErrorCode.runWith(frame).leftValue isE AssertionFailedWithErrorCode(None, 0)
+    }
+
+    new StatefulInstrFixture {
+      stack.push(Val.Bool(false))
+      stack.push(Val.U256(U256.Zero))
+      AssertWithErrorCode.runWith(frame).leftValue isE AssertionFailedWithErrorCode(
+        frame.obj.contractIdOpt,
+        0
+      )
     }
   }
 

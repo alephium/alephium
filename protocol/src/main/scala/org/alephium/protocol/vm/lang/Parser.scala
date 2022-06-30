@@ -488,16 +488,19 @@ object StatefulParser extends Parser[StatefulContext] {
       Ast.EnumFieldSelector(enumId, field)
     }
   def enumField[Unknown: P]: P[Ast.EnumField] =
-    P(Lexer.constantIdent ~ "=" ~ Lexer.typedNum).map {
-      case (ident, v @ Val.U256(_)) => Ast.EnumField(ident, v)
-      case _                        => throw Compiler.Error("Expect U256 type for enum field")
-    }
+    P(Lexer.constantIdent ~ "=" ~ value).map(Ast.EnumField.tupled)
   def rawEnumDef[Unknown: P]: P[Ast.EnumDef] =
     P(Lexer.keyword("enum") ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}").map { case (id, fields) =>
       if (fields.length == 0) {
         throw Compiler.Error(s"No field definition in Enum ${id.name}")
       }
       Ast.UniqueDef.checkDuplicates(fields, "enum fields")
+      if (fields.distinctBy(_.value.tpe).size != 1) {
+        throw Compiler.Error(s"Fields have different types in Enum ${id.name}")
+      }
+      if (fields.distinctBy(_.value).size != fields.length) {
+        throw Compiler.Error(s"Fields have the same value in Enum ${id.name}")
+      }
       Ast.EnumDef(id, fields)
     }
   def enumDef[Unknown: P]: P[Ast.EnumDef] = P(Start ~ rawEnumDef ~ End)
