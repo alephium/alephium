@@ -144,6 +144,7 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("let x = 1", StatelessParser.statement(_)).isSuccess is true
     fastparse.parse("x = 1", StatelessParser.statement(_)).isSuccess is true
     fastparse.parse("x = true", StatelessParser.statement(_)).isSuccess is true
+    fastparse.parse("ConstantVar = 0", StatefulParser.statement(_)).isSuccess is false
     fastparse.parse("add(x, y)", StatelessParser.statement(_)).isSuccess is true
     fastparse.parse("foo.add(x, y)", StatefulParser.statement(_)).isSuccess is true
     fastparse.parse("Foo(x).add(x, y)", StatefulParser.statement(_)).isSuccess is true
@@ -464,6 +465,25 @@ class ParserSpec extends AlephiumSpec {
     }
   }
 
+  it should "parse constant variable definition" in {
+    val invalidDefinition = "const c = 1"
+    fastparse.parse(invalidDefinition, StatefulParser.constantVarDef(_)).isSuccess is false
+
+    val address = Address.p2pkh(PublicKey.generate)
+    val definitions = Seq[(String, Val)](
+      ("const C = true", Val.True),
+      ("const C = 1", Val.U256(U256.One)),
+      ("const C = 1i", Val.I256(I256.One)),
+      ("const C = #11", Val.ByteVec(Hex.unsafe("11"))),
+      (s"const C = @${address.toBase58}", Val.Address(address.lockupScript))
+    )
+    definitions.foreach { definition =>
+      val constantVar = fastparse.parse(definition._1, StatefulParser.constantVarDef(_)).get.value
+      constantVar.ident.name is "C"
+      constantVar.value is definition._2
+    }
+  }
+
   it should "parse contract inheritance" in {
     {
       info("Simple contract inheritance")
@@ -491,6 +511,7 @@ class ParserSpec extends AlephiumSpec {
             Seq.empty
           )
         ),
+        Seq.empty,
         Seq.empty,
         List(
           ContractInheritance(TypeId("Parent0"), Seq(Ident("x"))),
@@ -526,6 +547,33 @@ class ParserSpec extends AlephiumSpec {
       val fooContract = extended.contracts(1)
       fooContract.events.length is 2
       barContract.events.length is 2
+    }
+
+    {
+      info("Contract constant variable inheritance")
+      val foo: String =
+        s"""
+           |TxContract Foo() {
+           |  const C0 = 0
+           |  const C1 = 1
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+
+      val bar: String =
+        s"""
+           |TxContract Bar() extends Foo() {
+           |  const C2 = 2
+           |  pub fn bar() -> () {}
+           |}
+           |$foo
+           |""".stripMargin
+      val extended =
+        fastparse.parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
+      val barContract = extended.contracts(0)
+      val fooContract = extended.contracts(1)
+      barContract.constantVars.length is 3
+      fooContract.constantVars.length is 2
     }
   }
 
@@ -595,6 +643,7 @@ class ParserSpec extends AlephiumSpec {
             Seq(ReturnStmt(Seq.empty))
           )
         ),
+        Seq.empty,
         Seq.empty,
         Seq(InterfaceInheritance(TypeId("Parent")))
       )

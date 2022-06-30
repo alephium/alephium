@@ -477,6 +477,10 @@ object Ast {
     }
   }
 
+  final case class ConstantVarDef(ident: Ident, value: Val) extends UniqueDef {
+    def name: String = ident.name
+  }
+
   final case class EventDef(
       id: TypeId,
       fields: Seq[EventField]
@@ -746,6 +750,7 @@ object Ast {
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
     def events: Seq[EventDef]
+    def constantVars: Seq[ConstantVarDef]
 
     def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = Seq.empty
 
@@ -769,6 +774,8 @@ object Ast {
     val events: Seq[EventDef]                  = Seq.empty
     val inheritances: Seq[ContractInheritance] = Seq.empty
 
+    def constantVars: Seq[ConstantVarDef] =
+      throw Compiler.Error(s"TxScript ${ident.name} does not contain any constant variable")
     def getTemplateVarsSignature(): String =
       s"TxScript ${name}(${templateVars.map(_.signature).mkString(",")})"
     def getTemplateVarsNames(): Seq[String] = templateVars.map(_.ident.name)
@@ -798,12 +805,24 @@ object Ast {
       fields: Seq[Argument],
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
+      constantVars: Seq[ConstantVarDef],
       inheritances: Seq[Inheritance]
   ) extends ContractWithState {
     def getFieldsSignature(): String =
       s"TxContract ${name}(${fields.map(_.signature).mkString(",")})"
     def getFieldNames(): Seq[String] = fields.map(_.ident.name)
     def getFieldTypes(): Seq[String] = fields.map(_.tpe.signature)
+
+    override def check(state: Compiler.State[StatefulContext]): Unit = {
+      if (constantVars.distinctBy(_.ident).size != constantVars.size) {
+        val duplicates = UniqueDef.duplicates(constantVars)
+        throw Compiler.Error(s"These constant variables are defined multiple times: $duplicates")
+      }
+      constantVars.foreach(v =>
+        state.addConstantVariable(v.ident, Type.fromVal(v.value.tpe), Seq(v.value.toConstInstr))
+      )
+      super.check(state)
+    }
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       check(state)
@@ -823,10 +842,11 @@ object Ast {
     def error(tpe: String): Compiler.Error =
       new Compiler.Error(s"Interface ${ident.name} does not contain any $tpe")
 
-    def templateVars: Seq[Argument]  = throw error("template variable")
-    def fields: Seq[Argument]        = throw error("field")
-    def getFieldsSignature(): String = throw error("field")
-    def getFieldTypes(): Seq[String] = throw error("field")
+    def templateVars: Seq[Argument]       = throw error("template variable")
+    def fields: Seq[Argument]             = throw error("field")
+    def getFieldsSignature(): String      = throw error("field")
+    def getFieldTypes(): Seq[String]      = throw error("field")
+    def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       throw new Compiler.Error(s"Interface ${ident.name} does not generate code")
@@ -897,17 +917,18 @@ object Ast {
         case script: TxScript =>
           script
         case c: TxContract =>
-          val (funcs, events) = MultiTxContract.extractFuncsAndEvents(parentsCache, c)
+          val (funcs, events, constantVars) = MultiTxContract.extractDefs(parentsCache, c)
           TxContract(
             c.ident,
             c.templateVars,
             c.fields,
             funcs,
             events,
+            constantVars,
             c.inheritances
           )
         case i: ContractInterface =>
-          val (funcs, events) = MultiTxContract.extractFuncsAndEvents(parentsCache, i)
+          val (funcs, events, _) = MultiTxContract.extractDefs(parentsCache, i)
           ContractInterface(i.ident, funcs, events, i.inheritances)
       }
       MultiTxContract(newContracts)
@@ -965,10 +986,10 @@ object Ast {
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
-    def extractFuncsAndEvents(
+    def extractDefs(
         parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
         contract: ContractWithState
-    ): (Seq[FuncDef[StatefulContext]], Seq[EventDef]) = {
+    ): (Seq[FuncDef[StatefulContext]], Seq[EventDef], Seq[ConstantVarDef]) = {
       val parents = parentsCache(contract.ident)
       val (allContracts, _allInterfaces) =
         (parents :+ contract).partition(_.isInstanceOf[TxContract])
@@ -977,6 +998,7 @@ object Ast {
 
       val _contractFuncs = allContracts.flatMap(_.funcs)
       val interfaceFuncs = allInterfaces.flatMap(_.funcs)
+      val constantVars   = allContracts.flatMap(_.constantVars)
       val isTxContract   = contract.isInstanceOf[TxContract]
       val contractFuncs  = checkInterfaceFuncs(_contractFuncs, interfaceFuncs, isTxContract)
 
@@ -989,7 +1011,7 @@ object Ast {
         require(contractFuncs.isEmpty)
         interfaceFuncs
       }
-      (resultFuncs, events)
+      (resultFuncs, events, constantVars)
     }
 
     private def sortInterfaces(

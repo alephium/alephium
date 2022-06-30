@@ -32,16 +32,17 @@ import org.alephium.protocol.vm.lang.Ast.{Annotation, Argument, ElseBranch, Func
 abstract class Parser[Ctx <: StatelessContext] {
   implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] => Lexer.emptyChars(ctx) }
 
-  def const[Unknown: P]: P[Ast.Const[Ctx]] =
-    P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address).map(Ast.Const.apply[Ctx])
+  def value[Unknown: P]: P[Val] = P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address)
+  def const[Unknown: P]: P[Ast.Const[Ctx]] = value.map(Ast.Const.apply[Ctx])
   def createArray1[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
     P("[" ~ expr.rep(1, ",") ~ "]").map(Ast.CreateArrayExpr.apply)
   def createArray2[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
     P("[" ~ expr ~ ";" ~ nonNegativeNum("array size") ~ "]").map { case (expr, size) =>
       Ast.CreateArrayExpr(Seq.fill(size)(expr))
     }
-  def arrayExpr[Unknown: P]: P[Ast.Expr[Ctx]]    = P(createArray1 | createArray2)
-  def variable[Unknown: P]: P[Ast.Variable[Ctx]] = P(Lexer.ident).map(Ast.Variable.apply[Ctx])
+  def arrayExpr[Unknown: P]: P[Ast.Expr[Ctx]] = P(createArray1 | createArray2)
+  def variable[Unknown: P]: P[Ast.Variable[Ctx]] =
+    P(Lexer.ident | Lexer.constantIdent).map(Ast.Variable.apply[Ctx])
 
   def alphAmount[Unknown: P]: P[Ast.Expr[Ctx]]                   = expr
   def tokenAmount[Unknown: P]: P[(Ast.Expr[Ctx], Ast.Expr[Ctx])] = P(expr ~ ":" ~ expr)
@@ -477,12 +478,17 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   }
 
+  def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef] =
+    P(Lexer.keyword("const") ~/ Lexer.constantIdent ~ "=" ~ value).map { case (ident, v) =>
+      Ast.ConstantVarDef(ident, v)
+    }
+
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[Unknown: P]: P[Ast.TxContract] =
     P(
       Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~
-        contractInheritances.? ~ "{" ~ eventDef.rep ~ func.rep ~ "}"
-    ).map { case (typeId, fields, contractInheritances, events, funcs) =>
+        contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ func.rep ~ "}"
+    ).map { case (typeId, fields, contractInheritances, events, constantVars, funcs) =>
       if (funcs.length < 1) {
         throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
       } else {
@@ -492,6 +498,7 @@ object StatefulParser extends Parser[StatefulContext] {
           fields,
           funcs,
           events,
+          constantVars,
           contractInheritances.getOrElse(Seq.empty)
         )
       }

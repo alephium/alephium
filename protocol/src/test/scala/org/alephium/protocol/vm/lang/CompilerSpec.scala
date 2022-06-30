@@ -18,7 +18,8 @@ package org.alephium.protocol.vm.lang
 
 import org.scalatest.Assertion
 
-import org.alephium.protocol.{Hash, Signature, SignatureSchema}
+import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm._
 import org.alephium.serde._
 import org.alephium.util._
@@ -2333,6 +2334,59 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       test(code, args = AVector(Val.U256(U256.Zero)), result = AVector(Val.U256(U256.unsafe(10))))
       test(code, args = AVector(Val.U256(U256.One)), result = AVector(Val.U256(U256.unsafe(1))))
       test(code, args = AVector(Val.U256(U256.Two)), result = AVector(Val.U256(U256.unsafe(100))))
+    }
+  }
+
+  it should "compile contract constant variables failed" in {
+    val code =
+      s"""
+         |TxContract Foo() {
+         |  const C = 0
+         |  const C = true
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    Compiler.compileContract(code).leftValue.message is
+      "These constant variables are defined multiple times: C"
+  }
+
+  it should "test contract constant variables" in new TestContractMethodFixture {
+    val foo =
+      s"""
+         |TxContract Foo() {
+         |  const C0 = 0
+         |  const C1 = #00
+         |  pub fn foo() -> () {
+         |    assert!(C0 == 0)
+         |    assert!(C1 == #00)
+         |  }
+         |}
+         |""".stripMargin
+
+    {
+      info("Contract constant variables")
+      test(foo)
+    }
+
+    {
+      info("Inherit constant variables from parents")
+      val address = Address.p2pkh(PublicKey.generate).toBase58
+      val bar =
+        s"""
+           |TxContract Bar() extends Foo() {
+           |  const C2 = 1i
+           |  const C3 = @$address
+           |  pub fn bar() -> () {
+           |    assert!(C0 == 0)
+           |    assert!(C1 == #00)
+           |    assert!(C2 == 1i)
+           |    assert!(C3 == @$address)
+           |  }
+           |}
+           |$foo
+           |""".stripMargin
+      test(bar, methodIndex = 0)
+      test(bar, methodIndex = 1)
     }
   }
 }
