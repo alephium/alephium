@@ -67,6 +67,7 @@ case object InvalidLengthForEncodeInstr                        extends ExeFailur
 case object InsufficientArgs                                   extends ExeFailure
 case object ExternalPrivateMethodCall                          extends ExeFailure
 case object AssertionFailed                                    extends ExeFailure
+final case class AssertionFailedWithErrorCode(code: Val.U256)  extends ExeFailure
 case object InvalidInstrOffset                                 extends ExeFailure
 case object PcOverflow                                         extends ExeFailure
 case object NonEmptyReturnForMainFunction                      extends ExeFailure

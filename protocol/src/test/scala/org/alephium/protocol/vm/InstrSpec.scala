@@ -71,7 +71,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover,
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
-      LoadLocalByIndex, StoreLocalByIndex, Dup
+      LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode
     )
     val lemanStatefulInstrs = AVector(
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
@@ -1245,6 +1245,24 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         Assert.runWith(frame).leftValue isE AssertionFailed
       }
       initialGas.subUnsafe(context.gasRemaining) is Assert.gas()
+    }
+  }
+
+  it should "AssertWithErrorCode" in new StatelessInstrFixture {
+    forAll(arbitrary[Boolean], arbitrary[U256]) { case (boolean, u256) =>
+      val initialGas = context.gasRemaining
+      val cond       = Val.Bool(boolean)
+      val code       = Val.U256(u256)
+
+      stack.push(cond)
+      stack.push(code)
+
+      if (boolean) {
+        AssertWithErrorCode.runWith(frame) isE ()
+      } else {
+        AssertWithErrorCode.runWith(frame).leftValue isE AssertionFailedWithErrorCode(code)
+      }
+      initialGas.subUnsafe(context.gasRemaining) is AssertWithErrorCode.gas()
     }
   }
 
@@ -2616,7 +2634,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover -> 2500,
       Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280,
       ContractIdToAddress -> 5,
-      LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2
+      LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2, AssertWithErrorCode -> 3
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -2741,7 +2759,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover -> 114,
       Log6 -> 115, Log7 -> 116, Log8 -> 117, Log9 -> 118,
       ContractIdToAddress -> 119,
-      LoadLocalByIndex -> 120, StoreLocalByIndex -> 121, Dup -> 122,
+      LoadLocalByIndex -> 120, StoreLocalByIndex -> 121, Dup -> 122, AssertWithErrorCode -> 123,
       // stateful instructions
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -2796,7 +2814,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover,
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
-      LoadLocalByIndex, StoreLocalByIndex, Dup
+      LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
