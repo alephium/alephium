@@ -125,7 +125,15 @@ final case class PartiallyEnabledInstr[-Ctx <: StatelessContext](instr: Instr[Ct
 
 final case class InvalidErrorCode(errorCode: U256) extends ExeFailure
 final case class AssertionFailedWithErrorCode(contractIdOpt: Option[ContractId], errorCode: Int)
-    extends ExeFailure
+    extends ExeFailure {
+  override def toString: String = {
+    val contractIdString = contractIdOpt match {
+      case Some(contractId) => contractId.toHexString
+      case None             => ""
+    }
+    s"AssertionFailedWithErrorCode($contractIdString,$errorCode)"
+  }
+}
 
 sealed trait IOFailure extends Product {
   def error: IOError
