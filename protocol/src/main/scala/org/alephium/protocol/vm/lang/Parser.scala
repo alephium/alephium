@@ -412,7 +412,7 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | callExpr | contractCallExpr | contractConv | variable | parenExpr | arrayExpr
+      const | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.ContractCallExpr] =
@@ -483,12 +483,31 @@ object StatefulParser extends Parser[StatefulContext] {
       Ast.ConstantVarDef(ident, v)
     }
 
+  def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[StatefulContext]] =
+    P(Lexer.typeId ~ "." ~ Lexer.constantIdent).map { case (enumId, field) =>
+      Ast.EnumFieldSelector(enumId, field)
+    }
+  def enumField[Unknown: P]: P[Ast.EnumField] =
+    P(Lexer.constantIdent ~ "=" ~ Lexer.typedNum).map {
+      case (ident, v @ Val.U256(_)) => Ast.EnumField(ident, v)
+      case _                        => throw Compiler.Error("Expect U256 type for enum field")
+    }
+  def rawEnumDef[Unknown: P]: P[Ast.EnumDef] =
+    P(Lexer.keyword("enum") ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}").map { case (id, fields) =>
+      if (fields.length == 0) {
+        throw Compiler.Error(s"No field definition in Enum ${id.name}")
+      }
+      Ast.UniqueDef.checkDuplicates(fields, "enum fields")
+      Ast.EnumDef(id, fields)
+    }
+  def enumDef[Unknown: P]: P[Ast.EnumDef] = P(Start ~ rawEnumDef ~ End)
+
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[Unknown: P]: P[Ast.TxContract] =
     P(
       Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~
-        contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ func.rep ~ "}"
-    ).map { case (typeId, fields, contractInheritances, events, constantVars, funcs) =>
+        contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
+    ).map { case (typeId, fields, contractInheritances, events, constantVars, enums, funcs) =>
       if (funcs.length < 1) {
         throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
       } else {
@@ -499,6 +518,7 @@ object StatefulParser extends Parser[StatefulContext] {
           funcs,
           events,
           constantVars,
+          enums,
           contractInheritances.getOrElse(Seq.empty)
         )
       }

@@ -26,6 +26,7 @@ import org.alephium.protocol.vm.lang.LogicalOperator._
 import org.alephium.protocol.vm.lang.TestOperator._
 import org.alephium.util.{AlephiumSpec, AVector, Hex, I256, U256}
 
+// scalastyle:off file.size.limit
 class ParserSpec extends AlephiumSpec {
   import Ast._
 
@@ -55,6 +56,12 @@ class ParserSpec extends AlephiumSpec {
         Or,
         Binop(And, Variable(Ident("x")), Variable(Ident("y"))),
         Variable(Ident("z"))
+      )
+    fastparse.parse("foo(ErrorCodes.Error)", StatefulParser.expr(_)).get.value is
+      CallExpr[StatefulContext](
+        FuncId("foo", false),
+        Seq.empty,
+        Seq(EnumFieldSelector(TypeId("ErrorCodes"), Ident("Error")))
       )
   }
 
@@ -145,6 +152,7 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("x = 1", StatelessParser.statement(_)).isSuccess is true
     fastparse.parse("x = true", StatelessParser.statement(_)).isSuccess is true
     fastparse.parse("ConstantVar = 0", StatefulParser.statement(_)).isSuccess is false
+    fastparse.parse("ErrorCodes.Error = 0", StatefulParser.statement(_)).isSuccess is false
     fastparse.parse("add(x, y)", StatelessParser.statement(_)).isSuccess is true
     fastparse.parse("foo.add(x, y)", StatefulParser.statement(_)).isSuccess is true
     fastparse.parse("Foo(x).add(x, y)", StatefulParser.statement(_)).isSuccess is true
@@ -484,6 +492,73 @@ class ParserSpec extends AlephiumSpec {
     }
   }
 
+  it should "parse enum definitions" in {
+    {
+      info("Invalid enum type")
+      val definition =
+        s"""
+           |enum errorCodes {
+           |  Error = 0
+           |}
+           |""".stripMargin
+      fastparse.parse(definition, StatefulParser.enumDef(_)).isSuccess is false
+    }
+
+    {
+      info("Invalid enum field name")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  error = 0
+           |}
+           |""".stripMargin
+      fastparse.parse(definition, StatefulParser.enumDef(_)).isSuccess is false
+    }
+
+    {
+      info("Invalid enum field type")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error = 0i
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](fastparse.parse(definition, StatefulParser.enumDef(_)))
+      error.message is "Expect U256 type for enum field"
+    }
+
+    {
+      info("Duplicated enum fields")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error = 0
+           |  Error = 1
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](fastparse.parse(definition, StatefulParser.enumDef(_)))
+      error.message is "These enum fields are defined multiple times: Error"
+    }
+
+    {
+      info("Enum definition")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = 0
+           |  Error1 = 1
+           |}
+           |""".stripMargin
+      fastparse.parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
+        TypeId("ErrorCodes"),
+        Seq(
+          EnumField(Ident("Error0"), Val.U256(U256.Zero)),
+          EnumField(Ident("Error1"), Val.U256(U256.One))
+        )
+      )
+    }
+  }
+
   it should "parse contract inheritance" in {
     {
       info("Simple contract inheritance")
@@ -511,6 +586,7 @@ class ParserSpec extends AlephiumSpec {
             Seq.empty
           )
         ),
+        Seq.empty,
         Seq.empty,
         Seq.empty,
         List(
@@ -574,6 +650,36 @@ class ParserSpec extends AlephiumSpec {
       val fooContract = extended.contracts(1)
       barContract.constantVars.length is 3
       fooContract.constantVars.length is 2
+    }
+
+    {
+      info("Contract enum inheritance")
+      val foo: String =
+        s"""
+           |TxContract Foo() {
+           |  enum FooErrorCodes {
+           |    Error = 0
+           |  }
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+
+      val bar: String =
+        s"""
+           |TxContract Bar() extends Foo() {
+           |  enum BarErrorCodes {
+           |    Error = 0
+           |  }
+           |  pub fn bar() -> () {}
+           |}
+           |$foo
+           |""".stripMargin
+      val extended =
+        fastparse.parse(bar, StatefulParser.multiContract(_)).get.value.extendedContracts()
+      val barContract = extended.contracts(0)
+      val fooContract = extended.contracts(1)
+      barContract.enums.length is 2
+      fooContract.enums.length is 1
     }
   }
 
@@ -643,6 +749,7 @@ class ParserSpec extends AlephiumSpec {
             Seq(ReturnStmt(Seq.empty))
           )
         ),
+        Seq.empty,
         Seq.empty,
         Seq.empty,
         Seq(InterfaceInheritance(TypeId("Parent")))

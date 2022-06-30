@@ -203,6 +203,14 @@ object Ast {
       state.genLoadCode(id)
     }
   }
+  final case class EnumFieldSelector[Ctx <: StatelessContext](enumId: TypeId, field: Ident)
+      extends Expr[Ctx] {
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.U256)
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val ident = EnumDef.fieldIdent(enumId, field)
+      state.genLoadCode(ident)
+    }
+  }
   final case class UnaryOp[Ctx <: StatelessContext](op: Operator, expr: Expr[Ctx])
       extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
@@ -354,6 +362,12 @@ object Ast {
   }
 
   object UniqueDef {
+    def checkDuplicates(defs: Seq[UniqueDef], name: String): Unit = {
+      if (defs.distinctBy(_.name).size != defs.size) {
+        throw Compiler.Error(s"These $name are defined multiple times: ${duplicates(defs)}")
+      }
+    }
+
     def duplicates(defs: Seq[UniqueDef]): String = {
       defs
         .groupBy(_.name)
@@ -479,6 +493,17 @@ object Ast {
 
   final case class ConstantVarDef(ident: Ident, value: Val) extends UniqueDef {
     def name: String = ident.name
+  }
+
+  final case class EnumField(ident: Ident, value: Val.U256) extends UniqueDef {
+    def name: String = ident.name
+  }
+  final case class EnumDef(id: TypeId, fields: Seq[EnumField]) extends UniqueDef {
+    def name: String = id.name
+  }
+  object EnumDef {
+    def fieldIdent(enumId: TypeId, field: Ident): Ident =
+      Ident(s"${enumId.name}.${field.name}")
   }
 
   final case class EventDef(
@@ -751,14 +776,12 @@ object Ast {
     def fields: Seq[Argument]
     def events: Seq[EventDef]
     def constantVars: Seq[ConstantVarDef]
+    def enums: Seq[EnumDef]
 
     def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = Seq.empty
 
     def eventsInfo(): Seq[Compiler.EventInfo] = {
-      if (events.distinctBy(_.id).size != events.size) {
-        val duplicates = UniqueDef.duplicates(events)
-        throw Compiler.Error(s"These events are defined multiple times: $duplicates")
-      }
+      UniqueDef.checkDuplicates(events, "events")
       events.map { event =>
         Compiler.EventInfo(event.id, event.fields.map(_.tpe))
       }
@@ -774,8 +797,10 @@ object Ast {
     val events: Seq[EventDef]                  = Seq.empty
     val inheritances: Seq[ContractInheritance] = Seq.empty
 
-    def constantVars: Seq[ConstantVarDef] =
-      throw Compiler.Error(s"TxScript ${ident.name} does not contain any constant variable")
+    def error(tpe: String): Compiler.Error =
+      new Compiler.Error(s"TxScript ${ident.name} does not contain any $tpe")
+    def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
+    def enums: Seq[EnumDef]               = throw error("enum")
     def getTemplateVarsSignature(): String =
       s"TxScript ${name}(${templateVars.map(_.signature).mkString(",")})"
     def getTemplateVarsNames(): Seq[String] = templateVars.map(_.ident.name)
@@ -806,6 +831,7 @@ object Ast {
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
       constantVars: Seq[ConstantVarDef],
+      enums: Seq[EnumDef],
       inheritances: Seq[Inheritance]
   ) extends ContractWithState {
     def getFieldsSignature(): String =
@@ -814,12 +840,19 @@ object Ast {
     def getFieldTypes(): Seq[String] = fields.map(_.tpe.signature)
 
     override def check(state: Compiler.State[StatefulContext]): Unit = {
-      if (constantVars.distinctBy(_.ident).size != constantVars.size) {
-        val duplicates = UniqueDef.duplicates(constantVars)
-        throw Compiler.Error(s"These constant variables are defined multiple times: $duplicates")
-      }
+      UniqueDef.checkDuplicates(constantVars, "constant variables")
       constantVars.foreach(v =>
         state.addConstantVariable(v.ident, Type.fromVal(v.value.tpe), Seq(v.value.toConstInstr))
+      )
+      UniqueDef.checkDuplicates(enums, "enums")
+      enums.foreach(e =>
+        e.fields.foreach(field =>
+          state.addConstantVariable(
+            EnumDef.fieldIdent(e.id, field.ident),
+            Type.U256,
+            Seq(field.value.toConstInstr)
+          )
+        )
       )
       super.check(state)
     }
@@ -847,6 +880,7 @@ object Ast {
     def getFieldsSignature(): String      = throw error("field")
     def getFieldTypes(): Seq[String]      = throw error("field")
     def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
+    def enums: Seq[EnumDef]               = throw error("enum")
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       throw new Compiler.Error(s"Interface ${ident.name} does not generate code")
@@ -917,7 +951,7 @@ object Ast {
         case script: TxScript =>
           script
         case c: TxContract =>
-          val (funcs, events, constantVars) = MultiTxContract.extractDefs(parentsCache, c)
+          val (funcs, events, constantVars, enums) = MultiTxContract.extractDefs(parentsCache, c)
           TxContract(
             c.ident,
             c.templateVars,
@@ -925,10 +959,11 @@ object Ast {
             funcs,
             events,
             constantVars,
+            enums,
             c.inheritances
           )
         case i: ContractInterface =>
-          val (funcs, events, _) = MultiTxContract.extractDefs(parentsCache, i)
+          val (funcs, events, _, _) = MultiTxContract.extractDefs(parentsCache, i)
           ContractInterface(i.ident, funcs, events, i.inheritances)
       }
       MultiTxContract(newContracts)
@@ -989,7 +1024,7 @@ object Ast {
     def extractDefs(
         parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
         contract: ContractWithState
-    ): (Seq[FuncDef[StatefulContext]], Seq[EventDef], Seq[ConstantVarDef]) = {
+    ): (Seq[FuncDef[StatefulContext]], Seq[EventDef], Seq[ConstantVarDef], Seq[EnumDef]) = {
       val parents = parentsCache(contract.ident)
       val (allContracts, _allInterfaces) =
         (parents :+ contract).partition(_.isInstanceOf[TxContract])
@@ -999,6 +1034,7 @@ object Ast {
       val _contractFuncs = allContracts.flatMap(_.funcs)
       val interfaceFuncs = allInterfaces.flatMap(_.funcs)
       val constantVars   = allContracts.flatMap(_.constantVars)
+      val enums          = allContracts.flatMap(_.enums)
       val isTxContract   = contract.isInstanceOf[TxContract]
       val contractFuncs  = checkInterfaceFuncs(_contractFuncs, interfaceFuncs, isTxContract)
 
@@ -1011,7 +1047,7 @@ object Ast {
         require(contractFuncs.isEmpty)
         interfaceFuncs
       }
-      (resultFuncs, events, constantVars)
+      (resultFuncs, events, constantVars, enums)
     }
 
     private def sortInterfaces(

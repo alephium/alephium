@@ -188,7 +188,8 @@ object Lexer {
     "extends",
     "implements",
     "alph",
-    "const"
+    "const",
+    "enum"
   )
 
   val primTpes: Map[String, Type] =

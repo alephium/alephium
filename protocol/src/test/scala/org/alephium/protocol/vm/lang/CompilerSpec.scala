@@ -2389,4 +2389,84 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       test(bar, methodIndex = 1)
     }
   }
+
+  it should "compile contract enum failed" in {
+    {
+      info("Duplicated enum definitions")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  enum ErrorCodes {
+           |    Error0 = 0
+           |  }
+           |  enum ErrorCodes {
+           |    Error1 = 1
+           |  }
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "These enums are defined multiple times: ErrorCodes"
+    }
+
+    {
+      info("Enum field does not exist")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  enum ErrorCodes {
+           |    Error0 = 0
+           |  }
+           |  pub fn foo() -> U256 {
+           |    return ErrorCodes.Error1
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Variable foo.ErrorCodes.Error1 does not exist"
+    }
+  }
+
+  it should "test contract enums" in new TestContractMethodFixture {
+    val foo =
+      s"""
+         |TxContract Foo() {
+         |  enum FooErrorCodes {
+         |    Error0 = 0
+         |    Error1 = 1
+         |  }
+         |  pub fn foo() -> () {
+         |    assert!(FooErrorCodes.Error0 == 0)
+         |    assert!(FooErrorCodes.Error1 == 1)
+         |  }
+         |}
+         |""".stripMargin
+
+    {
+      info("Contract enums")
+      test(foo)
+    }
+
+    {
+      info("Inherit enums from parents")
+      val bar =
+        s"""
+           |TxContract Bar() extends Foo() {
+           |  enum BarErrorCodes {
+           |    Error0 = 0
+           |    Error1 = 1
+           |  }
+           |  pub fn bar() -> () {
+           |    assert!(FooErrorCodes.Error0 == 0)
+           |    assert!(FooErrorCodes.Error1 == 1)
+           |    assert!(BarErrorCodes.Error0 == 0)
+           |    assert!(BarErrorCodes.Error1 == 1)
+           |  }
+           |}
+           |$foo
+           |""".stripMargin
+      test(bar, methodIndex = 0)
+      test(bar, methodIndex = 1)
+    }
+  }
 }
