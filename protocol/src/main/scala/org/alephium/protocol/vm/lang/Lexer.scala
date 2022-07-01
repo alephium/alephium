@@ -43,9 +43,10 @@ object Lexer {
 
   private def id[Unknown: P, T](prefix: => P[Unit], func: String => T): P[T] =
     P(prefix ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(func)
-  def ident[Unknown: P]: P[Ast.Ident]         = id(lowercase, Ast.Ident)
-  def constantIdent[Unknown: P]: P[Ast.Ident] = id(uppercase, Ast.Ident)
-  def typeId[Unknown: P]: P[Ast.TypeId]       = id(uppercase, Ast.TypeId)
+  def ident[Unknown: P]: P[Ast.Ident] = id(lowercase, Ast.Ident)
+  def constantIdent[Unknown: P]: P[Ast.Ident] =
+    id(uppercase.opaque("constant variables must start with an uppercase letter"), Ast.Ident)
+  def typeId[Unknown: P]: P[Ast.TypeId] = id(uppercase, Ast.TypeId)
   def funcId[Unknown: P]: P[Ast.FuncId] =
     P(ident ~ "!".?.!).map { case (id, postfix) =>
       Ast.FuncId(id.name, postfix.nonEmpty)

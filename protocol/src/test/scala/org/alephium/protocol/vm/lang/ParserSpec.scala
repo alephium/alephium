@@ -475,7 +475,10 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse constant variable definition" in {
     val invalidDefinition = "const c = 1"
-    fastparse.parse(invalidDefinition, StatefulParser.constantVarDef(_)).isSuccess is false
+    val failure = fastparse
+      .parse(invalidDefinition, StatefulParser.constantVarDef(_))
+      .asInstanceOf[fastparse.Parsed.Failure]
+    failure.trace().longMsg.contains("constant variables must start with an uppercase letter")
 
     val address = Address.p2pkh(PublicKey.generate)
     val definitions = Seq[(String, Val)](
@@ -512,7 +515,10 @@ class ParserSpec extends AlephiumSpec {
            |  error = 0
            |}
            |""".stripMargin
-      fastparse.parse(definition, StatefulParser.enumDef(_)).isSuccess is false
+      val failure = fastparse
+        .parse(definition, StatefulParser.enumDef(_))
+        .asInstanceOf[fastparse.Parsed.Failure]
+      failure.trace().longMsg.contains("constant variables must start with an uppercase letter")
     }
 
     {
