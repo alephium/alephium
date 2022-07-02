@@ -2583,6 +2583,34 @@ class VMSpec extends AlephiumSpec {
     worldState.getContractAsset(fooId).rightValue.amount is ALPH.alph(2)
   }
 
+  it should "test AssertWithErrorCode instruction" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  enum ErrorCodes {
+         |    Error = 0
+         |  }
+         |  pub fn foo() -> () {
+         |    assertWithErrorCode!(false, ErrorCodes.Error)
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, AVector.empty).key
+
+    val main: String =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.foo()
+         |}
+         |$foo
+         |""".stripMargin
+    val script = Compiler.compileTxScript(main).rightValue
+    intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage is
+      s"Right(TxScriptExeFailed(AssertionFailedWithErrorCode(${fooId.toHexString},0)))"
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

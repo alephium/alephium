@@ -41,10 +41,12 @@ object Lexer {
   def letter[Unknown: P]: P[Unit]    = P(lowercase | uppercase)
   def newline[Unknown: P]: P[Unit]   = P(NoTrace(StringIn("\r\n", "\n")))
 
-  def ident[Unknown: P]: P[Ast.Ident] =
-    P(lowercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.Ident)
-  def typeId[Unknown: P]: P[Ast.TypeId] =
-    P(uppercase ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(Ast.TypeId)
+  private def id[Unknown: P, T](prefix: => P[Unit], func: String => T): P[T] =
+    P(prefix ~ (letter | digit | "_").rep).!.filter(!keywordSet.contains(_)).map(func)
+  def ident[Unknown: P]: P[Ast.Ident] = id(lowercase, Ast.Ident)
+  def constantIdent[Unknown: P]: P[Ast.Ident] =
+    id(uppercase.opaque("constant variables must start with an uppercase letter"), Ast.Ident)
+  def typeId[Unknown: P]: P[Ast.TypeId] = id(uppercase, Ast.TypeId)
   def funcId[Unknown: P]: P[Ast.FuncId] =
     P(ident ~ "!".?.!).map { case (id, postfix) =>
       Ast.FuncId(id.name, postfix.nonEmpty)
@@ -186,7 +188,9 @@ object Lexer {
     "emit",
     "extends",
     "implements",
-    "alph"
+    "alph",
+    "const",
+    "enum"
   )
 
   val primTpes: Map[String, Type] =

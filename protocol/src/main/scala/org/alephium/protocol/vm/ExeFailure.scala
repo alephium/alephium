@@ -21,6 +21,7 @@ import java.math.BigInteger
 import org.alephium.io.IOError
 import org.alephium.protocol.model.ContractId
 import org.alephium.serde.SerdeError
+import org.alephium.util.U256
 
 // scalastyle:off number.of.types
 trait ExeFailure extends Product {
@@ -121,6 +122,18 @@ final case class UncaughtSerdeError(error: IOError.Serde)             extends Ex
 final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends ExeFailure
 final case class PartiallyEnabledInstr[-Ctx <: StatelessContext](instr: Instr[Ctx])
     extends ExeFailure
+
+final case class InvalidErrorCode(errorCode: U256) extends ExeFailure
+final case class AssertionFailedWithErrorCode(contractIdOpt: Option[ContractId], errorCode: Int)
+    extends ExeFailure {
+  override def toString: String = {
+    val contractIdString = contractIdOpt match {
+      case Some(contractId) => contractId.toHexString
+      case None             => ""
+    }
+    s"AssertionFailedWithErrorCode($contractIdString,$errorCode)"
+  }
+}
 
 sealed trait IOFailure extends Product {
   def error: IOError

@@ -113,7 +113,7 @@ object Compiler {
 
   final case class Error(message: String) extends Exception(message)
   object Error {
-    def parse(failure: Parsed.Failure): Error = Error(s"Parser failed: $failure")
+    def parse(failure: Parsed.Failure): Error = Error(s"Parser failed: ${failure.trace().longMsg}")
   }
 
   def expectOneType(ident: Ast.Ident, tpe: Seq[Type]): Type = {
@@ -139,6 +139,12 @@ object Compiler {
         ref: ArrayTransformer.ArrayRef[Ctx]
     ) extends VarInfo {
       def tpe: Type = ref.tpe
+    }
+    final case class Constant[Ctx <: StatelessContext](
+        tpe: Type,
+        instrs: Seq[Instr[Ctx]]
+    ) extends VarInfo {
+      def isMutable: Boolean = false
     }
   }
   trait ContractFunc[Ctx <: StatelessContext] extends FuncInfo[Ctx] {
@@ -399,6 +405,10 @@ object Compiler {
           varIndex += 1
       }
     }
+    def addConstantVariable(ident: Ast.Ident, tpe: Type, instrs: Seq[Instr[Ctx]]): Unit = {
+      val sname = checkNewVariable(ident)
+      varTable(sname) = VarInfo.Constant(tpe, instrs)
+    }
 
     private def checkNewVariable(ident: Ast.Ident): String = {
       val name  = ident.name
@@ -600,6 +610,7 @@ object Compiler {
         case v: VarInfo.Template => Seq(TemplateVariable(ident.name, v.tpe.toVal, v.index))
         case _: VarInfo.ArrayRef[StatelessContext @unchecked] =>
           getArrayRef(ident).genLoadCode(this)
+        case v: VarInfo.Constant[StatelessContext @unchecked] => v.instrs
       }
     }
 
@@ -610,6 +621,8 @@ object Compiler {
         case v: VarInfo.Local    => Seq(Seq(StoreLocal(v.index)))
         case _: VarInfo.Template => throw Error(s"Unexpected template variable: ${ident.name}")
         case ref: VarInfo.ArrayRef[StatelessContext @unchecked] => ref.ref.genStoreCode(this)
+        case _: VarInfo.Constant[StatelessContext @unchecked] =>
+          throw Error(s"Unexpected constant variable: ${ident.name}")
       }
     }
   }
@@ -681,6 +694,7 @@ object Compiler {
         case v: VarInfo.Local    => Seq(LoadLocal(v.index))
         case v: VarInfo.Template => Seq(TemplateVariable(ident.name, varInfo.tpe.toVal, v.index))
         case _: VarInfo.ArrayRef[StatefulContext @unchecked] => getArrayRef(ident).genLoadCode(this)
+        case v: VarInfo.Constant[StatefulContext @unchecked] => v.instrs
       }
     }
 
@@ -691,6 +705,8 @@ object Compiler {
         case v: VarInfo.Local    => Seq(Seq(StoreLocal(v.index)))
         case _: VarInfo.Template => throw Error(s"Unexpected template variable: ${ident.name}")
         case ref: VarInfo.ArrayRef[StatefulContext @unchecked] => ref.ref.genStoreCode(this)
+        case _: VarInfo.Constant[StatefulContext @unchecked] =>
+          throw Error(s"Unexpected constant variable: ${ident.name}")
       }
     }
   }

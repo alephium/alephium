@@ -148,7 +148,7 @@ object Instr {
     EthEcRecover,
     Log6, Log7, Log8, Log9,
     ContractIdToAddress,
-    LoadLocalByIndex, StoreLocalByIndex, Dup
+    LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -1063,6 +1063,25 @@ case object Assert extends StatelessInstrSimpleGas with StatelessInstrCompanion0
     for {
       predicate <- frame.popOpStackBool()
       _         <- if (predicate.v) okay else failed(AssertionFailed)
+    } yield ()
+  }
+}
+
+case object AssertWithErrorCode
+    extends LemanInstrWithSimpleGas[StatelessContext]
+    with StatelessInstrCompanion0
+    with GasVeryLow {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      errorCodeU256 <- frame.popOpStackU256()
+      errorCode     <- errorCodeU256.v.toInt.toRight(Right(InvalidErrorCode(errorCodeU256.v)))
+      predicate     <- frame.popOpStackBool()
+      _ <-
+        if (predicate.v) {
+          okay
+        } else {
+          failed(AssertionFailedWithErrorCode(frame.obj.contractIdOpt, errorCode))
+        }
     } yield ()
   }
 }

@@ -84,6 +84,13 @@ object BuiltIn {
     SimpleStatelessBuiltIn("sha3", Seq(Type.ByteVec), Seq(Type.ByteVec), Sha3)
   val assert: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("assert", Seq(Type.Bool), Seq(), Assert)
+  val assertWithErrorCode: SimpleStatelessBuiltIn =
+    SimpleStatelessBuiltIn(
+      "assertWithErrorCode",
+      Seq[Type](Type.Bool, Type.U256),
+      Seq.empty,
+      AssertWithErrorCode
+    )
   val verifyTxSignature: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("verifyTxSignature", Seq(Type.ByteVec), Seq(), VerifyTxSignature)
   val verifySecP256K1: SimpleStatelessBuiltIn =
@@ -409,7 +416,8 @@ object BuiltIn {
     ethEcRecover,
     contractIdToAddress,
     nullAddress,
-    dustAmount
+    dustAmount,
+    assertWithErrorCode
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleStatefulBuiltIn =
