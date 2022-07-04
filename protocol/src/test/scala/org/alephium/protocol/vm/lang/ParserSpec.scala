@@ -591,6 +591,7 @@ class ParserSpec extends AlephiumSpec {
            |""".stripMargin
 
       fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+        false,
         TypeId("Child"),
         Seq.empty,
         Seq(Argument(Ident("x"), Type.U256, false), Argument(Ident("y"), Type.U256, false)),
@@ -603,7 +604,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             Seq.empty,
             Seq.empty,
-            Seq.empty
+            Some(Seq.empty)
           )
         ),
         Seq.empty,
@@ -723,7 +724,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             Seq.empty,
             Seq.empty,
-            Seq.empty
+            None
           )
         ),
         Seq.empty,
@@ -754,6 +755,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+        false,
         TypeId("Child"),
         Seq.empty,
         Seq.empty,
@@ -766,7 +768,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             Seq.empty,
             Seq.empty,
-            Seq(ReturnStmt(Seq.empty))
+            Some(Seq(ReturnStmt(Seq.empty)))
           )
         ),
         Seq.empty,
@@ -792,7 +794,7 @@ class ParserSpec extends AlephiumSpec {
         false,
         Seq.empty,
         Seq.empty,
-        Seq(Ast.ReturnStmt(List()))
+        Some(Seq(Ast.ReturnStmt(List())))
       )
     )
   }

@@ -221,7 +221,7 @@ abstract class Parser[Ctx <: StatelessContext] {
           f.useContractAssets,
           f.args,
           f.rtypes,
-          statements
+          Some(statements)
         )
       case None =>
         throw Compiler.Error(s"Function ${f.id.name} does not have function body")
@@ -508,23 +508,25 @@ object StatefulParser extends Parser[StatefulContext] {
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[Unknown: P]: P[Ast.TxContract] =
     P(
-      Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~
+      Lexer.`abstract` ~ Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~
         contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
-    ).map { case (typeId, fields, contractInheritances, events, constantVars, enums, funcs) =>
-      if (funcs.length < 1) {
-        throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
-      } else {
-        Ast.TxContract(
-          typeId,
-          Seq.empty,
-          fields,
-          funcs,
-          events,
-          constantVars,
-          enums,
-          contractInheritances.getOrElse(Seq.empty)
-        )
-      }
+    ).map {
+      case (isAbstract, typeId, fields, contractInheritances, events, constantVars, enums, funcs) =>
+        if (funcs.length < 1) {
+          throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
+        } else {
+          Ast.TxContract(
+            isAbstract,
+            typeId,
+            Seq.empty,
+            fields,
+            funcs,
+            events,
+            constantVars,
+            enums,
+            contractInheritances.getOrElse(Seq.empty)
+          )
+        }
     }
   def contract[Unknown: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
 
@@ -543,7 +545,7 @@ object StatefulParser extends Parser[StatefulContext] {
             f.useContractAssets,
             f.args,
             f.rtypes,
-            Seq.empty
+            None
           )
         case _ =>
           throw Compiler.Error(s"Interface function ${f.id.name} should not have function body")

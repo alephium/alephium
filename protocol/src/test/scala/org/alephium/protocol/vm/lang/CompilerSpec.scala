@@ -160,7 +160,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler
         .compileContract(contract)
         .leftValue
-        .message is "These functions are defined multiple times: add1, add2"
+        .message is "These functions are implemented multiple times: add1, add2"
     }
 
   }
@@ -1828,7 +1828,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(child).leftValue.message is
-        "These functions are defined multiple times: foo"
+        "These functions are implemented multiple times: foo"
     }
 
     {
@@ -1979,7 +1979,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |$foo
            |""".stripMargin
       val error = Compiler.compileMultiContract(bar).leftValue
-      error.message is "These functions are defined multiple times: foo"
+      error.message is "These abstract functions are defined multiple times: foo"
     }
 
     {
