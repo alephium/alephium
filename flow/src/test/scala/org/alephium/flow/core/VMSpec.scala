@@ -1555,7 +1555,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("Inherit abstract TxContract")
+      info("Inherit single abstract TxContract")
 
       val contract: String =
         s"""
@@ -1589,6 +1589,52 @@ class VMSpec extends AlephiumSpec {
            |    x = x + 1
            |    emit GP(x)
            |  }
+           |
+           |  fn p1() -> () {
+           |    emit Parent1(2)
+           |    gp()
+           |  }
+           |}
+           |""".stripMargin
+
+      success(contract)
+    }
+
+    {
+      info("Inherit multiple abstract TxContract")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  fn gp() -> () {
+           |    x = x + 1
+           |    emit GP(x)
+           |  }
+           |
+           |  pub fn foo() -> () {
+           |    p0()
+           |    p1()
+           |    gp()
+           |  }
+           |}
+           |
+           |abstract TxContract Grandparent(mut x: U256) {
+           |  event GP(value: U256)
+           |
+           |  fn gp() -> ()
+           |}
+           |
+           |abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |  event Parent0(x: U256)
+           |
+           |  fn p0() -> () {
+           |    emit Parent0(1)
+           |    gp()
+           |  }
+           |}
+           |
+           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |  event Parent1(x: U256)
            |
            |  fn p1() -> () {
            |    emit Parent1(2)
@@ -1654,6 +1700,96 @@ class VMSpec extends AlephiumSpec {
       success(contract)
     }
 
+    {
+      info("miss abstract keyword for abstract TxContract")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  fn gp() -> () {
+           |    x = x + 1
+           |    emit GP(x)
+           |  }
+           |}
+           |
+           |abstract TxContract Grandparent(mut x: U256) {
+           |  event GP(value: U256)
+           |  fn gp() -> ()
+           |}
+           |
+           |TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |  event Parent0(x: U256)
+           |
+           |  pub fn foo() -> () {
+           |    p0()
+           |    p1()
+           |    gp()
+           |  }
+           |
+           |  fn p0() -> () {
+           |    emit Parent0(1)
+           |    gp()
+           |  }
+           |}
+           |
+           |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |  event Parent1(x: U256)
+           |
+           |  fn p1() -> () {
+           |    emit Parent1(2)
+           |    gp()
+           |  }
+           |}
+           |""".stripMargin
+
+      fail(contract, "TxContract Parent0 has unimplemented methods: gp")
+    }
+
+    {
+      info("use abstract keyword for non abstract TxContract")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  pub fn foo() -> () {
+           |    p0()
+           |    p1()
+           |    gp()
+           |  }
+           |}
+           |
+           |abstract TxContract Grandparent(mut x: U256) {
+           |  event GP(value: U256)
+           |  fn gp() -> ()
+           |}
+           |
+           |abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |  event Parent0(x: U256)
+           |
+           |  fn gp() -> () {
+           |    x = x + 1
+           |    emit GP(x)
+           |  }
+           |
+           |  fn p0() -> () {
+           |    emit Parent0(1)
+           |    gp()
+           |  }
+           |}
+           |
+           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |  event Parent1(x: U256)
+           |
+           |  fn p1() -> () {
+           |    emit Parent1(2)
+           |    gp()
+           |  }
+           |}
+           |""".stripMargin
+
+      fail(contract, "abstract TxContract Parent0 has no unimplemented methods")
+    }
+
     def success(contract: String) = {
       val contractOutputRef = createContract(contract, AVector(Val.U256(0)))
       val contractId        = contractOutputRef.key.toHexString
@@ -1689,6 +1825,10 @@ class VMSpec extends AlephiumSpec {
             LogState(txId, 1, AVector(Val.U256(3)))
           )
         )
+    }
+
+    def fail(contract: String, errorMessage: String) = {
+      Compiler.compileContract(contract).leftValue.message is errorMessage
     }
   }
 

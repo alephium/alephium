@@ -1056,15 +1056,22 @@ object Ast {
           if (!txContract.isAbstract && unimplementedFuncs.nonEmpty) {
             val methodNames = unimplementedFuncs.map(_.name).mkString(",")
             throw Compiler.Error(
-              s"""TxContract ${txContract.name} has unimplemented methods: $methodNames"""
+              s"TxContract ${txContract.name} has unimplemented methods: $methodNames"
             )
           }
+
+          if (txContract.isAbstract && unimplementedFuncs.isEmpty) {
+            throw Compiler.Error(
+              s"abstract TxContract ${txContract.name} has no unimplemented methods"
+            )
+          }
+
           allUniqueFuncs
         case interface: ContractInterface =>
           if (nonAbstractFuncs.nonEmpty) {
             val methodNames = nonAbstractFuncs.map(_.name).mkString(",")
             throw Compiler.Error(
-              s"""Interface ${interface.name} has implemented methods: $methodNames"""
+              s"Interface ${interface.name} has implemented methods: $methodNames"
             )
           }
           unimplementedFuncs
