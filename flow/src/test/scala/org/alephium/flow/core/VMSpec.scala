@@ -3171,6 +3171,43 @@ class VMSpec extends AlephiumSpec {
       s"Right(TxScriptExeFailed(AssertionFailedWithErrorCode(${fooId.toHexString},0)))"
   }
 
+  it should "test Contract type" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo(x: U256) {
+         |  pub fn foo() -> U256 {
+         |    return x
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, AVector(Val.U256(123))).key
+
+    val bar: String =
+      s"""
+         |TxContract Bar() {
+         |  pub fn bar(foo: Foo) -> U256 {
+         |    return foo.foo()
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    val barId = createContract(bar, AVector.empty).key
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  let bar = Bar(#${barId.toHexString})
+         |  let x = bar.bar(foo)
+         |  assert!(x == 123)
+         |}
+         |
+         |$bar
+         |""".stripMargin
+    callTxScript(script)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
