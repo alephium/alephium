@@ -2613,6 +2613,45 @@ class VMSpec extends AlephiumSpec {
     callTxScript(main)
   }
 
+  it should "work with abstract contract" in new ContractFixture {
+    val abstractContract =
+      s"""
+         |abstract TxContract AC() {
+         |  pub fn f1() -> U256 {
+         |    return 1
+         |  }
+         |  pub fn f2() -> U256
+         |}
+         |""".stripMargin
+
+    val contract =
+      s"""
+         |TxContract Foo() implements AC {
+         |  pub fn f2() -> U256 {
+         |    return 2
+         |  }
+         |}
+         |
+         |$abstractContract
+         |""".stripMargin
+
+    val contractId = createContract(contract, AVector.empty).key
+
+    val main =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  let impl = AC(#${contractId.toHexString})
+         |  assert!(impl.f1() == 1)
+         |  assert!(impl.f2() == 2)
+         |}
+         |
+         |$abstractContract
+         |""".stripMargin
+
+    callTxScript(main)
+  }
+
   it should "inherit interface events" in new ContractFixture {
     val foo: String =
       s"""

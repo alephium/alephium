@@ -780,6 +780,28 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "test abstract contract parser" in {
+    def fooFuncDef(isAbstract: Boolean) = FuncDef[StatefulContext](
+      Seq.empty,
+      FuncId("foo", false),
+      false,
+      false,
+      false,
+      Seq.empty,
+      Seq.empty,
+      if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
+    )
+
+    def barFuncDef(isAbstract: Boolean) = FuncDef[StatefulContext](
+      Seq.empty,
+      FuncId("bar", false),
+      false,
+      false,
+      false,
+      Seq.empty,
+      Seq.empty,
+      if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
+    )
+
     {
       info("Parse abstract contract")
       val code =
@@ -796,28 +818,7 @@ class ParserSpec extends AlephiumSpec {
         TypeId("Foo"),
         Seq.empty,
         Seq.empty,
-        Seq(
-          FuncDef(
-            Seq.empty,
-            FuncId("foo", false),
-            false,
-            false,
-            false,
-            Seq.empty,
-            Seq.empty,
-            None
-          ),
-          FuncDef(
-            Seq.empty,
-            FuncId("bar", false),
-            false,
-            false,
-            false,
-            Seq.empty,
-            Seq.empty,
-            Some(Seq(Ast.ReturnStmt(List())))
-          )
-        ),
+        Seq(fooFuncDef(true), barFuncDef(false)),
         Seq.empty,
         Seq.empty,
         Seq.empty,
@@ -852,26 +853,8 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq(
-          FuncDef(
-            Seq.empty,
-            FuncId("bar", false),
-            false,
-            false,
-            false,
-            Seq.empty,
-            Seq.empty,
-            None
-          ),
-          FuncDef(
-            Seq.empty,
-            FuncId("foo", false),
-            false,
-            false,
-            false,
-            Seq.empty,
-            Seq.empty,
-            Some(Seq(Ast.ReturnStmt(List())))
-          )
+          barFuncDef(true),
+          fooFuncDef(false)
         ),
         Seq.empty,
         Seq.empty,
