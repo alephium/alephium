@@ -863,7 +863,7 @@ object Ast {
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       if (isAbstract) {
-        throw new Compiler.Error(s"Abstract TxContract ${ident.name} does not generate code")
+        throw new Compiler.Error(s"abstract TxContract ${ident.name} does not generate code")
       } else {
         check(state)
         StatefulContract(
@@ -1053,12 +1053,20 @@ object Ast {
         case _: TxScript =>
           throw Compiler.Error("Extract definitions from TxScript is unexpected")
         case txContract: TxContract =>
-          if (!txContract.isAbstract) {
-            require(unimplementedFuncs.isEmpty)
+          if (!txContract.isAbstract && unimplementedFuncs.nonEmpty) {
+            val methodNames = unimplementedFuncs.map(_.name).mkString(",")
+            throw Compiler.Error(
+              s"""TxContract ${txContract.name} has unimplemented methods: $methodNames"""
+            )
           }
           allUniqueFuncs
-        case _: ContractInterface =>
-          require(nonAbstractFuncs.isEmpty)
+        case interface: ContractInterface =>
+          if (nonAbstractFuncs.nonEmpty) {
+            val methodNames = nonAbstractFuncs.map(_.name).mkString(",")
+            throw Compiler.Error(
+              s"""Interface ${interface.name} has implemented methods: $methodNames"""
+            )
+          }
           unimplementedFuncs
       }
 

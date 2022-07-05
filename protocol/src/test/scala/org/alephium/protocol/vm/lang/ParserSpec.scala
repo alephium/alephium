@@ -779,6 +779,108 @@ class ParserSpec extends AlephiumSpec {
     }
   }
 
+  it should "test abstract contract parser" in {
+    {
+      info("Parse abstract contract")
+      val code =
+        s"""
+           |abstract TxContract Foo() {
+           |  fn foo() -> ()
+           |  fn bar() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+        true,
+        TypeId("Foo"),
+        Seq.empty,
+        Seq.empty,
+        Seq(
+          FuncDef(
+            Seq.empty,
+            FuncId("foo", false),
+            false,
+            false,
+            false,
+            Seq.empty,
+            Seq.empty,
+            None
+          ),
+          FuncDef(
+            Seq.empty,
+            FuncId("bar", false),
+            false,
+            false,
+            false,
+            Seq.empty,
+            Seq.empty,
+            Some(Seq(Ast.ReturnStmt(List())))
+          )
+        ),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
+        Seq.empty
+      )
+    }
+
+    {
+      info("Parse abstract contract inheritance")
+      val bar =
+        s"""
+           |Interface Bar {
+           |  fn bar() -> ()
+           |}
+           |""".stripMargin
+
+      val code =
+        s"""
+           |abstract TxContract Foo() implements Bar {
+           |  fn foo() -> () {
+           |    return
+           |  }
+           |}
+           |$bar
+           |""".stripMargin
+      val extended =
+        fastparse.parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
+      val fooContract = extended.contracts(0)
+      fooContract is TxContract(
+        true,
+        TypeId("Foo"),
+        Seq.empty,
+        Seq.empty,
+        Seq(
+          FuncDef(
+            Seq.empty,
+            FuncId("bar", false),
+            false,
+            false,
+            false,
+            Seq.empty,
+            Seq.empty,
+            None
+          ),
+          FuncDef(
+            Seq.empty,
+            FuncId("foo", false),
+            false,
+            false,
+            false,
+            Seq.empty,
+            Seq.empty,
+            Some(Seq(Ast.ReturnStmt(List())))
+          )
+        ),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
+        Seq(InterfaceInheritance(TypeId("Bar")))
+      )
+    }
+  }
+
   trait ScriptFixture {
     val usePreapprovedAssets: Boolean
     val script: String

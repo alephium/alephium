@@ -211,21 +211,16 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
   def func[Unknown: P]: P[Ast.FuncDef[Ctx]] = funcTmp.map { f =>
-    f.body match {
-      case Some(statements) =>
-        Ast.FuncDef(
-          f.annotations,
-          f.id,
-          f.isPublic,
-          f.usePreapprovedAssets,
-          f.useContractAssets,
-          f.args,
-          f.rtypes,
-          Some(statements)
-        )
-      case None =>
-        throw Compiler.Error(s"Function ${f.id.name} does not have function body")
-    }
+    Ast.FuncDef(
+      f.annotations,
+      f.id,
+      f.isPublic,
+      f.usePreapprovedAssets,
+      f.useContractAssets,
+      f.args,
+      f.rtypes,
+      f.body
+    )
   }
 
   def eventFields[Unknown: P]: P[Seq[Ast.EventField]] = P("(" ~ eventField.rep(0, ",") ~ ")")
