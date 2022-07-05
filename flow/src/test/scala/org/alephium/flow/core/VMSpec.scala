@@ -1790,6 +1790,133 @@ class VMSpec extends AlephiumSpec {
       fail(contract, "abstract TxContract Parent0 has no unimplemented methods")
     }
 
+    {
+      info("conflicting abstract methods between abstract TxContract")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  pub fn foo() -> () {
+           |    p()
+           |  }
+           |
+           |  fn p() -> () {
+           |    emit Parent0(0)
+           |    emit Parent1(1)
+           |  }
+           |}
+           |
+           |abstract TxContract Parent0(mut x: U256) {
+           |  event Parent0(x: U256)
+           |  fn p() -> ()
+           |}
+           |
+           |abstract TxContract Parent1(mut x: U256) {
+           |  event Parent1(x: U256)
+           |  fn p() -> ()
+           |}
+           |""".stripMargin
+
+      fail(contract, "These abstract functions are defined multiple times: p")
+    }
+
+    {
+      info("conflicting abstract methods between abstract TxContract and Interface")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent1(x) implements Parent0 {
+           |  pub fn foo() -> () {
+           |    p()
+           |  }
+           |
+           |  fn p() -> () {
+           |    emit Parent0(0)
+           |    emit Parent1(1)
+           |  }
+           |}
+           |
+           |Interface Parent0 {
+           |  event Parent0(x: U256)
+           |  fn p() -> ()
+           |}
+           |
+           |abstract TxContract Parent1(mut x: U256) {
+           |  event Parent1(x: U256)
+           |  fn p() -> ()
+           |}
+           |""".stripMargin
+
+      fail(contract, "These abstract functions are defined multiple times: p")
+    }
+
+    {
+      info("conflicting method implementation between abstract TxContract")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  pub fn foo() -> () {
+           |    p()
+           |  }
+           |  fn p0() -> () {
+           |    return
+           |  }
+           |}
+           |
+           |abstract TxContract Parent0(mut x: U256) {
+           |  event Parent0(x: U256)
+           |  fn p() -> () {
+           |    emit Parent0(0)
+           |  }
+           |}
+           |
+           |abstract TxContract Parent1(mut x: U256) {
+           |  event Parent1(x: U256)
+           |  fn p() -> () {
+           |    emit Parent1(1)
+           |  }
+           |  fn p0() -> ()
+           |}
+           |""".stripMargin
+
+      fail(contract, "These functions are implemented multiple times: p")
+    }
+
+    {
+      info("conflicting method implementation between TxContract and abstract TxContract")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  pub fn foo() -> () {
+           |    p()
+           |  }
+           |  fn p() -> () {
+           |    emit Parent0(0)
+           |  }
+           |  fn p0() -> () {
+           |    return
+           |  }
+           |}
+           |
+           |abstract TxContract Parent0(mut x: U256) {
+           |  event Parent0(x: U256)
+           |  fn p() -> ()
+           |}
+           |
+           |abstract TxContract Parent1(mut x: U256) {
+           |  event Parent1(x: U256)
+           |  fn p() -> () {
+           |    emit Parent1(1)
+           |  }
+           |  fn p0() -> ()
+           |}
+           |""".stripMargin
+
+      fail(contract, "These functions are implemented multiple times: p")
+    }
+
     def success(contract: String) = {
       val contractOutputRef = createContract(contract, AVector(Val.U256(0)))
       val contractId        = contractOutputRef.key.toHexString
