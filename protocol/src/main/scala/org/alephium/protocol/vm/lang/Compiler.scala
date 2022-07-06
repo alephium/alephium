@@ -268,7 +268,7 @@ object Compiler {
         Ast.FuncId.empty,
         0,
         script.funcTable,
-        immutable.Map(script.ident -> script.funcTable)
+        immutable.Map(script.ident -> ContractInfo(ContractKind.TxScript, script.funcTable))
       )
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
@@ -276,8 +276,18 @@ object Compiler {
         multiContract: MultiTxContract,
         contractIndex: Int
     ): State[StatefulContext] = {
-      val contractsTable = multiContract.contracts.map(c => c.ident -> c.funcTable).toMap
-      val contract       = multiContract.get(contractIndex)
+      val contractsTable = multiContract.contracts.map { contract =>
+        val kind = contract match {
+          case _: Ast.ContractInterface =>
+            ContractKind.Interface
+          case _: Ast.TxScript =>
+            ContractKind.TxScript
+          case txContract: Ast.TxContract =>
+            ContractKind.TxContract(txContract.isAbstract)
+        }
+        contract.ident -> ContractInfo(kind, contract.funcTable)
+      }.toMap
+      val contract = multiContract.get(contractIndex)
       StateForContract(
         contract.isInstanceOf[Ast.TxScript],
         mutable.HashMap.empty,
@@ -290,13 +300,43 @@ object Compiler {
     }
   }
 
+  sealed trait ContractKind extends Serializable with Product {
+    def instantiable: Boolean
+    def inheritable: Boolean
+
+    override def toString(): String = productPrefix
+  }
+  object ContractKind {
+    case object TxScript extends ContractKind {
+      def instantiable: Boolean = false
+      def inheritable: Boolean  = false
+    }
+    case object Interface extends ContractKind {
+      def instantiable: Boolean = true
+      def inheritable: Boolean  = true
+    }
+    final case class TxContract(isAbstract: Boolean) extends ContractKind {
+      def instantiable: Boolean = !isAbstract
+      def inheritable: Boolean  = isAbstract
+
+      override def toString(): String = {
+        if (isAbstract) "abstract TxContract" else "TxContract"
+      }
+    }
+  }
+
+  final case class ContractInfo[Ctx <: StatelessContext](
+      kind: ContractKind,
+      funcs: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
+  )
+
   // scalastyle:off number.of.methods
   sealed trait State[Ctx <: StatelessContext] {
     def varTable: mutable.HashMap[String, VarInfo]
     var scope: Ast.FuncId
     var varIndex: Int
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
-    def contractTable: immutable.Map[Ast.TypeId, immutable.Map[Ast.FuncId, ContractFunc[Ctx]]]
+    def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
     private var freshNameIndex: Int              = 0
     private var arrayIndexVar: Option[Ast.Ident] = None
     def eventsInfo: Seq[EventInfo]
@@ -505,9 +545,12 @@ object Compiler {
     }
 
     def getFunc(typeId: Ast.TypeId, callId: Ast.FuncId): FuncInfo[Ctx] = {
-      contractTable
-        .getOrElse(typeId, throw Error(s"Contract ${typeId.name} does not exist"))
+      getContractInfo(typeId).funcs
         .getOrElse(callId, throw Error(s"Function ${typeId}.${callId.name} does not exist"))
+    }
+
+    def getContractInfo(typeId: Ast.TypeId): ContractInfo[Ctx] = {
+      contractTable.getOrElse(typeId, throw Error(s"Contract ${typeId.name} does not exist"))
     }
 
     def getEvent(typeId: Ast.TypeId): EventInfo = {
@@ -562,7 +605,7 @@ object Compiler {
       var scope: Ast.FuncId,
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatelessContext]],
-      contractTable: immutable.Map[Ast.TypeId, Contract[StatelessContext]]
+      contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatelessContext]]
   ) extends State[StatelessContext] {
     override def eventsInfo: Seq[EventInfo] = Seq.empty
 
@@ -634,7 +677,7 @@ object Compiler {
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatefulContext]],
       eventsInfo: Seq[EventInfo],
-      contractTable: immutable.Map[Ast.TypeId, Contract[StatefulContext]]
+      contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatefulContext]]
   ) extends State[StatefulContext] {
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatefulContext] = {
       BuiltIn.statefulFuncs

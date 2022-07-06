@@ -1523,7 +1523,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |TxContract Grandparent(mut x: U256) {
+           |abstract TxContract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
            |  fn gp() -> () {
@@ -1532,7 +1532,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
            |  event Parent0(x: U256)
            |
            |  fn p0() -> () {
@@ -1541,7 +1541,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
            |  fn p1() -> () {
@@ -1582,7 +1582,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
            |  fn gp() -> () {
@@ -1682,7 +1682,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
            |  fn gp() -> () {
@@ -1743,51 +1743,6 @@ class VMSpec extends AlephiumSpec {
            |""".stripMargin
 
       fail(contract, "TxContract Parent0 has unimplemented methods: gp")
-    }
-
-    {
-      info("use abstract keyword for non abstract TxContract")
-
-      val contract: String =
-        s"""
-           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
-           |  pub fn foo() -> () {
-           |    p0()
-           |    p1()
-           |    gp()
-           |  }
-           |}
-           |
-           |abstract TxContract Grandparent(mut x: U256) {
-           |  event GP(value: U256)
-           |  fn gp() -> ()
-           |}
-           |
-           |abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
-           |  event Parent0(x: U256)
-           |
-           |  fn gp() -> () {
-           |    x = x + 1
-           |    emit GP(x)
-           |  }
-           |
-           |  fn p0() -> () {
-           |    emit Parent0(1)
-           |    gp()
-           |  }
-           |}
-           |
-           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
-           |  event Parent1(x: U256)
-           |
-           |  fn p1() -> () {
-           |    emit Parent1(2)
-           |    gp()
-           |  }
-           |}
-           |""".stripMargin
-
-      fail(contract, "abstract TxContract Parent0 has no unimplemented methods")
     }
 
     {
@@ -2784,7 +2739,7 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
-  it should "work with abstract contract" in new ContractFixture {
+  it should "not instantiate with abstract contract" in new ContractFixture {
     val abstractContract =
       s"""
          |abstract TxContract AC() {
@@ -2813,14 +2768,15 @@ class VMSpec extends AlephiumSpec {
          |@using(preapprovedAssets = false)
          |TxScript Main {
          |  let impl = AC(#${contractId.toHexString})
-         |  assert!(impl.f1() == 1)
-         |  assert!(impl.f2() == 2)
          |}
          |
          |$abstractContract
          |""".stripMargin
 
-    callTxScript(main)
+    Compiler
+      .compileTxScript(main)
+      .leftValue
+      .message is "AC is not instantiable"
   }
 
   it should "inherit interface events" in new ContractFixture {

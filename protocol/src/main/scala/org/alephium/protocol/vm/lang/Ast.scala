@@ -239,11 +239,16 @@ object Ast {
       extends Expr[Ctx] {
     override protected def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       state.checkContractType(contractType)
+
       if (address.getType(state) != Seq(Type.ByteVec)) {
         throw Compiler.Error(s"Invalid expr $address for contract address")
-      } else {
-        Seq(Type.Contract.stack(contractType))
       }
+
+      if (!state.getContractInfo(contractType).kind.instantiable) {
+        throw Compiler.Error(s"${contractType.name} is not instantiable")
+      }
+
+      Seq(Type.Contract.stack(contractType))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
@@ -858,6 +863,13 @@ object Ast {
           )
         )
       )
+      inheritances.foreach { inheritance =>
+        val id   = inheritance.parentId
+        val kind = state.getContractInfo(id).kind
+        if (!kind.inheritable) {
+          throw Compiler.Error(s"$kind ${id.name} can not be inherited")
+        }
+      }
       super.check(state)
     }
 
@@ -1057,12 +1069,6 @@ object Ast {
             val methodNames = unimplementedFuncs.map(_.name).mkString(",")
             throw Compiler.Error(
               s"TxContract ${txContract.name} has unimplemented methods: $methodNames"
-            )
-          }
-
-          if (txContract.isAbstract && unimplementedFuncs.isEmpty) {
-            throw Compiler.Error(
-              s"abstract TxContract ${txContract.name} has no unimplemented methods"
             )
           }
 

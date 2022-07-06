@@ -1768,7 +1768,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "test contract inheritance compilation" in {
     val parent =
       s"""
-         |TxContract Parent(mut x: U256) {
+         |abstract TxContract Parent(mut x: U256) {
          |  event Foo()
          |
          |  pub fn foo() -> () {
@@ -1931,13 +1931,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |
-           |TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
            |  fn p0(a: Bool, b: Bool) -> () {
            |    gp(a)
            |  }
            |}
            |
-           |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
            |  fn p1(a: Bool, b: Bool, c: Bool) -> () {
            |    gp(a)
            |  }
@@ -2056,7 +2056,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Contract inherits both interface and contract")
       val foo1: String =
         s"""
-           |TxContract Foo1() {
+           |abstract TxContract Foo1() {
            |  fn foo1() -> () {}
            |}
            |""".stripMargin
@@ -2351,9 +2351,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test contract constant variables" in new TestContractMethodFixture {
-    val foo =
+    def foo(isAbstract: Boolean) = {
+      val `abstract` = if (isAbstract) "abstract " else ""
       s"""
-         |TxContract Foo() {
+         |${`abstract`}TxContract Foo() {
          |  const C0 = 0
          |  const C1 = #00
          |  pub fn foo() -> () {
@@ -2362,10 +2363,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
+    }
 
     {
       info("Contract constant variables")
-      test(foo)
+      test(foo(false))
     }
 
     {
@@ -2383,7 +2385,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    assert!(C3 == @$address)
            |  }
            |}
-           |$foo
+           |${foo(true)}
            |""".stripMargin
       test(bar, methodIndex = 0)
       test(bar, methodIndex = 1)
@@ -2428,9 +2430,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test contract enums" in new TestContractMethodFixture {
-    val foo =
+    def foo(isAbstract: Boolean): String = {
+      val `abstract` = if (isAbstract) "abstract " else ""
       s"""
-         |TxContract Foo() {
+         |${`abstract`}TxContract Foo() {
          |  enum FooErrorCodes {
          |    Error0 = 0
          |    Error1 = 1
@@ -2441,10 +2444,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
+    }
 
     {
       info("Contract enums")
-      test(foo)
+      test(foo(false))
     }
 
     {
@@ -2463,7 +2467,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    assert!(BarValues.Value1 == #01)
            |  }
            |}
-           |$foo
+           |${foo(true)}
            |""".stripMargin
       test(bar, methodIndex = 0)
       test(bar, methodIndex = 1)
