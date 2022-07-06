@@ -2705,9 +2705,20 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
 
+    val interface2 =
+      s"""
+         |Interface I2 {
+         |  pub fn f4() -> U256
+         |}
+         |""".stripMargin
+
     val contract =
       s"""
-         |TxContract Foo() implements I {
+         |TxContract Foo() implements I, I2 {
+         |  pub fn f4() -> U256 {
+         |    return 2
+         |  }
+         |
          |  pub fn f3() -> ByteVec {
          |    return #00
          |  }
@@ -2722,6 +2733,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |
          |$interface
+         |$interface2
          |""".stripMargin
 
     val contractId = createContract(contract, AVector.empty).key
@@ -2735,6 +2747,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |
          |$interface
+         |$interface2
          |""".stripMargin
 
     callTxScript(main)
