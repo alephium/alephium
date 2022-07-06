@@ -468,8 +468,18 @@ object StatefulParser extends Parser[StatefulContext] {
     P(Lexer.keyword("extends") ~ (contractInheritance.rep(1, ",")))
 
   def contractInheritances[Unknown: P]: P[Seq[Ast.Inheritance]] = {
-    P(contractExtending.? ~ interfaceImplementing.?).map { case (extendingsOpt, implementingOpt) =>
-      extendingsOpt.getOrElse(Seq.empty) ++ implementingOpt.getOrElse(Seq.empty)
+    P(contractExtending.? ~ interfaceImplementing.?).map {
+      case (extendingsOpt, implementingOpt) => {
+        val implementedInterfaces = implementingOpt.getOrElse(Seq.empty)
+        if (implementedInterfaces.length > 1) {
+          val interfaceNames = implementedInterfaces.map(_.parentId.name).mkString(", ")
+          throw Compiler.Error(
+            s"TxContract only supports implementing single interface: $interfaceNames"
+          )
+        }
+
+        extendingsOpt.getOrElse(Seq.empty) ++ implementedInterfaces
+      }
     }
   }
 
@@ -556,7 +566,7 @@ object StatefulParser extends Parser[StatefulContext] {
       inheritances match {
         case Some(parents) if parents.length > 1 =>
           throw Compiler.Error(
-            s"Interface only supports single inheritance: ${parents.map(_.parentId.name).mkString(",")}"
+            s"Interface only supports single inheritance: ${parents.map(_.parentId.name).mkString(", ")}"
           )
         case _ => ()
       }

@@ -741,7 +741,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val error = intercept[Compiler.Error](fastparse.parse(code, StatefulParser.interface(_)))
-      error.message is "Interface only supports single inheritance: Parent0,Parent1"
+      error.message is "Interface only supports single inheritance: Parent0, Parent1"
     }
 
     {
@@ -776,6 +776,58 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         Seq(InterfaceInheritance(TypeId("Parent")))
       )
+    }
+
+    {
+      info("Contract supports extends multiple contracts")
+      val code =
+        s"""
+           |TxContract Child() extends Parent0(), Parent1() implements Parent2 {
+           |  fn foo() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+        false,
+        TypeId("Child"),
+        Seq.empty,
+        Seq.empty,
+        Seq(
+          FuncDef(
+            Seq.empty,
+            FuncId("foo", false),
+            false,
+            false,
+            false,
+            Seq.empty,
+            Seq.empty,
+            Some(Seq(ReturnStmt(Seq.empty)))
+          )
+        ),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
+        Seq(
+          ContractInheritance(TypeId("Parent0"), Seq.empty),
+          ContractInheritance(TypeId("Parent1"), Seq.empty),
+          InterfaceInheritance(TypeId("Parent2"))
+        )
+      )
+    }
+
+    {
+      info("Contract can only implement single interface")
+      val code =
+        s"""
+           |TxContract Child() extends Parent0(), Parent1() implements Parent3, Parent4 {
+           |  fn foo() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](fastparse.parse(code, StatefulParser.contract(_)))
+      error.message is "TxContract only supports implementing single interface: Parent3, Parent4"
     }
   }
 

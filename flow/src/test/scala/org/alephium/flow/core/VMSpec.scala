@@ -2696,48 +2696,92 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "work with interface" in new ContractFixture {
-    val interface =
-      s"""
-         |Interface I {
-         |  pub fn f1() -> U256
-         |  pub fn f2() -> U256
-         |  pub fn f3() -> ByteVec
-         |}
-         |""".stripMargin
 
-    val contract =
-      s"""
-         |TxContract Foo() implements I {
-         |  pub fn f3() -> ByteVec {
-         |    return #00
-         |  }
-         |
-         |  pub fn f2() -> U256 {
-         |    return 2
-         |  }
-         |
-         |  pub fn f1() -> U256 {
-         |    return 1
-         |  }
-         |}
-         |
-         |$interface
-         |""".stripMargin
+    {
+      info("works with single inheritance")
 
-    val contractId = createContract(contract, AVector.empty).key
+      val interface =
+        s"""
+           |Interface I {
+           |  pub fn f1() -> U256
+           |  pub fn f2() -> U256
+           |  pub fn f3() -> ByteVec
+           |}
+           |""".stripMargin
 
-    val main =
-      s"""
-         |@using(preapprovedAssets = false)
-         |TxScript Main {
-         |  let impl = I(#${contractId.toHexString})
-         |  assert!(impl.f1() == 1)
-         |}
-         |
-         |$interface
-         |""".stripMargin
+      val contract =
+        s"""
+           |TxContract Foo() implements I {
+           |  pub fn f3() -> ByteVec {
+           |    return #00
+           |  }
+           |
+           |  pub fn f2() -> U256 {
+           |    return 2
+           |  }
+           |
+           |  pub fn f1() -> U256 {
+           |    return 1
+           |  }
+           |}
+           |
+           |$interface
+           |""".stripMargin
 
-    callTxScript(main)
+      val contractId = createContract(contract, AVector.empty).key
+
+      val main =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  let impl = I(#${contractId.toHexString})
+           |  assert!(impl.f1() == 1)
+           |}
+           |
+           |$interface
+           |""".stripMargin
+
+      callTxScript(main)
+    }
+
+    {
+      info("fail with multiple inheritance")
+
+      val interface1 =
+        s"""
+           |Interface I1 {
+           |  pub fn f1() -> U256
+           |}
+           |""".stripMargin
+
+      val interface2 =
+        s"""
+           |Interface I2 {
+           |  pub fn f2() -> U256
+           |}
+           |""".stripMargin
+
+      val contract =
+        s"""
+           |TxContract Foo() implements I1, I2 {
+           |  pub fn f2() -> U256 {
+           |    return 2
+           |  }
+           |
+           |  pub fn f1() -> U256 {
+           |    return 1
+           |  }
+           |}
+           |
+           |$interface1
+           |$interface2
+           |""".stripMargin
+
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "TxContract only supports implementing single interface: I1, I2"
+    }
   }
 
   it should "work with abstract contract" in new ContractFixture {
