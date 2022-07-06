@@ -320,6 +320,75 @@ object Ast {
       expr.genCode(state)
   }
 
+  trait IfBranch[Ctx <: StatelessContext] {
+    def condition: Expr[Ctx]
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
+  }
+  trait ElseBranch[Ctx <: StatelessContext] {
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
+  }
+  trait IfElse[Ctx <: StatelessContext] {
+    def ifBranches: Seq[IfBranch[Ctx]]
+    def elseBranchOpt: Option[ElseBranch[Ctx]]
+
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val ifBranchesIRs = Array.ofDim[Seq[Instr[Ctx]]](ifBranches.length + 1)
+      val elseOffsets   = Array.ofDim[Int](ifBranches.length + 1)
+      val elseBodyIRs   = elseBranchOpt.map(_.genCode(state)).getOrElse(Seq.empty)
+      ifBranchesIRs(ifBranches.length) = elseBodyIRs
+      elseOffsets(ifBranches.length) = elseBodyIRs.length
+      ifBranches.zipWithIndex.view.reverse.foreach { case (ifBranch, index) =>
+        val initialOffset    = elseOffsets(index + 1)
+        val notTheLastBranch = index < ifBranches.length - 1 || elseBranchOpt.nonEmpty
+
+        val bodyIRsWithoutOffset = ifBranch.genCode(state)
+        val bodyOffsetIR = if (notTheLastBranch) {
+          Seq(Jump(initialOffset))
+        } else {
+          Seq.empty
+        }
+        val bodyIRs = bodyIRsWithoutOffset ++ bodyOffsetIR
+
+        val conditionOffset =
+          if (notTheLastBranch) bodyIRs.length else bodyIRs.length + initialOffset
+        val conditionIRs = Statement.getCondIR(ifBranch.condition, state, conditionOffset)
+        ifBranchesIRs(index) = conditionIRs ++ bodyIRs
+        elseOffsets(index) = initialOffset + bodyIRs.length + conditionIRs.length
+      }
+      ifBranchesIRs.reduce(_ ++ _)
+    }
+  }
+
+  final case class IfBranchExpr[Ctx <: StatelessContext](
+      condition: Expr[Ctx],
+      expr: Expr[Ctx]
+  ) extends IfBranch[Ctx] {
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = expr.genCode(state)
+  }
+  final case class ElseBranchExpr[Ctx <: StatelessContext](
+      expr: Expr[Ctx]
+  ) extends ElseBranch[Ctx] {
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = expr.genCode(state)
+  }
+  final case class IfElseExpr[Ctx <: StatelessContext](
+      ifBranches: Seq[IfBranchExpr[Ctx]],
+      elseBranch: ElseBranchExpr[Ctx]
+  ) extends IfElse[Ctx]
+      with Expr[Ctx] {
+    def elseBranchOpt: Option[ElseBranch[Ctx]] = Some(elseBranch)
+
+    def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      val elseBranchType = elseBranch.expr.getType(state)
+      ifBranches.foreach { ifBranch =>
+        if (ifBranch.expr.getType(state) != elseBranchType) {
+          throw Compiler.Error("There are different types of if-else expression branches")
+        }
+      }
+      elseBranchType
+    }
+  }
+
   sealed trait Statement[Ctx <: StatelessContext] {
     def check(state: Compiler.State[Ctx]): Unit
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
@@ -415,9 +484,9 @@ object Ast {
     private def checkRetTypes(stmt: Option[Statement[Ctx]]): Unit = {
       stmt match {
         case Some(_: ReturnStmt[Ctx]) => // we checked the `rtypes` in `ReturnStmt`
-        case Some(IfElse(ifBranches, elseBranch)) =>
+        case Some(IfElseStatement(ifBranches, elseBranchOpt)) =>
           ifBranches.foreach(branch => checkRetTypes(branch.body.lastOption))
-          checkRetTypes(elseBranch.body.lastOption)
+          checkRetTypes(elseBranchOpt.flatMap(_.body.lastOption))
         case _ => throw new Compiler.Error(s"Expect return statement for function ${id.name}")
       }
     }
@@ -615,17 +684,23 @@ object Ast {
         Seq.fill[Instr[StatefulContext]](ArrayTransformer.flattenTypeLength(returnType))(Pop)
     }
   }
-  final case class IfBranch[Ctx <: StatelessContext](
+
+  final case class IfBranchStatement[Ctx <: StatelessContext](
       condition: Expr[Ctx],
       body: Seq[Statement[Ctx]]
-  )
-  final case class ElseBranch[Ctx <: StatelessContext](
+  ) extends IfBranch[Ctx] {
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = body.flatMap(_.genCode(state))
+  }
+  final case class ElseBranchStatement[Ctx <: StatelessContext](
       body: Seq[Statement[Ctx]]
-  )
-  final case class IfElse[Ctx <: StatelessContext](
-      ifBranches: Seq[IfBranch[Ctx]],
-      elseBranch: ElseBranch[Ctx]
-  ) extends Statement[Ctx] {
+  ) extends ElseBranch[Ctx] {
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = body.flatMap(_.genCode(state))
+  }
+  final case class IfElseStatement[Ctx <: StatelessContext](
+      ifBranches: Seq[IfBranchStatement[Ctx]],
+      elseBranchOpt: Option[ElseBranchStatement[Ctx]]
+  ) extends IfElse[Ctx]
+      with Statement[Ctx] {
     private def checkCondition(state: Compiler.State[Ctx], condition: Expr[Ctx]): Unit = {
       if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid type of condition expr $condition")
@@ -635,35 +710,7 @@ object Ast {
     override def check(state: Compiler.State[Ctx]): Unit = {
       ifBranches.foreach(branch => checkCondition(state, branch.condition))
       ifBranches.foreach(_.body.foreach(_.check(state)))
-      elseBranch.body.foreach(_.check(state))
-    }
-
-    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val ifBranchesIRs = Array.ofDim[Seq[Instr[Ctx]]](ifBranches.length + 1)
-      val elseOffsets   = Array.ofDim[Int](ifBranches.length + 1)
-      val elseBodyIRs   = elseBranch.body.flatMap(_.genCode(state))
-      ifBranchesIRs(ifBranches.length) = elseBodyIRs
-      elseOffsets(ifBranches.length) = elseBodyIRs.length
-      ifBranches.zipWithIndex.view.reverse.foreach { case (ifBranch, index) =>
-        val initialOffset    = elseOffsets(index + 1)
-        val notTheLastBranch = index < ifBranches.length - 1 || elseBranch.body.nonEmpty
-
-        val bodyIRsWithoutOffset = ifBranch.body.flatMap(_.genCode(state))
-        val bodyOffsetIR = if (notTheLastBranch) {
-          Seq(Jump(initialOffset))
-        } else {
-          Seq.empty
-        }
-        val bodyIRs = bodyIRsWithoutOffset ++ bodyOffsetIR
-
-        val conditionOffset =
-          if (notTheLastBranch) bodyIRs.length else bodyIRs.length + initialOffset
-        val conditionIRs = Statement.getCondIR(ifBranch.condition, state, conditionOffset)
-        ifBranchesIRs(index) = conditionIRs ++ bodyIRs
-        elseOffsets(index) = initialOffset + bodyIRs.length + conditionIRs.length
-      }
-      ifBranchesIRs.reduce(_ ++ _)
+      elseBranchOpt.foreach(_.body.foreach(_.check(state)))
     }
   }
   final case class While[Ctx <: StatelessContext](condition: Expr[Ctx], body: Seq[Statement[Ctx]])

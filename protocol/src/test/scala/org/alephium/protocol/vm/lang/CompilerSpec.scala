@@ -2337,6 +2337,101 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
+  it should "compile if-else expressions" in {
+    {
+      info("Simple if expression")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo() -> U256 {
+           |    return if true 0 else 1
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code).rightValue.methods.head.instrs is
+        AVector[Instr[StatefulContext]](
+          ConstTrue,
+          IfFalse(2),
+          U256Const0,
+          Jump(1),
+          U256Const1,
+          Return
+        )
+    }
+
+    {
+      info("Simple if-else-if expression")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo() -> U256 {
+           |    return if false 0 else if true 1 else 2
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code).rightValue.methods.head.instrs is
+        AVector[Instr[StatefulContext]](
+          ConstFalse,
+          IfFalse(2),
+          U256Const0,
+          Jump(5),
+          ConstTrue,
+          IfFalse(2),
+          U256Const1,
+          Jump(1),
+          U256Const2,
+          Return
+        )
+    }
+
+    {
+      info("Invalid if-else expression types")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo() -> U256 {
+           |    return if false 1 else #00
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code).leftValue.message is
+        "There are different types of if-else expression branches"
+    }
+
+    {
+      info("If-else expressions have no else branch")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo() -> U256 {
+           |    return if false 1
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code).leftValue.message is
+        "If else expressions should be terminated with an else branch"
+    }
+
+    new TestContractMethodFixture {
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  pub fn foo(x: U256) -> U256 {
+           |    return if (x == 1) 1 else if (x == 0) 10 else 100
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code, args = AVector(Val.U256(U256.Zero)), result = AVector(Val.U256(U256.unsafe(10))))
+      test(code, args = AVector(Val.U256(U256.One)), result = AVector(Val.U256(U256.unsafe(1))))
+      test(code, args = AVector(Val.U256(U256.Two)), result = AVector(Val.U256(U256.unsafe(100))))
+    }
+  }
+
   it should "compile contract constant variables failed" in {
     val code =
       s"""
