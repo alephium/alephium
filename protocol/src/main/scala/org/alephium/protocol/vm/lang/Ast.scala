@@ -350,7 +350,7 @@ object Ast {
         )
       }
       idents.zip(types).foreach { case ((isMutable, ident), tpe) =>
-        state.addLocalVariable(ident, tpe, isMutable)
+        state.addLocalVariable(ident, tpe, isMutable, false)
       }
     }
 
@@ -424,7 +424,7 @@ object Ast {
 
     def check(state: Compiler.State[Ctx]): Unit = {
       state.checkArguments(args)
-      args.foreach(arg => state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable))
+      args.foreach(arg => state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable, false))
       body.foreach(_.check(state))
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
@@ -432,6 +432,7 @@ object Ast {
     def toMethod(state: Compiler.State[Ctx]): Method[Ctx] = {
       state.setFuncScope(id)
       check(state)
+      state.checkUnusedLocalVars(id)
 
       val instrs    = body.flatMap(_.genCode(state))
       val localVars = state.getLocalVars(id)
@@ -747,7 +748,15 @@ object Ast {
       templateVars.zipWithIndex.foreach { case (temp, index) =>
         state.addTemplateVariable(temp.ident, temp.tpe, index)
       }
-      fields.foreach(field => state.addFieldVariable(field.ident, field.tpe, field.isMutable))
+      fields.foreach(field =>
+        state.addFieldVariable(field.ident, field.tpe, field.isMutable, false)
+      )
+    }
+
+    def getMethods(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
+      val methods = AVector.from(funcs.view.map(_.toMethod(state)))
+      state.checkUnusedGlobalVars()
+      methods
     }
 
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]
@@ -764,8 +773,7 @@ object Ast {
 
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
       check(state)
-      val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
-      StatelessScript.from(methods).getOrElse(throw Compiler.Error("Empty methods"))
+      StatelessScript.from(getMethods(state)).getOrElse(throw Compiler.Error("Empty methods"))
     }
   }
 
@@ -810,9 +818,8 @@ object Ast {
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
-      val methods = AVector.from(funcs.view.map(func => func.toMethod(state)))
       StatefulScript
-        .from(methods)
+        .from(getMethods(state))
         .getOrElse(
           throw Compiler.Error(
             "Expect the 1st function to be public and the other functions to be private for tx script"
@@ -863,7 +870,7 @@ object Ast {
       check(state)
       StatefulContract(
         ArrayTransformer.flattenTypeLength(fields.map(_.tpe)),
-        AVector.from(funcs.view.map(_.toMethod(state)))
+        getMethods(state)
       )
     }
   }

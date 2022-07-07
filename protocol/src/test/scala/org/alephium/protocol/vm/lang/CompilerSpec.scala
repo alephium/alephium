@@ -2469,4 +2469,125 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       test(bar, methodIndex = 1)
     }
   }
+
+  it should "check unused variables" in {
+    {
+      info("Check unused local variables in AssetScript")
+      val code =
+        s"""
+           |AssetScript Foo {
+           |  pub fn foo(a: U256) -> U256 {
+           |    let b = 1
+           |    let c = 2
+           |    return c
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileAssetScript(code).leftValue.message is
+        "Found unused variables in function foo: foo.a, foo.b"
+    }
+
+    {
+      info("Check unused local variables in TxScript")
+      val code =
+        s"""
+           |TxScript Foo {
+           |  let b = 1
+           |  foo()
+           |
+           |  fn foo() -> () {
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(code).leftValue.message is
+        "Found unused variables in function main: main.b"
+    }
+
+    {
+      info("Check unused template variables in TxScript")
+      val code =
+        s"""
+           |TxScript Foo(a: U256, b: U256) {
+           |  foo(a)
+           |
+           |  fn foo(v: U256) -> () {
+           |    assert!(v == 0)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(code).leftValue.message is
+        "Found unused global variables: b"
+    }
+
+    {
+      info("Check unused local variables in TxContract")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo(a: U256) -> U256 {
+           |    let b = 1
+           |    let c = 0
+           |    return c
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Found unused variables in function foo: foo.a, foo.b"
+    }
+
+    {
+      info("Check unused fields in TxContract")
+      val code =
+        s"""
+           |TxContract Foo(a: ByteVec, b: U256, c: [U256; 2]) {
+           |  fn getB() -> U256 {
+           |    return b
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Found unused global variables: a, c"
+    }
+
+    {
+      info("Check unused constants in TxContract")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  const C0 = 0
+           |  const C1 = 1
+           |  fn foo() -> () {
+           |    assert!(C1 == 1)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Found unused global variables: C0"
+    }
+
+    {
+      info("Check unused enums in TxContract")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  enum Chain {
+           |    Alephium = 0
+           |    Eth = 1
+           |  }
+           |
+           |  enum Language {
+           |    Ralph = #00
+           |    Solidity = #01
+           |  }
+           |
+           |  fn foo() -> () {
+           |    assert!(Chain.Alephium == 0)
+           |    assert!(Language.Ralph == #00)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Found unused global variables: Language.Solidity, Chain.Eth"
+    }
+  }
 }
