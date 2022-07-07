@@ -2691,6 +2691,8 @@ class VMSpec extends AlephiumSpec {
            |TxScript Main {
            |  let impl = I(#${contractId.toHexString})
            |  assert!(impl.f1() == 1)
+           |  assert!(impl.f2() == 2)
+           |  assert!(impl.f3() == #00)
            |}
            |
            |$interface
