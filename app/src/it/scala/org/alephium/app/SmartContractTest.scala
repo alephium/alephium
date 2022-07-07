@@ -167,8 +167,8 @@ class SmartContractTest extends AlephiumActorSpec {
     val contract =
       s"""
          |TxContract Foo(a: Bool, b: I256, c: U256, d: ByteVec, e: Address) {
-         |  pub fn foo() -> () {
-         |    return
+         |  pub fn foo() -> (Bool, I256, U256, ByteVec, Address) {
+         |    return a, b, c, d, e
          |  }
          |}
          |""".stripMargin
@@ -213,21 +213,21 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = None,
-        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.unsafe(0)))),
+        initialFields = None,
         issueTokenAmount = Some(1024)
       )
 
     val rawUnsignedTx = Hex.from(tokenContractBuildResult.unsignedTx).value
     val unsignedTx    = deserialize[UnsignedTransaction](rawUnsignedTx).rightValue
 
-    val scriptGas = estimateBuildContractGas(SwapContracts.tokenContract, Some("[0u]"), Some(1024))
+    val scriptGas = estimateBuildContractGas(SwapContracts.tokenContract, None, Some(1024))
     val gasWithoutScript = GasEstimation.estimateWithP2PKHInputs(
       unsignedTx.inputs.length,
       unsignedTx.fixedOutputs.length
     )
 
     gasWithoutScript.addUnsafe(scriptGas) is unsignedTx.gasAmount
-    unsignedTx.gasAmount is GasBox.unsafe(57068)
+    unsignedTx.gasAmount is GasBox.unsafe(57034)
 
     clique.stop()
   }
@@ -237,7 +237,7 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = Some(100000),
-        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.unsafe(0)))),
+        initialFields = None,
         issueTokenAmount = Some(1024)
       )
     val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
@@ -257,7 +257,7 @@ class SmartContractTest extends AlephiumActorSpec {
     )
 
     gasWithoutScript.addUnsafe(scriptGas) is unsignedTx.gasAmount
-    unsignedTx.gasAmount is GasBox.unsafe(32342)
+    unsignedTx.gasAmount is GasBox.unsafe(32338)
 
     clique.stop()
   }
@@ -269,7 +269,7 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = Some(100000),
-        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.unsafe(0)))),
+        initialFields = None,
         issueTokenAmount = Some(1024)
       )
     val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
@@ -364,7 +364,7 @@ class SmartContractTest extends AlephiumActorSpec {
       contract(
         SwapContracts.tokenContract,
         gas = Some(100000),
-        initialFields = Some(AVector[vm.Val](vm.Val.U256(U256.Zero))),
+        initialFields = None,
         issueTokenAmount = Some(1024)
       )
     val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
@@ -552,7 +552,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
 object SwapContracts {
   val tokenContract = s"""
-                         |TxContract Token(mut x: U256) {
+                         |TxContract Token() {
                          |
                          |  @using(assetsInContract = true)
                          |  pub fn withdraw(address: Address, amount: U256) -> () {

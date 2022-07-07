@@ -96,7 +96,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val contract =
         s"""
            |// comment
-           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |TxContract Foo(mut x: U256, mut y: U256) {
            |  // comment
            |  pub fn add0(a: U256, b: U256) -> (U256) {
            |    return (a + b)
@@ -227,8 +227,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileContract(input, 0).isRight is true
-    Compiler.compileTxScript(input, 1).isRight is true
+    Compiler.compileContract(input, 0, true).isRight is true
+    Compiler.compileTxScript(input, 1, true).isRight is true
   }
 
   it should "check function return types" in {
@@ -391,22 +391,24 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     )
     succeed.foreach { code =>
-      Compiler.compileContract(code).isRight is true
+      Compiler.compileContract(code, false).isRight is true
     }
   }
 
   trait Fixture {
     def test(
         input: String,
-        args: AVector[Val],
+        args: AVector[Val] = AVector.empty,
         output: AVector[Val] = AVector.empty,
-        fields: AVector[Val] = AVector.empty
+        fields: AVector[Val] = AVector.empty,
+        methodIndex: Int = 0,
+        checkUnusedVars: Boolean = true
     ): Assertion = {
-      val contract = Compiler.compileContract(input).toOption.get
+      val contract = Compiler.compileContract(input, checkUnusedVars).toOption.get
 
       deserialize[StatefulContract](serialize(contract)) isE contract
       val (obj, context) = prepareContract(contract, fields)
-      StatefulVM.executeWithOutputs(context, obj, args) isE output
+      StatefulVM.executeWithOutputs(context, obj, args, methodIndex) isE output
     }
   }
 
@@ -583,7 +585,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin,
-      AVector.empty
+      AVector.empty,
+      checkUnusedVars = false
     )
 
     test(
@@ -894,21 +897,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  trait TestContractMethodFixture {
-    def test(
-        contractCode: String,
-        initFields: AVector[Val] = AVector.empty,
-        methodIndex: Int = 0,
-        args: AVector[Val] = AVector.empty,
-        result: AVector[Val] = AVector.empty
-    ) = {
-      val contract       = Compiler.compileContract(contractCode).rightValue
-      val (obj, context) = prepareContract(contract, initFields)
-      StatefulVM.executeWithOutputs(context, obj, args, methodIndex).rightValue is result
-    }
-  }
-
-  it should "test array" in new TestContractMethodFixture {
+  it should "test array" in new Fixture {
     {
       info("get array element from array literal")
       val code =
@@ -1007,7 +996,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      test(code, args = AVector(Val.False, Val.True), result = AVector(Val.True, Val.False))
+      test(code, args = AVector(Val.False, Val.True), output = AVector(Val.True, Val.False))
     }
 
     {
@@ -1209,7 +1198,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val contract = Compiler.compileContract(code).rightValue
+    val contract = Compiler.compileContract(code, false).rightValue
     // format: off
     contract.methods(0) is Method[StatefulContext](
       isPublic = false,
@@ -1284,7 +1273,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val contract       = Compiler.compileContract(code).rightValue
+    val contract       = Compiler.compileContract(code, false).rightValue
     val (obj, context) = prepareContract(contract, AVector.fill(7)(Val.U256(0)))
 
     def test(methodIndex: Int, args: AVector[Val]) = {
@@ -1303,7 +1292,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     test(3, AVector(Val.U256(3), Val.U256(0)))
   }
 
-  it should "test contract array fields" in new TestContractMethodFixture {
+  it should "test contract array fields" in new Fixture {
     {
       info("array fields assignment")
       val code =
@@ -1328,7 +1317,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       val args = AVector.from[Val]((0 until 8).map(Val.U256(_)))
-      test(code, initFields = AVector.fill(8)(Val.U256(0)), args = args)
+      test(code, fields = AVector.fill(8)(Val.U256(0)), args = args)
     }
 
     {
@@ -1353,7 +1342,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      test(code, initFields = AVector(Val.U256(0)))
+      test(code, fields = AVector(Val.U256(0)), checkUnusedVars = false)
     }
 
     {
@@ -1386,7 +1375,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      test(code, initFields = AVector.fill(8)(Val.U256(0)))
+      test(code, fields = AVector.fill(8)(Val.U256(0)))
     }
 
     {
@@ -1420,7 +1409,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      test(code, initFields = AVector.fill(9)(Val.U256(0)))
+      test(code, fields = AVector.fill(9)(Val.U256(0)))
     }
   }
 
@@ -1529,7 +1518,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     codes.foreach(Compiler.compileContract(_).isLeft is true)
   }
 
-  it should "test return multiple values" in new TestContractMethodFixture {
+  it should "test return multiple values" in new Fixture {
     {
       info("return multiple simple values")
       val code =
@@ -1580,7 +1569,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      test(code, initFields = AVector.fill(3)(Val.U256(0)))
+      test(code, fields = AVector.fill(3)(Val.U256(0)))
     }
 
     {
@@ -1606,7 +1595,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "return from if block" in new TestContractMethodFixture {
+  it should "return from if block" in new Fixture {
     val code: String =
       s"""
          |TxContract Foo(mut value: U256) {
@@ -1621,7 +1610,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    test(code, initFields = AVector(Val.U256(0)), result = AVector(Val.U256(1)))
+    test(code, fields = AVector(Val.U256(0)), output = AVector(Val.U256(1)))
   }
 
   it should "generate efficient code for arrays" in {
@@ -1635,7 +1624,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileContract(code).rightValue.methods.head is
+    Compiler.compileContract(code, false).rightValue.methods.head is
       Method[StatefulContext](
         isPublic = true,
         usePreapprovedAssets = false,
@@ -1666,7 +1655,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |TxContract Foo() {
            |
            |  event Add(a: U256, b: U256)
            |
@@ -1684,7 +1673,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |TxContract Foo() {
            |
            |  event Add1(a: U256, b: U256)
            |  event Add2(a: U256, b: U256)
@@ -1704,7 +1693,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |TxContract Foo() {
            |
            |  event Add(a: U256, b: U256)
            |
@@ -1722,7 +1711,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |TxContract Foo() {
            |
            |  event Add1(a: U256, b: U256)
            |  event Add2(a: U256, b: U256)
@@ -1747,7 +1736,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |TxContract Foo() {
            |
            |  event Add(a: U256, b: U256)
            |
@@ -1794,7 +1783,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |$parent
            |""".stripMargin
 
-      Compiler.compileContract(child).isRight is true
+      Compiler.compileContract(child, false).isRight is true
     }
 
     {
@@ -1944,7 +1933,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val contract = Compiler.compileContract(code).rightValue
+      val contract = Compiler.compileContract(code, false).rightValue
       contract.methodsLength is 4
       contract.methods.map(_.argsLength) is AVector(2, 1, 3, 0)
     }
@@ -2209,7 +2198,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     }
-    Compiler.compileContract(code(false)).isRight is true
+    Compiler.compileContract(code(false), false).isRight is true
     Compiler
       .compileContract(code(true))
       .leftValue
@@ -2315,7 +2304,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "If ... else if constructs should be terminated with an else statement"
     }
 
-    new TestContractMethodFixture {
+    new Fixture {
       val code =
         s"""
            |TxContract Foo() {
@@ -2331,9 +2320,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      test(code, args = AVector(Val.U256(U256.Zero)), result = AVector(Val.U256(U256.unsafe(10))))
-      test(code, args = AVector(Val.U256(U256.One)), result = AVector(Val.U256(U256.unsafe(1))))
-      test(code, args = AVector(Val.U256(U256.Two)), result = AVector(Val.U256(U256.unsafe(100))))
+      test(code, args = AVector(Val.U256(U256.Zero)), output = AVector(Val.U256(U256.unsafe(10))))
+      test(code, args = AVector(Val.U256(U256.One)), output = AVector(Val.U256(U256.unsafe(1))))
+      test(code, args = AVector(Val.U256(U256.Two)), output = AVector(Val.U256(U256.unsafe(100))))
     }
   }
 
@@ -2350,7 +2339,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       "These constant variables are defined multiple times: C"
   }
 
-  it should "test contract constant variables" in new TestContractMethodFixture {
+  it should "test contract constant variables" in new Fixture {
     val foo =
       s"""
          |TxContract Foo() {
@@ -2427,7 +2416,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "test contract enums" in new TestContractMethodFixture {
+  it should "test contract enums" in new Fixture {
     val foo =
       s"""
          |TxContract Foo() {
