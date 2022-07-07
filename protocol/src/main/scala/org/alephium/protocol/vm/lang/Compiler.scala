@@ -519,8 +519,13 @@ object Compiler {
         val unusedVars = varTable.filter { case (name, varInfo) =>
           !usedVars.contains(name) && !varInfo.isGenerated
         }
-        if (unusedVars.nonEmpty) {
-          throw Error(s"Found unused global variables: ${unusedVars.keys.mkString(", ")}")
+        val (unusedConstants, unusedFields) =
+          unusedVars.partition(_._2.isInstanceOf[VarInfo.Constant[_]])
+        if (unusedFields.nonEmpty) {
+          throw Error(s"Found unused fields: ${unusedFields.keys.mkString(", ")}")
+        }
+        if (unusedConstants.nonEmpty) {
+          throw Error(s"Found unused constants: ${unusedConstants.keys.mkString(", ")}")
         }
       }
     }

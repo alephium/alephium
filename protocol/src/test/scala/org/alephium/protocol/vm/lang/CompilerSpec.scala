@@ -2505,7 +2505,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileTxScript(code).leftValue.message is
-        "Found unused global variables: b"
+        "Found unused fields: b"
     }
 
     {
@@ -2535,7 +2535,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Found unused global variables: a, c"
+        "Found unused fields: a, c"
     }
 
     {
@@ -2551,7 +2551,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Found unused global variables: C0"
+        "Found unused constants: C0"
     }
 
     {
@@ -2576,7 +2576,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Found unused global variables: Language.Solidity, Chain.Eth"
+        "Found unused constants: Language.Solidity, Chain.Eth"
+    }
+
+    {
+      info("Check unused fields in contract inheritance")
+      val code =
+        s"""
+           |TxContract Foo(a: U256, b: U256, c: [U256; 2]) extends Bar(a, b) {
+           |  pub fn foo() -> () {
+           |  }
+           |}
+           |
+           |TxContract Bar(a: U256, b: U256) {
+           |  pub fn bar() -> U256 {
+           |    return a
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Found unused fields: b, c"
     }
   }
 }
