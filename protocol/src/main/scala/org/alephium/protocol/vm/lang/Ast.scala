@@ -978,8 +978,11 @@ object Ast {
       MultiTxContract(newContracts)
     }
 
-    def genStatefulScript(contractIndex: Int): (StatefulScript, TxScript) = {
-      val state = Compiler.State.buildFor(this, contractIndex)
+    def genStatefulScript(
+        contractIndex: Int,
+        checkUnusedVars: Boolean
+    ): (StatefulScript, TxScript) = {
+      val state = Compiler.State.buildFor(this, contractIndex, checkUnusedVars)
       get(contractIndex) match {
         case script: TxScript => (script.genCode(state), script)
         case _: TxContract => throw Compiler.Error(s"The code is for TxContract, not for TxScript")
@@ -988,8 +991,11 @@ object Ast {
       }
     }
 
-    def genStatefulContract(contractIndex: Int): (StatefulContract, TxContract) = {
-      val state = Compiler.State.buildFor(this, contractIndex)
+    def genStatefulContract(
+        contractIndex: Int,
+        checkUnusedVars: Boolean
+    ): (StatefulContract, TxContract) = {
+      val state = Compiler.State.buildFor(this, contractIndex, checkUnusedVars)
       get(contractIndex) match {
         case contract: TxContract => (contract.genCode(state), contract)
         case _: TxScript => throw Compiler.Error(s"The code is for TxScript, not for TxContract")
