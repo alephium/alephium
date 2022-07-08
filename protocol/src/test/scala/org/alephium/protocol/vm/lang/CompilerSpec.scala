@@ -2469,4 +2469,77 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       test(bar, methodIndex = 1)
     }
   }
+
+  it should "test anonymous variable definitions" in new Fixture {
+    {
+      info("Single anonymous variable")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  pub fn foo() -> () {
+           |    let _ = 0
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).rightValue.methods.head.instrs is
+        AVector[Instr[StatefulContext]](
+          U256Const0,
+          Pop
+        )
+    }
+
+    {
+      info("Pop values for simple anonymous variables")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let (_, a, _) = bar()
+           |    return a
+           |  }
+           |
+           |  pub fn bar() -> (U256, U256, U256) {
+           |    return 0, 1, 2
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).rightValue.methods.head.instrs is
+        AVector[Instr[StatefulContext]](
+          CallLocal(1),
+          Pop,
+          StoreLocal(0),
+          Pop,
+          LoadLocal(0),
+          Return
+        )
+    }
+
+    {
+      info("Pop values for anonymous array variables")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  pub fn foo() -> () {
+           |    let (a, b, c, d) = bar()
+           |    assert!(a == 0 && b[0] == 1 && b[1] == 2 && c== 3)
+           |    assert!(d[0][0] == 4 && d[0][1] == 5 && d[1][0] == 6 && d[1][1] == 7)
+           |
+           |    let (e, _, f, _) = bar()
+           |    assert!(e == 0 && f == 3)
+           |
+           |    let (_, g, _, _) = bar()
+           |    assert!(g[0] == 1 && g[1] == 2)
+           |
+           |    let (_, _, _, h) = bar()
+           |    assert!(h[0][0] == 4 && h[0][1] == 5 && h[1][0] == 6 && h[1][1] == 7)
+           |  }
+           |
+           |  pub fn bar() -> (U256, [U256; 2], U256, [[U256; 2]; 2]) {
+           |    return 0, [1, 2], 3, [[4, 5], [6, 7]]
+           |  }
+           |}
+           |""".stripMargin
+      test(code, AVector.empty)
+    }
+  }
 }

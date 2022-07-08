@@ -136,7 +136,10 @@ class ParserSpec extends AlephiumSpec {
         Const(Val.ByteVec(Hex.unsafe("00")))
       )
     fastparse.parse("let bytes = #", StatefulParser.statement(_)).get.value is
-      VarDef[StatefulContext](Seq((false, Ident("bytes"))), Const(Val.ByteVec(ByteString.empty)))
+      VarDef[StatefulContext](
+        Seq(Ast.NamedVar(false, Ident("bytes"))),
+        Const(Val.ByteVec(ByteString.empty))
+      )
   }
 
   it should "parse return" in {
@@ -342,15 +345,35 @@ class ParserSpec extends AlephiumSpec {
   it should "parse variable definitions" in {
     val states: List[(String, Ast.Statement[StatelessContext])] = List(
       "let (a, b) = foo()" -> Ast.VarDef(
-        Seq((false, Ast.Ident("a")), (false, Ast.Ident("b"))),
+        Seq(Ast.NamedVar(false, Ast.Ident("a")), Ast.NamedVar(false, Ast.Ident("b"))),
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let (a, mut b) = foo()" -> Ast.VarDef(
-        Seq((false, Ast.Ident("a")), (true, Ast.Ident("b"))),
+        Seq(Ast.NamedVar(false, Ast.Ident("a")), Ast.NamedVar(true, Ast.Ident("b"))),
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let (mut a, mut b) = foo()" -> Ast.VarDef(
-        Seq((true, Ast.Ident("a")), (true, Ast.Ident("b"))),
+        Seq(Ast.NamedVar(true, Ast.Ident("a")), Ast.NamedVar(true, Ast.Ident("b"))),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
+      ),
+      "let _ = foo()" -> Ast.VarDef(
+        Seq(Ast.AnonymousVar),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
+      ),
+      "let (_, _) = foo()" -> Ast.VarDef(
+        Seq(Ast.AnonymousVar, Ast.AnonymousVar),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
+      ),
+      "let (_, a, b) = foo()" -> Ast.VarDef(
+        Seq(
+          Ast.AnonymousVar,
+          Ast.NamedVar(false, Ast.Ident("a")),
+          Ast.NamedVar(false, Ast.Ident("b"))
+        ),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
+      ),
+      "let (mut a, _, _) = foo()" -> Ast.VarDef(
+        Seq(Ast.NamedVar(true, Ast.Ident("a")), Ast.AnonymousVar, Ast.AnonymousVar),
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       )
     )

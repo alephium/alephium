@@ -136,13 +136,17 @@ abstract class Parser[Ctx <: StatelessContext] {
   def normalRet[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
     P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.ReturnStmt.apply[Ctx])
 
-  def ident[Unknown: P]: P[(Boolean, Ast.Ident)] = P(Lexer.mut ~ Lexer.ident)
-  def idents[Unknown: P]: P[Seq[(Boolean, Ast.Ident)]] = P(
-    ident.map(Seq(_)) | "(" ~ ident.rep(1, ",") ~ ")"
+  def anonymousVar[Unknown: P]: P[Ast.VarDeclaration] = P("_").map(_ => Ast.AnonymousVar)
+  def namedVar[Unknown: P]: P[Ast.VarDeclaration] =
+    P(Lexer.mut ~ Lexer.ident).map(Ast.NamedVar.tupled)
+
+  def varDeclaration[Unknown: P]: P[Ast.VarDeclaration] = P(namedVar | anonymousVar)
+  def varDeclarations[Unknown: P]: P[Seq[Ast.VarDeclaration]] = P(
+    varDeclaration.map(Seq(_)) | "(" ~ varDeclaration.rep(1, ",") ~ ")"
   )
   def varDef[Unknown: P]: P[Ast.VarDef[Ctx]] =
-    P(Lexer.keyword("let") ~/ idents ~ "=" ~ expr).map { case (idents, expr) =>
-      Ast.VarDef(idents, expr)
+    P(Lexer.keyword("let") ~/ varDeclarations ~ "=" ~ expr).map { case (vars, expr) =>
+      Ast.VarDef(vars, expr)
     }
   def assignmentSimpleTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = P(
     Lexer.ident.map(Ast.AssignmentSimpleTarget.apply[Ctx])
