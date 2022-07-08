@@ -2203,6 +2203,59 @@ class VMSpec extends AlephiumSpec {
     )
   }
 
+  it should "check external method return length" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> (Bool, [U256; 2]) {
+         |    return false, [0; 2]
+         |  }
+         |
+         |  pub fn upgrade(code: ByteVec) -> () {
+         |    migrate!(code)
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, AVector.empty).key
+
+    val script: String =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  let (condition, array) = foo.foo()
+         |  assert!(!condition)
+         |  assert!(array[0] == 0)
+         |  assert!(array[1] == 0)
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+
+    val fooV1: String =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {}
+         |  pub fn upgrade(code: ByteVec) -> () {
+         |    migrate!(code)
+         |  }
+         |}
+         |""".stripMargin
+    val fooV1Bytecode = serialize(Compiler.compileContract(fooV1).rightValue)
+
+    val upgradeFooScript: String =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.upgrade(#${Hex.toHexString(fooV1Bytecode)})
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(upgradeFooScript)
+
+    intercept[AssertionError](callTxScript(script)).getMessage is
+      "Right(TxScriptExeFailed(InvalidExternMethodRetLength))"
+  }
+
   it should "not load contract just after creation" in new ContractFixture {
     val contract: String =
       s"""
