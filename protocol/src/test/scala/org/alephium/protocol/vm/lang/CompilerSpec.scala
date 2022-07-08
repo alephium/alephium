@@ -2104,7 +2104,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     val script = Compiler.compileTxScript(code).rightValue
-    script.toTemplateString() is "0101030001000a{3}1700{0}{1}{2}a3{0}{2}16000100"
+    script.toTemplateString() is "0101030001000b{3}1700{0}{1}{2}a3{0}{2}0c16000100"
   }
 
   it should "use braces syntax for functions that uses preapproved assets" in {

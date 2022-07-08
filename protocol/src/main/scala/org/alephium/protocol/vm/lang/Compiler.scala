@@ -107,6 +107,10 @@ object Compiler {
     def usePreapprovedAssets: Boolean
     def useAssetsInContract: Boolean
     def getReturnType(inputType: Seq[Type]): Seq[Type]
+    def getReturnLength(inputType: Seq[Type]): Int = {
+      val retTypes = getReturnType(inputType)
+      Type.flattenTypeLength(retTypes)
+    }
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
   }

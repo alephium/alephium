@@ -495,7 +495,10 @@ final case class StatefulFrame(
 
   private def popRetLength(): ExeResult[Option[Int]] = {
     if (ctx.getHardFork().isLemanEnabled()) {
-      popOpStackU256().flatMap(_.v.toInt.toRight(InvalidRetLength))
+      popOpStackU256().flatMap(_.v.toInt match {
+        case Some(value) => Right(Some(value))
+        case None        => failed(InvalidRetLength)
+      })
     } else {
       Right(None)
     }

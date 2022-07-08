@@ -32,6 +32,15 @@ sealed trait Type {
 }
 
 object Type {
+  def flattenTypeLength(types: Seq[Type]): Int = {
+    types.foldLeft(0) { case (acc, tpe) =>
+      tpe match {
+        case t: Type.FixedSizeArray => acc + t.flattenSize()
+        case _                      => acc + 1
+      }
+    }
+  }
+
   val primitives: AVector[Type] = AVector[Type](Bool, I256, U256, ByteVec, Address)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))

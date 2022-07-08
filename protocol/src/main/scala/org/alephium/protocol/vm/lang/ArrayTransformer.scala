@@ -61,15 +61,6 @@ object ArrayTransformer {
     }
   }
 
-  def flattenTypeLength(types: Seq[Type]): Int = {
-    types.foldLeft(0) { case (acc, tpe) =>
-      tpe match {
-        case t: Type.FixedSizeArray => acc + t.flattenSize()
-        case _                      => acc + 1
-      }
-    }
-  }
-
   @inline def checkArrayIndex(index: Int, arraySize: Int): Unit = {
     if (index < 0 || index >= arraySize) {
       throw Compiler.Error(s"Invalid array index: $index, array size: $arraySize")
