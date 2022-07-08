@@ -1043,8 +1043,12 @@ class ServerUtils(implicit
           argsLength = 0,
           localsLength = 0,
           returnLength = returnLength,
-          instrs =
-            approveAsset(inputAssets, testGasFee) ++ callExternal(args, methodIndex, contractId)
+          instrs = approveAsset(inputAssets, testGasFee) ++ callExternal(
+            args,
+            methodIndex,
+            returnLength,
+            contractId
+          )
         )
       )
     )
@@ -1064,10 +1068,12 @@ class ServerUtils(implicit
   private def callExternal(
       args: AVector[Val],
       methodIndex: Int,
+      returnLength: Int,
       contractId: ContractId
   ): AVector[Instr[StatefulContext]] = {
     toVmVal(args).map(_.toConstInstr: Instr[StatefulContext]) ++
       AVector[Instr[StatefulContext]](
+        ConstInstr.u256(vm.Val.U256(U256.unsafe(returnLength))),
         BytesConst(vm.Val.ByteVec(contractId.bytes)),
         CallExternal(methodIndex.toByte)
       )

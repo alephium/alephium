@@ -257,7 +257,7 @@ class SmartContractTest extends AlephiumActorSpec {
     )
 
     gasWithoutScript.addUnsafe(scriptGas) is unsignedTx.gasAmount
-    unsignedTx.gasAmount is GasBox.unsafe(32342)
+    unsignedTx.gasAmount is GasBox.unsafe(32345)
 
     clique.stop()
   }

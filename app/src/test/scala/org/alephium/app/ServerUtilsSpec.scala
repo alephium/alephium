@@ -883,7 +883,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
     val callContractResult0 = serverUtils.callContract(blockFlow, params0).rightValue
     callContractResult0.returns is AVector[Val](ValU256(2))
-    callContractResult0.gasUsed is 23189
+    callContractResult0.gasUsed is 23194
     callContractResult0.txOutputs.length is 2
     val contractAttoAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
     callContractResult0.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount0
@@ -902,7 +902,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val params1             = params0.copy(worldStateBlockHash = Some(createContractBlock.hash))
     val callContractResult1 = serverUtils.callContract(blockFlow, params1).rightValue
     callContractResult1.returns is AVector[Val](ValU256(1))
-    callContractResult1.gasUsed is 23189
+    callContractResult1.gasUsed is 23194
     callContractResult1.txOutputs.length is 2
     val contractAttoAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
     callContractResult1.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount1
@@ -1058,7 +1058,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     result0.returns.isEmpty is true
-    result0.gasUsed is 17495
+    result0.gasUsed is 17497
     result0.contracts.length is 1
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
@@ -1109,7 +1109,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 18598
+    result1.gasUsed is 18602
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
@@ -1153,7 +1153,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     result0.returns.isEmpty is true
-    result0.gasUsed is 17504
+    result0.gasUsed is 17506
     result0.contracts.length is 1
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
@@ -1200,7 +1200,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 18569
+    result1.gasUsed is 18573
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
@@ -1244,7 +1244,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     result0.returns.isEmpty is true
-    result0.gasUsed is 17504
+    result0.gasUsed is 17506
     result0.contracts.length is 1
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
@@ -1291,7 +1291,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 18530
+    result1.gasUsed is 18534
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
