@@ -1523,7 +1523,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Grandparent(mut x: U256) {
+           |Abstract TxContract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
            |  fn gp() -> () {
@@ -1532,7 +1532,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
            |  event Parent0(x: U256)
            |
            |  fn p0() -> () {
@@ -1541,7 +1541,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
            |  fn p1() -> () {
@@ -1555,7 +1555,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("Inherit single abstract TxContract")
+      info("Inherit single Abstract TxContract")
 
       val contract: String =
         s"""
@@ -1567,13 +1567,13 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Grandparent(mut x: U256) {
+           |Abstract TxContract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
            |  fn gp() -> ()
            |}
            |
-           |abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
            |  event Parent0(x: U256)
            |
            |  fn p0() -> () {
@@ -1582,7 +1582,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
            |  fn gp() -> () {
@@ -1601,7 +1601,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("Inherit multiple abstract TxContract")
+      info("Inherit multiple Abstract TxContract")
 
       val contract: String =
         s"""
@@ -1618,13 +1618,13 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Grandparent(mut x: U256) {
+           |Abstract TxContract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
            |  fn gp() -> ()
            |}
            |
-           |abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
            |  event Parent0(x: U256)
            |
            |  fn p0() -> () {
@@ -1633,7 +1633,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
            |  fn p1() -> () {
@@ -1647,7 +1647,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("Inherit both abstract TxContract and Interface")
+      info("Inherit both Abstract TxContract and Interface")
 
       val contract: String =
         s"""
@@ -1664,7 +1664,7 @@ class VMSpec extends AlephiumSpec {
            |  fn ggp() -> ()
            |}
            |
-           |abstract TxContract Grandparent(mut x: U256) implements GreatGrandparent {
+           |Abstract TxContract Grandparent(mut x: U256) implements GreatGrandparent {
            |  event GP(value: U256)
            |
            |  fn ggp() -> () {
@@ -1673,7 +1673,7 @@ class VMSpec extends AlephiumSpec {
            |  fn gp() -> ()
            |}
            |
-           |abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
            |  event Parent0(x: U256)
            |
            |  fn p0() -> () {
@@ -1682,7 +1682,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
            |  fn gp() -> () {
@@ -1701,7 +1701,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("miss abstract keyword for abstract TxContract")
+      info("miss abstract keyword for Abstract TxContract")
 
       val contract: String =
         s"""
@@ -1712,7 +1712,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Grandparent(mut x: U256) {
+           |Abstract TxContract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |  fn gp() -> ()
            |}
@@ -1746,7 +1746,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("conflicting abstract methods between abstract TxContract")
+      info("conflicting abstract methods between Abstract TxContract")
 
       val contract: String =
         s"""
@@ -1761,12 +1761,12 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Parent0(mut x: U256) {
+           |Abstract TxContract Parent0(mut x: U256) {
            |  event Parent0(x: U256)
            |  fn p() -> ()
            |}
            |
-           |abstract TxContract Parent1(mut x: U256) {
+           |Abstract TxContract Parent1(mut x: U256) {
            |  event Parent1(x: U256)
            |  fn p() -> ()
            |}
@@ -1776,7 +1776,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("conflicting abstract methods between abstract TxContract and Interface")
+      info("conflicting abstract methods between Abstract TxContract and Interface")
 
       val contract: String =
         s"""
@@ -1796,7 +1796,7 @@ class VMSpec extends AlephiumSpec {
            |  fn p() -> ()
            |}
            |
-           |abstract TxContract Parent1(mut x: U256) {
+           |Abstract TxContract Parent1(mut x: U256) {
            |  event Parent1(x: U256)
            |  fn p() -> ()
            |}
@@ -1806,7 +1806,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("conflicting method implementation between abstract TxContract")
+      info("conflicting method implementation between Abstract TxContract")
 
       val contract: String =
         s"""
@@ -1819,14 +1819,14 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Parent0(mut x: U256) {
+           |Abstract TxContract Parent0(mut x: U256) {
            |  event Parent0(x: U256)
            |  fn p() -> () {
            |    emit Parent0(0)
            |  }
            |}
            |
-           |abstract TxContract Parent1(mut x: U256) {
+           |Abstract TxContract Parent1(mut x: U256) {
            |  event Parent1(x: U256)
            |  fn p() -> () {
            |    emit Parent1(1)
@@ -1839,7 +1839,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("conflicting method implementation between TxContract and abstract TxContract")
+      info("conflicting method implementation between TxContract and Abstract TxContract")
 
       val contract: String =
         s"""
@@ -1855,12 +1855,12 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |abstract TxContract Parent0(mut x: U256) {
+           |Abstract TxContract Parent0(mut x: U256) {
            |  event Parent0(x: U256)
            |  fn p() -> ()
            |}
            |
-           |abstract TxContract Parent1(mut x: U256) {
+           |Abstract TxContract Parent1(mut x: U256) {
            |  event Parent1(x: U256)
            |  fn p() -> () {
            |    emit Parent1(1)
@@ -2744,7 +2744,7 @@ class VMSpec extends AlephiumSpec {
   it should "not instantiate with abstract contract" in new ContractFixture {
     val abstractContract =
       s"""
-         |abstract TxContract AC() {
+         |Abstract TxContract AC() {
          |  pub fn f1() -> U256 {
          |    return 1
          |  }

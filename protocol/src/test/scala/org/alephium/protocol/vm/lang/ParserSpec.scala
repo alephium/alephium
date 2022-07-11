@@ -858,7 +858,7 @@ class ParserSpec extends AlephiumSpec {
       info("Parse abstract contract")
       val code =
         s"""
-           |abstract TxContract Foo() {
+           |Abstract TxContract Foo() {
            |  fn foo() -> ()
            |  fn bar() -> () {
            |    return
@@ -889,7 +889,7 @@ class ParserSpec extends AlephiumSpec {
 
       val code =
         s"""
-           |abstract TxContract Foo() implements Bar {
+           |Abstract TxContract Foo() implements Bar {
            |  fn foo() -> () {
            |    return
            |  }

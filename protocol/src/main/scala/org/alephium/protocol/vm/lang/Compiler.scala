@@ -320,7 +320,7 @@ object Compiler {
       def inheritable: Boolean  = isAbstract
 
       override def toString(): String = {
-        if (isAbstract) "abstract TxContract" else "TxContract"
+        if (isAbstract) "Abstract TxContract" else "TxContract"
       }
     }
   }

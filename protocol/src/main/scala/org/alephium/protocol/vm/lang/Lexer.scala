@@ -134,7 +134,7 @@ object Lexer {
       case _      => Val.Bool(false)
     }
 
-  def `abstract`[Unknown: P]: P[Boolean] = P(keyword("abstract").?.!).map(_.nonEmpty)
+  def `abstract`[Unknown: P]: P[Boolean] = P(keyword("Abstract").?.!).map(_.nonEmpty)
 
   def opByteVecAdd[Unknown: P]: P[Operator] = P("++").map(_ => Concat)
   def opAdd[Unknown: P]: P[Operator]        = P("+").map(_ => Add)
@@ -193,7 +193,7 @@ object Lexer {
     "alph",
     "const",
     "enum",
-    "abstract"
+    "Abstract"
   )
 
   val primTpes: Map[String, Type] =

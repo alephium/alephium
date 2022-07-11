@@ -1768,7 +1768,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "test contract inheritance compilation" in {
     val parent =
       s"""
-         |abstract TxContract Parent(mut x: U256) {
+         |Abstract TxContract Parent(mut x: U256) {
          |  event Foo()
          |
          |  pub fn foo() -> () {
@@ -1931,13 +1931,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |
-           |abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
            |  fn p0(a: Bool, b: Bool) -> () {
            |    gp(a)
            |  }
            |}
            |
-           |abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
            |  fn p1(a: Bool, b: Bool, c: Bool) -> () {
            |    gp(a)
            |  }
@@ -2056,7 +2056,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Contract inherits both interface and contract")
       val foo1: String =
         s"""
-           |abstract TxContract Foo1() {
+           |Abstract TxContract Foo1() {
            |  fn foo1() -> () {}
            |}
            |""".stripMargin
@@ -2352,7 +2352,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
   it should "test contract constant variables" in new TestContractMethodFixture {
     def foo(isAbstract: Boolean) = {
-      val `abstract` = if (isAbstract) "abstract " else ""
+      val `abstract` = if (isAbstract) "Abstract " else ""
       s"""
          |${`abstract`}TxContract Foo() {
          |  const C0 = 0
@@ -2431,7 +2431,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
   it should "test contract enums" in new TestContractMethodFixture {
     def foo(isAbstract: Boolean): String = {
-      val `abstract` = if (isAbstract) "abstract " else ""
+      val `abstract` = if (isAbstract) "Abstract " else ""
       s"""
          |${`abstract`}TxContract Foo() {
          |  enum FooErrorCodes {
