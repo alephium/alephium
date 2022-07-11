@@ -2781,6 +2781,33 @@ class VMSpec extends AlephiumSpec {
       .message is "AC is not instantiable"
   }
 
+  it should "not inherit from the non-abstract contract" in new ContractFixture {
+    val nonAbstractContract =
+      s"""
+         |TxContract C() {
+         |  pub fn f1() -> U256 {
+         |    return 1
+         |  }
+         |}
+         |""".stripMargin
+
+    val contract =
+      s"""
+         |TxContract Foo() implements C {
+         |  pub fn f2() -> U256 {
+         |    return 2
+         |  }
+         |}
+         |
+         |$nonAbstractContract
+         |""".stripMargin
+
+    Compiler
+      .compileContract(contract)
+      .leftValue
+      .message is "TxContract C can not be inherited"
+  }
+
   it should "inherit interface events" in new ContractFixture {
     val foo: String =
       s"""
