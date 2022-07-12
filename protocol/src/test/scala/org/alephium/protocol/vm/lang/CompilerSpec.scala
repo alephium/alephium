@@ -2250,6 +2250,24 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Invalid type of condition expr")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo() -> U256 {
+           |    if (0) {
+           |      return 0
+           |    } else {
+           |      return 1
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Invalid type of condition expr: List(U256)"
+    }
+
+    {
       info("Simple if-else statement")
       val code =
         s"""
@@ -2414,6 +2432,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       Compiler.compileContract(code).leftValue.message is
         "If else expressions should be terminated with an else branch"
+    }
+
+    {
+      info("Invalid type of condition expr")
+      val code =
+        s"""
+           |TxContract Foo() {
+           |  fn foo() -> U256 {
+           |    return if (0) 0 else 1
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code).leftValue.message is
+        "Invalid type of condition expr: List(U256)"
     }
 
     new TestContractMethodFixture {

@@ -322,6 +322,12 @@ object Ast {
 
   trait IfBranch[Ctx <: StatelessContext] {
     def condition: Expr[Ctx]
+    def checkCondition(state: Compiler.State[Ctx]): Unit = {
+      val conditionType = condition.getType(state)
+      if (conditionType != Seq(Type.Bool)) {
+        throw Compiler.Error(s"Invalid type of condition expr: $conditionType")
+      }
+    }
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
   trait ElseBranch[Ctx <: StatelessContext] {
@@ -381,6 +387,7 @@ object Ast {
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       val elseBranchType = elseBranch.expr.getType(state)
       ifBranches.foreach { ifBranch =>
+        ifBranch.checkCondition(state)
         val ifBranchType = ifBranch.expr.getType(state)
         if (ifBranchType != elseBranchType) {
           throw Compiler.Error(
@@ -704,14 +711,8 @@ object Ast {
       elseBranchOpt: Option[ElseBranchStatement[Ctx]]
   ) extends IfElse[Ctx]
       with Statement[Ctx] {
-    private def checkCondition(state: Compiler.State[Ctx], condition: Expr[Ctx]): Unit = {
-      if (condition.getType(state) != Seq(Type.Bool)) {
-        throw Compiler.Error(s"Invalid type of condition expr $condition")
-      }
-    }
-
     override def check(state: Compiler.State[Ctx]): Unit = {
-      ifBranches.foreach(branch => checkCondition(state, branch.condition))
+      ifBranches.foreach(_.checkCondition(state))
       ifBranches.foreach(_.body.foreach(_.check(state)))
       elseBranchOpt.foreach(_.body.foreach(_.check(state)))
     }
