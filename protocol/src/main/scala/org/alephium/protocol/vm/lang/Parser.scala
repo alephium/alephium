@@ -211,21 +211,16 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
   def func[Unknown: P]: P[Ast.FuncDef[Ctx]] = funcTmp.map { f =>
-    f.body match {
-      case Some(statements) =>
-        Ast.FuncDef(
-          f.annotations,
-          f.id,
-          f.isPublic,
-          f.usePreapprovedAssets,
-          f.useContractAssets,
-          f.args,
-          f.rtypes,
-          statements
-        )
-      case None =>
-        throw Compiler.Error(s"Function ${f.id.name} does not have function body")
-    }
+    Ast.FuncDef(
+      f.annotations,
+      f.id,
+      f.isPublic,
+      f.usePreapprovedAssets,
+      f.useContractAssets,
+      f.args,
+      f.rtypes,
+      f.body
+    )
   }
 
   def eventFields[Unknown: P]: P[Seq[Ast.EventField]] = P("(" ~ eventField.rep(0, ",") ~ ")")
@@ -473,8 +468,18 @@ object StatefulParser extends Parser[StatefulContext] {
     P(Lexer.keyword("extends") ~ (contractInheritance.rep(1, ",")))
 
   def contractInheritances[Unknown: P]: P[Seq[Ast.Inheritance]] = {
-    P(contractExtending.? ~ interfaceImplementing.?).map { case (extendingsOpt, implementingOpt) =>
-      extendingsOpt.getOrElse(Seq.empty) ++ implementingOpt.getOrElse(Seq.empty)
+    P(contractExtending.? ~ interfaceImplementing.?).map {
+      case (extendingsOpt, implementingOpt) => {
+        val implementedInterfaces = implementingOpt.getOrElse(Seq.empty)
+        if (implementedInterfaces.length > 1) {
+          val interfaceNames = implementedInterfaces.map(_.parentId.name).mkString(", ")
+          throw Compiler.Error(
+            s"TxContract only supports implementing single interface: $interfaceNames"
+          )
+        }
+
+        extendingsOpt.getOrElse(Seq.empty) ++ implementedInterfaces
+      }
     }
   }
 
@@ -508,23 +513,25 @@ object StatefulParser extends Parser[StatefulContext] {
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawTxContract[Unknown: P]: P[Ast.TxContract] =
     P(
-      Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~
+      Lexer.`abstract` ~ Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~
         contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
-    ).map { case (typeId, fields, contractInheritances, events, constantVars, enums, funcs) =>
-      if (funcs.length < 1) {
-        throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
-      } else {
-        Ast.TxContract(
-          typeId,
-          Seq.empty,
-          fields,
-          funcs,
-          events,
-          constantVars,
-          enums,
-          contractInheritances.getOrElse(Seq.empty)
-        )
-      }
+    ).map {
+      case (isAbstract, typeId, fields, contractInheritances, events, constantVars, enums, funcs) =>
+        if (funcs.length < 1) {
+          throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
+        } else {
+          Ast.TxContract(
+            isAbstract,
+            typeId,
+            Seq.empty,
+            fields,
+            funcs,
+            events,
+            constantVars,
+            enums,
+            contractInheritances.getOrElse(Seq.empty)
+          )
+        }
     }
   def contract[Unknown: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
 
@@ -543,7 +550,7 @@ object StatefulParser extends Parser[StatefulContext] {
             f.useContractAssets,
             f.args,
             f.rtypes,
-            Seq.empty
+            None
           )
         case _ =>
           throw Compiler.Error(s"Interface function ${f.id.name} should not have function body")
@@ -559,7 +566,7 @@ object StatefulParser extends Parser[StatefulContext] {
       inheritances match {
         case Some(parents) if parents.length > 1 =>
           throw Compiler.Error(
-            s"Interface only supports single inheritance: ${parents.map(_.parentId.name).mkString(",")}"
+            s"Interface only supports single inheritance: ${parents.map(_.parentId.name).mkString(", ")}"
           )
         case _ => ()
       }

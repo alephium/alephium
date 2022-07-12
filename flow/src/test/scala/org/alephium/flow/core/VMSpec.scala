@@ -1510,78 +1510,408 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "test contract inheritance" in new ContractFixture {
-    val contract: String =
-      s"""
-         |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
-         |  pub fn foo() -> () {
-         |    p0()
-         |    p1()
-         |    gp()
-         |  }
-         |}
-         |
-         |TxContract Grandparent(mut x: U256) {
-         |  event GP(value: U256)
-         |
-         |  fn gp() -> () {
-         |    x = x + 1
-         |    emit GP(x)
-         |  }
-         |}
-         |
-         |TxContract Parent0(mut x: U256) extends Grandparent(x) {
-         |  event Parent0(x: U256)
-         |
-         |  fn p0() -> () {
-         |    emit Parent0(1)
-         |    gp()
-         |  }
-         |}
-         |
-         |TxContract Parent1(mut x: U256) extends Grandparent(x) {
-         |  event Parent1(x: U256)
-         |
-         |  fn p1() -> () {
-         |    emit Parent1(2)
-         |    gp()
-         |  }
-         |}
-         |""".stripMargin
+    {
+      info("Inherit TxContract")
 
-    val contractOutputRef = createContract(contract, AVector(Val.U256(0)))
-    val contractId        = contractOutputRef.key.toHexString
-    checkContractState(contractId, contractOutputRef, true)
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  pub fn foo() -> () {
+           |    p0()
+           |    p1()
+           |    gp()
+           |  }
+           |}
+           |
+           |Abstract TxContract Grandparent(mut x: U256) {
+           |  event GP(value: U256)
+           |
+           |  fn gp() -> () {
+           |    x = x + 1
+           |    emit GP(x)
+           |  }
+           |}
+           |
+           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |  event Parent0(x: U256)
+           |
+           |  fn p0() -> () {
+           |    emit Parent0(1)
+           |    gp()
+           |  }
+           |}
+           |
+           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |  event Parent1(x: U256)
+           |
+           |  fn p1() -> () {
+           |    emit Parent1(2)
+           |    gp()
+           |  }
+           |}
+           |""".stripMargin
 
-    val script =
-      s"""
-         |@using(preapprovedAssets = false)
-         |TxScript Main {
-         |  let child = Child(#$contractId)
-         |  child.foo()
-         |}
-         |$contract
-         |""".stripMargin
+      success(contract)
+    }
 
-    val main  = Compiler.compileTxScript(script).rightValue
-    val block = simpleScript(blockFlow, chainIndex, main)
-    val txId  = block.nonCoinbase.head.id
-    addAndCheck(blockFlow, block)
+    {
+      info("Inherit single Abstract TxContract")
 
-    val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
-    val contractState = worldState.getContractState(contractOutputRef.key).rightValue
-    contractState.fields is AVector[Val](Val.U256(3))
-    getLogStates(blockFlow, chainIndex.from, contractOutputRef.key, 0).value is
-      LogStates(
-        block.hash,
-        contractOutputRef.key,
-        AVector(
-          LogState(txId, 0, AVector(Val.U256(1))),
-          LogState(txId, 1, AVector(Val.U256(1))),
-          LogState(txId, 2, AVector(Val.U256(2))),
-          LogState(txId, 1, AVector(Val.U256(2))),
-          LogState(txId, 1, AVector(Val.U256(3)))
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  pub fn foo() -> () {
+           |    p0()
+           |    p1()
+           |    gp()
+           |  }
+           |}
+           |
+           |Abstract TxContract Grandparent(mut x: U256) {
+           |  event GP(value: U256)
+           |
+           |  fn gp() -> ()
+           |}
+           |
+           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |  event Parent0(x: U256)
+           |
+           |  fn p0() -> () {
+           |    emit Parent0(1)
+           |    gp()
+           |  }
+           |}
+           |
+           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |  event Parent1(x: U256)
+           |
+           |  fn gp() -> () {
+           |    x = x + 1
+           |    emit GP(x)
+           |  }
+           |
+           |  fn p1() -> () {
+           |    emit Parent1(2)
+           |    gp()
+           |  }
+           |}
+           |""".stripMargin
+
+      success(contract)
+    }
+
+    {
+      info("Inherit multiple Abstract TxContract")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  fn gp() -> () {
+           |    x = x + 1
+           |    emit GP(x)
+           |  }
+           |
+           |  pub fn foo() -> () {
+           |    p0()
+           |    p1()
+           |    gp()
+           |  }
+           |}
+           |
+           |Abstract TxContract Grandparent(mut x: U256) {
+           |  event GP(value: U256)
+           |
+           |  fn gp() -> ()
+           |}
+           |
+           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |  event Parent0(x: U256)
+           |
+           |  fn p0() -> () {
+           |    emit Parent0(1)
+           |    gp()
+           |  }
+           |}
+           |
+           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |  event Parent1(x: U256)
+           |
+           |  fn p1() -> () {
+           |    emit Parent1(2)
+           |    gp()
+           |  }
+           |}
+           |""".stripMargin
+
+      success(contract)
+    }
+
+    {
+      info("Inherit both Abstract TxContract and Interface")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  pub fn foo() -> () {
+           |    p0()
+           |    p1()
+           |    gp()
+           |    ggp()
+           |  }
+           |}
+           |
+           |Interface GreatGrandparent {
+           |  fn ggp() -> ()
+           |}
+           |
+           |Abstract TxContract Grandparent(mut x: U256) implements GreatGrandparent {
+           |  event GP(value: U256)
+           |
+           |  fn ggp() -> () {
+           |  }
+           |
+           |  fn gp() -> ()
+           |}
+           |
+           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |  event Parent0(x: U256)
+           |
+           |  fn p0() -> () {
+           |    emit Parent0(1)
+           |    gp()
+           |  }
+           |}
+           |
+           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |  event Parent1(x: U256)
+           |
+           |  fn gp() -> () {
+           |    x = x + 1
+           |    emit GP(x)
+           |  }
+           |
+           |  fn p1() -> () {
+           |    emit Parent1(2)
+           |    gp()
+           |  }
+           |}
+           |""".stripMargin
+
+      success(contract)
+    }
+
+    {
+      info("miss abstract keyword for Abstract TxContract")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  fn gp() -> () {
+           |    x = x + 1
+           |    emit GP(x)
+           |  }
+           |}
+           |
+           |Abstract TxContract Grandparent(mut x: U256) {
+           |  event GP(value: U256)
+           |  fn gp() -> ()
+           |}
+           |
+           |TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |  event Parent0(x: U256)
+           |
+           |  pub fn foo() -> () {
+           |    p0()
+           |    p1()
+           |    gp()
+           |  }
+           |
+           |  fn p0() -> () {
+           |    emit Parent0(1)
+           |    gp()
+           |  }
+           |}
+           |
+           |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |  event Parent1(x: U256)
+           |
+           |  fn p1() -> () {
+           |    emit Parent1(2)
+           |    gp()
+           |  }
+           |}
+           |""".stripMargin
+
+      fail(contract, "TxContract Parent0 has unimplemented methods: gp")
+    }
+
+    {
+      info("conflicting abstract methods between Abstract TxContract")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  pub fn foo() -> () {
+           |    p()
+           |  }
+           |
+           |  fn p() -> () {
+           |    emit Parent0(0)
+           |    emit Parent1(1)
+           |  }
+           |}
+           |
+           |Abstract TxContract Parent0(mut x: U256) {
+           |  event Parent0(x: U256)
+           |  fn p() -> ()
+           |}
+           |
+           |Abstract TxContract Parent1(mut x: U256) {
+           |  event Parent1(x: U256)
+           |  fn p() -> ()
+           |}
+           |""".stripMargin
+
+      fail(contract, "These abstract functions are defined multiple times: p")
+    }
+
+    {
+      info("conflicting abstract methods between Abstract TxContract and Interface")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent1(x) implements Parent0 {
+           |  pub fn foo() -> () {
+           |    p()
+           |  }
+           |
+           |  fn p() -> () {
+           |    emit Parent0(0)
+           |    emit Parent1(1)
+           |  }
+           |}
+           |
+           |Interface Parent0 {
+           |  event Parent0(x: U256)
+           |  fn p() -> ()
+           |}
+           |
+           |Abstract TxContract Parent1(mut x: U256) {
+           |  event Parent1(x: U256)
+           |  fn p() -> ()
+           |}
+           |""".stripMargin
+
+      fail(contract, "These abstract functions are defined multiple times: p")
+    }
+
+    {
+      info("conflicting method implementation between Abstract TxContract")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  pub fn foo() -> () {
+           |    p()
+           |  }
+           |  fn p0() -> () {
+           |    return
+           |  }
+           |}
+           |
+           |Abstract TxContract Parent0(mut x: U256) {
+           |  event Parent0(x: U256)
+           |  fn p() -> () {
+           |    emit Parent0(0)
+           |  }
+           |}
+           |
+           |Abstract TxContract Parent1(mut x: U256) {
+           |  event Parent1(x: U256)
+           |  fn p() -> () {
+           |    emit Parent1(1)
+           |  }
+           |  fn p0() -> ()
+           |}
+           |""".stripMargin
+
+      fail(contract, "These functions are implemented multiple times: p")
+    }
+
+    {
+      info("conflicting method implementation between TxContract and Abstract TxContract")
+
+      val contract: String =
+        s"""
+           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  pub fn foo() -> () {
+           |    p()
+           |  }
+           |  fn p() -> () {
+           |    emit Parent0(0)
+           |  }
+           |  fn p0() -> () {
+           |    return
+           |  }
+           |}
+           |
+           |Abstract TxContract Parent0(mut x: U256) {
+           |  event Parent0(x: U256)
+           |  fn p() -> ()
+           |}
+           |
+           |Abstract TxContract Parent1(mut x: U256) {
+           |  event Parent1(x: U256)
+           |  fn p() -> () {
+           |    emit Parent1(1)
+           |  }
+           |  fn p0() -> ()
+           |}
+           |""".stripMargin
+
+      fail(contract, "These functions are implemented multiple times: p")
+    }
+
+    def success(contract: String) = {
+      val contractOutputRef = createContract(contract, AVector(Val.U256(0)))
+      val contractId        = contractOutputRef.key.toHexString
+      checkContractState(contractId, contractOutputRef, true)
+
+      val script =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  let child = Child(#$contractId)
+           |  child.foo()
+           |}
+           |$contract
+           |""".stripMargin
+
+      val main  = Compiler.compileTxScript(script).rightValue
+      val block = simpleScript(blockFlow, chainIndex, main)
+      val txId  = block.nonCoinbase.head.id
+      addAndCheck(blockFlow, block)
+
+      val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val contractState = worldState.getContractState(contractOutputRef.key).rightValue
+      contractState.fields is AVector[Val](Val.U256(3))
+      getLogStates(blockFlow, chainIndex.from, contractOutputRef.key, 0).value is
+        LogStates(
+          block.hash,
+          contractOutputRef.key,
+          AVector(
+            LogState(txId, 0, AVector(Val.U256(1))),
+            LogState(txId, 1, AVector(Val.U256(1))),
+            LogState(txId, 2, AVector(Val.U256(2))),
+            LogState(txId, 1, AVector(Val.U256(2))),
+            LogState(txId, 1, AVector(Val.U256(3)))
+          )
         )
-      )
+    }
+
+    def fail(contract: String, errorMessage: String) = {
+      Compiler.compileContract(contract).leftValue.message is errorMessage
+    }
   }
 
   trait EventFixture extends FlowFixture {
@@ -2321,32 +2651,116 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "work with interface" in new ContractFixture {
-    val interface =
+
+    {
+      info("works with single inheritance")
+
+      val interface =
+        s"""
+           |Interface I {
+           |  pub fn f1() -> U256
+           |  pub fn f2() -> U256
+           |  pub fn f3() -> ByteVec
+           |}
+           |""".stripMargin
+
+      val contract =
+        s"""
+           |TxContract Foo() implements I {
+           |  pub fn f3() -> ByteVec {
+           |    return #00
+           |  }
+           |
+           |  pub fn f2() -> U256 {
+           |    return 2
+           |  }
+           |
+           |  pub fn f1() -> U256 {
+           |    return 1
+           |  }
+           |}
+           |
+           |$interface
+           |""".stripMargin
+
+      val contractId = createContract(contract, AVector.empty).key
+
+      val main =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  let impl = I(#${contractId.toHexString})
+           |  assert!(impl.f1() == 1)
+           |  assert!(impl.f2() == 2)
+           |  assert!(impl.f3() == #00)
+           |}
+           |
+           |$interface
+           |""".stripMargin
+
+      callTxScript(main)
+    }
+
+    {
+      info("fail with multiple inheritance")
+
+      val interface1 =
+        s"""
+           |Interface I1 {
+           |  pub fn f1() -> U256
+           |}
+           |""".stripMargin
+
+      val interface2 =
+        s"""
+           |Interface I2 {
+           |  pub fn f2() -> U256
+           |}
+           |""".stripMargin
+
+      val contract =
+        s"""
+           |TxContract Foo() implements I1, I2 {
+           |  pub fn f2() -> U256 {
+           |    return 2
+           |  }
+           |
+           |  pub fn f1() -> U256 {
+           |    return 1
+           |  }
+           |}
+           |
+           |$interface1
+           |$interface2
+           |""".stripMargin
+
+      Compiler
+        .compileContract(contract)
+        .leftValue
+        .message is "TxContract only supports implementing single interface: I1, I2"
+    }
+  }
+
+  it should "not instantiate with abstract contract" in new ContractFixture {
+    val abstractContract =
       s"""
-         |Interface I {
-         |  pub fn f1() -> U256
+         |Abstract TxContract AC() {
+         |  pub fn f1() -> U256 {
+         |    return 1
+         |  }
          |  pub fn f2() -> U256
-         |  pub fn f3() -> ByteVec
          |}
          |""".stripMargin
 
     val contract =
       s"""
-         |TxContract Foo() implements I {
-         |  pub fn f3() -> ByteVec {
-         |    return #00
-         |  }
-         |
+         |TxContract Foo() implements AC {
          |  pub fn f2() -> U256 {
          |    return 2
          |  }
-         |
-         |  pub fn f1() -> U256 {
-         |    return 1
-         |  }
          |}
          |
-         |$interface
+         |$abstractContract
          |""".stripMargin
 
     val contractId = createContract(contract, AVector.empty).key
@@ -2355,14 +2769,43 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  let impl = I(#${contractId.toHexString})
-         |  assert!(impl.f1() == 1)
+         |  let impl = AC(#${contractId.toHexString})
          |}
          |
-         |$interface
+         |$abstractContract
          |""".stripMargin
 
-    callTxScript(main)
+    Compiler
+      .compileTxScript(main)
+      .leftValue
+      .message is "AC is not instantiable"
+  }
+
+  it should "not inherit from the non-abstract contract" in new ContractFixture {
+    val nonAbstractContract =
+      s"""
+         |TxContract C() {
+         |  pub fn f1() -> U256 {
+         |    return 1
+         |  }
+         |}
+         |""".stripMargin
+
+    val contract =
+      s"""
+         |TxContract Foo() implements C {
+         |  pub fn f2() -> U256 {
+         |    return 2
+         |  }
+         |}
+         |
+         |$nonAbstractContract
+         |""".stripMargin
+
+    Compiler
+      .compileContract(contract)
+      .leftValue
+      .message is "TxContract C can not be inherited"
   }
 
   it should "inherit interface events" in new ContractFixture {

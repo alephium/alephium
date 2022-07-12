@@ -591,6 +591,7 @@ class ParserSpec extends AlephiumSpec {
            |""".stripMargin
 
       fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+        false,
         TypeId("Child"),
         Seq.empty,
         Seq(Argument(Ident("x"), Type.U256, false), Argument(Ident("y"), Type.U256, false)),
@@ -603,7 +604,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             Seq.empty,
             Seq.empty,
-            Seq.empty
+            Some(Seq.empty)
           )
         ),
         Seq.empty,
@@ -723,7 +724,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             Seq.empty,
             Seq.empty,
-            Seq.empty
+            None
           )
         ),
         Seq.empty,
@@ -740,7 +741,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val error = intercept[Compiler.Error](fastparse.parse(code, StatefulParser.interface(_)))
-      error.message is "Interface only supports single inheritance: Parent0,Parent1"
+      error.message is "Interface only supports single inheritance: Parent0, Parent1"
     }
 
     {
@@ -754,6 +755,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+        false,
         TypeId("Child"),
         Seq.empty,
         Seq.empty,
@@ -766,13 +768,150 @@ class ParserSpec extends AlephiumSpec {
             false,
             Seq.empty,
             Seq.empty,
-            Seq(ReturnStmt(Seq.empty))
+            Some(Seq(ReturnStmt(Seq.empty)))
           )
         ),
         Seq.empty,
         Seq.empty,
         Seq.empty,
         Seq(InterfaceInheritance(TypeId("Parent")))
+      )
+    }
+
+    {
+      info("Contract supports extends multiple contracts")
+      val code =
+        s"""
+           |TxContract Child() extends Parent0(), Parent1() implements Parent2 {
+           |  fn foo() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+        false,
+        TypeId("Child"),
+        Seq.empty,
+        Seq.empty,
+        Seq(
+          FuncDef(
+            Seq.empty,
+            FuncId("foo", false),
+            false,
+            false,
+            false,
+            Seq.empty,
+            Seq.empty,
+            Some(Seq(ReturnStmt(Seq.empty)))
+          )
+        ),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
+        Seq(
+          ContractInheritance(TypeId("Parent0"), Seq.empty),
+          ContractInheritance(TypeId("Parent1"), Seq.empty),
+          InterfaceInheritance(TypeId("Parent2"))
+        )
+      )
+    }
+
+    {
+      info("Contract can only implement single interface")
+      val code =
+        s"""
+           |TxContract Child() extends Parent0(), Parent1() implements Parent3, Parent4 {
+           |  fn foo() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      val error = intercept[Compiler.Error](fastparse.parse(code, StatefulParser.contract(_)))
+      error.message is "TxContract only supports implementing single interface: Parent3, Parent4"
+    }
+  }
+
+  it should "test abstract contract parser" in {
+    def fooFuncDef(isAbstract: Boolean) = FuncDef[StatefulContext](
+      Seq.empty,
+      FuncId("foo", false),
+      false,
+      false,
+      false,
+      Seq.empty,
+      Seq.empty,
+      if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
+    )
+
+    def barFuncDef(isAbstract: Boolean) = FuncDef[StatefulContext](
+      Seq.empty,
+      FuncId("bar", false),
+      false,
+      false,
+      false,
+      Seq.empty,
+      Seq.empty,
+      if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
+    )
+
+    {
+      info("Parse abstract contract")
+      val code =
+        s"""
+           |Abstract TxContract Foo() {
+           |  fn foo() -> ()
+           |  fn bar() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+        true,
+        TypeId("Foo"),
+        Seq.empty,
+        Seq.empty,
+        Seq(fooFuncDef(true), barFuncDef(false)),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
+        Seq.empty
+      )
+    }
+
+    {
+      info("Parse abstract contract inheritance")
+      val bar =
+        s"""
+           |Interface Bar {
+           |  fn bar() -> ()
+           |}
+           |""".stripMargin
+
+      val code =
+        s"""
+           |Abstract TxContract Foo() implements Bar {
+           |  fn foo() -> () {
+           |    return
+           |  }
+           |}
+           |$bar
+           |""".stripMargin
+      val extended =
+        fastparse.parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
+      val fooContract = extended.contracts(0)
+      fooContract is TxContract(
+        true,
+        TypeId("Foo"),
+        Seq.empty,
+        Seq.empty,
+        Seq(
+          barFuncDef(true),
+          fooFuncDef(false)
+        ),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
+        Seq(InterfaceInheritance(TypeId("Bar")))
       )
     }
   }
@@ -792,7 +931,7 @@ class ParserSpec extends AlephiumSpec {
         false,
         Seq.empty,
         Seq.empty,
-        Seq(Ast.ReturnStmt(List()))
+        Some(Seq(Ast.ReturnStmt(List())))
       )
     )
   }

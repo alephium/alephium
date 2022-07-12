@@ -239,11 +239,16 @@ object Ast {
       extends Expr[Ctx] {
     override protected def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       state.checkContractType(contractType)
+
       if (address.getType(state) != Seq(Type.ByteVec)) {
         throw Compiler.Error(s"Invalid expr $address for contract address")
-      } else {
-        Seq(Type.Contract.stack(contractType))
       }
+
+      if (!state.getContractInfo(contractType).kind.instantiable) {
+        throw Compiler.Error(s"${contractType.name} is not instantiable")
+      }
+
+      Seq(Type.Contract.stack(contractType))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
@@ -387,9 +392,10 @@ object Ast {
       useAssetsInContract: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
-      body: Seq[Statement[Ctx]]
+      bodyOpt: Option[Seq[Statement[Ctx]]]
   ) extends UniqueDef {
-    def name: String = id.name
+    def name: String              = id.name
+    val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
     def signature: String = {
       val publicPrefix = if (isPublic) "pub " else ""
@@ -462,7 +468,7 @@ object Ast {
         useAssetsInContract = useAssetsInContract,
         args = Seq.empty,
         rtypes = Seq.empty,
-        body = stmts
+        bodyOpt = Some(stmts)
       )
     }
   }
@@ -827,6 +833,7 @@ object Ast {
   final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident]) extends Inheritance
   final case class InterfaceInheritance(parentId: TypeId)                    extends Inheritance
   final case class TxContract(
+      isAbstract: Boolean,
       ident: TypeId,
       templateVars: Seq[Argument],
       fields: Seq[Argument],
@@ -856,15 +863,26 @@ object Ast {
           )
         )
       )
+      inheritances.foreach { inheritance =>
+        val id   = inheritance.parentId
+        val kind = state.getContractInfo(id).kind
+        if (!kind.inheritable) {
+          throw Compiler.Error(s"$kind ${id.name} can not be inherited")
+        }
+      }
       super.check(state)
     }
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
-      check(state)
-      StatefulContract(
-        ArrayTransformer.flattenTypeLength(fields.map(_.tpe)),
-        AVector.from(funcs.view.map(_.toMethod(state)))
-      )
+      if (isAbstract) {
+        throw new Compiler.Error(s"abstract TxContract ${ident.name} does not generate code")
+      } else {
+        check(state)
+        StatefulContract(
+          ArrayTransformer.flattenTypeLength(fields.map(_.tpe)),
+          AVector.from(funcs.view.map(_.toMethod(state)))
+        )
+      }
     }
   }
 
@@ -955,6 +973,7 @@ object Ast {
         case c: TxContract =>
           val (funcs, events, constantVars, enums) = MultiTxContract.extractDefs(parentsCache, c)
           TxContract(
+            c.isAbstract,
             c.ident,
             c.templateVars,
             c.fields,
@@ -1033,22 +1052,37 @@ object Ast {
       val allInterfaces =
         sortInterfaces(parentsCache, _allInterfaces.map(_.asInstanceOf[ContractInterface]))
 
-      val _contractFuncs = allContracts.flatMap(_.funcs)
-      val interfaceFuncs = allInterfaces.flatMap(_.funcs)
-      val constantVars   = allContracts.flatMap(_.constantVars)
-      val enums          = allContracts.flatMap(_.enums)
-      val isTxContract   = contract.isInstanceOf[TxContract]
-      val contractFuncs  = checkInterfaceFuncs(_contractFuncs, interfaceFuncs, isTxContract)
+      val allFuncs                             = (allInterfaces ++ allContracts).flatMap(_.funcs)
+      val (abstractFuncs, nonAbstractFuncs)    = allFuncs.partition(_.bodyOpt.isEmpty)
+      val (unimplementedFuncs, allUniqueFuncs) = checkFuncs(abstractFuncs, nonAbstractFuncs)
+      val constantVars                         = allContracts.flatMap(_.constantVars)
+      val enums                                = allContracts.flatMap(_.enums)
 
       val contractEvents = allContracts.flatMap(_.events)
       val events         = allInterfaces.flatMap(_.events) ++ contractEvents
 
-      val resultFuncs = if (isTxContract) {
-        contractFuncs
-      } else {
-        require(contractFuncs.isEmpty)
-        interfaceFuncs
+      val resultFuncs = contract match {
+        case _: TxScript =>
+          throw Compiler.Error("Extract definitions from TxScript is unexpected")
+        case txContract: TxContract =>
+          if (!txContract.isAbstract && unimplementedFuncs.nonEmpty) {
+            val methodNames = unimplementedFuncs.map(_.name).mkString(",")
+            throw Compiler.Error(
+              s"TxContract ${txContract.name} has unimplemented methods: $methodNames"
+            )
+          }
+
+          allUniqueFuncs
+        case interface: ContractInterface =>
+          if (nonAbstractFuncs.nonEmpty) {
+            val methodNames = nonAbstractFuncs.map(_.name).mkString(",")
+            throw Compiler.Error(
+              s"Interface ${interface.name} has implemented methods: $methodNames"
+            )
+          }
+          unimplementedFuncs
       }
+
       (resultFuncs, events, constantVars, enums)
     }
 
@@ -1059,39 +1093,36 @@ object Ast {
       allInterfaces.sortBy(interface => parentsCache(interface.ident).length)
     }
 
-    private def checkInterfaceFuncs(
-        contractFuncs: Seq[FuncDef[StatefulContext]],
-        interfaceFuncs: Seq[FuncDef[StatefulContext]],
-        isTxContract: Boolean
-    ): Seq[FuncDef[StatefulContext]] = {
-      val contractFuncSet   = contractFuncs.view.map(f => f.id.name -> f).toMap
-      val interfaceFuncsSet = interfaceFuncs.view.map(f => f.id.name -> f).toMap
-      if (contractFuncSet.size != contractFuncs.size) {
-        val duplicates = UniqueDef.duplicates(contractFuncs)
-        throw Compiler.Error(s"These functions are defined multiple times: $duplicates")
-      } else if (interfaceFuncsSet.size != interfaceFuncs.size) {
-        val duplicates = UniqueDef.duplicates(interfaceFuncs)
-        throw Compiler.Error(s"These functions are defined multiple times: $duplicates")
-      } else if (isTxContract) {
-        val unimplemented = interfaceFuncsSet.keys.filter(!contractFuncSet.contains(_))
-        if (unimplemented.nonEmpty) {
-          throw new Compiler.Error(s"Functions are unimplemented: ${unimplemented.mkString(",")}")
-        }
-        interfaceFuncsSet.foreach { case (name, interfaceFunc) =>
-          val contractFunc = contractFuncSet(name)
-          if (contractFunc.copy(body = Seq.empty) != interfaceFunc) {
-            throw new Compiler.Error(s"Function ${name} is implemented with wrong signature")
-          }
+    def checkFuncs(
+        abstractFuncs: Seq[FuncDef[StatefulContext]],
+        nonAbstractFuncs: Seq[FuncDef[StatefulContext]]
+    ): (Seq[FuncDef[StatefulContext]], Seq[FuncDef[StatefulContext]]) = {
+      val nonAbstractFuncSet = nonAbstractFuncs.view.map(f => f.id.name -> f).toMap
+      val abstractFuncsSet   = abstractFuncs.view.map(f => f.id.name -> f).toMap
+      if (nonAbstractFuncSet.size != nonAbstractFuncs.size) {
+        val duplicates = UniqueDef.duplicates(nonAbstractFuncs)
+        throw Compiler.Error(s"These functions are implemented multiple times: $duplicates")
+      }
+
+      if (abstractFuncsSet.size != abstractFuncs.size) {
+        val duplicates = UniqueDef.duplicates(abstractFuncs)
+        throw Compiler.Error(s"These abstract functions are defined multiple times: $duplicates")
+      }
+
+      val (implementedFuncs, unimplementedFuncs) =
+        abstractFuncs.partition(func => nonAbstractFuncSet.contains(func.id.name))
+
+      implementedFuncs.foreach { abstractFunc =>
+        val funcName                = abstractFunc.id.name
+        val implementedAbstractFunc = nonAbstractFuncSet(funcName)
+        if (implementedAbstractFunc.copy(bodyOpt = None) != abstractFunc) {
+          throw new Compiler.Error(s"Function ${funcName} is implemented with wrong signature")
         }
       }
 
-      if (isTxContract) {
-        val sortedContractFuncSet = interfaceFuncs.map(f => contractFuncSet(f.id.name)) ++
-          contractFuncs.filter(f => !interfaceFuncsSet.contains(f.id.name))
-        sortedContractFuncSet
-      } else {
-        contractFuncs
-      }
+      val inherited    = abstractFuncs.map { f => nonAbstractFuncSet.getOrElse(f.id.name, f) }
+      val nonInherited = nonAbstractFuncs.filter(f => !abstractFuncsSet.contains(f.id.name))
+      (unimplementedFuncs, inherited ++ nonInherited)
     }
   }
 }
