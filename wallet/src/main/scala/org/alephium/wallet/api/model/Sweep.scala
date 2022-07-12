@@ -17,9 +17,9 @@
 package org.alephium.wallet.api.model
 
 import org.alephium.api.model.BuildTxCommon
+import org.alephium.protocol.BlockHash
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.protocol.BlockHash
 import org.alephium.util.TimeStamp
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))

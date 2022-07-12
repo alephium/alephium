@@ -708,7 +708,7 @@ object BuiltIn {
       ContractCodeHash
     )
 
-  abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] {
+  sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] {
     def name: String
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
@@ -730,6 +730,7 @@ object BuiltIn {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   val subContractIdOf: BuiltIn[StatefulContext] = new SubContractBuiltIn {
     val name: String = "subContractIdOf"
     def getReturnType(inputType: Seq[Type]): Seq[Type] = {
@@ -744,7 +745,7 @@ object BuiltIn {
       }
     }
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
-      Seq(ByteVecConcat, Blake2b, Blake2b)
+      Seq[Instr[StatefulContext]](ByteVecConcat, Blake2b, Blake2b)
     }
   }
 
