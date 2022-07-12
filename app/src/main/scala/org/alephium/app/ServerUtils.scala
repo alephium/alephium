@@ -800,7 +800,7 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def compileScript(query: Compile.Script): Try[CompileScriptResult] = {
     Compiler
-      .compileTxScriptFull(query.code)
+      .compileTxScriptFull(query.code, true)
       .map(p => CompileScriptResult.from(p._1, p._2))
       .left
       .map(error => failed(error.toString))
@@ -809,7 +809,7 @@ class ServerUtils(implicit
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def compileContract(query: Compile.Contract): Try[CompileContractResult] = {
     Compiler
-      .compileContractFull(query.code)
+      .compileContractFull(query.code, true)
       .map(p => CompileContractResult.from(p._1, p._2))
       .left
       .map(error => failed(error.toString))

@@ -135,7 +135,7 @@ class VMSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0, 1)
     checkState(blockFlow, chainIndex, contractKey0, initialState, contractOutputRef0)
 
-    val script1 = Compiler.compileTxScript(input1, 1).rightValue
+    val script1 = Compiler.compileTxScript(input1, 1, true).rightValue
     intercept[AssertionError](simpleScript(blockFlow, chainIndex, script1)).getMessage is
       s"Right(TxScriptExeFailed($ExternalPrivateMethodCall))"
   }
@@ -146,7 +146,7 @@ class VMSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0, 1)
     checkState(blockFlow, chainIndex, contractKey0, initialState, contractOutputRef0)
 
-    val script1   = Compiler.compileTxScript(input1, 1).rightValue
+    val script1   = Compiler.compileTxScript(input1, 1, true).rightValue
     val newState1 = AVector[Val](Val.U256(U256.unsafe(10)))
     val block1    = simpleScript(blockFlow, chainIndex, script1)
     addAndCheck(blockFlow, block1, 2)
@@ -167,9 +167,10 @@ class VMSpec extends AlephiumSpec {
         input: String,
         initialState: AVector[Val],
         tokenAmount: Option[U256] = None,
-        initialAttoAlphAmount: U256 = minimalAlphInContract
+        initialAttoAlphAmount: U256 = minimalAlphInContract,
+        checkUnusedVars: Boolean = true
     ): ContractOutputRef = {
-      val contract = Compiler.compileContract(input).rightValue
+      val contract = Compiler.compileContract(input, checkUnusedVars).rightValue
       val txScript =
         contractCreation(contract, initialState, genesisLockup, initialAttoAlphAmount, tokenAmount)
       val block = payableCall(blockFlow, chainIndex, txScript)
@@ -486,7 +487,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |
-         |TxContract Bar(mut x: U256) {
+         |TxContract Bar() {
          |  pub fn bar(foo: ByteVec) -> (U256) {
          |    return Foo(foo).get() + 100
          |  }
@@ -497,7 +498,7 @@ class VMSpec extends AlephiumSpec {
 
     val input1 =
       s"""
-         |TxContract Bar(mut x: U256) {
+         |TxContract Bar() {
          |  pub fn bar(foo: ByteVec) -> (U256) {
          |    return Foo(foo).get() + 100
          |  }
@@ -516,7 +517,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |
          |""".stripMargin
-    val contractOutputRef1 = createContractAndCheckState(input1, 3, 3)
+    val contractOutputRef1 = createContractAndCheckState(input1, 3, 3, initialState = AVector.empty)
     val contractKey1       = contractOutputRef1.key
 
     val main =
@@ -559,14 +560,20 @@ class VMSpec extends AlephiumSpec {
   it should "issue new token" in new ContractFixture {
     val input =
       s"""
-         |TxContract Foo(mut x: U256) {
+         |TxContract Foo() {
          |  pub fn foo() -> () {
          |    return
          |  }
          |}
          |""".stripMargin
-    val contractOutputRef = createContractAndCheckState(input, 2, 2, tokenAmount = Some(10000000))
-    val contractKey       = contractOutputRef.key
+    val contractOutputRef = createContractAndCheckState(
+      input,
+      2,
+      2,
+      tokenAmount = Some(10000000),
+      initialState = AVector.empty
+    )
+    val contractKey = contractOutputRef.key
 
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     worldState.getContractStates().rightValue.length is 2
@@ -1335,7 +1342,7 @@ class VMSpec extends AlephiumSpec {
   it should "create and use Uniswap-like contract" in new ContractFixture {
     val tokenContract =
       s"""
-         |TxContract Token(mut x: U256) {
+         |TxContract Token() {
          |  @using(assetsInContract = true)
          |  pub fn withdraw(address: Address, amount: U256) -> () {
          |    transferTokenFromSelf!(address, selfTokenId!(), amount)
@@ -1343,7 +1350,13 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val tokenContractKey =
-      createContractAndCheckState(tokenContract, 2, 2, tokenAmount = Some(1024)).key
+      createContractAndCheckState(
+        tokenContract,
+        2,
+        2,
+        tokenAmount = Some(1024),
+        initialState = AVector.empty
+      ).key
     val tokenId = tokenContractKey
 
     callTxScript(s"""
@@ -1918,7 +1931,7 @@ class VMSpec extends AlephiumSpec {
     def contractRaw: String
     def callingScriptRaw: String
 
-    lazy val contract       = Compiler.compileContract(contractRaw).rightValue
+    lazy val contract       = Compiler.compileContract(contractRaw, false).rightValue
     lazy val initialState   = AVector[Val](Val.U256.unsafe(10))
     lazy val chainIndex     = ChainIndex.unsafe(0, 0)
     lazy val fromLockup     = getGenesisLockupScript(chainIndex)
@@ -1934,7 +1947,7 @@ class VMSpec extends AlephiumSpec {
     addAndCheck(blockFlow, createContractBlock, 1)
     checkState(blockFlow, chainIndex, contractId, initialState, contractOutputRef)
 
-    val callingScript = Compiler.compileTxScript(callingScriptRaw, 1).rightValue
+    val callingScript = Compiler.compileTxScript(callingScriptRaw, 1, true).rightValue
     val callingBlock  = simpleScript(blockFlow, chainIndex, callingScript)
     addAndCheck(blockFlow, callingBlock, 2)
   }
@@ -2041,7 +2054,7 @@ class VMSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      val destroyScript        = Compiler.compileTxScript(destroyScriptRaw, 1).rightValue
+      val destroyScript        = Compiler.compileTxScript(destroyScriptRaw, 1, true).rightValue
       val destroyContractBlock = payableCall(blockFlow, chainIndex, destroyScript)
       addAndCheck(blockFlow, destroyContractBlock, 3)
 
@@ -2882,7 +2895,12 @@ class VMSpec extends AlephiumSpec {
            |""".stripMargin
 
       val barContractId =
-        createContract(bar, AVector.empty, initialAttoAlphAmount = ALPH.alph(2)).key
+        createContract(
+          bar,
+          AVector.empty,
+          initialAttoAlphAmount = ALPH.alph(2),
+          checkUnusedVars = false
+        ).key
 
       s"""
          |TxScript Main {
