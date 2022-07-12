@@ -2257,8 +2257,7 @@ class VMSpec extends AlephiumSpec {
 
     callTxScript(script)
     upgrade()
-    intercept[AssertionError](callTxScript(script)).getMessage is
-      "Right(TxScriptExeFailed(InvalidExternalMethodArgLength))"
+    failCallTxScript(script, InvalidExternalMethodArgLength)
   }
 
   it should "check external method return length" in new CheckArgAndReturnLengthFixture {
@@ -2283,8 +2282,7 @@ class VMSpec extends AlephiumSpec {
 
     callTxScript(script)
     upgrade()
-    intercept[AssertionError](callTxScript(script)).getMessage is
-      "Right(TxScriptExeFailed(InvalidExternalMethodReturnLength))"
+    failCallTxScript(script, InvalidExternalMethodReturnLength)
   }
 
   it should "not load contract just after creation" in new ContractFixture {
