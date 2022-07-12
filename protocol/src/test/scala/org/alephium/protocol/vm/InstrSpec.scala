@@ -2311,6 +2311,99 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
+  it should "check external method arg and return length" in new ContextGenerators {
+    def prepareFrame(lengthOpt: Option[(U256, U256)])(implicit
+        networkConfig: NetworkConfig
+    ): Frame[StatefulContext] = {
+      val contractMethod = Method[StatefulContext](
+        isPublic = true,
+        usePreapprovedAssets = false,
+        useContractAssets = false,
+        argsLength = 1,
+        localsLength = 1,
+        returnLength = 1,
+        instrs = AVector(LoadLocal(0), Return)
+      )
+      val contract   = StatefulContract(0, AVector(contractMethod))
+      val (obj, ctx) = prepareContract(contract, AVector.empty[Val])
+      val instrs = AVector[Instr[StatefulContext]](
+        BytesConst(Val.ByteVec(obj.contractId.bytes)),
+        CallExternal(0)
+      )
+      val scriptMethod = Method[StatefulContext](
+        isPublic = true,
+        usePreapprovedAssets = false,
+        useContractAssets = false,
+        argsLength = 0,
+        localsLength = 0,
+        returnLength = 0,
+        instrs = lengthOpt match {
+          case Some((argLength, retLength)) =>
+            AVector[Instr[StatefulContext]](
+              U256Const0,
+              ConstInstr.u256(Val.U256(argLength)),
+              ConstInstr.u256(Val.U256(retLength))
+            ) ++ instrs
+          case _ => U256Const0 +: instrs
+        }
+      )
+      val script         = StatefulScript.from(AVector(scriptMethod)).get
+      val (scriptObj, _) = prepareStatefulScript(script)
+      Frame
+        .stateful(
+          ctx,
+          None,
+          None,
+          scriptObj,
+          script.methods(0),
+          AVector.empty,
+          Stack.ofCapacity(10),
+          _ => okay
+        )
+        .rightValue
+    }
+
+    prepareFrame(None)(NetworkConfigFixture.PreLeman).execute().isRight is true
+    prepareFrame(Some((U256.One, U256.One)))(NetworkConfigFixture.PreLeman)
+      .execute()
+      .isRight is true
+
+    prepareFrame(None)(NetworkConfigFixture.Leman).execute().leftValue is Right(
+      InvalidExternalMethodReturnLength
+    )
+    prepareFrame(Some((U256.One, U256.One)))(NetworkConfigFixture.Leman).execute().isRight is true
+    prepareFrame(Some((U256.One, U256.Zero)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidExternalMethodReturnLength
+    )
+    prepareFrame(Some((U256.One, U256.Two)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidExternalMethodReturnLength
+    )
+    prepareFrame(Some((U256.One, U256.MaxValue)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidReturnLength
+    )
+    prepareFrame(Some((U256.Zero, U256.One)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidExternalMethodArgLength
+    )
+    prepareFrame(Some((U256.Two, U256.One)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidExternalMethodArgLength
+    )
+    prepareFrame(Some((U256.MaxValue, U256.One)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidArgLength
+    )
+  }
+
   it should "check method modifier when creating contract" in new StatefulFixture {
     val from = lockupScriptGen.sample.get
 

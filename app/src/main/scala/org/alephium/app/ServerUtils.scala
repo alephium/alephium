@@ -838,9 +838,7 @@ class ServerUtils(implicit
       )
       contractId = params.address.contractId
       contractObj <- wrapResult(worldState.getContractObj(contractId))
-      returnLength <- wrapExeResult(
-        contractObj.code.getMethod(params.methodIndex).map(_.returnLength)
-      )
+      method      <- wrapExeResult(contractObj.code.getMethod(params.methodIndex))
       txId = params.txId.getOrElse(Hash.random)
       resultPair <- executeContractMethod(
         worldState,
@@ -850,7 +848,7 @@ class ServerUtils(implicit
         params.inputAssets.getOrElse(AVector.empty),
         params.methodIndex,
         params.args.getOrElse(AVector.empty),
-        returnLength
+        method
       )
       (returns, result) = resultPair
       contractAddresses = params.existingContracts.getOrElse(
@@ -883,11 +881,7 @@ class ServerUtils(implicit
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex).map(_.staging()))
       _          <- testContract.existingContracts.foreachE(createContract(worldState, _))
       _          <- createContract(worldState, contractId, testContract)
-      returnLength <- wrapExeResult(
-        testContract.code
-          .getMethod(testContract.testMethodIndex)
-          .map(_.returnLength)
-      )
+      method     <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
       executionResultPair <- executeContractMethod(
         worldState,
         contractId,
@@ -896,7 +890,7 @@ class ServerUtils(implicit
         testContract.inputAssets,
         testContract.testMethodIndex,
         testContract.testArgs,
-        returnLength
+        method
       )
       events = fetchContractEvents(worldState)
       contractIds <- getCreatedAndDestroyedContractIds(events)
@@ -1016,7 +1010,7 @@ class ServerUtils(implicit
       inputAssets: AVector[TestInputAsset],
       methodIndex: Int,
       args: AVector[Val],
-      returnLength: Int
+      method: Method[StatefulContext]
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val blockEnv = BlockEnv(
       networkConfig.networkId,
@@ -1042,9 +1036,14 @@ class ServerUtils(implicit
           useContractAssets = false,
           argsLength = 0,
           localsLength = 0,
-          returnLength = returnLength,
-          instrs =
-            approveAsset(inputAssets, testGasFee) ++ callExternal(args, methodIndex, contractId)
+          returnLength = method.returnLength,
+          instrs = approveAsset(inputAssets, testGasFee) ++ callExternal(
+            args,
+            methodIndex,
+            method.argsLength,
+            method.returnLength,
+            contractId
+          )
         )
       )
     )
@@ -1064,10 +1063,14 @@ class ServerUtils(implicit
   private def callExternal(
       args: AVector[Val],
       methodIndex: Int,
+      argLength: Int,
+      returnLength: Int,
       contractId: ContractId
   ): AVector[Instr[StatefulContext]] = {
     toVmVal(args).map(_.toConstInstr: Instr[StatefulContext]) ++
       AVector[Instr[StatefulContext]](
+        ConstInstr.u256(vm.Val.U256(U256.unsafe(argLength))),
+        ConstInstr.u256(vm.Val.U256(U256.unsafe(returnLength))),
         BytesConst(vm.Val.ByteVec(contractId.bytes)),
         CallExternal(methodIndex.toByte)
       )

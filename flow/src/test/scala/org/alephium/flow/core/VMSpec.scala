@@ -2546,6 +2546,90 @@ class VMSpec extends AlephiumSpec {
     )
   }
 
+  trait CheckArgAndReturnLengthFixture extends ContractFixture {
+    val upgradable: String =
+      s"""
+         |Abstract TxContract Upgradable() {
+         |  pub fn upgrade(code: ByteVec) -> () {
+         |    migrate!(code)
+         |  }
+         |}
+         |""".stripMargin
+
+    def foo: String
+    lazy val fooIdHex = createContract(foo, AVector.empty).key.toHexString
+
+    def upgrade() = {
+      val fooV1 =
+        s"""
+           |TxContract Foo() extends Upgradable() {
+           |  pub fn foo() -> () {}
+           |}
+           |$upgradable
+           |""".stripMargin
+      val fooV1Bytecode = serialize(Compiler.compileContract(fooV1).rightValue)
+      val upgradeFooScript: String =
+        s"""
+           |TxScript Main {
+           |  let foo = Foo(#$fooIdHex)
+           |  foo.upgrade(#${Hex.toHexString(fooV1Bytecode)})
+           |}
+           |$foo
+           |""".stripMargin
+      callTxScript(upgradeFooScript)
+    }
+  }
+
+  it should "check external method arg length" in new CheckArgAndReturnLengthFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() extends Upgradable() {
+         |  pub fn foo(array: [U256; 2]) -> () {
+         |    let _ = array
+         |  }
+         |}
+         |$upgradable
+         |""".stripMargin
+
+    val script: String =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#$fooIdHex)
+         |  foo.foo([0, 0])
+         |}
+         |$foo
+         |""".stripMargin
+
+    callTxScript(script)
+    upgrade()
+    failCallTxScript(script, InvalidExternalMethodArgLength)
+  }
+
+  it should "check external method return length" in new CheckArgAndReturnLengthFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() extends Upgradable() {
+         |  pub fn foo() -> (Bool, [U256; 2]) {
+         |    return false, [0; 2]
+         |  }
+         |}
+         |$upgradable
+         |""".stripMargin
+
+    val script: String =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#$fooIdHex)
+         |  let (_, _) = foo.foo()
+         |}
+         |$foo
+         |""".stripMargin
+
+    callTxScript(script)
+    upgrade()
+    failCallTxScript(script, InvalidExternalMethodReturnLength)
+  }
+
   it should "not load contract just after creation" in new ContractFixture {
     val contract: String =
       s"""

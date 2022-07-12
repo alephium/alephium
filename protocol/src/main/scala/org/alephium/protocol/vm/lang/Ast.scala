@@ -275,7 +275,7 @@ object Ast {
     }
   }
 
-  trait ContractCallBase {
+  trait ContractCallBase extends ApproveAssets[StatefulContext] {
     def obj: Expr[StatefulContext]
     def callId: FuncId
     def args: Seq[Expr[StatefulContext]]
@@ -294,6 +294,26 @@ object Ast {
         }
       }
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def genContractCall(
+        state: Compiler.State[StatefulContext],
+        popReturnValues: Boolean
+    ): Seq[Instr[StatefulContext]] = {
+      val contract  = obj.getType(state)(0).asInstanceOf[Type.Contract]
+      val func      = state.getFunc(contract.id, callId)
+      val argLength = Type.flattenTypeLength(func.argsType)
+      val retLength = func.getReturnLength(args.flatMap(_.getType(state)))
+      genApproveCode(state, func) ++
+        args.flatMap(_.genCode(state)) ++
+        Seq(
+          ConstInstr.u256(Val.U256(U256.unsafe(argLength))),
+          ConstInstr.u256(Val.U256(U256.unsafe(retLength)))
+        ) ++
+        obj.genCode(state) ++
+        func.genExternalCallCode(contract.id) ++
+        (if (popReturnValues) Seq.fill[Instr[StatefulContext]](retLength)(Pop) else Seq.empty)
+    }
   }
   final case class ContractCallExpr(
       obj: Expr[StatefulContext],
@@ -301,20 +321,14 @@ object Ast {
       approveAssets: Seq[ApproveAsset[StatefulContext]],
       args: Seq[Expr[StatefulContext]]
   ) extends Expr[StatefulContext]
-      with ContractCallBase
-      with ApproveAssets[StatefulContext] {
+      with ContractCallBase {
     override def _getType(state: Compiler.State[StatefulContext]): Seq[Type] = {
       checkApproveAssets(state)
       _getTypeBase(state)
     }
 
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     override def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val contract = obj.getType(state)(0).asInstanceOf[Type.Contract]
-      val func     = state.getFunc(contract.id, callId)
-      genApproveCode(state, func) ++
-        args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
-        func.genExternalCallCode(contract.id)
+      genContractCall(state, false)
     }
   }
   final case class ParenExpr[Ctx <: StatelessContext](expr: Expr[Ctx]) extends Expr[Ctx] {
@@ -539,9 +553,9 @@ object Ast {
         isPublic,
         usePreapprovedAssets,
         useAssetsInContract,
-        argsLength = ArrayTransformer.flattenTypeLength(args.map(_.tpe)),
+        argsLength = Type.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
-        returnLength = ArrayTransformer.flattenTypeLength(rtypes),
+        returnLength = Type.flattenTypeLength(rtypes),
         AVector.from(instrs)
       )
     }
@@ -685,7 +699,7 @@ object Ast {
         args.flatMap(_.genCode(state)) ++
         (if (func.isVariadic) Seq(U256Const(Val.U256(U256.unsafe(args.length)))) else Seq.empty) ++
         func.genCode(argsType) ++
-        Seq.fill(ArrayTransformer.flattenTypeLength(returnType))(Pop)
+        Seq.fill(Type.flattenTypeLength(returnType))(Pop)
     }
   }
   final case class ContractCall(
@@ -694,24 +708,15 @@ object Ast {
       approveAssets: Seq[ApproveAsset[StatefulContext]],
       args: Seq[Expr[StatefulContext]]
   ) extends Statement[StatefulContext]
-      with ContractCallBase
-      with ApproveAssets[StatefulContext] {
+      with ContractCallBase {
     override def check(state: Compiler.State[StatefulContext]): Unit = {
       checkApproveAssets(state)
       _getTypeBase(state)
       ()
     }
 
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     override def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
-      val contract   = obj.getType(state)(0).asInstanceOf[Type.Contract]
-      val func       = state.getFunc(contract.id, callId)
-      val argsType   = args.flatMap(_.getType(state))
-      val returnType = func.getReturnType(argsType)
-      genApproveCode(state, func) ++
-        args.flatMap(_.genCode(state)) ++ obj.genCode(state) ++
-        func.genExternalCallCode(contract.id) ++
-        Seq.fill[Instr[StatefulContext]](ArrayTransformer.flattenTypeLength(returnType))(Pop)
+      genContractCall(state, true)
     }
   }
 
@@ -950,7 +955,7 @@ object Ast {
       } else {
         check(state)
         StatefulContract(
-          ArrayTransformer.flattenTypeLength(fields.map(_.tpe)),
+          Type.flattenTypeLength(fields.map(_.tpe)),
           getMethods(state)
         )
       }

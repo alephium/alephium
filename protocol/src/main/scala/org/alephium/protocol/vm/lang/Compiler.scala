@@ -134,6 +134,10 @@ object Compiler {
     def usePreapprovedAssets: Boolean
     def useAssetsInContract: Boolean
     def getReturnType(inputType: Seq[Type]): Seq[Type]
+    def getReturnLength(inputType: Seq[Type]): Int = {
+      val retTypes = getReturnType(inputType)
+      Type.flattenTypeLength(retTypes)
+    }
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
   }
@@ -182,6 +186,7 @@ object Compiler {
     }
   }
   trait ContractFunc[Ctx <: StatelessContext] extends FuncInfo[Ctx] {
+    def argsType: Seq[Type]
     def returnType: Seq[Type]
   }
   final case class SimpleFunc[Ctx <: StatelessContext](
@@ -642,7 +647,7 @@ object Compiler {
       }
     }
 
-    def getFunc(typeId: Ast.TypeId, callId: Ast.FuncId): FuncInfo[Ctx] = {
+    def getFunc(typeId: Ast.TypeId, callId: Ast.FuncId): ContractFunc[Ctx] = {
       getContractInfo(typeId).funcs
         .getOrElse(callId, throw Error(s"Function ${typeId}.${callId.name} does not exist"))
     }
