@@ -152,6 +152,7 @@ object Compiler {
     }
   }
   trait ContractFunc[Ctx <: StatelessContext] extends FuncInfo[Ctx] {
+    def argsType: Seq[Type]
     def returnType: Seq[Type]
   }
   final case class SimpleFunc[Ctx <: StatelessContext](
@@ -508,7 +509,7 @@ object Compiler {
       }
     }
 
-    def getFunc(typeId: Ast.TypeId, callId: Ast.FuncId): FuncInfo[Ctx] = {
+    def getFunc(typeId: Ast.TypeId, callId: Ast.FuncId): ContractFunc[Ctx] = {
       contractTable
         .getOrElse(typeId, throw Error(s"Contract ${typeId.name} does not exist"))
         .getOrElse(callId, throw Error(s"Function ${typeId}.${callId.name} does not exist"))

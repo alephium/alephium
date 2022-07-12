@@ -2311,18 +2311,18 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
-  it should "check external method return length" in new ContextGenerators {
-    def prepareFrame(lengthOpt: Option[U256])(implicit
+  it should "check external method arg and return length" in new ContextGenerators {
+    def prepareFrame(lengthOpt: Option[(U256, U256)])(implicit
         networkConfig: NetworkConfig
     ): Frame[StatefulContext] = {
       val contractMethod = Method[StatefulContext](
         isPublic = true,
         usePreapprovedAssets = false,
         useContractAssets = false,
-        argsLength = 0,
-        localsLength = 0,
+        argsLength = 1,
+        localsLength = 1,
         returnLength = 1,
-        instrs = AVector(U256Const0, Return)
+        instrs = AVector(LoadLocal(0), Return)
       )
       val contract   = StatefulContract(0, AVector(contractMethod))
       val (obj, ctx) = prepareContract(contract, AVector.empty[Val])
@@ -2338,8 +2338,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         localsLength = 0,
         returnLength = 0,
         instrs = lengthOpt match {
-          case Some(length) => ConstInstr.u256(Val.U256(length)) +: instrs
-          case _            => instrs
+          case Some((argLength, retLength)) =>
+            AVector[Instr[StatefulContext]](
+              U256Const0,
+              ConstInstr.u256(Val.U256(argLength)),
+              ConstInstr.u256(Val.U256(retLength))
+            ) ++ instrs
+          case _ => U256Const0 +: instrs
         }
       )
       val script         = StatefulScript.from(AVector(scriptMethod)).get
@@ -2359,17 +2364,41 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
 
     prepareFrame(None)(NetworkConfigFixture.PreLeman).execute().isRight is true
-    prepareFrame(Some(U256.One))(NetworkConfigFixture.PreLeman).execute().isRight is true
+    prepareFrame(Some((U256.One, U256.One)))(NetworkConfigFixture.PreLeman)
+      .execute()
+      .isRight is true
+
     prepareFrame(None)(NetworkConfigFixture.Leman).execute().leftValue is Right(StackUnderflow)
-    prepareFrame(Some(U256.One))(NetworkConfigFixture.Leman).execute().isRight is true
-    prepareFrame(Some(U256.Zero))(NetworkConfigFixture.Leman).execute().leftValue is Right(
-      InvalidExternMethodRetLength
+    prepareFrame(Some((U256.One, U256.One)))(NetworkConfigFixture.Leman).execute().isRight is true
+    prepareFrame(Some((U256.One, U256.Zero)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidExternalMethodReturnLength
     )
-    prepareFrame(Some(U256.Two))(NetworkConfigFixture.Leman).execute().leftValue is Right(
-      InvalidExternMethodRetLength
+    prepareFrame(Some((U256.One, U256.Two)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidExternalMethodReturnLength
     )
-    prepareFrame(Some(U256.MaxValue))(NetworkConfigFixture.Leman).execute().leftValue is Right(
-      InvalidRetLength
+    prepareFrame(Some((U256.One, U256.MaxValue)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidReturnLength
+    )
+    prepareFrame(Some((U256.Zero, U256.One)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidExternalMethodArgLength
+    )
+    prepareFrame(Some((U256.Two, U256.One)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidExternalMethodArgLength
+    )
+    prepareFrame(Some((U256.MaxValue, U256.One)))(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue is Right(
+      InvalidArgLength
     )
   }
 

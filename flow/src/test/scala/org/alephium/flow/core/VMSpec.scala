@@ -2203,57 +2203,88 @@ class VMSpec extends AlephiumSpec {
     )
   }
 
-  it should "check external method return length" in new ContractFixture {
-    val foo: String =
+  trait CheckArgAndReturnLengthFixture extends ContractFixture {
+    val upgradable: String =
       s"""
-         |TxContract Foo() {
-         |  pub fn foo() -> (Bool, [U256; 2]) {
-         |    return false, [0; 2]
-         |  }
-         |
+         |TxContract Upgradable() {
          |  pub fn upgrade(code: ByteVec) -> () {
          |    migrate!(code)
          |  }
          |}
          |""".stripMargin
-    val fooId = createContract(foo, AVector.empty).key
+
+    def foo: String
+    lazy val fooIdHex = createContract(foo, AVector.empty).key.toHexString
+
+    def upgrade() = {
+      val fooV1 =
+        s"""
+           |TxContract Foo() extends Upgradable() {
+           |  pub fn foo() -> () {}
+           |}
+           |$upgradable
+           |""".stripMargin
+      val fooV1Bytecode = serialize(Compiler.compileContract(fooV1).rightValue)
+      val upgradeFooScript: String =
+        s"""
+           |TxScript Main {
+           |  let foo = Foo(#$fooIdHex)
+           |  foo.upgrade(#${Hex.toHexString(fooV1Bytecode)})
+           |}
+           |$foo
+           |""".stripMargin
+      callTxScript(upgradeFooScript)
+    }
+  }
+
+  it should "check external method arg length" in new CheckArgAndReturnLengthFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo() extends Upgradable() {
+         |  pub fn foo(array: [U256; 2]) -> () {}
+         |}
+         |$upgradable
+         |""".stripMargin
 
     val script: String =
       s"""
          |TxScript Main {
-         |  let foo = Foo(#${fooId.toHexString})
-         |  let (condition, array) = foo.foo()
-         |  assert!(!condition)
-         |  assert!(array[0] == 0)
-         |  assert!(array[1] == 0)
+         |  let foo = Foo(#$fooIdHex)
+         |  foo.foo([0, 0])
          |}
          |$foo
          |""".stripMargin
-    callTxScript(script)
 
-    val fooV1: String =
+    callTxScript(script)
+    upgrade()
+    intercept[AssertionError](callTxScript(script)).getMessage is
+      "Right(TxScriptExeFailed(InvalidExternalMethodArgLength))"
+  }
+
+  it should "check external method return length" in new CheckArgAndReturnLengthFixture {
+    val foo: String =
       s"""
-         |TxContract Foo() {
-         |  pub fn foo() -> () {}
-         |  pub fn upgrade(code: ByteVec) -> () {
-         |    migrate!(code)
+         |TxContract Foo() extends Upgradable() {
+         |  pub fn foo() -> (Bool, [U256; 2]) {
+         |    return false, [0; 2]
          |  }
          |}
+         |$upgradable
          |""".stripMargin
-    val fooV1Bytecode = serialize(Compiler.compileContract(fooV1).rightValue)
 
-    val upgradeFooScript: String =
+    val script: String =
       s"""
          |TxScript Main {
-         |  let foo = Foo(#${fooId.toHexString})
-         |  foo.upgrade(#${Hex.toHexString(fooV1Bytecode)})
+         |  let foo = Foo(#$fooIdHex)
+         |  let (condition, array) = foo.foo()
          |}
          |$foo
          |""".stripMargin
-    callTxScript(upgradeFooScript)
 
+    callTxScript(script)
+    upgrade()
     intercept[AssertionError](callTxScript(script)).getMessage is
-      "Right(TxScriptExeFailed(InvalidExternMethodRetLength))"
+      "Right(TxScriptExeFailed(InvalidExternalMethodReturnLength))"
   }
 
   it should "not load contract just after creation" in new ContractFixture {

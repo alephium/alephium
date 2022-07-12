@@ -447,13 +447,15 @@ final case class StatefulFrame(
   def externalMethodFrame(
       contractKey: Hash,
       index: Int,
-      retLengthOpt: Option[Int]
+      retLengthOpt: Option[Int],
+      argLengthOpt: Option[Int]
   ): ExeResult[Frame[StatefulContext]] = {
     for {
-      contractObj        <- ctx.loadContractObj(contractKey)
-      method             <- contractObj.getMethod(index)
-      _                  <- checkRetLength(method, retLengthOpt)
-      _                  <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
+      contractObj <- ctx.loadContractObj(contractKey)
+      method      <- contractObj.getMethod(index)
+      _ <- checkLength(method.returnLength, retLengthOpt, InvalidExternalMethodReturnLength)
+      _ <- checkLength(method.argsLength, argLengthOpt, InvalidExternalMethodArgLength)
+      _ <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method)
       frame <-
         Frame.stateful(
@@ -468,18 +470,14 @@ final case class StatefulFrame(
     } yield frame
   }
 
-  private def checkRetLength(
-      method: Method[StatefulContext],
-      retLengthOpt: Option[Int]
+  private def checkLength(
+      expected: Int,
+      lengthOpt: Option[Int],
+      error: ExeFailure
   ): ExeResult[Unit] = {
-    retLengthOpt match {
-      case None => okay
-      case Some(expectedLength) =>
-        if (method.returnLength == expectedLength) {
-          okay
-        } else {
-          failed(InvalidExternMethodRetLength)
-        }
+    lengthOpt match {
+      case Some(length) => if (length == expected) okay else failed(error)
+      case None         => okay
     }
   }
 
@@ -488,16 +486,17 @@ final case class StatefulFrame(
     for {
       _            <- ctx.chargeGas(GasSchedule.callGas)
       contractId   <- popContractId()
-      retLengthOpt <- popRetLength()
-      newFrame     <- externalMethodFrame(contractId, Bytes.toPosInt(index), retLengthOpt)
+      retLengthOpt <- popLength(InvalidReturnLength)
+      argLengthOpt <- popLength(InvalidArgLength)
+      newFrame <- externalMethodFrame(contractId, Bytes.toPosInt(index), retLengthOpt, argLengthOpt)
     } yield Some(newFrame)
   }
 
-  private def popRetLength(): ExeResult[Option[Int]] = {
+  private def popLength(error: ExeFailure): ExeResult[Option[Int]] = {
     if (ctx.getHardFork().isLemanEnabled()) {
       popOpStackU256().flatMap(_.v.toInt match {
         case Some(value) => Right(Some(value))
-        case None        => failed(InvalidRetLength)
+        case None        => failed(error)
       })
     } else {
       Right(None)

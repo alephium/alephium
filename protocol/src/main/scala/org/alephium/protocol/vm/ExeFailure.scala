@@ -64,8 +64,10 @@ case object InvalidMethod                                      extends ExeFailur
 case object InvalidMethodModifierBeforeLeman                   extends ExeFailure
 final case class InvalidMethodIndex(index: Int)                extends ExeFailure
 final case class InvalidMethodArgLength(got: Int, expect: Int) extends ExeFailure
-case object InvalidRetLength                                   extends ExeFailure
-case object InvalidExternMethodRetLength                       extends ExeFailure
+case object InvalidReturnLength                                extends ExeFailure
+case object InvalidExternalMethodReturnLength                  extends ExeFailure
+case object InvalidArgLength                                   extends ExeFailure
+case object InvalidExternalMethodArgLength                     extends ExeFailure
 case object InvalidLengthForEncodeInstr                        extends ExeFailure
 case object InsufficientArgs                                   extends ExeFailure
 case object ExternalPrivateMethodCall                          extends ExeFailure
