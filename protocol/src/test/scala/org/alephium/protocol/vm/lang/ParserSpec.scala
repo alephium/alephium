@@ -160,11 +160,11 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse("foo.add(x, y)", StatefulParser.statement(_)).isSuccess is true
     fastparse.parse("Foo(x).add(x, y)", StatefulParser.statement(_)).isSuccess is true
     fastparse
-      .parse("if x >= 1 { y = y + x } else { y = 0 }", StatelessParser.statement(_))
+      .parse("if (x >= 1) { y = y + x } else { y = 0 }", StatelessParser.statement(_))
       .isSuccess is true
 
     fastparse
-      .parse("while true { x = x + 1 }", StatelessParser.statement(_))
+      .parse("while (true) { x = x + 1 }", StatelessParser.statement(_))
       .get
       .value is a[Ast.While[StatelessContext]]
     fastparse
@@ -175,7 +175,7 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse if-else statements" in {
     fastparse
-      .parse("if x { return }", StatelessParser.statement(_))
+      .parse("if (x) { return }", StatelessParser.statement(_))
       .get
       .value is
       Ast.IfElseStatement[StatelessContext](
@@ -185,12 +185,12 @@ class ParserSpec extends AlephiumSpec {
 
     val error = intercept[Compiler.Error](
       fastparse
-        .parse("if x { return } else if y { return }", StatelessParser.statement(_))
+        .parse("if (x) { return } else if (y) { return }", StatelessParser.statement(_))
     )
     error.message is "If ... else if constructs should be terminated with an else statement"
 
     fastparse
-      .parse("if x { return } else if y { return } else {}", StatelessParser.statement(_))
+      .parse("if (x) { return } else if (y) { return } else {}", StatelessParser.statement(_))
       .get
       .value is
       Ast.IfElseStatement[StatelessContext](
@@ -204,7 +204,7 @@ class ParserSpec extends AlephiumSpec {
 
   it should "parse if-else expressions" in {
     fastparse
-      .parse("if cond 0 else 1", StatelessParser.expr(_))
+      .parse("if (cond) 0 else 1", StatelessParser.expr(_))
       .get
       .value is
       Ast.IfElseExpr[StatelessContext](
@@ -215,7 +215,7 @@ class ParserSpec extends AlephiumSpec {
       )
 
     fastparse
-      .parse("if cond0 0 else if cond1 1 else 2", StatelessParser.expr(_))
+      .parse("if (cond0) 0 else if (cond1) 1 else 2", StatelessParser.expr(_))
       .get
       .value is
       Ast.IfElseExpr[StatelessContext](
@@ -226,7 +226,7 @@ class ParserSpec extends AlephiumSpec {
         Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.Two)))
       )
 
-    val error = intercept[Compiler.Error](fastparse.parse("if cond0 0", StatelessParser.expr(_)))
+    val error = intercept[Compiler.Error](fastparse.parse("if (cond0) 0", StatelessParser.expr(_)))
     error.message is "If else expressions should be terminated with an else branch"
   }
 

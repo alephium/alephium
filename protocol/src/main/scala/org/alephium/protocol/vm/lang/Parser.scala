@@ -127,7 +127,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     P("(" ~ expr ~ ")").map(Ast.ParenExpr.apply[Ctx])
 
   def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
-    P(Lexer.keyword("if") ~/ expr ~ expr).map { case (condition, expr) =>
+    P(Lexer.keyword("if") ~/ "(" ~ expr ~ ")" ~ expr).map { case (condition, expr) =>
       Ast.IfBranchExpr(condition, expr)
     }
   def elseIfBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
@@ -263,7 +263,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]]      = P("{" ~ statement.rep(1) ~ "}")
   def emptyBlock[Unknown: P]: P[Seq[Ast.Statement[Ctx]]] = P("{" ~ "}").map(_ => Seq.empty)
   def ifBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
-    P(Lexer.keyword("if") ~/ expr ~ block).map { case (condition, body) =>
+    P(Lexer.keyword("if") ~/ "(" ~ expr ~ ")" ~ block).map { case (condition, body) =>
       Ast.IfBranchStatement(condition, body)
     }
   def elseIfBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
@@ -282,7 +282,9 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
 
   def whileStmt[Unknown: P]: P[Ast.While[Ctx]] =
-    P(Lexer.keyword("while") ~/ expr ~ block).map { case (expr, block) => Ast.While(expr, block) }
+    P(Lexer.keyword("while") ~/ "(" ~ expr ~ ")" ~ block).map { case (expr, block) =>
+      Ast.While(expr, block)
+    }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def forLoopStmt[Unknown: P]: P[Ast.ForLoop[Ctx]] =

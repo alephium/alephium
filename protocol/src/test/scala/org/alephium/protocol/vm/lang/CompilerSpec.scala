@@ -527,9 +527,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn main() -> (U256) {
          |    let mut x = 5
          |    let mut done = false
-         |    while !done {
+         |    while (!done) {
          |      x = x + x - 3
-         |      if x % 5 == 0 { done = true }
+         |      if (x % 5 == 0) { done = true }
          |    }
          |    return x
          |  }
@@ -591,7 +591,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    let mut x = 5
          |    for (let mut done = false; !done; done = done) {
          |      x = x + x - 3
-         |      if x % 5 == 0 { done = true }
+         |      if (x % 5 == 0) { done = true }
          |    }
          |    return x
          |  }
@@ -633,7 +633,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract Fibonacci() {
          |  pub fn f(n: I256) -> (I256) {
-         |    if n < 2i {
+         |    if (n < 2i) {
          |      return n
          |    } else {
          |      return f(n-1i) + f(n-2i)
@@ -649,7 +649,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract Fibonacci() {
          |  pub fn f(n: U256) -> (U256) {
-         |    if n < 2u {
+         |    if (n < 2u) {
          |      return n
          |    } else {
          |      return f(n-1u) + f(n-2u)
@@ -702,7 +702,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract Foo() {
          |  pub fn f(mut n: U256) -> (U256) {
-         |    if n < 2 {
+         |    if (n < 2) {
          |      n = n + 1
          |    }
          |    return n
@@ -2391,7 +2391,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |TxContract Foo() {
            |  fn foo() -> U256 {
-           |    return if true 0 else 1
+           |    return if (true) 0 else 1
            |  }
            |}
            |""".stripMargin
@@ -2413,7 +2413,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |TxContract Foo() {
            |  fn foo() -> U256 {
-           |    return if false 0 else if true 1 else 2
+           |    return if (false) 0 else if (true) 1 else 2
            |  }
            |}
            |""".stripMargin
@@ -2439,7 +2439,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |TxContract Foo() {
            |  fn foo() -> U256 {
-           |    return if false 1 else #00
+           |    return if (false) 1 else #00
            |  }
            |}
            |""".stripMargin
@@ -2454,7 +2454,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |TxContract Foo() {
            |  fn foo() -> U256 {
-           |    return if false 1
+           |    return if (false) 1
            |  }
            |}
            |""".stripMargin
