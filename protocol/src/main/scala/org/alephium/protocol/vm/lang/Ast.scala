@@ -381,8 +381,11 @@ object Ast {
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       val elseBranchType = elseBranch.expr.getType(state)
       ifBranches.foreach { ifBranch =>
-        if (ifBranch.expr.getType(state) != elseBranchType) {
-          throw Compiler.Error("There are different types of if-else expression branches")
+        val ifBranchType = ifBranch.expr.getType(state)
+        if (ifBranchType != elseBranchType) {
+          throw Compiler.Error(
+            s"There are different types of if-else expression branches, expect $elseBranchType, have $ifBranchType"
+          )
         }
       }
       elseBranchType

@@ -2398,7 +2398,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(code).leftValue.message is
-        "There are different types of if-else expression branches"
+        "There are different types of if-else expression branches, expect List(ByteVec), have List(U256)"
     }
 
     {
