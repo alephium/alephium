@@ -708,21 +708,43 @@ object BuiltIn {
       ContractCodeHash
     )
 
-  val subContractId: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] {
-    def name: String                  = "subContractId"
+  abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] {
+    def name: String
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
 
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]]
+  }
+
+  val subContractId: BuiltIn[StatefulContext] = new SubContractBuiltIn {
+    val name: String = "subContractId"
     def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType == Seq(Type.ByteVec)) {
         Seq(Type.ByteVec)
       } else {
-        throw Error(s"Invalid argument type for subContractId, ByteVec expected")
+        throw Error(s"Invalid argument type for $name, ByteVec expected")
       }
     }
-
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
       Seq(SelfContractId, ByteVecConcat, Blake2b, Blake2b)
+    }
+  }
+
+  val subContractIdOf: BuiltIn[StatefulContext] = new SubContractBuiltIn {
+    val name: String = "subContractIdOf"
+    def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+      if (
+        inputType.length == 2 &&
+        inputType(0) == Type.ByteVec &&
+        inputType(1).isInstanceOf[Type.Contract]
+      ) {
+        Seq(Type.ByteVec)
+      } else {
+        throw Error(s"Invalid argument type for $name, ByteVec expected")
+      }
+    }
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
+      Seq(ByteVecConcat, Blake2b, Blake2b)
     }
   }
 
@@ -762,6 +784,7 @@ object BuiltIn {
       callerCodeHash,
       contractInitialStateHash,
       contractCodeHash,
-      subContractId
+      subContractId,
+      subContractIdOf
     ).map(f => f.name -> f)
 }

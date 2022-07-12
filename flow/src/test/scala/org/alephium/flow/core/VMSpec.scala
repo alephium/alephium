@@ -2471,6 +2471,8 @@ class VMSpec extends AlephiumSpec {
            |
            |  pub fn callSubContract(path: ByteVec) -> () {
            |    let subContractIdCalculated = subContractId!(path)
+           |    let subContractIdCalculatedTest = subContractIdOf!(path, Contract(selfContractId!()))
+           |    assert!(subContractIdCalculated == subContractIdCalculatedTest)
            |    assert!(subContractIdCalculated == subContractId)
            |    SubContract(subContractIdCalculated).call()
            |  }
