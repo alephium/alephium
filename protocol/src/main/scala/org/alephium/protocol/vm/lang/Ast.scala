@@ -422,24 +422,37 @@ object Ast {
       }
     }
   }
+
+  sealed trait VarDeclaration
+  final case class NamedVar(mutable: Boolean, ident: Ident) extends VarDeclaration
+  case object AnonymousVar                                  extends VarDeclaration
+
   final case class VarDef[Ctx <: StatelessContext](
-      idents: Seq[(Boolean, Ident)],
+      vars: Seq[VarDeclaration],
       value: Expr[Ctx]
   ) extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
       val types = value.getType(state)
-      if (types.length != idents.length) {
+      if (types.length != vars.length) {
         throw Compiler.Error(
-          s"Invalid variable def, expect ${types.length} vars, have ${idents.length} vars"
+          s"Invalid variable def, expect ${types.length} vars, have ${vars.length} vars"
         )
       }
-      idents.zip(types).foreach { case ((isMutable, ident), tpe) =>
-        state.addLocalVariable(ident, tpe, isMutable, false)
+      vars.zip(types).foreach {
+        case (NamedVar(isMutable, ident), tpe) =>
+          state.addLocalVariable(ident, tpe, isMutable, false)
+        case _ =>
       }
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      value.genCode(state) ++ idents.flatMap(p => state.genStoreCode(p._2)).reverse.flatten
+      val storeCodes = vars.zip(value.getType(state)).flatMap {
+        case (NamedVar(_, ident), _) => state.genStoreCode(ident)
+        case (AnonymousVar, tpe: Type.FixedSizeArray) =>
+          Seq(Seq.fill(tpe.flattenSize())(Pop))
+        case (AnonymousVar, _) => Seq(Seq(Pop))
+      }
+      value.genCode(state) ++ storeCodes.reverse.flatten
     }
   }
 
