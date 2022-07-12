@@ -449,9 +449,11 @@ final case class StatefulFrame(
       index: Int
   ): ExeResult[Frame[StatefulContext]] = {
     for {
-      contractObj        <- ctx.loadContractObj(contractKey)
-      method             <- contractObj.getMethod(index)
-      _                  <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
+      contractObj <- ctx.loadContractObj(contractKey)
+      method      <- contractObj.getMethod(index)
+      _ <- checkLength(method.returnLength, InvalidReturnLength, InvalidExternalMethodReturnLength)
+      _ <- checkLength(method.argsLength, InvalidArgLength, InvalidExternalMethodArgLength)
+      _ <- if (method.isPublic) okay else failed(ExternalPrivateMethodCall)
       newBalanceStateOpt <- getNewFrameBalancesState(contractObj, method)
       frame <-
         Frame.stateful(
@@ -464,6 +466,21 @@ final case class StatefulFrame(
           opStack.push
         )
     } yield frame
+  }
+
+  @inline private def checkLength(
+      expected: Int,
+      paramError: ExeFailure,
+      checkError: ExeFailure
+  ): ExeResult[Unit] = {
+    if (ctx.getHardFork().isLemanEnabled()) {
+      popOpStackU256().flatMap(_.v.toInt match {
+        case Some(length) => if (length == expected) okay else failed(checkError)
+        case None         => failed(paramError)
+      })
+    } else {
+      okay
+    }
   }
 
   def callExternal(index: Byte): ExeResult[Option[Frame[StatefulContext]]] = {

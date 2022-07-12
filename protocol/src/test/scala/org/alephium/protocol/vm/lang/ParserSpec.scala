@@ -136,7 +136,10 @@ class ParserSpec extends AlephiumSpec {
         Const(Val.ByteVec(Hex.unsafe("00")))
       )
     fastparse.parse("let bytes = #", StatefulParser.statement(_)).get.value is
-      VarDef[StatefulContext](Seq((false, Ident("bytes"))), Const(Val.ByteVec(ByteString.empty)))
+      VarDef[StatefulContext](
+        Seq(Ast.NamedVar(false, Ident("bytes"))),
+        Const(Val.ByteVec(ByteString.empty))
+      )
   }
 
   it should "parse return" in {
@@ -175,9 +178,9 @@ class ParserSpec extends AlephiumSpec {
       .parse("if x { return }", StatelessParser.statement(_))
       .get
       .value is
-      Ast.IfElse[StatelessContext](
-        Seq(Ast.IfBranch(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty)))),
-        ElseBranch(Seq.empty)
+      Ast.IfElseStatement[StatelessContext](
+        Seq(Ast.IfBranchStatement(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty)))),
+        None
       )
 
     val error = intercept[Compiler.Error](
@@ -190,13 +193,41 @@ class ParserSpec extends AlephiumSpec {
       .parse("if x { return } else if y { return } else {}", StatelessParser.statement(_))
       .get
       .value is
-      Ast.IfElse[StatelessContext](
+      Ast.IfElseStatement[StatelessContext](
         Seq(
-          Ast.IfBranch(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty))),
-          Ast.IfBranch(Variable(Ast.Ident("y")), Seq(ReturnStmt(Seq.empty)))
+          Ast.IfBranchStatement(Variable(Ast.Ident("x")), Seq(ReturnStmt(Seq.empty))),
+          Ast.IfBranchStatement(Variable(Ast.Ident("y")), Seq(ReturnStmt(Seq.empty)))
         ),
-        ElseBranch(Seq.empty)
+        Some(Ast.ElseBranchStatement(Seq.empty))
       )
+  }
+
+  it should "parse if-else expressions" in {
+    fastparse
+      .parse("if cond 0 else 1", StatelessParser.expr(_))
+      .get
+      .value is
+      Ast.IfElseExpr[StatelessContext](
+        Seq(
+          Ast.IfBranchExpr(Variable(Ast.Ident("cond")), Ast.Const(Val.U256(U256.Zero)))
+        ),
+        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.One)))
+      )
+
+    fastparse
+      .parse("if cond0 0 else if cond1 1 else 2", StatelessParser.expr(_))
+      .get
+      .value is
+      Ast.IfElseExpr[StatelessContext](
+        Seq(
+          Ast.IfBranchExpr(Variable(Ast.Ident("cond0")), Ast.Const(Val.U256(U256.Zero))),
+          Ast.IfBranchExpr(Variable(Ast.Ident("cond1")), Ast.Const(Val.U256(U256.One)))
+        ),
+        Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.Two)))
+      )
+
+    val error = intercept[Compiler.Error](fastparse.parse("if cond0 0", StatelessParser.expr(_)))
+    error.message is "If else expressions should be terminated with an else branch"
   }
 
   it should "parse annotations" in {
@@ -342,15 +373,35 @@ class ParserSpec extends AlephiumSpec {
   it should "parse variable definitions" in {
     val states: List[(String, Ast.Statement[StatelessContext])] = List(
       "let (a, b) = foo()" -> Ast.VarDef(
-        Seq((false, Ast.Ident("a")), (false, Ast.Ident("b"))),
+        Seq(Ast.NamedVar(false, Ast.Ident("a")), Ast.NamedVar(false, Ast.Ident("b"))),
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let (a, mut b) = foo()" -> Ast.VarDef(
-        Seq((false, Ast.Ident("a")), (true, Ast.Ident("b"))),
+        Seq(Ast.NamedVar(false, Ast.Ident("a")), Ast.NamedVar(true, Ast.Ident("b"))),
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "let (mut a, mut b) = foo()" -> Ast.VarDef(
-        Seq((true, Ast.Ident("a")), (true, Ast.Ident("b"))),
+        Seq(Ast.NamedVar(true, Ast.Ident("a")), Ast.NamedVar(true, Ast.Ident("b"))),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
+      ),
+      "let _ = foo()" -> Ast.VarDef(
+        Seq(Ast.AnonymousVar),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
+      ),
+      "let (_, _) = foo()" -> Ast.VarDef(
+        Seq(Ast.AnonymousVar, Ast.AnonymousVar),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
+      ),
+      "let (_, a, b) = foo()" -> Ast.VarDef(
+        Seq(
+          Ast.AnonymousVar,
+          Ast.NamedVar(false, Ast.Ident("a")),
+          Ast.NamedVar(false, Ast.Ident("b"))
+        ),
+        Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
+      ),
+      "let (mut a, _, _) = foo()" -> Ast.VarDef(
+        Seq(Ast.NamedVar(true, Ast.Ident("a")), Ast.AnonymousVar, Ast.AnonymousVar),
         Ast.CallExpr(Ast.FuncId("foo", false), Seq.empty, Seq.empty)
       )
     )

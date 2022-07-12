@@ -29,12 +29,13 @@ object ArrayTransformer {
       baseName: String,
       isMutable: Boolean,
       isLocal: Boolean,
-      varInfoBuild: (Type, Boolean, Byte) => Compiler.VarInfo
+      isGenerated: Boolean,
+      varInfoBuilder: Compiler.VarInfoBuilder
   ): ArrayRef[Ctx] = {
     val offset = ConstantArrayVarOffset[Ctx](state.varIndex)
-    initArrayVars(state, tpe, baseName, isMutable, isLocal, varInfoBuild)
+    initArrayVars(state, tpe, baseName, isMutable, isLocal, varInfoBuilder)
     val ref = ArrayRef[Ctx](isLocal, tpe, offset)
-    state.addArrayRef(Ident(baseName), isMutable, ref)
+    state.addArrayRef(Ident(baseName), isMutable, isGenerated, ref)
     ref
   }
 
@@ -45,28 +46,19 @@ object ArrayTransformer {
       baseName: String,
       isMutable: Boolean,
       isLocal: Boolean,
-      varInfoBuild: (Type, Boolean, Byte) => Compiler.VarInfo
+      varInfoBuilder: Compiler.VarInfoBuilder
   ): Unit = {
     tpe.baseType match {
       case baseType: Type.FixedSizeArray =>
         (0 until tpe.size).foreach { idx =>
           val newBaseName = arrayVarName(baseName, idx)
-          initArrayVars(state, baseType, newBaseName, isMutable, isLocal, varInfoBuild)
+          initArrayVars(state, baseType, newBaseName, isMutable, isLocal, varInfoBuilder)
         }
       case baseType =>
         (0 until tpe.size).foreach { idx =>
           val ident = Ast.Ident(arrayVarName(baseName, idx))
-          state.addVariable(ident, baseType, isMutable, isLocal, varInfoBuild)
+          state.addVariable(ident, baseType, isMutable, isLocal, true, varInfoBuilder)
         }
-    }
-  }
-
-  def flattenTypeLength(types: Seq[Type]): Int = {
-    types.foldLeft(0) { case (acc, tpe) =>
-      tpe match {
-        case t: Type.FixedSizeArray => acc + t.flattenSize()
-        case _                      => acc + 1
-      }
     }
   }
 

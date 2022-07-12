@@ -19,7 +19,7 @@ package org.alephium.protocol.vm.lang
 import fastparse._
 
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
-import org.alephium.protocol.vm.lang.Ast.{Annotation, Argument, ElseBranch, FuncId, Statement}
+import org.alephium.protocol.vm.lang.Ast.{Annotation, Argument, FuncId, Statement}
 
 // scalastyle:off number.of.methods
 @SuppressWarnings(
@@ -88,11 +88,13 @@ abstract class Parser[Ctx <: StatelessContext] {
   def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = P("[" ~ expr ~ "]")
 
   // Optimize chained comparisons
-  def expr[Unknown: P]: P[Ast.Expr[Ctx]]         = P(chain(andExpr, Lexer.opOr))
-  def andExpr[Unknown: P]: P[Ast.Expr[Ctx]]      = P(chain(relationExpr, Lexer.opAnd))
-  def relationExpr[Unknown: P]: P[Ast.Expr[Ctx]] = P(comp | arithExpr5)
-  def comp[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(arithExpr5 ~ comparison ~ arithExpr5).map { case (lhs, op, rhs) => Ast.Binop(op, lhs, rhs) }
+  def expr[Unknown: P]: P[Ast.Expr[Ctx]]    = P(chain(andExpr, Lexer.opOr))
+  def andExpr[Unknown: P]: P[Ast.Expr[Ctx]] = P(chain(relationExpr, Lexer.opAnd))
+  def relationExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
+    P(arithExpr5 ~ comparison.?).flatMap {
+      case (lhs, Some(op)) => arithExpr5.map(rhs => Ast.Binop(op, lhs, rhs))
+      case (lhs, None)     => Pass(lhs)
+    }
   def comparison[Unknown: P]: P[TestOperator] =
     P(Lexer.opEq | Lexer.opNe | Lexer.opLe | Lexer.opLt | Lexer.opGe | Lexer.opGt)
   def arithExpr5[Unknown: P]: P[Ast.Expr[Ctx]] =
@@ -124,6 +126,22 @@ abstract class Parser[Ctx <: StatelessContext] {
   def parenExpr[Unknown: P]: P[Ast.ParenExpr[Ctx]] =
     P("(" ~ expr ~ ")").map(Ast.ParenExpr.apply[Ctx])
 
+  def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
+    P(Lexer.keyword("if") ~/ expr ~ expr).map { case (condition, expr) =>
+      Ast.IfBranchExpr(condition, expr)
+    }
+  def elseIfBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
+    P(Lexer.keyword("else") ~ ifBranchExpr)
+  def elseBranchExpr[Unknown: P]: P[Ast.ElseBranchExpr[Ctx]] =
+    P(Lexer.keyword("else") ~ expr).map(Ast.ElseBranchExpr(_))
+  def ifelseExpr[Unknown: P]: P[Ast.IfElseExpr[Ctx]] =
+    P(ifBranchExpr ~ elseIfBranchExpr.rep(0) ~ elseBranchExpr.?).map {
+      case (ifBranch, elseIfBranches, Some(elseBranch)) =>
+        Ast.IfElseExpr(ifBranch +: elseIfBranches, elseBranch)
+      case (_, _, None) =>
+        throw Compiler.Error("If else expressions should be terminated with an else branch")
+    }
+
   def ret[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
     P(normalRet.rep(1)).map { returnStmts =>
       if (returnStmts.length > 1) {
@@ -136,13 +154,17 @@ abstract class Parser[Ctx <: StatelessContext] {
   def normalRet[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
     P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.ReturnStmt.apply[Ctx])
 
-  def ident[Unknown: P]: P[(Boolean, Ast.Ident)] = P(Lexer.mut ~ Lexer.ident)
-  def idents[Unknown: P]: P[Seq[(Boolean, Ast.Ident)]] = P(
-    ident.map(Seq(_)) | "(" ~ ident.rep(1, ",") ~ ")"
+  def anonymousVar[Unknown: P]: P[Ast.VarDeclaration] = P("_").map(_ => Ast.AnonymousVar)
+  def namedVar[Unknown: P]: P[Ast.VarDeclaration] =
+    P(Lexer.mut ~ Lexer.ident).map(Ast.NamedVar.tupled)
+
+  def varDeclaration[Unknown: P]: P[Ast.VarDeclaration] = P(namedVar | anonymousVar)
+  def varDeclarations[Unknown: P]: P[Seq[Ast.VarDeclaration]] = P(
+    varDeclaration.map(Seq(_)) | "(" ~ varDeclaration.rep(1, ",") ~ ")"
   )
   def varDef[Unknown: P]: P[Ast.VarDef[Ctx]] =
-    P(Lexer.keyword("let") ~/ idents ~ "=" ~ expr).map { case (idents, expr) =>
-      Ast.VarDef(idents, expr)
+    P(Lexer.keyword("let") ~/ varDeclarations ~ "=" ~ expr).map { case (vars, expr) =>
+      Ast.VarDef(vars, expr)
     }
   def assignmentSimpleTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = P(
     Lexer.ident.map(Ast.AssignmentSimpleTarget.apply[Ctx])
@@ -240,23 +262,23 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]]      = P("{" ~ statement.rep(1) ~ "}")
   def emptyBlock[Unknown: P]: P[Seq[Ast.Statement[Ctx]]] = P("{" ~ "}").map(_ => Seq.empty)
-  def ifBranch[Unknown: P]: P[Ast.IfBranch[Ctx]] =
+  def ifBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
     P(Lexer.keyword("if") ~/ expr ~ block).map { case (condition, body) =>
-      Ast.IfBranch(condition, body)
+      Ast.IfBranchStatement(condition, body)
     }
-  def elseIfBranch[Unknown: P]: P[Ast.IfBranch[Ctx]] =
-    P(Lexer.keyword("else") ~ ifBranch)
-  def elseBranch[Unknown: P]: P[ElseBranch[Ctx]] =
-    P(Lexer.keyword("else") ~ (block | emptyBlock)).map(Ast.ElseBranch(_))
-  def ifelse[Unknown: P]: P[Ast.IfElse[Ctx]] =
-    P(ifBranch ~ elseIfBranch.rep(0) ~ elseBranch.?)
+  def elseIfBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
+    P(Lexer.keyword("else") ~ ifBranchStmt)
+  def elseBranchStmt[Unknown: P]: P[Ast.ElseBranchStatement[Ctx]] =
+    P(Lexer.keyword("else") ~ (block | emptyBlock)).map(Ast.ElseBranchStatement(_))
+  def ifelseStmt[Unknown: P]: P[Ast.IfElseStatement[Ctx]] =
+    P(ifBranchStmt ~ elseIfBranchStmt.rep(0) ~ elseBranchStmt.?)
       .map { case (ifBranch, elseIfBranches, elseBranchOpt) =>
         if (elseIfBranches.nonEmpty && elseBranchOpt.isEmpty) {
           throw Compiler.Error(
             "If ... else if constructs should be terminated with an else statement"
           )
         }
-        Ast.IfElse(ifBranch +: elseIfBranches, elseBranchOpt.getOrElse(ElseBranch(Seq.empty)))
+        Ast.IfElseStatement(ifBranch +: elseIfBranches, elseBranchOpt)
       }
 
   def whileStmt[Unknown: P]: P[Ast.While[Ctx]] =
@@ -383,10 +405,10 @@ object Parser {
 )
 object StatelessParser extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
-    P(const | callExpr | contractConv | variable | parenExpr | arrayExpr)
+    P(const | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr)
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
-    P(varDef | assign | funcCall | ifelse | whileStmt | forLoopStmt | ret)
+    P(varDef | assign | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret)
 
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
@@ -407,7 +429,7 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr
+      const | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.ContractCallExpr] =
@@ -423,7 +445,7 @@ object StatefulParser extends Parser[StatefulContext] {
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | assign | funcCall | contractCall | ifelse | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | assign | funcCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
   def contractParams[Unknown: P]: P[Seq[Ast.Argument]] = P("(" ~ contractArgument.rep(0, ",") ~ ")")
