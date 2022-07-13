@@ -356,19 +356,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test panic" in new Fixture {
-    val code =
+    def code(error: String = "") =
       s"""
          |TxContract Foo() {
          |  pub fn foo(x: U256) -> (U256) {
          |    if (x == 0) {
          |      return 0
          |    }
-         |    panic!()
+         |    panic!($error)
          |  }
          |}
          |""".stripMargin
-    test(code, AVector(Val.U256(0)), AVector(Val.U256(0)))
-    fail(code, AVector(Val.U256(1)), AssertionFailed)
+    test(code(), AVector(Val.U256(0)), AVector(Val.U256(0)))
+    fail(code(), AVector(Val.U256(1)), _ is AssertionFailed)
+    fail(code("1"), AVector(Val.U256(2)), _ is a[AssertionFailedWithErrorCode])
   }
 
   it should "check contract type" in {
@@ -457,14 +458,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def fail(
         input: String,
         args: AVector[Val],
-        error: ExeFailure,
+        check: ExeFailure => Assertion,
         fields: AVector[Val] = AVector.empty
     ): Assertion = {
       val contract = Compiler.compileContract(input).toOption.get
 
       deserialize[StatefulContract](serialize(contract)) isE contract
       val (obj, context) = prepareContract(contract, fields)
-      StatefulVM.executeWithOutputs(context, obj, args).leftValue isE error
+      check(StatefulVM.executeWithOutputs(context, obj, args).leftValue.rightValue)
     }
   }
 

@@ -409,15 +409,24 @@ object BuiltIn {
       U256Const(Val.U256(dustUtxoAmount))
     )
 
-  val panic: SimpleStatelessBuiltIn =
-    SimpleStatelessBuiltIn(
-      "panic",
-      Seq.empty,
-      Seq[Type](Type.Panic),
-      Seq(ConstFalse, Assert),
-      usePreapprovedAssets = false,
-      useAssetsInContract = false
-    )
+  val panic: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
+    val name: String                  = "panic"
+    def usePreapprovedAssets: Boolean = false
+    def useAssetsInContract: Boolean  = false
+    override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+      if (inputType.nonEmpty && inputType != Seq(Type.U256)) {
+        throw Compiler.Error(s"Invalid argument type for $name, optional U256 expected")
+      }
+      Seq(Type.Panic)
+    }
+    override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+      if (inputType.isEmpty) {
+        Seq(ConstFalse, Assert)
+      } else {
+        Seq(ConstFalse, Swap, AssertWithErrorCode)
+      }
+    }
+  }
 
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
