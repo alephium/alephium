@@ -600,6 +600,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val unsignedTxs = blockflow
         .sweepAddress(
+          None,
           keyManager(output.lockupScript).publicKey,
           output.lockupScript,
           None,
@@ -917,6 +918,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     val unsignedTxs = blockFlow
       .sweepAddress(
+        None,
         keyManager(output.lockupScript).publicKey,
         output.lockupScript,
         None,

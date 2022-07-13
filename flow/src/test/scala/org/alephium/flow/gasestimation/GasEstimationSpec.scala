@@ -282,6 +282,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
 
     blockFlow
       .transfer(
+        None,
         lockup,
         unlock,
         output,

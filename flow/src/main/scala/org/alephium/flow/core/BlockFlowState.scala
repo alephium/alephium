@@ -219,7 +219,14 @@ trait BlockFlowState extends FlowTipsUtil {
   ): IOResult[WorldState.Persisted] = {
     assume(deps.length == brokerConfig.depsNum)
     val hash = deps.uncleHash(groupIndex)
-    getBlockChainWithState(groupIndex).getPersistedWorldState(hash)
+    getPersistedWorldState(hash, groupIndex)
+  }
+
+  private[flow] def getPersistedWorldState(
+      targetHash: BlockHash,
+      groupIndex: GroupIndex
+  ): IOResult[WorldState.Persisted] = {
+    getBlockChainWithState(groupIndex).getPersistedWorldState(targetHash)
   }
 
   private[flow] def getDepStateHash(header: BlockHeader): IOResult[Hash] = {
@@ -285,8 +292,18 @@ trait BlockFlowState extends FlowTipsUtil {
   def getImmutableGroupViewIncludePool(
       mainGroup: GroupIndex
   ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
-    val blockDeps = getBestDeps(mainGroup)
+    getImmutableGroupViewIncludePool(mainGroup, None)
+  }
+
+  def getImmutableGroupViewIncludePool(
+      mainGroup: GroupIndex,
+      targetBlockHashOpt: Option[BlockHash]
+  ): IOResult[BlockFlowGroupView[WorldState.Persisted]] = {
     for {
+      blockDeps <- targetBlockHashOpt match {
+        case Some(blockHash) => getBlockHeader(blockHash).map(_.blockDeps)
+        case None            => Right(getBestDeps(mainGroup))
+      }
       worldState  <- getPersistedWorldState(blockDeps, mainGroup)
       blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
     } yield BlockFlowGroupView.includePool(worldState, blockCaches, getMemPool(mainGroup))

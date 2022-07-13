@@ -232,7 +232,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "check function return types" in {
-    val failed = Seq(
+    val noReturnCases = Seq(
       s"""
          |TxContract Foo() {
          |  fn foo() -> (U256) {
@@ -271,13 +271,40 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     )
-    failed.foreach { code =>
+    noReturnCases.foreach { code =>
       Compiler.compileContract(code).leftValue is Compiler.Error(
         "Expect return statement for function foo"
       )
     }
 
+    val invalidReturnCases = Seq(
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> () {
+         |    return 1
+         |  }
+         |}
+         |""".stripMargin,
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> (U256) {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    )
+    invalidReturnCases.foreach { code =>
+      Compiler.compileContract(code).leftValue.message.startsWith("Invalid return types:") is true
+    }
+
     val succeed = Seq(
+      s"""
+         |TxContract Foo() {
+         |  fn foo() -> (U256) {
+         |    panic!()
+         |  }
+         |}
+         |""".stripMargin,
       s"""
          |TxContract Foo() {
          |  fn foo(value: U256) -> (U256) {
@@ -326,6 +353,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     succeed.foreach { code =>
       Compiler.compileContract(code).isRight is true
     }
+  }
+
+  it should "test panic" in new Fixture {
+    def code(error: String = "") =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo(x: U256) -> (U256) {
+         |    if (x == 0) {
+         |      return 0
+         |    }
+         |    panic!($error)
+         |  }
+         |}
+         |""".stripMargin
+    test(code(), AVector(Val.U256(0)), AVector(Val.U256(0)))
+    fail(code(), AVector(Val.U256(1)), _ is AssertionFailed)
+    fail(code("1"), AVector(Val.U256(2)), _ is a[AssertionFailedWithErrorCode])
   }
 
   it should "check contract type" in {
@@ -410,6 +454,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val (obj, context) = prepareContract(contract, fields)
       StatefulVM.executeWithOutputs(context, obj, args, methodIndex) isE output
     }
+
+    def fail(
+        input: String,
+        args: AVector[Val],
+        check: ExeFailure => Assertion,
+        fields: AVector[Val] = AVector.empty
+    ): Assertion = {
+      val contract = Compiler.compileContract(input).toOption.get
+
+      deserialize[StatefulContract](serialize(contract)) isE contract
+      val (obj, context) = prepareContract(contract, fields)
+      check(StatefulVM.executeWithOutputs(context, obj, args).leftValue.rightValue)
+    }
   }
 
   it should "generate IR code" in new Fixture {
@@ -464,22 +521,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       failed(StackUnderflow) // no signature in the stack
   }
 
-  it should "converse values" in new Fixture {
-    test(
-      s"""
-         |TxContract Conversion() {
-         |  pub fn main() -> () {
-         |    let mut x = 5u
-         |    let mut y = 5i
-         |    x = u256!(y)
-         |    y = i256!(x)
-         |  }
-         |}
-         |""".stripMargin,
-      AVector.empty
-    )
-  }
-
   it should "test while" in new Fixture {
     test(
       s"""
@@ -487,9 +528,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn main() -> (U256) {
          |    let mut x = 5
          |    let mut done = false
-         |    while !done {
+         |    while (!done) {
          |      x = x + x - 3
-         |      if x % 5 == 0 { done = true }
+         |      if (x % 5 == 0) { done = true }
          |    }
          |    return x
          |  }
@@ -500,7 +541,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     )
   }
 
-  it should "check types for for loop" in {
+  it should "check types for for-loop" in {
     def code(
         initialize: String = "let mut i = 0",
         condition: String = "i < 10",
@@ -510,7 +551,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract ForLoop() {
          |  pub fn test() -> () {
-         |    for $initialize; $condition; $update {
+         |    for ($initialize; $condition; $update) {
          |      $body
          |    }
          |  }
@@ -534,7 +575,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |TxContract ForLoop() {
          |  pub fn main() -> (U256) {
          |    let mut x = 1
-         |    for let mut i = 1; i < 5; i = i + 1 {
+         |    for (let mut i = 1; i < 5; i = i + 1) {
          |      x = x * i
          |    }
          |    return x
@@ -549,9 +590,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |TxContract ForLoop() {
          |  pub fn main() -> (U256) {
          |    let mut x = 5
-         |    for let mut done = false; !done; done = done {
+         |    for (let mut done = false; !done; done = done) {
          |      x = x + x - 3
-         |      if x % 5 == 0 { done = true }
+         |      if (x % 5 == 0) { done = true }
          |    }
          |    return x
          |  }
@@ -593,7 +634,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract Fibonacci() {
          |  pub fn f(n: I256) -> (I256) {
-         |    if n < 2i {
+         |    if (n < 2i) {
          |      return n
          |    } else {
          |      return f(n-1i) + f(n-2i)
@@ -609,7 +650,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract Fibonacci() {
          |  pub fn f(n: U256) -> (U256) {
-         |    if n < 2u {
+         |    if (n < 2u) {
          |      return n
          |    } else {
          |      return f(n-1u) + f(n-2u)
@@ -662,7 +703,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxContract Foo() {
          |  pub fn f(mut n: U256) -> (U256) {
-         |    if n < 2 {
+         |    if (n < 2) {
          |      n = n + 1
          |    }
          |    return n
@@ -2351,7 +2392,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |TxContract Foo() {
            |  fn foo() -> U256 {
-           |    return if true 0 else 1
+           |    return if (true) 0 else 1
            |  }
            |}
            |""".stripMargin
@@ -2373,7 +2414,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |TxContract Foo() {
            |  fn foo() -> U256 {
-           |    return if false 0 else if true 1 else 2
+           |    return if (false) 0 else if (true) 1 else 2
            |  }
            |}
            |""".stripMargin
@@ -2399,7 +2440,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |TxContract Foo() {
            |  fn foo() -> U256 {
-           |    return if false 1 else #00
+           |    return if (false) 1 else #00
            |  }
            |}
            |""".stripMargin
@@ -2414,7 +2455,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |TxContract Foo() {
            |  fn foo() -> U256 {
-           |    return if false 1
+           |    return if (false) 1
            |  }
            |}
            |""".stripMargin

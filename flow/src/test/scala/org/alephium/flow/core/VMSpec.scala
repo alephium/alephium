@@ -667,21 +667,36 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript ByteVecTest {
-         |  assert!(byteVec!(true) == #${encode(true)})
-         |  assert!(byteVec!(false) == #${encode(false)})
-         |  assert!(byteVec!(${i256}i) == #${encode(i256)})
-         |  assert!(byteVec!(${u256}) == #${encode(u256)})
-         |  assert!(byteVec!(@${address.toBase58}) == #${encode(address.lockupScript)})
+         |  assert!(toByteVec!(true) == #${encode(true)})
+         |  assert!(toByteVec!(false) == #${encode(false)})
+         |  assert!(toByteVec!(${i256}i) == #${encode(i256)})
+         |  assert!(toByteVec!(${u256}) == #${encode(u256)})
+         |  assert!(toByteVec!(@${address.toBase58}) == #${encode(address.lockupScript)})
          |  assert!(# ++ #$bytes0 == #$bytes0)
          |  assert!(#$bytes0 ++ # == #$bytes0)
          |  assert!((#${bytes0} ++ #${bytes1}) == #${bytes0 ++ bytes1})
-         |  assert!(size!(byteVec!(true)) == 1)
-         |  assert!(size!(byteVec!(false)) == 1)
-         |  assert!(size!(byteVec!(@${address.toBase58})) == 33)
+         |  assert!(size!(toByteVec!(true)) == 1)
+         |  assert!(size!(toByteVec!(false)) == 1)
+         |  assert!(size!(toByteVec!(@${address.toBase58})) == 33)
          |  assert!(size!(#${bytes0} ++ #${bytes1}) == 64)
          |  assert!(zeros!(2) == #0000)
          |  assert!(nullAddress!() == @${Address.contract(ContractId.zero)})
          |  assert!(nullAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq)
+         |}
+         |""".stripMargin
+
+    testSimpleScript(main)
+  }
+
+  it should "test conversion functions" in new ContractFixture {
+    val main: String =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript ByteVecTest {
+         |  assert!(toI256!(1) == 1i)
+         |  assert!(toU256!(1i) == 1)
+         |  assert!(toByteVec!(true) == #01)
+         |  assert!(toByteVec!(false) == #00)
          |}
          |""".stripMargin
 
@@ -2197,7 +2212,7 @@ class VMSpec extends AlephiumSpec {
          |  event TestEvent2(a: U256, b: I256, c: Address, d: Bool)
          |
          |  pub fn testEventTypes() -> (U256) {
-         |    emit TestEvent1(4, -5i, @${address.toBase58}, byteVec!(@${address.toBase58}))
+         |    emit TestEvent1(4, -5i, @${address.toBase58}, toByteVec!(@${address.toBase58}))
          |    let b = true
          |    emit TestEvent2(5, -4i, @${address.toBase58}, b)
          |    return result + 1
@@ -2456,6 +2471,8 @@ class VMSpec extends AlephiumSpec {
            |
            |  pub fn callSubContract(path: ByteVec) -> () {
            |    let subContractIdCalculated = subContractId!(path)
+           |    let subContractIdCalculatedTest = subContractIdOf!(Contract(selfContractId!()), path)
+           |    assert!(subContractIdCalculated == subContractIdCalculatedTest)
            |    assert!(subContractIdCalculated == subContractId)
            |    SubContract(subContractIdCalculated).call()
            |  }
@@ -2481,7 +2498,7 @@ class VMSpec extends AlephiumSpec {
 
       callTxScript(createSubContractRaw)
 
-      val subContractId = Hash.doubleHash(serialize(subContractPath) ++ contractId.bytes)
+      val subContractId = Hash.doubleHash(contractId.bytes ++ serialize(subContractPath))
       val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       worldState.getContractState(contractId).rightValue.fields is AVector[Val](
         Val.ByteVec(subContractId.bytes)
@@ -3154,6 +3171,43 @@ class VMSpec extends AlephiumSpec {
     val script = Compiler.compileTxScript(main).rightValue
     intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage is
       s"Right(TxScriptExeFailed(AssertionFailedWithErrorCode(${fooId.toHexString},0)))"
+  }
+
+  it should "test Contract type" in new ContractFixture {
+    val foo: String =
+      s"""
+         |TxContract Foo(x: U256) {
+         |  pub fn foo() -> U256 {
+         |    return x
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, AVector(Val.U256(123))).key
+
+    val bar: String =
+      s"""
+         |TxContract Bar() {
+         |  pub fn bar(foo: Foo) -> U256 {
+         |    return foo.foo()
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    val barId = createContract(bar, AVector.empty).key
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  let bar = Bar(#${barId.toHexString})
+         |  let x = bar.bar(foo)
+         |  assert!(x == 123)
+         |}
+         |
+         |$bar
+         |""".stripMargin
+    callTxScript(script)
   }
 
   private def getEvents(

@@ -40,13 +40,13 @@ class StackSpec extends AlephiumSpec {
     stack.isEmpty is true
     stack.pop().isLeft is true
 
-    stack.push(1).isRight is true
+    stack.push(1) isE ()
     stack.size is 1
     stack.top.get is 1
-    stack.push(2).isRight is true
+    stack.push(2) isE ()
     stack.top.get is 2
     stack.size is 2
-    stack.push(3).isLeft is true
+    stack.push(3).leftValue isE StackOverflow
     stack.top.get is 2
     stack.size is 2
 
@@ -89,13 +89,44 @@ class StackSpec extends AlephiumSpec {
   it should "remove" in {
     val stack = Stack.ofCapacity[Int](3)
 
-    stack.push(1)
-    stack.push(2)
-    stack.push(3)
+    stack.push(1) isE ()
+    stack.push(2) isE ()
+    stack.push(3) isE ()
     stack.remove(4).left.value isE StackUnderflow
     stack.remove(3).isRight is true
     stack.remove(-1).leftValue isE NegativeArgumentInStack
     stack.isEmpty is true
+  }
+
+  it should "dup" in {
+    val stack = Stack.ofCapacity[Int](2)
+
+    stack.dupTop().leftValue isE StackUnderflow
+
+    stack.push(1)
+    stack.size is 1
+
+    stack.dupTop() isE ()
+    stack.size is 2
+    stack.underlying.toSeq.take(2) is Seq(1, 1)
+
+    stack.dupTop().leftValue isE StackOverflow
+  }
+
+  it should "swap" in {
+    val stack = Stack.ofCapacity[Int](2)
+
+    stack.swapTopTwo().leftValue isE StackUnderflow
+
+    stack.push(1)
+    stack.size is 1
+    stack.swapTopTwo().leftValue isE StackUnderflow
+
+    stack.push(2)
+    stack.size is 2
+    stack.underlying.toSeq.take(2) is Seq(1, 2)
+    stack.swapTopTwo() isE ()
+    stack.underlying.toSeq.take(2) is Seq(2, 1)
   }
 
   it should "create sub stack" in {

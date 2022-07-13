@@ -8244,6 +8244,10 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
+          },
+          "targetBlockHash": {
+            "type": "string",
+            "format": "block-hash"
           }
         }
       },
@@ -8320,6 +8324,10 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
+          },
+          "targetBlockHash": {
+            "type": "string",
+            "format": "block-hash"
           }
         }
       },
@@ -8467,6 +8475,10 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
+          },
+          "targetBlockHash": {
+            "type": "string",
+            "format": "block-hash"
           }
         }
       },
@@ -8524,6 +8536,10 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
+          },
+          "targetBlockHash": {
+            "type": "string",
+            "format": "block-hash"
           }
         }
       },
@@ -9743,6 +9759,10 @@
           "utxosLimit": {
             "type": "integer",
             "format": "int32"
+          },
+          "targetBlockHash": {
+            "type": "string",
+            "format": "block-hash"
           }
         }
       },

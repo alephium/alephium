@@ -25,9 +25,9 @@ object BuiltIn {
   sealed trait BuiltIn[-Ctx <: StatelessContext] extends FuncInfo[Ctx] {
     def name: String
 
-    override def isPublic: Boolean = true
+    def isPublic: Boolean = true
 
-    override def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
+    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
       throw Compiler.Error(s"Built-in function $name does not belong to contract ${typeId.name}")
     }
   }
@@ -35,7 +35,7 @@ object BuiltIn {
   sealed trait SimpleBuiltIn[-Ctx <: StatelessContext] extends BuiltIn[Ctx] {
     def argsType: Seq[Type]
     def returnType: Seq[Type]
-    def instr: Instr[Ctx]
+    def instrs: Seq[Instr[Ctx]]
 
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType == argsType) {
@@ -45,28 +45,64 @@ object BuiltIn {
       }
     }
 
-    override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq(instr)
+    override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = instrs
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class SimpleStatelessBuiltIn(
       name: String,
       argsType: Seq[Type],
       returnType: Seq[Type],
-      instr: Instr[StatelessContext],
-      usePreapprovedAssets: Boolean = false,
-      useAssetsInContract: Boolean = false
+      instrs: Seq[Instr[StatelessContext]],
+      usePreapprovedAssets: Boolean,
+      useAssetsInContract: Boolean
   ) extends SimpleBuiltIn[StatelessContext]
-
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  object SimpleStatelessBuiltIn {
+    def apply(
+        name: String,
+        argsType: Seq[Type],
+        returnType: Seq[Type],
+        instr: Instr[StatelessContext],
+        usePreapprovedAssets: Boolean = false,
+        useAssetsInContract: Boolean = false
+    ): SimpleStatelessBuiltIn =
+      SimpleStatelessBuiltIn(
+        name,
+        argsType,
+        returnType,
+        Seq(instr),
+        usePreapprovedAssets,
+        useAssetsInContract
+      )
+  }
+
   final case class SimpleStatefulBuiltIn(
       name: String,
       argsType: Seq[Type],
       returnType: Seq[Type],
-      instr: Instr[StatefulContext],
-      usePreapprovedAssets: Boolean = false,
-      useAssetsInContract: Boolean = false
+      instrs: Seq[Instr[StatefulContext]],
+      usePreapprovedAssets: Boolean,
+      useAssetsInContract: Boolean
   ) extends SimpleBuiltIn[StatefulContext]
+  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+  object SimpleStatefulBuiltIn {
+    def apply(
+        name: String,
+        argsType: Seq[Type],
+        returnType: Seq[Type],
+        instr: Instr[StatefulContext],
+        usePreapprovedAssets: Boolean = false,
+        useAssetsInContract: Boolean = false
+    ): SimpleStatefulBuiltIn =
+      SimpleStatefulBuiltIn(
+        name,
+        argsType,
+        returnType,
+        Seq(instr),
+        usePreapprovedAssets,
+        useAssetsInContract
+      )
+  }
 
   sealed abstract class GenericStatelessBuiltIn(val name: String)
       extends BuiltIn[StatelessContext] {
@@ -157,7 +193,7 @@ object BuiltIn {
     }
   }
 
-  val toI256: ConversionBuiltIn = new ConversionBuiltIn("i256") {
+  val toI256: ConversionBuiltIn = new ConversionBuiltIn("toI256") {
     val validTypes: AVector[Type] = AVector(Type.U256)
 
     override def toType: Type = Type.I256
@@ -169,7 +205,7 @@ object BuiltIn {
       }
     }
   }
-  val toU256: ConversionBuiltIn = new ConversionBuiltIn("u256") {
+  val toU256: ConversionBuiltIn = new ConversionBuiltIn("toU256") {
     val validTypes: AVector[Type] = AVector(Type.I256)
 
     override def toType: Type = Type.U256
@@ -182,7 +218,7 @@ object BuiltIn {
     }
   }
 
-  val toByteVec: ConversionBuiltIn = new ConversionBuiltIn("byteVec") {
+  val toByteVec: ConversionBuiltIn = new ConversionBuiltIn("toByteVec") {
     val validTypes: AVector[Type] = AVector(Type.Bool, Type.I256, Type.U256, Type.Address)
 
     override def toType: Type = Type.ByteVec
@@ -373,6 +409,25 @@ object BuiltIn {
       U256Const(Val.U256(dustUtxoAmount))
     )
 
+  val panic: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
+    val name: String                  = "panic"
+    def usePreapprovedAssets: Boolean = false
+    def useAssetsInContract: Boolean  = false
+    override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+      if (inputType.nonEmpty && inputType != Seq(Type.U256)) {
+        throw Compiler.Error(s"Invalid argument type for $name, optional U256 expected")
+      }
+      Seq(Type.Panic)
+    }
+    override def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+      if (inputType.isEmpty) {
+        Seq(ConstFalse, Assert)
+      } else {
+        Seq(ConstFalse, Swap, AssertWithErrorCode)
+      }
+    }
+  }
+
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
@@ -417,7 +472,8 @@ object BuiltIn {
     contractIdToAddress,
     nullAddress,
     dustAmount,
-    assertWithErrorCode
+    assertWithErrorCode,
+    panic
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleStatefulBuiltIn =
@@ -661,21 +717,44 @@ object BuiltIn {
       ContractCodeHash
     )
 
-  val subContractId: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] {
-    def name: String                  = "subContractId"
+  sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] {
+    def name: String
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
 
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]]
+  }
+
+  val subContractId: BuiltIn[StatefulContext] = new SubContractBuiltIn {
+    val name: String = "subContractId"
     def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType == Seq(Type.ByteVec)) {
         Seq(Type.ByteVec)
       } else {
-        throw Error(s"Invalid argument type for subContractId, ByteVec expected")
+        throw Error(s"Invalid argument type for $name, ByteVec expected")
       }
     }
-
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
-      Seq(SelfContractId, ByteVecConcat, Blake2b, Blake2b)
+      Seq(SelfContractId, Swap, ByteVecConcat, Blake2b, Blake2b)
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+  val subContractIdOf: BuiltIn[StatefulContext] = new SubContractBuiltIn {
+    val name: String = "subContractIdOf"
+    def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+      if (
+        inputType.length == 2 &&
+        inputType(0).isInstanceOf[Type.Contract] &&
+        inputType(1) == Type.ByteVec
+      ) {
+        Seq(Type.ByteVec)
+      } else {
+        throw Error(s"Invalid argument type for $name, (Contract, ByteVec) expected")
+      }
+    }
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
+      Seq[Instr[StatefulContext]](ByteVecConcat, Blake2b, Blake2b)
     }
   }
 
@@ -715,6 +794,7 @@ object BuiltIn {
       callerCodeHash,
       contractInitialStateHash,
       contractCodeHash,
-      subContractId
+      subContractId,
+      subContractIdOf
     ).map(f => f.name -> f)
 }

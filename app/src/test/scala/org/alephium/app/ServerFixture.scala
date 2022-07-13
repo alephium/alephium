@@ -282,6 +282,7 @@ object ServerFixture {
     }
 
     override def transfer(
+        targetBlockHashOpt: Option[BlockHash],
         fromLockupScript: LockupScript.Asset,
         fromUnlockScript: UnlockScript,
         outputInfos: AVector[TxOutputInfo],
@@ -293,6 +294,7 @@ object ServerFixture {
     }
 
     override def sweepAddress(
+        targetBlockHashOpt: Option[BlockHash],
         fromPublicKey: PublicKey,
         toLockupScript: LockupScript.Asset,
         lockTimeOpt: Option[TimeStamp],

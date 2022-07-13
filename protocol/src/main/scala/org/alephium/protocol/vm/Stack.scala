@@ -107,6 +107,20 @@ class Stack[@sp T: ClassTag](
     }
   }
 
+  // Note: index starts from 2
+  def swapTopTwo(): ExeResult[Unit] = {
+    val fromIndex = currentIndex - 1
+    val toIndex   = currentIndex - 2
+    if (toIndex < offset) {
+      failed(StackUnderflow)
+    } else {
+      val tmp = underlying(fromIndex)
+      underlying(fromIndex) = underlying(toIndex)
+      underlying(toIndex) = tmp
+      Right(())
+    }
+  }
+
   def remove(n: Int): ExeResult[Unit] = {
     if (n > size) {
       failed(StackUnderflow)
@@ -115,6 +129,14 @@ class Stack[@sp T: ClassTag](
       Right(())
     } else {
       failed(NegativeArgumentInStack)
+    }
+  }
+
+  def dupTop(): ExeResult[Unit] = {
+    if (currentIndex >= 1) {
+      push(underlying(currentIndex - 1))
+    } else {
+      failed(StackUnderflow)
     }
   }
 

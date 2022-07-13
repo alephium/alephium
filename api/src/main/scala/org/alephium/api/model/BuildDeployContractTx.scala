@@ -19,7 +19,7 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.{vm, PublicKey}
+import org.alephium.protocol.{vm, BlockHash, PublicKey}
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
 import org.alephium.serde._
 import org.alephium.util.AVector
@@ -32,7 +32,8 @@ final case class BuildDeployContractTx(
     initialTokenAmounts: Option[AVector[Token]] = None,
     issueTokenAmount: Option[Amount] = None,
     gasAmount: Option[GasBox] = None,
-    gasPrice: Option[GasPrice] = None
+    gasPrice: Option[GasPrice] = None,
+    targetBlockHash: Option[BlockHash] = None
 ) extends BuildTxCommon
 
 object BuildDeployContractTx {

@@ -31,7 +31,7 @@ import org.alephium.flow.gasestimation._
 import org.alephium.protocol._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde.serialize
 import org.alephium.util._
@@ -367,6 +367,62 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  trait PrepareTxWithTargetBlockHash extends FlowFixtureWithApi {
+    val serverUtils           = new ServerUtils
+    val chainIndex            = ChainIndex.unsafe(0, 0)
+    val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val block0                = transfer(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0)
+    val block1 = transfer(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block1)
+
+    val destinations = AVector(generateDestination(chainIndex))
+
+    def generateTx(targetBlockHash: Option[BlockHash]): UnsignedTransaction
+
+    val tx0 = generateTx(Some(block0.hash))
+    val tx1 = generateTx(Some(block1.hash))
+    val tx2 = generateTx(None)
+    tx0.inputs.head is block0.transactions.head.unsigned.inputs.head
+    tx1.inputs.head is block1.transactions.head.unsigned.inputs.head
+    tx2.inputs.head isnot tx1.inputs.head
+  }
+
+  it should "use target block hash to prepare transfer tx" in new PrepareTxWithTargetBlockHash {
+    def generateTx(targetBlockHash: Option[BlockHash]) = {
+      serverUtils
+        .prepareUnsignedTransaction(
+          blockFlow,
+          LockupScript.p2pkh(fromPublicKey),
+          UnlockScript.p2pkh(fromPublicKey),
+          None,
+          destinations,
+          None,
+          defaultGasPrice,
+          targetBlockHash
+        )
+        .rightValue
+    }
+  }
+
+  it should "use target block hash for sweep tx" in new PrepareTxWithTargetBlockHash {
+    def generateTx(targetBlockHash: Option[BlockHash]): UnsignedTransaction = {
+      val txs = serverUtils
+        .prepareSweepAddressTransaction(
+          blockFlow,
+          fromPublicKey,
+          destinations.head.address,
+          None,
+          None,
+          defaultGasPrice,
+          targetBlockHash
+        )
+        .rightValue
+      txs.length is 1
+      txs.head
+    }
+  }
+
   "ServerUtils.decodeUnsignedTransaction" should "decode unsigned transaction" in new FlowFixtureWithApi {
     val serverUtils = new ServerUtils
 
@@ -383,7 +439,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         destinations,
         gasOpt = None,
-        defaultGasPrice
+        defaultGasPrice,
+        targetBlockHashOpt = None
       )
       .rightValue
 
@@ -447,7 +504,8 @@ class ServerUtilsSpec extends AlephiumSpec {
           outputRefsOpt = Some(outputRefs),
           destinations,
           gasOpt = Some(minimalGas),
-          defaultGasPrice
+          defaultGasPrice,
+          targetBlockHashOpt = None
         )
         .rightValue
     }
@@ -466,7 +524,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = None,
-        defaultGasPrice
+        defaultGasPrice,
+        targetBlockHashOpt = None
       )
       .rightValue
 
@@ -536,7 +595,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        targetBlockHashOpt = None
       )
       .leftValue
       .detail is "Not enough balance"
@@ -557,7 +617,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        targetBlockHashOpt = None
       )
       .leftValue
       .detail is "Selected UTXOs are not from the same group"
@@ -571,7 +632,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(AVector.empty),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        targetBlockHashOpt = None
       )
       .leftValue
       .detail is "Empty UTXOs"
@@ -590,7 +652,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(GasBox.unsafe(100)),
-        defaultGasPrice
+        defaultGasPrice,
+        targetBlockHashOpt = None
       )
       .leftValue
       .detail is "Provided gas GasBox(100) too small, minimal GasBox(20000)"
@@ -603,7 +666,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(GasBox.unsafe(625001)),
-        defaultGasPrice
+        defaultGasPrice,
+        targetBlockHashOpt = None
       )
       .leftValue
       .detail is "Provided gas GasBox(625001) too large, maximal GasBox(625000)"
@@ -622,7 +686,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        GasPrice(minimalGasPrice.value - 1)
+        GasPrice(minimalGasPrice.value - 1),
+        targetBlockHashOpt = None
       )
       .leftValue
       .detail is "Gas price GasPrice(999999999) too small, minimal GasPrice(1000000000)"
@@ -635,7 +700,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        GasPrice(ALPH.MaxALPHValue)
+        GasPrice(ALPH.MaxALPHValue),
+        targetBlockHashOpt = None
       )
       .leftValue
       .detail is "Gas price GasPrice(1000000000000000000000000000) too large, maximal GasPrice(999999999999999999999999999)"
@@ -653,7 +719,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         attoAlphAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        targetBlockHashOpt = None
       )
       .leftValue
       .detail is "ALPH amount overflow"
@@ -672,7 +739,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         tokenAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        targetBlockHashOpt = None
       )
       .leftValue
       .detail is s"Amount overflow for token $tokenId"
@@ -690,7 +758,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice
+        defaultGasPrice,
+        targetBlockHashOpt = None
       )
       .leftValue
       .detail is "Selected UTXOs must be of asset type"
@@ -952,7 +1021,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val barContract   = Compiler.compileContract(bar).rightValue
     val barContractId = Hash.random
     val destroyedFooContractId =
-      Hash.doubleHash(Hex.unsafe(destroyContractPath) ++ barContractId.bytes)
+      Hash.doubleHash(barContractId.bytes ++ Hex.unsafe(destroyContractPath))
     val existingContract = ContractState(
       Address.contract(destroyedFooContractId),
       fooContract,
@@ -972,7 +1041,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testFlow    = BlockFlow.emptyUnsafe(config)
     val serverUtils = new ServerUtils()
     val createdFooContractId =
-      Hash.doubleHash(Hex.unsafe(createContractPath) ++ barContractId.bytes)
+      Hash.doubleHash(barContractId.bytes ++ Hex.unsafe(createContractPath))
 
     val result =
       serverUtils.runTestContract(testFlow, testContractParams.toComplete().rightValue).rightValue
