@@ -25,9 +25,9 @@ object BuiltIn {
   sealed trait BuiltIn[-Ctx <: StatelessContext] extends FuncInfo[Ctx] {
     def name: String
 
-    override def isPublic: Boolean = true
+    def isPublic: Boolean = true
 
-    override def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
+    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
       throw Compiler.Error(s"Built-in function $name does not belong to contract ${typeId.name}")
     }
   }
@@ -741,7 +741,7 @@ object BuiltIn {
       ) {
         Seq(Type.ByteVec)
       } else {
-        throw Error(s"Invalid argument type for $name, ByteVec expected")
+        throw Error(s"Invalid argument type for $name, (ByteVec, Contract) expected")
       }
     }
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
