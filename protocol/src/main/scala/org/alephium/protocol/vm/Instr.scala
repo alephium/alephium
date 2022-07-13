@@ -148,7 +148,7 @@ object Instr {
     EthEcRecover,
     Log6, Log7, Log8, Log9,
     ContractIdToAddress,
-    LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode
+    LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -455,10 +455,13 @@ case object Pop extends PureStackInstr {
 
 case object Dup extends PureStackInstr with LemanInstrWithSimpleGas[StatelessContext] {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
-    for {
-      value <- frame.opStack.top.toRight(Right(StackUnderflow))
-      _     <- frame.pushOpStack(value)
-    } yield ()
+    frame.opStack.dupTop()
+  }
+}
+
+case object Swap extends PureStackInstr with LemanInstrWithSimpleGas[StatelessContext] {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.opStack.swapTopTwo()
   }
 }
 
