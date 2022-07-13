@@ -2471,7 +2471,7 @@ class VMSpec extends AlephiumSpec {
            |
            |  pub fn callSubContract(path: ByteVec) -> () {
            |    let subContractIdCalculated = subContractId!(path)
-           |    let subContractIdCalculatedTest = subContractIdOf!(path, Contract(selfContractId!()))
+           |    let subContractIdCalculatedTest = subContractIdOf!(Contract(selfContractId!()), path)
            |    assert!(subContractIdCalculated == subContractIdCalculatedTest)
            |    assert!(subContractIdCalculated == subContractId)
            |    SubContract(subContractIdCalculated).call()
@@ -2498,7 +2498,7 @@ class VMSpec extends AlephiumSpec {
 
       callTxScript(createSubContractRaw)
 
-      val subContractId = Hash.doubleHash(serialize(subContractPath) ++ contractId.bytes)
+      val subContractId = Hash.doubleHash(contractId.bytes ++ serialize(subContractPath))
       val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       worldState.getContractState(contractId).rightValue.fields is AVector[Val](
         Val.ByteVec(subContractId.bytes)

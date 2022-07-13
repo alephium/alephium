@@ -735,7 +735,7 @@ object BuiltIn {
       }
     }
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
-      Seq(SelfContractId, ByteVecConcat, Blake2b, Blake2b)
+      Seq(SelfContractId, Swap, ByteVecConcat, Blake2b, Blake2b)
     }
   }
 
@@ -745,12 +745,12 @@ object BuiltIn {
     def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (
         inputType.length == 2 &&
-        inputType(0) == Type.ByteVec &&
-        inputType(1).isInstanceOf[Type.Contract]
+        inputType(0).isInstanceOf[Type.Contract] &&
+        inputType(1) == Type.ByteVec
       ) {
         Seq(Type.ByteVec)
       } else {
-        throw Error(s"Invalid argument type for $name, (ByteVec, Contract) expected")
+        throw Error(s"Invalid argument type for $name, (Contract, ByteVec) expected")
       }
     }
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {

@@ -1021,7 +1021,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val barContract   = Compiler.compileContract(bar).rightValue
     val barContractId = Hash.random
     val destroyedFooContractId =
-      Hash.doubleHash(Hex.unsafe(destroyContractPath) ++ barContractId.bytes)
+      Hash.doubleHash(barContractId.bytes ++ Hex.unsafe(destroyContractPath))
     val existingContract = ContractState(
       Address.contract(destroyedFooContractId),
       fooContract,
@@ -1041,7 +1041,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testFlow    = BlockFlow.emptyUnsafe(config)
     val serverUtils = new ServerUtils()
     val createdFooContractId =
-      Hash.doubleHash(Hex.unsafe(createContractPath) ++ barContractId.bytes)
+      Hash.doubleHash(barContractId.bytes ++ Hex.unsafe(createContractPath))
 
     val result =
       serverUtils.runTestContract(testFlow, testContractParams.toComplete().rightValue).rightValue
