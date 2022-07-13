@@ -2,9 +2,12 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "1.5.0-rc0"
+    "version": "1.4.2"
   },
   "servers": [
+    {
+      "url": "../"
+    },
     {
       "url": "{protocol}://{host}:{port}",
       "variables": {

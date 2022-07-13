@@ -28,6 +28,14 @@ import org.alephium.conf._
 import org.alephium.protocol.Hash
 import org.alephium.util.{Duration, U256}
 
+/** @param networkInterface
+  * @param blockflowFetchMaxAge
+  * @param askTimeout
+  * @param apiKey
+  * @param gasFeeCap
+  * @param defaultUtxosLimit
+  *   the default value for mainnet is 5000. Public services might want to limit this
+  */
 final case class ApiConfig(
     networkInterface: InetAddress,
     blockflowFetchMaxAge: Duration,
