@@ -22,7 +22,9 @@ import scala.jdk.CollectionConverters._
 
 import com.typesafe.config.{ConfigException, ConfigFactory, ConfigValueFactory}
 
-import org.alephium.util.AlephiumSpec
+import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
+import org.alephium.protocol.model.NetworkId
+import org.alephium.util.{AlephiumSpec, Env}
 
 // scalastyle:off null
 class ApiConfigSpec extends AlephiumSpec {
@@ -31,6 +33,15 @@ class ApiConfigSpec extends AlephiumSpec {
     val file   = new File(path)
     val config = ConfigFactory.parseFile(file)
     ApiConfig.load(config)
+  }
+
+  it should "load mainnet api config" in {
+    val randomPath = Platform.getRootPath(Env.Test) // generate a random folder
+    val prodConfig = Configs.parseConfig(Env.Prod, randomPath, false, ConfigFactory.empty())
+    val alphConfig = AlephiumConfig.load(prodConfig)
+    val apiConfig  = ApiConfig.load(prodConfig)
+    alphConfig.network.networkId is NetworkId.AlephiumMainNet
+    apiConfig.defaultUtxosLimit is 5000
   }
 
   behavior of "Api interface is 127.0.0.1"

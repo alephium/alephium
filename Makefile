@@ -27,11 +27,7 @@ publish-local:
 
 # make release version=x.y.z
 release:
-	project/version.sh $(version)
-	git add -A && git commit -m "$(version)"
-	git tag v$(version)
-	git push origin v$(version)
-	git push origin master
+	project/release.sh $(version)
 
 run:
 	sbt app/run
