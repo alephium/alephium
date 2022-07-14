@@ -151,7 +151,7 @@ object Compiler {
     if (tpe.length == 1) {
       tpe(0)
     } else {
-      throw Error(s"Try to set types $tpe for varialbe $ident")
+      throw Error(s"Try to set types $tpe for variable $ident")
     }
   }
 
