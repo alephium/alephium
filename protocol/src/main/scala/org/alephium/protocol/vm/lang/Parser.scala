@@ -541,21 +541,17 @@ object StatefulParser extends Parser[StatefulContext] {
         contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
     ).map {
       case (isAbstract, typeId, fields, contractInheritances, events, constantVars, enums, funcs) =>
-        if (funcs.length < 1) {
-          throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
-        } else {
-          Ast.TxContract(
-            isAbstract,
-            typeId,
-            Seq.empty,
-            fields,
-            funcs,
-            events,
-            constantVars,
-            enums,
-            contractInheritances.getOrElse(Seq.empty)
-          )
-        }
+        Ast.TxContract(
+          isAbstract,
+          typeId,
+          Seq.empty,
+          fields,
+          funcs,
+          events,
+          constantVars,
+          enums,
+          contractInheritances.getOrElse(Seq.empty)
+        )
     }
   def contract[Unknown: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
 

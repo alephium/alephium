@@ -925,7 +925,13 @@ object Ast {
     def getFieldNames(): Seq[String] = fields.map(_.ident.name)
     def getFieldTypes(): Seq[String] = fields.map(_.tpe.signature)
 
-    override def check(state: Compiler.State[StatefulContext]): Unit = {
+    private def checkFuncs(): Unit = {
+      if (funcs.length < 1) {
+        throw Compiler.Error(s"No function definition in TxContract ${ident.name}")
+      }
+    }
+
+    private def checkConstants(state: Compiler.State[StatefulContext]): Unit = {
       UniqueDef.checkDuplicates(constantVars, "constant variables")
       constantVars.foreach(v =>
         state.addConstantVariable(v.ident, Type.fromVal(v.value.tpe), Seq(v.value.toConstInstr))
@@ -940,6 +946,9 @@ object Ast {
           )
         )
       )
+    }
+
+    private def checkInheritances(state: Compiler.State[StatefulContext]): Unit = {
       inheritances.foreach { inheritance =>
         val id   = inheritance.parentId
         val kind = state.getContractInfo(id).kind
@@ -947,6 +956,12 @@ object Ast {
           throw Compiler.Error(s"$kind ${id.name} can not be inherited")
         }
       }
+    }
+
+    override def check(state: Compiler.State[StatefulContext]): Unit = {
+      checkFuncs()
+      checkConstants(state)
+      checkInheritances(state)
       super.check(state)
     }
 
