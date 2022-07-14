@@ -559,18 +559,14 @@ object Compiler {
       }
     }
 
-    def checkUnusedGlobalVars(): Unit = {
+    def checkUnusedFields(): Unit = {
       if (checkUnusedVars) {
         val unusedVars = varTable.filter { case (name, varInfo) =>
           !usedVars.contains(name) && !varInfo.isGenerated
         }
-        val (unusedConstants, unusedFields) =
-          unusedVars.partition(_._2.isInstanceOf[VarInfo.Constant[_]])
+        val unusedFields = unusedVars.filterNot(_._2.isInstanceOf[VarInfo.Constant[_]])
         if (unusedFields.nonEmpty) {
           throw Error(s"Found unused fields: ${unusedFields.keys.mkString(", ")}")
-        }
-        if (unusedConstants.nonEmpty) {
-          throw Error(s"Found unused constants: ${unusedConstants.keys.mkString(", ")}")
         }
       }
     }

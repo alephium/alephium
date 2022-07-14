@@ -831,7 +831,7 @@ object Ast {
 
     def getMethods(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
       val methods = AVector.from(funcs.view.map(_.toMethod(state)))
-      state.checkUnusedGlobalVars()
+      state.checkUnusedFields()
       methods
     }
 

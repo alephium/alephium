@@ -2715,47 +2715,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Check unused constants in TxContract")
-      val code =
-        s"""
-           |TxContract Foo() {
-           |  const C0 = 0
-           |  const C1 = 1
-           |  fn foo() -> () {
-           |    assert!(C1 == 1)
-           |  }
-           |}
-           |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Found unused constants: C0"
-    }
-
-    {
-      info("Check unused enums in TxContract")
-      val code =
-        s"""
-           |TxContract Foo() {
-           |  enum Chain {
-           |    Alephium = 0
-           |    Eth = 1
-           |  }
-           |
-           |  enum Language {
-           |    Ralph = #00
-           |    Solidity = #01
-           |  }
-           |
-           |  fn foo() -> () {
-           |    assert!(Chain.Alephium == 0)
-           |    assert!(Language.Ralph == #00)
-           |  }
-           |}
-           |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Found unused constants: Language.Solidity, Chain.Eth"
-    }
-
-    {
       info("Check unused fields in contract inheritance")
       val code =
         s"""
@@ -2858,5 +2817,31 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     Compiler.compileContract(foo).leftValue.message is
       "These functions are not implemented in contract Foo: foo,bar"
+  }
+
+  "unused constants and enums" should "have no effect on code generation" in {
+    val foo =
+      s"""
+         |TxContract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    val bar =
+      s"""
+         |TxContract Bar() {
+         |  const C0 = 0
+         |  const C1 = 1
+         |  enum Errors {
+         |    Error0 = 0
+         |    Error1 = 1
+         |  }
+         |  pub fn bar() -> () {}
+         |}
+         |""".stripMargin
+
+    val fooContract = Compiler.compileContract(foo).rightValue
+    val barContract = Compiler.compileContract(bar).rightValue
+    fooContract is barContract
   }
 }
