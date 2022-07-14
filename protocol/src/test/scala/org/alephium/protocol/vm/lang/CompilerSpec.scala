@@ -2509,10 +2509,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test contract constant variables" in new Fixture {
-    def foo(isAbstract: Boolean) = {
-      val `abstract` = if (isAbstract) "Abstract " else ""
+    val foo =
       s"""
-         |${`abstract`}TxContract Foo() {
+         |Abstract TxContract Foo() {
          |  const C0 = 0
          |  const C1 = #00
          |  pub fn foo() -> () {
@@ -2521,11 +2520,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    }
 
     {
       info("Contract constant variables")
-      test(foo(false))
+      test(foo)
     }
 
     {
@@ -2543,8 +2541,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    assert!(C3 == @$address)
            |  }
            |}
-           |${foo(true)}
+           |$foo
            |""".stripMargin
+
       test(bar, methodIndex = 0)
       test(bar, methodIndex = 1)
     }
@@ -2588,10 +2587,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test contract enums" in new Fixture {
-    def foo(isAbstract: Boolean): String = {
-      val `abstract` = if (isAbstract) "Abstract " else ""
+    val foo =
       s"""
-         |${`abstract`}TxContract Foo() {
+         |Abstract TxContract Foo() {
          |  enum FooErrorCodes {
          |    Error0 = 0
          |    Error1 = 1
@@ -2602,11 +2600,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    }
 
     {
       info("Contract enums")
-      test(foo(false))
+      test(foo)
     }
 
     {
@@ -2625,7 +2622,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    assert!(BarValues.Value1 == #01)
            |  }
            |}
-           |${foo(true)}
+           |$foo
            |""".stripMargin
       test(bar, methodIndex = 0)
       test(bar, methodIndex = 1)
@@ -2843,5 +2840,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       test(code, AVector.empty)
     }
+  }
+
+  it should "not generate code if contract have unimplemented functions" in {
+    val foo =
+      s"""
+         |Abstract TxContract Foo() {
+         |  pub fn foo() -> ()
+         |  pub fn bar() -> ()
+         |}
+         |""".stripMargin
+    Compiler.compileContract(foo).leftValue.message is
+      "These functions are not implemented in contract Foo: foo,bar"
   }
 }

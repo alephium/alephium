@@ -966,8 +966,11 @@ object Ast {
     }
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
-      if (isAbstract) {
-        throw new Compiler.Error(s"abstract TxContract ${ident.name} does not generate code")
+      val unimplementedFuncs = funcs.view.filter(_.bodyOpt.isEmpty).map(_.id.name)
+      if (unimplementedFuncs.nonEmpty) {
+        throw new Compiler.Error(
+          s"These functions are not implemented in contract ${ident.name}: ${unimplementedFuncs.mkString(",")}"
+        )
       } else {
         check(state)
         StatefulContract(
