@@ -262,10 +262,10 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       estimateTxScript(
         s"""
            |TxScript Main {
-           |  assert!(1 == 2)
+           |  assert!(1 == 2, 0)
            |}
            |""".stripMargin
-      ).leftValue is "Execution error when estimating gas for tx script or contract: AssertionFailed"
+      ).leftValue is "Execution error when estimating gas for tx script or contract: AssertionFailedWithErrorCode(,0)"
       // scalastyle:on no.equal
     }
   }

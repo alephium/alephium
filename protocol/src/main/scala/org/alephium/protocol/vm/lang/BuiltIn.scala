@@ -119,10 +119,8 @@ object BuiltIn {
   val sha3: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn("sha3", Seq(Type.ByteVec), Seq(Type.ByteVec), Sha3)
   val assert: SimpleStatelessBuiltIn =
-    SimpleStatelessBuiltIn("assert", Seq(Type.Bool), Seq(), Assert)
-  val assertWithErrorCode: SimpleStatelessBuiltIn =
     SimpleStatelessBuiltIn(
-      "assertWithErrorCode",
+      "assert",
       Seq[Type](Type.Bool, Type.U256),
       Seq.empty,
       AssertWithErrorCode
@@ -472,7 +470,6 @@ object BuiltIn {
     contractIdToAddress,
     nullAddress,
     dustAmount,
-    assertWithErrorCode,
     panic
   ).map(f => f.name -> f).toMap
 

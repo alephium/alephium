@@ -498,7 +498,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |AssetScript P2PKH {
          |  pub fn verify(pk: ByteVec) -> () {
          |    let hash = #${hash.toHexString}
-         |    assert!(hash == blake2b!(pk))
+         |    assert!(hash == blake2b!(pk), 0)
          |    verifyTxSignature!(pk)
          |    return
          |  }
@@ -945,9 +945,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |TxContract ArrayTest() {
            |  pub fn test() -> () {
-           |    assert!([0, 1, 2][2] == 2)
-           |    assert!(foo()[1] == 1)
-           |    assert!([foo(), foo()][0][0] == 0)
+           |    assert!([0, 1, 2][2] == 2, 0)
+           |    assert!(foo()[1] == 1, 0)
+           |    assert!([foo(), foo()][0][0] == 0, 0)
            |  }
            |
            |  fn foo() -> ([U256; 3]) {
@@ -965,7 +965,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |TxContract ArrayTest() {
            |  pub fn test() -> () {
            |    let array = [1, 2, 3]
-           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3)
+           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3, 0)
            |  }
            |}
            |""".stripMargin
@@ -982,7 +982,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    array[0] = 1
            |    array[1] = 2
            |    array[2] = 3
-           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3)
+           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3, 0)
            |  }
            |}
            |""".stripMargin
@@ -997,9 +997,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn test() -> () {
            |    let x = [1, 2, 3]
            |    let mut y = [0; 3]
-           |    assert!(y[0] == 0 && y[1] == 0 && y[2] == 0)
+           |    assert!(y[0] == 0 && y[1] == 0 && y[2] == 0, 0)
            |    y = x
-           |    assert!(y[0] == 1 && y[1] == 2 && y[2] == 3)
+           |    assert!(y[0] == 1 && y[1] == 2 && y[2] == 3, 0)
            |  }
            |}
            |""".stripMargin
@@ -1018,7 +1018,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |      array[i] = i + 1
            |      i = i + 1
            |    }
-           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3)
+           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3, 0)
            |  }
            |}
            |""".stripMargin
@@ -1056,7 +1056,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |      array[0] == v &&
            |      array[1] == v + 1 &&
            |      array[2] == v + 2 &&
-           |      array[3] == v + 3
+           |      array[3] == v + 3,
+           |      0
            |    )
            |  }
            |}
@@ -1081,7 +1082,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  fn check(array: [U256; 4], v: U256) -> () {
            |    let mut i = 0
            |    while (i < 4) {
-           |      assert!(array[i] == v + i)
+           |      assert!(array[i] == v + i, 0)
            |      i = i + 1
            |    }
            |  }
@@ -1103,7 +1104,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    x[1][1] = 4
            |    assert!(
            |      x[0][0] == 1 && x[0][1] == 2 &&
-           |      x[1][0] == 3 && x[1][1] == 4
+           |      x[1][0] == 3 && x[1][1] == 4,
+           |      0
            |    )
            |  }
            |}
@@ -1130,7 +1132,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    }
            |    assert!(
            |      x[0][0] == 1 && x[0][1] == 2 &&
-           |      x[1][0] == 3 && x[1][1] == 4
+           |      x[1][0] == 3 && x[1][1] == 4,
+           |      0
            |    )
            |  }
            |}
@@ -1149,7 +1152,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    x[1] = [2, 3]
            |    assert!(
            |      x[0][0] == 0 && x[0][1] == 1 &&
-           |      x[1][0] == 2 && x[1][1] == 3
+           |      x[1][0] == 2 && x[1][1] == 3,
+           |      0
            |    )
            |  }
            |}
@@ -1171,8 +1175,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    }
            |    i = 0
            |    while (i < 2) {
-           |      assert!(x[i][0] == i)
-           |      assert!(x[i][1] == i + 1)
+           |      assert!(x[i][0] == i, 0)
+           |      assert!(x[i][1] == i + 1, 0)
            |      i = i + 1
            |    }
            |  }
@@ -1189,10 +1193,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn test() -> () {
            |    let mut x = [0, 1, 2, 3]
            |    let num = 4
-           |    assert!(x[foo()] == 3)
-           |    assert!(x[num / 2] == 2)
-           |    assert!(x[num % 3] == 1)
-           |    assert!(x[num - 4] == 0)
+           |    assert!(x[foo()] == 3, 0)
+           |    assert!(x[num / 2] == 2, 0)
+           |    assert!(x[num % 3] == 1, 0)
+           |    assert!(x[num - 4] == 0, 0)
            |  }
            |
            |  fn foo() -> U256 {
@@ -1212,14 +1216,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    let array0 = [0, 1, 2]
          |    let mut i = 0
          |    while (i < 3) {
-         |      assert!(array0[i] == i)
+         |      assert!(array0[i] == i, 0)
          |      i = i + 1
          |    }
          |
          |    let array1 = [0, 1]
          |    i = 0
          |    while (i < 2) {
-         |      assert!(array1[i] == i)
+         |      assert!(array1[i] == i, 0)
          |      i = i + 1
          |    }
          |  }
@@ -1251,14 +1255,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       instrs = AVector[Instr[StatefulContext]](
         U256Const0, U256Const1, U256Const2, StoreLocal(2), StoreLocal(1), StoreLocal(0),
         U256Const0, StoreLocal(3),
-        LoadLocal(3), U256Const3, U256Lt, IfFalse(14),
-        LoadLocal(3), Dup, U256Const3, U256Lt, Assert, LoadLocalByIndex, LoadLocal(3), U256Eq, Assert,
-        LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-18),
+        LoadLocal(3), U256Const3, U256Lt, IfFalse(15),
+        LoadLocal(3), Dup, U256Const3, U256Lt, Assert, LoadLocalByIndex, LoadLocal(3), U256Eq, U256Const0, AssertWithErrorCode,
+        LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-19),
         U256Const0, U256Const1, StoreLocal(5), StoreLocal(4),
         U256Const0, StoreLocal(3),
-        LoadLocal(3), U256Const2, U256Lt, IfFalse(16),
-        LoadLocal(3), Dup, U256Const2, U256Lt, Assert, U256Const4, U256Add, LoadLocalByIndex, LoadLocal(3), U256Eq, Assert,
-        LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-20)
+        LoadLocal(3), U256Const2, U256Lt, IfFalse(17),
+        LoadLocal(3), Dup, U256Const2, U256Lt, Assert, U256Const4, U256Add, LoadLocalByIndex, LoadLocal(3), U256Eq, U256Const0, AssertWithErrorCode,
+        LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-21)
       )
     )
     contract.methods(1) is Method[StatefulContext](
@@ -1351,7 +1355,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  fn foo(a: [U256; 2], b:[U256; 2]) -> () {
            |    let mut i = 0
            |    while (i < 2) {
-           |      assert!(a[i] == b[i])
+           |      assert!(a[i] == b[i], 0)
            |      i = i + 1
            |    }
            |  }
@@ -1368,13 +1372,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |TxContract ArrayTest(mut x: U256) {
            |  pub fn test() -> () {
            |    let array0 = [foo(), foo(), foo()]
-           |    assert!(x == 3)
+           |    assert!(x == 3, 0)
            |
            |    let array1 = [foo(), foo(), foo()][0]
-           |    assert!(x == 6)
+           |    assert!(x == 6, 0)
            |
            |    let array2 = [foo(); 3]
-           |    assert!(x == 9)
+           |    assert!(x == 9, 0)
            |  }
            |
            |  fn foo() -> U256 {
@@ -1407,7 +1411,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    j = 0
            |    while (i < 4) {
            |      while (j < 2) {
-           |        assert!(array[i][j] == i + j)
+           |        assert!(array[i][j] == i + j, 0)
            |        j = j + 1
            |      }
            |      j = 0
@@ -1429,17 +1433,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    while (i < 4) {
            |      array[foo()] = [x; 2]
            |      i = i + 1
-           |      assert!(x == i)
+           |      assert!(x == i, 0)
            |    }
-           |    assert!(x == 4)
+           |    assert!(x == 4, 0)
            |
            |    i = 0
            |    while (i < 4) {
            |      x = 0
-           |      assert!(array[i][foo()] == i)
-           |      assert!(array[i][foo()] == i)
+           |      assert!(array[i][foo()] == i, 0)
+           |      assert!(array[i][foo()] == i, 0)
            |      i = i + 1
-           |      assert!(x == 2)
+           |      assert!(x == 2, 0)
            |    }
            |  }
            |
@@ -1567,7 +1571,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |TxContract Foo() {
            |  pub fn test() -> () {
            |    let (a, b) = foo()
-           |    assert!(a == 1 && b)
+           |    assert!(a == 1 && b, 0)
            |  }
            |
            |  fn foo() -> (U256, Bool) {
@@ -1596,7 +1600,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |      x[0][0] == 1 && x[0][1] == 2 && x[0][2] == 3 &&
            |      x[1][0] == 2 && x[1][1] == 3 && x[1][2] == 4 &&
            |      x[2][0] == 4 && x[2][1] == 5 && x[2][2] == 6 &&
-           |      y[0] == 0 && y[1] == 1 && y[2] == 2
+           |      y[0] == 0 && y[1] == 1 && y[2] == 2,
+           |      0
            |    )
            |  }
            |
@@ -1623,7 +1628,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    assert!(
            |      array[0][0] == 1 && array[0][1] == 2 && array[0][2] == 3 &&
            |      array[1][0] == 4 && array[1][1] == 5 && array[1][2] == 6 &&
-           |      i == 7
+           |      i == 7,
+           |      0
            |    )
            |  }
            |
@@ -2517,8 +2523,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  const C0 = 0
            |  const C1 = #00
            |  pub fn foo() -> () {
-           |    assert!(C0 == 0)
-           |    assert!(C1 == #00)
+           |    assert!(C0 == 0, 0)
+           |    assert!(C1 == #00, 0)
            |  }
            |}
            |""".stripMargin
@@ -2534,10 +2540,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  const C2 = 1i
            |  const C3 = @$address
            |  pub fn bar() -> () {
-           |    assert!(C0 == 0)
-           |    assert!(C1 == #00)
-           |    assert!(C2 == 1i)
-           |    assert!(C3 == @$address)
+           |    assert!(C0 == 0, 0)
+           |    assert!(C1 == #00, 0)
+           |    assert!(C2 == 1i, 0)
+           |    assert!(C3 == @$address, 0)
            |  }
            |}
            |
@@ -2599,8 +2605,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    Error1 = 1
            |  }
            |  pub fn foo() -> () {
-           |    assert!(FooErrorCodes.Error0 == 0)
-           |    assert!(FooErrorCodes.Error1 == 1)
+           |    assert!(FooErrorCodes.Error0 == 0, 0)
+           |    assert!(FooErrorCodes.Error1 == 1, 0)
            |  }
            |}
            |""".stripMargin
@@ -2617,10 +2623,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    Value1 = #01
            |  }
            |  pub fn bar() -> () {
-           |    assert!(FooErrorCodes.Error0 == 0)
-           |    assert!(FooErrorCodes.Error1 == 1)
-           |    assert!(BarValues.Value0 == #00)
-           |    assert!(BarValues.Value1 == #01)
+           |    assert!(FooErrorCodes.Error0 == 0, 0)
+           |    assert!(FooErrorCodes.Error1 == 1, 0)
+           |    assert!(BarValues.Value0 == #00, 0)
+           |    assert!(BarValues.Value1 == #01, 0)
            |  }
            |}
            |
@@ -2676,7 +2682,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  foo(a)
            |
            |  fn foo(v: U256) -> () {
-           |    assert!(v == 0)
+           |    assert!(v == 0, 0)
            |  }
            |}
            |""".stripMargin
@@ -2785,17 +2791,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |TxContract Foo() {
            |  pub fn foo() -> () {
            |    let (a, b, c, d) = bar()
-           |    assert!(a == 0 && b[0] == 1 && b[1] == 2 && c== 3)
-           |    assert!(d[0][0] == 4 && d[0][1] == 5 && d[1][0] == 6 && d[1][1] == 7)
+           |    assert!(a == 0 && b[0] == 1 && b[1] == 2 && c== 3, 0)
+           |    assert!(d[0][0] == 4 && d[0][1] == 5 && d[1][0] == 6 && d[1][1] == 7, 0)
            |
            |    let (e, _, f, _) = bar()
-           |    assert!(e == 0 && f == 3)
+           |    assert!(e == 0 && f == 3, 0)
            |
            |    let (_, g, _, _) = bar()
-           |    assert!(g[0] == 1 && g[1] == 2)
+           |    assert!(g[0] == 1 && g[1] == 2, 0)
            |
            |    let (_, _, _, h) = bar()
-           |    assert!(h[0][0] == 4 && h[0][1] == 5 && h[1][0] == 6 && h[1][1] == 7)
+           |    assert!(h[0][0] == 4 && h[0][1] == 5 && h[1][0] == 6 && h[1][1] == 7, 0)
            |  }
            |
            |  pub fn bar() -> (U256, [U256; 2], U256, [[U256; 2]; 2]) {

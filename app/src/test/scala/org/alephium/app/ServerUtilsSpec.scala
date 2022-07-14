@@ -1454,7 +1454,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"""
          |TxContract Foo(y: U256) {
          |  pub fn foo() -> () {
-         |    assert!(1 != y)
+         |    assert!(1 != y, 0)
          |  }
          |}
          |""".stripMargin
@@ -1465,14 +1465,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     val compiledCode = result.bytecode
     compiledCode is Hex.toHexString(serialize(code))
     compiledCode is {
-      val bytecode     = "0100000000040da000304d"
+      val bytecode     = "0100000000050da000300c7b"
       val methodLength = Hex.toHexString(IndexedSeq((bytecode.length / 2).toByte))
       s"0101$methodLength" + bytecode
     }
   }
 
   it should "compile script" in new Fixture {
-    val expectedByteCode = "01010000000004{0}{1}304d"
+    val expectedByteCode = "01010000000005{0}{1}300c7b"
     val serverUtils      = new ServerUtils()
 
     {
@@ -1480,7 +1480,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"""
            |@using(preapprovedAssets = false)
            |TxScript Main(x: U256, y: U256) {
-           |  assert!(x != y)
+           |  assert!(x != y, 0)
            |}
            |""".stripMargin
 
@@ -1494,7 +1494,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"""
            |@using(preapprovedAssets = false)
            |TxScript Main {
-           |  assert!(1 != 2)
+           |  assert!(1 != 2, 0)
            |}
            |""".stripMargin
       val code   = Compiler.compileTxScript(rawCode).rightValue
@@ -1513,7 +1513,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"""
          |TxContract Foo(y: U256) {
          |  pub fn foo() -> () {
-         |    assert!(1 != y)
+         |    assert!(1 != y, 0)
          |  }
          |}
          |""".stripMargin

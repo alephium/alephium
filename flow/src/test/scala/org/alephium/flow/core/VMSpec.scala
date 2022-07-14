@@ -600,56 +600,56 @@ class VMSpec extends AlephiumSpec {
          |    i = i + 1
          |  }
          |  let r = x ⊗ y
-         |  assert!(r == $out)
+         |  assert!(r == $out, 0)
          |
          |  test()
          |
          |  fn test() -> () {
-         |    assert!((33 + 2 - 3) * 5 / 7 % 11 == 0)
+         |    assert!((33 + 2 - 3) * 5 / 7 % 11 == 0, 0)
          |
          |    let x = 0
          |    let y = 1
-         |    assert!(x << 1 == 0)
-         |    assert!(x >> 1 == 0)
-         |    assert!(y << 1 == 2)
-         |    assert!(y >> 1 == 0)
-         |    assert!(y << 255 != 0)
-         |    assert!(y << 256 == 0)
-         |    assert!(x & x == 0)
-         |    assert!(x & y == 0)
-         |    assert!(y & y == 1)
-         |    assert!(x | x == 0)
-         |    assert!(x | y == 1)
-         |    assert!(y | y == 1)
-         |    assert!(x ^ x == 0)
-         |    assert!(x ^ y == 1)
-         |    assert!(y ^ y == 0)
+         |    assert!(x << 1 == 0, 0)
+         |    assert!(x >> 1 == 0, 0)
+         |    assert!(y << 1 == 2, 0)
+         |    assert!(y >> 1 == 0, 0)
+         |    assert!(y << 255 != 0, 0)
+         |    assert!(y << 256 == 0, 0)
+         |    assert!(x & x == 0, 0)
+         |    assert!(x & y == 0, 0)
+         |    assert!(y & y == 1, 0)
+         |    assert!(x | x == 0, 0)
+         |    assert!(x | y == 1, 0)
+         |    assert!(y | y == 1, 0)
+         |    assert!(x ^ x == 0, 0)
+         |    assert!(x ^ y == 1, 0)
+         |    assert!(y ^ y == 0, 0)
          |
-         |    assert!((x < y) == true)
-         |    assert!((x <= y) == true)
-         |    assert!((x < x) == false)
-         |    assert!((x <= x) == true)
-         |    assert!((x > y) == false)
-         |    assert!((x >= y) == false)
-         |    assert!((x > x) == false)
-         |    assert!((x >= x) == true)
+         |    assert!((x < y) == true, 0)
+         |    assert!((x <= y) == true, 0)
+         |    assert!((x < x) == false, 0)
+         |    assert!((x <= x) == true, 0)
+         |    assert!((x > y) == false, 0)
+         |    assert!((x >= y) == false, 0)
+         |    assert!((x > x) == false, 0)
+         |    assert!((x >= x) == true, 0)
          |
-         |    assert!((true && true) == true)
-         |    assert!((true && false) == false)
-         |    assert!((false && false) == false)
-         |    assert!((true || true) == true)
-         |    assert!((true || false) == true)
-         |    assert!((false || false) == false)
+         |    assert!((true && true) == true, 0)
+         |    assert!((true && false) == false, 0)
+         |    assert!((false && false) == false, 0)
+         |    assert!((true || true) == true, 0)
+         |    assert!((true || false) == true, 0)
+         |    assert!((false || false) == false, 0)
          |
-         |    assert!(!true == false)
-         |    assert!(!false == true)
+         |    assert!(!true == false, 0)
+         |    assert!(!false == true, 0)
          |  }
          |}
          |""".stripMargin
     // scalastyle:on no.equal
 
     testSimpleScript(expect(1))
-    failSimpleScript(expect(2), AssertionFailed)
+    failSimpleScript(expect(2), AssertionFailedWithErrorCode(None, 0))
   }
   // scalastyle:on method.length
 
@@ -667,21 +667,21 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript ByteVecTest {
-         |  assert!(toByteVec!(true) == #${encode(true)})
-         |  assert!(toByteVec!(false) == #${encode(false)})
-         |  assert!(toByteVec!(${i256}i) == #${encode(i256)})
-         |  assert!(toByteVec!(${u256}) == #${encode(u256)})
-         |  assert!(toByteVec!(@${address.toBase58}) == #${encode(address.lockupScript)})
-         |  assert!(# ++ #$bytes0 == #$bytes0)
-         |  assert!(#$bytes0 ++ # == #$bytes0)
-         |  assert!((#${bytes0} ++ #${bytes1}) == #${bytes0 ++ bytes1})
-         |  assert!(size!(toByteVec!(true)) == 1)
-         |  assert!(size!(toByteVec!(false)) == 1)
-         |  assert!(size!(toByteVec!(@${address.toBase58})) == 33)
-         |  assert!(size!(#${bytes0} ++ #${bytes1}) == 64)
-         |  assert!(zeros!(2) == #0000)
-         |  assert!(nullAddress!() == @${Address.contract(ContractId.zero)})
-         |  assert!(nullAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq)
+         |  assert!(toByteVec!(true) == #${encode(true)}, 0)
+         |  assert!(toByteVec!(false) == #${encode(false)}, 0)
+         |  assert!(toByteVec!(${i256}i) == #${encode(i256)}, 0)
+         |  assert!(toByteVec!(${u256}) == #${encode(u256)}, 0)
+         |  assert!(toByteVec!(@${address.toBase58}) == #${encode(address.lockupScript)}, 0)
+         |  assert!(# ++ #$bytes0 == #$bytes0, 0)
+         |  assert!(#$bytes0 ++ # == #$bytes0, 0)
+         |  assert!((#${bytes0} ++ #${bytes1}) == #${bytes0 ++ bytes1}, 0)
+         |  assert!(size!(toByteVec!(true)) == 1, 0)
+         |  assert!(size!(toByteVec!(false)) == 1, 0)
+         |  assert!(size!(toByteVec!(@${address.toBase58})) == 33, 0)
+         |  assert!(size!(#${bytes0} ++ #${bytes1}) == 64, 0)
+         |  assert!(zeros!(2) == #0000, 0)
+         |  assert!(nullAddress!() == @${Address.contract(ContractId.zero)}, 0)
+         |  assert!(nullAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, 0)
          |}
          |""".stripMargin
 
@@ -693,10 +693,10 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript ByteVecTest {
-         |  assert!(toI256!(1) == 1i)
-         |  assert!(toU256!(1i) == 1)
-         |  assert!(toByteVec!(true) == #01)
-         |  assert!(toByteVec!(false) == #00)
+         |  assert!(toI256!(1) == 1i, 0)
+         |  assert!(toU256!(1i) == 1, 0)
+         |  assert!(toByteVec!(true) == #01, 0)
+         |  assert!(toByteVec!(false) == #00, 0)
          |}
          |""".stripMargin
 
@@ -750,18 +750,18 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxContract Foo() {
          |  pub fn foo(fooId: ByteVec, fooHash: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barHash: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
-         |    assert!(selfContractId!() == fooId)
-         |    assert!(contractInitialStateHash!(fooId) == fooHash)
-         |    assert!(contractInitialStateHash!(barId) == barHash)
-         |    assert!(contractCodeHash!(fooId) == fooCodeHash)
-         |    assert!(contractCodeHash!(barId) == barCodeHash)
-         |    assert!(callerContractId!() == barId)
-         |    assert!(callerAddress!() == barAddress)
-         |    assert!(callerInitialStateHash!() == barHash)
-         |    assert!(callerCodeHash!() == barCodeHash)
-         |    assert!(isCalledFromTxScript!() == false)
-         |    assert!(isAssetAddress!(barAddress) == false)
-         |    assert!(isContractAddress!(barAddress) == true)
+         |    assert!(selfContractId!() == fooId, 0)
+         |    assert!(contractInitialStateHash!(fooId) == fooHash, 0)
+         |    assert!(contractInitialStateHash!(barId) == barHash, 0)
+         |    assert!(contractCodeHash!(fooId) == fooCodeHash, 0)
+         |    assert!(contractCodeHash!(barId) == barCodeHash, 0)
+         |    assert!(callerContractId!() == barId, 0)
+         |    assert!(callerAddress!() == barAddress, 0)
+         |    assert!(callerInitialStateHash!() == barHash, 0)
+         |    assert!(callerCodeHash!() == barCodeHash, 0)
+         |    assert!(isCalledFromTxScript!() == false, 0)
+         |    assert!(isAssetAddress!(barAddress) == false, 0)
+         |    assert!(isContractAddress!(barAddress) == true, 0)
          |  }
          |}
          |""".stripMargin
@@ -772,16 +772,16 @@ class VMSpec extends AlephiumSpec {
          |TxContract Bar() {
          |  @using(preapprovedAssets = true)
          |  pub fn bar(fooId: ByteVec, fooHash: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barHash: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
-         |    assert!(selfContractId!() == barId)
-         |    assert!(selfAddress!() == barAddress)
-         |    assert!(contractInitialStateHash!(fooId) == fooHash)
-         |    assert!(contractInitialStateHash!(barId) == barHash)
+         |    assert!(selfContractId!() == barId, 0)
+         |    assert!(selfAddress!() == barAddress, 0)
+         |    assert!(contractInitialStateHash!(fooId) == fooHash, 0)
+         |    assert!(contractInitialStateHash!(barId) == barHash, 0)
          |    Foo(#$fooId).foo(fooId, fooHash, fooCodeHash, barId, barHash, barCodeHash, barAddress)
-         |    assert!(isCalledFromTxScript!() == true)
-         |    assert!(isPaying!(@$genesisAddress) == true)
-         |    assert!(isPaying!(selfAddress!()) == false)
-         |    assert!(isAssetAddress!(@$genesisAddress) == true)
-         |    assert!(isContractAddress!(@$genesisAddress) == false)
+         |    assert!(isCalledFromTxScript!() == true, 0)
+         |    assert!(isPaying!(@$genesisAddress) == true, 0)
+         |    assert!(isPaying!(selfAddress!()) == false, 0)
+         |    assert!(isAssetAddress!(@$genesisAddress) == true, 0)
+         |    assert!(isContractAddress!(@$genesisAddress) == false, 0)
          |  }
          |}
          |
@@ -794,7 +794,7 @@ class VMSpec extends AlephiumSpec {
          |TxScript Main {
          |  Bar(#$barId).bar{ @$genesisAddress -> 1 alph }(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
          |  copyCreateContract!{ @$genesisAddress -> 1 alph }(#$fooId, #$state)
-         |  assert!(isPaying!(@$genesisAddress) == true)
+         |  assert!(isPaying!(@$genesisAddress) == true, 0)
          |}
          |
          |$bar
@@ -822,7 +822,7 @@ class VMSpec extends AlephiumSpec {
          |@using(preapprovedAssets = false)
          |TxScript Main {
          |  let address = contractIdToAddress!(#${contractId.toHexString})
-         |  assert!(byteVecToAddress!(#$addressHex) == address)
+         |  assert!(byteVecToAddress!(#$addressHex) == address, 0)
          |}
          |""".stripMargin
     }
@@ -955,7 +955,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |
          |  pub fn checkX(expected: Bool) -> () {
-         |    assert!(x == expected)
+         |    assert!(x == expected, 0)
          |  }
          |}
          |""".stripMargin
@@ -972,7 +972,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |
          |  pub fn checkX(expected: Bool) -> () {
-         |    assert!(x == expected)
+         |    assert!(x == expected, 0)
          |  }
          |}
          |""".stripMargin
@@ -1099,9 +1099,9 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!(networkId!() == #02)
-         |  assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis})
-         |  assert!(blockTarget!() == ${latestHeader.target.value})
+         |  assert!(networkId!() == #02, 0)
+         |  assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis}, 0)
+         |  assert!(blockTarget!() == ${latestHeader.target.value}, 0)
          |}
          |""".stripMargin
 
@@ -1123,9 +1123,9 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript TxEnv {
-         |  assert!(txId!() != #${zeroId.toHexString})
-         |  assert!(txInputAddress!($index) == @${genesisAddress.toBase58})
-         |  assert!(txInputsSize!() == 1)
+         |  assert!(txId!() != #${zeroId.toHexString}, 0)
+         |  assert!(txInputAddress!($index) == @${genesisAddress.toBase58}, 0)
+         |  assert!(txInputsSize!() == 1, 0)
          |}
          |""".stripMargin
     testSimpleScript(main(0))
@@ -1137,8 +1137,8 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!(dustAmount!() == 0.001 alph)
-         |  assert!(dustAmount!() == $dustUtxoAmount)
+         |  assert!(dustAmount!() == 0.001 alph, 0)
+         |  assert!(dustAmount!() == $dustUtxoAmount, 0)
          |}
          |""".stripMargin
     testSimpleScript(main)
@@ -1151,14 +1151,14 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!(blake2b!(#$input) == #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a)
-         |  assert!(blake2b!(#$input) != #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b370)
-         |  assert!(keccak256!(#$input) == #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E3C)
-         |  assert!(keccak256!(#$input) != #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E30)
-         |  assert!(sha256!(#$input) == #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A9A)
-         |  assert!(sha256!(#$input) != #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A90)
-         |  assert!(sha3!(#$input) == #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed743)
-         |  assert!(sha3!(#$input) != #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed740)
+         |  assert!(blake2b!(#$input) == #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a, 0)
+         |  assert!(blake2b!(#$input) != #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b370, 0)
+         |  assert!(keccak256!(#$input) == #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E3C, 0)
+         |  assert!(keccak256!(#$input) != #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E30, 0)
+         |  assert!(sha256!(#$input) == #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A9A, 0)
+         |  assert!(sha256!(#$input) != #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A90, 0)
+         |  assert!(sha3!(#$input) == #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed743, 0)
+         |  assert!(sha3!(#$input) != #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed740, 0)
          |}
          |""".stripMargin
     testSimpleScript(main)
@@ -1191,14 +1191,14 @@ class VMSpec extends AlephiumSpec {
          |TxScript Main {
          |  let address = ethEcRecover!(#${Hex.toHexString(messageHash)},
          |    #${Hex.toHexString(signature)})
-         |  assert!(address == #${Hex.toHexString(address)})
+         |  assert!(address == #${Hex.toHexString(address)}, 0)
          |}
          |""".stripMargin
     testSimpleScript(main(messageHash.bytes, signature, address))
     failSimpleScript(main(signature, messageHash.bytes, address), FailedInRecoverEthAddress)
     failSimpleScript(
       main(messageHash.bytes, signature, Hash.random.bytes.take(20)),
-      AssertionFailed
+      AssertionFailedWithErrorCode(None, 0)
     )
   }
 
@@ -1236,7 +1236,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!($func($number) == #$hex)
+         |  assert!($func($number) == #$hex, 0)
          |}
          |""".stripMargin
     }
@@ -1248,7 +1248,7 @@ class VMSpec extends AlephiumSpec {
       failSimpleScript(main(name, size + 1), InvalidConversion(number, Val.ByteVec))
     }
     testSimpleScript(main("u256To32Byte!", 32))
-    failSimpleScript(main("u256To32Byte!", 33), AssertionFailed)
+    failSimpleScript(main("u256To32Byte!", 33), AssertionFailedWithErrorCode(None, 0))
   }
 
   it should "test u256 from bytes" in new ContractFixture {
@@ -1259,7 +1259,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!($func(#$hex) == $u256)
+         |  assert!($func(#$hex) == $u256, 0)
          |}
          |""".stripMargin
     }
@@ -1280,7 +1280,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!(byteVecSlice!(#$hex, $start, $end) == #$slice)
+         |  assert!(byteVecSlice!(#$hex, $start, $end) == #$slice, 0)
          |}
          |""".stripMargin
     }
@@ -1306,7 +1306,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!(byteVecToAddress!(#$hex) == @${address.toBase58})
+         |  assert!(byteVecToAddress!(#$hex) == @${address.toBase58}, 0)
          |}
          |""".stripMargin
     }
@@ -2472,8 +2472,8 @@ class VMSpec extends AlephiumSpec {
            |  pub fn callSubContract(path: ByteVec) -> () {
            |    let subContractIdCalculated = subContractId!(path)
            |    let subContractIdCalculatedTest = subContractIdOf!(Contract(selfContractId!()), path)
-           |    assert!(subContractIdCalculated == subContractIdCalculatedTest)
-           |    assert!(subContractIdCalculated == subContractId)
+           |    assert!(subContractIdCalculated == subContractIdCalculatedTest, 0)
+           |    assert!(subContractIdCalculated == subContractId, 0)
            |    SubContract(subContractIdCalculated).call()
            |  }
            |}
@@ -2723,7 +2723,7 @@ class VMSpec extends AlephiumSpec {
          |TxContract Foo() {
          |  pub fn foo() -> () {
          |    let bytes = encodeToByteVec!(true, 1, false)
-         |    assert!(bytes == #03000102010000)
+         |    assert!(bytes == #03000102010000, 0)
          |  }
          |}
          |""".stripMargin
@@ -2804,9 +2804,9 @@ class VMSpec extends AlephiumSpec {
            |@using(preapprovedAssets = false)
            |TxScript Main {
            |  let impl = I(#${contractId.toHexString})
-           |  assert!(impl.f1() == 1)
-           |  assert!(impl.f2() == 2)
-           |  assert!(impl.f3() == #00)
+           |  assert!(impl.f1() == 1, 0)
+           |  assert!(impl.f2() == 2, 0)
+           |  assert!(impl.f3() == #00, 0)
            |}
            |
            |$interface
@@ -3153,7 +3153,7 @@ class VMSpec extends AlephiumSpec {
          |    Error = 0
          |  }
          |  pub fn foo() -> () {
-         |    assertWithErrorCode!(false, ErrorCodes.Error)
+         |    assert!(false, ErrorCodes.Error)
          |  }
          |}
          |""".stripMargin
@@ -3202,7 +3202,7 @@ class VMSpec extends AlephiumSpec {
          |  let foo = Foo(#${fooId.toHexString})
          |  let bar = Bar(#${barId.toHexString})
          |  let x = bar.bar(foo)
-         |  assert!(x == 123)
+         |  assert!(x == 123, 0)
          |}
          |
          |$bar
