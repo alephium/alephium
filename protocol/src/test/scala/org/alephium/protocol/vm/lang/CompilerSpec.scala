@@ -2509,20 +2509,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test contract constant variables" in new Fixture {
-    val foo =
-      s"""
-         |Abstract TxContract Foo() {
-         |  const C0 = 0
-         |  const C1 = #00
-         |  pub fn foo() -> () {
-         |    assert!(C0 == 0)
-         |    assert!(C1 == #00)
-         |  }
-         |}
-         |""".stripMargin
-
     {
       info("Contract constant variables")
+      val foo =
+        s"""
+           |Abstract TxContract Foo() {
+           |  const C0 = 0
+           |  const C1 = #00
+           |  pub fn foo() -> () {
+           |    assert!(C0 == 0)
+           |    assert!(C1 == #00)
+           |  }
+           |}
+           |""".stripMargin
       test(foo)
     }
 
@@ -2541,11 +2540,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    assert!(C3 == @$address)
            |  }
            |}
-           |$foo
+           |
+           |Abstract TxContract Foo() {
+           |  const C0 = 0
+           |  const C1 = #00
+           |}
            |""".stripMargin
 
       test(bar, methodIndex = 0)
-      test(bar, methodIndex = 1)
     }
   }
 
@@ -2587,22 +2589,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test contract enums" in new Fixture {
-    val foo =
-      s"""
-         |Abstract TxContract Foo() {
-         |  enum FooErrorCodes {
-         |    Error0 = 0
-         |    Error1 = 1
-         |  }
-         |  pub fn foo() -> () {
-         |    assert!(FooErrorCodes.Error0 == 0)
-         |    assert!(FooErrorCodes.Error1 == 1)
-         |  }
-         |}
-         |""".stripMargin
-
     {
       info("Contract enums")
+      val foo =
+        s"""
+           |Abstract TxContract Foo() {
+           |  enum FooErrorCodes {
+           |    Error0 = 0
+           |    Error1 = 1
+           |  }
+           |  pub fn foo() -> () {
+           |    assert!(FooErrorCodes.Error0 == 0)
+           |    assert!(FooErrorCodes.Error1 == 1)
+           |  }
+           |}
+           |""".stripMargin
       test(foo)
     }
 
@@ -2622,10 +2623,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    assert!(BarValues.Value1 == #01)
            |  }
            |}
-           |$foo
+           |
+           |Abstract TxContract Foo() {
+           |  enum FooErrorCodes {
+           |    Error0 = 0
+           |    Error1 = 1
+           |  }
+           |}
            |""".stripMargin
       test(bar, methodIndex = 0)
-      test(bar, methodIndex = 1)
     }
   }
 
