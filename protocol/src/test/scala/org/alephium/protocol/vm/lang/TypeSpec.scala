@@ -21,7 +21,7 @@ import org.alephium.util.AlephiumSpec
 class TypeSpec extends AlephiumSpec {
   it should "return correct signature" in new TypeSignatureFixture {
     contractAst.getFieldsSignature() is
-      "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])"
+      "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])"
     contractAst.getFieldNames() is
       Seq("aa", "bb", "cc", "dd", "ee", "ff")
     contractAst.getFieldTypes() is
@@ -60,7 +60,7 @@ class TypeSpec extends AlephiumSpec {
 trait TypeSignatureFixture {
   val contractStr =
     s"""
-       |TxContract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2]) {
+       |Contract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2]) {
        |  event Bar(a: Bool, b: U256, d: ByteVec, e: Address)
        |
        |  @using(preapprovedAssets = true, assetsInContract = true)

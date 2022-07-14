@@ -166,7 +166,7 @@ class SmartContractTest extends AlephiumActorSpec {
     val restPort = clique.masterRestPort
     val contract =
       s"""
-         |TxContract Foo(a: Bool, b: I256, c: U256, d: ByteVec, e: Address) {
+         |Contract Foo(a: Bool, b: I256, c: U256, d: ByteVec, e: Address) {
          |  pub fn foo() -> (Bool, I256, U256, ByteVec, Address) {
          |    return a, b, c, d, e
          |  }
@@ -552,7 +552,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
 object SwapContracts {
   val tokenContract = s"""
-                         |TxContract Token() {
+                         |Contract Token() {
                          |
                          |  @using(assetsInContract = true)
                          |  pub fn withdraw(address: Address, amount: U256) -> () {
@@ -575,7 +575,7 @@ object SwapContracts {
     s"""
        |// Simple swap contract purely for testing
        |
-       |TxContract Swap(tokenId: ByteVec, mut alphReserve: U256, mut tokenReserve: U256) {
+       |Contract Swap(tokenId: ByteVec, mut alphReserve: U256, mut tokenReserve: U256) {
        |
        |  @using(preapprovedAssets = true, assetsInContract = true)
        |  pub fn addLiquidity(lp: Address, attoAlphAmount: U256, tokenAmount: U256) -> () {

@@ -53,7 +53,7 @@ final case class CompileContractResult(
 )
 
 object CompileContractResult {
-  def from(contract: StatefulContract, contractAst: Ast.TxContract): CompileContractResult = {
+  def from(contract: StatefulContract, contractAst: Ast.Contract): CompileContractResult = {
     assume(contractAst.templateVars.isEmpty) // Template variable is disabled right now
     val bytecode = Hex.toHexString(serialize(contract))
     val fields = CompileResult.FieldsSig(

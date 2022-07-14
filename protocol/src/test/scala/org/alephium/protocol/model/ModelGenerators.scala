@@ -288,7 +288,7 @@ trait TxGenerators
   lazy val counterContract: StatefulContract = {
     val input =
       s"""
-         |TxContract Foo(mut x: U256) {
+         |Contract Foo(mut x: U256) {
          |  fn add() -> () {
          |    x = x + 1
          |    return

@@ -635,13 +635,13 @@ class ParserSpec extends AlephiumSpec {
       info("Simple contract inheritance")
       val code =
         s"""
-           |TxContract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
+           |Contract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
            |  fn foo() -> () {
            |  }
            |}
            |""".stripMargin
 
-      fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+      fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
         false,
         TypeId("Child"),
         Seq.empty,
@@ -672,7 +672,7 @@ class ParserSpec extends AlephiumSpec {
       info("Contract event inheritance")
       val foo: String =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  event Foo(x: U256)
            |  event Foo2(x: U256)
            |
@@ -684,7 +684,7 @@ class ParserSpec extends AlephiumSpec {
            |""".stripMargin
       val bar: String =
         s"""
-           |TxContract Bar() extends Foo() {
+           |Contract Bar() extends Foo() {
            |  pub fn bar() -> () {}
            |}
            |$foo
@@ -701,7 +701,7 @@ class ParserSpec extends AlephiumSpec {
       info("Contract constant variable inheritance")
       val foo: String =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  const C0 = 0
            |  const C1 = 1
            |  pub fn foo() -> () {}
@@ -710,7 +710,7 @@ class ParserSpec extends AlephiumSpec {
 
       val bar: String =
         s"""
-           |TxContract Bar() extends Foo() {
+           |Contract Bar() extends Foo() {
            |  const C2 = 2
            |  pub fn bar() -> () {}
            |}
@@ -728,7 +728,7 @@ class ParserSpec extends AlephiumSpec {
       info("Contract enum inheritance")
       val foo: String =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  enum FooErrorCodes {
            |    Error = 0
            |  }
@@ -738,7 +738,7 @@ class ParserSpec extends AlephiumSpec {
 
       val bar: String =
         s"""
-           |TxContract Bar() extends Foo() {
+           |Contract Bar() extends Foo() {
            |  enum BarErrorCodes {
            |    Error = 0
            |  }
@@ -799,13 +799,13 @@ class ParserSpec extends AlephiumSpec {
       info("Contract inherits interface")
       val code =
         s"""
-           |TxContract Child() implements Parent {
+           |Contract Child() implements Parent {
            |  fn foo() -> () {
            |    return
            |  }
            |}
            |""".stripMargin
-      fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+      fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
         false,
         TypeId("Child"),
         Seq.empty,
@@ -833,13 +833,13 @@ class ParserSpec extends AlephiumSpec {
       info("Contract supports extends multiple contracts")
       val code =
         s"""
-           |TxContract Child() extends Parent0(), Parent1() implements Parent2 {
+           |Contract Child() extends Parent0(), Parent1() implements Parent2 {
            |  fn foo() -> () {
            |    return
            |  }
            |}
            |""".stripMargin
-      fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+      fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
         false,
         TypeId("Child"),
         Seq.empty,
@@ -871,14 +871,14 @@ class ParserSpec extends AlephiumSpec {
       info("Contract can only implement single interface")
       val code =
         s"""
-           |TxContract Child() extends Parent0(), Parent1() implements Parent3, Parent4 {
+           |Contract Child() extends Parent0(), Parent1() implements Parent3, Parent4 {
            |  fn foo() -> () {
            |    return
            |  }
            |}
            |""".stripMargin
       val error = intercept[Compiler.Error](fastparse.parse(code, StatefulParser.contract(_)))
-      error.message is "TxContract only supports implementing single interface: Parent3, Parent4"
+      error.message is "Contract only supports implementing single interface: Parent3, Parent4"
     }
   }
 
@@ -909,14 +909,14 @@ class ParserSpec extends AlephiumSpec {
       info("Parse abstract contract")
       val code =
         s"""
-           |Abstract TxContract Foo() {
+           |Abstract Contract Foo() {
            |  fn foo() -> ()
            |  fn bar() -> () {
            |    return
            |  }
            |}
            |""".stripMargin
-      fastparse.parse(code, StatefulParser.contract(_)).get.value is TxContract(
+      fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
         true,
         TypeId("Foo"),
         Seq.empty,
@@ -940,7 +940,7 @@ class ParserSpec extends AlephiumSpec {
 
       val code =
         s"""
-           |Abstract TxContract Foo() implements Bar {
+           |Abstract Contract Foo() implements Bar {
            |  fn foo() -> () {
            |    return
            |  }
@@ -950,7 +950,7 @@ class ParserSpec extends AlephiumSpec {
       val extended =
         fastparse.parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
       val fooContract = extended.contracts(0)
-      fooContract is TxContract(
+      fooContract is Contract(
         true,
         TypeId("Foo"),
         Seq.empty,

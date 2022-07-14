@@ -843,7 +843,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "bytecode": "0701402901010707061005a000a001a003a00461b413c40de0b6b3a7640000a916011602160316041605160602",
         |  "codeHash": "eff62a4b2d4d4936a84e360c916a398d80d5000497ccd4afbd80bfe254d62096",
         |  "fields": {
-        |    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])",
+        |    "signature": "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])",
         |    "names": ["aa","bb","cc","dd","ee","ff"],
         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |  },

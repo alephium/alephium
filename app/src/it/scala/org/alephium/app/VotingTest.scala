@@ -181,7 +181,7 @@ trait VotingFixture extends WalletFixture {
       .mkString("\n")
     // scalastyle:off no.equal
     val votingContract = s"""
-                            |TxContract Voting(
+                            |Contract Voting(
                             |  mut yes: U256,
                             |  mut no: U256,
                             |  mut isClosed: Bool,

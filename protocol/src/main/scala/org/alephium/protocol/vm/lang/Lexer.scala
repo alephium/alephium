@@ -171,7 +171,7 @@ object Lexer {
   }
 
   def keywordSet: Set[String] = Set(
-    "TxContract",
+    "Contract",
     "AssetScript",
     "TxScript",
     "Interface",

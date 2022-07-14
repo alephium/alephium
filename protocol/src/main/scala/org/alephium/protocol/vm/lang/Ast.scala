@@ -909,7 +909,7 @@ object Ast {
   }
   final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident]) extends Inheritance
   final case class InterfaceInheritance(parentId: TypeId)                    extends Inheritance
-  final case class TxContract(
+  final case class Contract(
       isAbstract: Boolean,
       ident: TypeId,
       templateVars: Seq[Argument],
@@ -921,13 +921,13 @@ object Ast {
       inheritances: Seq[Inheritance]
   ) extends ContractWithState {
     def getFieldsSignature(): String =
-      s"TxContract ${name}(${fields.map(_.signature).mkString(",")})"
+      s"Contract ${name}(${fields.map(_.signature).mkString(",")})"
     def getFieldNames(): Seq[String] = fields.map(_.ident.name)
     def getFieldTypes(): Seq[String] = fields.map(_.tpe.signature)
 
     private def checkFuncs(): Unit = {
       if (funcs.length < 1) {
-        throw Compiler.Error(s"No function definition in TxContract ${ident.name}")
+        throw Compiler.Error(s"No function definition in Contract ${ident.name}")
       }
     }
 
@@ -1002,7 +1002,7 @@ object Ast {
     }
   }
 
-  final case class MultiTxContract(contracts: Seq[ContractWithState]) {
+  final case class MultiContract(contracts: Seq[ContractWithState]) {
     def get(contractIndex: Int): ContractWithState = {
       if (contractIndex >= 0 && contractIndex < contracts.size) {
         contracts(contractIndex)
@@ -1033,7 +1033,7 @@ object Ast {
       contract.inheritances.foreach { inheritance =>
         val parentId       = inheritance.parentId
         val parentContract = getContract(parentId)
-        MultiTxContract.checkInheritanceFields(contract, inheritance, parentContract)
+        MultiContract.checkInheritanceFields(contract, inheritance, parentContract)
 
         allParents += parentId -> parentContract
         if (!parentsCache.contains(parentId)) {
@@ -1060,14 +1060,14 @@ object Ast {
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
-    def extendedContracts(): MultiTxContract = {
+    def extendedContracts(): MultiContract = {
       val parentsCache = buildDependencies()
       val newContracts: Seq[ContractWithState] = contracts.map {
         case script: TxScript =>
           script
-        case c: TxContract =>
-          val (funcs, events, constantVars, enums) = MultiTxContract.extractDefs(parentsCache, c)
-          TxContract(
+        case c: Contract =>
+          val (funcs, events, constantVars, enums) = MultiContract.extractDefs(parentsCache, c)
+          Contract(
             c.isAbstract,
             c.ident,
             c.templateVars,
@@ -1079,10 +1079,10 @@ object Ast {
             c.inheritances
           )
         case i: ContractInterface =>
-          val (funcs, events, _, _) = MultiTxContract.extractDefs(parentsCache, i)
+          val (funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
           ContractInterface(i.ident, funcs, events, i.inheritances)
       }
-      MultiTxContract(newContracts)
+      MultiContract(newContracts)
     }
 
     def genStatefulScript(
@@ -1092,7 +1092,7 @@ object Ast {
       val state = Compiler.State.buildFor(this, contractIndex, checkUnusedVars)
       get(contractIndex) match {
         case script: TxScript => (script.genCode(state), script)
-        case _: TxContract => throw Compiler.Error(s"The code is for TxContract, not for TxScript")
+        case _: Contract      => throw Compiler.Error(s"The code is for Contract, not for TxScript")
         case _: ContractInterface =>
           throw Compiler.Error(s"The code is for Interface, not for TxScript")
       }
@@ -1101,18 +1101,18 @@ object Ast {
     def genStatefulContract(
         contractIndex: Int,
         checkUnusedVars: Boolean
-    ): (StatefulContract, TxContract) = {
+    ): (StatefulContract, Contract) = {
       val state = Compiler.State.buildFor(this, contractIndex, checkUnusedVars)
       get(contractIndex) match {
-        case contract: TxContract => (contract.genCode(state), contract)
-        case _: TxScript => throw Compiler.Error(s"The code is for TxScript, not for TxContract")
+        case contract: Contract => (contract.genCode(state), contract)
+        case _: TxScript => throw Compiler.Error(s"The code is for TxScript, not for Contract")
         case _: ContractInterface =>
-          throw Compiler.Error(s"The code is for Interface, not for TxContract")
+          throw Compiler.Error(s"The code is for Interface, not for Contract")
       }
     }
   }
 
-  object MultiTxContract {
+  object MultiContract {
     def checkInheritanceFields(
         contract: ContractWithState,
         inheritance: Inheritance,
@@ -1149,7 +1149,7 @@ object Ast {
     ): (Seq[FuncDef[StatefulContext]], Seq[EventDef], Seq[ConstantVarDef], Seq[EnumDef]) = {
       val parents = parentsCache(contract.ident)
       val (allContracts, _allInterfaces) =
-        (parents :+ contract).partition(_.isInstanceOf[TxContract])
+        (parents :+ contract).partition(_.isInstanceOf[Contract])
       val allInterfaces =
         sortInterfaces(parentsCache, _allInterfaces.map(_.asInstanceOf[ContractInterface]))
 
@@ -1165,11 +1165,11 @@ object Ast {
       val resultFuncs = contract match {
         case _: TxScript =>
           throw Compiler.Error("Extract definitions from TxScript is unexpected")
-        case txContract: TxContract =>
+        case txContract: Contract =>
           if (!txContract.isAbstract && unimplementedFuncs.nonEmpty) {
             val methodNames = unimplementedFuncs.map(_.name).mkString(",")
             throw Compiler.Error(
-              s"TxContract ${txContract.name} has unimplemented methods: $methodNames"
+              s"Contract ${txContract.name} has unimplemented methods: $methodNames"
             )
           }
 
