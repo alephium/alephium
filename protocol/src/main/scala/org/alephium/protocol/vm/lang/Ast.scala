@@ -797,7 +797,7 @@ object Ast {
       exprs.flatMap(_.genCode(state)) :+ Return
   }
 
-  trait Contract[Ctx <: StatelessContext] {
+  trait ContractT[Ctx <: StatelessContext] {
     def ident: TypeId
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
@@ -842,7 +842,7 @@ object Ast {
       ident: TypeId,
       templateVars: Seq[Argument],
       funcs: Seq[FuncDef[StatelessContext]]
-  ) extends Contract[StatelessContext] {
+  ) extends ContractT[StatelessContext] {
     val fields: Seq[Argument] = Seq.empty
 
     def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatelessContext]] = Seq.empty
@@ -853,7 +853,7 @@ object Ast {
     }
   }
 
-  sealed trait ContractWithState extends Contract[StatefulContext] {
+  sealed trait ContractWithState extends ContractT[StatefulContext] {
     def ident: TypeId
     def name: String = ident.name
     def inheritances: Seq[Inheritance]

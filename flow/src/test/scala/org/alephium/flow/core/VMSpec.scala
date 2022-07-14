@@ -2463,7 +2463,7 @@ class VMSpec extends AlephiumSpec {
     ) = {
       val contractRaw: String =
         s"""
-           |Contract Contract(mut subContractId: ByteVec) {
+           |Contract Foo(mut subContractId: ByteVec) {
            |  @using(preapprovedAssets = true)
            |  pub fn createSubContract() -> () {
            |    subContractId = $createContractStmt
@@ -2471,7 +2471,7 @@ class VMSpec extends AlephiumSpec {
            |
            |  pub fn callSubContract(path: ByteVec) -> () {
            |    let subContractIdCalculated = subContractId!(path)
-           |    let subContractIdCalculatedTest = subContractIdOf!(Contract(selfContractId!()), path)
+           |    let subContractIdCalculatedTest = subContractIdOf!(Foo(selfContractId!()), path)
            |    assert!(subContractIdCalculated == subContractIdCalculatedTest, 0)
            |    assert!(subContractIdCalculated == subContractId, 0)
            |    SubContract(subContractIdCalculated).call()
@@ -2491,7 +2491,7 @@ class VMSpec extends AlephiumSpec {
       val createSubContractRaw: String =
         s"""
            |TxScript Main {
-           |  Contract(#${contractId.toHexString}).createSubContract{callerAddress!() -> 1 alph}()
+           |  Foo(#${contractId.toHexString}).createSubContract{callerAddress!() -> 1 alph}()
            |}
            |$contractRaw
            |""".stripMargin
@@ -2512,7 +2512,7 @@ class VMSpec extends AlephiumSpec {
       val callSubContractRaw: String =
         s"""
            |TxScript Main {
-           |  Contract(#${contractId.toHexString}).callSubContract(#${subContractPathHex})
+           |  Foo(#${contractId.toHexString}).callSubContract(#${subContractPathHex})
            |}
            |$contractRaw
            |""".stripMargin
