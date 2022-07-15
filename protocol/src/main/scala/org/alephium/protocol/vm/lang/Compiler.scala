@@ -21,7 +21,7 @@ import scala.collection.{immutable, mutable}
 import fastparse.Parsed
 
 import org.alephium.protocol.vm._
-import org.alephium.protocol.vm.lang.Ast.MultiTxContract
+import org.alephium.protocol.vm.lang.Ast.MultiContract
 import org.alephium.util.AVector
 
 // scalastyle:off file.size.limit
@@ -87,17 +87,17 @@ object Compiler {
   def compileContractFull(
       input: String,
       checkUnusedVars: Boolean
-  ): Either[Error, (StatefulContract, Ast.TxContract)] =
+  ): Either[Error, (StatefulContract, Ast.Contract)] =
     compileContractFull(input, 0, checkUnusedVars)
 
   def compileContractFull(
       input: String,
       index: Int,
       checkUnusedVars: Boolean
-  ): Either[Error, (StatefulContract, Ast.TxContract)] =
+  ): Either[Error, (StatefulContract, Ast.Contract)] =
     compileStateful(input, _.genStatefulContract(index, checkUnusedVars))
 
-  private def compileStateful[T](input: String, genCode: MultiTxContract => T): Either[Error, T] = {
+  private def compileStateful[T](input: String, genCode: MultiContract => T): Either[Error, T] = {
     try {
       compileMultiContract(input).map(genCode)
     } catch {
@@ -105,7 +105,7 @@ object Compiler {
     }
   }
 
-  def compileMultiContract[T](input: String): Either[Error, MultiTxContract] = {
+  def compileMultiContract[T](input: String): Either[Error, MultiContract] = {
     try {
       fastparse.parse(input, StatefulParser.multiContract(_)) match {
         case Parsed.Success(multiContract, _) => Right(multiContract.extendedContracts())
@@ -151,7 +151,7 @@ object Compiler {
     if (tpe.length == 1) {
       tpe(0)
     } else {
-      throw Error(s"Try to set types $tpe for varialbe $ident")
+      throw Error(s"Try to set types $tpe for variable $ident")
     }
   }
 
@@ -313,7 +313,7 @@ object Compiler {
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def buildFor(
-        multiContract: MultiTxContract,
+        multiContract: MultiContract,
         contractIndex: Int,
         checkUnusedVars: Boolean
     ): State[StatefulContext] = {
@@ -323,8 +323,8 @@ object Compiler {
             ContractKind.Interface
           case _: Ast.TxScript =>
             ContractKind.TxScript
-          case txContract: Ast.TxContract =>
-            ContractKind.TxContract(txContract.isAbstract)
+          case txContract: Ast.Contract =>
+            ContractKind.Contract(txContract.isAbstract)
         }
         contract.ident -> ContractInfo(kind, contract.funcTable)
       }.toMap
@@ -357,12 +357,12 @@ object Compiler {
       def instantiable: Boolean = true
       def inheritable: Boolean  = true
     }
-    final case class TxContract(isAbstract: Boolean) extends ContractKind {
+    final case class Contract(isAbstract: Boolean) extends ContractKind {
       def instantiable: Boolean = !isAbstract
       def inheritable: Boolean  = isAbstract
 
       override def toString(): String = {
-        if (isAbstract) "Abstract TxContract" else "TxContract"
+        if (isAbstract) "Abstract Contract" else "Contract"
       }
     }
   }
@@ -559,18 +559,14 @@ object Compiler {
       }
     }
 
-    def checkUnusedGlobalVars(): Unit = {
+    def checkUnusedFields(): Unit = {
       if (checkUnusedVars) {
         val unusedVars = varTable.filter { case (name, varInfo) =>
           !usedVars.contains(name) && !varInfo.isGenerated
         }
-        val (unusedConstants, unusedFields) =
-          unusedVars.partition(_._2.isInstanceOf[VarInfo.Constant[_]])
+        val unusedFields = unusedVars.filterNot(_._2.isInstanceOf[VarInfo.Constant[_]])
         if (unusedFields.nonEmpty) {
           throw Error(s"Found unused fields: ${unusedFields.keys.mkString(", ")}")
-        }
-        if (unusedConstants.nonEmpty) {
-          throw Error(s"Found unused constants: ${unusedConstants.keys.mkString(", ")}")
         }
       }
     }

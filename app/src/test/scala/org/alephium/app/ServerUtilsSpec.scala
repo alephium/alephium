@@ -888,7 +888,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val barCode =
       s"""
-         |TxContract Bar(mut value: U256) {
+         |Contract Bar(mut value: U256) {
          |  pub fn addOne() -> () {
          |    value = value + 1
          |  }
@@ -899,7 +899,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val barAddress = Address.contract(barId)
     val fooCode =
       s"""
-         |TxContract Foo(mut value: U256) {
+         |Contract Foo(mut value: U256) {
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn addOne() -> U256 {
          |    transferAlphToSelf!(@$callerAddress, ${ALPH.oneNanoAlph})
@@ -992,7 +992,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
     val foo =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn destroy() -> () {
          |    destroySelf!(@$assetAddress)
@@ -1007,7 +1007,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val destroyContractPath = "11"
     val bar =
       s"""
-         |TxContract Bar() {
+         |Contract Bar() {
          |  @using(assetsInContract = true)
          |  pub fn bar() -> () {
          |    createSubContract!{selfAddress!() -> 1 alph}(#$createContractPath, #$fooByteCode, #$encodedState)
@@ -1074,7 +1074,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "return upgraded contract code hash" in new TestContractFixture {
     val fooV1Code =
       s"""
-         |TxContract FooV1() {
+         |Contract FooV1() {
          |  pub fn foo() -> () {}
          |}
          |""".stripMargin
@@ -1083,7 +1083,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val fooV0Code =
       s"""
-         |TxContract FooV0() {
+         |Contract FooV0() {
          |  pub fn upgrade0() -> () {
          |    migrate!(#$fooV1Bytecode)
          |  }
@@ -1391,7 +1391,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val isPublic = if (Random.nextBoolean()) "pub" else ""
     val contract =
       s"""
-         |TxContract ArrayTest(mut array: [U256; 2]) {
+         |Contract ArrayTest(mut array: [U256; 2]) {
          |  ${isPublic} fn swap(input: [U256; 2]) -> ([U256; 2]) {
          |    array[0] = input[1]
          |    array[1] = input[0]
@@ -1428,7 +1428,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "test with preassigned block hash and tx id" in new Fixture {
     val contract =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn foo() -> () {
          |    return
          |  }
@@ -1452,9 +1452,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils = new ServerUtils()
     val rawCode =
       s"""
-         |TxContract Foo(y: U256) {
+         |Contract Foo(y: U256) {
          |  pub fn foo() -> () {
-         |    assert!(1 != y)
+         |    assert!(1 != y, 0)
          |  }
          |}
          |""".stripMargin
@@ -1465,14 +1465,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     val compiledCode = result.bytecode
     compiledCode is Hex.toHexString(serialize(code))
     compiledCode is {
-      val bytecode     = "0100000000040da000304d"
+      val bytecode     = "0100000000050da000300c7b"
       val methodLength = Hex.toHexString(IndexedSeq((bytecode.length / 2).toByte))
       s"0101$methodLength" + bytecode
     }
   }
 
   it should "compile script" in new Fixture {
-    val expectedByteCode = "01010000000004{0}{1}304d"
+    val expectedByteCode = "01010000000005{0}{1}300c7b"
     val serverUtils      = new ServerUtils()
 
     {
@@ -1480,7 +1480,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"""
            |@using(preapprovedAssets = false)
            |TxScript Main(x: U256, y: U256) {
-           |  assert!(x != y)
+           |  assert!(x != y, 0)
            |}
            |""".stripMargin
 
@@ -1494,7 +1494,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         s"""
            |@using(preapprovedAssets = false)
            |TxScript Main {
-           |  assert!(1 != 2)
+           |  assert!(1 != 2, 0)
            |}
            |""".stripMargin
       val code   = Compiler.compileTxScript(rawCode).rightValue
@@ -1511,9 +1511,9 @@ class ServerUtilsSpec extends AlephiumSpec {
   it should "create build deploy contract script" in new Fixture {
     val rawCode =
       s"""
-         |TxContract Foo(y: U256) {
+         |Contract Foo(y: U256) {
          |  pub fn foo() -> () {
-         |    assert!(1 != y)
+         |    assert!(1 != y, 0)
          |  }
          |}
          |""".stripMargin

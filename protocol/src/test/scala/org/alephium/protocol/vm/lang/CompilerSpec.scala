@@ -96,7 +96,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val contract =
         s"""
            |// comment
-           |TxContract Foo(mut x: U256, mut y: U256) {
+           |Contract Foo(mut x: U256, mut y: U256) {
            |  // comment
            |  pub fn add0(a: U256, b: U256) -> (U256) {
            |    return (a + b)
@@ -123,14 +123,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |Contract Foo(mut x: U256, mut y: U256, c: U256) {
            |  event Add(a: U256, b: U256)
            |}
            |""".stripMargin
       Compiler
         .compileContract(contract)
         .leftValue
-        .message is "No function definition in TxContract Foo"
+        .message is "No function definition in Contract Foo"
     }
 
     {
@@ -138,7 +138,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo(mut x: U256, mut y: U256, c: U256) {
+           |Contract Foo(mut x: U256, mut y: U256, c: U256) {
            |  pub fn add1(a: U256, b: U256) -> (U256) {
            |    return (a + b)
            |  }
@@ -178,7 +178,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     ) = {
       val contract =
         s"""
-           |TxContract Foo($xMut x: U256) {
+           |Contract Foo($xMut x: U256) {
            |  pub fn add($a: $aType, $b: $bType) -> ($rType) {
            |    x = a + b
            |    return (a - b)
@@ -206,7 +206,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "parse multiple contracts" in {
     val input =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo(bar: Bar) -> () {
          |    return bar.bar()
          |  }
@@ -234,13 +234,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "check function return types" in {
     val noReturnCases = Seq(
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> (U256) {
          |  }
          |}
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo(value: U256) -> (U256) {
          |    if (value > 10) {
          |      return 1
@@ -249,7 +249,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> (U256) {
          |    let mut x = 0
          |    return 0
@@ -258,7 +258,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo(value: U256) -> (U256) {
          |    if (value > 10) {
          |      return 0
@@ -279,14 +279,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val invalidReturnCases = Seq(
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    return 1
          |  }
          |}
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> (U256) {
          |    return
          |  }
@@ -299,14 +299,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val succeed = Seq(
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> (U256) {
          |    panic!()
          |  }
          |}
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo(value: U256) -> (U256) {
          |    if (value > 10) {
          |      return 0
@@ -317,7 +317,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo(value: U256) -> (U256) {
          |    if (value > 10) {
          |      return 0
@@ -331,7 +331,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo(value: U256) -> (U256) {
          |    if (value > 10) {
          |      if (value < 8) {
@@ -358,7 +358,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "test panic" in new Fixture {
     def code(error: String = "") =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn foo(x: U256) -> (U256) {
          |    if (x == 0) {
          |      return 0
@@ -375,19 +375,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "check contract type" in {
     val failed = Seq(
       s"""
-         |TxContract Foo(bar: Bar) {
+         |Contract Foo(bar: Bar) {
          |  fn foo() -> () {
          |  }
          |}
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo(bar: Bar) -> () {
          |  }
          |}
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let bar = Bar(#00)
          |  }
@@ -402,14 +402,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     val barContract =
       s"""
-         |TxContract Bar() {
+         |Contract Bar() {
          |  fn bar() -> () {
          |  }
          |}
          |""".stripMargin
     val succeed = Seq(
       s"""
-         |TxContract Foo(bar: Bar) {
+         |Contract Foo(bar: Bar) {
          |  fn foo() -> () {
          |  }
          |}
@@ -417,7 +417,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |$barContract
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo(bar: Bar) -> () {
          |  }
          |}
@@ -425,7 +425,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |$barContract
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let bar = Bar(#00)
          |  }
@@ -472,7 +472,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "generate IR code" in new Fixture {
     val input =
       s"""
-         |TxContract Foo(x: U256) {
+         |Contract Foo(x: U256) {
          |
          |  pub fn add(a: U256) -> (U256) {
          |    return square(x) + square(a)
@@ -498,7 +498,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |AssetScript P2PKH {
          |  pub fn verify(pk: ByteVec) -> () {
          |    let hash = #${hash.toHexString}
-         |    assert!(hash == blake2b!(pk))
+         |    assert!(hash == blake2b!(pk), 0)
          |    verifyTxSignature!(pk)
          |    return
          |  }
@@ -524,7 +524,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "test while" in new Fixture {
     test(
       s"""
-         |TxContract While() {
+         |Contract While() {
          |  pub fn main() -> (U256) {
          |    let mut x = 5
          |    let mut done = false
@@ -549,7 +549,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         body: String = "return"
     ): String =
       s"""
-         |TxContract ForLoop() {
+         |Contract ForLoop() {
          |  pub fn test() -> () {
          |    for ($initialize; $condition; $update) {
          |      $body
@@ -572,7 +572,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "test for loop" in new Fixture {
     test(
       s"""
-         |TxContract ForLoop() {
+         |Contract ForLoop() {
          |  pub fn main() -> (U256) {
          |    let mut x = 1
          |    for (let mut i = 1; i < 5; i = i + 1) {
@@ -587,7 +587,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     )
     test(
       s"""
-         |TxContract ForLoop() {
+         |Contract ForLoop() {
          |  pub fn main() -> (U256) {
          |    let mut x = 5
          |    for (let mut done = false; !done; done = done) {
@@ -606,7 +606,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "test the following typical examples" in new Fixture {
     test(
       s"""
-         |TxContract Main() {
+         |Contract Main() {
          |
          |  pub fn main() -> () {
          |    let an_i256 = 5i
@@ -632,7 +632,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     test(
       s"""
-         |TxContract Fibonacci() {
+         |Contract Fibonacci() {
          |  pub fn f(n: I256) -> (I256) {
          |    if (n < 2i) {
          |      return n
@@ -648,7 +648,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     test(
       s"""
-         |TxContract Fibonacci() {
+         |Contract Fibonacci() {
          |  pub fn f(n: U256) -> (U256) {
          |    if (n < 2u) {
          |      return n
@@ -664,7 +664,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     test(
       s"""
-         |TxContract Test() {
+         |Contract Test() {
          |  pub fn main() -> (Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool, Bool) {
          |    let b0 = 1 == 1
          |    let b1 = 1 == 2
@@ -701,7 +701,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     test(
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn f(mut n: U256) -> (U256) {
          |    if (n < 2) {
          |      n = n + 1
@@ -718,7 +718,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "execute quasi uniswap" in new Fixture {
     val contract =
       s"""
-         |TxContract Uniswap(
+         |Contract Uniswap(
          |  mut alphReserve: U256,
          |  mut btcReserve: U256
          |) {
@@ -752,7 +752,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "test operator precedence" in new Fixture {
     val contract =
       s"""
-         |TxContract Operator() {
+         |Contract Operator() {
          |  pub fn main() -> (U256, Bool, Bool) {
          |    let x = 1 + 2 * 3 - 2 / 2
          |    let y = (1 < 2) && (2 <= 2) && (2 < 3)
@@ -769,7 +769,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val codes = List(
       s"""
          |// duplicated variable name
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let x = 0
          |    let x = [1, 2, 3]
@@ -780,7 +780,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Local variables have the same name: x",
       s"""
          |// duplicated variable name
-         |TxContract Foo(x: [U256; 2]) {
+         |Contract Foo(x: [U256; 2]) {
          |  fn foo() -> () {
          |    let x = [2; 3]
          |    return
@@ -790,7 +790,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Global variable has the same name as local variable: x",
       s"""
          |// assign to immutable array element(contract field)
-         |TxContract Foo(x: [U256; 2]) {
+         |Contract Foo(x: [U256; 2]) {
          |  fn set() -> () {
          |    x[0] = 2
          |    return
@@ -800,7 +800,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Assign to immutable variable: x",
       s"""
          |// assign to immutable array element(local variable)
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let x = [2; 4]
          |    x[0] = 3
@@ -811,7 +811,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Assign to immutable variable: x",
       s"""
          |// out of index
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> (U256) {
          |    let x = [[2; 2]; 4]
          |    return x[1][3]
@@ -821,7 +821,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Invalid array index: 3, array size: 2",
       s"""
          |// out of index
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let mut x = [2; 2]
          |    x[2] = 3
@@ -832,7 +832,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Invalid array index: 2, array size: 2",
       s"""
          |// invalid array element assignment
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let mut x = [1, 2]
          |    x[2] = 2
@@ -843,7 +843,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Invalid array index: 2, array size: 2",
       s"""
          |// invalid array element assignment
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let mut x = [1, 2]
          |    x[0][0] = 2
@@ -854,7 +854,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Expect array type, have: U256",
       s"""
          |// invalid array expression
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let x = [1, 2]
          |    let y = x[0][0]
@@ -865,7 +865,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Expect array type, have: U256", // TODO: improve this error message
       s"""
          |// invalid array expression
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let x = 2
          |    let y = x[0]
@@ -876,7 +876,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Expect array type, have: List(U256)",
       s"""
          |// invalid binary expression(compare array)
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> (Bool) {
          |    let x = [3; 2]
          |    let y = [3; 2]
@@ -887,7 +887,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for Eq",
       s"""
          |// invalid binary expression(add array)
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let x = [2; 2] + [2; 2]
          |    return
@@ -896,7 +896,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Invalid param types List(FixedSizeArray(U256,2), FixedSizeArray(U256,2)) for ArithOperator",
       s"""
          |// assign array element with invalid type
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let mut x = [3i; 2]
          |    x[0] = 3
@@ -906,7 +906,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin ->
         "Assign List(U256) to List(I256)",
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> U256 {
          |    let x = [1; 2]
          |    return x[#00]
@@ -915,7 +915,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin ->
         "Invalid array index type List(ByteVec)",
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let mut x = [1; 2]
          |    x[-1i] = 0
@@ -924,7 +924,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin ->
         "Invalid array index type List(I256)",
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn foo() -> () {
          |    let mut x = [1; 2]
          |    x[1 + 2] = 0
@@ -943,11 +943,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("get array element from array literal")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
-           |    assert!([0, 1, 2][2] == 2)
-           |    assert!(foo()[1] == 1)
-           |    assert!([foo(), foo()][0][0] == 0)
+           |    assert!([0, 1, 2][2] == 2, 0)
+           |    assert!(foo()[1] == 1, 0)
+           |    assert!([foo(), foo()][0][0] == 0, 0)
            |  }
            |
            |  fn foo() -> ([U256; 3]) {
@@ -962,10 +962,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("array constant index")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
            |    let array = [1, 2, 3]
-           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3)
+           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3, 0)
            |  }
            |}
            |""".stripMargin
@@ -976,13 +976,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("assign array element by constant index")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
            |    let mut array = [0; 3]
            |    array[0] = 1
            |    array[1] = 2
            |    array[2] = 3
-           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3)
+           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3, 0)
            |  }
            |}
            |""".stripMargin
@@ -993,13 +993,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("array variable assignment")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
            |    let x = [1, 2, 3]
            |    let mut y = [0; 3]
-           |    assert!(y[0] == 0 && y[1] == 0 && y[2] == 0)
+           |    assert!(y[0] == 0 && y[1] == 0 && y[2] == 0, 0)
            |    y = x
-           |    assert!(y[0] == 1 && y[1] == 2 && y[2] == 3)
+           |    assert!(y[0] == 1 && y[1] == 2 && y[2] == 3, 0)
            |  }
            |}
            |""".stripMargin
@@ -1010,7 +1010,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("assign array element by variable index")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
            |    let mut array = [0; 3]
            |    let mut i = 0
@@ -1018,7 +1018,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |      array[i] = i + 1
            |      i = i + 1
            |    }
-           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3)
+           |    assert!(array[0] == 1 && array[1] == 2 && array[2] == 3, 0)
            |  }
            |}
            |""".stripMargin
@@ -1029,7 +1029,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("array as function params and return values")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test(mut x: [Bool; 2]) -> ([Bool; 2]) {
            |    x[0] = !x[0]
            |    x[1] = !x[1]
@@ -1044,7 +1044,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("get sub array by constant index")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
            |    let array = [[0, 1, 2, 3], [4, 5, 6, 7]]
            |    check(array[0], 0)
@@ -1056,7 +1056,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |      array[0] == v &&
            |      array[1] == v + 1 &&
            |      array[2] == v + 2 &&
-           |      array[3] == v + 3
+           |      array[3] == v + 3,
+           |      0
            |    )
            |  }
            |}
@@ -1068,7 +1069,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("get sub array by variable index")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
            |    let array = [[0, 1, 2, 3], [4, 5, 6, 7]]
            |    let mut i = 0
@@ -1081,7 +1082,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  fn check(array: [U256; 4], v: U256) -> () {
            |    let mut i = 0
            |    while (i < 4) {
-           |      assert!(array[i] == v + i)
+           |      assert!(array[i] == v + i, 0)
            |      i = i + 1
            |    }
            |  }
@@ -1094,7 +1095,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("assign multi-dim array elements by constant index")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
            |    let mut x = [[0; 2]; 2]
            |    x[0][0] = 1
@@ -1103,7 +1104,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    x[1][1] = 4
            |    assert!(
            |      x[0][0] == 1 && x[0][1] == 2 &&
-           |      x[1][0] == 3 && x[1][1] == 4
+           |      x[1][0] == 3 && x[1][1] == 4,
+           |      0
            |    )
            |  }
            |}
@@ -1115,7 +1117,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("assign multi-dim array elements by variable index")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
            |    let mut x = [[0, 1], [2, 3]]
            |    let mut i = 0
@@ -1130,7 +1132,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    }
            |    assert!(
            |      x[0][0] == 1 && x[0][1] == 2 &&
-           |      x[1][0] == 3 && x[1][1] == 4
+           |      x[1][0] == 3 && x[1][1] == 4,
+           |      0
            |    )
            |  }
            |}
@@ -1142,14 +1145,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("assign sub array by constant index")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
            |    let mut x = [[0; 2]; 2]
            |    x[0] = [0, 1]
            |    x[1] = [2, 3]
            |    assert!(
            |      x[0][0] == 0 && x[0][1] == 1 &&
-           |      x[1][0] == 2 && x[1][1] == 3
+           |      x[1][0] == 2 && x[1][1] == 3,
+           |      0
            |    )
            |  }
            |}
@@ -1161,7 +1165,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("assign sub array by variable index")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
            |    let mut x = [[0; 2]; 2]
            |    let mut i = 0
@@ -1171,8 +1175,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    }
            |    i = 0
            |    while (i < 2) {
-           |      assert!(x[i][0] == i)
-           |      assert!(x[i][1] == i + 1)
+           |      assert!(x[i][0] == i, 0)
+           |      assert!(x[i][1] == i + 1, 0)
            |      i = i + 1
            |    }
            |  }
@@ -1185,14 +1189,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("expression as array index")
       val code =
         s"""
-           |TxContract ArrayTest() {
+           |Contract ArrayTest() {
            |  pub fn test() -> () {
            |    let mut x = [0, 1, 2, 3]
            |    let num = 4
-           |    assert!(x[foo()] == 3)
-           |    assert!(x[num / 2] == 2)
-           |    assert!(x[num % 3] == 1)
-           |    assert!(x[num - 4] == 0)
+           |    assert!(x[foo()] == 3, 0)
+           |    assert!(x[num / 2] == 2, 0)
+           |    assert!(x[num % 3] == 1, 0)
+           |    assert!(x[num - 4] == 0, 0)
            |  }
            |
            |  fn foo() -> U256 {
@@ -1207,19 +1211,19 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "avoid using array index variables whenever possible" in {
     val code =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn func0() -> () {
          |    let array0 = [0, 1, 2]
          |    let mut i = 0
          |    while (i < 3) {
-         |      assert!(array0[i] == i)
+         |      assert!(array0[i] == i, 0)
          |      i = i + 1
          |    }
          |
          |    let array1 = [0, 1]
          |    i = 0
          |    while (i < 2) {
-         |      assert!(array1[i] == i)
+         |      assert!(array1[i] == i, 0)
          |      i = i + 1
          |    }
          |  }
@@ -1251,14 +1255,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       instrs = AVector[Instr[StatefulContext]](
         U256Const0, U256Const1, U256Const2, StoreLocal(2), StoreLocal(1), StoreLocal(0),
         U256Const0, StoreLocal(3),
-        LoadLocal(3), U256Const3, U256Lt, IfFalse(14),
-        LoadLocal(3), Dup, U256Const3, U256Lt, Assert, LoadLocalByIndex, LoadLocal(3), U256Eq, Assert,
-        LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-18),
+        LoadLocal(3), U256Const3, U256Lt, IfFalse(15),
+        LoadLocal(3), Dup, U256Const3, U256Lt, Assert, LoadLocalByIndex, LoadLocal(3), U256Eq, U256Const0, AssertWithErrorCode,
+        LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-19),
         U256Const0, U256Const1, StoreLocal(5), StoreLocal(4),
         U256Const0, StoreLocal(3),
-        LoadLocal(3), U256Const2, U256Lt, IfFalse(16),
-        LoadLocal(3), Dup, U256Const2, U256Lt, Assert, U256Const4, U256Add, LoadLocalByIndex, LoadLocal(3), U256Eq, Assert,
-        LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-20)
+        LoadLocal(3), U256Const2, U256Lt, IfFalse(17),
+        LoadLocal(3), Dup, U256Const2, U256Lt, Assert, U256Const4, U256Add, LoadLocalByIndex, LoadLocal(3), U256Eq, U256Const0, AssertWithErrorCode,
+        LoadLocal(3), U256Const1, U256Add, StoreLocal(3), Jump(-21)
       )
     )
     contract.methods(1) is Method[StatefulContext](
@@ -1289,7 +1293,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "abort if variable array index is invalid" in {
     val code =
       s"""
-         |TxContract Foo(foo: U256, mut array: [[U256; 2]; 3]) {
+         |Contract Foo(foo: U256, mut array: [[U256; 2]; 3]) {
          |  pub fn test0() -> () {
          |    let mut x = [1, 2, 3, 4]
          |    let mut i = 0
@@ -1338,7 +1342,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("array fields assignment")
       val code =
         s"""
-           |TxContract ArrayTest(mut array: [[U256; 2]; 4]) {
+           |Contract ArrayTest(mut array: [[U256; 2]; 4]) {
            |  pub fn test(a: [[U256; 2]; 4]) -> () {
            |    array = a
            |    let mut i = 0
@@ -1351,7 +1355,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  fn foo(a: [U256; 2], b:[U256; 2]) -> () {
            |    let mut i = 0
            |    while (i < 2) {
-           |      assert!(a[i] == b[i])
+           |      assert!(a[i] == b[i], 0)
            |      i = i + 1
            |    }
            |  }
@@ -1365,16 +1369,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("create array with side effect")
       val code =
         s"""
-           |TxContract ArrayTest(mut x: U256) {
+           |Contract ArrayTest(mut x: U256) {
            |  pub fn test() -> () {
            |    let array0 = [foo(), foo(), foo()]
-           |    assert!(x == 3)
+           |    assert!(x == 3, 0)
            |
            |    let array1 = [foo(), foo(), foo()][0]
-           |    assert!(x == 6)
+           |    assert!(x == 6, 0)
            |
            |    let array2 = [foo(); 3]
-           |    assert!(x == 9)
+           |    assert!(x == 9, 0)
            |  }
            |
            |  fn foo() -> U256 {
@@ -1390,7 +1394,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("assign array element")
       val code =
         s"""
-           |TxContract ArrayTest(mut array: [[U256; 2]; 4]) {
+           |Contract ArrayTest(mut array: [[U256; 2]; 4]) {
            |  pub fn test() -> () {
            |    let mut i = 0
            |    let mut j = 0
@@ -1407,7 +1411,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    j = 0
            |    while (i < 4) {
            |      while (j < 2) {
-           |        assert!(array[i][j] == i + j)
+           |        assert!(array[i][j] == i + j, 0)
            |        j = j + 1
            |      }
            |      j = 0
@@ -1423,23 +1427,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("avoid executing array indexing instructions multiple times")
       val code =
         s"""
-           |TxContract Foo(mut array: [[U256; 2]; 4], mut x: U256) {
+           |Contract Foo(mut array: [[U256; 2]; 4], mut x: U256) {
            |  pub fn test() -> () {
            |    let mut i = 0
            |    while (i < 4) {
            |      array[foo()] = [x; 2]
            |      i = i + 1
-           |      assert!(x == i)
+           |      assert!(x == i, 0)
            |    }
-           |    assert!(x == 4)
+           |    assert!(x == 4, 0)
            |
            |    i = 0
            |    while (i < 4) {
            |      x = 0
-           |      assert!(array[i][foo()] == i)
-           |      assert!(array[i][foo()] == i)
+           |      assert!(array[i][foo()] == i, 0)
+           |      assert!(array[i][foo()] == i, 0)
            |      i = i + 1
-           |      assert!(x == 2)
+           |      assert!(x == 2, 0)
            |    }
            |  }
            |
@@ -1483,7 +1487,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val codes = Seq(
       s"""
          |// Assign to immutable variable
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn bar() -> (U256, U256) {
          |    return 1, 2
          |  }
@@ -1498,7 +1502,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin,
       s"""
          |// Assign ByteVec to U256
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn bar() -> (U256, ByteVec) {
          |    return 1, #00
          |  }
@@ -1513,7 +1517,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin,
       s"""
          |// Assign (U256, U256) to (U256, U256, U256)
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn bar() -> (U256, U256) {
          |    return 1, 2
          |  }
@@ -1529,7 +1533,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin,
       s"""
          |// Assign (U256, U256, U256) to (U256, U256)
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn bar() -> (U256, U256, U256) {
          |    return 1, 2, 3
          |  }
@@ -1543,7 +1547,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin,
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  fn bar() -> (U256, U256) {
          |    return 1, 2
          |  }
@@ -1564,10 +1568,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("return multiple simple values")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  pub fn test() -> () {
            |    let (a, b) = foo()
-           |    assert!(a == 1 && b)
+           |    assert!(a == 1 && b, 0)
            |  }
            |
            |  fn foo() -> (U256, Bool) {
@@ -1582,7 +1586,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("test return array and simple values")
       val code =
         s"""
-           |TxContract Foo(mut array: [U256; 3]) {
+           |Contract Foo(mut array: [U256; 3]) {
            |  pub fn test() -> () {
            |    array = [1, 2, 3]
            |    let mut x = [[0; 3]; 3]
@@ -1596,7 +1600,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |      x[0][0] == 1 && x[0][1] == 2 && x[0][2] == 3 &&
            |      x[1][0] == 2 && x[1][1] == 3 && x[1][2] == 4 &&
            |      x[2][0] == 4 && x[2][1] == 5 && x[2][2] == 6 &&
-           |      y[0] == 0 && y[1] == 1 && y[2] == 2
+           |      y[0] == 0 && y[1] == 1 && y[2] == 2,
+           |      0
            |    )
            |  }
            |
@@ -1617,13 +1622,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("test return multi-dim array and values")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  pub fn test() -> () {
            |    let (array, i) = foo()
            |    assert!(
            |      array[0][0] == 1 && array[0][1] == 2 && array[0][2] == 3 &&
            |      array[1][0] == 4 && array[1][1] == 5 && array[1][2] == 6 &&
-           |      i == 7
+           |      i == 7,
+           |      0
            |    )
            |  }
            |
@@ -1639,7 +1645,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "return from if block" in new Fixture {
     val code: String =
       s"""
-         |TxContract Foo(mut value: U256) {
+         |Contract Foo(mut value: U256) {
          |  pub fn test() -> U256 {
          |    if (true) {
          |      value = 1
@@ -1657,7 +1663,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "generate efficient code for arrays" in {
     val code =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn foo() -> () {
          |    let mut x = [1, 2, 3, 4]
          |    let y = x[0]
@@ -1696,7 +1702,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |
            |  event Add(a: U256, b: U256)
            |
@@ -1714,7 +1720,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |
            |  event Add1(a: U256, b: U256)
            |  event Add2(a: U256, b: U256)
@@ -1734,7 +1740,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |
            |  event Add(a: U256, b: U256)
            |
@@ -1752,7 +1758,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |
            |  event Add1(a: U256, b: U256)
            |  event Add2(a: U256, b: U256)
@@ -1777,7 +1783,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val contract =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |
            |  event Add(a: U256, b: U256)
            |
@@ -1798,7 +1804,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "test contract inheritance compilation" in {
     val parent =
       s"""
-         |Abstract TxContract Parent(mut x: U256) {
+         |Abstract Contract Parent(mut x: U256) {
          |  event Foo()
          |
          |  pub fn foo() -> () {
@@ -1811,7 +1817,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val child =
         s"""
-           |TxContract Child(mut x: U256, y: U256) extends Parent(x) {
+           |Contract Child(mut x: U256, y: U256) extends Parent(x) {
            |  pub fn bar() -> () {
            |    foo()
            |  }
@@ -1832,7 +1838,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val child =
         s"""
-           |TxContract Child(mut x: U256, y: U256) extends Parent(z) {
+           |Contract Child(mut x: U256, y: U256) extends Parent(z) {
            |  pub fn foo() -> () {
            |  }
            |}
@@ -1849,7 +1855,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val child =
         s"""
-           |TxContract Child(mut x: U256, y: U256) extends Parent(x) {
+           |Contract Child(mut x: U256, y: U256) extends Parent(x) {
            |  pub fn foo() -> () {
            |  }
            |}
@@ -1866,7 +1872,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val child =
         s"""
-           |TxContract Child(mut x: U256, y: U256) extends Parent(x) {
+           |Contract Child(mut x: U256, y: U256) extends Parent(x) {
            |  event Foo()
            |
            |  pub fn bar() -> () {
@@ -1885,7 +1891,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val child =
         s"""
-           |TxContract Child(x: U256, y: U256) extends Parent(x) {
+           |Contract Child(x: U256, y: U256) extends Parent(x) {
            |  pub fn bar() -> () {
            |  }
            |}
@@ -1902,7 +1908,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val child =
         s"""
-           |TxContract Child(mut x: U256, mut y: U256) extends Parent(y) {
+           |Contract Child(mut x: U256, mut y: U256) extends Parent(y) {
            |  pub fn bar() -> () {
            |  }
            |}
@@ -1919,17 +1925,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val code =
         s"""
-           |TxContract A(x: U256) extends B(x) {
+           |Contract A(x: U256) extends B(x) {
            |  fn a() -> () {
            |  }
            |}
            |
-           |TxContract B(x: U256) extends C(x) {
+           |Contract B(x: U256) extends C(x) {
            |  fn b() -> () {
            |  }
            |}
            |
-           |TxContract C(x: U256) extends A(x) {
+           |Contract C(x: U256) extends A(x) {
            |  fn c() -> () {
            |  }
            |}
@@ -1944,7 +1950,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val code =
         s"""
-           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |Contract Child(mut x: U256) extends Parent0(x), Parent1(x) {
            |  pub fn foo() -> () {
            |    p0(true, true)
            |    p1(true, true, true)
@@ -1952,7 +1958,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |
-           |TxContract Grandparent(mut x: U256) {
+           |Contract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
            |  fn gp(a: Bool) -> () {
@@ -1961,13 +1967,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |
-           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |Abstract Contract Parent0(mut x: U256) extends Grandparent(x) {
            |  fn p0(a: Bool, b: Bool) -> () {
            |    gp(a)
            |  }
            |}
            |
-           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |Abstract Contract Parent1(mut x: U256) extends Grandparent(x) {
            |  fn p1(a: Bool, b: Bool, c: Bool) -> () {
            |    gp(a)
            |  }
@@ -2022,7 +2028,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val bar =
         s"""
-           |TxContract Bar() implements Foo {
+           |Contract Bar() implements Foo {
            |  pub fn foo() -> () {
            |    return
            |  }
@@ -2064,7 +2070,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       val code =
         s"""
-           |TxContract Foo() implements C {
+           |Contract Foo() implements C {
            |  pub fn c(x: Bool, y: Bool) -> () {}
            |  pub fn a() -> () {}
            |  pub fn b(x: Bool) -> () {}
@@ -2078,7 +2084,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |$c
            |""".stripMargin
       val contract =
-        Compiler.compileMultiContract(code).rightValue.contracts(0).asInstanceOf[Ast.TxContract]
+        Compiler.compileMultiContract(code).rightValue.contracts(0).asInstanceOf[Ast.Contract]
       contract.funcs.map(_.args.length) is Seq(0, 1, 2, 3)
     }
 
@@ -2086,7 +2092,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Contract inherits both interface and contract")
       val foo1: String =
         s"""
-           |Abstract TxContract Foo1() {
+           |Abstract Contract Foo1() {
            |  fn foo1() -> () {}
            |}
            |""".stripMargin
@@ -2098,7 +2104,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val bar1: String =
         s"""
-           |TxContract Bar1() extends Foo1() implements Foo2 {
+           |Contract Bar1() extends Foo1() implements Foo2 {
            |  fn foo2() -> () {}
            |}
            |$foo1
@@ -2106,7 +2112,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val bar2: String =
         s"""
-           |TxContract Bar2() extends Foo1() implements Foo2 {
+           |Contract Bar2() extends Foo1() implements Foo2 {
            |  fn foo2() -> () {}
            |}
            |$foo1
@@ -2169,7 +2175,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "check if contract assets is used in the function" in {
     def code(useAssetsInContract: Boolean = false, instr: String = "return"): String =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  @using(assetsInContract = $useAssetsInContract)
          |  fn foo() -> () {
          |    $instr
@@ -2229,7 +2235,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val eventStr = if (nineFields) ", a9: U256" else ""
       val emitStr  = if (nineFields) ", 9" else ""
       s"""
-         |TxContract Foo(tmp: U256) {
+         |Contract Foo(tmp: U256) {
          |  event Foo(a1: U256, a2: U256, a3: U256, a4: U256, a5: U256, a6: U256, a7: U256, a8: U256 $eventStr)
          |
          |  pub fn foo() -> () {
@@ -2251,7 +2257,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Simple if statement")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo() -> () {
            |    if (true) {
            |      return
@@ -2267,7 +2273,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Simple if statement without return")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo() -> U256 {
            |    if (true) {
            |      return 1
@@ -2283,7 +2289,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Invalid type of condition expr")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo() -> U256 {
            |    if (0) {
            |      return 0
@@ -2301,7 +2307,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Simple if-else statement")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo() -> () {
            |    if (true) {
            |      return
@@ -2319,7 +2325,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Simple if-else-if statement")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo() -> () {
            |    if (true) {
            |      return
@@ -2349,7 +2355,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Invalid if-else-if statement")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo() -> () {
            |    if (true) {
            |      return
@@ -2366,7 +2372,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     new Fixture {
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  pub fn foo(x: U256) -> (U256) {
            |    if (x == 1) {
            |      return 1
@@ -2390,7 +2396,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Simple if expression")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo() -> U256 {
            |    return if (true) 0 else 1
            |  }
@@ -2412,7 +2418,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Simple if-else-if expression")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo() -> U256 {
            |    return if (false) 0 else if (true) 1 else 2
            |  }
@@ -2438,7 +2444,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Invalid if-else expression types")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo() -> U256 {
            |    return if (false) 1 else #00
            |  }
@@ -2453,7 +2459,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("If-else expressions have no else branch")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo() -> U256 {
            |    return if (false) 1
            |  }
@@ -2468,7 +2474,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Invalid type of condition expr")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo() -> U256 {
            |    return if (0) 0 else 1
            |  }
@@ -2482,7 +2488,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     new Fixture {
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  pub fn foo(x: U256) -> U256 {
            |    return if (x == 1) 1 else if (x == 0) 10 else 100
            |  }
@@ -2498,7 +2504,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "compile contract constant variables failed" in {
     val code =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  const C = 0
          |  const C = true
          |  pub fn foo() -> () {}
@@ -2509,23 +2515,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test contract constant variables" in new Fixture {
-    def foo(isAbstract: Boolean) = {
-      val `abstract` = if (isAbstract) "Abstract " else ""
-      s"""
-         |${`abstract`}TxContract Foo() {
-         |  const C0 = 0
-         |  const C1 = #00
-         |  pub fn foo() -> () {
-         |    assert!(C0 == 0)
-         |    assert!(C1 == #00)
-         |  }
-         |}
-         |""".stripMargin
-    }
-
     {
       info("Contract constant variables")
-      test(foo(false))
+      val foo =
+        s"""
+           |Abstract Contract Foo() {
+           |  const C0 = 0
+           |  const C1 = #00
+           |  pub fn foo() -> () {
+           |    assert!(C0 == 0, 0)
+           |    assert!(C1 == #00, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(foo)
     }
 
     {
@@ -2533,20 +2536,24 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val address = Address.p2pkh(PublicKey.generate).toBase58
       val bar =
         s"""
-           |TxContract Bar() extends Foo() {
+           |Contract Bar() extends Foo() {
            |  const C2 = 1i
            |  const C3 = @$address
            |  pub fn bar() -> () {
-           |    assert!(C0 == 0)
-           |    assert!(C1 == #00)
-           |    assert!(C2 == 1i)
-           |    assert!(C3 == @$address)
+           |    assert!(C0 == 0, 0)
+           |    assert!(C1 == #00, 0)
+           |    assert!(C2 == 1i, 0)
+           |    assert!(C3 == @$address, 0)
            |  }
            |}
-           |${foo(true)}
+           |
+           |Abstract Contract Foo() {
+           |  const C0 = 0
+           |  const C1 = #00
+           |}
            |""".stripMargin
+
       test(bar, methodIndex = 0)
-      test(bar, methodIndex = 1)
     }
   }
 
@@ -2555,7 +2562,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Duplicated enum definitions")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  enum ErrorCodes {
            |    Error0 = 0
            |  }
@@ -2573,7 +2580,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Enum field does not exist")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  enum ErrorCodes {
            |    Error0 = 0
            |  }
@@ -2588,47 +2595,49 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test contract enums" in new Fixture {
-    def foo(isAbstract: Boolean): String = {
-      val `abstract` = if (isAbstract) "Abstract " else ""
-      s"""
-         |${`abstract`}TxContract Foo() {
-         |  enum FooErrorCodes {
-         |    Error0 = 0
-         |    Error1 = 1
-         |  }
-         |  pub fn foo() -> () {
-         |    assert!(FooErrorCodes.Error0 == 0)
-         |    assert!(FooErrorCodes.Error1 == 1)
-         |  }
-         |}
-         |""".stripMargin
-    }
-
     {
       info("Contract enums")
-      test(foo(false))
+      val foo =
+        s"""
+           |Abstract Contract Foo() {
+           |  enum FooErrorCodes {
+           |    Error0 = 0
+           |    Error1 = 1
+           |  }
+           |  pub fn foo() -> () {
+           |    assert!(FooErrorCodes.Error0 == 0, 0)
+           |    assert!(FooErrorCodes.Error1 == 1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(foo)
     }
 
     {
       info("Inherit enums from parents")
       val bar =
         s"""
-           |TxContract Bar() extends Foo() {
+           |Contract Bar() extends Foo() {
            |  enum BarValues {
            |    Value0 = #00
            |    Value1 = #01
            |  }
            |  pub fn bar() -> () {
-           |    assert!(FooErrorCodes.Error0 == 0)
-           |    assert!(FooErrorCodes.Error1 == 1)
-           |    assert!(BarValues.Value0 == #00)
-           |    assert!(BarValues.Value1 == #01)
+           |    assert!(FooErrorCodes.Error0 == 0, 0)
+           |    assert!(FooErrorCodes.Error1 == 1, 0)
+           |    assert!(BarValues.Value0 == #00, 0)
+           |    assert!(BarValues.Value1 == #01, 0)
            |  }
            |}
-           |${foo(true)}
+           |
+           |Abstract Contract Foo() {
+           |  enum FooErrorCodes {
+           |    Error0 = 0
+           |    Error1 = 1
+           |  }
+           |}
            |""".stripMargin
       test(bar, methodIndex = 0)
-      test(bar, methodIndex = 1)
     }
   }
 
@@ -2673,7 +2682,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  foo(a)
            |
            |  fn foo(v: U256) -> () {
-           |    assert!(v == 0)
+           |    assert!(v == 0, 0)
            |  }
            |}
            |""".stripMargin
@@ -2682,10 +2691,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Check unused local variables in TxContract")
+      info("Check unused local variables in Contract")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 0
@@ -2698,10 +2707,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Check unused fields in TxContract")
+      info("Check unused fields in Contract")
       val code =
         s"""
-           |TxContract Foo(a: ByteVec, b: U256, c: [U256; 2]) {
+           |Contract Foo(a: ByteVec, b: U256, c: [U256; 2]) {
            |  fn getB() -> U256 {
            |    return b
            |  }
@@ -2712,56 +2721,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Check unused constants in TxContract")
-      val code =
-        s"""
-           |TxContract Foo() {
-           |  const C0 = 0
-           |  const C1 = 1
-           |  fn foo() -> () {
-           |    assert!(C1 == 1)
-           |  }
-           |}
-           |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Found unused constants: C0"
-    }
-
-    {
-      info("Check unused enums in TxContract")
-      val code =
-        s"""
-           |TxContract Foo() {
-           |  enum Chain {
-           |    Alephium = 0
-           |    Eth = 1
-           |  }
-           |
-           |  enum Language {
-           |    Ralph = #00
-           |    Solidity = #01
-           |  }
-           |
-           |  fn foo() -> () {
-           |    assert!(Chain.Alephium == 0)
-           |    assert!(Language.Ralph == #00)
-           |  }
-           |}
-           |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Found unused constants: Language.Solidity, Chain.Eth"
-    }
-
-    {
       info("Check unused fields in contract inheritance")
       val code =
         s"""
-           |TxContract Foo(a: U256, b: U256, c: [U256; 2]) extends Bar(a, b) {
+           |Contract Foo(a: U256, b: U256, c: [U256; 2]) extends Bar(a, b) {
            |  pub fn foo() -> () {
            |  }
            |}
            |
-           |Abstract TxContract Bar(a: U256, b: U256) {
+           |Abstract Contract Bar(a: U256, b: U256) {
            |  pub fn bar() -> U256 {
            |    return a
            |  }
@@ -2777,7 +2745,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Single anonymous variable")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  pub fn foo() -> () {
            |    let _ = 0
            |  }
@@ -2794,7 +2762,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Pop values for simple anonymous variables")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  pub fn foo() -> U256 {
            |    let (_, a, _) = bar()
            |    return a
@@ -2820,20 +2788,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Pop values for anonymous array variables")
       val code =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  pub fn foo() -> () {
            |    let (a, b, c, d) = bar()
-           |    assert!(a == 0 && b[0] == 1 && b[1] == 2 && c== 3)
-           |    assert!(d[0][0] == 4 && d[0][1] == 5 && d[1][0] == 6 && d[1][1] == 7)
+           |    assert!(a == 0 && b[0] == 1 && b[1] == 2 && c== 3, 0)
+           |    assert!(d[0][0] == 4 && d[0][1] == 5 && d[1][0] == 6 && d[1][1] == 7, 0)
            |
            |    let (e, _, f, _) = bar()
-           |    assert!(e == 0 && f == 3)
+           |    assert!(e == 0 && f == 3, 0)
            |
            |    let (_, g, _, _) = bar()
-           |    assert!(g[0] == 1 && g[1] == 2)
+           |    assert!(g[0] == 1 && g[1] == 2, 0)
            |
            |    let (_, _, _, h) = bar()
-           |    assert!(h[0][0] == 4 && h[0][1] == 5 && h[1][0] == 6 && h[1][1] == 7)
+           |    assert!(h[0][0] == 4 && h[0][1] == 5 && h[1][0] == 6 && h[1][1] == 7, 0)
            |  }
            |
            |  pub fn bar() -> (U256, [U256; 2], U256, [[U256; 2]; 2]) {
@@ -2843,5 +2811,43 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       test(code, AVector.empty)
     }
+  }
+
+  it should "not generate code if contract have unimplemented functions" in {
+    val foo =
+      s"""
+         |Abstract Contract Foo() {
+         |  pub fn foo() -> ()
+         |  pub fn bar() -> ()
+         |}
+         |""".stripMargin
+    Compiler.compileContract(foo).leftValue.message is
+      "These functions are not implemented in contract Foo: foo,bar"
+  }
+
+  "unused constants and enums" should "have no effect on code generation" in {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    val bar =
+      s"""
+         |Contract Bar() {
+         |  const C0 = 0
+         |  const C1 = 1
+         |  enum Errors {
+         |    Error0 = 0
+         |    Error1 = 1
+         |  }
+         |  pub fn bar() -> () {}
+         |}
+         |""".stripMargin
+
+    val fooContract = Compiler.compileContract(foo).rightValue
+    val barContract = Compiler.compileContract(bar).rightValue
+    fooContract is barContract
   }
 }

@@ -5737,7 +5737,7 @@
                 "$ref": "#/components/schemas/Contract"
               },
               "example": {
-                "code": "TxContract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+                "code": "Contract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
               }
             }
           },
@@ -5754,7 +5754,7 @@
                   "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
-                    "signature": "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+                    "signature": "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
                     "names": [
                       "aa",
                       "bb",

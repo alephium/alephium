@@ -87,7 +87,7 @@ class VMSpec extends AlephiumSpec {
 
     lazy val input0 =
       s"""
-         |TxContract Foo(mut x: U256) {
+         |Contract Foo(mut x: U256) {
          |  $access fn add(a: U256) -> () {
          |    x = x + a
          |    if (a > 0) {
@@ -110,7 +110,7 @@ class VMSpec extends AlephiumSpec {
 
     lazy val input1 =
       s"""
-         |TxContract Foo(mut x: U256) {
+         |Contract Foo(mut x: U256) {
          |  pub fn add(a: U256) -> () {
          |    x = x + a
          |    if (a > 0) {
@@ -281,7 +281,7 @@ class VMSpec extends AlephiumSpec {
   it should "disallow loading upgraded contract in current tx" in new ContractFixture {
     val fooV1Code =
       s"""
-         |TxContract FooV1() {
+         |Contract FooV1() {
          |  pub fn foo() -> () {}
          |}
          |""".stripMargin
@@ -289,7 +289,7 @@ class VMSpec extends AlephiumSpec {
 
     val fooV0Code =
       s"""
-         |TxContract FooV0() {
+         |Contract FooV0() {
          |  pub fn upgrade() -> () {
          |    migrate!(#${Hex.toHexString(serialize(fooV1))})
          |  }
@@ -319,7 +319,7 @@ class VMSpec extends AlephiumSpec {
   it should "burn token" in new ContractFixture {
     val contract =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn mint() -> () {
          |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), 2 alph)
@@ -372,7 +372,7 @@ class VMSpec extends AlephiumSpec {
   it should "lock assets" in new ContractFixture {
     val token =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn mint() -> () {
          |    transferTokenFromSelf!(@$genesisAddress, selfTokenId!(), 10 alph)
@@ -448,7 +448,7 @@ class VMSpec extends AlephiumSpec {
   it should "not use up contract assets" in new ContractFixture {
     val input =
       """
-        |TxContract Foo() {
+        |Contract Foo() {
         |  @using(assetsInContract = true)
         |  pub fn foo(address: Address) -> () {
         |    transferAlphFromSelf!(address, alphRemaining!(selfAddress!()))
@@ -475,7 +475,7 @@ class VMSpec extends AlephiumSpec {
   it should "use latest worldstate when call external functions" in new ContractFixture {
     val input0 =
       s"""
-         |TxContract Foo(mut x: U256) {
+         |Contract Foo(mut x: U256) {
          |  pub fn get() -> (U256) {
          |    return x
          |  }
@@ -487,7 +487,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |
-         |TxContract Bar() {
+         |Contract Bar() {
          |  pub fn bar(foo: ByteVec) -> (U256) {
          |    return Foo(foo).get() + 100
          |  }
@@ -498,13 +498,13 @@ class VMSpec extends AlephiumSpec {
 
     val input1 =
       s"""
-         |TxContract Bar() {
+         |Contract Bar() {
          |  pub fn bar(foo: ByteVec) -> (U256) {
          |    return Foo(foo).get() + 100
          |  }
          |}
          |
-         |TxContract Foo(mut x: U256) {
+         |Contract Foo(mut x: U256) {
          |  pub fn get() -> (U256) {
          |    return x
          |  }
@@ -528,7 +528,7 @@ class VMSpec extends AlephiumSpec {
          |  foo.foo(#${contractKey0.toHexString}, #${contractKey1.toHexString})
          |}
          |
-         |TxContract Foo(mut x: U256) {
+         |Contract Foo(mut x: U256) {
          |  pub fn get() -> (U256) {
          |    return x
          |  }
@@ -560,7 +560,7 @@ class VMSpec extends AlephiumSpec {
   it should "issue new token" in new ContractFixture {
     val input =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn foo() -> () {
          |    return
          |  }
@@ -600,56 +600,56 @@ class VMSpec extends AlephiumSpec {
          |    i = i + 1
          |  }
          |  let r = x ⊗ y
-         |  assert!(r == $out)
+         |  assert!(r == $out, 0)
          |
          |  test()
          |
          |  fn test() -> () {
-         |    assert!((33 + 2 - 3) * 5 / 7 % 11 == 0)
+         |    assert!((33 + 2 - 3) * 5 / 7 % 11 == 0, 0)
          |
          |    let x = 0
          |    let y = 1
-         |    assert!(x << 1 == 0)
-         |    assert!(x >> 1 == 0)
-         |    assert!(y << 1 == 2)
-         |    assert!(y >> 1 == 0)
-         |    assert!(y << 255 != 0)
-         |    assert!(y << 256 == 0)
-         |    assert!(x & x == 0)
-         |    assert!(x & y == 0)
-         |    assert!(y & y == 1)
-         |    assert!(x | x == 0)
-         |    assert!(x | y == 1)
-         |    assert!(y | y == 1)
-         |    assert!(x ^ x == 0)
-         |    assert!(x ^ y == 1)
-         |    assert!(y ^ y == 0)
+         |    assert!(x << 1 == 0, 0)
+         |    assert!(x >> 1 == 0, 0)
+         |    assert!(y << 1 == 2, 0)
+         |    assert!(y >> 1 == 0, 0)
+         |    assert!(y << 255 != 0, 0)
+         |    assert!(y << 256 == 0, 0)
+         |    assert!(x & x == 0, 0)
+         |    assert!(x & y == 0, 0)
+         |    assert!(y & y == 1, 0)
+         |    assert!(x | x == 0, 0)
+         |    assert!(x | y == 1, 0)
+         |    assert!(y | y == 1, 0)
+         |    assert!(x ^ x == 0, 0)
+         |    assert!(x ^ y == 1, 0)
+         |    assert!(y ^ y == 0, 0)
          |
-         |    assert!((x < y) == true)
-         |    assert!((x <= y) == true)
-         |    assert!((x < x) == false)
-         |    assert!((x <= x) == true)
-         |    assert!((x > y) == false)
-         |    assert!((x >= y) == false)
-         |    assert!((x > x) == false)
-         |    assert!((x >= x) == true)
+         |    assert!((x < y) == true, 0)
+         |    assert!((x <= y) == true, 0)
+         |    assert!((x < x) == false, 0)
+         |    assert!((x <= x) == true, 0)
+         |    assert!((x > y) == false, 0)
+         |    assert!((x >= y) == false, 0)
+         |    assert!((x > x) == false, 0)
+         |    assert!((x >= x) == true, 0)
          |
-         |    assert!((true && true) == true)
-         |    assert!((true && false) == false)
-         |    assert!((false && false) == false)
-         |    assert!((true || true) == true)
-         |    assert!((true || false) == true)
-         |    assert!((false || false) == false)
+         |    assert!((true && true) == true, 0)
+         |    assert!((true && false) == false, 0)
+         |    assert!((false && false) == false, 0)
+         |    assert!((true || true) == true, 0)
+         |    assert!((true || false) == true, 0)
+         |    assert!((false || false) == false, 0)
          |
-         |    assert!(!true == false)
-         |    assert!(!false == true)
+         |    assert!(!true == false, 0)
+         |    assert!(!false == true, 0)
          |  }
          |}
          |""".stripMargin
     // scalastyle:on no.equal
 
     testSimpleScript(expect(1))
-    failSimpleScript(expect(2), AssertionFailed)
+    failSimpleScript(expect(2), AssertionFailedWithErrorCode(None, 0))
   }
   // scalastyle:on method.length
 
@@ -667,21 +667,21 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript ByteVecTest {
-         |  assert!(toByteVec!(true) == #${encode(true)})
-         |  assert!(toByteVec!(false) == #${encode(false)})
-         |  assert!(toByteVec!(${i256}i) == #${encode(i256)})
-         |  assert!(toByteVec!(${u256}) == #${encode(u256)})
-         |  assert!(toByteVec!(@${address.toBase58}) == #${encode(address.lockupScript)})
-         |  assert!(# ++ #$bytes0 == #$bytes0)
-         |  assert!(#$bytes0 ++ # == #$bytes0)
-         |  assert!((#${bytes0} ++ #${bytes1}) == #${bytes0 ++ bytes1})
-         |  assert!(size!(toByteVec!(true)) == 1)
-         |  assert!(size!(toByteVec!(false)) == 1)
-         |  assert!(size!(toByteVec!(@${address.toBase58})) == 33)
-         |  assert!(size!(#${bytes0} ++ #${bytes1}) == 64)
-         |  assert!(zeros!(2) == #0000)
-         |  assert!(nullAddress!() == @${Address.contract(ContractId.zero)})
-         |  assert!(nullAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq)
+         |  assert!(toByteVec!(true) == #${encode(true)}, 0)
+         |  assert!(toByteVec!(false) == #${encode(false)}, 0)
+         |  assert!(toByteVec!(${i256}i) == #${encode(i256)}, 0)
+         |  assert!(toByteVec!(${u256}) == #${encode(u256)}, 0)
+         |  assert!(toByteVec!(@${address.toBase58}) == #${encode(address.lockupScript)}, 0)
+         |  assert!(# ++ #$bytes0 == #$bytes0, 0)
+         |  assert!(#$bytes0 ++ # == #$bytes0, 0)
+         |  assert!((#${bytes0} ++ #${bytes1}) == #${bytes0 ++ bytes1}, 0)
+         |  assert!(size!(toByteVec!(true)) == 1, 0)
+         |  assert!(size!(toByteVec!(false)) == 1, 0)
+         |  assert!(size!(toByteVec!(@${address.toBase58})) == 33, 0)
+         |  assert!(size!(#${bytes0} ++ #${bytes1}) == 64, 0)
+         |  assert!(zeros!(2) == #0000, 0)
+         |  assert!(nullAddress!() == @${Address.contract(ContractId.zero)}, 0)
+         |  assert!(nullAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, 0)
          |}
          |""".stripMargin
 
@@ -693,10 +693,10 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript ByteVecTest {
-         |  assert!(toI256!(1) == 1i)
-         |  assert!(toU256!(1i) == 1)
-         |  assert!(toByteVec!(true) == #01)
-         |  assert!(toByteVec!(false) == #00)
+         |  assert!(toI256!(1) == 1i, 0)
+         |  assert!(toU256!(1i) == 1, 0)
+         |  assert!(toByteVec!(true) == #01, 0)
+         |  assert!(toByteVec!(false) == #00, 0)
          |}
          |""".stripMargin
 
@@ -706,7 +706,7 @@ class VMSpec extends AlephiumSpec {
   it should "test CopyCreateContractWithToken instruction" in new ContractFixture {
     val fooContract =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn foo() -> () {
          |  }
          |}
@@ -748,20 +748,20 @@ class VMSpec extends AlephiumSpec {
 
     val foo =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn foo(fooId: ByteVec, fooHash: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barHash: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
-         |    assert!(selfContractId!() == fooId)
-         |    assert!(contractInitialStateHash!(fooId) == fooHash)
-         |    assert!(contractInitialStateHash!(barId) == barHash)
-         |    assert!(contractCodeHash!(fooId) == fooCodeHash)
-         |    assert!(contractCodeHash!(barId) == barCodeHash)
-         |    assert!(callerContractId!() == barId)
-         |    assert!(callerAddress!() == barAddress)
-         |    assert!(callerInitialStateHash!() == barHash)
-         |    assert!(callerCodeHash!() == barCodeHash)
-         |    assert!(isCalledFromTxScript!() == false)
-         |    assert!(isAssetAddress!(barAddress) == false)
-         |    assert!(isContractAddress!(barAddress) == true)
+         |    assert!(selfContractId!() == fooId, 0)
+         |    assert!(contractInitialStateHash!(fooId) == fooHash, 0)
+         |    assert!(contractInitialStateHash!(barId) == barHash, 0)
+         |    assert!(contractCodeHash!(fooId) == fooCodeHash, 0)
+         |    assert!(contractCodeHash!(barId) == barCodeHash, 0)
+         |    assert!(callerContractId!() == barId, 0)
+         |    assert!(callerAddress!() == barAddress, 0)
+         |    assert!(callerInitialStateHash!() == barHash, 0)
+         |    assert!(callerCodeHash!() == barCodeHash, 0)
+         |    assert!(isCalledFromTxScript!() == false, 0)
+         |    assert!(isAssetAddress!(barAddress) == false, 0)
+         |    assert!(isContractAddress!(barAddress) == true, 0)
          |  }
          |}
          |""".stripMargin
@@ -769,19 +769,19 @@ class VMSpec extends AlephiumSpec {
 
     val bar =
       s"""
-         |TxContract Bar() {
+         |Contract Bar() {
          |  @using(preapprovedAssets = true)
          |  pub fn bar(fooId: ByteVec, fooHash: ByteVec, fooCodeHash: ByteVec, barId: ByteVec, barHash: ByteVec, barCodeHash: ByteVec, barAddress: Address) -> () {
-         |    assert!(selfContractId!() == barId)
-         |    assert!(selfAddress!() == barAddress)
-         |    assert!(contractInitialStateHash!(fooId) == fooHash)
-         |    assert!(contractInitialStateHash!(barId) == barHash)
+         |    assert!(selfContractId!() == barId, 0)
+         |    assert!(selfAddress!() == barAddress, 0)
+         |    assert!(contractInitialStateHash!(fooId) == fooHash, 0)
+         |    assert!(contractInitialStateHash!(barId) == barHash, 0)
          |    Foo(#$fooId).foo(fooId, fooHash, fooCodeHash, barId, barHash, barCodeHash, barAddress)
-         |    assert!(isCalledFromTxScript!() == true)
-         |    assert!(isPaying!(@$genesisAddress) == true)
-         |    assert!(isPaying!(selfAddress!()) == false)
-         |    assert!(isAssetAddress!(@$genesisAddress) == true)
-         |    assert!(isContractAddress!(@$genesisAddress) == false)
+         |    assert!(isCalledFromTxScript!() == true, 0)
+         |    assert!(isPaying!(@$genesisAddress) == true, 0)
+         |    assert!(isPaying!(selfAddress!()) == false, 0)
+         |    assert!(isAssetAddress!(@$genesisAddress) == true, 0)
+         |    assert!(isContractAddress!(@$genesisAddress) == false, 0)
          |  }
          |}
          |
@@ -794,7 +794,7 @@ class VMSpec extends AlephiumSpec {
          |TxScript Main {
          |  Bar(#$barId).bar{ @$genesisAddress -> 1 alph }(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
          |  copyCreateContract!{ @$genesisAddress -> 1 alph }(#$fooId, #$state)
-         |  assert!(isPaying!(@$genesisAddress) == true)
+         |  assert!(isPaying!(@$genesisAddress) == true, 0)
          |}
          |
          |$bar
@@ -822,7 +822,7 @@ class VMSpec extends AlephiumSpec {
          |@using(preapprovedAssets = false)
          |TxScript Main {
          |  let address = contractIdToAddress!(#${contractId.toHexString})
-         |  assert!(byteVecToAddress!(#$addressHex) == address)
+         |  assert!(byteVecToAddress!(#$addressHex) == address, 0)
          |}
          |""".stripMargin
     }
@@ -861,7 +861,7 @@ class VMSpec extends AlephiumSpec {
   it should "destroy contract" in new DestroyFixture {
     val foo =
       s"""
-         |TxContract Foo(mut x: U256) {
+         |Contract Foo(mut x: U256) {
          |  @using(assetsInContract = true)
          |  pub fn destroy(targetAddress: Address) -> () {
          |    x = x + 1
@@ -916,7 +916,7 @@ class VMSpec extends AlephiumSpec {
   it should "not destroy a contract after approving assets" in new DestroyFixture {
     def buildFoo(useAssetsInContract: Boolean) =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  @using(assetsInContract = $useAssetsInContract)
          |  pub fn destroy(targetAddress: Address) -> () {
          |    approveAlph!(selfAddress!(), 2 alph)
@@ -944,7 +944,7 @@ class VMSpec extends AlephiumSpec {
   it should "migrate contract" in new DestroyFixture {
     val fooV1 =
       s"""
-         |TxContract Foo(x: Bool) {
+         |Contract Foo(x: Bool) {
          |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
          |    // in practice, we should check the permission for migration
          |    if (!changeState) {
@@ -955,14 +955,14 @@ class VMSpec extends AlephiumSpec {
          |  }
          |
          |  pub fn checkX(expected: Bool) -> () {
-         |    assert!(x == expected)
+         |    assert!(x == expected, 0)
          |  }
          |}
          |""".stripMargin
     val (fooId, _) = prepareContract(fooV1, AVector[Val](Val.True))
     val fooV2 =
       s"""
-         |TxContract Foo(x: Bool) {
+         |Contract Foo(x: Bool) {
          |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
          |    if (changeState) {
          |      migrateWithFields!(code, #010000)
@@ -972,7 +972,7 @@ class VMSpec extends AlephiumSpec {
          |  }
          |
          |  pub fn checkX(expected: Bool) -> () {
-         |    assert!(x == expected)
+         |    assert!(x == expected, 0)
          |  }
          |}
          |""".stripMargin
@@ -1026,7 +1026,7 @@ class VMSpec extends AlephiumSpec {
   it should "call contract destroy function from another contract" in new DestroyFixture {
     val foo =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn destroy(targetAddress: Address) -> () {
          |    destroySelf!(targetAddress) // in practice, the contract should check the caller before destruction
@@ -1038,7 +1038,7 @@ class VMSpec extends AlephiumSpec {
 
     val bar =
       s"""
-         |TxContract Bar() {
+         |Contract Bar() {
          |  pub fn bar(targetAddress: Address) -> () {
          |    Foo(#$fooId).destroy(targetAddress) // in practice, the contract should check the caller before destruction
          |  }
@@ -1064,7 +1064,7 @@ class VMSpec extends AlephiumSpec {
   it should "not call contract destroy function from the same contract" in new DestroyFixture {
     val foo =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn foo(targetAddress: Address) -> () {
          |    approveAlph!(selfAddress!(), alphRemaining!(selfAddress!()))
@@ -1099,9 +1099,9 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!(networkId!() == #02)
-         |  assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis})
-         |  assert!(blockTarget!() == ${latestHeader.target.value})
+         |  assert!(networkId!() == #02, 0)
+         |  assert!(blockTimeStamp!() >= ${latestHeader.timestamp.millis}, 0)
+         |  assert!(blockTarget!() == ${latestHeader.target.value}, 0)
          |}
          |""".stripMargin
 
@@ -1123,9 +1123,9 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript TxEnv {
-         |  assert!(txId!() != #${zeroId.toHexString})
-         |  assert!(txInputAddress!($index) == @${genesisAddress.toBase58})
-         |  assert!(txInputsSize!() == 1)
+         |  assert!(txId!() != #${zeroId.toHexString}, 0)
+         |  assert!(txInputAddress!($index) == @${genesisAddress.toBase58}, 0)
+         |  assert!(txInputsSize!() == 1, 0)
          |}
          |""".stripMargin
     testSimpleScript(main(0))
@@ -1137,8 +1137,8 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!(dustAmount!() == 0.001 alph)
-         |  assert!(dustAmount!() == $dustUtxoAmount)
+         |  assert!(dustAmount!() == 0.001 alph, 0)
+         |  assert!(dustAmount!() == $dustUtxoAmount, 0)
          |}
          |""".stripMargin
     testSimpleScript(main)
@@ -1151,14 +1151,14 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!(blake2b!(#$input) == #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a)
-         |  assert!(blake2b!(#$input) != #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b370)
-         |  assert!(keccak256!(#$input) == #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E3C)
-         |  assert!(keccak256!(#$input) != #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E30)
-         |  assert!(sha256!(#$input) == #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A9A)
-         |  assert!(sha256!(#$input) != #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A90)
-         |  assert!(sha3!(#$input) == #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed743)
-         |  assert!(sha3!(#$input) != #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed740)
+         |  assert!(blake2b!(#$input) == #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b37a, 0)
+         |  assert!(blake2b!(#$input) != #8947bee8a082f643a8ceab187d866e8ec0be8c2d7d84ffa8922a6db77644b370, 0)
+         |  assert!(keccak256!(#$input) == #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E3C, 0)
+         |  assert!(keccak256!(#$input) != #2744686CE50A2A5AE2A94D18A3A51149E2F21F7EEB4178DE954A2DFCADC21E30, 0)
+         |  assert!(sha256!(#$input) == #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A9A, 0)
+         |  assert!(sha256!(#$input) != #6D1103674F29502C873DE14E48E9E432EC6CF6DB76272C7B0DAD186BB92C9A90, 0)
+         |  assert!(sha3!(#$input) == #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed743, 0)
+         |  assert!(sha3!(#$input) != #f5ad69e6b85ae4a51264df200c2bd19fbc337e4160c77dfaa1ea98cbae8ed740, 0)
          |}
          |""".stripMargin
     testSimpleScript(main)
@@ -1191,14 +1191,14 @@ class VMSpec extends AlephiumSpec {
          |TxScript Main {
          |  let address = ethEcRecover!(#${Hex.toHexString(messageHash)},
          |    #${Hex.toHexString(signature)})
-         |  assert!(address == #${Hex.toHexString(address)})
+         |  assert!(address == #${Hex.toHexString(address)}, 0)
          |}
          |""".stripMargin
     testSimpleScript(main(messageHash.bytes, signature, address))
     failSimpleScript(main(signature, messageHash.bytes, address), FailedInRecoverEthAddress)
     failSimpleScript(
       main(messageHash.bytes, signature, Hash.random.bytes.take(20)),
-      AssertionFailed
+      AssertionFailedWithErrorCode(None, 0)
     )
   }
 
@@ -1236,7 +1236,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!($func($number) == #$hex)
+         |  assert!($func($number) == #$hex, 0)
          |}
          |""".stripMargin
     }
@@ -1248,7 +1248,7 @@ class VMSpec extends AlephiumSpec {
       failSimpleScript(main(name, size + 1), InvalidConversion(number, Val.ByteVec))
     }
     testSimpleScript(main("u256To32Byte!", 32))
-    failSimpleScript(main("u256To32Byte!", 33), AssertionFailed)
+    failSimpleScript(main("u256To32Byte!", 33), AssertionFailedWithErrorCode(None, 0))
   }
 
   it should "test u256 from bytes" in new ContractFixture {
@@ -1259,7 +1259,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!($func(#$hex) == $u256)
+         |  assert!($func(#$hex) == $u256, 0)
          |}
          |""".stripMargin
     }
@@ -1280,7 +1280,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!(byteVecSlice!(#$hex, $start, $end) == #$slice)
+         |  assert!(byteVecSlice!(#$hex, $start, $end) == #$slice, 0)
          |}
          |""".stripMargin
     }
@@ -1306,7 +1306,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  assert!(byteVecToAddress!(#$hex) == @${address.toBase58})
+         |  assert!(byteVecToAddress!(#$hex) == @${address.toBase58}, 0)
          |}
          |""".stripMargin
     }
@@ -1321,7 +1321,7 @@ class VMSpec extends AlephiumSpec {
     val nftContract =
       s"""
          |// credits to @chloekek
-         |TxContract Nft(author: Address, price: U256)
+         |Contract Nft(author: Address, price: U256)
          |{
          |    @using(preapprovedAssets = true, assetsInContract = true)
          |    pub fn buy(buyer: Address) -> ()
@@ -1357,7 +1357,7 @@ class VMSpec extends AlephiumSpec {
   it should "create and use Uniswap-like contract" in new ContractFixture {
     val tokenContract =
       s"""
-         |TxContract Token() {
+         |Contract Token() {
          |  @using(assetsInContract = true)
          |  pub fn withdraw(address: Address, amount: U256) -> () {
          |    transferTokenFromSelf!(address, selfTokenId!(), amount)
@@ -1435,7 +1435,7 @@ class VMSpec extends AlephiumSpec {
   it should "execute tx in random order" in new ContractFixture {
     val testContract =
       s"""
-         |TxContract Foo(mut x: U256) {
+         |Contract Foo(mut x: U256) {
          |  pub fn foo(y: U256) -> () {
          |    x = x * 10 + y
          |  }
@@ -1462,7 +1462,7 @@ class VMSpec extends AlephiumSpec {
   it should "be able to call a contract multiple times in a block" in new ContractFixture {
     val testContract =
       s"""
-         |TxContract Foo(mut x: U256) {
+         |Contract Foo(mut x: U256) {
          |  @using(assetsInContract = true)
          |  pub fn foo(address: Address) -> () {
          |    x = x + 1
@@ -1539,11 +1539,11 @@ class VMSpec extends AlephiumSpec {
 
   it should "test contract inheritance" in new ContractFixture {
     {
-      info("Inherit TxContract")
+      info("Inherit Contract")
 
       val contract: String =
         s"""
-           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |Contract Child(mut x: U256) extends Parent0(x), Parent1(x) {
            |  pub fn foo() -> () {
            |    p0()
            |    p1()
@@ -1551,7 +1551,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |Abstract TxContract Grandparent(mut x: U256) {
+           |Abstract Contract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
            |  fn gp() -> () {
@@ -1560,7 +1560,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |Abstract Contract Parent0(mut x: U256) extends Grandparent(x) {
            |  event Parent0(x: U256)
            |
            |  fn p0() -> () {
@@ -1569,7 +1569,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |Abstract Contract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
            |  fn p1() -> () {
@@ -1583,11 +1583,11 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("Inherit single Abstract TxContract")
+      info("Inherit single Abstract Contract")
 
       val contract: String =
         s"""
-           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |Contract Child(mut x: U256) extends Parent0(x), Parent1(x) {
            |  pub fn foo() -> () {
            |    p0()
            |    p1()
@@ -1595,64 +1595,13 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |Abstract TxContract Grandparent(mut x: U256) {
-           |  event GP(value: U256)
-           |
-           |  fn gp() -> ()
-           |}
-           |
-           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
-           |  event Parent0(x: U256)
-           |
-           |  fn p0() -> () {
-           |    emit Parent0(1)
-           |    gp()
-           |  }
-           |}
-           |
-           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
-           |  event Parent1(x: U256)
-           |
-           |  fn gp() -> () {
-           |    x = x + 1
-           |    emit GP(x)
-           |  }
-           |
-           |  fn p1() -> () {
-           |    emit Parent1(2)
-           |    gp()
-           |  }
-           |}
-           |""".stripMargin
-
-      success(contract)
-    }
-
-    {
-      info("Inherit multiple Abstract TxContract")
-
-      val contract: String =
-        s"""
-           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
-           |  fn gp() -> () {
-           |    x = x + 1
-           |    emit GP(x)
-           |  }
-           |
-           |  pub fn foo() -> () {
-           |    p0()
-           |    p1()
-           |    gp()
-           |  }
-           |}
-           |
-           |Abstract TxContract Grandparent(mut x: U256) {
+           |Abstract Contract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
            |  fn gp() -> ()
            |}
            |
-           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |Abstract Contract Parent0(mut x: U256) extends Grandparent(x) {
            |  event Parent0(x: U256)
            |
            |  fn p0() -> () {
@@ -1661,7 +1610,58 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |Abstract Contract Parent1(mut x: U256) extends Grandparent(x) {
+           |  event Parent1(x: U256)
+           |
+           |  fn gp() -> () {
+           |    x = x + 1
+           |    emit GP(x)
+           |  }
+           |
+           |  fn p1() -> () {
+           |    emit Parent1(2)
+           |    gp()
+           |  }
+           |}
+           |""".stripMargin
+
+      success(contract)
+    }
+
+    {
+      info("Inherit multiple Abstract Contract")
+
+      val contract: String =
+        s"""
+           |Contract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  fn gp() -> () {
+           |    x = x + 1
+           |    emit GP(x)
+           |  }
+           |
+           |  pub fn foo() -> () {
+           |    p0()
+           |    p1()
+           |    gp()
+           |  }
+           |}
+           |
+           |Abstract Contract Grandparent(mut x: U256) {
+           |  event GP(value: U256)
+           |
+           |  fn gp() -> ()
+           |}
+           |
+           |Abstract Contract Parent0(mut x: U256) extends Grandparent(x) {
+           |  event Parent0(x: U256)
+           |
+           |  fn p0() -> () {
+           |    emit Parent0(1)
+           |    gp()
+           |  }
+           |}
+           |
+           |Abstract Contract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
            |  fn p1() -> () {
@@ -1675,11 +1675,11 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("Inherit both Abstract TxContract and Interface")
+      info("Inherit both Abstract Contract and Interface")
 
       val contract: String =
         s"""
-           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |Contract Child(mut x: U256) extends Parent0(x), Parent1(x) {
            |  pub fn foo() -> () {
            |    p0()
            |    p1()
@@ -1692,7 +1692,7 @@ class VMSpec extends AlephiumSpec {
            |  fn ggp() -> ()
            |}
            |
-           |Abstract TxContract Grandparent(mut x: U256) implements GreatGrandparent {
+           |Abstract Contract Grandparent(mut x: U256) implements GreatGrandparent {
            |  event GP(value: U256)
            |
            |  fn ggp() -> () {
@@ -1701,7 +1701,7 @@ class VMSpec extends AlephiumSpec {
            |  fn gp() -> ()
            |}
            |
-           |Abstract TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |Abstract Contract Parent0(mut x: U256) extends Grandparent(x) {
            |  event Parent0(x: U256)
            |
            |  fn p0() -> () {
@@ -1710,7 +1710,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |Abstract TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |Abstract Contract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
            |  fn gp() -> () {
@@ -1729,23 +1729,23 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("miss abstract keyword for Abstract TxContract")
+      info("miss abstract keyword for Abstract Contract")
 
       val contract: String =
         s"""
-           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |Contract Child(mut x: U256) extends Parent0(x), Parent1(x) {
            |  fn gp() -> () {
            |    x = x + 1
            |    emit GP(x)
            |  }
            |}
            |
-           |Abstract TxContract Grandparent(mut x: U256) {
+           |Abstract Contract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |  fn gp() -> ()
            |}
            |
-           |TxContract Parent0(mut x: U256) extends Grandparent(x) {
+           |Contract Parent0(mut x: U256) extends Grandparent(x) {
            |  event Parent0(x: U256)
            |
            |  pub fn foo() -> () {
@@ -1760,7 +1760,7 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |TxContract Parent1(mut x: U256) extends Grandparent(x) {
+           |Contract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
            |  fn p1() -> () {
@@ -1770,15 +1770,15 @@ class VMSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      fail(contract, "TxContract Parent0 has unimplemented methods: gp")
+      fail(contract, "Contract Parent0 has unimplemented methods: gp")
     }
 
     {
-      info("conflicting abstract methods between Abstract TxContract")
+      info("conflicting abstract methods between Abstract Contract")
 
       val contract: String =
         s"""
-           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |Contract Child(mut x: U256) extends Parent0(x), Parent1(x) {
            |  pub fn foo() -> () {
            |    p()
            |  }
@@ -1789,12 +1789,12 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |Abstract TxContract Parent0(mut x: U256) {
+           |Abstract Contract Parent0(mut x: U256) {
            |  event Parent0(x: U256)
            |  fn p() -> ()
            |}
            |
-           |Abstract TxContract Parent1(mut x: U256) {
+           |Abstract Contract Parent1(mut x: U256) {
            |  event Parent1(x: U256)
            |  fn p() -> ()
            |}
@@ -1804,11 +1804,11 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("conflicting abstract methods between Abstract TxContract and Interface")
+      info("conflicting abstract methods between Abstract Contract and Interface")
 
       val contract: String =
         s"""
-           |TxContract Child(mut x: U256) extends Parent1(x) implements Parent0 {
+           |Contract Child(mut x: U256) extends Parent1(x) implements Parent0 {
            |  pub fn foo() -> () {
            |    p()
            |  }
@@ -1824,7 +1824,7 @@ class VMSpec extends AlephiumSpec {
            |  fn p() -> ()
            |}
            |
-           |Abstract TxContract Parent1(mut x: U256) {
+           |Abstract Contract Parent1(mut x: U256) {
            |  event Parent1(x: U256)
            |  fn p() -> ()
            |}
@@ -1834,11 +1834,11 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("conflicting method implementation between Abstract TxContract")
+      info("conflicting method implementation between Abstract Contract")
 
       val contract: String =
         s"""
-           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |Contract Child(mut x: U256) extends Parent0(x), Parent1(x) {
            |  pub fn foo() -> () {
            |    p()
            |  }
@@ -1847,14 +1847,14 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |Abstract TxContract Parent0(mut x: U256) {
+           |Abstract Contract Parent0(mut x: U256) {
            |  event Parent0(x: U256)
            |  fn p() -> () {
            |    emit Parent0(0)
            |  }
            |}
            |
-           |Abstract TxContract Parent1(mut x: U256) {
+           |Abstract Contract Parent1(mut x: U256) {
            |  event Parent1(x: U256)
            |  fn p() -> () {
            |    emit Parent1(1)
@@ -1867,11 +1867,11 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("conflicting method implementation between TxContract and Abstract TxContract")
+      info("conflicting method implementation between Contract and Abstract Contract")
 
       val contract: String =
         s"""
-           |TxContract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |Contract Child(mut x: U256) extends Parent0(x), Parent1(x) {
            |  pub fn foo() -> () {
            |    p()
            |  }
@@ -1883,12 +1883,12 @@ class VMSpec extends AlephiumSpec {
            |  }
            |}
            |
-           |Abstract TxContract Parent0(mut x: U256) {
+           |Abstract Contract Parent0(mut x: U256) {
            |  event Parent0(x: U256)
            |  fn p() -> ()
            |}
            |
-           |Abstract TxContract Parent1(mut x: U256) {
+           |Abstract Contract Parent1(mut x: U256) {
            |  event Parent1(x: U256)
            |  fn p() -> () {
            |    emit Parent1(1)
@@ -1970,7 +1970,7 @@ class VMSpec extends AlephiumSpec {
   trait EventFixtureWithContract extends EventFixture {
     override def contractRaw: String =
       s"""
-         |TxContract Foo(mut result: U256) {
+         |Contract Foo(mut result: U256) {
          |
          |  event Adding(a: U256, b: U256)
          |  event Added()
@@ -2157,7 +2157,7 @@ class VMSpec extends AlephiumSpec {
   it should "write script events to log storage" in new EventFixture {
     override def contractRaw: String =
       s"""
-         |TxContract Add(x: U256) {
+         |Contract Add(x: U256) {
          |  event Add1(a: U256, b: U256)
          |  event Add2(a: U256, b: U256)
          |
@@ -2206,7 +2206,7 @@ class VMSpec extends AlephiumSpec {
 
     override def contractRaw: String =
       s"""
-         |TxContract Foo(mut result: U256) {
+         |Contract Foo(mut result: U256) {
          |
          |  event TestEvent1(a: U256, b: I256, c: Address, d: ByteVec)
          |  event TestEvent2(a: U256, b: I256, c: Address, d: Bool)
@@ -2264,7 +2264,7 @@ class VMSpec extends AlephiumSpec {
   it should "emit events for at most 8 fields" in new EventFixture {
     def contractRaw: String =
       s"""
-         |TxContract Foo(tmp: U256) {
+         |Contract Foo(tmp: U256) {
          |  event Foo(a1: U256, a2: U256, a3: U256, a4: U256, a5: U256, a6: U256, a7: U256, a8: U256)
          |
          |  pub fn foo() -> () {
@@ -2355,7 +2355,7 @@ class VMSpec extends AlephiumSpec {
   it should "not compile when emitting events with array field types" in new FlowFixture {
     def contractRaw: String =
       s"""
-         |TxContract Foo(mut result: U256) {
+         |Contract Foo(mut result: U256) {
          |
          |  event TestEvent(f: [U256; 2])
          |
@@ -2403,7 +2403,7 @@ class VMSpec extends AlephiumSpec {
   it should "return contract id in contract creation" in new ContractFixture {
     val contract: String =
       s"""
-         |TxContract Foo(mut subContractId: ByteVec) {
+         |Contract Foo(mut subContractId: ByteVec) {
          |  event Create(subContractId: ByteVec)
          |
          |  @using(preapprovedAssets = true)
@@ -2447,7 +2447,7 @@ class VMSpec extends AlephiumSpec {
   trait SubContractFixture extends ContractFixture {
     val subContractRaw: String =
       s"""
-         |TxContract SubContract() {
+         |Contract SubContract() {
          |  pub fn call() -> () {
          |  }
          |}
@@ -2463,7 +2463,7 @@ class VMSpec extends AlephiumSpec {
     ) = {
       val contractRaw: String =
         s"""
-           |TxContract Contract(mut subContractId: ByteVec) {
+           |Contract Foo(mut subContractId: ByteVec) {
            |  @using(preapprovedAssets = true)
            |  pub fn createSubContract() -> () {
            |    subContractId = $createContractStmt
@@ -2471,9 +2471,9 @@ class VMSpec extends AlephiumSpec {
            |
            |  pub fn callSubContract(path: ByteVec) -> () {
            |    let subContractIdCalculated = subContractId!(path)
-           |    let subContractIdCalculatedTest = subContractIdOf!(Contract(selfContractId!()), path)
-           |    assert!(subContractIdCalculated == subContractIdCalculatedTest)
-           |    assert!(subContractIdCalculated == subContractId)
+           |    let subContractIdCalculatedTest = subContractIdOf!(Foo(selfContractId!()), path)
+           |    assert!(subContractIdCalculated == subContractIdCalculatedTest, 0)
+           |    assert!(subContractIdCalculated == subContractId, 0)
            |    SubContract(subContractIdCalculated).call()
            |  }
            |}
@@ -2491,7 +2491,7 @@ class VMSpec extends AlephiumSpec {
       val createSubContractRaw: String =
         s"""
            |TxScript Main {
-           |  Contract(#${contractId.toHexString}).createSubContract{callerAddress!() -> 1 alph}()
+           |  Foo(#${contractId.toHexString}).createSubContract{callerAddress!() -> 1 alph}()
            |}
            |$contractRaw
            |""".stripMargin
@@ -2512,7 +2512,7 @@ class VMSpec extends AlephiumSpec {
       val callSubContractRaw: String =
         s"""
            |TxScript Main {
-           |  Contract(#${contractId.toHexString}).callSubContract(#${subContractPathHex})
+           |  Foo(#${contractId.toHexString}).callSubContract(#${subContractPathHex})
            |}
            |$contractRaw
            |""".stripMargin
@@ -2566,7 +2566,7 @@ class VMSpec extends AlephiumSpec {
   trait CheckArgAndReturnLengthFixture extends ContractFixture {
     val upgradable: String =
       s"""
-         |Abstract TxContract Upgradable() {
+         |Abstract Contract Upgradable() {
          |  pub fn upgrade(code: ByteVec) -> () {
          |    migrate!(code)
          |  }
@@ -2579,7 +2579,7 @@ class VMSpec extends AlephiumSpec {
     def upgrade() = {
       val fooV1 =
         s"""
-           |TxContract Foo() extends Upgradable() {
+           |Contract Foo() extends Upgradable() {
            |  pub fn foo() -> () {}
            |}
            |$upgradable
@@ -2600,7 +2600,7 @@ class VMSpec extends AlephiumSpec {
   it should "check external method arg length" in new CheckArgAndReturnLengthFixture {
     val foo: String =
       s"""
-         |TxContract Foo() extends Upgradable() {
+         |Contract Foo() extends Upgradable() {
          |  pub fn foo(array: [U256; 2]) -> () {
          |    let _ = array
          |  }
@@ -2625,7 +2625,7 @@ class VMSpec extends AlephiumSpec {
   it should "check external method return length" in new CheckArgAndReturnLengthFixture {
     val foo: String =
       s"""
-         |TxContract Foo() extends Upgradable() {
+         |Contract Foo() extends Upgradable() {
          |  pub fn foo() -> (Bool, [U256; 2]) {
          |    return false, [0; 2]
          |  }
@@ -2650,7 +2650,7 @@ class VMSpec extends AlephiumSpec {
   it should "not load contract just after creation" in new ContractFixture {
     val contract: String =
       s"""
-         |TxContract Foo(mut subContractId: ByteVec) {
+         |Contract Foo(mut subContractId: ByteVec) {
          |  @using(preapprovedAssets = true)
          |  pub fn foo() -> () {
          |    subContractId = copyCreateContract!{
@@ -2681,7 +2681,7 @@ class VMSpec extends AlephiumSpec {
   it should "not call contract destruction from the same contract" in new ContractFixture {
     val foo: String =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn foo(barId: ByteVec) -> () {
          |    let bar = Bar(barId)
          |    bar.bar(selfContractId!())
@@ -2693,7 +2693,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val bar: String =
       s"""
-         |TxContract Bar() {
+         |Contract Bar() {
          |  pub fn bar(fooId: ByteVec) -> () {
          |    let foo = Foo(fooId)
          |    foo.destroy()
@@ -2720,10 +2720,10 @@ class VMSpec extends AlephiumSpec {
   it should "encode values" in new ContractFixture {
     val foo: String =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn foo() -> () {
          |    let bytes = encodeToByteVec!(true, 1, false)
-         |    assert!(bytes == #03000102010000)
+         |    assert!(bytes == #03000102010000, 0)
          |  }
          |}
          |""".stripMargin
@@ -2743,7 +2743,7 @@ class VMSpec extends AlephiumSpec {
   it should "not pay to unloaded contract" in new ContractFixture {
     val foo: String =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn foo() -> () {
          |    return
          |  }
@@ -2780,7 +2780,7 @@ class VMSpec extends AlephiumSpec {
 
       val contract =
         s"""
-           |TxContract Foo() implements I {
+           |Contract Foo() implements I {
            |  pub fn f3() -> ByteVec {
            |    return #00
            |  }
@@ -2804,9 +2804,9 @@ class VMSpec extends AlephiumSpec {
            |@using(preapprovedAssets = false)
            |TxScript Main {
            |  let impl = I(#${contractId.toHexString})
-           |  assert!(impl.f1() == 1)
-           |  assert!(impl.f2() == 2)
-           |  assert!(impl.f3() == #00)
+           |  assert!(impl.f1() == 1, 0)
+           |  assert!(impl.f2() == 2, 0)
+           |  assert!(impl.f3() == #00, 0)
            |}
            |
            |$interface
@@ -2834,7 +2834,7 @@ class VMSpec extends AlephiumSpec {
 
       val contract =
         s"""
-           |TxContract Foo() implements I1, I2 {
+           |Contract Foo() implements I1, I2 {
            |  pub fn f2() -> U256 {
            |    return 2
            |  }
@@ -2851,14 +2851,14 @@ class VMSpec extends AlephiumSpec {
       Compiler
         .compileContract(contract)
         .leftValue
-        .message is "TxContract only supports implementing single interface: I1, I2"
+        .message is "Contract only supports implementing single interface: I1, I2"
     }
   }
 
   it should "not instantiate with abstract contract" in new ContractFixture {
     val abstractContract =
       s"""
-         |Abstract TxContract AC() {
+         |Abstract Contract AC() {
          |  pub fn f1() -> U256 {
          |    return 1
          |  }
@@ -2868,7 +2868,7 @@ class VMSpec extends AlephiumSpec {
 
     val contract =
       s"""
-         |TxContract Foo() implements AC {
+         |Contract Foo() implements AC {
          |  pub fn f2() -> U256 {
          |    return 2
          |  }
@@ -2898,7 +2898,7 @@ class VMSpec extends AlephiumSpec {
   it should "not inherit from the non-abstract contract" in new ContractFixture {
     val nonAbstractContract =
       s"""
-         |TxContract C() {
+         |Contract C() {
          |  pub fn f1() -> U256 {
          |    return 1
          |  }
@@ -2907,7 +2907,7 @@ class VMSpec extends AlephiumSpec {
 
     val contract =
       s"""
-         |TxContract Foo() implements C {
+         |Contract Foo() implements C {
          |  pub fn f2() -> U256 {
          |    return 2
          |  }
@@ -2919,7 +2919,7 @@ class VMSpec extends AlephiumSpec {
     Compiler
       .compileContract(contract)
       .leftValue
-      .message is "TxContract C can not be inherited"
+      .message is "Contract C can not be inherited"
   }
 
   it should "inherit interface events" in new ContractFixture {
@@ -2932,7 +2932,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val bar: String =
       s"""
-         |TxContract Bar() implements Foo {
+         |Contract Bar() implements Foo {
          |  event Bar(x: U256)
          |  pub fn foo() -> () {
          |    emit Foo(1)
@@ -2965,7 +2965,7 @@ class VMSpec extends AlephiumSpec {
   it should "not be able to transfer assets right after contract is created" in new ContractFixture {
     val foo: String =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn foo() -> () {
          |  }
          |}
@@ -2984,7 +2984,7 @@ class VMSpec extends AlephiumSpec {
 
       val bar: String =
         s"""
-           |TxContract Bar() {
+           |Contract Bar() {
            |  @using(preapprovedAssets = true, assetsInContract = $transferAlph)
            |  pub fn bar() -> () {
            |    let contractId = createContract!{@$genesisAddress -> $minimalAlphInContract}(#$fooByteCode, #$fooInitialState)
@@ -3033,11 +3033,11 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("Transfer to random contract address in TxContract")
+      info("Transfer to random contract address in Contract")
 
       val foo: String =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  @using(assetsInContract = true)
            |  pub fn foo() -> () {
            |    transferAlphFromSelf!(@${randomContract}, 0.01 alph)
@@ -3062,10 +3062,10 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("Transfer to one of the caller addresses in TxContract")
+      info("Transfer to one of the caller addresses in Contract")
       val foo: String =
         s"""
-           |TxContract Foo() {
+           |Contract Foo() {
            |  @using(assetsInContract = true)
            |  pub fn foo(to: Address) -> () {
            |    transferAlphFromSelf!(to, 0.01 alph)
@@ -3076,7 +3076,7 @@ class VMSpec extends AlephiumSpec {
 
       val bar: String =
         s"""
-           |TxContract Bar(index: U256, nextBarId: ByteVec) {
+           |Contract Bar(index: U256, nextBarId: ByteVec) {
            |  @using(assetsInContract = true)
            |  pub fn bar(to: Address) -> () {
            |    if (index == 0) {
@@ -3116,7 +3116,7 @@ class VMSpec extends AlephiumSpec {
   it should "test the special case (1)" in new ContractFixture {
     val foo: String =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn foo() -> () {
          |    bar{selfAddress!() -> 0.1 alph}()
@@ -3148,12 +3148,12 @@ class VMSpec extends AlephiumSpec {
   it should "test AssertWithErrorCode instruction" in new ContractFixture {
     val foo: String =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  enum ErrorCodes {
          |    Error = 0
          |  }
          |  pub fn foo() -> () {
-         |    assertWithErrorCode!(false, ErrorCodes.Error)
+         |    assert!(false, ErrorCodes.Error)
          |  }
          |}
          |""".stripMargin
@@ -3176,7 +3176,7 @@ class VMSpec extends AlephiumSpec {
   it should "test Contract type" in new ContractFixture {
     val foo: String =
       s"""
-         |TxContract Foo(x: U256) {
+         |Contract Foo(x: U256) {
          |  pub fn foo() -> U256 {
          |    return x
          |  }
@@ -3186,7 +3186,7 @@ class VMSpec extends AlephiumSpec {
 
     val bar: String =
       s"""
-         |TxContract Bar() {
+         |Contract Bar() {
          |  pub fn bar(foo: Foo) -> U256 {
          |    return foo.foo()
          |  }
@@ -3202,7 +3202,7 @@ class VMSpec extends AlephiumSpec {
          |  let foo = Foo(#${fooId.toHexString})
          |  let bar = Bar(#${barId.toHexString})
          |  let x = bar.bar(foo)
-         |  assert!(x == 123)
+         |  assert!(x == 123, 0)
          |}
          |
          |$bar

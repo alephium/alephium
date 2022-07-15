@@ -493,7 +493,7 @@ trait EndpointsExamples extends ErrorExamples {
       Compile.Contract(
         // Note that we use this weird format to avoid Windows linebreak issue
         code =
-          "TxContract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+          "Contract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
       )
     )
 
@@ -525,7 +525,7 @@ trait EndpointsExamples extends ErrorExamples {
         bytecode = hexString,
         codeHash = hash,
         fields = CompileResult.FieldsSig(
-          signature = "TxContract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
+          signature = "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
           names = AVector("aa", "bb", "cc", "dd", "ee"),
           types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
         ),

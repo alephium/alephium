@@ -678,7 +678,7 @@ trait FlowFixture
     val chainIndex = ChainIndex.unsafe(0, 0)
     val input =
       s"""
-         |TxContract Foo() {
+         |Contract Foo() {
          |  pub fn foo() -> () {
          |    return
          |  }

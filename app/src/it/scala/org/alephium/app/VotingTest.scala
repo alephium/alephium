@@ -181,7 +181,7 @@ trait VotingFixture extends WalletFixture {
       .mkString("\n")
     // scalastyle:off no.equal
     val votingContract = s"""
-                            |TxContract Voting(
+                            |Contract Voting(
                             |  mut yes: U256,
                             |  mut no: U256,
                             |  mut isClosed: Bool,
@@ -196,8 +196,8 @@ trait VotingFixture extends WalletFixture {
                             |
                             |  @using(preapprovedAssets = true, assetsInContract = true)
                             |  pub fn allocateTokens() -> () {
-                            |     assert!(initialized == false)
-                            |     assert!(callerAddress!() == admin)
+                            |     assert!(initialized == false, 0)
+                            |     assert!(callerAddress!() == admin, 0)
                             |     ${allocationTransfers}
                             |     yes = 0
                             |     no = 0
@@ -208,7 +208,7 @@ trait VotingFixture extends WalletFixture {
                             |
                             |  @using(preapprovedAssets = true, assetsInContract = true)
                             |  pub fn vote(choice: Bool, voter: Address) -> () {
-                            |    assert!(initialized == true && isClosed == false)
+                            |    assert!(initialized == true && isClosed == false, 0)
                             |    transferAlph!(voter, admin, $dustAmount)
                             |    transferTokenToSelf!(voter, selfTokenId!(), 1)
                             |
@@ -222,8 +222,8 @@ trait VotingFixture extends WalletFixture {
                             |  }
                             |
                             |   pub fn close() -> () {
-                            |     assert!(initialized == true && isClosed == false)
-                            |     assert!(callerAddress!() == admin)
+                            |     assert!(initialized == true && isClosed == false, 0)
+                            |     assert!(callerAddress!() == admin, 0)
                             |     isClosed = true
                             |
                             |     emit VotingClosed()

@@ -498,7 +498,7 @@ object StatefulParser extends Parser[StatefulContext] {
         if (implementedInterfaces.length > 1) {
           val interfaceNames = implementedInterfaces.map(_.parentId.name).mkString(", ")
           throw Compiler.Error(
-            s"TxContract only supports implementing single interface: $interfaceNames"
+            s"Contract only supports implementing single interface: $interfaceNames"
           )
         }
 
@@ -535,29 +535,25 @@ object StatefulParser extends Parser[StatefulContext] {
   def enumDef[Unknown: P]: P[Ast.EnumDef] = P(Start ~ rawEnumDef ~ End)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def rawTxContract[Unknown: P]: P[Ast.TxContract] =
+  def rawContract[Unknown: P]: P[Ast.Contract] =
     P(
-      Lexer.`abstract` ~ Lexer.keyword("TxContract") ~/ Lexer.typeId ~ contractParams ~
+      Lexer.`abstract` ~ Lexer.keyword("Contract") ~/ Lexer.typeId ~ contractParams ~
         contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
     ).map {
       case (isAbstract, typeId, fields, contractInheritances, events, constantVars, enums, funcs) =>
-        if (funcs.length < 1) {
-          throw Compiler.Error(s"No function definition in TxContract ${typeId.name}")
-        } else {
-          Ast.TxContract(
-            isAbstract,
-            typeId,
-            Seq.empty,
-            fields,
-            funcs,
-            events,
-            constantVars,
-            enums,
-            contractInheritances.getOrElse(Seq.empty)
-          )
-        }
+        Ast.Contract(
+          isAbstract,
+          typeId,
+          Seq.empty,
+          fields,
+          funcs,
+          events,
+          constantVars,
+          enums,
+          contractInheritances.getOrElse(Seq.empty)
+        )
     }
-  def contract[Unknown: P]: P[Ast.TxContract] = P(Start ~ rawTxContract ~ End)
+  def contract[Unknown: P]: P[Ast.Contract] = P(Start ~ rawContract ~ End)
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def interfaceInheritance[Unknown: P]: P[Ast.InterfaceInheritance] =
@@ -607,9 +603,9 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   def interface[Unknown: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
 
-  def multiContract[Unknown: P]: P[Ast.MultiTxContract] =
-    P(Start ~ (rawTxScript | rawTxContract | rawInterface).rep(1) ~ End)
-      .map(Ast.MultiTxContract.apply)
+  def multiContract[Unknown: P]: P[Ast.MultiContract] =
+    P(Start ~ (rawTxScript | rawContract | rawInterface).rep(1) ~ End)
+      .map(Ast.MultiContract.apply)
 
   def state[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] =
     P("[" ~ constOrArray.rep(0, ",") ~ "]").map(_.flatten)

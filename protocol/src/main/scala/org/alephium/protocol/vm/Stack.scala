@@ -107,7 +107,6 @@ class Stack[@sp T: ClassTag](
     }
   }
 
-  // Note: index starts from 2
   def swapTopTwo(): ExeResult[Unit] = {
     val fromIndex = currentIndex - 1
     val toIndex   = currentIndex - 2
