@@ -1452,8 +1452,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils = new ServerUtils()
     val rawCode =
       s"""
-         |Contract Foo(y: U256) {
+         |Contract Foo(x: U256, y: U256) {
          |  pub fn foo() -> () {
+         |    let a = 0
          |    assert!(1 != y, 0)
          |  }
          |}
@@ -1465,10 +1466,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     val compiledCode = result.bytecode
     compiledCode is Hex.toHexString(serialize(code))
     compiledCode is {
-      val bytecode     = "0100000000050da000300c7b"
+      val bytecode     = "0100000100070c17000da001300c7b"
       val methodLength = Hex.toHexString(IndexedSeq((bytecode.length / 2).toByte))
-      s"0101$methodLength" + bytecode
+      s"0201$methodLength" + bytecode
     }
+    result.warnings is AVector(
+      "Found unused variables in function foo: foo.a",
+      "Found unused fields: x"
+    )
   }
 
   it should "compile script" in new Fixture {
@@ -1505,6 +1510,23 @@ class ServerUtilsSpec extends AlephiumSpec {
       result.bytecodeTemplate is expectedByteCode
         .replace("{0}", "0d") // bytecode of U256Const1
         .replace("{1}", "0e") // bytecode of U256Const2
+    }
+
+    {
+      val rawCode =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main(a: U256, b: U256) {
+           |  let c = 0
+           |  assert!(a != 0, 0)
+           |}
+           |""".stripMargin
+      val query  = Compile.Script(rawCode)
+      val result = serverUtils.compileScript(query).rightValue
+      result.warnings is AVector(
+        "Found unused variables in function main: main.c",
+        "Found unused fields: b"
+      )
     }
   }
 

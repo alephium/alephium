@@ -5516,6 +5516,9 @@
                         "Address"
                       ]
                     }
+                  ],
+                  "warnings": [
+                    "Found unused fields: a"
                   ]
                 }
               }
@@ -5813,6 +5816,9 @@
                         "Address"
                       ]
                     }
+                  ],
+                  "warnings": [
+                    "Found unused fields: a"
                   ]
                 }
               }
@@ -8735,7 +8741,8 @@
           "codeHash",
           "fields",
           "functions",
-          "events"
+          "events",
+          "warnings"
         ],
         "type": "object",
         "properties": {
@@ -8760,6 +8767,12 @@
             "items": {
               "$ref": "#/components/schemas/EventSig"
             }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -8767,7 +8780,8 @@
         "required": [
           "bytecodeTemplate",
           "fields",
-          "functions"
+          "functions",
+          "warnings"
         ],
         "type": "object",
         "properties": {
@@ -8781,6 +8795,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FunctionSig"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           }
         }

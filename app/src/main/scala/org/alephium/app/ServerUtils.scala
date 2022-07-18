@@ -838,7 +838,7 @@ class ServerUtils(implicit
   def compileScript(query: Compile.Script): Try[CompileScriptResult] = {
     Compiler
       .compileTxScriptFull(query.code)
-      .map(p => CompileScriptResult.from(p._1, p._2))
+      .map(p => CompileScriptResult.from(p._1, p._2, p._3))
       .left
       .map(error => failed(error.toString))
   }
@@ -847,7 +847,7 @@ class ServerUtils(implicit
   def compileContract(query: Compile.Contract): Try[CompileContractResult] = {
     Compiler
       .compileContractFull(query.code)
-      .map(p => CompileContractResult.from(p._1, p._2))
+      .map(p => CompileContractResult.from(p._1, p._2, p._3))
       .left
       .map(error => failed(error.toString))
   }
