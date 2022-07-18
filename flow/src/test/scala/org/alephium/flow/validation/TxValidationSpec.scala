@@ -739,7 +739,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |""".stripMargin
     // scalastyle:on no.equal
 
-    val script   = Compiler.compileAssetScript(rawScript(51)).rightValue
+    val script   = Compiler.compileAssetScript(rawScript(51)).rightValue._1
     val lockup   = LockupScript.p2sh(script)
     val unlock   = UnlockScript.p2sh(script, AVector(Val.U256(51)))
     val unsigned = prepareOutput(lockup, unlock)
@@ -752,7 +752,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx1 = tx0.replaceUnlock(UnlockScript.p2sh(script, AVector(Val.U256(50))))
     tx1.fail(UnlockScriptExeFailed(AssertionFailedWithErrorCode(None, 0)))
 
-    val newScript = Compiler.compileAssetScript(rawScript(50)).rightValue
+    val newScript = Compiler.compileAssetScript(rawScript(50)).rightValue._1
     val tx2       = tx0.replaceUnlock(UnlockScript.p2sh(newScript, AVector(Val.U256(50))))
     tx2.fail(InvalidScriptHash)
   }
@@ -782,7 +782,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
          |}
          |""".stripMargin
 
-    val script   = Compiler.compileAssetScript(rawScript).rightValue
+    val script   = Compiler.compileAssetScript(rawScript).rightValue._1
     val lockup   = LockupScript.p2sh(script)
     val unlock   = UnlockScript.p2sh(script, AVector.empty)
     val unsigned = prepareOutput(lockup, unlock)
