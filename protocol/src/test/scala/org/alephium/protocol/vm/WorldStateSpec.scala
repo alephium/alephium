@@ -54,6 +54,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     worldState.getOutput(assetOutputRef).isLeft is true
     worldState.getOutput(contractOutputRef).isLeft is true
     worldState.getContractObj(contractOutputRef.key).isLeft is true
+    worldState.contractExist(contractOutputRef.key) isE false
     worldState.removeAsset(assetOutputRef).isLeft is true
     worldState.removeAsset(contractOutputRef).isLeft is true
 
@@ -69,6 +70,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       )
     )
     worldState.getContractObj(contractOutputRef.key) isE contractObj
+    worldState.contractExist(contractOutputRef.key) isE true
     worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
     worldState.getOutput(contractOutputRef) isE contractOutput
 
@@ -90,6 +92,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
     update(worldState.removeContract(contractId))
     worldState.getContractObj(contractId).isLeft is true
+    worldState.contractExist(contractId) isE false
     worldState.getOutput(contractOutputRef).isLeft is true
     worldState.getContractState(contractId).isLeft is true
     worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
@@ -97,6 +100,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
     update(worldState.removeContract(contractId1))
     worldState.getContractObj(contractId1).isLeft is true
+    worldState.contractExist(contractId1) isE false
     worldState.getOutput(contractOutputRef1).isLeft is true
     worldState.getContractState(contractId).isLeft is true
     worldState.getContractCode(code.hash).isLeft is true
@@ -186,17 +190,21 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
   it should "commit staged changes" in new StagingFixture {
     staging.commit()
     staging.getContractObj(contractId) isE contractObj
+    staging.contractExist(contractId) isE true
     worldState.getContractObj(contractId) isE contractObj
+    worldState.contractExist(contractId) isE true
   }
 
   it should "rollback staged changes" in new StagingFixture {
     staging.rollback()
     staging.getContractObj(contractId).isLeft is true
     staging.getContractState(contractId).isLeft is true
+    staging.contractExist(contractId) isE false
     staging.getContractCode(code.hash).isLeft is true
     staging.getContractAsset(contractId).isLeft is true
     worldState.getContractObj(contractId).isLeft is true
     worldState.getContractState(contractId).isLeft is true
+    worldState.contractExist(contractId) isE false
     worldState.getContractCode(code.hash).isLeft is true
     worldState.getContractAsset(contractId).isLeft is true
   }
