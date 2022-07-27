@@ -57,11 +57,11 @@ class ContextSpec
     }
   }
 
-  it should "test contract exist" in new Fixture {
+  it should "test contract exists" in new Fixture {
     val (_, _, outputRef, _) = generateContract().sample.get
-    context.contractExist(outputRef.key) isE false
+    context.contractExists(outputRef.key) isE false
     val contractId = createContract()
-    context.contractExist(contractId) isE true
+    context.contractExists(contractId) isE true
   }
 
   it should "generate asset output" in new Fixture {

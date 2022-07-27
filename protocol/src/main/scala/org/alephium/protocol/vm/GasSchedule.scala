@@ -159,9 +159,9 @@ object GasCopyCreate {
 }
 
 @Gas
-trait GasContractExist extends GasSimple
-object GasContractExist {
-  val gas: GasBox = GasBox.unsafe(100)
+trait GasContractExists extends GasSimple
+object GasContractExists {
+  val gas: GasBox = GasBox.unsafe(800)
 }
 
 @Gas

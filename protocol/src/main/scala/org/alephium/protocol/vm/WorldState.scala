@@ -71,7 +71,7 @@ trait WorldState[T, R1, R2, R3] {
     contractState.get(key)
   }
 
-  def contractExist(key: Hash): IOResult[Boolean] = {
+  def contractExists(key: Hash): IOResult[Boolean] = {
     contractState.exists(key)
   }
 

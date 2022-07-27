@@ -640,12 +640,12 @@ object BuiltIn {
       usePreapprovedAssets = true
     )
 
-  val contractExist: SimpleStatefulBuiltIn =
+  val contractExists: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
-      "contractExist",
+      "contractExists",
       Seq[Type](Type.ByteVec),
       Seq[Type](Type.Bool),
-      ContractExist
+      ContractExists
     )
 
   val destroySelf: SimpleStatefulBuiltIn =
@@ -787,7 +787,7 @@ object BuiltIn {
       createSubContractWithToken,
       copyCreateSubContract,
       copyCreateSubContractWithToken,
-      contractExist,
+      contractExists,
       destroySelf,
       migrate,
       migrateWithFields,

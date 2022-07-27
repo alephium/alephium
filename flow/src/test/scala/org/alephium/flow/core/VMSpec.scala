@@ -844,13 +844,13 @@ class VMSpec extends AlephiumSpec {
     failSimpleScript(failure(33), InvalidContractId)
   }
 
-  it should "test contract exist" in new ContractFixture {
+  it should "test contract exists" in new ContractFixture {
     val foo =
       s"""
          |Contract Foo() {
          |  pub fn foo() -> () {
-         |    assert!(contractExist!(selfContractId!()), 0)
-         |    assert!(!contractExist!(#${Hash.generate.toHexString}), 0)
+         |    assert!(contractExists!(selfContractId!()), 0)
+         |    assert!(!contractExists!(#${Hash.generate.toHexString}), 0)
          |  }
          |}
          |""".stripMargin
