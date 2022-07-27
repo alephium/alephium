@@ -347,7 +347,7 @@ class TransactionSpec
              |}
              |""".stripMargin
 
-        Compiler.compileAssetScript(raw).rightValue
+        Compiler.compileAssetScript(raw).rightValue._1
       }
 
       val unsignedTx = UnsignedTransaction(

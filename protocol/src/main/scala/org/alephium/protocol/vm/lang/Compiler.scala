@@ -26,16 +26,12 @@ import org.alephium.util.AVector
 
 // scalastyle:off file.size.limit
 object Compiler {
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  def compileAssetScript(
-      input: String,
-      checkUnusedVars: Boolean = true
-  ): Either[Error, StatelessScript] =
+  def compileAssetScript(input: String): Either[Error, (StatelessScript, AVector[String])] =
     try {
       fastparse.parse(input, StatelessParser.assetScript(_)) match {
         case Parsed.Success(script, _) =>
-          val state = State.buildFor(script, checkUnusedVars)
-          Right(script.genCode(state))
+          val state = State.buildFor(script)
+          Right((script.genCode(state), state.getWarnings))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
       }
@@ -43,59 +39,39 @@ object Compiler {
       case e: Error => Left(e)
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  def compileTxScript(
-      input: String,
-      checkUnusedVars: Boolean = true
-  ): Either[Error, StatefulScript] =
-    compileTxScript(input, 0, checkUnusedVars)
+  def compileTxScript(input: String): Either[Error, StatefulScript] =
+    compileTxScript(input, 0)
 
-  def compileTxScript(
-      input: String,
-      index: Int,
-      checkUnusedVars: Boolean
-  ): Either[Error, StatefulScript] =
-    compileTxScriptFull(input, index, checkUnusedVars).map(_._1)
+  def compileTxScript(input: String, index: Int): Either[Error, StatefulScript] =
+    compileTxScriptFull(input, index).map(_._1)
+
+  def compileTxScriptFull(
+      input: String
+  ): Either[Error, (StatefulScript, Ast.TxScript, AVector[String])] =
+    compileTxScriptFull(input, 0)
 
   def compileTxScriptFull(
       input: String,
-      checkUnusedVars: Boolean
-  ): Either[Error, (StatefulScript, Ast.TxScript)] =
-    compileTxScriptFull(input, 0, checkUnusedVars)
+      index: Int
+  ): Either[Error, (StatefulScript, Ast.TxScript, AVector[String])] =
+    compileStateful(input, _.genStatefulScript(index))
 
-  def compileTxScriptFull(
-      input: String,
-      index: Int,
-      checkUnusedVars: Boolean
-  ): Either[Error, (StatefulScript, Ast.TxScript)] =
-    compileStateful(input, _.genStatefulScript(index, checkUnusedVars))
+  def compileContract(input: String): Either[Error, StatefulContract] =
+    compileContract(input, 0)
 
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  def compileContract(
-      input: String,
-      checkUnusedVars: Boolean = true
-  ): Either[Error, StatefulContract] =
-    compileContract(input, 0, checkUnusedVars)
+  def compileContract(input: String, index: Int): Either[Error, StatefulContract] =
+    compileContractFull(input, index).map(_._1)
 
-  def compileContract(
-      input: String,
-      index: Int,
-      checkUnusedVars: Boolean
-  ): Either[Error, StatefulContract] =
-    compileContractFull(input, index, checkUnusedVars).map(_._1)
+  def compileContractFull(
+      input: String
+  ): Either[Error, (StatefulContract, Ast.Contract, AVector[String])] =
+    compileContractFull(input, 0)
 
   def compileContractFull(
       input: String,
-      checkUnusedVars: Boolean
-  ): Either[Error, (StatefulContract, Ast.Contract)] =
-    compileContractFull(input, 0, checkUnusedVars)
-
-  def compileContractFull(
-      input: String,
-      index: Int,
-      checkUnusedVars: Boolean
-  ): Either[Error, (StatefulContract, Ast.Contract)] =
-    compileStateful(input, _.genStatefulContract(index, checkUnusedVars))
+      index: Int
+  ): Either[Error, (StatefulContract, Ast.Contract, AVector[String])] =
+    compileStateful(input, _.genStatefulContract(index))
 
   private def compileStateful[T](input: String, genCode: MultiContract => T): Either[Error, T] = {
     try {
@@ -160,22 +136,29 @@ object Compiler {
     def tpe: Type
     def isMutable: Boolean
     def isGenerated: Boolean
+    def isLocal: Boolean
   }
   object VarInfo {
     final case class Local(tpe: Type, isMutable: Boolean, index: Byte, isGenerated: Boolean)
-        extends VarInfo
+        extends VarInfo {
+      def isLocal: Boolean = true
+    }
     final case class Field(tpe: Type, isMutable: Boolean, index: Byte, isGenerated: Boolean)
-        extends VarInfo
+        extends VarInfo {
+      def isLocal: Boolean = false
+    }
     final case class Template(tpe: Type, index: Int) extends VarInfo {
       def isMutable: Boolean   = false
       def isGenerated: Boolean = false
+      def isLocal: Boolean     = false
     }
     final case class ArrayRef[Ctx <: StatelessContext](
         isMutable: Boolean,
         isGenerated: Boolean,
         ref: ArrayTransformer.ArrayRef[Ctx]
     ) extends VarInfo {
-      def tpe: Type = ref.tpe
+      def tpe: Type        = ref.tpe
+      def isLocal: Boolean = ref.isLocal
     }
     final case class Constant[Ctx <: StatelessContext](
         tpe: Type,
@@ -183,6 +166,7 @@ object Compiler {
     ) extends VarInfo {
       def isMutable: Boolean   = false
       def isGenerated: Boolean = false
+      def isLocal: Boolean     = true
     }
   }
   trait ContractFunc[Ctx <: StatelessContext] extends FuncInfo[Ctx] {
@@ -301,21 +285,19 @@ object Compiler {
       }
     }
 
-    def buildFor(script: Ast.AssetScript, checkUnusedVars: Boolean): State[StatelessContext] =
+    def buildFor(script: Ast.AssetScript): State[StatelessContext] =
       StateForScript(
         mutable.HashMap.empty,
         Ast.FuncId.empty,
         0,
         script.funcTable,
-        immutable.Map(script.ident -> ContractInfo(ContractKind.TxScript, script.funcTable)),
-        checkUnusedVars
+        immutable.Map(script.ident -> ContractInfo(ContractKind.TxScript, script.funcTable))
       )
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def buildFor(
         multiContract: MultiContract,
-        contractIndex: Int,
-        checkUnusedVars: Boolean
+        contractIndex: Int
     ): State[StatefulContext] = {
       val contractsTable = multiContract.contracts.map { contract =>
         val kind = contract match {
@@ -336,8 +318,7 @@ object Compiler {
         0,
         contract.funcTable,
         contract.eventsInfo(),
-        contractsTable,
-        checkUnusedVars
+        contractsTable
       )
     }
   }
@@ -374,15 +355,16 @@ object Compiler {
 
   // scalastyle:off number.of.methods
   sealed trait State[Ctx <: StatelessContext] {
-    def checkUnusedVars: Boolean
     def varTable: mutable.HashMap[String, VarInfo]
     var scope: Ast.FuncId
     var varIndex: Int
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
-    private var freshNameIndex: Int              = 0
-    private var arrayIndexVar: Option[Ast.Ident] = None
-    private val usedVars: mutable.Set[String]    = mutable.Set.empty[String]
+    private var freshNameIndex: Int                   = 0
+    private var arrayIndexVar: Option[Ast.Ident]      = None
+    private val usedVars: mutable.Set[String]         = mutable.Set.empty[String]
+    private val warnings: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
+    def getWarnings: AVector[String]                  = AVector.from(warnings)
     def eventsInfo: Seq[EventInfo]
 
     @inline final def freshName(): String = {
@@ -538,36 +520,37 @@ object Compiler {
             case None          => throw Error(s"Variable $sname does not exist")
           }
       }
-      if (checkUnusedVars) {
-        usedVars.add(varName)
-      }
+      usedVars.add(varName)
       varInfo
     }
 
     def checkUnusedLocalVars(funcId: Ast.FuncId): Unit = {
-      if (checkUnusedVars) {
-        val prefix = s"${funcId.name}."
-        val unusedVars = varTable.filter { case (name, varInfo) =>
-          name.startsWith(prefix) && !usedVars.contains(name) && !varInfo.isGenerated
-        }
-        if (unusedVars.nonEmpty) {
-          throw Error(
-            s"Found unused variables in function ${funcId.name}: ${unusedVars.keys.mkString(", ")}"
-          )
-        }
-        usedVars.filterInPlace(name => !name.startsWith(prefix))
+      val prefix = s"${funcId.name}."
+      val unusedVars = varTable.filter { case (name, varInfo) =>
+        name.startsWith(prefix) && !usedVars.contains(name) && !varInfo.isGenerated
       }
+      if (unusedVars.nonEmpty) {
+        warnings += s"Found unused variables in function ${funcId.name}: ${unusedVars.keys.mkString(", ")}"
+      }
+      usedVars.filterInPlace(name => !name.startsWith(prefix))
     }
 
     def checkUnusedFields(): Unit = {
-      if (checkUnusedVars) {
-        val unusedVars = varTable.filter { case (name, varInfo) =>
-          !usedVars.contains(name) && !varInfo.isGenerated
-        }
-        val unusedFields = unusedVars.filterNot(_._2.isInstanceOf[VarInfo.Constant[_]])
-        if (unusedFields.nonEmpty) {
-          throw Error(s"Found unused fields: ${unusedFields.keys.mkString(", ")}")
-        }
+      val unusedVars = varTable.filter { case (name, varInfo) =>
+        !usedVars.contains(name) && !varInfo.isGenerated
+      }
+      val unusedConstants = mutable.ArrayBuffer.empty[String]
+      val unusedFields    = mutable.ArrayBuffer.empty[String]
+      unusedVars.foreach {
+        case (name, _: VarInfo.Constant[_])      => unusedConstants.addOne(name)
+        case (name, varInfo) if !varInfo.isLocal => unusedFields.addOne(name)
+        case _                                   => ()
+      }
+      if (unusedConstants.nonEmpty) {
+        warnings += s"Found unused constants: ${unusedConstants.mkString(", ")}"
+      }
+      if (unusedFields.nonEmpty) {
+        warnings += s"Found unused fields: ${unusedFields.mkString(", ")}"
       }
     }
 
@@ -704,8 +687,7 @@ object Compiler {
       var scope: Ast.FuncId,
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatelessContext]],
-      contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatelessContext]],
-      checkUnusedVars: Boolean
+      contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatelessContext]]
   ) extends State[StatelessContext] {
     override def eventsInfo: Seq[EventInfo] = Seq.empty
 
@@ -777,8 +759,7 @@ object Compiler {
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatefulContext]],
       eventsInfo: Seq[EventInfo],
-      contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatefulContext]],
-      checkUnusedVars: Boolean
+      contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatefulContext]]
   ) extends State[StatefulContext] {
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatefulContext] = {
       BuiltIn.statefulFuncs

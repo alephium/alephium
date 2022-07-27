@@ -25,11 +25,16 @@ import org.alephium.util.{AVector, Hex}
 final case class CompileScriptResult(
     bytecodeTemplate: String,
     fields: CompileResult.FieldsSig,
-    functions: AVector[CompileResult.FunctionSig]
+    functions: AVector[CompileResult.FunctionSig],
+    warnings: AVector[String]
 )
 
 object CompileScriptResult {
-  def from(script: StatefulScript, scriptAst: Ast.TxScript): CompileScriptResult = {
+  def from(
+      script: StatefulScript,
+      scriptAst: Ast.TxScript,
+      warnings: AVector[String]
+  ): CompileScriptResult = {
     val bytecodeTemplate = script.toTemplateString()
     val fields = CompileResult.FieldsSig(
       scriptAst.getTemplateVarsSignature(),
@@ -39,7 +44,8 @@ object CompileScriptResult {
     CompileScriptResult(
       bytecodeTemplate,
       fields = fields,
-      functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from))
+      functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from)),
+      warnings = warnings
     )
   }
 }
@@ -49,11 +55,16 @@ final case class CompileContractResult(
     codeHash: Hash,
     fields: CompileResult.FieldsSig,
     functions: AVector[CompileResult.FunctionSig],
-    events: AVector[CompileResult.EventSig]
+    events: AVector[CompileResult.EventSig],
+    warnings: AVector[String]
 )
 
 object CompileContractResult {
-  def from(contract: StatefulContract, contractAst: Ast.Contract): CompileContractResult = {
+  def from(
+      contract: StatefulContract,
+      contractAst: Ast.Contract,
+      warnings: AVector[String]
+  ): CompileContractResult = {
     assume(contractAst.templateVars.isEmpty) // Template variable is disabled right now
     val bytecode = Hex.toHexString(serialize(contract))
     val fields = CompileResult.FieldsSig(
@@ -66,7 +77,8 @@ object CompileContractResult {
       contract.hash,
       fields,
       functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
-      events = AVector.from(contractAst.events.map(CompileResult.EventSig.from))
+      events = AVector.from(contractAst.events.map(CompileResult.EventSig.from)),
+      warnings = warnings
     )
   }
 }

@@ -140,7 +140,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
              |  }
              |}
              |""".stripMargin
-        val script = Compiler.compileAssetScript(raw).rightValue
+        val script = Compiler.compileAssetScript(raw).rightValue._1
         val lockup = LockupScript.p2sh(script)
         val unlock = UnlockScript.p2sh(script, AVector(Val.U256(60), Val.U256(50)))
 
@@ -171,7 +171,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
            |}
            |""".stripMargin
 
-      val script = Compiler.compileAssetScript(raw).rightValue
+      val script = Compiler.compileAssetScript(raw).rightValue._1
       val lockup = LockupScript.p2sh(script)
       val unlock = UnlockScript.p2sh(script, AVector(Val.ByteVec(pubKey1.bytes)))
 
@@ -196,7 +196,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
            |}
            |""".stripMargin
 
-      val script = Compiler.compileAssetScript(raw).rightValue
+      val script = Compiler.compileAssetScript(raw).rightValue._1
       val lockup = LockupScript.p2sh(script)
       val unlock = UnlockScript.p2sh(script, AVector(Val.U256(50), Val.U256(60)))
 

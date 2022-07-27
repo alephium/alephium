@@ -836,7 +836,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode CompilerResult" in new TypeSignatureFixture {
-    val result0 = CompileContractResult.from(contract, contractAst)
+    val result0 = CompileContractResult.from(contract, contractAst, contractWarnings)
     val jsonRaw0 =
       """
         |{
@@ -863,12 +863,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |      "fieldNames":["a","b","d","e"],
         |      "fieldTypes": ["Bool", "U256", "ByteVec", "Address"]
         |    }
+        |  ],
+        |  "warnings": [
+        |    "Found unused variables in function bar: bar.a",
+        |    "Found unused fields: aa, bb, cc, dd, ee"
         |  ]
         |}
         |""".stripMargin
     write(result0).filter(!_.isWhitespace) is jsonRaw0.filter(!_.isWhitespace)
 
-    val result1 = CompileScriptResult.from(script, scriptAst)
+    val result1 = CompileScriptResult.from(script, scriptAst, scriptWarnings)
     val jsonRaw1 =
       """
         |{
@@ -893,6 +897,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |      "argTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
         |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
         |    }
+        |  ],
+        |  "warnings": [
+        |    "Found unused variables in function bar: bar.a",
+        |    "Found unused fields: cc, ff"
         |  ]
         |}
         |""".stripMargin

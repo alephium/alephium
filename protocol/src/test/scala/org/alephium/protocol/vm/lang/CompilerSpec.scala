@@ -227,8 +227,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileContract(input, 0, true).isRight is true
-    Compiler.compileTxScript(input, 1, true).isRight is true
+    Compiler.compileContract(input, 0).isRight is true
+    Compiler.compileTxScript(input, 1).isRight is true
   }
 
   it should "check function return types" in {
@@ -435,7 +435,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     )
     succeed.foreach { code =>
-      Compiler.compileContract(code, false).isRight is true
+      Compiler.compileContract(code).isRight is true
     }
   }
 
@@ -445,10 +445,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         args: AVector[Val] = AVector.empty,
         output: AVector[Val] = AVector.empty,
         fields: AVector[Val] = AVector.empty,
-        methodIndex: Int = 0,
-        checkUnusedVars: Boolean = true
+        methodIndex: Int = 0
     ): Assertion = {
-      val contract = Compiler.compileContract(input, checkUnusedVars).toOption.get
+      val contract = Compiler.compileContract(input).toOption.get
 
       deserialize[StatefulContract](serialize(contract)) isE contract
       val (obj, context) = prepareContract(contract, fields)
@@ -508,7 +507,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val (priKey, pubKey) = SignatureSchema.generatePriPub()
     val pubKeyHash       = Hash.hash(pubKey.bytes)
 
-    val script = Compiler.compileAssetScript(input(pubKeyHash)).rightValue
+    val script = Compiler.compileAssetScript(input(pubKeyHash)).rightValue._1
     deserialize[StatelessScript](serialize(script)) isE script
 
     val args             = AVector[Val](Val.ByteVec.from(pubKey))
@@ -626,8 +625,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin,
-      AVector.empty,
-      checkUnusedVars = false
+      AVector.empty
     )
 
     test(
@@ -1243,7 +1241,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val contract = Compiler.compileContract(code, false).rightValue
+    val contract = Compiler.compileContract(code).rightValue
     // format: off
     contract.methods(0) is Method[StatefulContext](
       isPublic = false,
@@ -1318,7 +1316,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val contract       = Compiler.compileContract(code, false).rightValue
+    val contract       = Compiler.compileContract(code).rightValue
     val (obj, context) = prepareContract(contract, AVector.fill(7)(Val.U256(0)))
 
     def test(methodIndex: Int, args: AVector[Val]) = {
@@ -1387,7 +1385,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      test(code, fields = AVector(Val.U256(0)), checkUnusedVars = false)
+      test(code, fields = AVector(Val.U256(0)))
     }
 
     {
@@ -1671,7 +1669,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileContract(code, false).rightValue.methods.head is
+    Compiler.compileContract(code).rightValue.methods.head is
       Method[StatefulContext](
         isPublic = true,
         usePreapprovedAssets = false,
@@ -1830,7 +1828,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |$parent
            |""".stripMargin
 
-      Compiler.compileContract(child, false).isRight is true
+      Compiler.compileContract(child).isRight is true
     }
 
     {
@@ -1980,7 +1978,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      val contract = Compiler.compileContract(code, false).rightValue
+      val contract = Compiler.compileContract(code).rightValue
       contract.methodsLength is 4
       contract.methods.map(_.argsLength) is AVector(2, 1, 3, 0)
     }
@@ -2245,7 +2243,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     }
-    Compiler.compileContract(code(false), false).isRight is true
+    Compiler.compileContract(code(false)).isRight is true
     Compiler
       .compileContract(code(true))
       .leftValue
@@ -2654,8 +2652,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileAssetScript(code).leftValue.message is
-        "Found unused variables in function foo: foo.a, foo.b"
+      Compiler.compileAssetScript(code).rightValue._2 is
+        AVector("Found unused variables in function foo: foo.a, foo.b")
     }
 
     {
@@ -2670,8 +2668,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileTxScript(code).leftValue.message is
-        "Found unused variables in function main: main.b"
+      Compiler.compileTxScriptFull(code).rightValue._3 is
+        AVector("Found unused variables in function main: main.b")
     }
 
     {
@@ -2686,8 +2684,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileTxScript(code).leftValue.message is
-        "Found unused fields: b"
+      Compiler.compileTxScriptFull(code).rightValue._3 is
+        AVector("Found unused fields: b")
     }
 
     {
@@ -2702,8 +2700,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Found unused variables in function foo: foo.a, foo.b"
+      Compiler.compileContractFull(code).rightValue._3 is
+        AVector("Found unused variables in function foo: foo.a, foo.b")
     }
 
     {
@@ -2716,8 +2714,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Found unused fields: a, c"
+      Compiler.compileContractFull(code).rightValue._3 is
+        AVector("Found unused fields: a, c")
     }
 
     {
@@ -2735,8 +2733,49 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Found unused fields: b, c"
+      Compiler.compileContractFull(code).rightValue._3 is
+        AVector("Found unused fields: b, c")
+    }
+
+    {
+      info("Check unused constants in Contract")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  const C0 = 0
+           |  const C1 = 1
+           |  fn foo() -> () {
+           |    assert!(C1 == 1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContractFull(code).rightValue._3 is
+        AVector("Found unused constants: C0")
+    }
+
+    {
+      info("Check unused enums in Contract")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  enum Chain {
+           |    Alephium = 0
+           |    Eth = 1
+           |  }
+           |
+           |  enum Language {
+           |    Ralph = #00
+           |    Solidity = #01
+           |  }
+           |
+           |  fn foo() -> () {
+           |    assert!(Chain.Alephium == 0, 0)
+           |    assert!(Language.Ralph == #00, 0)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContractFull(code).rightValue._3 is
+        AVector("Found unused constants: Language.Solidity, Chain.Eth")
     }
   }
 
