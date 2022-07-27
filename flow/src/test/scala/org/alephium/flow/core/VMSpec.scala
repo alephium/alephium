@@ -135,7 +135,7 @@ class VMSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0, 1)
     checkState(blockFlow, chainIndex, contractKey0, initialState, contractOutputRef0)
 
-    val script1 = Compiler.compileTxScript(input1, 1, true).rightValue
+    val script1 = Compiler.compileTxScript(input1, 1).rightValue
     intercept[AssertionError](simpleScript(blockFlow, chainIndex, script1)).getMessage is
       s"Right(TxScriptExeFailed($ExternalPrivateMethodCall))"
   }
@@ -146,7 +146,7 @@ class VMSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0, 1)
     checkState(blockFlow, chainIndex, contractKey0, initialState, contractOutputRef0)
 
-    val script1   = Compiler.compileTxScript(input1, 1, true).rightValue
+    val script1   = Compiler.compileTxScript(input1, 1).rightValue
     val newState1 = AVector[Val](Val.U256(U256.unsafe(10)))
     val block1    = simpleScript(blockFlow, chainIndex, script1)
     addAndCheck(blockFlow, block1, 2)
@@ -167,10 +167,9 @@ class VMSpec extends AlephiumSpec {
         input: String,
         initialState: AVector[Val],
         tokenAmount: Option[U256] = None,
-        initialAttoAlphAmount: U256 = minimalAlphInContract,
-        checkUnusedVars: Boolean = true
+        initialAttoAlphAmount: U256 = minimalAlphInContract
     ): ContractOutputRef = {
-      val contract = Compiler.compileContract(input, checkUnusedVars).rightValue
+      val contract = Compiler.compileContract(input).rightValue
       val txScript =
         contractCreation(contract, initialState, genesisLockup, initialAttoAlphAmount, tokenAmount)
       val block = payableCall(blockFlow, chainIndex, txScript)
@@ -1946,7 +1945,7 @@ class VMSpec extends AlephiumSpec {
     def contractRaw: String
     def callingScriptRaw: String
 
-    lazy val contract       = Compiler.compileContract(contractRaw, false).rightValue
+    lazy val contract       = Compiler.compileContract(contractRaw).rightValue
     lazy val initialState   = AVector[Val](Val.U256.unsafe(10))
     lazy val chainIndex     = ChainIndex.unsafe(0, 0)
     lazy val fromLockup     = getGenesisLockupScript(chainIndex)
@@ -1962,7 +1961,7 @@ class VMSpec extends AlephiumSpec {
     addAndCheck(blockFlow, createContractBlock, 1)
     checkState(blockFlow, chainIndex, contractId, initialState, contractOutputRef)
 
-    val callingScript = Compiler.compileTxScript(callingScriptRaw, 1, true).rightValue
+    val callingScript = Compiler.compileTxScript(callingScriptRaw, 1).rightValue
     val callingBlock  = simpleScript(blockFlow, chainIndex, callingScript)
     addAndCheck(blockFlow, callingBlock, 2)
   }
@@ -2069,7 +2068,7 @@ class VMSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      val destroyScript        = Compiler.compileTxScript(destroyScriptRaw, 1, true).rightValue
+      val destroyScript        = Compiler.compileTxScript(destroyScriptRaw, 1).rightValue
       val destroyContractBlock = payableCall(blockFlow, chainIndex, destroyScript)
       addAndCheck(blockFlow, destroyContractBlock, 3)
 
@@ -2999,8 +2998,7 @@ class VMSpec extends AlephiumSpec {
         createContract(
           bar,
           AVector.empty,
-          initialAttoAlphAmount = ALPH.alph(2),
-          checkUnusedVars = false
+          initialAttoAlphAmount = ALPH.alph(2)
         ).key
 
       s"""

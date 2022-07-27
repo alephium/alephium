@@ -1085,26 +1085,20 @@ object Ast {
       MultiContract(newContracts)
     }
 
-    def genStatefulScript(
-        contractIndex: Int,
-        checkUnusedVars: Boolean
-    ): (StatefulScript, TxScript) = {
-      val state = Compiler.State.buildFor(this, contractIndex, checkUnusedVars)
+    def genStatefulScript(contractIndex: Int): (StatefulScript, TxScript, AVector[String]) = {
+      val state = Compiler.State.buildFor(this, contractIndex)
       get(contractIndex) match {
-        case script: TxScript => (script.genCode(state), script)
+        case script: TxScript => (script.genCode(state), script, state.getWarnings)
         case _: Contract      => throw Compiler.Error(s"The code is for Contract, not for TxScript")
         case _: ContractInterface =>
           throw Compiler.Error(s"The code is for Interface, not for TxScript")
       }
     }
 
-    def genStatefulContract(
-        contractIndex: Int,
-        checkUnusedVars: Boolean
-    ): (StatefulContract, Contract) = {
-      val state = Compiler.State.buildFor(this, contractIndex, checkUnusedVars)
+    def genStatefulContract(contractIndex: Int): (StatefulContract, Contract, AVector[String]) = {
+      val state = Compiler.State.buildFor(this, contractIndex)
       get(contractIndex) match {
-        case contract: Contract => (contract.genCode(state), contract)
+        case contract: Contract => (contract.genCode(state), contract, state.getWarnings)
         case _: TxScript => throw Compiler.Error(s"The code is for TxScript, not for Contract")
         case _: ContractInterface =>
           throw Compiler.Error(s"The code is for Interface, not for Contract")

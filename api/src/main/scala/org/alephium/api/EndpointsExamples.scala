@@ -515,7 +515,8 @@ trait EndpointsExamples extends ErrorExamples {
             argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
           )
-        )
+        ),
+        warnings = AVector("Found unused fields: a")
       )
     )
 
@@ -546,7 +547,8 @@ trait EndpointsExamples extends ErrorExamples {
             fieldNames = AVector("a", "b", "d", "e"),
             fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
           )
-        )
+        ),
+        warnings = AVector("Found unused fields: a")
       )
     )
 
