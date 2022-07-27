@@ -159,6 +159,12 @@ object GasCopyCreate {
 }
 
 @Gas
+trait GasContractExists extends GasSimple
+object GasContractExists {
+  val gas: GasBox = GasBox.unsafe(800)
+}
+
+@Gas
 trait GasDestroy extends GasSimple
 object GasDestroy {
   val gas: GasBox = GasSchedule.txInputBaseGas

@@ -159,7 +159,7 @@ object Instr {
     /* Below are instructions for Leman hard fork */
     MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
     CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-    LoadFieldByIndex, StoreFieldByIndex
+    LoadFieldByIndex, StoreFieldByIndex, ContractExists
   )
   // format: on
 
@@ -1613,6 +1613,19 @@ object CopyCreateSubContractWithToken
     with LemanInstrWithSimpleGas[StatefulContext] {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, issueToken = true)
+  }
+}
+
+object ContractExists
+    extends StatefulInstrCompanion0
+    with LemanInstrWithSimpleGas[StatefulContext]
+    with GasContractExists {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      contractId <- frame.popContractId()
+      exist      <- frame.ctx.contractExists(contractId)
+      _          <- frame.pushOpStack(Val.Bool(exist))
+    } yield ()
   }
 }
 

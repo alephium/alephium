@@ -21,6 +21,7 @@ import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
 import org.alephium.util.AVector
 
+// scalastyle:off file.size.limit
 object BuiltIn {
   sealed trait BuiltIn[-Ctx <: StatelessContext] extends FuncInfo[Ctx] {
     def name: String
@@ -639,6 +640,14 @@ object BuiltIn {
       usePreapprovedAssets = true
     )
 
+  val contractExists: SimpleStatefulBuiltIn =
+    SimpleStatefulBuiltIn(
+      "contractExists",
+      Seq[Type](Type.ByteVec),
+      Seq[Type](Type.Bool),
+      ContractExists
+    )
+
   val destroySelf: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "destroySelf",
@@ -778,6 +787,7 @@ object BuiltIn {
       createSubContractWithToken,
       copyCreateSubContract,
       copyCreateSubContractWithToken,
+      contractExists,
       destroySelf,
       migrate,
       migrateWithFields,

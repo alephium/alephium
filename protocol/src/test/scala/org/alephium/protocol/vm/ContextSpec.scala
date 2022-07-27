@@ -57,6 +57,13 @@ class ContextSpec
     }
   }
 
+  it should "test contract exists" in new Fixture {
+    val (_, _, outputRef, _) = generateContract().sample.get
+    context.contractExists(outputRef.key) isE false
+    val contractId = createContract()
+    context.contractExists(contractId) isE true
+  }
+
   it should "generate asset output" in new Fixture {
     val assetOutput = assetOutputGen(GroupIndex.unsafe(0))().sample.get
     context.generateOutput(assetOutput) isE ()

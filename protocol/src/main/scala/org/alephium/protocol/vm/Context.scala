@@ -234,6 +234,13 @@ trait StatefulContext extends StatelessContext with ContractPool {
     }
   }
 
+  def contractExists(contractId: Hash): ExeResult[Boolean] = {
+    worldState
+      .contractExists(contractId)
+      .left
+      .flatMap(error => ioFailed(IOErrorLoadContract(error)))
+  }
+
   def createContract(
       contractId: Hash,
       code: StatefulContract.HalfDecoded,

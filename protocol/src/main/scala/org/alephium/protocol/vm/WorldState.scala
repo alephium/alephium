@@ -71,6 +71,10 @@ trait WorldState[T, R1, R2, R3] {
     contractState.get(key)
   }
 
+  def contractExists(key: Hash): IOResult[Boolean] = {
+    contractState.exists(key)
+  }
+
   def getContractCode(key: Hash): IOResult[WorldState.CodeRecord] = {
     codeState.get(key)
   }

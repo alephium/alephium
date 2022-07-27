@@ -843,6 +843,29 @@ class VMSpec extends AlephiumSpec {
     failSimpleScript(failure(33), InvalidContractId)
   }
 
+  it should "test contract exists" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    assert!(contractExists!(selfContractId!()), 0)
+         |    assert!(!contractExists!(#${Hash.generate.toHexString}), 0)
+         |  }
+         |}
+         |""".stripMargin
+    val contractId = createContract(foo, AVector.empty).key.toHexString
+
+    val script =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  Foo(#$contractId).foo()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script)
+  }
+
   trait DestroyFixture extends ContractFixture {
     def prepareContract(
         contract: String,
