@@ -1411,7 +1411,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val compileResult = serverUtils.compileContract(Compile.Contract(contract)).rightValue
     compileResult.fields.types is AVector("[U256;2]")
     val func = compileResult.functions.head
-    func.argTypes is AVector("[U256;2]")
+    func.paramNames is AVector("input")
+    func.paramTypes is AVector("[U256;2]")
+    func.paramIsMutable is AVector(false)
     func.returnTypes is AVector("[U256;2]")
 
     val testFlow      = BlockFlow.emptyUnsafe(config)

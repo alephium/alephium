@@ -519,9 +519,10 @@ object Ast {
       }
       s"${assetModifier}${publicPrefix}${name}(${args.map(_.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
     }
-    def getArgNames(): Seq[String]          = args.map(_.ident.name)
-    def getArgTypeSignatures(): Seq[String] = args.map(_.tpe.signature)
-    def getReturnSignatures(): Seq[String]  = rtypes.map(_.signature)
+    def getArgNames(): AVector[String]          = AVector.from(args.view.map(_.ident.name))
+    def getArgTypeSignatures(): AVector[String] = AVector.from(args.view.map(_.tpe.signature))
+    def getArgMutability(): AVector[Boolean]    = AVector.from(args.view.map(_.isMutable))
+    def getReturnSignatures(): AVector[String]  = AVector.from(rtypes.view.map(_.signature))
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     private def checkRetTypes(stmt: Option[Statement[Ctx]]): Unit = {
@@ -630,8 +631,8 @@ object Ast {
 
     def signature: String = s"event ${id.name}(${fields.map(_.signature).mkString(",")})"
 
-    def getFieldNames(): Seq[String]          = fields.map(_.ident.name)
-    def getFieldTypeSignatures(): Seq[String] = fields.map(_.tpe.signature)
+    def getFieldNames(): AVector[String]          = AVector.from(fields.view.map(_.ident.name))
+    def getFieldTypeSignatures(): AVector[String] = AVector.from(fields.view.map(_.tpe.signature))
   }
 
   final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
@@ -889,8 +890,11 @@ object Ast {
     def enums: Seq[EnumDef]               = throw error("enum")
     def getTemplateVarsSignature(): String =
       s"TxScript ${name}(${templateVars.map(_.signature).mkString(",")})"
-    def getTemplateVarsNames(): Seq[String] = templateVars.map(_.ident.name)
-    def getTemplateVarsTypes(): Seq[String] = templateVars.map(_.tpe.signature)
+    def getTemplateVarsNames(): AVector[String] = AVector.from(templateVars.view.map(_.ident.name))
+    def getTemplateVarsTypes(): AVector[String] =
+      AVector.from(templateVars.view.map(_.tpe.signature))
+    def getTemplateVarsMutability(): AVector[Boolean] =
+      AVector.from(templateVars.view.map(_.isMutable))
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
@@ -922,8 +926,9 @@ object Ast {
   ) extends ContractWithState {
     def getFieldsSignature(): String =
       s"Contract ${name}(${fields.map(_.signature).mkString(",")})"
-    def getFieldNames(): Seq[String] = fields.map(_.ident.name)
-    def getFieldTypes(): Seq[String] = fields.map(_.tpe.signature)
+    def getFieldNames(): AVector[String]       = AVector.from(fields.view.map(_.ident.name))
+    def getFieldTypes(): AVector[String]       = AVector.from(fields.view.map(_.tpe.signature))
+    def getFieldMutability(): AVector[Boolean] = AVector.from(fields.view.map(_.isMutable))
 
     private def checkFuncs(): Unit = {
       if (funcs.length < 1) {

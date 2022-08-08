@@ -16,39 +16,45 @@
 
 package org.alephium.protocol.vm.lang
 
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class TypeSpec extends AlephiumSpec {
   it should "return correct signature" in new TypeSignatureFixture {
     contractAst.getFieldsSignature() is
       "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])"
     contractAst.getFieldNames() is
-      Seq("aa", "bb", "cc", "dd", "ee", "ff")
+      AVector("aa", "bb", "cc", "dd", "ee", "ff")
     contractAst.getFieldTypes() is
-      Seq("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]")
+      AVector("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]")
+    contractAst.getFieldMutability() is
+      AVector(false, true, false, true, false, false)
     contractAst.funcs.map(_.signature) is Seq(
       "@using(preapprovedAssets=true,assetsInContract=true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
     )
     contractAst.funcs.map(_.getArgNames()) is
-      Seq(Seq("a", "b", "c", "d", "e", "f"))
+      Seq(AVector("a", "b", "c", "d", "e", "f"))
     contractAst.funcs.map(_.getArgTypeSignatures()) is
-      Seq(Seq("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"))
+      Seq(AVector("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"))
+    contractAst.funcs.map(_.getArgMutability()) is
+      Seq(AVector(false, true, false, true, false, false))
     contractAst.funcs.map(_.getReturnSignatures()) is
-      Seq(Seq("U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"))
+      Seq(AVector("U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"))
     contractAst.events.map(_.signature) is Seq(
       "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)"
     )
     contractAst.events.map(_.getFieldNames()) is
-      Seq(Seq("a", "b", "d", "e"))
+      Seq(AVector("a", "b", "d", "e"))
     contractAst.events.map(_.getFieldTypeSignatures()) is
-      Seq(Seq("Bool", "U256", "ByteVec", "Address"))
+      Seq(AVector("Bool", "U256", "ByteVec", "Address"))
 
     scriptAst.getTemplateVarsSignature() is
       "TxScript Foo(aa:Bool,bb:U256,cc:I256,dd:ByteVec,ee:Address)"
     scriptAst.getTemplateVarsNames() is
-      Seq("aa", "bb", "cc", "dd", "ee")
+      AVector("aa", "bb", "cc", "dd", "ee")
     scriptAst.getTemplateVarsTypes() is
-      Seq("Bool", "U256", "I256", "ByteVec", "Address")
+      AVector("Bool", "U256", "I256", "ByteVec", "Address")
+    scriptAst.getTemplateVarsMutability() is
+      AVector(false, false, false, false, false)
     scriptAst.funcs.map(_.signature) is Seq(
       "@using(preapprovedAssets=true) pub main()->()",
       "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
