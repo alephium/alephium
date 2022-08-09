@@ -502,17 +502,19 @@ trait EndpointsExamples extends ErrorExamples {
       CompileScriptResult(
         bytecodeTemplate = hexString,
         fields = CompileResult.FieldsSig(
-          signature = "TxScript Bar(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
           names = AVector("aa", "bb", "cc", "dd", "ee"),
-          types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
+          types = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+          isMutable = AVector(false, true, false, true, false)
         ),
         functions = AVector(
           CompileResult.FunctionSig(
             name = "bar",
-            signature =
-              "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
-            argNames = AVector("a", "b", "c", "d", "e"),
-            argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+            usePreapprovedAssets = false,
+            useAssetsInContract = false,
+            isPublic = true,
+            paramNames = AVector("a", "b", "c", "d", "e"),
+            paramTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+            paramIsMutable = AVector(false, true, false, true, false),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
           )
         ),
@@ -526,24 +528,25 @@ trait EndpointsExamples extends ErrorExamples {
         bytecode = hexString,
         codeHash = hash,
         fields = CompileResult.FieldsSig(
-          signature = "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
           names = AVector("aa", "bb", "cc", "dd", "ee"),
-          types = AVector("Bool", "U256", "I256", "ByteVec", "Address")
+          types = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+          isMutable = AVector(false, true, false, true, false)
         ),
         functions = AVector(
           CompileResult.FunctionSig(
             name = "bar",
-            signature =
-              "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
-            argNames = AVector("a", "b", "c", "d", "e"),
-            argTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+            usePreapprovedAssets = false,
+            useAssetsInContract = false,
+            isPublic = true,
+            paramNames = AVector("a", "b", "c", "d", "e"),
+            paramTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+            paramIsMutable = AVector(false, true, false, true, false),
             returnTypes = AVector("U256", "I256", "ByteVec", "Address")
           )
         ),
         events = AVector(
           CompileResult.EventSig(
             name = "Bar",
-            signature = "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
             fieldNames = AVector("a", "b", "d", "e"),
             fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
           )

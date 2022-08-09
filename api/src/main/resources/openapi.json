@@ -5475,7 +5475,6 @@
                 "example": {
                   "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "fields": {
-                    "signature": "TxScript Bar(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
                     "names": [
                       "aa",
                       "bb",
@@ -5489,25 +5488,41 @@
                       "I256",
                       "ByteVec",
                       "Address"
+                    ],
+                    "isMutable": [
+                      false,
+                      true,
+                      false,
+                      true,
+                      false
                     ]
                   },
                   "functions": [
                     {
                       "name": "bar",
-                      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
-                      "argNames": [
+                      "usePreapprovedAssets": false,
+                      "useAssetsInContract": false,
+                      "isPublic": true,
+                      "paramNames": [
                         "a",
                         "b",
                         "c",
                         "d",
                         "e"
                       ],
-                      "argTypes": [
+                      "paramTypes": [
                         "Bool",
                         "U256",
                         "I256",
                         "ByteVec",
                         "Address"
+                      ],
+                      "paramIsMutable": [
+                        false,
+                        true,
+                        false,
+                        true,
+                        false
                       ],
                       "returnTypes": [
                         "U256",
@@ -5757,7 +5772,6 @@
                   "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
-                    "signature": "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address)",
                     "names": [
                       "aa",
                       "bb",
@@ -5771,25 +5785,41 @@
                       "I256",
                       "ByteVec",
                       "Address"
+                    ],
+                    "isMutable": [
+                      false,
+                      true,
+                      false,
+                      true,
+                      false
                     ]
                   },
                   "functions": [
                     {
                       "name": "bar",
-                      "signature": "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address)->(U256,I256,ByteVec,Address)",
-                      "argNames": [
+                      "usePreapprovedAssets": false,
+                      "useAssetsInContract": false,
+                      "isPublic": true,
+                      "paramNames": [
                         "a",
                         "b",
                         "c",
                         "d",
                         "e"
                       ],
-                      "argTypes": [
+                      "paramTypes": [
                         "Bool",
                         "U256",
                         "I256",
                         "ByteVec",
                         "Address"
+                      ],
+                      "paramIsMutable": [
+                        false,
+                        true,
+                        false,
+                        true,
+                        false
                       ],
                       "returnTypes": [
                         "U256",
@@ -5802,7 +5832,6 @@
                   "events": [
                     {
                       "name": "Bar",
-                      "signature": "event Bar(a:Bool,b:U256,d:ByteVec,e:Address)",
                       "fieldNames": [
                         "a",
                         "b",
@@ -9106,16 +9135,12 @@
       "EventSig": {
         "required": [
           "name",
-          "signature",
           "fieldNames",
           "fieldTypes"
         ],
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
-          },
-          "signature": {
             "type": "string"
           },
           "fieldNames": {
@@ -9151,15 +9176,12 @@
       },
       "FieldsSig": {
         "required": [
-          "signature",
           "names",
-          "types"
+          "types",
+          "isMutable"
         ],
         "type": "object",
         "properties": {
-          "signature": {
-            "type": "string"
-          },
           "names": {
             "type": "array",
             "items": {
@@ -9170,6 +9192,12 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "isMutable": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
             }
           }
         }
@@ -9221,9 +9249,12 @@
       "FunctionSig": {
         "required": [
           "name",
-          "signature",
-          "argNames",
-          "argTypes",
+          "usePreapprovedAssets",
+          "useAssetsInContract",
+          "isPublic",
+          "paramNames",
+          "paramTypes",
+          "paramIsMutable",
           "returnTypes"
         ],
         "type": "object",
@@ -9231,19 +9262,31 @@
           "name": {
             "type": "string"
           },
-          "signature": {
-            "type": "string"
+          "usePreapprovedAssets": {
+            "type": "boolean"
           },
-          "argNames": {
+          "useAssetsInContract": {
+            "type": "boolean"
+          },
+          "isPublic": {
+            "type": "boolean"
+          },
+          "paramNames": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "argTypes": {
+          "paramTypes": {
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "paramIsMutable": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
             }
           },
           "returnTypes": {

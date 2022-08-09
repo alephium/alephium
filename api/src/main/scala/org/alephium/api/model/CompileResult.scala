@@ -37,9 +37,9 @@ object CompileScriptResult {
   ): CompileScriptResult = {
     val bytecodeTemplate = script.toTemplateString()
     val fields = CompileResult.FieldsSig(
-      scriptAst.getTemplateVarsSignature(),
-      AVector.from(scriptAst.getTemplateVarsNames()),
-      AVector.from(scriptAst.getTemplateVarsTypes())
+      scriptAst.getTemplateVarsNames(),
+      scriptAst.getTemplateVarsTypes(),
+      scriptAst.getTemplateVarsMutability()
     )
     CompileScriptResult(
       bytecodeTemplate,
@@ -68,9 +68,9 @@ object CompileContractResult {
     assume(contractAst.templateVars.isEmpty) // Template variable is disabled right now
     val bytecode = Hex.toHexString(serialize(contract))
     val fields = CompileResult.FieldsSig(
-      contractAst.getFieldsSignature(),
-      AVector.from(contractAst.getFieldNames()),
-      AVector.from(contractAst.getFieldTypes())
+      contractAst.getFieldNames(),
+      contractAst.getFieldTypes(),
+      contractAst.getFieldMutability()
     )
     CompileContractResult(
       bytecode,
@@ -85,30 +85,39 @@ object CompileContractResult {
 
 object CompileResult {
 
-  final case class FieldsSig(signature: String, names: AVector[String], types: AVector[String])
+  final case class FieldsSig(
+      names: AVector[String],
+      types: AVector[String],
+      isMutable: AVector[Boolean]
+  )
 
   final case class FunctionSig(
       name: String,
-      signature: String,
-      argNames: AVector[String],
-      argTypes: AVector[String],
+      usePreapprovedAssets: Boolean,
+      useAssetsInContract: Boolean,
+      isPublic: Boolean,
+      paramNames: AVector[String],
+      paramTypes: AVector[String],
+      paramIsMutable: AVector[Boolean],
       returnTypes: AVector[String]
   )
   object FunctionSig {
     def from(func: Ast.FuncDef[StatefulContext]): FunctionSig = {
       FunctionSig(
         func.id.name,
-        func.signature,
-        AVector.from(func.getArgNames()),
-        AVector.from(func.getArgTypeSignatures()),
-        AVector.from(func.getReturnSignatures())
+        func.usePreapprovedAssets,
+        func.useAssetsInContract,
+        func.isPublic,
+        func.getArgNames(),
+        func.getArgTypeSignatures(),
+        func.getArgMutability(),
+        func.getReturnSignatures()
       )
     }
   }
 
   final case class EventSig(
       name: String,
-      signature: String,
       fieldNames: AVector[String],
       fieldTypes: AVector[String]
   )
@@ -116,9 +125,8 @@ object CompileResult {
     def from(event: Ast.EventDef): EventSig = {
       EventSig(
         event.name,
-        event.signature,
-        AVector.from(event.getFieldNames()),
-        AVector.from(event.getFieldTypeSignatures())
+        event.getFieldNames(),
+        event.getFieldTypeSignatures()
       )
     }
   }
