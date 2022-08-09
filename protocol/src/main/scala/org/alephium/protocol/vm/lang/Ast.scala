@@ -27,7 +27,7 @@ object Ast {
   final case class Ident(name: String)
   final case class TypeId(name: String)
   final case class FuncId(name: String, isBuiltIn: Boolean)
-  final case class Argument(ident: Ident, tpe: Type, isMutable: Boolean) {
+  final case class Argument(ident: Ident, tpe: Type, isMutable: Boolean, isUnused: Boolean) {
     def signature: String = {
       val prefix = if (isMutable) "mut " else ""
       s"${prefix}${ident.name}:${tpe.signature}"
@@ -454,7 +454,7 @@ object Ast {
       }
       vars.zip(types).foreach {
         case (NamedVar(isMutable, ident), tpe) =>
-          state.addLocalVariable(ident, tpe, isMutable, false)
+          state.addLocalVariable(ident, tpe, isMutable, isUnused = false, isGenerated = false)
         case _ =>
       }
     }
@@ -538,7 +538,9 @@ object Ast {
 
     def check(state: Compiler.State[Ctx]): Unit = {
       state.checkArguments(args)
-      args.foreach(arg => state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable, false))
+      args.foreach(arg =>
+        state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, isGenerated = false)
+      )
       body.foreach(_.check(state))
       state.checkUnusedLocalVars(id)
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
@@ -826,7 +828,13 @@ object Ast {
         state.addTemplateVariable(temp.ident, temp.tpe, index)
       }
       fields.foreach(field =>
-        state.addFieldVariable(field.ident, field.tpe, field.isMutable, false)
+        state.addFieldVariable(
+          field.ident,
+          field.tpe,
+          field.isMutable,
+          field.isUnused,
+          isGenerated = false
+        )
       )
     }
 

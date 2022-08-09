@@ -28,14 +28,15 @@ object ArrayTransformer {
       tpe: Type.FixedSizeArray,
       baseName: String,
       isMutable: Boolean,
+      isUnused: Boolean,
       isLocal: Boolean,
       isGenerated: Boolean,
       varInfoBuilder: Compiler.VarInfoBuilder
   ): ArrayRef[Ctx] = {
     val offset = ConstantArrayVarOffset[Ctx](state.varIndex)
-    initArrayVars(state, tpe, baseName, isMutable, isLocal, varInfoBuilder)
+    initArrayVars(state, tpe, baseName, isMutable, isUnused, isLocal, varInfoBuilder)
     val ref = ArrayRef[Ctx](isLocal, tpe, offset)
-    state.addArrayRef(Ident(baseName), isMutable, isGenerated, ref)
+    state.addArrayRef(Ident(baseName), isMutable, isUnused, isGenerated, ref)
     ref
   }
 
@@ -45,6 +46,7 @@ object ArrayTransformer {
       tpe: Type.FixedSizeArray,
       baseName: String,
       isMutable: Boolean,
+      isUnused: Boolean,
       isLocal: Boolean,
       varInfoBuilder: Compiler.VarInfoBuilder
   ): Unit = {
@@ -52,12 +54,20 @@ object ArrayTransformer {
       case baseType: Type.FixedSizeArray =>
         (0 until tpe.size).foreach { idx =>
           val newBaseName = arrayVarName(baseName, idx)
-          initArrayVars(state, baseType, newBaseName, isMutable, isLocal, varInfoBuilder)
+          initArrayVars(state, baseType, newBaseName, isMutable, isUnused, isLocal, varInfoBuilder)
         }
       case baseType =>
         (0 until tpe.size).foreach { idx =>
           val ident = Ast.Ident(arrayVarName(baseName, idx))
-          state.addVariable(ident, baseType, isMutable, isLocal, true, varInfoBuilder)
+          state.addVariable(
+            ident,
+            baseType,
+            isMutable,
+            isUnused,
+            isLocal,
+            isGenerated = true,
+            varInfoBuilder
+          )
         }
     }
   }

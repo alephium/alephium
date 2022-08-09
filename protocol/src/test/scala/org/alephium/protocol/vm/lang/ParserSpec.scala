@@ -339,18 +339,25 @@ class ParserSpec extends AlephiumSpec {
     val funcArgs = List(
       "(mut a: [Bool; 2], b: [[Address; 3]; 2], c: [Foo; 4], d: U256)" ->
         Seq(
-          Argument(Ident("a"), Type.FixedSizeArray(Type.Bool, 2), isMutable = true),
+          Argument(
+            Ident("a"),
+            Type.FixedSizeArray(Type.Bool, 2),
+            isMutable = true,
+            isUnused = false
+          ),
           Argument(
             Ident("b"),
             Type.FixedSizeArray(Type.FixedSizeArray(Type.Address, 3), 2),
-            isMutable = false
+            isMutable = false,
+            isUnused = false
           ),
           Argument(
             Ident("c"),
             Type.FixedSizeArray(Type.Contract.local(TypeId("Foo"), Ident("c")), 4),
-            isMutable = false
+            isMutable = false,
+            isUnused = false
           ),
-          Argument(Ident("d"), Type.U256, isMutable = false)
+          Argument(Ident("d"), Type.U256, isMutable = false, isUnused = false)
         )
     )
 
@@ -645,7 +652,10 @@ class ParserSpec extends AlephiumSpec {
         false,
         TypeId("Child"),
         Seq.empty,
-        Seq(Argument(Ident("x"), Type.U256, false), Argument(Ident("y"), Type.U256, false)),
+        Seq(
+          Argument(Ident("x"), Type.U256, false, false),
+          Argument(Ident("y"), Type.U256, false, false)
+        ),
         Seq(
           FuncDef(
             Seq.empty,
@@ -972,7 +982,7 @@ class ParserSpec extends AlephiumSpec {
     val script: String
 
     val ident        = TypeId("Main")
-    val templateVars = Seq(Argument(Ident("x"), Type.U256, false))
+    val templateVars = Seq(Argument(Ident("x"), Type.U256, false, false))
     def funcs[C <: StatelessContext] = Seq[FuncDef[C]](
       FuncDef(
         Seq.empty,

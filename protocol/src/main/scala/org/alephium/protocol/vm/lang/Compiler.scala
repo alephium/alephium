@@ -131,29 +131,42 @@ object Compiler {
     }
   }
 
-  type VarInfoBuilder = (Type, Boolean, Byte, Boolean) => VarInfo
+  type VarInfoBuilder = (Type, Boolean, Boolean, Byte, Boolean) => VarInfo
   sealed trait VarInfo {
     def tpe: Type
     def isMutable: Boolean
+    def isUnused: Boolean
     def isGenerated: Boolean
     def isLocal: Boolean
   }
   object VarInfo {
-    final case class Local(tpe: Type, isMutable: Boolean, index: Byte, isGenerated: Boolean)
-        extends VarInfo {
+    final case class Local(
+        tpe: Type,
+        isMutable: Boolean,
+        isUnused: Boolean,
+        index: Byte,
+        isGenerated: Boolean
+    ) extends VarInfo {
       def isLocal: Boolean = true
     }
-    final case class Field(tpe: Type, isMutable: Boolean, index: Byte, isGenerated: Boolean)
-        extends VarInfo {
+    final case class Field(
+        tpe: Type,
+        isMutable: Boolean,
+        isUnused: Boolean,
+        index: Byte,
+        isGenerated: Boolean
+    ) extends VarInfo {
       def isLocal: Boolean = false
     }
     final case class Template(tpe: Type, index: Int) extends VarInfo {
       def isMutable: Boolean   = false
+      def isUnused: Boolean    = false
       def isGenerated: Boolean = false
       def isLocal: Boolean     = false
     }
     final case class ArrayRef[Ctx <: StatelessContext](
         isMutable: Boolean,
+        isUnused: Boolean,
         isGenerated: Boolean,
         ref: ArrayTransformer.ArrayRef[Ctx]
     ) extends VarInfo {
@@ -165,6 +178,7 @@ object Compiler {
         instrs: Seq[Instr[Ctx]]
     ) extends VarInfo {
       def isMutable: Boolean   = false
+      def isUnused: Boolean    = false
       def isGenerated: Boolean = false
       def isLocal: Boolean     = true
     }
@@ -378,7 +392,7 @@ object Compiler {
         case Some(ident) => ident
         case None =>
           val ident = Ast.Ident(freshName())
-          addLocalVariable(ident, Type.U256, true, true)
+          addLocalVariable(ident, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
           arrayIndexVar = Some(ident)
           ident
       }
@@ -400,7 +414,16 @@ object Compiler {
         case _ =>
           val arrayType = expr.getType(this)(0).asInstanceOf[Type.FixedSizeArray]
           val arrayRef =
-            ArrayTransformer.init(this, arrayType, freshName(), false, true, true, VarInfo.Local)
+            ArrayTransformer.init(
+              this,
+              arrayType,
+              freshName(),
+              isMutable = false,
+              isUnused = false,
+              isLocal = true,
+              isGenerated = true,
+              VarInfo.Local
+            )
           val codes = expr.genCode(this) ++ arrayRef.genStoreCode(this).reverse.flatten
           (arrayRef, codes)
       }
@@ -409,11 +432,12 @@ object Compiler {
     def addArrayRef(
         ident: Ast.Ident,
         isMutable: Boolean,
+        isUnused: Boolean,
         isGenerated: Boolean,
         arrayRef: ArrayTransformer.ArrayRef[Ctx]
     ): Unit = {
       val sname = checkNewVariable(ident)
-      varTable(sname) = VarInfo.ArrayRef(isMutable, isGenerated, arrayRef)
+      varTable(sname) = VarInfo.ArrayRef(isMutable, isUnused, isGenerated, arrayRef)
     }
 
     def getArrayRef(ident: Ast.Ident): ArrayTransformer.ArrayRef[Ctx] = {
@@ -449,22 +473,25 @@ object Compiler {
         ident: Ast.Ident,
         tpe: Type,
         isMutable: Boolean,
+        isUnused: Boolean,
         isGenerated: Boolean
     ): Unit = {
-      addVariable(ident, tpe, isMutable, false, isGenerated, VarInfo.Field)
+      addVariable(ident, tpe, isMutable, isUnused, isLocal = false, isGenerated, VarInfo.Field)
     }
     def addLocalVariable(
         ident: Ast.Ident,
         tpe: Type,
         isMutable: Boolean,
+        isUnused: Boolean,
         isGenerated: Boolean
     ): Unit = {
-      addVariable(ident, tpe, isMutable, true, isGenerated, VarInfo.Local)
+      addVariable(ident, tpe, isMutable, isUnused, isLocal = true, isGenerated, VarInfo.Local)
     }
     def addVariable(
         ident: Ast.Ident,
         tpe: Type,
         isMutable: Boolean,
+        isUnused: Boolean,
         isLocal: Boolean,
         isGenerated: Boolean,
         varInfoBuilder: Compiler.VarInfoBuilder
@@ -477,6 +504,7 @@ object Compiler {
             t,
             ident.name,
             isMutable,
+            isUnused,
             isLocal,
             isGenerated,
             varInfoBuilder
@@ -484,10 +512,11 @@ object Compiler {
           ()
         case c: Type.Contract =>
           val varType = Type.Contract.local(c.id, ident)
-          varTable(sname) = varInfoBuilder(varType, isMutable, varIndex.toByte, isGenerated)
+          varTable(sname) =
+            varInfoBuilder(varType, isMutable, isUnused, varIndex.toByte, isGenerated)
           varIndex += 1
         case _ =>
-          varTable(sname) = varInfoBuilder(tpe, isMutable, varIndex.toByte, isGenerated)
+          varTable(sname) = varInfoBuilder(tpe, isMutable, isUnused, varIndex.toByte, isGenerated)
           varIndex += 1
       }
     }
@@ -527,17 +556,21 @@ object Compiler {
     def checkUnusedLocalVars(funcId: Ast.FuncId): Unit = {
       val prefix = s"${funcId.name}."
       val unusedVars = varTable.filter { case (name, varInfo) =>
-        name.startsWith(prefix) && !usedVars.contains(name) && !varInfo.isGenerated
+        name.startsWith(prefix) &&
+        !usedVars.contains(name) &&
+        !varInfo.isGenerated &&
+        !varInfo.isUnused
       }
       if (unusedVars.nonEmpty) {
-        warnings += s"Found unused variables in function ${funcId.name}: ${unusedVars.keys.mkString(", ")}"
+        val unusedVarsString = unusedVars.keys.toArray.sorted.mkString(", ")
+        warnings += s"Found unused variables in function ${funcId.name}: ${unusedVarsString}"
       }
       usedVars.filterInPlace(name => !name.startsWith(prefix))
     }
 
     def checkUnusedFields(): Unit = {
       val unusedVars = varTable.filter { case (name, varInfo) =>
-        !usedVars.contains(name) && !varInfo.isGenerated
+        !usedVars.contains(name) && !varInfo.isGenerated && !varInfo.isUnused
       }
       val unusedConstants = mutable.ArrayBuffer.empty[String]
       val unusedFields    = mutable.ArrayBuffer.empty[String]
@@ -547,10 +580,10 @@ object Compiler {
         case _                                   => ()
       }
       if (unusedConstants.nonEmpty) {
-        warnings += s"Found unused constants: ${unusedConstants.mkString(", ")}"
+        warnings += s"Found unused constants: ${unusedConstants.sorted.mkString(", ")}"
       }
       if (unusedFields.nonEmpty) {
-        warnings += s"Found unused fields: ${unusedFields.mkString(", ")}"
+        warnings += s"Found unused fields: ${unusedFields.sorted.mkString(", ")}"
       }
     }
 
