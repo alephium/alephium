@@ -58,9 +58,13 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse("U256", Lexer.typeId(_)).get.value is Ast.TypeId("U256")
     fastparse.parse("Foo", Lexer.typeId(_)).get.value is Ast.TypeId("Foo")
     fastparse.parse("x: U256", StatelessParser.funcArgument(_)).get.value is
-      Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = false)
+      Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = false, isUnused = false)
     fastparse.parse("mut x: U256", StatelessParser.funcArgument(_)).get.value is
-      Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = true)
+      Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = true, isUnused = false)
+    fastparse.parse("@unused mut x: U256", StatelessParser.funcArgument(_)).get.value is
+      Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = true, isUnused = true)
+    fastparse.parse("@unused mut x: U256", StatelessParser.contractField(_)).get.value is
+      Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = true, isUnused = true)
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
     fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
     fastparse.parse("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)

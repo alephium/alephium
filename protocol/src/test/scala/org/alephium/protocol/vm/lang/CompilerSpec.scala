@@ -1898,7 +1898,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(child).leftValue.message is
-        "Invalid contract inheritance fields, expect List(Argument(Ident(x),U256,true)), have List(Argument(Ident(x),U256,false))"
+        "Invalid contract inheritance fields, expect List(Argument(Ident(x),U256,true,false)), have List(Argument(Ident(x),U256,false,false))"
     }
 
     {
@@ -1915,7 +1915,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(child).leftValue.message is
-        "Invalid contract inheritance fields, expect List(Argument(Ident(x),U256,true)), have List(Argument(Ident(y),U256,true))"
+        "Invalid contract inheritance fields, expect List(Argument(Ident(x),U256,true,false)), have List(Argument(Ident(y),U256,true,false))"
     }
 
     {
@@ -2775,7 +2775,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
-        AVector("Found unused constants: Language.Solidity, Chain.Eth")
+        AVector("Found unused constants: Chain.Eth, Language.Solidity")
     }
   }
 
@@ -2888,5 +2888,31 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val fooContract = Compiler.compileContract(foo).rightValue
     val barContract = Compiler.compileContract(bar).rightValue
     fooContract is barContract
+  }
+
+  it should "parse unused variables and fields" in {
+    def code(unused: String) =
+      s"""
+         |Contract Foo($unused a: U256, $unused b: [U256; 2]) {
+         |  pub fn foo($unused x: U256, $unused y: [U256; 2]) -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    {
+      info("Fields and variables are unused")
+      val warnings = Compiler.compileContractFull(code("")).rightValue._3
+      warnings is AVector(
+        "Found unused variables in function foo: foo.x, foo.y",
+        "Found unused fields: a, b"
+      )
+    }
+
+    {
+      info("Fields and variables are annotated as unused")
+      val warnings = Compiler.compileContractFull(code("@unused")).rightValue._3
+      warnings.isEmpty is true
+    }
   }
 }

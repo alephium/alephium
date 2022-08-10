@@ -56,11 +56,15 @@ object Lexer {
     obj.getClass.getSimpleName.dropRight(1)
   }
 
-  def keyword[Unknown: P](s: String): P[Unit] = {
-    require(keywordSet.contains(s))
+  def token[Unknown: P](s: String): P[Unit] = {
     s ~ !(letter | digit | "_")
   }
-  def mut[Unknown: P]: P[Boolean] = P(keyword("mut").?.!).map(_.nonEmpty)
+  def keyword[Unknown: P](s: String): P[Unit] = {
+    require(keywordSet.contains(s))
+    token(s)
+  }
+  def unused[Unknown: P]: P[Boolean] = token("@unused").?.!.map(_.nonEmpty)
+  def mut[Unknown: P]: P[Boolean]    = P(keyword("mut").?.!).map(_.nonEmpty)
 
   def lineComment[Unknown: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
   def emptyChars[Unknown: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
