@@ -85,6 +85,7 @@ object BuiltIn {
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean
   ) extends SimpleBuiltIn[StatefulContext]
+
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   object SimpleStatefulBuiltIn {
     def apply(
@@ -577,14 +578,34 @@ object BuiltIn {
       usePreapprovedAssets = true
     )
 
-  val createContractWithToken: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn(
-      "createContractWithToken",
-      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
-      Seq[Type](Type.ByteVec),
-      CreateContractWithToken,
-      usePreapprovedAssets = true
-    )
+  val createContractWithToken: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] {
+    val name: String                  = "createContractWithToken"
+    val usePreapprovedAssets: Boolean = true
+    val useAssetsInContract: Boolean  = false
+
+    val argsTypeWithoutTransfer: Seq[Type] =
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256)
+    val argsTypeWithTransfer: Seq[Type] =
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256, Type.Address)
+
+    override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+      if (inputType == argsTypeWithTransfer || inputType == argsTypeWithoutTransfer) {
+        Seq[Type](Type.ByteVec)
+      } else {
+        throw Error(s"Invalid args type $inputType for builtin func $name")
+      }
+    }
+
+    override def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
+      if (inputType == argsTypeWithTransfer) {
+        Seq(CreateContractAndTransferToken)
+      } else if (inputType == argsTypeWithoutTransfer) {
+        Seq(CreateContractWithToken)
+      } else {
+        throw Error(s"Invalid args type $inputType for builtin func $name")
+      }
+    }
+  }
 
   val copyCreateContract: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(

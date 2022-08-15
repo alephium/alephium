@@ -166,12 +166,18 @@ class VMSpec extends AlephiumSpec {
     def createContract(
         input: String,
         initialState: AVector[Val],
-        tokenAmount: Option[U256] = None,
+        tokenIssuanceInfo: Option[TokenIssuance.Info] = None,
         initialAttoAlphAmount: U256 = minimalAlphInContract
     ): ContractOutputRef = {
       val contract = Compiler.compileContract(input).rightValue
       val txScript =
-        contractCreation(contract, initialState, genesisLockup, initialAttoAlphAmount, tokenAmount)
+        contractCreation(
+          contract,
+          initialState,
+          genesisLockup,
+          initialAttoAlphAmount,
+          tokenIssuanceInfo
+        )
       val block = payableCall(blockFlow, chainIndex, txScript)
 
       val contractOutputRef =
@@ -188,11 +194,11 @@ class VMSpec extends AlephiumSpec {
         numAssets: Int,
         numContracts: Int,
         initialState: AVector[Val] = AVector[Val](Val.U256(U256.Zero)),
-        tokenAmount: Option[U256] = None,
+        tokenIssuanceInfo: Option[TokenIssuance.Info] = None,
         initialAttoAlphAmount: U256 = minimalAlphInContract
     ): ContractOutputRef = {
       val contractOutputRef =
-        createContract(input, initialState, tokenAmount, initialAttoAlphAmount)
+        createContract(input, initialState, tokenIssuanceInfo, initialAttoAlphAmount)
 
       val contractKey = contractOutputRef.key
       checkState(
@@ -275,6 +281,11 @@ class VMSpec extends AlephiumSpec {
       worldState.contractState.exists(contractKey) isE existed
       worldState.outputState.exists(contractAssetRef) isE existed
     }
+
+    def getContractAsset(contractId: Hash, chainIndex: ChainIndex): ContractOutput = {
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+      worldState.getContractAsset(contractId).rightValue
+    }
   }
 
   it should "disallow loading upgraded contract in current tx" in new ContractFixture {
@@ -315,6 +326,48 @@ class VMSpec extends AlephiumSpec {
     ) is true
   }
 
+  it should "create contract and optionally transfer token" in new ContractFixture {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn main() -> () {
+         |  }
+         |}
+         |""".stripMargin
+
+    {
+      info("create contract and transfer token")
+      val contractId = createContract(
+        code,
+        initialState = AVector.empty,
+        Some(TokenIssuance.Info(Val.U256.unsafe(10), Some(Val.Address(genesisLockup))))
+      ).key
+
+      val genesisTokenAmount = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
+      genesisTokenAmount is 10
+
+      val contractAsset = getContractAsset(contractId, chainIndex)
+      contractAsset.tokens.length is 0
+    }
+
+    {
+      info("create contract and not transfer token")
+      val contractId = createContract(
+        code,
+        initialState = AVector.empty,
+        Some(TokenIssuance.Info(Val.U256.unsafe(10), None))
+      ).key
+
+      val genesisTokenAmount = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
+      genesisTokenAmount is 0
+
+      val contractAsset = getContractAsset(contractId, chainIndex)
+      contractAsset.tokens.length is 1
+      contractAsset.tokens(0)._1 is contractId
+      contractAsset.tokens(0)._2 is 10
+    }
+  }
+
   it should "burn token" in new ContractFixture {
     val contract =
       s"""
@@ -331,7 +384,8 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val contractId = createContract(contract, AVector.empty, Some(ALPH.alph(5))).key
+    val contractId =
+      createContract(contract, AVector.empty, Some(TokenIssuance.Info(ALPH.alph(5)))).key
 
     val mint =
       s"""
@@ -343,8 +397,7 @@ class VMSpec extends AlephiumSpec {
          |$contract
          |""".stripMargin
     callTxScript(mint)
-    val worldState0    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
-    val contractAsset0 = worldState0.getContractAsset(contractId).rightValue
+    val contractAsset0 = getContractAsset(contractId, chainIndex)
     contractAsset0.lockupScript is LockupScript.p2c(contractId)
     contractAsset0.tokens is AVector(contractId -> ALPH.alph(3))
     val tokenAmount0 = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
@@ -360,8 +413,7 @@ class VMSpec extends AlephiumSpec {
          |$contract
          |""".stripMargin
     callTxScript(burn)
-    val worldState1    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
-    val contractAsset1 = worldState1.getContractAsset(contractId).rightValue
+    val contractAsset1 = getContractAsset(contractId, chainIndex)
     contractAsset1.lockupScript is LockupScript.p2c(contractId)
     contractAsset1.tokens is AVector(contractId -> ALPH.alph(2))
     val tokenAmount1 = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
@@ -380,8 +432,10 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     import org.alephium.protocol.model.tokenIdOrder
-    val _tokenId0               = createContract(token, AVector.empty, ALPH.alph(100)).key
-    val _tokenId1               = createContract(token, AVector.empty, ALPH.alph(100)).key
+    val _tokenId0 =
+      createContract(token, AVector.empty, Some(TokenIssuance.Info(ALPH.alph(100)))).key
+    val _tokenId1 =
+      createContract(token, AVector.empty, Some(TokenIssuance.Info(ALPH.alph(100)))).key
     val Seq(tokenId0, tokenId1) = Seq(_tokenId0, _tokenId1).sorted
     val tokenId0Hex             = tokenId0.toHexString
     val tokenId1Hex             = tokenId1.toHexString
@@ -569,7 +623,7 @@ class VMSpec extends AlephiumSpec {
       input,
       2,
       2,
-      tokenAmount = Some(10000000),
+      tokenIssuanceInfo = Some(TokenIssuance.Info(10000000)),
       initialState = AVector.empty
     )
     val contractKey = contractOutputRef.key
@@ -1361,7 +1415,7 @@ class VMSpec extends AlephiumSpec {
         2,
         initialState =
           AVector[Val](Val.Address(genesisAddress.lockupScript), Val.U256(U256.unsafe(1000000))),
-        tokenAmount = Some(1024)
+        tokenIssuanceInfo = Some(TokenIssuance.Info(1024))
       ).key
 
     callTxScript(
@@ -1391,7 +1445,7 @@ class VMSpec extends AlephiumSpec {
         tokenContract,
         2,
         2,
-        tokenAmount = Some(1024),
+        tokenIssuanceInfo = Some(TokenIssuance.Info(1024)),
         initialState = AVector.empty
       ).key
     val tokenId = tokenContractKey
@@ -1407,7 +1461,7 @@ class VMSpec extends AlephiumSpec {
     val swapContractKey = createContract(
       AMMContract.swapContract,
       AVector[Val](Val.ByteVec.from(tokenId), Val.U256(U256.Zero), Val.U256(U256.Zero)),
-      tokenAmount = Some(1024)
+      tokenIssuanceInfo = Some(TokenIssuance.Info(1024))
     ).key
 
     def checkSwapBalance(alphReserve: U256, tokenReserve: U256) = {

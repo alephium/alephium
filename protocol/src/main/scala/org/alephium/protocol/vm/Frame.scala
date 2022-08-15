@@ -21,6 +21,7 @@ import scala.annotation.{switch, tailrec}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
+import org.alephium.protocol.vm.TokenIssuance
 import org.alephium.serde.deserialize
 import org.alephium.util.{AVector, Bytes}
 
@@ -137,7 +138,7 @@ abstract class Frame[Ctx <: StatelessContext] {
       contractId: Hash,
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
-      tokenAmount: Option[Val.U256]
+      tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId]
 
   def destroyContract(address: LockupScript): ExeResult[Unit]
@@ -209,7 +210,7 @@ final class StatelessFrame(
       contractId: Hash,
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
-      tokenAmount: Option[Val.U256]
+      tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId] = StatelessFrame.notAllowed
   def destroyContract(address: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
   def checkPayToContractAddressInCallerTrace(address: LockupScript.P2C): ExeResult[Unit] =
@@ -346,12 +347,12 @@ final case class StatefulFrame(
       contractId: Hash,
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
-      tokenAmount: Option[Val.U256]
+      tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId] = {
     for {
       balanceState <- getBalanceState()
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
-      _            <- ctx.createContract(contractId, code, balances, fields, tokenAmount)
+      _            <- ctx.createContract(contractId, code, balances, fields, tokenIssuanceInfo)
       _ <- ctx.writeLog(
         Some(createContractEventId),
         AVector(
