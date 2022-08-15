@@ -160,7 +160,8 @@ object Instr {
     /* Below are instructions for Leman hard fork */
     MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
     CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-    LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken
+    LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
+    CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken
   )
   // format: on
 
@@ -1610,6 +1611,14 @@ object CopyCreateContractWithToken
   }
 }
 
+object CopyCreateContractAndTransferToken
+    extends CopyCreateContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, tokenIssuance = IssueToken(true))
+  }
+}
+
 sealed trait CreateSubContractBase extends CreateContractAbstract with GasCreate {
   def subContract: Boolean = true
   def copyCreate: Boolean  = false
@@ -1631,6 +1640,14 @@ object CreateSubContractWithToken
   }
 }
 
+object CreateSubContractAndTransferToken
+    extends CreateSubContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, tokenIssuance = IssueToken(true))
+  }
+}
+
 sealed trait CopyCreateSubContractBase extends CreateContractAbstract with GasCopyCreate {
   def subContract: Boolean = true
   def copyCreate: Boolean  = true
@@ -1649,6 +1666,14 @@ object CopyCreateSubContractWithToken
     with LemanInstrWithSimpleGas[StatefulContext] {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     __runWith(frame, tokenIssuance = IssueToken(false))
+  }
+}
+
+object CopyCreateSubContractAndTransferToken
+    extends CopyCreateSubContractBase
+    with LemanInstrWithSimpleGas[StatefulContext] {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    __runWith(frame, tokenIssuance = IssueToken(true))
   }
 }
 

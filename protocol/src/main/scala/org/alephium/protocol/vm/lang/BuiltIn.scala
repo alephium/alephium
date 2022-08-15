@@ -650,10 +650,19 @@ object BuiltIn {
   val copyCreateContractWithToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "copyCreateContractWithToken",
-      Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
+      argsTypeWithInstrs = Seq(
+        ArgsTypeWithInstrs(
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
+          Seq(CopyCreateContractWithToken),
+        ),
+        ArgsTypeWithInstrs(
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
+          Seq(CopyCreateContractAndTransferToken)
+        )
+      ),
       Seq[Type](Type.ByteVec),
-      CopyCreateContractWithToken,
-      usePreapprovedAssets = true
+      usePreapprovedAssets = true,
+      useAssetsInContract = false
     )
 
   val createSubContract: SimpleStatefulBuiltIn =
@@ -668,10 +677,19 @@ object BuiltIn {
   val createSubContractWithToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "createSubContractWithToken",
-      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
+      argsTypeWithInstrs = Seq(
+        ArgsTypeWithInstrs(
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
+          Seq(CreateSubContractWithToken),
+        ),
+        ArgsTypeWithInstrs(
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
+          Seq(CreateSubContractAndTransferToken),
+        )
+      ),
       Seq[Type](Type.ByteVec),
-      CreateSubContractWithToken,
-      usePreapprovedAssets = true
+      usePreapprovedAssets = true,
+      useAssetsInContract = false
     )
 
   val copyCreateSubContract: SimpleStatefulBuiltIn =
@@ -686,10 +704,19 @@ object BuiltIn {
   val copyCreateSubContractWithToken: SimpleStatefulBuiltIn =
     SimpleStatefulBuiltIn(
       "copyCreateSubContractWithToken",
-      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
+      argsTypeWithInstrs = Seq(
+        ArgsTypeWithInstrs(
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
+          Seq(CopyCreateSubContractWithToken),
+        ),
+        ArgsTypeWithInstrs(
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
+          Seq(CopyCreateSubContractAndTransferToken),
+        )
+      ),
       Seq[Type](Type.ByteVec),
-      CopyCreateSubContractWithToken,
-      usePreapprovedAssets = true
+      usePreapprovedAssets = true,
+      useAssetsInContract = false
     )
 
   val contractExists: SimpleStatefulBuiltIn =

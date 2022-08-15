@@ -76,7 +76,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val lemanStatefulInstrs = AVector(
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-      LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken
+      LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
+      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken
     )
     // format: on
   }
@@ -2235,11 +2236,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val extraGas = instr match {
         case CreateContract | CreateContractWithToken | CreateContractAndTransferToken =>
           contractBytes.length + 200 // 200 from GasSchedule.callGas
-        case CopyCreateContract | CopyCreateContractWithToken =>
+        case CopyCreateContract | CopyCreateContractWithToken |
+            CopyCreateContractAndTransferToken =>
           801 // 801 from contractLoadGas
-        case CreateSubContract | CreateSubContractWithToken =>
+        case CreateSubContract | CreateSubContractWithToken | CreateSubContractAndTransferToken =>
           contractBytes.length + 314
-        case CopyCreateSubContract | CopyCreateSubContractWithToken =>
+        case CopyCreateSubContract | CopyCreateSubContractWithToken |
+            CopyCreateSubContractAndTransferToken =>
           915
       }
       initialGas.subUnsafe(frame.ctx.gasRemaining) is GasBox.unsafe(
@@ -2781,7 +2784,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MigrateSimple -> 32000, MigrateWithFields -> 32000, CopyCreateContractWithToken -> 24000,
       BurnToken -> 30, LockApprovedAssets -> 30,
       CreateSubContract -> 32000, CreateSubContractWithToken -> 32000, CopyCreateSubContract -> 24000, CopyCreateSubContractWithToken -> 24000,
-      LoadFieldByIndex -> 5, StoreFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000
+      LoadFieldByIndex -> 5, StoreFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
+      CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -2905,7 +2909,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MigrateSimple -> 186, MigrateWithFields -> 187, CopyCreateContractWithToken -> 188,
       BurnToken -> 189, LockApprovedAssets -> 190,
       CreateSubContract -> 191, CreateSubContractWithToken -> 192, CopyCreateSubContract -> 193, CopyCreateSubContractWithToken -> 194,
-      LoadFieldByIndex -> 195, StoreFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198
+      LoadFieldByIndex -> 195, StoreFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
+      CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201
     )
     // format: on
 
@@ -2960,7 +2965,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Leman hard fork */
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-      LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken
+      LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
+      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken
     )
     // format: on
   }
