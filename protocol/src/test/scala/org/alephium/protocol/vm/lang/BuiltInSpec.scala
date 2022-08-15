@@ -43,7 +43,11 @@ class BuiltInSpec extends AlephiumSpec {
       .filter(_.useAssetsInContract)
       .toSet
       .map((f: Compiler.FuncInfo[StatefulContext]) =>
-        f.asInstanceOf[SimpleStatefulBuiltIn].instrs.asInstanceOf[Seq[Instr[_]]].head
+        f.asInstanceOf[SimpleStatefulBuiltIn]
+          .argsTypeWithInstrs(0)
+          .instrs
+          .asInstanceOf[Seq[Instr[_]]]
+          .head
       ) is Ast.ContractAssets.contractAssetsInstrs.-(SelfAddress)
   }
 }
