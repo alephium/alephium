@@ -336,6 +336,21 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     {
+      info("create contract with token")
+      val contractId = createContract(
+        code,
+        initialState = AVector.empty,
+        Some(TokenIssuance.Info(Val.U256.unsafe(10), None))
+      ).key
+
+      val genesisTokenAmount = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
+      genesisTokenAmount is 0
+
+      val contractAsset = getContractAsset(contractId, chainIndex)
+      contractAsset.tokens is AVector((contractId, U256.unsafe(10)))
+    }
+
+    {
       info("create contract and transfer token")
       val contractId = createContract(
         code,
@@ -348,23 +363,6 @@ class VMSpec extends AlephiumSpec {
 
       val contractAsset = getContractAsset(contractId, chainIndex)
       contractAsset.tokens.length is 0
-    }
-
-    {
-      info("create contract and not transfer token")
-      val contractId = createContract(
-        code,
-        initialState = AVector.empty,
-        Some(TokenIssuance.Info(Val.U256.unsafe(10), None))
-      ).key
-
-      val genesisTokenAmount = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
-      genesisTokenAmount is 0
-
-      val contractAsset = getContractAsset(contractId, chainIndex)
-      contractAsset.tokens.length is 1
-      contractAsset.tokens(0)._1 is contractId
-      contractAsset.tokens(0)._2 is 10
     }
   }
 
@@ -770,18 +768,39 @@ class VMSpec extends AlephiumSpec {
 
     val encodedState = Hex.toHexString(serialize[AVector[Val]](AVector.empty))
     val tokenAmount  = ALPH.oneNanoAlph
-    val script =
-      s"""
-         |TxScript Main {
-         |  copyCreateContractWithToken!{ @$genesisAddress -> 1 alph }(#$contractId, #$encodedState, ${tokenAmount.v})
-         |}
-         |""".stripMargin
 
-    val block          = callTxScript(script)
-    val transaction    = block.nonCoinbase.head
-    val contractOutput = transaction.generatedOutputs(0).asInstanceOf[ContractOutput]
-    val tokenId        = contractOutput.lockupScript.contractId
-    contractOutput.tokens is AVector((tokenId, tokenAmount))
+    {
+      info("copy create contract with token")
+      val script: String =
+        s"""
+           |TxScript Main {
+           |  copyCreateContractWithToken!{ @$genesisAddress -> 1 alph }(#$contractId, #$encodedState, ${tokenAmount.v})
+           |}
+           |""".stripMargin
+
+      val block          = callTxScript(script)
+      val transaction    = block.nonCoinbase.head
+      val contractOutput = transaction.generatedOutputs(0).asInstanceOf[ContractOutput]
+      val tokenId        = contractOutput.lockupScript.contractId
+      contractOutput.tokens is AVector((tokenId, tokenAmount))
+    }
+
+    {
+      info("copy create contract and transfer token")
+      val script: String =
+        s"""
+           |TxScript Main {
+           |  copyCreateContractWithToken!{ @$genesisAddress -> 1 alph }(#$contractId, #$encodedState, ${tokenAmount.v}, @${genesisAddress.toBase58})
+           |}
+           |""".stripMargin
+
+      val block          = callTxScript(script)
+      val transaction    = block.nonCoinbase.head
+      val contractOutput = transaction.generatedOutputs(0).asInstanceOf[ContractOutput]
+      val tokenId        = contractOutput.lockupScript.contractId
+      contractOutput.tokens.length is 0
+      getTokenBalance(blockFlow, genesisAddress.lockupScript, tokenId) is tokenAmount
+    }
   }
 
   // scalastyle:off no.equal
@@ -2536,7 +2555,7 @@ class VMSpec extends AlephiumSpec {
         subContractPath: String,
         numOfAssets: Int,
         numOfContracts: Int
-    ) = {
+    ): Hash = {
       val contractRaw: String =
         s"""
            |Contract Foo(mut subContractId: ByteVec) {
@@ -2594,6 +2613,8 @@ class VMSpec extends AlephiumSpec {
            |""".stripMargin
 
       callTxScript(callSubContractRaw)
+
+      subContractId
     }
     // scalastyle:on method.length
   }
@@ -2602,41 +2623,91 @@ class VMSpec extends AlephiumSpec {
     val subContract         = Compiler.compileContract(subContractRaw).rightValue
     val subContractByteCode = Hex.toHexString(serialize(subContract))
 
-    val subContractPath1 = Hex.toHexString(serialize("nft-01"))
-    verify(
-      s"createSubContract!{callerAddress!() -> 1 alph}(#$subContractPath1, #$subContractByteCode, #$subContractInitialState)",
-      subContractPath = "nft-01",
-      numOfAssets = 2,
-      numOfContracts = 2
-    )
+    {
+      info("create sub-contract without token")
+      val subContractPath1 = Hex.toHexString(serialize("nft-01"))
+      verify(
+        s"createSubContract!{callerAddress!() -> 1 alph}(#$subContractPath1, #$subContractByteCode, #$subContractInitialState)",
+        subContractPath = "nft-01",
+        numOfAssets = 2,
+        numOfContracts = 2
+      )
+    }
 
-    val subContractPath2 = Hex.toHexString(serialize("nft-02"))
-    verify(
-      s"createSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath2, #$subContractByteCode, #$subContractInitialState, 10)",
-      subContractPath = "nft-02",
-      numOfAssets = 5,
-      numOfContracts = 4
-    )
+    {
+      info("create sub-contract with token")
+      val subContractPath2 = Hex.toHexString(serialize("nft-02"))
+      val subContractId = verify(
+        s"createSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath2, #$subContractByteCode, #$subContractInitialState, 10)",
+        subContractPath = "nft-02",
+        numOfAssets = 5,
+        numOfContracts = 4
+      )
+      val asset = getContractAsset(subContractId, chainIndex)
+      asset.tokens is AVector((subContractId, U256.unsafe(10)))
+    }
+
+    {
+      info("create sub-contract and transfer token")
+      val subContractPath3 = Hex.toHexString(serialize("nft-03"))
+      val subContractId = verify(
+        s"createSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath3, #$subContractByteCode, #$subContractInitialState, 10, @${genesisAddress.toBase58})",
+        subContractPath = "nft-03",
+        numOfAssets = 8,
+        numOfContracts = 6
+      )
+      val asset = getContractAsset(subContractId, chainIndex)
+      asset.tokens.length is 0
+
+      val genesisTokenAmount =
+        getTokenBalance(blockFlow, genesisAddress.lockupScript, subContractId)
+      genesisTokenAmount is 10
+    }
   }
 
   it should "check copyCreateSubContract and copyCreateSubContractWithToken" in new SubContractFixture {
     val subContractId = createContractAndCheckState(subContractRaw, 2, 2, AVector.empty).key
 
-    val subContractPath1 = Hex.toHexString(serialize("nft-01"))
-    verify(
-      s"copyCreateSubContract!{callerAddress!() -> 1 alph}(#$subContractPath1, #${subContractId.toHexString}, #$subContractInitialState)",
-      subContractPath = "nft-01",
-      numOfAssets = 3,
-      numOfContracts = 3
-    )
+    {
+      info("copy create sub-contract without token")
+      val subContractPath1 = Hex.toHexString(serialize("nft-01"))
+      verify(
+        s"copyCreateSubContract!{callerAddress!() -> 1 alph}(#$subContractPath1, #${subContractId.toHexString}, #$subContractInitialState)",
+        subContractPath = "nft-01",
+        numOfAssets = 3,
+        numOfContracts = 3
+      )
+    }
 
-    val subContractPath2 = Hex.toHexString(serialize("nft-02"))
-    verify(
-      s"copyCreateSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath2, #${subContractId.toHexString}, #$subContractInitialState, 10)",
-      subContractPath = "nft-02",
-      numOfAssets = 6,
-      numOfContracts = 5
-    )
+    {
+      info("copy create sub-contract with token")
+      val subContractPath2 = Hex.toHexString(serialize("nft-02"))
+      val contractId = verify(
+        s"copyCreateSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath2, #${subContractId.toHexString}, #$subContractInitialState, 10)",
+        subContractPath = "nft-02",
+        numOfAssets = 6,
+        numOfContracts = 5
+      )
+
+      val asset = getContractAsset(contractId, chainIndex)
+      asset.tokens is AVector((contractId, U256.unsafe(10)))
+    }
+
+    {
+      info("copy create sub-contract and transfer token")
+      val subContractPath3 = Hex.toHexString(serialize("nft-03"))
+      val contractId = verify(
+        s"copyCreateSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath3, #${subContractId.toHexString}, #$subContractInitialState, 10, @${genesisAddress.toBase58})",
+        subContractPath = "nft-03",
+        numOfAssets = 9,
+        numOfContracts = 7
+      )
+      val asset = getContractAsset(contractId, chainIndex)
+      asset.tokens.length is 0
+
+      val genesisTokenAmount = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
+      genesisTokenAmount is 10
+    }
   }
 
   trait CheckArgAndReturnLengthFixture extends ContractFixture {

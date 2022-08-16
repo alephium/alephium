@@ -653,7 +653,7 @@ object BuiltIn {
       argsTypeWithInstrs = Seq(
         ArgsTypeWithInstrs(
           Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
-          Seq(CopyCreateContractWithToken),
+          Seq(CopyCreateContractWithToken)
         ),
         ArgsTypeWithInstrs(
           Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
@@ -680,11 +680,11 @@ object BuiltIn {
       argsTypeWithInstrs = Seq(
         ArgsTypeWithInstrs(
           Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
-          Seq(CreateSubContractWithToken),
+          Seq(CreateSubContractWithToken)
         ),
         ArgsTypeWithInstrs(
           Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
-          Seq(CreateSubContractAndTransferToken),
+          Seq(CreateSubContractAndTransferToken)
         )
       ),
       Seq[Type](Type.ByteVec),
@@ -707,11 +707,11 @@ object BuiltIn {
       argsTypeWithInstrs = Seq(
         ArgsTypeWithInstrs(
           Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
-          Seq(CopyCreateSubContractWithToken),
+          Seq(CopyCreateSubContractWithToken)
         ),
         ArgsTypeWithInstrs(
           Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
-          Seq(CopyCreateSubContractAndTransferToken),
+          Seq(CopyCreateSubContractAndTransferToken)
         )
       ),
       Seq[Type](Type.ByteVec),
