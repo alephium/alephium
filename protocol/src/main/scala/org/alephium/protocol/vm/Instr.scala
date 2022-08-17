@@ -1251,25 +1251,13 @@ sealed trait LockApprovedAssetsInstr extends LemanAssetInstr with StatefulInstrC
       timestamp     <- timestampU256.v.toLong.map(TimeStamp.unsafe).toRight(Right(LockTimeOverflow))
     } yield timestamp
   }
-
-  def popAssetAddress[C <: StatefulContext](frame: Frame[C]): ExeResult[LockupScript.Asset] = {
-    for {
-      address <- frame.popOpStackAddress()
-      lockupScript <-
-        if (address.lockupScript.isAssetType) {
-          Right(address.lockupScript.asInstanceOf[LockupScript.Asset])
-        } else {
-          Left(Right(InvalidAssetAddress))
-        }
-    } yield lockupScript
-  }
 }
 
 object LockApprovedAssets extends LockApprovedAssetsInstr {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       lockTime     <- popTimestamp(frame)
-      lockupScript <- popAssetAddress(frame)
+      lockupScript <- frame.popAssetAddress()
       balanceState <- frame.getBalanceState()
       approved     <- balanceState.useAllApproved(lockupScript).toRight(Right(NoAssetsApproved))
       _            <- frame.ctx.generateOutput(approved.toLockedTxOutput(lockupScript, lockTime))
@@ -1485,7 +1473,7 @@ object TokenIssuance {
   case object IssueTokenWithoutTransfer extends TokenIssuance
   case object IssueTokenAndTransfer     extends TokenIssuance
 
-  final case class Info(amount: Val.U256, transferTo: Option[Val.Address])
+  final case class Info(amount: Val.U256, transferTo: Option[LockupScript.Asset])
   object Info {
     def apply(amount: Val.U256): Info  = Info(amount, None)
     def apply(amount: util.U256): Info = Info(Val.U256(amount), None)
@@ -1507,7 +1495,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
         frame.popOpStackU256().map(amount => Some(TokenIssuance.Info(amount)))
       case TokenIssuance.IssueTokenAndTransfer =>
         for {
-          transferTo <- frame.popOpStackAddress()
+          transferTo <- frame.popAssetAddress()
           amount     <- frame.popOpStackU256()
         } yield Some(TokenIssuance.Info(amount, Some(transferTo)))
     }

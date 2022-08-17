@@ -663,8 +663,10 @@ trait FlowFixture
     val creation = tokenIssuanceInfo match {
       case Some(TokenIssuance.Info(amount, None)) =>
         s"createContractWithToken!{@$address -> ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw, ${amount.v})"
-      case Some(TokenIssuance.Info(amount, Some(transferTo))) =>
-        s"createContractWithToken!{@$address -> ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw, ${amount.v}, @${transferTo.toBase58})"
+      case Some(TokenIssuance.Info(amount, Some(transferTo))) => {
+        val toAddress = Address.from(transferTo).toBase58
+        s"createContractWithToken!{@$address -> ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw, ${amount.v}, @${toAddress})"
+      }
       case None =>
         s"createContract!{@$address -> ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw)"
     }

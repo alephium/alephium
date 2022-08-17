@@ -94,6 +94,18 @@ abstract class Frame[Ctx <: StatelessContext] {
       case elem              => failed(InvalidType(elem))
     }
 
+  def popAssetAddress[C <: StatefulContext](): ExeResult[LockupScript.Asset] = {
+    for {
+      address <- popOpStackAddress()
+      lockupScript <-
+        if (address.lockupScript.isAssetType) {
+          Right(address.lockupScript.asInstanceOf[LockupScript.Asset])
+        } else {
+          Left(Right(InvalidAssetAddress))
+        }
+    } yield lockupScript
+  }
+
   @inline
   def popContractId(): ExeResult[ContractId] = {
     for {

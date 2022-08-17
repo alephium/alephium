@@ -251,8 +251,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
   ): ExeResult[Hash] = {
     tokenIssuanceInfo.foreach { info =>
       info.transferTo match {
-        case Some(toAddress) =>
-          outputBalances.addToken(toAddress.lockupScript, contractId, info.amount.v)
+        case Some(transferTo) =>
+          outputBalances.addToken(transferTo, contractId, info.amount.v)
         case None =>
           initialBalances.addToken(contractId, info.amount.v)
       }

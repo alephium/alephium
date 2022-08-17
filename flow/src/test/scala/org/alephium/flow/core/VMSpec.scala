@@ -351,11 +351,11 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("create contract and transfer token")
+      info("create contract and transfer token to asset address")
       val contractId = createContract(
         code,
         initialState = AVector.empty,
-        Some(TokenIssuance.Info(Val.U256.unsafe(10), Some(Val.Address(genesisLockup))))
+        Some(TokenIssuance.Info(Val.U256.unsafe(10), Some(genesisLockup)))
       ).key
 
       val genesisTokenAmount = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
@@ -363,6 +363,23 @@ class VMSpec extends AlephiumSpec {
 
       val contractAsset = getContractAsset(contractId, chainIndex)
       contractAsset.tokens.length is 0
+    }
+
+    {
+      info("create contract and transfer token to contract address")
+      val contract         = Compiler.compileContract(code).rightValue
+      val contractByteCode = Hex.toHexString(serialize(contract))
+      val contractAddress  = Address.contract(ContractId.random).toBase58
+      val encodedState     = Hex.toHexString(serialize[AVector[Val]](AVector.empty))
+
+      val script: String =
+        s"""
+           |TxScript Main {
+           |  createContractWithToken!{ @$genesisAddress -> 1 alph }(#$contractByteCode, #$encodedState, 1, @$contractAddress)
+           |}
+           |""".stripMargin
+
+      failCallTxScript(script, InvalidAssetAddress)
     }
   }
 
@@ -786,7 +803,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("copy create contract and transfer token")
+      info("copy create contract and transfer token to asset address")
       val script: String =
         s"""
            |TxScript Main {
@@ -800,6 +817,19 @@ class VMSpec extends AlephiumSpec {
       val tokenId        = contractOutput.lockupScript.contractId
       contractOutput.tokens.length is 0
       getTokenBalance(blockFlow, genesisAddress.lockupScript, tokenId) is tokenAmount
+    }
+
+    {
+      info("copy create contract and transfer token to contract address")
+      val contractAddress = Address.contract(ContractId.random)
+      val script: String =
+        s"""
+           |TxScript Main {
+           |  copyCreateContractWithToken!{ @$genesisAddress -> 1 alph }(#$contractId, #$encodedState, ${tokenAmount.v}, @${contractAddress.toBase58})
+           |}
+           |""".stripMargin
+
+      failCallTxScript(script, InvalidAssetAddress)
     }
   }
 
@@ -2616,6 +2646,35 @@ class VMSpec extends AlephiumSpec {
 
       subContractId
     }
+
+    def verify(
+        createContractStmt: String,
+        failure: ExeFailure
+    ): Hash = {
+      val contractRaw: String =
+        s"""
+           |Contract Foo(mut subContractId: ByteVec) {
+           |  @using(preapprovedAssets = true)
+           |  pub fn createSubContract() -> () {
+           |    subContractId = $createContractStmt
+           |  }
+           |}
+           |$subContractRaw
+           |""".stripMargin
+
+      val contractId = createContract(contractRaw, AVector(Val.ByteVec(ByteString.empty))).key
+
+      val createSubContractRaw: String =
+        s"""
+           |TxScript Main {
+           |  Foo(#${contractId.toHexString}).createSubContract{callerAddress!() -> 1 alph}()
+           |}
+           |$contractRaw
+           |""".stripMargin
+
+      failCallTxScript(createSubContractRaw, failure)
+      contractId
+    }
     // scalastyle:on method.length
   }
 
@@ -2648,7 +2707,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("create sub-contract and transfer token")
+      info("create sub-contract and transfer token to asset address")
       val subContractPath3 = Hex.toHexString(serialize("nft-03"))
       val subContractId = verify(
         s"createSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath3, #$subContractByteCode, #$subContractInitialState, 10, @${genesisAddress.toBase58})",
@@ -2662,6 +2721,16 @@ class VMSpec extends AlephiumSpec {
       val genesisTokenAmount =
         getTokenBalance(blockFlow, genesisAddress.lockupScript, subContractId)
       genesisTokenAmount is 10
+    }
+
+    {
+      info("create sub-contract and transfer token to contract address")
+      val subContractPath4 = Hex.toHexString(serialize("nft-04"))
+      val contractAddress  = Address.contract(ContractId.random)
+      verify(
+        s"createSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath4, #$subContractByteCode, #$subContractInitialState, 10, @${contractAddress.toBase58})",
+        InvalidAssetAddress
+      )
     }
   }
 
@@ -2694,7 +2763,7 @@ class VMSpec extends AlephiumSpec {
     }
 
     {
-      info("copy create sub-contract and transfer token")
+      info("copy create sub-contract and transfer token to asset address")
       val subContractPath3 = Hex.toHexString(serialize("nft-03"))
       val contractId = verify(
         s"copyCreateSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath3, #${subContractId.toHexString}, #$subContractInitialState, 10, @${genesisAddress.toBase58})",
@@ -2707,6 +2776,16 @@ class VMSpec extends AlephiumSpec {
 
       val genesisTokenAmount = getTokenBalance(blockFlow, genesisAddress.lockupScript, contractId)
       genesisTokenAmount is 10
+    }
+
+    {
+      info("copy create sub-contract and transfer token to contract address")
+      val subContractPath4 = Hex.toHexString(serialize("nft-04"))
+      val contractAddress  = Address.contract(ContractId.random)
+      verify(
+        s"copyCreateSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath4, #${subContractId.toHexString}, #$subContractInitialState, 10, @${contractAddress.toBase58})",
+        InvalidAssetAddress
+      )
     }
   }
 
