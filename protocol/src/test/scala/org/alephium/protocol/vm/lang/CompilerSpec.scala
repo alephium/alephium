@@ -1981,6 +1981,29 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       contract.methodsLength is 4
       contract.methods.map(_.argsLength) is AVector(2, 1, 3, 0)
     }
+
+    {
+      info("Follow the same function annotation")
+
+      def code(flag: Boolean) =
+        s"""
+           |Contract Foo() implements Bar {
+           |  @using(permissionCheck = $flag)
+           |  fn bar() -> () {
+           |    return
+           |  }
+           |}
+           |Interface Bar {
+           |  @using(permissionCheck = false)
+           |  fn bar() -> ()
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code(false)).isRight is true
+      Compiler
+        .compileContract(code(true))
+        .leftValue
+        .message is "Function bar is implemented with wrong signature"
+    }
   }
 
   it should "test interface compilation" in {
