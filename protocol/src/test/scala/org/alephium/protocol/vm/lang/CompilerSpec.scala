@@ -216,8 +216,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |
-         |TxScript Bar {
-         |  return
+         |Contract Bar() {
          |  pub fn bar() -> () {
          |    return foo()
          |  }
@@ -228,7 +227,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     Compiler.compileContract(input, 0).isRight is true
-    Compiler.compileTxScript(input, 1).isRight is true
+    Compiler.compileContract(input, 1).isRight is true
   }
 
   it should "check function return types" in {
@@ -447,7 +446,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         fields: AVector[Val] = AVector.empty,
         methodIndex: Int = 0
     ): Assertion = {
-      val contract = Compiler.compileContract(input).toOption.get
+      val contract = Compiler.compileContract(input).rightValue
 
       deserialize[StatefulContract](serialize(contract)) isE contract
       val (obj, context) = prepareContract(contract, fields)
