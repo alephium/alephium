@@ -25,7 +25,11 @@ import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
 import org.alephium.protocol.model.{AssetOutput, TxOutputRef}
-import org.alephium.protocol.vm.TokenIssuance.{IssueToken, NoIssuance}
+import org.alephium.protocol.vm.TokenIssuance.{
+  IssueTokenAndTransfer,
+  IssueTokenWithoutTransfer,
+  NoIssuance
+}
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
 import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
 import org.alephium.util
@@ -1477,8 +1481,9 @@ sealed trait ContractInstr
 
 sealed trait TokenIssuance
 object TokenIssuance {
-  case object NoIssuance                              extends TokenIssuance
-  final case class IssueToken(transferToken: Boolean) extends TokenIssuance
+  case object NoIssuance                extends TokenIssuance
+  case object IssueTokenWithoutTransfer extends TokenIssuance
+  case object IssueTokenAndTransfer     extends TokenIssuance
 
   final case class Info(amount: Val.U256, transferTo: Option[Val.Address])
   object Info {
@@ -1498,15 +1503,13 @@ sealed trait CreateContractAbstract extends ContractInstr {
     tokenIssuance match {
       case TokenIssuance.NoIssuance =>
         Right(None)
-      case TokenIssuance.IssueToken(transferToken) =>
-        if (transferToken) {
-          for {
-            transferTo <- frame.popOpStackAddress()
-            amount     <- frame.popOpStackU256()
-          } yield Some(TokenIssuance.Info(amount, Some(transferTo)))
-        } else {
-          frame.popOpStackU256().map(amount => Some(TokenIssuance.Info(amount)))
-        }
+      case TokenIssuance.IssueTokenWithoutTransfer =>
+        frame.popOpStackU256().map(amount => Some(TokenIssuance.Info(amount)))
+      case TokenIssuance.IssueTokenAndTransfer =>
+        for {
+          transferTo <- frame.popOpStackAddress()
+          amount     <- frame.popOpStackU256()
+        } yield Some(TokenIssuance.Info(amount, Some(transferTo)))
     }
   }
 
@@ -1580,7 +1583,7 @@ object CreateContract extends CreateContractBase {
 
 object CreateContractWithToken extends CreateContractBase {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    __runWith(frame, tokenIssuance = IssueToken(false))
+    __runWith(frame, tokenIssuance = IssueTokenWithoutTransfer)
   }
 }
 
@@ -1588,7 +1591,7 @@ object CreateContractAndTransferToken
     extends CreateContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    __runWith(frame, tokenIssuance = IssueToken(true))
+    __runWith(frame, tokenIssuance = IssueTokenAndTransfer)
   }
 }
 
@@ -1607,7 +1610,7 @@ object CopyCreateContractWithToken
     extends CopyCreateContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    __runWith(frame, tokenIssuance = IssueToken(false))
+    __runWith(frame, tokenIssuance = IssueTokenWithoutTransfer)
   }
 }
 
@@ -1615,7 +1618,7 @@ object CopyCreateContractAndTransferToken
     extends CopyCreateContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    __runWith(frame, tokenIssuance = IssueToken(true))
+    __runWith(frame, tokenIssuance = IssueTokenAndTransfer)
   }
 }
 
@@ -1636,7 +1639,7 @@ object CreateSubContractWithToken
     extends CreateSubContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    __runWith(frame, tokenIssuance = IssueToken(false))
+    __runWith(frame, tokenIssuance = IssueTokenWithoutTransfer)
   }
 }
 
@@ -1644,7 +1647,7 @@ object CreateSubContractAndTransferToken
     extends CreateSubContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    __runWith(frame, tokenIssuance = IssueToken(true))
+    __runWith(frame, tokenIssuance = IssueTokenAndTransfer)
   }
 }
 
@@ -1665,7 +1668,7 @@ object CopyCreateSubContractWithToken
     extends CopyCreateSubContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    __runWith(frame, tokenIssuance = IssueToken(false))
+    __runWith(frame, tokenIssuance = IssueTokenWithoutTransfer)
   }
 }
 
@@ -1673,7 +1676,7 @@ object CopyCreateSubContractAndTransferToken
     extends CopyCreateSubContractBase
     with LemanInstrWithSimpleGas[StatefulContext] {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    __runWith(frame, tokenIssuance = IssueToken(true))
+    __runWith(frame, tokenIssuance = IssueTokenAndTransfer)
   }
 }
 
