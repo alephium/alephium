@@ -663,6 +663,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             false,
+            true,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -783,6 +784,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             false,
+            true,
             Seq.empty,
             Seq.empty,
             None
@@ -827,6 +829,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             false,
+            true,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -861,6 +864,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             false,
+            true,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -899,6 +903,7 @@ class ParserSpec extends AlephiumSpec {
       false,
       false,
       false,
+      true,
       Seq.empty,
       Seq.empty,
       if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -910,6 +915,7 @@ class ParserSpec extends AlephiumSpec {
       false,
       false,
       false,
+      true,
       Seq.empty,
       Seq.empty,
       if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -990,6 +996,7 @@ class ParserSpec extends AlephiumSpec {
         true,
         usePreapprovedAssets,
         false,
+        true,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))

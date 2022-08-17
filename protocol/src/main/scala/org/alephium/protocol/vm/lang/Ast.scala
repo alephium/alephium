@@ -499,6 +499,7 @@ object Ast {
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean,
+      usePermissionCheck: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -529,6 +530,7 @@ object Ast {
     def getReturnSignatures(): AVector[String]  = AVector.from(rtypes.view.map(_.signature))
 
     def hasDirectPermissionCheck(): Boolean = {
+      !usePermissionCheck || // permission check manually disabled
       body.exists {
         case FuncCall(id, _, _) => id.isBuiltIn && id.name == "checkPermission"
         case _                  => false
@@ -588,6 +590,7 @@ object Ast {
         isPublic = true,
         usePreapprovedAssets = usePreapprovedAssets,
         useAssetsInContract = useAssetsInContract,
+        usePermissionCheck = true,
         args = Seq.empty,
         rtypes = Seq.empty,
         bodyOpt = Some(stmts)

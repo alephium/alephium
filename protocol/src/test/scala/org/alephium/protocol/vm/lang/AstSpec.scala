@@ -36,13 +36,23 @@ class AstSpec extends AlephiumSpec {
          |  fn bar() -> () {
          |    checkPermission!(false, 1)
          |  }
+         |
+         |  @using(permissionCheck = false)
+         |  fn baz() -> () {
+         |    return
+         |  }
          |}
          |""".stripMargin
     val (_, contractAst, _) = Compiler.compileContractFull(code).rightValue
     val foo                 = contractAst.funcs(0)
     val bar                 = contractAst.funcs(1)
+    val baz                 = contractAst.funcs(2)
+    foo.id.name is "foo"
     foo.hasDirectPermissionCheck() is false
+    bar.id.name is "bar"
     bar.hasDirectPermissionCheck() is true
+    baz.id.name is "baz"
+    baz.hasDirectPermissionCheck() is true
   }
 
   trait InternalCallFixture {
@@ -94,6 +104,11 @@ class AstSpec extends AlephiumSpec {
          |    e()
          |    b()
          |  }
+         |
+         |  @using(permissionCheck = false)
+         |  pub fn i() -> () {
+         |    noCheck()
+         |  }
          |}
          |""".stripMargin
   }
@@ -113,7 +128,8 @@ class AstSpec extends AlephiumSpec {
       "d" -> Seq("b"),
       "f" -> Seq("e"),
       "g" -> Seq("a", "c", "e"),
-      "h" -> Seq("a", "b", "c", "e")
+      "h" -> Seq("a", "b", "c", "e"),
+      "i" -> Seq("noCheck")
     )
     state.externalCalls.isEmpty is true
 
@@ -129,7 +145,8 @@ class AstSpec extends AlephiumSpec {
         "e"       -> true,
         "f"       -> false,
         "g"       -> false,
-        "h"       -> true
+        "h"       -> true,
+        "i"       -> true
       )
   }
 
@@ -171,6 +188,12 @@ class AstSpec extends AlephiumSpec {
          |    callee.g()
          |    callee.f()
          |    callee.h()
+         |  }
+         |
+         |  pub fn e() -> () {
+         |    callee.g()
+         |    callee.f()
+         |    callee.i()
          |  }
          |}
          |
