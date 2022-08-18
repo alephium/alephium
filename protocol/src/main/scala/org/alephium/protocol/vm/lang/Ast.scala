@@ -1222,7 +1222,7 @@ object Ast {
               contracts(index) match {
                 case anotherContract: Contract if !anotherContract.isAbstract =>
                   anotherContract.genCode(state)
-                case _ => () // TODO: check permission for interface
+                case _ => ()
               }
             }
           }
