@@ -867,8 +867,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |    }
         |  ],
         |  "warnings": [
-        |    "Found unused variables in function bar: bar.a",
-        |    "Found unused fields: aa, bb, cc, dd, ee"
+        |    "Found unused variables in Foo: bar.a",
+        |    "Found unused fields in Foo: aa, bb, cc, dd, ee"
         |  ]
         |}
         |""".stripMargin
@@ -907,8 +907,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |    }
         |  ],
         |  "warnings": [
-        |    "Found unused variables in function bar: bar.a",
-        |    "Found unused fields: cc, ff"
+        |    "Found unused variables in Foo: bar.a",
+        |    "Found unused fields in Foo: cc, ff"
         |  ]
         |}
         |""".stripMargin

@@ -1473,8 +1473,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"0201$methodLength" + bytecode
     }
     result.warnings is AVector(
-      "Found unused variables in function foo: foo.a",
-      "Found unused fields: x"
+      "Found unused variables in Foo: foo.a",
+      "Found unused fields in Foo: x"
     )
   }
 
@@ -1526,8 +1526,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       val query  = Compile.Script(rawCode)
       val result = serverUtils.compileScript(query).rightValue
       result.warnings is AVector(
-        "Found unused variables in function main: main.c",
-        "Found unused fields: b"
+        "Found unused variables in Main: main.c",
+        "Found unused fields in Main: b"
       )
     }
   }
