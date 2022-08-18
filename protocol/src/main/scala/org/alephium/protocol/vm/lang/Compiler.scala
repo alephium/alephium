@@ -302,6 +302,7 @@ object Compiler {
 
     def buildFor(script: Ast.AssetScript): State[StatelessContext] =
       StateForScript(
+        script.ident,
         mutable.HashMap.empty,
         Ast.FuncId.empty,
         0,
@@ -327,6 +328,7 @@ object Compiler {
       }.toMap
       val contract = multiContract.get(contractIndex)
       StateForContract(
+        contract.ident,
         contract.isInstanceOf[Ast.TxScript],
         mutable.HashMap.empty,
         Ast.FuncId.empty,
@@ -393,6 +395,7 @@ object Compiler {
 
   // scalastyle:off number.of.methods
   sealed trait State[Ctx <: StatelessContext] extends CallGraph {
+    def typeId: Ast.TypeId
     def varTable: mutable.HashMap[String, VarInfo]
     var scope: Ast.FuncId
     var varIndex: Int
@@ -587,7 +590,7 @@ object Compiler {
       }
       if (unusedVars.nonEmpty) {
         val unusedVarsString = unusedVars.keys.toArray.sorted.mkString(", ")
-        warnings += s"Found unused variables in function ${funcId.name}: ${unusedVarsString}"
+        warnings += s"Found unused variables in ${typeId.name}: ${unusedVarsString}"
       }
       usedVars.filterInPlace(name => !name.startsWith(prefix))
     }
@@ -604,10 +607,10 @@ object Compiler {
         case _                                   => ()
       }
       if (unusedConstants.nonEmpty) {
-        warnings += s"Found unused constants: ${unusedConstants.sorted.mkString(", ")}"
+        warnings += s"Found unused constants in ${typeId.name}: ${unusedConstants.sorted.mkString(", ")}"
       }
       if (unusedFields.nonEmpty) {
-        warnings += s"Found unused fields: ${unusedFields.sorted.mkString(", ")}"
+        warnings += s"Found unused fields in ${typeId.name}: ${unusedFields.sorted.mkString(", ")}"
       }
     }
 
@@ -740,6 +743,7 @@ object Compiler {
 
   type Contract[Ctx <: StatelessContext] = immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
   final case class StateForScript(
+      typeId: Ast.TypeId,
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,
       var varIndex: Int,
@@ -810,6 +814,7 @@ object Compiler {
   }
 
   final case class StateForContract(
+      typeId: Ast.TypeId,
       isTxScript: Boolean,
       varTable: mutable.HashMap[String, VarInfo],
       var scope: Ast.FuncId,

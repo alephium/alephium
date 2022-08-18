@@ -2675,7 +2675,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileAssetScript(code).rightValue._2 is
-        AVector("Found unused variables in function foo: foo.a, foo.b")
+        AVector("Found unused variables in Foo: foo.a, foo.b")
     }
 
     {
@@ -2691,7 +2691,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileTxScriptFull(code).rightValue._3 is
-        AVector("Found unused variables in function main: main.b")
+        AVector("Found unused variables in Foo: main.b")
     }
 
     {
@@ -2707,7 +2707,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileTxScriptFull(code).rightValue._3 is
-        AVector("Found unused fields: b")
+        AVector("Found unused fields in Foo: b")
     }
 
     {
@@ -2723,7 +2723,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
-        AVector("Found unused variables in function foo: foo.a, foo.b")
+        AVector("Found unused variables in Foo: foo.a, foo.b")
     }
 
     {
@@ -2737,7 +2737,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
-        AVector("Found unused fields: a, c")
+        AVector("Found unused fields in Foo: a, c")
     }
 
     {
@@ -2756,7 +2756,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
-        AVector("Found unused fields: b, c")
+        AVector("Found unused fields in Foo: b, c")
     }
 
     {
@@ -2772,7 +2772,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
-        AVector("Found unused constants: C0")
+        AVector("Found unused constants in Foo: C0")
     }
 
     {
@@ -2797,7 +2797,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
-        AVector("Found unused constants: Chain.Eth, Language.Solidity")
+        AVector("Found unused constants in Foo: Chain.Eth, Language.Solidity")
     }
   }
 
@@ -2926,8 +2926,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Fields and variables are unused")
       val warnings = Compiler.compileContractFull(code("")).rightValue._3
       warnings is AVector(
-        "Found unused variables in function foo: foo.x, foo.y",
-        "Found unused fields: a, b"
+        "Found unused variables in Foo: foo.x, foo.y",
+        "Found unused fields in Foo: a, b"
       )
     }
 
