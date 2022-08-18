@@ -195,11 +195,11 @@ class AstSpec extends AlephiumSpec {
          |    callee.f()
          |    callee.i()
          |  }
-         |  
+         |
          |  fn proxy() -> () {
          |    callee.c()
          |  }
-         |  
+         |
          |  pub fn f() -> () {
          |    proxy()
          |  }
