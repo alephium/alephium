@@ -34,19 +34,38 @@ object BuiltIn {
     }
   }
 
+  sealed trait SimpleBuiltIn[-Ctx <: StatelessContext] extends BuiltIn[Ctx] {
+    def argsType: Seq[Type]
+    def returnType: Seq[Type]
+    def instrs: Seq[Instr[Ctx]]
+
+    override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+      if (inputType == argsType) {
+        returnType
+      } else {
+        throw Error(s"Invalid args type $inputType for builtin func $name")
+      }
+    }
+
+    override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = instrs
+  }
+
   final case class ArgsTypeWithInstrs[-Ctx <: StatelessContext](
       argsTypes: Seq[Type],
       instrs: Seq[Instr[Ctx]]
   )
 
-  sealed trait SimpleBuiltIn[-Ctx <: StatelessContext] extends BuiltIn[Ctx] {
-    def argsTypeWithInstrs: Seq[ArgsTypeWithInstrs[Ctx]]
-    def returnType: Seq[Type]
-
+  final case class OverloadedSimpleBuiltIn[Ctx <: StatelessContext](
+      name: String,
+      argsTypeWithInstrs: Seq[ArgsTypeWithInstrs[Ctx]],
+      returnType: Seq[Type],
+      usePreapprovedAssets: Boolean,
+      useAssetsInContract: Boolean
+  ) extends BuiltIn[Ctx] {
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       assume(argsTypeWithInstrs.distinctBy(_.argsTypes).length == argsTypeWithInstrs.length)
 
-      if (argsTypeWithInstrs.find(_.argsTypes == inputType).nonEmpty) {
+      if (argsTypeWithInstrs.exists(_.argsTypes == inputType)) {
         returnType
       } else {
         throw Error(s"Invalid args type $inputType for builtin func $name")
@@ -65,29 +84,14 @@ object BuiltIn {
 
   final case class SimpleStatelessBuiltIn(
       name: String,
-      argsTypeWithInstrs: Seq[ArgsTypeWithInstrs[StatelessContext]],
+      argsType: Seq[Type],
       returnType: Seq[Type],
+      instrs: Seq[Instr[StatelessContext]],
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean
   ) extends SimpleBuiltIn[StatelessContext]
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   object SimpleStatelessBuiltIn {
-    def apply(
-        name: String,
-        argsType: Seq[Type],
-        returnType: Seq[Type],
-        instrs: Seq[Instr[StatelessContext]],
-        usePreapprovedAssets: Boolean,
-        useAssetsInContract: Boolean
-    ): SimpleStatelessBuiltIn =
-      SimpleStatelessBuiltIn(
-        name,
-        Seq(ArgsTypeWithInstrs(argsType, instrs)),
-        returnType,
-        usePreapprovedAssets,
-        useAssetsInContract
-      )
-
     def apply(
         name: String,
         argsType: Seq[Type],
@@ -98,8 +102,9 @@ object BuiltIn {
     ): SimpleStatelessBuiltIn =
       SimpleStatelessBuiltIn(
         name,
-        Seq(ArgsTypeWithInstrs(argsType, Seq(instr))),
+        argsType,
         returnType,
+        Seq(instr),
         usePreapprovedAssets,
         useAssetsInContract
       )
@@ -107,8 +112,9 @@ object BuiltIn {
 
   final case class SimpleStatefulBuiltIn(
       name: String,
-      argsTypeWithInstrs: Seq[ArgsTypeWithInstrs[StatefulContext]],
+      argsType: Seq[Type],
       returnType: Seq[Type],
+      instrs: Seq[Instr[StatefulContext]],
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean
   ) extends SimpleBuiltIn[StatefulContext]
@@ -119,30 +125,15 @@ object BuiltIn {
         name: String,
         argsType: Seq[Type],
         returnType: Seq[Type],
-        instrs: Seq[Instr[StatefulContext]],
-        usePreapprovedAssets: Boolean,
-        useAssetsInContract: Boolean
-    ): SimpleStatefulBuiltIn =
-      SimpleStatefulBuiltIn(
-        name,
-        Seq(ArgsTypeWithInstrs(argsType, instrs)),
-        returnType,
-        usePreapprovedAssets,
-        useAssetsInContract
-      )
-
-    def apply(
-        name: String,
-        argsType: Seq[Type],
-        returnType: Seq[Type],
         instr: Instr[StatefulContext],
         usePreapprovedAssets: Boolean = false,
         useAssetsInContract: Boolean = false
     ): SimpleStatefulBuiltIn =
       SimpleStatefulBuiltIn(
         name,
-        Seq(ArgsTypeWithInstrs(argsType, Seq(instr))),
+        argsType,
         returnType,
+        Seq(instr),
         usePreapprovedAssets,
         useAssetsInContract
       )
@@ -620,8 +611,8 @@ object BuiltIn {
       usePreapprovedAssets = true
     )
 
-  val createContractWithToken: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn(
+  val createContractWithToken: BuiltIn[StatefulContext] =
+    OverloadedSimpleBuiltIn[StatefulContext](
       "createContractWithToken",
       argsTypeWithInstrs = Seq(
         ArgsTypeWithInstrs(
@@ -647,8 +638,8 @@ object BuiltIn {
       usePreapprovedAssets = true
     )
 
-  val copyCreateContractWithToken: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn(
+  val copyCreateContractWithToken: BuiltIn[StatefulContext] =
+    OverloadedSimpleBuiltIn(
       "copyCreateContractWithToken",
       argsTypeWithInstrs = Seq(
         ArgsTypeWithInstrs(
@@ -674,8 +665,8 @@ object BuiltIn {
       usePreapprovedAssets = true
     )
 
-  val createSubContractWithToken: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn(
+  val createSubContractWithToken: BuiltIn[StatefulContext] =
+    OverloadedSimpleBuiltIn(
       "createSubContractWithToken",
       argsTypeWithInstrs = Seq(
         ArgsTypeWithInstrs(
@@ -701,8 +692,8 @@ object BuiltIn {
       usePreapprovedAssets = true
     )
 
-  val copyCreateSubContractWithToken: SimpleStatefulBuiltIn =
-    SimpleStatefulBuiltIn(
+  val copyCreateSubContractWithToken: BuiltIn[StatefulContext] =
+    OverloadedSimpleBuiltIn(
       "copyCreateSubContractWithToken",
       argsTypeWithInstrs = Seq(
         ArgsTypeWithInstrs(

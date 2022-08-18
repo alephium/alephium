@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm.lang
 
 import org.alephium.protocol.vm.{Instr, SelfAddress, StatefulContext}
-import org.alephium.protocol.vm.lang.BuiltIn.SimpleStatefulBuiltIn
+import org.alephium.protocol.vm.lang.BuiltIn.{OverloadedSimpleBuiltIn, SimpleStatefulBuiltIn}
 import org.alephium.util.AlephiumSpec
 
 class BuiltInSpec extends AlephiumSpec {
@@ -41,13 +41,14 @@ class BuiltInSpec extends AlephiumSpec {
     BuiltIn.statelessFuncs.values.count(_.useAssetsInContract) is 0
     BuiltIn.statefulFuncs.values
       .filter(_.useAssetsInContract)
-      .toSet
-      .map((f: Compiler.FuncInfo[StatefulContext]) =>
-        f.asInstanceOf[SimpleStatefulBuiltIn]
-          .argsTypeWithInstrs(0)
-          .instrs
-          .asInstanceOf[Seq[Instr[_]]]
-          .head
-      ) is Ast.ContractAssets.contractAssetsInstrs.-(SelfAddress)
+      .flatMap {
+        case f: SimpleStatefulBuiltIn => f.instrs.asInstanceOf[Seq[Instr[_]]]
+        case f: OverloadedSimpleBuiltIn[_] =>
+          f.argsTypeWithInstrs(0)
+            .instrs
+            .asInstanceOf[Seq[Instr[_]]]
+        case _: Any => Seq.empty[Instr[_]]
+      }
+      .toSet is Ast.ContractAssets.contractAssetsInstrs.-(SelfAddress)
   }
 }
