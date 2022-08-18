@@ -75,11 +75,11 @@ class AstSpec extends AlephiumSpec {
          |    check()
          |  }
          |
-         |  fn c() -> () {
+         |  pub fn c() -> () {
          |    a()
          |  }
          |
-         |  fn d() -> () {
+         |  pub fn d() -> () {
          |    b()
          |  }
          |
@@ -195,6 +195,14 @@ class AstSpec extends AlephiumSpec {
          |    callee.f()
          |    callee.i()
          |  }
+         |  
+         |  fn proxy() -> () {
+         |    callee.c()
+         |  }
+         |  
+         |  pub fn f() -> () {
+         |    proxy()
+         |  }
          |}
          |
          |$internalCalls
@@ -204,6 +212,7 @@ class AstSpec extends AlephiumSpec {
   it should "check permission for external calls" in new ExternalCallsFixture {
     val (_, _, warnings) = Compiler.compileContractFull(externalCalls, 0).rightValue
     warnings.toSet is Set(
+      MultiContract.noPermissionCheckWarning("InternalCalls", "c"),
       MultiContract.noPermissionCheckWarning("InternalCalls", "f"),
       MultiContract.noPermissionCheckWarning("InternalCalls", "g")
     )
