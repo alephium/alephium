@@ -1193,23 +1193,25 @@ object Ast {
           }
         }
       }
+      val allNoPermissionChecks: mutable.Set[(TypeId, FuncId)] = mutable.Set.empty
       contract.funcs.foreach { func =>
         // To check that external calls inside public methods should have permission checks
         if (func.isPublic) {
           contractState.externalCalls.get(func.id) match {
             case Some(callees) if callees.nonEmpty =>
-              if (
-                !callees.exists { case (typeId, funcId) =>
-                  externalCallPermissionTables(typeId)(funcId)
+              callees.foreach { case funcRef @ (typeId, funcId) =>
+                if (!externalCallPermissionTables(typeId)(funcId)) {
+                  allNoPermissionChecks.addOne(funcRef)
                 }
-              ) {
-                contractState.warnings.addOne(
-                  MultiContract.noPermissionCheckWarning(contract.ident.name, func.name)
-                )
               }
             case _ => ()
           }
         }
+      }
+      allNoPermissionChecks.foreach { case (typeId, funcId) =>
+        contractState.warnings.addOne(
+          MultiContract.noPermissionCheckWarning(typeId.name, funcId.name)
+        )
       }
     }
 

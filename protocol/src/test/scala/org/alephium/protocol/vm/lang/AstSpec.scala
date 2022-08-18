@@ -204,8 +204,8 @@ class AstSpec extends AlephiumSpec {
   it should "check permission for external calls" in new ExternalCallsFixture {
     val (_, _, warnings) = Compiler.compileContractFull(externalCalls, 0).rightValue
     warnings.toSet is Set(
-      MultiContract.noPermissionCheckWarning("ExternalCalls", "a"),
-      MultiContract.noPermissionCheckWarning("ExternalCalls", "c")
+      MultiContract.noPermissionCheckWarning("InternalCalls", "f"),
+      MultiContract.noPermissionCheckWarning("InternalCalls", "g")
     )
   }
 
@@ -231,7 +231,7 @@ class AstSpec extends AlephiumSpec {
 
   it should "not check permission for mutual recursive calls" in new MutualRecursionFixture {
     val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
-    warnings.toSet is Set(MultiContract.noPermissionCheckWarning("Foo", "a"))
+    warnings.toSet is Set(MultiContract.noPermissionCheckWarning("Bar", "a"))
   }
 
   it should "display the right warning message for permission check" in {
