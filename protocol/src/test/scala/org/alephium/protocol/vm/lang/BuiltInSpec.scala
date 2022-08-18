@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm.lang
 
 import org.alephium.protocol.vm.{Instr, SelfAddress, StatefulContext}
-import org.alephium.protocol.vm.lang.BuiltIn.{OverloadedSimpleBuiltIn, SimpleStatefulBuiltIn}
+import org.alephium.protocol.vm.lang.BuiltIn.{OverloadedSimpleBuiltIn, SimpleBuiltIn}
 import org.alephium.util.AlephiumSpec
 
 class BuiltInSpec extends AlephiumSpec {
@@ -42,7 +42,7 @@ class BuiltInSpec extends AlephiumSpec {
     BuiltIn.statefulFuncs.values
       .filter(_.useAssetsInContract)
       .flatMap {
-        case f: SimpleStatefulBuiltIn => f.instrs.asInstanceOf[Seq[Instr[_]]]
+        case f: SimpleBuiltIn[_] => f.instrs.asInstanceOf[Seq[Instr[_]]]
         case f: OverloadedSimpleBuiltIn[_] =>
           f.argsTypeWithInstrs(0)
             .instrs
