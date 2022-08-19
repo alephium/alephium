@@ -664,6 +664,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
+            false,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -785,6 +786,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
+            false,
             Seq.empty,
             Seq.empty,
             None
@@ -830,6 +832,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
+            false,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -865,6 +868,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
+            false,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -904,6 +908,7 @@ class ParserSpec extends AlephiumSpec {
       false,
       false,
       permissionCheck,
+      false,
       Seq.empty,
       Seq.empty,
       if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -916,6 +921,7 @@ class ParserSpec extends AlephiumSpec {
       false,
       false,
       permissionCheck,
+      false,
       Seq.empty,
       Seq.empty,
       if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -985,6 +991,43 @@ class ParserSpec extends AlephiumSpec {
     }
   }
 
+  it should "parse using readonly annotation" in {
+    def parse(annotations: String) = {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using($annotations)
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      fastparse.parse(code, StatefulParser.rawContract(_)).get.value.funcs(0)
+    }
+
+    var func = parse("readonly = true")
+    func.usePreapprovedAssets is false
+    func.useAssetsInContract is false
+    func.usePermissionCheck is false
+    func.useReadonly is true
+
+    func = parse("readonly = false")
+    func.usePreapprovedAssets is false
+    func.useAssetsInContract is false
+    func.usePermissionCheck is true
+    func.useReadonly is false
+
+    def error(annotations: String) = {
+      val e = intercept[Compiler.Error](parse(annotations))
+      e.message is "Invalid annotations, function foo is readonly"
+    }
+
+    error("readonly = true, preapprovedAssets = true")
+    error("readonly = true, assetsInContract = true")
+    error("readonly = true, permissionCheck = true")
+    error(
+      "readonly = true, preapprovedAssets = true, assetsInContract = true, permissionCheck = true"
+    )
+  }
+
   trait ScriptFixture {
     val usePreapprovedAssets: Boolean
     val script: String
@@ -999,6 +1042,7 @@ class ParserSpec extends AlephiumSpec {
         usePreapprovedAssets,
         false,
         true,
+        false,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))

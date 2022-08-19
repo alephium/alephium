@@ -500,6 +500,7 @@ object Ast {
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean,
       usePermissionCheck: Boolean,
+      useReadonly: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -591,6 +592,7 @@ object Ast {
         usePreapprovedAssets = usePreapprovedAssets,
         useAssetsInContract = useAssetsInContract,
         usePermissionCheck = true,
+        useReadonly = false,
         args = Seq.empty,
         rtypes = Seq.empty,
         bodyOpt = Some(stmts)

@@ -219,8 +219,8 @@ abstract class Parser[Ctx <: StatelessContext] {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
       } else {
         val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
-        val (usePreapprovedAssets, useContractAssets, usePermissionCheck) =
-          Parser.extractAssetModifier(annotations, false, false, true)
+        val (usePreapprovedAssets, useContractAssets, usePermissionCheck, useReadonly) =
+          Parser.extractFuncModifier(s"${funcId.name}", annotations, false, false, true, false)
         FuncDefTmp(
           Seq.empty,
           funcId,
@@ -228,6 +228,7 @@ abstract class Parser[Ctx <: StatelessContext] {
           usePreapprovedAssets,
           useContractAssets,
           usePermissionCheck,
+          useReadonly,
           params,
           returnType,
           statements
@@ -242,6 +243,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       f.usePreapprovedAssets,
       f.useContractAssets,
       f.usePermissionCheck,
+      f.useReadonly,
       f.args,
       f.rtypes,
       f.body
@@ -346,6 +348,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     usePreapprovedAssets: Boolean,
     useContractAssets: Boolean,
     usePermissionCheck: Boolean,
+    useReadonly: Boolean,
     args: Seq[Argument],
     rtypes: Seq[Type],
     body: Option[Seq[Statement[Ctx]]]
@@ -355,14 +358,19 @@ object Parser {
   val usePreapprovedAssetsKey = "preapprovedAssets"
   val useContractAssetsKey    = "assetsInContract"
   val usePermissionCheckKey   = "permissionCheck"
-  val keys: Set[String] = Set(usePreapprovedAssetsKey, useContractAssetsKey, usePermissionCheckKey)
+  val useReadonlyKey          = "readonly"
+  val keys: Set[String] =
+    Set(usePreapprovedAssetsKey, useContractAssetsKey, usePermissionCheckKey, useReadonlyKey)
 
-  def extractAssetModifier(
+  // scalastyle:off method.length
+  def extractFuncModifier(
+      funcName: String,
       annotations: Seq[Annotation],
       usePreapprovedAssetsDefault: Boolean,
       useContractAssetsDefault: Boolean,
-      usePermissionCheckDefault: Boolean
-  ): (Boolean, Boolean, Boolean) = {
+      usePermissionCheckDefault: Boolean,
+      useReadonlyDefault: Boolean
+  ): (Boolean, Boolean, Boolean, Boolean) = {
     if (annotations.exists(_.id.name != "using")) {
       throw Compiler.Error(s"Generic annotation is not supported yet")
     } else {
@@ -375,32 +383,61 @@ object Parser {
             )
           }
 
-          val usePreapprovedAssets =
-            extractAnnotationBoolean(
-              useAnnotation,
-              usePreapprovedAssetsKey,
-              usePreapprovedAssetsDefault
-            )
-          val useContractAssets =
-            extractAnnotationBoolean(useAnnotation, useContractAssetsKey, useContractAssetsDefault)
-          val usePermissionCheck = extractAnnotationBoolean(
+          val (hasReadonly, useReadonly) = extractAnnotationBoolean(
+            useAnnotation,
+            useReadonlyKey,
+            useReadonlyDefault
+          )
+          val (hasUsePreapprovedAssets, usePreapprovedAssets) = extractAnnotationBoolean(
+            useAnnotation,
+            usePreapprovedAssetsKey,
+            usePreapprovedAssetsDefault
+          )
+          val (hasUseContractAssets, useContractAssets) = extractAnnotationBoolean(
+            useAnnotation,
+            useContractAssetsKey,
+            useContractAssetsDefault
+          )
+          val (hasUsePermissionCheck, usePermissionCheck) = extractAnnotationBoolean(
             useAnnotation,
             usePermissionCheckKey,
             usePermissionCheckDefault
           )
-          (usePreapprovedAssets, useContractAssets, usePermissionCheck)
+
+          if (hasReadonly && useReadonly) {
+            if (
+              (hasUsePreapprovedAssets && usePreapprovedAssets) ||
+              (hasUseContractAssets && useContractAssets) ||
+              (hasUsePermissionCheck && usePermissionCheck)
+            ) {
+              throw Compiler.Error(s"Invalid annotations, function $funcName is readonly")
+            }
+
+            (false, false, false, true)
+          } else {
+            (usePreapprovedAssets, useContractAssets, usePermissionCheck, false)
+          }
         case None =>
-          (usePreapprovedAssetsDefault, useContractAssetsDefault, usePermissionCheckDefault)
+          (
+            usePreapprovedAssetsDefault,
+            useContractAssetsDefault,
+            usePermissionCheckDefault,
+            useReadonlyDefault
+          )
       }
     }
   }
 
-  def extractAnnotationBoolean(annotation: Annotation, name: String, default: Boolean): Boolean = {
+  def extractAnnotationBoolean(
+      annotation: Annotation,
+      name: String,
+      default: Boolean
+  ): (Boolean, Boolean) = {
     annotation.fields.find(_.ident.name == name).map(_.value) match {
-      case Some(value: Val.Bool) => value.v
+      case Some(value: Val.Bool) => (true, value.v)
       case Some(_) =>
         throw Compiler.Error(s"Expect boolean for ${name} in annotation ${annotation.id.name}")
-      case None => default
+      case None => (false, default)
     }
   }
 }
@@ -472,8 +509,15 @@ object StatefulParser extends Parser[StatefulContext] {
         if (mainStmts.isEmpty) {
           throw Compiler.Error(s"No main statements defined in TxScript ${typeId.name}")
         } else {
-          val (usePreapprovedAssets, useContractAssets, _) =
-            Parser.extractAssetModifier(annotations, true, false, true)
+          val (usePreapprovedAssets, useContractAssets, _, _) =
+            Parser.extractFuncModifier(
+              s"${typeId.name}.main",
+              annotations,
+              true,
+              false,
+              true,
+              false
+            )
           Ast.TxScript(
             typeId,
             templateVars.getOrElse(Seq.empty),
@@ -576,6 +620,7 @@ object StatefulParser extends Parser[StatefulContext] {
             f.usePreapprovedAssets,
             f.useContractAssets,
             f.usePermissionCheck,
+            f.useReadonly,
             f.args,
             f.rtypes,
             None
