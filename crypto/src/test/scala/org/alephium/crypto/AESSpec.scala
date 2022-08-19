@@ -48,7 +48,12 @@ class AESSpec() extends AlephiumSpec with TryValues {
         ByteString.fromArrayUnsafe(encrypted.encrypted.updated(index, modifiedByte).toArray)
       val corrupted = encrypted.copy(encrypted = corruptedData)
 
-      AES.decrypt(corrupted, password).failure.exception.getMessage is "Tag mismatch!"
+      AES
+        .decrypt(corrupted, password)
+        .failure
+        .exception
+        .getMessage
+        .startsWith("Tag mismatch") is true
     }
   }
 
@@ -56,7 +61,12 @@ class AESSpec() extends AlephiumSpec with TryValues {
     forAll(dataGen, passwordGen, passwordGen) { case (data, password, wrongPassword) =>
       whenever(wrongPassword != password) {
         val encrypted = AES.encrypt(data, password)
-        AES.decrypt(encrypted, wrongPassword).failure.exception.getMessage is "Tag mismatch!"
+        AES
+          .decrypt(encrypted, wrongPassword)
+          .failure
+          .exception
+          .getMessage
+          .startsWith("Tag mismatch") is true
       }
     }
   }

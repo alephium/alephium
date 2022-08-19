@@ -22,6 +22,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.{BlockHash, Hash, Signature}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.TokenIssuance
 import org.alephium.util.{discard, AVector, TimeStamp, U256}
 
 final case class BlockEnv(
@@ -246,9 +247,17 @@ trait StatefulContext extends StatelessContext with ContractPool {
       code: StatefulContract.HalfDecoded,
       initialBalances: MutBalancesPerLockup,
       initialFields: AVector[Val],
-      tokenAmount: Option[Val.U256]
+      tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[Hash] = {
-    tokenAmount.foreach(amount => initialBalances.addToken(contractId, amount.v))
+    tokenIssuanceInfo.foreach { info =>
+      info.transferTo match {
+        case Some(transferTo) =>
+          outputBalances.addToken(transferTo, contractId, info.amount.v)
+        case None =>
+          initialBalances.addToken(contractId, info.amount.v)
+      }
+    }
+
     val contractOutput = ContractOutput(
       initialBalances.attoAlphAmount,
       LockupScript.p2c(contractId),

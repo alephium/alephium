@@ -76,7 +76,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val lemanStatefulInstrs = AVector(
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-      LoadFieldByIndex, StoreFieldByIndex, ContractExists
+      LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
+      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken
     )
     // format: on
   }
@@ -2233,13 +2234,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val initialGas = context.gasRemaining
       instr.runWith(frame) isE ()
       val extraGas = instr match {
-        case CreateContract | CreateContractWithToken =>
+        case CreateContract | CreateContractWithToken | CreateContractAndTransferToken =>
           contractBytes.length + 200 // 200 from GasSchedule.callGas
-        case CopyCreateContract | CopyCreateContractWithToken =>
+        case CopyCreateContract | CopyCreateContractWithToken |
+            CopyCreateContractAndTransferToken =>
           801 // 801 from contractLoadGas
-        case CreateSubContract | CreateSubContractWithToken =>
+        case CreateSubContract | CreateSubContractWithToken | CreateSubContractAndTransferToken =>
           contractBytes.length + 314
-        case CopyCreateSubContract | CopyCreateSubContractWithToken =>
+        case CopyCreateSubContract | CopyCreateSubContractWithToken |
+            CopyCreateSubContractAndTransferToken =>
           915
       }
       initialGas.subUnsafe(frame.ctx.gasRemaining) is GasBox.unsafe(
@@ -2293,6 +2296,43 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
+  it should "CreateContractAndTransferToken" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(
+        MutBalances.empty,
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+
+    val state = Val.ByteVec(serialize(fields))
+
+    {
+      info("create contract and transfer token")
+
+      stack.push(Val.ByteVec(contractBytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(assetGen.sample.get))
+
+      test(
+        CreateContractAndTransferToken,
+        U256.Zero,
+        AVector((tokenId, ALPH.oneAlph)),
+        tokenAmount = None
+      )
+    }
+
+    {
+      info("can only transfer to asset address")
+
+      stack.push(Val.ByteVec(contractBytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(p2cGen.sample.get))
+
+      CreateContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+    }
+  }
+
   it should "CreateSubContract" in new CreateContractAbstractFixture {
     val balanceState =
       MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
@@ -2325,6 +2365,47 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Some(ALPH.oneNanoAlph),
       Some(subContractId)
     )
+  }
+
+  it should "CreateSubContractAndTransferToken" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(
+        MutBalances.empty,
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+
+    val state = Val.ByteVec(serialize(fields))
+
+    {
+      info("create sub contract and transfer token")
+
+      stack.push(Val.ByteVec(serialize("nft-01")))
+      stack.push(Val.ByteVec(contractBytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(assetGen.sample.get))
+
+      val subContractId = Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01"))
+      test(
+        CreateSubContractAndTransferToken,
+        U256.Zero,
+        AVector((tokenId, ALPH.oneAlph)),
+        tokenAmount = None,
+        Some(subContractId)
+      )
+    }
+
+    {
+      info("can only transfer to asset address")
+
+      stack.push(Val.ByteVec(serialize("nft-01")))
+      stack.push(Val.ByteVec(contractBytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(p2cGen.sample.get))
+
+      CreateSubContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+    }
   }
 
   it should "check external method arg and return length" in new ContextGenerators {
@@ -2511,6 +2592,52 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
+  it should "CopyCreateContractAndTransferToken" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(
+        MutBalances.empty,
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+
+    val state        = Val.ByteVec(serialize(AVector[Val](Val.True)))
+    val assetAddress = Val.Address(assetGen.sample.get)
+
+    {
+      info("create contract and transfer token")
+
+      stack.push(Val.ByteVec(fromContractId.bytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(assetAddress)
+      test(
+        CopyCreateContractAndTransferToken,
+        U256.Zero,
+        AVector((tokenId, ALPH.oneAlph)),
+        tokenAmount = None
+      )
+    }
+
+    {
+      info("non existent contract")
+
+      stack.push(Val.ByteVec(serialize(Hash.generate)))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(assetGen.sample.get))
+      CopyCreateContractAndTransferToken.runWith(frame).leftValue isE a[NonExistContract]
+    }
+
+    {
+      info("can only transfer to asset address")
+
+      stack.push(Val.ByteVec(serialize(Hash.generate)))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(p2cGen.sample.get))
+      CopyCreateContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+    }
+  }
+
   it should "CopyCreateSubContract" in new CreateContractAbstractFixture {
     val balanceState =
       MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
@@ -2553,6 +2680,60 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Some(ALPH.oneNanoAlph),
       Some(subContractId)
     )
+  }
+
+  it should "CopyCreateSubContractAndTransferToken" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(
+        MutBalances.empty,
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+
+    val state        = Val.ByteVec(serialize(AVector[Val](Val.True)))
+    val assetAddress = Val.Address(assetGen.sample.get)
+
+    {
+      info("copy create sub contract and transfer token")
+
+      stack.push(Val.ByteVec(serialize("nft-01")))
+      stack.push(Val.ByteVec(fromContractId.bytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(assetAddress)
+
+      val subContractId = Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01"))
+      test(
+        CopyCreateSubContractAndTransferToken,
+        U256.Zero,
+        AVector((tokenId, ALPH.oneAlph)),
+        tokenAmount = None,
+        Some(subContractId)
+      )
+    }
+
+    {
+      info("non existent contract")
+
+      stack.push(Val.ByteVec(serialize("nft-01")))
+      stack.push(Val.ByteVec(serialize(Hash.generate)))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(assetAddress)
+
+      CopyCreateSubContractAndTransferToken.runWith(frame).leftValue isE a[NonExistContract]
+    }
+
+    {
+      info("can only transfer to asset address")
+
+      stack.push(Val.ByteVec(serialize("nft-01")))
+      stack.push(Val.ByteVec(serialize(Hash.generate)))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(p2cGen.sample.get))
+
+      CopyCreateContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+    }
   }
 
   it should "ContractExists" in new StatefulInstrFixture {
@@ -2781,7 +2962,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MigrateSimple -> 32000, MigrateWithFields -> 32000, CopyCreateContractWithToken -> 24000,
       BurnToken -> 30, LockApprovedAssets -> 30,
       CreateSubContract -> 32000, CreateSubContractWithToken -> 32000, CopyCreateSubContract -> 24000, CopyCreateSubContractWithToken -> 24000,
-      LoadFieldByIndex -> 5, StoreFieldByIndex -> 5, ContractExists -> 800
+      LoadFieldByIndex -> 5, StoreFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
+      CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -2905,7 +3087,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MigrateSimple -> 186, MigrateWithFields -> 187, CopyCreateContractWithToken -> 188,
       BurnToken -> 189, LockApprovedAssets -> 190,
       CreateSubContract -> 191, CreateSubContractWithToken -> 192, CopyCreateSubContract -> 193, CopyCreateSubContractWithToken -> 194,
-      LoadFieldByIndex -> 195, StoreFieldByIndex -> 196, ContractExists -> 197
+      LoadFieldByIndex -> 195, StoreFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
+      CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201
     )
     // format: on
 
@@ -2960,7 +3143,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Leman hard fork */
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-      LoadFieldByIndex, StoreFieldByIndex, ContractExists
+      LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
+      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken
     )
     // format: on
   }

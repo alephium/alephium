@@ -655,15 +655,20 @@ trait FlowFixture
       initialState: AVector[Val],
       lockupScript: LockupScript.Asset,
       attoAlphAmount: U256,
-      newTokenAmount: Option[U256] = None
+      tokenIssuanceInfo: Option[TokenIssuance.Info] = None
   ): StatefulScript = {
     val address  = Address.Asset(lockupScript)
     val codeRaw  = Hex.toHexString(serialize(code))
     val stateRaw = Hex.toHexString(serialize(initialState))
-    val creation = newTokenAmount match {
-      case Some(amount) =>
+    val creation = tokenIssuanceInfo match {
+      case Some(TokenIssuance.Info(amount, None)) =>
         s"createContractWithToken!{@$address -> ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw, ${amount.v})"
-      case None => s"createContract!{@$address -> ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw)"
+      case Some(TokenIssuance.Info(amount, Some(transferTo))) => {
+        val toAddress = Address.from(transferTo).toBase58
+        s"createContractWithToken!{@$address -> ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw, ${amount.v}, @${toAddress})"
+      }
+      case None =>
+        s"createContract!{@$address -> ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw)"
     }
     val scriptRaw =
       s"""
