@@ -663,6 +663,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             false,
+            true,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -783,6 +784,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             false,
+            true,
             Seq.empty,
             Seq.empty,
             None
@@ -827,6 +829,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             false,
+            true,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -861,6 +864,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             false,
+            true,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -893,23 +897,25 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "test abstract contract parser" in {
-    def fooFuncDef(isAbstract: Boolean) = FuncDef[StatefulContext](
+    def fooFuncDef(isAbstract: Boolean, permissionCheck: Boolean = true) = FuncDef[StatefulContext](
       Seq.empty,
       FuncId("foo", false),
       false,
       false,
       false,
+      permissionCheck,
       Seq.empty,
       Seq.empty,
       if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
     )
 
-    def barFuncDef(isAbstract: Boolean) = FuncDef[StatefulContext](
+    def barFuncDef(isAbstract: Boolean, permissionCheck: Boolean = true) = FuncDef[StatefulContext](
       Seq.empty,
       FuncId("bar", false),
       false,
       false,
       false,
+      permissionCheck,
       Seq.empty,
       Seq.empty,
       if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -944,6 +950,7 @@ class ParserSpec extends AlephiumSpec {
       val bar =
         s"""
            |Interface Bar {
+           |  @using(permissionCheck = false)
            |  fn bar() -> ()
            |}
            |""".stripMargin
@@ -951,6 +958,7 @@ class ParserSpec extends AlephiumSpec {
       val code =
         s"""
            |Abstract Contract Foo() implements Bar {
+           |  @using(permissionCheck = false)
            |  fn foo() -> () {
            |    return
            |  }
@@ -966,8 +974,8 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         Seq.empty,
         Seq(
-          barFuncDef(true),
-          fooFuncDef(false)
+          barFuncDef(true, false),
+          fooFuncDef(false, false)
         ),
         Seq.empty,
         Seq.empty,
@@ -990,6 +998,7 @@ class ParserSpec extends AlephiumSpec {
         true,
         usePreapprovedAssets,
         false,
+        true,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))

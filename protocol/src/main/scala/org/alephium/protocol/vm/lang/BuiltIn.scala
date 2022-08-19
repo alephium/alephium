@@ -135,6 +135,13 @@ object BuiltIn {
       Seq.empty,
       VerifySecP256K1
     )
+  val checkPermission: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn(
+      "checkPermission",
+      Seq[Type](Type.Bool, Type.U256),
+      Seq.empty,
+      AssertWithErrorCode
+    )
   val verifyED25519: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn(
       "verifyED25519",
@@ -433,6 +440,7 @@ object BuiltIn {
     sha256,
     sha3,
     assert,
+    checkPermission,
     verifyTxSignature,
     verifySecP256K1,
     verifyED25519,

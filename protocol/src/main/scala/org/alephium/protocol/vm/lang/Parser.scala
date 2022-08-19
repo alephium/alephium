@@ -219,14 +219,15 @@ abstract class Parser[Ctx <: StatelessContext] {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
       } else {
         val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
-        val (usePreapprovedAssets, useContractAssets) =
-          Parser.extractAssetModifier(annotations, false, false)
+        val (usePreapprovedAssets, useContractAssets, usePermissionCheck) =
+          Parser.extractAssetModifier(annotations, false, false, true)
         FuncDefTmp(
           Seq.empty,
           funcId,
           isPublic,
           usePreapprovedAssets,
           useContractAssets,
+          usePermissionCheck,
           params,
           returnType,
           statements
@@ -240,6 +241,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       f.isPublic,
       f.usePreapprovedAssets,
       f.useContractAssets,
+      f.usePermissionCheck,
       f.args,
       f.rtypes,
       f.body
@@ -343,28 +345,30 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     isPublic: Boolean,
     usePreapprovedAssets: Boolean,
     useContractAssets: Boolean,
+    usePermissionCheck: Boolean,
     args: Seq[Argument],
     rtypes: Seq[Type],
     body: Option[Seq[Statement[Ctx]]]
 )
 
 object Parser {
+  val usePreapprovedAssetsKey = "preapprovedAssets"
+  val useContractAssetsKey    = "assetsInContract"
+  val usePermissionCheckKey   = "permissionCheck"
+  val keys: Set[String] = Set(usePreapprovedAssetsKey, useContractAssetsKey, usePermissionCheckKey)
+
   def extractAssetModifier(
       annotations: Seq[Annotation],
       usePreapprovedAssetsDefault: Boolean,
-      useContractAssetsDefault: Boolean
-  ): (Boolean, Boolean) = {
+      useContractAssetsDefault: Boolean,
+      usePermissionCheckDefault: Boolean
+  ): (Boolean, Boolean, Boolean) = {
     if (annotations.exists(_.id.name != "using")) {
       throw Compiler.Error(s"Generic annotation is not supported yet")
     } else {
-      val usePreapprovedAssetsKey = "preapprovedAssets"
-      val useContractAssetsKey    = "assetsInContract"
       annotations.headOption match {
         case Some(useAnnotation) =>
-          val invalidKeys = useAnnotation.fields
-            .filter(f =>
-              f.ident.name != usePreapprovedAssetsKey && f.ident.name != useContractAssetsKey
-            )
+          val invalidKeys = useAnnotation.fields.filter(f => !keys.contains(f.ident.name))
           if (invalidKeys.nonEmpty) {
             throw Compiler.Error(
               s"Invalid keys for use annotation: ${invalidKeys.map(_.ident.name).mkString(",")}"
@@ -372,24 +376,31 @@ object Parser {
           }
 
           val usePreapprovedAssets =
-            extractAnnotationBoolean(useAnnotation, usePreapprovedAssetsKey)
-          val useContractAssets = extractAnnotationBoolean(useAnnotation, useContractAssetsKey)
-          (
-            usePreapprovedAssets.getOrElse(usePreapprovedAssetsDefault),
-            useContractAssets.getOrElse(useContractAssetsDefault)
+            extractAnnotationBoolean(
+              useAnnotation,
+              usePreapprovedAssetsKey,
+              usePreapprovedAssetsDefault
+            )
+          val useContractAssets =
+            extractAnnotationBoolean(useAnnotation, useContractAssetsKey, useContractAssetsDefault)
+          val usePermissionCheck = extractAnnotationBoolean(
+            useAnnotation,
+            usePermissionCheckKey,
+            usePermissionCheckDefault
           )
+          (usePreapprovedAssets, useContractAssets, usePermissionCheck)
         case None =>
-          (usePreapprovedAssetsDefault, useContractAssetsDefault)
+          (usePreapprovedAssetsDefault, useContractAssetsDefault, usePermissionCheckDefault)
       }
     }
   }
 
-  def extractAnnotationBoolean(annotation: Annotation, name: String): Option[Boolean] = {
+  def extractAnnotationBoolean(annotation: Annotation, name: String, default: Boolean): Boolean = {
     annotation.fields.find(_.ident.name == name).map(_.value) match {
-      case Some(value: Val.Bool) => Some(value.v)
+      case Some(value: Val.Bool) => value.v
       case Some(_) =>
         throw Compiler.Error(s"Expect boolean for ${name} in annotation ${annotation.id.name}")
-      case None => None
+      case None => default
     }
   }
 }
@@ -461,8 +472,8 @@ object StatefulParser extends Parser[StatefulContext] {
         if (mainStmts.isEmpty) {
           throw Compiler.Error(s"No main statements defined in TxScript ${typeId.name}")
         } else {
-          val (usePreapprovedAssets, useContractAssets) =
-            Parser.extractAssetModifier(annotations, true, false)
+          val (usePreapprovedAssets, useContractAssets, _) =
+            Parser.extractAssetModifier(annotations, true, false, true)
           Ast.TxScript(
             typeId,
             templateVars.getOrElse(Seq.empty),
@@ -564,6 +575,7 @@ object StatefulParser extends Parser[StatefulContext] {
             f.isPublic,
             f.usePreapprovedAssets,
             f.useContractAssets,
+            f.usePermissionCheck,
             f.args,
             f.rtypes,
             None

@@ -5533,7 +5533,7 @@
                     }
                   ],
                   "warnings": [
-                    "Found unused fields: a"
+                    "Found unused fields in Foo: a"
                   ]
                 }
               }
@@ -5847,7 +5847,7 @@
                     }
                   ],
                   "warnings": [
-                    "Found unused fields: a"
+                    "Found unused fields in Foo: a"
                   ]
                 }
               }

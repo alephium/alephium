@@ -216,8 +216,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |
-         |TxScript Bar {
-         |  return
+         |Contract Bar() {
          |  pub fn bar() -> () {
          |    return foo()
          |  }
@@ -228,7 +227,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     Compiler.compileContract(input, 0).isRight is true
-    Compiler.compileTxScript(input, 1).isRight is true
+    Compiler.compileContract(input, 1).isRight is true
   }
 
   it should "check function return types" in {
@@ -447,7 +446,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         fields: AVector[Val] = AVector.empty,
         methodIndex: Int = 0
     ): Assertion = {
-      val contract = Compiler.compileContract(input).toOption.get
+      val contract = Compiler.compileContract(input).rightValue
 
       deserialize[StatefulContract](serialize(contract)) isE contract
       val (obj, context) = prepareContract(contract, fields)
@@ -1982,6 +1981,29 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       contract.methodsLength is 4
       contract.methods.map(_.argsLength) is AVector(2, 1, 3, 0)
     }
+
+    {
+      info("Follow the same function annotation")
+
+      def code(flag: Boolean) =
+        s"""
+           |Contract Foo() implements Bar {
+           |  @using(permissionCheck = $flag)
+           |  fn bar() -> () {
+           |    return
+           |  }
+           |}
+           |Interface Bar {
+           |  @using(permissionCheck = false)
+           |  fn bar() -> ()
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code(false)).isRight is true
+      Compiler
+        .compileContract(code(true))
+        .leftValue
+        .message is "Function bar is implemented with wrong signature"
+    }
   }
 
   it should "test interface compilation" in {
@@ -2001,12 +2023,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val foo =
         s"""
            |Interface Foo {
+           |  @using(permissionCheck = false)
            |  fn foo() -> ()
            |}
            |""".stripMargin
       val bar =
         s"""
            |Interface Bar extends Foo {
+           |  @using(permissionCheck = false)
            |  fn foo() -> ()
            |}
            |
@@ -2021,12 +2045,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val foo =
         s"""
            |Interface Foo {
+           |  @using(permissionCheck = false)
            |  fn foo() -> ()
            |}
            |""".stripMargin
       val bar =
         s"""
            |Contract Bar() implements Foo {
+           |  @using(permissionCheck = false)
            |  pub fn foo() -> () {
            |    return
            |  }
@@ -2043,12 +2069,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val a =
         s"""
            |Interface A {
+           |  @using(permissionCheck = false)
            |  pub fn a() -> ()
            |}
            |""".stripMargin
       val b =
         s"""
            |Interface B extends A {
+           |  @using(permissionCheck = false)
            |  pub fn b(x: Bool) -> ()
            |}
            |
@@ -2057,6 +2085,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val c =
         s"""
            |Interface C extends B {
+           |  @using(permissionCheck = false)
            |  pub fn c(x: Bool, y: Bool) -> ()
            |}
            |
@@ -2069,8 +2098,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() implements C {
+           |  @using(permissionCheck = false)
            |  pub fn c(x: Bool, y: Bool) -> () {}
+           |  @using(permissionCheck = false)
            |  pub fn a() -> () {}
+           |  @using(permissionCheck = false)
            |  pub fn b(x: Bool) -> () {}
            |  pub fn d(x: Bool, y: Bool, z: Bool) -> () {
            |    a()
@@ -2091,18 +2123,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val foo1: String =
         s"""
            |Abstract Contract Foo1() {
+           |  @using(permissionCheck = false)
            |  fn foo1() -> () {}
            |}
            |""".stripMargin
       val foo2: String =
         s"""
            |Interface Foo2 {
+           |  @using(permissionCheck = false)
            |  fn foo2() -> ()
            |}
            |""".stripMargin
       val bar1: String =
         s"""
            |Contract Bar1() extends Foo1() implements Foo2 {
+           |  @using(permissionCheck = false)
            |  fn foo2() -> () {}
            |}
            |$foo1
@@ -2111,6 +2146,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val bar2: String =
         s"""
            |Contract Bar2() extends Foo1() implements Foo2 {
+           |  @using(permissionCheck = false)
            |  fn foo2() -> () {}
            |}
            |$foo1
@@ -2653,7 +2689,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileAssetScript(code).rightValue._2 is
-        AVector("Found unused variables in function foo: foo.a, foo.b")
+        AVector("Found unused variables in Foo: foo.a, foo.b")
     }
 
     {
@@ -2669,7 +2705,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileTxScriptFull(code).rightValue._3 is
-        AVector("Found unused variables in function main: main.b")
+        AVector("Found unused variables in Foo: main.b")
     }
 
     {
@@ -2685,7 +2721,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileTxScriptFull(code).rightValue._3 is
-        AVector("Found unused fields: b")
+        AVector("Found unused fields in Foo: b")
     }
 
     {
@@ -2701,7 +2737,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
-        AVector("Found unused variables in function foo: foo.a, foo.b")
+        AVector("Found unused variables in Foo: foo.a, foo.b")
     }
 
     {
@@ -2715,7 +2751,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
-        AVector("Found unused fields: a, c")
+        AVector("Found unused fields in Foo: a, c")
     }
 
     {
@@ -2734,7 +2770,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
-        AVector("Found unused fields: b, c")
+        AVector("Found unused fields in Foo: b, c")
     }
 
     {
@@ -2750,7 +2786,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
-        AVector("Found unused constants: C0")
+        AVector("Found unused constants in Foo: C0")
     }
 
     {
@@ -2775,7 +2811,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
-        AVector("Found unused constants: Chain.Eth, Language.Solidity")
+        AVector("Found unused constants in Foo: Chain.Eth, Language.Solidity")
     }
   }
 
@@ -2904,8 +2940,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Fields and variables are unused")
       val warnings = Compiler.compileContractFull(code("")).rightValue._3
       warnings is AVector(
-        "Found unused variables in function foo: foo.x, foo.y",
-        "Found unused fields: a, b"
+        "Found unused variables in Foo: foo.x, foo.y",
+        "Found unused fields in Foo: a, b"
       )
     }
 
