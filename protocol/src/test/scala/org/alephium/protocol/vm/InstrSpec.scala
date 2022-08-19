@@ -2296,6 +2296,43 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
+  it should "CreateContractAndTransferToken" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(
+        MutBalances.empty,
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+
+    val state = Val.ByteVec(serialize(fields))
+
+    {
+      info("create contract and transfer token")
+
+      stack.push(Val.ByteVec(contractBytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(assetGen.sample.get))
+
+      test(
+        CreateContractAndTransferToken,
+        U256.Zero,
+        AVector((tokenId, ALPH.oneAlph)),
+        tokenAmount = None
+      )
+    }
+
+    {
+      info("can only transfer to asset address")
+
+      stack.push(Val.ByteVec(contractBytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(p2cGen.sample.get))
+
+      CreateContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+    }
+  }
+
   it should "CreateSubContract" in new CreateContractAbstractFixture {
     val balanceState =
       MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
@@ -2328,6 +2365,47 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Some(ALPH.oneNanoAlph),
       Some(subContractId)
     )
+  }
+
+  it should "CreateSubContractAndTransferToken" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(
+        MutBalances.empty,
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+
+    val state = Val.ByteVec(serialize(fields))
+
+    {
+      info("create sub contract and transfer token")
+
+      stack.push(Val.ByteVec(serialize("nft-01")))
+      stack.push(Val.ByteVec(contractBytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(assetGen.sample.get))
+
+      val subContractId = Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01"))
+      test(
+        CreateSubContractAndTransferToken,
+        U256.Zero,
+        AVector((tokenId, ALPH.oneAlph)),
+        tokenAmount = None,
+        Some(subContractId)
+      )
+    }
+
+    {
+      info("can only transfer to asset address")
+
+      stack.push(Val.ByteVec(serialize("nft-01")))
+      stack.push(Val.ByteVec(contractBytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(p2cGen.sample.get))
+
+      CreateSubContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+    }
   }
 
   it should "check external method arg and return length" in new ContextGenerators {
@@ -2514,6 +2592,52 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
+  it should "CopyCreateContractAndTransferToken" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(
+        MutBalances.empty,
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+
+    val state        = Val.ByteVec(serialize(AVector[Val](Val.True)))
+    val assetAddress = Val.Address(assetGen.sample.get)
+
+    {
+      info("create contract and transfer token")
+
+      stack.push(Val.ByteVec(fromContractId.bytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(assetAddress)
+      test(
+        CopyCreateContractAndTransferToken,
+        U256.Zero,
+        AVector((tokenId, ALPH.oneAlph)),
+        tokenAmount = None
+      )
+    }
+
+    {
+      info("non existent contract")
+
+      stack.push(Val.ByteVec(serialize(Hash.generate)))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(assetGen.sample.get))
+      CopyCreateContractAndTransferToken.runWith(frame).leftValue isE a[NonExistContract]
+    }
+
+    {
+      info("can only transfer to asset address")
+
+      stack.push(Val.ByteVec(serialize(Hash.generate)))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(p2cGen.sample.get))
+      CopyCreateContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+    }
+  }
+
   it should "CopyCreateSubContract" in new CreateContractAbstractFixture {
     val balanceState =
       MutBalanceState(MutBalances.empty, alphBalance(from, ALPH.oneAlph))
@@ -2556,6 +2680,60 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Some(ALPH.oneNanoAlph),
       Some(subContractId)
     )
+  }
+
+  it should "CopyCreateSubContractAndTransferToken" in new CreateContractAbstractFixture {
+    val balanceState =
+      MutBalanceState(
+        MutBalances.empty,
+        tokenBalance(from, tokenId, ALPH.oneAlph)
+      )
+
+    val state        = Val.ByteVec(serialize(AVector[Val](Val.True)))
+    val assetAddress = Val.Address(assetGen.sample.get)
+
+    {
+      info("copy create sub contract and transfer token")
+
+      stack.push(Val.ByteVec(serialize("nft-01")))
+      stack.push(Val.ByteVec(fromContractId.bytes))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(assetAddress)
+
+      val subContractId = Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01"))
+      test(
+        CopyCreateSubContractAndTransferToken,
+        U256.Zero,
+        AVector((tokenId, ALPH.oneAlph)),
+        tokenAmount = None,
+        Some(subContractId)
+      )
+    }
+
+    {
+      info("non existent contract")
+
+      stack.push(Val.ByteVec(serialize("nft-01")))
+      stack.push(Val.ByteVec(serialize(Hash.generate)))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(assetAddress)
+
+      CopyCreateSubContractAndTransferToken.runWith(frame).leftValue isE a[NonExistContract]
+    }
+
+    {
+      info("can only transfer to asset address")
+
+      stack.push(Val.ByteVec(serialize("nft-01")))
+      stack.push(Val.ByteVec(serialize(Hash.generate)))
+      stack.push(state)
+      stack.push(Val.U256(ALPH.oneNanoAlph))
+      stack.push(Val.Address(p2cGen.sample.get))
+
+      CopyCreateContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+    }
   }
 
   it should "ContractExists" in new StatefulInstrFixture {
