@@ -1062,7 +1062,9 @@ object Ast {
           Type.flattenTypeLength(fields.map(_.tpe)),
           getMethods(state)
         )
-        checkPrivateMethods(state)
+        if (!isAbstract) { // We don't check private functions in abstract contracts
+          checkPrivateMethods(state)
+        }
         contract
       }
     }
