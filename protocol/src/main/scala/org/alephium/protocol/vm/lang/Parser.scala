@@ -509,7 +509,7 @@ object StatefulParser extends Parser[StatefulContext] {
         if (mainStmts.isEmpty) {
           throw Compiler.Error(s"No main statements defined in TxScript ${typeId.name}")
         } else {
-          val (usePreapprovedAssets, useContractAssets, _, _) =
+          val (usePreapprovedAssets, useContractAssets, _, useReadonly) =
             Parser.extractFuncModifier(
               s"${typeId.name}.main",
               annotations,
@@ -521,7 +521,8 @@ object StatefulParser extends Parser[StatefulContext] {
           Ast.TxScript(
             typeId,
             templateVars.getOrElse(Seq.empty),
-            Ast.FuncDef.main(mainStmts, usePreapprovedAssets, useContractAssets) +: funcs
+            Ast.FuncDef
+              .main(mainStmts, usePreapprovedAssets, useContractAssets, useReadonly) +: funcs
           )
         }
       }

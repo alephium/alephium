@@ -867,7 +867,9 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |    }
         |  ],
         |  "warnings": [
+        |    "Function main is readonly, please use @using(readonly = true) for the function",
         |    "Found unused variables in Foo: bar.a",
+        |    "Function bar is readonly, please use @using(readonly = true) for the function",
         |    "Found unused fields in Foo: aa, bb, cc, dd, ee"
         |  ]
         |}

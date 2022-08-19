@@ -1474,6 +1474,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
     result.warnings is AVector(
       "Found unused variables in Foo: foo.a",
+      "Function foo is readonly, please use @using(readonly = true) for the function",
       "Found unused fields in Foo: x"
     )
   }
@@ -1527,6 +1528,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val result = serverUtils.compileScript(query).rightValue
       result.warnings is AVector(
         "Found unused variables in Main: main.c",
+        "Function main is readonly, please use @using(readonly = true) for the function",
         "Found unused fields in Main: b"
       )
     }

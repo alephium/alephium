@@ -561,27 +561,28 @@ object Ast {
     }
 
     def checkReadonly(state: Compiler.State[Ctx], instrs: Seq[Instr[Ctx]]): Unit = {
-      if (useReadonly) {
-        val changeContractState = instrs.exists {
-          case _: StoreField             => true
-          case _: StoreFieldByIndex.type => true
-          case _                         => false
-        }
+      val changeContractState = instrs.exists {
+        case _: StoreField             => true
+        case _: StoreFieldByIndex.type => true
+        case _                         => false
+      }
+      val internalCalls        = state.internalCalls.getOrElse(id, mutable.Set.empty)
+      val invalidInternalCalls = internalCalls.filterNot(state.getFunc(_).isReadonly)
+      val externalCalls        = state.externalCalls.getOrElse(id, mutable.Set.empty)
+      val invalidExternalCalls = externalCalls.filterNot { case (typeId, funcId) =>
+        state.getFunc(typeId, funcId).isReadonly
+      }
+
+      val isReadonly =
+        !changeContractState && invalidInternalCalls.isEmpty && invalidExternalCalls.isEmpty
+      if (!isReadonly && useReadonly) {
         if (changeContractState) {
           throw Compiler.Error(s"Readonly function ${id.name} changes contract state")
         }
-
-        val internalCalls        = state.internalCalls.getOrElse(id, mutable.Set.empty)
-        val invalidInternalCalls = internalCalls.filterNot(state.getFunc(_).isReadonly)
         if (invalidInternalCalls.nonEmpty) {
           throw Compiler.Error(
             s"Readonly function ${id.name} have invalid internal calls: ${invalidInternalCalls.map(_.name).mkString(", ")}"
           )
-        }
-
-        val externalCalls = state.externalCalls.getOrElse(id, mutable.Set.empty)
-        val invalidExternalCalls = externalCalls.filterNot { case (typeId, funcId) =>
-          state.getFunc(typeId, funcId).isReadonly
         }
         if (invalidExternalCalls.nonEmpty) {
           val msg = invalidExternalCalls
@@ -591,6 +592,12 @@ object Ast {
             .mkString(", ")
           throw Compiler.Error(s"Readonly function ${id.name} have invalid external calls: $msg")
         }
+      }
+
+      if (isReadonly && !useReadonly) {
+        state.warnings.addOne(
+          s"Function ${id.name} is readonly, please use @using(readonly = true) for the function"
+        )
       }
     }
 
@@ -618,7 +625,8 @@ object Ast {
     def main(
         stmts: Seq[Ast.Statement[StatefulContext]],
         usePreapprovedAssets: Boolean,
-        useAssetsInContract: Boolean
+        useAssetsInContract: Boolean,
+        useReadonly: Boolean
     ): FuncDef[StatefulContext] = {
       FuncDef[StatefulContext](
         Seq.empty,
@@ -627,7 +635,7 @@ object Ast {
         usePreapprovedAssets = usePreapprovedAssets,
         useAssetsInContract = useAssetsInContract,
         usePermissionCheck = true,
-        useReadonly = false,
+        useReadonly = useReadonly,
         args = Seq.empty,
         rtypes = Seq.empty,
         bodyOpt = Some(stmts)

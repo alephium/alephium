@@ -20,10 +20,15 @@ import scala.collection.mutable
 
 import org.alephium.protocol.vm.lang.Ast.MultiContract
 import org.alephium.util.AlephiumSpec
+import org.alephium.util.AVector
 
 class AstSpec extends AlephiumSpec {
 
   behavior of "Permission check"
+
+  def permissionCheckWarnings(warnings: AVector[String]): AVector[String] = {
+    warnings.filter(_.startsWith("No permission check"))
+  }
 
   it should "detect direct permission check" in {
     val code =
@@ -213,7 +218,7 @@ class AstSpec extends AlephiumSpec {
 
   it should "check permission for external calls" in new ExternalCallsFixture {
     val (_, _, warnings) = Compiler.compileContractFull(externalCalls, 0).rightValue
-    warnings.toSet is Set(
+    permissionCheckWarnings(warnings).toSet is Set(
       MultiContract.noPermissionCheckMsg("InternalCalls", "c"),
       MultiContract.noPermissionCheckMsg("InternalCalls", "f"),
       MultiContract.noPermissionCheckMsg("InternalCalls", "g")
@@ -242,7 +247,9 @@ class AstSpec extends AlephiumSpec {
 
   it should "not check permission for mutual recursive calls" in new MutualRecursionFixture {
     val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
-    warnings.toSet is Set(MultiContract.noPermissionCheckMsg("Bar", "a"))
+    permissionCheckWarnings(warnings).toSet is Set(
+      MultiContract.noPermissionCheckMsg("Bar", "a")
+    )
   }
 
   it should "test permission check for interface" in {
@@ -287,14 +294,17 @@ class AstSpec extends AlephiumSpec {
       val code =
         s"""
            |Contract Bar() implements Foo {
+           |  @using(readonly = true)
            |  pub fn foo() -> () {
            |    bar()
            |  }
+           |  @using(readonly = true)
            |  fn bar() -> () {
            |    checkPermission!(true, 0)
            |  }
            |}
            |Interface Foo {
+           |  @using(readonly = true)
            |  pub fn foo() -> ()
            |}
            |""".stripMargin

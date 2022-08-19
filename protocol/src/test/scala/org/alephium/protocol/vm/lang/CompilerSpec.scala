@@ -2681,6 +2681,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |AssetScript Foo {
+           |  @using(readonly = true)
            |  pub fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 2
@@ -2696,10 +2697,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Check unused local variables in TxScript")
       val code =
         s"""
+           |@using(readonly = true)
            |TxScript Foo {
            |  let b = 1
            |  foo()
            |
+           |  @using(readonly = true)
            |  fn foo() -> () {
            |  }
            |}
@@ -2712,9 +2715,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Check unused template variables in TxScript")
       val code =
         s"""
+           |@using(readonly = true)
            |TxScript Foo(a: U256, b: U256) {
            |  foo(a)
            |
+           |  @using(readonly = true)
            |  fn foo(v: U256) -> () {
            |    assert!(v == 0, 0)
            |  }
@@ -2729,6 +2734,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
+           |  @using(readonly = true)
            |  fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 0
@@ -2745,6 +2751,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(a: ByteVec, b: U256, c: [U256; 2]) {
+           |  @using(readonly = true)
            |  fn getB() -> U256 {
            |    return b
            |  }
@@ -2759,11 +2766,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(a: U256, b: U256, c: [U256; 2]) extends Bar(a, b) {
-           |  pub fn foo() -> () {
-           |  }
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {}
            |}
            |
            |Abstract Contract Bar(a: U256, b: U256) {
+           |  @using(readonly = true)
            |  pub fn bar() -> U256 {
            |    return a
            |  }
@@ -2780,6 +2788,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo() {
            |  const C0 = 0
            |  const C1 = 1
+           |  @using(readonly = true)
            |  fn foo() -> () {
            |    assert!(C1 == 1, 0)
            |  }
@@ -2804,6 +2813,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    Solidity = #01
            |  }
            |
+           |  @using(readonly = true)
            |  fn foo() -> () {
            |    assert!(Chain.Alephium == 0, 0)
            |    assert!(Language.Ralph == #00, 0)
@@ -2930,6 +2940,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def code(unused: String) =
       s"""
          |Contract Foo($unused a: U256, $unused b: [U256; 2]) {
+         |  @using(readonly = true)
          |  pub fn foo($unused x: U256, $unused y: [U256; 2]) -> () {
          |    return
          |  }
@@ -3060,6 +3071,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
         "Readonly function foo have invalid external calls: Bar.bar"
+    }
+
+    {
+      info("Warning for readonly functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
+      warnings is AVector(
+        "Function foo is readonly, please use @using(readonly = true) for the function"
+      )
     }
   }
 }
