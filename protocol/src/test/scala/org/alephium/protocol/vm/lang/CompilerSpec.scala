@@ -21,6 +21,7 @@ import org.scalatest.Assertion
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.lang.Ast.MultiContract
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -2019,16 +2020,33 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Implemented function should have permission check")
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn foo() -> () {}
+           |}
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |""".stripMargin
+      val error = Compiler.compileContractFull(code, 0).leftValue
+      error.message is MultiContract.noPermissionCheckMsg("Bar", "foo")
+    }
+
+    {
       info("Interface inheritance should not contain duplicated functions")
       val foo =
         s"""
            |Interface Foo {
+           |  @using(permissionCheck = false)
            |  fn foo() -> ()
            |}
            |""".stripMargin
       val bar =
         s"""
            |Interface Bar extends Foo {
+           |  @using(permissionCheck = false)
            |  fn foo() -> ()
            |}
            |
@@ -2043,12 +2061,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val foo =
         s"""
            |Interface Foo {
+           |  @using(permissionCheck = false)
            |  fn foo() -> ()
            |}
            |""".stripMargin
       val bar =
         s"""
            |Contract Bar() implements Foo {
+           |  @using(permissionCheck = false)
            |  pub fn foo() -> () {
            |    return
            |  }
@@ -2065,12 +2085,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val a =
         s"""
            |Interface A {
+           |  @using(permissionCheck = false)
            |  pub fn a() -> ()
            |}
            |""".stripMargin
       val b =
         s"""
            |Interface B extends A {
+           |  @using(permissionCheck = false)
            |  pub fn b(x: Bool) -> ()
            |}
            |
@@ -2079,6 +2101,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val c =
         s"""
            |Interface C extends B {
+           |  @using(permissionCheck = false)
            |  pub fn c(x: Bool, y: Bool) -> ()
            |}
            |
@@ -2091,8 +2114,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() implements C {
+           |  @using(permissionCheck = false)
            |  pub fn c(x: Bool, y: Bool) -> () {}
+           |  @using(permissionCheck = false)
            |  pub fn a() -> () {}
+           |  @using(permissionCheck = false)
            |  pub fn b(x: Bool) -> () {}
            |  pub fn d(x: Bool, y: Bool, z: Bool) -> () {
            |    a()
@@ -2113,18 +2139,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val foo1: String =
         s"""
            |Abstract Contract Foo1() {
+           |  @using(permissionCheck = false)
            |  fn foo1() -> () {}
            |}
            |""".stripMargin
       val foo2: String =
         s"""
            |Interface Foo2 {
+           |  @using(permissionCheck = false)
            |  fn foo2() -> ()
            |}
            |""".stripMargin
       val bar1: String =
         s"""
            |Contract Bar1() extends Foo1() implements Foo2 {
+           |  @using(permissionCheck = false)
            |  fn foo2() -> () {}
            |}
            |$foo1
@@ -2133,6 +2162,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val bar2: String =
         s"""
            |Contract Bar2() extends Foo1() implements Foo2 {
+           |  @using(permissionCheck = false)
            |  fn foo2() -> () {}
            |}
            |$foo1
