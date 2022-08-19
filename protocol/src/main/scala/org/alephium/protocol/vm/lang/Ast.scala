@@ -1216,7 +1216,9 @@ object Ast {
     def genStatefulContract(contractIndex: Int): (StatefulContract, Contract, AVector[String]) = {
       get(contractIndex) match {
         case contract: Contract =>
-          val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
+          val states       = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
+          val state        = states(contractIndex)
+          val contractCode = contract.genCode(state)
           states.foreachWithIndex { case (state, index) =>
             if (index != contractIndex) {
               contracts(index) match {
@@ -1226,8 +1228,6 @@ object Ast {
               }
             }
           }
-          val state        = states(contractIndex)
-          val contractCode = contract.genCode(state)
           checkExternalCallPermissions(states, contractIndex, contract)
           (contractCode, contract, state.getWarnings)
         case _: TxScript => throw Compiler.Error(s"The code is for TxScript, not for Contract")
