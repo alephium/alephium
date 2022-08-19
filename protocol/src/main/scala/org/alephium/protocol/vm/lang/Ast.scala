@@ -881,7 +881,7 @@ object Ast {
       table
     }
 
-    def checkPrivateMethods(state: Compiler.State[Ctx]): Unit = {
+    def checkIfPrivateMethodsUsed(state: Compiler.State[Ctx]): Unit = {
       funcs.foreach { func =>
         if (func.isPrivate && !state.internalCallsReversed.get(func.id).exists(_.nonEmpty)) {
           state.warnings.addOne(
@@ -1063,7 +1063,7 @@ object Ast {
           getMethods(state)
         )
         if (!isAbstract) { // We don't check private functions in abstract contracts
-          checkPrivateMethods(state)
+          checkIfPrivateMethodsUsed(state)
         }
         contract
       }
