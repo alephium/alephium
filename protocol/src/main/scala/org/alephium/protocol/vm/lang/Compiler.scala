@@ -376,12 +376,26 @@ object Compiler {
   trait CallGraph {
     def scope: Ast.FuncId
 
+    // caller -> callees
     val internalCalls = mutable.HashMap.empty[Ast.FuncId, mutable.Set[Ast.FuncId]]
     def addInternalCall(callee: Ast.FuncId): Unit = {
       internalCalls.get(scope) match {
         case Some(callees) => callees += callee
         case None          => internalCalls.update(scope, mutable.Set(callee))
       }
+    }
+    // callee -> callers
+    lazy val internalCallsReversed: mutable.Map[Ast.FuncId, mutable.ArrayBuffer[Ast.FuncId]] = {
+      val reversed = mutable.Map.empty[Ast.FuncId, mutable.ArrayBuffer[Ast.FuncId]]
+      internalCalls.foreach { case (caller, callees) =>
+        callees.foreach { callee =>
+          reversed.get(callee) match {
+            case None          => reversed.update(callee, mutable.ArrayBuffer(caller))
+            case Some(callers) => callers.addOne(caller)
+          }
+        }
+      }
+      reversed
     }
 
     val externalCalls = mutable.HashMap.empty[Ast.FuncId, mutable.Set[(Ast.TypeId, Ast.FuncId)]]

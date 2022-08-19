@@ -2735,7 +2735,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  @using(readonly = true)
-           |  fn foo(a: U256) -> U256 {
+           |  pub fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 0
            |    return c
@@ -2752,7 +2752,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo(a: ByteVec, b: U256, c: [U256; 2]) {
            |  @using(readonly = true)
-           |  fn getB() -> U256 {
+           |  pub fn getB() -> U256 {
            |    return b
            |  }
            |}
@@ -2789,7 +2789,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  const C0 = 0
            |  const C1 = 1
            |  @using(readonly = true)
-           |  fn foo() -> () {
+           |  pub fn foo() -> () {
            |    assert!(C1 == 1, 0)
            |  }
            |}
@@ -2814,7 +2814,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |
            |  @using(readonly = true)
-           |  fn foo() -> () {
+           |  pub fn foo() -> () {
            |    assert!(Chain.Alephium == 0, 0)
            |    assert!(Language.Ralph == #00, 0)
            |  }

@@ -318,4 +318,24 @@ class AstSpec extends AlephiumSpec {
     MultiContract.noPermissionCheckMsg("Foo", "bar") is
       "No permission check for function: Foo.bar, please use checkPermission!(...) for the function or its private callees."
   }
+
+  behavior of "Private function usage"
+
+  it should "check if private functions are used" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  @using(readonly = true)
+         |  fn private0() -> () {}
+         |  @using(readonly = true)
+         |  fn private1() -> () {}
+         |  @using(readonly = true)
+         |  pub fn public() -> () {
+         |    private0()
+         |  }
+         |}
+         |""".stripMargin
+    val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
+    warnings is AVector("Private function Foo.private1 is not used")
+  }
 }
