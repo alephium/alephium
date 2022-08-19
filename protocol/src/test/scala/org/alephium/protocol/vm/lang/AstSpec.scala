@@ -276,7 +276,7 @@ class AstSpec extends AlephiumSpec {
 
       val (_, _, warnings0) = Compiler.compileContractFull(code(true), 0).rightValue
       warnings0.isEmpty is true
-      val (_, _, warnings1) = Compiler.compileContractFull(code(true), 0).rightValue
+      val (_, _, warnings1) = Compiler.compileContractFull(code(false), 0).rightValue
       warnings1.isEmpty is true
     }
 
