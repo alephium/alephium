@@ -40,7 +40,8 @@ object BuiltIn {
       returnType: Seq[Type],
       instrs: Seq[Instr[Ctx]],
       usePreapprovedAssets: Boolean,
-      useAssetsInContract: Boolean
+      useAssetsInContract: Boolean,
+      isReadonly: Boolean
   ) extends BuiltIn[Ctx] {
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType == argsType) {
@@ -61,7 +62,8 @@ object BuiltIn {
         returnType: Seq[Type],
         instr: Instr[Ctx],
         usePreapprovedAssets: Boolean = false,
-        useAssetsInContract: Boolean = false
+        useAssetsInContract: Boolean = false,
+        isReadonly: Boolean = true
     ): SimpleBuiltIn[Ctx] =
       SimpleBuiltIn(
         name,
@@ -69,7 +71,8 @@ object BuiltIn {
         returnType,
         Seq(instr),
         usePreapprovedAssets,
-        useAssetsInContract
+        useAssetsInContract,
+        isReadonly
       )
   }
 
@@ -83,7 +86,8 @@ object BuiltIn {
       argsTypeWithInstrs: Seq[ArgsTypeWithInstrs[Ctx]],
       returnType: Seq[Type],
       usePreapprovedAssets: Boolean,
-      useAssetsInContract: Boolean
+      useAssetsInContract: Boolean,
+      isReadonly: Boolean
   ) extends BuiltIn[Ctx] {
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       assume(argsTypeWithInstrs.distinctBy(_.argsTypes).length == argsTypeWithInstrs.length)
@@ -109,6 +113,7 @@ object BuiltIn {
       extends BuiltIn[StatelessContext] {
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
+    def isReadonly: Boolean           = true
   }
 
   val blake2b: SimpleBuiltIn[StatelessContext] =
@@ -273,6 +278,7 @@ object BuiltIn {
     override def isVariadic: Boolean  = true
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
+    def isReadonly: Boolean           = true
 
     def getReturnType(inputType: Seq[Type]): Seq[Type] = Seq(Type.ByteVec)
 
@@ -419,6 +425,7 @@ object BuiltIn {
     val name: String                  = "panic"
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
+    def isReadonly                    = true
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType.nonEmpty && inputType != Seq(Type.U256)) {
         throw Compiler.Error(s"Invalid argument type for $name, optional U256 expected")
@@ -483,36 +490,51 @@ object BuiltIn {
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn("approveAlph", Seq[Type](Type.Address, Type.U256), Seq.empty, ApproveAlph)
+    SimpleBuiltIn(
+      "approveAlph",
+      Seq[Type](Type.Address, Type.U256),
+      Seq.empty,
+      ApproveAlph,
+      isReadonly = false
+    )
 
   val approveToken: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn(
       "approveToken",
       Seq[Type](Type.Address, Type.ByteVec, Type.U256),
       Seq.empty,
-      ApproveToken
+      ApproveToken,
+      isReadonly = false
     )
 
   val alphRemaining: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn("alphRemaining", Seq(Type.Address), Seq(Type.U256), AlphRemaining)
+    SimpleBuiltIn(
+      "alphRemaining",
+      Seq(Type.Address),
+      Seq(Type.U256),
+      AlphRemaining,
+      isReadonly = false
+    )
 
   val tokenRemaining: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn(
       "tokenRemaining",
       Seq[Type](Type.Address, Type.ByteVec),
       Seq(Type.U256),
-      TokenRemaining
+      TokenRemaining,
+      isReadonly = false
     )
 
   val isPaying: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn("isPaying", Seq(Type.Address), Seq(Type.Bool), IsPaying)
+    SimpleBuiltIn("isPaying", Seq(Type.Address), Seq(Type.Bool), IsPaying, isReadonly = false)
 
   val transferAlph: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn(
       "transferAlph",
       Seq[Type](Type.Address, Type.Address, Type.U256),
       Seq.empty,
-      TransferAlph
+      TransferAlph,
+      isReadonly = false
     )
 
   val transferAlphFromSelf: SimpleBuiltIn[StatefulContext] =
@@ -521,7 +543,8 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.U256),
       Seq.empty,
       TransferAlphFromSelf,
-      useAssetsInContract = true
+      useAssetsInContract = true,
+      isReadonly = false
     )
 
   val transferAlphToSelf: SimpleBuiltIn[StatefulContext] =
@@ -530,7 +553,8 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.U256),
       Seq.empty,
       TransferAlphToSelf,
-      useAssetsInContract = true
+      useAssetsInContract = true,
+      isReadonly = false
     )
 
   val transferToken: SimpleBuiltIn[StatefulContext] =
@@ -538,7 +562,8 @@ object BuiltIn {
       "transferToken",
       Seq[Type](Type.Address, Type.Address, Type.ByteVec, Type.U256),
       Seq.empty,
-      TransferToken
+      TransferToken,
+      isReadonly = false
     )
 
   val transferTokenFromSelf: SimpleBuiltIn[StatefulContext] =
@@ -547,7 +572,8 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.ByteVec, Type.U256),
       Seq.empty,
       TransferTokenFromSelf,
-      useAssetsInContract = true
+      useAssetsInContract = true,
+      isReadonly = false
     )
 
   val transferTokenToSelf: SimpleBuiltIn[StatefulContext] =
@@ -556,7 +582,8 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.ByteVec, Type.U256),
       Seq.empty,
       TransferTokenToSelf,
-      useAssetsInContract = true
+      useAssetsInContract = true,
+      isReadonly = false
     )
 
   val burnToken: SimpleBuiltIn[StatefulContext] =
@@ -564,7 +591,8 @@ object BuiltIn {
       "burnToken",
       Seq[Type](Type.Address, Type.ByteVec, Type.U256),
       Seq.empty,
-      BurnToken
+      BurnToken,
+      isReadonly = false
     )
 
   val lockApprovedAssets: SimpleBuiltIn[StatefulContext] =
@@ -573,7 +601,8 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.U256),
       Seq.empty,
       LockApprovedAssets,
-      usePreapprovedAssets = true
+      usePreapprovedAssets = true,
+      isReadonly = false
     )
 
   val createContract: SimpleBuiltIn[StatefulContext] =
@@ -582,7 +611,8 @@ object BuiltIn {
       Seq[Type](Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
       CreateContract,
-      usePreapprovedAssets = true
+      usePreapprovedAssets = true,
+      isReadonly = false
     )
 
   val createContractWithToken: BuiltIn[StatefulContext] =
@@ -600,7 +630,8 @@ object BuiltIn {
       ),
       Seq[Type](Type.ByteVec),
       usePreapprovedAssets = true,
-      useAssetsInContract = false
+      useAssetsInContract = false,
+      isReadonly = false
     )
 
   val copyCreateContract: SimpleBuiltIn[StatefulContext] =
@@ -609,7 +640,8 @@ object BuiltIn {
       Seq[Type](Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
       CopyCreateContract,
-      usePreapprovedAssets = true
+      usePreapprovedAssets = true,
+      isReadonly = false
     )
 
   val copyCreateContractWithToken: BuiltIn[StatefulContext] =
@@ -627,7 +659,8 @@ object BuiltIn {
       ),
       Seq[Type](Type.ByteVec),
       usePreapprovedAssets = true,
-      useAssetsInContract = false
+      useAssetsInContract = false,
+      isReadonly = false
     )
 
   val createSubContract: SimpleBuiltIn[StatefulContext] =
@@ -636,7 +669,8 @@ object BuiltIn {
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
       CreateSubContract,
-      usePreapprovedAssets = true
+      usePreapprovedAssets = true,
+      isReadonly = false
     )
 
   val createSubContractWithToken: BuiltIn[StatefulContext] =
@@ -654,7 +688,8 @@ object BuiltIn {
       ),
       Seq[Type](Type.ByteVec),
       usePreapprovedAssets = true,
-      useAssetsInContract = false
+      useAssetsInContract = false,
+      isReadonly = false
     )
 
   val copyCreateSubContract: SimpleBuiltIn[StatefulContext] =
@@ -663,7 +698,8 @@ object BuiltIn {
       Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
       CopyCreateSubContract,
-      usePreapprovedAssets = true
+      usePreapprovedAssets = true,
+      isReadonly = false
     )
 
   val copyCreateSubContractWithToken: BuiltIn[StatefulContext] =
@@ -681,15 +717,8 @@ object BuiltIn {
       ),
       Seq[Type](Type.ByteVec),
       usePreapprovedAssets = true,
-      useAssetsInContract = false
-    )
-
-  val contractExists: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn(
-      "contractExists",
-      Seq[Type](Type.ByteVec),
-      Seq[Type](Type.Bool),
-      ContractExists
+      useAssetsInContract = false,
+      isReadonly = false
     )
 
   val destroySelf: SimpleBuiltIn[StatefulContext] =
@@ -698,7 +727,8 @@ object BuiltIn {
       Seq[Type](Type.Address),
       Seq.empty,
       DestroySelf,
-      useAssetsInContract = true
+      useAssetsInContract = true,
+      isReadonly = false
     )
 
   val migrate: SimpleBuiltIn[StatefulContext] =
@@ -706,7 +736,8 @@ object BuiltIn {
       "migrate",
       Seq[Type](Type.ByteVec),
       Seq.empty,
-      MigrateSimple
+      MigrateSimple,
+      isReadonly = false
     )
 
   val migrateWithFields: SimpleBuiltIn[StatefulContext] =
@@ -714,7 +745,16 @@ object BuiltIn {
       "migrateWithFields",
       Seq[Type](Type.ByteVec, Type.ByteVec),
       Seq.empty,
-      MigrateWithFields
+      MigrateWithFields,
+      isReadonly = false
+    )
+
+  val contractExists: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn(
+      "contractExists",
+      Seq[Type](Type.ByteVec),
+      Seq[Type](Type.Bool),
+      ContractExists
     )
 
   val selfAddress: SimpleBuiltIn[StatefulContext] =
@@ -771,6 +811,7 @@ object BuiltIn {
     def name: String
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
+    def isReadonly: Boolean           = true
 
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]]
   }

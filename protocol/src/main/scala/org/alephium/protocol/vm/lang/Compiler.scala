@@ -110,6 +110,7 @@ object Compiler {
     def isVariadic: Boolean = false
     def usePreapprovedAssets: Boolean
     def useAssetsInContract: Boolean
+    def isReadonly: Boolean
     def getReturnType(inputType: Seq[Type]): Seq[Type]
     def getReturnLength(inputType: Seq[Type]): Int = {
       val retTypes = getReturnType(inputType)
@@ -193,6 +194,7 @@ object Compiler {
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean,
+      isReadonly: Boolean,
       argsType: Seq[Type],
       returnType: Seq[Type],
       index: Byte
@@ -227,6 +229,7 @@ object Compiler {
           func.isPublic,
           func.usePreapprovedAssets,
           func.useAssetsInContract,
+          func.useReadonly,
           func.args.map(_.tpe),
           func.rtypes,
           index.toByte
@@ -375,11 +378,9 @@ object Compiler {
 
     val internalCalls = mutable.HashMap.empty[Ast.FuncId, mutable.Set[Ast.FuncId]]
     def addInternalCall(callee: Ast.FuncId): Unit = {
-      if (!callee.isBuiltIn) {
-        internalCalls.get(scope) match {
-          case Some(callees) => callees += callee
-          case None          => internalCalls.update(scope, mutable.Set(callee))
-        }
+      internalCalls.get(scope) match {
+        case Some(callees) => callees += callee
+        case None          => internalCalls.update(scope, mutable.Set(callee))
       }
     }
 

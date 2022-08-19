@@ -560,11 +560,46 @@ object Ast {
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
 
+    def checkReadonly(state: Compiler.State[Ctx], instrs: Seq[Instr[Ctx]]): Unit = {
+      if (useReadonly) {
+        val changeContractState = instrs.exists {
+          case _: StoreField             => true
+          case _: StoreFieldByIndex.type => true
+          case _                         => false
+        }
+        if (changeContractState) {
+          throw Compiler.Error(s"Readonly function ${id.name} changes contract state")
+        }
+
+        val internalCalls        = state.internalCalls.getOrElse(id, mutable.Set.empty)
+        val invalidInternalCalls = internalCalls.filterNot(state.getFunc(_).isReadonly)
+        if (invalidInternalCalls.nonEmpty) {
+          throw Compiler.Error(
+            s"Readonly function ${id.name} have invalid internal calls: ${invalidInternalCalls.map(_.name).mkString(", ")}"
+          )
+        }
+
+        val externalCalls = state.externalCalls.getOrElse(id, mutable.Set.empty)
+        val invalidExternalCalls = externalCalls.filterNot { case (typeId, funcId) =>
+          state.getFunc(typeId, funcId).isReadonly
+        }
+        if (invalidExternalCalls.nonEmpty) {
+          val msg = invalidExternalCalls
+            .map { case (typeId, funcId) =>
+              s"${typeId.name}.${funcId.name}"
+            }
+            .mkString(", ")
+          throw Compiler.Error(s"Readonly function ${id.name} have invalid external calls: $msg")
+        }
+      }
+    }
+
     def toMethod(state: Compiler.State[Ctx]): Method[Ctx] = {
       state.setFuncScope(id)
       check(state)
 
-      val instrs    = body.flatMap(_.genCode(state))
+      val instrs = body.flatMap(_.genCode(state))
+      checkReadonly(state, instrs)
       val localVars = state.getLocalVars(id)
       ContractAssets.checkCodeUsingContractAssets(instrs, useAssetsInContract, id.name)
       Method[Ctx](
@@ -1021,7 +1056,7 @@ object Ast {
         mutable.Map.empty[FuncId, mutable.ArrayBuffer[FuncDef[StatefulContext]]]
       internalCalls.foreach { case (caller, callees) =>
         val callerFunc = getFuncUnsafe(caller)
-        callees.foreach { callee =>
+        callees.view.filterNot(_.isBuiltIn).foreach { callee =>
           internalCallsReversed.get(callee) match {
             case None => internalCallsReversed.update(callee, mutable.ArrayBuffer(callerFunc))
             case Some(callers) => callers.addOne(callerFunc)

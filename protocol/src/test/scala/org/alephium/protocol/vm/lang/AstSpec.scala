@@ -118,9 +118,11 @@ class AstSpec extends AlephiumSpec {
     val state     = Compiler.State.buildFor(contracts, 0)
     val contract  = contracts.contracts(0).asInstanceOf[Ast.Contract]
     contract.genCode(state)
-    val interallCalls = state.internalCalls.map { case (caller, callees) =>
-      caller.name -> callees.map(_.name).toSeq.sorted
-    }
+    val interallCalls = state.internalCalls
+      .map { case (caller, callees) =>
+        caller.name -> callees.view.filterNot(_.isBuiltIn).map(_.name).toSeq.sorted
+      }
+      .filter(_._2.nonEmpty)
     interallCalls is mutable.HashMap(
       "a" -> Seq("noCheck"),
       "b" -> Seq("check"),

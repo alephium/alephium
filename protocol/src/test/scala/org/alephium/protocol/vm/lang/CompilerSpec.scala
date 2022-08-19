@@ -2951,4 +2951,115 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       warnings.isEmpty is true
     }
   }
+
+  it should "test compile readonly functions" in {
+    {
+      info("Simple readonly functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("Readonly function change the contract state")
+      val code =
+        s"""
+           |Contract Foo(mut a: U256) {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    a = 0
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function foo changes contract state"
+    }
+
+    {
+      info("Call internal readonly functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    bar()
+           |  }
+           |  @using(readonly = true)
+           |  pub fn bar() -> () {}
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("Call readonly builtin functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    let _ = selfContractId!()
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("Invalid builtin function calls")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    transferAlphToSelf!(callerAddress!(), 1 alph)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function foo have invalid internal calls: transferAlphToSelf"
+    }
+
+    {
+      info("Invalid internal function calls")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    bar()
+           |  }
+           |  @using(readonly = false)
+           |  pub fn bar() -> () {}
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function foo have invalid internal calls: bar"
+    }
+
+    {
+      info("Invalid external function calls")
+      val code =
+        s"""
+           |Contract Foo(bar: Bar) {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    bar.bar()
+           |  }
+           |}
+           |Contract Bar(mut x: [U256; 2]) {
+           |  pub fn bar() -> () {
+           |    x[0] = 0
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function foo have invalid external calls: Bar.bar"
+    }
+  }
 }
