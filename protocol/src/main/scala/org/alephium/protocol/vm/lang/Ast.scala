@@ -1056,6 +1056,18 @@ object Ast {
       }
       permissionCheckedTable
     }
+
+    def validateInterfaceFuncsPermissionCheck(
+        interfaceFuncsSize: Int,
+        state: Compiler.State[StatefulContext]
+    ): Unit = {
+      val permissionTable = buildPermissionCheckTable(state)
+      funcs.slice(0, interfaceFuncsSize).foreach { case func =>
+        if (func.usePermissionCheck && !permissionTable(func.id)) {
+          throw Compiler.Error(MultiContract.noPermissionCheckMsg(ident.name, func.id.name))
+        }
+      }
+    }
   }
 
   final case class ContractInterface(
@@ -1093,6 +1105,13 @@ object Ast {
         case None              => throw Compiler.Error(s"Contract $typeId does not exist")
         case Some(_: TxScript) => throw Compiler.Error(s"Expect contract $typeId, but got script")
         case Some(contract: ContractWithState) => contract
+      }
+    }
+
+    private def getInterfaceOpt(typeId: TypeId): Option[ContractInterface] = {
+      getContract(typeId) match {
+        case interface: ContractInterface => Some(interface)
+        case _                            => None
       }
     }
 
@@ -1189,7 +1208,11 @@ object Ast {
               val calleeContractState = states(calleeContractIndex)
               val table = calleeContract.buildPermissionCheckTable(calleeContractState)
               externalCallPermissionTables.update(calleeTypeId, table)
-            case _ => () // no permission check for interface
+            case calleeInterface: ContractInterface =>
+              // Skip permission checks for interface function calls
+              val table = mutable.Map.from(calleeInterface.funcs.map(_.id -> true))
+              externalCallPermissionTables.update(calleeTypeId, table)
+            case _ => ()
           }
         }
       }
@@ -1208,7 +1231,7 @@ object Ast {
       }
       allNoPermissionChecks.foreach { case (typeId, funcId) =>
         contractState.warnings.addOne(
-          MultiContract.noPermissionCheckWarning(typeId.name, funcId.name)
+          MultiContract.noPermissionCheckMsg(typeId.name, funcId.name)
         )
       }
     }
@@ -1216,7 +1239,13 @@ object Ast {
     def genStatefulContract(contractIndex: Int): (StatefulContract, Contract, AVector[String]) = {
       get(contractIndex) match {
         case contract: Contract =>
-          val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
+          val states       = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
+          val state        = states(contractIndex)
+          val contractCode = contract.genCode(state)
+          val interfaceFuncsSize = contract.inheritances.view.map { case inheritance =>
+            getInterfaceOpt(inheritance.parentId).map(_.funcs.size).getOrElse(0)
+          }.sum
+          contract.validateInterfaceFuncsPermissionCheck(interfaceFuncsSize, state)
           states.foreachWithIndex { case (state, index) =>
             if (index != contractIndex) {
               contracts(index) match {
@@ -1226,8 +1255,6 @@ object Ast {
               }
             }
           }
-          val state        = states(contractIndex)
-          val contractCode = contract.genCode(state)
           checkExternalCallPermissions(states, contractIndex, contract)
           (contractCode, contract, state.getWarnings)
         case _: TxScript => throw Compiler.Error(s"The code is for TxScript, not for Contract")
@@ -1351,7 +1378,7 @@ object Ast {
       (unimplementedFuncs, inherited ++ nonInherited)
     }
 
-    def noPermissionCheckWarning(typeId: String, funcId: String): String =
+    def noPermissionCheckMsg(typeId: String, funcId: String): String =
       s"No permission check for function: ${typeId}.${funcId}, please use checkPermission!(...) for the function or its private callees."
   }
 }

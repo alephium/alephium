@@ -212,9 +212,9 @@ class AstSpec extends AlephiumSpec {
   it should "check permission for external calls" in new ExternalCallsFixture {
     val (_, _, warnings) = Compiler.compileContractFull(externalCalls, 0).rightValue
     warnings.toSet is Set(
-      MultiContract.noPermissionCheckWarning("InternalCalls", "c"),
-      MultiContract.noPermissionCheckWarning("InternalCalls", "f"),
-      MultiContract.noPermissionCheckWarning("InternalCalls", "g")
+      MultiContract.noPermissionCheckMsg("InternalCalls", "c"),
+      MultiContract.noPermissionCheckMsg("InternalCalls", "f"),
+      MultiContract.noPermissionCheckMsg("InternalCalls", "g")
     )
   }
 
@@ -240,11 +240,70 @@ class AstSpec extends AlephiumSpec {
 
   it should "not check permission for mutual recursive calls" in new MutualRecursionFixture {
     val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
-    warnings.toSet is Set(MultiContract.noPermissionCheckWarning("Bar", "a"))
+    warnings.toSet is Set(MultiContract.noPermissionCheckMsg("Bar", "a"))
+  }
+
+  it should "test permission check for interface" in {
+    {
+      info("Implemented function should have permission check")
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn foo() -> () {}
+           |}
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |""".stripMargin
+      val error = Compiler.compileContractFull(code, 0).leftValue
+      error.message is MultiContract.noPermissionCheckMsg("Bar", "foo")
+    }
+
+    {
+      info("not check permission check for interface function calls")
+      def code(permissionCheck: Boolean) =
+        s"""
+           |Contract Bar() {
+           |  pub fn bar(fooId: ByteVec) -> () {
+           |    Foo(fooId).foo()
+           |  }
+           |}
+           |Interface Foo {
+           |  @using(permissionCheck = $permissionCheck)
+           |  pub fn foo() -> ()
+           |}
+           |""".stripMargin
+
+      val (_, _, warnings0) = Compiler.compileContractFull(code(true), 0).rightValue
+      warnings0.isEmpty is true
+      val (_, _, warnings1) = Compiler.compileContractFull(code(false), 0).rightValue
+      warnings1.isEmpty is true
+    }
+
+    {
+      info("implemented function have permission check in private callee")
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn foo() -> () {
+           |    bar()
+           |  }
+           |  fn bar() -> () {
+           |    checkPermission!(true, 0)
+           |  }
+           |}
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |""".stripMargin
+
+      val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
+      warnings.isEmpty is true
+    }
   }
 
   it should "display the right warning message for permission check" in {
-    MultiContract.noPermissionCheckWarning("Foo", "bar") is
+    MultiContract.noPermissionCheckMsg("Foo", "bar") is
       "No permission check for function: Foo.bar, please use checkPermission!(...) for the function or its private callees."
   }
 }

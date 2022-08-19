@@ -1711,14 +1711,15 @@ class VMSpec extends AlephiumSpec {
            |}
            |
            |Interface GreatGrandparent {
+           |  @using(permissionCheck = false)
            |  fn ggp() -> ()
            |}
            |
            |Abstract Contract Grandparent(mut x: U256) implements GreatGrandparent {
            |  event GP(value: U256)
            |
-           |  fn ggp() -> () {
-           |  }
+           |  @using(permissionCheck = false)
+           |  fn ggp() -> () {}
            |
            |  fn gp() -> ()
            |}
@@ -2794,8 +2795,11 @@ class VMSpec extends AlephiumSpec {
       val interface =
         s"""
            |Interface I {
+           |  @using(permissionCheck = false)
            |  pub fn f1() -> U256
+           |  @using(permissionCheck = false)
            |  pub fn f2() -> U256
+           |  @using(permissionCheck = false)
            |  pub fn f3() -> ByteVec
            |}
            |""".stripMargin
@@ -2803,14 +2807,17 @@ class VMSpec extends AlephiumSpec {
       val contract =
         s"""
            |Contract Foo() implements I {
+           |  @using(permissionCheck = false)
            |  pub fn f3() -> ByteVec {
            |    return #00
            |  }
            |
+           |  @using(permissionCheck = false)
            |  pub fn f2() -> U256 {
            |    return 2
            |  }
            |
+           |  @using(permissionCheck = false)
            |  pub fn f1() -> U256 {
            |    return 1
            |  }
@@ -2949,6 +2956,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |Interface Foo {
          |  event Foo(x: U256)
+         |  @using(permissionCheck = false)
          |  pub fn foo() -> ()
          |}
          |""".stripMargin
@@ -2956,6 +2964,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |Contract Bar() implements Foo {
          |  event Bar(x: U256)
+         |  @using(permissionCheck = false)
          |  pub fn foo() -> () {
          |    emit Foo(1)
          |    emit Bar(2)
