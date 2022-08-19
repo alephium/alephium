@@ -243,7 +243,21 @@ class AstSpec extends AlephiumSpec {
     warnings.toSet is Set(MultiContract.noPermissionCheckMsg("Bar", "a"))
   }
 
-  it should "test permission check for interface function calls" in {
+  it should "test permission check for interface" in {
+    {
+      info("Implemented function should have permission check")
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn foo() -> () {}
+           |}
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |""".stripMargin
+      val error = Compiler.compileContractFull(code, 0).leftValue
+      error.message is MultiContract.noPermissionCheckMsg("Bar", "foo")
+    }
 
     {
       info("not check permission check for interface function calls")

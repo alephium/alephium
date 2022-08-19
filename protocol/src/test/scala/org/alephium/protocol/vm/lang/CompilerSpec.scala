@@ -21,7 +21,6 @@ import org.scalatest.Assertion
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm._
-import org.alephium.protocol.vm.lang.Ast.MultiContract
 import org.alephium.serde._
 import org.alephium.util._
 
@@ -2017,21 +2016,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val error = Compiler.compileMultiContract(foo).leftValue
       error.message is "No function definition in Interface Foo"
-    }
-
-    {
-      info("Implemented function should have permission check")
-      val code =
-        s"""
-           |Contract Bar() implements Foo {
-           |  pub fn foo() -> () {}
-           |}
-           |Interface Foo {
-           |  pub fn foo() -> ()
-           |}
-           |""".stripMargin
-      val error = Compiler.compileContractFull(code, 0).leftValue
-      error.message is MultiContract.noPermissionCheckMsg("Bar", "foo")
     }
 
     {
