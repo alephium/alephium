@@ -881,6 +881,16 @@ object Ast {
       table
     }
 
+    def checkIfPrivateMethodsUsed(state: Compiler.State[Ctx]): Unit = {
+      funcs.foreach { func =>
+        if (func.isPrivate && !state.internalCallsReversed.get(func.id).exists(_.nonEmpty)) {
+          state.warnings.addOne(
+            s"Private function ${ident.name}.${func.name} is not used"
+          )
+        }
+      }
+    }
+
     def check(state: Compiler.State[Ctx]): Unit = {
       state.checkArguments(fields)
       templateVars.zipWithIndex.foreach { case (temp, index) =>
@@ -1048,10 +1058,14 @@ object Ast {
         )
       } else {
         check(state)
-        StatefulContract(
+        val contract = StatefulContract(
           Type.flattenTypeLength(fields.map(_.tpe)),
           getMethods(state)
         )
+        if (!isAbstract) { // We don't check private functions in abstract contracts
+          checkIfPrivateMethodsUsed(state)
+        }
+        contract
       }
     }
 
@@ -1059,28 +1073,15 @@ object Ast {
     def buildPermissionCheckTable(
         state: Compiler.State[StatefulContext]
     ): mutable.Map[FuncId, Boolean] = {
-      val internalCalls = state.internalCalls // caller -> callees
-      val internalCallsReversed = // callee -> callers
-        mutable.Map.empty[FuncId, mutable.ArrayBuffer[FuncDef[StatefulContext]]]
-      internalCalls.foreach { case (caller, callees) =>
-        val callerFunc = getFuncUnsafe(caller)
-        callees.view.filterNot(_.isBuiltIn).foreach { callee =>
-          internalCallsReversed.get(callee) match {
-            case None => internalCallsReversed.update(callee, mutable.ArrayBuffer(callerFunc))
-            case Some(callers) => callers.addOne(callerFunc)
-          }
-        }
-      }
-
       val permissionCheckedTable = mutable.Map.empty[FuncId, Boolean]
       funcs.foreach(func => permissionCheckedTable(func.id) = false)
 
       // TODO: optimize these two functions
       def updateCheckedRecursivelyForPrivateMethod(checkedPrivateCalleeId: FuncId): Unit = {
-        internalCallsReversed.get(checkedPrivateCalleeId) match {
+        state.internalCallsReversed.get(checkedPrivateCalleeId) match {
           case Some(callers) =>
             callers.foreach { caller =>
-              updateCheckedRecursively(caller)
+              updateCheckedRecursively(getFuncUnsafe(caller))
             }
           case None => ()
         }
