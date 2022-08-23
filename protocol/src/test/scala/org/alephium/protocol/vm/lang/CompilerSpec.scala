@@ -2553,7 +2553,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Contract constant variables")
       val foo =
         s"""
-           |Abstract Contract Foo() {
+           |Contract Foo() {
            |  const C0 = 0
            |  const C1 = #00
            |  pub fn foo() -> () {
@@ -2633,7 +2633,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Contract enums")
       val foo =
         s"""
-           |Abstract Contract Foo() {
+           |Contract Foo() {
            |  enum FooErrorCodes {
            |    Error0 = 0
            |    Error1 = 1
@@ -2898,16 +2898,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "not generate code if contract have unimplemented functions" in {
+  it should "not generate code for abstract contract" in {
     val foo =
       s"""
          |Abstract Contract Foo() {
-         |  pub fn foo() -> ()
-         |  pub fn bar() -> ()
+         |  pub fn foo() -> () {}
+         |  pub fn bar() -> () {}
          |}
          |""".stripMargin
     Compiler.compileContract(foo).leftValue.message is
-      "These functions are not implemented in contract Foo: foo,bar"
+      "Unable to generate code for abstract contract Foo"
   }
 
   "unused constants and enums" should "have no effect on code generation" in {
@@ -3142,5 +3142,43 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Function foo is readonly, please use @using(readonly = true) for the function"
       )
     }
+  }
+
+  trait MultiContractFixture {
+    val code =
+      s"""
+         |Abstract Contract Common() {
+         |  pub fn c() -> () {}
+         |}
+         |Contract Foo() extends Common() {
+         |  pub fn foo() -> () {}
+         |}
+         |TxScript M1(id: ByteVec) {
+         |  Foo(id).foo()
+         |}
+         |Contract Bar() extends Common() {
+         |  pub fn bar() -> () {}
+         |}
+         |TxScript M2(id: ByteVec) {
+         |  Bar(id).bar()
+         |}
+         |""".stripMargin
+    val multiContract = Compiler.compileMultiContract(code).rightValue
+  }
+
+  it should "compile all contracts" in new MultiContractFixture {
+    val contracts = multiContract.genStatefulContracts()
+    contracts.length is 2
+    contracts(0)._2.ident.name is "Foo"
+    contracts(0)._4 is 1
+    contracts(1)._2.ident.name is "Bar"
+    contracts(1)._4 is 3
+  }
+
+  it should "compile all scripts" in new MultiContractFixture {
+    val scripts = multiContract.genStatefulScripts()
+    scripts.length is 2
+    scripts(0)._2.ident.name is "M1"
+    scripts(1)._2.ident.name is "M2"
   }
 }

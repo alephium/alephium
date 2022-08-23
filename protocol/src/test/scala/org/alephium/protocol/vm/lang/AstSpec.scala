@@ -322,9 +322,9 @@ class AstSpec extends AlephiumSpec {
   behavior of "Private function usage"
 
   it should "check if private functions are used" in {
-    def code(prefix: String) =
+    val code =
       s"""
-         |$prefix Contract Foo() {
+         |Contract Foo() {
          |  @using(readonly = true)
          |  fn private0() -> () {}
          |  @using(readonly = true)
@@ -335,10 +335,7 @@ class AstSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val (_, _, warnings0) = Compiler.compileContractFull(code(""), 0).rightValue
-    warnings0 is AVector("Private function Foo.private1 is not used")
-
-    val (_, _, warnings1) = Compiler.compileContractFull(code("Abstract"), 0).rightValue
-    warnings1.isEmpty is true
+    val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
+    warnings is AVector("Private function Foo.private1 is not used")
   }
 }

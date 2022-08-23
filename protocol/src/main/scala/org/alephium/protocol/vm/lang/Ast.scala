@@ -509,6 +509,8 @@ object Ast {
     def isPrivate: Boolean        = !isPublic
     val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
+    private var usedVars: Option[Set[String]] = None
+
     def signature: String = {
       val publicPrefix = if (isPublic) "pub " else ""
       val assetModifier = {
@@ -555,7 +557,15 @@ object Ast {
       args.foreach(arg =>
         state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, isGenerated = false)
       )
-      body.foreach(_.check(state))
+      usedVars match {
+        case Some(vars) => // the function has been compiled before
+          state.addUsedVars(vars)
+          body.foreach(_.check(state))
+        case None =>
+          val prevUsedVars = mutable.Set.from(state.usedVars)
+          body.foreach(_.check(state))
+          usedVars = Some(Set.from(state.usedVars.diff(prevUsedVars)))
+      }
       state.checkUnusedLocalVars(id)
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
@@ -1050,22 +1060,14 @@ object Ast {
     }
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
-      val unimplementedFuncs = funcs.view.filter(_.bodyOpt.isEmpty).map(_.id.name)
-      if (unimplementedFuncs.nonEmpty) {
-        throw new Compiler.Error(
-          s"These functions are not implemented in contract ${ident.name}: ${unimplementedFuncs.mkString(",")}"
-        )
-      } else {
-        check(state)
-        val contract = StatefulContract(
-          Type.flattenTypeLength(fields.map(_.tpe)),
-          getMethods(state)
-        )
-        if (!isAbstract) { // We don't check private functions in abstract contracts
-          checkIfPrivateMethodsUsed(state)
-        }
-        contract
-      }
+      assume(!isAbstract)
+      check(state)
+      val contract = StatefulContract(
+        Type.flattenTypeLength(fields.map(_.tpe)),
+        getMethods(state)
+      )
+      checkIfPrivateMethodsUsed(state)
+      contract
     }
 
     // the state must have been updated in the check pass
@@ -1226,6 +1228,12 @@ object Ast {
       MultiContract(newContracts)
     }
 
+    def genStatefulScripts(): AVector[(StatefulScript, TxScript, AVector[String])] = {
+      AVector.from(contracts.view.zipWithIndex.collect { case (_: TxScript, index) =>
+        genStatefulScript(index)
+      })
+    }
+
     def genStatefulScript(contractIndex: Int): (StatefulScript, TxScript, AVector[String]) = {
       val state = Compiler.State.buildFor(this, contractIndex)
       get(contractIndex) match {
@@ -1281,27 +1289,38 @@ object Ast {
       }
     }
 
-    def genStatefulContract(contractIndex: Int): (StatefulContract, Contract, AVector[String]) = {
-      get(contractIndex) match {
-        case contract: Contract =>
-          val states       = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
-          val state        = states(contractIndex)
-          val contractCode = contract.genCode(state)
+    def genStatefulContracts(): AVector[(StatefulContract, Contract, AVector[String], Int)] = {
+      val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
+      val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
+        case (contract: Contract, index) if !contract.isAbstract =>
+          val state            = states(index)
+          val statefulContract = contract.genCode(state)
           val interfaceFuncsSize = contract.inheritances.view.map { case inheritance =>
             getInterfaceOpt(inheritance.parentId).map(_.funcs.size).getOrElse(0)
           }.sum
           contract.validateInterfaceFuncsPermissionCheck(interfaceFuncsSize, state)
-          states.foreachWithIndex { case (state, index) =>
-            if (index != contractIndex) {
-              contracts(index) match {
-                case anotherContract: Contract if !anotherContract.isAbstract =>
-                  anotherContract.genCode(state)
-                case _ => ()
-              }
-            }
+          (statefulContract, contract, index)
+      })
+      statefulContracts.map { case ((statefulContract, contract, index)) =>
+        checkExternalCallPermissions(states, index, contract)
+        (statefulContract, contract, states(index).getWarnings, index)
+      }
+    }
+
+    def genStatefulContract(contractIndex: Int): (StatefulContract, Contract, AVector[String]) = {
+      get(contractIndex) match {
+        case contract: Contract =>
+          if (contract.isAbstract) {
+            throw Compiler.Error(
+              s"Unable to generate code for abstract contract ${contract.ident.name}"
+            )
           }
-          checkExternalCallPermissions(states, contractIndex, contract)
-          (contractCode, contract, state.getWarnings)
+          val statefulContracts = genStatefulContracts()
+          statefulContracts.find(_._4 == contractIndex) match {
+            case Some(v) => (v._1, v._2, v._3)
+            case None => // should never happen
+              throw Compiler.Error(s"Failed to compile contract ${contract.ident.name}")
+          }
         case _: TxScript => throw Compiler.Error(s"The code is for TxScript, not for Contract")
         case _: ContractInterface =>
           throw Compiler.Error(s"The code is for Interface, not for Contract")

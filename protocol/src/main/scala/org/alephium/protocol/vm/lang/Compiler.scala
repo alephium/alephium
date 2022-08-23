@@ -27,6 +27,9 @@ import org.alephium.util.AVector
 // scalastyle:off number.of.methods
 // scalastyle:off file.size.limit
 object Compiler {
+  type CompiledContract = (StatefulContract, Ast.Contract, AVector[String])
+  type CompiledScript   = (StatefulScript, Ast.TxScript, AVector[String])
+
   def compileAssetScript(input: String): Either[Error, (StatelessScript, AVector[String])] =
     try {
       fastparse.parse(input, StatelessParser.assetScript(_)) match {
@@ -46,15 +49,10 @@ object Compiler {
   def compileTxScript(input: String, index: Int): Either[Error, StatefulScript] =
     compileTxScriptFull(input, index).map(_._1)
 
-  def compileTxScriptFull(
-      input: String
-  ): Either[Error, (StatefulScript, Ast.TxScript, AVector[String])] =
+  def compileTxScriptFull(input: String): Either[Error, CompiledScript] =
     compileTxScriptFull(input, 0)
 
-  def compileTxScriptFull(
-      input: String,
-      index: Int
-  ): Either[Error, (StatefulScript, Ast.TxScript, AVector[String])] =
+  def compileTxScriptFull(input: String, index: Int): Either[Error, CompiledScript] =
     compileStateful(input, _.genStatefulScript(index))
 
   def compileContract(input: String): Either[Error, StatefulContract] =
@@ -63,15 +61,10 @@ object Compiler {
   def compileContract(input: String, index: Int): Either[Error, StatefulContract] =
     compileContractFull(input, index).map(_._1)
 
-  def compileContractFull(
-      input: String
-  ): Either[Error, (StatefulContract, Ast.Contract, AVector[String])] =
+  def compileContractFull(input: String): Either[Error, CompiledContract] =
     compileContractFull(input, 0)
 
-  def compileContractFull(
-      input: String,
-      index: Int
-  ): Either[Error, (StatefulContract, Ast.Contract, AVector[String])] =
+  def compileContractFull(input: String, index: Int): Either[Error, CompiledContract] =
     compileStateful(input, _.genStatefulContract(index))
 
   private def compileStateful[T](input: String, genCode: MultiContract => T): Either[Error, T] = {
@@ -82,7 +75,21 @@ object Compiler {
     }
   }
 
-  def compileMultiContract[T](input: String): Either[Error, MultiContract] = {
+  def compileProject(
+      input: String
+  ): Either[Error, (AVector[CompiledContract], AVector[CompiledScript])] = {
+    try {
+      compileMultiContract(input).map { multiContract =>
+        val statefulContracts = multiContract.genStatefulContracts().map(c => (c._1, c._2, c._3))
+        val statefulScripts   = multiContract.genStatefulScripts()
+        (statefulContracts, statefulScripts)
+      }
+    } catch {
+      case e: Error => Left(e)
+    }
+  }
+
+  def compileMultiContract(input: String): Either[Error, MultiContract] = {
     try {
       fastparse.parse(input, StatefulParser.multiContract(_)) match {
         case Parsed.Success(multiContract, _) => Right(multiContract.extendedContracts())
@@ -418,7 +425,7 @@ object Compiler {
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
     private var freshNameIndex: Int              = 0
     private var arrayIndexVar: Option[Ast.Ident] = None
-    private val usedVars: mutable.Set[String]    = mutable.Set.empty[String]
+    val usedVars: mutable.Set[String]            = mutable.Set.empty[String]
     val warnings: mutable.ArrayBuffer[String]    = mutable.ArrayBuffer.empty[String]
     def getWarnings: AVector[String]             = AVector.from(warnings)
     def eventsInfo: Seq[EventInfo]
@@ -594,6 +601,8 @@ object Compiler {
       usedVars.add(varName)
       varInfo
     }
+
+    def addUsedVars(names: Set[String]): Unit = usedVars.addAll(names)
 
     def checkUnusedLocalVars(funcId: Ast.FuncId): Unit = {
       val prefix = s"${funcId.name}."
