@@ -62,14 +62,15 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         outputRef: ContractOutputRef,
         output: ContractOutput
     ): Assertion = {
+      val contractId = outputRef.key
       pool.worldState
         .createContractUnsafe(
+          contractId,
           contract.toHalfDecoded(),
           fields(contract.fieldLength),
           outputRef,
           output
         ) isE ()
-      val contractId = outputRef.key
       pool.worldState.getContractObj(contractId) isE
         contract.toHalfDecoded().toObjectUnsafe(contractId, fields(contract.fieldLength))
     }
@@ -175,6 +176,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     val contractId = outputRef.key
     val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
     pool.worldState.createContractUnsafe(
+      contractId,
       StatefulContract.forSMT,
       AVector.empty,
       outputRef,
