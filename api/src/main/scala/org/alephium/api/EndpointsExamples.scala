@@ -497,61 +497,75 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
-  implicit val compileScriptResultExamples: List[Example[CompileScriptResult]] =
+  implicit val compileProjectExamples: List[Example[Compile.Project]] =
     simpleExample(
-      CompileScriptResult(
-        bytecodeTemplate = hexString,
-        fields = CompileResult.FieldsSig(
-          names = AVector("aa", "bb", "cc", "dd", "ee"),
-          types = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
-          isMutable = AVector(false, true, false, true, false)
-        ),
-        functions = AVector(
-          CompileResult.FunctionSig(
-            name = "bar",
-            usePreapprovedAssets = false,
-            useAssetsInContract = false,
-            isPublic = true,
-            paramNames = AVector("a", "b", "c", "d", "e"),
-            paramTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
-            paramIsMutable = AVector(false, true, false, true, false),
-            returnTypes = AVector("U256", "I256", "ByteVec", "Address")
-          )
-        ),
-        warnings = AVector("Found unused fields in Foo: a")
+      Compile.Project(
+        code =
+          "Contract Foo() {\n pub fn foo() -> () {}\n }\n TxScript Main(id: ByteVec) {\n Foo(id).foo() \n}"
       )
     )
 
+  private val compileScriptResult = CompileScriptResult(
+    bytecodeTemplate = hexString,
+    fields = CompileResult.FieldsSig(
+      names = AVector("aa", "bb", "cc", "dd", "ee"),
+      types = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+      isMutable = AVector(false, true, false, true, false)
+    ),
+    functions = AVector(
+      CompileResult.FunctionSig(
+        name = "bar",
+        usePreapprovedAssets = false,
+        useAssetsInContract = false,
+        isPublic = true,
+        paramNames = AVector("a", "b", "c", "d", "e"),
+        paramTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+        paramIsMutable = AVector(false, true, false, true, false),
+        returnTypes = AVector("U256", "I256", "ByteVec", "Address")
+      )
+    ),
+    warnings = AVector("Found unused fields in Foo: a")
+  )
+  implicit val compileScriptResultExamples: List[Example[CompileScriptResult]] =
+    simpleExample(compileScriptResult)
+
+  private val compileContractResult = CompileContractResult(
+    bytecode = hexString,
+    codeHash = hash,
+    fields = CompileResult.FieldsSig(
+      names = AVector("aa", "bb", "cc", "dd", "ee"),
+      types = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+      isMutable = AVector(false, true, false, true, false)
+    ),
+    functions = AVector(
+      CompileResult.FunctionSig(
+        name = "bar",
+        usePreapprovedAssets = false,
+        useAssetsInContract = false,
+        isPublic = true,
+        paramNames = AVector("a", "b", "c", "d", "e"),
+        paramTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
+        paramIsMutable = AVector(false, true, false, true, false),
+        returnTypes = AVector("U256", "I256", "ByteVec", "Address")
+      )
+    ),
+    events = AVector(
+      CompileResult.EventSig(
+        name = "Bar",
+        fieldNames = AVector("a", "b", "d", "e"),
+        fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
+      )
+    ),
+    warnings = AVector("Found unused fields in Foo: a")
+  )
   implicit val compileContractResultExamples: List[Example[CompileContractResult]] =
+    simpleExample(compileContractResult)
+
+  implicit val compileProjectResultExamples: List[Example[CompileProjectResult]] =
     simpleExample(
-      CompileContractResult(
-        bytecode = hexString,
-        codeHash = hash,
-        fields = CompileResult.FieldsSig(
-          names = AVector("aa", "bb", "cc", "dd", "ee"),
-          types = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
-          isMutable = AVector(false, true, false, true, false)
-        ),
-        functions = AVector(
-          CompileResult.FunctionSig(
-            name = "bar",
-            usePreapprovedAssets = false,
-            useAssetsInContract = false,
-            isPublic = true,
-            paramNames = AVector("a", "b", "c", "d", "e"),
-            paramTypes = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
-            paramIsMutable = AVector(false, true, false, true, false),
-            returnTypes = AVector("U256", "I256", "ByteVec", "Address")
-          )
-        ),
-        events = AVector(
-          CompileResult.EventSig(
-            name = "Bar",
-            fieldNames = AVector("a", "b", "d", "e"),
-            fieldTypes = AVector("Bool", "U256", "ByteVec", "Address")
-          )
-        ),
-        warnings = AVector("Found unused fields in Foo: a")
+      CompileProjectResult(
+        contracts = AVector(compileContractResult),
+        scripts = AVector(compileScriptResult)
       )
     )
 

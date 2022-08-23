@@ -20,4 +20,5 @@ object Compile {
   // use different type to avoid ambiguous implicit values in endpoint examples
   final case class Script(code: String)
   final case class Contract(code: String)
+  final case class Project(code: String)
 }
