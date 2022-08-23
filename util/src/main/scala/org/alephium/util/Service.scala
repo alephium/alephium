@@ -21,6 +21,8 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 
 trait Service {
+  def serviceName: String = this.getClass.getSimpleName
+
   implicit protected def executionContext: ExecutionContext
 
   def subServices: ArraySeq[Service] // Note: put high-level services in front
@@ -34,6 +36,7 @@ trait Service {
   def start(): Future[Unit] =
     startPromise.synchronized {
       if (!started) {
+        print(s"Starting service: ${serviceName}\n")
         started = true
         try {
           startPromise.completeWith {
@@ -67,6 +70,7 @@ trait Service {
 
   private def stopAfterStarted(): Future[Unit] = {
     if (!stopped) {
+      print(s"Stopping service: ${serviceName}\n")
       stopped = true
       try {
         stopPromise.completeWith {

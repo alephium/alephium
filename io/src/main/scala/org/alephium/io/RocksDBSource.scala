@@ -189,10 +189,12 @@ class RocksDBSource(val path: Path, val db: RocksDB, val cfHandles: AVector[Colu
 
   def close(): IOResult[Unit] =
     tryExecute {
-      db.close()
+      closeUnsafe()
     }
 
   def closeUnsafe(): Unit = {
+    print("Closing RocksDB")
+    db.cancelAllBackgroundWork(true)
     cfHandles.foreach(_.close())
     db.close()
   }
