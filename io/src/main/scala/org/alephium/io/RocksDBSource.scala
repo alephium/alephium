@@ -208,7 +208,8 @@ class RocksDBSource(val path: Path, val db: RocksDB, val cfHandles: AVector[Colu
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def dESTROYUnsafe(): Unit = {
-    closeUnsafe()
+    cfHandles.foreach(_.close())
+    db.close()
     RocksDB.destroyDB(path.toString, new Options())
   }
 }
