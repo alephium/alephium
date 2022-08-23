@@ -1103,18 +1103,6 @@ object Ast {
       }
       permissionCheckedTable
     }
-
-    def validateInterfaceFuncsPermissionCheck(
-        interfaceFuncsSize: Int,
-        state: Compiler.State[StatefulContext]
-    ): Unit = {
-      val permissionTable = buildPermissionCheckTable(state)
-      funcs.slice(0, interfaceFuncsSize).foreach { case func =>
-        if (func.usePermissionCheck && !permissionTable(func.id)) {
-          throw Compiler.Error(MultiContract.noPermissionCheckMsg(ident.name, func.id.name))
-        }
-      }
-    }
   }
 
   final case class ContractInterface(
@@ -1138,7 +1126,10 @@ object Ast {
     }
   }
 
-  final case class MultiContract(contracts: Seq[ContractWithState]) {
+  final case class MultiContract(
+      contracts: Seq[ContractWithState],
+      dependencies: Option[Map[TypeId, Seq[TypeId]]]
+  ) {
     def get(contractIndex: Int): ContractWithState = {
       if (contractIndex >= 0 && contractIndex < contracts.size) {
         contracts(contractIndex)
@@ -1155,10 +1146,18 @@ object Ast {
       }
     }
 
-    private def getInterfaceOpt(typeId: TypeId): Option[ContractInterface] = {
+    private def isContract(typeId: TypeId): Boolean = {
+      contracts.find(_.ident == typeId) match {
+        case None => throw Compiler.Error(s"Contract $typeId does not exist")
+        case Some(contract: Contract) if !contract.isAbstract => true
+        case _                                                => false
+      }
+    }
+
+    private def getInterface(typeId: TypeId): ContractInterface = {
       getContract(typeId) match {
-        case interface: ContractInterface => Some(interface)
-        case _                            => None
+        case interface: ContractInterface => interface
+        case _ => throw Compiler.Error(s"Interface ${typeId.name} does not exist")
       }
     }
 
@@ -1225,7 +1224,8 @@ object Ast {
           val (funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
           ContractInterface(i.ident, funcs, events, i.inheritances)
       }
-      MultiContract(newContracts)
+      val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
+      MultiContract(newContracts, Some(dependencies))
     }
 
     def genStatefulScripts(): AVector[(StatefulScript, TxScript, AVector[String])] = {
@@ -1245,37 +1245,17 @@ object Ast {
     }
 
     private[vm] def checkExternalCallPermissions(
-        states: AVector[Compiler.State[StatefulContext]],
-        contractIndex: Int,
-        contract: Contract
+        contractState: Compiler.State[StatefulContext],
+        contract: Contract,
+        permissionCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
     ): Unit = {
-      val contractState = states(contractIndex)
-      val externalCalls =
-        contractState.externalCalls.values.foldLeft(mutable.Set.empty[(TypeId, FuncId)])(_ ++ _)
-      val externalCallPermissionTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
-      externalCalls.foreach { case (calleeTypeId, _) =>
-        if (!externalCallPermissionTables.contains(calleeTypeId)) {
-          getContract(calleeTypeId) match {
-            case calleeContract: Contract =>
-              val calleeContractIndex = contracts.indexWhere(_.ident == calleeContract.ident)
-              val calleeContractState = states(calleeContractIndex)
-              val table = calleeContract.buildPermissionCheckTable(calleeContractState)
-              externalCallPermissionTables.update(calleeTypeId, table)
-            case calleeInterface: ContractInterface =>
-              // Skip permission checks for interface function calls
-              val table = mutable.Map.from(calleeInterface.funcs.map(_.id -> true))
-              externalCallPermissionTables.update(calleeTypeId, table)
-            case _ => ()
-          }
-        }
-      }
       val allNoPermissionChecks: mutable.Set[(TypeId, FuncId)] = mutable.Set.empty
       contract.funcs.foreach { func =>
         // To check that external calls should have permission checks
         contractState.externalCalls.get(func.id) match {
           case Some(callees) if callees.nonEmpty =>
             callees.foreach { case funcRef @ (typeId, funcId) =>
-              if (!externalCallPermissionTables(typeId)(funcId)) {
+              if (!permissionCheckTables(typeId)(funcId)) {
                 allNoPermissionChecks.addOne(funcRef)
               }
             }
@@ -1289,21 +1269,48 @@ object Ast {
       }
     }
 
+    def checkInterfacePermissionCheck(
+        interfaceTypeId: TypeId,
+        permissionCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
+    ): Unit = {
+      assume(dependencies.isDefined)
+      val children = dependencies
+        .map(_.filter { case (child, parents) =>
+          parents.contains(interfaceTypeId) && isContract(child)
+        }.keys.toSeq)
+        .getOrElse(Seq.empty)
+      val interface = getInterface(interfaceTypeId)
+      children.foreach { case contractId =>
+        val table = permissionCheckTables(contractId)
+        interface.funcs.foreach { func =>
+          if (func.usePermissionCheck && !table(func.id)) {
+            throw Compiler.Error(MultiContract.noPermissionCheckMsg(contractId.name, func.id.name))
+          }
+        }
+      }
+    }
+
     def genStatefulContracts(): AVector[(StatefulContract, Contract, AVector[String], Int)] = {
       val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
+      val permissionCheckTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
       val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
         case (contract: Contract, index) if !contract.isAbstract =>
           val state            = states(index)
           val statefulContract = contract.genCode(state)
-          val interfaceFuncsSize = contract.inheritances.view.map { case inheritance =>
-            getInterfaceOpt(inheritance.parentId).map(_.funcs.size).getOrElse(0)
-          }.sum
-          contract.validateInterfaceFuncsPermissionCheck(interfaceFuncsSize, state)
-          (statefulContract, contract, index)
+          val table            = contract.buildPermissionCheckTable(state)
+          permissionCheckTables.update(contract.ident, table)
+          (statefulContract, contract, state, index)
       })
-      statefulContracts.map { case ((statefulContract, contract, index)) =>
-        checkExternalCallPermissions(states, index, contract)
-        (statefulContract, contract, states(index).getWarnings, index)
+      contracts.foreach {
+        case interface: ContractInterface =>
+          checkInterfacePermissionCheck(interface.ident, permissionCheckTables)
+          val table = mutable.Map.from(interface.funcs.map(_.id -> true))
+          permissionCheckTables.update(interface.ident, table)
+        case _ => ()
+      }
+      statefulContracts.map { case ((statefulContract, contract, state, index)) =>
+        checkExternalCallPermissions(state, contract, permissionCheckTables)
+        (statefulContract, contract, state.getWarnings, index)
       }
     }
 

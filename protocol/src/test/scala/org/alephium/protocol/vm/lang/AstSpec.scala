@@ -254,18 +254,33 @@ class AstSpec extends AlephiumSpec {
 
   it should "test permission check for interface" in {
     {
-      info("Implemented function should have permission check")
+      info("All contracts that inherit from the interface should have permission check")
       val code =
         s"""
-           |Contract Bar() implements Foo {
-           |  pub fn foo() -> () {}
+           |Interface Base {
+           |  pub fn base() -> ()
            |}
-           |Interface Foo {
-           |  pub fn foo() -> ()
+           |Contract Foo() implements Base {
+           |  pub fn base() -> () {
+           |    checkPermission!(true, 0)
+           |  }
+           |}
+           |Abstract Contract A() implements Base {
+           |  fn a() -> () {
+           |    checkPermission!(true, 0)
+           |  }
+           |}
+           |Contract Bar() extends A() {
+           |  pub fn base() -> () {
+           |    a()
+           |  }
+           |}
+           |Contract Baz() implements Base {
+           |  pub fn base() -> () {}
            |}
            |""".stripMargin
-      val error = Compiler.compileContractFull(code, 0).leftValue
-      error.message is MultiContract.noPermissionCheckMsg("Bar", "foo")
+      val error = Compiler.compileProject(code).leftValue
+      error.message is MultiContract.noPermissionCheckMsg("Baz", "base")
     }
 
     {
