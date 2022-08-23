@@ -570,7 +570,7 @@ object Ast {
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
 
-    def checkReadonly(state: Compiler.State[Ctx], instrs: Seq[Instr[Ctx]]): Unit = {
+    def checkReadonly(state: Compiler.State[Ctx], instrs: AVector[Instr[Ctx]]): Unit = {
       val changeState = instrs.exists {
         case _: StoreField | _: StoreFieldByIndex.type | _: LogInstr => true
         case _                                                       => false
@@ -614,8 +614,7 @@ object Ast {
       state.setFuncScope(id)
       check(state)
 
-      val instrs = body.flatMap(_.genCode(state))
-      checkReadonly(state, instrs)
+      val instrs    = body.flatMap(_.genCode(state))
       val localVars = state.getLocalVars(id)
       ContractAssets.checkCodeUsingContractAssets(instrs, useAssetsInContract, id.name)
       Method[Ctx](
@@ -984,13 +983,21 @@ object Ast {
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
-      StatefulScript
-        .from(getMethods(state))
+      val methods = getMethods(state)
+      val script = StatefulScript
+        .from(methods)
         .getOrElse(
           throw Compiler.Error(
             "Expect the 1st function to be public and the other functions to be private for tx script"
           )
         )
+      // skip check readonly for main function
+      val methodsExceptMain = methods.drop(1)
+      val funcsExceptMain   = funcs.drop(1)
+      methodsExceptMain.foreachWithIndex { case (method, index) =>
+        funcsExceptMain(index).checkReadonly(state, method.instrs)
+      }
+      script
     }
   }
 
@@ -1062,10 +1069,11 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
       check(state)
-      val contract = StatefulContract(
-        Type.flattenTypeLength(fields.map(_.tpe)),
-        getMethods(state)
-      )
+      val methods  = getMethods(state)
+      val contract = StatefulContract(Type.flattenTypeLength(fields.map(_.tpe)), methods)
+      methods.foreachWithIndex { case (method, index) =>
+        funcs(index).checkReadonly(state, method.instrs)
+      }
       checkIfPrivateMethodsUsed(state)
       contract
     }

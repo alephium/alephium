@@ -36,7 +36,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileAssetScript(script).isRight is true
+    val (_, warnings) = Compiler.compileAssetScript(script).rightValue
+    warnings.isEmpty is true
   }
 
   it should "parse tx script" in {
@@ -2681,7 +2682,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |AssetScript Foo {
-           |  @using(readonly = true)
            |  pub fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 2
@@ -2964,6 +2964,18 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test compile readonly functions" in {
+    {
+      info("Skip check readonly for script main function")
+      val code =
+        s"""
+           |TxScript Main {
+           |  assert!(true, 0)
+           |}
+           |""".stripMargin
+      val (_, _, warnings) = Compiler.compileTxScriptFull(code).rightValue
+      warnings.isEmpty is true
+    }
+
     {
       info("Simple readonly functions")
       val code =

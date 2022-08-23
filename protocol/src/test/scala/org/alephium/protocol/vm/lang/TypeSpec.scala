@@ -77,7 +77,7 @@ trait TypeSignatureFixture {
        |  }
        |}
        |""".stripMargin
-  lazy val (contract, contractAst, scriptWarnings) =
+  lazy val (contract, contractAst, contractWarnings) =
     Compiler.compileContractFull(contractStr).toOption.get
 
   val scriptStr =
@@ -90,6 +90,6 @@ trait TypeSignatureFixture {
        |}
        |""".stripMargin
 
-  lazy val (script, scriptAst, contractWarnings) =
+  lazy val (script, scriptAst, scriptWarnings) =
     Compiler.compileTxScriptFull(scriptStr).toOption.get
 }
