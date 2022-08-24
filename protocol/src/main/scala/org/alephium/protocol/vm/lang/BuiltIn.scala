@@ -513,7 +513,7 @@ object BuiltIn {
       Seq(Type.Address),
       Seq(Type.U256),
       AlphRemaining,
-      isReadonly = false
+      isReadonly = true
     )
 
   val tokenRemaining: SimpleBuiltIn[StatefulContext] =
@@ -522,11 +522,11 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.ByteVec),
       Seq(Type.U256),
       TokenRemaining,
-      isReadonly = false
+      isReadonly = true
     )
 
   val isPaying: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn("isPaying", Seq(Type.Address), Seq(Type.Bool), IsPaying, isReadonly = false)
+    SimpleBuiltIn("isPaying", Seq(Type.Address), Seq(Type.Bool), IsPaying, isReadonly = true)
 
   val transferAlph: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn(

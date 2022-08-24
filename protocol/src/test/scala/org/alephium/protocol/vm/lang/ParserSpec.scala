@@ -251,7 +251,7 @@ class ParserSpec extends AlephiumSpec {
 
     val parsed1 = fastparse
       .parse(
-        """@using(preapprovedAssets = true)
+        """@using(preapprovedAssets = true, readonly = false)
           |pub fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }
           |""".stripMargin,
         StatelessParser.func(_)
@@ -262,6 +262,8 @@ class ParserSpec extends AlephiumSpec {
     parsed1.isPublic is true
     parsed1.usePreapprovedAssets is true
     parsed1.useAssetsInContract is false
+    parsed1.usePermissionCheck is true
+    parsed1.useReadonly is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
 
@@ -278,13 +280,15 @@ class ParserSpec extends AlephiumSpec {
     parsed2.isPublic is true
     parsed2.usePreapprovedAssets is true
     parsed2.useAssetsInContract is true
+    parsed2.usePermissionCheck is true
+    parsed2.useReadonly is false
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
 
     info("More use annotation")
     val parsed3 = fastparse
       .parse(
-        """@using(assetsInContract = true)
+        """@using(assetsInContract = true, readonly = true)
           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
         StatelessParser.func(_)
       )
@@ -292,6 +296,8 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed3.usePreapprovedAssets is false
     parsed3.useAssetsInContract is true
+    parsed3.usePermissionCheck is true
+    parsed3.useReadonly is true
   }
 
   it should "parser contract initial states" in {
@@ -989,48 +995,6 @@ class ParserSpec extends AlephiumSpec {
         Seq(InterfaceInheritance(TypeId("Bar")))
       )
     }
-  }
-
-  it should "parse using readonly annotation" in {
-    def parse(annotations: String) = {
-      val code =
-        s"""
-           |Contract Foo() {
-           |  @using($annotations)
-           |  pub fn foo() -> () {}
-           |}
-           |""".stripMargin
-      fastparse.parse(code, StatefulParser.rawContract(_)).get.value.funcs(0)
-    }
-
-    var func = parse("readonly = true")
-    func.usePreapprovedAssets is false
-    func.useAssetsInContract is false
-    func.usePermissionCheck is true
-    func.useReadonly is true
-
-    func = parse("readonly = false")
-    func.usePreapprovedAssets is false
-    func.useAssetsInContract is false
-    func.usePermissionCheck is true
-    func.useReadonly is false
-
-    func = parse("readonly = true, permissionCheck = false")
-    func.usePreapprovedAssets is false
-    func.useAssetsInContract is false
-    func.usePermissionCheck is false
-    func.useReadonly is true
-
-    def error(annotations: String) = {
-      val e = intercept[Compiler.Error](parse(annotations))
-      e.message is "Invalid annotations, function foo is readonly"
-    }
-
-    error("readonly = true, preapprovedAssets = true")
-    error("readonly = true, assetsInContract = true")
-    error(
-      "readonly = true, preapprovedAssets = true, assetsInContract = true, permissionCheck = true"
-    )
   }
 
   trait ScriptFixture {

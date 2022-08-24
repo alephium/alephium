@@ -220,7 +220,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       } else {
         val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
         val (usePreapprovedAssets, useContractAssets, usePermissionCheck, useReadonly) =
-          Parser.extractFuncModifier(funcId.name, annotations, false, false, true, false)
+          Parser.extractFuncModifier(annotations, false, false, true, false)
         FuncDefTmp(
           Seq.empty,
           funcId,
@@ -364,7 +364,6 @@ object Parser {
 
   // scalastyle:off method.length
   def extractFuncModifier(
-      funcName: String,
       annotations: Seq[Annotation],
       usePreapprovedAssetsDefault: Boolean,
       useContractAssetsDefault: Boolean,
@@ -383,39 +382,27 @@ object Parser {
             )
           }
 
-          val (hasReadonly, useReadonly) = extractAnnotationBoolean(
-            useAnnotation,
-            useReadonlyKey,
-            useReadonlyDefault
-          )
-          val (hasUsePreapprovedAssets, usePreapprovedAssets) = extractAnnotationBoolean(
+          val usePreapprovedAssets = extractAnnotationBoolean(
             useAnnotation,
             usePreapprovedAssetsKey,
             usePreapprovedAssetsDefault
           )
-          val (hasUseContractAssets, useContractAssets) = extractAnnotationBoolean(
+          val useContractAssets = extractAnnotationBoolean(
             useAnnotation,
             useContractAssetsKey,
             useContractAssetsDefault
           )
-          val (_, usePermissionCheck) = extractAnnotationBoolean(
+          val usePermissionCheck = extractAnnotationBoolean(
             useAnnotation,
             usePermissionCheckKey,
             usePermissionCheckDefault
           )
-
-          if (hasReadonly && useReadonly) {
-            if (
-              (hasUsePreapprovedAssets && usePreapprovedAssets) ||
-              (hasUseContractAssets && useContractAssets)
-            ) {
-              throw Compiler.Error(s"Invalid annotations, function $funcName is readonly")
-            }
-
-            (false, false, usePermissionCheck, true)
-          } else {
-            (usePreapprovedAssets, useContractAssets, usePermissionCheck, false)
-          }
+          val useReadonly = extractAnnotationBoolean(
+            useAnnotation,
+            useReadonlyKey,
+            useReadonlyDefault
+          )
+          (usePreapprovedAssets, useContractAssets, usePermissionCheck, useReadonly)
         case None =>
           (
             usePreapprovedAssetsDefault,
@@ -431,12 +418,12 @@ object Parser {
       annotation: Annotation,
       name: String,
       default: Boolean
-  ): (Boolean, Boolean) = {
+  ): Boolean = {
     annotation.fields.find(_.ident.name == name).map(_.value) match {
-      case Some(value: Val.Bool) => (true, value.v)
+      case Some(value: Val.Bool) => value.v
       case Some(_) =>
         throw Compiler.Error(s"Expect boolean for ${name} in annotation ${annotation.id.name}")
-      case None => (false, default)
+      case None => default
     }
   }
 }
@@ -510,7 +497,6 @@ object StatefulParser extends Parser[StatefulContext] {
         } else {
           val (usePreapprovedAssets, useContractAssets, _, useReadonly) =
             Parser.extractFuncModifier(
-              s"${typeId.name}.main",
               annotations,
               true,
               false,

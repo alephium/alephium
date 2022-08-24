@@ -3090,6 +3090,22 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Readonly functions use preapproved assets")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true, preapprovedAssets = true)
+           |  pub fn foo(tokenId: ByteVec) -> () {
+           |    assert!(tokenRemaining!(callerAddress!(), tokenId) == 1, 0)
+           |    assert!(alphRemaining!(callerAddress!()) == 1, 0)
+           |    assert!(isPaying!(callerAddress!()), 0)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
       info("Warning for readonly functions")
       val code =
         s"""
