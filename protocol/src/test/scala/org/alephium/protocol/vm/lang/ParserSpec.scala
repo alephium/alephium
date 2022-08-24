@@ -1006,7 +1006,7 @@ class ParserSpec extends AlephiumSpec {
     var func = parse("readonly = true")
     func.usePreapprovedAssets is false
     func.useAssetsInContract is false
-    func.usePermissionCheck is false
+    func.usePermissionCheck is true
     func.useReadonly is true
 
     func = parse("readonly = false")
@@ -1015,6 +1015,12 @@ class ParserSpec extends AlephiumSpec {
     func.usePermissionCheck is true
     func.useReadonly is false
 
+    func = parse("readonly = true, permissionCheck = false")
+    func.usePreapprovedAssets is false
+    func.useAssetsInContract is false
+    func.usePermissionCheck is false
+    func.useReadonly is true
+
     def error(annotations: String) = {
       val e = intercept[Compiler.Error](parse(annotations))
       e.message is "Invalid annotations, function foo is readonly"
@@ -1022,7 +1028,6 @@ class ParserSpec extends AlephiumSpec {
 
     error("readonly = true, preapprovedAssets = true")
     error("readonly = true, assetsInContract = true")
-    error("readonly = true, permissionCheck = true")
     error(
       "readonly = true, preapprovedAssets = true, assetsInContract = true, permissionCheck = true"
     )

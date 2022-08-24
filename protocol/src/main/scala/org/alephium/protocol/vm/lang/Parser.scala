@@ -220,7 +220,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       } else {
         val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
         val (usePreapprovedAssets, useContractAssets, usePermissionCheck, useReadonly) =
-          Parser.extractFuncModifier(s"${funcId.name}", annotations, false, false, true, false)
+          Parser.extractFuncModifier(funcId.name, annotations, false, false, true, false)
         FuncDefTmp(
           Seq.empty,
           funcId,
@@ -398,7 +398,7 @@ object Parser {
             useContractAssetsKey,
             useContractAssetsDefault
           )
-          val (hasUsePermissionCheck, usePermissionCheck) = extractAnnotationBoolean(
+          val (_, usePermissionCheck) = extractAnnotationBoolean(
             useAnnotation,
             usePermissionCheckKey,
             usePermissionCheckDefault
@@ -407,13 +407,12 @@ object Parser {
           if (hasReadonly && useReadonly) {
             if (
               (hasUsePreapprovedAssets && usePreapprovedAssets) ||
-              (hasUseContractAssets && useContractAssets) ||
-              (hasUsePermissionCheck && usePermissionCheck)
+              (hasUseContractAssets && useContractAssets)
             ) {
               throw Compiler.Error(s"Invalid annotations, function $funcName is readonly")
             }
 
-            (false, false, false, true)
+            (false, false, usePermissionCheck, true)
           } else {
             (usePreapprovedAssets, useContractAssets, usePermissionCheck, false)
           }
