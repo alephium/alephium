@@ -222,7 +222,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         val (usePreapprovedAssets, useContractAssets, usePermissionCheck, useReadonly) =
           Parser.extractFuncModifier(annotations, false, false, true, false)
         FuncDefTmp(
-          Seq.empty,
+          annotations,
           funcId,
           isPublic,
           usePreapprovedAssets,
@@ -355,6 +355,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
 )
 
 object Parser {
+  val usingAnnotationId       = "using"
   val usePreapprovedAssetsKey = "preapprovedAssets"
   val useContractAssetsKey    = "assetsInContract"
   val usePermissionCheckKey   = "permissionCheck"
@@ -370,7 +371,7 @@ object Parser {
       usePermissionCheckDefault: Boolean,
       useReadonlyDefault: Boolean
   ): (Boolean, Boolean, Boolean, Boolean) = {
-    if (annotations.exists(_.id.name != "using")) {
+    if (annotations.exists(_.id.name != usingAnnotationId)) {
       throw Compiler.Error(s"Generic annotation is not supported yet")
     } else {
       annotations.headOption match {
@@ -442,10 +443,18 @@ object StatelessParser extends Parser[StatelessContext] {
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
     P(varDef | assign | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret)
 
+  def assetScriptFunc[Unknown: P]: P[Ast.FuncDef[StatelessContext]] =
+    func.map { f =>
+      if (f.annotations.exists(_.id.name == Parser.usingAnnotationId)) {
+        throw new Compiler.Error("AssetScript does not support using annotation")
+      }
+      f
+    }
+
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
       Start ~ Lexer.keyword("AssetScript") ~/ Lexer.typeId ~ templateParams.? ~
-        "{" ~ func.rep(1) ~ "}"
+        "{" ~ assetScriptFunc.rep(1) ~ "}"
     ).map { case (typeId, templateVars, funcs) =>
       Ast.AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
     }
