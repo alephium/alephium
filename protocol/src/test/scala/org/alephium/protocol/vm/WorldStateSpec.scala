@@ -62,6 +62,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
     update(
       worldState.createContractUnsafe(
+        contractId,
         code,
         state,
         contractOutputRef,
@@ -79,6 +80,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     assume(newState != state)
     update(
       worldState.createContractUnsafe(
+        contractId1,
         code,
         newState,
         contractOutputRef1,
@@ -178,7 +180,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
     val contractId  = contractOutputRef.key
     val contractObj = code.toObjectUnsafe(contractId, state)
-    staging.createContractUnsafe(code, state, contractOutputRef, contractOutput) isE ()
+    staging.createContractUnsafe(contractId, code, state, contractOutputRef, contractOutput) isE ()
     staging.getContractObj(contractId) isE contractObj
     worldState.getContractObj(contractId).isLeft is true
   }

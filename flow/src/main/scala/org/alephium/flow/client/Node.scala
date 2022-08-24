@@ -63,6 +63,8 @@ object Node {
       val config: AlephiumConfig
   ) extends Node
       with StrictLogging {
+    override def serviceName: String = "Node"
+
     implicit override def system: ActorSystem = flowSystem
     implicit private val brokerConfig         = config.broker
     implicit private val consensusConfig      = config.consensus

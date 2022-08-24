@@ -412,6 +412,7 @@ object ServerFixture {
         val contractId: Hash = dummyContract.toHalfDecoded().hash
         storages.emptyWorldState
           .createContractUnsafe(
+            contractId,
             dummyContract.toHalfDecoded(),
             AVector(vm.Val.U256(U256.Zero)),
             ContractOutputRef.unsafe(Hint.unsafe(0), contractId),

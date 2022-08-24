@@ -105,6 +105,7 @@ trait WorldState[T, R1, R2, R3] {
   def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[T]
 
   def createContractUnsafe(
+      contractId: ContractId,
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       outputRef: ContractOutputRef,
@@ -280,6 +281,7 @@ object WorldState {
     }
 
     def createContractUnsafe(
+        contractId: ContractId,
         code: StatefulContract.HalfDecoded,
         fields: AVector[Val],
         outputRef: ContractOutputRef,
@@ -361,6 +363,7 @@ object WorldState {
     }
 
     def createContractUnsafe(
+        contractId: ContractId,
         code: StatefulContract.HalfDecoded,
         fields: AVector[Val],
         outputRef: ContractOutputRef,
@@ -369,7 +372,7 @@ object WorldState {
       val state = ContractState.unsafe(code, fields, outputRef)
       for {
         _         <- outputState.put(outputRef, output)
-        _         <- contractState.put(outputRef.key, state)
+        _         <- contractState.put(contractId, state)
         recordOpt <- codeState.getOpt(code.hash)
         _         <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
       } yield ()
