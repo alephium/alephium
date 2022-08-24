@@ -2988,7 +2988,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function foo changes contract state"
+        "Readonly function foo changes state"
     }
 
     {
@@ -3071,6 +3071,22 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
         "Readonly function foo have invalid external calls: Bar.bar"
+    }
+
+    {
+      info("Readonly functions emit events")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  event E(v: U256)
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    emit E(0)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function foo changes state"
     }
 
     {

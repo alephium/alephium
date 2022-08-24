@@ -561,10 +561,9 @@ object Ast {
     }
 
     def checkReadonly(state: Compiler.State[Ctx], instrs: Seq[Instr[Ctx]]): Unit = {
-      val changeContractState = instrs.exists {
-        case _: StoreField             => true
-        case _: StoreFieldByIndex.type => true
-        case _                         => false
+      val changeState = instrs.exists {
+        case _: StoreField | _: StoreFieldByIndex.type | _: LogInstr => true
+        case _                                                       => false
       }
       val internalCalls        = state.internalCalls.getOrElse(id, mutable.Set.empty)
       val invalidInternalCalls = internalCalls.filterNot(state.getFunc(_).isReadonly)
@@ -574,10 +573,10 @@ object Ast {
       }
 
       val isReadonly =
-        !changeContractState && invalidInternalCalls.isEmpty && invalidExternalCalls.isEmpty
+        !changeState && invalidInternalCalls.isEmpty && invalidExternalCalls.isEmpty
       if (!isReadonly && useReadonly) {
-        if (changeContractState) {
-          throw Compiler.Error(s"Readonly function ${id.name} changes contract state")
+        if (changeState) {
+          throw Compiler.Error(s"Readonly function ${id.name} changes state")
         }
         if (invalidInternalCalls.nonEmpty) {
           throw Compiler.Error(
