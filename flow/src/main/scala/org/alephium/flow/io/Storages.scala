@@ -94,7 +94,7 @@ final case class Storages(
 ) extends KeyValueSource {
   def close(): IOResult[Unit] = sources.foreachE(_.close())
 
-  def closeUnsafe(): Unit = sources.foreach(_.close())
+  def closeUnsafe(): Unit = sources.foreach(_.closeUnsafe())
 
   def dESTROY(): IOResult[Unit] = sources.foreachE(_.dESTROY())
 

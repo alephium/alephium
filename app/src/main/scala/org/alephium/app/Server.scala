@@ -112,6 +112,8 @@ object Server {
       val apiConfig: ApiConfig,
       val executionContext: ExecutionContext
   ) extends Server {
+    override def serviceName: String = "Server"
+
     val dbPath                = rootPath.resolve(config.network.networkId.nodeFolder)
     val storageFolder: String = "db"
     val writeOptions = if (config.node.dbSyncWrite) Settings.syncWrite else Settings.writeOptions

@@ -73,6 +73,7 @@ lazy val util = project("util")
       akka,
       `akka-slf4j`,
       bcprov,
+      `scala-logging`,
       `scala-reflect`(scalaVersion.value)
     )
   )
@@ -90,7 +91,7 @@ lazy val crypto = project("crypto")
 lazy val io = project("io")
   .dependsOn(util % "test->test;compile->compile", serde, crypto)
   .settings(
-    libraryDependencies += rocksdb
+    libraryDependencies ++= Seq(rocksdb, `scala-logging`)
   )
 
 lazy val rpc = project("rpc")
