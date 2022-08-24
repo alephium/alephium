@@ -83,13 +83,17 @@ class ContextSpec
   }
 
   it should "generate contract output when the contract is loaded" in new Fixture {
-    val contractId = createContract()
+    val contractId   = createContract()
+    val oldOutputRef = context.worldState.getContractState(contractId).rightValue.contractOutputRef
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
     context.loadContractObj(contractId).isRight is true
     context.useContractAssets(contractId).isRight is true
     context.generateOutput(newOutput) isE ()
+
+    val newOutputRef = context.worldState.getContractState(contractId).rightValue.contractOutputRef
     context.worldState.getContractAsset(contractId) isE newOutput
+    newOutputRef isnot oldOutputRef
     (initialGas.value -
       GasSchedule.contractLoadGas(StatefulContract.forSMT.methodsBytes.length).value -
       GasSchedule.txInputBaseGas.value -

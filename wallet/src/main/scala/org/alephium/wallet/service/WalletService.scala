@@ -241,6 +241,8 @@ object WalletService {
       lockingTimeout: Duration
   )(implicit groupConfig: GroupConfig, val executionContext: ExecutionContext)
       extends WalletService {
+    override def serviceName: String = "WalletService"
+
     private val secretStorages = Storages(mutable.Map.empty, lockingTimeout)
 
     private val path: AVector[Int] = Constants.path

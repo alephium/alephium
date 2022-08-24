@@ -3444,6 +3444,38 @@ class VMSpec extends AlephiumSpec {
     callTxScript(script)
   }
 
+  it should "update contract output ref for every TX" in new ContractFixture {
+    val foo: String =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    transferAlphToSelf!(callerAddress!(), 0.01 alph)
+         |  }
+         |}
+         |""".stripMargin
+    val fooOutputRef = createContract(foo, AVector.empty)
+    val fooId        = fooOutputRef.key
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  let foo = Foo(#${fooId.toHexString})
+         |  foo.foo{callerAddress!() -> 1 alph}()
+         |}
+         |$foo
+         |""".stripMargin
+    val block      = callTxScript(script)
+    val tx         = block.nonCoinbase.head
+    val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+    val fooOutputRefNew = worldState.getContractState(fooId).rightValue.contractOutputRef
+    fooOutputRefNew isnot fooOutputRef
+
+    val fooOutputNew = worldState.getContractOutput(fooOutputRefNew).rightValue
+    fooOutputRefNew is ContractOutputRef.unsafe(tx.id, fooOutputNew, 0)
+    fooOutputRefNew.asInstanceOf[TxOutputRef] is TxOutputRef.unsafe(tx, 0)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

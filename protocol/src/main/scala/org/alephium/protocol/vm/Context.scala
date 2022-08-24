@@ -214,14 +214,14 @@ trait StatefulContext extends StatelessContext with ContractPool {
 
   def nextOutputIndex: Int
 
-  def nextContractOutputRef(contractId: Hash, output: ContractOutput): ContractOutputRef =
-    ContractOutputRef.unsafe(output.hint, contractId)
+  def nextContractOutputRef(output: ContractOutput): ContractOutputRef =
+    ContractOutputRef.unsafe(txId, output, nextOutputIndex)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def generateOutput(output: TxOutput): ExeResult[Unit] = {
     output match {
       case contractOutput @ ContractOutput(_, LockupScript.P2C(contractId), _) =>
-        val outputRef = nextContractOutputRef(contractId, contractOutput)
+        val outputRef = nextContractOutputRef(contractOutput)
         for {
           _ <- chargeGeneratedOutput()
           _ <- updateContractAsset(contractId, outputRef, contractOutput)
@@ -263,7 +263,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       LockupScript.p2c(contractId),
       initialBalances.tokenVector
     )
-    val outputRef = nextContractOutputRef(contractId, contractOutput)
+    val outputRef = nextContractOutputRef(contractOutput)
 
     for {
       _ <-
@@ -278,7 +278,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       _ <- code.check(initialFields)
       _ <-
         worldState
-          .createContractUnsafe(code, initialFields, outputRef, contractOutput)
+          .createContractUnsafe(contractId, code, initialFields, outputRef, contractOutput)
           .map(_ => discard(generatedOutputs.addOne(contractOutput)))
           .left
           .map(e => Left(IOErrorUpdateState(e)))
