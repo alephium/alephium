@@ -264,11 +264,11 @@ object Ast {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
-      state.addInternalCall(id)
       funcInfo.getReturnType(args.flatMap(_.getType(state)))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      state.addInternalCall(id)
       val func = state.getFunc(id)
       genApproveCode(state, func) ++
         args.flatMap(_.genCode(state)) ++
