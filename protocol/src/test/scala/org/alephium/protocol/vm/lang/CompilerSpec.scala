@@ -3106,6 +3106,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Invalid mutual function calls")
+      val code =
+        s"""
+           |Contract Foo(bar: Bar, mut a: U256) {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    bar.bar()
+           |  }
+           |  pub fn update() -> () {
+           |    a = 0
+           |  }
+           |}
+           |Contract Bar(foo: Foo) {
+           |  @using(readonly = true)
+           |  pub fn bar() -> () {
+           |    foo.update()
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function bar have invalid external calls: Foo.update"
+    }
+
+    {
       info("Warning for readonly functions")
       val code =
         s"""
