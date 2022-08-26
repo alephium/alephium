@@ -1161,6 +1161,7 @@ class ServerUtils(implicit
     val output     = asset.toContractOutput(contractId)
     wrapResult(
       worldState.createContractUnsafe(
+        contractId,
         code.toHalfDecoded(),
         initialState,
         outputRef,

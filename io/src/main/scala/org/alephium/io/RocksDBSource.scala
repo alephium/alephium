@@ -19,6 +19,7 @@ package org.alephium.io
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 
+import com.typesafe.scalalogging.LazyLogging
 import org.rocksdb._
 import org.rocksdb.util.SizeUnit
 
@@ -180,7 +181,8 @@ object RocksDBSource {
 }
 
 class RocksDBSource(val path: Path, val db: RocksDB, val cfHandles: AVector[ColumnFamilyHandle])
-    extends KeyValueSource {
+    extends KeyValueSource
+    with LazyLogging {
   import IOUtils.tryExecute
   import RocksDBSource._
 
@@ -189,10 +191,12 @@ class RocksDBSource(val path: Path, val db: RocksDB, val cfHandles: AVector[Colu
 
   def close(): IOResult[Unit] =
     tryExecute {
-      db.close()
+      closeUnsafe()
     }
 
   def closeUnsafe(): Unit = {
+    logger.info("Closing RocksDB")
+    db.cancelAllBackgroundWork(true)
     cfHandles.foreach(_.close())
     db.close()
   }
@@ -204,7 +208,8 @@ class RocksDBSource(val path: Path, val db: RocksDB, val cfHandles: AVector[Colu
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def dESTROYUnsafe(): Unit = {
-    closeUnsafe()
+    cfHandles.foreach(_.close())
+    db.close()
     RocksDB.destroyDB(path.toString, new Options())
   }
 }

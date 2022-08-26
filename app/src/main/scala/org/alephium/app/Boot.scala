@@ -79,6 +79,10 @@ class BootUp extends StrictLogging {
     }))
   }
 
+  flowSystem.registerOnTermination { () =>
+    server.storages.closeUnsafe()
+  }
+
   CoordinatedShutdown(flowSystem).addTask(
     CoordinatedShutdown.PhaseBeforeActorSystemTerminate,
     "Shutdown services"
