@@ -653,6 +653,17 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(compile, jsonRaw)
   }
 
+  it should "encode/decode Compile.Project" in {
+    val project = Compile.Project(code = "0000")
+    val jsonRaw =
+      s"""
+         |{
+         |  "code": "0000"
+         |}
+         |""".stripMargin
+    checkData(project, jsonRaw)
+  }
+
   it should "encode/decode BuildContract" in {
     val publicKey = PublicKey.generate
     val buildDeployContractTx = BuildDeployContractTx(
@@ -868,7 +879,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  ],
         |  "warnings": [
         |    "Found unused variables in Foo: bar.a",
-        |    "Found unused fields in Foo: aa, bb, cc, dd, ee"
+        |    "Found unused fields in Foo: cc, ff"
         |  ]
         |}
         |""".stripMargin
@@ -908,11 +919,22 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  ],
         |  "warnings": [
         |    "Found unused variables in Foo: bar.a",
-        |    "Found unused fields in Foo: cc, ff"
+        |    "Found unused fields in Foo: aa, bb, cc, dd, ee",
+        |    "Function bar is readonly, please use @using(readonly = true) for the function"
         |  ]
         |}
         |""".stripMargin
     write(result1).filter(!_.isWhitespace) is jsonRaw1.filter(!_.isWhitespace)
+
+    val result2 = CompileProjectResult(AVector(result0), AVector(result1))
+    val jsonRaw2 =
+      s"""
+         |{
+         |  "contracts": [$jsonRaw0],
+         |  "scripts": [$jsonRaw1]
+         |}
+         |""".stripMargin
+    write(result2).filter(!_.isWhitespace) is jsonRaw2.filter(!_.isWhitespace)
   }
 
   behavior of "TimeInterval"

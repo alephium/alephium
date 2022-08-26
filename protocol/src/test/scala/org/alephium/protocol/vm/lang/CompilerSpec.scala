@@ -36,7 +36,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileAssetScript(script).isRight is true
+    val (_, warnings) = Compiler.compileAssetScript(script).rightValue
+    warnings.isEmpty is true
   }
 
   it should "parse tx script" in {
@@ -2553,7 +2554,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Contract constant variables")
       val foo =
         s"""
-           |Abstract Contract Foo() {
+           |Contract Foo() {
            |  const C0 = 0
            |  const C1 = #00
            |  pub fn foo() -> () {
@@ -2633,7 +2634,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Contract enums")
       val foo =
         s"""
-           |Abstract Contract Foo() {
+           |Contract Foo() {
            |  enum FooErrorCodes {
            |    Error0 = 0
            |    Error1 = 1
@@ -2696,10 +2697,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Check unused local variables in TxScript")
       val code =
         s"""
+           |@using(readonly = true)
            |TxScript Foo {
            |  let b = 1
            |  foo()
            |
+           |  @using(readonly = true)
            |  fn foo() -> () {
            |  }
            |}
@@ -2712,9 +2715,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Check unused template variables in TxScript")
       val code =
         s"""
+           |@using(readonly = true)
            |TxScript Foo(a: U256, b: U256) {
            |  foo(a)
            |
+           |  @using(readonly = true)
            |  fn foo(v: U256) -> () {
            |    assert!(v == 0, 0)
            |  }
@@ -2729,7 +2734,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  fn foo(a: U256) -> U256 {
+           |  @using(readonly = true)
+           |  pub fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 0
            |    return c
@@ -2745,7 +2751,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(a: ByteVec, b: U256, c: [U256; 2]) {
-           |  fn getB() -> U256 {
+           |  @using(readonly = true)
+           |  pub fn getB() -> U256 {
            |    return b
            |  }
            |}
@@ -2759,11 +2766,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(a: U256, b: U256, c: [U256; 2]) extends Bar(a, b) {
-           |  pub fn foo() -> () {
-           |  }
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {}
            |}
            |
            |Abstract Contract Bar(a: U256, b: U256) {
+           |  @using(readonly = true)
            |  pub fn bar() -> U256 {
            |    return a
            |  }
@@ -2780,7 +2788,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo() {
            |  const C0 = 0
            |  const C1 = 1
-           |  fn foo() -> () {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
            |    assert!(C1 == 1, 0)
            |  }
            |}
@@ -2804,7 +2813,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    Solidity = #01
            |  }
            |
-           |  fn foo() -> () {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
            |    assert!(Chain.Alephium == 0, 0)
            |    assert!(Language.Ralph == #00, 0)
            |  }
@@ -2812,6 +2822,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue._3 is
         AVector("Found unused constants in Foo: Chain.Eth, Language.Solidity")
+    }
+
+    {
+      info("No warnings for multiple contracts inherit from the same parent")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  @using(readonly = true)
+           |  fn foo(x: U256) -> () {
+           |    assert!(x == 0, 0)
+           |  }
+           |}
+           |Contract Bar() extends Foo() {
+           |  @using(readonly = true)
+           |  pub fn bar() -> () { foo(0) }
+           |}
+           |Contract Baz() extends Foo() {
+           |  @using(readonly = true)
+           |  pub fn baz() -> () { foo(0) }
+           |}
+           |""".stripMargin
+      val (contracts, _) = Compiler.compileProject(code).rightValue
+      contracts.length is 2
+      contracts.foreach(_._3.isEmpty is true)
     }
   }
 
@@ -2888,16 +2922,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "not generate code if contract have unimplemented functions" in {
+  it should "not generate code for abstract contract" in {
     val foo =
       s"""
          |Abstract Contract Foo() {
-         |  pub fn foo() -> ()
-         |  pub fn bar() -> ()
+         |  pub fn foo() -> () {}
+         |  pub fn bar() -> () {}
          |}
          |""".stripMargin
     Compiler.compileContract(foo).leftValue.message is
-      "These functions are not implemented in contract Foo: foo,bar"
+      "Unable to generate code for abstract contract Foo"
   }
 
   "unused constants and enums" should "have no effect on code generation" in {
@@ -2930,6 +2964,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def code(unused: String) =
       s"""
          |Contract Foo($unused a: U256, $unused b: [U256; 2]) {
+         |  @using(readonly = true)
          |  pub fn foo($unused x: U256, $unused y: [U256; 2]) -> () {
          |    return
          |  }
@@ -2950,5 +2985,256 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val warnings = Compiler.compileContractFull(code("@unused")).rightValue._3
       warnings.isEmpty is true
     }
+  }
+
+  it should "test compile readonly functions" in {
+    {
+      info("Skip check readonly for script main function")
+      val code =
+        s"""
+           |TxScript Main {
+           |  assert!(true, 0)
+           |}
+           |""".stripMargin
+      val (_, _, warnings) = Compiler.compileTxScriptFull(code).rightValue
+      warnings.isEmpty is true
+    }
+
+    {
+      info("Simple readonly functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("Readonly function change the contract state")
+      val code =
+        s"""
+           |Contract Foo(mut a: U256) {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    a = 0
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function foo changes state"
+    }
+
+    {
+      info("Call internal readonly functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    bar()
+           |  }
+           |  @using(readonly = true)
+           |  pub fn bar() -> () {}
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("Call readonly builtin functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    let _ = selfContractId!()
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("Invalid builtin function calls")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    transferAlphToSelf!(callerAddress!(), 1 alph)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function foo have invalid internal calls: transferAlphToSelf"
+    }
+
+    {
+      info("Invalid internal function calls")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    bar()
+           |  }
+           |  @using(readonly = false)
+           |  pub fn bar() -> () {}
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function foo have invalid internal calls: bar"
+    }
+
+    {
+      info("Invalid external function calls")
+      val code =
+        s"""
+           |Contract Foo(bar: Bar) {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    bar.bar()
+           |  }
+           |}
+           |Contract Bar(mut x: [U256; 2]) {
+           |  pub fn bar() -> () {
+           |    x[0] = 0
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function foo have invalid external calls: Bar.bar"
+    }
+
+    {
+      info("Readonly functions emit events")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  event E(v: U256)
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    emit E(0)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function foo changes state"
+    }
+
+    {
+      info("Readonly functions use preapproved assets")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true, preapprovedAssets = true)
+           |  pub fn foo(tokenId: ByteVec) -> () {
+           |    assert!(tokenRemaining!(callerAddress!(), tokenId) == 1, 0)
+           |    assert!(alphRemaining!(callerAddress!()) == 1, 0)
+           |    assert!(isPaying!(callerAddress!()), 0)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("Invalid mutual function calls")
+      val code =
+        s"""
+           |Contract Foo(bar: Bar, mut a: U256) {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    bar.bar()
+           |  }
+           |  pub fn update() -> () {
+           |    a = 0
+           |  }
+           |}
+           |Contract Bar(foo: Foo) {
+           |  @using(readonly = true)
+           |  pub fn bar() -> () {
+           |    foo.update()
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is
+        "Readonly function bar have invalid external calls: Foo.update"
+    }
+
+    {
+      info("Invalid interface function calls")
+      def code(readonly: Boolean): String =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo(contractId: ByteVec) -> () {
+           |    Bar(contractId).bar()
+           |  }
+           |}
+           |Interface Bar {
+           |  @using(readonly = $readonly)
+           |  pub fn bar() -> ()
+           |}
+           |""".stripMargin
+      Compiler.compileContractFull(code(true)).isRight is true
+      val error = Compiler.compileContractFull(code(false)).leftValue
+      error.message is "Readonly function foo have invalid external calls: Bar.bar"
+    }
+
+    {
+      info("Warning for readonly functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
+      warnings is AVector(
+        "Function foo is readonly, please use @using(readonly = true) for the function"
+      )
+    }
+  }
+
+  trait MultiContractFixture {
+    val code =
+      s"""
+         |Abstract Contract Common() {
+         |  pub fn c() -> () {}
+         |}
+         |Contract Foo() extends Common() {
+         |  pub fn foo() -> () {}
+         |}
+         |TxScript M1(id: ByteVec) {
+         |  Foo(id).foo()
+         |}
+         |Contract Bar() extends Common() {
+         |  pub fn bar() -> () {}
+         |}
+         |TxScript M2(id: ByteVec) {
+         |  Bar(id).bar()
+         |}
+         |""".stripMargin
+    val multiContract = Compiler.compileMultiContract(code).rightValue
+  }
+
+  it should "compile all contracts" in new MultiContractFixture {
+    val contracts = multiContract.genStatefulContracts()
+    contracts.length is 2
+    contracts(0)._2.ident.name is "Foo"
+    contracts(0)._4 is 1
+    contracts(1)._2.ident.name is "Bar"
+    contracts(1)._4 is 3
+  }
+
+  it should "compile all scripts" in new MultiContractFixture {
+    val scripts = multiContract.genStatefulScripts()
+    scripts.length is 2
+    scripts(0)._2.ident.name is "M1"
+    scripts(1)._2.ident.name is "M2"
   }
 }

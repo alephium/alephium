@@ -852,6 +852,15 @@ class ServerUtils(implicit
       .map(error => failed(error.toString))
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def compileProject(query: Compile.Project): Try[CompileProjectResult] = {
+    Compiler
+      .compileProject(query.code)
+      .map(p => CompileProjectResult.from(p._1, p._2))
+      .left
+      .map(error => failed(error.toString))
+  }
+
   def getContractState(
       blockFlow: BlockFlow,
       address: Address.Contract,

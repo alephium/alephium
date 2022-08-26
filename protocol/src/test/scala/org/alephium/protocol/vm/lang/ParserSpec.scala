@@ -251,7 +251,7 @@ class ParserSpec extends AlephiumSpec {
 
     val parsed1 = fastparse
       .parse(
-        """@using(preapprovedAssets = true)
+        """@using(preapprovedAssets = true, readonly = false)
           |pub fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }
           |""".stripMargin,
         StatelessParser.func(_)
@@ -262,6 +262,8 @@ class ParserSpec extends AlephiumSpec {
     parsed1.isPublic is true
     parsed1.usePreapprovedAssets is true
     parsed1.useAssetsInContract is false
+    parsed1.usePermissionCheck is true
+    parsed1.useReadonly is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
 
@@ -278,13 +280,15 @@ class ParserSpec extends AlephiumSpec {
     parsed2.isPublic is true
     parsed2.usePreapprovedAssets is true
     parsed2.useAssetsInContract is true
+    parsed2.usePermissionCheck is true
+    parsed2.useReadonly is false
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
 
     info("More use annotation")
     val parsed3 = fastparse
       .parse(
-        """@using(assetsInContract = true)
+        """@using(assetsInContract = true, readonly = true)
           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
         StatelessParser.func(_)
       )
@@ -292,6 +296,17 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed3.usePreapprovedAssets is false
     parsed3.useAssetsInContract is true
+    parsed3.usePermissionCheck is true
+    parsed3.useReadonly is true
+
+    val error = intercept[Compiler.Error](
+      fastparse.parse(
+        """@using(assetsInContract = true)
+          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
+        StatelessParser.assetScriptFunc(_)
+      )
+    )
+    error.message is "AssetScript does not support using annotation"
   }
 
   it should "parser contract initial states" in {
@@ -664,6 +679,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
+            false,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -785,6 +801,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
+            false,
             Seq.empty,
             Seq.empty,
             None
@@ -830,6 +847,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
+            false,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -865,6 +883,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
+            false,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -904,6 +923,7 @@ class ParserSpec extends AlephiumSpec {
       false,
       false,
       permissionCheck,
+      false,
       Seq.empty,
       Seq.empty,
       if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -916,6 +936,7 @@ class ParserSpec extends AlephiumSpec {
       false,
       false,
       permissionCheck,
+      false,
       Seq.empty,
       Seq.empty,
       if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -968,14 +989,20 @@ class ParserSpec extends AlephiumSpec {
       val extended =
         fastparse.parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
       val fooContract = extended.contracts(0)
+      val annotations = Seq(
+        Annotation(
+          Ident(Parser.usingAnnotationId),
+          Seq(AnnotationField(Ident(Parser.usePermissionCheckKey), Val.False))
+        )
+      )
       fooContract is Contract(
         true,
         TypeId("Foo"),
         Seq.empty,
         Seq.empty,
         Seq(
-          barFuncDef(true, false),
-          fooFuncDef(false, false)
+          barFuncDef(true, false).copy(annotations = annotations),
+          fooFuncDef(false, false).copy(annotations = annotations)
         ),
         Seq.empty,
         Seq.empty,
@@ -999,6 +1026,7 @@ class ParserSpec extends AlephiumSpec {
         usePreapprovedAssets,
         false,
         true,
+        false,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))

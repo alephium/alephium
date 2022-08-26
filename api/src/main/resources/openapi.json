@@ -5922,6 +5922,257 @@
         }
       }
     },
+    "/contracts/compile-project": {
+      "post": {
+        "tags": [
+          "Contracts"
+        ],
+        "summary": "Compile a project",
+        "operationId": "postContractsCompile-project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Project"
+              },
+              "example": {
+                "code": "Contract Foo() {\n pub fn foo() -> () {}\n }\n TxScript Main(id: ByteVec) {\n Foo(id).foo() \n}"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompileProjectResult"
+                },
+                "example": {
+                  "contracts": [
+                    {
+                      "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "fields": {
+                        "names": [
+                          "aa",
+                          "bb",
+                          "cc",
+                          "dd",
+                          "ee"
+                        ],
+                        "types": [
+                          "Bool",
+                          "U256",
+                          "I256",
+                          "ByteVec",
+                          "Address"
+                        ],
+                        "isMutable": [
+                          false,
+                          true,
+                          false,
+                          true,
+                          false
+                        ]
+                      },
+                      "functions": [
+                        {
+                          "name": "bar",
+                          "usePreapprovedAssets": false,
+                          "useAssetsInContract": false,
+                          "isPublic": true,
+                          "paramNames": [
+                            "a",
+                            "b",
+                            "c",
+                            "d",
+                            "e"
+                          ],
+                          "paramTypes": [
+                            "Bool",
+                            "U256",
+                            "I256",
+                            "ByteVec",
+                            "Address"
+                          ],
+                          "paramIsMutable": [
+                            false,
+                            true,
+                            false,
+                            true,
+                            false
+                          ],
+                          "returnTypes": [
+                            "U256",
+                            "I256",
+                            "ByteVec",
+                            "Address"
+                          ]
+                        }
+                      ],
+                      "events": [
+                        {
+                          "name": "Bar",
+                          "fieldNames": [
+                            "a",
+                            "b",
+                            "d",
+                            "e"
+                          ],
+                          "fieldTypes": [
+                            "Bool",
+                            "U256",
+                            "ByteVec",
+                            "Address"
+                          ]
+                        }
+                      ],
+                      "warnings": [
+                        "Found unused fields in Foo: a"
+                      ]
+                    }
+                  ],
+                  "scripts": [
+                    {
+                      "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "fields": {
+                        "names": [
+                          "aa",
+                          "bb",
+                          "cc",
+                          "dd",
+                          "ee"
+                        ],
+                        "types": [
+                          "Bool",
+                          "U256",
+                          "I256",
+                          "ByteVec",
+                          "Address"
+                        ],
+                        "isMutable": [
+                          false,
+                          true,
+                          false,
+                          true,
+                          false
+                        ]
+                      },
+                      "functions": [
+                        {
+                          "name": "bar",
+                          "usePreapprovedAssets": false,
+                          "useAssetsInContract": false,
+                          "isPublic": true,
+                          "paramNames": [
+                            "a",
+                            "b",
+                            "c",
+                            "d",
+                            "e"
+                          ],
+                          "paramTypes": [
+                            "Bool",
+                            "U256",
+                            "I256",
+                            "ByteVec",
+                            "Address"
+                          ],
+                          "paramIsMutable": [
+                            false,
+                            true,
+                            false,
+                            true,
+                            false
+                          ],
+                          "returnTypes": [
+                            "U256",
+                            "I256",
+                            "ByteVec",
+                            "Address"
+                          ]
+                        }
+                      ],
+                      "warnings": [
+                        "Found unused fields in Foo: a"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/contracts/unsigned-tx/deploy-contract": {
       "post": {
         "tags": [
@@ -8805,6 +9056,27 @@
           }
         }
       },
+      "CompileProjectResult": {
+        "required": [
+          "contracts",
+          "scripts"
+        ],
+        "type": "object",
+        "properties": {
+          "contracts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompileContractResult"
+            }
+          },
+          "scripts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompileScriptResult"
+            }
+          }
+        }
+      },
       "CompileScriptResult": {
         "required": [
           "bytecodeTemplate",
@@ -9604,6 +9876,17 @@
             "format": "int32"
           },
           "type": {
+            "type": "string"
+          }
+        }
+      },
+      "Project": {
+        "required": [
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
             "type": "string"
           }
         }

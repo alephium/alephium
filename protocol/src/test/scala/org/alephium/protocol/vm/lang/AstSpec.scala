@@ -20,10 +20,15 @@ import scala.collection.mutable
 
 import org.alephium.protocol.vm.lang.Ast.MultiContract
 import org.alephium.util.AlephiumSpec
+import org.alephium.util.AVector
 
 class AstSpec extends AlephiumSpec {
 
   behavior of "Permission check"
+
+  def permissionCheckWarnings(warnings: AVector[String]): AVector[String] = {
+    warnings.filter(_.startsWith("No permission check"))
+  }
 
   it should "detect direct permission check" in {
     val code =
@@ -118,9 +123,11 @@ class AstSpec extends AlephiumSpec {
     val state     = Compiler.State.buildFor(contracts, 0)
     val contract  = contracts.contracts(0).asInstanceOf[Ast.Contract]
     contract.genCode(state)
-    val interallCalls = state.internalCalls.map { case (caller, callees) =>
-      caller.name -> callees.map(_.name).toSeq.sorted
-    }
+    val interallCalls = state.internalCalls
+      .map { case (caller, callees) =>
+        caller.name -> callees.view.filterNot(_.isBuiltIn).map(_.name).toSeq.sorted
+      }
+      .filter(_._2.nonEmpty)
     interallCalls is mutable.HashMap(
       "a" -> Seq("noCheck"),
       "b" -> Seq("check"),
@@ -211,7 +218,7 @@ class AstSpec extends AlephiumSpec {
 
   it should "check permission for external calls" in new ExternalCallsFixture {
     val (_, _, warnings) = Compiler.compileContractFull(externalCalls, 0).rightValue
-    warnings.toSet is Set(
+    permissionCheckWarnings(warnings).toSet is Set(
       MultiContract.noPermissionCheckMsg("InternalCalls", "c"),
       MultiContract.noPermissionCheckMsg("InternalCalls", "f"),
       MultiContract.noPermissionCheckMsg("InternalCalls", "g")
@@ -240,23 +247,40 @@ class AstSpec extends AlephiumSpec {
 
   it should "not check permission for mutual recursive calls" in new MutualRecursionFixture {
     val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
-    warnings.toSet is Set(MultiContract.noPermissionCheckMsg("Bar", "a"))
+    permissionCheckWarnings(warnings).toSet is Set(
+      MultiContract.noPermissionCheckMsg("Bar", "a")
+    )
   }
 
   it should "test permission check for interface" in {
     {
-      info("Implemented function should have permission check")
+      info("All contracts that inherit from the interface should have permission check")
       val code =
         s"""
-           |Contract Bar() implements Foo {
-           |  pub fn foo() -> () {}
+           |Interface Base {
+           |  pub fn base() -> ()
            |}
-           |Interface Foo {
-           |  pub fn foo() -> ()
+           |Contract Foo() implements Base {
+           |  pub fn base() -> () {
+           |    checkPermission!(true, 0)
+           |  }
+           |}
+           |Abstract Contract A() implements Base {
+           |  fn a() -> () {
+           |    checkPermission!(true, 0)
+           |  }
+           |}
+           |Contract Bar() extends A() {
+           |  pub fn base() -> () {
+           |    a()
+           |  }
+           |}
+           |Contract Baz() implements Base {
+           |  pub fn base() -> () {}
            |}
            |""".stripMargin
-      val error = Compiler.compileContractFull(code, 0).leftValue
-      error.message is MultiContract.noPermissionCheckMsg("Bar", "foo")
+      val error = Compiler.compileProject(code).leftValue
+      error.message is MultiContract.noPermissionCheckMsg("Baz", "base")
     }
 
     {
@@ -285,14 +309,17 @@ class AstSpec extends AlephiumSpec {
       val code =
         s"""
            |Contract Bar() implements Foo {
+           |  @using(readonly = true)
            |  pub fn foo() -> () {
            |    bar()
            |  }
+           |  @using(readonly = true)
            |  fn bar() -> () {
            |    checkPermission!(true, 0)
            |  }
            |}
            |Interface Foo {
+           |  @using(readonly = true)
            |  pub fn foo() -> ()
            |}
            |""".stripMargin
@@ -305,5 +332,50 @@ class AstSpec extends AlephiumSpec {
   it should "display the right warning message for permission check" in {
     MultiContract.noPermissionCheckMsg("Foo", "bar") is
       "No permission check for function: Foo.bar, please use checkPermission!(...) for the function or its private callees."
+  }
+
+  behavior of "Private function usage"
+
+  it should "check if private functions are used" in {
+    val code0 =
+      s"""
+         |Contract Foo() {
+         |  @using(readonly = true)
+         |  fn private0() -> () {}
+         |  @using(readonly = true)
+         |  fn private1() -> () {}
+         |  @using(readonly = true)
+         |  pub fn public() -> () {
+         |    private0()
+         |  }
+         |}
+         |""".stripMargin
+    val (_, _, warnings0) = Compiler.compileContractFull(code0, 0).rightValue
+    warnings0 is AVector("Private function Foo.private1 is not used")
+
+    val code1 =
+      s"""
+         |Abstract Contract Foo() {
+         |  @using(readonly = true)
+         |  fn foo0() -> U256 {
+         |    return 0
+         |  }
+         |  @using(readonly = true)
+         |  fn foo1() -> () {
+         |    let _ = foo0()
+         |  }
+         |}
+         |Contract Bar() extends Foo() {
+         |  @using(readonly = true)
+         |  pub fn bar() -> () { foo1() }
+         |}
+         |Contract Baz() extends Foo() {
+         |  @using(readonly = true)
+         |  pub fn baz() -> () { foo1() }
+         |}
+         |""".stripMargin
+    val (contracts, _) = Compiler.compileProject(code1).rightValue
+    contracts.length is 2
+    contracts.foreach(_._3.isEmpty is true)
   }
 }
