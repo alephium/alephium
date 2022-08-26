@@ -254,7 +254,7 @@ class AstSpec extends AlephiumSpec {
 
   it should "test permission check for interface" in {
     {
-      info("All contracts that inherit from the interface should have permission check")
+      info("all contracts that inherit from the interface should have permission check")
       val code =
         s"""
            |Interface Base {
@@ -284,7 +284,7 @@ class AstSpec extends AlephiumSpec {
     }
 
     {
-      info("not check permission check for interface function calls")
+      info("not check permission check for unimplemented interface function calls")
       def code(permissionCheck: Boolean) =
         s"""
            |Contract Bar() {
@@ -302,6 +302,33 @@ class AstSpec extends AlephiumSpec {
       warnings0.isEmpty is true
       val (_, _, warnings1) = Compiler.compileContractFull(code(false), 0).rightValue
       warnings1.isEmpty is true
+    }
+
+    {
+      info("implemented interface functions should have permission check")
+      def code(permissionCheck: Boolean) =
+        s"""
+           |Contract Bar() {
+           |  @using(readonly = true)
+           |  pub fn bar(fooId: ByteVec) -> () {
+           |    Foo(fooId).foo()
+           |  }
+           |}
+           |Interface Foo {
+           |  @using(readonly = true, permissionCheck = $permissionCheck)
+           |  pub fn foo() -> ()
+           |}
+           |Contract Impl() implements Foo {
+           |  @using(readonly = true, permissionCheck = $permissionCheck)
+           |  pub fn foo() -> () {
+           |    ${if (permissionCheck) "checkPermission!(true, 0)" else ""}
+           |  }
+           |}
+           |""".stripMargin
+      val (_, _, warnings) = Compiler.compileContractFull(code(true), 0).rightValue
+      warnings.isEmpty is true
+      val error = Compiler.compileContractFull(code(false), 0).leftValue
+      error.message is MultiContract.noPermissionCheckMsg("Foo", "foo")
     }
 
     {

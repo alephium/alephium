@@ -1991,17 +1991,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo() implements Bar {
            |  @using(permissionCheck = $flag)
            |  fn bar() -> () {
-           |    return
+           |    ${if (flag) "checkPermission!(true, 0)" else ""}
            |  }
            |}
            |Interface Bar {
-           |  @using(permissionCheck = false)
+           |  @using(permissionCheck = true)
            |  fn bar() -> ()
            |}
            |""".stripMargin
-      Compiler.compileContract(code(false)).isRight is true
+      Compiler.compileContract(code(true)).isRight is true
       Compiler
-        .compileContract(code(true))
+        .compileContract(code(false))
         .leftValue
         .message is "Function bar is implemented with wrong signature"
     }
@@ -2131,15 +2131,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val foo2: String =
         s"""
            |Interface Foo2 {
-           |  @using(permissionCheck = false)
            |  fn foo2() -> ()
            |}
            |""".stripMargin
       val bar1: String =
         s"""
            |Contract Bar1() extends Foo1() implements Foo2 {
-           |  @using(permissionCheck = false)
-           |  fn foo2() -> () {}
+           |  fn foo2() -> () {
+           |    checkPermission!(true, 0)
+           |  }
            |}
            |$foo1
            |$foo2
@@ -2147,8 +2147,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val bar2: String =
         s"""
            |Contract Bar2() extends Foo1() implements Foo2 {
-           |  @using(permissionCheck = false)
-           |  fn foo2() -> () {}
+           |  fn foo2() -> () {
+           |    checkPermission!(true, 0)
+           |  }
            |}
            |$foo1
            |$foo2
