@@ -509,7 +509,7 @@ object Ast {
     def isPrivate: Boolean        = !isPublic
     val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
-    private var usedVars: Option[Set[String]] = None
+//    private var usedVars: Option[Set[String]] = None
 
     def signature: String = {
       val publicPrefix = if (isPublic) "pub " else ""
@@ -557,15 +557,16 @@ object Ast {
       args.foreach(arg =>
         state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, isGenerated = false)
       )
-      usedVars match {
-        case Some(vars) => // the function has been compiled before
-          state.addUsedVars(vars)
-          body.foreach(_.check(state))
-        case None =>
-          val prevUsedVars = mutable.Set.from(state.usedVars)
-          body.foreach(_.check(state))
-          usedVars = Some(Set.from(state.usedVars.diff(prevUsedVars)))
-      }
+      body.foreach(_.check(state))
+//      usedVars match {
+//        case Some(vars) => // the function has been compiled before
+//          state.addUsedVars(vars)
+//          body.foreach(_.check(state))
+//        case None =>
+//          val prevUsedVars = mutable.Set.from(state.usedVars)
+//          body.foreach(_.check(state))
+//          usedVars = Some(Set.from(state.usedVars.diff(prevUsedVars)))
+//      }
       state.checkUnusedLocalVars(id)
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
@@ -992,8 +993,8 @@ object Ast {
           )
         )
       // skip check readonly for main function
-      val methodsExceptMain = methods.drop(1)
-      val funcsExceptMain   = funcs.drop(1)
+      val methodsExceptMain = methods.tail
+      val funcsExceptMain   = funcs.tail
       methodsExceptMain.foreachWithIndex { case (method, index) =>
         funcsExceptMain(index).checkReadonly(state, method.instrs)
       }
@@ -1312,11 +1313,12 @@ object Ast {
       contracts.foreach {
         case interface: ContractInterface =>
           checkInterfacePermissionCheck(interface.ident, permissionCheckTables)
-          val table = mutable.Map.from(interface.funcs.map(_.id -> true))
+          val table =
+            mutable.Map.from(interface.funcs.map(func => func.id -> func.usePermissionCheck))
           permissionCheckTables.update(interface.ident, table)
         case _ => ()
       }
-      statefulContracts.map { case ((statefulContract, contract, state, index)) =>
+      statefulContracts.map { case (statefulContract, contract, state, index) =>
         checkExternalCallPermissions(state, contract, permissionCheckTables)
         (statefulContract, contract, state.getWarnings, index)
       }

@@ -284,7 +284,7 @@ class AstSpec extends AlephiumSpec {
     }
 
     {
-      info("not check permission check for interface function calls")
+      info("check permission check for interface function calls")
       def code(permissionCheck: Boolean) =
         s"""
            |Contract Bar() {
@@ -301,7 +301,9 @@ class AstSpec extends AlephiumSpec {
       val (_, _, warnings0) = Compiler.compileContractFull(code(true), 0).rightValue
       warnings0.isEmpty is true
       val (_, _, warnings1) = Compiler.compileContractFull(code(false), 0).rightValue
-      warnings1.isEmpty is true
+      warnings1 is AVector(
+        "No permission check for function: Foo.foo, please use checkPermission!(...) for the function or its private callees."
+      )
     }
 
     {
