@@ -3167,6 +3167,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Invalid interface function calls")
+      def code(readonly: Boolean): String =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo(contractId: ByteVec) -> () {
+           |    Bar(contractId).bar()
+           |  }
+           |}
+           |Interface Bar {
+           |  @using(readonly = $readonly)
+           |  pub fn bar() -> ()
+           |}
+           |""".stripMargin
+      Compiler.compileContractFull(code(true)).isRight is true
+      val error = Compiler.compileContractFull(code(false)).leftValue
+      error.message is "Readonly function foo have invalid external calls: Bar.bar"
+    }
+
+    {
       info("Warning for readonly functions")
       val code =
         s"""
