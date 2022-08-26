@@ -1288,21 +1288,12 @@ object Ast {
           parents.contains(interfaceTypeId) && isContract(child)
         }.keys.toSeq)
         .getOrElse(Seq.empty)
-      if (children.nonEmpty) {
-        val interface = getInterface(interfaceTypeId)
-        children.foreach { contractId =>
-          val table = permissionCheckTables(contractId)
-          interface.funcs.foreach { func =>
-            if (!func.usePermissionCheck) {
-              throw Compiler.Error(
-                MultiContract.noPermissionCheckMsg(interfaceTypeId.name, func.id.name)
-              )
-            }
-            if (!table(func.id)) {
-              throw Compiler.Error(
-                MultiContract.noPermissionCheckMsg(contractId.name, func.id.name)
-              )
-            }
+      val interface = getInterface(interfaceTypeId)
+      children.foreach { case contractId =>
+        val table = permissionCheckTables(contractId)
+        interface.funcs.foreach { func =>
+          if (func.usePermissionCheck && !table(func.id)) {
+            throw Compiler.Error(MultiContract.noPermissionCheckMsg(contractId.name, func.id.name))
           }
         }
       }
