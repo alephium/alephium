@@ -254,18 +254,33 @@ class AstSpec extends AlephiumSpec {
 
   it should "test permission check for interface" in {
     {
-      info("Implemented function should have permission check")
+      info("All contracts that inherit from the interface should have permission check")
       val code =
         s"""
-           |Contract Bar() implements Foo {
-           |  pub fn foo() -> () {}
+           |Interface Base {
+           |  pub fn base() -> ()
            |}
-           |Interface Foo {
-           |  pub fn foo() -> ()
+           |Contract Foo() implements Base {
+           |  pub fn base() -> () {
+           |    checkPermission!(true, 0)
+           |  }
+           |}
+           |Abstract Contract A() implements Base {
+           |  fn a() -> () {
+           |    checkPermission!(true, 0)
+           |  }
+           |}
+           |Contract Bar() extends A() {
+           |  pub fn base() -> () {
+           |    a()
+           |  }
+           |}
+           |Contract Baz() implements Base {
+           |  pub fn base() -> () {}
            |}
            |""".stripMargin
-      val error = Compiler.compileContractFull(code, 0).leftValue
-      error.message is MultiContract.noPermissionCheckMsg("Bar", "foo")
+      val error = Compiler.compileProject(code).leftValue
+      error.message is MultiContract.noPermissionCheckMsg("Baz", "base")
     }
 
     {
@@ -322,9 +337,9 @@ class AstSpec extends AlephiumSpec {
   behavior of "Private function usage"
 
   it should "check if private functions are used" in {
-    def code(prefix: String) =
+    val code0 =
       s"""
-         |$prefix Contract Foo() {
+         |Contract Foo() {
          |  @using(readonly = true)
          |  fn private0() -> () {}
          |  @using(readonly = true)
@@ -335,10 +350,32 @@ class AstSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val (_, _, warnings0) = Compiler.compileContractFull(code(""), 0).rightValue
+    val (_, _, warnings0) = Compiler.compileContractFull(code0, 0).rightValue
     warnings0 is AVector("Private function Foo.private1 is not used")
 
-    val (_, _, warnings1) = Compiler.compileContractFull(code("Abstract"), 0).rightValue
-    warnings1.isEmpty is true
+    val code1 =
+      s"""
+         |Abstract Contract Foo() {
+         |  @using(readonly = true)
+         |  fn foo0() -> U256 {
+         |    return 0
+         |  }
+         |  @using(readonly = true)
+         |  fn foo1() -> () {
+         |    let _ = foo0()
+         |  }
+         |}
+         |Contract Bar() extends Foo() {
+         |  @using(readonly = true)
+         |  pub fn bar() -> () { foo1() }
+         |}
+         |Contract Baz() extends Foo() {
+         |  @using(readonly = true)
+         |  pub fn baz() -> () { foo1() }
+         |}
+         |""".stripMargin
+    val (contracts, _) = Compiler.compileProject(code1).rightValue
+    contracts.length is 2
+    contracts.foreach(_._3.isEmpty is true)
   }
 }

@@ -264,11 +264,11 @@ object Ast {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
-      state.addInternalCall(id)
       funcInfo.getReturnType(args.flatMap(_.getType(state)))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      state.addInternalCall(id)
       val func = state.getFunc(id)
       genApproveCode(state, func) ++
         args.flatMap(_.genCode(state)) ++
@@ -509,6 +509,8 @@ object Ast {
     def isPrivate: Boolean        = !isPublic
     val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
+    private var usedVars: Option[Set[String]] = None
+
     def signature: String = {
       val publicPrefix = if (isPublic) "pub " else ""
       val assetModifier = {
@@ -555,12 +557,20 @@ object Ast {
       args.foreach(arg =>
         state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, isGenerated = false)
       )
-      body.foreach(_.check(state))
+      usedVars match {
+        case Some(vars) => // the function has been compiled before
+          state.addUsedVars(vars)
+          body.foreach(_.check(state))
+        case None =>
+          val prevUsedVars = mutable.Set.from(state.usedVars)
+          body.foreach(_.check(state))
+          usedVars = Some(Set.from(state.usedVars.diff(prevUsedVars)))
+      }
       state.checkUnusedLocalVars(id)
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
 
-    def checkReadonly(state: Compiler.State[Ctx], instrs: Seq[Instr[Ctx]]): Unit = {
+    def checkReadonly(state: Compiler.State[Ctx], instrs: AVector[Instr[Ctx]]): Unit = {
       val changeState = instrs.exists {
         case _: StoreField | _: StoreFieldByIndex.type | _: LogInstr => true
         case _                                                       => false
@@ -604,8 +614,7 @@ object Ast {
       state.setFuncScope(id)
       check(state)
 
-      val instrs = body.flatMap(_.genCode(state))
-      checkReadonly(state, instrs)
+      val instrs    = body.flatMap(_.genCode(state))
       val localVars = state.getLocalVars(id)
       ContractAssets.checkCodeUsingContractAssets(instrs, useAssetsInContract, id.name)
       Method[Ctx](
@@ -972,15 +981,24 @@ object Ast {
     def getTemplateVarsMutability(): AVector[Boolean] =
       AVector.from(templateVars.view.map(_.isMutable))
 
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
-      StatefulScript
-        .from(getMethods(state))
+      val methods = getMethods(state)
+      val script = StatefulScript
+        .from(methods)
         .getOrElse(
           throw Compiler.Error(
             "Expect the 1st function to be public and the other functions to be private for tx script"
           )
         )
+      // skip check readonly for main function
+      val methodsExceptMain = methods.tail
+      val funcsExceptMain   = funcs.tail
+      methodsExceptMain.foreachWithIndex { case (method, index) =>
+        funcsExceptMain(index).checkReadonly(state, method.instrs)
+      }
+      script
     }
   }
 
@@ -1050,22 +1068,15 @@ object Ast {
     }
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
-      val unimplementedFuncs = funcs.view.filter(_.bodyOpt.isEmpty).map(_.id.name)
-      if (unimplementedFuncs.nonEmpty) {
-        throw new Compiler.Error(
-          s"These functions are not implemented in contract ${ident.name}: ${unimplementedFuncs.mkString(",")}"
-        )
-      } else {
-        check(state)
-        val contract = StatefulContract(
-          Type.flattenTypeLength(fields.map(_.tpe)),
-          getMethods(state)
-        )
-        if (!isAbstract) { // We don't check private functions in abstract contracts
-          checkIfPrivateMethodsUsed(state)
-        }
-        contract
+      assume(!isAbstract)
+      check(state)
+      val methods  = getMethods(state)
+      val contract = StatefulContract(Type.flattenTypeLength(fields.map(_.tpe)), methods)
+      methods.foreachWithIndex { case (method, index) =>
+        funcs(index).checkReadonly(state, method.instrs)
       }
+      checkIfPrivateMethodsUsed(state)
+      contract
     }
 
     // the state must have been updated in the check pass
@@ -1101,18 +1112,6 @@ object Ast {
       }
       permissionCheckedTable
     }
-
-    def validateInterfaceFuncsPermissionCheck(
-        interfaceFuncsSize: Int,
-        state: Compiler.State[StatefulContext]
-    ): Unit = {
-      val permissionTable = buildPermissionCheckTable(state)
-      funcs.slice(0, interfaceFuncsSize).foreach { case func =>
-        if (func.usePermissionCheck && !permissionTable(func.id)) {
-          throw Compiler.Error(MultiContract.noPermissionCheckMsg(ident.name, func.id.name))
-        }
-      }
-    }
   }
 
   final case class ContractInterface(
@@ -1136,7 +1135,10 @@ object Ast {
     }
   }
 
-  final case class MultiContract(contracts: Seq[ContractWithState]) {
+  final case class MultiContract(
+      contracts: Seq[ContractWithState],
+      dependencies: Option[Map[TypeId, Seq[TypeId]]]
+  ) {
     def get(contractIndex: Int): ContractWithState = {
       if (contractIndex >= 0 && contractIndex < contracts.size) {
         contracts(contractIndex)
@@ -1153,10 +1155,18 @@ object Ast {
       }
     }
 
-    private def getInterfaceOpt(typeId: TypeId): Option[ContractInterface] = {
+    private def isContract(typeId: TypeId): Boolean = {
+      contracts.find(_.ident == typeId) match {
+        case None => throw Compiler.Error(s"Contract $typeId does not exist")
+        case Some(contract: Contract) if !contract.isAbstract => true
+        case _                                                => false
+      }
+    }
+
+    private def getInterface(typeId: TypeId): ContractInterface = {
       getContract(typeId) match {
-        case interface: ContractInterface => Some(interface)
-        case _                            => None
+        case interface: ContractInterface => interface
+        case _ => throw Compiler.Error(s"Interface ${typeId.name} does not exist")
       }
     }
 
@@ -1223,7 +1233,14 @@ object Ast {
           val (funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
           ContractInterface(i.ident, funcs, events, i.inheritances)
       }
-      MultiContract(newContracts)
+      val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
+      MultiContract(newContracts, Some(dependencies))
+    }
+
+    def genStatefulScripts(): AVector[(StatefulScript, TxScript, AVector[String])] = {
+      AVector.from(contracts.view.zipWithIndex.collect { case (_: TxScript, index) =>
+        genStatefulScript(index)
+      })
     }
 
     def genStatefulScript(contractIndex: Int): (StatefulScript, TxScript, AVector[String]) = {
@@ -1237,37 +1254,17 @@ object Ast {
     }
 
     private[vm] def checkExternalCallPermissions(
-        states: AVector[Compiler.State[StatefulContext]],
-        contractIndex: Int,
-        contract: Contract
+        contractState: Compiler.State[StatefulContext],
+        contract: Contract,
+        permissionCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
     ): Unit = {
-      val contractState = states(contractIndex)
-      val externalCalls =
-        contractState.externalCalls.values.foldLeft(mutable.Set.empty[(TypeId, FuncId)])(_ ++ _)
-      val externalCallPermissionTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
-      externalCalls.foreach { case (calleeTypeId, _) =>
-        if (!externalCallPermissionTables.contains(calleeTypeId)) {
-          getContract(calleeTypeId) match {
-            case calleeContract: Contract =>
-              val calleeContractIndex = contracts.indexWhere(_.ident == calleeContract.ident)
-              val calleeContractState = states(calleeContractIndex)
-              val table = calleeContract.buildPermissionCheckTable(calleeContractState)
-              externalCallPermissionTables.update(calleeTypeId, table)
-            case calleeInterface: ContractInterface =>
-              // Skip permission checks for interface function calls
-              val table = mutable.Map.from(calleeInterface.funcs.map(_.id -> true))
-              externalCallPermissionTables.update(calleeTypeId, table)
-            case _ => ()
-          }
-        }
-      }
       val allNoPermissionChecks: mutable.Set[(TypeId, FuncId)] = mutable.Set.empty
       contract.funcs.foreach { func =>
         // To check that external calls should have permission checks
         contractState.externalCalls.get(func.id) match {
           case Some(callees) if callees.nonEmpty =>
             callees.foreach { case funcRef @ (typeId, funcId) =>
-              if (!externalCallPermissionTables(typeId)(funcId)) {
+              if (!permissionCheckTables(typeId)(funcId)) {
                 allNoPermissionChecks.addOne(funcRef)
               }
             }
@@ -1281,27 +1278,65 @@ object Ast {
       }
     }
 
+    def checkInterfacePermissionCheck(
+        interfaceTypeId: TypeId,
+        permissionCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
+    ): Unit = {
+      assume(dependencies.isDefined)
+      val children = dependencies
+        .map(_.filter { case (child, parents) =>
+          parents.contains(interfaceTypeId) && isContract(child)
+        }.keys.toSeq)
+        .getOrElse(Seq.empty)
+      val interface = getInterface(interfaceTypeId)
+      children.foreach { case contractId =>
+        val table = permissionCheckTables(contractId)
+        interface.funcs.foreach { func =>
+          if (func.usePermissionCheck && !table(func.id)) {
+            throw Compiler.Error(MultiContract.noPermissionCheckMsg(contractId.name, func.id.name))
+          }
+        }
+      }
+    }
+
+    def genStatefulContracts(): AVector[(StatefulContract, Contract, AVector[String], Int)] = {
+      val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
+      val permissionCheckTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
+      val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
+        case (contract: Contract, index) if !contract.isAbstract =>
+          val state            = states(index)
+          val statefulContract = contract.genCode(state)
+          val table            = contract.buildPermissionCheckTable(state)
+          permissionCheckTables.update(contract.ident, table)
+          (statefulContract, contract, state, index)
+      })
+      contracts.foreach {
+        case interface: ContractInterface =>
+          checkInterfacePermissionCheck(interface.ident, permissionCheckTables)
+          val table = mutable.Map.from(interface.funcs.map(_.id -> true))
+          permissionCheckTables.update(interface.ident, table)
+        case _ => ()
+      }
+      statefulContracts.map { case (statefulContract, contract, state, index) =>
+        checkExternalCallPermissions(state, contract, permissionCheckTables)
+        (statefulContract, contract, state.getWarnings, index)
+      }
+    }
+
     def genStatefulContract(contractIndex: Int): (StatefulContract, Contract, AVector[String]) = {
       get(contractIndex) match {
         case contract: Contract =>
-          val states       = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
-          val state        = states(contractIndex)
-          val contractCode = contract.genCode(state)
-          val interfaceFuncsSize = contract.inheritances.view.map { case inheritance =>
-            getInterfaceOpt(inheritance.parentId).map(_.funcs.size).getOrElse(0)
-          }.sum
-          contract.validateInterfaceFuncsPermissionCheck(interfaceFuncsSize, state)
-          states.foreachWithIndex { case (state, index) =>
-            if (index != contractIndex) {
-              contracts(index) match {
-                case anotherContract: Contract if !anotherContract.isAbstract =>
-                  anotherContract.genCode(state)
-                case _ => ()
-              }
-            }
+          if (contract.isAbstract) {
+            throw Compiler.Error(
+              s"Unable to generate code for abstract contract ${contract.ident.name}"
+            )
           }
-          checkExternalCallPermissions(states, contractIndex, contract)
-          (contractCode, contract, state.getWarnings)
+          val statefulContracts = genStatefulContracts()
+          statefulContracts.find(_._4 == contractIndex) match {
+            case Some(v) => (v._1, v._2, v._3)
+            case None => // should never happen
+              throw Compiler.Error(s"Failed to compile contract ${contract.ident.name}")
+          }
         case _: TxScript => throw Compiler.Error(s"The code is for TxScript, not for Contract")
         case _: ContractInterface =>
           throw Compiler.Error(s"The code is for Interface, not for Contract")

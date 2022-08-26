@@ -1474,9 +1474,40 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
     result.warnings is AVector(
       "Found unused variables in Foo: foo.a",
-      "Function foo is readonly, please use @using(readonly = true) for the function",
-      "Found unused fields in Foo: x"
+      "Found unused fields in Foo: x",
+      "Function foo is readonly, please use @using(readonly = true) for the function"
     )
+  }
+
+  it should "compile project" in new Fixture {
+    val serverUtils = new ServerUtils()
+    val rawCode =
+      s"""
+         |Interface Foo {
+         |  pub fn foo() -> ()
+         |}
+         |Contract Bar() implements Foo {
+         |  pub fn foo() -> () {
+         |    checkPermission!(true, 0)
+         |  }
+         |}
+         |TxScript Main(id: ByteVec) {
+         |  Bar(id).foo()
+         |}
+         |""".stripMargin
+    val (contracts, scripts) = Compiler.compileProject(rawCode).rightValue
+    val query                = Compile.Project(rawCode)
+    val result               = serverUtils.compileProject(query).rightValue
+
+    result.contracts.length is 1
+    contracts.length is 1
+    val contractCode = result.contracts(0).bytecode
+    contractCode is Hex.toHexString(serialize(contracts(0)._1))
+
+    result.scripts.length is 1
+    scripts.length is 1
+    val scriptCode = result.scripts(0).bytecodeTemplate
+    scriptCode is scripts(0)._1.toTemplateString()
   }
 
   it should "compile script" in new Fixture {
@@ -1528,7 +1559,6 @@ class ServerUtilsSpec extends AlephiumSpec {
       val result = serverUtils.compileScript(query).rightValue
       result.warnings is AVector(
         "Found unused variables in Main: main.c",
-        "Function main is readonly, please use @using(readonly = true) for the function",
         "Found unused fields in Main: b"
       )
     }

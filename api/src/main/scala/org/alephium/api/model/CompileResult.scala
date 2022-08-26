@@ -83,6 +83,22 @@ object CompileContractResult {
   }
 }
 
+final case class CompileProjectResult(
+    contracts: AVector[CompileContractResult],
+    scripts: AVector[CompileScriptResult]
+)
+
+object CompileProjectResult {
+  def from(
+      contracts: AVector[(StatefulContract, Ast.Contract, AVector[String])],
+      scripts: AVector[(StatefulScript, Ast.TxScript, AVector[String])]
+  ): CompileProjectResult = {
+    val compiledContracts = contracts.map(c => CompileContractResult.from(c._1, c._2, c._3))
+    val compiledScripts   = scripts.map(s => CompileScriptResult.from(s._1, s._2, s._3))
+    CompileProjectResult(compiledContracts, compiledScripts)
+  }
+}
+
 object CompileResult {
 
   final case class FieldsSig(

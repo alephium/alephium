@@ -36,7 +36,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileAssetScript(script).isRight is true
+    val (_, warnings) = Compiler.compileAssetScript(script).rightValue
+    warnings.isEmpty is true
   }
 
   it should "parse tx script" in {
@@ -2553,7 +2554,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Contract constant variables")
       val foo =
         s"""
-           |Abstract Contract Foo() {
+           |Contract Foo() {
            |  const C0 = 0
            |  const C1 = #00
            |  pub fn foo() -> () {
@@ -2633,7 +2634,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Contract enums")
       val foo =
         s"""
-           |Abstract Contract Foo() {
+           |Contract Foo() {
            |  enum FooErrorCodes {
            |    Error0 = 0
            |    Error1 = 1
@@ -2681,7 +2682,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |AssetScript Foo {
-           |  @using(readonly = true)
            |  pub fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 2
@@ -2823,6 +2823,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler.compileContractFull(code).rightValue._3 is
         AVector("Found unused constants in Foo: Chain.Eth, Language.Solidity")
     }
+
+    {
+      info("No warnings for multiple contracts inherit from the same parent")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  @using(readonly = true)
+           |  fn foo(x: U256) -> () {
+           |    assert!(x == 0, 0)
+           |  }
+           |}
+           |Contract Bar() extends Foo() {
+           |  @using(readonly = true)
+           |  pub fn bar() -> () { foo(0) }
+           |}
+           |Contract Baz() extends Foo() {
+           |  @using(readonly = true)
+           |  pub fn baz() -> () { foo(0) }
+           |}
+           |""".stripMargin
+      val (contracts, _) = Compiler.compileProject(code).rightValue
+      contracts.length is 2
+      contracts.foreach(_._3.isEmpty is true)
+    }
   }
 
   it should "test anonymous variable definitions" in new Fixture {
@@ -2898,16 +2922,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "not generate code if contract have unimplemented functions" in {
+  it should "not generate code for abstract contract" in {
     val foo =
       s"""
          |Abstract Contract Foo() {
-         |  pub fn foo() -> ()
-         |  pub fn bar() -> ()
+         |  pub fn foo() -> () {}
+         |  pub fn bar() -> () {}
          |}
          |""".stripMargin
     Compiler.compileContract(foo).leftValue.message is
-      "These functions are not implemented in contract Foo: foo,bar"
+      "Unable to generate code for abstract contract Foo"
   }
 
   "unused constants and enums" should "have no effect on code generation" in {
@@ -2964,6 +2988,18 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "test compile readonly functions" in {
+    {
+      info("Skip check readonly for script main function")
+      val code =
+        s"""
+           |TxScript Main {
+           |  assert!(true, 0)
+           |}
+           |""".stripMargin
+      val (_, _, warnings) = Compiler.compileTxScriptFull(code).rightValue
+      warnings.isEmpty is true
+    }
+
     {
       info("Simple readonly functions")
       val code =
@@ -3130,6 +3166,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Invalid interface function calls")
+      def code(readonly: Boolean): String =
+        s"""
+           |Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo(contractId: ByteVec) -> () {
+           |    Bar(contractId).bar()
+           |  }
+           |}
+           |Interface Bar {
+           |  @using(readonly = $readonly)
+           |  pub fn bar() -> ()
+           |}
+           |""".stripMargin
+      Compiler.compileContractFull(code(true)).isRight is true
+      val error = Compiler.compileContractFull(code(false)).leftValue
+      error.message is "Readonly function foo have invalid external calls: Bar.bar"
+    }
+
+    {
       info("Warning for readonly functions")
       val code =
         s"""
@@ -3142,5 +3198,43 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         "Function foo is readonly, please use @using(readonly = true) for the function"
       )
     }
+  }
+
+  trait MultiContractFixture {
+    val code =
+      s"""
+         |Abstract Contract Common() {
+         |  pub fn c() -> () {}
+         |}
+         |Contract Foo() extends Common() {
+         |  pub fn foo() -> () {}
+         |}
+         |TxScript M1(id: ByteVec) {
+         |  Foo(id).foo()
+         |}
+         |Contract Bar() extends Common() {
+         |  pub fn bar() -> () {}
+         |}
+         |TxScript M2(id: ByteVec) {
+         |  Bar(id).bar()
+         |}
+         |""".stripMargin
+    val multiContract = Compiler.compileMultiContract(code).rightValue
+  }
+
+  it should "compile all contracts" in new MultiContractFixture {
+    val contracts = multiContract.genStatefulContracts()
+    contracts.length is 2
+    contracts(0)._2.ident.name is "Foo"
+    contracts(0)._4 is 1
+    contracts(1)._2.ident.name is "Bar"
+    contracts(1)._4 is 3
+  }
+
+  it should "compile all scripts" in new MultiContractFixture {
+    val scripts = multiContract.genStatefulScripts()
+    scripts.length is 2
+    scripts(0)._2.ident.name is "M1"
+    scripts(1)._2.ident.name is "M2"
   }
 }

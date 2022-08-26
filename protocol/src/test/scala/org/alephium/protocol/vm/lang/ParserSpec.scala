@@ -298,6 +298,15 @@ class ParserSpec extends AlephiumSpec {
     parsed3.useAssetsInContract is true
     parsed3.usePermissionCheck is true
     parsed3.useReadonly is true
+
+    val error = intercept[Compiler.Error](
+      fastparse.parse(
+        """@using(assetsInContract = true)
+          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
+        StatelessParser.assetScriptFunc(_)
+      )
+    )
+    error.message is "AssetScript does not support using annotation"
   }
 
   it should "parser contract initial states" in {
@@ -980,14 +989,20 @@ class ParserSpec extends AlephiumSpec {
       val extended =
         fastparse.parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
       val fooContract = extended.contracts(0)
+      val annotations = Seq(
+        Annotation(
+          Ident(Parser.usingAnnotationId),
+          Seq(AnnotationField(Ident(Parser.usePermissionCheckKey), Val.False))
+        )
+      )
       fooContract is Contract(
         true,
         TypeId("Foo"),
         Seq.empty,
         Seq.empty,
         Seq(
-          barFuncDef(true, false),
-          fooFuncDef(false, false)
+          barFuncDef(true, false).copy(annotations = annotations),
+          fooFuncDef(false, false).copy(annotations = annotations)
         ),
         Seq.empty,
         Seq.empty,
