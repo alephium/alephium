@@ -2823,6 +2823,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler.compileContractFull(code).rightValue._3 is
         AVector("Found unused constants in Foo: Chain.Eth, Language.Solidity")
     }
+
+    {
+      info("No warnings for multiple contracts inherit from the same parent")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  @using(readonly = true)
+           |  fn foo(x: U256) -> () {
+           |    assert!(x == 0, 0)
+           |  }
+           |}
+           |Contract Bar() extends Foo() {
+           |  @using(readonly = true)
+           |  pub fn bar() -> () { foo(0) }
+           |}
+           |Contract Baz() extends Foo() {
+           |  @using(readonly = true)
+           |  pub fn baz() -> () { foo(0) }
+           |}
+           |""".stripMargin
+      val (contracts, _) = Compiler.compileProject(code).rightValue
+      contracts.length is 2
+      contracts.foreach(_._3.isEmpty is true)
+    }
   }
 
   it should "test anonymous variable definitions" in new Fixture {

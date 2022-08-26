@@ -981,6 +981,7 @@ object Ast {
     def getTemplateVarsMutability(): AVector[Boolean] =
       AVector.from(templateVars.view.map(_.isMutable))
 
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       check(state)
       val methods = getMethods(state)
@@ -992,8 +993,8 @@ object Ast {
           )
         )
       // skip check readonly for main function
-      val methodsExceptMain = methods.drop(1)
-      val funcsExceptMain   = funcs.drop(1)
+      val methodsExceptMain = methods.tail
+      val funcsExceptMain   = funcs.tail
       methodsExceptMain.foreachWithIndex { case (method, index) =>
         funcsExceptMain(index).checkReadonly(state, method.instrs)
       }
@@ -1316,7 +1317,7 @@ object Ast {
           permissionCheckTables.update(interface.ident, table)
         case _ => ()
       }
-      statefulContracts.map { case ((statefulContract, contract, state, index)) =>
+      statefulContracts.map { case (statefulContract, contract, state, index) =>
         checkExternalCallPermissions(state, contract, permissionCheckTables)
         (statefulContract, contract, state.getWarnings, index)
       }
