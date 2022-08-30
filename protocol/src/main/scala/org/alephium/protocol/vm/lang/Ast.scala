@@ -499,7 +499,7 @@ object Ast {
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean,
-      usePermissionCheck: Boolean,
+      useExternalCallCheck: Boolean,
       useReadonly: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
@@ -532,10 +532,10 @@ object Ast {
     def getArgMutability(): AVector[Boolean]    = AVector.from(args.view.map(_.isMutable))
     def getReturnSignatures(): AVector[String]  = AVector.from(rtypes.view.map(_.signature))
 
-    def hasDirectPermissionCheck(): Boolean = {
-      !usePermissionCheck || // permission check manually disabled
+    def hasDirectExternalCallCheck(): Boolean = {
+      !useExternalCallCheck || // external call check manually disabled
       body.exists {
-        case FuncCall(id, _, _) => id.isBuiltIn && id.name == "checkPermission"
+        case FuncCall(id, _, _) => id.isBuiltIn && id.name == "checkCaller"
         case _                  => false
       }
     }
@@ -642,7 +642,7 @@ object Ast {
         isPublic = true,
         usePreapprovedAssets = usePreapprovedAssets,
         useAssetsInContract = useAssetsInContract,
-        usePermissionCheck = true,
+        useExternalCallCheck = true,
         useReadonly = useReadonly,
         args = Seq.empty,
         rtypes = Seq.empty,
@@ -1080,11 +1080,11 @@ object Ast {
     }
 
     // the state must have been updated in the check pass
-    def buildPermissionCheckTable(
+    def buildExternalCallCheckTable(
         state: Compiler.State[StatefulContext]
     ): mutable.Map[FuncId, Boolean] = {
-      val permissionCheckedTable = mutable.Map.empty[FuncId, Boolean]
-      funcs.foreach(func => permissionCheckedTable(func.id) = false)
+      val externalCallCheckedTable = mutable.Map.empty[FuncId, Boolean]
+      funcs.foreach(func => externalCallCheckedTable(func.id) = false)
 
       // TODO: optimize these two functions
       def updateCheckedRecursivelyForPrivateMethod(checkedPrivateCalleeId: FuncId): Unit = {
@@ -1097,20 +1097,20 @@ object Ast {
         }
       }
       def updateCheckedRecursively(func: FuncDef[StatefulContext]): Unit = {
-        if (!permissionCheckedTable(func.id)) {
-          permissionCheckedTable(func.id) = true
-          if (func.isPrivate) { // indirect permission check should be in private methods
+        if (!externalCallCheckedTable(func.id)) {
+          externalCallCheckedTable(func.id) = true
+          if (func.isPrivate) { // indirect external call check should be in private methods
             updateCheckedRecursivelyForPrivateMethod(func.id)
           }
         }
       }
 
       funcs.foreach { func =>
-        if (func.hasDirectPermissionCheck()) {
+        if (func.hasDirectExternalCallCheck()) {
           updateCheckedRecursively(func)
         }
       }
-      permissionCheckedTable
+      externalCallCheckedTable
     }
   }
 
@@ -1256,31 +1256,31 @@ object Ast {
     private[vm] def checkExternalCallPermissions(
         contractState: Compiler.State[StatefulContext],
         contract: Contract,
-        permissionCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
+        externalCallCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
     ): Unit = {
-      val allNoPermissionChecks: mutable.Set[(TypeId, FuncId)] = mutable.Set.empty
+      val allNoExternalCallChecks: mutable.Set[(TypeId, FuncId)] = mutable.Set.empty
       contract.funcs.foreach { func =>
-        // To check that external calls should have permission checks
+        // To check that external calls should have external call checks
         contractState.externalCalls.get(func.id) match {
           case Some(callees) if callees.nonEmpty =>
             callees.foreach { case funcRef @ (typeId, funcId) =>
-              if (!permissionCheckTables(typeId)(funcId)) {
-                allNoPermissionChecks.addOne(funcRef)
+              if (!externalCallCheckTables(typeId)(funcId)) {
+                allNoExternalCallChecks.addOne(funcRef)
               }
             }
           case _ => ()
         }
       }
-      allNoPermissionChecks.foreach { case (typeId, funcId) =>
+      allNoExternalCallChecks.foreach { case (typeId, funcId) =>
         contractState.warnings.addOne(
-          MultiContract.noPermissionCheckMsg(typeId.name, funcId.name)
+          MultiContract.noExternalCallCheckMsg(typeId.name, funcId.name)
         )
       }
     }
 
-    def checkInterfacePermissionCheck(
+    def checkInterfaceExternalCallCheck(
         interfaceTypeId: TypeId,
-        permissionCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
+        externalCallCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
     ): Unit = {
       assume(dependencies.isDefined)
       val children = dependencies
@@ -1290,10 +1290,12 @@ object Ast {
         .getOrElse(Seq.empty)
       val interface = getInterface(interfaceTypeId)
       children.foreach { case contractId =>
-        val table = permissionCheckTables(contractId)
+        val table = externalCallCheckTables(contractId)
         interface.funcs.foreach { func =>
-          if (func.usePermissionCheck && !table(func.id)) {
-            throw Compiler.Error(MultiContract.noPermissionCheckMsg(contractId.name, func.id.name))
+          if (func.useExternalCallCheck && !table(func.id)) {
+            throw Compiler.Error(
+              MultiContract.noExternalCallCheckMsg(contractId.name, func.id.name)
+            )
           }
         }
       }
@@ -1301,24 +1303,24 @@ object Ast {
 
     def genStatefulContracts(): AVector[(StatefulContract, Contract, AVector[String], Int)] = {
       val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
-      val permissionCheckTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
+      val externalCallCheckTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
       val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
         case (contract: Contract, index) if !contract.isAbstract =>
           val state            = states(index)
           val statefulContract = contract.genCode(state)
-          val table            = contract.buildPermissionCheckTable(state)
-          permissionCheckTables.update(contract.ident, table)
+          val table            = contract.buildExternalCallCheckTable(state)
+          externalCallCheckTables.update(contract.ident, table)
           (statefulContract, contract, state, index)
       })
       contracts.foreach {
         case interface: ContractInterface =>
-          checkInterfacePermissionCheck(interface.ident, permissionCheckTables)
+          checkInterfaceExternalCallCheck(interface.ident, externalCallCheckTables)
           val table = mutable.Map.from(interface.funcs.map(_.id -> true))
-          permissionCheckTables.update(interface.ident, table)
+          externalCallCheckTables.update(interface.ident, table)
         case _ => ()
       }
       statefulContracts.map { case (statefulContract, contract, state, index) =>
-        checkExternalCallPermissions(state, contract, permissionCheckTables)
+        checkExternalCallPermissions(state, contract, externalCallCheckTables)
         (statefulContract, contract, state.getWarnings, index)
       }
     }
@@ -1458,8 +1460,8 @@ object Ast {
       (unimplementedFuncs, inherited ++ nonInherited)
     }
 
-    def noPermissionCheckMsg(typeId: String, funcId: String): String =
-      s"No permission check for function: ${typeId}.${funcId}, please use checkPermission!(...) for the function or its private callees."
+    def noExternalCallCheckMsg(typeId: String, funcId: String): String =
+      s"No external call check for function: ${typeId}.${funcId}, please use checkCaller!(...) for the function or its private callees."
   }
 }
 // scalastyle:on number.of.methods number.of.types

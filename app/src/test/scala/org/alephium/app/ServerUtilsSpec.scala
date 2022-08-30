@@ -1488,7 +1488,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |}
          |Contract Bar() implements Foo {
          |  pub fn foo() -> () {
-         |    checkPermission!(true, 0)
+         |    checkCaller!(true, 0)
          |  }
          |}
          |TxScript Main(id: ByteVec) {
