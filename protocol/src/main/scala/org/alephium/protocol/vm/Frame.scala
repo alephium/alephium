@@ -377,6 +377,7 @@ final case class StatefulFrame(
 
   def destroyContract(address: LockupScript): ExeResult[Unit] = {
     for {
+      _           <- checkDestroyContractRecipientAddress(address)
       contractId  <- obj.getContractId()
       callerFrame <- getCallerFrame()
       _ <- callerFrame.checkNonRecursive(contractId, ContractDestructionShouldNotBeCalledFromSelf)
@@ -392,6 +393,18 @@ final case class StatefulFrame(
       _ <- runReturn()
     } yield {
       pc -= 1 // because of the `advancePC` call following this instruction
+    }
+  }
+
+  def checkDestroyContractRecipientAddress(address: LockupScript): ExeResult[Unit] = {
+    address match {
+      case _: LockupScript.Asset => okay
+      case contractAddr: LockupScript.P2C =>
+        if (ctx.getHardFork().isLemanEnabled()) {
+          checkPayToContractAddressInCallerTrace(contractAddr)
+        } else {
+          failed(InvalidAddressTypeInContractDestroy)
+        }
     }
   }
 

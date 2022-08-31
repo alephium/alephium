@@ -983,7 +983,7 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
-  it should "destroy contract" in new DestroyFixture {
+  trait VerifyDestroyRecipientAddressFixture extends DestroyFixture {
     val foo =
       s"""
          |Contract Foo(mut x: U256) {
@@ -997,7 +997,40 @@ class VMSpec extends AlephiumSpec {
     val (fooId, fooAssetRef) = prepareContract(foo, AVector(Val.U256(0)))
     checkContractState(fooId, fooAssetRef, true)
 
-    def main(targetAddress: String) =
+    lazy val fooParent =
+      s"""
+         |Contract FooParent() {
+         |  pub fn destroyFooWithAddress(targetAddress: Address) -> () {
+         |    Foo(#$fooId).destroy(targetAddress)
+         |  }
+         |
+         |  @using(assetsInContract = true)
+         |  pub fn destroyFoo() -> () {
+         |    Foo(#$fooId).destroy(selfAddress!())
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+    lazy val (fooParentId, fooParentAssetRef) = prepareContract(fooParent, AVector.empty)
+
+    lazy val fooGrandParent =
+      s"""
+         |Contract FooGrandParent() {
+         |  @using(assetsInContract = true)
+         |  pub fn destroyFoo() -> () {
+         |    FooParent(#$fooParentId).destroyFooWithAddress(selfAddress!())
+         |  }
+         |}
+         |
+         |$fooParent
+         |""".stripMargin
+    lazy val (fooGrandParentId, fooGrandParentAssetRef) =
+      prepareContract(fooGrandParent, AVector.empty)
+  }
+
+  it should "destroy contract directly" in new VerifyDestroyRecipientAddressFixture {
+    def destroy(targetAddress: String) =
       s"""
          |TxScript Main {
          |  Foo(#$fooId).destroy(@$targetAddress)
@@ -1007,10 +1040,18 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     {
-      info("Destroy a contract with contract address")
+      info("Destroy a contract and transfer value to non-calling contract address")
       val address = Address.Contract(LockupScript.P2C(Hash.generate))
-      val script  = Compiler.compileTxScript(main(address.toBase58)).rightValue
-      fail(blockFlow, chainIndex, script, InvalidAddressTypeInContractDestroy)
+      val script  = Compiler.compileTxScript(destroy(address.toBase58)).rightValue
+      fail(blockFlow, chainIndex, script, PayToContractAddressNotInCallerTrace)
+      checkContractState(fooId, fooAssetRef, true)
+    }
+
+    {
+      info("Destroy a contract and and transfer value to itself")
+      val fooAddress = Address.contract(Hash.unsafe(Hex.unsafe(fooId)))
+      val script  = Compiler.compileTxScript(destroy(fooAddress.toBase58)).rightValue
+      fail(blockFlow, chainIndex, script, ContractAssetAlreadyFlushed)
       checkContractState(fooId, fooAssetRef, true)
     }
 
@@ -1033,9 +1074,37 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("Destroy a contract properly")
-      callTxScript(main(genesisAddress.toBase58))
+      callTxScript(destroy(genesisAddress.toBase58))
       checkContractState(fooId, fooAssetRef, false)
     }
+  }
+
+  it should "destroy contract from parent" in new VerifyDestroyRecipientAddressFixture {
+    def destroy() =
+      s"""
+         |TxScript Main {
+         |  FooParent(#$fooParentId).destroyFoo()
+         |}
+         |
+         |$fooParent
+         |""".stripMargin
+
+    callTxScript(destroy())
+    checkContractState(fooId, fooAssetRef, false)
+  }
+
+  it should "destroy contract from grand parent" in new VerifyDestroyRecipientAddressFixture {
+    def destroy() =
+      s"""
+         |TxScript Main {
+         |  FooGrandParent(#$fooGrandParentId).destroyFoo()
+         |}
+         |
+         |$fooGrandParent
+         |""".stripMargin
+
+    callTxScript(destroy())
+    checkContractState(fooId, fooAssetRef, false)
   }
 
   it should "not destroy a contract after approving assets" in new DestroyFixture {
