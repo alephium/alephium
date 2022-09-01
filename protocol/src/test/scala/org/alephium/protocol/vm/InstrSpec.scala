@@ -2777,6 +2777,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait DestroySelfFixture extends GenFixture {
+    // scalastyle:off method.length
     def prepareFrame()(implicit networkConfig: NetworkConfig): Frame[StatefulContext] = {
       val destroyMethod = Method[StatefulContext](
         isPublic = true,
@@ -2807,9 +2808,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val callingContract         = StatefulContract(0, AVector(callingMethod))
       val (callingContractObj, _) = prepareContract(callingContract, AVector.empty[Val])
 
-      val balanceState = MutBalances(
-        ArrayBuffer(
-          (LockupScript.P2C(destroyContractObj.contractId), MutBalancesPerLockup.alph(ALPH.oneAlph))
+      val balanceState = MutBalanceState.from(
+        MutBalances(
+          ArrayBuffer(
+            (
+              LockupScript.P2C(destroyContractObj.contractId),
+              MutBalancesPerLockup.alph(ALPH.oneAlph)
+            )
+          )
         )
       )
 
@@ -2826,6 +2832,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         )
         .rightValue
     }
+    // scalastyle:on method.length
   }
 
   it should "test DestroySelf and transfer fund to non-calling contract" in new DestroySelfFixture {

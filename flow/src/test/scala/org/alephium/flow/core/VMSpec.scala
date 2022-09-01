@@ -1090,8 +1090,15 @@ class VMSpec extends AlephiumSpec {
          |$fooCaller
          |""".stripMargin
 
+    val fooCallerContractId  = Hash.unsafe(Hex.unsafe(fooCallerId))
+    val fooCallerAssetBefore = getContractAsset(fooCallerContractId, chainIndex)
+    fooCallerAssetBefore.amount is ALPH.oneAlph
+
     callTxScript(destroy())
     checkContractState(fooId, fooAssetRef, false)
+
+    val fooCallerAssetAfter = getContractAsset(fooCallerContractId, chainIndex)
+    fooCallerAssetAfter.amount is ALPH.alph(2)
   }
 
   it should "destroy contract and transfer fund to caller's caller" in new DestroyFixture
