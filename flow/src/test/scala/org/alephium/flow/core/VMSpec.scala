@@ -983,7 +983,7 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
-  trait VerifyRecipientAddress { self: DestroyFixture =>
+  trait VerifyRecipientAddress { _: DestroyFixture =>
     val foo =
       s"""
          |Contract Foo(mut x: U256) {
