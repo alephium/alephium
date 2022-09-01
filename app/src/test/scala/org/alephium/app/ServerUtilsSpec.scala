@@ -1111,9 +1111,12 @@ class ServerUtilsSpec extends AlephiumSpec {
       existingContracts = Some(existingContracts),
       inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
     )
+
+    val testFlow    = BlockFlow.emptyUnsafe(config)
+    val serverUtils = new ServerUtils()
   }
 
-  "the test contract endpoint" should "handle destroy contracts and transfer fund to calling address" in new DestroyFixture {
+  it should "successfully destroy contracts and transfer fund to calling address" in new DestroyFixture {
     override def fooCaller: String =
       s"""
          |Contract FooCaller(fooId: ByteVec) {
@@ -1127,8 +1130,6 @@ class ServerUtilsSpec extends AlephiumSpec {
          |$foo
          |""".stripMargin
 
-    val testFlow    = BlockFlow.emptyUnsafe(config)
-    val serverUtils = new ServerUtils()
     val result = serverUtils
       .runTestContract(
         testFlow,
@@ -1147,7 +1148,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractOutput.attoAlphAmount.value is ALPH.alph(2)
   }
 
-  it should "not handle destroy contracts and transfer fund to non-calling address" in new DestroyFixture {
+  it should "fail to destroy contracts and transfer fund to non-calling address" in new DestroyFixture {
     override def fooCaller: String =
       s"""
          |Contract FooCaller(fooId: ByteVec) {
@@ -1159,9 +1160,6 @@ class ServerUtilsSpec extends AlephiumSpec {
          |
          |$foo
          |""".stripMargin
-
-    val testFlow    = BlockFlow.emptyUnsafe(config)
-    val serverUtils = new ServerUtils()
 
     serverUtils
       .runTestContract(

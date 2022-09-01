@@ -2791,8 +2791,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val destroyContract           = StatefulContract(0, AVector(destroyMethod))
       val (destroyContractObj, ctx) = prepareContract(destroyContract, AVector.empty[Val])
 
-      val from = LockupScript.P2C(destroyContractObj.contractId)
-
       val callingMethod =
         Method[StatefulContext](
           isPublic = true,
@@ -2809,11 +2807,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val callingContract         = StatefulContract(0, AVector(callingMethod))
       val (callingContractObj, _) = prepareContract(callingContract, AVector.empty[Val])
 
-      def alphBalance(lockupScript: LockupScript, amount: U256): MutBalances = {
-        MutBalances(ArrayBuffer((lockupScript, MutBalancesPerLockup.alph(amount))))
-      }
-
-      val balanceState = MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
+      val balanceState = MutBalances(
+        ArrayBuffer(
+          (LockupScript.P2C(destroyContractObj.contractId), MutBalancesPerLockup.alph(ALPH.oneAlph))
+        )
+      )
 
       Frame
         .stateful(
