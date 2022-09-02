@@ -72,14 +72,15 @@ trait ServerFixture
     Balance.from(
       Amount.Zero,
       Amount.Zero,
-      Some(AVector(Token(Hash.hash("token1"), U256.One))),
-      Some(AVector(Token(Hash.hash("token2"), U256.Two))),
+      Some(AVector(Token(TokenId.hash("token1"), U256.One))),
+      Some(AVector(Token(TokenId.hash("token2"), U256.Two))),
       0
     )
-  lazy val dummyGroup           = Group(Gen.choose(0, brokerConfig.groups - 1).sample.get)
-  lazy val dummyContract        = counterContract
-  lazy val dummyContractGroup   = Group(brokerConfig.groups - 1)
-  lazy val dummyContractAddress = Address.Contract(LockupScript.P2C(counterContract.hash)).toBase58
+  lazy val dummyGroup         = Group(Gen.choose(0, brokerConfig.groups - 1).sample.get)
+  lazy val dummyContract      = counterContract
+  lazy val dummyContractGroup = Group(brokerConfig.groups - 1)
+  lazy val dummyContractAddress =
+    Address.Contract(LockupScript.P2C(ContractId(counterContract.hash))).toBase58
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(
     GroupIndex.unsafe(dummyGroup.group)
   ).sample.get
@@ -137,7 +138,7 @@ object ServerFixture {
     val output = TxOutput.asset(
       U256.Ten,
       toLockupScript,
-      AVector((Hash.hash("token1"), U256.One), (Hash.hash("token2"), U256.Two)),
+      AVector((TokenId.hash("token1"), U256.One), (TokenId.hash("token2"), U256.Two)),
       lockTimeOpt
     )
     tx.copy(
@@ -251,9 +252,9 @@ object ServerFixture {
     override def getBalance(
         lockupScript: LockupScript.Asset,
         utxosLimit: Int
-    ): IOResult[(U256, U256, AVector[(Hash, U256)], AVector[(Hash, U256)], Int)] = {
-      val tokens       = AVector((Hash.hash("token1"), U256.One))
-      val lockedTokens = AVector((Hash.hash("token2"), U256.Two))
+    ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
+      val tokens       = AVector((TokenId.hash("token1"), U256.One))
+      val lockedTokens = AVector((TokenId.hash("token2"), U256.Two))
       Right((U256.Zero, U256.Zero, tokens, lockedTokens, 0))
     }
 
@@ -262,7 +263,7 @@ object ServerFixture {
         utxosLimit: Int
     ): IOResult[AVector[AssetOutputInfo]] = {
       val assetOutputInfos = AVector(U256.One, U256.Two).map { amount =>
-        val tokens = AVector((Hash.hash("token1"), U256.One))
+        val tokens = AVector((TokenId.hash("token1"), U256.One))
         val output = AssetOutput(amount, lockupScript, TimeStamp.now(), tokens, ByteString.empty)
         val ref    = AssetOutputRef.unsafe(Hint.from(output), Hash.generate)
         AssetOutputInfo(ref, output, FlowUtils.PersistedOutput)
@@ -421,13 +422,13 @@ object ServerFixture {
           contractGroup
         ) && (groupIndex.value == contractGroup)
       ) {
-        val contractId: Hash = dummyContract.toHalfDecoded().hash
+        val contractId: ContractId = ContractId(dummyContract.toHalfDecoded().hash)
         storages.emptyWorldState
           .createContractUnsafe(
             contractId,
             dummyContract.toHalfDecoded(),
             AVector(vm.Val.U256(U256.Zero)),
-            ContractOutputRef.unsafe(Hint.unsafe(0), contractId),
+            ContractOutputRef.unsafe(Hint.unsafe(0), contractId.value),
             ContractOutput(U256.Zero, LockupScript.P2C(contractId), AVector())
           )
           .map(_.cached())

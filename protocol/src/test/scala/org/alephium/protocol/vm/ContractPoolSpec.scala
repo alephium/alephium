@@ -39,9 +39,9 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         n: Long = 0,
         fieldLength: Int = 0
     ): (StatefulContract, ContractOutputRef, ContractOutput) = {
-      val contractId = Hash.generate
+      val contractId = ContractId(Hash.generate)
       val output     = ContractOutput(ALPH.alph(n), LockupScript.p2c(contractId), AVector.empty)
-      val outputRef  = ContractOutputRef.unsafe(output.hint, contractId)
+      val outputRef  = ContractOutputRef.unsafe(output.hint, contractId.value)
       val method = Method[StatefulContext](
         isPublic = true,
         usePreapprovedAssets = false,
@@ -62,7 +62,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         outputRef: ContractOutputRef,
         output: ContractOutput
     ): Assertion = {
-      val contractId = outputRef.key
+      val contractId = ContractId(outputRef.key)
       pool.worldState
         .createContractUnsafe(
           contractId,
@@ -75,10 +75,10 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         contract.toHalfDecoded().toObjectUnsafe(contractId, fields(contract.fieldLength))
     }
 
-    def createContract(n: Long = 0, fieldLength: Int = 0): (Hash, StatefulContract) = {
+    def createContract(n: Long = 0, fieldLength: Int = 0): (ContractId, StatefulContract) = {
       val (contract, outputRef, output) = genContract(n, fieldLength)
       createContract(contract, outputRef, output)
-      outputRef.key -> contract
+      ContractId(outputRef.key) -> contract
     }
 
     def toObject(contract: StatefulContract, contractId: ContractId) = {
@@ -152,8 +152,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "market assets properly" in new Fixture {
-    val contractId0 = Hash.generate
-    val contractId1 = Hash.generate
+    val contractId0 = ContractId(Hash.generate)
+    val contractId1 = ContractId(Hash.generate)
     pool.markAssetInUsing(contractId0) isE ()
     pool.markAssetInUsing(contractId0) is failed(ContractAssetAlreadyInUsing)
 
@@ -173,7 +173,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     with GroupConfigFixture.Default
     with NetworkConfigFixture.Default {
     val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
-    val contractId = outputRef.key
+    val contractId = ContractId(outputRef.key)
     val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
     pool.worldState.createContractUnsafe(
       contractId,

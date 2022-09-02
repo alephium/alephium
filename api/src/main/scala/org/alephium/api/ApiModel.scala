@@ -31,7 +31,15 @@ import org.alephium.json.Json.{ReadWriter => RW}
 import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{Address, CliqueId, GroupIndex, NetworkId, Nonce}
+import org.alephium.protocol.model.{
+  Address,
+  CliqueId,
+  ContractId,
+  GroupIndex,
+  NetworkId,
+  Nonce,
+  TokenId
+}
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
 import org.alephium.serde.{deserialize, serialize, RandomBytes}
 import org.alephium.util._
@@ -115,6 +123,12 @@ trait ApiModelCodec {
   )
   implicit val blockHashReader: Reader[BlockHash] =
     byteStringReader.map(BlockHash.from(_).getOrElse(throw new Abort("cannot decode block hash")))
+
+  implicit val tokenIdWriter: Writer[TokenId] = hashWriter.comap[TokenId](_.value)
+  implicit val tokenIdReader: Reader[TokenId] = hashReader.map(TokenId(_))
+
+  implicit val contractIdWriter: Writer[ContractId] = hashWriter.comap[ContractId](_.value)
+  implicit val contractIdReader: Reader[ContractId] = hashReader.map(ContractId(_))
 
   implicit lazy val assetAddressWriter: Writer[Address.Asset] =
     StringWriter.comap[Address.Asset](_.toBase58)

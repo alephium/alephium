@@ -38,8 +38,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val (assetOutputRef, assetOutput)                    = generateAsset.sample.get
     val (code, state, contractOutputRef, contractOutput) = generateContract().sample.get
     val (_, _, contractOutputRef1, contractOutput1)      = generateContract().sample.get
-    val contractId                                       = contractOutputRef.key
-    val contractId1                                      = contractOutputRef1.key
+    val contractId                                       = ContractId(contractOutputRef.key)
+    val contractId1                                      = ContractId(contractOutputRef1.key)
 
     val contractObj = code.toObjectUnsafe(contractId, state)
     var worldState  = initialWorldState
@@ -53,8 +53,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
     worldState.getOutput(assetOutputRef).isLeft is true
     worldState.getOutput(contractOutputRef).isLeft is true
-    worldState.getContractObj(contractOutputRef.key).isLeft is true
-    worldState.contractExists(contractOutputRef.key) isE false
+    worldState.getContractObj(contractId).isLeft is true
+    worldState.contractExists(contractId) isE false
     worldState.removeAsset(assetOutputRef).isLeft is true
     worldState.removeAsset(contractOutputRef).isLeft is true
 
@@ -70,8 +70,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         contractOutput
       )
     )
-    worldState.getContractObj(contractOutputRef.key) isE contractObj
-    worldState.contractExists(contractOutputRef.key) isE true
+    worldState.getContractObj(contractId) isE contractObj
+    worldState.contractExists(contractId) isE true
     worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
     worldState.getOutput(contractOutputRef) isE contractOutput
 
@@ -133,10 +133,10 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
   it should "maintain the order of the cached logs" in {
     val logInputGen = for {
-      blockHash  <- blockHashGen
-      txId       <- hashGen
-      contractId <- hashGen
-    } yield (blockHash, txId, contractId)
+      blockHash       <- blockHashGen
+      txId            <- hashGen
+      contractIdValue <- hashGen
+    } yield (blockHash, txId, ContractId(contractIdValue))
 
     val storage = newDBStorage()
     val worldState = WorldState
@@ -159,7 +159,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         false
       )
 
-      LogStates(blockHash, contractId, AVector(LogState(txId, 0, fields.tail)))
+      LogStates(blockHash, contractId.value, AVector(LogState(txId, 0, fields.tail)))
     }
 
     val newLogs = worldState.logState.getNewLogs()
@@ -167,8 +167,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
   }
 
   it should "test the event key of contract creation and destruction" in {
-    createContractEventId.bytes is Hash.zero.bytes.init ++ ByteString(-1)
-    destroyContractEventId.bytes is Hash.zero.bytes.init ++ ByteString(-2)
+    createContractEventId.value.bytes is Hash.zero.bytes.init ++ ByteString(-1)
+    destroyContractEventId.value.bytes is Hash.zero.bytes.init ++ ByteString(-2)
   }
 
   trait StagingFixture {
@@ -182,7 +182,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
     val (code, state, contractOutputRef, contractOutput) = generateContract().sample.get
 
-    val contractId  = contractOutputRef.key
+    val contractId  = ContractId(contractOutputRef.key)
     val contractObj = code.toObjectUnsafe(contractId, state)
     staging.createContractUnsafe(contractId, code, state, contractOutputRef, contractOutput) isE ()
     staging.getContractObj(contractId) isE contractObj

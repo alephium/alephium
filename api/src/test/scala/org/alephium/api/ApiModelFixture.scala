@@ -57,7 +57,7 @@ trait ApiModelFixture
 
   val contractOutput = TxOutput.contract(
     ALPH.oneAlph,
-    LockupScript.p2c(Hash.zero)
+    LockupScript.p2c(ContractId.zero)
   )
 
   val unsignedTransaction = UnsignedTransaction(

@@ -18,7 +18,7 @@ package org.alephium.api.model
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, TxOutputRef, UnsignedTransaction}
+import org.alephium.protocol.model.{Address, ContractId, TxOutputRef, UnsignedTransaction}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
@@ -38,7 +38,7 @@ object BuildDeployContractTxResult {
   def from(
       unsignedTx: UnsignedTransaction
   )(implicit groupConfig: GroupConfig): BuildDeployContractTxResult = {
-    val contractId = TxOutputRef.key(unsignedTx.hash, unsignedTx.fixedOutputs.length)
+    val contractId = ContractId(TxOutputRef.key(unsignedTx.hash, unsignedTx.fixedOutputs.length))
     BuildDeployContractTxResult(
       unsignedTx.fromGroup.value,
       unsignedTx.toGroup.value,

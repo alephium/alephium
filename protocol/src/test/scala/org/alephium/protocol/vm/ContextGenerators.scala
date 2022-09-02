@@ -94,16 +94,17 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       (co, cor)
     }
     val halfDecoded = contract.toHalfDecoded()
+    val contractId  = ContractId(contractOutputRef.key)
 
     cachedWorldState.createContractUnsafe(
-      contractOutputRef.key,
+      contractId,
       halfDecoded,
       fields,
       contractOutputRef,
       contractOutput
     ) isE ()
 
-    val obj = halfDecoded.toObjectUnsafe(contractOutputRef.key, fields)
+    val obj = halfDecoded.toObjectUnsafe(contractId, fields)
     val context = new StatefulContext {
       val worldState: WorldState.Staging = cachedWorldState.staging()
       val networkConfig: NetworkConfig   = _networkConfig

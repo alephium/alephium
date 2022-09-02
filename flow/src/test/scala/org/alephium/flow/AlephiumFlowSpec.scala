@@ -592,7 +592,7 @@ trait FlowFixture
   def checkState(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      key: Hash,
+      key: ContractId,
       fields: AVector[Val],
       outputRef: ContractOutputRef,
       numAssets: Int = 2,

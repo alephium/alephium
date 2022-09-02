@@ -22,7 +22,7 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.{ALPH, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.{ALPH, Signature, SignatureSchema}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulScript}
 import org.alephium.serde.serialize
@@ -134,7 +134,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
     info("output token")
     block.Coinbase.unsignedTx(_.copy(fixedOutputs = AVector(output0))).pass()
-    val outputsWithTokens = AVector(output0.copy(tokens = AVector(Hash.zero -> 10)))
+    val outputsWithTokens = AVector(output0.copy(tokens = AVector(TokenId.zero -> 10)))
     block.Coinbase.unsignedTx(_.copy(fixedOutputs = outputsWithTokens)).fail()
 
     info("contract input")

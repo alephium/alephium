@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
-import org.alephium.protocol.model.{TxGenerators, TxOutput}
+import org.alephium.protocol.model.{TokenId, TxGenerators, TxOutput}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 import org.alephium.util.Bytes.byteStringOrdering
 
@@ -30,30 +30,30 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
     val tokens = mutable.Map(tokenId -> ALPH.oneAlph)
     MutBalancesPerLockup(ALPH.oneAlph, tokens, 1).tokenVector is AVector((tokenId, ALPH.oneAlph))
 
-    val tokenIdZero = hashGen.sample.get
+    val tokenIdZero = TokenId(hashGen.sample.get)
     tokens.addOne((tokenIdZero, U256.Zero))
 
     MutBalancesPerLockup(ALPH.oneAlph, tokens, 1).tokenVector is AVector((tokenId, ALPH.oneAlph))
 
     tokens.remove(tokenIdZero)
 
-    forAll(hashGen) { newTokenId =>
-      tokens.addOne((newTokenId, ALPH.oneAlph))
+    forAll(hashGen) { newTokenIdValue =>
+      tokens.addOne((TokenId(newTokenIdValue), ALPH.oneAlph))
       MutBalancesPerLockup(ALPH.oneAlph, tokens, 1).tokenVector is AVector.from(
-        tokens.toSeq.sortBy(_._1.bytes)
+        tokens.toSeq.sortBy(_._1.value.bytes)
       )
     }
   }
 
   it should "getTokenAmount" in new Fixture {
-    val tokenId2 = hashGen.sample.get
+    val tokenId2 = TokenId(hashGen.sample.get)
     val tokens   = mutable.Map(tokenId -> U256.One, tokenId2 -> U256.Two)
 
     val balancesPerLockup = MutBalancesPerLockup(ALPH.oneAlph, tokens, 1)
 
     balancesPerLockup.getTokenAmount(tokenId) is Some(U256.One)
     balancesPerLockup.getTokenAmount(tokenId2) is Some(U256.Two)
-    balancesPerLockup.getTokenAmount(hashGen.sample.get) is None
+    balancesPerLockup.getTokenAmount(TokenId(hashGen.sample.get)) is None
   }
 
   it should "addAlph" in new Fixture {
@@ -85,7 +85,7 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
     balancesPerLockup.addToken(tokenId, U256.MaxValue) is None
     balancesPerLockup.getTokenAmount(tokenId) is Some(ALPH.alph(2))
 
-    val tokenId2 = hashGen.sample.get
+    val tokenId2 = TokenId(hashGen.sample.get)
     balancesPerLockup.getTokenAmount(tokenId2) is None
     balancesPerLockup.addToken(tokenId2, ALPH.oneAlph) is Some(())
     balancesPerLockup.getTokenAmount(tokenId2) is Some(ALPH.oneAlph)
@@ -120,7 +120,7 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
     balancesPerLockup.subToken(tokenId, U256.MaxValue) is None
     balancesPerLockup.getTokenAmount(tokenId) is Some(U256.Zero)
 
-    val tokenId2 = hashGen.sample.get
+    val tokenId2 = TokenId(hashGen.sample.get)
     balancesPerLockup.getTokenAmount(tokenId2) is None
     balancesPerLockup.subToken(tokenId2, ALPH.oneAlph) is None
     balancesPerLockup.getTokenAmount(tokenId2) is None
@@ -130,7 +130,7 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
     val balancesPerLockup =
       MutBalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
 
-    val tokenId2 = hashGen.sample.get
+    val tokenId2 = TokenId(hashGen.sample.get)
     val balancesPerLockup2 = MutBalancesPerLockup(
       ALPH.oneAlph,
       mutable.Map(tokenId -> ALPH.oneAlph, tokenId2 -> ALPH.oneAlph),
@@ -154,7 +154,7 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
     val balancesPerLockup =
       MutBalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
 
-    val tokenId2 = hashGen.sample.get
+    val tokenId2 = TokenId(hashGen.sample.get)
     val balancesPerLockup2 =
       MutBalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> ALPH.oneAlph), 1)
 
@@ -189,7 +189,7 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
   }
 
   trait Fixture extends TxGenerators with NetworkConfigFixture.Default {
-    val tokenId = hashGen.sample.get
+    val tokenId = TokenId(hashGen.sample.get)
 
     implicit override val groupConfig: GroupConfig =
       new GroupConfig {

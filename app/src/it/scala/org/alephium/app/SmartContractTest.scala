@@ -273,6 +273,7 @@ class SmartContractTest extends AlephiumActorSpec {
         issueTokenAmount = Some(1024)
       )
     val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
+    val tokenId          = TokenId(tokenContractKey.value)
 
     info("Transfer 1024 token back to self")
     script(SwapContracts.tokenWithdrawTxScript(address, tokenContractKey, U256.unsafe(1024)))
@@ -282,7 +283,7 @@ class SmartContractTest extends AlephiumActorSpec {
       SwapContracts.swapContract,
       Some(
         AVector[vm.Val](
-          vm.Val.ByteVec(tokenContractKey.bytes),
+          vm.Val.ByteVec(tokenContractKey.value.bytes),
           vm.Val.U256(U256.Zero),
           vm.Val.U256(U256.Zero)
         )
@@ -296,7 +297,7 @@ class SmartContractTest extends AlephiumActorSpec {
       SwapContracts.addLiquidityTxScript(
         address,
         ALPH.alph(10),
-        tokenContractKey,
+        tokenId,
         U256.unsafe(100),
         swapContractKey
       )
@@ -310,7 +311,7 @@ class SmartContractTest extends AlephiumActorSpec {
       SwapContracts.swapTokenForAlphTxScript(
         address,
         swapContractKey,
-        tokenContractKey,
+        tokenId,
         U256.unsafe(50)
       )
     )
@@ -368,6 +369,7 @@ class SmartContractTest extends AlephiumActorSpec {
         issueTokenAmount = Some(1024)
       )
     val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
+    val tokenId          = TokenId(tokenContractKey.value)
 
     checkUTXOs { currentUTXOs =>
       // Create the token contract
@@ -389,7 +391,7 @@ class SmartContractTest extends AlephiumActorSpec {
       )
     }
 
-    def token(amount: Int) = AVector(Token(tokenContractKey, U256.unsafe(amount)))
+    def token(amount: Int) = AVector(Token(tokenId, U256.unsafe(amount)))
 
     info("Transfer 1024 token back to self")
     script(
@@ -421,7 +423,7 @@ class SmartContractTest extends AlephiumActorSpec {
       SwapContracts.swapContract,
       Some(
         AVector[vm.Val](
-          vm.Val.ByteVec(tokenContractKey.bytes),
+          vm.Val.ByteVec(tokenContractKey.value.bytes),
           vm.Val.U256(U256.Zero),
           vm.Val.U256(U256.Zero)
         )
@@ -455,7 +457,7 @@ class SmartContractTest extends AlephiumActorSpec {
       SwapContracts.addLiquidityTxScript(
         address,
         ALPH.alph(100),
-        tokenContractKey,
+        tokenId,
         U256.unsafe(1000),
         swapContractKey
       ),
@@ -517,7 +519,7 @@ class SmartContractTest extends AlephiumActorSpec {
       SwapContracts.swapTokenForAlphTxScript(
         address,
         swapContractKey,
-        tokenContractKey,
+        tokenId,
         U256.unsafe(500)
       )
     )
@@ -561,10 +563,10 @@ object SwapContracts {
                          |}
     """.stripMargin
 
-  def tokenWithdrawTxScript(address: String, tokenContractKey: Hash, tokenAmount: U256) =
+  def tokenWithdrawTxScript(address: String, tokenContractKey: ContractId, tokenAmount: U256) =
     s"""
        |TxScript Main {
-       |  let token = Token(#${tokenContractKey.toHexString})
+       |  let token = Token(#${tokenContractKey.value.toHexString})
        |  token.withdraw(@${address}, $tokenAmount)
        |}
        |
@@ -608,15 +610,15 @@ object SwapContracts {
   def addLiquidityTxScript(
       address: String,
       attoAlphAmount: U256,
-      tokenId: Hash,
+      tokenId: TokenId,
       tokenAmount: U256,
-      swapContractKey: Hash
+      swapContractKey: ContractId
   ) =
     s"""
        |TxScript Main {
-       |  let swap = Swap(#${swapContractKey.toHexString})
+       |  let swap = Swap(#${swapContractKey.value.toHexString})
        |  swap.addLiquidity{
-       |    @$address -> $attoAlphAmount, #${tokenId.toHexString}: $tokenAmount
+       |    @$address -> $attoAlphAmount, #${tokenId.value.toHexString}: $tokenAmount
        |  }(@$address, $attoAlphAmount, $tokenAmount)
        |}
        |
@@ -625,23 +627,23 @@ object SwapContracts {
 
   def swapTokenForAlphTxScript(
       address: String,
-      swapContractKey: Hash,
-      tokenId: Hash,
+      swapContractKey: ContractId,
+      tokenId: TokenId,
       tokenAmount: U256
   ) =
     s"""
        |TxScript Main {
-       |  let swap = Swap(#${swapContractKey.toHexString})
-       |  swap.swapAlph{@$address -> #${tokenId.toHexString}: $tokenAmount}(@$address, $tokenAmount)
+       |  let swap = Swap(#${swapContractKey.value.toHexString})
+       |  swap.swapAlph{@$address -> #${tokenId.value.toHexString}: $tokenAmount}(@$address, $tokenAmount)
        |}
        |
        |$swapContract
        |""".stripMargin
 
-  def swapAlphForTokenTxScript(address: String, swapContractKey: Hash, attoAlphAmount: U256) =
+  def swapAlphForTokenTxScript(address: String, swapContractKey: ContractId, attoAlphAmount: U256) =
     s"""
        |TxScript Main {
-       |  let swap = Swap(#${swapContractKey.toHexString})
+       |  let swap = Swap(#${swapContractKey.value.toHexString})
        |  swap.swapToken{@$address -> $attoAlphAmount}(@$address, $attoAlphAmount)
        |}
        |

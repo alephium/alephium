@@ -24,7 +24,7 @@ import org.alephium.crypto
 import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
-import org.alephium.protocol.model.{AssetOutput, TxOutputRef}
+import org.alephium.protocol.model.{AssetOutput, ContractId, TokenId, TxOutputRef}
 import org.alephium.protocol.vm.TokenIssuance.{
   IssueTokenAndTransfer,
   IssueTokenWithoutTransfer,
@@ -911,9 +911,9 @@ case object ContractIdToAddress
     with GasLow {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      contractIdRaw <- frame.popOpStackByteVec()
-      contractId    <- Hash.from(contractIdRaw.bytes).toRight(Right(InvalidContractId))
-      address = Val.Address(LockupScript.p2c(contractId))
+      contractIdRaw   <- frame.popOpStackByteVec()
+      contractIdValue <- Hash.from(contractIdRaw.bytes).toRight(Right(InvalidContractId))
+      address = Val.Address(LockupScript.p2c(ContractId(contractIdValue)))
       _ <- frame.ctx.chargeGas(gas())
       _ <- frame.pushOpStack(address)
     } yield ()
@@ -1234,7 +1234,7 @@ object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
     for {
       tokenAmount  <- frame.popOpStackU256()
       tokenIdRaw   <- frame.popOpStackByteVec()
-      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       fromAddress  <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
       _ <- balanceState
@@ -1297,7 +1297,7 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
     for {
       amount       <- frame.popOpStackU256()
       tokenIdRaw   <- frame.popOpStackByteVec()
-      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
       _ <- balanceState
@@ -1325,7 +1325,7 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
     for {
       tokenIdRaw   <- frame.popOpStackByteVec()
       address      <- frame.popOpStackAddress()
-      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       balanceState <- frame.getBalanceState()
       amount <- balanceState
         .tokenRemaining(address.lockupScript, tokenId)
@@ -1388,7 +1388,7 @@ sealed trait Transfer extends AssetInstr {
     for {
       amount       <- frame.popOpStackU256()
       tokenIdRaw   <- frame.popOpStackByteVec()
-      tokenId      <- Hash.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       to           <- toThunk
       from         <- fromThunk
       balanceState <- frame.getBalanceState()
@@ -1522,18 +1522,18 @@ sealed trait CreateContractAbstract extends ContractInstr {
     }
   }
 
-  protected def getContractId[C <: StatefulContext](frame: Frame[C]): ExeResult[Hash] = {
+  protected def getContractId[C <: StatefulContext](frame: Frame[C]): ExeResult[ContractId] = {
     if (subContract) {
       for {
         parentContractId <- frame.obj.getContractId()
         path             <- frame.popOpStackByteVec()
-        subContractIdPreImage = parentContractId.bytes ++ path.bytes
+        subContractIdPreImage = parentContractId.value.bytes ++ path.bytes
         _ <- frame.ctx.chargeDoubleHash(subContractIdPreImage.length)
       } yield {
-        Hash.doubleHash(subContractIdPreImage)
+        ContractId(Hash.doubleHash(subContractIdPreImage))
       }
     } else {
-      Right(TxOutputRef.key(frame.ctx.txId, frame.ctx.nextOutputIndex))
+      Right(ContractId(TxOutputRef.key(frame.ctx.txId, frame.ctx.nextOutputIndex)))
     }
   }
 
@@ -1550,7 +1550,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
       _ <- frame.createContract(newContractId, contractCode, fields, tokenIssuanceInfo)
       _ <-
         if (frame.ctx.getHardFork().isLemanEnabled()) {
-          frame.pushOpStack(Val.ByteVec(newContractId.bytes))
+          frame.pushOpStack(Val.ByteVec(newContractId.value.bytes))
         } else {
           okay
         }
@@ -1740,7 +1740,7 @@ object SelfContractId extends ContractInstr with GasVeryLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       contractId <- frame.obj.getContractId()
-      _          <- frame.pushOpStack(Val.ByteVec(contractId.bytes))
+      _          <- frame.pushOpStack(Val.ByteVec(contractId.value.bytes))
     } yield ()
   }
 }
@@ -1750,7 +1750,7 @@ object CallerContractId extends ContractInstr with GasLow {
     for {
       callerFrame <- frame.getCallerFrame()
       contractId  <- callerFrame.obj.getContractId()
-      _           <- frame.pushOpStack(Val.ByteVec(contractId.bytes))
+      _           <- frame.pushOpStack(Val.ByteVec(contractId.value.bytes))
     } yield ()
   }
 }

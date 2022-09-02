@@ -219,23 +219,23 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode Token" in {
-    val id     = Hash.generate
+    val id     = TokenId(Hash.generate)
     val amount = ALPH.oneAlph
 
     val token: Token = Token(id, amount)
     val jsonRaw =
-      s"""{"id":"${id.toHexString}","amount":"${amount}"}"""
+      s"""{"id":"${id.value.toHexString}","amount":"${amount}"}"""
 
     checkData(token, jsonRaw)
 
-    parseFail[Token](s"""{"id":"${id.toHexString}","amount":"1 ALPH"}""")
+    parseFail[Token](s"""{"id":"${id.value.toHexString}","amount":"1 ALPH"}""")
   }
 
   it should "encode/decode Output with big amount" in {
     val amount    = Amount(U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion)))
     val amountStr = "15000000000000000000"
-    val tokenId1  = Hash.hash("token1")
-    val tokenId2  = Hash.hash("token2")
+    val tokenId1  = TokenId.hash("token1")
+    val tokenId2  = TokenId.hash("token2")
     val tokens =
       AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
     val hint = 1234
@@ -254,11 +254,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  "address": "$addressStr",
                        |  "tokens": [
                        |    {
-                       |      "id": "${tokenId1.toHexString}",
+                       |      "id": "${tokenId1.value.toHexString}",
                        |      "amount": "42"
                        |    },
                        |    {
-                       |      "id": "${tokenId2.toHexString}",
+                       |      "id": "${tokenId2.value.toHexString}",
                        |      "amount": "1000"
                        |    }
                        |  ]
@@ -310,16 +310,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     {
       info("with token balances")
-      val tokenId1 = Hash.hash("token1")
-      val tokenId2 = Hash.hash("token2")
+      val tokenId1 = TokenId.hash("token1")
+      val tokenId2 = TokenId.hash("token2")
       val tokens =
         AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
-      val tokenId3     = Hash.hash("token3")
+      val tokenId3     = TokenId.hash("token3")
       val lockedTokens = AVector(Token(tokenId3, U256.unsafe(1)))
       val response =
         Balance(amount, amount.hint, locked, locked.hint, Some(tokens), Some(lockedTokens), 1)
       val jsonRaw =
-        s"""{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","tokenBalances":[{"id":"${tokenId1.toHexString}","amount":"42"},{"id":"${tokenId2.toHexString}","amount":"1000"}],"lockedTokenBalances":[{"id":"${tokenId3.toHexString}","amount":"1"}],"utxoNum":1}"""
+        s"""{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","tokenBalances":[{"id":"${tokenId1.value.toHexString}","amount":"42"},{"id":"${tokenId2.value.toHexString}","amount":"1000"}],"lockedTokenBalances":[{"id":"${tokenId3.value.toHexString}","amount":"1"}],"utxoNum":1}"""
       checkData(response, jsonRaw, dropWhiteSpace = false)
     }
 
@@ -393,7 +393,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
 
     {
-      val tokenId1 = Hash.hash("tokenId1")
+      val tokenId1 = TokenId.hash("tokenId1")
 
       val transfer = BuildTransaction(
         fromPublicKey,
@@ -418,7 +418,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |      "attoAlphAmount": "1",
                        |      "tokens": [
                        |        {
-                       |          "id": "${tokenId1.toHexString}",
+                       |          "id": "${tokenId1.value.toHexString}",
                        |          "amount": "10"
                        |        }
                        |      ],
@@ -433,7 +433,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
 
     {
-      val tokenId1 = Hash.hash("tokenId1")
+      val tokenId1 = TokenId.hash("tokenId1")
 
       val transfer = BuildTransaction(
         fromPublicKey,
@@ -458,7 +458,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |      "attoAlphAmount": "1",
                        |      "tokens": [
                        |        {
-                       |          "id": "${tokenId1.toHexString}",
+                       |          "id": "${tokenId1.value.toHexString}",
                        |          "amount": "10"
                        |        }
                        |      ],
@@ -473,7 +473,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
 
     {
-      val tokenId1 = Hash.hash("tokenId1")
+      val tokenId1 = TokenId.hash("tokenId1")
       val otxoKey1 = Hash.hash("utxo1")
 
       val transfer = BuildTransaction(
@@ -499,7 +499,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |      "attoAlphAmount": "1",
                        |      "tokens": [
                        |        {
-                       |          "id": "${tokenId1.toHexString}",
+                       |          "id": "${tokenId1.value.toHexString}",
                        |          "amount": "10"
                        |        }
                        |      ],
@@ -688,7 +688,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode BuildDeployContractTxResult" in {
     val txId       = Hash.generate
-    val contractId = Hash.generate
+    val contractId = ContractId(Hash.generate)
     val buildDeployContractTxResult = BuildDeployContractTxResult(
       fromGroup = 2,
       toGroup = 2,
@@ -779,7 +779,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 = s"""{"attoAlphAmount": "100"}"""
     checkData(asset1, jsonRaw1)
 
-    val asset2 = AssetState.from(U256.unsafe(100), AVector(Token(Hash.zero, U256.unsafe(123))))
+    val asset2 = AssetState.from(U256.unsafe(100), AVector(Token(TokenId.zero, U256.unsafe(123))))
     val jsonRaw2 =
       s"""
          |{
@@ -801,7 +801,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       codeHash = Hash.zero,
       initialStateHash = Some(Hash.zero),
       AVector(u256, i256, bool, byteVec, address1),
-      AssetState.from(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
+      AssetState.from(ALPH.alph(1), AVector(Token(TokenId.zero, ALPH.alph(2))))
     )
     val jsonRaw =
       s"""

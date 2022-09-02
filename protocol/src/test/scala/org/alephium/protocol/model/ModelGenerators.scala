@@ -83,7 +83,9 @@ trait LockupScriptGenerators extends Generators {
       .retryUntil { hash =>
         ScriptHint.fromHash(hash).groupIndex.equals(groupIndex)
       }
-      .map(LockupScript.p2c)
+      .map { hash =>
+        LockupScript.p2c(ContractId(hash))
+      }
   }
 
   def lockupGen(groupIndex: GroupIndex): Gen[LockupScript] = {
@@ -214,9 +216,9 @@ trait TokenGenerators extends Generators with NumericHelpers {
 
   def tokenGen(inputNum: Int): Gen[(TokenId, U256)] =
     for {
-      tokenId <- hashGen
-      amount  <- amountGen(inputNum)
-    } yield (tokenId, amount)
+      tokenIdValue <- hashGen
+      amount       <- amountGen(inputNum)
+    } yield (TokenId(tokenIdValue), amount)
 
   def tokensGen(inputNum: Int, tokensNumGen: Gen[Int]): Gen[Map[TokenId, U256]] =
     for {

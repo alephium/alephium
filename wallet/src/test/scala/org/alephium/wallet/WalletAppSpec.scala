@@ -33,7 +33,7 @@ import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.protocol.model.{Address, CliqueId, NetworkId, TxGenerators}
+import org.alephium.protocol.model.{Address, CliqueId, NetworkId, TokenId, TxGenerators}
 import org.alephium.serde.serialize
 import org.alephium.util.{discard, AlephiumFutureSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.api.model._
@@ -502,8 +502,8 @@ object WalletAppSpec extends {
     }
 
     router.route().path("/addresses/:address/balance").handler { ctx =>
-      val tokens       = AVector(Token(Hash.hash("token1"), U256.One))
-      val lockedTokens = AVector(Token(Hash.hash("token2"), U256.Two))
+      val tokens       = AVector(Token(TokenId.hash("token1"), U256.One))
+      val lockedTokens = AVector(Token(TokenId.hash("token2"), U256.Two))
 
       complete(
         ctx,

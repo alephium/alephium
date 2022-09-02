@@ -204,9 +204,9 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
 
       val tokens = {
         val tokenId1 =
-          Hash.unsafe(hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822")
+          TokenId.from(hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822").value
         val tokenId2 =
-          Hash.unsafe(hex"2d257dfb825bd2c4ee87c9ebf45d6fafc1b628d3f01a85a877ca00c017fca056")
+          TokenId.from(hex"2d257dfb825bd2c4ee87c9ebf45d6fafc1b628d3f01a85a877ca00c017fca056").value
 
         AVector((tokenId1, U256.unsafe(10)), (tokenId2, U256.unsafe(20)))
       }

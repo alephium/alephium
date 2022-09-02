@@ -47,7 +47,7 @@ final case class TestInputAsset(address: Address.Asset, asset: AssetState) {
     val tokenInstrs = asset.flatTokens.flatMap[Instr[StatefulContext]] { token =>
       AVector(
         addressConst,
-        BytesConst(vm.Val.ByteVec(token.id.bytes)),
+        BytesConst(vm.Val.ByteVec(token.id.value.bytes)),
         U256Const(vm.Val.U256(token.amount)),
         ApproveToken
       )

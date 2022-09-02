@@ -235,7 +235,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     }
   }
 
-  def contractExists(contractId: Hash): ExeResult[Boolean] = {
+  def contractExists(contractId: ContractId): ExeResult[Boolean] = {
     worldState
       .contractExists(contractId)
       .left
@@ -243,18 +243,18 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def createContract(
-      contractId: Hash,
+      contractId: ContractId,
       code: StatefulContract.HalfDecoded,
       initialBalances: MutBalancesPerLockup,
       initialFields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
-  ): ExeResult[Hash] = {
+  ): ExeResult[ContractId] = {
     tokenIssuanceInfo.foreach { info =>
       info.transferTo match {
         case Some(transferTo) =>
-          outputBalances.addToken(transferTo, contractId, info.amount.v)
+          outputBalances.addToken(transferTo, TokenId.from(contractId), info.amount.v)
         case None =>
-          initialBalances.addToken(contractId, info.amount.v)
+          initialBalances.addToken(TokenId.from(contractId), info.amount.v)
       }
     }
 

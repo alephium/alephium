@@ -21,6 +21,7 @@ import org.scalacheck.Gen
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.NetworkConfigFixture
+import org.alephium.protocol.model.{ContractId, TokenId}
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler
 import org.alephium.serde._
@@ -218,7 +219,7 @@ class TransactionSpec
       val address1 = Address.p2pkh(pubKey1).toBase58
       val address2 = Address.p2pkh(pubKey2).toBase58
       val tokenId =
-        Hash.unsafe(hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822")
+        TokenId.from(hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822").value
 
       val script =
         s"""
@@ -226,7 +227,7 @@ class TransactionSpec
            |TxScript Main {
            |  verifyTxSignature!(#${pubKey1.toHexString})
            |  transferAlphFromSelf!(@$address1, 1)
-           |  transferTokenToSelf!(@$address1, #${tokenId.toHexString}, 42)
+           |  transferTokenToSelf!(@$address1, #${tokenId.value.toHexString}, 42)
            |
            |  verifyTxSignature!(#${pubKey2.toHexString})
            |  transferAlphFromSelf!(@$address2, 5)
@@ -287,11 +288,11 @@ class TransactionSpec
     {
       info("transfer multiple tokens")
       val tokenId1 =
-        Hash.unsafe(hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822")
+        TokenId.from(hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822").value
       val tokenId2 =
-        Hash.unsafe(hex"2d257dfb825bd2c4ee87c9ebf45d6fafc1b628d3f01a85a877ca00c017fca056")
+        TokenId.from(hex"2d257dfb825bd2c4ee87c9ebf45d6fafc1b628d3f01a85a877ca00c017fca056").value
       val tokenId3 =
-        Hash.unsafe(hex"825bd2b5d6fafc1b628d3f01c4ee87c9ebf4a85a877ca00c017fca0562d257df")
+        TokenId.from(hex"825bd2b5d6fafc1b628d3f01c4ee87c9ebf4a85a877ca00c017fca0562d257df").value
 
       val tx = {
         val unsignedTx = unsignedTransaction(
@@ -390,7 +391,7 @@ class TransactionSpec
       info("with contract output")
 
       val contractLockupScript = LockupScript.P2C(
-        Hash.unsafe(hex"0fa5e21a53aef6019606167b3aad9acca7bce6fd6a868642509b8c3dc7e27113")
+        ContractId.from(hex"0fa5e21a53aef6019606167b3aad9acca7bce6fd6a868642509b8c3dc7e27113").value
       )
       val contractAddress = Address.Contract(contractLockupScript).toBase58
       val script = {

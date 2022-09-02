@@ -110,7 +110,7 @@ object Lexer {
         case Some(bytes) => ByteVec(bytes)
         case None =>
           Address.extractLockupScript(string) match {
-            case Some(LockupScript.P2C(contractId)) => ByteVec(contractId.bytes)
+            case Some(LockupScript.P2C(contractId)) => ByteVec(contractId.value.bytes)
             case _ => throw Compiler.Error(s"Invalid byteVec: $string")
           }
       }
@@ -118,7 +118,7 @@ object Lexer {
   def bytes[Unknown: P]: P[Val.ByteVec] = P("#" ~ bytesInternal)
   def contractAddress[Unknown: P]: P[Val.ByteVec] =
     addressInternal.map {
-      case Val.Address(LockupScript.P2C(contractId)) => Val.ByteVec(contractId.bytes)
+      case Val.Address(LockupScript.P2C(contractId)) => Val.ByteVec(contractId.value.bytes)
       case addr => throw Compiler.Error(s"Invalid contract address: #@${addr.toBase58}")
     }
 

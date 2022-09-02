@@ -806,7 +806,9 @@ abstract class RestServerSpec(
     val end       = 100
     // No events for this contractId, see `getEvents` method for `BlockFlowDummy` in `ServerFixture.scala`
     val contractId =
-      Blake2b.unsafe(hex"e939f9c5d2ad12ea2375dcc5231f5f25db0a2ac8af426f547819e13559aa693e")
+      ContractId(
+        Blake2b.unsafe(hex"e939f9c5d2ad12ea2375dcc5231f5f25db0a2ac8af426f547819e13559aa693e")
+      )
     val contractAddress = Address.Contract(LockupScript.P2C(contractId)).toBase58
     val urlBase         = s"/events/contract/$contractAddress"
 
@@ -824,7 +826,7 @@ abstract class RestServerSpec(
   // scalastyle:off no.equal
   it should "get events for contract id with wrong group" in {
     val blockHash       = dummyBlock.hash
-    val contractId      = Hash.random
+    val contractId      = ContractId(Hash.random)
     val contractAddress = Address.Contract(LockupScript.P2C(contractId)).toBase58
     val chainIndex      = ChainIndex.from(blockHash, groupConfig.groups)
     val wrongGroup      = (chainIndex.from.value + 1) % groupConfig.groups
@@ -858,7 +860,7 @@ abstract class RestServerSpec(
                      |  "events": [
                      |    {
                      |      "blockHash": "${blockHash.toHexString}",
-                     |      "contractAddress": "${Address.contract(txId).toBase58}",
+                     |      "contractAddress": "${Address.contract(ContractId(txId)).toBase58}",
                      |      "eventIndex": 0,
                      |      "fields": [
                      |        {

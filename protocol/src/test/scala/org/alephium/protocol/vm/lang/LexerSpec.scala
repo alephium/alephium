@@ -18,7 +18,7 @@ package org.alephium.protocol.vm.lang
 
 import org.alephium.crypto.Byte32
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.protocol.vm.Val
 import org.alephium.protocol.vm.lang.ArithOperator._
 import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
@@ -83,7 +83,7 @@ class LexerSpec extends AlephiumSpec {
   it should "parse bytes and address" in {
     val hash     = Hash.random
     val address  = Address.p2pkh(PublicKey.generate)
-    val contract = Address.contract(Hash.random)
+    val contract = Address.contract(ContractId(Hash.random))
     fastparse.parse(s"#${hash.toHexString}", Lexer.bytes(_)).get.value is
       Val.ByteVec(hash.bytes)
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is
@@ -91,6 +91,6 @@ class LexerSpec extends AlephiumSpec {
     intercept[Compiler.Error](fastparse.parse(s"#${address.toBase58}", Lexer.bytes(_))) is Compiler
       .Error(s"Invalid byteVec: ${address.toBase58}")
     fastparse.parse(s"#${contract.toBase58}", Lexer.bytes(_)).get.value is
-      Val.ByteVec(contract.contractId.bytes)
+      Val.ByteVec(contract.contractId.value.bytes)
   }
 }

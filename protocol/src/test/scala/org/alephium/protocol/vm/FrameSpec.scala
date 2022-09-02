@@ -23,6 +23,7 @@ import scala.reflect.ClassTag
 
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
+import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.ContractPool.{ContractAssetInUsing}
 import org.alephium.util.{AlephiumSpec, AVector}
 
@@ -65,13 +66,13 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     def prepareContract() = {
       val (code, state, contractOutputRef, contractOutput) = generateContract().sample.get
       cachedWorldState.createContractUnsafe(
-        contractOutputRef.key,
+        ContractId(contractOutputRef.key),
         code,
         state,
         contractOutputRef,
         contractOutput
       )
-      contractOutputRef.key
+      ContractId(contractOutputRef.key)
     }
 
     val from = lockupScriptGen.sample.get

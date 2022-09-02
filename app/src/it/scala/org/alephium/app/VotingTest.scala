@@ -33,7 +33,7 @@ class VotingTest extends AlephiumActorSpec {
       buildDeployContractTx(admin, voters, U256.unsafe(voters.size))
     checkState(0, 0, false, false)
 
-    allocateTokens(admin, voters, contractId.toHexString, contractCode)
+    allocateTokens(admin, voters, contractId.value.toHexString, contractCode)
     checkState(0, 0, false, true)
 
     checkEvents(contractAddress, 0) { events =>
@@ -45,11 +45,11 @@ class VotingTest extends AlephiumActorSpec {
     val nbYes = voters.size - 1
     val nbNo  = voters.size - nbYes
     val voteForTxInfos = voters.take(nbYes).map { wallet =>
-      val txId = vote(wallet, contractId.toHexString, true, contractCode).txId
+      val txId = vote(wallet, contractId.value.toHexString, true, contractCode).txId
       (wallet.activeAddress, true, txId)
     }
     val voteAgainstTxInfos = voters.drop(nbYes).map { wallet =>
-      val txId = vote(wallet, contractId.toHexString, false, contractCode).txId
+      val txId = vote(wallet, contractId.value.toHexString, false, contractCode).txId
       (wallet.activeAddress, false, txId)
     }
     checkState(nbYes, nbNo, false, true)
@@ -60,7 +60,7 @@ class VotingTest extends AlephiumActorSpec {
 
     val countAfterVotingCasted = getEventsCurrentCount(contractAddress)
 
-    close(admin, contractId.toHexString, contractCode)
+    close(admin, contractId.value.toHexString, contractCode)
     checkState(nbYes, nbNo, true, true)
 
     checkEvents(contractAddress, countAfterVotingCasted) { events =>

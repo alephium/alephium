@@ -111,7 +111,7 @@ abstract class Frame[Ctx <: StatelessContext] {
     for {
       byteVec     <- popOpStackByteVec()
       contractKey <- Hash.from(byteVec.bytes).toRight(Right(InvalidContractAddress))
-    } yield contractKey
+    } yield ContractId(contractKey)
   }
 
   @inline
@@ -147,7 +147,7 @@ abstract class Frame[Ctx <: StatelessContext] {
   def methodFrame(index: Int): ExeResult[Frame[Ctx]]
 
   def createContract(
-      contractId: Hash,
+      contractId: ContractId,
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
@@ -219,7 +219,7 @@ final class StatelessFrame(
   // the following should not be used in stateless context
   def balanceStateOpt: Option[MutBalanceState] = None
   def createContract(
-      contractId: Hash,
+      contractId: ContractId,
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
@@ -356,7 +356,7 @@ final case class StatefulFrame(
   }
 
   def createContract(
-      contractId: Hash,
+      contractId: ContractId,
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
@@ -458,11 +458,11 @@ final case class StatefulFrame(
   }
 
   def externalMethodFrame(
-      contractKey: Hash,
+      contractId: ContractId,
       index: Int
   ): ExeResult[Frame[StatefulContext]] = {
     for {
-      contractObj <- ctx.loadContractObj(contractKey)
+      contractObj <- ctx.loadContractObj(contractId)
       method      <- contractObj.getMethod(index)
       _ <- checkLength(method.returnLength, InvalidReturnLength, InvalidExternalMethodReturnLength)
       _ <- checkLength(method.argsLength, InvalidArgLength, InvalidExternalMethodArgLength)

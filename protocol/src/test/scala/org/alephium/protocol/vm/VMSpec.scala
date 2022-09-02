@@ -250,7 +250,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val balances0    = MutBalancesPerLockup(100, mutable.Map.empty, 0)
     val (_, pubKey1) = SignatureSchema.generatePriPub()
     val address1     = Val.Address(LockupScript.p2pkh(pubKey1))
-    val tokenId      = Hash.random
+    val tokenId      = TokenId(Hash.random)
     val balances1    = MutBalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext =
@@ -323,7 +323,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       AddressConst(address1),
       AlphRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(tokenId.bytes)),
+      BytesConst(Val.ByteVec(tokenId.value.bytes)),
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U256(100), Val.U256(1), Val.U256(99)))
@@ -332,7 +332,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   it should "fail when there is no token balances" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      BytesConst(Val.ByteVec(tokenId.bytes)),
+      BytesConst(Val.ByteVec(tokenId.value.bytes)),
       TokenRemaining
     )
     fail(instrs, NoTokenBalanceForTheAddress)
@@ -346,13 +346,13 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       AddressConst(address0),
       AlphRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(tokenId.bytes)),
+      BytesConst(Val.ByteVec(tokenId.value.bytes)),
       U256Const(Val.U256(10)),
       ApproveToken,
       AddressConst(address1),
       AlphRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(tokenId.bytes)),
+      BytesConst(Val.ByteVec(tokenId.value.bytes)),
       TokenRemaining
     )
     pass(instrs, AVector[Val](Val.U256(90), Val.U256(1), Val.U256(89)))
@@ -389,7 +389,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   it should "fail when no enough balance for approval" in new BalancesFixture {
     val instrs = AVector[Instr[StatefulContext]](
       AddressConst(address0),
-      BytesConst(Val.ByteVec(tokenId.bytes)),
+      BytesConst(Val.ByteVec(tokenId.value.bytes)),
       U256Const(Val.U256(10)),
       ApproveToken
     )
@@ -404,7 +404,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       TransferAlph,
       AddressConst(address1),
       AddressConst(address0),
-      BytesConst(Val.ByteVec(tokenId.bytes)),
+      BytesConst(Val.ByteVec(tokenId.value.bytes)),
       U256Const(Val.U256(1)),
       TransferToken,
       AddressConst(address0),
@@ -412,7 +412,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       AddressConst(address1),
       AlphRemaining,
       AddressConst(address1),
-      BytesConst(Val.ByteVec(tokenId.bytes)),
+      BytesConst(Val.ByteVec(tokenId.value.bytes)),
       TokenRemaining
     )
 
@@ -571,7 +571,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
 
     def test(vm: StatefulVM, contract: StatefulContract, succeeded: Boolean) = {
-      val obj = StatefulContractObject.from(contract, AVector.empty, ContractId.random)
+      val obj = StatefulContractObject.from(contract, AVector.empty, ContractId(Hash.random))
       if (succeeded) {
         vm.execute(obj, 0, AVector.empty) match {
           case Right(res)  => res is ()

@@ -1071,7 +1071,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     } yield lockupScript
 
     forAll(p2cLockupScriptGen) { lockupScript =>
-      val bytes      = lockupScript.contractId.bytes
+      val bytes      = lockupScript.contractId.value.bytes
       val address    = Val.Address(lockupScript)
       val initialGas = context.gasRemaining
 
@@ -1727,7 +1727,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       )
     val contract = StatefulContract(1, methods = AVector(baseMethod))
 
-    val tokenId = Hash.generate
+    val tokenId = TokenId(Hash.generate)
 
     def alphBalance(lockupScript: LockupScript, amount: U256): MutBalances = {
       MutBalances(ArrayBuffer((lockupScript, MutBalancesPerLockup.alph(amount))))
@@ -1781,7 +1781,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     lazy val stack   = frame.opStack
     lazy val context = frame.ctx
 
-    lazy val contractAddress = LockupScript.p2c(ContractId.random)
+    lazy val contractAddress = LockupScript.p2c(ContractId(Hash.random))
 
     def runAndCheckGas[I <: Instr[StatefulContext] with GasSimple](
         instr: I,
@@ -1879,7 +1879,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     override lazy val frame = prepareFrame(Some(balanceState))
 
     stack.push(Val.Address(lockupScript))
-    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.ByteVec(tokenId.value.bytes))
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
     frame.balanceStateOpt.get is balanceState
@@ -1915,7 +1915,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     override lazy val frame = prepareFrame(Some(balanceState))
 
     stack.push(Val.Address(lockupScript))
-    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.ByteVec(tokenId.value.bytes))
 
     runAndCheckGas(TokenRemaining)
 
@@ -1986,7 +1986,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     override lazy val frame = prepareFrame(Some(balanceState))
 
     stack.push(Val.Address(from))
-    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.ByteVec(tokenId.value.bytes))
     stack.push(Val.U256(ALPH.oneAlph))
 
     runAndCheckGas(BurnToken)
@@ -1998,7 +1998,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
 
     stack.push(Val.Address(from))
-    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.ByteVec(tokenId.value.bytes))
     stack.push(Val.U256(ALPH.alph(2)))
 
     BurnToken.runWith(frame).leftValue isE NotEnoughBalance
@@ -2084,7 +2084,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "TransferAlphFromSelf" in new ContractOutputFixture {
-    val from = LockupScript.P2C(contractOutputRef.key)
+    val from = LockupScript.P2C(ContractId(contractOutputRef.key))
     val to   = assetLockupScriptGen.sample.get
 
     val balanceState =
@@ -2107,7 +2107,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "TransferAlphToSelf" in new ContractOutputFixture {
     val from = lockupScriptGen.sample.get
-    val to   = LockupScript.P2C(contractOutputRef.key)
+    val to   = LockupScript.P2C(ContractId(contractOutputRef.key))
 
     val balanceState =
       MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
@@ -2135,7 +2135,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(Val.Address(from))
     stack.push(Val.Address(to))
-    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.ByteVec(tokenId.value.bytes))
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
     runAndCheckGas(TransferToken)
@@ -2146,13 +2146,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(Val.Address(from))
     stack.push(Val.Address(contractAddress))
-    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.ByteVec(tokenId.value.bytes))
     stack.push(Val.U256(ALPH.oneNanoAlph))
     TransferToken.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
   }
 
   it should "TransferTokenFromSelf" in new ContractOutputFixture {
-    val from = LockupScript.P2C(contractOutputRef.key)
+    val from = LockupScript.P2C(ContractId(contractOutputRef.key))
     val to   = assetLockupScriptGen.sample.get
 
     val balanceState =
@@ -2164,7 +2164,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       prepareFrame(Some(balanceState), Some((contractOutput, contractOutputRef)))
 
     stack.push(Val.Address(to))
-    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.ByteVec(tokenId.value.bytes))
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
     runAndCheckGas(TransferTokenFromSelf)
@@ -2174,14 +2174,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
 
     stack.push(Val.Address(contractAddress))
-    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.ByteVec(tokenId.value.bytes))
     stack.push(Val.U256(ALPH.oneNanoAlph))
     TransferTokenFromSelf.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
   }
 
   it should "TransferTokenToSelf" in new ContractOutputFixture {
     val from = lockupScriptGen.sample.get
-    val to   = LockupScript.P2C(contractOutputRef.key)
+    val to   = LockupScript.P2C(ContractId(contractOutputRef.key))
 
     val balanceState =
       MutBalanceState.from(
@@ -2192,7 +2192,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       prepareFrame(Some(balanceState), Some((contractOutput, contractOutputRef)))
 
     stack.push(Val.Address(from))
-    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.ByteVec(tokenId.value.bytes))
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
     runAndCheckGas(TransferTokenToSelf)
@@ -2229,7 +2229,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         attoAlphAmount: U256,
         tokens: AVector[(TokenId, U256)],
         tokenAmount: Option[U256],
-        expectedContractId: Option[Hash] = None
+        expectedContractId: Option[ContractId] = None
     ) = {
       val initialGas = context.gasRemaining
       instr.runWith(frame) isE ()
@@ -2249,15 +2249,16 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         instr.gas().value + fields.length + extraGas
       )
       frame.opStack.size is 1
-      val contractId = Hash.from(frame.popOpStackByteVec().rightValue.bytes).get
+      val contractId = ContractId.from(frame.popOpStackByteVec().rightValue.bytes).get
       expectedContractId.foreach { _ is contractId }
 
       val contractState = frame.ctx.worldState.getContractState(contractId).rightValue
       contractState.fields is fields
       val contractOutput =
         frame.ctx.worldState.getContractAsset(contractState.contractOutputRef).rightValue
+      val tokenId = TokenId(contractId.value)
       val allTokens = tokenAmount match {
-        case Some(amount) => tokens :+ (contractId -> amount)
+        case Some(amount) => tokens :+ (tokenId -> amount)
         case None         => tokens
       }
       contractOutput.tokens.toSet is allTokens.toSet
@@ -2341,7 +2342,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(contractBytes))
     stack.push(Val.ByteVec(serialize(fields)))
 
-    val subContractId = Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01"))
+    val subContractId =
+      ContractId(Hash.doubleHash(fromContractId.value.bytes ++ serialize("nft-01")))
     test(CreateSubContract, ALPH.oneAlph, AVector.empty, None, Some(subContractId))
   }
 
@@ -2357,7 +2359,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(serialize(fields)))
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
-    val subContractId = Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01"))
+    val subContractId =
+      ContractId(Hash.doubleHash(fromContractId.value.bytes ++ serialize("nft-01")))
     test(
       CreateSubContractWithToken,
       U256.Zero,
@@ -2385,7 +2388,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(Val.U256(ALPH.oneNanoAlph))
       stack.push(Val.Address(assetGen.sample.get))
 
-      val subContractId = Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01"))
+      val subContractId =
+        ContractId(Hash.doubleHash(fromContractId.value.bytes ++ serialize("nft-01")))
       test(
         CreateSubContractAndTransferToken,
         U256.Zero,
@@ -2424,7 +2428,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val contract   = StatefulContract(0, AVector(contractMethod))
       val (obj, ctx) = prepareContract(contract, AVector.empty[Val])
       val instrs = AVector[Instr[StatefulContext]](
-        BytesConst(Val.ByteVec(obj.contractId.bytes)),
+        BytesConst(Val.ByteVec(obj.contractId.value.bytes)),
         CallExternal(0)
       )
       val scriptMethod = Method[StatefulContext](
@@ -2563,7 +2567,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
     CopyCreateContract.runWith(frame).leftValue isE a[NonExistContract]
 
-    stack.push(Val.ByteVec(fromContractId.bytes))
+    stack.push(Val.ByteVec(fromContractId.value.bytes))
     stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
     test(CopyCreateContract, ALPH.oneAlph, AVector.empty, None)
   }
@@ -2581,7 +2585,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(ALPH.oneNanoAlph))
     CopyCreateContractWithToken.runWith(frame).leftValue isE a[NonExistContract]
 
-    stack.push(Val.ByteVec(fromContractId.bytes))
+    stack.push(Val.ByteVec(fromContractId.value.bytes))
     stack.push(state)
     stack.push(Val.U256(ALPH.oneNanoAlph))
     test(
@@ -2605,7 +2609,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("create contract and transfer token")
 
-      stack.push(Val.ByteVec(fromContractId.bytes))
+      stack.push(Val.ByteVec(fromContractId.value.bytes))
       stack.push(state)
       stack.push(Val.U256(ALPH.oneNanoAlph))
       stack.push(assetAddress)
@@ -2647,10 +2651,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     CopyCreateSubContract.runWith(frame).leftValue isE a[NonExistContract]
 
     stack.push(Val.ByteVec(serialize("nft-01")))
-    stack.push(Val.ByteVec(fromContractId.bytes))
+    stack.push(Val.ByteVec(fromContractId.value.bytes))
     stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
 
-    val subContractId = Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01"))
+    val subContractId =
+      ContractId(Hash.doubleHash(fromContractId.value.bytes ++ serialize("nft-01")))
     test(CopyCreateSubContract, ALPH.oneAlph, AVector.empty, None, Some(subContractId))
   }
 
@@ -2668,11 +2673,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     CopyCreateSubContractWithToken.runWith(frame).leftValue isE a[NonExistContract]
 
     stack.push(Val.ByteVec(serialize("nft-01")))
-    stack.push(Val.ByteVec(fromContractId.bytes))
+    stack.push(Val.ByteVec(fromContractId.value.bytes))
     stack.push(state)
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
-    val subContractId = Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01"))
+    val subContractId =
+      ContractId(Hash.doubleHash(fromContractId.value.bytes ++ serialize("nft-01")))
     test(
       CopyCreateSubContractWithToken,
       U256.Zero,
@@ -2696,12 +2702,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       info("copy create sub contract and transfer token")
 
       stack.push(Val.ByteVec(serialize("nft-01")))
-      stack.push(Val.ByteVec(fromContractId.bytes))
+      stack.push(Val.ByteVec(fromContractId.value.bytes))
       stack.push(state)
       stack.push(Val.U256(ALPH.oneNanoAlph))
       stack.push(assetAddress)
 
-      val subContractId = Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01"))
+      val subContractId =
+        ContractId(Hash.doubleHash(fromContractId.value.bytes ++ serialize("nft-01")))
       test(
         CopyCreateSubContractAndTransferToken,
         U256.Zero,
@@ -2759,7 +2766,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val callerFrame = prepareFrame().asInstanceOf[StatefulFrame]
 
-    val from = LockupScript.P2C(contractOutputRef.key)
+    val from = LockupScript.P2C(ContractId(contractOutputRef.key))
 
     val balanceState =
       MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
@@ -2794,7 +2801,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "SelfContractId" in new ContractInstrFixture {
-    test(SelfContractId, Val.ByteVec(frame.obj.contractIdOpt.get.bytes))
+    test(SelfContractId, Val.ByteVec(frame.obj.contractIdOpt.get.value.bytes))
   }
 
   it should "SelfAddress" in new ContractInstrFixture {
@@ -2807,7 +2814,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "CallerContractId" in new CallerFrameFixture {
-    test(CallerContractId, Val.ByteVec(callerFrame.obj.contractIdOpt.get.bytes))
+    test(CallerContractId, Val.ByteVec(callerFrame.obj.contractIdOpt.get.value.bytes))
   }
 
   it should "CallerAddress" in new CallerFrameFixture with TxEnvFixture {
@@ -2898,7 +2905,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "ContractInitialStateHash" in new ContractInstrFixture {
-    stack.push(Val.ByteVec(frame.obj.contractIdOpt.get.bytes))
+    stack.push(Val.ByteVec(frame.obj.contractIdOpt.get.value.bytes))
     ContractInitialStateHash.runWith(frame) isE ()
 
     stack.size is 1
@@ -2908,7 +2915,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "ContractCodeHash" in new ContractInstrFixture {
-    stack.push(Val.ByteVec(frame.obj.contractIdOpt.get.bytes))
+    stack.push(Val.ByteVec(frame.obj.contractIdOpt.get.value.bytes))
     ContractCodeHash.runWith(frame) isE ()
 
     stack.size is 1

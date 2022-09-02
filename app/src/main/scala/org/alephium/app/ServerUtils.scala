@@ -361,7 +361,7 @@ class ServerUtils(implicit
     for {
       groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
       chainIndex = ChainIndex(groupIndex, groupIndex)
-      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId))
+      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId.value))
       count    <- countOpt.toRight(notFound(s"Current events count for contract $contractAddress"))
     } yield count
   }
@@ -469,7 +469,7 @@ class ServerUtils(implicit
                 Right(
                   ContractEventByTxId(
                     logStates.blockHash,
-                    Address.contract(logStates.eventKey),
+                    Address.contract(ContractId(logStates.eventKey)),
                     state.index.toInt,
                     state.fields.map(Val.from)
                   )
@@ -492,7 +492,7 @@ class ServerUtils(implicit
     wrapResult(
       blockFlow
         .getEvents(
-          contractId,
+          contractId.value,
           start,
           endOpt.getOrElse(start + CounterRange.MaxCounterRange)
         )
@@ -1018,7 +1018,7 @@ class ServerUtils(implicit
           AVector(
             ContractEventByTxId(
               logStates.blockHash,
-              Address.contract(logStates.eventKey),
+              Address.contract(ContractId(logStates.eventKey)),
               state.index.toInt,
               state.fields.map(Val.from)
             )
@@ -1117,7 +1117,7 @@ class ServerUtils(implicit
       AVector[Instr[StatefulContext]](
         ConstInstr.u256(vm.Val.U256(U256.unsafe(argLength))),
         ConstInstr.u256(vm.Val.U256(U256.unsafe(returnLength))),
-        BytesConst(vm.Val.ByteVec(contractId.bytes)),
+        BytesConst(vm.Val.ByteVec(contractId.value.bytes)),
         CallExternal(methodIndex.toByte)
       )
   }
@@ -1157,7 +1157,7 @@ class ServerUtils(implicit
       asset: AssetState
   ): Try[Unit] = {
     val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
-    val outputRef  = ContractOutputRef.unsafe(outputHint, contractId)
+    val outputRef  = ContractOutputRef.unsafe(outputHint, contractId.value)
     val output     = asset.toContractOutput(contractId)
     wrapResult(
       worldState.createContractUnsafe(
@@ -1262,7 +1262,7 @@ object ServerUtils {
     } else {
       val approveTokens = initialTokenAmounts
         .map { token =>
-          s"#${token.id.toHexString}: ${token.amount.v}"
+          s"#${token.id.value.toHexString}: ${token.amount.v}"
         }
         .mkString(", ")
       val approveAssets = s"{@$address -> ${initialAttoAlphAmount.v}, $approveTokens}"

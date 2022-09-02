@@ -14,9 +14,26 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.protocol.model
 
-import org.alephium.protocol.model.TokenId
-import org.alephium.util.U256
+import akka.util.ByteString
 
-final case class Token(id: TokenId, amount: U256)
+import org.alephium.protocol.Hash
+import org.alephium.serde.Serde
+
+final case class ContractId(value: Hash) extends AnyVal
+
+object ContractId {
+  implicit val serde: Serde[ContractId] = Serde.forProduct1(ContractId.apply, t => t.value)
+
+  val zero: ContractId = ContractId(Hash.zero)
+  val length: Int      = Hash.length
+
+  def from(bytes: ByteString): Option[ContractId] = {
+    Hash.from(bytes).map(ContractId.apply)
+  }
+
+  def hash(str: String): ContractId = {
+    ContractId(Hash.hash(str))
+  }
+}
