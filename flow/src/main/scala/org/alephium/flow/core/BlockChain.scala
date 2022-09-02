@@ -23,9 +23,9 @@ import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.{ALPH, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
-import org.alephium.protocol.model.{Block, ChainIndex, Weight}
+import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, Weight}
 import org.alephium.protocol.vm.WorldState
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}

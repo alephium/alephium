@@ -16,8 +16,8 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.BlockHash
 import org.alephium.util.Bytes
 
 class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
@@ -85,7 +85,7 @@ object ChainIndex {
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def from(hash: BlockHash, groups: Int): ChainIndex = {
-    val bytes = hash.bytes
+    val bytes = hash.value.bytes
     assume(bytes.length >= 2)
 
     val beforeLast = Bytes.toPosInt(bytes(bytes.length - 2))

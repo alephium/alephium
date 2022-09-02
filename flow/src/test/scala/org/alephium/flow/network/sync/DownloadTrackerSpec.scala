@@ -22,8 +22,7 @@ import akka.testkit.TestActorRef
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.broker.BrokerHandler
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.model.{BlockHash, ChainIndex}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 class DownloadTrackerSpec extends AlephiumFlowActorSpec {

@@ -24,7 +24,7 @@ import sttp.tapir.EndpointIO.Example
 import org.alephium.api.model._
 import org.alephium.protocol._
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{Address, CliqueId, ContractId, NetworkId, TokenId}
+import org.alephium.protocol.model.{Address, BlockHash, CliqueId, ContractId, NetworkId, TokenId}
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._

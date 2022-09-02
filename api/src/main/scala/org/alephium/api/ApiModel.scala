@@ -28,11 +28,12 @@ import org.alephium.api.model._
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.json.Json._
 import org.alephium.json.Json.{ReadWriter => RW}
-import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
+import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{
   Address,
+  BlockHash,
   CliqueId,
   ContractId,
   GroupIndex,
@@ -119,7 +120,7 @@ trait ApiModelCodec {
     byteStringReader.map(Hash.from(_).getOrElse(throw new Abort("cannot decode hash")))
 
   implicit val blockHashWriter: Writer[BlockHash] = StringWriter.comap[BlockHash](
-    _.toHexString
+    _.value.toHexString
   )
   implicit val blockHashReader: Reader[BlockHash] =
     byteStringReader.map(BlockHash.from(_).getOrElse(throw new Abort("cannot decode block hash")))

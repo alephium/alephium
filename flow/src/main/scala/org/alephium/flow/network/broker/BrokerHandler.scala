@@ -29,10 +29,10 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.{InvalidHeaderStatus, Validation}
 import org.alephium.io.IOResult
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{Block, BrokerInfo, ChainIndex, FlowData}
+import org.alephium.protocol.model.{Block, BlockHash, BrokerInfo, ChainIndex, FlowData}
 import org.alephium.util._
 
 object BrokerHandler {
@@ -129,7 +129,7 @@ trait BrokerHandler extends FlowDataHandler {
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
       log.debug(
-        s"Download #${hashes.length} blocks ${Utils.showDigest(hashes)} from $remoteAddress"
+        s"Download #${hashes.length} blocks ${Utils.showDigest(hashes.map(_.value))} from $remoteAddress"
       )
       send(BlocksRequest(hashes))
     case Received(NewBlock(block)) =>

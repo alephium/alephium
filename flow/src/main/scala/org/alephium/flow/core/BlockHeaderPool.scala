@@ -17,8 +17,7 @@
 package org.alephium.flow.core
 
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.{BlockHeader, Weight}
+import org.alephium.protocol.model.{BlockHash, BlockHeader, Weight}
 import org.alephium.util.AVector
 
 trait BlockHeaderPool extends BlockHashPool {

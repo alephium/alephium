@@ -22,8 +22,9 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
+import org.alephium.crypto.Blake3
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
-import org.alephium.protocol.{ALPH, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Duration}
 
@@ -103,7 +104,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     genesis.blockDeps.deps.foreach(_ is BlockHash.zero)
 
     val correctDeps = genesis.blockDeps.deps
-    val nonZeroHash = BlockHash.hash(1)
+    val nonZeroHash = BlockHash(Blake3.hash(1))
     correctDeps.indices.foreach { k =>
       val modified = genesis.copy(blockDeps = BlockDeps.unsafe(correctDeps.replace(k, nonZeroHash)))
       failValidation(modified, InvalidGenesisDeps)

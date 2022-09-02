@@ -18,9 +18,9 @@ package org.alephium.api.model
 
 import org.alephium.api.{badRequest, Try}
 import org.alephium.api.model.TestContract._
-import org.alephium.protocol.{ALPH, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, ContractId, GroupIndex}
+import org.alephium.protocol.model.{Address, BlockHash, ContractId, GroupIndex}
 import org.alephium.protocol.vm.{ContractState => _, Val => _, _}
 import org.alephium.util.AVector
 

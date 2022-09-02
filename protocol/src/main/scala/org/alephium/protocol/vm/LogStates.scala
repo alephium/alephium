@@ -16,7 +16,8 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.BlockHash
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, I256}
 

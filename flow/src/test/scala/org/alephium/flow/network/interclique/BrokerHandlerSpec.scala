@@ -35,10 +35,10 @@ import org.alephium.flow.network.broker.{InboundBrokerHandler => BaseInboundBrok
 import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.{BlockHash, Generators, Hash}
+import org.alephium.protocol.{Generators, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{ChainIndex, CliqueInfo, NoIndexModelGeneratorsLike}
+import org.alephium.protocol.model.{BlockHash, ChainIndex, CliqueInfo, NoIndexModelGeneratorsLike}
 import org.alephium.util.{ActorRefT, AVector, TimeStamp, UnsecureRandom}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec {

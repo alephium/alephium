@@ -16,8 +16,8 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.{Address, ContractId}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.{Address, BlockHash, ContractId}
 import org.alephium.protocol.vm.{LockupScript, LogState, LogStateRef, LogStates}
 import org.alephium.util.AVector
 

@@ -17,8 +17,7 @@
 package org.alephium.flow.core
 
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.{Block, BlockDeps, BlockHeader, GroupIndex}
+import org.alephium.protocol.model.{Block, BlockDeps, BlockHash, BlockHeader, GroupIndex}
 import org.alephium.util.AVector
 
 trait BlockFlowValidation extends ConflictedBlocks with FlowTipsUtil { self: BlockFlow =>

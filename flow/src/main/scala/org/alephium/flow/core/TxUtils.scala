@@ -26,7 +26,7 @@ import org.alephium.flow.core.FlowUtils._
 import org.alephium.flow.core.UtxoSelectionAlgo.{AssetAmounts, ProvidedGas}
 import org.alephium.flow.gasestimation._
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey}
+import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}

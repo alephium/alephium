@@ -23,7 +23,7 @@ import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOResult, KeyValueStorage}
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._

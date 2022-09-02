@@ -21,8 +21,9 @@ import scala.collection.immutable.ArraySeq
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.MerkleHashable
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.model.BlockHash
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -136,7 +137,7 @@ object Block {
       val initialSeed = {
         val maxIndex = nonCoinbaseLength - 1
         val samples  = ArraySeq(0, maxIndex / 2, maxIndex)
-        samples.foldLeft(Hash.unsafe(parentHash.bytes)) { case (acc, index) =>
+        samples.foldLeft(Hash.unsafe(parentHash.value.bytes)) { case (acc, index) =>
           val tx = nonCoinbase(index)
           Hash.xor(acc, tx.id)
         }

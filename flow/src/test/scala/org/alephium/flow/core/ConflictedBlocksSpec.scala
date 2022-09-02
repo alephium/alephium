@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.{BlockHash, Hash, Signature}
+import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}

@@ -19,8 +19,8 @@ package org.alephium.flow.network.sync
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
+import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{AVector, BaseActor, TimeStamp}
 
 object BlockFetcher {

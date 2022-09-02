@@ -30,7 +30,7 @@ import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
-import org.alephium.protocol.{vm, BlockHash, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{vm, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo

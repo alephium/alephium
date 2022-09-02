@@ -25,7 +25,7 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.io.RocksDBSource.Settings
-import org.alephium.protocol.{ALPH, BlockHash}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LogConfig, WorldState}
@@ -400,11 +400,11 @@ object BlockFlow extends StrictLogging {
     def shuffle(index: Int, seed: BlockHash): Unit = {
       if (index < groupOrders.length - 1) {
         val groupRemaining = groupOrders.length - index
-        val randomIndex    = index + Math.floorMod(seed.toRandomIntUnsafe, groupRemaining)
+        val randomIndex    = index + Math.floorMod(seed.value.toRandomIntUnsafe, groupRemaining)
         val tmp            = groupOrders(index)
         groupOrders(index) = groupOrders(randomIndex)
         groupOrders(randomIndex) = tmp
-        shuffle(index + 1, BlockHash.hash(seed.bytes))
+        shuffle(index + 1, BlockHash.hash(seed.value.bytes))
       }
     }
 

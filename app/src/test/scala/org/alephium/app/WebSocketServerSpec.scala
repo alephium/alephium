@@ -29,10 +29,11 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.model.BlockEntry
+import org.alephium.crypto.Blake3
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json._
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util._
@@ -50,7 +51,7 @@ class WebSocketServerSpec
   behavior of "http"
 
   it should "encode BlockNotify" in new Fixture {
-    val dep  = BlockHash.hash("foo")
+    val dep  = BlockHash(Blake3.hash("foo"))
     val deps = AVector.fill(groupConfig.depsNum)(dep)
     val header =
       BlockHeader.unsafeWithRawDeps(

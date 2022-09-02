@@ -18,7 +18,8 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{BlockHash, PublicKey}
+import org.alephium.protocol.PublicKey
+import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
 

@@ -30,7 +30,7 @@ import org.alephium.api.TapirSchemasLike
 import org.alephium.api.UtilJson.{avectorReadWriter, inetAddressRW}
 import org.alephium.api.model._
 import org.alephium.json.Json.ReadWriter
-import org.alephium.protocol.{ALPH, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}

@@ -21,7 +21,8 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.{LogStates, LogStatesId, WorldState}
 
 trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {

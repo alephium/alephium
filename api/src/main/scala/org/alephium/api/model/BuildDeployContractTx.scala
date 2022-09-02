@@ -19,7 +19,8 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.{vm, BlockHash, PublicKey}
+import org.alephium.protocol.{vm, PublicKey}
+import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
 import org.alephium.serde._
 import org.alephium.util.AVector

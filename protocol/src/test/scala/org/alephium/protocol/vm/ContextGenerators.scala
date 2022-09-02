@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.{BlockHash, Hash, Signature}
+import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}

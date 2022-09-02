@@ -27,7 +27,7 @@ import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.core.BlockFlowState.{BlockCache, Confirmed}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.protocol.{ALPH, BlockHash, Generators}
+import org.alephium.protocol.{ALPH, Generators}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript

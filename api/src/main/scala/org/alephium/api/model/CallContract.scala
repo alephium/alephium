@@ -17,9 +17,9 @@
 package org.alephium.api.model
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex}
+import org.alephium.protocol.model.{Address, BlockHash, ChainIndex, GroupIndex}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))

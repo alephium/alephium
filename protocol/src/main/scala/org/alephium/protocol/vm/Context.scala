@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.IOError
-import org.alephium.protocol.{BlockHash, Hash, Signature}
+import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.TokenIssuance
