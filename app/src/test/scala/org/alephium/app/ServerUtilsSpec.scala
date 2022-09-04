@@ -1053,6 +1053,123 @@ class ServerUtilsSpec extends AlephiumSpec {
     assetOutput.attoAlphAmount is Amount(ALPH.alph(2).subUnsafe(defaultGasPrice * maximalGasPerTx))
   }
 
+  trait DestroyFixture extends Fixture {
+    val (_, pubKey)  = SignatureSchema.generatePriPub()
+    val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
+
+    val fooContractId = Hash.random
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn destroy(address: Address) -> () {
+         |    destroySelf!(address)
+         |  }
+         |}
+         |""".stripMargin
+    val fooContract = Compiler.compileContract(foo).rightValue
+
+    val fooCallerContractId = Hash.random
+    def fooCaller: String
+    val fooCallerContract = Compiler.compileContract(fooCaller).rightValue
+
+    val bar =
+      s"""
+         |Contract Bar() {
+         |  pub fn bar() -> () {
+         |    FooCaller(#${fooCallerContractId.toHexString}).destroyFoo()
+         |  }
+         |}
+         |
+         |$fooCaller
+         |""".stripMargin
+
+    val barContract   = Compiler.compileContract(bar).rightValue
+    val barContractId = Hash.random
+    val existingContracts = AVector(
+      ContractState(
+        Address.contract(fooCallerContractId),
+        fooCallerContract,
+        fooCallerContract.hash,
+        None,
+        AVector(ValByteVec(fooContractId.bytes)),
+        AssetState(ALPH.oneAlph)
+      ),
+      ContractState(
+        Address.contract(fooContractId),
+        fooContract,
+        fooContract.hash,
+        None,
+        AVector.empty[Val],
+        AssetState(ALPH.oneAlph)
+      )
+    )
+    val testContractParams = TestContract(
+      address = Some(Address.contract(barContractId)),
+      bytecode = barContract,
+      initialAsset = Some(AssetState(ALPH.alph(10))),
+      existingContracts = Some(existingContracts),
+      inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
+    )
+
+    val testFlow    = BlockFlow.emptyUnsafe(config)
+    val serverUtils = new ServerUtils()
+  }
+
+  it should "successfully destroy contracts and transfer fund to calling address" in new DestroyFixture {
+    override def fooCaller: String =
+      s"""
+         |Contract FooCaller(fooId: ByteVec) {
+         |  @using(assetsInContract = true)
+         |  pub fn destroyFoo() -> () {
+         |    let foo = Foo(fooId)
+         |    foo.destroy(selfAddress!())
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+
+    val result = serverUtils
+      .runTestContract(
+        testFlow,
+        testContractParams.toComplete().rightValue
+      )
+      .rightValue
+    result.contracts.length is 2
+    result.contracts(0).address is Address.contract(fooCallerContractId)
+    result.contracts(1).address is Address.contract(barContractId)
+    val assetOutput = result.txOutputs(1)
+    assetOutput.address is assetAddress
+    val totalGas = defaultGasPrice * maximalGasPerTx
+    assetOutput.attoAlphAmount is Amount(ALPH.oneAlph.subUnsafe(totalGas))
+    val contractOutput = result.txOutputs(0)
+    contractOutput.address is Address.contract(fooCallerContractId)
+    contractOutput.attoAlphAmount.value is ALPH.alph(2)
+  }
+
+  it should "fail to destroy contracts and transfer fund to non-calling address" in new DestroyFixture {
+    override def fooCaller: String =
+      s"""
+         |Contract FooCaller(fooId: ByteVec) {
+         |  pub fn destroyFoo() -> () {
+         |    let foo = Foo(fooId)
+         |    foo.destroy(@${Address.contract(Hash.random).toBase58})
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+
+    serverUtils
+      .runTestContract(
+        testFlow,
+        testContractParams.toComplete().rightValue
+      )
+      .leftValue
+      .detail is "PayToContractAddressNotInCallerTrace"
+  }
+
   trait TestContractFixture extends Fixture {
     val tokenId         = Hash.random
     val (_, pubKey)     = SignatureSchema.generatePriPub()

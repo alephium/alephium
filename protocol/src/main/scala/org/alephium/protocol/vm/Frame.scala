@@ -153,7 +153,7 @@ abstract class Frame[Ctx <: StatelessContext] {
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId]
 
-  def destroyContract(address: LockupScript): ExeResult[Unit]
+  def destroyContract(refundAddress: LockupScript): ExeResult[Unit]
 
   def checkPayToContractAddressInCallerTrace(address: LockupScript.P2C): ExeResult[Unit]
 
@@ -224,7 +224,7 @@ final class StatelessFrame(
       fields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId] = StatelessFrame.notAllowed
-  def destroyContract(address: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
+  def destroyContract(refundAddress: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
   def checkPayToContractAddressInCallerTrace(address: LockupScript.P2C): ExeResult[Unit] =
     StatelessFrame.notAllowed
   def migrateContract(
@@ -375,8 +375,9 @@ final case class StatefulFrame(
     } yield contractId
   }
 
-  def destroyContract(address: LockupScript): ExeResult[Unit] = {
+  def destroyContract(refundAddress: LockupScript): ExeResult[Unit] = {
     for {
+      _           <- checkDestroyContractRecipientAddress(refundAddress)
       contractId  <- obj.getContractId()
       callerFrame <- getCallerFrame()
       _ <- callerFrame.checkNonRecursive(contractId, ContractDestructionShouldNotBeCalledFromSelf)
@@ -384,7 +385,7 @@ final case class StatefulFrame(
       contractAssets <- balanceState
         .useAll(LockupScript.p2c(contractId))
         .toRight(Right(InvalidBalances))
-      _ <- ctx.destroyContract(contractId, contractAssets, address)
+      _ <- ctx.destroyContract(contractId, contractAssets, refundAddress)
       _ <- ctx.writeLog(
         Some(destroyContractEventId),
         AVector(destroyContractEventIndex, Val.Address(LockupScript.p2c(contractId)))
@@ -392,6 +393,18 @@ final case class StatefulFrame(
       _ <- runReturn()
     } yield {
       pc -= 1 // because of the `advancePC` call following this instruction
+    }
+  }
+
+  def checkDestroyContractRecipientAddress(refundAddress: LockupScript): ExeResult[Unit] = {
+    refundAddress match {
+      case _: LockupScript.Asset => okay
+      case contractAddr: LockupScript.P2C =>
+        if (ctx.getHardFork().isLemanEnabled()) {
+          checkPayToContractAddressInCallerTrace(contractAddr)
+        } else {
+          failed(InvalidAddressTypeInContractDestroy)
+        }
     }
   }
 
