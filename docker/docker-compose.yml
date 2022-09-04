@@ -10,6 +10,11 @@ services:
   alephium:
     image: alephium/alephium:latest
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "150m"
+        max-file: "30"
     ports:
       # 9973 (udp and tcp) is used for external p2p connection and must be exposed
       - 9973:9973/tcp
