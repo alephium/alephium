@@ -43,7 +43,7 @@ object Dependencies {
   lazy val scalatest       = "org.scalatest"              %% "scalatest"       % "3.2.12"  % Test
   lazy val scalatestplus   = "org.scalatestplus"          %% "scalacheck-1-14" % "3.2.2.0" % Test
   lazy val weupnp          = "org.bitlet"                  % "weupnp"          % "0.1.4"
-  lazy val janino          = "org.codehaus.janino"         % "janino"          % "3.1.7"
+  lazy val janino          = "org.codehaus.janino"         % "janino"          % "3.1.8"
 
   def `scala-reflect`(scalaVersion: String) = "org.scala-lang" % "scala-reflect" % scalaVersion
 
