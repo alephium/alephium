@@ -325,17 +325,17 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def isTxConfirmed(txId: Hash, chainIndex: ChainIndex): IOResult[Boolean] = {
+  def isTxConfirmed(txId: TransactionId, chainIndex: ChainIndex): IOResult[Boolean] = {
     assume(brokerConfig.contains(chainIndex.from))
     val chain = getBlockChain(chainIndex)
-    chain.isTxConfirmed(txId)
+    chain.isTxConfirmed(txId.value)
   }
 
-  def getTxStatus(txId: Hash, chainIndex: ChainIndex): IOResult[Option[TxStatus]] =
+  def getTxStatus(txId: TransactionId, chainIndex: ChainIndex): IOResult[Option[TxStatus]] =
     IOUtils.tryExecute {
       assume(brokerConfig.contains(chainIndex.from))
       val chain = getBlockChain(chainIndex)
-      chain.getTxStatusUnsafe(txId).flatMap { chainStatus =>
+      chain.getTxStatusUnsafe(txId.value).flatMap { chainStatus =>
         val confirmations = chainStatus.confirmations
         if (chainIndex.isIntraGroup) {
           Some(Confirmed(chainStatus.index, confirmations, confirmations, confirmations))
@@ -430,7 +430,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def searchLocalTransactionStatus(
-      txId: Hash,
+      txId: TransactionId,
       chainIndexes: AVector[ChainIndex]
   ): Either[String, Option[TxStatus]] = {
     @tailrec
@@ -454,7 +454,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def getTransactionStatus(
-      txId: Hash,
+      txId: TransactionId,
       chainIndex: ChainIndex
   ): Either[String, Option[TxStatus]] = {
     if (brokerConfig.contains(chainIndex.from)) {
@@ -472,8 +472,8 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def isInMemPool(txId: Hash, chainIndex: ChainIndex): Boolean = {
-    Self.blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
+  def isInMemPool(txId: TransactionId, chainIndex: ChainIndex): Boolean = {
+    Self.blockFlow.getMemPool(chainIndex).contains(chainIndex, txId.value)
   }
 
   def checkTxChainIndex(chainIndex: ChainIndex, tx: Hash): Either[String, Unit] = {

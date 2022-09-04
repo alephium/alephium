@@ -50,7 +50,7 @@ class MemPool private (
   def size: Int = sharedPools.sumBy(_.size) + pendingPool.size
 
   def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean = {
-    contains(index, transaction.id)
+    contains(index, transaction.id.value)
   }
 
   def contains(index: ChainIndex, txId: Hash): Boolean =

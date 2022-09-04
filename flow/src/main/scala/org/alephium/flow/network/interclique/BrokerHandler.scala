@@ -23,18 +23,24 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
-import org.alephium.protocol.Hash
 import org.alephium.protocol.message._
 import org.alephium.protocol.mining.PoW
-import org.alephium.protocol.model.{Block, BlockHash, BrokerInfo, ChainIndex, TransactionTemplate}
+import org.alephium.protocol.model.{
+  Block,
+  BlockHash,
+  BrokerInfo,
+  ChainIndex,
+  TransactionId,
+  TransactionTemplate
+}
 import org.alephium.util.{ActorRefT, AVector, Cache}
 
 trait BrokerHandler extends BaseBrokerHandler {
   val maxBlockCapacity: Int              = brokerConfig.groupNumPerBroker * brokerConfig.groups * 10
   val maxTxsCapacity: Int                = maxBlockCapacity * 32
   val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](maxBlockCapacity)
-  val seenTxs: Cache[Hash, Unit]         = Cache.fifo[Hash, Unit](maxTxsCapacity)
-  val maxForkDepth: Int                  = systemMaxForkDepth
+  val seenTxs: Cache[TransactionId, Unit] = Cache.fifo[TransactionId, Unit](maxTxsCapacity)
+  val maxForkDepth: Int                   = systemMaxForkDepth
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 
@@ -102,13 +108,13 @@ trait BrokerHandler extends BaseBrokerHandler {
           seenBlocks.put(hash, ())
           send(NewBlockHash(hash))
         }
-      case BaseBrokerHandler.RelayTxs(hashes)              => handleRelayTxs(hashes)
+      case BaseBrokerHandler.RelayTxs(txs)                 => handleRelayTxs(txs)
       case BaseBrokerHandler.Received(NewTxHashes(hashes)) => handleNewTxHashes(hashes)
-      case BaseBrokerHandler.DownloadTxs(hashes) =>
-        log.debug(s"Download txs ${Utils.showChainIndexedDigest(hashes)} from $remoteAddress")
-        send(TxsRequest(hashes))
-      case BaseBrokerHandler.Received(TxsRequest(id, hashes)) =>
-        handleTxsRequest(id, hashes)
+      case BaseBrokerHandler.DownloadTxs(txs) =>
+        log.debug(s"Download txs ${Utils.showChainIndexedDigest(txs)} from $remoteAddress")
+        send(TxsRequest(txs))
+      case BaseBrokerHandler.Received(TxsRequest(id, txs)) =>
+        handleTxsRequest(id, txs)
       case BaseBrokerHandler.Received(TxsResponse(id, txs)) =>
         handleTxsResponse(id, txs)
     }
@@ -116,15 +122,15 @@ trait BrokerHandler extends BaseBrokerHandler {
     receive
   }
 
-  private def handleRelayTxs(hashes: AVector[(ChainIndex, AVector[Hash])]): Unit = {
-    val invs = hashes.fold(AVector.empty[(ChainIndex, AVector[Hash])]) {
-      case (acc, (chainIndex, txHashes)) =>
-        val selected = txHashes.filter { hash =>
-          val peerHaveTx = seenTxs.contains(hash)
+  private def handleRelayTxs(txs: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
+    val invs = txs.fold(AVector.empty[(ChainIndex, AVector[TransactionId])]) {
+      case (acc, (chainIndex, txIds)) =>
+        val selected = txIds.filter { txId =>
+          val peerHaveTx = seenTxs.contains(txId)
           if (peerHaveTx) {
-            log.debug(s"Remote broker already have the tx ${hash.shortHex}")
+            log.debug(s"Remote broker already have the tx ${txId.shortHex}")
           } else {
-            seenTxs.put(hash, ())
+            seenTxs.put(txId, ())
           }
           !peerHaveTx
         }
@@ -139,7 +145,7 @@ trait BrokerHandler extends BaseBrokerHandler {
     }
   }
 
-  private def handleNewTxHashes(hashes: AVector[(ChainIndex, AVector[Hash])]): Unit = {
+  private def handleNewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
     log.debug(s"Received txs hashes ${Utils.showChainIndexedDigest(hashes)} from $remoteAddress")
     // ignore the tx announcements before synced
     if (selfSynced && remoteSynced) {
@@ -169,18 +175,18 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   private def handleTxsRequest(
       id: RequestId,
-      hashes: AVector[(ChainIndex, AVector[Hash])]
+      txs: AVector[(ChainIndex, AVector[TransactionId])]
   ): Unit = {
     log.debug(
-      s"Received txs request ${Utils.showChainIndexedDigest(hashes)} from $remoteAddress with $id"
+      s"Received txs request ${Utils.showChainIndexedDigest(txs)} from $remoteAddress with $id"
     )
-    val result = hashes.foldE(AVector.empty[TransactionTemplate]) {
+    val result = txs.foldE(AVector.empty[TransactionTemplate]) {
       case (acc, (chainIndex, txHashes)) =>
         if (!brokerConfig.contains(chainIndex.from)) {
           Left(())
         } else {
           val sharedPool = blockflow.getMemPool(chainIndex).getSharedPool(chainIndex)
-          val txs        = sharedPool.getTxs(txHashes)
+          val txs        = sharedPool.getTxs(txHashes.map(_.value))
           Right(acc ++ txs)
         }
     }
@@ -194,7 +200,7 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   private def handleTxsResponse(id: RequestId, txs: AVector[TransactionTemplate]): Unit = {
     log.debug(
-      s"Received #${txs.length} txs ${Utils.showDigest(txs.map(_.id))} from $remoteAddress with $id"
+      s"Received #${txs.length} txs ${Utils.showDigest(txs.map(_.id.value))} from $remoteAddress with $id"
     )
     if (txs.nonEmpty) {
       if (txs.exists(tx => !brokerConfig.contains(tx.chainIndex.from))) {

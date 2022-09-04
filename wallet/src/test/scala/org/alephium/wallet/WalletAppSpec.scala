@@ -33,7 +33,14 @@ import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.protocol.model.{Address, CliqueId, NetworkId, TokenId, TxGenerators}
+import org.alephium.protocol.model.{
+  Address,
+  CliqueId,
+  NetworkId,
+  TokenId,
+  TransactionId,
+  TxGenerators
+}
 import org.alephium.serde.serialize
 import org.alephium.util.{discard, AlephiumFutureSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.api.model._
@@ -460,7 +467,7 @@ object WalletAppSpec extends {
             Hex.toHexString(serialize(unsignedTx)),
             unsignedTx.gasAmount,
             unsignedTx.gasPrice,
-            unsignedTx.hash,
+            TransactionId(unsignedTx.hash),
             unsignedTx.fromGroup.value,
             unsignedTx.toGroup.value
           )
@@ -484,7 +491,7 @@ object WalletAppSpec extends {
 
     router.route().path("/transactions/submit").handler(BodyHandler.create()).handler { ctx =>
       val _ = read[SubmitTransaction](ctx.body().asString())
-      complete(ctx, SubmitTxResult(Hash.generate, 0, 0))
+      complete(ctx, SubmitTxResult(TransactionId.generate, 0, 0))
     }
 
     router.route().path("/infos/chain-params").handler { ctx =>

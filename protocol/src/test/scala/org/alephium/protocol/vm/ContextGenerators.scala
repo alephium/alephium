@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.{Hash, Signature}
+import org.alephium.protocol.Signature
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
@@ -90,7 +90,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     val groupIndex = GroupIndex.unsafe(0)
     val (contractOutput, contractOutputRef) = contractOutputOpt.getOrElse {
       val co  = contractOutputGen(scriptGen = p2cLockupGen(groupIndex)).sample.get
-      val cor = ContractOutputRef.unsafe(Hash.generate, co, 0)
+      val cor = ContractOutputRef.unsafe(TransactionId.generate, co, 0)
       (co, cor)
     }
     val halfDecoded = contract.toHalfDecoded()

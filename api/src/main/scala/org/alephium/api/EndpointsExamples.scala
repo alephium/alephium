@@ -24,7 +24,15 @@ import sttp.tapir.EndpointIO.Example
 import org.alephium.api.model._
 import org.alephium.protocol._
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{Address, BlockHash, CliqueId, ContractId, NetworkId, TokenId}
+import org.alephium.protocol.model.{
+  Address,
+  BlockHash,
+  CliqueId,
+  ContractId,
+  NetworkId,
+  TokenId,
+  TransactionId
+}
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._
@@ -81,7 +89,9 @@ trait EndpointsExamples extends ErrorExamples {
   val byteString   = Hex.unsafe(hexString)
   protected val ts = TimeStamp.unsafe(1611041396892L)
   val txId =
-    Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
+    TransactionId(
+      Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
+    )
   val contractId =
     Hash.from(Hex.unsafe("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")).get
   private val tokens = AVector(
@@ -192,7 +202,7 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val event = ContractEvent(
     blockHash,
-    contractAddress.lockupScript.contractId.value,
+    txId,
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
@@ -410,7 +420,7 @@ trait EndpointsExamples extends ErrorExamples {
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,
-        hash,
+        txId,
         fromGroup = 2,
         toGroup = 1
       )
@@ -419,7 +429,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
     val sweepAddressTxs = AVector(
-      SweepAddressTransaction(hash, hexString, model.minimalGas, model.defaultGasPrice)
+      SweepAddressTransaction(txId, hexString, model.minimalGas, model.defaultGasPrice)
     )
     simpleExample(BuildSweepAddressTransactionsResult(sweepAddressTxs, fromGroup = 2, toGroup = 1))
   }
@@ -608,7 +618,7 @@ trait EndpointsExamples extends ErrorExamples {
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,
-        txId = hash,
+        txId = txId,
         contractAddress = Address.contract(ContractId(contractId))
       )
     )
@@ -621,7 +631,7 @@ trait EndpointsExamples extends ErrorExamples {
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,
-        txId = hash
+        txId = txId
       )
     )
 

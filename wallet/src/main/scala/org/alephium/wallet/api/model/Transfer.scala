@@ -17,8 +17,7 @@
 package org.alephium.wallet.api.model
 
 import org.alephium.api.model.Destination
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.GroupIndex
+import org.alephium.protocol.model.{GroupIndex, TransactionId}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
 
@@ -30,10 +29,10 @@ final case class Transfer(
     utxosLimit: Option[Int] = None
 )
 
-final case class TransferResult(txId: Hash, fromGroup: GroupIndex, toGroup: GroupIndex)
+final case class TransferResult(txId: TransactionId, fromGroup: GroupIndex, toGroup: GroupIndex)
 final case class TransferResults(results: AVector[TransferResult])
 object TransferResults {
-  def from(input: AVector[(Hash, GroupIndex, GroupIndex)]): TransferResults = {
+  def from(input: AVector[(TransactionId, GroupIndex, GroupIndex)]): TransferResults = {
     TransferResults(input.map((TransferResult.apply _).tupled))
   }
 }

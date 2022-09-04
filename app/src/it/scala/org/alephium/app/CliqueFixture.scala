@@ -48,8 +48,8 @@ import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
-import org.alephium.protocol.{ALPH, Hash, PrivateKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, Block, ChainIndex}
+import org.alephium.protocol.{ALPH, PrivateKey, Signature, SignatureSchema}
+import org.alephium.protocol.model.{Address, Block, ChainIndex, TransactionId}
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{GasPrice, LockupScript}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -685,7 +685,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost("/contracts/unsigned-tx/execute-script", Some(query))
   }
 
-  def submitTxQuery(unsignedTx: String, txId: Hash) = {
+  def submitTxQuery(unsignedTx: String, txId: TransactionId) = {
     val signature: Signature =
       SignatureSchema.sign(txId.bytes, PrivateKey.unsafe(Hex.unsafe(privateKey)))
     submitTransaction(s"""
@@ -695,7 +695,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
           }""")
   }
 
-  def submitTxWithPort(unsignedTx: String, txId: Hash, restPort: Int): Hash = {
+  def submitTxWithPort(unsignedTx: String, txId: TransactionId, restPort: Int): TransactionId = {
     val txResult = request[SubmitTxResult](
       submitTxQuery(unsignedTx, txId),
       restPort

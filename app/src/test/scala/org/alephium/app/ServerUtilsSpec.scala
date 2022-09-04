@@ -58,7 +58,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture with ApiConfigFixture {
     implicit def flowImplicit: BlockFlow = blockFlow
 
-    def emptyKey(index: Int): Hash = TxOutputRef.key(Hash.zero, index)
+    def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index)
   }
 
   trait FlowFixtureWithApi extends FlowFixture with ApiConfigFixture
@@ -1449,7 +1449,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract = TestContract(
       blockHash = Some(BlockHash.random),
-      txId = Some(Hash.random),
+      txId = Some(TransactionId.random),
       bytecode = code,
       initialFields = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))),
       args = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))))
@@ -1656,7 +1656,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   private def signAndAddToMemPool(
-      txId: Hash,
+      txId: TransactionId,
       unsignedTx: String,
       chainIndex: ChainIndex,
       fromPrivateKey: PrivateKey

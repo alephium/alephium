@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{Address, TxOutput}
+import org.alephium.protocol.model.{Address, TransactionId, TxOutput}
 import org.alephium.util.{AVector, TimeStamp}
 
 sealed trait Output {
@@ -34,7 +34,7 @@ sealed trait Output {
 
 object Output {
 
-  def from(output: TxOutput, txId: Hash, index: Int): Output = {
+  def from(output: TxOutput, txId: TransactionId, index: Int): Output = {
     output match {
       case o: model.AssetOutput =>
         AssetOutput(
@@ -121,7 +121,11 @@ final case class FixedAssetOutput(
 }
 
 object FixedAssetOutput {
-  def fromProtocol(assetOutput: model.AssetOutput, txId: Hash, index: Int): FixedAssetOutput = {
+  def fromProtocol(
+      assetOutput: model.AssetOutput,
+      txId: TransactionId,
+      index: Int
+  ): FixedAssetOutput = {
     FixedAssetOutput(
       assetOutput.hint.value,
       model.TxOutputRef.key(txId, index),

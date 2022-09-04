@@ -136,7 +136,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       blockHash       <- blockHashGen
       txId            <- hashGen
       contractIdValue <- hashGen
-    } yield (blockHash, txId, ContractId(contractIdValue))
+    } yield (blockHash, TransactionId(txId), ContractId(contractIdValue))
 
     val storage = newDBStorage()
     val worldState = WorldState

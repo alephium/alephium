@@ -266,8 +266,8 @@ class FlowUtilsSpec extends AlephiumSpec {
       val mempool   = blockFlow.getMemPool(chainIndex)
       mempool.addNewTx(chainIndex, tx0, currentTs)
       mempool.addNewTx(chainIndex, tx1, currentTs)
-      mempool.pendingPool.contains(tx0.id) is false
-      mempool.pendingPool.contains(tx1.id) is true
+      mempool.pendingPool.contains(tx0.id.value) is false
+      mempool.pendingPool.contains(tx1.id.value) is true
 
       val oldDeps = blockFlow.getBestDeps(chainIndex.from)
       addWithoutViewUpdate(blockFlow, block0)

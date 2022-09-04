@@ -31,9 +31,9 @@ import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager.{BrokerState, SyncedResult}
 import org.alephium.flow.network.broker._
-import org.alephium.protocol.{Generators, Hash}
+import org.alephium.protocol.Generators
 import org.alephium.protocol.message.{Message, NewBlock}
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
+import org.alephium.protocol.model.{BrokerInfo, ChainIndex, TransactionId}
 import org.alephium.util._
 
 class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with ScalaFutures {
@@ -536,7 +536,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     interCliqueManager ! CliqueManager.Synced(brokerInfo1)
     interCliqueManager ! CliqueManager.Synced(brokerInfo2)
 
-    val txHashes   = AVector.fill(4)(Hash.generate)
+    val txHashes   = AVector.fill(4)(TransactionId.generate)
     val chainIndex = ChainIndex.unsafe(0, 1)
     val message    = InterCliqueManager.BroadCastTx(AVector((chainIndex, txHashes)))
     interCliqueManager ! message

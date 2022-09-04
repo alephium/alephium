@@ -228,7 +228,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   protected def persistTxs(block: Block): IOResult[Unit] = {
     if (brokerConfig.contains(block.chainIndex.from)) {
       block.transactions.foreachWithIndexE { case (tx, index) =>
-        txStorage.add(tx.id, TxIndex(block.hash, index))
+        txStorage.add(tx.id.value, TxIndex(block.hash, index))
       }
     } else {
       Right(())

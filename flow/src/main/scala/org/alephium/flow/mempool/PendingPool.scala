@@ -45,12 +45,12 @@ class PendingPool(
   }
 
   def add(tx: TransactionTemplate, timeStamp: TimeStamp): Boolean = writeOnly {
-    if (!txs.contains(tx.id)) {
+    if (!txs.contains(tx.id.value)) {
       if (isFull()) {
         false
       } else {
-        txs.put(tx.id, tx)
-        timestamps.put(tx.id, timeStamp)
+        txs.put(tx.id.value, tx)
+        timestamps.put(tx.id.value, timeStamp)
         indexes.add(tx)
         measureTransactionsTotal()
         true
@@ -70,8 +70,8 @@ class PendingPool(
   }
 
   def _remove(tx: TransactionTemplate): Unit = {
-    txs.remove(tx.id).foreach { _ =>
-      timestamps.remove(tx.id)
+    txs.remove(tx.id.value).foreach { _ =>
+      timestamps.remove(tx.id.value)
       indexes.remove(tx)
     }
   }
@@ -98,7 +98,7 @@ class PendingPool(
         ) {
           acc
         } else {
-          acc :+ (tx -> timestamps.unsafe(tx.id))
+          acc :+ (tx -> timestamps.unsafe(tx.id.value))
         }
       }
     }

@@ -240,7 +240,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val requestId     = RequestId.unsafe(1)
     val tx1           = transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate
     val tx2           = transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate
-    val txsRequest    = TxsRequest(requestId, AVector((chainIndex, AVector(tx1.id, tx2.id))))
+    val txsRequest =
+      TxsRequest(requestId, AVector((chainIndex, AVector(tx1.id, tx2.id))))
     verifySerde(txsRequest) {
       // code id
       hex"0e" ++
@@ -316,7 +317,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val txTemplate1 = transactionGen().sample.get.toTemplate
     val txTemplate2 = transactionGen().sample.get.toTemplate
     val chainIndex  = chainIndexGen.sample.get
-    val newTxHashes = NewTxHashes(AVector((chainIndex, AVector(txTemplate1.id, txTemplate2.id))))
+    val newTxHashes =
+      NewTxHashes(AVector((chainIndex, AVector(txTemplate1.id, txTemplate2.id))))
     verifySerde(newTxHashes) {
       // code id
       hex"0d" ++
@@ -449,7 +451,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     invResponse.asInstanceOf[Payload].verify("inv-response")
 
     info("txs request / txs response")
-    val txsRequest = TxsRequest(requestId, AVector((chainIndex, AVector(tx1.id, tx2.id))))
+    val txsRequest =
+      TxsRequest(requestId, AVector((chainIndex, AVector(tx1.id, tx2.id))))
     txsRequest.asInstanceOf[Payload].verify("txs-request")
 
     val txsResponse = TxsResponse(requestId, AVector(tx1.toTemplate, tx2.toTemplate))

@@ -97,7 +97,11 @@ object ContractOutputRef {
 
   def unsafe(hint: Hint, key: Hash): ContractOutputRef = new ContractOutputRef(hint, key)
 
-  def unsafe(txId: Hash, contractOutput: ContractOutput, outputIndex: Int): ContractOutputRef = {
+  def unsafe(
+      txId: TransactionId,
+      contractOutput: ContractOutput,
+      outputIndex: Int
+  ): ContractOutputRef = {
     val refKey = TxOutputRef.key(txId, outputIndex)
     unsafe(contractOutput.hint, refKey)
   }
@@ -117,7 +121,7 @@ object TxOutputRef {
     if (hint.isAssetType) AssetOutputRef.unsafe(hint, key) else ContractOutputRef.unsafe(hint, key)
   }
 
-  def key(txId: Hash, outputIndex: Int): Hash = {
+  def key(txId: TransactionId, outputIndex: Int): Hash = {
     Hash.hash(txId.bytes ++ Bytes.from(outputIndex))
   }
 

@@ -323,7 +323,7 @@ class ServerUtils(implicit
 
   def getTransactionStatus(
       blockFlow: BlockFlow,
-      txId: Hash,
+      txId: TransactionId,
       chainIndex: ChainIndex
   ): Try[TxStatus] = {
     blockFlow.getTransactionStatus(txId, chainIndex).left.map(failed).map(convert)
@@ -426,7 +426,7 @@ class ServerUtils(implicit
 
   def searchLocalTransactionStatus(
       blockFlow: BlockFlow,
-      txId: Hash,
+      txId: TransactionId,
       chainIndexes: AVector[ChainIndex]
   ): Try[TxStatus] = {
     blockFlow.searchLocalTransactionStatus(txId, chainIndexes).left.map(failed).map(convert)
@@ -434,7 +434,7 @@ class ServerUtils(implicit
 
   def getChainIndexForTx(
       blockFlow: BlockFlow,
-      txId: Hash
+      txId: TransactionId
   ): Try[ChainIndex] = {
     searchLocalTransactionStatus(blockFlow, txId, brokerConfig.chainIndexes) match {
       case Right(Confirmed(blockHash, _, _, _, _)) =>
@@ -885,7 +885,7 @@ class ServerUtils(implicit
       contractId = params.address.contractId
       contractObj <- wrapResult(worldState.getContractObj(contractId))
       method      <- wrapExeResult(contractObj.code.getMethod(params.methodIndex))
-      txId = params.txId.getOrElse(Hash.random)
+      txId = params.txId.getOrElse(TransactionId.random)
       resultPair <- executeContractMethod(
         worldState,
         contractId,
@@ -953,7 +953,7 @@ class ServerUtils(implicit
         contracts = postState._1,
         txInputs = executionResult.contractPrevOutputs.map(_.lockupScript).map(Address.from),
         txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
-          Output.from(output, Hash.zero, index)
+          Output.from(output, TransactionId.zero, index)
         },
         events = events
       )
@@ -1051,7 +1051,7 @@ class ServerUtils(implicit
   private def executeContractMethod(
       worldState: WorldState.Staging,
       contractId: ContractId,
-      txId: Hash,
+      txId: TransactionId,
       blockHash: BlockHash,
       inputAssets: AVector[TestInputAsset],
       methodIndex: Int,

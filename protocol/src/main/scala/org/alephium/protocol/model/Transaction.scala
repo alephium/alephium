@@ -32,7 +32,7 @@ sealed trait TransactionAbstract {
   def inputSignatures: AVector[Signature]
   def scriptSignatures: AVector[Signature]
 
-  def id: Hash = unsigned.hash
+  def id: TransactionId = TransactionId(unsigned.hash)
 
   // this might only works for validated tx
   def fromGroup(implicit config: GroupConfig): GroupIndex = unsigned.fromGroup
@@ -327,7 +327,7 @@ object Transaction {
   }
 
   final private[model] case class MerkelTx(
-      id: Hash,
+      id: TransactionId,
       scriptExecutionOk: Boolean,
       contractInputs: AVector[ContractOutputRef],
       generatedOutputs: AVector[TxOutput],

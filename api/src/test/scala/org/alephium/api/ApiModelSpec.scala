@@ -339,7 +339,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode TxResult" in {
-    val hash    = Hash.generate
+    val hash    = TransactionId.generate
     val result  = SubmitTxResult(hash, 0, 1)
     val jsonRaw = s"""{"txId":"${hash.toHexString}","fromGroup":0,"toGroup":1}"""
     checkData(result, jsonRaw)
@@ -521,7 +521,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode BuildTransactionResult" in {
-    val txId     = Hash.generate
+    val txId     = TransactionId.generate
     val gas      = GasBox.unsafe(1)
     val gasPrice = GasPrice(1)
     val result   = BuildTransactionResult("tx", gas, gasPrice, txId, 1, 2)
@@ -531,7 +531,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode SweepAddressTransaction" in {
-    val txId     = Hash.generate
+    val txId     = TransactionId.generate
     val gas      = GasBox.unsafe(1)
     val gasPrice = GasPrice(1)
     val result   = SweepAddressTransaction(txId, "tx", gas, gasPrice)
@@ -687,7 +687,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode BuildDeployContractTxResult" in {
-    val txId       = Hash.generate
+    val txId       = TransactionId.generate
     val contractId = ContractId(Hash.generate)
     val buildDeployContractTxResult = BuildDeployContractTxResult(
       fromGroup = 2,
@@ -734,7 +734,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode BuildScriptTxResult" in {
-    val txId = Hash.generate
+    val txId = TransactionId.generate
     val buildExecuteScriptTxResult = BuildExecuteScriptTxResult(
       fromGroup = 1,
       toGroup = 1,
@@ -971,7 +971,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "message": ""
          |}
          |""".stripMargin
-    checkData(FixedAssetOutput.fromProtocol(assetOutput, Hash.zero, 0), jsonRaw)
+    checkData(FixedAssetOutput.fromProtocol(assetOutput, TransactionId.zero, 0), jsonRaw)
   }
 
   it should "endcode/decode Output" in {
@@ -988,7 +988,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "message": ""
          |}
          |""".stripMargin
-    checkData[Output](Output.from(assetOutput, Hash.zero, 0), assetOutputJson)
+    checkData[Output](Output.from(assetOutput, TransactionId.zero, 0), assetOutputJson)
 
     val contractOutputJson =
       s"""
@@ -1001,7 +1001,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "tokens": []
          |}
          |""".stripMargin
-    checkData[Output](Output.from(contractOutput, Hash.zero, 0), contractOutputJson)
+    checkData[Output](Output.from(contractOutput, TransactionId.zero, 0), contractOutputJson)
   }
 
   it should "encode/decode UnsignedTx" in {

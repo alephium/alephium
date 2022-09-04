@@ -2079,7 +2079,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   trait ContractOutputFixture extends StatefulInstrFixture {
     val contractOutput    = ContractOutput(ALPH.alph(0), p2cGen.sample.get, AVector.empty)
-    val txId              = Hash.generate
+    val txId              = TransactionId.generate
     val contractOutputRef = ContractOutputRef.unsafe(txId, contractOutput, 0)
   }
 
@@ -2745,7 +2745,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "ContractExists" in new StatefulInstrFixture {
     val contractOutput    = ContractOutput(ALPH.alph(1), p2cGen.sample.get, AVector.empty)
-    val contractOutputRef = ContractOutputRef.unsafe(Hash.generate, contractOutput, 0)
+    val contractOutputRef = ContractOutputRef.unsafe(TransactionId.generate, contractOutput, 0)
     override lazy val frame =
       prepareFrame(contractOutputOpt = Some((contractOutput, contractOutputRef)))
 
@@ -2760,7 +2760,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "DestroySelf" in new StatefulInstrFixture {
     val contractOutput = ContractOutput(ALPH.alph(0), p2cGen.sample.get, AVector.empty)
-    val txId           = Hash.generate
+    val txId           = TransactionId.generate
 
     val contractOutputRef = ContractOutputRef.unsafe(txId, contractOutput, 0)
 

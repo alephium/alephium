@@ -18,7 +18,7 @@ package org.alephium.api.model
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.model.{NetworkId, UnsignedTransaction}
+import org.alephium.protocol.model.{NetworkId, TransactionId, UnsignedTransaction}
 import org.alephium.protocol.vm
 import org.alephium.util.{AVector, U256}
 
@@ -67,7 +67,7 @@ object UnsignedTx {
       unsignedTx.gasPrice.value,
       unsignedTx.inputs.map(AssetInput.from),
       unsignedTx.fixedOutputs.zipWithIndex.map { case (out, index) =>
-        FixedAssetOutput.fromProtocol(out, unsignedTx.hash, index)
+        FixedAssetOutput.fromProtocol(out, TransactionId(unsignedTx.hash), index)
       }
     )
   }

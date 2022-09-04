@@ -2279,7 +2279,7 @@ class VMSpec extends AlephiumSpec {
 
     getLogStates(blockFlow, chainIndex.from, contractId, 0) isnot None
     val txId = callingBlock.nonCoinbase.head.id
-    getLogStatesByTxId(blockFlow, chainIndex.from, txId) is None
+    getLogStatesByTxId(blockFlow, chainIndex.from, txId.value) is None
   }
 
   it should "write to the log storage with tx id indexing" in new EventFixtureWithContract {
@@ -2291,7 +2291,7 @@ class VMSpec extends AlephiumSpec {
 
     getLogStates(blockFlow, chainIndex.from, contractId, 0) isnot None
     val txId = callingBlock.nonCoinbase.head.id
-    getLogStatesByTxId(blockFlow, chainIndex.from, txId) isnot None
+    getLogStatesByTxId(blockFlow, chainIndex.from, txId.value) isnot None
   }
 
   it should "write script events to log storage" in new EventFixture {
@@ -2329,9 +2329,9 @@ class VMSpec extends AlephiumSpec {
     contractLogStates.states(0) is LogState(txId, 0, fields)
     contractLogStates.states(1) is LogState(txId, 1, fields)
 
-    val txIdLogStates = getLogStatesByTxId(blockFlow, chainIndex.from, txId).value
+    val txIdLogStates = getLogStatesByTxId(blockFlow, chainIndex.from, txId.value).value
     txIdLogStates.blockHash is callingBlock.hash
-    txIdLogStates.eventKey is txId
+    txIdLogStates.eventKey is txId.value
     txIdLogStates.states.length is 2
 
     val logStatesId = LogStatesId(contractId.value, 0)

@@ -32,8 +32,8 @@ class SharedPoolSpec
   def emptyTxIndexes = TxIndexes.emptySharedPool(dummyIndex.from)
 
   def checkTx(pool: SharedPool, tx: TransactionTemplate): Unit = {
-    pool.txs.contains(tx.id) is true
-    pool.timestamps.contains(tx.id) is true
+    pool.txs.contains(tx.id.value) is true
+    pool.timestamps.contains(tx.id.value) is true
     checkTx(pool.sharedTxIndex, tx)
   }
 
@@ -81,14 +81,14 @@ class SharedPoolSpec
   }
 
   it should "use read lock for containing" in new Fixture {
-    checkReadLock(rwl)(true, pool.contains(block.transactions.head.id), false)
+    checkReadLock(rwl)(true, pool.contains(block.transactions.head.id.value), false)
   }
 
   it should "use read lock for getting" in new Fixture {
     pool.add(txTemplates, now)
-    val txIds = block.transactions.map(_.id) :+ Hash.generate
+    val txIds = block.transactions.map(_.id.value) :+ Hash.generate
     checkReadLock(rwl)(AVector.empty, pool.getTxs(txIds), txTemplates)
-    checkReadLock(rwl)(AVector.empty, pool.getTxs(block.transactions.map(_.id)), txTemplates)
+    checkReadLock(rwl)(AVector.empty, pool.getTxs(block.transactions.map(_.id.value)), txTemplates)
   }
 
   it should "use write lock for adding" in new Fixture {

@@ -72,7 +72,7 @@ class SmartContractTest extends AlephiumActorSpec {
       buildResult
     }
 
-    def submitTx(unsignedTx: String, txId: Hash): Hash = {
+    def submitTx(unsignedTx: String, txId: TransactionId): TransactionId = {
       submitTxWithPort(unsignedTx, txId, restPort)
     }
 

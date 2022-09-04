@@ -39,7 +39,8 @@ import org.alephium.protocol.model.{
   GroupIndex,
   NetworkId,
   Nonce,
-  TokenId
+  TokenId,
+  TransactionId
 }
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
 import org.alephium.serde.{deserialize, serialize, RandomBytes}
@@ -130,6 +131,9 @@ trait ApiModelCodec {
 
   implicit val contractIdWriter: Writer[ContractId] = hashWriter.comap[ContractId](_.value)
   implicit val contractIdReader: Reader[ContractId] = hashReader.map(ContractId(_))
+
+  implicit val transactionIdWriter: Writer[TransactionId] = hashWriter.comap[TransactionId](_.value)
+  implicit val transactionIdReader: Reader[TransactionId] = hashReader.map(TransactionId(_))
 
   implicit lazy val assetAddressWriter: Writer[Address.Asset] =
     StringWriter.comap[Address.Asset](_.toBase58)

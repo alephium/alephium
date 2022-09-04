@@ -34,7 +34,6 @@ import org.alephium.flow.network.broker._
 import org.alephium.flow.network.interclique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util._
@@ -71,7 +70,7 @@ object InterCliqueManager {
       origin: DataOrigin
   ) extends Command
       with EventStream.Event
-  final case class BroadCastTx(hashes: AVector[(ChainIndex, AVector[Hash])])
+  final case class BroadCastTx(hashes: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
       with EventStream.Event
 

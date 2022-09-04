@@ -52,23 +52,24 @@ object TxHandler {
     Props(new TxHandler(blockFlow, pendingTxStorage, readyTxStorage))
 
   sealed trait Command
-  final case class AddToSharedPool(txs: AVector[TransactionTemplate])            extends Command
-  final case class Broadcast(txs: AVector[(TransactionTemplate, TimeStamp)])     extends Command
-  final case class AddToGrandPool(txs: AVector[TransactionTemplate])             extends Command
-  final case class TxAnnouncements(hashes: AVector[(ChainIndex, AVector[Hash])]) extends Command
-  case object CleanSharedPool                                                    extends Command
-  case object CleanPendingPool                                                   extends Command
-  private case object BroadcastTxs                                               extends Command
-  private case object DownloadTxs                                                extends Command
+  final case class AddToSharedPool(txs: AVector[TransactionTemplate])        extends Command
+  final case class Broadcast(txs: AVector[(TransactionTemplate, TimeStamp)]) extends Command
+  final case class AddToGrandPool(txs: AVector[TransactionTemplate])         extends Command
+  final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
+      extends Command
+  case object CleanSharedPool      extends Command
+  case object CleanPendingPool     extends Command
+  private case object BroadcastTxs extends Command
+  private case object DownloadTxs  extends Command
 
   sealed trait Event
-  final case class AddSucceeded(txId: Hash)              extends Event
-  final case class AddFailed(txId: Hash, reason: String) extends Event
+  final case class AddSucceeded(txId: TransactionId)              extends Event
+  final case class AddFailed(txId: TransactionId, reason: String) extends Event
 
   final case class Announcement(
       brokerHandler: ActorRefT[BrokerHandler.Command],
       chainIndex: ChainIndex,
-      hash: Hash
+      hash: TransactionId
   )
 
   val MaxDownloadTimes: Int = 2
@@ -172,6 +173,8 @@ class TxHandler(
 
   override def receive: Receive = handleCommand orElse updateNodeSyncStatus
 
+  type TxsPerChainId = mutable.Map[ChainIndex, mutable.ArrayBuffer[TransactionId]]
+
   // scalastyle:off method.length
   def handleCommand: Receive = {
     case TxHandler.AddToSharedPool(txs) =>
@@ -190,10 +193,10 @@ class TxHandler(
       } else {
         mineTxsForDev(txs)
       }
-    case TxHandler.Broadcast(txs)          => handleReadyTxsFromPendingPool(txs)
-    case TxHandler.TxAnnouncements(hashes) => handleAnnouncements(hashes)
-    case TxHandler.BroadcastTxs            => broadcastTxs()
-    case TxHandler.DownloadTxs             => downloadTxs()
+    case TxHandler.Broadcast(txs)       => handleReadyTxsFromPendingPool(txs)
+    case TxHandler.TxAnnouncements(txs) => handleAnnouncements(txs)
+    case TxHandler.BroadcastTxs         => broadcastTxs()
+    case TxHandler.DownloadTxs          => downloadTxs()
     case TxHandler.CleanSharedPool =>
       log.debug("Start to clean shared pools")
       val results = blockFlow.grandPool.cleanAndExtractReadyTxs(
@@ -202,10 +205,12 @@ class TxHandler(
       )
       results.foreach { result =>
         result.invalidTxss.foreach(escapeIOError(_)(_.foreach { tx =>
-          escapeIOError(readyTxStorage.getOpt(tx.id).flatMap {
+          escapeIOError(readyTxStorage.getOpt(tx.id.value).flatMap {
             case Some(info) =>
-              val persistedTxId = PersistedTxId(info.timestamp, tx.id)
-              readyTxStorage.delete(tx.id).flatMap(_ => pendingTxStorage.delete(persistedTxId))
+              val persistedTxId = PersistedTxId(info.timestamp, tx.id.value)
+              readyTxStorage
+                .delete(tx.id.value)
+                .flatMap(_ => pendingTxStorage.delete(persistedTxId))
             case None =>
               Right(())
           })
@@ -217,7 +222,7 @@ class TxHandler(
       blockFlow.grandPool.cleanPendingPool(blockFlow).foreach { result =>
         escapeIOError(result) { invalidPendingTxs =>
           invalidPendingTxs.foreach { case (tx, timestamp) =>
-            val persistedTxId = PersistedTxId(timestamp, tx.id)
+            val persistedTxId = PersistedTxId(timestamp, tx.id.value)
             escapeIOError(pendingTxStorage.delete(persistedTxId))
           }
         }
@@ -236,7 +241,7 @@ class TxHandler(
 
   private def removeConfirmedTxsFromStorage(): Unit = {
     escapeIOError(readyTxStorage.iterateE { (hash, info) =>
-      blockFlow.isTxConfirmed(hash, info.chainIndex).flatMap { confirmed =>
+      blockFlow.isTxConfirmed(TransactionId(hash), info.chainIndex).flatMap { confirmed =>
         if (confirmed) {
           val persistedTxId = PersistedTxId(info.timestamp, hash)
           readyTxStorage.delete(hash).flatMap(_ => pendingTxStorage.delete(persistedTxId))
@@ -255,7 +260,7 @@ class TxHandler(
     txs.foreach { case (tx, timestamp) =>
       delayedTxs.put(tx, broadcastTs)
       val info = ReadyTxInfo(tx.chainIndex, timestamp)
-      escapeIOError(readyTxStorage.put(tx.id, info))
+      escapeIOError(readyTxStorage.put(tx.id.value, info))
     }
   }
 
@@ -305,8 +310,7 @@ class TxHandler(
   private def downloadTxs(): Unit = {
     log.debug("Start to download txs")
     if (announcements.nonEmpty) {
-      val downloads = mutable.Map
-        .empty[ActorRefT[BrokerHandler.Command], mutable.Map[ChainIndex, mutable.ArrayBuffer[Hash]]]
+      val downloads = mutable.Map.empty[ActorRefT[BrokerHandler.Command], TxsPerChainId]
       announcements.keys().foreach { announcement =>
         downloads.get(announcement.brokerHandler) match {
           case Some(chainIndexedHashes) =>
@@ -327,17 +331,17 @@ class TxHandler(
     scheduleOnce(self, TxHandler.DownloadTxs, memPoolSetting.batchDownloadTxsFrequency)
   }
 
-  private def handleAnnouncements(hashes: AVector[(ChainIndex, AVector[Hash])]): Unit = {
+  private def handleAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
     val timestamp     = TimeStamp.now()
     val brokerHandler = ActorRefT[BrokerHandler.Command](sender())
-    hashes.foreach { case (chainIndex, hashes) =>
+    txs.foreach { case (chainIndex, txs) =>
       val mempool = blockFlow.getMemPool(chainIndex)
-      hashes.foreach { hash =>
+      txs.foreach { tx =>
         if (
-          fetching.needToFetch(hash, timestamp) &&
-          !mempool.contains(chainIndex, hash)
+          fetching.needToFetch(tx.value, timestamp) &&
+          !mempool.contains(chainIndex, tx.value)
         ) {
-          val announcement = TxHandler.Announcement(brokerHandler, chainIndex, hash)
+          val announcement = TxHandler.Announcement(brokerHandler, chainIndex, tx)
           announcements.put(announcement, ())
         }
       }
@@ -409,10 +413,10 @@ class TxHandler(
         }
         persistedTxIdOpt.foreach { persistedTxId =>
           val info = ReadyTxInfo(chainIndex, persistedTxId.timestamp)
-          escapeIOError(readyTxStorage.put(tx.id, info))
+          escapeIOError(readyTxStorage.put(tx.id.value, info))
         }
       case MemPool.AddedToPendingPool => // We don't broadcast txs that are pending locally
-        val newPersistedTxId = PersistedTxId(currentTs, tx.id)
+        val newPersistedTxId = PersistedTxId(currentTs, tx.id.value)
         persistedTxIdOpt match {
           case Some(oldPersistedTxId) =>
             escapeIOError(pendingTxStorage.replace(oldPersistedTxId, newPersistedTxId, tx))
@@ -427,9 +431,9 @@ class TxHandler(
   }
 
   private def updateChainIndexHashes(
-      hash: Hash,
+      hash: TransactionId,
       chainIndex: ChainIndex,
-      hashes: mutable.Map[ChainIndex, mutable.ArrayBuffer[Hash]]
+      hashes: TxsPerChainId
   ): Unit = {
     hashes.get(chainIndex) match {
       case Some(chainIndexHashes) => chainIndexHashes += hash
@@ -440,9 +444,9 @@ class TxHandler(
   }
 
   private def chainIndexedHashesToAVector(
-      hashes: mutable.Map[ChainIndex, mutable.ArrayBuffer[Hash]]
-  ): AVector[(ChainIndex, AVector[Hash])] = {
-    hashes.foldLeft(AVector.empty[(ChainIndex, AVector[Hash])]) {
+      hashes: TxsPerChainId
+  ): AVector[(ChainIndex, AVector[TransactionId])] = {
+    hashes.foldLeft(AVector.empty[(ChainIndex, AVector[TransactionId])]) {
       case (acc, (chainIndex, hashes)) =>
         acc :+ (chainIndex -> AVector.from(hashes))
     }
@@ -450,7 +454,7 @@ class TxHandler(
 
   private def broadcastTxs(): Unit = {
     log.debug("Start to broadcast txs")
-    val broadcasts = mutable.Map.empty[ChainIndex, mutable.ArrayBuffer[Hash]]
+    val broadcasts = mutable.Map.empty[ChainIndex, mutable.ArrayBuffer[TransactionId]]
     if (txsBuffer.nonEmpty) {
       txsBuffer.keys().foreach { tx =>
         updateChainIndexHashes(tx.id, tx.chainIndex, broadcasts)

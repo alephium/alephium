@@ -309,7 +309,7 @@ object ServerFixture {
     // scalastyle:off no.equal
     val blockChainIndex = ChainIndex.from(block.hash, config.broker.groups)
     override def getTxStatus(
-        txId: Hash,
+        txId: TransactionId,
         chainIndex: ChainIndex
     ): IOResult[Option[BlockFlowState.TxStatus]] = {
       assume(brokerConfig.contains(chainIndex.from))
@@ -346,7 +346,7 @@ object ServerFixture {
     }
 
     override def searchLocalTransactionStatus(
-        txId: Hash,
+        txId: TransactionId,
         chainIndexes: AVector[ChainIndex]
     ): Either[String, Option[BlockFlowState.TxStatus]] = {
       val blockChainIndex = ChainIndex.from(block.hash, config.broker.groups)

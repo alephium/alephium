@@ -37,7 +37,7 @@ class PendingTxStorageSpec
     val currentTs = TimeStamp.now()
     forAll(transactionGen()) { transaction =>
       val tx = transaction.toTemplate
-      val id = PersistedTxId(currentTs, tx.id)
+      val id = PersistedTxId(currentTs, tx.id.value)
       storage.exists(id) isE false
       storage.put(id, tx) isE ()
       storage.exists(id) isE true
@@ -57,7 +57,7 @@ class PendingTxStorageSpec
 
     def genPendingTx(ts: TimeStamp): (PersistedTxId, TransactionTemplate) = {
       val tx = transactionGen().sample.get.toTemplate
-      val id = PersistedTxId(ts, tx.id)
+      val id = PersistedTxId(ts, tx.id.value)
       (id, tx)
     }
 

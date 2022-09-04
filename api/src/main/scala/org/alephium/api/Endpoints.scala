@@ -324,20 +324,20 @@ trait Endpoints
       .summary("Submit a multi-signed transaction")
 
   lazy val getTransactionStatus
-      : BaseEndpoint[(Hash, Option[GroupIndex], Option[GroupIndex]), TxStatus] =
+      : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), TxStatus] =
     transactionsEndpoint.get
       .in("status")
-      .in(query[Hash]("txId"))
+      .in(query[TransactionId]("txId"))
       .in(query[Option[GroupIndex]]("fromGroup"))
       .in(query[Option[GroupIndex]]("toGroup"))
       .out(jsonBody[TxStatus])
       .summary("Get tx status")
 
   lazy val getTransactionStatusLocal
-      : BaseEndpoint[(Hash, Option[GroupIndex], Option[GroupIndex]), TxStatus] =
+      : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), TxStatus] =
     transactionsEndpoint.get
       .in("local-status")
-      .in(query[Hash]("txId"))
+      .in(query[TransactionId]("txId"))
       .in(query[Option[GroupIndex]]("fromGroup"))
       .in(query[Option[GroupIndex]]("toGroup"))
       .out(jsonBody[TxStatus])

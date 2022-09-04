@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.IOError
-import org.alephium.protocol.{Hash, Signature}
+import org.alephium.protocol.Signature
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.TokenIssuance
@@ -54,7 +54,7 @@ object BlockEnv {
 }
 
 sealed trait TxEnv {
-  def txId: Hash
+  def txId: TransactionId
   def signatures: Stack[Signature]
   def prevOutputs: AVector[AssetOutput]
   def fixedOutputs: AVector[AssetOutput]
@@ -71,7 +71,7 @@ object TxEnv {
   ): TxEnv = Default(tx, prevOutputs, signatures)
 
   def mockup(
-      txId: Hash,
+      txId: TransactionId,
       signatures: Stack[Signature],
       prevOutputs: AVector[AssetOutput],
       fixedOutputs: AVector[AssetOutput],
@@ -85,14 +85,14 @@ object TxEnv {
       prevOutputs: AVector[AssetOutput],
       signatures: Stack[Signature]
   ) extends TxEnv {
-    def txId: Hash                         = tx.id
+    def txId: TransactionId                = tx.id
     def fixedOutputs: AVector[AssetOutput] = tx.unsigned.fixedOutputs
     def gasFeeUnsafe: U256                 = tx.gasFeeUnsafe
     def isEntryMethodPayable: Boolean      = tx.isEntryMethodPayable
   }
 
   final case class Mockup(
-      txId: Hash,
+      txId: TransactionId,
       signatures: Stack[Signature],
       prevOutputs: AVector[AssetOutput],
       fixedOutputs: AVector[AssetOutput],
@@ -141,7 +141,7 @@ trait StatelessContext extends CostStrategy {
 
   def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit]
 
-  def txId: Hash                   = txEnv.txId
+  def txId: TransactionId          = txEnv.txId
   def signatures: Stack[Signature] = txEnv.signatures
 
   def getTxPrevOutput(indexRaw: Val.U256): ExeResult[AssetOutput] = {

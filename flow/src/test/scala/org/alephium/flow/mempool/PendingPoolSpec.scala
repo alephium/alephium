@@ -31,8 +31,8 @@ class PendingPoolSpec
   def emptyTxIndexes     = TxIndexes.emptyPendingPool(dummyIndex)
 
   def checkTx(pool: PendingPool, tx: TransactionTemplate): Unit = {
-    pool.txs.contains(tx.id) is true
-    pool.timestamps.contains(tx.id) is true
+    pool.txs.contains(tx.id.value) is true
+    pool.timestamps.contains(tx.id.value) is true
     checkTx(pool.indexes, tx)
   }
 
@@ -48,8 +48,8 @@ class PendingPoolSpec
     val pool = PendingPool.empty(dummyIndex, 10)
     pool.add(tx, now)
     pool.add(tx, now) // for idempotent
-    pool.txs.contains(tx.id) is true
-    pool.timestamps.contains(tx.id) is true
+    pool.txs.contains(tx.id.value) is true
+    pool.timestamps.contains(tx.id.value) is true
     checkTx(pool, tx)
 
     pool.remove(tx)
@@ -96,26 +96,26 @@ class PendingPoolSpec
     val txs        = AVector(tx1 -> timestamp1, tx2 -> timestamp2)
     addAndCheckTxs(pool, txs)
     pool.clean(blockFlow, txIndexes) isE AVector(tx1 -> timestamp1, tx2 -> timestamp2)
-    pool.contains(tx1.id) is false
-    pool.contains(tx2.id) is false
+    pool.contains(tx1.id.value) is false
+    pool.contains(tx2.id.value) is false
 
     txIndexes.add(tx0)
     addAndCheckTxs(pool, txs)
     pool.clean(blockFlow, txIndexes) isE AVector.empty[(TransactionTemplate, TimeStamp)]
-    pool.contains(tx1.id) is true
-    pool.contains(tx2.id) is true
+    pool.contains(tx1.id.value) is true
+    pool.contains(tx2.id.value) is true
 
     pool.remove(tx1)
-    pool.contains(tx1.id) is false
+    pool.contains(tx1.id.value) is false
     pool.clean(blockFlow, txIndexes) isE AVector(tx2 -> timestamp2)
-    pool.contains(tx2.id) is false
+    pool.contains(tx2.id.value) is false
 
     txIndexes.remove(tx0)
     txIndexes.outputIndex.isEmpty is true
     addAndCheckTxs(pool, txs)
     addAndCheck(blockFlow, block0)
     pool.clean(blockFlow, txIndexes) isE AVector.empty[(TransactionTemplate, TimeStamp)]
-    pool.contains(tx1.id) is true
-    pool.contains(tx2.id) is true
+    pool.contains(tx1.id.value) is true
+    pool.contains(tx2.id.value) is true
   }
 }

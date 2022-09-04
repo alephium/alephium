@@ -16,6 +16,6 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.model.TransactionId
 
-final case class SubmitTxResult(txId: Hash, fromGroup: Int, toGroup: Int)
+final case class SubmitTxResult(txId: TransactionId, fromGroup: Int, toGroup: Int)

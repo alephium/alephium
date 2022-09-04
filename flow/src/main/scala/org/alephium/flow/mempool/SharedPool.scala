@@ -89,14 +89,14 @@ class SharedPool private (
   }
 
   def __add(tx: TransactionTemplate, timeStamp: TimeStamp): Unit = {
-    txs.put(tx.id, tx)
-    timestamps.put(tx.id, timeStamp)
+    txs.put(tx.id.value, tx)
+    timestamps.put(tx.id.value, timeStamp)
     sharedTxIndex.add(tx)
   }
 
   def remove(transactions: AVector[TransactionTemplate]): Int = writeOnly {
     val sizeBefore = size
-    transactions.foreach(tx => _remove(tx.id))
+    transactions.foreach(tx => _remove(tx.id.value))
     measureTransactionsTotal()
     val sizeAfter = size
     sizeBefore - sizeAfter
@@ -153,5 +153,5 @@ object SharedPool {
     )
 
   implicit val txOrdering: Ordering[TransactionTemplate] =
-    Ordering.by[TransactionTemplate, (U256, Hash)](tx => (tx.unsigned.gasPrice.value, tx.id))
+    Ordering.by[TransactionTemplate, (U256, Hash)](tx => (tx.unsigned.gasPrice.value, tx.id.value))
 }

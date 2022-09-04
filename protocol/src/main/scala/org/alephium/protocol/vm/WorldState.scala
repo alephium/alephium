@@ -444,7 +444,7 @@ object WorldState {
 
     def writeLogForContract(
         blockHash: BlockHash,
-        txId: Hash,
+        txId: TransactionId,
         contractId: ContractId,
         fields: AVector[Val],
         indexByTxId: Boolean
@@ -487,13 +487,13 @@ object WorldState {
 
     private[WorldState] def writeLogIndexByTxId(
         blockHash: BlockHash,
-        txId: Hash,
+        txId: TransactionId,
         id: LogStatesId,
         offset: Int
     ): IOResult[Unit] = {
       val logRef = LogStateRef(id, offset)
       val state  = LogState(txId, eventRefIndex, logRef.toFields)
-      writeLog(blockHash, txId, state).map(_ => ())
+      writeLog(blockHash, txId.value, state).map(_ => ())
     }
 
     private[WorldState] def getIndex(

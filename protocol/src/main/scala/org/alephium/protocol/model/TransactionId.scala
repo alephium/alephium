@@ -18,32 +18,31 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
-import org.alephium.crypto.Blake3
+import org.alephium.protocol.Hash
 import org.alephium.serde.Serde
+import org.alephium.util.Bytes.byteStringOrdering
 
-final case class BlockHash(value: Blake3) extends AnyVal {
+final case class TransactionId(value: Hash) extends AnyVal {
   def toHexString: String = value.toHexString
   def shortHex: String    = value.shortHex
   def bytes: ByteString   = value.bytes
 }
 
-object BlockHash {
-  implicit val serde: Serde[BlockHash] = Serde.forProduct1(BlockHash.apply, t => t.value)
+object TransactionId {
+  implicit val serde: Serde[TransactionId] = Serde.forProduct1(TransactionId.apply, t => t.value)
+  implicit val transactionIdOrder: Ordering[TransactionId] = Ordering.by(_.value.bytes)
 
-  val zero: BlockHash     = BlockHash(Blake3.zero)
-  val length: Int         = Blake3.length
-  def random: BlockHash   = BlockHash(Blake3.random)
-  def generate: BlockHash = BlockHash(Blake3.generate)
+  val zero: TransactionId = TransactionId(Hash.zero)
+  val length: Int         = Hash.length
 
-  def from(bytes: ByteString): Option[BlockHash] = {
-    Blake3.from(bytes).map(BlockHash.apply)
+  def random: TransactionId   = TransactionId(Hash.random)
+  def generate: TransactionId = TransactionId(Hash.generate)
+
+  def from(bytes: ByteString): Option[TransactionId] = {
+    Hash.from(bytes).map(TransactionId.apply)
   }
 
-  def hash(str: ByteString): BlockHash = {
-    BlockHash(Blake3.hash(str))
-  }
-
-  def unsafe(str: ByteString): BlockHash = {
-    BlockHash(Blake3.unsafe(str))
+  def hash(str: String): TransactionId = {
+    TransactionId(Hash.hash(str))
   }
 }

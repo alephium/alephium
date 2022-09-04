@@ -122,10 +122,10 @@ object Block {
     val scriptOrders      = scriptIndexes(nonCoinbase)
 
     @tailrec
-    def shuffle(index: Int, seed: Hash): Unit = {
+    def shuffle(index: Int, seed: TransactionId): Unit = {
       if (index < scriptOrders.length - 1) {
         val txRemaining = scriptOrders.length - index
-        val randomIndex = index + Math.floorMod(seed.toRandomIntUnsafe, txRemaining)
+        val randomIndex = index + Math.floorMod(seed.value.toRandomIntUnsafe, txRemaining)
         val tmp         = scriptOrders(index)
         scriptOrders(index) = scriptOrders(randomIndex)
         scriptOrders(randomIndex) = tmp
@@ -137,10 +137,11 @@ object Block {
       val initialSeed = {
         val maxIndex = nonCoinbaseLength - 1
         val samples  = ArraySeq(0, maxIndex / 2, maxIndex)
-        samples.foldLeft(Hash.unsafe(parentHash.value.bytes)) { case (acc, index) =>
+        val hash = samples.foldLeft(Hash.unsafe(parentHash.value.bytes)) { case (acc, index) =>
           val tx = nonCoinbase(index)
-          Hash.xor(acc, tx.id)
+          Hash.xor(acc, tx.id.value)
         }
+        TransactionId(hash)
       }
       shuffle(0, initialSeed)
     }
