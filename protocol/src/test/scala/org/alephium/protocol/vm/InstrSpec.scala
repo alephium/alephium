@@ -2876,16 +2876,17 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("Should succeed after Leman hardfork")
 
-      val frame               = prepareFrame()(Leman)
-      val callingLockupScript = LockupScript.p2c(frame.obj.contractIdOpt.value)
-
+      val frame = prepareFrame()(Leman)
       frame.opStack.push(Val.U256(0))
       frame.opStack.push(Val.U256(0))
 
-      val destroyFrame = frame.execute().rightValue.value
+      checkDestroyRefundBalance(frame) { destroyFrame =>
+        val callingLockupScript = LockupScript.p2c(frame.obj.contractIdOpt.value)
+        destroyFrame.opStack.push(Val.Address(callingLockupScript))
+        destroyFrame.execute().isRight is true
 
-      destroyFrame.opStack.push(Val.Address(callingLockupScript))
-      destroyFrame.execute().isRight is true
+        callingLockupScript
+      }
     }
   }
 
@@ -2893,11 +2894,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     {
       info("Before Leman hardfork")
 
-      val frame        = prepareFrame()(PreLeman)
-      val destroyFrame = frame.execute().rightValue.value
+      val frame = prepareFrame()(PreLeman)
 
-      destroyFrame.opStack.push(Val.Address(assetLockupScriptGen.sample.get))
-      destroyFrame.execute().isRight is true
+      checkDestroyRefundBalance(frame) { destroyFrame =>
+        val assetLockupScript = assetLockupScriptGen.sample.get
+        destroyFrame.opStack.push(Val.Address(assetLockupScript))
+        destroyFrame.execute().isRight is true
+
+        assetLockupScript
+      }
     }
 
     {
@@ -2907,11 +2912,29 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       frame.opStack.push(Val.U256(0))
       frame.opStack.push(Val.U256(0))
 
-      val destroyFrame = frame.execute().rightValue.value
+      checkDestroyRefundBalance(frame) { destroyFrame =>
+        val assetLockupScript = assetLockupScriptGen.sample.get
+        destroyFrame.opStack.push(Val.Address(assetLockupScript))
+        destroyFrame.execute().isRight is true
 
-      destroyFrame.opStack.push(Val.Address(assetLockupScriptGen.sample.get))
-      destroyFrame.execute().isRight is true
+        assetLockupScript
+      }
     }
+  }
+
+  private def checkDestroyRefundBalance(
+      frame: Frame[StatefulContext]
+  )(runTest: (Frame[StatefulContext]) => LockupScript) = {
+    val destroyFrame         = frame.execute().rightValue.value
+    val remainingBalance     = destroyFrame.getBalanceState().rightValue.remaining
+    val contractId           = destroyFrame.obj.contractIdOpt.value
+    val contractLockupScript = LockupScript.p2c(contractId)
+    val contractBalance      = remainingBalance.getBalances(contractLockupScript).value
+
+    val lockupScript = runTest(destroyFrame)
+
+    val refundBalance = destroyFrame.ctx.outputBalances.getBalances(lockupScript).value
+    refundBalance is contractBalance
   }
 
   trait ContractInstrFixture extends StatefulInstrFixture {

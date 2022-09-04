@@ -291,10 +291,10 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def destroyContract(
       contractId: ContractId,
       contractAssets: MutBalancesPerLockup,
-      address: LockupScript
+      refundAddress: LockupScript
   ): ExeResult[Unit] = {
     for {
-      _ <- outputBalances.add(address, contractAssets).toRight(Right(InvalidBalances))
+      _ <- outputBalances.add(refundAddress, contractAssets).toRight(Right(InvalidBalances))
       _ <- removeContract(contractId)
     } yield ()
   }
