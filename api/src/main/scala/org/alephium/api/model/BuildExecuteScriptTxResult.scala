@@ -41,6 +41,6 @@ object BuildExecuteScriptTxResult {
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,
       unsignedTx.gasPrice,
-      TransactionId(unsignedTx.hash)
+      unsignedTx.id
     )
 }

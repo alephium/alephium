@@ -31,7 +31,7 @@ final case class SweepAddressTransaction(
 object SweepAddressTransaction {
   def from(unsignedTx: UnsignedTransaction): SweepAddressTransaction = {
     SweepAddressTransaction(
-      TransactionId(unsignedTx.hash),
+      unsignedTx.id,
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,
       unsignedTx.gasPrice

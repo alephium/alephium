@@ -406,7 +406,7 @@ trait TxGenerators
       )
       unsignedTx <- unsignedTxGen(chainIndex)(Gen.const(assetInfos), lockupGen)
       signatures =
-        assetInfos.map(info => SignatureSchema.sign(unsignedTx.hash.bytes, info.privateKey))
+        assetInfos.map(info => SignatureSchema.sign(unsignedTx.id, info.privateKey))
     } yield {
       val tx = Transaction.from(unsignedTx, signatures)
       tx -> assetInfos

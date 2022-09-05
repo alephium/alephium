@@ -44,7 +44,7 @@ object BuildDeployContractTxResult {
       unsignedTx: UnsignedTransaction
   )(implicit groupConfig: GroupConfig): BuildDeployContractTxResult = {
     val contractId = ContractId(
-      TxOutputRef.key(TransactionId(unsignedTx.hash), unsignedTx.fixedOutputs.length)
+      TxOutputRef.key(unsignedTx.id, unsignedTx.fixedOutputs.length)
     )
     BuildDeployContractTxResult(
       unsignedTx.fromGroup.value,
@@ -52,7 +52,7 @@ object BuildDeployContractTxResult {
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,
       unsignedTx.gasPrice,
-      TransactionId(unsignedTx.hash),
+      unsignedTx.id,
       Address.contract(contractId)
     )
   }

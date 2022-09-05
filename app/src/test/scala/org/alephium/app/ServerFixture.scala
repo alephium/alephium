@@ -97,7 +97,7 @@ trait ServerFixture
     .get
   lazy val dummySignature =
     SignatureSchema.sign(
-      dummyTx.unsigned.hash.bytes,
+      dummyTx.unsigned.id,
       PrivateKey.unsafe(Hex.unsafe(dummyPrivateKey.toHexString))
     )
   lazy val dummyTransferResult = SubmitTxResult(

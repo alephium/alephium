@@ -19,13 +19,11 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
-import org.alephium.serde.Serde
+import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Bytes.byteStringOrdering
 
-final case class TransactionId(value: Hash) extends AnyVal {
-  def toHexString: String = value.toHexString
-  def shortHex: String    = value.shortHex
-  def bytes: ByteString   = value.bytes
+final case class TransactionId(value: Hash) extends RandomBytes {
+  def bytes: ByteString = value.bytes
 }
 
 object TransactionId {
@@ -40,6 +38,10 @@ object TransactionId {
 
   def from(bytes: ByteString): Option[TransactionId] = {
     Hash.from(bytes).map(TransactionId.apply)
+  }
+
+  def hash(bytes: ByteString): TransactionId = {
+    TransactionId(Hash.hash(bytes))
   }
 
   def hash(str: String): TransactionId = {

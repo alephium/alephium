@@ -98,7 +98,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
 
     def sign(unsigned: UnsignedTransaction, privateKeys: PrivateKey*): Transaction = {
-      val signatures = privateKeys.map(SignatureSchema.sign(unsigned.hash.bytes, _))
+      val signatures = privateKeys.map(SignatureSchema.sign(unsigned.id, _))
       Transaction.from(unsigned, AVector.from(signatures))
     }
 

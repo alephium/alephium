@@ -111,7 +111,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val emptySignatures = AVector.empty[Signature]
     val script          = StatefulScript.alwaysFail
     val testSignatures =
-      AVector[Signature](SignatureSchema.sign(block.coinbase.unsigned.hash.bytes, privateKey))
+      AVector[Signature](SignatureSchema.sign(block.coinbase.unsigned.id, privateKey))
 
     implicit val validator                 = (blk: Block) => checkCoinbaseEasy(blk, 1)
     implicit val error: InvalidBlockStatus = InvalidCoinbaseFormat

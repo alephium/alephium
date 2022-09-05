@@ -130,7 +130,7 @@ trait EndpointsExamples extends ErrorExamples {
   )
 
   private val unsignedTx = UnsignedTx(
-    hash,
+    txId,
     1,
     1,
     None,

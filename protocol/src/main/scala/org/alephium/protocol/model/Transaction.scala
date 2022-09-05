@@ -32,7 +32,7 @@ sealed trait TransactionAbstract {
   def inputSignatures: AVector[Signature]
   def scriptSignatures: AVector[Signature]
 
-  def id: TransactionId = TransactionId(unsigned.hash)
+  def id: TransactionId = unsigned.id
 
   // this might only works for validated tx
   def fromGroup(implicit config: GroupConfig): GroupIndex = unsigned.fromGroup
@@ -188,7 +188,7 @@ object Transaction {
       generatedOutputs: AVector[TxOutput],
       privateKey: PrivateKey
   ): Transaction = {
-    val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
+    val signature = SignatureSchema.sign(unsigned.id, privateKey)
     Transaction(
       unsigned,
       scriptExecutionOk = true,
@@ -205,7 +205,7 @@ object Transaction {
       generatedOutputs: AVector[TxOutput],
       privateKey: PrivateKey
   ): Transaction = {
-    val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
+    val signature = SignatureSchema.sign(unsigned.id, privateKey)
     Transaction(
       unsigned,
       scriptExecutionOk = true,
@@ -367,7 +367,7 @@ object TransactionTemplate {
   )
 
   def from(unsigned: UnsignedTransaction, privateKey: PrivateKey): TransactionTemplate = {
-    val signature = SignatureSchema.sign(unsigned.hash.bytes, privateKey)
+    val signature = SignatureSchema.sign(unsigned.id, privateKey)
     TransactionTemplate(
       unsigned,
       AVector(signature),

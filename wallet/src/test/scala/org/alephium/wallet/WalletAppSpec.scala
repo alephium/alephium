@@ -359,9 +359,9 @@ class WalletAppSpec
 
     val unsignedTx = transactionGen().sample.get.unsigned
 
-    sign(unsignedTx.hash.toHexString) check { response =>
+    sign(unsignedTx.id.toHexString) check { response =>
       response.as[SignResult].signature is SignatureSchema.sign(
-        unsignedTx.hash.bytes,
+        unsignedTx.id,
         privateKey
       )
       response.code is StatusCode.Ok
@@ -467,7 +467,7 @@ object WalletAppSpec extends {
             Hex.toHexString(serialize(unsignedTx)),
             unsignedTx.gasAmount,
             unsignedTx.gasPrice,
-            TransactionId(unsignedTx.hash),
+            unsignedTx.id,
             unsignedTx.fromGroup.value,
             unsignedTx.toGroup.value
           )

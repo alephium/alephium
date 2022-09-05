@@ -40,7 +40,7 @@ object BuildTransactionResult {
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,
       unsignedTx.gasPrice,
-      TransactionId(unsignedTx.hash),
+      unsignedTx.id,
       unsignedTx.fromGroup.value,
       unsignedTx.toGroup.value
     )
