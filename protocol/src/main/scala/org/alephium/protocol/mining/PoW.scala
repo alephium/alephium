@@ -42,7 +42,7 @@ object PoW {
   }
 
   def checkWork(hash: BlockHash, target: Target): Boolean = {
-    val current = BigInt(1, hash.value.bytes.toArray)
+    val current = BigInt(1, hash.bytes.toArray)
     current.compareTo(target.value) <= 0
   }
 

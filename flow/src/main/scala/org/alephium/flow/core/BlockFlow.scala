@@ -17,9 +17,8 @@
 package org.alephium.flow.core
 
 import scala.annotation.tailrec
-
 import com.typesafe.scalalogging.StrictLogging
-
+import org.alephium.crypto.Blake3
 import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, ConsensusSetting, MemPoolSetting}
@@ -397,18 +396,18 @@ object BlockFlow extends StrictLogging {
     val groupOrders = Array.tabulate(config.groups)(identity)
 
     @tailrec
-    def shuffle(index: Int, seed: BlockHash): Unit = {
+    def shuffle(index: Int, seed: Blake3): Unit = {
       if (index < groupOrders.length - 1) {
         val groupRemaining = groupOrders.length - index
-        val randomIndex    = index + Math.floorMod(seed.value.toRandomIntUnsafe, groupRemaining)
+        val randomIndex    = index + Math.floorMod(seed.toRandomIntUnsafe, groupRemaining)
         val tmp            = groupOrders(index)
         groupOrders(index) = groupOrders(randomIndex)
         groupOrders(randomIndex) = tmp
-        shuffle(index + 1, BlockHash.hash(seed.value.bytes))
+        shuffle(index + 1, Blake3.hash(seed.bytes))
       }
     }
 
-    shuffle(0, hash)
+    shuffle(0, hash.value)
     AVector.unsafe(groupOrders)
   }
 }

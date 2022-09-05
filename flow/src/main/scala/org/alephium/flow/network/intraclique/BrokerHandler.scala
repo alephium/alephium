@@ -52,7 +52,7 @@ trait BrokerHandler extends BaseBrokerHandler {
         send(NewInv(inventories))
       case BaseBrokerHandler.Received(NewInv(hashes)) =>
         log.debug(
-          s"Received new inv ${Utils.showFlow(hashes.map(_.map(_.value)))} from intra clique broker"
+          s"Received new inv ${Utils.showFlow(hashes)} from intra clique broker"
         )
         handleInv(hashes)
       case BrokerHandler.IntraSync =>

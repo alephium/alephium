@@ -37,14 +37,6 @@ object BlockHash {
     Blake3.from(bytes).map(BlockHash.apply)
   }
 
-  def hash(bytes: ByteString): BlockHash = {
-    BlockHash(Blake3.hash(bytes))
-  }
-
-  def hash(string: String): BlockHash = {
-    BlockHash(Blake3.hash(string))
-  }
-
   def unsafe(str: ByteString): BlockHash = {
     BlockHash(Blake3.unsafe(str))
   }

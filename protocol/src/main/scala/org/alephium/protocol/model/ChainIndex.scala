@@ -85,7 +85,7 @@ object ChainIndex {
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def from(hash: BlockHash, groups: Int): ChainIndex = {
-    val bytes = hash.value.bytes
+    val bytes = hash.bytes
     assume(bytes.length >= 2)
 
     val beforeLast = Bytes.toPosInt(bytes(bytes.length - 2))

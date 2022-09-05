@@ -137,7 +137,7 @@ object Block {
       val initialSeed = {
         val maxIndex = nonCoinbaseLength - 1
         val samples  = ArraySeq(0, maxIndex / 2, maxIndex)
-        val hash = samples.foldLeft(Hash.unsafe(parentHash.value.bytes)) { case (acc, index) =>
+        val hash = samples.foldLeft(Hash.unsafe(parentHash.bytes)) { case (acc, index) =>
           val tx = nonCoinbase(index)
           Hash.xor(acc, tx.id.value)
         }
