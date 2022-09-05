@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.util.{Bytes, Hex, SecureAndSlowRandom}
 
-trait RandomBytes {
+trait RandomBytes extends Any {
   def bytes: ByteString
 
   def last: Byte = bytes(bytes.size - 1)
