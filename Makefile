@@ -32,5 +32,8 @@ release:
 run:
 	sbt app/run
 
+update-openapi:
+	ALEPHIUM_ENV=test sbt "tools/runMain org.alephium.tools.OpenApiUpdate"
+
 benchmark:
 	sbt "benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*"

@@ -17,7 +17,9 @@
 package org.alephium.flow.core
 
 import scala.annotation.tailrec
+
 import com.typesafe.scalalogging.StrictLogging
+
 import org.alephium.crypto.Blake3
 import org.alephium.flow.Utils
 import org.alephium.flow.io.Storages

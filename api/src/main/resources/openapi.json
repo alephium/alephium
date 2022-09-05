@@ -3436,7 +3436,7 @@
                         "transactions": [
                           {
                             "unsigned": {
-                              "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                              "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                               "version": 1,
                               "networkId": 1,
                               "gasAmount": 20000,
@@ -3642,7 +3642,7 @@
                   "transactions": [
                     {
                       "unsigned": {
-                        "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                         "version": 1,
                         "networkId": 1,
                         "gasAmount": 20000,
@@ -4669,7 +4669,7 @@
                     "unconfirmedTransactions": [
                       {
                         "unsigned": {
-                          "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                           "version": 1,
                           "networkId": 1,
                           "gasAmount": 20000,
@@ -5199,7 +5199,7 @@
                   "fromGroup": 1,
                   "toGroup": 2,
                   "unsignedTx": {
-                    "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                     "version": 1,
                     "networkId": 1,
                     "gasAmount": 20000,
@@ -8572,8 +8572,7 @@
             "format": "uint256"
           },
           "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+            "$ref": "#/components/schemas/TransactionId"
           },
           "contractAddress": {
             "type": "string",
@@ -8651,8 +8650,7 @@
             "format": "uint256"
           },
           "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+            "$ref": "#/components/schemas/TransactionId"
           }
         }
       },
@@ -8855,8 +8853,7 @@
             "format": "uint256"
           },
           "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+            "$ref": "#/components/schemas/TransactionId"
           },
           "fromGroup": {
             "type": "integer",
@@ -8885,8 +8882,7 @@
             "format": "block-hash"
           },
           "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+            "$ref": "#/components/schemas/TransactionId"
           },
           "address": {
             "type": "string",
@@ -9167,8 +9163,7 @@
             "format": "block-hash"
           },
           "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+            "$ref": "#/components/schemas/TransactionId"
           },
           "eventIndex": {
             "type": "integer",
@@ -10070,8 +10065,7 @@
         "type": "object",
         "properties": {
           "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+            "$ref": "#/components/schemas/TransactionId"
           },
           "fromGroup": {
             "type": "integer",
@@ -10125,8 +10119,7 @@
         "type": "object",
         "properties": {
           "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+            "$ref": "#/components/schemas/TransactionId"
           },
           "unsignedTx": {
             "type": "string"
@@ -10156,8 +10149,7 @@
             "format": "block-hash"
           },
           "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+            "$ref": "#/components/schemas/TransactionId"
           },
           "address": {
             "type": "string",
@@ -10282,12 +10274,23 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "format": "32-byte-hash"
+            "$ref": "#/components/schemas/TokenId"
           },
           "amount": {
             "type": "string",
             "format": "uint256"
+          }
+        }
+      },
+      "TokenId": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "32-byte-hash"
           }
         }
       },
@@ -10333,6 +10336,18 @@
               "type": "string",
               "format": "hex-string"
             }
+          }
+        }
+      },
+      "TransactionId": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "32-byte-hash"
           }
         }
       },
@@ -10398,8 +10413,7 @@
         "type": "object",
         "properties": {
           "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+            "$ref": "#/components/schemas/TransactionId"
           },
           "fromGroup": {
             "type": "integer",
@@ -10593,8 +10607,7 @@
         "type": "object",
         "properties": {
           "txId": {
-            "type": "string",
-            "format": "32-byte-hash"
+            "$ref": "#/components/schemas/TransactionId"
           },
           "version": {
             "type": "integer"

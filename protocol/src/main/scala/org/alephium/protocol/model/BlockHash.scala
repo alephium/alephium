@@ -17,6 +17,7 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
+
 import org.alephium.crypto.{Blake3, HashUtils}
 import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Env
