@@ -842,8 +842,9 @@ abstract class RestServerSpec(
   // scalastyle:on no.equal
 
   it should "get events for tx id with events" in {
-    val blockHash = dummyBlock.hash
-    val txId      = Hash.random
+    val blockHash  = dummyBlock.hash
+    val txId       = TransactionId.random
+    val contractId = ContractId(Hash.random)
 
     servers.foreach { server =>
       val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
@@ -860,7 +861,7 @@ abstract class RestServerSpec(
                      |  "events": [
                      |    {
                      |      "blockHash": "${blockHash.toHexString}",
-                     |      "contractAddress": "${Address.contract(ContractId(txId)).toBase58}",
+                     |      "contractAddress": "${Address.contract(contractId).toBase58}",
                      |      "eventIndex": 0,
                      |      "fields": [
                      |        {

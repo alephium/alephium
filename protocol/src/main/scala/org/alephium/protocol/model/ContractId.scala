@@ -24,6 +24,10 @@ import org.alephium.util.Bytes
 
 final case class ContractId(value: Hash) extends RandomBytes {
   def bytes: ByteString = value.bytes
+
+  def subContractId(path: ByteString): ContractId = {
+    ContractId(Hash.doubleHash(bytes ++ path))
+  }
 }
 
 object ContractId {

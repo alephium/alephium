@@ -298,7 +298,7 @@ object WorldState {
       val state = ContractState.unsafe(code, fields, outputRef)
       for {
         newOutputState   <- outputState.put(outputRef, output)
-        newContractState <- contractState.put(ContractId(outputRef.key), state)
+        newContractState <- contractState.put(contractId, state)
         recordOpt        <- codeState.getOpt(code.hash)
         newCodeState     <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
       } yield Persisted(newOutputState, newContractState, newCodeState, logState, logCounterState)

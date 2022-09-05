@@ -80,7 +80,7 @@ trait ServerFixture
   lazy val dummyContract      = counterContract
   lazy val dummyContractGroup = Group(brokerConfig.groups - 1)
   lazy val dummyContractAddress =
-    Address.Contract(LockupScript.P2C(ContractId(counterContract.hash))).toBase58
+    Address.Contract(LockupScript.P2C(ContractId.zero)).toBase58
   lazy val (dummyKeyAddress, dummyKey, dummyPrivateKey) = addressStringGen(
     GroupIndex.unsafe(dummyGroup.group)
   ).sample.get
@@ -422,13 +422,13 @@ object ServerFixture {
           contractGroup
         ) && (groupIndex.value == contractGroup)
       ) {
-        val contractId: ContractId = ContractId(dummyContract.toHalfDecoded().hash)
+        val contractId: ContractId = ContractId.zero
         storages.emptyWorldState
           .createContractUnsafe(
             contractId,
             dummyContract.toHalfDecoded(),
             AVector(vm.Val.U256(U256.Zero)),
-            ContractOutputRef.unsafe(Hint.unsafe(0), contractId.value),
+            ContractOutputRef.unsafe(Hint.unsafe(0), Hash.zero),
             ContractOutput(U256.Zero, LockupScript.P2C(contractId), AVector())
           )
           .map(_.cached())

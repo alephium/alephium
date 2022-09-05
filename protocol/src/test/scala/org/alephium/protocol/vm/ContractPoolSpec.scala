@@ -38,7 +38,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     def genContract(
         n: Long = 0,
         fieldLength: Int = 0
-    ): (StatefulContract, ContractOutputRef, ContractOutput) = {
+    ): (ContractId, StatefulContract, ContractOutputRef, ContractOutput) = {
       val contractId = ContractId(Hash.generate)
       val output     = ContractOutput(ALPH.alph(n), LockupScript.p2c(contractId), AVector.empty)
       val outputRef  = ContractOutputRef.unsafe(output.hint, contractId.value)
@@ -52,17 +52,17 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         instrs = AVector(U256Const(Val.U256(n)))
       )
       val contract = StatefulContract(fieldLength, methods = AVector(method))
-      (contract, outputRef, output)
+      (contractId, contract, outputRef, output)
     }
 
     def fields(length: Int): AVector[Val] = AVector.fill(length)(Val.True)
 
     def createContract(
+        contractId: ContractId,
         contract: StatefulContract,
         outputRef: ContractOutputRef,
         output: ContractOutput
     ): Assertion = {
-      val contractId = ContractId(outputRef.key)
       pool.worldState
         .createContractUnsafe(
           contractId,
@@ -76,9 +76,9 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     }
 
     def createContract(n: Long = 0, fieldLength: Int = 0): (ContractId, StatefulContract) = {
-      val (contract, outputRef, output) = genContract(n, fieldLength)
-      createContract(contract, outputRef, output)
-      ContractId(outputRef.key) -> contract
+      val (contractId, contract, outputRef, output) = genContract(n, fieldLength)
+      createContract(contractId, contract, outputRef, output)
+      contractId -> contract
     }
 
     def toObject(contract: StatefulContract, contractId: ContractId) = {
@@ -173,7 +173,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     with GroupConfigFixture.Default
     with NetworkConfigFixture.Default {
     val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
-    val contractId = ContractId(outputRef.key)
+    val contractId = ContractId(Hash.random)
     val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
     pool.worldState.createContractUnsafe(
       contractId,

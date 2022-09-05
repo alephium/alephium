@@ -592,14 +592,14 @@ trait FlowFixture
   def checkState(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
-      key: ContractId,
+      contractId: ContractId,
       fields: AVector[Val],
       outputRef: ContractOutputRef,
       numAssets: Int = 2,
       numContracts: Int = 2
   ): Assertion = {
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
-    val contractState = worldState.getContractState(key).fold(throw _, identity)
+    val contractState = worldState.getContractState(contractId).fold(throw _, identity)
 
     contractState.fields is fields
     contractState.contractOutputRef is outputRef

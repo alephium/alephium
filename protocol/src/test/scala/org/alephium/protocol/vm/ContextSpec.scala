@@ -18,8 +18,9 @@ package org.alephium.protocol.vm
 
 import org.scalacheck.Gen
 
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
-import org.alephium.protocol.model.{ContractId, GroupIndex, HardFork, TxGenerators, TxOutputRef}
+import org.alephium.protocol.model.{ContractId, GroupIndex, HardFork, TxGenerators}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class ContextSpec
@@ -35,7 +36,7 @@ class ContextSpec
       val output =
         contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(ContractId.zero))).sample.get
       val balances   = MutBalancesPerLockup.from(output)
-      val contractId = ContractId(TxOutputRef.key(context.txId, context.txEnv.fixedOutputs.length))
+      val contractId = ContractId.from(context.txId, context.txEnv.fixedOutputs.length)
       context
         .createContract(
           contractId,
@@ -58,10 +59,10 @@ class ContextSpec
   }
 
   it should "test contract exists" in new Fixture {
-    val (_, _, outputRef, _) = generateContract().sample.get
-    context.contractExists(ContractId(outputRef.key)) isE false
-    val contractId = createContract()
-    context.contractExists(contractId) isE true
+    val contractId0 = ContractId(Hash.random)
+    context.contractExists(contractId0) isE false
+    val contractId1 = createContract()
+    context.contractExists(contractId1) isE true
   }
 
   it should "generate asset output" in new Fixture {

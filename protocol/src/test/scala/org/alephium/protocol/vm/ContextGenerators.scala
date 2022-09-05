@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.Signature
+import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
@@ -84,17 +84,17 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       contract: StatefulContract,
       fields: AVector[Val],
       gasLimit: GasBox = GasBox.unsafe(100000),
-      contractOutputOpt: Option[(ContractOutput, ContractOutputRef)] = None,
+      contractOutputOpt: Option[(ContractId, ContractOutput, ContractOutputRef)] = None,
       txEnvOpt: Option[TxEnv] = None
   )(implicit _networkConfig: NetworkConfig): (StatefulContractObject, StatefulContext) = {
     val groupIndex = GroupIndex.unsafe(0)
-    val (contractOutput, contractOutputRef) = contractOutputOpt.getOrElse {
+    val (contractId, contractOutput, contractOutputRef) = contractOutputOpt.getOrElse {
+      val ci  = ContractId(Hash.random)
       val co  = contractOutputGen(scriptGen = p2cLockupGen(groupIndex)).sample.get
       val cor = ContractOutputRef.unsafe(TransactionId.generate, co, 0)
-      (co, cor)
+      (ci, co, cor)
     }
     val halfDecoded = contract.toHalfDecoded()
-    val contractId  = ContractId(contractOutputRef.key)
 
     cachedWorldState.createContractUnsafe(
       contractId,

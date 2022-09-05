@@ -35,11 +35,9 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
   // scalastyle:off method.length
   def test[T, R1, R2, R3](initialWorldState: WorldState[T, R1, R2, R3]) = {
-    val (assetOutputRef, assetOutput)                    = generateAsset.sample.get
-    val (code, state, contractOutputRef, contractOutput) = generateContract().sample.get
-    val (_, _, contractOutputRef1, contractOutput1)      = generateContract().sample.get
-    val contractId                                       = ContractId(contractOutputRef.key)
-    val contractId1                                      = ContractId(contractOutputRef1.key)
+    val (assetOutputRef, assetOutput)                                = generateAsset.sample.get
+    val (contractId, code, state, contractOutputRef, contractOutput) = generateContract().sample.get
+    val (contractId1, _, _, contractOutputRef1, contractOutput1)     = generateContract().sample.get
 
     val contractObj = code.toObjectUnsafe(contractId, state)
     var worldState  = initialWorldState
@@ -180,9 +178,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     )
     val staging = worldState.staging()
 
-    val (code, state, contractOutputRef, contractOutput) = generateContract().sample.get
-
-    val contractId  = ContractId(contractOutputRef.key)
+    val (contractId, code, state, contractOutputRef, contractOutput) = generateContract().sample.get
     val contractObj = code.toObjectUnsafe(contractId, state)
     staging.createContractUnsafe(contractId, code, state, contractOutputRef, contractOutput) isE ()
     staging.getContractObj(contractId) isE contractObj
