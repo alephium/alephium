@@ -23,7 +23,7 @@ import org.alephium.protocol.Hash
 import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.{Bytes, Env}
 
-final case class ContractId(value: Hash) extends RandomBytes {
+final case class ContractId private (value: Hash) extends RandomBytes {
   def bytes: ByteString = value.bytes
 
   def subContractId(path: ByteString): ContractId = {
