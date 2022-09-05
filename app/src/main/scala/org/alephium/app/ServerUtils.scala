@@ -450,11 +450,11 @@ class ServerUtils(implicit
 
   def getEventsByTxId(
       blockFlow: BlockFlow,
-      txId: Hash
+      txId: TransactionId
   ): Try[ContractEventsByTxId] = {
     wrapResult(
       for {
-        result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
+        result <- blockFlow.getEvents(txId.value, 0, CounterRange.MaxCounterRange)
         (nextStart, logStatesVec) = result
         events <- logStatesVec.flatMapE { logStates =>
           logStates.states

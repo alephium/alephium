@@ -31,7 +31,7 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
 import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
 import org.alephium.flow.validation._
-import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, LogConfig}
@@ -162,8 +162,12 @@ class TxHandler(
     with InterCliqueManager.NodeSyncStatus {
   private val nonCoinbaseValidation = TxValidation.build
   val maxCapacity: Int = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
-  val fetching: FetchState[Hash] =
-    FetchState[Hash](maxCapacity, networkSetting.syncExpiryPeriod, TxHandler.MaxDownloadTimes)
+  val fetching: FetchState[TransactionId] =
+    FetchState[TransactionId](
+      maxCapacity,
+      networkSetting.syncExpiryPeriod,
+      TxHandler.MaxDownloadTimes
+    )
   val txsBuffer: Cache[TransactionTemplate, Unit] =
     Cache.fifo[TransactionTemplate, Unit](maxCapacity)
   val delayedTxs: Cache[TransactionTemplate, TimeStamp] =
@@ -338,7 +342,7 @@ class TxHandler(
       val mempool = blockFlow.getMemPool(chainIndex)
       txs.foreach { tx =>
         if (
-          fetching.needToFetch(tx.value, timestamp) &&
+          fetching.needToFetch(tx, timestamp) &&
           !mempool.contains(chainIndex, tx)
         ) {
           val announcement = TxHandler.Announcement(brokerHandler, chainIndex, tx)

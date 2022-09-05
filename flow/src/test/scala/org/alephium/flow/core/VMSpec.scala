@@ -802,7 +802,7 @@ class VMSpec extends AlephiumSpec {
       val block          = callTxScript(script)
       val transaction    = block.nonCoinbase.head
       val contractOutput = transaction.generatedOutputs(0).asInstanceOf[ContractOutput]
-      val tokenId        = TokenId(contractOutput.lockupScript.contractId.value)
+      val tokenId        = TokenId.from(contractOutput.lockupScript.contractId)
       contractOutput.tokens is AVector((tokenId, tokenAmount))
     }
 
@@ -2348,7 +2348,7 @@ class VMSpec extends AlephiumSpec {
 
     getLogStates(blockFlow, chainIndex.from, contractId, 0) isnot None
     val txId = callingBlock.nonCoinbase.head.id
-    getLogStatesByTxId(blockFlow, chainIndex.from, txId.value) is None
+    getLogStatesByTxId(blockFlow, chainIndex.from, txId) is None
   }
 
   it should "write to the log storage with tx id indexing" in new EventFixtureWithContract {
@@ -2360,7 +2360,7 @@ class VMSpec extends AlephiumSpec {
 
     getLogStates(blockFlow, chainIndex.from, contractId, 0) isnot None
     val txId = callingBlock.nonCoinbase.head.id
-    getLogStatesByTxId(blockFlow, chainIndex.from, txId.value) isnot None
+    getLogStatesByTxId(blockFlow, chainIndex.from, txId) isnot None
   }
 
   it should "write script events to log storage" in new EventFixture {
@@ -2398,7 +2398,7 @@ class VMSpec extends AlephiumSpec {
     contractLogStates.states(0) is LogState(txId, 0, fields)
     contractLogStates.states(1) is LogState(txId, 1, fields)
 
-    val txIdLogStates = getLogStatesByTxId(blockFlow, chainIndex.from, txId.value).value
+    val txIdLogStates = getLogStatesByTxId(blockFlow, chainIndex.from, txId).value
     txIdLogStates.blockHash is callingBlock.hash
     txIdLogStates.eventKey is txId.value
     txIdLogStates.states.length is 2
@@ -2592,9 +2592,9 @@ class VMSpec extends AlephiumSpec {
   private def getLogStatesByTxId(
       blockFlow: BlockFlow,
       groupIndex: GroupIndex,
-      txId: Hash
+      txId: TransactionId
   ): Option[LogStates] = {
-    val logStatesId = LogStatesId(txId, 0)
+    val logStatesId = LogStatesId(txId.value, 0)
     getLogStates(blockFlow, groupIndex, logStatesId)
   }
 
@@ -2707,10 +2707,8 @@ class VMSpec extends AlephiumSpec {
 
       callTxScript(createSubContractRaw)
 
-      val subContractId = ContractId(
-        Hash.doubleHash(contractId.bytes ++ serialize(subContractPath))
-      )
-      val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val subContractId = contractId.subContractId(serialize(subContractPath))
+      val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       worldState.getContractState(contractId).rightValue.fields is AVector[Val](
         Val.ByteVec(subContractId.bytes)
       )

@@ -421,7 +421,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       val brokerHandler = TestProbe()
       val announcement  = TxHandler.Announcement(ActorRefT(brokerHandler.ref), chainIndex, txId)
       brokerHandler.send(txHandler, TxHandler.TxAnnouncements(AVector((chainIndex, AVector(txId)))))
-      txHandler.underlyingActor.fetching.states.contains(txId.value) is true
+      txHandler.underlyingActor.fetching.states.contains(txId) is true
       txHandler.underlyingActor.announcements.contains(announcement) is haveAnnouncement
       brokerHandler -> AVector(chainIndex -> AVector(txId))
     }

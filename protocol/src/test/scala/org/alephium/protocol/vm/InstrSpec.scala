@@ -2256,7 +2256,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       contractState.fields is fields
       val contractOutput =
         frame.ctx.worldState.getContractAsset(contractState.contractOutputRef).rightValue
-      val tokenId = TokenId(contractId.value)
+      val tokenId = TokenId.from(contractId)
       val allTokens = tokenAmount match {
         case Some(amount) => tokens :+ (tokenId -> amount)
         case None         => tokens
@@ -2342,8 +2342,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(contractBytes))
     stack.push(Val.ByteVec(serialize(fields)))
 
-    val subContractId =
-      ContractId(Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01")))
+    val subContractId = fromContractId.subContractId(serialize("nft-01"))
     test(CreateSubContract, ALPH.oneAlph, AVector.empty, None, Some(subContractId))
   }
 
@@ -2359,8 +2358,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(serialize(fields)))
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
-    val subContractId =
-      ContractId(Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01")))
+    val subContractId = fromContractId.subContractId(serialize("nft-01"))
     test(
       CreateSubContractWithToken,
       U256.Zero,
@@ -2388,8 +2386,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(Val.U256(ALPH.oneNanoAlph))
       stack.push(Val.Address(assetLockupScriptGen.sample.get))
 
-      val subContractId =
-        ContractId(Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01")))
+      val subContractId = fromContractId.subContractId(serialize("nft-01"))
       test(
         CreateSubContractAndTransferToken,
         U256.Zero,
@@ -2654,8 +2651,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(fromContractId.bytes))
     stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
 
-    val subContractId =
-      ContractId(Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01")))
+    val subContractId = fromContractId.subContractId(serialize("nft-01"))
     test(CopyCreateSubContract, ALPH.oneAlph, AVector.empty, None, Some(subContractId))
   }
 
@@ -2677,8 +2673,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(state)
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
-    val subContractId =
-      ContractId(Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01")))
+    val subContractId = fromContractId.subContractId(serialize("nft-01"))
     test(
       CopyCreateSubContractWithToken,
       U256.Zero,
@@ -2707,8 +2702,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(Val.U256(ALPH.oneNanoAlph))
       stack.push(assetAddress)
 
-      val subContractId =
-        ContractId(Hash.doubleHash(fromContractId.bytes ++ serialize("nft-01")))
+      val subContractId = fromContractId.subContractId(serialize("nft-01"))
       test(
         CopyCreateSubContractAndTransferToken,
         U256.Zero,

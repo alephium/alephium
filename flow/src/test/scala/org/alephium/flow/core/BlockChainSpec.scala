@@ -117,9 +117,9 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       block0.transactions.foreachWithIndex { case (tx, index) =>
         val txIndex = TxIndex(block0.hash, index)
         if (brokerConfig.contains(block0.chainIndex.from)) {
-          chain.txStorage.get(tx.id.value) isE TxIndexes(AVector(txIndex))
+          chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex))
         } else {
-          chain.txStorage.exists(tx.id.value) isE false
+          chain.txStorage.exists(tx.id) isE false
         }
       }
       val block1 = block0.copy(header = block0.header.copy(nonce = Nonce.secureRandom()))
@@ -132,13 +132,13 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
           brokerConfig.contains(block1.chainIndex.from)
         ) match {
           case (true, true) =>
-            chain.txStorage.get(tx.id.value) isE TxIndexes(AVector(txIndex0, txIndex1))
+            chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0, txIndex1))
           case (true, false) =>
-            chain.txStorage.get(tx.id.value) isE TxIndexes(AVector(txIndex0))
+            chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex0))
           case (false, true) =>
-            chain.txStorage.get(tx.id.value) isE TxIndexes(AVector(txIndex1))
+            chain.txStorage.get(tx.id) isE TxIndexes(AVector(txIndex1))
           case (false, false) =>
-            chain.txStorage.exists(tx.id.value) isE false
+            chain.txStorage.exists(tx.id) isE false
         }
       }
     }
@@ -152,31 +152,31 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val chain      = buildBlockChain()
 
     shortChain.foreach { block =>
-      block.transactions.foreach { tx => chain.getTxStatus(tx.id.value) isE None }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
     longChain.foreach { block =>
-      block.transactions.foreach { tx => chain.getTxStatus(tx.id.value) isE None }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
 
     addBlocks(chain, shortChain)
     shortChain.foreachWithIndex { case (block, blockIndex) =>
       block.transactions.foreachWithIndex { case (tx, txIndex) =>
-        chain.getTxStatus(tx.id.value) isE Some(
+        chain.getTxStatus(tx.id) isE Some(
           TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex)
         )
       }
     }
     longChain.foreach { block =>
-      block.transactions.foreach { tx => chain.getTxStatus(tx.id.value) isE None }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
 
     addBlocks(chain, longChain)
     shortChain.foreach { block =>
-      block.transactions.foreach { tx => chain.getTxStatus(tx.id.value) isE None }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
     longChain.foreachWithIndex { case (block, blockIndex) =>
       block.transactions.foreachWithIndex { case (tx, txIndex) =>
-        chain.getTxStatus(tx.id.value) isE Some(
+        chain.getTxStatus(tx.id) isE Some(
           TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex)
         )
       }
@@ -193,16 +193,16 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val chain = buildBlockChain()
 
     shortChain.foreach { block =>
-      block.transactions.foreach { tx => chain.getTxStatus(tx.id.value) isE None }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
     longChain.foreach { block =>
-      block.transactions.foreach { tx => chain.getTxStatus(tx.id.value) isE None }
+      block.transactions.foreach { tx => chain.getTxStatus(tx.id) isE None }
     }
 
     addBlocks(chain, shortChain)
     shortChain.foreachWithIndex { case (block, blockIndex) =>
       block.transactions.foreachWithIndex { case (tx, txIndex) =>
-        chain.getTxStatus(tx.id.value) isE Some(
+        chain.getTxStatus(tx.id) isE Some(
           TxStatus(TxIndex(block.hash, txIndex), shortChain.length - blockIndex)
         )
       }
@@ -210,14 +210,14 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     longChain.foreachWithIndex { case (block, blockIndex) =>
       block.transactions.foreachWithIndex { case (tx, txIndex) =>
         if (blockIndex < shortChain.length) {
-          chain.getTxStatus(tx.id.value) isE Some(
+          chain.getTxStatus(tx.id) isE Some(
             TxStatus(
               TxIndex(shortChain(blockIndex).hash, txIndex),
               shortChain.length - blockIndex
             )
           )
         } else {
-          chain.getTxStatus(tx.id.value) isE None
+          chain.getTxStatus(tx.id) isE None
         }
       }
     }
@@ -225,14 +225,14 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     addBlocks(chain, longChain)
     shortChain.foreachWithIndex { case (block, blockIndex) =>
       block.transactions.foreachWithIndex { case (tx, txIndex) =>
-        chain.getTxStatus(tx.id.value) isE Some(
+        chain.getTxStatus(tx.id) isE Some(
           TxStatus(TxIndex(longChain(blockIndex).hash, txIndex), longChain.length - blockIndex)
         )
       }
     }
     longChain.foreachWithIndex { case (block, blockIndex) =>
       block.transactions.foreachWithIndex { case (tx, txIndex) =>
-        chain.getTxStatus(tx.id.value) isE Some(
+        chain.getTxStatus(tx.id) isE Some(
           TxStatus(TxIndex(block.hash, txIndex), longChain.length - blockIndex)
         )
       }

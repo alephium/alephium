@@ -23,9 +23,9 @@ import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.{ALPH}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
-import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, Weight}
+import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, TransactionId, Weight}
 import org.alephium.protocol.vm.WorldState
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}
@@ -228,19 +228,19 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   protected def persistTxs(block: Block): IOResult[Unit] = {
     if (brokerConfig.contains(block.chainIndex.from)) {
       block.transactions.foreachWithIndexE { case (tx, index) =>
-        txStorage.add(tx.id.value, TxIndex(block.hash, index))
+        txStorage.add(tx.id, TxIndex(block.hash, index))
       }
     } else {
       Right(())
     }
   }
 
-  def isTxConfirmed(txId: Hash): IOResult[Boolean] = txStorage.exists(txId)
+  def isTxConfirmed(txId: TransactionId): IOResult[Boolean] = txStorage.exists(txId)
 
-  def getTxStatus(txId: Hash): IOResult[Option[TxStatus]] =
+  def getTxStatus(txId: TransactionId): IOResult[Option[TxStatus]] =
     IOUtils.tryExecute(getTxStatusUnsafe(txId))
 
-  def getTxStatusUnsafe(txId: Hash): Option[TxStatus] = {
+  def getTxStatusUnsafe(txId: TransactionId): Option[TxStatus] = {
     txStorage.getOptUnsafe(txId).flatMap { txIndexes =>
       val canonicalIndex = txIndexes.indexes.filter(index => isCanonicalUnsafe(index.hash))
       if (canonicalIndex.nonEmpty) {

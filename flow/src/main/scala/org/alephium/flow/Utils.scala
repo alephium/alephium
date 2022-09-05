@@ -34,12 +34,8 @@ object Utils {
     if (elems.isEmpty) "[]" else s"[ ${elems.head.shortHex} .. ${elems.last.shortHex} ]"
   }
 
-  def showDataFlow[T <: FlowData](elems: AVector[AVector[T]]): String = {
-    elems.map(showDataDigest).mkString(", ")
-  }
-
   def showChainIndexedDigest(elems: AVector[(ChainIndex, AVector[TransactionId])]): String = {
-    elems.map(p => s"${p._1} -> ${showDigest(p._2.map(_.value))}").mkString(", ")
+    elems.map(p => s"${p._1} -> ${showDigest(p._2)}").mkString(", ")
   }
 
   def unsafe[T](e: IOResult[T]): T =

@@ -328,14 +328,14 @@ trait TxUtils { Self: FlowUtils =>
   def isTxConfirmed(txId: TransactionId, chainIndex: ChainIndex): IOResult[Boolean] = {
     assume(brokerConfig.contains(chainIndex.from))
     val chain = getBlockChain(chainIndex)
-    chain.isTxConfirmed(txId.value)
+    chain.isTxConfirmed(txId)
   }
 
   def getTxStatus(txId: TransactionId, chainIndex: ChainIndex): IOResult[Option[TxStatus]] =
     IOUtils.tryExecute {
       assume(brokerConfig.contains(chainIndex.from))
       val chain = getBlockChain(chainIndex)
-      chain.getTxStatusUnsafe(txId.value).flatMap { chainStatus =>
+      chain.getTxStatusUnsafe(txId).flatMap { chainStatus =>
         val confirmations = chainStatus.confirmations
         if (chainIndex.isIntraGroup) {
           Some(Confirmed(chainStatus.index, confirmations, confirmations, confirmations))

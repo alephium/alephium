@@ -24,7 +24,7 @@ import org.alephium.crypto
 import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
-import org.alephium.protocol.model.{AssetOutput, ContractId, TokenId, TxOutputRef}
+import org.alephium.protocol.model.{AssetOutput, ContractId, TokenId}
 import org.alephium.protocol.vm.TokenIssuance.{
   IssueTokenAndTransfer,
   IssueTokenWithoutTransfer,
@@ -1533,7 +1533,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
         ContractId(Hash.doubleHash(subContractIdPreImage))
       }
     } else {
-      Right(ContractId(TxOutputRef.key(frame.ctx.txId, frame.ctx.nextOutputIndex)))
+      Right(ContractId.from(frame.ctx.txId, frame.ctx.nextOutputIndex))
     }
   }
 
