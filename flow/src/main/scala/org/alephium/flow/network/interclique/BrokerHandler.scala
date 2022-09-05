@@ -186,7 +186,7 @@ trait BrokerHandler extends BaseBrokerHandler {
           Left(())
         } else {
           val sharedPool = blockflow.getMemPool(chainIndex).getSharedPool(chainIndex)
-          val txs        = sharedPool.getTxs(txHashes.map(_.value))
+          val txs        = sharedPool.getTxs(txHashes)
           Right(acc ++ txs)
         }
     }

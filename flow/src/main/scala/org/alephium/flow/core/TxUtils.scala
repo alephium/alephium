@@ -26,7 +26,7 @@ import org.alephium.flow.core.FlowUtils._
 import org.alephium.flow.core.UtxoSelectionAlgo.{AssetAmounts, ProvidedGas}
 import org.alephium.flow.gasestimation._
 import org.alephium.io.{IOResult, IOUtils}
-import org.alephium.protocol.{ALPH, Hash, PublicKey}
+import org.alephium.protocol.{ALPH, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
@@ -473,10 +473,10 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def isInMemPool(txId: TransactionId, chainIndex: ChainIndex): Boolean = {
-    Self.blockFlow.getMemPool(chainIndex).contains(chainIndex, txId.value)
+    Self.blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
-  def checkTxChainIndex(chainIndex: ChainIndex, tx: Hash): Either[String, Unit] = {
+  def checkTxChainIndex(chainIndex: ChainIndex, tx: TransactionId): Either[String, Unit] = {
     if (brokerConfig.contains(chainIndex.from)) {
       Right(())
     } else {

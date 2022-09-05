@@ -205,11 +205,11 @@ class TxHandler(
       )
       results.foreach { result =>
         result.invalidTxss.foreach(escapeIOError(_)(_.foreach { tx =>
-          escapeIOError(readyTxStorage.getOpt(tx.id.value).flatMap {
+          escapeIOError(readyTxStorage.getOpt(tx.id).flatMap {
             case Some(info) =>
-              val persistedTxId = PersistedTxId(info.timestamp, tx.id.value)
+              val persistedTxId = PersistedTxId(info.timestamp, tx.id)
               readyTxStorage
-                .delete(tx.id.value)
+                .delete(tx.id)
                 .flatMap(_ => pendingTxStorage.delete(persistedTxId))
             case None =>
               Right(())
@@ -222,7 +222,7 @@ class TxHandler(
       blockFlow.grandPool.cleanPendingPool(blockFlow).foreach { result =>
         escapeIOError(result) { invalidPendingTxs =>
           invalidPendingTxs.foreach { case (tx, timestamp) =>
-            val persistedTxId = PersistedTxId(timestamp, tx.id.value)
+            val persistedTxId = PersistedTxId(timestamp, tx.id)
             escapeIOError(pendingTxStorage.delete(persistedTxId))
           }
         }
@@ -240,11 +240,11 @@ class TxHandler(
   }
 
   private def removeConfirmedTxsFromStorage(): Unit = {
-    escapeIOError(readyTxStorage.iterateE { (hash, info) =>
-      blockFlow.isTxConfirmed(TransactionId(hash), info.chainIndex).flatMap { confirmed =>
+    escapeIOError(readyTxStorage.iterateE { (txId, info) =>
+      blockFlow.isTxConfirmed(txId, info.chainIndex).flatMap { confirmed =>
         if (confirmed) {
-          val persistedTxId = PersistedTxId(info.timestamp, hash)
-          readyTxStorage.delete(hash).flatMap(_ => pendingTxStorage.delete(persistedTxId))
+          val persistedTxId = PersistedTxId(info.timestamp, txId)
+          readyTxStorage.delete(txId).flatMap(_ => pendingTxStorage.delete(persistedTxId))
         } else {
           Right(())
         }
@@ -260,7 +260,7 @@ class TxHandler(
     txs.foreach { case (tx, timestamp) =>
       delayedTxs.put(tx, broadcastTs)
       val info = ReadyTxInfo(tx.chainIndex, timestamp)
-      escapeIOError(readyTxStorage.put(tx.id.value, info))
+      escapeIOError(readyTxStorage.put(tx.id, info))
     }
   }
 
@@ -339,7 +339,7 @@ class TxHandler(
       txs.foreach { tx =>
         if (
           fetching.needToFetch(tx.value, timestamp) &&
-          !mempool.contains(chainIndex, tx.value)
+          !mempool.contains(chainIndex, tx)
         ) {
           val announcement = TxHandler.Announcement(brokerHandler, chainIndex, tx)
           announcements.put(announcement, ())
@@ -413,10 +413,10 @@ class TxHandler(
         }
         persistedTxIdOpt.foreach { persistedTxId =>
           val info = ReadyTxInfo(chainIndex, persistedTxId.timestamp)
-          escapeIOError(readyTxStorage.put(tx.id.value, info))
+          escapeIOError(readyTxStorage.put(tx.id, info))
         }
       case MemPool.AddedToPendingPool => // We don't broadcast txs that are pending locally
-        val newPersistedTxId = PersistedTxId(currentTs, tx.id.value)
+        val newPersistedTxId = PersistedTxId(currentTs, tx.id)
         persistedTxIdOpt match {
           case Some(oldPersistedTxId) =>
             escapeIOError(pendingTxStorage.replace(oldPersistedTxId, newPersistedTxId, tx))

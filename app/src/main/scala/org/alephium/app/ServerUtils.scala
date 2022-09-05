@@ -349,7 +349,7 @@ class ServerUtils(implicit
     }
   }
 
-  def isInMemPool(blockFlow: BlockFlow, txId: Hash, chainIndex: ChainIndex): Boolean = {
+  def isInMemPool(blockFlow: BlockFlow, txId: TransactionId, chainIndex: ChainIndex): Boolean = {
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 

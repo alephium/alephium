@@ -106,7 +106,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     setSynced()
     txHandler ! TxHandler.AddToSharedPool(AVector(tx0))
     expectMsg(TxHandler.AddSucceeded(tx0.id))
-    mempool.getSharedPool(tx0.chainIndex).contains(tx0.id.value) is true
+    mempool.getSharedPool(tx0.chainIndex).contains(tx0.id) is true
     txHandler.underlyingActor.txsBuffer.contains(tx0) is true
     txHandler.underlyingActor.delayedTxs.contains(tx0) is false
 
@@ -118,7 +118,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     worldState.existOutput(tx1.unsigned.inputs.head.outputRef) isE true
     txHandler ! TxHandler.AddToSharedPool(AVector(tx1))
     expectMsg(TxHandler.AddSucceeded(tx1.id))
-    mempool.getSharedPool(tx1.chainIndex).contains(tx1.id.value) is true
+    mempool.getSharedPool(tx1.chainIndex).contains(tx1.id) is true
     txHandler.underlyingActor.txsBuffer.contains(tx1) is false
     txHandler.underlyingActor.delayedTxs.contains(tx1) is true
 
@@ -204,7 +204,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     def addReadyTx(tx: TransactionTemplate) = {
       txHandler ! TxHandler.AddToSharedPool(AVector(tx))
-      sharedPool.contains(tx.id.value) is true
+      sharedPool.contains(tx.id) is true
       txHandler.underlyingActor.txsBuffer.contains(tx) is true
       broadcastTxProbe.expectMsg(
         InterCliqueManager.BroadCastTx(AVector(chainIndex -> AVector(tx.id)))
@@ -213,21 +213,21 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     def addPendingTx(tx: TransactionTemplate): PersistedTxId = {
       txHandler ! TxHandler.AddToGrandPool(AVector(tx))
-      pendingPool.contains(tx.id.value) is true
-      val timestamp     = pendingPool.timestamps.unsafe(tx.id.value)
-      val persistedTxId = PersistedTxId(timestamp, tx.id.value)
+      pendingPool.contains(tx.id) is true
+      val timestamp     = pendingPool.timestamps.unsafe(tx.id)
+      val persistedTxId = PersistedTxId(timestamp, tx.id)
       pendingTxStorage.get(persistedTxId) isE tx
       persistedTxId
     }
 
     def removeReadyTxs(txs: AVector[TransactionTemplate]) = {
       sharedPool.remove(txs) is txs.length
-      txs.foreach(tx => sharedPool.contains(tx.id.value) is false)
+      txs.foreach(tx => sharedPool.contains(tx.id) is false)
     }
 
     def removePendingTxs(txs: AVector[TransactionTemplate]) = {
       pendingPool.remove(txs)
-      txs.foreach(tx => pendingPool.contains(tx.id.value) is false)
+      txs.foreach(tx => pendingPool.contains(tx.id) is false)
     }
 
     setSynced()
@@ -237,11 +237,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     addReadyTx(tx0)
     val persistedTxId = addPendingTx(tx1)
     info("Pending tx becomes ready")
-    readyTxStorage.exists(tx1.id.value) isE false
+    readyTxStorage.exists(tx1.id) isE false
     txHandler ! TxHandler.Broadcast(AVector(tx1 -> persistedTxId.timestamp))
     txHandler.underlyingActor.delayedTxs.contains(tx1) is true
     pendingTxStorage.get(persistedTxId) isE tx1
-    readyTxStorage.get(tx1.id.value) isE ReadyTxInfo(tx1.chainIndex, persistedTxId.timestamp)
+    readyTxStorage.get(tx1.id) isE ReadyTxInfo(tx1.chainIndex, persistedTxId.timestamp)
 
     info("Remove pending tx from storage when confirmed")
     addAndCheck(blockFlow, block0)
@@ -251,7 +251,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     blockFlow.isTxConfirmed(tx1.id, tx1.chainIndex) isE true
     txHandler ! TxHandler.CleanPendingPool
     pendingTxStorage.exists(persistedTxId) isE false
-    readyTxStorage.exists(tx1.id.value) isE false
+    readyTxStorage.exists(tx1.id) isE false
   }
 
   it should "load persisted pending txs" in new PersistenceFixture {
@@ -276,20 +276,20 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     txHandler.underlyingActor.clearStorageAndLoadTxs()
 
     info("Load persisted pending tx to shared pool")
-    sharedPool.contains(tx1.id.value) is true
-    pendingPool.contains(tx1.id.value) is false
+    sharedPool.contains(tx1.id) is true
+    pendingPool.contains(tx1.id) is false
     txHandler.underlyingActor.delayedTxs.contains(tx1) is true
     pendingTxStorage.get(persistedTxId1) isE tx1
-    readyTxStorage.get(tx1.id.value) isE ReadyTxInfo(tx1.chainIndex, persistedTxId1.timestamp)
+    readyTxStorage.get(tx1.id) isE ReadyTxInfo(tx1.chainIndex, persistedTxId1.timestamp)
 
     info("Load persisted pending tx to pending pool")
-    sharedPool.contains(tx2.id.value) is false
-    pendingPool.contains(tx2.id.value) is true
-    val timestamp         = pendingPool.timestamps.unsafe(tx2.id.value)
-    val newPersistedTxId2 = PersistedTxId(timestamp, tx2.id.value)
+    sharedPool.contains(tx2.id) is false
+    pendingPool.contains(tx2.id) is true
+    val timestamp         = pendingPool.timestamps.unsafe(tx2.id)
+    val newPersistedTxId2 = PersistedTxId(timestamp, tx2.id)
     pendingTxStorage.get(newPersistedTxId2) isE tx2
     pendingTxStorage.exists(persistedTxId2) isE false
-    readyTxStorage.exists(tx2.id.value) isE false
+    readyTxStorage.exists(tx2.id) isE false
   }
 
   it should "cleanup storages if ready tx is invalid" in new PersistenceFixture {
@@ -304,21 +304,21 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     val persistedTxId1 = addPendingTx(tx1)
     addAndCheck(blockFlow, block0)
-    sharedPool.contains(tx1.id.value) is true
-    pendingPool.contains(tx1.id.value) is false
+    sharedPool.contains(tx1.id) is true
+    pendingPool.contains(tx1.id) is false
 
     // update timestamp because shared pool only check old txs
     val expiredTs = TimeStamp.now().minusUnsafe(memPoolSetting.cleanSharedPoolFrequency)
-    sharedPool.timestamps.put(tx1.id.value, expiredTs)
+    sharedPool.timestamps.put(tx1.id, expiredTs)
     txHandler ! TxHandler.Broadcast(AVector(tx1 -> persistedTxId1.timestamp))
-    readyTxStorage.get(tx1.id.value) isE ReadyTxInfo(tx1.chainIndex, persistedTxId1.timestamp)
+    readyTxStorage.get(tx1.id) isE ReadyTxInfo(tx1.chainIndex, persistedTxId1.timestamp)
     pendingTxStorage.get(persistedTxId1) isE tx1
 
     // tx1 is invalid because of reorg
     addAndCheck(blockFlow, forkedBlock0)
     addAndCheck(blockFlow, forkedBlock1)
     txHandler ! TxHandler.CleanSharedPool
-    readyTxStorage.exists(tx1.id.value) isE false
+    readyTxStorage.exists(tx1.id) isE false
     pendingTxStorage.exists(persistedTxId1) isE false
   }
 
@@ -333,8 +333,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       eventually {
         pendingTxStorage.get(persistedTxId1) isE tx1
         pendingTxStorage.get(persistedTxId2) isE tx2
-        pendingPool.contains(tx1.id.value) is true
-        pendingPool.contains(tx2.id.value) is true
+        pendingPool.contains(tx1.id) is true
+        pendingPool.contains(tx2.id) is true
       }
 
       info("Remove invalid tx(tx2)")
@@ -342,7 +342,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       txHandler ! TxHandler.CleanPendingPool
       eventually {
         pendingTxStorage.exists(persistedTxId2) isE false
-        pendingPool.contains(tx2.id.value) is false
+        pendingPool.contains(tx2.id) is false
       }
     }
 
@@ -355,8 +355,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       eventually {
         pendingTxStorage.exists(persistedTxId1) isE false
         pendingTxStorage.exists(persistedTxId2) isE false
-        pendingPool.contains(tx1.id.value) is false
-        pendingPool.contains(tx2.id.value) is false
+        pendingPool.contains(tx1.id) is false
+        pendingPool.contains(tx2.id) is false
       }
     }
   }
@@ -399,7 +399,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       txHandler ! addTx(tx1)
       expectMsg(
         TxHandler
-          .AddFailed(tx1.id, s"tx ${tx1.id.value.shortHex} is double spending: ${hex(tx1)}")
+          .AddFailed(tx1.id, s"tx ${tx1.id.shortHex} is double spending: ${hex(tx1)}")
       )
       broadcastTxProbe.expectNoMessage()
     }
@@ -451,9 +451,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val txHash3 = TransactionId.generate
     val txHash4 = TransactionId.generate
     val mempool = blockFlow.getMemPool(chain02)
-    mempool.contains(chain02, tx2.id.value) is false
+    mempool.contains(chain02, tx2.id) is false
     mempool.addNewTx(chain02, tx2, TimeStamp.now())
-    mempool.contains(chain02, tx2.id.value) is true
+    mempool.contains(chain02, tx2.id) is true
 
     txHandler ! TxHandler.TxAnnouncements(
       AVector(

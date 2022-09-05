@@ -21,7 +21,6 @@ import scala.collection.mutable
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -29,8 +28,8 @@ import org.alephium.util._
 
 class PendingPool(
     groupIndex: GroupIndex,
-    val txs: mutable.HashMap[Hash, TransactionTemplate],
-    val timestamps: ValueSortedMap[Hash, TimeStamp],
+    val txs: mutable.HashMap[TransactionId, TransactionTemplate],
+    val timestamps: ValueSortedMap[TransactionId, TimeStamp],
     val indexes: TxIndexes,
     capacity: Int
 ) extends RWLock {
@@ -40,17 +39,17 @@ class PendingPool(
 
   def isFull(): Boolean = txs.size >= capacity
 
-  def contains(txId: Hash): Boolean = readOnly {
+  def contains(txId: TransactionId): Boolean = readOnly {
     txs.contains(txId)
   }
 
   def add(tx: TransactionTemplate, timeStamp: TimeStamp): Boolean = writeOnly {
-    if (!txs.contains(tx.id.value)) {
+    if (!txs.contains(tx.id)) {
       if (isFull()) {
         false
       } else {
-        txs.put(tx.id.value, tx)
-        timestamps.put(tx.id.value, timeStamp)
+        txs.put(tx.id, tx)
+        timestamps.put(tx.id, timeStamp)
         indexes.add(tx)
         measureTransactionsTotal()
         true
@@ -70,8 +69,8 @@ class PendingPool(
   }
 
   def _remove(tx: TransactionTemplate): Unit = {
-    txs.remove(tx.id.value).foreach { _ =>
-      timestamps.remove(tx.id.value)
+    txs.remove(tx.id).foreach { _ =>
+      timestamps.remove(tx.id)
       indexes.remove(tx)
     }
   }
@@ -98,7 +97,7 @@ class PendingPool(
         ) {
           acc
         } else {
-          acc :+ (tx -> timestamps.unsafe(tx.id.value))
+          acc :+ (tx -> timestamps.unsafe(tx.id))
         }
       }
     }

@@ -57,7 +57,7 @@ class PendingTxRocksDBStorage(
       newId: PersistedTxId,
       tx: TransactionTemplate
   ): IOResult[Unit] = {
-    assume(oldId.hash == newId.hash)
+    assume(oldId.txId == newId.txId)
     IOUtils.tryExecute {
       deleteUnsafe(oldId)
       putUnsafe(newId, tx)

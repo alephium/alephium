@@ -29,7 +29,6 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.model.BlockEntry
-import org.alephium.crypto.Blake3
 import org.alephium.flow.handler.FlowHandler.BlockNotify
 import org.alephium.flow.handler.TestUtils
 import org.alephium.json.Json._
