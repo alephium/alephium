@@ -2641,11 +2641,11 @@ class VMSpec extends AlephiumSpec {
       callTxScript(createSubContractRaw)
 
       val subContractId = ContractId(
-        Hash.doubleHash(contractId.value.bytes ++ serialize(subContractPath))
+        Hash.doubleHash(contractId.bytes ++ serialize(subContractPath))
       )
       val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       worldState.getContractState(contractId).rightValue.fields is AVector[Val](
-        Val.ByteVec(subContractId.value.bytes)
+        Val.ByteVec(subContractId.bytes)
       )
 
       intercept[AssertionError](callTxScript(createSubContractRaw)).getMessage.startsWith(
@@ -3353,7 +3353,7 @@ class VMSpec extends AlephiumSpec {
       var lastBarId: ContractId = fooId
       (0 until 5).foreach { index =>
         val initialFields =
-          AVector[Val](Val.U256(U256.unsafe(index)), Val.ByteVec(lastBarId.value.bytes))
+          AVector[Val](Val.U256(U256.unsafe(index)), Val.ByteVec(lastBarId.bytes))
         val barId =
           ContractId(createContract(bar, initialFields, initialAttoAlphAmount = ALPH.alph(2)).key)
         lastBarId = barId

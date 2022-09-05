@@ -1117,7 +1117,7 @@ class ServerUtils(implicit
       AVector[Instr[StatefulContext]](
         ConstInstr.u256(vm.Val.U256(U256.unsafe(argLength))),
         ConstInstr.u256(vm.Val.U256(U256.unsafe(returnLength))),
-        BytesConst(vm.Val.ByteVec(contractId.value.bytes)),
+        BytesConst(vm.Val.ByteVec(contractId.bytes)),
         CallExternal(methodIndex.toByte)
       )
   }

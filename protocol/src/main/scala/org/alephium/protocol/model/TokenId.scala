@@ -28,7 +28,7 @@ final case class TokenId(value: Hash) extends RandomBytes {
 
 object TokenId {
   implicit val serde: Serde[TokenId]           = Serde.forProduct1(TokenId.apply, t => t.value)
-  implicit val tokenIdOrder: Ordering[TokenId] = Ordering.by(_.value.bytes)
+  implicit val tokenIdOrder: Ordering[TokenId] = Ordering.by(_.bytes)
 
   def from(contractId: ContractId): TokenId = {
     TokenId(contractId.value)

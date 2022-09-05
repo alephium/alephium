@@ -28,7 +28,7 @@ final case class TransactionId(value: Hash) extends RandomBytes {
 
 object TransactionId {
   implicit val serde: Serde[TransactionId] = Serde.forProduct1(TransactionId.apply, t => t.value)
-  implicit val transactionIdOrder: Ordering[TransactionId] = Ordering.by(_.value.bytes)
+  implicit val transactionIdOrder: Ordering[TransactionId] = Ordering.by(_.bytes)
 
   val zero: TransactionId = TransactionId(Hash.zero)
   val length: Int         = Hash.length

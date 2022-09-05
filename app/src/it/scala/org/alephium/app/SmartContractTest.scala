@@ -283,7 +283,7 @@ class SmartContractTest extends AlephiumActorSpec {
       SwapContracts.swapContract,
       Some(
         AVector[vm.Val](
-          vm.Val.ByteVec(tokenContractKey.value.bytes),
+          vm.Val.ByteVec(tokenContractKey.bytes),
           vm.Val.U256(U256.Zero),
           vm.Val.U256(U256.Zero)
         )
@@ -423,7 +423,7 @@ class SmartContractTest extends AlephiumActorSpec {
       SwapContracts.swapContract,
       Some(
         AVector[vm.Val](
-          vm.Val.ByteVec(tokenContractKey.value.bytes),
+          vm.Val.ByteVec(tokenContractKey.bytes),
           vm.Val.U256(U256.Zero),
           vm.Val.U256(U256.Zero)
         )

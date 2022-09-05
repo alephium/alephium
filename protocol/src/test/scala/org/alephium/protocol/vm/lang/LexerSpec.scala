@@ -91,6 +91,6 @@ class LexerSpec extends AlephiumSpec {
     intercept[Compiler.Error](fastparse.parse(s"#${address.toBase58}", Lexer.bytes(_))) is Compiler
       .Error(s"Invalid byteVec: ${address.toBase58}")
     fastparse.parse(s"#${contract.toBase58}", Lexer.bytes(_)).get.value is
-      Val.ByteVec(contract.contractId.value.bytes)
+      Val.ByteVec(contract.contractId.bytes)
   }
 }

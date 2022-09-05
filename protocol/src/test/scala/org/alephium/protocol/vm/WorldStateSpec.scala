@@ -167,8 +167,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
   }
 
   it should "test the event key of contract creation and destruction" in {
-    createContractEventId.value.bytes is Hash.zero.bytes.init ++ ByteString(-1)
-    destroyContractEventId.value.bytes is Hash.zero.bytes.init ++ ByteString(-2)
+    createContractEventId.bytes is Hash.zero.bytes.init ++ ByteString(-1)
+    destroyContractEventId.bytes is Hash.zero.bytes.init ++ ByteString(-2)
   }
 
   trait StagingFixture {

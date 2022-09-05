@@ -1021,7 +1021,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val barContract   = Compiler.compileContract(bar).rightValue
     val barContractId = ContractId(Hash.random)
     val destroyedFooContractId =
-      ContractId(Hash.doubleHash(barContractId.value.bytes ++ Hex.unsafe(destroyContractPath)))
+      ContractId(Hash.doubleHash(barContractId.bytes ++ Hex.unsafe(destroyContractPath)))
     val existingContract = ContractState(
       Address.contract(destroyedFooContractId),
       fooContract,
@@ -1041,7 +1041,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testFlow    = BlockFlow.emptyUnsafe(config)
     val serverUtils = new ServerUtils()
     val createdFooContractId =
-      ContractId(Hash.doubleHash(barContractId.value.bytes ++ Hex.unsafe(createContractPath)))
+      ContractId(Hash.doubleHash(barContractId.bytes ++ Hex.unsafe(createContractPath)))
 
     val result =
       serverUtils.runTestContract(testFlow, testContractParams.toComplete().rightValue).rightValue
@@ -1115,7 +1115,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       code = AMMContract.swapCode,
       originalCodeHash = AMMContract.swapCode.hash,
       initialFields =
-        AVector[Val](ValByteVec(tokenId.value.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
+        AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState.from(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
       testMethodIndex = 0,
       testArgs = AVector[Val](ValAddress(lp), ValU256(ALPH.alph(100)), ValU256(100)),
@@ -1133,7 +1133,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
     contractState.fields is
-      AVector[Val](ValByteVec(tokenId.value.bytes), ValU256(ALPH.alph(110)), ValU256(200))
+      AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(110)), ValU256(200))
     contractState.asset is AssetState.from(ALPH.alph(110), AVector(Token(tokenId, 200)))
     result0.txInputs is AVector[Address](contractAddress)
     result0.txOutputs.length is 2
@@ -1166,8 +1166,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       code = AMMContract.swapProxyCode,
       originalCodeHash = AMMContract.swapProxyCode.hash,
       initialFields = AVector[Val](
-        ValByteVec(testContract0.contractId.value.bytes),
-        ValByteVec(tokenId.value.bytes)
+        ValByteVec(testContract0.contractId.bytes),
+        ValByteVec(tokenId.bytes)
       ),
       initialAsset = AssetState(ALPH.alph(1)),
       testMethodIndex = 0,
@@ -1186,7 +1186,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
     contractState1.fields is
-      AVector[Val](ValByteVec(tokenId.value.bytes), ValU256(ALPH.alph(210)), ValU256(300))
+      AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(210)), ValU256(300))
     contractState1.asset is AssetState.from(ALPH.alph(210), AVector(Token(tokenId, 300)))
     result1.txInputs is AVector[Address](contractAddress)
     result1.txOutputs.length is 2
@@ -1213,7 +1213,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       code = AMMContract.swapCode,
       originalCodeHash = AMMContract.swapCode.hash,
       initialFields =
-        AVector[Val](ValByteVec(tokenId.value.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
+        AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState.from(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
       testMethodIndex = 1,
       testArgs = AVector[Val](ValAddress(buyer), ValU256(ALPH.alph(10))),
@@ -1231,7 +1231,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
     contractState.fields is
-      AVector[Val](ValByteVec(tokenId.value.bytes), ValU256(ALPH.alph(20)), ValU256(50))
+      AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(20)), ValU256(50))
     contractState.asset is AssetState.from(ALPH.alph(20), AVector(Token(tokenId, 50)))
     result0.txInputs is AVector[Address](contractAddress)
     result0.txOutputs.length is 2
@@ -1260,8 +1260,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       code = AMMContract.swapProxyCode,
       originalCodeHash = AMMContract.swapProxyCode.hash,
       initialFields = AVector[Val](
-        ValByteVec(testContract0.contractId.value.bytes),
-        ValByteVec(tokenId.value.bytes)
+        ValByteVec(testContract0.contractId.bytes),
+        ValByteVec(tokenId.bytes)
       ),
       initialAsset = AssetState(ALPH.alph(1)),
       testMethodIndex = 2,
@@ -1280,7 +1280,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
     contractState1.fields is
-      AVector[Val](ValByteVec(tokenId.value.bytes), ValU256(ALPH.alph(10)), ValU256(100))
+      AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100))
     contractState1.asset is AssetState.from(ALPH.alph(10), AVector(Token(tokenId, 100)))
     result1.txInputs is AVector[Address](contractAddress)
     result1.txOutputs.length is 2
@@ -1307,7 +1307,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       code = AMMContract.swapCode,
       originalCodeHash = AMMContract.swapCode.hash,
       initialFields =
-        AVector[Val](ValByteVec(tokenId.value.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
+        AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100)),
       initialAsset = AssetState.from(ALPH.alph(10), tokens = AVector(Token(tokenId, 100))),
       testMethodIndex = 2,
       testArgs = AVector[Val](ValAddress(buyer), ValU256(100)),
@@ -1325,7 +1325,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
     contractState.fields is
-      AVector[Val](ValByteVec(tokenId.value.bytes), ValU256(ALPH.alph(5)), ValU256(200))
+      AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(5)), ValU256(200))
     contractState.asset is AssetState.from(ALPH.alph(5), AVector(Token(tokenId, 200)))
     result0.txInputs is AVector[Address](contractAddress)
     result0.txOutputs.length is 2
@@ -1354,8 +1354,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       code = AMMContract.swapProxyCode,
       originalCodeHash = AMMContract.swapProxyCode.hash,
       initialFields = AVector[Val](
-        ValByteVec(testContract0.contractId.value.bytes),
-        ValByteVec(tokenId.value.bytes)
+        ValByteVec(testContract0.contractId.bytes),
+        ValByteVec(tokenId.bytes)
       ),
       initialAsset = AssetState(ALPH.alph(1)),
       testMethodIndex = 1,
@@ -1374,7 +1374,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
     contractState1.fields is
-      AVector[Val](ValByteVec(tokenId.value.bytes), ValU256(ALPH.alph(10)), ValU256(100))
+      AVector[Val](ValByteVec(tokenId.bytes), ValU256(ALPH.alph(10)), ValU256(100))
     contractState1.asset is AssetState.from(ALPH.alph(10), AVector(Token(tokenId, 100)))
     result1.txInputs is AVector[Address](contractAddress)
     result1.txOutputs.length is 2

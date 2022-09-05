@@ -1527,7 +1527,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
       for {
         parentContractId <- frame.obj.getContractId()
         path             <- frame.popOpStackByteVec()
-        subContractIdPreImage = parentContractId.value.bytes ++ path.bytes
+        subContractIdPreImage = parentContractId.bytes ++ path.bytes
         _ <- frame.ctx.chargeDoubleHash(subContractIdPreImage.length)
       } yield {
         ContractId(Hash.doubleHash(subContractIdPreImage))
@@ -1550,7 +1550,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
       _ <- frame.createContract(newContractId, contractCode, fields, tokenIssuanceInfo)
       _ <-
         if (frame.ctx.getHardFork().isLemanEnabled()) {
-          frame.pushOpStack(Val.ByteVec(newContractId.value.bytes))
+          frame.pushOpStack(Val.ByteVec(newContractId.bytes))
         } else {
           okay
         }
@@ -1740,7 +1740,7 @@ object SelfContractId extends ContractInstr with GasVeryLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       contractId <- frame.obj.getContractId()
-      _          <- frame.pushOpStack(Val.ByteVec(contractId.value.bytes))
+      _          <- frame.pushOpStack(Val.ByteVec(contractId.bytes))
     } yield ()
   }
 }
@@ -1750,7 +1750,7 @@ object CallerContractId extends ContractInstr with GasLow {
     for {
       callerFrame <- frame.getCallerFrame()
       contractId  <- callerFrame.obj.getContractId()
-      _           <- frame.pushOpStack(Val.ByteVec(contractId.value.bytes))
+      _           <- frame.pushOpStack(Val.ByteVec(contractId.bytes))
     } yield ()
   }
 }
