@@ -21,7 +21,7 @@ import akka.util.ByteString
 import org.alephium.crypto.HashUtils
 import org.alephium.protocol.Hash
 import org.alephium.serde.{RandomBytes, Serde}
-import org.alephium.util.{Bytes, Env}
+import org.alephium.util.Bytes
 
 final case class ContractId private (value: Hash) extends AnyVal with RandomBytes {
   def bytes: ByteString = value.bytes
@@ -37,10 +37,7 @@ object ContractId extends HashUtils[ContractId] {
   val zero: ContractId = ContractId(Hash.zero)
   val length: Int      = Hash.length
 
-  def generate: ContractId = {
-    Env.checkNonProdEnv()
-    ContractId(Hash.generate)
-  }
+  def generate: ContractId = ContractId(Hash.generate)
 
   def from(bytes: ByteString): Option[ContractId] = {
     Hash.from(bytes).map(ContractId.apply)
@@ -50,12 +47,7 @@ object ContractId extends HashUtils[ContractId] {
     hash(txId.bytes ++ Bytes.from(outputIndex))
   }
 
-  def hash(bytes: Seq[Byte]): ContractId = {
-    Env.checkNonProdEnv()
-    ContractId(Hash.hash(bytes))
-  }
+  @inline def hash(bytes: Seq[Byte]): ContractId = ContractId(Hash.hash(bytes))
 
-  def hash(str: String): ContractId = {
-    hash(ByteString(str))
-  }
+  @inline def hash(str: String): ContractId = hash(ByteString(str))
 }

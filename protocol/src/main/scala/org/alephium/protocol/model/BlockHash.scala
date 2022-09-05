@@ -20,7 +20,6 @@ import akka.util.ByteString
 
 import org.alephium.crypto.{Blake3, HashUtils}
 import org.alephium.serde.{RandomBytes, Serde}
-import org.alephium.util.Env
 
 final case class BlockHash private (value: Blake3) extends AnyVal with RandomBytes {
   def bytes: ByteString = value.bytes
@@ -32,10 +31,7 @@ object BlockHash extends HashUtils[BlockHash] {
   val zero: BlockHash = BlockHash(Blake3.zero)
   val length: Int     = Blake3.length
 
-  def generate: BlockHash = {
-    Env.checkNonProdEnv()
-    BlockHash(Blake3.generate)
-  }
+  def generate: BlockHash = BlockHash(Blake3.generate)
 
   def from(bytes: ByteString): Option[BlockHash] = {
     Blake3.from(bytes).map(BlockHash.apply)
@@ -44,8 +40,5 @@ object BlockHash extends HashUtils[BlockHash] {
   def hash(bytes: Seq[Byte]): BlockHash = ???
   def hash(string: String): BlockHash   = ???
 
-  def unsafe(str: ByteString): BlockHash = {
-    Env.checkNonProdEnv()
-    BlockHash(Blake3.unsafe(str))
-  }
+  def unsafe(str: ByteString): BlockHash = BlockHash(Blake3.unsafe(str))
 }

@@ -22,7 +22,6 @@ import org.alephium.crypto.HashUtils
 import org.alephium.protocol.Hash
 import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Bytes.byteStringOrdering
-import org.alephium.util.Env
 
 final case class TokenId private (value: Hash) extends AnyVal with RandomBytes {
   def bytes: ByteString = value.bytes
@@ -34,10 +33,7 @@ object TokenId extends HashUtils[TokenId] {
 
   def length: Int = Hash.length
 
-  def generate: TokenId = {
-    Env.checkNonProdEnv()
-    TokenId(Hash.generate)
-  }
+  def generate: TokenId = TokenId(Hash.generate)
 
   def from(contractId: ContractId): TokenId = {
     TokenId(contractId.value)
@@ -47,14 +43,9 @@ object TokenId extends HashUtils[TokenId] {
     Hash.from(bytes).map(TokenId.apply)
   }
 
-  def hash(bytes: Seq[Byte]): TokenId = {
-    require(Env.currentEnv != Env.Prod)
-    TokenId(Hash.hash(bytes))
-  }
+  @inline def hash(bytes: Seq[Byte]): TokenId = TokenId(Hash.hash(bytes))
 
-  def hash(str: String): TokenId = {
-    hash(ByteString(str))
-  }
+  @inline def hash(str: String): TokenId = hash(ByteString(str))
 
   def zero: TokenId = TokenId(Hash.zero)
 }

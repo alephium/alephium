@@ -22,7 +22,6 @@ import org.alephium.crypto.HashUtils
 import org.alephium.protocol.Hash
 import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Bytes.byteStringOrdering
-import org.alephium.util.Env
 
 final case class TransactionId private (value: Hash) extends AnyVal with RandomBytes {
   def bytes: ByteString = value.bytes
@@ -41,12 +40,9 @@ object TransactionId extends HashUtils[TransactionId] {
     Hash.from(bytes).map(TransactionId.apply)
   }
 
-  def hash(bytes: Seq[Byte]): TransactionId = {
-    Env.checkNonProdEnv()
+  @inline def hash(bytes: Seq[Byte]): TransactionId = {
     TransactionId(Hash.hash(bytes))
   }
 
-  def hash(str: String): TransactionId = {
-    hash(ByteString(str))
-  }
+  @inline def hash(str: String): TransactionId = hash(ByteString(str))
 }
