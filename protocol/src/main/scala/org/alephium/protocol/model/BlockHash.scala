@@ -42,6 +42,7 @@ object BlockHash extends HashUtils[BlockHash] {
   }
 
   def hash(bytes: Seq[Byte]): BlockHash = ???
+  def hash(string: String): BlockHash   = ???
 
   def unsafe(str: ByteString): BlockHash = {
     Env.checkNonProdEnv()
