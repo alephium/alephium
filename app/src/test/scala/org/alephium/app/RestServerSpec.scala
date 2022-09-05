@@ -844,7 +844,7 @@ abstract class RestServerSpec(
   it should "get events for tx id with events" in {
     val blockHash  = dummyBlock.hash
     val txId       = TransactionId.random
-    val contractId = ContractId.random
+    val contractId = ContractId(txId.value) // TODO: refactor BlockFlowDummy to fix this hacky value
 
     servers.foreach { server =>
       val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
