@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers}
@@ -39,7 +39,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         n: Long = 0,
         fieldLength: Int = 0
     ): (ContractId, StatefulContract, ContractOutputRef, ContractOutput) = {
-      val contractId = ContractId(Hash.generate)
+      val contractId = ContractId.generate
       val output     = ContractOutput(ALPH.alph(n), LockupScript.p2c(contractId), AVector.empty)
       val outputRef  = ContractOutputRef.unsafe(output.hint, contractId.value)
       val method = Method[StatefulContext](
@@ -152,8 +152,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "market assets properly" in new Fixture {
-    val contractId0 = ContractId(Hash.generate)
-    val contractId1 = ContractId(Hash.generate)
+    val contractId0 = ContractId.generate
+    val contractId1 = ContractId.generate
     pool.markAssetInUsing(contractId0) isE ()
     pool.markAssetInUsing(contractId0) is failed(ContractAssetAlreadyInUsing)
 
@@ -173,7 +173,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     with GroupConfigFixture.Default
     with NetworkConfigFixture.Default {
     val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
-    val contractId = ContractId(Hash.random)
+    val contractId = ContractId.random
     val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
     pool.worldState.createContractUnsafe(
       contractId,

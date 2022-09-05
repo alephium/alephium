@@ -17,27 +17,33 @@
 package org.alephium.protocol.model
 
 import akka.util.ByteString
-
-import org.alephium.crypto.Blake3
+import org.alephium.crypto.{Blake3, HashUtils}
 import org.alephium.serde.{RandomBytes, Serde}
+import org.alephium.util.Env
 
 final case class BlockHash(value: Blake3) extends RandomBytes {
   def bytes: ByteString = value.bytes
 }
 
-object BlockHash {
+object BlockHash extends HashUtils[BlockHash] {
   implicit val serde: Serde[BlockHash] = Serde.forProduct1(BlockHash.apply, t => t.value)
 
-  val zero: BlockHash     = BlockHash(Blake3.zero)
-  val length: Int         = Blake3.length
-  def random: BlockHash   = BlockHash(Blake3.random)
-  def generate: BlockHash = BlockHash(Blake3.generate)
+  val zero: BlockHash = BlockHash(Blake3.zero)
+  val length: Int     = Blake3.length
+
+  def generate: BlockHash = {
+    Env.checkNonProdEnv()
+    BlockHash(Blake3.generate)
+  }
 
   def from(bytes: ByteString): Option[BlockHash] = {
     Blake3.from(bytes).map(BlockHash.apply)
   }
 
+  def hash(bytes: Seq[Byte]): BlockHash = ???
+
   def unsafe(str: ByteString): BlockHash = {
+    Env.checkNonProdEnv()
     BlockHash(Blake3.unsafe(str))
   }
 }

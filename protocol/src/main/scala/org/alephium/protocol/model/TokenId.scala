@@ -18,17 +18,26 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
+import org.alephium.crypto.HashUtils
 import org.alephium.protocol.Hash
 import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Bytes.byteStringOrdering
+import org.alephium.util.Env
 
 final case class TokenId(value: Hash) extends RandomBytes {
   def bytes: ByteString = value.bytes
 }
 
-object TokenId {
+object TokenId extends HashUtils[TokenId] {
   implicit val serde: Serde[TokenId]           = Serde.forProduct1(TokenId.apply, t => t.value)
   implicit val tokenIdOrder: Ordering[TokenId] = Ordering.by(_.bytes)
+
+  def length: Int = Hash.length
+
+  def generate: TokenId = {
+    Env.checkNonProdEnv()
+    TokenId(Hash.generate)
+  }
 
   def from(contractId: ContractId): TokenId = {
     TokenId(contractId.value)
@@ -38,8 +47,13 @@ object TokenId {
     Hash.from(bytes).map(TokenId.apply)
   }
 
+  def hash(bytes: Seq[Byte]): TokenId = {
+    require(Env.currentEnv != Env.Prod)
+    TokenId(Hash.hash(bytes))
+  }
+
   def hash(str: String): TokenId = {
-    TokenId(Hash.hash(str))
+    hash(ByteString(str))
   }
 
   def zero: TokenId = TokenId(Hash.zero)

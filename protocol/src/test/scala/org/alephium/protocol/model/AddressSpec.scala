@@ -105,7 +105,7 @@ class AddressSpec extends AlephiumSpec {
   }
 
   "Address.asset" should "parse asset address only" in {
-    val lock    = LockupScript.P2C(ContractId(Hash.random))
+    val lock    = LockupScript.P2C(ContractId.random)
     val address = Address.from(lock).toBase58
     Address.asset(address) is None
     Address.fromBase58(address).value.lockupScript is lock

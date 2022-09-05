@@ -16,6 +16,8 @@
 
 package org.alephium.crypto
 
+import java.nio.charset.Charset
+
 import akka.util.ByteString
 import org.bouncycastle.crypto.Digest
 
@@ -53,11 +55,30 @@ object HashSchema {
   }
 }
 
+trait HashUtils[T] {
+  def length: Int
+
+  @inline def random: T = generate
+  def generate: T
+
+  def hash(bytes: Seq[Byte]): T
+  def hash(string: String): T
+}
+
 abstract class HashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)
-    extends RandomBytes.Companion[T](unsafe, toBytes) {
+    extends RandomBytes.Companion[T](unsafe, toBytes)
+    with HashUtils[T] {
   def hash(input: Seq[Byte]): T
 
   def doubleHash(input: Seq[Byte]): T
+
+  def hash(input: String): T = {
+    hash(ByteString.fromString(input))
+  }
+
+  def hash(input: String, charset: Charset): T = {
+    hash(ByteString.fromString(input, charset))
+  }
 
   def hash[S: Serializer](input: S): T = {
     hash(serialize(input))
@@ -76,8 +97,6 @@ abstract class HashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)
     val result = Array.tabulate[Byte](length)(index => (bytes0(index) + bytes1(index)).toByte)
     unsafe(ByteString.fromArrayUnsafe(result))
   }
-
-  def random: T = generate
 }
 
 abstract class BCHashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)

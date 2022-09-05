@@ -18,33 +18,35 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
+import org.alephium.crypto.HashUtils
 import org.alephium.protocol.Hash
 import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Bytes.byteStringOrdering
+import org.alephium.util.Env
 
 final case class TransactionId(value: Hash) extends RandomBytes {
   def bytes: ByteString = value.bytes
 }
 
-object TransactionId {
+object TransactionId extends HashUtils[TransactionId] {
   implicit val serde: Serde[TransactionId] = Serde.forProduct1(TransactionId.apply, t => t.value)
   implicit val transactionIdOrder: Ordering[TransactionId] = Ordering.by(_.bytes)
 
   val zero: TransactionId = TransactionId(Hash.zero)
   val length: Int         = Hash.length
 
-  def random: TransactionId   = TransactionId(Hash.random)
   def generate: TransactionId = TransactionId(Hash.generate)
 
   def from(bytes: ByteString): Option[TransactionId] = {
     Hash.from(bytes).map(TransactionId.apply)
   }
 
-  def hash(bytes: ByteString): TransactionId = {
+  def hash(bytes: Seq[Byte]): TransactionId = {
+    Env.checkNonProdEnv()
     TransactionId(Hash.hash(bytes))
   }
 
   def hash(str: String): TransactionId = {
-    TransactionId(Hash.hash(str))
+    hash(ByteString(str))
   }
 }

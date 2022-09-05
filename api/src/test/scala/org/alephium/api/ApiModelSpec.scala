@@ -219,7 +219,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode Token" in {
-    val id     = TokenId(Hash.generate)
+    val id     = TokenId.generate
     val amount = ALPH.oneAlph
 
     val token: Token = Token(id, amount)
@@ -688,7 +688,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "encode/decode BuildDeployContractTxResult" in {
     val txId       = TransactionId.generate
-    val contractId = ContractId(Hash.generate)
+    val contractId = ContractId.generate
     val buildDeployContractTxResult = BuildDeployContractTxResult(
       fromGroup = 2,
       toGroup = 2,

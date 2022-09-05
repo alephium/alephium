@@ -46,4 +46,8 @@ object Env {
       case _    => ()
     }
   }
+
+  def checkNonProdEnv(): Unit = {
+    require(currentEnv != Env.Prod, "Non production env is required")
+  }
 }

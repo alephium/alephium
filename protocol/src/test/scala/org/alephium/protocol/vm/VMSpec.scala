@@ -22,7 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 import org.scalatest.Assertion
 
-import org.alephium.protocol.{ALPH, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.{ALPH, Signature, SignatureSchema}
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.serde._
@@ -250,7 +250,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val balances0    = MutBalancesPerLockup(100, mutable.Map.empty, 0)
     val (_, pubKey1) = SignatureSchema.generatePriPub()
     val address1     = Val.Address(LockupScript.p2pkh(pubKey1))
-    val tokenId      = TokenId(Hash.random)
+    val tokenId      = TokenId.random
     val balances1    = MutBalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext =
@@ -571,7 +571,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
 
     def test(vm: StatefulVM, contract: StatefulContract, succeeded: Boolean) = {
-      val obj = StatefulContractObject.from(contract, AVector.empty, ContractId(Hash.random))
+      val obj = StatefulContractObject.from(contract, AVector.empty, ContractId.random)
       if (succeeded) {
         vm.execute(obj, 0, AVector.empty) match {
           case Right(res)  => res is ()

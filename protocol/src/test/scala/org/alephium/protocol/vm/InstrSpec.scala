@@ -1736,7 +1736,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val contract = StatefulContract(1, methods = AVector(baseMethod))
 
-    val tokenId = TokenId(Hash.generate)
+    val tokenId = TokenId.generate
 
     def alphBalance(lockupScript: LockupScript, amount: U256): MutBalances = {
       MutBalances(ArrayBuffer((lockupScript, MutBalancesPerLockup.alph(amount))))
@@ -1779,7 +1779,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     lazy val stack   = frame.opStack
     lazy val context = frame.ctx
 
-    lazy val contractAddress = LockupScript.p2c(ContractId(Hash.random))
+    lazy val contractAddress = LockupScript.p2c(ContractId.random)
 
     def runAndCheckGas[I <: Instr[StatefulContext] with GasSimple](
         instr: I,
@@ -2080,7 +2080,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractOutput(ALPH.alph(0), contractLockupScriptGen.sample.get, AVector.empty)
     val txId              = TransactionId.generate
     val contractOutputRef = ContractOutputRef.unsafe(txId, contractOutput, 0)
-    val contractId        = ContractId(Hash.random)
+    val contractId        = ContractId.random
   }
 
   it should "TransferAlphFromSelf" in new ContractOutputFixture {
@@ -2747,7 +2747,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val contractOutput =
       ContractOutput(ALPH.alph(1), contractLockupScriptGen.sample.get, AVector.empty)
     val contractOutputRef = ContractOutputRef.unsafe(TransactionId.generate, contractOutput, 0)
-    val contractId        = ContractId(Hash.random)
+    val contractId        = ContractId.random
     override lazy val frame =
       prepareFrame(contractOutputOpt = Some((contractId, contractOutput, contractOutputRef)))
 
@@ -2766,7 +2766,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val txId = TransactionId.generate
 
     val contractOutputRef = ContractOutputRef.unsafe(txId, contractOutput, 0)
-    val contractId        = ContractId(Hash.random)
+    val contractId        = ContractId.random
 
     val callerFrame = prepareFrame().asInstanceOf[StatefulFrame]
 

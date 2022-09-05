@@ -140,7 +140,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       }
 
       def zeroTokenAmount(): Transaction = {
-        updateRandomFixedOutputs(_.copy(tokens = AVector(TokenId(Hash.generate) -> U256.Zero)))
+        updateRandomFixedOutputs(_.copy(tokens = AVector(TokenId.generate -> U256.Zero)))
       }
 
       def inputs(inputs: AVector[TxInput]): Transaction = {
@@ -851,7 +851,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.contractInputs.length is 0
     tx.pass()
 
-    val contractId = ContractId(Hash.generate)
+    val contractId = ContractId.generate
     val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
     val outputRef = ContractOutputRef.unsafe(output.hint, contractId.value)
     tx.copy(contractInputs = AVector(outputRef)).fail(InvalidContractInputs)

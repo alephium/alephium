@@ -826,7 +826,7 @@ abstract class RestServerSpec(
   // scalastyle:off no.equal
   it should "get events for contract id with wrong group" in {
     val blockHash       = dummyBlock.hash
-    val contractId      = ContractId(Hash.random)
+    val contractId      = ContractId.random
     val contractAddress = Address.Contract(LockupScript.P2C(contractId)).toBase58
     val chainIndex      = ChainIndex.from(blockHash, groupConfig.groups)
     val wrongGroup      = (chainIndex.from.value + 1) % groupConfig.groups
@@ -844,7 +844,7 @@ abstract class RestServerSpec(
   it should "get events for tx id with events" in {
     val blockHash  = dummyBlock.hash
     val txId       = TransactionId.random
-    val contractId = ContractId(Hash.random)
+    val contractId = ContractId.random
 
     servers.foreach { server =>
       val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)

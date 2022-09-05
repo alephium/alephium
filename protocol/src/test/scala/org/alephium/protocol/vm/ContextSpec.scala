@@ -18,7 +18,6 @@ package org.alephium.protocol.vm
 
 import org.scalacheck.Gen
 
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
 import org.alephium.protocol.model.{ContractId, GroupIndex, HardFork, TxGenerators}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
@@ -59,7 +58,7 @@ class ContextSpec
   }
 
   it should "test contract exists" in new Fixture {
-    val contractId0 = ContractId(Hash.random)
+    val contractId0 = ContractId.random
     context.contractExists(contractId0) isE false
     val contractId1 = createContract()
     context.contractExists(contractId1) isE true

@@ -371,7 +371,7 @@ class VMSpec extends AlephiumSpec {
       info("create contract and transfer token to contract address")
       val contract         = Compiler.compileContract(code).rightValue
       val contractByteCode = Hex.toHexString(serialize(contract))
-      val contractAddress  = Address.contract(ContractId(Hash.random)).toBase58
+      val contractAddress  = Address.contract(ContractId.random).toBase58
       val encodedState     = Hex.toHexString(serialize[AVector[Val]](AVector.empty))
 
       val script: String =
@@ -732,7 +732,7 @@ class VMSpec extends AlephiumSpec {
 
     val i256    = UnsecureRandom.nextI256()
     val u256    = UnsecureRandom.nextU256()
-    val address = Address.from(LockupScript.p2c(ContractId(Hash.random)))
+    val address = Address.from(LockupScript.p2c(ContractId.random))
     val bytes0  = Hex.toHexString(Hash.random.bytes)
     val bytes1  = Hex.toHexString(Hash.random.bytes)
 
@@ -825,7 +825,7 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("copy create contract and transfer token to contract address")
-      val contractAddress = Address.contract(ContractId(Hash.random))
+      val contractAddress = Address.contract(ContractId.random)
       val script: String =
         s"""
            |TxScript Main {
@@ -921,7 +921,7 @@ class VMSpec extends AlephiumSpec {
 
   it should "test contractIdToAddress instruction" in new ContractFixture {
     def success(): String = {
-      val contractId       = ContractId(Hash.generate)
+      val contractId       = ContractId.generate
       val address: Address = Address.contract(contractId)
       val addressHex       = Hex.toHexString(serialize(address.lockupScript))
       s"""
@@ -1045,7 +1045,7 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("Destroy a contract and transfer value to non-calling contract address")
-      val address = Address.Contract(LockupScript.P2C(ContractId(Hash.generate)))
+      val address = Address.Contract(LockupScript.P2C(ContractId.generate))
       val script  = Compiler.compileTxScript(destroy(address.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, PayToContractAddressNotInCallerTrace)
       checkContractState(fooId, fooAssetRef, true)
@@ -1507,7 +1507,7 @@ class VMSpec extends AlephiumSpec {
         2
       )
     )
-    val p2cAddress = Address.contract(ContractId(Hash.generate))
+    val p2cAddress = Address.contract(ContractId.generate)
     def main(address: Address): String = {
       val hex = Hex.toHexString(serialize(address.lockupScript))
       s"""
@@ -2315,7 +2315,7 @@ class VMSpec extends AlephiumSpec {
     {
       info("Events emitted from a non-existent contract")
 
-      val wrongContractId = ContractId(Hash.generate)
+      val wrongContractId = ContractId.generate
       val logStatesOpt    = getLogStates(blockFlow, chainIndex.from, wrongContractId, 0)
       logStatesOpt is None
     }
@@ -2333,7 +2333,7 @@ class VMSpec extends AlephiumSpec {
       enabled = true,
       indexByTxId = true,
       contractAddresses =
-        Some(AVector(ContractId(Hash.generate), ContractId(Hash.generate)).map(Address.contract))
+        Some(AVector(ContractId.generate, ContractId.generate).map(Address.contract))
     )
 
     getLogStates(blockFlow, chainIndex.from, contractId, 0) is None
@@ -2411,7 +2411,7 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "emit events with all supported field types" in new EventFixture {
-    lazy val address = Address.Contract(LockupScript.P2C(ContractId(Hash.generate)))
+    lazy val address = Address.Contract(LockupScript.P2C(ContractId.generate))
 
     override def contractRaw: String =
       s"""
@@ -2814,7 +2814,7 @@ class VMSpec extends AlephiumSpec {
     {
       info("create sub-contract and transfer token to contract address")
       val subContractPath4 = Hex.toHexString(serialize("nft-04"))
-      val contractAddress  = Address.contract(ContractId(Hash.random))
+      val contractAddress  = Address.contract(ContractId.random)
       verify(
         s"createSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath4, #$subContractByteCode, #$subContractInitialState, 10, @${contractAddress.toBase58})",
         InvalidAssetAddress
@@ -2871,7 +2871,7 @@ class VMSpec extends AlephiumSpec {
     {
       info("copy create sub-contract and transfer token to contract address")
       val subContractPath4 = Hex.toHexString(serialize("nft-04"))
-      val contractAddress  = Address.contract(ContractId(Hash.random))
+      val contractAddress  = Address.contract(ContractId.random)
       verify(
         s"copyCreateSubContractWithToken!{callerAddress!() -> 1 alph}(#$subContractPath4, #${subContractId.toHexString}, #$subContractInitialState, 10, @${contractAddress.toBase58})",
         InvalidAssetAddress
@@ -3341,7 +3341,7 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "not transfer assets to arbitrary contract" in new ContractFixture {
-    val randomContract = Address.contract(ContractId(Hash.random)).toBase58
+    val randomContract = Address.contract(ContractId.random).toBase58
 
     {
       info("Transfer to random contract address in TxScript")

@@ -1019,7 +1019,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
 
     val barContract            = Compiler.compileContract(bar).rightValue
-    val barContractId          = ContractId(Hash.random)
+    val barContractId          = ContractId.random
     val destroyedFooContractId = barContractId.subContractId(Hex.unsafe(destroyContractPath))
     val existingContract = ContractState(
       Address.contract(destroyedFooContractId),
@@ -1055,7 +1055,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (_, pubKey)  = SignatureSchema.generatePriPub()
     val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
 
-    val fooContractId = ContractId(Hash.random)
+    val fooContractId = ContractId.random
     val foo =
       s"""
          |Contract Foo() {
@@ -1067,7 +1067,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
     val fooContract = Compiler.compileContract(foo).rightValue
 
-    val fooCallerContractId = ContractId(Hash.random)
+    val fooCallerContractId = ContractId.random
     def fooCaller: String
     val fooCallerContract = Compiler.compileContract(fooCaller).rightValue
 
@@ -1083,7 +1083,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
 
     val barContract   = Compiler.compileContract(bar).rightValue
-    val barContractId = ContractId(Hash.random)
+    val barContractId = ContractId.random
     val existingContracts = AVector(
       ContractState(
         Address.contract(fooCallerContractId),
@@ -1152,7 +1152,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |Contract FooCaller(fooId: ByteVec) {
          |  pub fn destroyFoo() -> () {
          |    let foo = Foo(fooId)
-         |    foo.destroy(@${Address.contract(ContractId(Hash.random)).toBase58})
+         |    foo.destroy(@${Address.contract(ContractId.random).toBase58})
          |  }
          |}
          |
@@ -1169,7 +1169,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait TestContractFixture extends Fixture {
-    val tokenId         = TokenId(Hash.random)
+    val tokenId         = TokenId.random
     val (_, pubKey)     = SignatureSchema.generatePriPub()
     val lp              = Address.Asset(LockupScript.p2pkh(pubKey))
     val buyer           = lp
@@ -1181,7 +1181,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testFlow     = BlockFlow.emptyUnsafe(config)
     lazy val result0 = serverUtils.runTestContract(testFlow, testContract0).rightValue
 
-    val testContractId1 = ContractId(Hash.random)
+    val testContractId1 = ContractId.random
     def testContract1: TestContract.Complete
     lazy val result1 = serverUtils.runTestContract(testFlow, testContract1).rightValue
   }
@@ -1700,8 +1700,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     {
       info("With approved tokens")
-      val token1                         = TokenId(Hash.generate)
-      val token2                         = TokenId(Hash.generate)
+      val token1                         = TokenId.generate
+      val token2                         = TokenId.generate
       val codeRaw                        = Hex.toHexString(serialize(contract))
       val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
       val stateRaw                       = Hex.toHexString(serialize(initialFields))
