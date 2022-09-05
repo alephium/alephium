@@ -34,18 +34,24 @@ import org.alephium.serde.RandomBytes
 //scalastyle:off magic.number
 
 class SecP256K1PrivateKey(val bytes: ByteString) extends PrivateKey {
-  lazy val bigInt = new BigInteger(1, bytes.toArray)
+  private def getBigInt() = new BigInteger(1, bytes.toArray)
 
-  def isZero: Boolean = bigInt == BigInteger.ZERO
+  def isZero: Boolean = {
+    val bigInt = getBigInt()
+    bigInt == BigInteger.ZERO
+  }
 
   def publicKey: SecP256K1PublicKey = {
+    val bigInt       = getBigInt()
     val rawPublicKey = SecP256K1.params.getG.multiply(bigInt).getEncoded(true)
     SecP256K1PublicKey.unsafe(ByteString.fromArrayUnsafe(rawPublicKey))
   }
 
   def add(that: SecP256K1PrivateKey): SecP256K1PrivateKey = {
+    val thisBigInt = this.getBigInt()
+    val thatBigInt = that.getBigInt()
     val result =
-      this.bigInt.add(that.bigInt).mod(SecP256K1.params.getN).toByteArray.dropWhile(_ == 0.toByte)
+      thisBigInt.add(thatBigInt).mod(SecP256K1.params.getN).toByteArray.dropWhile(_ == 0.toByte)
     assume(result.length <= SecP256K1PrivateKey.length)
     val buffer = Array.ofDim[Byte](SecP256K1PrivateKey.length)
     System.arraycopy(result, 0, buffer, buffer.length - result.length, result.length)
@@ -66,7 +72,7 @@ object SecP256K1PrivateKey
 
 // public key should be compressed, but the format is not checked until signature verification
 class SecP256K1PublicKey(val bytes: ByteString) extends PublicKey {
-  lazy val unsafePoint: ECPoint = SecP256K1.point(bytes)
+  def unsafePoint: ECPoint = SecP256K1.point(bytes)
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def toEthAddress(): ByteString = {
