@@ -16,8 +16,6 @@
 
 package org.alephium.crypto
 
-import java.nio.charset.Charset
-
 import akka.util.ByteString
 import org.bouncycastle.crypto.Digest
 
@@ -60,14 +58,6 @@ abstract class HashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)
   def hash(input: Seq[Byte]): T
 
   def doubleHash(input: Seq[Byte]): T
-
-  def hash(input: String): T = {
-    hash(ByteString.fromString(input))
-  }
-
-  def hash(input: String, charset: Charset): T = {
-    hash(ByteString.fromString(input, charset))
-  }
 
   def hash[S: Serializer](input: S): T = {
     hash(serialize(input))

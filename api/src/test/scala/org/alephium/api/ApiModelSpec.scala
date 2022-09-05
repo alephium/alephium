@@ -474,7 +474,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     {
       val tokenId1 = TokenId.hash("tokenId1")
-      val otxoKey1 = Hash.hash("utxo1")
+      val utxoKey1 = Hash.hash("utxo1")
 
       val transfer = BuildTransaction(
         fromPublicKey,
@@ -486,7 +486,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
             Some(TimeStamp.unsafe(1234))
           )
         ),
-        Some(AVector(OutputRef(1, otxoKey1))),
+        Some(AVector(OutputRef(1, utxoKey1))),
         Some(GasBox.unsafe(1)),
         Some(GasPrice(1))
       )
@@ -509,7 +509,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  "utxos": [
                        |    {
                        |      "hint": 1,
-                       |      "key": "${otxoKey1.toHexString}"
+                       |      "key": "${utxoKey1.toHexString}"
                        |    }
                        |  ],
                        |  "gasAmount": 1,
