@@ -53,7 +53,9 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
         TxInput(
           AssetOutputRef.unsafe(
             Hint.unsafe(-1038667625),
-            Hash.unsafe(hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7")
+            TxOutputRef.unsafeKey(
+              Hash.unsafe(hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7")
+            )
           ),
           UnlockScript.P2PKH(publicKey)
         )

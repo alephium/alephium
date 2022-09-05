@@ -21,14 +21,14 @@ import org.alephium.protocol.model.{AssetOutputRef, ContractOutputRef, Hint, TxO
 
 final case class OutputRef(hint: Int, key: Hash) {
   def unsafeToAssetOutputRef(): AssetOutputRef = {
-    AssetOutputRef.unsafe(Hint.unsafe(hint), key)
+    AssetOutputRef.unsafe(Hint.unsafe(hint), TxOutputRef.unsafeKey(key))
   }
   def unsafeToContractOutputRef(): ContractOutputRef = {
-    ContractOutputRef.unsafe(Hint.unsafe(hint), key)
+    ContractOutputRef.unsafe(Hint.unsafe(hint), TxOutputRef.unsafeKey(key))
   }
 }
 
 object OutputRef {
   def from(outputRef: TxOutputRef): OutputRef =
-    OutputRef(outputRef.hint.value, outputRef.key)
+    OutputRef(outputRef.hint.value, outputRef.key.value)
 }

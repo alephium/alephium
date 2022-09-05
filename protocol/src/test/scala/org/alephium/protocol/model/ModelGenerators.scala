@@ -168,14 +168,14 @@ trait TxInputGenerators extends Generators {
     for {
       scriptHint <- scriptHintGen(groupIndex)
       hash       <- hashGen
-    } yield AssetOutputRef.unsafe(Hint.ofAsset(scriptHint), hash)
+    } yield AssetOutputRef.unsafe(Hint.ofAsset(scriptHint), TxOutputRef.unsafeKey(hash))
   }
 
   def contractOutputRefGen(groupIndex: GroupIndex): Gen[ContractOutputRef] = {
     for {
       scriptHint <- scriptHintGen(groupIndex)
       hash       <- hashGen
-    } yield ContractOutputRef.unsafe(Hint.ofContract(scriptHint), hash)
+    } yield ContractOutputRef.unsafe(Hint.ofContract(scriptHint), TxOutputRef.unsafeKey(hash))
   }
 
   lazy val txInputGen: Gen[TxInput] =
@@ -189,7 +189,7 @@ trait TxInputGenerators extends Generators {
       scriptHint <- scriptHintGen(groupIndex)
       hash       <- hashGen
     } yield {
-      val outputRef = AssetOutputRef.unsafeWithScriptHint(scriptHint, hash)
+      val outputRef = AssetOutputRef.from(scriptHint, TxOutputRef.unsafeKey(hash))
       TxInput(outputRef, UnlockScript.p2pkh(PublicKey.generate))
     }
 
@@ -313,11 +313,12 @@ trait TxGenerators
       ScriptPair(lockup, unlock, privateKey) <- scriptGen
       lockTime                               <- lockTimeGen
       data                                   <- dataGen
-      outputHash                             <- hashGen
+      outputKey                              <- hashGen
     } yield {
       val assetOutput =
         AssetOutput(balances.attoAlphAmount, lockup, lockTime, AVector.from(balances.tokens), data)
-      val txInput = TxInput(AssetOutputRef.unsafe(assetOutput.hint, outputHash), unlock)
+      val txInput =
+        TxInput(AssetOutputRef.unsafe(assetOutput.hint, TxOutputRef.unsafeKey(outputKey)), unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
 

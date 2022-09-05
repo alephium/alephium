@@ -1156,9 +1156,8 @@ class ServerUtils(implicit
       initialState: AVector[vm.Val],
       asset: AssetState
   ): Try[Unit] = {
-    val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
-    val outputRef  = ContractOutputRef.unsafe(outputHint, contractId.value)
-    val output     = asset.toContractOutput(contractId)
+    val outputRef = contractId.firstOutputRef()
+    val output    = asset.toContractOutput(contractId)
     wrapResult(
       worldState.createContractUnsafe(
         contractId,

@@ -91,7 +91,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     val (contractId, contractOutput, contractOutputRef) = contractOutputOpt.getOrElse {
       val ci  = ContractId.random
       val co  = contractOutputGen(scriptGen = p2cLockupGen(groupIndex)).sample.get
-      val cor = ContractOutputRef.unsafe(TransactionId.generate, co, 0)
+      val cor = ContractOutputRef.from(TransactionId.generate, co, 0)
       (ci, co, cor)
     }
     val halfDecoded = contract.toHalfDecoded()

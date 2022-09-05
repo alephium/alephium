@@ -295,7 +295,9 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
           contractInputs = AVector(
             ContractOutputRef.unsafe(
               Hint.unsafe(-1038667620),
-              Hash.unsafe(hex"1334b03ce27313db24ace4fb1f72ec56f0bc6223d137430aaac0f37cccf2dd98")
+              TxOutputRef.unsafeKey(
+                Hash.unsafe(hex"1334b03ce27313db24ace4fb1f72ec56f0bc6223d137430aaac0f37cccf2dd98")
+              )
             )
           ),
           generatedOutputs = AVector(

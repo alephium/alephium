@@ -21,8 +21,19 @@ import org.alephium.util.AlephiumSpec
 
 class TxInputSpec extends AlephiumSpec {
   "AssetOutputRef" should "use code hash from it's key" in {
-    val key            = Hash.generate
+    val key            = TxOutputRef.unsafeKey(Hash.generate)
     val assetOutputRef = AssetOutputRef.unsafe(Hint.unsafe(0), key)
     assetOutputRef.hashCode() is key.hashCode()
+  }
+
+  "TxOutputRef.Key" should "check equality" in {
+    val hash0 = Hash.hash("hello")
+    val hash1 = Hash.hash("hello")
+    val hash2 = Hash.hash("world")
+    val key0  = TxOutputRef.unsafeKey(hash0)
+    val key1  = TxOutputRef.unsafeKey(hash1)
+    val key2  = TxOutputRef.unsafeKey(hash2)
+    key0 is key1
+    key0 isnot key2
   }
 }

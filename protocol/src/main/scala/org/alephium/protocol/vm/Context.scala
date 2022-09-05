@@ -215,7 +215,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def nextOutputIndex: Int
 
   def nextContractOutputRef(output: ContractOutput): ContractOutputRef =
-    ContractOutputRef.unsafe(txId, output, nextOutputIndex)
+    ContractOutputRef.from(txId, output, nextOutputIndex)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def generateOutput(output: TxOutput): ExeResult[Unit] = {

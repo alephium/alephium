@@ -2079,7 +2079,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val contractOutput =
       ContractOutput(ALPH.alph(0), contractLockupScriptGen.sample.get, AVector.empty)
     val txId              = TransactionId.generate
-    val contractOutputRef = ContractOutputRef.unsafe(txId, contractOutput, 0)
+    val contractOutputRef = ContractOutputRef.from(txId, contractOutput, 0)
     val contractId        = ContractId.random
   }
 
@@ -2740,7 +2740,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "ContractExists" in new StatefulInstrFixture {
     val contractOutput =
       ContractOutput(ALPH.alph(1), contractLockupScriptGen.sample.get, AVector.empty)
-    val contractOutputRef = ContractOutputRef.unsafe(TransactionId.generate, contractOutput, 0)
+    val contractOutputRef = ContractOutputRef.from(TransactionId.generate, contractOutput, 0)
     val contractId        = ContractId.random
     override lazy val frame =
       prepareFrame(contractOutputOpt = Some((contractId, contractOutput, contractOutputRef)))
@@ -2759,7 +2759,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractOutput(ALPH.alph(0), contractLockupScriptGen.sample.get, AVector.empty)
     val txId = TransactionId.generate
 
-    val contractOutputRef = ContractOutputRef.unsafe(txId, contractOutput, 0)
+    val contractOutputRef = ContractOutputRef.from(txId, contractOutput, 0)
     val contractId        = ContractId.random
 
     val callerFrame = prepareFrame().asInstanceOf[StatefulFrame]

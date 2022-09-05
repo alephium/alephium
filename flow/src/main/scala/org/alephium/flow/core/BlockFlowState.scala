@@ -539,7 +539,7 @@ object BlockFlowState {
   )(implicit brokerConfig: GroupConfig): IOResult[Unit] = {
     tx.allOutputs.foreachWithIndexE {
       case (output: AssetOutput, index) if output.toGroup == targetGroup =>
-        val outputRef = TxOutputRef.from(output, TxOutputRef.key(tx.id, index))
+        val outputRef = TxOutputRef.from(tx.id, index, output)
         val outputUpdated =
           if (output.lockTime < blockTs) output.copy(lockTime = blockTs) else output
         worldState.addAsset(outputRef, outputUpdated)

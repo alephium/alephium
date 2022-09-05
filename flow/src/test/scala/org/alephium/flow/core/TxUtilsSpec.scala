@@ -979,7 +979,8 @@ class TxUtilsSpec extends AlephiumSpec {
       lockupScript: LockupScript.Asset,
       tokens: (TokenId, U256)*
   ): (AssetOutputRef, AssetOutput) = {
-    val ref = AssetOutputRef.unsafeWithScriptHint(new ScriptHint(0), Hash.hash(name))
+    val ref =
+      AssetOutputRef.from(new ScriptHint(0), TxOutputRef.unsafeKey(Hash.hash(name)))
     val output = AssetOutput(
       amount,
       lockupScript,

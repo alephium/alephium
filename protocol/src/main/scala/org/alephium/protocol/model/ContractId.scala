@@ -29,6 +29,10 @@ final case class ContractId private (value: Hash) extends AnyVal with RandomByte
   def subContractId(path: ByteString): ContractId = {
     ContractId(Hash.doubleHash(bytes ++ path))
   }
+
+  def firstOutputRef(): ContractOutputRef = {
+    ContractOutputRef.firstOutput(this)
+  }
 }
 
 object ContractId extends HashUtils[ContractId] {

@@ -279,10 +279,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx    = transactionGen().sample.get
     val input = tx.unsigned.inputs.head
 
-    val modified0         = tx.inputs(AVector.fill(ALPH.MaxTxInputNum)(input))
-    val modified1         = tx.inputs(AVector.fill(ALPH.MaxTxInputNum + 1)(input))
-    val contractOutputRef = ContractOutputRef.unsafe(Hint.unsafe(1), Hash.zero)
-    val modified2         = tx.copy(contractInputs = AVector(contractOutputRef))
+    val modified0 = tx.inputs(AVector.fill(ALPH.MaxTxInputNum)(input))
+    val modified1 = tx.inputs(AVector.fill(ALPH.MaxTxInputNum + 1)(input))
+    val contractOutputRef =
+      ContractOutputRef.unsafe(Hint.unsafe(1), TxOutputRef.unsafeKey(Hash.zero))
+    val modified2 = tx.copy(contractInputs = AVector(contractOutputRef))
     val modified3 =
       tx.copy(contractInputs = AVector.fill(ALPH.MaxTxInputNum + 1)(contractOutputRef))
 
@@ -457,7 +458,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           scriptHint   <- scriptHintGen(fromGroupNew)
         } yield {
           tx.updateRandomInputs { input =>
-            val outputRefNew = AssetOutputRef.unsafeWithScriptHint(scriptHint, input.outputRef.key)
+            val outputRefNew = AssetOutputRef.from(scriptHint, input.outputRef.key)
             input.copy(outputRef = outputRefNew)
           }
         }
@@ -852,8 +853,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.pass()
 
     val contractId = ContractId.generate
-    val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
-    val outputRef = ContractOutputRef.unsafe(output.hint, contractId.value)
+    val outputRef  = contractId.firstOutputRef()
     tx.copy(contractInputs = AVector(outputRef)).fail(InvalidContractInputs)
 
     tx.copy(generatedOutputs = AVector(assetOutputGen.sample.get)).fail(InvalidGeneratedOutputs)

@@ -170,21 +170,27 @@ class TransactionSpec
           TxInput(
             AssetOutputRef.unsafe(
               Hint.unsafe(-1038667625),
-              Hash.unsafe(hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7")
+              TxOutputRef.unsafeKey(
+                Hash.unsafe(hex"a5ecc0fa7bce6fd6a868621a167b3aad9a4e2711353aef60196062509b8c3dc7")
+              )
             ),
             UnlockScript.P2PKH(pubKey1)
           ),
           TxInput(
             AssetOutputRef.unsafe(
               Hint.unsafe(12347),
-              Hash.unsafe(hex"0fa5fd6aecca7b21a167b3aad9a4e27762509b8c3ce68611353aef60196086dc")
+              TxOutputRef.unsafeKey(
+                Hash.unsafe(hex"0fa5fd6aecca7b21a167b3aad9a4e27762509b8c3ce68611353aef60196086dc")
+              )
             ),
             UnlockScript.P2PKH(pubKey2)
           ),
           TxInput(
             AssetOutputRef.unsafe(
               Hint.unsafe(-1038667625),
-              Hash.unsafe(hex"ce6fd6a868621a167b62509b8c3dc7a5ecc0fa7b3aad9a4e2711353aef601960")
+              TxOutputRef.unsafeKey(
+                Hash.unsafe(hex"ce6fd6a868621a167b62509b8c3dc7a5ecc0fa7b3aad9a4e2711353aef601960")
+              )
             ),
             UnlockScript.P2PKH(pubKey1)
           )
@@ -254,11 +260,15 @@ class TransactionSpec
           contractInputs = AVector(
             ContractOutputRef.unsafe(
               Hint.unsafe(-1038667620),
-              Hash.unsafe(hex"1334b03ce27313db24ace4fb1f72ec56f0bc6223d137430aaac0f37cccf2dd98")
+              TxOutputRef.unsafeKey(
+                Hash.unsafe(hex"1334b03ce27313db24ace4fb1f72ec56f0bc6223d137430aaac0f37cccf2dd98")
+              )
             ),
             ContractOutputRef.unsafe(
               Hint.unsafe(-1038667620),
-              Hash.unsafe(hex"45ace4fb7430a1f72ec6f0bc622d981334b03ce27313db23d13aac0f37cccf2d")
+              TxOutputRef.unsafeKey(
+                Hash.unsafe(hex"45ace4fb7430a1f72ec6f0bc622d981334b03ce27313db23d13aac0f37cccf2d")
+              )
             )
           ),
           generatedOutputs = AVector(
@@ -361,14 +371,18 @@ class TransactionSpec
           TxInput(
             AssetOutputRef.unsafe(
               Hint.unsafe(-1038667625),
-              Hash.unsafe(hex"fda5eaacc0fa7bcf60196062509b8167b3d9a4e2711353aec3dc7e66a868621a")
+              TxOutputRef.unsafeKey(
+                Hash.unsafe(hex"fda5eaacc0fa7bcf60196062509b8167b3d9a4e2711353aec3dc7e66a868621a")
+              )
             ),
             UnlockScript.p2mpkh(AVector((pubKey1, 1), (pubKey2, 3)))
           ),
           TxInput(
             AssetOutputRef.unsafe(
               Hint.unsafe(-1038667625),
-              Hash.unsafe(hex"b62509167b8c3dc7a5ecc0fa7b3afd6a868621aad9a4e2711353aef601960ce6")
+              TxOutputRef.unsafeKey(
+                Hash.unsafe(hex"b62509167b8c3dc7a5ecc0fa7b3afd6a868621aad9a4e2711353aef601960ce6")
+              )
             ),
             UnlockScript
               .p2sh(script, AVector(Val.ByteVec(pubKey1.bytes), Val.ByteVec(pubKey2.bytes)))
@@ -417,7 +431,9 @@ class TransactionSpec
           TxInput(
             AssetOutputRef.unsafe(
               Hint.unsafe(-1038667625),
-              Hash.unsafe(hex"ad9a4e2711353aef6d6a868621a167b3a0196062509b8c3dc7a5ecc0fa7bce6f")
+              TxOutputRef.unsafeKey(
+                Hash.unsafe(hex"ad9a4e2711353aef6d6a868621a167b3a0196062509b8c3dc7a5ecc0fa7bce6f")
+              )
             ),
             UnlockScript.P2PKH(pubKey1)
           )

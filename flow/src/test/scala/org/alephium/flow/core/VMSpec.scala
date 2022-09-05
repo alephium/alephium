@@ -183,6 +183,7 @@ class VMSpec extends AlephiumSpec {
       val contractOutputRef =
         TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
       val contractId = ContractId.from(block.transactions.head.id, 0)
+      contractId.firstOutputRef() is contractOutputRef
 
       deserialize[StatefulContract.HalfDecoded](serialize(contract.toHalfDecoded())).rightValue
         .toContract() isE contract
@@ -3558,7 +3559,7 @@ class VMSpec extends AlephiumSpec {
     fooOutputRefNew isnot fooOutputRef
 
     val fooOutputNew = worldState.getContractOutput(fooOutputRefNew).rightValue
-    fooOutputRefNew is ContractOutputRef.unsafe(tx.id, fooOutputNew, 0)
+    fooOutputRefNew is ContractOutputRef.from(tx.id, fooOutputNew, 0)
     fooOutputRefNew.asInstanceOf[TxOutputRef] is TxOutputRef.unsafe(tx, 0)
   }
 

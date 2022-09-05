@@ -265,7 +265,7 @@ object ServerFixture {
       val assetOutputInfos = AVector(U256.One, U256.Two).map { amount =>
         val tokens = AVector((TokenId.hash("token1"), U256.One))
         val output = AssetOutput(amount, lockupScript, TimeStamp.now(), tokens, ByteString.empty)
-        val ref    = AssetOutputRef.unsafe(Hint.from(output), Hash.generate)
+        val ref    = AssetOutputRef.unsafe(Hint.from(output), TxOutputRef.unsafeKey(Hash.generate))
         AssetOutputInfo(ref, output, FlowUtils.PersistedOutput)
       }
 
@@ -428,7 +428,7 @@ object ServerFixture {
             contractId,
             dummyContract.toHalfDecoded(),
             AVector(vm.Val.U256(U256.Zero)),
-            ContractOutputRef.unsafe(Hint.unsafe(0), Hash.zero),
+            ContractOutputRef.unsafe(Hint.unsafe(0), TxOutputRef.unsafeKey(Hash.zero)),
             ContractOutput(U256.Zero, LockupScript.P2C(contractId), AVector())
           )
           .map(_.cached())
