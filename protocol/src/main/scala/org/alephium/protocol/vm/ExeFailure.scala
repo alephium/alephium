@@ -132,7 +132,7 @@ final case class AssertionFailedWithErrorCode(contractIdOpt: Option[ContractId],
     extends ExeFailure {
   override def toString: String = {
     val contractIdString = contractIdOpt match {
-      case Some(contractId) => contractId.value.toHexString
+      case Some(contractId) => contractId.toHexString
       case None             => ""
     }
     s"AssertionFailedWithErrorCode($contractIdString,$errorCode)"

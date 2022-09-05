@@ -1262,7 +1262,7 @@ object ServerUtils {
     } else {
       val approveTokens = initialTokenAmounts
         .map { token =>
-          s"#${token.id.value.toHexString}: ${token.amount.v}"
+          s"#${token.id.toHexString}: ${token.amount.v}"
         }
         .mkString(", ")
       val approveAssets = s"{@$address -> ${initialAttoAlphAmount.v}, $approveTokens}"

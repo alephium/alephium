@@ -19,10 +19,12 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
-import org.alephium.serde.Serde
+import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Bytes.byteStringOrdering
 
-final case class TokenId(value: Hash) extends AnyVal
+final case class TokenId(value: Hash) extends RandomBytes {
+  def bytes: ByteString = value.bytes
+}
 
 object TokenId {
   implicit val serde: Serde[TokenId]           = Serde.forProduct1(TokenId.apply, t => t.value)

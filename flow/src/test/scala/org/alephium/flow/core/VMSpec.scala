@@ -122,7 +122,7 @@ class VMSpec extends AlephiumSpec {
          |
          |@using(preapprovedAssets = false)
          |TxScript Bar {
-         |  let foo = Foo(#${contractKey0.value.toHexString})
+         |  let foo = Foo(#${contractKey0.toHexString})
          |  foo.add(4)
          |  return
          |}
@@ -411,7 +411,7 @@ class VMSpec extends AlephiumSpec {
     val mint =
       s"""
          |TxScript Main {
-         |  let foo = Foo(#${contractId.value.toHexString})
+         |  let foo = Foo(#${contractId.toHexString})
          |  foo.mint()
          |}
          |
@@ -427,8 +427,8 @@ class VMSpec extends AlephiumSpec {
     val burn =
       s"""
          |TxScript Main {
-         |  let foo = Foo(#${contractId.value.toHexString})
-         |  foo.burn{@$genesisAddress -> #${contractId.value.toHexString}: 2 alph}()
+         |  let foo = Foo(#${contractId.toHexString})
+         |  foo.burn{@$genesisAddress -> #${contractId.toHexString}: 2 alph}()
          |}
          |
          |$contract
@@ -458,8 +458,8 @@ class VMSpec extends AlephiumSpec {
     val _tokenId1 =
       TokenId(createContract(token, AVector.empty, Some(TokenIssuance.Info(ALPH.alph(100)))).key)
     val Seq(tokenId0, tokenId1) = Seq(_tokenId0, _tokenId1).sorted
-    val tokenId0Hex             = tokenId0.value.toHexString
-    val tokenId1Hex             = tokenId1.value.toHexString
+    val tokenId0Hex             = tokenId0.toHexString
+    val tokenId1Hex             = tokenId1.toHexString
 
     val mint =
       s"""
@@ -598,8 +598,8 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  let foo = Foo(#${contractKey0.value.toHexString})
-         |  foo.foo(#${contractKey0.value.toHexString}, #${contractKey1.value.toHexString})
+         |  let foo = Foo(#${contractKey0.toHexString})
+         |  foo.foo(#${contractKey0.toHexString}, #${contractKey1.toHexString})
          |}
          |
          |Contract Foo(mut x: U256) {
@@ -848,7 +848,7 @@ class VMSpec extends AlephiumSpec {
       val contractState = worldState.getContractState(contractId).rightValue
       val address       = Address.Contract(LockupScript.p2c(contractId)).toBase58
       (
-        contractId.value.toHexString,
+        contractId.toHexString,
         address,
         contractState.initialStateHash.toHexString,
         contractState.codeHash.toHexString
@@ -930,7 +930,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  let address = contractIdToAddress!(#${contractId.value.toHexString})
+         |  let address = contractIdToAddress!(#${contractId.toHexString})
          |  assert!(byteVecToAddress!(#$addressHex) == address, 0)
          |}
          |""".stripMargin
@@ -988,7 +988,7 @@ class VMSpec extends AlephiumSpec {
         )
       val worldState       = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractAssetRef = worldState.getContractState(contractId).rightValue.contractOutputRef
-      contractId.value.toHexString -> contractAssetRef
+      contractId.toHexString -> contractAssetRef
     }
   }
 
@@ -1534,9 +1534,9 @@ class VMSpec extends AlephiumSpec {
 
     callTxScript(s"""
                     |TxScript Main {
-                    |  let swap = Swap(#${swapContractId.value.toHexString})
+                    |  let swap = Swap(#${swapContractId.toHexString})
                     |  swap.addLiquidity{
-                    |   @$genesisAddress -> 10, #${tokenId.value.toHexString}: 100
+                    |   @$genesisAddress -> 10, #${tokenId.toHexString}: 100
                     |  }(@${genesisAddress.toBase58}, 10, 100)
                     |}
                     |
@@ -1546,7 +1546,7 @@ class VMSpec extends AlephiumSpec {
 
     callTxScript(s"""
                     |TxScript Main {
-                    |  let swap = Swap(#${swapContractId.value.toHexString})
+                    |  let swap = Swap(#${swapContractId.toHexString})
                     |  swap.swapToken{@$genesisAddress -> 10}(@${genesisAddress.toBase58}, 10)
                     |}
                     |
@@ -1557,8 +1557,8 @@ class VMSpec extends AlephiumSpec {
     callTxScript(
       s"""
          |TxScript Main {
-         |  let swap = Swap(#${swapContractId.value.toHexString})
-         |  swap.swapAlph{@$genesisAddress -> #${tokenId.value.toHexString}: 50}(@$genesisAddress, 50)
+         |  let swap = Swap(#${swapContractId.toHexString})
+         |  swap.swapAlph{@$genesisAddress -> #${tokenId.toHexString}: 50}(@$genesisAddress, 50)
          |}
          |
          |${AMMContract.swapContract}
@@ -1632,7 +1632,7 @@ class VMSpec extends AlephiumSpec {
     def main(address: LockupScript.Asset) =
       s"""
          |TxScript Main {
-         |  let foo = Foo(#${contractId.value.toHexString})
+         |  let foo = Foo(#${contractId.toHexString})
          |  foo.foo(@${Address.Asset(address).toBase58})
          |}
          |
@@ -2041,7 +2041,7 @@ class VMSpec extends AlephiumSpec {
     def success(contract: String) = {
       val contractOutputRef = createContract(contract, AVector(Val.U256(0)))
       val contractId        = ContractId(contractOutputRef.key)
-      val contractIdHex     = contractId.value.toHexString
+      val contractIdHex     = contractId.toHexString
       checkContractState(contractIdHex, contractOutputRef, true)
 
       val script =
@@ -2134,7 +2134,7 @@ class VMSpec extends AlephiumSpec {
          |
          |@using(preapprovedAssets = false)
          |TxScript Bar {
-         |  let foo = Foo(#${contractId.value.toHexString})
+         |  let foo = Foo(#${contractId.toHexString})
          |  foo.add(4)
          |
          |  return
@@ -2204,7 +2204,7 @@ class VMSpec extends AlephiumSpec {
            |$contractRaw
            |
            |TxScript Main {
-           |  Foo(#${contractId.value.toHexString}).destroy(@${genesisAddress.toBase58})
+           |  Foo(#${contractId.toHexString}).destroy(@${genesisAddress.toBase58})
            |}
            |""".stripMargin
 
@@ -2315,7 +2315,7 @@ class VMSpec extends AlephiumSpec {
          |
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  let contract = Add(#${contractId.value.toHexString})
+         |  let contract = Add(#${contractId.toHexString})
          |  contract.add(1, 2)
          |}
          |""".stripMargin
@@ -2366,7 +2366,7 @@ class VMSpec extends AlephiumSpec {
          |
          |@using(preapprovedAssets = false)
          |TxScript Bar {
-         |  let foo = Foo(#${contractId.value.toHexString})
+         |  let foo = Foo(#${contractId.toHexString})
          |  foo.testEventTypes()
          |
          |  return
@@ -2420,7 +2420,7 @@ class VMSpec extends AlephiumSpec {
          |
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  Foo(#${contractId.value.toHexString}).foo()
+         |  Foo(#${contractId.toHexString}).foo()
          |}
          |""".stripMargin
 
@@ -2649,14 +2649,14 @@ class VMSpec extends AlephiumSpec {
       )
 
       intercept[AssertionError](callTxScript(createSubContractRaw)).getMessage.startsWith(
-        s"Right(TxScriptExeFailed(ContractAlreadyExists(${subContractId.value.toHexString}))"
+        s"Right(TxScriptExeFailed(ContractAlreadyExists(${subContractId.toHexString}))"
       )
 
       val subContractPathHex = Hex.toHexString(serialize(subContractPath))
       val callSubContractRaw: String =
         s"""
            |TxScript Main {
-           |  Foo(#${contractId.value.toHexString}).callSubContract(#${subContractPathHex})
+           |  Foo(#${contractId.toHexString}).callSubContract(#${subContractPathHex})
            |}
            |$contractRaw
            |""".stripMargin
@@ -3004,7 +3004,7 @@ class VMSpec extends AlephiumSpec {
     val main: String =
       s"""
          |TxScript Main {
-         |  Foo(#${fooId.value.toHexString}).foo()
+         |  Foo(#${fooId.toHexString}).foo()
          |  transferAlph!(callerAddress!(), @${fooAddress}, 1 alph)
          |}
          |
@@ -3058,7 +3058,7 @@ class VMSpec extends AlephiumSpec {
         s"""
            |@using(preapprovedAssets = false)
            |TxScript Main {
-           |  let impl = I(#${contractId.value.toHexString})
+           |  let impl = I(#${contractId.toHexString})
            |  assert!(impl.f1() == 1, 0)
            |  assert!(impl.f2() == 2, 0)
            |  assert!(impl.f3() == #00, 0)
@@ -3204,7 +3204,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
-         |  let foo = Foo(#${barId.value.toHexString})
+         |  let foo = Foo(#${barId.toHexString})
          |  foo.foo()
          |}
          |$foo
@@ -3309,7 +3309,7 @@ class VMSpec extends AlephiumSpec {
            |TxScript Main {
            |  let caller = callerAddress!()
            |  transferAlph!(caller, @${fooAddress}, 0.01 alph)
-           |  let foo = Foo(#${fooId.value.toHexString})
+           |  let foo = Foo(#${fooId.toHexString})
            |  foo.foo()
            |}
            |
@@ -3338,7 +3338,7 @@ class VMSpec extends AlephiumSpec {
            |  @using(assetsInContract = true)
            |  pub fn bar(to: Address) -> () {
            |    if (index == 0) {
-           |      let foo = Foo(#${fooId.value.toHexString})
+           |      let foo = Foo(#${fooId.toHexString})
            |      foo.foo(to)
            |    } else {
            |      let bar = Bar(nextBarId)
@@ -3362,7 +3362,7 @@ class VMSpec extends AlephiumSpec {
       val script =
         s"""
            |TxScript Main {
-           |  let bar = Bar(#${lastBarId.value.toHexString})
+           |  let bar = Bar(#${lastBarId.toHexString})
            |  bar.bar(@${Address.contract(lastBarId)})
            |}
            |
@@ -3393,7 +3393,7 @@ class VMSpec extends AlephiumSpec {
     val script =
       s"""
          |TxScript Main {
-         |  let foo = Foo(#${fooId.value.toHexString})
+         |  let foo = Foo(#${fooId.toHexString})
          |  foo.foo()
          |}
          |
@@ -3486,7 +3486,7 @@ class VMSpec extends AlephiumSpec {
     val script =
       s"""
          |TxScript Main {
-         |  let foo = Foo(#${fooId.value.toHexString})
+         |  let foo = Foo(#${fooId.toHexString})
          |  foo.foo{callerAddress!() -> 1 alph}()
          |}
          |$foo

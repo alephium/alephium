@@ -227,7 +227,7 @@ class TransactionSpec
            |TxScript Main {
            |  verifyTxSignature!(#${pubKey1.toHexString})
            |  transferAlphFromSelf!(@$address1, 1)
-           |  transferTokenToSelf!(@$address1, #${tokenId.value.toHexString}, 42)
+           |  transferTokenToSelf!(@$address1, #${tokenId.toHexString}, 42)
            |
            |  verifyTxSignature!(#${pubKey2.toHexString})
            |  transferAlphFromSelf!(@$address2, 5)

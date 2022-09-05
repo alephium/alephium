@@ -19,9 +19,12 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
-import org.alephium.serde.Serde
+import org.alephium.serde.{RandomBytes, Serde}
+import org.alephium.util.Bytes
 
-final case class ContractId(value: Hash) extends AnyVal
+final case class ContractId(value: Hash) extends RandomBytes {
+  def bytes: ByteString = value.bytes
+}
 
 object ContractId {
   implicit val serde: Serde[ContractId] = Serde.forProduct1(ContractId.apply, t => t.value)
@@ -31,6 +34,14 @@ object ContractId {
 
   def from(bytes: ByteString): Option[ContractId] = {
     Hash.from(bytes).map(ContractId.apply)
+  }
+
+  def from(txId: TransactionId, outputIndex: Int): ContractId = {
+    hash(txId.bytes ++ Bytes.from(outputIndex))
+  }
+
+  def hash(bytes: ByteString): ContractId = {
+    ContractId(Hash.hash(bytes))
   }
 
   def hash(str: String): ContractId = {

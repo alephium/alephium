@@ -19,12 +19,10 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.crypto.Blake3
-import org.alephium.serde.Serde
+import org.alephium.serde.{RandomBytes, Serde}
 
-final case class BlockHash(value: Blake3) extends AnyVal {
-  def toHexString: String = value.toHexString
-  def shortHex: String    = value.shortHex
-  def bytes: ByteString   = value.bytes
+final case class BlockHash(value: Blake3) extends RandomBytes {
+  def bytes: ByteString = value.bytes
 }
 
 object BlockHash {
@@ -39,8 +37,12 @@ object BlockHash {
     Blake3.from(bytes).map(BlockHash.apply)
   }
 
-  def hash(str: ByteString): BlockHash = {
-    BlockHash(Blake3.hash(str))
+  def hash(bytes: ByteString): BlockHash = {
+    BlockHash(Blake3.hash(bytes))
+  }
+
+  def hash(string: String): BlockHash = {
+    BlockHash(Blake3.hash(string))
   }
 
   def unsafe(str: ByteString): BlockHash = {

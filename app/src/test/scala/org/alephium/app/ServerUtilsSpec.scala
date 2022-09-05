@@ -904,7 +904,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  pub fn addOne() -> U256 {
          |    transferAlphToSelf!(@$callerAddress, ${ALPH.oneNanoAlph})
          |    value = value + 1
-         |    let bar = Bar(#${barId.value.toHexString})
+         |    let bar = Bar(#${barId.toHexString})
          |    bar.addOne()
          |    return value
          |  }
@@ -920,7 +920,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = true)
          |TxScript Main {
-         |  let foo = Foo(#${fooId.value.toHexString})
+         |  let foo = Foo(#${fooId.toHexString})
          |  foo.addOne{@$callerAddress -> 1 alph}()
          |}
          |
@@ -1597,7 +1597,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> 10, #${token1.value.toHexString}: 10, #${token2.value.toHexString}: 20}(#$codeRaw, #$stateRaw, 50)
+           |  createContractWithToken!{@$fromAddress -> 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true

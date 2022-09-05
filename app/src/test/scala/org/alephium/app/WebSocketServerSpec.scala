@@ -51,7 +51,7 @@ class WebSocketServerSpec
   behavior of "http"
 
   it should "encode BlockNotify" in new Fixture {
-    val dep  = BlockHash(Blake3.hash("foo"))
+    val dep  = BlockHash.hash("foo")
     val deps = AVector.fill(groupConfig.depsNum)(dep)
     val header =
       BlockHeader.unsafeWithRawDeps(

@@ -566,7 +566,7 @@ object SwapContracts {
   def tokenWithdrawTxScript(address: String, tokenContractKey: ContractId, tokenAmount: U256) =
     s"""
        |TxScript Main {
-       |  let token = Token(#${tokenContractKey.value.toHexString})
+       |  let token = Token(#${tokenContractKey.toHexString})
        |  token.withdraw(@${address}, $tokenAmount)
        |}
        |
@@ -616,9 +616,9 @@ object SwapContracts {
   ) =
     s"""
        |TxScript Main {
-       |  let swap = Swap(#${swapContractKey.value.toHexString})
+       |  let swap = Swap(#${swapContractKey.toHexString})
        |  swap.addLiquidity{
-       |    @$address -> $attoAlphAmount, #${tokenId.value.toHexString}: $tokenAmount
+       |    @$address -> $attoAlphAmount, #${tokenId.toHexString}: $tokenAmount
        |  }(@$address, $attoAlphAmount, $tokenAmount)
        |}
        |
@@ -633,8 +633,8 @@ object SwapContracts {
   ) =
     s"""
        |TxScript Main {
-       |  let swap = Swap(#${swapContractKey.value.toHexString})
-       |  swap.swapAlph{@$address -> #${tokenId.value.toHexString}: $tokenAmount}(@$address, $tokenAmount)
+       |  let swap = Swap(#${swapContractKey.toHexString})
+       |  swap.swapAlph{@$address -> #${tokenId.toHexString}: $tokenAmount}(@$address, $tokenAmount)
        |}
        |
        |$swapContract
@@ -643,7 +643,7 @@ object SwapContracts {
   def swapAlphForTokenTxScript(address: String, swapContractKey: ContractId, attoAlphAmount: U256) =
     s"""
        |TxScript Main {
-       |  let swap = Swap(#${swapContractKey.value.toHexString})
+       |  let swap = Swap(#${swapContractKey.toHexString})
        |  swap.swapToken{@$address -> $attoAlphAmount}(@$address, $attoAlphAmount)
        |}
        |

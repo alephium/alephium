@@ -93,7 +93,9 @@ trait EndpointsExamples extends ErrorExamples {
       Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
     )
   val contractId =
-    Hash.from(Hex.unsafe("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")).get
+    ContractId(
+      Hash.from(Hex.unsafe("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")).get
+    )
   private val tokens = AVector(
     Token(TokenId.hash("token1"), alph(42).value),
     Token(TokenId.hash("token2"), alph(1000).value)
@@ -209,7 +211,7 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val eventByTxId = ContractEventByTxId(
     blockHash,
-    Address.contract(ContractId(contractId)),
+    Address.contract(contractId),
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
@@ -619,7 +621,7 @@ trait EndpointsExamples extends ErrorExamples {
         model.minimalGas,
         model.defaultGasPrice,
         txId = txId,
-        contractAddress = Address.contract(ContractId(contractId))
+        contractAddress = Address.contract(contractId)
       )
     )
 

@@ -376,7 +376,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     EventFilter.warning(pattern = ".*already existed.*").intercept {
       txHandler ! addTx(tx)
       expectMsg(
-        TxHandler.AddFailed(tx.id, s"tx ${tx.id.value.toHexString} is already included")
+        TxHandler.AddFailed(tx.id, s"tx ${tx.id.toHexString} is already included")
       )
       broadcastTxProbe.expectNoMessage()
     }

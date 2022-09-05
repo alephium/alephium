@@ -136,7 +136,7 @@ trait BrokerHandler extends FlowDataHandler {
   def exchangingCommon: Receive = {
     case DownloadBlocks(hashes) =>
       log.debug(
-        s"Download #${hashes.length} blocks ${Utils.showDigest(hashes.map(_.value))} from $remoteAddress"
+        s"Download #${hashes.length} blocks ${Utils.showDigest(hashes)} from $remoteAddress"
       )
       send(BlocksRequest(hashes))
     case Received(NewBlock(block)) =>

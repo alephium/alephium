@@ -224,11 +224,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     val token: Token = Token(id, amount)
     val jsonRaw =
-      s"""{"id":"${id.value.toHexString}","amount":"${amount}"}"""
+      s"""{"id":"${id.toHexString}","amount":"${amount}"}"""
 
     checkData(token, jsonRaw)
 
-    parseFail[Token](s"""{"id":"${id.value.toHexString}","amount":"1 ALPH"}""")
+    parseFail[Token](s"""{"id":"${id.toHexString}","amount":"1 ALPH"}""")
   }
 
   it should "encode/decode Output with big amount" in {
@@ -254,11 +254,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  "address": "$addressStr",
                        |  "tokens": [
                        |    {
-                       |      "id": "${tokenId1.value.toHexString}",
+                       |      "id": "${tokenId1.toHexString}",
                        |      "amount": "42"
                        |    },
                        |    {
-                       |      "id": "${tokenId2.value.toHexString}",
+                       |      "id": "${tokenId2.toHexString}",
                        |      "amount": "1000"
                        |    }
                        |  ]
@@ -319,7 +319,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val response =
         Balance(amount, amount.hint, locked, locked.hint, Some(tokens), Some(lockedTokens), 1)
       val jsonRaw =
-        s"""{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","tokenBalances":[{"id":"${tokenId1.value.toHexString}","amount":"42"},{"id":"${tokenId2.value.toHexString}","amount":"1000"}],"lockedTokenBalances":[{"id":"${tokenId3.value.toHexString}","amount":"1"}],"utxoNum":1}"""
+        s"""{"balance":"100000000000000000000","balanceHint":"100 ALPH","lockedBalance":"50000000000000000000","lockedBalanceHint":"50 ALPH","tokenBalances":[{"id":"${tokenId1.toHexString}","amount":"42"},{"id":"${tokenId2.toHexString}","amount":"1000"}],"lockedTokenBalances":[{"id":"${tokenId3.toHexString}","amount":"1"}],"utxoNum":1}"""
       checkData(response, jsonRaw, dropWhiteSpace = false)
     }
 
@@ -418,7 +418,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |      "attoAlphAmount": "1",
                        |      "tokens": [
                        |        {
-                       |          "id": "${tokenId1.value.toHexString}",
+                       |          "id": "${tokenId1.toHexString}",
                        |          "amount": "10"
                        |        }
                        |      ],
@@ -458,7 +458,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |      "attoAlphAmount": "1",
                        |      "tokens": [
                        |        {
-                       |          "id": "${tokenId1.value.toHexString}",
+                       |          "id": "${tokenId1.toHexString}",
                        |          "amount": "10"
                        |        }
                        |      ],
@@ -499,7 +499,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |      "attoAlphAmount": "1",
                        |      "tokens": [
                        |        {
-                       |          "id": "${tokenId1.value.toHexString}",
+                       |          "id": "${tokenId1.toHexString}",
                        |          "amount": "10"
                        |        }
                        |      ],

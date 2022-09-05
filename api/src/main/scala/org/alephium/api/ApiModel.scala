@@ -121,7 +121,7 @@ trait ApiModelCodec {
     byteStringReader.map(Hash.from(_).getOrElse(throw new Abort("cannot decode hash")))
 
   implicit val blockHashWriter: Writer[BlockHash] = StringWriter.comap[BlockHash](
-    _.value.toHexString
+    _.toHexString
   )
   implicit val blockHashReader: Reader[BlockHash] =
     byteStringReader.map(BlockHash.from(_).getOrElse(throw new Abort("cannot decode block hash")))
