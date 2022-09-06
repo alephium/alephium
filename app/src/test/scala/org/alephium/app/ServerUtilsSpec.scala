@@ -1596,7 +1596,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.warnings is AVector(
       "Found unused variables in Foo: foo.a",
       "Found unused fields in Foo: x",
-      "Function foo is readonly, please use @using(readonly = true) for the function"
+      "Function Foo.foo is readonly, please use @using(readonly = true) for the function"
     )
   }
 

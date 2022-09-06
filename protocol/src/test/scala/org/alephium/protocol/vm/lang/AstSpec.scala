@@ -18,7 +18,6 @@ package org.alephium.protocol.vm.lang
 
 import scala.collection.mutable
 
-import org.alephium.protocol.vm.lang.Ast.MultiContract
 import org.alephium.util.AlephiumSpec
 import org.alephium.util.AVector
 
@@ -120,7 +119,7 @@ class AstSpec extends AlephiumSpec {
 
   it should "build external call check table" in new InternalCallFixture {
     val contracts = fastparse.parse(internalCalls, StatefulParser.multiContract(_)).get.value
-    val state     = Compiler.State.buildFor(contracts, 0)
+    val state     = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
     val contract  = contracts.contracts(0).asInstanceOf[Ast.Contract]
     contract.genCode(state)
     val interallCalls = state.internalCalls
@@ -219,9 +218,9 @@ class AstSpec extends AlephiumSpec {
   it should "check permission for external calls" in new ExternalCallsFixture {
     val (_, _, warnings) = Compiler.compileContractFull(externalCalls, 0).rightValue
     externalCallCheckWarnings(warnings).toSet is Set(
-      MultiContract.noExternalCallCheckMsg("InternalCalls", "c"),
-      MultiContract.noExternalCallCheckMsg("InternalCalls", "f"),
-      MultiContract.noExternalCallCheckMsg("InternalCalls", "g")
+      Warnings.noExternalCallCheckMsg("InternalCalls", "c"),
+      Warnings.noExternalCallCheckMsg("InternalCalls", "f"),
+      Warnings.noExternalCallCheckMsg("InternalCalls", "g")
     )
   }
 
@@ -248,7 +247,7 @@ class AstSpec extends AlephiumSpec {
   it should "not check permission for mutual recursive calls" in new MutualRecursionFixture {
     val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
     externalCallCheckWarnings(warnings).toSet is Set(
-      MultiContract.noExternalCallCheckMsg("Bar", "a")
+      Warnings.noExternalCallCheckMsg("Bar", "a")
     )
   }
 
@@ -280,7 +279,7 @@ class AstSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val error = Compiler.compileProject(code).leftValue
-      error.message is MultiContract.noExternalCallCheckMsg("Baz", "base")
+      error.message is Warnings.noExternalCallCheckMsg("Baz", "base")
     }
 
     {
@@ -330,7 +329,7 @@ class AstSpec extends AlephiumSpec {
   }
 
   it should "display the right warning message for external call check" in {
-    MultiContract.noExternalCallCheckMsg("Foo", "bar") is
+    Warnings.noExternalCallCheckMsg("Foo", "bar") is
       "No external call check for function: Foo.bar, please use checkCaller!(...) for the function or its private callees."
   }
 

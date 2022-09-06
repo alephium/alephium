@@ -3195,7 +3195,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
       warnings is AVector(
-        "Function foo is readonly, please use @using(readonly = true) for the function"
+        "Function Foo.foo is readonly, please use @using(readonly = true) for the function"
       )
     }
   }
@@ -3223,7 +3223,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "compile all contracts" in new MultiContractFixture {
-    val contracts = multiContract.genStatefulContracts()
+    val contracts = multiContract.genStatefulContracts()(CompilerOptions.Default)
     contracts.length is 2
     contracts(0)._2.ident.name is "Foo"
     contracts(0)._4 is 1
@@ -3232,7 +3232,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "compile all scripts" in new MultiContractFixture {
-    val scripts = multiContract.genStatefulScripts()
+    val scripts = multiContract.genStatefulScripts()(CompilerOptions.Default)
     scripts.length is 2
     scripts(0)._2.ident.name is "M1"
     scripts(1)._2.ident.name is "M2"

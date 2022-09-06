@@ -30,11 +30,14 @@ object Compiler {
   type CompiledContract = (StatefulContract, Ast.Contract, AVector[String])
   type CompiledScript   = (StatefulScript, Ast.TxScript, AVector[String])
 
-  def compileAssetScript(input: String): Either[Error, (StatelessScript, AVector[String])] =
+  def compileAssetScript(
+      input: String,
+      compilerOptions: CompilerOptions = CompilerOptions.Default
+  ): Either[Error, (StatelessScript, AVector[String])] =
     try {
       fastparse.parse(input, StatelessParser.assetScript(_)) match {
         case Parsed.Success(script, _) =>
-          val state = State.buildFor(script)
+          val state = State.buildFor(script)(compilerOptions)
           Right((script.genCode(state), state.getWarnings))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
@@ -43,29 +46,33 @@ object Compiler {
       case e: Error => Left(e)
     }
 
-  def compileTxScript(input: String): Either[Error, StatefulScript] =
-    compileTxScript(input, 0)
+  def compileTxScript(
+      input: String,
+      index: Int = 0,
+      compilerOptions: CompilerOptions = CompilerOptions.Default
+  ): Either[Error, StatefulScript] =
+    compileTxScriptFull(input, index, compilerOptions).map(_._1)
 
-  def compileTxScript(input: String, index: Int): Either[Error, StatefulScript] =
-    compileTxScriptFull(input, index).map(_._1)
+  def compileTxScriptFull(
+      input: String,
+      index: Int = 0,
+      compilerOptions: CompilerOptions = CompilerOptions.Default
+  ): Either[Error, CompiledScript] =
+    compileStateful(input, _.genStatefulScript(index)(compilerOptions))
 
-  def compileTxScriptFull(input: String): Either[Error, CompiledScript] =
-    compileTxScriptFull(input, 0)
+  def compileContract(
+      input: String,
+      index: Int = 0,
+      compilerOptions: CompilerOptions = CompilerOptions.Default
+  ): Either[Error, StatefulContract] =
+    compileContractFull(input, index, compilerOptions).map(_._1)
 
-  def compileTxScriptFull(input: String, index: Int): Either[Error, CompiledScript] =
-    compileStateful(input, _.genStatefulScript(index))
-
-  def compileContract(input: String): Either[Error, StatefulContract] =
-    compileContract(input, 0)
-
-  def compileContract(input: String, index: Int): Either[Error, StatefulContract] =
-    compileContractFull(input, index).map(_._1)
-
-  def compileContractFull(input: String): Either[Error, CompiledContract] =
-    compileContractFull(input, 0)
-
-  def compileContractFull(input: String, index: Int): Either[Error, CompiledContract] =
-    compileStateful(input, _.genStatefulContract(index))
+  def compileContractFull(
+      input: String,
+      index: Int = 0,
+      compilerOptions: CompilerOptions = CompilerOptions.Default
+  ): Either[Error, CompiledContract] =
+    compileStateful(input, _.genStatefulContract(index)(compilerOptions))
 
   private def compileStateful[T](input: String, genCode: MultiContract => T): Either[Error, T] = {
     try {
@@ -76,12 +83,14 @@ object Compiler {
   }
 
   def compileProject(
-      input: String
+      input: String,
+      compilerOptions: CompilerOptions = CompilerOptions.Default
   ): Either[Error, (AVector[CompiledContract], AVector[CompiledScript])] = {
     try {
       compileMultiContract(input).map { multiContract =>
-        val statefulContracts = multiContract.genStatefulContracts().map(c => (c._1, c._2, c._3))
-        val statefulScripts   = multiContract.genStatefulScripts()
+        val statefulContracts =
+          multiContract.genStatefulContracts()(compilerOptions).map(c => (c._1, c._2, c._3))
+        val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
         (statefulContracts, statefulScripts)
       }
     } catch {
@@ -310,7 +319,9 @@ object Compiler {
       }
     }
 
-    def buildFor(script: Ast.AssetScript): State[StatelessContext] =
+    def buildFor(script: Ast.AssetScript)(implicit
+        compilerOptions: CompilerOptions
+    ): State[StatelessContext] =
       StateForScript(
         script.ident,
         mutable.HashMap.empty,
@@ -324,7 +335,7 @@ object Compiler {
     def buildFor(
         multiContract: MultiContract,
         contractIndex: Int
-    ): State[StatefulContext] = {
+    )(implicit compilerOptions: CompilerOptions): State[StatefulContext] = {
       val contractsTable = multiContract.contracts.map { contract =>
         val kind = contract match {
           case _: Ast.ContractInterface =>
@@ -416,7 +427,7 @@ object Compiler {
   }
 
   // scalastyle:off number.of.methods
-  sealed trait State[Ctx <: StatelessContext] extends CallGraph {
+  sealed trait State[Ctx <: StatelessContext] extends CallGraph with Warnings {
     def typeId: Ast.TypeId
     def varTable: mutable.HashMap[String, VarInfo]
     var scope: Ast.FuncId
@@ -426,8 +437,6 @@ object Compiler {
     private var freshNameIndex: Int              = 0
     private var arrayIndexVar: Option[Ast.Ident] = None
     val usedVars: mutable.Set[String]            = mutable.Set.empty[String]
-    val warnings: mutable.ArrayBuffer[String]    = mutable.ArrayBuffer.empty[String]
-    def getWarnings: AVector[String]             = AVector.from(warnings)
     def eventsInfo: Seq[EventInfo]
 
     @inline final def freshName(): String = {
@@ -613,8 +622,7 @@ object Compiler {
         !varInfo.isUnused
       }
       if (unusedVars.nonEmpty) {
-        val unusedVarsString = unusedVars.keys.toArray.sorted.mkString(", ")
-        warnings += s"Found unused variables in ${typeId.name}: ${unusedVarsString}"
+        warnUnusedVariables(typeId, unusedVars)
       }
       usedVars.filterInPlace(name => !name.startsWith(prefix))
     }
@@ -631,10 +639,10 @@ object Compiler {
         case _                                   => ()
       }
       if (unusedConstants.nonEmpty) {
-        warnings += s"Found unused constants in ${typeId.name}: ${unusedConstants.sorted.mkString(", ")}"
+        warnUnusedConstants(typeId, unusedConstants)
       }
       if (unusedFields.nonEmpty) {
-        warnings += s"Found unused fields in ${typeId.name}: ${unusedFields.sorted.mkString(", ")}"
+        warnUnusedFields(typeId, unusedFields)
       }
     }
 
@@ -773,7 +781,8 @@ object Compiler {
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatelessContext]],
       contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatelessContext]]
-  ) extends State[StatelessContext] {
+  )(implicit val compilerOptions: CompilerOptions)
+      extends State[StatelessContext] {
     override def eventsInfo: Seq[EventInfo] = Seq.empty
 
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatelessContext] = {
@@ -846,7 +855,8 @@ object Compiler {
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatefulContext]],
       eventsInfo: Seq[EventInfo],
       contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatefulContext]]
-  ) extends State[StatefulContext] {
+  )(implicit val compilerOptions: CompilerOptions)
+      extends State[StatefulContext] {
     protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatefulContext] = {
       BuiltIn.statefulFuncs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))

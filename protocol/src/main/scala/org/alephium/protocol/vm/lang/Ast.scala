@@ -604,9 +604,7 @@ object Ast {
       }
 
       if (isReadonly && !useReadonly) {
-        state.warnings.addOne(
-          s"Function ${id.name} is readonly, please use @using(readonly = true) for the function"
-        )
+        state.warnReadonlyCheck(state.typeId, id)
       }
     }
 
@@ -892,9 +890,7 @@ object Ast {
     def checkIfPrivateMethodsUsed(state: Compiler.State[Ctx]): Unit = {
       funcs.foreach { func =>
         if (func.isPrivate && !state.internalCallsReversed.get(func.id).exists(_.nonEmpty)) {
-          state.warnings.addOne(
-            s"Private function ${ident.name}.${func.name} is not used"
-          )
+          state.warnUnusedPrivateFunction(ident, func.id)
         }
       }
     }
@@ -1237,13 +1233,17 @@ object Ast {
       MultiContract(newContracts, Some(dependencies))
     }
 
-    def genStatefulScripts(): AVector[(StatefulScript, TxScript, AVector[String])] = {
+    def genStatefulScripts()(implicit
+        compilerOptions: CompilerOptions
+    ): AVector[(StatefulScript, TxScript, AVector[String])] = {
       AVector.from(contracts.view.zipWithIndex.collect { case (_: TxScript, index) =>
         genStatefulScript(index)
       })
     }
 
-    def genStatefulScript(contractIndex: Int): (StatefulScript, TxScript, AVector[String]) = {
+    def genStatefulScript(
+        contractIndex: Int
+    )(implicit compilerOptions: CompilerOptions): (StatefulScript, TxScript, AVector[String]) = {
       val state = Compiler.State.buildFor(this, contractIndex)
       get(contractIndex) match {
         case script: TxScript => (script.genCode(state), script, state.getWarnings)
@@ -1272,9 +1272,7 @@ object Ast {
         }
       }
       allNoExternalCallChecks.foreach { case (typeId, funcId) =>
-        contractState.warnings.addOne(
-          MultiContract.noExternalCallCheckMsg(typeId.name, funcId.name)
-        )
+        contractState.warnExternalCallCheck(typeId, funcId)
       }
     }
 
@@ -1293,15 +1291,15 @@ object Ast {
         val table = externalCallCheckTables(contractId)
         interface.funcs.foreach { func =>
           if (func.useExternalCallCheck && !table(func.id)) {
-            throw Compiler.Error(
-              MultiContract.noExternalCallCheckMsg(contractId.name, func.id.name)
-            )
+            throw Compiler.Error(Warnings.noExternalCallCheckMsg(contractId.name, func.id.name))
           }
         }
       }
     }
 
-    def genStatefulContracts(): AVector[(StatefulContract, Contract, AVector[String], Int)] = {
+    def genStatefulContracts()(implicit
+        compilerOptions: CompilerOptions
+    ): AVector[(StatefulContract, Contract, AVector[String], Int)] = {
       val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
       val externalCallCheckTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
       val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
@@ -1325,7 +1323,9 @@ object Ast {
       }
     }
 
-    def genStatefulContract(contractIndex: Int): (StatefulContract, Contract, AVector[String]) = {
+    def genStatefulContract(
+        contractIndex: Int
+    )(implicit compilerOptions: CompilerOptions): (StatefulContract, Contract, AVector[String]) = {
       get(contractIndex) match {
         case contract: Contract =>
           if (contract.isAbstract) {
@@ -1459,9 +1459,6 @@ object Ast {
       val nonInherited = nonAbstractFuncs.filter(f => !abstractFuncsSet.contains(f.id.name))
       (unimplementedFuncs, inherited ++ nonInherited)
     }
-
-    def noExternalCallCheckMsg(typeId: String, funcId: String): String =
-      s"No external call check for function: ${typeId}.${funcId}, please use checkCaller!(...) for the function or its private callees."
   }
 }
 // scalastyle:on number.of.methods number.of.types
