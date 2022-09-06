@@ -659,7 +659,7 @@ object Compiler {
     def checkArrayIndexType(index: Ast.Expr[Ctx]): Unit = {
       index.getType(this) match {
         case Seq(Type.U256) =>
-        case tpe            => throw Compiler.Error(s"Invalid array index type $tpe")
+        case tpe => throw Compiler.Error(s"Invalid array index type ${quote(tpe)}, expected ${quote("U256")}")
       }
     }
 
@@ -673,7 +673,7 @@ object Compiler {
       } else {
         arrayType.baseType match {
           case baseType: Type.FixedSizeArray => arrayElementType(baseType, indexes.drop(1))
-          case tpe => throw Compiler.Error(s"Expect array type, have: $tpe")
+          case tpe => throw Compiler.Error(s"Expected array type, got ${quote(tpe)}")
         }
       }
     }
@@ -686,7 +686,7 @@ object Compiler {
       tpes match {
         case Seq(tpe: Type.FixedSizeArray) => arrayElementType(tpe, indexes)
         case tpe =>
-          throw Compiler.Error(s"Expect array type, have: $tpe")
+          throw Compiler.Error(s"Expected array type, got ${quote(tpe)}")
       }
     }
 
@@ -767,7 +767,7 @@ object Compiler {
     def checkReturn(returnType: Seq[Type]): Unit = {
       val rtype = funcIdents(scope).returnType
       if (returnType != rtype) {
-        throw Error(s"Invalid return types: expected $rtype, got $returnType")
+        throw Error(s"Invalid return types: expected ${quote(rtype)}, got ${quote(returnType)}")
       }
     }
   }
@@ -936,7 +936,7 @@ object Compiler {
     if (logFieldLength >= 0 && logFieldLength < Instr.allLogInstrs.length) {
       Instr.allLogInstrs(logFieldLength)
     } else {
-      throw Compiler.Error(s"Max 8 fields allowed for contract events")
+      throw Compiler.Error(s"Contract events allow up to 8 fields")
     }
   }
 }
