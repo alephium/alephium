@@ -58,7 +58,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture with ApiConfigFixture {
     implicit def flowImplicit: BlockFlow = blockFlow
 
-    def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index)
+    def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
   }
 
   trait FlowFixtureWithApi extends FlowFixture with ApiConfigFixture

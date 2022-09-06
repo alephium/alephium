@@ -295,7 +295,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
     ): Asset = {
       val output =
         AssetOutput(amount, lockupScript, TimeStamp.now(), tokens, ByteString.empty)
-      val ref = AssetOutputRef.unsafe(Hint.from(output), Hash.generate)
+      val ref = AssetOutputRef.unsafe(Hint.from(output), TxOutputRef.unsafeKey(Hash.generate))
       AssetOutputInfo(ref, output, PersistedOutput)
     }
 
