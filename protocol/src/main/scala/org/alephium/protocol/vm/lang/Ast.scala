@@ -544,7 +544,8 @@ object Ast {
           ifBranches.foreach(branch => checkRetTypes(branch.body.lastOption))
           checkRetTypes(elseBranchOpt.flatMap(_.body.lastOption))
         case Some(call: FuncCall[_]) if call.id == FuncId("panic", isBuiltIn = true) => ()
-        case _ => throw new Compiler.Error(s"Expected return statement for function ${quote(id.name)}")
+        case _ =>
+          throw new Compiler.Error(s"Expected return statement for function ${quote(id.name)}")
       }
     }
 
@@ -586,7 +587,9 @@ object Ast {
         }
         if (invalidInternalCalls.nonEmpty) {
           throw Compiler.Error(
-            s"Readonly function ${funcName(state.typeId, id)} have invalid internal calls: ${quote(invalidInternalCalls.map(_.name).mkString(", "))}"
+            s"Readonly function ${funcName(state.typeId, id)} have invalid internal calls: ${quote(
+                invalidInternalCalls.map(_.name).mkString(", ")
+              )}"
           )
         }
         if (invalidExternalCalls.nonEmpty) {
@@ -717,7 +720,9 @@ object Ast {
       }
       val argsType = args.flatMap(_.getType(state))
       if (argsType.exists(_.isArrayType)) {
-        throw Compiler.Error(s"Array type not supported for event ${quote(s"${state.typeId.name}.${id.name}")}")
+        throw Compiler.Error(
+          s"Array type not supported for event ${quote(s"${state.typeId.name}.${id.name}")}"
+        )
       }
       val logOpCode = Compiler.genLogs(args.length)
       eventIndex ++ args.flatMap(_.genCode(state)) :+ logOpCode
