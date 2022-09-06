@@ -20,10 +20,6 @@ import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
 import org.scalacheck.Gen
-import org.scalatest.concurrent.Eventually.eventually
-import org.scalatest.concurrent.PatienceConfiguration
-import org.scalatest.concurrent.ScalaFutures.convertScalaFuture
-import org.scalatest.time.{Millis, Seconds, Span}
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlowState
@@ -231,7 +227,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
         val persistedTxId = PersistedTxId(timestamp, tx.id)
         pendingTxStorage.get(persistedTxId) isE tx
         persistedTxId
-      }
+      }(patienceConfig, implicitly, implicitly)
     }
 
     def removeReadyTxs(txs: AVector[TransactionTemplate]) = {
@@ -627,10 +623,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     balance12 is balance11.subUnsafe(ALPH.oneAlph)
   }
 
-  trait Fixture extends FlowFixture with TxGenerators with PatienceConfiguration {
+  trait Fixture extends FlowFixture with TxGenerators {
     implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
-    implicit override val patienceConfig =
-      PatienceConfig(timeout = Span(1, Seconds), interval = Span(200, Millis))
 
     // use lazy here because we want to override config values
     lazy val chainIndex = ChainIndex.unsafe(0, 0)

@@ -31,7 +31,6 @@ import akka.util.Timeout
 import io.vertx.core.Vertx
 import io.vertx.core.http.WebSocketBase
 import org.scalatest.Assertion
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Seconds, Span}
 import sttp.model.StatusCode
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
@@ -62,14 +61,12 @@ import org.alephium.wallet.api.model._
 // scalastyle:off number.of.methods
 // scalastyle:off file.size.limit
 class CliqueFixture(implicit spec: AlephiumActorSpec)
-    extends AlephiumSpec
+    extends AlephiumFutureSpec
     with ItConfigFixture
     with NumericHelpers
     with ApiModelCodec
     with wallet.json.ModelCodecs
-    with HttpFixture
-    with ScalaFutures
-    with Eventually { Fixture =>
+    with HttpFixture { Fixture =>
   implicit val system: ActorSystem = spec.system
 
   private val vertx      = Vertx.vertx()

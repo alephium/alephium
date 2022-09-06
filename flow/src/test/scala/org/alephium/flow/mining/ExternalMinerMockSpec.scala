@@ -20,14 +20,13 @@ import java.net.InetSocketAddress
 
 import akka.actor.ActorRef
 import akka.testkit.{TestActor, TestProbe}
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import org.alephium.flow.handler.{TestUtils, ViewHandler}
 import org.alephium.flow.mining.{ExternalMinerMock, Miner, MinerApiController}
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.util.{AlephiumActorSpec, AVector, Duration, SocketUtil}
 
-class ExternalMinerMockSpec extends AlephiumActorSpec with Eventually with IntegrationPatience {
+class ExternalMinerMockSpec extends AlephiumActorSpec {
   override def actorSystemConfig = AlephiumActorSpec.infoConfig
 
   it should "initialize connections as None" in new ExternalMinerMockFixture {

@@ -23,7 +23,6 @@ import akka.actor.{ActorRef, Props}
 import akka.io.Tcp
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
-import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.FlowFixture
