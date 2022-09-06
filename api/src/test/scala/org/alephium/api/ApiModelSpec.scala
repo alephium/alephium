@@ -68,6 +68,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   val inetAddress = InetAddress.getByName("127.0.0.1")
 
+  val compilerOptions = CompilerOptions(ignoreUnusedConstantsWarnings = Some(true))
+
   def generateAddress(): Address.Asset = Address.p2pkh(PublicKey.generate)
   def generateContractAddress(): Address.Contract =
     Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").get)
@@ -628,40 +630,90 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode Compile.Script" in {
-    val compile =
-      Compile.Script(
-        code = "0000"
-      )
-    val jsonRaw =
-      s"""
-         |{
-         |  "code": "0000"
-         |}
-         |""".stripMargin
-    checkData(compile, jsonRaw)
+    {
+      info("Without CompilerOptions")
+      val compile =
+        Compile.Script(
+          code = "0000"
+        )
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000"
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
+
+    {
+      info("With CompilerOptions")
+      val compile =
+        Compile.Script(code = "0000", compilerOptions = Some(compilerOptions))
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000",
+           |  "compilerOptions": { "ignoreUnusedConstantsWarnings": true }
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
   }
 
   it should "encode/decode Compile.Contract" in {
-    val compile =
-      Compile.Contract(code = "0000")
-    val jsonRaw =
-      s"""
-         |{
-         |  "code": "0000"
-         |}
-         |""".stripMargin
-    checkData(compile, jsonRaw)
+    {
+      info("Without CompilerOptions")
+      val compile =
+        Compile.Contract(code = "0000")
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000"
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
+
+    {
+      info("With CompilerOptions")
+      val compile =
+        Compile.Contract(code = "0000", compilerOptions = Some(compilerOptions))
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000",
+           |  "compilerOptions": { "ignoreUnusedConstantsWarnings": true }
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
   }
 
   it should "encode/decode Compile.Project" in {
-    val project = Compile.Project(code = "0000")
-    val jsonRaw =
-      s"""
-         |{
-         |  "code": "0000"
-         |}
-         |""".stripMargin
-    checkData(project, jsonRaw)
+    {
+      info("Without CompilerOptions")
+      val project = Compile.Project(code = "0000")
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000"
+           |}
+           |""".stripMargin
+      checkData(project, jsonRaw)
+    }
+
+    {
+      info("With CompilerOptions")
+      val project = Compile.Project(code = "0000", compilerOptions = Some(compilerOptions))
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000",
+           |  "compilerOptions": { "ignoreUnusedConstantsWarnings": true }
+           |}
+           |""".stripMargin
+      checkData(project, jsonRaw)
+    }
   }
 
   it should "encode/decode BuildContract" in {

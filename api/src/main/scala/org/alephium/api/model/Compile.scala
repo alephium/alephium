@@ -16,9 +16,58 @@
 
 package org.alephium.api.model
 
+import org.alephium.protocol.vm.lang
+
 object Compile {
+  trait Common {
+    def code: String
+    def compilerOptions: Option[CompilerOptions]
+
+    def getLangCompilerOptions(): lang.CompilerOptions = {
+      compilerOptions match {
+        case None          => lang.CompilerOptions.Default
+        case Some(options) => options.toLangCompilerOptions()
+      }
+    }
+  }
+
   // use different type to avoid ambiguous implicit values in endpoint examples
-  final case class Script(code: String)
-  final case class Contract(code: String)
-  final case class Project(code: String)
+  final case class Script(code: String, compilerOptions: Option[CompilerOptions] = None)
+      extends Common
+  final case class Contract(code: String, compilerOptions: Option[CompilerOptions] = None)
+      extends Common
+  final case class Project(code: String, compilerOptions: Option[CompilerOptions] = None)
+      extends Common
+}
+
+final case class CompilerOptions(
+    ignoreUnusedConstantsWarnings: Option[Boolean] = None,
+    ignoreUnusedVariablesWarnings: Option[Boolean] = None,
+    ignoreUnusedFieldsWarnings: Option[Boolean] = None,
+    ignoreUnusedPrivateFunctionsWarnings: Option[Boolean] = None,
+    ignoreReadonlyCheckWarnings: Option[Boolean] = None,
+    ignoreExternalCallCheckWarnings: Option[Boolean] = None
+) {
+  def toLangCompilerOptions(): lang.CompilerOptions = {
+    lang.CompilerOptions(
+      ignoreUnusedConstantsWarnings = ignoreUnusedConstantsWarnings.getOrElse(
+        lang.CompilerOptions.Default.ignoreUnusedConstantsWarnings
+      ),
+      ignoreUnusedVariablesWarnings = ignoreUnusedVariablesWarnings.getOrElse(
+        lang.CompilerOptions.Default.ignoreUnusedVariablesWarnings
+      ),
+      ignoreUnusedFieldsWarnings = ignoreUnusedFieldsWarnings.getOrElse(
+        lang.CompilerOptions.Default.ignoreUnusedFieldsWarnings
+      ),
+      ignoreUnusedPrivateFunctionsWarnings = ignoreUnusedPrivateFunctionsWarnings.getOrElse(
+        lang.CompilerOptions.Default.ignoreUnusedPrivateFunctionsWarnings
+      ),
+      ignoreReadonlyCheckWarnings = ignoreReadonlyCheckWarnings.getOrElse(
+        lang.CompilerOptions.Default.ignoreReadonlyCheckWarnings
+      ),
+      ignoreExternalCallCheckWarnings = ignoreExternalCallCheckWarnings.getOrElse(
+        lang.CompilerOptions.Default.ignoreExternalCallCheckWarnings
+      )
+    )
+  }
 }

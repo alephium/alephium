@@ -494,11 +494,14 @@ trait EndpointsExamples extends ErrorExamples {
       Example(TxNotFound, None, Some("Cannot find tx with the id"))
     )
 
+  private val compilerOptions = CompilerOptions(ignoreUnusedConstantsWarnings = Some(true))
+
   implicit val compileScriptExamples: List[Example[Compile.Script]] =
     simpleExample(
       Compile.Script(
         code =
-          s"TxScript Main { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) }"
+          s"TxScript Main { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@${address.toBase58}, 1024) }",
+        Some(compilerOptions)
       )
     )
 
@@ -507,7 +510,8 @@ trait EndpointsExamples extends ErrorExamples {
       Compile.Contract(
         // Note that we use this weird format to avoid Windows linebreak issue
         code =
-          "Contract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+          "Contract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
+        Some(compilerOptions)
       )
     )
 
@@ -515,7 +519,8 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       Compile.Project(
         code =
-          "Contract Foo() {\n pub fn foo() -> () {}\n }\n TxScript Main(id: ByteVec) {\n Foo(id).foo() \n}"
+          "Contract Foo() {\n pub fn foo() -> () {}\n }\n TxScript Main(id: ByteVec) {\n Foo(id).foo() \n}",
+        Some(compilerOptions)
       )
     )
 
