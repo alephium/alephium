@@ -18,9 +18,8 @@ package org.alephium.flow.core
 
 import org.alephium.flow.core.BlockFlowState.BlockCache
 import org.alephium.flow.model.BlockState
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.BlockHeader
+import org.alephium.protocol.model.{BlockHash, BlockHeader}
 import org.alephium.util.{RWLock, ValueSortedMap}
 
 object FlowCache {

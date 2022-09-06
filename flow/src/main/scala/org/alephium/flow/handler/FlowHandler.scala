@@ -19,7 +19,6 @@ package org.alephium.flow.handler
 import akka.actor.{Props, Stash}
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.RequestId
 import org.alephium.protocol.model._

@@ -16,29 +16,29 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.model.BlockHash
-import org.alephium.util.TimeStamp
+import akka.util.ByteString
 
-trait FlowData {
-  def timestamp: TimeStamp
+import org.alephium.crypto.{Blake3, HashUtils}
+import org.alephium.serde.{RandomBytes, Serde}
 
-  def target: Target
+final case class BlockHash private (value: Blake3) extends AnyVal with RandomBytes {
+  def bytes: ByteString = value.bytes
+}
 
-  def weight: Weight = Weight.from(target)
+object BlockHash extends HashUtils[BlockHash] {
+  implicit val serde: Serde[BlockHash] = Serde.forProduct1(BlockHash.apply, t => t.value)
 
-  def hash: BlockHash
+  val zero: BlockHash = BlockHash(Blake3.zero)
+  val length: Int     = Blake3.length
 
-  def chainIndex: ChainIndex
+  def generate: BlockHash = BlockHash(Blake3.generate)
 
-  def isGenesis: Boolean
+  def from(bytes: ByteString): Option[BlockHash] = {
+    Blake3.from(bytes).map(BlockHash.apply)
+  }
 
-  def blockDeps: BlockDeps
+  def hash(bytes: Seq[Byte]): BlockHash = ???
+  def hash(string: String): BlockHash   = ???
 
-  def parentHash: BlockHash
-
-  def uncleHash(toIndex: GroupIndex): BlockHash
-
-  def shortHex: String = hash.shortHex
-
-  def `type`: String
+  def unsafe(str: ByteString): BlockHash = BlockHash(Blake3.unsafe(str))
 }

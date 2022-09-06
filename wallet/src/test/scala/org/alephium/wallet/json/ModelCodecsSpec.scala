@@ -40,6 +40,7 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
   val balance              = Amount(ALPH.oneAlph)
   val lockedBalance        = Amount(ALPH.alph(2))
   val hash                 = Hash.generate
+  val txId                 = TransactionId.generate
   val password             = "password"
   val walletName           = "wallet-name"
   val mnemonicPassphrase   = "mnemonic-passphrase"
@@ -103,8 +104,8 @@ class ModelCodecsSpec extends AlephiumSpec with ModelCodecs {
 
   it should "TransferResult" in {
     val json =
-      s"""{"txId":"${hash.toHexString}","fromGroup":${group.value},"toGroup":${group.value}}"""
-    val transfer = TransferResult(hash, group, group)
+      s"""{"txId":"${txId.toHexString}","fromGroup":${group.value},"toGroup":${group.value}}"""
+    val transfer = TransferResult(txId, group, group)
     check(transfer, json)
   }
 

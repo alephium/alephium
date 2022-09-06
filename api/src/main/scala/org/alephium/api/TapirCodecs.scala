@@ -23,9 +23,9 @@ import sttp.tapir.CodecFormat.TextPlain
 
 import org.alephium.api.model._
 import org.alephium.json.Json._
-import org.alephium.protocol.{BlockHash, Hash, PublicKey}
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.protocol.model.{Address, BlockHash, GroupIndex, TransactionId}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{TimeStamp, U256}
 
@@ -39,6 +39,9 @@ trait TapirCodecs extends ApiModelCodec {
 
   implicit val blockHashTapirCodec: Codec[String, BlockHash, TextPlain] =
     fromJson[BlockHash]
+
+  implicit val transactionIdCodec: Codec[String, TransactionId, TextPlain] =
+    fromJson[TransactionId]
 
   implicit val assetAddressTapirCodec: Codec[String, Address.Asset, TextPlain] =
     fromJson[Address.Asset]

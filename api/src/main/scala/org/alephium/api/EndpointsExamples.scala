@@ -24,7 +24,15 @@ import sttp.tapir.EndpointIO.Example
 import org.alephium.api.model._
 import org.alephium.protocol._
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{Address, CliqueId, ContractId, NetworkId}
+import org.alephium.protocol.model.{
+  Address,
+  BlockHash,
+  CliqueId,
+  ContractId,
+  NetworkId,
+  TokenId,
+  TransactionId
+}
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util._
@@ -46,7 +54,9 @@ trait EndpointsExamples extends ErrorExamples {
   val address                          = Address.Asset(lockupScript)
   val contractAddress = Address.Contract(
     LockupScript.p2c(
-      Hash.unsafe(Hex.unsafe("109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25"))
+      ContractId(
+        Hash.unsafe(Hex.unsafe("109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25"))
+      )
     )
   )
   private val cliqueId          = CliqueId(publicKey)
@@ -79,14 +89,18 @@ trait EndpointsExamples extends ErrorExamples {
   val byteString   = Hex.unsafe(hexString)
   protected val ts = TimeStamp.unsafe(1611041396892L)
   val txId =
-    Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
+    TransactionId(
+      Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
+    )
   val contractId =
-    Hash.from(Hex.unsafe("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")).get
+    ContractId(
+      Hash.from(Hex.unsafe("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")).get
+    )
   private val tokens = AVector(
-    Token(Hash.hash("token1"), alph(42).value),
-    Token(Hash.hash("token2"), alph(1000).value)
+    Token(TokenId.hash("token1"), alph(42).value),
+    Token(TokenId.hash("token2"), alph(1000).value)
   )
-  private val lockedTokens = AVector(Token(Hash.hash("token3"), alph(65).value))
+  private val lockedTokens = AVector(Token(TokenId.hash("token3"), alph(65).value))
 
   val defaultDestinations = AVector(Destination(address, bigAmount, None, None))
   val moreSettingsDestinations = AVector(
@@ -118,7 +132,7 @@ trait EndpointsExamples extends ErrorExamples {
   )
 
   private val unsignedTx = UnsignedTx(
-    hash,
+    txId,
     1,
     1,
     None,
@@ -190,14 +204,14 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val event = ContractEvent(
     blockHash,
-    contractAddress.lockupScript.contractId,
+    txId,
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
 
   private val eventByTxId = ContractEventByTxId(
     blockHash,
-    Address.contract(txId),
+    Address.contract(contractId),
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
@@ -408,7 +422,7 @@ trait EndpointsExamples extends ErrorExamples {
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,
-        hash,
+        txId,
         fromGroup = 2,
         toGroup = 1
       )
@@ -417,7 +431,7 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
     val sweepAddressTxs = AVector(
-      SweepAddressTransaction(hash, hexString, model.minimalGas, model.defaultGasPrice)
+      SweepAddressTransaction(txId, hexString, model.minimalGas, model.defaultGasPrice)
     )
     simpleExample(BuildSweepAddressTransactionsResult(sweepAddressTxs, fromGroup = 2, toGroup = 1))
   }
@@ -606,7 +620,7 @@ trait EndpointsExamples extends ErrorExamples {
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,
-        txId = hash,
+        txId = txId,
         contractAddress = Address.contract(contractId)
       )
     )
@@ -619,7 +633,7 @@ trait EndpointsExamples extends ErrorExamples {
         unsignedTx = hexString,
         model.minimalGas,
         model.defaultGasPrice,
-        txId = hash
+        txId = txId
       )
     )
 
@@ -628,7 +642,7 @@ trait EndpointsExamples extends ErrorExamples {
 
   private def asset(n: Long) = AssetState.from(
     ALPH.alph(n),
-    AVector(Token(id = Hash.hash(s"token${n}"), amount = ALPH.nanoAlph(n)))
+    AVector(Token(id = TokenId.hash(s"token${n}"), amount = ALPH.nanoAlph(n)))
   )
   private val anotherContractId = ContractId.hash("contract")
   private val code              = StatefulContract.forSMT.toContract().toOption.get

@@ -26,8 +26,7 @@ import akka.actor.Props
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex, FlowData}
+import org.alephium.protocol.model.{Block, BlockHash, BlockHeader, ChainIndex, FlowData}
 import org.alephium.util.{ActorRefT, AVector, Cache, TimeStamp}
 import org.alephium.util.EventStream.Subscriber
 

@@ -27,7 +27,7 @@ import org.alephium.flow.model.{PersistedTxId, ReadyTxInfo}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.validation.NonExistInput
-import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
 import org.alephium.serde.serialize
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, Hex, TimeStamp}
@@ -375,7 +375,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     EventFilter.warning(pattern = ".*already existed.*").intercept {
       txHandler ! addTx(tx)
-      expectMsg(TxHandler.AddFailed(tx.id, s"tx ${tx.id.toHexString} is already included"))
+      expectMsg(
+        TxHandler.AddFailed(tx.id, s"tx ${tx.id.toHexString} is already included")
+      )
       broadcastTxProbe.expectNoMessage()
     }
   }
@@ -396,7 +398,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     EventFilter.warning(pattern = ".*double spending.*").intercept {
       txHandler ! addTx(tx1)
       expectMsg(
-        TxHandler.AddFailed(tx1.id, s"tx ${tx1.id.shortHex} is double spending: ${hex(tx1)}")
+        TxHandler
+          .AddFailed(tx1.id, s"tx ${tx1.id.shortHex} is double spending: ${hex(tx1)}")
       )
       broadcastTxProbe.expectNoMessage()
     }
@@ -412,19 +415,19 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     def sendAnnouncement(
         chainIndex: ChainIndex,
-        hash: Hash,
+        txId: TransactionId,
         haveAnnouncement: Boolean
-    ): (TestProbe, AVector[(ChainIndex, AVector[Hash])]) = {
+    ): (TestProbe, AVector[(ChainIndex, AVector[TransactionId])]) = {
       val brokerHandler = TestProbe()
-      val announcement  = TxHandler.Announcement(ActorRefT(brokerHandler.ref), chainIndex, hash)
-      brokerHandler.send(txHandler, TxHandler.TxAnnouncements(AVector((chainIndex, AVector(hash)))))
-      txHandler.underlyingActor.fetching.states.contains(hash) is true
+      val announcement  = TxHandler.Announcement(ActorRefT(brokerHandler.ref), chainIndex, txId)
+      brokerHandler.send(txHandler, TxHandler.TxAnnouncements(AVector((chainIndex, AVector(txId)))))
+      txHandler.underlyingActor.fetching.states.contains(txId) is true
       txHandler.underlyingActor.announcements.contains(announcement) is haveAnnouncement
-      brokerHandler -> AVector(chainIndex -> AVector(hash))
+      brokerHandler -> AVector(chainIndex -> AVector(txId))
     }
 
     val chain01     = ChainIndex.unsafe(0, 1)
-    val txHash1     = Hash.generate
+    val txHash1     = TransactionId.generate
     val maxCapacity = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
 
     setSynced()
@@ -445,8 +448,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val chain02 = ChainIndex.unsafe(0, 2)
     val chain03 = ChainIndex.unsafe(0, 3)
     val tx2     = transactionGen(chainIndexGen = Gen.const(chain02)).sample.get.toTemplate
-    val txHash3 = Hash.generate
-    val txHash4 = Hash.generate
+    val txHash3 = TransactionId.generate
+    val txHash4 = TransactionId.generate
     val mempool = blockFlow.getMemPool(chain02)
     mempool.contains(chain02, tx2.id) is false
     mempool.addNewTx(chain02, tx2, TimeStamp.now())

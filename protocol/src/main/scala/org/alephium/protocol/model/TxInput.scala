@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.UnlockScript
+import org.alephium.protocol.vm.{LockupScript, UnlockScript}
 import org.alephium.serde._
 import org.alephium.util.Bytes
 
@@ -34,13 +34,13 @@ object TxInput {
 
 trait TxOutputRef {
   def hint: Hint
-  def key: Hash
+  def key: TxOutputRef.Key
 
   def isAssetType: Boolean
   def isContractType: Boolean
 }
 
-final case class AssetOutputRef private (hint: Hint, key: Hash) extends TxOutputRef {
+final case class AssetOutputRef private (hint: Hint, key: TxOutputRef.Key) extends TxOutputRef {
   override def isAssetType: Boolean    = true
   override def isContractType: Boolean = false
 
@@ -56,7 +56,7 @@ final case class AssetOutputRef private (hint: Hint, key: Hash) extends TxOutput
 object AssetOutputRef {
   implicit val serde: Serde[AssetOutputRef] =
     Serde
-      .forProduct2[Hint, Hash, AssetOutputRef](unsafe, t => (t.hint, t.key))
+      .forProduct2[Hint, TxOutputRef.Key, AssetOutputRef](unsafe, t => (t.hint, t.key))
       .validate(outputRef =>
         if (outputRef.hint.isAssetType) {
           Right(())
@@ -65,28 +65,30 @@ object AssetOutputRef {
         }
       )
 
-  def unsafe(hint: Hint, key: Hash): AssetOutputRef = new AssetOutputRef(hint, key)
+  // Hint might not be from script hint
+  def unsafe(hint: Hint, key: TxOutputRef.Key): AssetOutputRef = new AssetOutputRef(hint, key)
 
-  def unsafeWithScriptHint(scriptHint: ScriptHint, key: Hash): AssetOutputRef =
+  def from(scriptHint: ScriptHint, key: TxOutputRef.Key): AssetOutputRef =
     unsafe(Hint.ofAsset(scriptHint), key)
 
-  def from(output: AssetOutput, key: Hash): AssetOutputRef = unsafe(output.hint, key)
+  def from(output: AssetOutput, key: TxOutputRef.Key): AssetOutputRef =
+    new AssetOutputRef(output.hint, key)
 
   // Only use this to initialize Merkle tree of ouptuts
   def forSMT: AssetOutputRef = {
     val hint = Hint.ofAsset(ScriptHint.fromHash(0))
-    unsafe(hint, Hash.zero)
+    unsafe(hint, TxOutputRef.unsafeKey(Hash.zero))
   }
 }
 
-final case class ContractOutputRef private (hint: Hint, key: Hash) extends TxOutputRef {
+final case class ContractOutputRef private (hint: Hint, key: TxOutputRef.Key) extends TxOutputRef {
   override def isAssetType: Boolean    = false
   override def isContractType: Boolean = true
 }
 object ContractOutputRef {
   implicit val serde: Serde[ContractOutputRef] =
     Serde
-      .forProduct2[Hint, Hash, ContractOutputRef](unsafe, t => (t.hint, t.key))
+      .forProduct2[Hint, TxOutputRef.Key, ContractOutputRef](unsafe, t => (t.hint, t.key))
       .validate(outputRef =>
         if (outputRef.hint.isContractType) {
           Right(())
@@ -95,38 +97,60 @@ object ContractOutputRef {
         }
       )
 
-  def unsafe(hint: Hint, key: Hash): ContractOutputRef = new ContractOutputRef(hint, key)
+  def firstOutput(contractId: ContractId): ContractOutputRef = {
+    val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
+    new ContractOutputRef(outputHint, TxOutputRef.firstContractOutputKey(contractId))
+  }
 
-  def unsafe(txId: Hash, contractOutput: ContractOutput, outputIndex: Int): ContractOutputRef = {
+  // Hint might not be from contract hint
+  def unsafe(hint: Hint, key: TxOutputRef.Key): ContractOutputRef = new ContractOutputRef(hint, key)
+
+  def from(
+      txId: TransactionId,
+      contractOutput: ContractOutput,
+      outputIndex: Int
+  ): ContractOutputRef = {
     val refKey = TxOutputRef.key(txId, outputIndex)
-    unsafe(contractOutput.hint, refKey)
+    new ContractOutputRef(contractOutput.hint, refKey)
   }
 
   // Only use this to initialize Merkle tree of ouptuts
   def forSMT: ContractOutputRef = {
     val hint = Hint.ofContract(ScriptHint.fromHash(0))
-    unsafe(hint, Hash.zero)
+    unsafe(hint, TxOutputRef.unsafeKey(Hash.zero))
   }
 }
 
 object TxOutputRef {
-  implicit val serde: Serde[TxOutputRef] =
-    Serde.forProduct2[Hint, Hash, TxOutputRef](TxOutputRef.from, t => (t.hint, t.key))
+  class Key(val value: Hash) extends AnyVal
+  implicit val keySerde: Serde[Key] = serdeImpl[Hash].xmap(new Key(_), _.value)
 
-  def from(hint: Hint, key: Hash): TxOutputRef = {
+  @inline def key(txId: TransactionId, outputIndex: Int): Key = {
+    new Key(Hash.hash(txId.bytes ++ Bytes.from(outputIndex)))
+  }
+  @inline def firstContractOutputKey(contractId: ContractId): Key = {
+    new Key(contractId.value)
+  }
+  // The hash might not be calculated from (txId, outputIndex) pair
+  @inline def unsafeKey(hash: Hash): Key = new Key(hash)
+
+  implicit val serde: Serde[TxOutputRef] =
+    Serde.forProduct2[Hint, Key, TxOutputRef](TxOutputRef.from, t => (t.hint, t.key))
+
+  def from(hint: Hint, key: Key): TxOutputRef = {
     if (hint.isAssetType) AssetOutputRef.unsafe(hint, key) else ContractOutputRef.unsafe(hint, key)
   }
 
-  def key(txId: Hash, outputIndex: Int): Hash = {
-    Hash.hash(txId.bytes ++ Bytes.from(outputIndex))
-  }
-
+  // The output index might not be valid
   def unsafe(transaction: Transaction, outputIndex: Int): TxOutputRef = {
-    val refKey = key(transaction.id, outputIndex)
-    from(transaction.getOutput(outputIndex), refKey)
+    from(transaction.id, outputIndex, transaction.getOutput(outputIndex))
   }
 
-  def from(output: TxOutput, key: Hash): TxOutputRef = {
+  def from(txId: TransactionId, outputIndex: Int, output: TxOutput): TxOutputRef = {
+    from(output.hint, key(txId, outputIndex))
+  }
+
+  def from(output: TxOutput, key: Key): TxOutputRef = {
     from(output.hint, key)
   }
 }

@@ -14,19 +14,35 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.flow.model
+package org.alephium.protocol.model
 
+import org.alephium.crypto.Blake3
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, Target, Transaction}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.AlephiumSpec
 
-final case class BlockFlowTemplate(
-    index: ChainIndex,
-    deps: AVector[BlockHash],
-    depStateHash: Hash,
-    target: Target,
-    templateTs: TimeStamp,
-    transactions: AVector[Transaction]
-) {
-  lazy val txsHash = Block.calTxsHash(transactions)
+class IdsSpec extends AlephiumSpec {
+  it should "check equality for general hashes" in {
+    val hash0 = Hash.hash("hello")
+    val hash1 = Hash.hash("hello")
+    val hash2 = Hash.hash("world")
+
+    def test[T](f: Hash => T) = {
+      f(hash0) is f(hash1)
+      f(hash0) isnot f(hash2)
+    }
+
+    test(identity)
+    test(TransactionId.apply)
+    test(ContractId.apply)
+    test(TokenId.apply)
+  }
+
+  it should "check equality for blake hash" in {
+    val hash0 = Blake3.hash("hello")
+    val hash1 = Blake3.hash("hello")
+    val hash2 = Blake3.hash("world")
+
+    BlockHash(hash0) is BlockHash(hash1)
+    BlockHash(hash0) isnot BlockHash(hash2)
+  }
 }

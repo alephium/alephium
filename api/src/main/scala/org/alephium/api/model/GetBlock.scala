@@ -16,6 +16,6 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.BlockHash
 
 final case class GetBlock(hash: BlockHash)

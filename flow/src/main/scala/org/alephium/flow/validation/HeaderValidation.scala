@@ -17,7 +17,7 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.{ALPH, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._

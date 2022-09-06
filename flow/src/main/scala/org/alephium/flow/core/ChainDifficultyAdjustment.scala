@@ -20,9 +20,9 @@ import java.math.BigInteger
 
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.{ALPH, BlockHash}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.model.Target
+import org.alephium.protocol.model.{BlockHash, Target}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait ChainDifficultyAdjustment {

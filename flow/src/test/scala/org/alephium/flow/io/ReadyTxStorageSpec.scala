@@ -20,8 +20,8 @@ import org.alephium.flow.model.ReadyTxInfo
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.RocksDBSource
 import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.protocol.{Generators, Hash}
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.Generators
+import org.alephium.protocol.model.{ChainIndex, TransactionId}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class ReadyTxStorageSpec
@@ -34,14 +34,14 @@ class ReadyTxStorageSpec
     source => ReadyTxRocksDBStorage(source, ColumnFamily.PendingTx)
 
   it should "exists/put/get/remove for tx id" in new Generators {
-    forAll(hashGen, chainIndexGen) { (hash, chainIndex) =>
+    forAll(txIdGen, chainIndexGen) { (txId, chainIndex) =>
       val readyTxInfo = ReadyTxInfo(chainIndex, TimeStamp.now())
-      storage.exists(hash) isE false
-      storage.put(hash, readyTxInfo) isE ()
-      storage.exists(hash) isE true
-      storage.get(hash) isE readyTxInfo
-      storage.delete(hash) isE ()
-      storage.exists(hash) isE false
+      storage.exists(txId) isE false
+      storage.put(txId, readyTxInfo) isE ()
+      storage.exists(txId) isE true
+      storage.get(txId) isE readyTxInfo
+      storage.delete(txId) isE ()
+      storage.exists(txId) isE false
     }
   }
 
@@ -50,19 +50,19 @@ class ReadyTxStorageSpec
     val entrySize  = 30
     val currentTs  = TimeStamp.now()
 
-    def genEntries(): AVector[(Hash, ReadyTxInfo)] = {
+    def genEntries(): AVector[(TransactionId, ReadyTxInfo)] = {
       AVector.fill(entrySize) {
-        val hash        = Hash.generate
+        val txId        = TransactionId.generate
         val readyTxInfo = ReadyTxInfo(chainIndex, currentTs)
-        hash -> readyTxInfo
+        txId -> readyTxInfo
       }
     }
   }
 
   it should "works for remove/put when iterate" in new Fixture {
     val entries0 = genEntries().toIterable.toMap
-    entries0.foreach { case (hash, info) =>
-      storage.put(hash, info) isE ()
+    entries0.foreach { case (txId, info) =>
+      storage.put(txId, info) isE ()
     }
     val entries1 = genEntries()
     var index    = 0

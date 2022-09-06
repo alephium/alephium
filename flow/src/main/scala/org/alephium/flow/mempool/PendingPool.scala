@@ -21,7 +21,6 @@ import scala.collection.mutable
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -29,8 +28,8 @@ import org.alephium.util._
 
 class PendingPool(
     groupIndex: GroupIndex,
-    val txs: mutable.HashMap[Hash, TransactionTemplate],
-    val timestamps: ValueSortedMap[Hash, TimeStamp],
+    val txs: mutable.HashMap[TransactionId, TransactionTemplate],
+    val timestamps: ValueSortedMap[TransactionId, TimeStamp],
     val indexes: TxIndexes,
     capacity: Int
 ) extends RWLock {
@@ -40,7 +39,7 @@ class PendingPool(
 
   def isFull(): Boolean = txs.size >= capacity
 
-  def contains(txId: Hash): Boolean = readOnly {
+  def contains(txId: TransactionId): Boolean = readOnly {
     txs.contains(txId)
   }
 

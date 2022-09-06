@@ -17,9 +17,13 @@
 package org.alephium.flow.handler
 
 import org.alephium.flow.AlephiumFlowActorSpec
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BrokerGroupInfo, ChainIndex, NoIndexModelGeneratorsLike}
+import org.alephium.protocol.model.{
+  BlockHash,
+  BrokerGroupInfo,
+  ChainIndex,
+  NoIndexModelGeneratorsLike
+}
 import org.alephium.util.AVector
 
 class FlowHandlerSpec extends AlephiumFlowActorSpec with NoIndexModelGeneratorsLike {

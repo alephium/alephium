@@ -18,9 +18,10 @@ package org.alephium.protocol.model
 
 import scala.annotation.tailrec
 
-import org.alephium.protocol.{ALPH, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
+import org.alephium.protocol.model.BlockHash
 import org.alephium.serde.{u256Serde => _, _}
 import org.alephium.util.{AVector, TimeStamp, U256}
 

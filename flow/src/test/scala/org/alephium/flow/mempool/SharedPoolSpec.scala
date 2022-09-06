@@ -17,7 +17,6 @@
 package org.alephium.flow.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{AVector, LockFixture, TimeStamp, U256}
@@ -86,7 +85,7 @@ class SharedPoolSpec
 
   it should "use read lock for getting" in new Fixture {
     pool.add(txTemplates, now)
-    val txIds = block.transactions.map(_.id) :+ Hash.generate
+    val txIds = block.transactions.map(_.id) :+ TransactionId.generate
     checkReadLock(rwl)(AVector.empty, pool.getTxs(txIds), txTemplates)
     checkReadLock(rwl)(AVector.empty, pool.getTxs(block.transactions.map(_.id)), txTemplates)
   }

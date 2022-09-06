@@ -294,8 +294,8 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "build transaction successfully with tokens" in new UnsignedTransactionFixture {
-    val tokenId1 = Hash.hash("tokenId1")
-    val tokenId2 = Hash.hash("tokenId2")
+    val tokenId1 = TokenId.hash("tokenId1")
+    val tokenId2 = TokenId.hash("tokenId2")
 
     val inputs = {
       val input1 = input("input1", ALPH.oneAlph, fromLockupScript, (tokenId2, U256.unsafe(10)))
@@ -336,8 +336,8 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "fail when output has token that doesn't exist in input" in new UnsignedTransactionFixture {
-    val tokenId1 = Hash.hash("tokenId1")
-    val tokenId2 = Hash.hash("tokenId2")
+    val tokenId1 = TokenId.hash("tokenId1")
+    val tokenId2 = TokenId.hash("tokenId2")
 
     val inputs = {
       val input1 = input("input1", ALPH.oneAlph, fromLockupScript, (tokenId2, U256.unsafe(10)))
@@ -363,8 +363,8 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "fail without enough tokens" in new UnsignedTransactionFixture {
-    val tokenId1 = Hash.hash("tokenId1")
-    val tokenId2 = Hash.hash("tokenId2")
+    val tokenId1 = TokenId.hash("tokenId1")
+    val tokenId2 = TokenId.hash("tokenId2")
 
     val inputs = {
       val input1 = input("input1", ALPH.oneAlph, fromLockupScript, (tokenId2, U256.unsafe(10)))
@@ -392,8 +392,8 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "fail when outputs doesn't have minimal amount of Alph" in new UnsignedTransactionFixture {
     {
       info("with tokens")
-      val tokenId1 = Hash.hash("tokenId1")
-      val tokenId2 = Hash.hash("tokenId2")
+      val tokenId1 = TokenId.hash("tokenId1")
+      val tokenId2 = TokenId.hash("tokenId2")
 
       val inputs = {
         val input1 = input("input1", ALPH.oneAlph, fromLockupScript, (tokenId2, U256.unsafe(10)))
@@ -450,8 +450,8 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "fail when change output doesn't have minimal amount of Alph" in new UnsignedTransactionFixture {
     {
       info("with tokens")
-      val tokenId1 = Hash.hash("tokenId1")
-      val tokenId2 = Hash.hash("tokenId2")
+      val tokenId1 = TokenId.hash("tokenId1")
+      val tokenId2 = TokenId.hash("tokenId2")
 
       val inputs = {
         val input1Amount = defaultGasFee.addUnsafe(minimalAttoAlphAmountPerTxOutput(1)).subUnsafe(1)
@@ -537,7 +537,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val inputs = AVector(input("input", ALPH.alph(3), fromLockupScript))
     val outputs = {
       val tokens = AVector.tabulate(maxTokenPerUtxo + 1) { i =>
-        val tokenId = Hash.hash(s"tokenId$i")
+        val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
 
@@ -558,8 +558,8 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "fail when there are tokens with zero value in the transaction output" in new UnsignedTransactionFixture {
-    val tokenId1 = Hash.hash("tokenId1")
-    val tokenId2 = Hash.hash("tokenId2")
+    val tokenId1 = TokenId.hash("tokenId1")
+    val tokenId2 = TokenId.hash("tokenId2")
     val inputs = AVector(
       input("input", ALPH.alph(3), fromLockupScript, (tokenId1, U256.Zero), (tokenId2, U256.Two))
     )
@@ -669,7 +669,7 @@ class TxUtilsSpec extends AlephiumSpec {
     {
       info("token amount not more than `maxTokenPerUtxo`")
       val tokens = AVector.tabulate(maxTokenPerUtxo) { i =>
-        val tokenId = Hash.hash(s"tokenId$i")
+        val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
 
@@ -682,7 +682,7 @@ class TxUtilsSpec extends AlephiumSpec {
     {
       info("token amount more than `maxTokenPerUtxo`")
       val tokens = AVector.tabulate(maxTokenPerUtxo + 1) { i =>
-        val tokenId = Hash.hash(s"tokenId$i")
+        val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
 
@@ -704,7 +704,7 @@ class TxUtilsSpec extends AlephiumSpec {
     {
       info("token amount a bit more than two times of `maxTokenPerUtxo`")
       val tokens = AVector.tabulate(2 * maxTokenPerUtxo + 1) { i =>
-        val tokenId = Hash.hash(s"tokenId$i")
+        val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
 
@@ -727,7 +727,7 @@ class TxUtilsSpec extends AlephiumSpec {
     {
       info("token amount three times of `maxTokenPerUtxo`")
       val tokens = AVector.tabulate(3 * maxTokenPerUtxo) { i =>
-        val tokenId = Hash.hash(s"tokenId$i")
+        val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
 
@@ -754,7 +754,7 @@ class TxUtilsSpec extends AlephiumSpec {
         .addUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
 
       val tokens = AVector.tabulate(3 * maxTokenPerUtxo - 1) { i =>
-        val tokenId = Hash.hash(s"tokenId$i")
+        val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
 
@@ -979,7 +979,8 @@ class TxUtilsSpec extends AlephiumSpec {
       lockupScript: LockupScript.Asset,
       tokens: (TokenId, U256)*
   ): (AssetOutputRef, AssetOutput) = {
-    val ref = AssetOutputRef.unsafeWithScriptHint(new ScriptHint(0), Hash.hash(name))
+    val ref =
+      AssetOutputRef.from(new ScriptHint(0), TxOutputRef.unsafeKey(Hash.hash(name)))
     val output = AssetOutput(
       amount,
       lockupScript,

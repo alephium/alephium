@@ -17,7 +17,7 @@
 package org.alephium.flow.validation
 
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm._
 import org.alephium.util.AVector
 

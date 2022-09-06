@@ -27,8 +27,8 @@ import org.alephium.util._
  */
 class SharedPool private (
     val chainIndex: ChainIndex,
-    val txs: ValueSortedMap[Hash, TransactionTemplate],
-    val timestamps: ValueSortedMap[Hash, TimeStamp],
+    val txs: ValueSortedMap[TransactionId, TransactionTemplate],
+    val timestamps: ValueSortedMap[TransactionId, TimeStamp],
     val sharedTxIndex: TxIndexes,
     val capacity: Int
 ) extends RWLock {
@@ -37,11 +37,11 @@ class SharedPool private (
 
   def size: Int = readOnly(txs.size)
 
-  def contains(txId: Hash): Boolean = readOnly {
+  def contains(txId: TransactionId): Boolean = readOnly {
     txs.contains(txId)
   }
 
-  def getTxs(txIds: AVector[Hash]): AVector[TransactionTemplate] = readOnly {
+  def getTxs(txIds: AVector[TransactionId]): AVector[TransactionTemplate] = readOnly {
     txIds.fold(AVector.empty[TransactionTemplate]) { (acc, txId) =>
       txs.get(txId) match {
         case Some(tx) => acc :+ tx
@@ -102,7 +102,7 @@ class SharedPool private (
     sizeBefore - sizeAfter
   }
 
-  def _remove(txId: Hash): Unit = {
+  def _remove(txId: TransactionId): Unit = {
     txs.remove(txId).foreach { tx =>
       timestamps.remove(txId)
       sharedTxIndex.remove(tx)
@@ -153,5 +153,5 @@ object SharedPool {
     )
 
   implicit val txOrdering: Ordering[TransactionTemplate] =
-    Ordering.by[TransactionTemplate, (U256, Hash)](tx => (tx.unsigned.gasPrice.value, tx.id))
+    Ordering.by[TransactionTemplate, (U256, Hash)](tx => (tx.unsigned.gasPrice.value, tx.id.value))
 }

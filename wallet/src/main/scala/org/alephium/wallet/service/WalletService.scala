@@ -33,9 +33,9 @@ import org.alephium.api.ApiError
 import org.alephium.api.model.{Amount, Destination, SweepAddressTransaction}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.{Hash, Signature, SignatureSchema}
+import org.alephium.protocol.{Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Address, GroupIndex}
+import org.alephium.protocol.model.{Address, GroupIndex, TransactionId}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{discard, AVector, Duration, FutureCollection, Hex, Service, TimeStamp}
 import org.alephium.wallet.Constants
@@ -84,7 +84,7 @@ trait WalletService extends Service {
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       utxosLimit: Option[Int]
-  ): Future[Either[WalletError, (Hash, GroupIndex, GroupIndex)]]
+  ): Future[Either[WalletError, (TransactionId, GroupIndex, GroupIndex)]]
   def sweepActiveAddress(
       wallet: String,
       address: Address.Asset,
@@ -92,7 +92,7 @@ trait WalletService extends Service {
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       utxosLimit: Option[Int]
-  ): Future[Either[WalletError, AVector[(Hash, GroupIndex, GroupIndex)]]]
+  ): Future[Either[WalletError, AVector[(TransactionId, GroupIndex, GroupIndex)]]]
   def sweepAllAddresses(
       wallet: String,
       address: Address.Asset,
@@ -100,7 +100,7 @@ trait WalletService extends Service {
       gas: Option[GasBox],
       gasPrice: Option[GasPrice],
       utxosLimit: Option[Int]
-  ): Future[Either[WalletError, AVector[(Hash, GroupIndex, GroupIndex)]]]
+  ): Future[Either[WalletError, AVector[(TransactionId, GroupIndex, GroupIndex)]]]
   def sign(
       wallet: String,
       data: String
@@ -384,7 +384,7 @@ object WalletService {
         gas: Option[GasBox],
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, (Hash, GroupIndex, GroupIndex)]] = {
+    ): Future[Either[WalletError, (TransactionId, GroupIndex, GroupIndex)]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         val pubKey = privateKey.publicKey
         blockFlowClient
@@ -412,7 +412,7 @@ object WalletService {
         gas: Option[GasBox],
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, AVector[(Hash, GroupIndex, GroupIndex)]]] = {
+    ): Future[Either[WalletError, AVector[(TransactionId, GroupIndex, GroupIndex)]]] = {
       withPrivateKeyFut(wallet) { privateKey =>
         sweepAddress(privateKey, address, lockTime, gas, gasPrice, utxosLimit)
       }
@@ -425,9 +425,9 @@ object WalletService {
         gas: Option[GasBox],
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, AVector[(Hash, GroupIndex, GroupIndex)]]] = {
+    ): Future[Either[WalletError, AVector[(TransactionId, GroupIndex, GroupIndex)]]] = {
       withPrivateKeysFut(wallet) { case (_, privateKeys) =>
-        val init = AVector.empty[(Hash, GroupIndex, GroupIndex)]
+        val init = AVector.empty[(TransactionId, GroupIndex, GroupIndex)]
         FutureCollection.foldSequentialE(privateKeys)(init) { case (txs, privKey) =>
           sweepAddress(privKey, address, lockTime, gas, gasPrice, utxosLimit)
             .map(_.map(_ ++ txs))
@@ -442,7 +442,7 @@ object WalletService {
         gas: Option[GasBox],
         gasPrice: Option[GasPrice],
         utxosLimit: Option[Int]
-    ): Future[Either[WalletError, AVector[(Hash, GroupIndex, GroupIndex)]]] = {
+    ): Future[Either[WalletError, AVector[(TransactionId, GroupIndex, GroupIndex)]]] = {
       blockFlowClient
         .prepareSweepActiveAddressTransaction(
           privateKey.publicKey,
@@ -456,7 +456,7 @@ object WalletService {
           case Left(error) => Future.successful(Left(BlockFlowClientError(error)))
           case Right(buildSweepAllTxResult) =>
             FutureCollection
-              .foldSequentialE(buildSweepAllTxResult.unsignedTxs)(AVector.empty[Hash]) {
+              .foldSequentialE(buildSweepAllTxResult.unsignedTxs)(AVector.empty[TransactionId]) {
                 case (txIds, SweepAddressTransaction(txId, unsignedTx, _, _)) => {
                   val signature = SignatureSchema.sign(txId.bytes, privateKey.privateKey)
                   blockFlowClient

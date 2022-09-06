@@ -22,10 +22,9 @@ import org.alephium.flow.handler.FlowHandler
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{BlocksRequest, HeadersRequest, NewInv}
-import org.alephium.protocol.model.{BrokerGroupInfo, BrokerInfo, CliqueInfo}
+import org.alephium.protocol.model.{BlockHash, BrokerGroupInfo, BrokerInfo, CliqueInfo}
 import org.alephium.util.{ActorRefT, AVector, Duration}
 
 trait BrokerHandler extends BaseBrokerHandler {
@@ -52,7 +51,9 @@ trait BrokerHandler extends BaseBrokerHandler {
       case FlowHandler.SyncInventories(None, inventories) =>
         send(NewInv(inventories))
       case BaseBrokerHandler.Received(NewInv(hashes)) =>
-        log.debug(s"Received new inv ${Utils.showFlow(hashes)} from intra clique broker")
+        log.debug(
+          s"Received new inv ${Utils.showFlow(hashes)} from intra clique broker"
+        )
         handleInv(hashes)
       case BrokerHandler.IntraSync =>
         allHandlers.flowHandler ! FlowHandler.GetIntraSyncInventories

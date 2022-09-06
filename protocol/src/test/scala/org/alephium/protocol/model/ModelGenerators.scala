@@ -83,7 +83,9 @@ trait LockupScriptGenerators extends Generators {
       .retryUntil { hash =>
         ScriptHint.fromHash(hash).groupIndex.equals(groupIndex)
       }
-      .map(LockupScript.p2c)
+      .map { hash =>
+        LockupScript.p2c(ContractId(hash))
+      }
   }
 
   def lockupGen(groupIndex: GroupIndex): Gen[LockupScript] = {
@@ -166,14 +168,14 @@ trait TxInputGenerators extends Generators {
     for {
       scriptHint <- scriptHintGen(groupIndex)
       hash       <- hashGen
-    } yield AssetOutputRef.unsafe(Hint.ofAsset(scriptHint), hash)
+    } yield AssetOutputRef.unsafe(Hint.ofAsset(scriptHint), TxOutputRef.unsafeKey(hash))
   }
 
   def contractOutputRefGen(groupIndex: GroupIndex): Gen[ContractOutputRef] = {
     for {
       scriptHint <- scriptHintGen(groupIndex)
       hash       <- hashGen
-    } yield ContractOutputRef.unsafe(Hint.ofContract(scriptHint), hash)
+    } yield ContractOutputRef.unsafe(Hint.ofContract(scriptHint), TxOutputRef.unsafeKey(hash))
   }
 
   lazy val txInputGen: Gen[TxInput] =
@@ -187,7 +189,7 @@ trait TxInputGenerators extends Generators {
       scriptHint <- scriptHintGen(groupIndex)
       hash       <- hashGen
     } yield {
-      val outputRef = AssetOutputRef.unsafeWithScriptHint(scriptHint, hash)
+      val outputRef = AssetOutputRef.from(scriptHint, TxOutputRef.unsafeKey(hash))
       TxInput(outputRef, UnlockScript.p2pkh(PublicKey.generate))
     }
 
@@ -214,9 +216,9 @@ trait TokenGenerators extends Generators with NumericHelpers {
 
   def tokenGen(inputNum: Int): Gen[(TokenId, U256)] =
     for {
-      tokenId <- hashGen
-      amount  <- amountGen(inputNum)
-    } yield (tokenId, amount)
+      tokenIdValue <- hashGen
+      amount       <- amountGen(inputNum)
+    } yield (TokenId(tokenIdValue), amount)
 
   def tokensGen(inputNum: Int, tokensNumGen: Gen[Int]): Gen[Map[TokenId, U256]] =
     for {
@@ -311,11 +313,12 @@ trait TxGenerators
       ScriptPair(lockup, unlock, privateKey) <- scriptGen
       lockTime                               <- lockTimeGen
       data                                   <- dataGen
-      outputHash                             <- hashGen
+      outputKey                              <- hashGen
     } yield {
       val assetOutput =
         AssetOutput(balances.attoAlphAmount, lockup, lockTime, AVector.from(balances.tokens), data)
-      val txInput = TxInput(AssetOutputRef.unsafe(assetOutput.hint, outputHash), unlock)
+      val txInput =
+        TxInput(AssetOutputRef.unsafe(assetOutput.hint, TxOutputRef.unsafeKey(outputKey)), unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
 
@@ -404,7 +407,7 @@ trait TxGenerators
       )
       unsignedTx <- unsignedTxGen(chainIndex)(Gen.const(assetInfos), lockupGen)
       signatures =
-        assetInfos.map(info => SignatureSchema.sign(unsignedTx.hash.bytes, info.privateKey))
+        assetInfos.map(info => SignatureSchema.sign(unsignedTx.id, info.privateKey))
     } yield {
       val tx = Transaction.from(unsignedTx, signatures)
       tx -> assetInfos
@@ -537,16 +540,18 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
   def chainGenOf(length: Int): Gen[AVector[Block]] =
     chainIndexGen.flatMap(chainGenOf(_, length))
 
-  def generateContract()
-      : Gen[(StatefulContract.HalfDecoded, AVector[Val], ContractOutputRef, ContractOutput)] = {
+  type GeneratedContract =
+    (ContractId, StatefulContract.HalfDecoded, AVector[Val], ContractOutputRef, ContractOutput)
+  def generateContract(): Gen[GeneratedContract] = {
     lazy val counterStateGen: Gen[AVector[Val]] =
       Gen.choose(0L, Long.MaxValue / 1000).map(n => AVector(Val.U256(U256.unsafe(n))))
     for {
       groupIndex    <- groupIndexGen
+      hash          <- hashGen
       outputRef     <- contractOutputRefGen(groupIndex)
       output        <- contractOutputGen(scriptGen = p2cLockupGen(groupIndex))
       contractState <- counterStateGen
-    } yield (counterContract.toHalfDecoded(), contractState, outputRef, output)
+    } yield (ContractId(hash), counterContract.toHalfDecoded(), contractState, outputRef, output)
   }
 }
 

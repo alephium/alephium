@@ -16,7 +16,7 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.model.TokenId
 import org.alephium.util.U256
 
-final case class Token(id: Hash, amount: U256)
+final case class Token(id: TokenId, amount: U256)

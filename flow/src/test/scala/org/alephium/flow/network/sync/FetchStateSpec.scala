@@ -16,7 +16,7 @@
 
 package org.alephium.flow.network.sync
 
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}
 
 class FetchStateSpec extends AlephiumSpec {

@@ -29,24 +29,31 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.{InvalidHeaderStatus, Validation}
 import org.alephium.io.IOResult
-import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{Block, BrokerInfo, ChainIndex, FlowData}
+import org.alephium.protocol.model.{
+  Block,
+  BlockHash,
+  BrokerInfo,
+  ChainIndex,
+  FlowData,
+  TransactionId
+}
 import org.alephium.util._
 
 object BrokerHandler {
   sealed trait Command
-  case object HandShakeTimeout                                               extends Command
-  final case class Send(data: ByteString)                                    extends Command
-  final case class Received(payload: Payload)                                extends Command
-  case object SendPing                                                       extends Command
-  final case class SyncLocators(hashes: AVector[AVector[BlockHash]])         extends Command
-  final case class DownloadHeaders(fromHashes: AVector[BlockHash])           extends Command
-  final case class DownloadBlocks(hashes: AVector[BlockHash])                extends Command
-  final case class RelayBlock(hash: BlockHash)                               extends Command
-  final case class RelayTxs(hashes: AVector[(ChainIndex, AVector[Hash])])    extends Command
-  final case class DownloadTxs(hashes: AVector[(ChainIndex, AVector[Hash])]) extends Command
+  case object HandShakeTimeout                                                  extends Command
+  final case class Send(data: ByteString)                                       extends Command
+  final case class Received(payload: Payload)                                   extends Command
+  case object SendPing                                                          extends Command
+  final case class SyncLocators(hashes: AVector[AVector[BlockHash]])            extends Command
+  final case class DownloadHeaders(fromHashes: AVector[BlockHash])              extends Command
+  final case class DownloadBlocks(hashes: AVector[BlockHash])                   extends Command
+  final case class RelayBlock(hash: BlockHash)                                  extends Command
+  final case class RelayTxs(txs: AVector[(ChainIndex, AVector[TransactionId])]) extends Command
+  final case class DownloadTxs(hashes: AVector[(ChainIndex, AVector[TransactionId])])
+      extends Command
 
   final case class ConnectionInfo(remoteAddress: InetSocketAddress, lcoalAddress: InetSocketAddress)
 }

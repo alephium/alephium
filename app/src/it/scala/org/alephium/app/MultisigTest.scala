@@ -179,7 +179,7 @@ class MultisigTest extends AlephiumActorSpec {
       deserialize[UnsignedTransaction](Hex.from(buildTxResult.unsignedTx).get).rightValue
 
     val signature1: Signature = SignatureSchema.sign(
-      unsignedTx.hash.bytes,
+      unsignedTx.id,
       PrivateKey.unsafe(Hex.unsafe(privateKey))
     )
 

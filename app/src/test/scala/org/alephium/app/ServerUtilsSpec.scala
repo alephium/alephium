@@ -58,7 +58,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture with ApiConfigFixture {
     implicit def flowImplicit: BlockFlow = blockFlow
 
-    def emptyKey(index: Int): Hash = TxOutputRef.key(Hash.zero, index)
+    def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
   }
 
   trait FlowFixtureWithApi extends FlowFixture with ApiConfigFixture
@@ -727,7 +727,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "not create transaction when with token amount overflow" in new MultipleUtxos {
-    val tokenId = Hash.hash("token1")
+    val tokenId = TokenId.hash("token1")
     val tokenAmountOverflowDestinations = AVector(
       destination1.copy(tokens = Some(AVector(Token(tokenId, U256.MaxValue)))),
       destination2.copy(tokens = Some(AVector(Token(tokenId, U256.One))))
@@ -881,9 +881,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       val contract = Compiler.compileContract(code).rightValue
       val script =
         contractCreation(contract, fields, lockupScript, minimalAlphInContract)
-      val block     = executeScript(script)
-      val outputRef = TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
-      (block, outputRef.key)
+      val block      = executeScript(script)
+      val contractId = ContractId.from(block.transactions.head.id, 0)
+      (block, contractId)
     }
 
     val barCode =
@@ -1018,10 +1018,9 @@ class ServerUtilsSpec extends AlephiumSpec {
          |$foo
          |""".stripMargin
 
-    val barContract   = Compiler.compileContract(bar).rightValue
-    val barContractId = Hash.random
-    val destroyedFooContractId =
-      Hash.doubleHash(barContractId.bytes ++ Hex.unsafe(destroyContractPath))
+    val barContract            = Compiler.compileContract(bar).rightValue
+    val barContractId          = ContractId.random
+    val destroyedFooContractId = barContractId.subContractId(Hex.unsafe(destroyContractPath))
     val existingContract = ContractState(
       Address.contract(destroyedFooContractId),
       fooContract,
@@ -1038,10 +1037,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
     )
 
-    val testFlow    = BlockFlow.emptyUnsafe(config)
-    val serverUtils = new ServerUtils()
-    val createdFooContractId =
-      Hash.doubleHash(barContractId.bytes ++ Hex.unsafe(createContractPath))
+    val testFlow             = BlockFlow.emptyUnsafe(config)
+    val serverUtils          = new ServerUtils()
+    val createdFooContractId = barContractId.subContractId(Hex.unsafe(createContractPath))
 
     val result =
       serverUtils.runTestContract(testFlow, testContractParams.toComplete().rightValue).rightValue
@@ -1057,7 +1055,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (_, pubKey)  = SignatureSchema.generatePriPub()
     val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
 
-    val fooContractId = Hash.random
+    val fooContractId = ContractId.random
     val foo =
       s"""
          |Contract Foo() {
@@ -1069,7 +1067,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
     val fooContract = Compiler.compileContract(foo).rightValue
 
-    val fooCallerContractId = Hash.random
+    val fooCallerContractId = ContractId.random
     def fooCaller: String
     val fooCallerContract = Compiler.compileContract(fooCaller).rightValue
 
@@ -1085,7 +1083,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
 
     val barContract   = Compiler.compileContract(bar).rightValue
-    val barContractId = Hash.random
+    val barContractId = ContractId.random
     val existingContracts = AVector(
       ContractState(
         Address.contract(fooCallerContractId),
@@ -1154,7 +1152,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |Contract FooCaller(fooId: ByteVec) {
          |  pub fn destroyFoo() -> () {
          |    let foo = Foo(fooId)
-         |    foo.destroy(@${Address.contract(Hash.random).toBase58})
+         |    foo.destroy(@${Address.contract(ContractId.random).toBase58})
          |  }
          |}
          |
@@ -1171,7 +1169,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait TestContractFixture extends Fixture {
-    val tokenId         = Hash.random
+    val tokenId         = TokenId.random
     val (_, pubKey)     = SignatureSchema.generatePriPub()
     val lp              = Address.Asset(LockupScript.p2pkh(pubKey))
     val buyer           = lp
@@ -1281,8 +1279,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       contractId = testContractId1,
       code = AMMContract.swapProxyCode,
       originalCodeHash = AMMContract.swapProxyCode.hash,
-      initialFields =
-        AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
+      initialFields = AVector[Val](
+        ValByteVec(testContract0.contractId.bytes),
+        ValByteVec(tokenId.bytes)
+      ),
       initialAsset = AssetState(ALPH.alph(1)),
       testMethodIndex = 0,
       testArgs = AVector[Val](ValAddress(lp), ValU256(ALPH.alph(100)), ValU256(100)),
@@ -1372,8 +1372,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       contractId = testContractId1,
       code = AMMContract.swapProxyCode,
       originalCodeHash = AMMContract.swapProxyCode.hash,
-      initialFields =
-        AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
+      initialFields = AVector[Val](
+        ValByteVec(testContract0.contractId.bytes),
+        ValByteVec(tokenId.bytes)
+      ),
       initialAsset = AssetState(ALPH.alph(1)),
       testMethodIndex = 2,
       testArgs = AVector[Val](ValAddress(buyer), ValU256(50)),
@@ -1463,8 +1465,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       contractId = testContractId1,
       code = AMMContract.swapProxyCode,
       originalCodeHash = AMMContract.swapProxyCode.hash,
-      initialFields =
-        AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
+      initialFields = AVector[Val](
+        ValByteVec(testContract0.contractId.bytes),
+        ValByteVec(tokenId.bytes)
+      ),
       initialAsset = AssetState(ALPH.alph(1)),
       testMethodIndex = 1,
       testArgs = AVector[Val](ValAddress(buyer), ValU256(ALPH.alph(5))),
@@ -1557,7 +1561,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract = TestContract(
       blockHash = Some(BlockHash.random),
-      txId = Some(Hash.random),
+      txId = Some(TransactionId.random),
       bytecode = code,
       initialFields = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))),
       args = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))))
@@ -1696,8 +1700,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     {
       info("With approved tokens")
-      val token1                         = Hash.generate
-      val token2                         = Hash.generate
+      val token1                         = TokenId.generate
+      val token2                         = TokenId.generate
       val codeRaw                        = Hex.toHexString(serialize(contract))
       val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
       val stateRaw                       = Hex.toHexString(serialize(initialFields))
@@ -1764,7 +1768,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   private def signAndAddToMemPool(
-      txId: Hash,
+      txId: TransactionId,
       unsignedTx: String,
       chainIndex: ChainIndex,
       fromPrivateKey: PrivateKey

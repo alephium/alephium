@@ -28,7 +28,7 @@ final case class MutBalancesPerLockup(
     scopeDepth: Int
 ) {
   def tokenVector: AVector[(TokenId, U256)] = {
-    import org.alephium.protocol.model.tokenIdOrder
+    import org.alephium.protocol.model.TokenId.tokenIdOrder
     AVector.from(tokenAmounts.filter(_._2.nonZero)).sortBy(_._1)
   }
 

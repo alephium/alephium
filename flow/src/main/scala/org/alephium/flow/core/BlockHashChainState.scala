@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import org.alephium.flow.io.ChainStateStorage
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{AVector, ConcurrentHashMap, TimeStamp}
 
 trait BlockHashChainState {

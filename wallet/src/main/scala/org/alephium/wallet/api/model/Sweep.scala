@@ -17,8 +17,7 @@
 package org.alephium.wallet.api.model
 
 import org.alephium.api.model.BuildTxCommon
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.model.{Address, BlockHash}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.TimeStamp
 

@@ -27,10 +27,9 @@ import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation._
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
-import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.model.{Block, BlockHash, ChainIndex}
 import org.alephium.protocol.vm.{LogConfig, WorldState}
 import org.alephium.util.{ActorRefT, EventBus, EventStream}
 

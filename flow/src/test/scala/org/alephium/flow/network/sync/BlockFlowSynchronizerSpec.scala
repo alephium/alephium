@@ -22,7 +22,8 @@ import org.scalatest.concurrent.Eventually
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.network.broker.BrokerHandler
-import org.alephium.protocol.{BlockHash, Generators}
+import org.alephium.protocol.Generators
+import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{AlephiumActorSpec, AVector}
 
 class BlockFlowSynchronizerSpec extends AlephiumActorSpec {

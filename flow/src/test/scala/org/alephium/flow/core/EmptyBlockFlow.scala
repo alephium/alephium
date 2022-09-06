@@ -19,7 +19,6 @@ package org.alephium.flow.core
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState

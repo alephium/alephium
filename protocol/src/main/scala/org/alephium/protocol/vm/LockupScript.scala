@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{GroupIndex, Hint, ScriptHint}
+import org.alephium.protocol.model.{ContractId, GroupIndex, Hint, ScriptHint}
 import org.alephium.serde._
 import org.alephium.util.{AVector, Base58, Bytes}
 
@@ -39,7 +39,7 @@ object LockupScript {
         case s: P2PKH  => ByteString(0) ++ serdeImpl[Hash].serialize(s.pkHash)
         case s: P2MPKH => ByteString(1) ++ P2MPKH.serde.serialize(s)
         case s: P2SH   => ByteString(2) ++ serdeImpl[Hash].serialize(s.scriptHash)
-        case s: P2C    => ByteString(3) ++ serdeImpl[Hash].serialize(s.contractId)
+        case s: P2C    => ByteString(3) ++ serdeImpl[Hash].serialize(s.contractId.value)
       }
     }
 
@@ -82,8 +82,8 @@ object LockupScript {
   }
   def p2sh(script: StatelessScript): P2SH =
     P2SH(Hash.hash(serdeImpl[StatelessScript].serialize(script)))
-  def p2sh(scriptHash: Hash): P2SH = P2SH(scriptHash)
-  def p2c(contractId: Hash): P2C   = P2C(contractId)
+  def p2sh(scriptHash: Hash): P2SH     = P2SH(scriptHash)
+  def p2c(contractId: ContractId): P2C = P2C(contractId)
   def p2c(input: String): Option[LockupScript.P2C] = {
     fromBase58(input).flatMap {
       case e: LockupScript.P2C => Some(e)
@@ -139,8 +139,8 @@ object LockupScript {
     lazy val scriptHint: ScriptHint = ScriptHint.fromHash(scriptHash)
   }
   // pay to contract (only used for contract outputs)
-  final case class P2C(contractId: Hash) extends LockupScript {
-    lazy val scriptHint: ScriptHint = ScriptHint.fromHash(contractId)
+  final case class P2C(contractId: ContractId) extends LockupScript {
+    lazy val scriptHint: ScriptHint = ScriptHint.fromHash(contractId.value)
 
     def hintBytes: ByteString = serialize(Hint.ofContract(scriptHint))
 

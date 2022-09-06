@@ -30,7 +30,7 @@ import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
 import org.alephium.io.IOError
-import org.alephium.protocol.{vm, BlockHash, Hash, PublicKey, Signature, SignatureSchema}
+import org.alephium.protocol.{vm, Hash, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
@@ -323,7 +323,7 @@ class ServerUtils(implicit
 
   def getTransactionStatus(
       blockFlow: BlockFlow,
-      txId: Hash,
+      txId: TransactionId,
       chainIndex: ChainIndex
   ): Try[TxStatus] = {
     blockFlow.getTransactionStatus(txId, chainIndex).left.map(failed).map(convert)
@@ -349,7 +349,7 @@ class ServerUtils(implicit
     }
   }
 
-  def isInMemPool(blockFlow: BlockFlow, txId: Hash, chainIndex: ChainIndex): Boolean = {
+  def isInMemPool(blockFlow: BlockFlow, txId: TransactionId, chainIndex: ChainIndex): Boolean = {
     blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
   }
 
@@ -361,7 +361,7 @@ class ServerUtils(implicit
     for {
       groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
       chainIndex = ChainIndex(groupIndex, groupIndex)
-      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId))
+      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId.value))
       count    <- countOpt.toRight(notFound(s"Current events count for contract $contractAddress"))
     } yield count
   }
@@ -426,7 +426,7 @@ class ServerUtils(implicit
 
   def searchLocalTransactionStatus(
       blockFlow: BlockFlow,
-      txId: Hash,
+      txId: TransactionId,
       chainIndexes: AVector[ChainIndex]
   ): Try[TxStatus] = {
     blockFlow.searchLocalTransactionStatus(txId, chainIndexes).left.map(failed).map(convert)
@@ -434,7 +434,7 @@ class ServerUtils(implicit
 
   def getChainIndexForTx(
       blockFlow: BlockFlow,
-      txId: Hash
+      txId: TransactionId
   ): Try[ChainIndex] = {
     searchLocalTransactionStatus(blockFlow, txId, brokerConfig.chainIndexes) match {
       case Right(Confirmed(blockHash, _, _, _, _)) =>
@@ -450,11 +450,11 @@ class ServerUtils(implicit
 
   def getEventsByTxId(
       blockFlow: BlockFlow,
-      txId: Hash
+      txId: TransactionId
   ): Try[ContractEventsByTxId] = {
     wrapResult(
       for {
-        result <- blockFlow.getEvents(txId, 0, CounterRange.MaxCounterRange)
+        result <- blockFlow.getEvents(txId.value, 0, CounterRange.MaxCounterRange)
         (nextStart, logStatesVec) = result
         events <- logStatesVec.flatMapE { logStates =>
           logStates.states
@@ -469,7 +469,7 @@ class ServerUtils(implicit
                 Right(
                   ContractEventByTxId(
                     logStates.blockHash,
-                    Address.contract(logStates.eventKey),
+                    Address.contract(ContractId(logStates.eventKey)),
                     state.index.toInt,
                     state.fields.map(Val.from)
                   )
@@ -492,7 +492,7 @@ class ServerUtils(implicit
     wrapResult(
       blockFlow
         .getEvents(
-          contractId,
+          contractId.value,
           start,
           endOpt.getOrElse(start + CounterRange.MaxCounterRange)
         )
@@ -885,7 +885,7 @@ class ServerUtils(implicit
       contractId = params.address.contractId
       contractObj <- wrapResult(worldState.getContractObj(contractId))
       method      <- wrapExeResult(contractObj.code.getMethod(params.methodIndex))
-      txId = params.txId.getOrElse(Hash.random)
+      txId = params.txId.getOrElse(TransactionId.random)
       resultPair <- executeContractMethod(
         worldState,
         contractId,
@@ -953,7 +953,7 @@ class ServerUtils(implicit
         contracts = postState._1,
         txInputs = executionResult.contractPrevOutputs.map(_.lockupScript).map(Address.from),
         txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
-          Output.from(output, Hash.zero, index)
+          Output.from(output, TransactionId.zero, index)
         },
         events = events
       )
@@ -1018,7 +1018,7 @@ class ServerUtils(implicit
           AVector(
             ContractEventByTxId(
               logStates.blockHash,
-              Address.contract(logStates.eventKey),
+              Address.contract(ContractId(logStates.eventKey)),
               state.index.toInt,
               state.fields.map(Val.from)
             )
@@ -1051,7 +1051,7 @@ class ServerUtils(implicit
   private def executeContractMethod(
       worldState: WorldState.Staging,
       contractId: ContractId,
-      txId: Hash,
+      txId: TransactionId,
       blockHash: BlockHash,
       inputAssets: AVector[TestInputAsset],
       methodIndex: Int,
@@ -1156,9 +1156,8 @@ class ServerUtils(implicit
       initialState: AVector[vm.Val],
       asset: AssetState
   ): Try[Unit] = {
-    val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
-    val outputRef  = ContractOutputRef.unsafe(outputHint, contractId)
-    val output     = asset.toContractOutput(contractId)
+    val outputRef = contractId.firstOutputRef()
+    val output    = asset.toContractOutput(contractId)
     wrapResult(
       worldState.createContractUnsafe(
         contractId,

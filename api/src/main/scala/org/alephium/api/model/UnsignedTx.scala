@@ -16,15 +16,14 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.model.{NetworkId, UnsignedTransaction}
+import org.alephium.protocol.model.{NetworkId, TransactionId, UnsignedTransaction}
 import org.alephium.protocol.vm
 import org.alephium.util.{AVector, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class UnsignedTx(
-    txId: Hash,
+    txId: TransactionId,
     version: Byte,
     networkId: Byte,
     scriptOpt: Option[Script] = None,
@@ -51,7 +50,7 @@ final case class UnsignedTx(
         assetInputs,
         fixedOutputs.map(_.toProtocol())
       )
-      _ <- Either.cond(txId == utx.hash, (), "Invalid hash")
+      _ <- Either.cond(txId == utx.id, (), "Invalid hash")
     } yield utx
   }
 }
@@ -59,7 +58,7 @@ final case class UnsignedTx(
 object UnsignedTx {
   def fromProtocol(unsignedTx: UnsignedTransaction): UnsignedTx = {
     UnsignedTx(
-      unsignedTx.hash,
+      unsignedTx.id,
       unsignedTx.version,
       unsignedTx.networkId.id,
       unsignedTx.scriptOpt.map(Script.fromProtocol),
@@ -67,7 +66,7 @@ object UnsignedTx {
       unsignedTx.gasPrice.value,
       unsignedTx.inputs.map(AssetInput.from),
       unsignedTx.fixedOutputs.zipWithIndex.map { case (out, index) =>
-        FixedAssetOutput.fromProtocol(out, unsignedTx.hash, index)
+        FixedAssetOutput.fromProtocol(out, unsignedTx.id, index)
       }
     )
   }

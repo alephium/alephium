@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
-import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers}
@@ -38,10 +38,10 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     def genContract(
         n: Long = 0,
         fieldLength: Int = 0
-    ): (StatefulContract, ContractOutputRef, ContractOutput) = {
-      val contractId = Hash.generate
+    ): (ContractId, StatefulContract, ContractOutputRef, ContractOutput) = {
+      val contractId = ContractId.generate
       val output     = ContractOutput(ALPH.alph(n), LockupScript.p2c(contractId), AVector.empty)
-      val outputRef  = ContractOutputRef.unsafe(output.hint, contractId)
+      val outputRef  = contractId.firstOutputRef()
       val method = Method[StatefulContext](
         isPublic = true,
         usePreapprovedAssets = false,
@@ -52,17 +52,17 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         instrs = AVector(U256Const(Val.U256(n)))
       )
       val contract = StatefulContract(fieldLength, methods = AVector(method))
-      (contract, outputRef, output)
+      (contractId, contract, outputRef, output)
     }
 
     def fields(length: Int): AVector[Val] = AVector.fill(length)(Val.True)
 
     def createContract(
+        contractId: ContractId,
         contract: StatefulContract,
         outputRef: ContractOutputRef,
         output: ContractOutput
     ): Assertion = {
-      val contractId = outputRef.key
       pool.worldState
         .createContractUnsafe(
           contractId,
@@ -75,10 +75,10 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         contract.toHalfDecoded().toObjectUnsafe(contractId, fields(contract.fieldLength))
     }
 
-    def createContract(n: Long = 0, fieldLength: Int = 0): (Hash, StatefulContract) = {
-      val (contract, outputRef, output) = genContract(n, fieldLength)
-      createContract(contract, outputRef, output)
-      outputRef.key -> contract
+    def createContract(n: Long = 0, fieldLength: Int = 0): (ContractId, StatefulContract) = {
+      val (contractId, contract, outputRef, output) = genContract(n, fieldLength)
+      createContract(contractId, contract, outputRef, output)
+      contractId -> contract
     }
 
     def toObject(contract: StatefulContract, contractId: ContractId) = {
@@ -152,8 +152,8 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "market assets properly" in new Fixture {
-    val contractId0 = Hash.generate
-    val contractId1 = Hash.generate
+    val contractId0 = ContractId.generate
+    val contractId1 = ContractId.generate
     pool.markAssetInUsing(contractId0) isE ()
     pool.markAssetInUsing(contractId0) is failed(ContractAssetAlreadyInUsing)
 
@@ -173,7 +173,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     with GroupConfigFixture.Default
     with NetworkConfigFixture.Default {
     val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
-    val contractId = outputRef.key
+    val contractId = ContractId.random
     val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
     pool.worldState.createContractUnsafe(
       contractId,

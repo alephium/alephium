@@ -30,9 +30,8 @@ import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.model.DataOrigin.Local
 import org.alephium.flow.network.broker.ConnectionHandler
 import org.alephium.flow.setting.{MiningSetting, NetworkSetting}
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
-import org.alephium.protocol.model.{Block, ChainIndex}
+import org.alephium.protocol.model.{Block, BlockHash, ChainIndex}
 import org.alephium.serde.{deserialize, SerdeResult, Staging}
 import org.alephium.util.{ActorRefT, AVector, BaseActor, Hex}
 

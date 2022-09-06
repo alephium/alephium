@@ -21,7 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
-import org.alephium.protocol.model.{TxGenerators, TxOutput}
+import org.alephium.protocol.model.{TokenId, TxGenerators, TxOutput}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 
 class MutBalancesSpec extends AlephiumSpec {
@@ -72,7 +72,7 @@ class MutBalancesSpec extends AlephiumSpec {
       )
     )
 
-    val tokenId2 = hashGen.sample.get
+    val tokenId2 = TokenId.generate
 
     balances.addToken(lockupScript, tokenId2, ALPH.oneAlph) is Some(())
     balances is MutBalances(
@@ -128,7 +128,7 @@ class MutBalancesSpec extends AlephiumSpec {
       )
     )
 
-    val tokenId2 = hashGen.sample.get
+    val tokenId2 = TokenId.generate
 
     balances.subToken(lockupScript, tokenId2, ALPH.oneAlph) is None
 
@@ -270,7 +270,7 @@ class MutBalancesSpec extends AlephiumSpec {
         override def groups: Int = 3
       }
 
-    val tokenId    = hashGen.sample.get
+    val tokenId    = TokenId.generate
     val scopeDepth = 1
     val tokens     = mutable.Map(tokenId -> ALPH.oneAlph)
     val balancesPerLockup =

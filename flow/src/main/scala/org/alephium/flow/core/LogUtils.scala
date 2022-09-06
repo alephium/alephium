@@ -20,8 +20,8 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.{BlockHash, ChainIndex}
 import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates, LogStatesId}
 import org.alephium.util.AVector
 

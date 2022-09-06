@@ -25,8 +25,8 @@ import sttp.tapir.SchemaType.{SArray, SInteger, SProduct, SProductField, SString
 
 import org.alephium.api.model.{Amount, Script}
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.{BlockHash, Hash, PublicKey, Signature}
-import org.alephium.protocol.model.{Address, CliqueId, GroupIndex}
+import org.alephium.protocol.{Hash, PublicKey, Signature}
+import org.alephium.protocol.model.{Address, BlockHash, CliqueId, GroupIndex}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
