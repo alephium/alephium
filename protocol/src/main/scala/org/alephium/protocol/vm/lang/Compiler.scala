@@ -26,6 +26,7 @@ import org.alephium.util.AVector
 
 // scalastyle:off number.of.methods
 // scalastyle:off file.size.limit
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object Compiler {
   type CompiledContract = (StatefulContract, Ast.Contract, AVector[String])
   type CompiledScript   = (StatefulScript, Ast.TxScript, AVector[String])
@@ -659,7 +660,8 @@ object Compiler {
     def checkArrayIndexType(index: Ast.Expr[Ctx]): Unit = {
       index.getType(this) match {
         case Seq(Type.U256) =>
-        case tpe => throw Compiler.Error(s"Invalid array index type ${quote(tpe)}, expected ${quote("U256")}")
+        case tpe =>
+          throw Compiler.Error(s"Invalid array index type ${quote(tpe)}, expected ${quote("U256")}")
       }
     }
 

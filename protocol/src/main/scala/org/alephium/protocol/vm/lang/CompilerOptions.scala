@@ -26,7 +26,7 @@ final case class CompilerOptions(
 )
 
 object CompilerOptions {
-  val Default = CompilerOptions(
+  val Default: CompilerOptions = CompilerOptions(
     ignoreUnusedConstantsWarnings = false,
     ignoreUnusedVariablesWarnings = false,
     ignoreUnusedFieldsWarnings = false,

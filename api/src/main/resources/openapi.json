@@ -5459,7 +5459,10 @@
                 "$ref": "#/components/schemas/Script"
               },
               "example": {
-                "code": "TxScript Main { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y, 1024) }"
+                "code": "TxScript Main { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y, 1024) }",
+                "compilerOptions": {
+                  "ignoreUnusedConstantsWarnings": true
+                }
               }
             }
           },
@@ -5756,7 +5759,10 @@
                 "$ref": "#/components/schemas/Contract"
               },
               "example": {
-                "code": "Contract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+                "code": "Contract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
+                "compilerOptions": {
+                  "ignoreUnusedConstantsWarnings": true
+                }
               }
             }
           },
@@ -5938,7 +5944,10 @@
                 "$ref": "#/components/schemas/Project"
               },
               "example": {
-                "code": "Contract Foo() {\n pub fn foo() -> () {}\n }\n TxScript Main(id: ByteVec) {\n Foo(id).foo() \n}"
+                "code": "Contract Foo() {\n pub fn foo() -> () {}\n }\n TxScript Main(id: ByteVec) {\n Foo(id).foo() \n}",
+                "compilerOptions": {
+                  "ignoreUnusedConstantsWarnings": true
+                }
               }
             }
           },
@@ -9118,6 +9127,29 @@
           }
         }
       },
+      "CompilerOptions": {
+        "type": "object",
+        "properties": {
+          "ignoreUnusedConstantsWarnings": {
+            "type": "boolean"
+          },
+          "ignoreUnusedVariablesWarnings": {
+            "type": "boolean"
+          },
+          "ignoreUnusedFieldsWarnings": {
+            "type": "boolean"
+          },
+          "ignoreUnusedPrivateFunctionsWarnings": {
+            "type": "boolean"
+          },
+          "ignoreReadonlyCheckWarnings": {
+            "type": "boolean"
+          },
+          "ignoreExternalCallCheckWarnings": {
+            "type": "boolean"
+          }
+        }
+      },
       "Confirmed": {
         "required": [
           "blockHash",
@@ -9162,6 +9194,9 @@
         "properties": {
           "code": {
             "type": "string"
+          },
+          "compilerOptions": {
+            "$ref": "#/components/schemas/CompilerOptions"
           }
         }
       },
@@ -9900,6 +9935,9 @@
         "properties": {
           "code": {
             "type": "string"
+          },
+          "compilerOptions": {
+            "$ref": "#/components/schemas/CompilerOptions"
           }
         }
       },
@@ -9974,6 +10012,9 @@
         "properties": {
           "code": {
             "type": "string"
+          },
+          "compilerOptions": {
+            "$ref": "#/components/schemas/CompilerOptions"
           }
         }
       },

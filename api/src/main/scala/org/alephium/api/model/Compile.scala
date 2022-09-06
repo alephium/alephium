@@ -18,6 +18,7 @@ package org.alephium.api.model
 
 import org.alephium.protocol.vm.lang
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object Compile {
   trait Common {
     def code: String
@@ -40,6 +41,7 @@ object Compile {
       extends Common
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class CompilerOptions(
     ignoreUnusedConstantsWarnings: Option[Boolean] = None,
     ignoreUnusedVariablesWarnings: Option[Boolean] = None,
