@@ -520,6 +520,7 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   private val compileScriptResult = CompileScriptResult(
+    name = "Main",
     bytecodeTemplate = hexString,
     fields = CompileResult.FieldsSig(
       names = AVector("aa", "bb", "cc", "dd", "ee"),
@@ -544,6 +545,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(compileScriptResult)
 
   private val compileContractResult = CompileContractResult(
+    name = "Foo",
     bytecode = hexString,
     codeHash = hash,
     fields = CompileResult.FieldsSig(

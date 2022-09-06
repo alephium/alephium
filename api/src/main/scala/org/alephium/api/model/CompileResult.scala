@@ -23,6 +23,7 @@ import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex}
 
 final case class CompileScriptResult(
+    name: String,
     bytecodeTemplate: String,
     fields: CompileResult.FieldsSig,
     functions: AVector[CompileResult.FunctionSig],
@@ -42,6 +43,7 @@ object CompileScriptResult {
       scriptAst.getTemplateVarsMutability()
     )
     CompileScriptResult(
+      scriptAst.name,
       bytecodeTemplate,
       fields = fields,
       functions = AVector.from(scriptAst.funcs.view.map(CompileResult.FunctionSig.from)),
@@ -51,6 +53,7 @@ object CompileScriptResult {
 }
 
 final case class CompileContractResult(
+    name: String,
     bytecode: String,
     codeHash: Hash,
     fields: CompileResult.FieldsSig,
@@ -73,6 +76,7 @@ object CompileContractResult {
       contractAst.getFieldMutability()
     )
     CompileContractResult(
+      contractAst.name,
       bytecode,
       contract.hash,
       fields,

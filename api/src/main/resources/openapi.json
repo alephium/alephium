@@ -5473,6 +5473,7 @@
                   "$ref": "#/components/schemas/CompileScriptResult"
                 },
                 "example": {
+                  "name": "Main",
                   "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "fields": {
                     "names": [
@@ -5769,6 +5770,7 @@
                   "$ref": "#/components/schemas/CompileContractResult"
                 },
                 "example": {
+                  "name": "Foo",
                   "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
@@ -5952,6 +5954,7 @@
                 "example": {
                   "contracts": [
                     {
+                      "name": "Foo",
                       "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                       "fields": {
@@ -6036,6 +6039,7 @@
                   ],
                   "scripts": [
                     {
+                      "name": "Main",
                       "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "fields": {
                         "names": [
@@ -9017,6 +9021,7 @@
       },
       "CompileContractResult": {
         "required": [
+          "name",
           "bytecode",
           "codeHash",
           "fields",
@@ -9026,6 +9031,9 @@
         ],
         "type": "object",
         "properties": {
+          "name": {
+            "type": "string"
+          },
           "bytecode": {
             "type": "string"
           },
@@ -9079,6 +9087,7 @@
       },
       "CompileScriptResult": {
         "required": [
+          "name",
           "bytecodeTemplate",
           "fields",
           "functions",
@@ -9086,6 +9095,9 @@
         ],
         "type": "object",
         "properties": {
+          "name": {
+            "type": "string"
+          },
           "bytecodeTemplate": {
             "type": "string"
           },
