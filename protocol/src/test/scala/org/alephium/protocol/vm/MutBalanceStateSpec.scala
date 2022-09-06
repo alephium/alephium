@@ -64,7 +64,7 @@ class MutBalanceStateSpec extends AlephiumSpec {
   it should "tokenRemaining" in new Fixture {
     balanceState.tokenRemaining(lockupScript, tokenId) is Some(ALPH.oneAlph)
     balanceState.tokenRemaining(lockupScriptGen.sample.get, tokenId) is None
-    balanceState.tokenRemaining(lockupScript, TokenId(hashGen.sample.get)) is None
+    balanceState.tokenRemaining(lockupScript, TokenId.generate) is None
   }
 
   it should "isPaying" in new Fixture {
@@ -128,7 +128,7 @@ class MutBalanceStateSpec extends AlephiumSpec {
         override def groups: Int = 3
       }
 
-    val tokenId    = TokenId(hashGen.sample.get)
+    val tokenId    = TokenId.generate
     val scopeDepth = 1
     val tokens     = mutable.Map(tokenId -> ALPH.oneAlph)
     val balancesPerLockup =
