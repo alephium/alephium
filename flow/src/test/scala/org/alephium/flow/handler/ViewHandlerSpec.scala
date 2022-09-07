@@ -18,8 +18,6 @@ package org.alephium.flow.handler
 
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
-import org.scalatest.concurrent.ScalaFutures.convertScalaFuture
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.model.DataOrigin
@@ -52,11 +50,7 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     }
   }
 
-  trait Fixture
-      extends FlowFixture
-      with Eventually
-      with IntegrationPatience
-      with LockupScriptGenerators {
+  trait Fixture extends FlowFixture with LockupScriptGenerators {
 
     val txProbe = TestProbe()
     lazy val minderAddresses =

@@ -24,7 +24,6 @@ import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import org.scalacheck.Gen
-import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow

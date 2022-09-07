@@ -20,7 +20,6 @@ import scala.annotation.tailrec
 
 import akka.testkit.TestActorRef
 import akka.util.Timeout
-import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.ScalaFutures
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}

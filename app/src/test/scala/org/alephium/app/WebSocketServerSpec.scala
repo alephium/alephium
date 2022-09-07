@@ -25,7 +25,6 @@ import akka.util.Timeout
 import io.vertx.core.Vertx
 import io.vertx.core.http.HttpClientOptions
 import org.scalatest.{Assertion, EitherValues}
-import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
 
 import org.alephium.api.model.BlockEntry
@@ -39,13 +38,10 @@ import org.alephium.rpc.model.JsonRPC._
 import org.alephium.util._
 
 class WebSocketServerSpec
-    extends AlephiumSpec
+    extends AlephiumFutureSpec
     with NoIndexModelGenerators
     with EitherValues
-    with ScalaFutures
-    with Eventually
-    with NumericHelpers
-    with IntegrationPatience {
+    with NumericHelpers {
   import ServerFixture._
 
   behavior of "http"

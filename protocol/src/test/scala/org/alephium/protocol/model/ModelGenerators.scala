@@ -30,7 +30,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.util.{AlephiumSpec, AVector, I256, Number, NumericHelpers, TimeStamp, U256}
+import org.alephium.util._
 
 trait LockupScriptGenerators extends Generators {
   import ModelGenerators.ScriptPair
@@ -436,36 +436,44 @@ trait BlockGenerators extends TxGenerators {
 
   lazy val nonceGen = Gen.const(()).map(_ => Nonce.unsecureRandom())
 
-  def blockGen(chainIndex: ChainIndex, txNumGen: Gen[Int]): Gen[Block] =
+  def blockGen(
+      chainIndex: ChainIndex,
+      txNumGen: Gen[Int],
+      blockTs: TimeStamp
+  ): Gen[Block] =
     for {
       depStateHash <- hashGen
       deps <- Gen
         .listOfN(2 * groupConfig.groups - 1, blockHashGen)
         .map(_.toArray)
         .map(AVector.unsafe(_))
-      block <- blockGenOf(chainIndex, deps, depStateHash, txNumGen)
+      block <- blockGenOf(chainIndex, deps, depStateHash, blockTs, txNumGen)
     } yield block
 
   def blockGen(chainIndex: ChainIndex): Gen[Block] = {
-    blockGen(chainIndex, Gen.choose(1, 5))
+    blockGen(chainIndex, TimeStamp.now())
+  }
+
+  def blockGen(chainIndex: ChainIndex, blockTs: TimeStamp): Gen[Block] = {
+    blockGen(chainIndex, Gen.choose(1, 5), blockTs)
   }
 
   def blockGenOf(broker: BrokerGroupInfo): Gen[Block] =
-    chainIndexGenRelatedTo(broker).flatMap(blockGen)
+    chainIndexGenRelatedTo(broker).flatMap(blockGen(_))
 
   def blockGenNotOf(broker: BrokerGroupInfo): Gen[Block] =
-    chainIndexGenNotRelatedTo(broker).flatMap(blockGen)
+    chainIndexGenNotRelatedTo(broker).flatMap(blockGen(_))
 
   def blockGenOf(group: GroupIndex): Gen[Block] =
-    chainIndexFrom(group).flatMap(blockGen)
+    chainIndexFrom(group).flatMap(blockGen(_))
 
   private def gen(
       chainIndex: ChainIndex,
       deps: AVector[BlockHash],
       depStateHash: Hash,
+      blockTs: TimeStamp,
       txs: AVector[Transaction]
   ): Block = {
-    val blockTs = TimeStamp.now()
     val coinbase = Transaction.coinbase(
       chainIndex,
       txs,
@@ -494,26 +502,33 @@ trait BlockGenerators extends TxGenerators {
       chainIndex: ChainIndex,
       deps: AVector[BlockHash],
       depStateHash: Hash,
+      blockTs: TimeStamp,
       txNumGen: Gen[Int]
   ): Gen[Block] =
     for {
       txNum <- txNumGen
       txs   <- Gen.listOfN(txNum, transactionGen(chainIndexGen = Gen.const(chainIndex)))
-    } yield gen(chainIndex, deps, depStateHash, AVector.from(txs))
+    } yield gen(chainIndex, deps, depStateHash, blockTs, AVector.from(txs))
 
   def chainGenOf(chainIndex: ChainIndex, length: Int, block: Block): Gen[AVector[Block]] =
-    chainGenOf(chainIndex, length, block.hash)
+    chainGenOf(chainIndex, length, block.hash, block.timestamp)
 
   def chainGenOf(chainIndex: ChainIndex, length: Int): Gen[AVector[Block]] =
-    chainGenOf(chainIndex, length, BlockHash.zero)
+    chainGenOf(chainIndex, length, BlockHash.zero, TimeStamp.now())
 
-  def chainGenOf(chainIndex: ChainIndex, length: Int, initialHash: BlockHash): Gen[AVector[Block]] =
+  def chainGenOf(
+      chainIndex: ChainIndex,
+      length: Int,
+      initialHash: BlockHash,
+      initialTs: TimeStamp
+  ): Gen[AVector[Block]] =
     Gen.listOfN(length, blockGen(chainIndex)).map { blocks =>
-      blocks.foldLeft(AVector.empty[Block]) { case (acc, block) =>
+      blocks.zipWithIndex.foldLeft(AVector.empty[Block]) { case (acc, (block, index)) =>
         val prevHash      = if (acc.isEmpty) initialHash else acc.last.hash
         val currentHeader = block.header
         val deps          = BlockDeps.build(AVector.fill(groupConfig.depsNum)(prevHash))
-        val newHeader     = currentHeader.copy(blockDeps = deps)
+        val newTs         = initialTs.plusUnsafe(Duration.ofSecondsUnsafe(index.toLong + 1))
+        val newHeader     = currentHeader.copy(blockDeps = deps, timestamp = newTs)
         val newBlock      = block.copy(header = newHeader)
         acc :+ newBlock
       }
@@ -529,10 +544,12 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
     chainIndexGen.flatMap(blockGen(_))
 
   def blockGenOf(txNumGen: Gen[Int]): Gen[Block] =
-    chainIndexGen.flatMap(blockGen(_, txNumGen))
+    chainIndexGen.flatMap(blockGen(_, txNumGen, TimeStamp.now()))
 
   def blockGenOf(deps: AVector[BlockHash], depStateHash: Hash): Gen[Block] =
-    chainIndexGen.flatMap(blockGenOf(_, deps, depStateHash, Gen.choose(1, 5)))
+    chainIndexGen.flatMap(
+      blockGenOf(_, deps, depStateHash, TimeStamp.now(), Gen.choose(1, 5))
+    )
 
   def chainGenOf(length: Int, block: Block): Gen[AVector[Block]] =
     chainIndexGen.flatMap(chainGenOf(_, length, block))

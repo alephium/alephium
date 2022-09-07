@@ -18,7 +18,6 @@ package org.alephium.flow.network.broker
 
 import akka.io.Tcp
 import akka.testkit.TestProbe
-import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.network.DiscoveryServer

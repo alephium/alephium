@@ -20,7 +20,6 @@ import java.net.InetSocketAddress
 
 import akka.actor.Props
 import akka.testkit.{TestActorRef, TestProbe}
-import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow

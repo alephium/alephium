@@ -23,7 +23,6 @@ import scala.util.Random
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import org.scalacheck.Gen
-import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.network.DiscoveryServer.NeighborPeers
@@ -34,12 +33,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.util._
 
-class DiscoveryServerSpec
-    extends AlephiumActorSpec
-    with ScalaFutures
-    with Eventually
-    with SocketUtil
-    with IntegrationPatience {
+class DiscoveryServerSpec extends AlephiumActorSpec with SocketUtil {
   import DiscoveryServerSpec._
 
   def buildMisbehaviorManager(system: ActorSystem): ActorRefT[MisbehaviorManager.Command] = {

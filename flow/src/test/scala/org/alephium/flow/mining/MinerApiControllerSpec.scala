@@ -21,7 +21,6 @@ import scala.util.Random
 import akka.actor.ActorRef
 import akka.io.{IO, Tcp}
 import akka.testkit.{EventFilter, TestActor, TestProbe}
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import org.alephium.flow.AlephiumFlowActorSpec
 import org.alephium.flow.handler.{BlockChainHandler, TestUtils, ViewHandler}
@@ -31,7 +30,7 @@ import org.alephium.serde.serialize
 import org.alephium.util.{AVector, SocketUtil}
 
 class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
-  trait Fixture extends Eventually with IntegrationPatience {
+  trait Fixture {
     val apiPort                         = generatePort()
     val (allHandlers, allHandlerProbes) = TestUtils.createAllHandlersProbe
     val minerApiController = EventFilter.info(start = "Miner API server bound").intercept {
@@ -93,7 +92,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     }
   }
 
-  it should "handle submission" in new SyncedFixture with Eventually {
+  it should "handle submission" in new SyncedFixture {
     val probe0      = TestProbe()
     val connection0 = connectToServer(probe0)
 
@@ -117,7 +116,7 @@ class MinerApiControllerSpec extends AlephiumFlowActorSpec with SocketUtil {
     }
   }
 
-  trait ConnectionFixture extends Fixture with Eventually {
+  trait ConnectionFixture extends Fixture {
     val probe = TestProbe()
     watch(probe.ref)
 
