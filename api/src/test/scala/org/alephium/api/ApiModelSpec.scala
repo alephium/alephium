@@ -68,6 +68,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   val inetAddress = InetAddress.getByName("127.0.0.1")
 
+  val compilerOptions = CompilerOptions(ignoreUnusedConstantsWarnings = Some(true))
+
   def generateAddress(): Address.Asset = Address.p2pkh(PublicKey.generate)
   def generateContractAddress(): Address.Contract =
     Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").get)
@@ -628,40 +630,90 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode Compile.Script" in {
-    val compile =
-      Compile.Script(
-        code = "0000"
-      )
-    val jsonRaw =
-      s"""
-         |{
-         |  "code": "0000"
-         |}
-         |""".stripMargin
-    checkData(compile, jsonRaw)
+    {
+      info("Without CompilerOptions")
+      val compile =
+        Compile.Script(
+          code = "0000"
+        )
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000"
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
+
+    {
+      info("With CompilerOptions")
+      val compile =
+        Compile.Script(code = "0000", compilerOptions = Some(compilerOptions))
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000",
+           |  "compilerOptions": { "ignoreUnusedConstantsWarnings": true }
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
   }
 
   it should "encode/decode Compile.Contract" in {
-    val compile =
-      Compile.Contract(code = "0000")
-    val jsonRaw =
-      s"""
-         |{
-         |  "code": "0000"
-         |}
-         |""".stripMargin
-    checkData(compile, jsonRaw)
+    {
+      info("Without CompilerOptions")
+      val compile =
+        Compile.Contract(code = "0000")
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000"
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
+
+    {
+      info("With CompilerOptions")
+      val compile =
+        Compile.Contract(code = "0000", compilerOptions = Some(compilerOptions))
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000",
+           |  "compilerOptions": { "ignoreUnusedConstantsWarnings": true }
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
   }
 
   it should "encode/decode Compile.Project" in {
-    val project = Compile.Project(code = "0000")
-    val jsonRaw =
-      s"""
-         |{
-         |  "code": "0000"
-         |}
-         |""".stripMargin
-    checkData(project, jsonRaw)
+    {
+      info("Without CompilerOptions")
+      val project = Compile.Project(code = "0000")
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000"
+           |}
+           |""".stripMargin
+      checkData(project, jsonRaw)
+    }
+
+    {
+      info("With CompilerOptions")
+      val project = Compile.Project(code = "0000", compilerOptions = Some(compilerOptions))
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000",
+           |  "compilerOptions": { "ignoreUnusedConstantsWarnings": true }
+           |}
+           |""".stripMargin
+      checkData(project, jsonRaw)
+    }
   }
 
   it should "encode/decode BuildContract" in {
@@ -851,6 +903,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw0 =
       """
         |{
+        |  "name": "Foo",
         |  "bytecode": "0701402901010707061005a000a001a003a00461b413c40de0b6b3a7640000a916011602160316041605160602",
         |  "codeHash": "eff62a4b2d4d4936a84e360c916a398d80d5000497ccd4afbd80bfe254d62096",
         |  "fields": {
@@ -889,6 +942,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 =
       """
         |{
+        |  "name": "Foo",
         |  "bytecodeTemplate": "020103000000010201000707060716011602160316041605160602",
         |  "fields": {
         |    "names": ["aa","bb","cc","dd","ee"],
@@ -920,7 +974,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "warnings": [
         |    "Found unused variables in Foo: bar.a",
         |    "Found unused fields in Foo: aa, bb, cc, dd, ee",
-        |    "Function bar is readonly, please use @using(readonly = true) for the function"
+        |    "Function Foo.bar is readonly, please use @using(readonly = true) for the function"
         |  ]
         |}
         |""".stripMargin

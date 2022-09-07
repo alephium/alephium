@@ -2576,7 +2576,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     Compiler.compileContract(contractRaw).leftValue is Compiler.Error(
-      "Array type not supported for event TestEvent"
+      "Array type not supported for event \"Foo.TestEvent\""
     )
   }
 

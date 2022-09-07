@@ -26,7 +26,7 @@ import akka.testkit.{TestActorRef, TestKit}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.BeforeAndAfterEach
 
-trait AlephiumActorSpec extends AlephiumSpec with BeforeAndAfterEach with ActorKit {
+trait AlephiumActorSpec extends AlephiumFutureSpec with BeforeAndAfterEach with ActorKit {
   implicit def actorSpec: AlephiumActorSpec = this
 
   def actorSystemConfig: Config = AlephiumActorSpec.warningConfig

@@ -1596,8 +1596,18 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.warnings is AVector(
       "Found unused variables in Foo: foo.a",
       "Found unused fields in Foo: x",
-      "Function foo is readonly, please use @using(readonly = true) for the function"
+      "Function Foo.foo is readonly, please use @using(readonly = true) for the function"
     )
+
+    info("Turn off warnings")
+    val compilerOptions = CompilerOptions(
+      ignoreUnusedVariablesWarnings = Some(true),
+      ignoreUnusedFieldsWarnings = Some(true),
+      ignoreReadonlyCheckWarnings = Some(true)
+    )
+    val newResult =
+      serverUtils.compileContract(query.copy(compilerOptions = Some(compilerOptions))).rightValue
+    newResult.warnings.isEmpty is true
   }
 
   it should "compile project" in new Fixture {
@@ -1682,6 +1692,15 @@ class ServerUtilsSpec extends AlephiumSpec {
         "Found unused variables in Main: main.c",
         "Found unused fields in Main: b"
       )
+
+      info("Turn off warnings")
+      val compilerOptions = CompilerOptions(
+        ignoreUnusedVariablesWarnings = Some(true),
+        ignoreUnusedFieldsWarnings = Some(true)
+      )
+      val newResult =
+        serverUtils.compileScript(query.copy(compilerOptions = Some(compilerOptions))).rightValue
+      newResult.warnings.isEmpty is true
     }
   }
 
