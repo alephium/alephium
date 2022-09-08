@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "1.5.0"
+    "version": "1.4.4"
   },
   "servers": [
     {
@@ -7527,6 +7527,111 @@
         }
       }
     },
+    "/miners/cpu-mining/mine-one-block": {
+      "post": {
+        "tags": [
+          "Miners"
+        ],
+        "summary": "Mine a block on CPU miner. !!! for test only !!!",
+        "operationId": "postMinersCpu-miningMine-one-block",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MineOneBlock"
+              },
+              "examples": {
+                "Chain index": {
+                  "value": {
+                    "fromGroup": 0,
+                    "toGroup": 1
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                },
+                "example": true
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/miners/addresses": {
       "get": {
         "tags": [
@@ -9713,6 +9818,23 @@
           }
         }
       },
+      "MineOneBlock": {
+        "required": [
+          "fromGroup",
+          "toGroup"
+        ],
+        "type": "object",
+        "properties": {
+          "fromGroup": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toGroup": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "MinerAddresses": {
         "required": [
           "addresses"
@@ -10705,12 +10827,12 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "ValArray": "#/components/schemas/ValArray",
-            "ValI256": "#/components/schemas/ValI256",
             "ValAddress": "#/components/schemas/ValAddress",
+            "ValArray": "#/components/schemas/ValArray",
+            "ValBool": "#/components/schemas/ValBool",
             "ValByteVec": "#/components/schemas/ValByteVec",
-            "ValU256": "#/components/schemas/ValU256",
-            "ValBool": "#/components/schemas/ValBool"
+            "ValI256": "#/components/schemas/ValI256",
+            "ValU256": "#/components/schemas/ValU256"
           }
         }
       },

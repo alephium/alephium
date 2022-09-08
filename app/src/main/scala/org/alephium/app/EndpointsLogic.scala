@@ -48,6 +48,7 @@ import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.serde._
 import org.alephium.util._
 
+// scalastyle:off file.size.limit
 // scalastyle:off method.length
 trait EndpointsLogic extends Endpoints {
   def node: Node
@@ -510,6 +511,22 @@ trait EndpointsLogic extends Endpoints {
           )
         case None => Left(ApiError.InternalServerError(s"Miner addresses are not set up"))
       }
+  }
+
+  val mineOneBlockLogic = serverLogic(mineOneBlock) { case MineOneBlock(fromGroup, toGroup) =>
+    withSyncedClique {
+      ChainIndex.from(fromGroup, toGroup) match {
+        case Some(chainIndex) => serverUtils.execute(txHandler ! TxHandler.MineOneBlock(chainIndex))
+        case None =>
+          Future.successful(
+            Left(
+              ApiError.BadRequest(
+                s"Invalid group parameter: ${fromGroup} or ${toGroup}"
+              )
+            )
+          )
+      }
+    }
   }
 
   val minerUpdateAddressesLogic = serverLogic(minerUpdateAddresses) { minerAddresses =>

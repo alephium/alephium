@@ -521,6 +521,50 @@ abstract class RestServerSpec(
         "The clique is not synced"
       )
     }
+
+    Post(s"/miners/cpu-mining/mine-one-block",
+      body =
+      s"""
+         |{
+         |  "fromGroup": ${dummyGroup.group},
+         |  "toGroup": ${dummyGroup.group}
+         |}
+    """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.ServiceUnavailable
+      response.as[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
+        "The clique is not synced"
+      )
+    }
+
+    interCliqueSynced = true
+    Post(
+      s"/miners/cpu-mining/mine-one-block",
+      body = s"""
+                |{
+                |  "fromGroup": ${dummyGroup.group},
+                |  "toGroup": ${dummyGroup.group}
+                |}
+      """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.Ok
+      response.as[Boolean] is true
+    }
+
+    Post(
+      s"/miners/cpu-mining/mine-one-block",
+      body = s"""
+                |{
+                |  "fromGroup": ${dummyGroup.group},
+                |  "toGroup": ${brokerConfig.groups + 1}
+                |}
+      """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.BadRequest
+      response.as[ApiError.BadRequest] is ApiError.BadRequest(
+        s"Invalid group parameter: ${dummyGroup.group} or ${brokerConfig.groups + 1}"
+      )
+    }
   }
 
   it should "call GET /miners/addresses" in {

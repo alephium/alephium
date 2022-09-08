@@ -57,10 +57,11 @@ object TxHandler {
   final case class AddToGrandPool(txs: AVector[TransactionTemplate])         extends Command
   final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
-  case object CleanSharedPool      extends Command
-  case object CleanPendingPool     extends Command
-  private case object BroadcastTxs extends Command
-  private case object DownloadTxs  extends Command
+  final case class MineOneBlock(chainIndex: ChainIndex) extends Command
+  case object CleanSharedPool                           extends Command
+  case object CleanPendingPool                          extends Command
+  private case object BroadcastTxs                      extends Command
+  private case object DownloadTxs                       extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: TransactionId)              extends Event
@@ -201,6 +202,8 @@ class TxHandler(
     case TxHandler.TxAnnouncements(txs) => handleAnnouncements(txs)
     case TxHandler.BroadcastTxs         => broadcastTxs()
     case TxHandler.DownloadTxs          => downloadTxs()
+    case TxHandler.MineOneBlock(chainIndex) =>
+      TxHandler.mineTxForDev(blockFlow, chainIndex).swap.foreach(log.error(_))
     case TxHandler.CleanSharedPool =>
       log.debug("Start to clean shared pools")
       val results = blockFlow.grandPool.cleanAndExtractReadyTxs(
