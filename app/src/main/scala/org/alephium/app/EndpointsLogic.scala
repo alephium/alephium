@@ -515,15 +515,19 @@ trait EndpointsLogic extends Endpoints {
 
   val mineOneBlockLogic = serverLogic(mineOneBlock) { case MineOneBlock(fromGroup, toGroup) =>
     withSyncedClique {
-      ChainIndex.from(fromGroup, toGroup) match {
-        case Some(chainIndex) => serverUtils.execute(txHandler ! TxHandler.MineOneBlock(chainIndex))
-        case None =>
+      val groups = Array(fromGroup, toGroup)
+      groups.find(!GroupIndex.validate(_)) match {
+        case Some(group) =>
           Future.successful(
             Left(
               ApiError.BadRequest(
-                s"Invalid group parameter: ${fromGroup} or ${toGroup}"
+                s"Invalid group parameter: ${group}"
               )
             )
+          )
+        case None =>
+          serverUtils.execute(
+            txHandler ! TxHandler.MineOneBlock(ChainIndex.unsafe(fromGroup, toGroup))
           )
       }
     }

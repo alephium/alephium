@@ -522,13 +522,13 @@ abstract class RestServerSpec(
       )
     }
 
-    Post(s"/miners/cpu-mining/mine-one-block",
-      body =
-      s"""
-         |{
-         |  "fromGroup": ${dummyGroup.group},
-         |  "toGroup": ${dummyGroup.group}
-         |}
+    Post(
+      s"/miners/cpu-mining/mine-one-block",
+      body = s"""
+                |{
+                |  "fromGroup": ${dummyGroup.group},
+                |  "toGroup": ${dummyGroup.group}
+                |}
     """.stripMargin
     ) check { response =>
       response.code is StatusCode.ServiceUnavailable
@@ -562,7 +562,7 @@ abstract class RestServerSpec(
     ) check { response =>
       response.code is StatusCode.BadRequest
       response.as[ApiError.BadRequest] is ApiError.BadRequest(
-        s"Invalid group parameter: ${dummyGroup.group} or ${brokerConfig.groups + 1}"
+        s"Invalid group parameter: ${brokerConfig.groups + 1}"
       )
     }
   }
