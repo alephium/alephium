@@ -523,13 +523,7 @@ abstract class RestServerSpec(
     }
 
     Post(
-      s"/miners/cpu-mining/mine-one-block",
-      body = s"""
-                |{
-                |  "fromGroup": ${dummyGroup.group},
-                |  "toGroup": ${dummyGroup.group}
-                |}
-    """.stripMargin
+      s"/miners/cpu-mining/mine-one-block?fromGroup=${dummyGroup.group}&toGroup=${dummyGroup.group}"
     ) check { response =>
       response.code is StatusCode.ServiceUnavailable
       response.as[ApiError.ServiceUnavailable] is ApiError.ServiceUnavailable(
@@ -539,30 +533,27 @@ abstract class RestServerSpec(
 
     interCliqueSynced = true
     Post(
-      s"/miners/cpu-mining/mine-one-block",
-      body = s"""
-                |{
-                |  "fromGroup": ${dummyGroup.group},
-                |  "toGroup": ${dummyGroup.group}
-                |}
-      """.stripMargin
+      s"/miners/cpu-mining/mine-one-block?fromGroup=${dummyGroup.group}&toGroup=${dummyGroup.group}"
     ) check { response =>
       response.code is StatusCode.Ok
       response.as[Boolean] is true
     }
 
     Post(
-      s"/miners/cpu-mining/mine-one-block",
-      body = s"""
-                |{
-                |  "fromGroup": ${dummyGroup.group},
-                |  "toGroup": ${brokerConfig.groups + 1}
-                |}
-      """.stripMargin
+      s"/miners/cpu-mining/mine-one-block?fromGroup=${dummyGroup.group}&toGroup=${dummyGroup.group + 10}"
     ) check { response =>
       response.code is StatusCode.BadRequest
       response.as[ApiError.BadRequest] is ApiError.BadRequest(
-        s"Invalid group parameter: ${brokerConfig.groups + 1}"
+        s"Invalid value for: query parameter toGroup (Invalid group index: ${dummyGroup.group + 10})"
+      )
+    }
+
+    Post(
+      s"/miners/cpu-mining/mine-one-block?fromGroup=${dummyGroup.group}"
+    ) check { response =>
+      response.code is StatusCode.BadRequest
+      response.as[ApiError.BadRequest] is ApiError.BadRequest(
+        s"Invalid value for: query parameter toGroup"
       )
     }
   }

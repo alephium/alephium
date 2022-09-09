@@ -7534,24 +7534,26 @@
         ],
         "summary": "Mine a block on CPU miner. !!! for test only !!!",
         "operationId": "postMinersCpu-miningMine-one-block",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MineOneBlock"
-              },
-              "examples": {
-                "Chain index": {
-                  "value": {
-                    "fromGroup": 0,
-                    "toGroup": 1
-                  }
-                }
-              }
+        "parameters": [
+          {
+            "name": "fromGroup",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           },
-          "required": true
-        },
+          {
+            "name": "toGroup",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -9815,23 +9817,6 @@
         "properties": {
           "type": {
             "type": "string"
-          }
-        }
-      },
-      "MineOneBlock": {
-        "required": [
-          "fromGroup",
-          "toGroup"
-        ],
-        "type": "object",
-        "properties": {
-          "fromGroup": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "toGroup": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },

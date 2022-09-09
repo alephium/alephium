@@ -513,23 +513,11 @@ trait EndpointsLogic extends Endpoints {
       }
   }
 
-  val mineOneBlockLogic = serverLogic(mineOneBlock) { case MineOneBlock(fromGroup, toGroup) =>
+  val mineOneBlockLogic = serverLogic(mineOneBlock) { chainIndex =>
     withSyncedClique {
-      val groups = Array(fromGroup, toGroup)
-      groups.find(!GroupIndex.validate(_)) match {
-        case Some(group) =>
-          Future.successful(
-            Left(
-              ApiError.BadRequest(
-                s"Invalid group parameter: ${group}"
-              )
-            )
-          )
-        case None =>
-          serverUtils.execute(
-            txHandler ! TxHandler.MineOneBlock(ChainIndex.unsafe(fromGroup, toGroup))
-          )
-      }
+      serverUtils.execute(
+        txHandler ! TxHandler.MineOneBlock(chainIndex)
+      )
     }
   }
 

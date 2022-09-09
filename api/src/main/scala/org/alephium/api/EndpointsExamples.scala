@@ -221,8 +221,8 @@ trait EndpointsExamples extends ErrorExamples {
     Example[MinerAction](MinerAction.StopMining, Some("Stop mining"), None)
   )
 
-  implicit val mineOneBlockExamples: List[Example[MineOneBlock]] = List(
-    Example[MineOneBlock](MineOneBlock(0, 1), Some("Chain index"), None)
+  implicit val mineOneBlockExamples: List[Example[(Group, Group)]] = List(
+    Example[(Group, Group)]((Group(0), Group(1)), Some("Chain index"), None)
   )
 
   implicit val misbehaviorActionExamples: List[Example[MisbehaviorAction]] =

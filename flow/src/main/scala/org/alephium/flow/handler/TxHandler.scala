@@ -134,6 +134,17 @@ object TxHandler {
     }
   }
 
+  def forceMineForDev(blockFlow: BlockFlow, chainIndex: ChainIndex)(implicit
+      groupConfig: GroupConfig,
+      memPoolSetting: MemPoolSetting
+  ): Either[String, Unit] = {
+    if (memPoolSetting.autoMineForDev) {
+      mineTxForDev(blockFlow, chainIndex)
+    } else {
+      Left("Force mine a block for test only !")
+    }
+  }
+
   private def validateAndAddBlock(blockFlow: BlockFlow, block: Block): Either[String, Unit] = {
     val blockValidator = BlockValidation.build(blockFlow)
     blockValidator.validate(block, blockFlow) match {
@@ -203,7 +214,7 @@ class TxHandler(
     case TxHandler.BroadcastTxs         => broadcastTxs()
     case TxHandler.DownloadTxs          => downloadTxs()
     case TxHandler.MineOneBlock(chainIndex) =>
-      TxHandler.mineTxForDev(blockFlow, chainIndex).swap.foreach(log.error(_))
+      TxHandler.forceMineForDev(blockFlow, chainIndex).swap.foreach(log.error(_))
     case TxHandler.CleanSharedPool =>
       log.debug("Start to clean shared pools")
       val results = blockFlow.grandPool.cleanAndExtractReadyTxs(

@@ -358,11 +358,11 @@ trait Endpoints
       .out(jsonBody[Boolean])
       .summary("Execute an action on CPU miner. !!! for test only !!!")
 
-  val mineOneBlock: BaseEndpoint[MineOneBlock, Boolean] =
+  val mineOneBlock: BaseEndpoint[ChainIndex, Boolean] =
     minersEndpoint.post
       .in("cpu-mining")
       .in("mine-one-block")
-      .in(jsonBody[MineOneBlock])
+      .in(chainIndexQuery)
       .out(jsonBody[Boolean])
       .summary("Mine a block on CPU miner. !!! for test only !!!")
 
