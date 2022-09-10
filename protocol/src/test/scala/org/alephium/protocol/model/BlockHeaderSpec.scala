@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.model
 
+import org.alephium.crypto.Blake3
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfigFixture, GroupConfigFixture}
 import org.alephium.protocol.model.BlockHash
@@ -45,7 +46,8 @@ class BlockHeaderSpec
   }
 
   it should "extract dependencies properly" in {
-    val deps      = AVector.tabulate(groupConfig.depsNum)(i => BlockHash.hash(Seq(i.toByte)))
+    val deps =
+      AVector.tabulate(groupConfig.depsNum)(i => BlockHash.unsafe(Blake3.hash(Seq(i.toByte))))
     val blockDeps = BlockDeps.build(deps)
 
     val genesis = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
