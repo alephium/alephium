@@ -54,4 +54,6 @@ object ContractId extends HashUtils[ContractId] {
   @inline def hash(bytes: Seq[Byte]): ContractId = ContractId(Hash.hash(bytes))
 
   @inline def hash(str: String): ContractId = hash(ByteString(str))
+
+  @inline def unsafe(hash: Hash): ContractId = ContractId(hash)
 }

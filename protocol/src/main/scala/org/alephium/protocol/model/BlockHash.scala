@@ -41,4 +41,9 @@ object BlockHash extends HashUtils[BlockHash] {
   def hash(string: String): BlockHash   = ???
 
   def unsafe(str: ByteString): BlockHash = BlockHash(Blake3.unsafe(str))
+
+  def unsafe(hash: Blake3): BlockHash = BlockHash(hash)
+
+  @inline def doubleHash(byteString: ByteString): BlockHash =
+    BlockHash(Blake3.doubleHash(byteString))
 }

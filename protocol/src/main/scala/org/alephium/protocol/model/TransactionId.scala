@@ -45,4 +45,6 @@ object TransactionId extends HashUtils[TransactionId] {
   }
 
   @inline def hash(str: String): TransactionId = hash(ByteString(str))
+
+  @inline def unsafe(hash: Hash): TransactionId = TransactionId(hash)
 }

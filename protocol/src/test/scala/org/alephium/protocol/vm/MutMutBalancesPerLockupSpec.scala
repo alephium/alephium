@@ -38,7 +38,7 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
     tokens.remove(tokenIdZero)
 
     forAll(hashGen) { newTokenIdValue =>
-      tokens.addOne((TokenId(newTokenIdValue), ALPH.oneAlph))
+      tokens.addOne((TokenId.unsafe(newTokenIdValue), ALPH.oneAlph))
       MutBalancesPerLockup(ALPH.oneAlph, tokens, 1).tokenVector is AVector.from(
         tokens.toSeq.sortBy(_._1.bytes)
       )

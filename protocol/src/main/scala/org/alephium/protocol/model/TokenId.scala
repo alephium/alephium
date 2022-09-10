@@ -47,5 +47,7 @@ object TokenId extends HashUtils[TokenId] {
 
   @inline def hash(str: String): TokenId = hash(ByteString(str))
 
+  @inline def unsafe(hash: Hash): TokenId = TokenId(hash)
+
   def zero: TokenId = TokenId(Hash.zero)
 }

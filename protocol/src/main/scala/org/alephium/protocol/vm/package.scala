@@ -40,7 +40,7 @@ package object vm {
       )
     )
 
-    ContractId(value)
+    ContractId.unsafe(value)
   }
 
   // scalastyle:off magic.number

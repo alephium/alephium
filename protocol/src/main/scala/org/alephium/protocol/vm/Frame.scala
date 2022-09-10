@@ -18,7 +18,6 @@ package org.alephium.protocol.vm
 
 import scala.annotation.{switch, tailrec}
 
-import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.protocol.vm.TokenIssuance
@@ -109,9 +108,9 @@ abstract class Frame[Ctx <: StatelessContext] {
   @inline
   def popContractId(): ExeResult[ContractId] = {
     for {
-      byteVec     <- popOpStackByteVec()
-      contractKey <- Hash.from(byteVec.bytes).toRight(Right(InvalidContractAddress))
-    } yield ContractId(contractKey)
+      byteVec    <- popOpStackByteVec()
+      contractId <- ContractId.from(byteVec.bytes).toRight(Right(InvalidContractId))
+    } yield contractId
   }
 
   @inline

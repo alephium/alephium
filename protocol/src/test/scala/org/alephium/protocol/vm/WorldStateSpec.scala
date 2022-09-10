@@ -131,10 +131,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
   it should "maintain the order of the cached logs" in {
     val logInputGen = for {
-      blockHash       <- blockHashGen
-      txId            <- hashGen
-      contractIdValue <- hashGen
-    } yield (blockHash, TransactionId(txId), ContractId(contractIdValue))
+      blockHash <- blockHashGen
+    } yield (blockHash, TransactionId.random, ContractId.random)
 
     val storage = newDBStorage()
     val worldState = WorldState

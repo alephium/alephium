@@ -469,7 +469,7 @@ class ServerUtils(implicit
                 Right(
                   ContractEventByTxId(
                     logStates.blockHash,
-                    Address.contract(ContractId(logStates.eventKey)),
+                    Address.contract(ContractId.unsafe(logStates.eventKey)),
                     state.index.toInt,
                     state.fields.map(Val.from)
                   )
@@ -1018,7 +1018,7 @@ class ServerUtils(implicit
           AVector(
             ContractEventByTxId(
               logStates.blockHash,
-              Address.contract(ContractId(logStates.eventKey)),
+              Address.contract(ContractId.unsafe(logStates.eventKey)),
               state.index.toInt,
               state.fields.map(Val.from)
             )

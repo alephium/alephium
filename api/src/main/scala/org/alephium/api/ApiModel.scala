@@ -127,13 +127,13 @@ trait ApiModelCodec {
     byteStringReader.map(BlockHash.from(_).getOrElse(throw new Abort("cannot decode block hash")))
 
   implicit val tokenIdWriter: Writer[TokenId] = hashWriter.comap[TokenId](_.value)
-  implicit val tokenIdReader: Reader[TokenId] = hashReader.map(TokenId(_))
+  implicit val tokenIdReader: Reader[TokenId] = hashReader.map(TokenId.unsafe(_))
 
   implicit val contractIdWriter: Writer[ContractId] = hashWriter.comap[ContractId](_.value)
-  implicit val contractIdReader: Reader[ContractId] = hashReader.map(ContractId(_))
+  implicit val contractIdReader: Reader[ContractId] = hashReader.map(ContractId.unsafe(_))
 
   implicit val transactionIdWriter: Writer[TransactionId] = hashWriter.comap[TransactionId](_.value)
-  implicit val transactionIdReader: Reader[TransactionId] = hashReader.map(TransactionId(_))
+  implicit val transactionIdReader: Reader[TransactionId] = hashReader.map(TransactionId.unsafe(_))
 
   implicit lazy val assetAddressWriter: Writer[Address.Asset] =
     StringWriter.comap[Address.Asset](_.toBase58)

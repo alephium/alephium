@@ -16,7 +16,6 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.crypto.Blake3
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{AlephiumSpec, AVector}
@@ -24,13 +23,13 @@ import org.alephium.util.{AlephiumSpec, AVector}
 class BlockDepsSpec extends AlephiumSpec with GroupConfigFixture.Default {
 
   it should "validate number of deps" in {
-    val deps = AVector.tabulate(groupConfig.depsNum)(i => BlockHash(Blake3.hash(Seq(i.toByte))))
+    val deps = AVector.tabulate(groupConfig.depsNum)(i => BlockHash.hash(Seq(i.toByte)))
     assertThrows[IllegalArgumentException](BlockDeps.build(deps.init))
     assertThrows[IllegalArgumentException](BlockDeps.build(deps ++ deps))
   }
 
   it should "extract dependencies properly" in {
-    val deps = AVector.tabulate(groupConfig.depsNum)(i => BlockHash(Blake3.hash(Seq(i.toByte))))
+    val deps      = AVector.tabulate(groupConfig.depsNum)(i => BlockHash.hash(Seq(i.toByte)))
     val blockDeps = BlockDeps.build(deps)
     blockDeps.inDeps is deps.take(2)
     blockDeps.outDeps is deps.drop(2)
