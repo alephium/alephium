@@ -396,7 +396,7 @@ val commonSettings = publishSettings ++ Seq(
   IntegrationTest / test / wartremoverErrors := Warts.allBut(wartsTestExcludes: _*),
   fork                                       := true,
   javaOptions += "-Xss2m",
-  Test / scalacOptions ++= Seq("-Xcheckinit", "-Wconf:cat=other-non-cooperative-equals:s"),
+  Test / scalacOptions ++= Seq("-Xcheckinit"),
   Test / envVars += "ALEPHIUM_ENV" -> "test",
   Test / testOptions += Tests.Argument("-oD"),
   IntegrationTest / envVars += "ALEPHIUM_ENV" -> "it",

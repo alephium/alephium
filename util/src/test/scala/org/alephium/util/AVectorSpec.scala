@@ -326,11 +326,11 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   it should "exists" in new Fixture {
     forAll(vectorGen, ab.arbitrary) { (vc, a) =>
       val arr = vc.toArray
-      arr.foreach { elem => vc.exists(_ equals elem) is vc.contains(elem) }
-      vc.exists(_ equals a) is vc.contains(a)
+      arr.foreach { elem => vc.exists(_ == elem) is vc.contains(elem) }
+      vc.exists(_ == a) is vc.contains(a)
       vc.foreachWithIndex { (elem, index) =>
-        vc.existsWithIndex((e, i) => (e equals elem) && (i equals index)) is true
-        vc.existsWithIndex((e, i) => (e equals elem) && (i equals -1)) is false
+        vc.existsWithIndex((e, i) => (e == elem) && (i == index)) is true
+        vc.existsWithIndex((e, i) => (e == elem) && (i == -1)) is false
       }
     }
   }
@@ -377,7 +377,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
       arr.foreach { elem =>
-        vc.find(_ equals elem) is arr.find(_ equals elem)
+        vc.find(_ == elem) is arr.find(_ == elem)
         vc.find(_ => false) is arr.find(_ => false)
       }
     }
@@ -387,7 +387,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
       arr.foreach { elem =>
-        vc.indexWhere(_ equals elem) is arr.indexWhere(_ equals elem)
+        vc.indexWhere(_ == elem) is arr.indexWhere(_ == elem)
         vc.indexWhere(_ => false) is arr.indexWhere(_ => false)
       }
     }
@@ -397,7 +397,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen0.filter(_.nonEmpty)) { vc =>
       val index = Random.nextInt(vc.length)
       val vc1   = vc.replace(index, vc.head)
-      vc.indices.foreach { i => if (i equals index) vc1(i) is vc.head else vc1(i) is vc(i) }
+      vc.indices.foreach { i => if (i == index) vc1(i) is vc.head else vc1(i) is vc(i) }
     }
   }
 
@@ -514,7 +514,7 @@ class IntAVectorSpec extends AVectorSpec[Int] {
   it should "forall" in new Fixture {
     AVector.empty[Int].forall(_ > 0) is true
     AVector.empty[Int].forall(_ < 0) is true
-    AVector.empty[Int].forall(_ equals 0) is true
+    AVector.empty[Int].forall(_ == 0) is true
     AVector(1, 2, 3).forall(_ > 0) is true
     AVector(-1, 2, 3).forall(_ > 0) is false
     AVector(1, -2, 3).forall(_ > 0) is false
@@ -525,7 +525,7 @@ class IntAVectorSpec extends AVectorSpec[Int] {
 
   it should "forallE" in new FixtureF {
     forAll(vectorGen) { vc =>
-      vc.forallE(e => Right(e equals e)) isE true
+      vc.forallE(e => Right(e == e)) isE true
       vc.forallE(e => Right(e != vc.last)) isE false
       vc.forallE(_ => Left(())).isLeft is true
     }
@@ -584,7 +584,7 @@ class IntAVectorSpec extends AVectorSpec[Int] {
       }
       AVector.tabulateE[Int, Unit](n1)(Right(_)) isE AVector.tabulate(n1)(identity)
       AVector
-        .tabulateE[Int, Unit](n1)(k => if (k equals (n1 / 2)) Left(()) else Right(k))
+        .tabulateE[Int, Unit](n1)(k => if (k == (n1 / 2)) Left(()) else Right(k))
         .leftValue is ()
     }
   }
