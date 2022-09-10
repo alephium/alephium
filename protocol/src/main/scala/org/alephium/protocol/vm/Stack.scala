@@ -101,7 +101,7 @@ class Stack[@sp T: ClassTag](
       currentIndex = start
       Right(elems)
     } else if (n == 0) {
-      Right(AVector.ofSize(0))
+      Right(AVector.ofCapacity(0))
     } else {
       failed(NegativeArgumentInStack)
     }

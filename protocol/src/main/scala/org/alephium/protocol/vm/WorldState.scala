@@ -150,7 +150,7 @@ trait WorldState[T, R1, R2, R3] {
       tx: TransactionAbstract
   ): IOResult[Option[AVector[AssetOutput]]] = {
     val inputs = tx.unsigned.inputs
-    inputs.foldE[IOError, Option[AVector[AssetOutput]]](Some(AVector.ofSize(inputs.length))) {
+    inputs.foldE[IOError, Option[AVector[AssetOutput]]](Some(AVector.ofCapacity(inputs.length))) {
       case (Some(outputs), input) =>
         getAssetOpt(input.outputRef).map {
           case Some(output) => Some(outputs :+ output)

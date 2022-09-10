@@ -354,6 +354,7 @@ val commonSettings = publishSettings ++ Seq(
   Test / parallelExecution := false,
   scalacOptions ++= Seq(
     "-Xsource:3",
+    "-opt:l:method",
 //    "-Xdisable-assertions", // TODO: use this properly
     "-deprecation",
     "-encoding",

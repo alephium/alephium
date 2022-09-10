@@ -70,12 +70,12 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
 
   it should "create empty vector" in new Fixture {
     val vector = AVector.empty[A]
-    checkState(vector, 0, 0, 0, AVector.defaultSize, true)
+    checkState(vector, 0, 0, 0, 0, true)
   }
 
-  it should "create vector with ofSize" in new Fixture {
+  it should "create vector with ofCapacity" in new Fixture {
     forAll(sizeGen) { n =>
-      val vector = AVector.ofSize[A](n)
+      val vector = AVector.ofCapacity[A](n)
       checkState(vector, 0, 0, 0, n, true)
     }
   }
@@ -171,10 +171,10 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
 
   it should "grow size" in {
     val vc0 = AVector.empty[A]
-    0 to 3 * AVector.defaultSize foreach { n =>
+    1 to 3 * AVector.defaultGrowSize foreach { n =>
       vc0.ensureSize(n)
-      if (n <= AVector.defaultSize) {
-        vc0.capacity is AVector.defaultSize
+      if (n <= AVector.defaultGrowSize) {
+        vc0.capacity is AVector.defaultGrowSize
       } else {
         vc0.capacity is AVector.nextPowerOfTwo(n)
       }
@@ -438,12 +438,12 @@ class DoubleAVectorSpec  extends AVectorSpec[Double]
 class IntAVectorSpec extends AVectorSpec[Int] {
 
   it should "create vector from array" in new Fixture {
-    val vc0 = AVector(0 until AVector.defaultSize - 1: _*)
-    vc0.length is AVector.defaultSize - 1
-    vc0.capacity is AVector.defaultSize
-    val vc1 = AVector(0 until AVector.defaultSize + 1: _*)
-    vc1.length is AVector.defaultSize + 1
-    vc1.capacity is AVector.defaultSize + 1
+    val vc0 = AVector(0 until AVector.defaultGrowSize - 1: _*)
+    vc0.length is AVector.defaultGrowSize - 1
+    vc0.capacity is AVector.defaultGrowSize - 1
+    val vc1 = AVector(0 until AVector.defaultGrowSize + 1: _*)
+    vc1.length is AVector.defaultGrowSize + 1
+    vc1.capacity is AVector.defaultGrowSize + 1
   }
 
   it should "withFilter" in new Fixture {
@@ -590,9 +590,9 @@ class IntAVectorSpec extends AVectorSpec[Int] {
   }
 
   it should "fill" in new Fixture {
-    val vc = AVector.fill(AVector.defaultSize)(AVector.defaultSize)
-    vc.length is AVector.defaultSize
-    vc.foreach(_ is AVector.defaultSize)
+    val vc = AVector.fill(AVector.defaultGrowSize)(AVector.defaultGrowSize)
+    vc.length is AVector.defaultGrowSize
+    vc.foreach(_ is AVector.defaultGrowSize)
   }
 
   it should "not share the underlying array" in new Fixture {

@@ -135,7 +135,7 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLocku
         }
       }
     }
-    iter(AVector.ofSize[TxOutput](all.size), 0)
+    iter(AVector.ofCapacity[TxOutput](all.size), 0)
   }
   // scalastyle:on return
 }
