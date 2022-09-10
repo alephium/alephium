@@ -338,6 +338,7 @@ trait ApiModelCodec {
       case other          => throw Abort(s"Invalid miner action: $other")
     }
   )
+
   implicit val misbehaviorActionUnBanRW: RW[MisbehaviorAction.Unban] = macroRW
   implicit val misbehaviorActionBanRW: RW[MisbehaviorAction.Ban]     = macroRW
   implicit val misbehaviorActionRW: RW[MisbehaviorAction]            = macroRW

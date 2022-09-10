@@ -141,7 +141,9 @@ object TxHandler {
     if (memPoolSetting.autoMineForDev) {
       mineTxForDev(blockFlow, chainIndex)
     } else {
-      Left("Force mine a block for test only !")
+      Left(
+        "CPU mining for dev is not enabled, please turn it on in config:\\n alephium.mempool.auto-mine-for-dev = true"
+      )
     }
   }
 
