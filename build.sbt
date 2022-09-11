@@ -152,7 +152,6 @@ lazy val app = mainProject("app")
         assemblyMergeStrategy.value(other)
     },
     libraryDependencies ++= Seq(
-      janino,
       vertx,
       `tapir-core`,
       `tapir-vertx`,

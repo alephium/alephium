@@ -22,16 +22,16 @@
     </appender>
 
     <appender name="INFOFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium-info.log</file>
+        <file>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium.log</file>
         <append>true</append>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>INFO</level>
+            <level>${ALEPHIUM_FILE_LOG_LEVEL:-OFF}</level>
         </filter>
         <encoder>
             <pattern>${defaultPattern}</pattern>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium-info.%i.log</fileNamePattern>
+            <fileNamePattern>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium.%i.log</fileNamePattern>
             <minIndex>1</minIndex>
             <maxIndex>10</maxIndex>
         </rollingPolicy>
@@ -40,30 +40,9 @@
         </triggeringPolicy>
     </appender>
 
-    <if condition='Boolean.valueOf(property("ALEPHIUM_ENABLE_DEBUG_LOGGING"))'>
-        <then>
-            <appender name="DEBUGFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-                <file>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium-debug.log</file>
-                <append>true</append>
-                <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-                    <level>DEBUG</level>
-                </filter>
-                <encoder>
-                    <pattern>${defaultPattern}</pattern>
-                </encoder>
-                <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-                    <fileNamePattern>${ALEPHIUM_HOME:-${user.home}/.alephium}/logs/alephium-debug.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-                    <maxFileSize>100MB</maxFileSize>
-                    <maxHistory>60</maxHistory>
-                    <totalSizeCap>1GB</totalSizeCap>
-                </rollingPolicy>
-            </appender>
-        </then>
-    </if>
-
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>${ALEPHIUM_LOG_LEVEL:-INFO}</level>
+            <level>${ALEPHIUM_CONSOLE_LOG_LEVEL:-INFO}</level>
         </filter>
 
         <encoder>
@@ -77,6 +56,5 @@
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="ERRFILE"/>
         <appender-ref ref="INFOFILE"/>
-        <appender-ref ref="DEBUGFILE"/>
     </root>
 </configuration>
