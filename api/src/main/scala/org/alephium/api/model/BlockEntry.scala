@@ -18,9 +18,9 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.model.{Block, BlockDeps, BlockHeader, Nonce, Target}
+import org.alephium.protocol.model.{Block, BlockDeps, BlockHash, BlockHeader, Nonce, Target}
 import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockEntry(

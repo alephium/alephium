@@ -24,7 +24,7 @@ import org.scalatest.compatible.Assertion
 
 import org.alephium.crypto.SecP256K1Signature
 import org.alephium.macros.EnumerationMacros
-import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
+import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.message.Payload.Code
 import org.alephium.protocol.model._
 import org.alephium.serde.{serialize, Serde, SerdeError}
@@ -240,7 +240,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val requestId     = RequestId.unsafe(1)
     val tx1           = transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate
     val tx2           = transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate
-    val txsRequest    = TxsRequest(requestId, AVector((chainIndex, AVector(tx1.id, tx2.id))))
+    val txsRequest =
+      TxsRequest(requestId, AVector((chainIndex, AVector(tx1.id, tx2.id))))
     verifySerde(txsRequest) {
       // code id
       hex"0e" ++
@@ -316,7 +317,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     val txTemplate1 = transactionGen().sample.get.toTemplate
     val txTemplate2 = transactionGen().sample.get.toTemplate
     val chainIndex  = chainIndexGen.sample.get
-    val newTxHashes = NewTxHashes(AVector((chainIndex, AVector(txTemplate1.id, txTemplate2.id))))
+    val newTxHashes =
+      NewTxHashes(AVector((chainIndex, AVector(txTemplate1.id, txTemplate2.id))))
     verifySerde(newTxHashes) {
       // code id
       hex"0d" ++
@@ -413,12 +415,12 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
           hex"c03ce271334db24f37313bbbf2d4aced9c6223d1378b1f472ec56f0b30aaac04",
           TimeStamp.unsafe(12345),
           additionalData = hex"55deff667f0096ffc024ff53d6017ff5",
-          tokens = AVector((Hash.unsafe(tokenId1), U256.unsafe(2)))
+          tokens = AVector((TokenId.from(tokenId1).value, U256.unsafe(2)))
         ),
         p2pkhOutput(
           100,
           hex"c6223d72ec56f13781334db24f37313fb03ce27cccf2d4aced9b1f40b30aaac0",
-          tokens = AVector((Hash.unsafe(tokenId1), U256.unsafe(8)))
+          tokens = AVector((TokenId.from(tokenId1).value, U256.unsafe(8)))
         )
       )
 
@@ -449,7 +451,8 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
     invResponse.asInstanceOf[Payload].verify("inv-response")
 
     info("txs request / txs response")
-    val txsRequest = TxsRequest(requestId, AVector((chainIndex, AVector(tx1.id, tx2.id))))
+    val txsRequest =
+      TxsRequest(requestId, AVector((chainIndex, AVector(tx1.id, tx2.id))))
     txsRequest.asInstanceOf[Payload].verify("txs-request")
 
     val txsResponse = TxsResponse(requestId, AVector(tx1.toTemplate, tx2.toTemplate))

@@ -37,6 +37,10 @@ private[crypto] trait SignatureSchema[D <: PrivateKey, Q <: PublicKey, S <: Sign
     sign(message.toArray, privateKey.bytes.toArray)
   }
 
+  def sign(bytes: RandomBytes, privateKey: D): S = {
+    sign(bytes.bytes.toArray, privateKey.bytes.toArray)
+  }
+
   def sign(message: AVector[Byte], privateKey: D): S = {
     sign(message.toArray, privateKey.bytes.toArray)
   }

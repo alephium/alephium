@@ -21,7 +21,6 @@ import scala.collection.mutable.ArrayBuffer
 
 import akka.actor.Props
 import akka.testkit.{TestActorRef, TestProbe}
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{maxSyncBlocksPerChain, BlockFlow}
@@ -245,9 +244,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
     state.pending.contains(block0.hash) is false
   }
 
-  it should "remove pending hashes based on expiry duration" in new Fixture
-    with Eventually
-    with IntegrationPatience {
+  it should "remove pending hashes based on expiry duration" in new Fixture {
     override val configValues = Map(
       ("alephium.broker.broker-num", 1),
       ("alephium.broker.groups", 1),

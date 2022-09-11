@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.network.broker.BrokerHandler
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{AVector, BaseActor, Duration, TimeStamp}
 
 trait DownloadTracker extends BaseActor {

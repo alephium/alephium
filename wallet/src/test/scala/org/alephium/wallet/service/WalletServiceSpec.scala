@@ -214,10 +214,10 @@ class WalletServiceSpec extends AlephiumFutureSpec {
   it should "sign a transaction" in new UserWallet with TxGenerators {
     val unsignedTx = transactionGen().sample.get.unsigned
 
-    val expected = SignatureSchema.sign(unsignedTx.hash.bytes, privateKey)
+    val expected = SignatureSchema.sign(unsignedTx.id, privateKey)
 
     walletService
-      .sign(walletName, unsignedTx.hash.toHexString)
+      .sign(walletName, unsignedTx.id.toHexString)
       .rightValue is expected
   }
 

@@ -19,14 +19,14 @@ package org.alephium.protocol.vm
 import akka.util.ByteString
 
 import org.alephium.io._
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
 
 trait WorldState[T, R1, R2, R3] {
   def outputState: MutableKV[TxOutputRef, TxOutput, R1]
-  def contractState: MutableKV[Hash, ContractState, R2]
+  def contractState: MutableKV[ContractId, ContractState, R2]
   def codeState: MutableKV[Hash, WorldState.CodeRecord, R3]
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -67,21 +67,21 @@ trait WorldState[T, R1, R2, R3] {
     outputState.exists(outputRef)
   }
 
-  def getContractState(key: Hash): IOResult[ContractState] = {
-    contractState.get(key)
+  def getContractState(id: ContractId): IOResult[ContractState] = {
+    contractState.get(id)
   }
 
-  def contractExists(key: Hash): IOResult[Boolean] = {
-    contractState.exists(key)
+  def contractExists(id: ContractId): IOResult[Boolean] = {
+    contractState.exists(id)
   }
 
-  def getContractCode(key: Hash): IOResult[WorldState.CodeRecord] = {
-    codeState.get(key)
+  def getContractCode(id: Hash): IOResult[WorldState.CodeRecord] = {
+    codeState.get(id)
   }
 
-  def getContractAsset(key: Hash): IOResult[ContractOutput] = {
+  def getContractAsset(id: ContractId): IOResult[ContractOutput] = {
     for {
-      state  <- getContractState(key)
+      state  <- getContractState(id)
       output <- getContractAsset(state.contractOutputRef)
     } yield output
   }
@@ -99,7 +99,7 @@ trait WorldState[T, R1, R2, R3] {
     } yield output
   }
 
-  def getContractObj(key: Hash): IOResult[StatefulContractObject] = {
+  def getContractObj(key: ContractId): IOResult[StatefulContractObject] = {
     for {
       state <- getContractState(key)
       code  <- getContractCode(state.codeHash)
@@ -116,15 +116,19 @@ trait WorldState[T, R1, R2, R3] {
       output: ContractOutput
   ): IOResult[T]
 
-  def updateContractUnsafe(key: Hash, fields: AVector[Val]): IOResult[T]
+  def updateContractUnsafe(key: ContractId, fields: AVector[Val]): IOResult[T]
 
-  def updateContract(key: Hash, outputRef: ContractOutputRef, output: ContractOutput): IOResult[T]
+  def updateContract(
+      key: ContractId,
+      outputRef: ContractOutputRef,
+      output: ContractOutput
+  ): IOResult[T]
 
-  protected[vm] def updateContract(key: Hash, state: ContractState): IOResult[T]
+  protected[vm] def updateContract(key: ContractId, state: ContractState): IOResult[T]
 
   def removeAsset(outputRef: TxOutputRef): IOResult[T]
 
-  def removeContract(contractKey: Hash): IOResult[T]
+  def removeContract(contractKey: ContractId): IOResult[T]
 
   protected def removeContractCode(
       currentState: ContractState,
@@ -183,7 +187,7 @@ sealed abstract class MutableWorldState extends WorldState[Unit, Unit, Unit, Uni
     } yield (state.contractOutputRef, output)
   }
 
-  def updateContractUnsafe(key: Hash, fields: AVector[Val]): IOResult[Unit] = {
+  def updateContractUnsafe(key: ContractId, fields: AVector[Val]): IOResult[Unit] = {
     for {
       oldState <- getContractState(key)
       newState <- updateContract(key, oldState.updateFieldsUnsafe(fields))
@@ -191,7 +195,7 @@ sealed abstract class MutableWorldState extends WorldState[Unit, Unit, Unit, Uni
   }
 
   def updateContract(
-      key: Hash,
+      key: ContractId,
       outputRef: ContractOutputRef,
       output: ContractOutput
   ): IOResult[Unit]
@@ -202,10 +206,10 @@ sealed abstract class ImmutableWorldState
     extends WorldState[
       ImmutableWorldState,
       SparseMerkleTrie[TxOutputRef, TxOutput],
-      SparseMerkleTrie[Hash, ContractState],
+      SparseMerkleTrie[ContractId, ContractState],
       SparseMerkleTrie[Hash, WorldState.CodeRecord]
     ] {
-  def updateContractUnsafe(key: Hash, fields: AVector[Val]): IOResult[ImmutableWorldState] = {
+  def updateContractUnsafe(key: ContractId, fields: AVector[Val]): IOResult[ImmutableWorldState] = {
     for {
       oldState <- getContractState(key)
       newState <- updateContract(key, oldState.updateFieldsUnsafe(fields))
@@ -232,7 +236,7 @@ object WorldState {
 
   final case class Persisted(
       outputState: SparseMerkleTrie[TxOutputRef, TxOutput],
-      contractState: SparseMerkleTrie[Hash, ContractState],
+      contractState: SparseMerkleTrie[ContractId, ContractState],
       codeState: SparseMerkleTrie[Hash, CodeRecord],
       logState: KeyValueStorage[LogStatesId, LogStates],
       logCounterState: KeyValueStorage[Hash, Int]
@@ -294,20 +298,20 @@ object WorldState {
       val state = ContractState.unsafe(code, fields, outputRef)
       for {
         newOutputState   <- outputState.put(outputRef, output)
-        newContractState <- contractState.put(outputRef.key, state)
+        newContractState <- contractState.put(contractId, state)
         recordOpt        <- codeState.getOpt(code.hash)
         newCodeState     <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
       } yield Persisted(newOutputState, newContractState, newCodeState, logState, logCounterState)
     }
 
-    def updateContract(key: Hash, state: ContractState): IOResult[Persisted] = {
+    def updateContract(key: ContractId, state: ContractState): IOResult[Persisted] = {
       contractState
         .put(key, state)
         .map(Persisted(outputState, _, codeState, logState, logCounterState))
     }
 
     def updateContract(
-        key: Hash,
+        key: ContractId,
         outputRef: ContractOutputRef,
         output: ContractOutput
     ): IOResult[Persisted] = {
@@ -324,7 +328,7 @@ object WorldState {
         .map(Persisted(_, contractState, codeState, logState, logCounterState))
     }
 
-    def removeContract(contractKey: Hash): IOResult[Persisted] = {
+    def removeContract(contractKey: ContractId): IOResult[Persisted] = {
       for {
         state            <- getContractState(contractKey)
         newOutputState   <- outputState.remove(state.contractOutputRef)
@@ -357,7 +361,7 @@ object WorldState {
 
   sealed abstract class AbstractCached extends MutableWorldState {
     def outputState: MutableKV[TxOutputRef, TxOutput, Unit]
-    def contractState: MutableKV[Hash, ContractState, Unit]
+    def contractState: MutableKV[ContractId, ContractState, Unit]
     def codeState: MutableKV[Hash, CodeRecord, Unit]
     def logState: MutableKV[LogStatesId, LogStates, Unit]
     def logCounterState: MutableKV[Hash, Int, Unit] with MutableKV.WithInitialValue[Hash, Int, Unit]
@@ -382,12 +386,12 @@ object WorldState {
       } yield ()
     }
 
-    def updateContract(key: Hash, state: ContractState): IOResult[Unit] = {
+    def updateContract(key: ContractId, state: ContractState): IOResult[Unit] = {
       contractState.put(key, state)
     }
 
     def updateContract(
-        key: Hash,
+        key: ContractId,
         outputRef: ContractOutputRef,
         output: ContractOutput
     ): IOResult[Unit] = {
@@ -417,7 +421,7 @@ object WorldState {
       outputState.remove(outputRef)
     }
 
-    def removeContract(contractKey: Hash): IOResult[Unit] = {
+    def removeContract(contractKey: ContractId): IOResult[Unit] = {
       for {
         state      <- getContractState(contractKey)
         _          <- outputState.remove(state.contractOutputRef)
@@ -440,7 +444,7 @@ object WorldState {
 
     def writeLogForContract(
         blockHash: BlockHash,
-        txId: Hash,
+        txId: TransactionId,
         contractId: ContractId,
         fields: AVector[Val],
         indexByTxId: Boolean
@@ -448,7 +452,7 @@ object WorldState {
       getIndex(fields) match {
         case Some(index) =>
           val state = LogState(txId, index, fields.tail)
-          writeLog(blockHash, contractId, state).flatMap { case (id, offset) =>
+          writeLog(blockHash, contractId.value, state).flatMap { case (id, offset) =>
             if (indexByTxId) {
               writeLogIndexByTxId(blockHash, txId, id, offset)
             } else {
@@ -483,13 +487,13 @@ object WorldState {
 
     private[WorldState] def writeLogIndexByTxId(
         blockHash: BlockHash,
-        txId: Hash,
+        txId: TransactionId,
         id: LogStatesId,
         offset: Int
     ): IOResult[Unit] = {
       val logRef = LogStateRef(id, offset)
       val state  = LogState(txId, eventRefIndex, logRef.toFields)
-      writeLog(blockHash, txId, state).map(_ => ())
+      writeLog(blockHash, txId.value, state).map(_ => ())
     }
 
     private[WorldState] def getIndex(
@@ -504,7 +508,7 @@ object WorldState {
 
   final case class Cached(
       outputState: CachedSMT[TxOutputRef, TxOutput],
-      contractState: CachedSMT[Hash, ContractState],
+      contractState: CachedSMT[ContractId, ContractState],
       codeState: CachedSMT[Hash, CodeRecord],
       logState: CachedLogStates,
       logCounterState: CachedLogCounterState
@@ -537,7 +541,7 @@ object WorldState {
 
   final case class Staging(
       outputState: StagingSMT[TxOutputRef, TxOutput],
-      contractState: StagingSMT[Hash, ContractState],
+      contractState: StagingSMT[ContractId, ContractState],
       codeState: StagingSMT[Hash, CodeRecord],
       logState: StagingLogStates,
       logCounterState: StagingLogCounterState
@@ -573,7 +577,7 @@ object WorldState {
     val emptyState =
       ContractState.unsafe(StatefulContract.forSMT, AVector.empty, genesisRef)
     val emptyCode         = CodeRecord(StatefulContract.forSMT, 0)
-    val emptyContractTrie = SparseMerkleTrie.unsafe(trieStorage, Hash.zero, emptyState)
+    val emptyContractTrie = SparseMerkleTrie.unsafe(trieStorage, ContractId(Hash.zero), emptyState)
     val emptyCodeTrie     = SparseMerkleTrie.unsafe(trieStorage, Hash.zero, emptyCode)
     Persisted(emptyOutputTrie, emptyContractTrie, emptyCodeTrie, logStorage, logCounterStorage)
   }
@@ -592,9 +596,10 @@ object WorldState {
         logStorage: KeyValueStorage[LogStatesId, LogStates],
         logCounterStorage: KeyValueStorage[Hash, Int]
     ): Persisted = {
-      val outputState   = SparseMerkleTrie[TxOutputRef, TxOutput](outputStateHash, trieStorage)
-      val contractState = SparseMerkleTrie[Hash, ContractState](contractStateHash, trieStorage)
-      val codeState     = SparseMerkleTrie[Hash, CodeRecord](codeStateHash, trieStorage)
+      val outputState = SparseMerkleTrie[TxOutputRef, TxOutput](outputStateHash, trieStorage)
+      val contractState =
+        SparseMerkleTrie[ContractId, ContractState](contractStateHash, trieStorage)
+      val codeState = SparseMerkleTrie[Hash, CodeRecord](codeStateHash, trieStorage)
       Persisted(outputState, contractState, codeState, logStorage, logCounterStorage)
     }
 

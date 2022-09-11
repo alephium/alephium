@@ -368,7 +368,7 @@ object NewBlockHash extends Payload.Serding[NewBlockHash] with Payload.Code {
 }
 
 trait IndexedHashes {
-  def hashes: AVector[(ChainIndex, AVector[Hash])]
+  def hashes: AVector[(ChainIndex, AVector[TransactionId])]
 }
 
 sealed trait IndexedSerding[T <: IndexedHashes with Payload] extends Payload.ValidatedSerding[T] {
@@ -382,13 +382,13 @@ sealed trait IndexedSerding[T <: IndexedHashes with Payload] extends Payload.Val
 }
 
 object IndexedSerding {
-  implicit private[message] val txSerde: Serde[(ChainIndex, AVector[Hash])] = {
+  implicit private[message] val txSerde: Serde[(ChainIndex, AVector[TransactionId])] = {
     implicit val indexSerde: Serde[ChainIndex] =
       Serde.forProduct2[Int, Int, ChainIndex](
         (from, to) => ChainIndex(new GroupIndex(from), new GroupIndex(to)),
         chainIndex => (chainIndex.from.value, chainIndex.to.value)
       )
-    Serde.tuple2[ChainIndex, AVector[Hash]]
+    Serde.tuple2[ChainIndex, AVector[TransactionId]]
   }
 
   @inline private def check(
@@ -398,7 +398,7 @@ object IndexedSerding {
   }
 }
 
-final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[Hash])])
+final case class NewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId])])
     extends Payload.UnSolicited
     with IndexedHashes {
   override def measure(): Unit = NewTxHashes.payloadLabeled.inc()
@@ -409,7 +409,7 @@ object NewTxHashes extends IndexedSerding[NewTxHashes] with Payload.Code {
   implicit val serde: Serde[NewTxHashes] = Serde.forProduct1(NewTxHashes.apply, t => t.hashes)
 }
 
-final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[Hash])])
+final case class TxsRequest(id: RequestId, hashes: AVector[(ChainIndex, AVector[TransactionId])])
     extends Payload.Solicited
     with IndexedHashes {
   override def measure(): Unit = TxsRequest.payloadLabeled.inc()
@@ -419,7 +419,7 @@ object TxsRequest extends IndexedSerding[TxsRequest] with Payload.Code {
   import IndexedSerding.txSerde
   implicit val serde: Serde[TxsRequest] = Serde.forProduct2(apply, p => (p.id, p.hashes))
 
-  def apply(hashes: AVector[(ChainIndex, AVector[Hash])]): TxsRequest =
+  def apply(hashes: AVector[(ChainIndex, AVector[TransactionId])]): TxsRequest =
     TxsRequest(RequestId.random(), hashes)
 }
 

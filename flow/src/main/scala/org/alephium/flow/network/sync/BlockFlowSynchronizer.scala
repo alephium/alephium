@@ -25,9 +25,8 @@ import org.alephium.flow.handler.{AllHandlers, FlowHandler, IOBaseActor}
 import org.alephium.flow.network._
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.BrokerInfo
+import org.alephium.protocol.model.{BlockHash, BrokerInfo}
 import org.alephium.util.{ActorRefT, AVector}
 import org.alephium.util.EventStream.Subscriber
 

@@ -30,7 +30,7 @@ import org.alephium.api.TapirSchemasLike
 import org.alephium.api.UtilJson.{avectorReadWriter, inetAddressRW}
 import org.alephium.api.model._
 import org.alephium.json.Json.ReadWriter
-import org.alephium.protocol.{ALPH, BlockHash, Hash}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
@@ -324,20 +324,20 @@ trait Endpoints
       .summary("Submit a multi-signed transaction")
 
   lazy val getTransactionStatus
-      : BaseEndpoint[(Hash, Option[GroupIndex], Option[GroupIndex]), TxStatus] =
+      : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), TxStatus] =
     transactionsEndpoint.get
       .in("status")
-      .in(query[Hash]("txId"))
+      .in(query[TransactionId]("txId"))
       .in(query[Option[GroupIndex]]("fromGroup"))
       .in(query[Option[GroupIndex]]("toGroup"))
       .out(jsonBody[TxStatus])
       .summary("Get tx status")
 
   lazy val getTransactionStatusLocal
-      : BaseEndpoint[(Hash, Option[GroupIndex], Option[GroupIndex]), TxStatus] =
+      : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), TxStatus] =
     transactionsEndpoint.get
       .in("local-status")
-      .in(query[Hash]("txId"))
+      .in(query[TransactionId]("txId"))
       .in(query[Option[GroupIndex]]("fromGroup"))
       .in(query[Option[GroupIndex]]("toGroup"))
       .out(jsonBody[TxStatus])
@@ -473,9 +473,10 @@ trait Endpoints
       .out(jsonBody[Int])
       .summary("Get current value of the events counter for a contract")
 
-  lazy val getEventsByTxId: BaseEndpoint[(Hash, Option[GroupIndex]), ContractEventsByTxId] =
+  lazy val getEventsByTxId
+      : BaseEndpoint[(TransactionId, Option[GroupIndex]), ContractEventsByTxId] =
     eventsByTxIdEndpoint.get
-      .in(path[Hash]("txId"))
+      .in(path[TransactionId]("txId"))
       .in(query[Option[GroupIndex]]("group"))
       .out(jsonBody[ContractEventsByTxId])
       .summary("Get events for a TxScript")

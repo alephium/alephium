@@ -36,11 +36,11 @@ trait ApiModelFixture
   val script  = vm.StatefulScript.unsafe(methods)
   val assetTxOutputRef = AssetOutputRef.unsafe(
     Hint.unsafe(0),
-    hashGen.sample.get
+    TxOutputRef.unsafeKey(hashGen.sample.get)
   )
   val contractTxOutputRef = ContractOutputRef.unsafe(
     Hint.unsafe(0),
-    hashGen.sample.get
+    TxOutputRef.unsafeKey(hashGen.sample.get)
   )
   val (priKey, pubKey) = keypairGen.sample.get
 
@@ -57,7 +57,7 @@ trait ApiModelFixture
 
   val contractOutput = TxOutput.contract(
     ALPH.oneAlph,
-    LockupScript.p2c(Hash.zero)
+    LockupScript.p2c(ContractId.zero)
   )
 
   val unsignedTransaction = UnsignedTransaction(

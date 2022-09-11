@@ -103,7 +103,7 @@ object TxOutput {
 
   // TODO: improve this when vm is mature
   def forSMT: TxOutput =
-    ContractOutput(U256.One, LockupScript.p2c(Hash.zero), AVector.empty)
+    ContractOutput(U256.One, LockupScript.p2c(ContractId(Hash.zero)), AVector.empty)
 }
 
 /** @param amount

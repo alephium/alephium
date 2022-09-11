@@ -18,8 +18,8 @@ package org.alephium.flow.handler
 
 import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
+import akka.util.Timeout
 import org.scalacheck.Gen
-import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlowState
@@ -27,10 +27,10 @@ import org.alephium.flow.model.{PersistedTxId, ReadyTxInfo}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.validation.NonExistInput
-import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
 import org.alephium.serde.serialize
-import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, Hex, TimeStamp}
+import org.alephium.util._
 
 class TxHandlerSpec extends AlephiumFlowActorSpec {
 
@@ -106,9 +106,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     setSynced()
     txHandler ! TxHandler.AddToSharedPool(AVector(tx0))
     expectMsg(TxHandler.AddSucceeded(tx0.id))
-    mempool.getSharedPool(tx0.chainIndex).contains(tx0.id) is true
-    txHandler.underlyingActor.txsBuffer.contains(tx0) is true
-    txHandler.underlyingActor.delayedTxs.contains(tx0) is false
+    eventually {
+      mempool.getSharedPool(tx0.chainIndex).contains(tx0.id) is true
+      txHandler.underlyingActor.txsBuffer.contains(tx0) is true
+      txHandler.underlyingActor.delayedTxs.contains(tx0) is false
+    }
 
     addAndCheck(blockFlow, block0)
     val block1     = transfer(blockFlow, privKey0, pubKey1, ALPH.alph(1))
@@ -118,9 +120,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     worldState.existOutput(tx1.unsigned.inputs.head.outputRef) isE true
     txHandler ! TxHandler.AddToSharedPool(AVector(tx1))
     expectMsg(TxHandler.AddSucceeded(tx1.id))
-    mempool.getSharedPool(tx1.chainIndex).contains(tx1.id) is true
-    txHandler.underlyingActor.txsBuffer.contains(tx1) is false
-    txHandler.underlyingActor.delayedTxs.contains(tx1) is true
+    eventually {
+      mempool.getSharedPool(tx1.chainIndex).contains(tx1.id) is true
+      txHandler.underlyingActor.txsBuffer.contains(tx1) is false
+      txHandler.underlyingActor.delayedTxs.contains(tx1) is true
+    }
 
     broadcastTxProbe.expectMsg(
       InterCliqueManager.BroadCastTx(AVector(tx0.chainIndex -> AVector(tx0.id)))
@@ -154,8 +158,10 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     worldState.existOutput(tx.unsigned.inputs.head.outputRef) isE false
     txHandler ! TxHandler.AddToSharedPool(AVector(tx))
     expectMsg(TxHandler.AddSucceeded(tx.id))
-    txHandler.underlyingActor.txsBuffer.contains(tx) is false
-    txHandler.underlyingActor.delayedTxs.contains(tx) is true
+    eventually {
+      txHandler.underlyingActor.txsBuffer.contains(tx) is false
+      txHandler.underlyingActor.delayedTxs.contains(tx) is true
+    }
     broadcastTxProbe.expectMsg(
       InterCliqueManager.BroadCastTx(AVector(tx.chainIndex -> AVector(tx.id)))
     )
@@ -204,30 +210,38 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     def addReadyTx(tx: TransactionTemplate) = {
       txHandler ! TxHandler.AddToSharedPool(AVector(tx))
-      sharedPool.contains(tx.id) is true
-      txHandler.underlyingActor.txsBuffer.contains(tx) is true
-      broadcastTxProbe.expectMsg(
-        InterCliqueManager.BroadCastTx(AVector(chainIndex -> AVector(tx.id)))
-      )
+      eventually {
+        sharedPool.contains(tx.id) is true
+        txHandler.underlyingActor.txsBuffer.contains(tx) is true
+        broadcastTxProbe.expectMsg(
+          InterCliqueManager.BroadCastTx(AVector(chainIndex -> AVector(tx.id)))
+        )
+      }
     }
 
     def addPendingTx(tx: TransactionTemplate): PersistedTxId = {
       txHandler ! TxHandler.AddToGrandPool(AVector(tx))
-      pendingPool.contains(tx.id) is true
-      val timestamp     = pendingPool.timestamps.unsafe(tx.id)
-      val persistedTxId = PersistedTxId(timestamp, tx.id)
-      pendingTxStorage.get(persistedTxId) isE tx
-      persistedTxId
+      eventually {
+        pendingPool.contains(tx.id) is true
+        val timestamp     = pendingPool.timestamps.unsafe(tx.id)
+        val persistedTxId = PersistedTxId(timestamp, tx.id)
+        pendingTxStorage.get(persistedTxId) isE tx
+        persistedTxId
+      }(patienceConfig, implicitly, implicitly)
     }
 
     def removeReadyTxs(txs: AVector[TransactionTemplate]) = {
       sharedPool.remove(txs) is txs.length
-      txs.foreach(tx => sharedPool.contains(tx.id) is false)
+      eventually {
+        txs.foreach(tx => sharedPool.contains(tx.id) is false)
+      }
     }
 
     def removePendingTxs(txs: AVector[TransactionTemplate]) = {
       pendingPool.remove(txs)
-      txs.foreach(tx => pendingPool.contains(tx.id) is false)
+      eventually {
+        txs.foreach(tx => pendingPool.contains(tx.id) is false)
+      }
     }
 
     setSynced()
@@ -237,11 +251,13 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     addReadyTx(tx0)
     val persistedTxId = addPendingTx(tx1)
     info("Pending tx becomes ready")
-    readyTxStorage.exists(tx1.id) isE false
+    eventually(readyTxStorage.exists(tx1.id) isE false)
     txHandler ! TxHandler.Broadcast(AVector(tx1 -> persistedTxId.timestamp))
-    txHandler.underlyingActor.delayedTxs.contains(tx1) is true
-    pendingTxStorage.get(persistedTxId) isE tx1
-    readyTxStorage.get(tx1.id) isE ReadyTxInfo(tx1.chainIndex, persistedTxId.timestamp)
+    eventually {
+      txHandler.underlyingActor.delayedTxs.contains(tx1) is true
+      pendingTxStorage.get(persistedTxId) isE tx1
+      readyTxStorage.get(tx1.id) isE ReadyTxInfo(tx1.chainIndex, persistedTxId.timestamp)
+    }
 
     info("Remove pending tx from storage when confirmed")
     addAndCheck(blockFlow, block0)
@@ -250,8 +266,10 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     addAndCheck(blockFlow, newBlock)
     blockFlow.isTxConfirmed(tx1.id, tx1.chainIndex) isE true
     txHandler ! TxHandler.CleanPendingPool
-    pendingTxStorage.exists(persistedTxId) isE false
-    readyTxStorage.exists(tx1.id) isE false
+    eventually {
+      pendingTxStorage.exists(persistedTxId) isE false
+      readyTxStorage.exists(tx1.id) isE false
+    }
   }
 
   it should "load persisted pending txs" in new PersistenceFixture {
@@ -262,6 +280,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     removePendingTxs(AVector(tx1, tx2))
     sharedPool.txs.isEmpty is true
     pendingPool.txs.isEmpty is true
+    pendingTxStorage.exists(persistedTxId1) isE true
+    pendingTxStorage.exists(persistedTxId2) isE true
 
     info("Remove invalid persisted pending txs from storage")
     txHandler.underlyingActor.clearStorageAndLoadTxs()
@@ -270,12 +290,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     pendingTxStorage.exists(persistedTxId1) isE false
     pendingTxStorage.exists(persistedTxId2) isE false
 
+    info("Load persisted pending tx to shared pool")
     pendingTxStorage.put(persistedTxId1, tx1) isE ()
     pendingTxStorage.put(persistedTxId2, tx2) isE ()
     addAndCheck(blockFlow, block0)
     txHandler.underlyingActor.clearStorageAndLoadTxs()
-
-    info("Load persisted pending tx to shared pool")
     sharedPool.contains(tx1.id) is true
     pendingPool.contains(tx1.id) is false
     txHandler.underlyingActor.delayedTxs.contains(tx1) is true
@@ -311,15 +330,19 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val expiredTs = TimeStamp.now().minusUnsafe(memPoolSetting.cleanSharedPoolFrequency)
     sharedPool.timestamps.put(tx1.id, expiredTs)
     txHandler ! TxHandler.Broadcast(AVector(tx1 -> persistedTxId1.timestamp))
-    readyTxStorage.get(tx1.id) isE ReadyTxInfo(tx1.chainIndex, persistedTxId1.timestamp)
-    pendingTxStorage.get(persistedTxId1) isE tx1
+    eventually {
+      readyTxStorage.get(tx1.id) isE ReadyTxInfo(tx1.chainIndex, persistedTxId1.timestamp)
+      pendingTxStorage.get(persistedTxId1) isE tx1
+    }
 
     // tx1 is invalid because of reorg
     addAndCheck(blockFlow, forkedBlock0)
     addAndCheck(blockFlow, forkedBlock1)
     txHandler ! TxHandler.CleanSharedPool
-    readyTxStorage.exists(tx1.id) isE false
-    pendingTxStorage.exists(persistedTxId1) isE false
+    eventually {
+      readyTxStorage.exists(tx1.id) isE false
+      pendingTxStorage.exists(persistedTxId1) isE false
+    }
   }
 
   it should "remove invalid txs from storage when clean up pending pool" in new PersistenceFixture {
@@ -375,7 +398,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     EventFilter.warning(pattern = ".*already existed.*").intercept {
       txHandler ! addTx(tx)
-      expectMsg(TxHandler.AddFailed(tx.id, s"tx ${tx.id.toHexString} is already included"))
+      expectMsg(
+        TxHandler.AddFailed(tx.id, s"tx ${tx.id.toHexString} is already included")
+      )
       broadcastTxProbe.expectNoMessage()
     }
   }
@@ -396,7 +421,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     EventFilter.warning(pattern = ".*double spending.*").intercept {
       txHandler ! addTx(tx1)
       expectMsg(
-        TxHandler.AddFailed(tx1.id, s"tx ${tx1.id.shortHex} is double spending: ${hex(tx1)}")
+        TxHandler
+          .AddFailed(tx1.id, s"tx ${tx1.id.shortHex} is double spending: ${hex(tx1)}")
       )
       broadcastTxProbe.expectNoMessage()
     }
@@ -412,19 +438,21 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     def sendAnnouncement(
         chainIndex: ChainIndex,
-        hash: Hash,
+        txId: TransactionId,
         haveAnnouncement: Boolean
-    ): (TestProbe, AVector[(ChainIndex, AVector[Hash])]) = {
+    ): (TestProbe, AVector[(ChainIndex, AVector[TransactionId])]) = {
       val brokerHandler = TestProbe()
-      val announcement  = TxHandler.Announcement(ActorRefT(brokerHandler.ref), chainIndex, hash)
-      brokerHandler.send(txHandler, TxHandler.TxAnnouncements(AVector((chainIndex, AVector(hash)))))
-      txHandler.underlyingActor.fetching.states.contains(hash) is true
-      txHandler.underlyingActor.announcements.contains(announcement) is haveAnnouncement
-      brokerHandler -> AVector(chainIndex -> AVector(hash))
+      val announcement  = TxHandler.Announcement(ActorRefT(brokerHandler.ref), chainIndex, txId)
+      brokerHandler.send(txHandler, TxHandler.TxAnnouncements(AVector((chainIndex, AVector(txId)))))
+      eventually {
+        txHandler.underlyingActor.fetching.states.contains(txId) is true
+        txHandler.underlyingActor.announcements.contains(announcement) is haveAnnouncement
+      }
+      brokerHandler -> AVector(chainIndex -> AVector(txId))
     }
 
     val chain01     = ChainIndex.unsafe(0, 1)
-    val txHash1     = Hash.generate
+    val txHash1     = TransactionId.generate
     val maxCapacity = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
 
     setSynced()
@@ -445,8 +473,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val chain02 = ChainIndex.unsafe(0, 2)
     val chain03 = ChainIndex.unsafe(0, 3)
     val tx2     = transactionGen(chainIndexGen = Gen.const(chain02)).sample.get.toTemplate
-    val txHash3 = Hash.generate
-    val txHash4 = Hash.generate
+    val txHash3 = TransactionId.generate
+    val txHash4 = TransactionId.generate
     val mempool = blockFlow.getMemPool(chain02)
     mempool.contains(chain02, tx2.id) is false
     mempool.addNewTx(chain02, tx2, TimeStamp.now())
@@ -540,7 +568,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val tx    = block.transactions.head
     txHandler ! addTx(tx)
     expectMsg(TxHandler.AddSucceeded(tx.id))
-    blockFlow.getMemPool(chainIndex).size is 0
+    eventually(blockFlow.getMemPool(chainIndex).size is 0)
 
     val status = blockFlow.getTxStatus(tx.id, chainIndex).rightValue.get
     status is a[BlockFlowState.Confirmed]
@@ -569,7 +597,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val tx    = block.transactions.head
     txHandler ! addTx(tx)
     expectMsg(TxHandler.AddSucceeded(tx.id))
-    blockFlow.getMemPool(index).size is 0
+    eventually(blockFlow.getMemPool(index).size is 0)
 
     val status = blockFlow.getTxStatus(tx.id, index).rightValue.get
     status is a[BlockFlowState.Confirmed]
@@ -596,16 +624,27 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   trait Fixture extends FlowFixture with TxGenerators {
+    implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
+
     // use lazy here because we want to override config values
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
     lazy val txHandler =
-      TestActorRef[TxHandler](
+      newTestActorRef[TxHandler](
         TxHandler.props(blockFlow, storages.pendingTxStorage, storages.readyTxStorage)
       )
 
     def addTx(tx: Transaction) = TxHandler.AddToSharedPool(AVector(tx.toTemplate))
     def hex(tx: Transaction)   = Hex.toHexString(serialize(tx.toTemplate))
-    def setSynced()            = txHandler ! InterCliqueManager.SyncedResult(true)
+    def setSynced() = {
+      txHandler ! InterCliqueManager.SyncedResult(true)
+      eventually {
+        val result = txHandler
+          .ask(InterCliqueManager.IsSynced)
+          .mapTo[InterCliqueManager.SyncedResult]
+          .futureValue
+        result.isSynced is true
+      }
+    }
 
     val broadcastTxProbe = TestProbe()
     system.eventStream.subscribe(broadcastTxProbe.ref, classOf[InterCliqueManager.BroadCastTx])

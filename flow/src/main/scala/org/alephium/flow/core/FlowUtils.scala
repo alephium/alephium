@@ -27,7 +27,6 @@ import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.{ConsensusSetting, MemPoolSetting}
 import org.alephium.flow.validation.{BlockValidation, TxScriptExeFailed, TxValidation}
 import org.alephium.io.{IOError, IOResult, IOUtils}
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._

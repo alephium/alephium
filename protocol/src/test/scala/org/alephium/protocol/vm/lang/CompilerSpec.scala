@@ -131,7 +131,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler
         .compileContract(contract)
         .leftValue
-        .message is "No function definition in Contract Foo"
+        .message is "No function found in Contract \"Foo\""
     }
 
     {
@@ -273,7 +273,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     )
     noReturnCases.foreach { code =>
       Compiler.compileContract(code).leftValue is Compiler.Error(
-        "Expect return statement for function foo"
+        "Expected return statement for function \"foo\""
       )
     }
 
@@ -849,7 +849,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expect array type, have: U256",
+        "Expected array type, got \"U256\"",
       s"""
          |// invalid array expression
          |Contract Foo() {
@@ -860,7 +860,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expect array type, have: U256", // TODO: improve this error message
+        "Expected array type, got \"U256\"", // TODO: improve this error message
       s"""
          |// invalid array expression
          |Contract Foo() {
@@ -871,7 +871,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expect array type, have: List(U256)",
+        "Expected array type, got \"List(U256)\"",
       s"""
          |// invalid binary expression(compare array)
          |Contract Foo() {
@@ -911,7 +911,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Invalid array index type List(ByteVec)",
+        "Invalid array index type \"List(ByteVec)\", expected \"U256\"",
       s"""
          |Contract Foo() {
          |  fn foo() -> () {
@@ -920,7 +920,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Invalid array index type List(I256)",
+        "Invalid array index type \"List(I256)\", expected \"U256\"",
       s"""
          |Contract Foo() {
          |  fn foo() -> () {
@@ -1845,7 +1845,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(child).leftValue.message is
-        "Contract field z does not exist"
+        "Inherited field \"z\" does not exist in contract \"Child\""
     }
 
     {
@@ -1898,7 +1898,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(child).leftValue.message is
-        "Invalid contract inheritance fields, expect List(Argument(Ident(x),U256,true,false)), have List(Argument(Ident(x),U256,false,false))"
+        "Invalid contract inheritance fields, expected \"List(Argument(Ident(x),U256,true,false))\", got \"List(Argument(Ident(x),U256,false,false))\""
     }
 
     {
@@ -1915,7 +1915,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(child).leftValue.message is
-        "Invalid contract inheritance fields, expect List(Argument(Ident(x),U256,true,false)), have List(Argument(Ident(y),U256,true,false))"
+        "Invalid contract inheritance fields, expected \"List(Argument(Ident(x),U256,true,false))\", got \"List(Argument(Ident(y),U256,true,false))\""
     }
 
     {
@@ -2003,7 +2003,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler
         .compileContract(code(true))
         .leftValue
-        .message is "Function bar is implemented with wrong signature"
+        .message is "Function \"bar\" is implemented with wrong signature"
     }
   }
 
@@ -2062,7 +2062,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |$foo
            |""".stripMargin
       val error = Compiler.compileMultiContract(bar).leftValue
-      error.message is "Function foo is implemented with wrong signature"
+      error.message is "Function \"foo\" is implemented with wrong signature"
     }
 
     {
@@ -2227,7 +2227,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     Compiler
       .compileContract(code(true))
       .leftValue
-      .message is "Function `foo` does not use contract assets, but its annotation of contract assets is turn on"
+      .message is "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on"
   }
 
   it should "check types for braces syntax" in {
@@ -2317,7 +2317,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Expect return statement for function foo"
+        "Expected return statement for function \"foo\""
     }
 
     {
@@ -2487,7 +2487,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(code).leftValue.message is
-        "There are different types of if-else expression branches, expect List(ByteVec), have List(U256)"
+        "Invalid types of if-else expression branches, expected \"List(ByteVec)\", got \"List(U256)\""
     }
 
     {
@@ -2931,7 +2931,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     Compiler.compileContract(foo).leftValue.message is
-      "Unable to generate code for abstract contract Foo"
+      "Code generation is not supported for abstract contract \"Foo\""
   }
 
   "unused constants and enums" should "have no effect on code generation" in {
@@ -3024,7 +3024,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function foo changes state"
+        "Readonly function \"Foo.foo\" changes state"
     }
 
     {
@@ -3069,7 +3069,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function foo have invalid internal calls: transferAlphToSelf"
+        "Readonly function \"Foo.foo\" have invalid internal calls: \"transferAlphToSelf\""
     }
 
     {
@@ -3086,7 +3086,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function foo have invalid internal calls: bar"
+        "Readonly function \"Foo.foo\" have invalid internal calls: \"bar\""
     }
 
     {
@@ -3106,7 +3106,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function foo have invalid external calls: Bar.bar"
+        "Readonly function \"Foo.foo\" have invalid external calls: \"Bar.bar\""
     }
 
     {
@@ -3122,7 +3122,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function foo changes state"
+        "Readonly function \"Foo.foo\" changes state"
     }
 
     {
@@ -3162,7 +3162,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function bar have invalid external calls: Foo.update"
+        "Readonly function \"Bar.bar\" have invalid external calls: \"Foo.update\""
     }
 
     {
@@ -3182,7 +3182,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContractFull(code(true)).isRight is true
       val error = Compiler.compileContractFull(code(false)).leftValue
-      error.message is "Readonly function foo have invalid external calls: Bar.bar"
+      error.message is "Readonly function \"Foo.foo\" have invalid external calls: \"Bar.bar\""
     }
 
     {
@@ -3195,7 +3195,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
       warnings is AVector(
-        "Function foo is readonly, please use @using(readonly = true) for the function"
+        "Function Foo.foo is readonly, please use @using(readonly = true) for the function"
       )
     }
   }
@@ -3223,7 +3223,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "compile all contracts" in new MultiContractFixture {
-    val contracts = multiContract.genStatefulContracts()
+    val contracts = multiContract.genStatefulContracts()(CompilerOptions.Default)
     contracts.length is 2
     contracts(0)._2.ident.name is "Foo"
     contracts(0)._4 is 1
@@ -3232,7 +3232,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "compile all scripts" in new MultiContractFixture {
-    val scripts = multiContract.genStatefulScripts()
+    val scripts = multiContract.genStatefulScripts()(CompilerOptions.Default)
     scripts.length is 2
     scripts(0)._2.ident.name is "M1"
     scripts(1)._2.ident.name is "M2"

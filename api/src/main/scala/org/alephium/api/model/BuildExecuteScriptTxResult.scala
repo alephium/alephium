@@ -16,9 +16,8 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.UnsignedTransaction
+import org.alephium.protocol.model.{TransactionId, UnsignedTransaction}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.serde.serialize
 import org.alephium.util.Hex
@@ -29,7 +28,7 @@ final case class BuildExecuteScriptTxResult(
     unsignedTx: String,
     gasAmount: GasBox,
     gasPrice: GasPrice,
-    txId: Hash
+    txId: TransactionId
 ) extends GasInfo
     with ChainIndexInfo
 object BuildExecuteScriptTxResult {
@@ -42,6 +41,6 @@ object BuildExecuteScriptTxResult {
       Hex.toHexString(serialize(unsignedTx)),
       unsignedTx.gasAmount,
       unsignedTx.gasPrice,
-      unsignedTx.hash
+      unsignedTx.id
     )
 }

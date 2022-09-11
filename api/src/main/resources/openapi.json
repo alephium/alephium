@@ -3436,7 +3436,7 @@
                         "transactions": [
                           {
                             "unsigned": {
-                              "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                              "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                               "version": 1,
                               "networkId": 1,
                               "gasAmount": 20000,
@@ -3642,7 +3642,7 @@
                   "transactions": [
                     {
                       "unsigned": {
-                        "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                         "version": 1,
                         "networkId": 1,
                         "gasAmount": 20000,
@@ -4669,7 +4669,7 @@
                     "unconfirmedTransactions": [
                       {
                         "unsigned": {
-                          "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                           "version": 1,
                           "networkId": 1,
                           "gasAmount": 20000,
@@ -4860,7 +4860,7 @@
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
-                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                   "fromGroup": 2,
                   "toGroup": 1
                 }
@@ -4982,7 +4982,7 @@
                 "example": {
                   "unsignedTxs": [
                     {
-                      "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                       "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "gasAmount": 20000,
                       "gasPrice": "100000000000"
@@ -5199,7 +5199,7 @@
                   "fromGroup": 1,
                   "toGroup": 2,
                   "unsignedTx": {
-                    "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                     "version": 1,
                     "networkId": 1,
                     "gasAmount": 20000,
@@ -5459,7 +5459,10 @@
                 "$ref": "#/components/schemas/Script"
               },
               "example": {
-                "code": "TxScript Main { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y, 1024) }"
+                "code": "TxScript Main { let token = Token(#36cdbfabca2d71622b6) token.withdraw(@1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y, 1024) }",
+                "compilerOptions": {
+                  "ignoreUnusedConstantsWarnings": true
+                }
               }
             }
           },
@@ -5473,6 +5476,7 @@
                   "$ref": "#/components/schemas/CompileScriptResult"
                 },
                 "example": {
+                  "name": "Main",
                   "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "fields": {
                     "names": [
@@ -5667,7 +5671,7 @@
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
-                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69"
                 }
               }
             }
@@ -5755,7 +5759,10 @@
                 "$ref": "#/components/schemas/Contract"
               },
               "example": {
-                "code": "Contract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}"
+                "code": "Contract Foo(bar: ByteVec) {\n pub fn baz(amount: U256) -> () {\nissueToken!(amount)\n}}",
+                "compilerOptions": {
+                  "ignoreUnusedConstantsWarnings": true
+                }
               }
             }
           },
@@ -5769,6 +5776,7 @@
                   "$ref": "#/components/schemas/CompileContractResult"
                 },
                 "example": {
+                  "name": "Foo",
                   "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
@@ -5936,7 +5944,10 @@
                 "$ref": "#/components/schemas/Project"
               },
               "example": {
-                "code": "Contract Foo() {\n pub fn foo() -> () {}\n }\n TxScript Main(id: ByteVec) {\n Foo(id).foo() \n}"
+                "code": "Contract Foo() {\n pub fn foo() -> () {}\n }\n TxScript Main(id: ByteVec) {\n Foo(id).foo() \n}",
+                "compilerOptions": {
+                  "ignoreUnusedConstantsWarnings": true
+                }
               }
             }
           },
@@ -5952,6 +5963,7 @@
                 "example": {
                   "contracts": [
                     {
+                      "name": "Foo",
                       "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                       "fields": {
@@ -6036,6 +6048,7 @@
                   ],
                   "scripts": [
                     {
+                      "name": "Main",
                       "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "fields": {
                         "names": [
@@ -6233,7 +6246,7 @@
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
-                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                   "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
                 }
               }
@@ -6580,7 +6593,7 @@
                   "events": [
                     {
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                      "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
+                      "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq",
                       "eventIndex": 1,
                       "fields": [
                         {
@@ -6777,7 +6790,7 @@
                   "events": [
                     {
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                      "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
+                      "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq",
                       "eventIndex": 1,
                       "fields": [
                         {
@@ -7044,7 +7057,7 @@
                   "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "gasAmount": 20000,
                   "gasPrice": "100000000000",
-                  "txId": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                   "fromGroup": 2,
                   "toGroup": 1
                 }
@@ -7753,7 +7766,7 @@
                   "events": [
                     {
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                      "txId": "109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25",
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
                       "eventIndex": 1,
                       "fields": [
                         {
@@ -7976,7 +7989,7 @@
                   "events": [
                     {
                       "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                      "contractAddress": "z69mxCq5vnw7UZdN2iUDi2jqGRpfnSmgAuouvPeUXeMn",
+                      "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq",
                       "eventIndex": 1,
                       "fields": [
                         {
@@ -9017,6 +9030,7 @@
       },
       "CompileContractResult": {
         "required": [
+          "name",
           "bytecode",
           "codeHash",
           "fields",
@@ -9026,6 +9040,9 @@
         ],
         "type": "object",
         "properties": {
+          "name": {
+            "type": "string"
+          },
           "bytecode": {
             "type": "string"
           },
@@ -9079,6 +9096,7 @@
       },
       "CompileScriptResult": {
         "required": [
+          "name",
           "bytecodeTemplate",
           "fields",
           "functions",
@@ -9086,6 +9104,9 @@
         ],
         "type": "object",
         "properties": {
+          "name": {
+            "type": "string"
+          },
           "bytecodeTemplate": {
             "type": "string"
           },
@@ -9103,6 +9124,29 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "CompilerOptions": {
+        "type": "object",
+        "properties": {
+          "ignoreUnusedConstantsWarnings": {
+            "type": "boolean"
+          },
+          "ignoreUnusedVariablesWarnings": {
+            "type": "boolean"
+          },
+          "ignoreUnusedFieldsWarnings": {
+            "type": "boolean"
+          },
+          "ignoreUnusedPrivateFunctionsWarnings": {
+            "type": "boolean"
+          },
+          "ignoreReadonlyCheckWarnings": {
+            "type": "boolean"
+          },
+          "ignoreExternalCallCheckWarnings": {
+            "type": "boolean"
           }
         }
       },
@@ -9150,6 +9194,9 @@
         "properties": {
           "code": {
             "type": "string"
+          },
+          "compilerOptions": {
+            "$ref": "#/components/schemas/CompilerOptions"
           }
         }
       },
@@ -9888,6 +9935,9 @@
         "properties": {
           "code": {
             "type": "string"
+          },
+          "compilerOptions": {
+            "$ref": "#/components/schemas/CompilerOptions"
           }
         }
       },
@@ -9962,6 +10012,9 @@
         "properties": {
           "code": {
             "type": "string"
+          },
+          "compilerOptions": {
+            "$ref": "#/components/schemas/CompilerOptions"
           }
         }
       },

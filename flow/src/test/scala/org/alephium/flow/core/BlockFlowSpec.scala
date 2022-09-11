@@ -27,7 +27,7 @@ import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.core.BlockFlowState.{BlockCache, Confirmed}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
-import org.alephium.protocol.{ALPH, BlockHash, Generators, Hash}
+import org.alephium.protocol.{ALPH, Generators}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -604,7 +604,13 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block)
     val lockedBalance = ALPH.alph(1) - defaultGasFee
     blockFlow.getBalance(toLockupScript, Int.MaxValue) is Right(
-      (lockedBalance, lockedBalance, AVector.empty[(Hash, U256)], AVector.empty[(Hash, U256)], 1)
+      (
+        lockedBalance,
+        lockedBalance,
+        AVector.empty[(TokenId, U256)],
+        AVector.empty[(TokenId, U256)],
+        1
+      )
     )
 
     blockFlow
@@ -675,8 +681,8 @@ class BlockFlowSpec extends AlephiumSpec {
         .rightValue is ((
         balance,
         U256.Zero,
-        AVector.empty[(Hash, U256)],
-        AVector.empty[(Hash, U256)],
+        AVector.empty[(TokenId, U256)],
+        AVector.empty[(TokenId, U256)],
         1
       ))
 

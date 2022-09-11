@@ -34,11 +34,13 @@ package object vm {
   val contractFieldMaxSize: Int = 512
 
   private def specialContractId(n: Byte): ContractId = {
-    ContractId.unsafe(
+    val value = Hash.unsafe(
       ByteString.fromArray(
         Array.tabulate(ContractId.length)(index => if (index == ContractId.length - 1) n else 0)
       )
     )
+
+    ContractId(value)
   }
 
   // scalastyle:off magic.number

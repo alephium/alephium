@@ -57,13 +57,7 @@ package object model {
   def minimalAttoAlphAmountPerTxOutput(tokenNum: Int): U256 = {
     ALPH.nanoAlph(100 * tokenNum.toLong).addUnsafe(dustUtxoAmount)
   }
+
+  implicit val hashOrdering: Ordering[Hash] = Ordering.by(_.bytes)
   // scalastyle:on magic.number
-
-  type TokenId = Hash
-  val TokenId: Hash.type = Hash
-
-  type ContractId = Hash
-  val ContractId: Hash.type = Hash
-
-  implicit val tokenIdOrder: Ordering[TokenId] = Ordering.by(_.bytes)
 }

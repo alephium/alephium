@@ -16,8 +16,8 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.{BlockHash, PublicKey}
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.PublicKey
+import org.alephium.protocol.model.{Address, BlockHash}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.TimeStamp
 

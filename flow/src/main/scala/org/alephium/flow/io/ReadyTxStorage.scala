@@ -21,11 +21,11 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 import org.alephium.flow.model.ReadyTxInfo
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.protocol.Hash
+import org.alephium.protocol.model.TransactionId
 
-trait ReadyTxStorage extends KeyValueStorage[Hash, ReadyTxInfo] {
-  def iterateE(f: (Hash, ReadyTxInfo) => IOResult[Unit]): IOResult[Unit]
-  def iterate(f: (Hash, ReadyTxInfo) => Unit): IOResult[Unit]
+trait ReadyTxStorage extends KeyValueStorage[TransactionId, ReadyTxInfo] {
+  def iterateE(f: (TransactionId, ReadyTxInfo) => IOResult[Unit]): IOResult[Unit]
+  def iterate(f: (TransactionId, ReadyTxInfo) => Unit): IOResult[Unit]
   def clear(): IOResult[Unit]
 }
 
@@ -44,7 +44,7 @@ class ReadyTxRocksDBStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, ReadyTxInfo](
+) extends RocksDBKeyValueStorage[TransactionId, ReadyTxInfo](
       storage,
       cf,
       writeOptions,

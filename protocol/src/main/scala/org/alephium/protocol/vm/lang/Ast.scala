@@ -45,6 +45,8 @@ object Ast {
     def empty: FuncId = FuncId("", isBuiltIn = false)
   }
 
+  def funcName(typeId: TypeId, funcId: FuncId): String = quote(s"${typeId.name}.${funcId.name}")
+
   final case class ApproveAsset[Ctx <: StatelessContext](
       address: Expr[Ctx],
       attoAlphAmountOpt: Option[Expr[Ctx]],
@@ -120,11 +122,12 @@ object Ast {
     def checkCodeUsingContractAssets[Ctx <: StatelessContext](
         instrs: Seq[Instr[Ctx]],
         useAssetsInContract: Boolean,
-        funcName: String
+        typeId: TypeId,
+        funcId: FuncId
     ): Unit = {
       if (useAssetsInContract && !instrs.exists(contractAssetsInstrs.contains(_))) {
         throw Compiler.Error(
-          s"Function `$funcName` does not use contract assets, but its annotation of contract assets is turn on"
+          s"Function ${funcName(typeId, funcId)} does not use contract assets, but its annotation of contract assets is turn on"
         )
       }
     }
@@ -160,23 +163,16 @@ object Ast {
       assume(elements.nonEmpty)
       val baseType = elements(0).getType(state)
       if (baseType.length != 1) {
-        throw Compiler.Error("Expect single type for array element")
+        throw Compiler.Error(s"Expected single type for array element, got ${quote(elements)}")
       }
       if (elements.drop(0).exists(_.getType(state) != baseType)) {
-        throw Compiler.Error(s"Array elements should have same type")
+        throw Compiler.Error(s"Array elements should have same type, got ${quote(elements)}")
       }
       Seq(Type.FixedSizeArray(baseType(0), elements.size))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       elements.flatMap(_.genCode(state))
-    }
-  }
-  def getConstantArrayIndex[Ctx <: StatelessContext](index: Expr[Ctx]): Int = {
-    index match {
-      case Ast.Const(Val.U256(v)) =>
-        v.toInt.getOrElse(throw Compiler.Error(s"Invalid array index $v"))
-      case _ => throw Compiler.Error(s"Invalid array index $index")
     }
   }
   final case class ArrayElement[Ctx <: StatelessContext](
@@ -285,7 +281,7 @@ object Ast {
     def _getTypeBase(state: Compiler.State[StatefulContext]): Seq[Type] = {
       val objType = obj.getType(state)
       if (objType.length != 1) {
-        throw Compiler.Error(s"Expect single type from $obj")
+        throw Compiler.Error(s"Expected a single parameter for contract object, got ${quote(obj)}")
       } else {
         objType(0) match {
           case contract: Type.Contract =>
@@ -293,7 +289,7 @@ object Ast {
             state.addExternalCall(contract.id, callId)
             funcInfo.getReturnType(args.flatMap(_.getType(state)))
           case _ =>
-            throw Compiler.Error(s"Expect contract for $callId of $obj")
+            throw Compiler.Error(s"Expected a contract for ${quote(callId)}, got ${quote(obj)}")
         }
       }
     }
@@ -413,7 +409,7 @@ object Ast {
         val ifBranchType = ifBranch.expr.getType(state)
         if (ifBranchType != elseBranchType) {
           throw Compiler.Error(
-            s"There are different types of if-else expression branches, expect $elseBranchType, have $ifBranchType"
+            s"Invalid types of if-else expression branches, expected ${quote(elseBranchType)}, got ${quote(ifBranchType)}"
           )
         }
       }
@@ -452,7 +448,7 @@ object Ast {
       val types = value.getType(state)
       if (types.length != vars.length) {
         throw Compiler.Error(
-          s"Invalid variable def, expect ${types.length} vars, have ${vars.length} vars"
+          s"Invalid variable declaration, expected ${types.length} variables, got ${vars.length} variables"
         )
       }
       vars.zip(types).foreach {
@@ -548,7 +544,8 @@ object Ast {
           ifBranches.foreach(branch => checkRetTypes(branch.body.lastOption))
           checkRetTypes(elseBranchOpt.flatMap(_.body.lastOption))
         case Some(call: FuncCall[_]) if call.id == FuncId("panic", isBuiltIn = true) => ()
-        case _ => throw new Compiler.Error(s"Expect return statement for function ${id.name}")
+        case _ =>
+          throw new Compiler.Error(s"Expected return statement for function ${quote(id.name)}")
       }
     }
 
@@ -586,11 +583,13 @@ object Ast {
         !changeState && invalidInternalCalls.isEmpty && invalidExternalCalls.isEmpty
       if (!isReadonly && useReadonly) {
         if (changeState) {
-          throw Compiler.Error(s"Readonly function ${id.name} changes state")
+          throw Compiler.Error(s"Readonly function ${funcName(state.typeId, id)} changes state")
         }
         if (invalidInternalCalls.nonEmpty) {
           throw Compiler.Error(
-            s"Readonly function ${id.name} have invalid internal calls: ${invalidInternalCalls.map(_.name).mkString(", ")}"
+            s"Readonly function ${funcName(state.typeId, id)} have invalid internal calls: ${quote(
+                invalidInternalCalls.map(_.name).mkString(", ")
+              )}"
           )
         }
         if (invalidExternalCalls.nonEmpty) {
@@ -599,14 +598,14 @@ object Ast {
               s"${typeId.name}.${funcId.name}"
             }
             .mkString(", ")
-          throw Compiler.Error(s"Readonly function ${id.name} have invalid external calls: $msg")
+          throw Compiler.Error(
+            s"Readonly function ${funcName(state.typeId, id)} have invalid external calls: ${quote(msg)}"
+          )
         }
       }
 
       if (isReadonly && !useReadonly) {
-        state.warnings.addOne(
-          s"Function ${id.name} is readonly, please use @using(readonly = true) for the function"
-        )
+        state.warnReadonlyCheck(state.typeId, id)
       }
     }
 
@@ -616,7 +615,7 @@ object Ast {
 
       val instrs    = body.flatMap(_.genCode(state))
       val localVars = state.getLocalVars(id)
-      ContractAssets.checkCodeUsingContractAssets(instrs, useAssetsInContract, id.name)
+      ContractAssets.checkCodeUsingContractAssets(instrs, useAssetsInContract, state.typeId, id)
       Method[Ctx](
         isPublic,
         usePreapprovedAssets,
@@ -721,7 +720,9 @@ object Ast {
       }
       val argsType = args.flatMap(_.getType(state))
       if (argsType.exists(_.isArrayType)) {
-        throw Compiler.Error(s"Array type not supported for event ${id.name}")
+        throw Compiler.Error(
+          s"Array type not supported for event ${quote(s"${state.typeId.name}.${id.name}")}"
+        )
       }
       val logOpCode = Compiler.genLogs(args.length)
       eventIndex ++ args.flatMap(_.genCode(state)) :+ logOpCode
@@ -817,7 +818,7 @@ object Ast {
       extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
       if (condition.getType(state) != Seq(Type.Bool)) {
-        throw Compiler.Error(s"Invalid type of condition expr $condition")
+        throw Compiler.Error(s"Invalid type of conditional expr ${quote(condition)}")
       }
       body.foreach(_.check(state))
     }
@@ -828,7 +829,7 @@ object Ast {
       val whileLen = condIR.length + bodyIR.length + 1
       if (whileLen > 0xff) {
         // TODO: support long branches
-        throw Compiler.Error(s"Too many instrs for if-else branches")
+        throw Compiler.Error(s"Too many instructions for if-else branches")
       }
       condIR ++ bodyIR :+ Jump(-whileLen)
     }
@@ -892,9 +893,7 @@ object Ast {
     def checkIfPrivateMethodsUsed(state: Compiler.State[Ctx]): Unit = {
       funcs.foreach { func =>
         if (func.isPrivate && !state.internalCallsReversed.get(func.id).exists(_.nonEmpty)) {
-          state.warnings.addOne(
-            s"Private function ${ident.name}.${func.name} is not used"
-          )
+          state.warnUnusedPrivateFunction(ident, func.id)
         }
       }
     }
@@ -935,7 +934,9 @@ object Ast {
 
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
       check(state)
-      StatelessScript.from(getMethods(state)).getOrElse(throw Compiler.Error("Empty methods"))
+      StatelessScript
+        .from(getMethods(state))
+        .getOrElse(throw Compiler.Error(s"No methods found in ${quote(ident.name)}"))
     }
   }
 
@@ -989,7 +990,7 @@ object Ast {
         .from(methods)
         .getOrElse(
           throw Compiler.Error(
-            "Expect the 1st function to be public and the other functions to be private for tx script"
+            "Expected the 1st function to be public and the other functions to be private for tx script"
           )
         )
       // skip check readonly for main function
@@ -1026,7 +1027,7 @@ object Ast {
 
     private def checkFuncs(): Unit = {
       if (funcs.length < 1) {
-        throw Compiler.Error(s"No function definition in Contract ${ident.name}")
+        throw Compiler.Error(s"No function found in Contract ${quote(ident.name)}")
       }
     }
 
@@ -1121,7 +1122,7 @@ object Ast {
       inheritances: Seq[InterfaceInheritance]
   ) extends ContractWithState {
     def error(tpe: String): Compiler.Error =
-      new Compiler.Error(s"Interface ${ident.name} does not contain any $tpe")
+      new Compiler.Error(s"Interface ${quote(ident.name)} should not contain any ${quote(tpe)}")
 
     def templateVars: Seq[Argument]       = throw error("template variable")
     def fields: Seq[Argument]             = throw error("field")
@@ -1131,7 +1132,7 @@ object Ast {
     def enums: Seq[EnumDef]               = throw error("enum")
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
-      throw new Compiler.Error(s"Interface ${ident.name} does not generate code")
+      throw new Compiler.Error(s"Interface ${quote(ident.name)} should not generate code")
     }
   }
 
@@ -1149,15 +1150,16 @@ object Ast {
 
     private def getContract(typeId: TypeId): ContractWithState = {
       contracts.find(_.ident == typeId) match {
-        case None              => throw Compiler.Error(s"Contract $typeId does not exist")
-        case Some(_: TxScript) => throw Compiler.Error(s"Expect contract $typeId, but got script")
+        case None => throw Compiler.Error(s"Contract ${quote(typeId.name)} does not exist")
+        case Some(_: TxScript) =>
+          throw Compiler.Error(s"Expected contract ${quote(typeId.name)}, but got script")
         case Some(contract: ContractWithState) => contract
       }
     }
 
     private def isContract(typeId: TypeId): Boolean = {
       contracts.find(_.ident == typeId) match {
-        case None => throw Compiler.Error(s"Contract $typeId does not exist")
+        case None => throw Compiler.Error(s"Contract ${quote(typeId.name)} does not exist")
         case Some(contract: Contract) if !contract.isAbstract => true
         case _                                                => false
       }
@@ -1237,13 +1239,17 @@ object Ast {
       MultiContract(newContracts, Some(dependencies))
     }
 
-    def genStatefulScripts(): AVector[(StatefulScript, TxScript, AVector[String])] = {
+    def genStatefulScripts()(implicit
+        compilerOptions: CompilerOptions
+    ): AVector[(StatefulScript, TxScript, AVector[String])] = {
       AVector.from(contracts.view.zipWithIndex.collect { case (_: TxScript, index) =>
         genStatefulScript(index)
       })
     }
 
-    def genStatefulScript(contractIndex: Int): (StatefulScript, TxScript, AVector[String]) = {
+    def genStatefulScript(
+        contractIndex: Int
+    )(implicit compilerOptions: CompilerOptions): (StatefulScript, TxScript, AVector[String]) = {
       val state = Compiler.State.buildFor(this, contractIndex)
       get(contractIndex) match {
         case script: TxScript => (script.genCode(state), script, state.getWarnings)
@@ -1272,9 +1278,7 @@ object Ast {
         }
       }
       allNoExternalCallChecks.foreach { case (typeId, funcId) =>
-        contractState.warnings.addOne(
-          MultiContract.noExternalCallCheckMsg(typeId.name, funcId.name)
-        )
+        contractState.warnExternalCallCheck(typeId, funcId)
       }
     }
 
@@ -1293,15 +1297,15 @@ object Ast {
         val table = externalCallCheckTables(contractId)
         interface.funcs.foreach { func =>
           if (func.useExternalCallCheck && !table(func.id)) {
-            throw Compiler.Error(
-              MultiContract.noExternalCallCheckMsg(contractId.name, func.id.name)
-            )
+            throw Compiler.Error(Warnings.noExternalCallCheckMsg(contractId.name, func.id.name))
           }
         }
       }
     }
 
-    def genStatefulContracts(): AVector[(StatefulContract, Contract, AVector[String], Int)] = {
+    def genStatefulContracts()(implicit
+        compilerOptions: CompilerOptions
+    ): AVector[(StatefulContract, Contract, AVector[String], Int)] = {
       val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
       val externalCallCheckTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
       val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
@@ -1325,12 +1329,14 @@ object Ast {
       }
     }
 
-    def genStatefulContract(contractIndex: Int): (StatefulContract, Contract, AVector[String]) = {
+    def genStatefulContract(
+        contractIndex: Int
+    )(implicit compilerOptions: CompilerOptions): (StatefulContract, Contract, AVector[String]) = {
       get(contractIndex) match {
         case contract: Contract =>
           if (contract.isAbstract) {
             throw Compiler.Error(
-              s"Unable to generate code for abstract contract ${contract.ident.name}"
+              s"Code generation is not supported for abstract contract ${quote(contract.ident.name)}"
             )
           }
           val statefulContracts = genStatefulContracts()
@@ -1366,12 +1372,14 @@ object Ast {
         contract.fields
           .find(_.ident == ident)
           .getOrElse(
-            throw Compiler.Error(s"Contract field ${ident.name} does not exist")
+            throw Compiler.Error(
+              s"Inherited field ${quote(ident.name)} does not exist in contract ${quote(contract.name)}"
+            )
           )
       }
       if (fields != parentContract.fields) {
         throw Compiler.Error(
-          s"Invalid contract inheritance fields, expect ${parentContract.fields}, have $fields"
+          s"Invalid contract inheritance fields, expected ${quote(parentContract.fields)}, got ${quote(fields)}"
         )
       }
     }
@@ -1451,7 +1459,9 @@ object Ast {
         val funcName                = abstractFunc.id.name
         val implementedAbstractFunc = nonAbstractFuncSet(funcName)
         if (implementedAbstractFunc.copy(bodyOpt = None) != abstractFunc) {
-          throw new Compiler.Error(s"Function ${funcName} is implemented with wrong signature")
+          throw new Compiler.Error(
+            s"Function ${quote(funcName)} is implemented with wrong signature"
+          )
         }
       }
 
@@ -1459,9 +1469,6 @@ object Ast {
       val nonInherited = nonAbstractFuncs.filter(f => !abstractFuncsSet.contains(f.id.name))
       (unimplementedFuncs, inherited ++ nonInherited)
     }
-
-    def noExternalCallCheckMsg(typeId: String, funcId: String): String =
-      s"No external call check for function: ${typeId}.${funcId}, please use checkCaller!(...) for the function or its private callees."
   }
 }
 // scalastyle:on number.of.methods number.of.types

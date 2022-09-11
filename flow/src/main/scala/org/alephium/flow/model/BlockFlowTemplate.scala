@@ -16,8 +16,8 @@
 
 package org.alephium.flow.model
 
-import org.alephium.protocol.{BlockHash, Hash}
-import org.alephium.protocol.model.{Block, ChainIndex, Target, Transaction}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, Target, Transaction}
 import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockFlowTemplate(

@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.BlockHash
 import org.alephium.util.TimeStamp
 
 trait FlowData {

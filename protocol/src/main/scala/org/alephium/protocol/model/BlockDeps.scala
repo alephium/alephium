@@ -16,8 +16,8 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.model.BlockHash
 import org.alephium.serde.Serde
 import org.alephium.util.AVector
 

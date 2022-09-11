@@ -24,9 +24,9 @@ import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.{ALPH, BlockHash}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
-import org.alephium.protocol.model.{BlockHeader, ChainIndex, Target, Weight}
+import org.alephium.protocol.model.{BlockHash, BlockHeader, ChainIndex, Target, Weight}
 import org.alephium.protocol.vm.BlockEnv
 import org.alephium.util._
 

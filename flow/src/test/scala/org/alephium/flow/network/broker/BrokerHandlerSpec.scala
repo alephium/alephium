@@ -20,7 +20,6 @@ import java.net.InetSocketAddress
 
 import akka.actor.Props
 import akka.testkit.{TestActorRef, TestProbe}
-import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
@@ -29,10 +28,10 @@ import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation.InvalidHeaderFlow
-import org.alephium.protocol.{BlockHash, Generators, SignatureSchema}
+import org.alephium.protocol.{Generators, SignatureSchema}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{BrokerInfo, ChainIndex, CliqueId}
+import org.alephium.protocol.model.{BlockHash, BrokerInfo, ChainIndex, CliqueId}
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector, Duration, TimeStamp}
 
 class BrokerHandlerSpec extends AlephiumActorSpec {

@@ -55,8 +55,19 @@ object HashSchema {
   }
 }
 
+trait HashUtils[T] {
+  def length: Int
+
+  @inline def random: T = generate
+  def generate: T
+
+  def hash(bytes: Seq[Byte]): T
+  def hash(string: String): T
+}
+
 abstract class HashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)
-    extends RandomBytes.Companion[T](unsafe, toBytes) {
+    extends RandomBytes.Companion[T](unsafe, toBytes)
+    with HashUtils[T] {
   def hash(input: Seq[Byte]): T
 
   def doubleHash(input: Seq[Byte]): T
@@ -86,8 +97,6 @@ abstract class HashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)
     val result = Array.tabulate[Byte](length)(index => (bytes0(index) + bytes1(index)).toByte)
     unsafe(ByteString.fromArrayUnsafe(result))
   }
-
-  def random: T = generate
 }
 
 abstract class BCHashSchema[T](unsafe: ByteString => T, toBytes: T => ByteString)

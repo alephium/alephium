@@ -57,7 +57,7 @@ object Transaction {
       transaction.scriptExecutionOk,
       transaction.contractInputs.map(OutputRef.from),
       transaction.generatedOutputs.zipWithIndex.map { case (out, index) =>
-        Output.from(out, transaction.unsigned.hash, index)
+        Output.from(out, transaction.unsigned.id, index)
       },
       transaction.inputSignatures.map(sig => serialize(sig)),
       transaction.scriptSignatures.map(sig => serialize(sig))

@@ -16,8 +16,7 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.BlockHeader
+import org.alephium.protocol.model.{BlockHash, BlockHeader}
 import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockHeaderEntry(

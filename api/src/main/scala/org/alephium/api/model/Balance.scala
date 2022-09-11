@@ -16,7 +16,7 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.model.TokenId
 import org.alephium.util.AVector
 import org.alephium.util.U256
 
@@ -53,7 +53,7 @@ object Balance {
   )
 
   def from(
-      balanceLockedUtxoNum: (U256, U256, AVector[(Hash, U256)], AVector[(Hash, U256)], Int),
+      balanceLockedUtxoNum: (U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int),
       utxosLimit: Int
   ): Balance = {
     val balance             = Amount(balanceLockedUtxoNum._1)
@@ -76,7 +76,7 @@ object Balance {
     )
   }
 
-  private def getTokenBalances(balances: AVector[(Hash, U256)]): Option[AVector[Token]] = {
+  private def getTokenBalances(balances: AVector[(TokenId, U256)]): Option[AVector[Token]] = {
     val tokenBalances = balances.map(tokenBalance => Token(tokenBalance._1, tokenBalance._2))
     Option.when(tokenBalances.nonEmpty)(tokenBalances)
   }

@@ -18,8 +18,8 @@ package org.alephium.app
 
 import org.alephium.api.model._
 import org.alephium.json.Json._
-import org.alephium.protocol.{ALPH, BlockHash, Hash, PublicKey}
-import org.alephium.protocol.model.{dustUtxoAmount, Address, ContractId}
+import org.alephium.protocol.{ALPH, PublicKey}
+import org.alephium.protocol.model.{dustUtxoAmount, Address, BlockHash, ContractId, TransactionId}
 import org.alephium.protocol.vm
 import org.alephium.util._
 import org.alephium.wallet.api.model._
@@ -87,7 +87,7 @@ class VotingTest extends AlephiumActorSpec {
       event.eventIndex is 0
     }
 
-    def checkVoteCastedEventsByTxId(infos: Seq[(String, Boolean, Hash)]) = {
+    def checkVoteCastedEventsByTxId(infos: Seq[(String, Boolean, TransactionId)]) = {
       infos.foreach { info =>
         val (address, choice, txId) = info
         val response = request[ContractEventsByTxId](
@@ -301,7 +301,7 @@ trait WalletFixture extends CliqueFixture {
   val clique                = bootClique(1)
   val activeAddressesGroup  = 0
   val genesisWalletName     = "genesis-wallet"
-  def submitTx(unsignedTx: String, txId: Hash, walletName: String): SubmitTxResult = {
+  def submitTx(unsignedTx: String, txId: TransactionId, walletName: String): SubmitTxResult = {
     val signature =
       request[SignResult](sign(walletName, s"${txId.toHexString}"), restPort).signature
     val tx = request[SubmitTxResult](

@@ -23,8 +23,7 @@ import org.scalatest.Assertion
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.io.ChainStateStorage
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.model.{BlockHash, ChainIndex}
 import org.alephium.util.{ConcurrentHashMap, TimeStamp}
 
 class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>

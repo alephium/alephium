@@ -21,7 +21,6 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.flow.core.ConflictedBlocks.GroupCache
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Duration, TimeStamp}

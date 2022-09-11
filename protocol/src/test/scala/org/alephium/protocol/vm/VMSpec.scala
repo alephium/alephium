@@ -22,7 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 import akka.util.ByteString
 import org.scalatest.Assertion
 
-import org.alephium.protocol.{ALPH, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.{ALPH, Signature, SignatureSchema}
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.serde._
@@ -250,7 +250,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val balances0    = MutBalancesPerLockup(100, mutable.Map.empty, 0)
     val (_, pubKey1) = SignatureSchema.generatePriPub()
     val address1     = Val.Address(LockupScript.p2pkh(pubKey1))
-    val tokenId      = Hash.random
+    val tokenId      = TokenId.random
     val balances1    = MutBalancesPerLockup(1, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext =
@@ -258,7 +258,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         val worldState: WorldState.Staging = cachedWorldState.staging()
         def blockEnv: BlockEnv             = genBlockEnv()
         def txEnv: TxEnv                   = genTxEnv(None, AVector.empty)
-        override def txId: Hash            = Hash.zero
+        override def txId: TransactionId   = TransactionId.zero
         var gasRemaining                   = GasBox.unsafe(100000)
         def nextOutputIndex: Int           = 0
         def logConfig: LogConfig           = LogConfig.allEnabled()

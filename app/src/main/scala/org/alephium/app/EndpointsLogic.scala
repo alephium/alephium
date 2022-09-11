@@ -42,7 +42,6 @@ import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
 import org.alephium.http.EndpointSender
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, LogConfig}
@@ -409,7 +408,7 @@ trait EndpointsLogic extends Endpoints {
   }
 
   private def searchTransactionStatus(
-      txId: Hash,
+      txId: TransactionId,
       chainFrom: Option[GroupIndex],
       chainTo: Option[GroupIndex]
   ): FutureTry[TxStatus] = {
@@ -445,7 +444,7 @@ trait EndpointsLogic extends Endpoints {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-  private def searchTransactionStatusInOtherNodes(txId: Hash): FutureTry[TxStatus] = {
+  private def searchTransactionStatusInOtherNodes(txId: TransactionId): FutureTry[TxStatus] = {
     val otherGroupFrom = groupConfig.allGroups.filterNot(brokerConfig.contains)
     if (otherGroupFrom.isEmpty) {
       Future.successful(Right(TxNotFound))

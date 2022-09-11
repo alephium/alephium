@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.ContractOutputRef
+import org.alephium.protocol.model.{ContractId, ContractOutputRef}
 import org.alephium.serde.{avectorSerde, Serde}
 import org.alephium.util.AVector
 
@@ -40,10 +40,10 @@ final case class ContractState private (
   }
 
   def toObject(
-      address: Hash,
+      contractId: ContractId,
       code: StatefulContract.HalfDecoded
   ): StatefulContractObject = {
-    StatefulContractObject.unsafe(codeHash, code, initialStateHash, fields, address)
+    StatefulContractObject.unsafe(codeHash, code, initialStateHash, fields, contractId)
   }
 }
 
