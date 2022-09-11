@@ -31,7 +31,6 @@ import akka.util.Timeout
 import io.vertx.core.Vertx
 import io.vertx.core.http.WebSocketBase
 import org.scalatest.Assertion
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Seconds, Span}
 import sttp.model.StatusCode
 import sttp.tapir.server.vertx.VertxFutureServerInterpreter._
@@ -48,8 +47,8 @@ import org.alephium.flow.setting.AlephiumConfig
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
-import org.alephium.protocol.{ALPH, Hash, PrivateKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, Block, ChainIndex}
+import org.alephium.protocol.{ALPH, PrivateKey, Signature, SignatureSchema}
+import org.alephium.protocol.model.{Address, Block, ChainIndex, TransactionId}
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{GasPrice, LockupScript}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -62,14 +61,12 @@ import org.alephium.wallet.api.model._
 // scalastyle:off number.of.methods
 // scalastyle:off file.size.limit
 class CliqueFixture(implicit spec: AlephiumActorSpec)
-    extends AlephiumSpec
+    extends AlephiumFutureSpec
     with ItConfigFixture
     with NumericHelpers
     with ApiModelCodec
     with wallet.json.ModelCodecs
-    with HttpFixture
-    with ScalaFutures
-    with Eventually { Fixture =>
+    with HttpFixture { Fixture =>
   implicit val system: ActorSystem = spec.system
 
   private val vertx      = Vertx.vertx()
@@ -685,7 +682,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost("/contracts/unsigned-tx/execute-script", Some(query))
   }
 
-  def submitTxQuery(unsignedTx: String, txId: Hash) = {
+  def submitTxQuery(unsignedTx: String, txId: TransactionId) = {
     val signature: Signature =
       SignatureSchema.sign(txId.bytes, PrivateKey.unsafe(Hex.unsafe(privateKey)))
     submitTransaction(s"""
@@ -695,7 +692,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
           }""")
   }
 
-  def submitTxWithPort(unsignedTx: String, txId: Hash, restPort: Int): Hash = {
+  def submitTxWithPort(unsignedTx: String, txId: TransactionId, restPort: Int): TransactionId = {
     val txResult = request[SubmitTxResult](
       submitTxQuery(unsignedTx, txId),
       restPort

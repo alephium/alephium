@@ -16,15 +16,16 @@
 
 package org.alephium.flow.model
 
-import org.alephium.protocol.Hash
+import org.alephium.protocol.model.TransactionId
 import org.alephium.serde.Serde
 import org.alephium.util.TimeStamp
 
-final case class PersistedTxId(timestamp: TimeStamp, hash: Hash)
+final case class PersistedTxId(timestamp: TimeStamp, txId: TransactionId)
 
 object PersistedTxId {
-  implicit val serde: Serde[PersistedTxId] = Serde.forProduct2[TimeStamp, Hash, PersistedTxId](
-    (ts, hash) => PersistedTxId(ts, hash),
-    id => (id.timestamp, id.hash)
-  )
+  implicit val serde: Serde[PersistedTxId] =
+    Serde.forProduct2[TimeStamp, TransactionId, PersistedTxId](
+      (ts, hash) => PersistedTxId(ts, hash),
+      id => (id.timestamp, id.txId)
+    )
 }

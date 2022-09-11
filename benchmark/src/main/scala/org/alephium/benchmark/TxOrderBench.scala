@@ -22,7 +22,7 @@ import akka.util.ByteString
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import org.alephium.protocol.{BlockHash, Hash, Signature}
+import org.alephium.protocol.{Hash, Signature}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.StatefulScript

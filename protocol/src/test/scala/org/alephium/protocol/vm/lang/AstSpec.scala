@@ -18,19 +18,18 @@ package org.alephium.protocol.vm.lang
 
 import scala.collection.mutable
 
-import org.alephium.protocol.vm.lang.Ast.MultiContract
 import org.alephium.util.AlephiumSpec
 import org.alephium.util.AVector
 
 class AstSpec extends AlephiumSpec {
 
-  behavior of "Permission check"
+  behavior of "External call check"
 
-  def permissionCheckWarnings(warnings: AVector[String]): AVector[String] = {
-    warnings.filter(_.startsWith("No permission check"))
+  def externalCallCheckWarnings(warnings: AVector[String]): AVector[String] = {
+    warnings.filter(_.startsWith("No external call check"))
   }
 
-  it should "detect direct permission check" in {
+  it should "detect direct external call check" in {
     val code =
       s"""
          |Contract Foo() {
@@ -39,10 +38,10 @@ class AstSpec extends AlephiumSpec {
          |  }
          |
          |  fn bar() -> () {
-         |    checkPermission!(false, 1)
+         |    checkCaller!(false, 1)
          |  }
          |
-         |  @using(permissionCheck = false)
+         |  @using(externalCallCheck = false)
          |  fn baz() -> () {
          |    return
          |  }
@@ -53,11 +52,11 @@ class AstSpec extends AlephiumSpec {
     val bar                 = contractAst.funcs(1)
     val baz                 = contractAst.funcs(2)
     foo.id.name is "foo"
-    foo.hasDirectPermissionCheck() is false
+    foo.hasDirectExternalCallCheck() is false
     bar.id.name is "bar"
-    bar.hasDirectPermissionCheck() is true
+    bar.hasDirectExternalCallCheck() is true
     baz.id.name is "baz"
-    baz.hasDirectPermissionCheck() is true
+    baz.hasDirectExternalCallCheck() is true
   }
 
   trait InternalCallFixture {
@@ -69,7 +68,7 @@ class AstSpec extends AlephiumSpec {
          |  }
          |
          |  fn check() -> () {
-         |    checkPermission!(true, 0)
+         |    checkCaller!(true, 0)
          |  }
          |
          |  fn a() -> () {
@@ -89,10 +88,10 @@ class AstSpec extends AlephiumSpec {
          |  }
          |
          |  pub fn e() -> () {
-         |    checkPermission!(true, 0)
+         |    checkCaller!(true, 0)
          |  }
          |
-         |  // permission check in another public function does not help
+         |  // external call check in another public function does not help
          |  pub fn f() -> () {
          |    e()
          |  }
@@ -110,7 +109,7 @@ class AstSpec extends AlephiumSpec {
          |    b()
          |  }
          |
-         |  @using(permissionCheck = false)
+         |  @using(externalCallCheck = false)
          |  pub fn i() -> () {
          |    noCheck()
          |  }
@@ -118,9 +117,9 @@ class AstSpec extends AlephiumSpec {
          |""".stripMargin
   }
 
-  it should "build permission check table" in new InternalCallFixture {
+  it should "build external call check table" in new InternalCallFixture {
     val contracts = fastparse.parse(internalCalls, StatefulParser.multiContract(_)).get.value
-    val state     = Compiler.State.buildFor(contracts, 0)
+    val state     = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
     val contract  = contracts.contracts(0).asInstanceOf[Ast.Contract]
     contract.genCode(state)
     val interallCalls = state.internalCalls
@@ -140,7 +139,7 @@ class AstSpec extends AlephiumSpec {
     )
     state.externalCalls.isEmpty is true
 
-    val table = contract.buildPermissionCheckTable(state)
+    val table = contract.buildExternalCallCheckTable(state)
     table.map { case (fundId, checked) => fundId.name -> checked } is
       mutable.Map(
         "noCheck" -> false,
@@ -166,10 +165,10 @@ class AstSpec extends AlephiumSpec {
          |  }
          |
          |  fn checkPri() -> () {
-         |    checkPermission!(true, 0)
+         |    checkCaller!(true, 0)
          |  }
          |
-         |  // no need to check permission since it does not call external functions
+         |  // no need to check external call since it does not call external functions
          |  pub fn noCheck() -> () {
          |    noCheckPri()
          |  }
@@ -218,10 +217,10 @@ class AstSpec extends AlephiumSpec {
 
   it should "check permission for external calls" in new ExternalCallsFixture {
     val (_, _, warnings) = Compiler.compileContractFull(externalCalls, 0).rightValue
-    permissionCheckWarnings(warnings).toSet is Set(
-      MultiContract.noPermissionCheckMsg("InternalCalls", "c"),
-      MultiContract.noPermissionCheckMsg("InternalCalls", "f"),
-      MultiContract.noPermissionCheckMsg("InternalCalls", "g")
+    externalCallCheckWarnings(warnings).toSet is Set(
+      Warnings.noExternalCallCheckMsg("InternalCalls", "c"),
+      Warnings.noExternalCallCheckMsg("InternalCalls", "f"),
+      Warnings.noExternalCallCheckMsg("InternalCalls", "g")
     )
   }
 
@@ -233,7 +232,7 @@ class AstSpec extends AlephiumSpec {
          |    bar.a()
          |  }
          |  pub fn b() -> () {
-         |    checkPermission!(true, 0)
+         |    checkCaller!(true, 0)
          |  }
          |}
          |
@@ -247,14 +246,14 @@ class AstSpec extends AlephiumSpec {
 
   it should "not check permission for mutual recursive calls" in new MutualRecursionFixture {
     val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
-    permissionCheckWarnings(warnings).toSet is Set(
-      MultiContract.noPermissionCheckMsg("Bar", "a")
+    externalCallCheckWarnings(warnings).toSet is Set(
+      Warnings.noExternalCallCheckMsg("Bar", "a")
     )
   }
 
-  it should "test permission check for interface" in {
+  it should "test external call check for interface" in {
     {
-      info("All contracts that inherit from the interface should have permission check")
+      info("All contracts that inherit from the interface should have external call check")
       val code =
         s"""
            |Interface Base {
@@ -262,12 +261,12 @@ class AstSpec extends AlephiumSpec {
            |}
            |Contract Foo() implements Base {
            |  pub fn base() -> () {
-           |    checkPermission!(true, 0)
+           |    checkCaller!(true, 0)
            |  }
            |}
            |Abstract Contract A() implements Base {
            |  fn a() -> () {
-           |    checkPermission!(true, 0)
+           |    checkCaller!(true, 0)
            |  }
            |}
            |Contract Bar() extends A() {
@@ -280,12 +279,12 @@ class AstSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val error = Compiler.compileProject(code).leftValue
-      error.message is MultiContract.noPermissionCheckMsg("Baz", "base")
+      error.message is Warnings.noExternalCallCheckMsg("Baz", "base")
     }
 
     {
-      info("not check permission check for interface function calls")
-      def code(permissionCheck: Boolean) =
+      info("not check external call check for interface function calls")
+      def code(externalCallCheck: Boolean) =
         s"""
            |Contract Bar() {
            |  pub fn bar(fooId: ByteVec) -> () {
@@ -293,7 +292,7 @@ class AstSpec extends AlephiumSpec {
            |  }
            |}
            |Interface Foo {
-           |  @using(permissionCheck = $permissionCheck)
+           |  @using(externalCallCheck = $externalCallCheck)
            |  pub fn foo() -> ()
            |}
            |""".stripMargin
@@ -305,7 +304,7 @@ class AstSpec extends AlephiumSpec {
     }
 
     {
-      info("implemented function have permission check in private callee")
+      info("implemented function have external call check in private callee")
       val code =
         s"""
            |Contract Bar() implements Foo {
@@ -315,7 +314,7 @@ class AstSpec extends AlephiumSpec {
            |  }
            |  @using(readonly = true)
            |  fn bar() -> () {
-           |    checkPermission!(true, 0)
+           |    checkCaller!(true, 0)
            |  }
            |}
            |Interface Foo {
@@ -329,9 +328,9 @@ class AstSpec extends AlephiumSpec {
     }
   }
 
-  it should "display the right warning message for permission check" in {
-    MultiContract.noPermissionCheckMsg("Foo", "bar") is
-      "No permission check for function: Foo.bar, please use checkPermission!(...) for the function or its private callees."
+  it should "display the right warning message for external call check" in {
+    Warnings.noExternalCallCheckMsg("Foo", "bar") is
+      "No external call check for function: Foo.bar, please use checkCaller!(...) for the function or its private callees."
   }
 
   behavior of "Private function usage"

@@ -23,7 +23,7 @@ import org.alephium.flow.core.BlockChain.{TxIndex, TxIndexes, TxStatus}
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.io.IOError
-import org.alephium.protocol.{ALPH, BlockHash, Hash}
+import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp}
 

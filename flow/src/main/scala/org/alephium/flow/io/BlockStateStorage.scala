@@ -22,7 +22,7 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 import org.alephium.flow.model.BlockState
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.BlockHash
 
 trait BlockStateStorage extends KeyValueStorage[BlockHash, BlockState] {
   override def storageKey(key: BlockHash): ByteString =

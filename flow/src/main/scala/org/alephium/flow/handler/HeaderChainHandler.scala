@@ -23,9 +23,8 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
-import org.alephium.protocol.model.{BlockHeader, ChainIndex}
+import org.alephium.protocol.model.{BlockHash, BlockHeader, ChainIndex}
 import org.alephium.util.ActorRefT
 
 object HeaderChainHandler {

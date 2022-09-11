@@ -20,7 +20,6 @@ import scala.reflect.ClassTag
 
 import org.alephium.flow.model.BlockState
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, WorldState}

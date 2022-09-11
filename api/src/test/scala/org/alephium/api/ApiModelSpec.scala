@@ -68,6 +68,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   val inetAddress = InetAddress.getByName("127.0.0.1")
 
+  val compilerOptions = CompilerOptions(ignoreUnusedConstantsWarnings = Some(true))
+
   def generateAddress(): Address.Asset = Address.p2pkh(PublicKey.generate)
   def generateContractAddress(): Address.Contract =
     Address.Contract(LockupScript.p2c("uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S").get)
@@ -219,7 +221,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode Token" in {
-    val id     = Hash.generate
+    val id     = TokenId.generate
     val amount = ALPH.oneAlph
 
     val token: Token = Token(id, amount)
@@ -234,8 +236,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode Output with big amount" in {
     val amount    = Amount(U256.unsafe(15).mulUnsafe(U256.unsafe(Number.quintillion)))
     val amountStr = "15000000000000000000"
-    val tokenId1  = Hash.hash("token1")
-    val tokenId2  = Hash.hash("token2")
+    val tokenId1  = TokenId.hash("token1")
+    val tokenId2  = TokenId.hash("token2")
     val tokens =
       AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
     val hint = 1234
@@ -310,11 +312,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     {
       info("with token balances")
-      val tokenId1 = Hash.hash("token1")
-      val tokenId2 = Hash.hash("token2")
+      val tokenId1 = TokenId.hash("token1")
+      val tokenId2 = TokenId.hash("token2")
       val tokens =
         AVector(Token(tokenId1, U256.unsafe(42)), Token(tokenId2, U256.unsafe(1000)))
-      val tokenId3     = Hash.hash("token3")
+      val tokenId3     = TokenId.hash("token3")
       val lockedTokens = AVector(Token(tokenId3, U256.unsafe(1)))
       val response =
         Balance(amount, amount.hint, locked, locked.hint, Some(tokens), Some(lockedTokens), 1)
@@ -339,7 +341,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode TxResult" in {
-    val hash    = Hash.generate
+    val hash    = TransactionId.generate
     val result  = SubmitTxResult(hash, 0, 1)
     val jsonRaw = s"""{"txId":"${hash.toHexString}","fromGroup":0,"toGroup":1}"""
     checkData(result, jsonRaw)
@@ -393,7 +395,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
 
     {
-      val tokenId1 = Hash.hash("tokenId1")
+      val tokenId1 = TokenId.hash("tokenId1")
 
       val transfer = BuildTransaction(
         fromPublicKey,
@@ -433,7 +435,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
 
     {
-      val tokenId1 = Hash.hash("tokenId1")
+      val tokenId1 = TokenId.hash("tokenId1")
 
       val transfer = BuildTransaction(
         fromPublicKey,
@@ -473,8 +475,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
 
     {
-      val tokenId1 = Hash.hash("tokenId1")
-      val otxoKey1 = Hash.hash("utxo1")
+      val tokenId1 = TokenId.hash("tokenId1")
+      val utxoKey1 = Hash.hash("utxo1")
 
       val transfer = BuildTransaction(
         fromPublicKey,
@@ -486,7 +488,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
             Some(TimeStamp.unsafe(1234))
           )
         ),
-        Some(AVector(OutputRef(1, otxoKey1))),
+        Some(AVector(OutputRef(1, utxoKey1))),
         Some(GasBox.unsafe(1)),
         Some(GasPrice(1))
       )
@@ -509,7 +511,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                        |  "utxos": [
                        |    {
                        |      "hint": 1,
-                       |      "key": "${otxoKey1.toHexString}"
+                       |      "key": "${utxoKey1.toHexString}"
                        |    }
                        |  ],
                        |  "gasAmount": 1,
@@ -521,7 +523,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode BuildTransactionResult" in {
-    val txId     = Hash.generate
+    val txId     = TransactionId.generate
     val gas      = GasBox.unsafe(1)
     val gasPrice = GasPrice(1)
     val result   = BuildTransactionResult("tx", gas, gasPrice, txId, 1, 2)
@@ -531,7 +533,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode SweepAddressTransaction" in {
-    val txId     = Hash.generate
+    val txId     = TransactionId.generate
     val gas      = GasBox.unsafe(1)
     val gasPrice = GasPrice(1)
     val result   = SweepAddressTransaction(txId, "tx", gas, gasPrice)
@@ -628,40 +630,90 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode Compile.Script" in {
-    val compile =
-      Compile.Script(
-        code = "0000"
-      )
-    val jsonRaw =
-      s"""
-         |{
-         |  "code": "0000"
-         |}
-         |""".stripMargin
-    checkData(compile, jsonRaw)
+    {
+      info("Without CompilerOptions")
+      val compile =
+        Compile.Script(
+          code = "0000"
+        )
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000"
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
+
+    {
+      info("With CompilerOptions")
+      val compile =
+        Compile.Script(code = "0000", compilerOptions = Some(compilerOptions))
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000",
+           |  "compilerOptions": { "ignoreUnusedConstantsWarnings": true }
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
   }
 
   it should "encode/decode Compile.Contract" in {
-    val compile =
-      Compile.Contract(code = "0000")
-    val jsonRaw =
-      s"""
-         |{
-         |  "code": "0000"
-         |}
-         |""".stripMargin
-    checkData(compile, jsonRaw)
+    {
+      info("Without CompilerOptions")
+      val compile =
+        Compile.Contract(code = "0000")
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000"
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
+
+    {
+      info("With CompilerOptions")
+      val compile =
+        Compile.Contract(code = "0000", compilerOptions = Some(compilerOptions))
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000",
+           |  "compilerOptions": { "ignoreUnusedConstantsWarnings": true }
+           |}
+           |""".stripMargin
+      checkData(compile, jsonRaw)
+    }
   }
 
   it should "encode/decode Compile.Project" in {
-    val project = Compile.Project(code = "0000")
-    val jsonRaw =
-      s"""
-         |{
-         |  "code": "0000"
-         |}
-         |""".stripMargin
-    checkData(project, jsonRaw)
+    {
+      info("Without CompilerOptions")
+      val project = Compile.Project(code = "0000")
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000"
+           |}
+           |""".stripMargin
+      checkData(project, jsonRaw)
+    }
+
+    {
+      info("With CompilerOptions")
+      val project = Compile.Project(code = "0000", compilerOptions = Some(compilerOptions))
+      val jsonRaw =
+        s"""
+           |{
+           |  "code": "0000",
+           |  "compilerOptions": { "ignoreUnusedConstantsWarnings": true }
+           |}
+           |""".stripMargin
+      checkData(project, jsonRaw)
+    }
   }
 
   it should "encode/decode BuildContract" in {
@@ -687,8 +739,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode BuildDeployContractTxResult" in {
-    val txId       = Hash.generate
-    val contractId = Hash.generate
+    val txId       = TransactionId.generate
+    val contractId = ContractId.generate
     val buildDeployContractTxResult = BuildDeployContractTxResult(
       fromGroup = 2,
       toGroup = 2,
@@ -734,7 +786,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode BuildScriptTxResult" in {
-    val txId = Hash.generate
+    val txId = TransactionId.generate
     val buildExecuteScriptTxResult = BuildExecuteScriptTxResult(
       fromGroup = 1,
       toGroup = 1,
@@ -779,7 +831,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 = s"""{"attoAlphAmount": "100"}"""
     checkData(asset1, jsonRaw1)
 
-    val asset2 = AssetState.from(U256.unsafe(100), AVector(Token(Hash.zero, U256.unsafe(123))))
+    val asset2 = AssetState.from(U256.unsafe(100), AVector(Token(TokenId.zero, U256.unsafe(123))))
     val jsonRaw2 =
       s"""
          |{
@@ -801,7 +853,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       codeHash = Hash.zero,
       initialStateHash = Some(Hash.zero),
       AVector(u256, i256, bool, byteVec, address1),
-      AssetState.from(ALPH.alph(1), AVector(Token(Hash.zero, ALPH.alph(2))))
+      AssetState.from(ALPH.alph(1), AVector(Token(TokenId.zero, ALPH.alph(2))))
     )
     val jsonRaw =
       s"""
@@ -851,6 +903,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw0 =
       """
         |{
+        |  "name": "Foo",
         |  "bytecode": "0701402901010707061005a000a001a003a00461b413c40de0b6b3a7640000a916011602160316041605160602",
         |  "codeHash": "eff62a4b2d4d4936a84e360c916a398d80d5000497ccd4afbd80bfe254d62096",
         |  "fields": {
@@ -889,6 +942,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw1 =
       """
         |{
+        |  "name": "Foo",
         |  "bytecodeTemplate": "020103000000010201000707060716011602160316041605160602",
         |  "fields": {
         |    "names": ["aa","bb","cc","dd","ee"],
@@ -920,7 +974,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |  "warnings": [
         |    "Found unused variables in Foo: bar.a",
         |    "Found unused fields in Foo: aa, bb, cc, dd, ee",
-        |    "Function bar is readonly, please use @using(readonly = true) for the function"
+        |    "Function Foo.bar is readonly, please use @using(readonly = true) for the function"
         |  ]
         |}
         |""".stripMargin
@@ -971,7 +1025,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "message": ""
          |}
          |""".stripMargin
-    checkData(FixedAssetOutput.fromProtocol(assetOutput, Hash.zero, 0), jsonRaw)
+    checkData(FixedAssetOutput.fromProtocol(assetOutput, TransactionId.zero, 0), jsonRaw)
   }
 
   it should "endcode/decode Output" in {
@@ -988,7 +1042,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "message": ""
          |}
          |""".stripMargin
-    checkData[Output](Output.from(assetOutput, Hash.zero, 0), assetOutputJson)
+    checkData[Output](Output.from(assetOutput, TransactionId.zero, 0), assetOutputJson)
 
     val contractOutputJson =
       s"""
@@ -1001,7 +1055,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "tokens": []
          |}
          |""".stripMargin
-    checkData[Output](Output.from(contractOutput, Hash.zero, 0), contractOutputJson)
+    checkData[Output](Output.from(contractOutput, TransactionId.zero, 0), contractOutputJson)
   }
 
   it should "encode/decode UnsignedTx" in {
@@ -1009,7 +1063,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val jsonRaw =
       s"""
          |{
-         |  "txId": "${unsignedTransaction.hash.toHexString}",
+         |  "txId": "${unsignedTransaction.id.toHexString}",
          |  "version": ${unsignedTransaction.version},
          |  "networkId": ${unsignedTransaction.networkId.id},
          |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},

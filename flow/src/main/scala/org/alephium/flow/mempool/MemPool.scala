@@ -23,7 +23,6 @@ import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.mempool.MemPool.CleanupResult
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.io.IOResult
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
@@ -53,7 +52,7 @@ class MemPool private (
     contains(index, transaction.id)
   }
 
-  def contains(index: ChainIndex, txId: Hash): Boolean =
+  def contains(index: ChainIndex, txId: TransactionId): Boolean =
     getSharedPool(index).contains(txId) || pendingPool.contains(txId)
 
   def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] =

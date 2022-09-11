@@ -16,7 +16,7 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.BlockHash
+import org.alephium.protocol.model.BlockHash
 
 sealed trait TxStatus
 

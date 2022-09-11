@@ -24,7 +24,6 @@ import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import org.scalacheck.Gen
-import org.scalatest.concurrent.Eventually.eventually
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlow
@@ -35,10 +34,16 @@ import org.alephium.flow.network.broker.{InboundBrokerHandler => BaseInboundBrok
 import org.alephium.flow.network.broker.{ConnectionHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
-import org.alephium.protocol.{BlockHash, Generators, Hash}
+import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message._
-import org.alephium.protocol.model.{ChainIndex, CliqueInfo, NoIndexModelGeneratorsLike}
+import org.alephium.protocol.model.{
+  BlockHash,
+  ChainIndex,
+  CliqueInfo,
+  NoIndexModelGeneratorsLike,
+  TransactionId
+}
 import org.alephium.util.{ActorRefT, AVector, TimeStamp, UnsecureRandom}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec {
@@ -225,17 +230,17 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     brokerHandlerActor.maxBlockCapacity is capacity
     brokerHandlerActor.maxTxsCapacity is (capacity * 32)
     setSynced()
-    val txHash0 = Hash.generate
+    val txHash0 = TransactionId.generate
     brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, AVector(txHash0)))))
     brokerHandlerActor.seenTxs.contains(txHash0) is true
-    val txHashes = AVector.fill(brokerHandlerActor.maxTxsCapacity)(Hash.generate)
+    val txHashes = AVector.fill(brokerHandlerActor.maxTxsCapacity)(TransactionId.generate)
     brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, txHashes))))
     brokerHandlerActor.seenTxs.contains(txHash0) is false
     brokerHandlerActor.seenTxs.keys().toSet is txHashes.toSet
   }
 
   it should "mark tx seen when receive valid tx announcements" in new Fixture {
-    val txHashes = AVector.fill(10)(Hash.generate)
+    val txHashes = AVector.fill(10)(TransactionId.generate)
     brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, txHashes))))
     brokerHandlerActor.seenTxs.isEmpty is true
     setSynced()
@@ -259,7 +264,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
 
   it should "publish misbehavior when receive invalid tx announcements" in new Fixture {
     val listener = TestProbe()
-    val txHashes = AVector.fill(10)(Hash.generate)
+    val txHashes = AVector.fill(10)(TransactionId.generate)
     system.eventStream.subscribe(listener.ref, classOf[MisbehaviorManager.Misbehavior])
     watch(brokerHandler)
     setSynced()
@@ -269,8 +274,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "ignore the duplicated tx announcements" in new Fixture {
-    val txHashes1 = AVector.fill(6)(Hash.generate)
-    val txHashes2 = AVector.fill(4)(Hash.generate)
+    val txHashes1 = AVector.fill(6)(TransactionId.generate)
+    val txHashes2 = AVector.fill(4)(TransactionId.generate)
 
     brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, txHashes1))))
     brokerHandlerActor.seenTxs.isEmpty is true
@@ -291,8 +296,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "send announcements only if remote have not seen the tx" in new Fixture {
-    val txHash1 = Hash.generate
-    val txHash2 = Hash.generate
+    val txHash1 = TransactionId.generate
+    val txHash2 = TransactionId.generate
 
     brokerHandlerActor.seenTxs.put(txHash1, ())
     brokerHandler ! BaseBrokerHandler.RelayTxs(AVector((chainIndex, AVector(txHash1))))
@@ -314,7 +319,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
       mempool.getSharedPool(chainIndex).contains(tx.id) is true
     }
 
-    val txHashes = txs.take(3).map(_.id) :+ Hash.generate
+    val txHashes = txs.take(3).map(_.id) :+ TransactionId.generate
     val request  = TxsRequest(RequestId.random(), AVector((chainIndex, txHashes)))
     brokerHandler ! BaseBrokerHandler.Received(request)
     val message = Message.serialize(TxsResponse(request.id, txs.take(3)))
@@ -361,7 +366,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "request txs" in new Fixture {
-    val txHashes = AVector.fill(4)((chainIndex, AVector(Hash.generate)))
+    val txHashes = AVector.fill(4)((chainIndex, AVector(TransactionId.generate)))
     brokerHandler ! BaseBrokerHandler.DownloadTxs(txHashes)
     connectionHandler.expectMsgPF() { case ConnectionHandler.Send(message) =>
       Message

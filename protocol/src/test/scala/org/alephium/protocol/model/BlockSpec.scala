@@ -37,7 +37,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
 
   it should "hash" in {
     forAll(blockGen) { block =>
-      val expected = Blake3.hash(Blake3.hash(serialize(block.header)).bytes)
+      val expected = BlockHash(Blake3.hash(Blake3.hash(serialize(block.header)).bytes))
       block.hash is block.header.hash
       block.hash is expected
     }
@@ -204,9 +204,9 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
 
       val tokens = {
         val tokenId1 =
-          Hash.unsafe(hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822")
+          TokenId.from(hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822").value
         val tokenId2 =
-          Hash.unsafe(hex"2d257dfb825bd2c4ee87c9ebf45d6fafc1b628d3f01a85a877ca00c017fca056")
+          TokenId.from(hex"2d257dfb825bd2c4ee87c9ebf45d6fafc1b628d3f01a85a877ca00c017fca056").value
 
         AVector((tokenId1, U256.unsafe(10)), (tokenId2, U256.unsafe(20)))
       }
@@ -295,7 +295,9 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
           contractInputs = AVector(
             ContractOutputRef.unsafe(
               Hint.unsafe(-1038667620),
-              Hash.unsafe(hex"1334b03ce27313db24ace4fb1f72ec56f0bc6223d137430aaac0f37cccf2dd98")
+              TxOutputRef.unsafeKey(
+                Hash.unsafe(hex"1334b03ce27313db24ace4fb1f72ec56f0bc6223d137430aaac0f37cccf2dd98")
+              )
             )
           ),
           generatedOutputs = AVector(

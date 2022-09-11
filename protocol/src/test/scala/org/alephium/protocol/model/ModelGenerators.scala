@@ -30,7 +30,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}
 import org.alephium.protocol.vm.lang.Compiler
-import org.alephium.util.{AlephiumSpec, AVector, I256, Number, NumericHelpers, TimeStamp, U256}
+import org.alephium.util._
 
 trait LockupScriptGenerators extends Generators {
   import ModelGenerators.ScriptPair
@@ -83,7 +83,9 @@ trait LockupScriptGenerators extends Generators {
       .retryUntil { hash =>
         ScriptHint.fromHash(hash).groupIndex.equals(groupIndex)
       }
-      .map(LockupScript.p2c)
+      .map { hash =>
+        LockupScript.p2c(ContractId(hash))
+      }
   }
 
   def lockupGen(groupIndex: GroupIndex): Gen[LockupScript] = {
@@ -166,14 +168,14 @@ trait TxInputGenerators extends Generators {
     for {
       scriptHint <- scriptHintGen(groupIndex)
       hash       <- hashGen
-    } yield AssetOutputRef.unsafe(Hint.ofAsset(scriptHint), hash)
+    } yield AssetOutputRef.unsafe(Hint.ofAsset(scriptHint), TxOutputRef.unsafeKey(hash))
   }
 
   def contractOutputRefGen(groupIndex: GroupIndex): Gen[ContractOutputRef] = {
     for {
       scriptHint <- scriptHintGen(groupIndex)
       hash       <- hashGen
-    } yield ContractOutputRef.unsafe(Hint.ofContract(scriptHint), hash)
+    } yield ContractOutputRef.unsafe(Hint.ofContract(scriptHint), TxOutputRef.unsafeKey(hash))
   }
 
   lazy val txInputGen: Gen[TxInput] =
@@ -187,7 +189,7 @@ trait TxInputGenerators extends Generators {
       scriptHint <- scriptHintGen(groupIndex)
       hash       <- hashGen
     } yield {
-      val outputRef = AssetOutputRef.unsafeWithScriptHint(scriptHint, hash)
+      val outputRef = AssetOutputRef.from(scriptHint, TxOutputRef.unsafeKey(hash))
       TxInput(outputRef, UnlockScript.p2pkh(PublicKey.generate))
     }
 
@@ -214,9 +216,9 @@ trait TokenGenerators extends Generators with NumericHelpers {
 
   def tokenGen(inputNum: Int): Gen[(TokenId, U256)] =
     for {
-      tokenId <- hashGen
-      amount  <- amountGen(inputNum)
-    } yield (tokenId, amount)
+      tokenIdValue <- hashGen
+      amount       <- amountGen(inputNum)
+    } yield (TokenId(tokenIdValue), amount)
 
   def tokensGen(inputNum: Int, tokensNumGen: Gen[Int]): Gen[Map[TokenId, U256]] =
     for {
@@ -311,11 +313,12 @@ trait TxGenerators
       ScriptPair(lockup, unlock, privateKey) <- scriptGen
       lockTime                               <- lockTimeGen
       data                                   <- dataGen
-      outputHash                             <- hashGen
+      outputKey                              <- hashGen
     } yield {
       val assetOutput =
         AssetOutput(balances.attoAlphAmount, lockup, lockTime, AVector.from(balances.tokens), data)
-      val txInput = TxInput(AssetOutputRef.unsafe(assetOutput.hint, outputHash), unlock)
+      val txInput =
+        TxInput(AssetOutputRef.unsafe(assetOutput.hint, TxOutputRef.unsafeKey(outputKey)), unlock)
       AssetInputInfo(txInput, assetOutput, privateKey)
     }
 
@@ -404,7 +407,7 @@ trait TxGenerators
       )
       unsignedTx <- unsignedTxGen(chainIndex)(Gen.const(assetInfos), lockupGen)
       signatures =
-        assetInfos.map(info => SignatureSchema.sign(unsignedTx.hash.bytes, info.privateKey))
+        assetInfos.map(info => SignatureSchema.sign(unsignedTx.id, info.privateKey))
     } yield {
       val tx = Transaction.from(unsignedTx, signatures)
       tx -> assetInfos
@@ -433,36 +436,44 @@ trait BlockGenerators extends TxGenerators {
 
   lazy val nonceGen = Gen.const(()).map(_ => Nonce.unsecureRandom())
 
-  def blockGen(chainIndex: ChainIndex, txNumGen: Gen[Int]): Gen[Block] =
+  def blockGen(
+      chainIndex: ChainIndex,
+      txNumGen: Gen[Int],
+      blockTs: TimeStamp
+  ): Gen[Block] =
     for {
       depStateHash <- hashGen
       deps <- Gen
         .listOfN(2 * groupConfig.groups - 1, blockHashGen)
         .map(_.toArray)
         .map(AVector.unsafe(_))
-      block <- blockGenOf(chainIndex, deps, depStateHash, txNumGen)
+      block <- blockGenOf(chainIndex, deps, depStateHash, blockTs, txNumGen)
     } yield block
 
   def blockGen(chainIndex: ChainIndex): Gen[Block] = {
-    blockGen(chainIndex, Gen.choose(1, 5))
+    blockGen(chainIndex, TimeStamp.now())
+  }
+
+  def blockGen(chainIndex: ChainIndex, blockTs: TimeStamp): Gen[Block] = {
+    blockGen(chainIndex, Gen.choose(1, 5), blockTs)
   }
 
   def blockGenOf(broker: BrokerGroupInfo): Gen[Block] =
-    chainIndexGenRelatedTo(broker).flatMap(blockGen)
+    chainIndexGenRelatedTo(broker).flatMap(blockGen(_))
 
   def blockGenNotOf(broker: BrokerGroupInfo): Gen[Block] =
-    chainIndexGenNotRelatedTo(broker).flatMap(blockGen)
+    chainIndexGenNotRelatedTo(broker).flatMap(blockGen(_))
 
   def blockGenOf(group: GroupIndex): Gen[Block] =
-    chainIndexFrom(group).flatMap(blockGen)
+    chainIndexFrom(group).flatMap(blockGen(_))
 
   private def gen(
       chainIndex: ChainIndex,
       deps: AVector[BlockHash],
       depStateHash: Hash,
+      blockTs: TimeStamp,
       txs: AVector[Transaction]
   ): Block = {
-    val blockTs = TimeStamp.now()
     val coinbase = Transaction.coinbase(
       chainIndex,
       txs,
@@ -491,26 +502,33 @@ trait BlockGenerators extends TxGenerators {
       chainIndex: ChainIndex,
       deps: AVector[BlockHash],
       depStateHash: Hash,
+      blockTs: TimeStamp,
       txNumGen: Gen[Int]
   ): Gen[Block] =
     for {
       txNum <- txNumGen
       txs   <- Gen.listOfN(txNum, transactionGen(chainIndexGen = Gen.const(chainIndex)))
-    } yield gen(chainIndex, deps, depStateHash, AVector.from(txs))
+    } yield gen(chainIndex, deps, depStateHash, blockTs, AVector.from(txs))
 
   def chainGenOf(chainIndex: ChainIndex, length: Int, block: Block): Gen[AVector[Block]] =
-    chainGenOf(chainIndex, length, block.hash)
+    chainGenOf(chainIndex, length, block.hash, block.timestamp)
 
   def chainGenOf(chainIndex: ChainIndex, length: Int): Gen[AVector[Block]] =
-    chainGenOf(chainIndex, length, BlockHash.zero)
+    chainGenOf(chainIndex, length, BlockHash.zero, TimeStamp.now())
 
-  def chainGenOf(chainIndex: ChainIndex, length: Int, initialHash: BlockHash): Gen[AVector[Block]] =
+  def chainGenOf(
+      chainIndex: ChainIndex,
+      length: Int,
+      initialHash: BlockHash,
+      initialTs: TimeStamp
+  ): Gen[AVector[Block]] =
     Gen.listOfN(length, blockGen(chainIndex)).map { blocks =>
-      blocks.foldLeft(AVector.empty[Block]) { case (acc, block) =>
+      blocks.zipWithIndex.foldLeft(AVector.empty[Block]) { case (acc, (block, index)) =>
         val prevHash      = if (acc.isEmpty) initialHash else acc.last.hash
         val currentHeader = block.header
         val deps          = BlockDeps.build(AVector.fill(groupConfig.depsNum)(prevHash))
-        val newHeader     = currentHeader.copy(blockDeps = deps)
+        val newTs         = initialTs.plusUnsafe(Duration.ofSecondsUnsafe(index.toLong + 1))
+        val newHeader     = currentHeader.copy(blockDeps = deps, timestamp = newTs)
         val newBlock      = block.copy(header = newHeader)
         acc :+ newBlock
       }
@@ -526,10 +544,12 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
     chainIndexGen.flatMap(blockGen(_))
 
   def blockGenOf(txNumGen: Gen[Int]): Gen[Block] =
-    chainIndexGen.flatMap(blockGen(_, txNumGen))
+    chainIndexGen.flatMap(blockGen(_, txNumGen, TimeStamp.now()))
 
   def blockGenOf(deps: AVector[BlockHash], depStateHash: Hash): Gen[Block] =
-    chainIndexGen.flatMap(blockGenOf(_, deps, depStateHash, Gen.choose(1, 5)))
+    chainIndexGen.flatMap(
+      blockGenOf(_, deps, depStateHash, TimeStamp.now(), Gen.choose(1, 5))
+    )
 
   def chainGenOf(length: Int, block: Block): Gen[AVector[Block]] =
     chainIndexGen.flatMap(chainGenOf(_, length, block))
@@ -537,16 +557,18 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
   def chainGenOf(length: Int): Gen[AVector[Block]] =
     chainIndexGen.flatMap(chainGenOf(_, length))
 
-  def generateContract()
-      : Gen[(StatefulContract.HalfDecoded, AVector[Val], ContractOutputRef, ContractOutput)] = {
+  type GeneratedContract =
+    (ContractId, StatefulContract.HalfDecoded, AVector[Val], ContractOutputRef, ContractOutput)
+  def generateContract(): Gen[GeneratedContract] = {
     lazy val counterStateGen: Gen[AVector[Val]] =
       Gen.choose(0L, Long.MaxValue / 1000).map(n => AVector(Val.U256(U256.unsafe(n))))
     for {
       groupIndex    <- groupIndexGen
+      hash          <- hashGen
       outputRef     <- contractOutputRefGen(groupIndex)
       output        <- contractOutputGen(scriptGen = p2cLockupGen(groupIndex))
       contractState <- counterStateGen
-    } yield (counterContract.toHalfDecoded(), contractState, outputRef, output)
+    } yield (ContractId(hash), counterContract.toHalfDecoded(), contractState, outputRef, output)
   }
 }
 

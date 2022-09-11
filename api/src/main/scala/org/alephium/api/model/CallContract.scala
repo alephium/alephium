@@ -17,16 +17,15 @@
 package org.alephium.api.model
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.{BlockHash, Hash}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex}
+import org.alephium.protocol.model.{Address, BlockHash, ChainIndex, GroupIndex, TransactionId}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class CallContract(
     group: Int,
     worldStateBlockHash: Option[BlockHash] = None,
-    txId: Option[Hash] = None,
+    txId: Option[TransactionId] = None,
     address: Address.Contract,
     methodIndex: Int,
     args: Option[AVector[Val]] = None,

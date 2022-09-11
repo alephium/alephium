@@ -42,7 +42,7 @@ class FlowUtilsSpec extends AlephiumSpec {
       val unsignedTx = UnsignedTransaction(txScriptOpt = Some(script), inputs, AVector.empty)
       val tx = TransactionTemplate(
         unsignedTx,
-        assets.map(asset => SignatureSchema.sign(unsignedTx.hash.bytes, asset.privateKey)),
+        assets.map(asset => SignatureSchema.sign(unsignedTx.id, asset.privateKey)),
         AVector.empty
       )
 

@@ -262,7 +262,7 @@ class ParserSpec extends AlephiumSpec {
     parsed1.isPublic is true
     parsed1.usePreapprovedAssets is true
     parsed1.useAssetsInContract is false
-    parsed1.usePermissionCheck is true
+    parsed1.useExternalCallCheck is true
     parsed1.useReadonly is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
@@ -280,7 +280,7 @@ class ParserSpec extends AlephiumSpec {
     parsed2.isPublic is true
     parsed2.usePreapprovedAssets is true
     parsed2.useAssetsInContract is true
-    parsed2.usePermissionCheck is true
+    parsed2.useExternalCallCheck is true
     parsed2.useReadonly is false
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
@@ -296,7 +296,7 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed3.usePreapprovedAssets is false
     parsed3.useAssetsInContract is true
-    parsed3.usePermissionCheck is true
+    parsed3.useExternalCallCheck is true
     parsed3.useReadonly is true
 
     val error = intercept[Compiler.Error](
@@ -916,31 +916,33 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "test abstract contract parser" in {
-    def fooFuncDef(isAbstract: Boolean, permissionCheck: Boolean = true) = FuncDef[StatefulContext](
-      Seq.empty,
-      FuncId("foo", false),
-      false,
-      false,
-      false,
-      permissionCheck,
-      false,
-      Seq.empty,
-      Seq.empty,
-      if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
-    )
+    def fooFuncDef(isAbstract: Boolean, externalCallCheck: Boolean = true) =
+      FuncDef[StatefulContext](
+        Seq.empty,
+        FuncId("foo", false),
+        false,
+        false,
+        false,
+        externalCallCheck,
+        false,
+        Seq.empty,
+        Seq.empty,
+        if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
+      )
 
-    def barFuncDef(isAbstract: Boolean, permissionCheck: Boolean = true) = FuncDef[StatefulContext](
-      Seq.empty,
-      FuncId("bar", false),
-      false,
-      false,
-      false,
-      permissionCheck,
-      false,
-      Seq.empty,
-      Seq.empty,
-      if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
-    )
+    def barFuncDef(isAbstract: Boolean, externalCallCheck: Boolean = true) =
+      FuncDef[StatefulContext](
+        Seq.empty,
+        FuncId("bar", false),
+        false,
+        false,
+        false,
+        externalCallCheck,
+        false,
+        Seq.empty,
+        Seq.empty,
+        if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
+      )
 
     {
       info("Parse abstract contract")
@@ -971,7 +973,7 @@ class ParserSpec extends AlephiumSpec {
       val bar =
         s"""
            |Interface Bar {
-           |  @using(permissionCheck = false)
+           |  @using(externalCallCheck = false)
            |  fn bar() -> ()
            |}
            |""".stripMargin
@@ -979,7 +981,7 @@ class ParserSpec extends AlephiumSpec {
       val code =
         s"""
            |Abstract Contract Foo() implements Bar {
-           |  @using(permissionCheck = false)
+           |  @using(externalCallCheck = false)
            |  fn foo() -> () {
            |    return
            |  }
@@ -992,7 +994,7 @@ class ParserSpec extends AlephiumSpec {
       val annotations = Seq(
         Annotation(
           Ident(Parser.usingAnnotationId),
-          Seq(AnnotationField(Ident(Parser.usePermissionCheckKey), Val.False))
+          Seq(AnnotationField(Ident(Parser.useExternalCallCheckKey), Val.False))
         )
       )
       fooContract is Contract(

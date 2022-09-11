@@ -16,8 +16,8 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.crypto.Blake3
 import org.alephium.protocol._
+import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{AVector, Hex, TimeStamp}
 
 trait BlockSnapshotsFixture extends TransactionSnapshotsFixture {
@@ -29,11 +29,11 @@ trait BlockSnapshotsFixture extends TransactionSnapshotsFixture {
       version = DefaultBlockVersion,
       blockDeps = BlockDeps.build(
         deps = AVector(
-          Blake3.unsafe(hex"f4e21b0811b4d1a56d016d4980cdcb34708de0d96050e077ac6a28bc3831be97"),
-          Blake3.unsafe(hex"abb46756a535f6912c90f9f06f503eed53748697f4fad672da1557e2126fa760"),
-          Blake3.unsafe(hex"aecea2ddb52f00109726408bb1eb86bbde953fe696c57e6517c93b27973cc805"),
-          Blake3.unsafe(hex"6725874ac2a55cd70b1ffec51b2afb46eeaf098052e5352582f2ff0135da127e"),
-          Blake3.unsafe(hex"4325ecfd044d88e58c3537275381d1c3a1f410812a2847382058e5686dccfd7a")
+          BlockHash.unsafe(hex"f4e21b0811b4d1a56d016d4980cdcb34708de0d96050e077ac6a28bc3831be97"),
+          BlockHash.unsafe(hex"abb46756a535f6912c90f9f06f503eed53748697f4fad672da1557e2126fa760"),
+          BlockHash.unsafe(hex"aecea2ddb52f00109726408bb1eb86bbde953fe696c57e6517c93b27973cc805"),
+          BlockHash.unsafe(hex"6725874ac2a55cd70b1ffec51b2afb46eeaf098052e5352582f2ff0135da127e"),
+          BlockHash.unsafe(hex"4325ecfd044d88e58c3537275381d1c3a1f410812a2847382058e5686dccfd7a")
         )
       ),
       depStateHash =

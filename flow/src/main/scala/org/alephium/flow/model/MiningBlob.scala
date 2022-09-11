@@ -20,7 +20,7 @@ import java.math.BigInteger
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp}

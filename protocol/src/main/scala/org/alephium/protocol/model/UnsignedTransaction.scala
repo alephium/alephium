@@ -18,7 +18,6 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
-import org.alephium.macros.HashSerde
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.vm._
@@ -41,7 +40,6 @@ import org.alephium.util.{AVector, TimeStamp, U256}
   * @param fixedOutputs
   *   a vector of TxOutput. ContractOutput are put in front of AssetOutput
   */
-@HashSerde
 final case class UnsignedTransaction(
     version: Byte,
     networkId: NetworkId,
@@ -51,6 +49,8 @@ final case class UnsignedTransaction(
     inputs: AVector[TxInput],
     fixedOutputs: AVector[AssetOutput]
 ) extends AnyRef {
+  lazy val id: TransactionId = TransactionId.hash(serialize(this))
+
   // this might only works for validated tx
   def fromGroup(implicit config: GroupConfig): GroupIndex = {
     inputs.head.fromGroup

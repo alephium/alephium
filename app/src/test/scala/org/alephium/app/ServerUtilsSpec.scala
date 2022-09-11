@@ -58,7 +58,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture with ApiConfigFixture {
     implicit def flowImplicit: BlockFlow = blockFlow
 
-    def emptyKey(index: Int): Hash = TxOutputRef.key(Hash.zero, index)
+    def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
   }
 
   trait FlowFixtureWithApi extends FlowFixture with ApiConfigFixture
@@ -727,7 +727,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "not create transaction when with token amount overflow" in new MultipleUtxos {
-    val tokenId = Hash.hash("token1")
+    val tokenId = TokenId.hash("token1")
     val tokenAmountOverflowDestinations = AVector(
       destination1.copy(tokens = Some(AVector(Token(tokenId, U256.MaxValue)))),
       destination2.copy(tokens = Some(AVector(Token(tokenId, U256.One))))
@@ -881,9 +881,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       val contract = Compiler.compileContract(code).rightValue
       val script =
         contractCreation(contract, fields, lockupScript, minimalAlphInContract)
-      val block     = executeScript(script)
-      val outputRef = TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
-      (block, outputRef.key)
+      val block      = executeScript(script)
+      val contractId = ContractId.from(block.transactions.head.id, 0)
+      (block, contractId)
     }
 
     val barCode =
@@ -1018,10 +1018,9 @@ class ServerUtilsSpec extends AlephiumSpec {
          |$foo
          |""".stripMargin
 
-    val barContract   = Compiler.compileContract(bar).rightValue
-    val barContractId = Hash.random
-    val destroyedFooContractId =
-      Hash.doubleHash(barContractId.bytes ++ Hex.unsafe(destroyContractPath))
+    val barContract            = Compiler.compileContract(bar).rightValue
+    val barContractId          = ContractId.random
+    val destroyedFooContractId = barContractId.subContractId(Hex.unsafe(destroyContractPath))
     val existingContract = ContractState(
       Address.contract(destroyedFooContractId),
       fooContract,
@@ -1038,10 +1037,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
     )
 
-    val testFlow    = BlockFlow.emptyUnsafe(config)
-    val serverUtils = new ServerUtils()
-    val createdFooContractId =
-      Hash.doubleHash(barContractId.bytes ++ Hex.unsafe(createContractPath))
+    val testFlow             = BlockFlow.emptyUnsafe(config)
+    val serverUtils          = new ServerUtils()
+    val createdFooContractId = barContractId.subContractId(Hex.unsafe(createContractPath))
 
     val result =
       serverUtils.runTestContract(testFlow, testContractParams.toComplete().rightValue).rightValue
@@ -1053,8 +1051,125 @@ class ServerUtilsSpec extends AlephiumSpec {
     assetOutput.attoAlphAmount is Amount(ALPH.alph(2).subUnsafe(defaultGasPrice * maximalGasPerTx))
   }
 
+  trait DestroyFixture extends Fixture {
+    val (_, pubKey)  = SignatureSchema.generatePriPub()
+    val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
+
+    val fooContractId = ContractId.random
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn destroy(address: Address) -> () {
+         |    destroySelf!(address)
+         |  }
+         |}
+         |""".stripMargin
+    val fooContract = Compiler.compileContract(foo).rightValue
+
+    val fooCallerContractId = ContractId.random
+    def fooCaller: String
+    val fooCallerContract = Compiler.compileContract(fooCaller).rightValue
+
+    val bar =
+      s"""
+         |Contract Bar() {
+         |  pub fn bar() -> () {
+         |    FooCaller(#${fooCallerContractId.toHexString}).destroyFoo()
+         |  }
+         |}
+         |
+         |$fooCaller
+         |""".stripMargin
+
+    val barContract   = Compiler.compileContract(bar).rightValue
+    val barContractId = ContractId.random
+    val existingContracts = AVector(
+      ContractState(
+        Address.contract(fooCallerContractId),
+        fooCallerContract,
+        fooCallerContract.hash,
+        None,
+        AVector(ValByteVec(fooContractId.bytes)),
+        AssetState(ALPH.oneAlph)
+      ),
+      ContractState(
+        Address.contract(fooContractId),
+        fooContract,
+        fooContract.hash,
+        None,
+        AVector.empty[Val],
+        AssetState(ALPH.oneAlph)
+      )
+    )
+    val testContractParams = TestContract(
+      address = Some(Address.contract(barContractId)),
+      bytecode = barContract,
+      initialAsset = Some(AssetState(ALPH.alph(10))),
+      existingContracts = Some(existingContracts),
+      inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
+    )
+
+    val testFlow    = BlockFlow.emptyUnsafe(config)
+    val serverUtils = new ServerUtils()
+  }
+
+  it should "successfully destroy contracts and transfer fund to calling address" in new DestroyFixture {
+    override def fooCaller: String =
+      s"""
+         |Contract FooCaller(fooId: ByteVec) {
+         |  @using(assetsInContract = true)
+         |  pub fn destroyFoo() -> () {
+         |    let foo = Foo(fooId)
+         |    foo.destroy(selfAddress!())
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+
+    val result = serverUtils
+      .runTestContract(
+        testFlow,
+        testContractParams.toComplete().rightValue
+      )
+      .rightValue
+    result.contracts.length is 2
+    result.contracts(0).address is Address.contract(fooCallerContractId)
+    result.contracts(1).address is Address.contract(barContractId)
+    val assetOutput = result.txOutputs(1)
+    assetOutput.address is assetAddress
+    val totalGas = defaultGasPrice * maximalGasPerTx
+    assetOutput.attoAlphAmount is Amount(ALPH.oneAlph.subUnsafe(totalGas))
+    val contractOutput = result.txOutputs(0)
+    contractOutput.address is Address.contract(fooCallerContractId)
+    contractOutput.attoAlphAmount.value is ALPH.alph(2)
+  }
+
+  it should "fail to destroy contracts and transfer fund to non-calling address" in new DestroyFixture {
+    override def fooCaller: String =
+      s"""
+         |Contract FooCaller(fooId: ByteVec) {
+         |  pub fn destroyFoo() -> () {
+         |    let foo = Foo(fooId)
+         |    foo.destroy(@${Address.contract(ContractId.random).toBase58})
+         |  }
+         |}
+         |
+         |$foo
+         |""".stripMargin
+
+    serverUtils
+      .runTestContract(
+        testFlow,
+        testContractParams.toComplete().rightValue
+      )
+      .leftValue
+      .detail is "PayToContractAddressNotInCallerTrace"
+  }
+
   trait TestContractFixture extends Fixture {
-    val tokenId         = Hash.random
+    val tokenId         = TokenId.random
     val (_, pubKey)     = SignatureSchema.generatePriPub()
     val lp              = Address.Asset(LockupScript.p2pkh(pubKey))
     val buyer           = lp
@@ -1164,8 +1279,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       contractId = testContractId1,
       code = AMMContract.swapProxyCode,
       originalCodeHash = AMMContract.swapProxyCode.hash,
-      initialFields =
-        AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
+      initialFields = AVector[Val](
+        ValByteVec(testContract0.contractId.bytes),
+        ValByteVec(tokenId.bytes)
+      ),
       initialAsset = AssetState(ALPH.alph(1)),
       testMethodIndex = 0,
       testArgs = AVector[Val](ValAddress(lp), ValU256(ALPH.alph(100)), ValU256(100)),
@@ -1255,8 +1372,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       contractId = testContractId1,
       code = AMMContract.swapProxyCode,
       originalCodeHash = AMMContract.swapProxyCode.hash,
-      initialFields =
-        AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
+      initialFields = AVector[Val](
+        ValByteVec(testContract0.contractId.bytes),
+        ValByteVec(tokenId.bytes)
+      ),
       initialAsset = AssetState(ALPH.alph(1)),
       testMethodIndex = 2,
       testArgs = AVector[Val](ValAddress(buyer), ValU256(50)),
@@ -1346,8 +1465,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       contractId = testContractId1,
       code = AMMContract.swapProxyCode,
       originalCodeHash = AMMContract.swapProxyCode.hash,
-      initialFields =
-        AVector[Val](ValByteVec(testContract0.contractId.bytes), ValByteVec(tokenId.bytes)),
+      initialFields = AVector[Val](
+        ValByteVec(testContract0.contractId.bytes),
+        ValByteVec(tokenId.bytes)
+      ),
       initialAsset = AssetState(ALPH.alph(1)),
       testMethodIndex = 1,
       testArgs = AVector[Val](ValAddress(buyer), ValU256(ALPH.alph(5))),
@@ -1440,7 +1561,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract = TestContract(
       blockHash = Some(BlockHash.random),
-      txId = Some(Hash.random),
+      txId = Some(TransactionId.random),
       bytecode = code,
       initialFields = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))),
       args = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One)))))
@@ -1475,8 +1596,18 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.warnings is AVector(
       "Found unused variables in Foo: foo.a",
       "Found unused fields in Foo: x",
-      "Function foo is readonly, please use @using(readonly = true) for the function"
+      "Function Foo.foo is readonly, please use @using(readonly = true) for the function"
     )
+
+    info("Turn off warnings")
+    val compilerOptions = CompilerOptions(
+      ignoreUnusedVariablesWarnings = Some(true),
+      ignoreUnusedFieldsWarnings = Some(true),
+      ignoreReadonlyCheckWarnings = Some(true)
+    )
+    val newResult =
+      serverUtils.compileContract(query.copy(compilerOptions = Some(compilerOptions))).rightValue
+    newResult.warnings.isEmpty is true
   }
 
   it should "compile project" in new Fixture {
@@ -1488,7 +1619,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |}
          |Contract Bar() implements Foo {
          |  pub fn foo() -> () {
-         |    checkPermission!(true, 0)
+         |    checkCaller!(true, 0)
          |  }
          |}
          |TxScript Main(id: ByteVec) {
@@ -1561,6 +1692,15 @@ class ServerUtilsSpec extends AlephiumSpec {
         "Found unused variables in Main: main.c",
         "Found unused fields in Main: b"
       )
+
+      info("Turn off warnings")
+      val compilerOptions = CompilerOptions(
+        ignoreUnusedVariablesWarnings = Some(true),
+        ignoreUnusedFieldsWarnings = Some(true)
+      )
+      val newResult =
+        serverUtils.compileScript(query.copy(compilerOptions = Some(compilerOptions))).rightValue
+      newResult.warnings.isEmpty is true
     }
   }
 
@@ -1579,8 +1719,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     {
       info("With approved tokens")
-      val token1                         = Hash.generate
-      val token2                         = Hash.generate
+      val token1                         = TokenId.generate
+      val token2                         = TokenId.generate
       val codeRaw                        = Hex.toHexString(serialize(contract))
       val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
       val stateRaw                       = Hex.toHexString(serialize(initialFields))
@@ -1647,7 +1787,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   private def signAndAddToMemPool(
-      txId: Hash,
+      txId: TransactionId,
       unsignedTx: String,
       chainIndex: ChainIndex,
       fromPrivateKey: PrivateKey

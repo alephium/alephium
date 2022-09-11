@@ -22,8 +22,6 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.actor.ActorRef.noSender
 import akka.io.{IO, Tcp}
 import akka.testkit.{EventFilter, SocketUtil, TestProbe}
-import org.scalatest.concurrent.{Eventually, PatienceConfiguration}
-import org.scalatest.time.{Millis, Seconds, Span}
 
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.setting.{AlephiumConfigFixture, NetworkSetting}
@@ -31,7 +29,7 @@ import org.alephium.util._
 
 class TcpControllerSpec extends AlephiumActorSpec with AlephiumConfigFixture {
 
-  trait Fixture extends Eventually {
+  trait Fixture {
     implicit val system = createSystem()
 
     val discoveryServer    = TestProbe()
@@ -122,7 +120,7 @@ class TcpControllerSpec extends AlephiumActorSpec with AlephiumConfigFixture {
     }
   }
 
-  it should "handle outgoing connections" in new Eventually {
+  it should "handle outgoing connections" in {
     val fixture1 = new Fixture {}
     val fixture2 = new Fixture {}
     eventually {
@@ -134,13 +132,7 @@ class TcpControllerSpec extends AlephiumActorSpec with AlephiumConfigFixture {
     }
   }
 
-  it should "forward connection failure" in new Fixture with PatienceConfiguration {
-    implicit override val patienceConfig: PatienceConfig =
-      PatienceConfig(
-        timeout = Span(15, Seconds),
-        interval = Span(150, Millis)
-      )
-
+  it should "forward connection failure" in new Fixture {
     val freeAddress = SocketUtil.temporaryServerAddress()
     val probe       = TestProbe()
     controller ! TcpController.ConnectTo(freeAddress, probe.ref)

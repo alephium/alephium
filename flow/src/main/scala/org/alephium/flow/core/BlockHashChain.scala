@@ -23,9 +23,9 @@ import org.alephium.flow.core.BlockHashChain.ChainDiff
 import org.alephium.flow.io.{BlockStateStorage, HeightIndexStorage}
 import org.alephium.flow.model.BlockState
 import org.alephium.io.{IOError, IOResult, IOUtils}
-import org.alephium.protocol.{ALPH, BlockHash}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{ChainIndex, Weight}
+import org.alephium.protocol.model.{BlockHash, ChainIndex, Weight}
 import org.alephium.util.{AVector, EitherF, Math, TimeStamp}
 
 // scalastyle:off number.of.methods

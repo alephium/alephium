@@ -19,9 +19,8 @@ package org.alephium.protocol.mining
 import akka.util.ByteString
 
 import org.alephium.crypto.Blake3
-import org.alephium.protocol.BlockHash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData, Target}
+import org.alephium.protocol.model.{BlockHash, BlockHeader, ChainIndex, FlowData, Target}
 import org.alephium.serde._
 
 object PoW {
@@ -31,7 +30,7 @@ object PoW {
   }
 
   def hash(headerBlob: ByteString): BlockHash = {
-    Blake3.doubleHash(headerBlob)
+    BlockHash(Blake3.doubleHash(headerBlob))
   }
 
   def checkWork(data: FlowData): Boolean = {

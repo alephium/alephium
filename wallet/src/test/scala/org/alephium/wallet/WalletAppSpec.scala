@@ -33,7 +33,14 @@ import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
-import org.alephium.protocol.model.{Address, CliqueId, NetworkId, TxGenerators}
+import org.alephium.protocol.model.{
+  Address,
+  CliqueId,
+  NetworkId,
+  TokenId,
+  TransactionId,
+  TxGenerators
+}
 import org.alephium.serde.serialize
 import org.alephium.util.{discard, AlephiumFutureSpec, AVector, Duration, Hex, U256}
 import org.alephium.wallet.api.model._
@@ -352,9 +359,9 @@ class WalletAppSpec
 
     val unsignedTx = transactionGen().sample.get.unsigned
 
-    sign(unsignedTx.hash.toHexString) check { response =>
+    sign(unsignedTx.id.toHexString) check { response =>
       response.as[SignResult].signature is SignatureSchema.sign(
-        unsignedTx.hash.bytes,
+        unsignedTx.id,
         privateKey
       )
       response.code is StatusCode.Ok
@@ -460,7 +467,7 @@ object WalletAppSpec extends {
             Hex.toHexString(serialize(unsignedTx)),
             unsignedTx.gasAmount,
             unsignedTx.gasPrice,
-            unsignedTx.hash,
+            unsignedTx.id,
             unsignedTx.fromGroup.value,
             unsignedTx.toGroup.value
           )
@@ -484,7 +491,7 @@ object WalletAppSpec extends {
 
     router.route().path("/transactions/submit").handler(BodyHandler.create()).handler { ctx =>
       val _ = read[SubmitTransaction](ctx.body().asString())
-      complete(ctx, SubmitTxResult(Hash.generate, 0, 0))
+      complete(ctx, SubmitTxResult(TransactionId.generate, 0, 0))
     }
 
     router.route().path("/infos/chain-params").handler { ctx =>
@@ -502,8 +509,8 @@ object WalletAppSpec extends {
     }
 
     router.route().path("/addresses/:address/balance").handler { ctx =>
-      val tokens       = AVector(Token(Hash.hash("token1"), U256.One))
-      val lockedTokens = AVector(Token(Hash.hash("token2"), U256.Two))
+      val tokens       = AVector(Token(TokenId.hash("token1"), U256.One))
+      val lockedTokens = AVector(Token(TokenId.hash("token2"), U256.Two))
 
       complete(
         ctx,

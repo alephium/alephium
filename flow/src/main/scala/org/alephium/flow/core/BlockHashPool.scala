@@ -18,8 +18,7 @@ package org.alephium.flow.core
 
 import org.alephium.flow.model.BlockState
 import org.alephium.io.IOResult
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.Weight
+import org.alephium.protocol.model.{BlockHash, Weight}
 import org.alephium.util.{AVector, Bytes}
 
 trait BlockHashPool {

@@ -31,10 +31,9 @@ import net.ceedubs.ficus.readers.ValueReader
 
 import org.alephium.conf._
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
-import org.alephium.protocol.model.{Address, GroupIndex, NetworkId}
+import org.alephium.protocol.model.{Address, ContractId, GroupIndex, NetworkId}
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex, TimeStamp}
 
@@ -219,7 +218,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     {
       info("With addresses")
       def address(contractId: String) = {
-        Address.contract(Hash.unsafe(Hex.unsafe(contractId)))
+        Address.contract(ContractId.from(Hex.unsafe(contractId)).value)
       }
       val address1 = address("109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25")
       val address2 = address("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")

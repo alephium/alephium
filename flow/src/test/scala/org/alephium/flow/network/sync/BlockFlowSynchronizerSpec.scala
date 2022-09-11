@@ -17,16 +17,16 @@
 package org.alephium.flow.network.sync
 
 import akka.testkit.{TestActorRef, TestProbe}
-import org.scalatest.concurrent.Eventually
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.network.broker.BrokerHandler
-import org.alephium.protocol.{BlockHash, Generators}
+import org.alephium.protocol.Generators
+import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{AlephiumActorSpec, AVector}
 
 class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
-  trait Fixture extends FlowFixture with Generators with Eventually {
+  trait Fixture extends FlowFixture with Generators {
     val (allHandlers, _) = TestUtils.createAllHandlersProbe
     val blockFlowSynchronizer = TestActorRef[BlockFlowSynchronizer](
       BlockFlowSynchronizer.props(blockFlow, allHandlers)

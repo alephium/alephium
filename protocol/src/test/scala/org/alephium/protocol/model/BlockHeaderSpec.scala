@@ -17,8 +17,9 @@
 package org.alephium.protocol.model
 
 import org.alephium.crypto.Blake3
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfigFixture, GroupConfigFixture}
+import org.alephium.protocol.model.BlockHash
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
@@ -45,7 +46,7 @@ class BlockHeaderSpec
   }
 
   it should "extract dependencies properly" in {
-    val deps      = AVector.tabulate(groupConfig.depsNum)(i => BlockHash.hash(Seq(i.toByte)))
+    val deps = AVector.tabulate(groupConfig.depsNum)(i => BlockHash(Blake3.hash(Seq(i.toByte))))
     val blockDeps = BlockDeps.build(deps)
 
     val genesis = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
@@ -119,11 +120,11 @@ class BlockHeaderSpec
       version = DefaultBlockVersion,
       blockDeps = BlockDeps.build(
         deps = AVector(
-          Blake3.unsafe(hex"1b08f56d011b4d1ad498064e21cdcb07ac6a28bc3831be97d96034708de50e07"),
-          Blake3.unsafe(hex"6a5ab35f69b467512c90d53f9f06f5697f4fad672da15576fa76003ee748e212"),
-          Blake3.unsafe(hex"aedb5ceabb1e2d2f001096c59726408b86bbde953fe67eb27973cc8056517c93"),
-          Blake3.unsafe(hex"c2a55cd706725874ab1ffe46eeafc51be5352582f2ff02afb098a127e052135d"),
-          Blake3.unsafe(hex"4325372753815ecfd0410812a28473824d88e58c8e5686dccfd7a3d1c3a1f405")
+          BlockHash.unsafe(hex"1b08f56d011b4d1ad498064e21cdcb07ac6a28bc3831be97d96034708de50e07"),
+          BlockHash.unsafe(hex"6a5ab35f69b467512c90d53f9f06f5697f4fad672da15576fa76003ee748e212"),
+          BlockHash.unsafe(hex"aedb5ceabb1e2d2f001096c59726408b86bbde953fe67eb27973cc8056517c93"),
+          BlockHash.unsafe(hex"c2a55cd706725874ab1ffe46eeafc51be5352582f2ff02afb098a127e052135d"),
+          BlockHash.unsafe(hex"4325372753815ecfd0410812a28473824d88e58c8e5686dccfd7a3d1c3a1f405")
         )
       ),
       depStateHash =

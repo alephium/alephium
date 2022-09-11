@@ -16,8 +16,7 @@
 
 package org.alephium.flow.core
 
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.{BlockDeps, GroupIndex}
+import org.alephium.protocol.model.{BlockDeps, BlockHash, GroupIndex}
 import org.alephium.util.AVector
 
 final case class FlowTips(

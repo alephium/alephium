@@ -16,7 +16,8 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.{BlockHash, Hash}
+import org.alephium.protocol.Hash
+import org.alephium.protocol.model.{BlockHash, TransactionId}
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, I256}
 
@@ -64,7 +65,7 @@ object LogStateRef {
 }
 
 final case class LogState(
-    txId: Hash,
+    txId: TransactionId,
     index: Byte,
     fields: AVector[Val]
 ) {

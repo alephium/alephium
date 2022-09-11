@@ -22,18 +22,18 @@ import org.alephium.flow.core.BlockChain
 import org.alephium.flow.core.BlockChain.{TxIndex, TxIndexes}
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.protocol.Hash
+import org.alephium.protocol.model.TransactionId
 import org.alephium.util.AVector
 
-trait TxStorage extends KeyValueStorage[Hash, TxIndexes] {
-  def add(txId: Hash, txIndex: TxIndex): IOResult[Unit] = {
+trait TxStorage extends KeyValueStorage[TransactionId, TxIndexes] {
+  def add(txId: TransactionId, txIndex: TxIndex): IOResult[Unit] = {
     getOpt(txId).flatMap {
       case Some(txIndexes) => put(txId, TxIndexes(txIndexes.indexes :+ txIndex))
       case None            => put(txId, TxIndexes(AVector(txIndex)))
     }
   }
 
-  def addUnsafe(txId: Hash, txIndex: TxIndex): Unit = {
+  def addUnsafe(txId: TransactionId, txIndex: TxIndex): Unit = {
     getOptUnsafe(txId) match {
       case Some(txIndexes) => putUnsafe(txId, TxIndexes(txIndexes.indexes :+ txIndex))
       case None            => putUnsafe(txId, TxIndexes(AVector(txIndex)))
@@ -56,14 +56,14 @@ class TxRocksDBStorage(
     cf: ColumnFamily,
     writeOptions: WriteOptions,
     readOptions: ReadOptions
-) extends RocksDBKeyValueStorage[Hash, BlockChain.TxIndexes](
+) extends RocksDBKeyValueStorage[TransactionId, BlockChain.TxIndexes](
       storage,
       cf,
       writeOptions,
       readOptions
     )
     with TxStorage {
-  override def delete(key: Hash): IOResult[Unit] = ???
+  override def delete(key: TransactionId): IOResult[Unit] = ???
 
-  override def deleteUnsafe(key: Hash): Unit = ???
+  override def deleteUnsafe(key: TransactionId): Unit = ???
 }

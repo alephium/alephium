@@ -219,7 +219,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
       } else {
         val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
-        val (usePreapprovedAssets, useContractAssets, usePermissionCheck, useReadonly) =
+        val (usePreapprovedAssets, useContractAssets, useExternalCallCheck, useReadonly) =
           Parser.extractFuncModifier(annotations, false, false, true, false)
         FuncDefTmp(
           annotations,
@@ -227,7 +227,7 @@ abstract class Parser[Ctx <: StatelessContext] {
           isPublic,
           usePreapprovedAssets,
           useContractAssets,
-          usePermissionCheck,
+          useExternalCallCheck,
           useReadonly,
           params,
           returnType,
@@ -242,7 +242,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       f.isPublic,
       f.usePreapprovedAssets,
       f.useContractAssets,
-      f.usePermissionCheck,
+      f.useExternalCallCheck,
       f.useReadonly,
       f.args,
       f.rtypes,
@@ -347,7 +347,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     isPublic: Boolean,
     usePreapprovedAssets: Boolean,
     useContractAssets: Boolean,
-    usePermissionCheck: Boolean,
+    useExternalCallCheck: Boolean,
     useReadonly: Boolean,
     args: Seq[Argument],
     rtypes: Seq[Type],
@@ -358,17 +358,17 @@ object Parser {
   val usingAnnotationId       = "using"
   val usePreapprovedAssetsKey = "preapprovedAssets"
   val useContractAssetsKey    = "assetsInContract"
-  val usePermissionCheckKey   = "permissionCheck"
+  val useExternalCallCheckKey = "externalCallCheck"
   val useReadonlyKey          = "readonly"
   val keys: Set[String] =
-    Set(usePreapprovedAssetsKey, useContractAssetsKey, usePermissionCheckKey, useReadonlyKey)
+    Set(usePreapprovedAssetsKey, useContractAssetsKey, useExternalCallCheckKey, useReadonlyKey)
 
   // scalastyle:off method.length
   def extractFuncModifier(
       annotations: Seq[Annotation],
       usePreapprovedAssetsDefault: Boolean,
       useContractAssetsDefault: Boolean,
-      usePermissionCheckDefault: Boolean,
+      useExternalCallCheckDefault: Boolean,
       useReadonlyDefault: Boolean
   ): (Boolean, Boolean, Boolean, Boolean) = {
     if (annotations.exists(_.id.name != usingAnnotationId)) {
@@ -393,22 +393,22 @@ object Parser {
             useContractAssetsKey,
             useContractAssetsDefault
           )
-          val usePermissionCheck = extractAnnotationBoolean(
+          val useExternalCallCheck = extractAnnotationBoolean(
             useAnnotation,
-            usePermissionCheckKey,
-            usePermissionCheckDefault
+            useExternalCallCheckKey,
+            useExternalCallCheckDefault
           )
           val useReadonly = extractAnnotationBoolean(
             useAnnotation,
             useReadonlyKey,
             useReadonlyDefault
           )
-          (usePreapprovedAssets, useContractAssets, usePermissionCheck, useReadonly)
+          (usePreapprovedAssets, useContractAssets, useExternalCallCheck, useReadonly)
         case None =>
           (
             usePreapprovedAssetsDefault,
             useContractAssetsDefault,
-            usePermissionCheckDefault,
+            useExternalCallCheckDefault,
             useReadonlyDefault
           )
       }
@@ -614,7 +614,7 @@ object StatefulParser extends Parser[StatefulContext] {
             f.isPublic,
             f.usePreapprovedAssets,
             f.useContractAssets,
-            f.usePermissionCheck,
+            f.useExternalCallCheck,
             f.useReadonly,
             f.args,
             f.rtypes,

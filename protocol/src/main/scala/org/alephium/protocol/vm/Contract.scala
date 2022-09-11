@@ -335,12 +335,12 @@ object StatefulContract {
 
     // For testing purpose
     def toObjectUnsafe(
-        address: Hash,
+        contractId: ContractId,
         fields: AVector[Val]
     ): StatefulContractObject = {
       val initialStateHash =
         Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
-      StatefulContractObject.unsafe(this.hash, this, initialStateHash, fields, address)
+      StatefulContractObject.unsafe(this.hash, this, initialStateHash, fields, contractId)
     }
   }
 
@@ -437,8 +437,8 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
 }
 
 sealed trait ScriptObj[Ctx <: StatelessContext] extends ContractObj[Ctx] {
-  val contractIdOpt: Option[Hash]   = None
-  val fields: mutable.ArraySeq[Val] = mutable.ArraySeq.empty
+  val contractIdOpt: Option[ContractId] = None
+  val fields: mutable.ArraySeq[Val]     = mutable.ArraySeq.empty
 }
 
 final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[StatelessContext]

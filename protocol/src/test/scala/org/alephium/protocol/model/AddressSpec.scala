@@ -20,6 +20,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
@@ -104,7 +105,7 @@ class AddressSpec extends AlephiumSpec {
   }
 
   "Address.asset" should "parse asset address only" in {
-    val lock    = LockupScript.P2C(Hash.random)
+    val lock    = LockupScript.P2C(ContractId.random)
     val address = Address.from(lock).toBase58
     Address.asset(address) is None
     Address.fromBase58(address).value.lockupScript is lock
@@ -166,7 +167,7 @@ class AddressSpec extends AlephiumSpec {
     }
 
     def script = {
-      LockupScript.p2c(Hash.from(contractId.value).value)
+      LockupScript.p2c(ContractId.from(contractId.value).value)
     }
   }
 

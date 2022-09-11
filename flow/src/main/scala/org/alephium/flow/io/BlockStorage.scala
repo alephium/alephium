@@ -20,8 +20,7 @@ import org.rocksdb.{ReadOptions, WriteOptions}
 
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily
-import org.alephium.protocol.BlockHash
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, BlockHash}
 
 trait BlockStorage extends KeyValueStorage[BlockHash, Block] {
   def put(block: Block): IOResult[Unit] = put(block.hash, block)

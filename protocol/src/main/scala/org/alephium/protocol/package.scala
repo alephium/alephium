@@ -25,9 +25,6 @@ package object protocol {
   type Hash = Blake2b
   val Hash: Blake2b.type = Blake2b
 
-  type BlockHash = Blake3
-  val BlockHash: Blake3.type = Blake3
-
   type PublicKey = SecP256K1PublicKey
   val PublicKey: SecP256K1PublicKey.type = SecP256K1PublicKey
 
