@@ -28,8 +28,8 @@ final case class BlockHash private (value: Blake3) extends AnyVal with RandomByt
 object BlockHash extends HashUtils[BlockHash] {
   implicit val serde: Serde[BlockHash] = Serde.forProduct1(BlockHash.apply, t => t.value)
 
-  val zero: BlockHash = BlockHash(Blake3.zero)
-  val length: Int     = Blake3.length
+  lazy val zero: BlockHash = BlockHash(Blake3.zero)
+  val length: Int          = Blake3.length
 
   def generate: BlockHash = BlockHash(Blake3.generate)
 
@@ -41,4 +41,9 @@ object BlockHash extends HashUtils[BlockHash] {
   def hash(string: String): BlockHash   = ???
 
   def unsafe(str: ByteString): BlockHash = BlockHash(Blake3.unsafe(str))
+
+  def unsafe(hash: Blake3): BlockHash = BlockHash(hash)
+
+  @inline def doubleHash(byteString: ByteString): BlockHash =
+    BlockHash(Blake3.doubleHash(byteString))
 }

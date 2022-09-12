@@ -70,12 +70,12 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
 
   it should "create empty vector" in new Fixture {
     val vector = AVector.empty[A]
-    checkState(vector, 0, 0, 0, AVector.defaultSize, true)
+    checkState(vector, 0, 0, 0, 0, true)
   }
 
-  it should "create vector with ofSize" in new Fixture {
+  it should "create vector with ofCapacity" in new Fixture {
     forAll(sizeGen) { n =>
-      val vector = AVector.ofSize[A](n)
+      val vector = AVector.ofCapacity[A](n)
       checkState(vector, 0, 0, 0, n, true)
     }
   }
@@ -171,10 +171,10 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
 
   it should "grow size" in {
     val vc0 = AVector.empty[A]
-    0 to 3 * AVector.defaultSize foreach { n =>
+    1 to 3 * AVector.defaultGrowSize foreach { n =>
       vc0.ensureSize(n)
-      if (n <= AVector.defaultSize) {
-        vc0.capacity is AVector.defaultSize
+      if (n <= AVector.defaultGrowSize) {
+        vc0.capacity is AVector.defaultGrowSize
       } else {
         vc0.capacity is AVector.nextPowerOfTwo(n)
       }
@@ -326,11 +326,11 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
   it should "exists" in new Fixture {
     forAll(vectorGen, ab.arbitrary) { (vc, a) =>
       val arr = vc.toArray
-      arr.foreach { elem => vc.exists(_ equals elem) is vc.contains(elem) }
-      vc.exists(_ equals a) is vc.contains(a)
+      arr.foreach { elem => vc.exists(_ == elem) is vc.contains(elem) }
+      vc.exists(_ == a) is vc.contains(a)
       vc.foreachWithIndex { (elem, index) =>
-        vc.existsWithIndex((e, i) => (e equals elem) && (i equals index)) is true
-        vc.existsWithIndex((e, i) => (e equals elem) && (i equals -1)) is false
+        vc.existsWithIndex((e, i) => (e == elem) && (i == index)) is true
+        vc.existsWithIndex((e, i) => (e == elem) && (i == -1)) is false
       }
     }
   }
@@ -377,7 +377,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
       arr.foreach { elem =>
-        vc.find(_ equals elem) is arr.find(_ equals elem)
+        vc.find(_ == elem) is arr.find(_ == elem)
         vc.find(_ => false) is arr.find(_ => false)
       }
     }
@@ -387,7 +387,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen) { vc =>
       val arr = vc.toArray
       arr.foreach { elem =>
-        vc.indexWhere(_ equals elem) is arr.indexWhere(_ equals elem)
+        vc.indexWhere(_ == elem) is arr.indexWhere(_ == elem)
         vc.indexWhere(_ => false) is arr.indexWhere(_ => false)
       }
     }
@@ -397,7 +397,7 @@ abstract class AVectorSpec[@sp A: ClassTag](implicit ab: Arbitrary[A], cmp: Orde
     forAll(vectorGen0.filter(_.nonEmpty)) { vc =>
       val index = Random.nextInt(vc.length)
       val vc1   = vc.replace(index, vc.head)
-      vc.indices.foreach { i => if (i equals index) vc1(i) is vc.head else vc1(i) is vc(i) }
+      vc.indices.foreach { i => if (i == index) vc1(i) is vc.head else vc1(i) is vc(i) }
     }
   }
 
@@ -438,12 +438,12 @@ class DoubleAVectorSpec  extends AVectorSpec[Double]
 class IntAVectorSpec extends AVectorSpec[Int] {
 
   it should "create vector from array" in new Fixture {
-    val vc0 = AVector(0 until AVector.defaultSize - 1: _*)
-    vc0.length is AVector.defaultSize - 1
-    vc0.capacity is AVector.defaultSize
-    val vc1 = AVector(0 until AVector.defaultSize + 1: _*)
-    vc1.length is AVector.defaultSize + 1
-    vc1.capacity is AVector.defaultSize + 1
+    val vc0 = AVector(0 until AVector.defaultGrowSize - 1: _*)
+    vc0.length is AVector.defaultGrowSize - 1
+    vc0.capacity is AVector.defaultGrowSize - 1
+    val vc1 = AVector(0 until AVector.defaultGrowSize + 1: _*)
+    vc1.length is AVector.defaultGrowSize + 1
+    vc1.capacity is AVector.defaultGrowSize + 1
   }
 
   it should "withFilter" in new Fixture {
@@ -514,7 +514,7 @@ class IntAVectorSpec extends AVectorSpec[Int] {
   it should "forall" in new Fixture {
     AVector.empty[Int].forall(_ > 0) is true
     AVector.empty[Int].forall(_ < 0) is true
-    AVector.empty[Int].forall(_ equals 0) is true
+    AVector.empty[Int].forall(_ == 0) is true
     AVector(1, 2, 3).forall(_ > 0) is true
     AVector(-1, 2, 3).forall(_ > 0) is false
     AVector(1, -2, 3).forall(_ > 0) is false
@@ -525,7 +525,7 @@ class IntAVectorSpec extends AVectorSpec[Int] {
 
   it should "forallE" in new FixtureF {
     forAll(vectorGen) { vc =>
-      vc.forallE(e => Right(e equals e)) isE true
+      vc.forallE(_ => Right(true)) isE true
       vc.forallE(e => Right(e != vc.last)) isE false
       vc.forallE(_ => Left(())).isLeft is true
     }
@@ -584,15 +584,15 @@ class IntAVectorSpec extends AVectorSpec[Int] {
       }
       AVector.tabulateE[Int, Unit](n1)(Right(_)) isE AVector.tabulate(n1)(identity)
       AVector
-        .tabulateE[Int, Unit](n1)(k => if (k equals (n1 / 2)) Left(()) else Right(k))
+        .tabulateE[Int, Unit](n1)(k => if (k == (n1 / 2)) Left(()) else Right(k))
         .leftValue is ()
     }
   }
 
   it should "fill" in new Fixture {
-    val vc = AVector.fill(AVector.defaultSize)(AVector.defaultSize)
-    vc.length is AVector.defaultSize
-    vc.foreach(_ is AVector.defaultSize)
+    val vc = AVector.fill(AVector.defaultGrowSize)(AVector.defaultGrowSize)
+    vc.length is AVector.defaultGrowSize
+    vc.foreach(_ is AVector.defaultGrowSize)
   }
 
   it should "not share the underlying array" in new Fixture {

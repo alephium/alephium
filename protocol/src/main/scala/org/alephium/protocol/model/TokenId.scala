@@ -31,7 +31,8 @@ object TokenId extends HashUtils[TokenId] {
   implicit val serde: Serde[TokenId]           = Serde.forProduct1(TokenId.apply, t => t.value)
   implicit val tokenIdOrder: Ordering[TokenId] = Ordering.by(_.bytes)
 
-  def length: Int = Hash.length
+  lazy val zero: TokenId = TokenId(Hash.zero)
+  def length: Int        = Hash.length
 
   def generate: TokenId = TokenId(Hash.generate)
 
@@ -47,5 +48,5 @@ object TokenId extends HashUtils[TokenId] {
 
   @inline def hash(str: String): TokenId = hash(ByteString(str))
 
-  def zero: TokenId = TokenId(Hash.zero)
+  @inline def unsafe(hash: Hash): TokenId = TokenId(hash)
 }

@@ -806,7 +806,7 @@ abstract class RestServerSpec(
     val end       = 100
     // No events for this contractId, see `getEvents` method for `BlockFlowDummy` in `ServerFixture.scala`
     val contractId =
-      ContractId(
+      ContractId.unsafe(
         Blake2b.unsafe(hex"e939f9c5d2ad12ea2375dcc5231f5f25db0a2ac8af426f547819e13559aa693e")
       )
     val contractAddress = Address.Contract(LockupScript.P2C(contractId)).toBase58
@@ -842,9 +842,10 @@ abstract class RestServerSpec(
   // scalastyle:on no.equal
 
   it should "get events for tx id with events" in {
-    val blockHash  = dummyBlock.hash
-    val txId       = TransactionId.random
-    val contractId = ContractId(txId.value) // TODO: refactor BlockFlowDummy to fix this hacky value
+    val blockHash = dummyBlock.hash
+    val txId      = TransactionId.random
+    val contractId =
+      ContractId.unsafe(txId.value) // TODO: refactor BlockFlowDummy to fix this hacky value
 
     servers.foreach { server =>
       val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)

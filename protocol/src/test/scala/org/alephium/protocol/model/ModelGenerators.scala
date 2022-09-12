@@ -84,7 +84,7 @@ trait LockupScriptGenerators extends Generators {
         ScriptHint.fromHash(hash).groupIndex.equals(groupIndex)
       }
       .map { hash =>
-        LockupScript.p2c(ContractId(hash))
+        LockupScript.p2c(ContractId.unsafe(hash))
       }
   }
 
@@ -216,9 +216,8 @@ trait TokenGenerators extends Generators with NumericHelpers {
 
   def tokenGen(inputNum: Int): Gen[(TokenId, U256)] =
     for {
-      tokenIdValue <- hashGen
-      amount       <- amountGen(inputNum)
-    } yield (TokenId(tokenIdValue), amount)
+      amount <- amountGen(inputNum)
+    } yield (TokenId.random, amount)
 
   def tokensGen(inputNum: Int, tokensNumGen: Gen[Int]): Gen[Map[TokenId, U256]] =
     for {
@@ -564,11 +563,16 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
       Gen.choose(0L, Long.MaxValue / 1000).map(n => AVector(Val.U256(U256.unsafe(n))))
     for {
       groupIndex    <- groupIndexGen
-      hash          <- hashGen
       outputRef     <- contractOutputRefGen(groupIndex)
       output        <- contractOutputGen(scriptGen = p2cLockupGen(groupIndex))
       contractState <- counterStateGen
-    } yield (ContractId(hash), counterContract.toHalfDecoded(), contractState, outputRef, output)
+    } yield (
+      ContractId.random,
+      counterContract.toHalfDecoded(),
+      contractState,
+      outputRef,
+      output
+    )
   }
 }
 

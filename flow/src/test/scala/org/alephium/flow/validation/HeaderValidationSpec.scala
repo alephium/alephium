@@ -104,7 +104,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     genesis.blockDeps.deps.foreach(_ is BlockHash.zero)
 
     val correctDeps = genesis.blockDeps.deps
-    val nonZeroHash = BlockHash(Blake3.hash(1))
+    val nonZeroHash = BlockHash.unsafe(Blake3.hash(1))
     correctDeps.indices.foreach { k =>
       val modified = genesis.copy(blockDeps = BlockDeps.unsafe(correctDeps.replace(k, nonZeroHash)))
       failValidation(modified, InvalidGenesisDeps)

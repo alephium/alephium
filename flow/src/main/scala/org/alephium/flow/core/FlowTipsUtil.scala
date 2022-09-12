@@ -265,7 +265,7 @@ trait FlowTipsUtil {
       }
     }
 
-    iter(AVector.ofSize(tips1.length), 0)
+    iter(AVector.ofCapacity(tips1.length), 0)
   }
 
   private[core] def mergeInTips(

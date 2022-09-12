@@ -28,23 +28,20 @@ import org.alephium.macros.HPC
  * Immutable vector that is optimized for appending, not synchronized
  */
 // scalastyle:off number.of.methods return
-@SuppressWarnings(Array("org.wartremover.warts.While"))
-abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable { self =>
+@SuppressWarnings(Array("org.wartremover.warts.While", "org.wartremover.warts.AsInstanceOf"))
+final class AVector[@sp A](
+    protected[util] var elems: Array[A],
+    val start: Int, // The left index boundary (inclusive) of elements
+    val end: Int,   // The right index boundary (exclusive) of elements
+    var appendable: Boolean
+)(implicit val ct: ClassTag[A])
+    extends Serializable
+    with IterableOnce[A] { self =>
   import HPC.cfor
 
-  protected[util] var elems: Array[A]
+  final def capacity: Int = elems.length
 
-  def capacity: Int = elems.length
-
-  // The left index boundary (inclusive) of elements
-  def start: Int
-
-  // The right index boundary (exclusive) of elements
-  def end: Int
-
-  def length: Int = end - start
-
-  var appendable: Boolean
+  @inline def length: Int = end - start
 
   def isEmpty: Boolean = length == 0
 
@@ -93,8 +90,8 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     val goal = start + n
     if (goal > capacity) {
       val size =
-        if (goal <= AVector.defaultSize) {
-          AVector.defaultSize
+        if (goal <= AVector.defaultGrowSize) {
+          AVector.defaultGrowSize
         } else {
           AVector.nextPowerOfTwo(goal)
         }
@@ -654,10 +651,12 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     ArraySeq.unsafeWrapArray(toArray)
   }
 
+  def iterator: Iterator[A] = elems.iterator.slice(start, end)
+
   def toIterable: Iterable[A] = {
     new Iterable[A] {
       override def size: Int                   = length
-      def iterator: Iterator[A]                = elems.iterator.slice(start, end)
+      def iterator: Iterator[A]                = self.iterator
       override def foreach[U](f: A => U): Unit = self.foreach(f)
     }
   }
@@ -713,17 +712,15 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
 object AVector {
   import HPC.cfor
 
-  private[util] val defaultSize = 8
+  private[util] val defaultGrowSize = 8
 
-  def empty[@sp A: ClassTag]: AVector[A] = ofSize[A](defaultSize)
+  def empty[@sp A: ClassTag]: AVector[A] = ofCapacity[A](0)
 
   def apply[@sp A: ClassTag](elems: A*): AVector[A] = {
-    val array = Array.ofDim[A](if (elems.length <= defaultSize) defaultSize else elems.length)
-    elems.copyToArray(array, 0, elems.length)
-    unsafe(array, 0, elems.length, true)
+    from(elems)
   }
 
-  def ofSize[@sp A: ClassTag](n: Int): AVector[A] = {
+  def ofCapacity[@sp A: ClassTag](n: Int): AVector[A] = {
     val arr = new Array[A](n)
     unsafe(arr, 0, 0, true)
   }
@@ -778,17 +775,12 @@ object AVector {
   }
 
   private def unsafe[@sp A: ClassTag](
-      _elems: Array[A],
-      _start: Int,
-      _end: Int,
-      _appendable: Boolean
+      elems: Array[A],
+      start: Int,
+      end: Int,
+      appendable: Boolean
   ): AVector[A] =
-    new AVector[A] {
-      override var elems: Array[A]     = _elems
-      override def start: Int          = _start
-      override def end: Int            = _end
-      override var appendable: Boolean = _appendable
-    }
+    new AVector[A](elems, start, end, appendable)
 
   @inline def unsafe[@sp A: ClassTag](elems: Array[A]): AVector[A] = unsafe(elems, 0)
 

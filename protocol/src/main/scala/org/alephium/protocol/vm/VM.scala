@@ -38,7 +38,7 @@ sealed abstract class VM[Ctx <: StatelessContext](
       methodIndex: Int,
       args: AVector[Val]
   ): ExeResult[AVector[Val]] = {
-    var outputs: AVector[Val]                     = AVector.ofSize(0)
+    var outputs: AVector[Val]                     = AVector.ofCapacity(0)
     val returnTo: AVector[Val] => ExeResult[Unit] = returns => { outputs = returns; Right(()) }
     execute(obj, methodIndex, args, Some(returnTo)).map(_ => outputs)
   }

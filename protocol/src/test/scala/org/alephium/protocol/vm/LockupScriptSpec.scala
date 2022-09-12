@@ -49,7 +49,7 @@ class LockupScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
     val lock2 = LockupScript.p2sh(hash0)
     serialize[LockupScript](lock2) is Hex.unsafe(s"02${hash0.toHexString}")
 
-    val lock3 = LockupScript.p2c(ContractId(hash0))
+    val lock3 = LockupScript.p2c(ContractId.unsafe(hash0))
     serialize[LockupScript](lock3) is Hex.unsafe(s"03${hash0.toHexString}")
   }
 

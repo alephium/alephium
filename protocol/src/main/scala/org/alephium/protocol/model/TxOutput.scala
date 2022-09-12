@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
@@ -103,7 +103,7 @@ object TxOutput {
 
   // TODO: improve this when vm is mature
   def forSMT: TxOutput =
-    ContractOutput(U256.One, LockupScript.p2c(ContractId(Hash.zero)), AVector.empty)
+    ContractOutput(U256.One, LockupScript.p2c(ContractId.zero), AVector.empty)
 }
 
 /** @param amount

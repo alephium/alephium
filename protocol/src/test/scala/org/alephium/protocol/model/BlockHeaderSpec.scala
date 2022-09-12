@@ -46,7 +46,8 @@ class BlockHeaderSpec
   }
 
   it should "extract dependencies properly" in {
-    val deps = AVector.tabulate(groupConfig.depsNum)(i => BlockHash(Blake3.hash(Seq(i.toByte))))
+    val deps =
+      AVector.tabulate(groupConfig.depsNum)(i => BlockHash.unsafe(Blake3.hash(Seq(i.toByte))))
     val blockDeps = BlockDeps.build(deps)
 
     val genesis = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)

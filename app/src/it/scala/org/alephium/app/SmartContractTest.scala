@@ -272,18 +272,18 @@ class SmartContractTest extends AlephiumActorSpec {
         initialFields = None,
         issueTokenAmount = Some(1024)
       )
-    val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
-    val tokenId          = TokenId(tokenContractKey.value)
+    val tokenContractId = tokenContractBuildResult.contractAddress.contractId
+    val tokenId         = TokenId.from(tokenContractId)
 
     info("Transfer 1024 token back to self")
-    script(SwapContracts.tokenWithdrawTxScript(address, tokenContractKey, U256.unsafe(1024)))
+    script(SwapContracts.tokenWithdrawTxScript(address, tokenContractId, U256.unsafe(1024)))
 
     info("Create the ALPH/token swap contract")
     val swapContractBuildResult = contract(
       SwapContracts.swapContract,
       Some(
         AVector[vm.Val](
-          vm.Val.ByteVec(tokenContractKey.bytes),
+          vm.Val.ByteVec(tokenContractId.bytes),
           vm.Val.U256(U256.Zero),
           vm.Val.U256(U256.Zero)
         )
@@ -368,8 +368,8 @@ class SmartContractTest extends AlephiumActorSpec {
         initialFields = None,
         issueTokenAmount = Some(1024)
       )
-    val tokenContractKey = tokenContractBuildResult.contractAddress.contractId
-    val tokenId          = TokenId(tokenContractKey.value)
+    val tokenContractId = tokenContractBuildResult.contractAddress.contractId
+    val tokenId         = TokenId.from(tokenContractId)
 
     checkUTXOs { currentUTXOs =>
       // Create the token contract
@@ -395,7 +395,7 @@ class SmartContractTest extends AlephiumActorSpec {
 
     info("Transfer 1024 token back to self")
     script(
-      SwapContracts.tokenWithdrawTxScript(address, tokenContractKey, U256.unsafe(1024))
+      SwapContracts.tokenWithdrawTxScript(address, tokenContractId, U256.unsafe(1024))
     )
 
     checkUTXOs { currentUTXOs =>
@@ -423,7 +423,7 @@ class SmartContractTest extends AlephiumActorSpec {
       SwapContracts.swapContract,
       Some(
         AVector[vm.Val](
-          vm.Val.ByteVec(tokenContractKey.bytes),
+          vm.Val.ByteVec(tokenContractId.bytes),
           vm.Val.U256(U256.Zero),
           vm.Val.U256(U256.Zero)
         )

@@ -337,17 +337,6 @@ object Compiler {
         multiContract: MultiContract,
         contractIndex: Int
     )(implicit compilerOptions: CompilerOptions): State[StatefulContext] = {
-      val contractsTable = multiContract.contracts.map { contract =>
-        val kind = contract match {
-          case _: Ast.ContractInterface =>
-            ContractKind.Interface
-          case _: Ast.TxScript =>
-            ContractKind.TxScript
-          case txContract: Ast.Contract =>
-            ContractKind.Contract(txContract.isAbstract)
-        }
-        contract.ident -> ContractInfo(kind, contract.funcTable)
-      }.toMap
       val contract = multiContract.get(contractIndex)
       StateForContract(
         contract.ident,
@@ -357,7 +346,7 @@ object Compiler {
         0,
         contract.funcTable,
         contract.eventsInfo(),
-        contractsTable
+        multiContract.contractsTable
       )
     }
   }

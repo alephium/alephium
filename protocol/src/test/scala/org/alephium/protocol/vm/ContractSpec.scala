@@ -244,7 +244,7 @@ class ContractSpec extends AlephiumSpec {
   it should "check method modifier in contracts" in new ContractFixture {
     val contracts: Seq[Contract[_]] =
       Seq(statelessMethod0, statelessMethod1, statelessMethod2, statelessMethod3).map(method =>
-        StatelessScript(AVector(method))
+        StatelessScript.unsafe(AVector(method))
       )
     contracts.foreach(_.checkAssetsModifier(lemanContext) isE ())
     contracts(0).checkAssetsModifier(preLemanContext) isE ()
