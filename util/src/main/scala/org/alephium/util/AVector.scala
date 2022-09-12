@@ -28,8 +28,11 @@ import org.alephium.macros.HPC
  * Immutable vector that is optimized for appending, not synchronized
  */
 // scalastyle:off number.of.methods return
+// scalastyle:off file.size.limit
 @SuppressWarnings(Array("org.wartremover.warts.While"))
-abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable { self =>
+abstract class AVector[@sp A](implicit val ct: ClassTag[A])
+    extends Serializable
+    with IterableOnce[A] { self =>
   import HPC.cfor
 
   protected[util] var elems: Array[A]
@@ -654,10 +657,12 @@ abstract class AVector[@sp A](implicit val ct: ClassTag[A]) extends Serializable
     ArraySeq.unsafeWrapArray(toArray)
   }
 
+  def iterator: Iterator[A] = elems.iterator.slice(start, end)
+
   def toIterable: Iterable[A] = {
     new Iterable[A] {
       override def size: Int                   = length
-      def iterator: Iterator[A]                = elems.iterator.slice(start, end)
+      def iterator: Iterator[A]                = self.iterator
       override def foreach[U](f: A => U): Unit = self.foreach(f)
     }
   }
