@@ -152,6 +152,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         txId,
         contractId,
         fields,
+        false,
         false
       )
 

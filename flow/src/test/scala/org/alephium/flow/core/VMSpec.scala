@@ -2323,8 +2323,7 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "not write to the log storage when logging is disabled" in new EventFixtureWithContract {
-    implicit override lazy val logConfig: LogConfig =
-      LogConfig(enabled = false, indexByTxId = false, contractAddresses = None)
+    implicit override lazy val logConfig: LogConfig = LogConfig.disabled()
 
     getLogStates(blockFlow, chainIndex.from, contractId, 0) is None
   }
@@ -2333,6 +2332,7 @@ class VMSpec extends AlephiumSpec {
     implicit override lazy val logConfig: LogConfig = LogConfig(
       enabled = true,
       indexByTxId = true,
+      indexByBlockHash = true,
       contractAddresses =
         Some(AVector(ContractId.generate, ContractId.generate).map(Address.contract))
     )
@@ -2344,6 +2344,7 @@ class VMSpec extends AlephiumSpec {
     implicit override lazy val logConfig: LogConfig = LogConfig(
       enabled = true,
       indexByTxId = false,
+      indexByBlockHash = false,
       contractAddresses = None
     )
 
@@ -2356,6 +2357,7 @@ class VMSpec extends AlephiumSpec {
     implicit override lazy val logConfig: LogConfig = LogConfig(
       enabled = true,
       indexByTxId = true,
+      indexByBlockHash = false,
       contractAddresses = None
     )
 
@@ -2406,9 +2408,9 @@ class VMSpec extends AlephiumSpec {
 
     val logStatesId = LogStatesId(contractId.value, 0)
     txIdLogStates
-      .states(0) is LogState(txId, eventRefIndex, LogStateRef(logStatesId, 0).toFields)
+      .states(0) is LogState(txId, txEventRefIndex, LogStateRef(logStatesId, 0).toFields)
     txIdLogStates
-      .states(1) is LogState(txId, eventRefIndex, LogStateRef(logStatesId, 1).toFields)
+      .states(1) is LogState(txId, txEventRefIndex, LogStateRef(logStatesId, 1).toFields)
   }
 
   it should "emit events with all supported field types" in new EventFixture {

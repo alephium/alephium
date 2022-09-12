@@ -447,14 +447,18 @@ object WorldState {
         txId: TransactionId,
         contractId: ContractId,
         fields: AVector[Val],
-        indexByTxId: Boolean
+        indexByTxId: Boolean,
+        indexByBlockHash: Boolean
     ): IOResult[Unit] = {
       getIndex(fields) match {
         case Some(index) =>
           val state = LogState(txId, index, fields.tail)
           writeLog(blockHash, contractId.value, state).flatMap { case (id, offset) =>
+            val logRef = LogStateRef(id, offset)
             if (indexByTxId) {
-              writeLogIndexByTxId(blockHash, txId, id, offset)
+              writeLogIndexByTxId(blockHash, txId, logRef)
+            } else if (indexByBlockHash) {
+              writeLogIndexByBlockHash(blockHash, txId, logRef)
             } else {
               Right(())
             }
@@ -485,14 +489,21 @@ object WorldState {
       } yield (id, logStatesOpt.map(_.states.length).getOrElse(0))
     }
 
-    private[WorldState] def writeLogIndexByTxId(
+    @inline private[WorldState] def writeLogIndexByTxId(
         blockHash: BlockHash,
         txId: TransactionId,
-        id: LogStatesId,
-        offset: Int
+        logRef: LogStateRef
     ): IOResult[Unit] = {
-      val logRef = LogStateRef(id, offset)
-      val state  = LogState(txId, eventRefIndex, logRef.toFields)
+      val state = LogState(txId, txEventRefIndex, logRef.toFields)
+      writeLog(blockHash, txId.value, state).map(_ => ())
+    }
+
+    @inline private[WorldState] def writeLogIndexByBlockHash(
+        blockHash: BlockHash,
+        txId: TransactionId,
+        logRef: LogStateRef
+    ): IOResult[Unit] = {
+      val state = LogState(txId, blockEventRefIndex, logRef.toFields)
       writeLog(blockHash, txId.value, state).map(_ => ())
     }
 

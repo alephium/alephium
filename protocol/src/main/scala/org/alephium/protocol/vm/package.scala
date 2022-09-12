@@ -48,6 +48,7 @@ package object vm {
   val createContractEventIndex: Val      = Val.I256(I256.from(-1))
   val destroyContractEventId: ContractId = specialContractId(-2)
   val destroyContractEventIndex: Val     = Val.I256(I256.from(-2))
-  val eventRefIndex: Byte                = -3
+  val txEventRefIndex: Byte              = -3
+  val blockEventRefIndex: Byte           = -4
   // scalastyle:on magic.number
 }

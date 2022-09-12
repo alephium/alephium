@@ -69,7 +69,7 @@ final case class LogState(
     index: Byte,
     fields: AVector[Val]
 ) {
-  def isRef: Boolean = index == eventRefIndex
+  def isRef: Boolean = index == txEventRefIndex
 }
 
 object LogState {
