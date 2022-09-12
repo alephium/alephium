@@ -525,7 +525,7 @@ class IntAVectorSpec extends AVectorSpec[Int] {
 
   it should "forallE" in new FixtureF {
     forAll(vectorGen) { vc =>
-      vc.forallE(e => Right(e == e)) isE true
+      vc.forallE(_ => Right(true)) isE true
       vc.forallE(e => Right(e != vc.last)) isE false
       vc.forallE(_ => Left(())).isLeft is true
     }
