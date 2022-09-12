@@ -107,9 +107,10 @@ final case class LogConfig(
     contractAddresses: Option[AVector[Address.Contract]]
 ) {
   def logContractEnabled(contractAddress: Address.Contract): Boolean = {
-    val allowAllContracts = contractAddresses.isEmpty
-    val allowThisContract = contractAddresses.exists(_.contains(contractAddress))
-    enabled && (allowAllContracts || allowThisContract)
+    enabled && {
+      contractAddresses.isEmpty ||                          // allow all contracts
+      contractAddresses.exists(_.contains(contractAddress)) // allow the contract
+    }
   }
 }
 
