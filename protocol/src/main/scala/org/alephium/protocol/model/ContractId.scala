@@ -38,8 +38,8 @@ final case class ContractId private (value: Hash) extends AnyVal with RandomByte
 object ContractId extends HashUtils[ContractId] {
   implicit val serde: Serde[ContractId] = Serde.forProduct1(ContractId.apply, t => t.value)
 
-  val zero: ContractId = ContractId(Hash.zero)
-  val length: Int      = Hash.length
+  lazy val zero: ContractId = ContractId(Hash.zero)
+  val length: Int           = Hash.length
 
   def generate: ContractId = ContractId(Hash.generate)
 
