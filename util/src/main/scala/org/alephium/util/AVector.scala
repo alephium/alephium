@@ -35,7 +35,8 @@ final class AVector[@sp A](
     val end: Int,   // The right index boundary (exclusive) of elements
     var appendable: Boolean
 )(implicit val ct: ClassTag[A])
-    extends Serializable { self =>
+    extends Serializable
+    with IterableOnce[A] { self =>
   import HPC.cfor
 
   final def capacity: Int = elems.length
@@ -650,10 +651,12 @@ final class AVector[@sp A](
     ArraySeq.unsafeWrapArray(toArray)
   }
 
+  def iterator: Iterator[A] = elems.iterator.slice(start, end)
+
   def toIterable: Iterable[A] = {
     new Iterable[A] {
       override def size: Int                   = length
-      def iterator: Iterator[A]                = elems.iterator.slice(start, end)
+      def iterator: Iterator[A]                = self.iterator
       override def foreach[U](f: A => U): Unit = self.foreach(f)
     }
   }
