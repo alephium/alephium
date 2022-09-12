@@ -70,6 +70,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     verifySignature,
     checkHashIndexing,
     minerAction,
+    mineOneBlock,
     minerListAddresses,
     minerUpdateAddresses,
     getContractEvents,

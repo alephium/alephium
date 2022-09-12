@@ -97,6 +97,7 @@ class RestServer(
       getTransactionStatusLocalLogic,
       decodeUnsignedTransactionLogic,
       minerActionLogic,
+      mineOneBlockLogic,
       minerListAddressesLogic,
       minerUpdateAddressesLogic,
       compileScriptLogic,

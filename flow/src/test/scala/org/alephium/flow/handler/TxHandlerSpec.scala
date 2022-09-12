@@ -580,6 +580,20 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     blockFlow.getBestDeps(chainIndex.from).deps.contains(blockHash) is true
   }
 
+  it should "check force mine block for dev if auto-mine is enabled" in new Fixture {
+    override val configValues = Map(("alephium.mempool.auto-mine-for-dev", true))
+    config.mempool.autoMineForDev is true
+    TxHandler.forceMineForDev(blockFlow, chainIndex) is Right(())
+  }
+
+  it should "check force mine block for dev if auto-mine is disabled" in new Fixture {
+    override val configValues = Map(("alephium.mempool.auto-mine-for-dev", false))
+    config.mempool.autoMineForDev is false
+    TxHandler.forceMineForDev(blockFlow, chainIndex) is Left(
+      "CPU mining for dev is not enabled, please turn it on in config:\\n alephium.mempool.auto-mine-for-dev = true"
+    )
+  }
+
   it should "mine new block for inter-group chain if auto-mine is enabled" in new Fixture {
     override val configValues =
       Map(("alephium.broker.broker-num", 1), ("alephium.mempool.auto-mine-for-dev", true))

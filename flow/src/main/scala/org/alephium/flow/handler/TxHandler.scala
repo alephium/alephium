@@ -57,10 +57,11 @@ object TxHandler {
   final case class AddToGrandPool(txs: AVector[TransactionTemplate])         extends Command
   final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
-  case object CleanSharedPool      extends Command
-  case object CleanPendingPool     extends Command
-  private case object BroadcastTxs extends Command
-  private case object DownloadTxs  extends Command
+  final case class MineOneBlock(chainIndex: ChainIndex) extends Command
+  case object CleanSharedPool                           extends Command
+  case object CleanPendingPool                          extends Command
+  private case object BroadcastTxs                      extends Command
+  private case object DownloadTxs                       extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: TransactionId)              extends Event
@@ -133,6 +134,19 @@ object TxHandler {
     }
   }
 
+  def forceMineForDev(blockFlow: BlockFlow, chainIndex: ChainIndex)(implicit
+      groupConfig: GroupConfig,
+      memPoolSetting: MemPoolSetting
+  ): Either[String, Unit] = {
+    if (memPoolSetting.autoMineForDev) {
+      mineTxForDev(blockFlow, chainIndex)
+    } else {
+      Left(
+        "CPU mining for dev is not enabled, please turn it on in config:\\n alephium.mempool.auto-mine-for-dev = true"
+      )
+    }
+  }
+
   private def validateAndAddBlock(blockFlow: BlockFlow, block: Block): Either[String, Unit] = {
     val blockValidator = BlockValidation.build(blockFlow)
     blockValidator.validate(block, blockFlow) match {
@@ -201,6 +215,8 @@ class TxHandler(
     case TxHandler.TxAnnouncements(txs) => handleAnnouncements(txs)
     case TxHandler.BroadcastTxs         => broadcastTxs()
     case TxHandler.DownloadTxs          => downloadTxs()
+    case TxHandler.MineOneBlock(chainIndex) =>
+      TxHandler.forceMineForDev(blockFlow, chainIndex).swap.foreach(log.error(_))
     case TxHandler.CleanSharedPool =>
       log.debug("Start to clean shared pools")
       val results = blockFlow.grandPool.cleanAndExtractReadyTxs(

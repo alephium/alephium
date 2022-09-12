@@ -35,6 +35,7 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
+//scalastyle:off file.size.limit
 trait Endpoints
     extends ApiModelCodec
     with BaseEndpoint
@@ -356,6 +357,14 @@ trait Endpoints
       .in(query[MinerAction]("action").examples(minerActionExamples))
       .out(jsonBody[Boolean])
       .summary("Execute an action on CPU miner. !!! for test only !!!")
+
+  val mineOneBlock: BaseEndpoint[ChainIndex, Boolean] =
+    minersEndpoint.post
+      .in("cpu-mining")
+      .in("mine-one-block")
+      .in(chainIndexQuery)
+      .out(jsonBody[Boolean])
+      .summary("Mine a block on CPU miner. !!! for test only !!!")
 
   val minerListAddresses: BaseEndpoint[Unit, MinerAddresses] =
     minersEndpoint.get
