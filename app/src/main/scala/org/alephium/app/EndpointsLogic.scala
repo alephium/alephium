@@ -67,7 +67,7 @@ trait EndpointsLogic extends Endpoints {
   implicit lazy val groupConfig: GroupConfig         = brokerConfig
   implicit lazy val networkConfig: NetworkSetting    = node.config.network
   implicit lazy val consenseConfig: ConsensusSetting = node.config.consensus
-  implicit lazy val logConfig: LogConfig             = node.config.node.logConfig
+  implicit lazy val logConfig: LogConfig             = node.config.node.eventLogConfig
   implicit lazy val askTimeout: Timeout              = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
