@@ -67,24 +67,6 @@ object WorldStateRockDBStorage {
       Settings.readOptions
     )
   }
-
-  def apply(
-      trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      logStorage: LogStorage,
-      storage: RocksDBSource,
-      cf: ColumnFamily,
-      writeOptions: WriteOptions,
-      readOptions: ReadOptions
-  ): WorldStateRockDBStorage = {
-    new WorldStateRockDBStorage(
-      trieStorage,
-      logStorage,
-      storage,
-      cf,
-      writeOptions,
-      readOptions
-    )
-  }
 }
 
 class WorldStateRockDBStorage(
