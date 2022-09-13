@@ -764,14 +764,14 @@ abstract class RestServerSpec(
   it should "get events for a contract within a counter range with events" in {
     val blockHash  = dummyBlock.hash
     val start      = 10
-    val end        = 100
+    val limit      = 90
     val urlBase    = s"/events/contract/$dummyContractAddress"
     val chainIndex = ChainIndex.from(blockHash, groupConfig.groups)
 
-    info("with valid start and end")
+    info("with valid start and limit")
     verifyResponseWithNodes(
-      s"$urlBase?start=$start&end=$end",
-      s"$urlBase?start=$start&end=$end&group=${chainIndex.from.value}",
+      s"$urlBase?start=$start&limit=$limit",
+      s"$urlBase?start=$start&limit=$limit&group=${chainIndex.from.value}",
       chainIndex,
       port
     )(validResponse)
@@ -784,17 +784,16 @@ abstract class RestServerSpec(
       port
     )(validResponse)
 
-    info("with start smaller than end")
-    Get(s"$urlBase?start=$end&end=$start").check { response =>
+    info("with non-positive limit")
+    Get(s"$urlBase?start=$start&limit=0").check { response =>
       response.code is StatusCode.BadRequest
-      response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `end` must be larger than `start`, but was: CounterRange(100,Some(10)))"}"""
+      response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `limit` must be larger than 0, but was: CounterRange(10,Some(0)))"}"""
     }
 
-    info("with end larger than (start + MaxCounterRange)")
-    Get(s"$urlBase?start=$start&end=${start + CounterRange.MaxCounterRange + 1}").check {
-      response =>
-        response.code is StatusCode.BadRequest
-        response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `end` must be smaller than 110, but was: CounterRange(10,Some(111)))"}"""
+    info("with limit larger than MaxCounterRange")
+    Get(s"$urlBase?start=$start&limit=${CounterRange.MaxCounterRange + 1}").check { response =>
+      response.code is StatusCode.BadRequest
+      response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `limit` must not be larger than 100, but was: CounterRange(10,Some(101)))"}"""
     }
 
     info("with start larger than (Int.MaxValue - MaxCounterRange)")

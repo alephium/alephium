@@ -474,13 +474,12 @@ class ServerUtils(implicit
   def getEventsByContractId(
       blockFlow: BlockFlow,
       start: Int,
-      endOpt: Option[Int],
+      limit: Int,
       contractId: ContractId
   ): Try[ContractEvents] = {
-    val end = endOpt.getOrElse(start + CounterRange.MaxCounterRange)
     wrapResult(
       blockFlow
-        .getEvents(contractId, start, end)
+        .getEvents(contractId, start, start + limit)
         .map {
           case (nextStart, logStatesVec) => {
             ContractEvents.from(logStatesVec, nextStart)

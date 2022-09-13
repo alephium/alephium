@@ -608,7 +608,7 @@ trait EndpointsLogic extends Endpoints {
           serverUtils.getEventsByContractId(
             blockFlow,
             counterRange.start,
-            counterRange.endOpt,
+            counterRange.limitOpt.getOrElse(CounterRange.MaxCounterRange),
             contractAddress.lockupScript.contractId
           )
         }

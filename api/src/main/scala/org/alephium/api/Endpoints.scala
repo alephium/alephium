@@ -57,9 +57,9 @@ trait Endpoints
 
   private val counterQuery: EndpointInput[CounterRange] =
     query[Int]("start")
-      .and(query[Option[Int]]("end"))
-      .map { case (start, endOpt) => CounterRange(start, endOpt) }(counterQuery =>
-        (counterQuery.start, counterQuery.endOpt)
+      .and(query[Option[Int]]("limit"))
+      .map { case (start, limitOpt) => CounterRange(start, limitOpt) }(counterQuery =>
+        (counterQuery.start, counterQuery.limitOpt)
       )
       .validate(CounterRange.validator)
 
