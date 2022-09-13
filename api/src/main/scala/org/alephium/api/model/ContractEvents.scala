@@ -55,7 +55,7 @@ object ContractEventByTxId {
   def from(blockHash: BlockHash, ref: LogStateRef, logState: LogState): ContractEventByTxId = {
     ContractEventByTxId(
       blockHash,
-      Address.contract(ContractId(ref.id.eventKey)),
+      Address.contract(ContractId.unsafe(ref.id.eventKey)),
       logState.index.toInt,
       logState.fields.map(Val.from)
     )

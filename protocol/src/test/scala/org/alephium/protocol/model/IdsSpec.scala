@@ -32,9 +32,9 @@ class IdsSpec extends AlephiumSpec {
     }
 
     test(identity)
-    test(TransactionId.apply)
-    test(ContractId.apply)
-    test(TokenId.apply)
+    test(TransactionId.unsafe)
+    test(ContractId.unsafe)
+    test(TokenId.unsafe)
   }
 
   it should "check equality for blake hash" in {
@@ -42,7 +42,7 @@ class IdsSpec extends AlephiumSpec {
     val hash1 = Blake3.hash("hello")
     val hash2 = Blake3.hash("world")
 
-    BlockHash(hash0) is BlockHash(hash1)
-    BlockHash(hash0) isnot BlockHash(hash2)
+    BlockHash.unsafe(hash0) is BlockHash.unsafe(hash1)
+    BlockHash.unsafe(hash0) isnot BlockHash.unsafe(hash2)
   }
 }

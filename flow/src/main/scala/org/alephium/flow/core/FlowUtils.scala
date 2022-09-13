@@ -381,7 +381,7 @@ object FlowUtils {
   }
 
   def filterDoubleSpending[T <: TransactionAbstract: ClassTag](txs: AVector[T]): AVector[T] = {
-    var output   = AVector.ofSize[T](txs.length)
+    var output   = AVector.ofCapacity[T](txs.length)
     val utxoUsed = scala.collection.mutable.Set.empty[TxOutputRef]
     txs.foreach { tx =>
       if (tx.unsigned.inputs.forall(input => !utxoUsed.contains(input.outputRef))) {

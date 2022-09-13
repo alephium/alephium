@@ -469,7 +469,7 @@ class ServerUtils(implicit
                 Right(
                   ContractEventByTxId(
                     logStates.blockHash,
-                    Address.contract(ContractId(logStates.eventKey)),
+                    Address.contract(ContractId.unsafe(logStates.eventKey)),
                     state.index.toInt,
                     state.fields.map(Val.from)
                   )
@@ -802,7 +802,7 @@ class ServerUtils(implicit
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def toVmVal(values: AVector[Val]): AVector[vm.Val] = {
-    values.fold(AVector.ofSize[vm.Val](values.length)) {
+    values.fold(AVector.ofCapacity[vm.Val](values.length)) {
       case (acc, value: Val.Primitive) => acc :+ value.toVmVal
       case (acc, value: ValArray)      => acc ++ toVmVal(value.value)
     }
@@ -1018,7 +1018,7 @@ class ServerUtils(implicit
           AVector(
             ContractEventByTxId(
               logStates.blockHash,
-              Address.contract(ContractId(logStates.eventKey)),
+              Address.contract(ContractId.unsafe(logStates.eventKey)),
               state.index.toInt,
               state.fields.map(Val.from)
             )

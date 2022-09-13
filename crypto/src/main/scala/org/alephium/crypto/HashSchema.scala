@@ -58,6 +58,8 @@ object HashSchema {
 trait HashUtils[T] {
   def length: Int
 
+  def zero: T
+
   @inline def random: T = generate
   def generate: T
 

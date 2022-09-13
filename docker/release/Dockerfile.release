@@ -1,5 +1,4 @@
-FROM adoptopenjdk/openjdk11:jre-11.0.11_9
-# adoptopenjdk/openjdk11:jre is no longer available for arm/v7?
+FROM eclipse-temurin:17-jre
 
 ARG RELEASE=0.0.0
 

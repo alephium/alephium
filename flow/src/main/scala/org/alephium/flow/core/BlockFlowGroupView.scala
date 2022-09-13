@@ -39,7 +39,7 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
   }
 
   def getPreOutputs(inputs: AVector[TxInput]): IOResult[Option[AVector[AssetOutput]]] = {
-    inputs.foldE(Option(AVector.ofSize[AssetOutput](inputs.length))) {
+    inputs.foldE(Option(AVector.ofCapacity[AssetOutput](inputs.length))) {
       case (Some(outputs), input) => getAsset(input.outputRef).map(_.map(outputs :+ _))
       case (None, _)              => Right(None)
     }
@@ -60,7 +60,7 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
   def getPrevAssetOutputs(
       inputs: AVector[AssetOutputRef]
   ): IOResult[Option[AVector[(AssetOutputRef, AssetOutput)]]] = {
-    inputs.foldE(Option(AVector.ofSize[(AssetOutputRef, AssetOutput)](inputs.length))) {
+    inputs.foldE(Option(AVector.ofCapacity[(AssetOutputRef, AssetOutput)](inputs.length))) {
       case (Some(outputs), input) =>
         getPreOutput(input).map(_.map { output =>
           val assetOutput = output.asInstanceOf[AssetOutput]
@@ -73,7 +73,7 @@ trait BlockFlowGroupView[WS <: WorldState[_, _, _, _]] {
   def getPreContractOutputs(
       inputs: AVector[ContractOutputRef]
   ): IOResult[Option[AVector[TxOutput]]] = {
-    inputs.foldE(Option(AVector.ofSize[TxOutput](inputs.length))) {
+    inputs.foldE(Option(AVector.ofCapacity[TxOutput](inputs.length))) {
       case (Some(outputs), input) => getPreOutput(input).map(_.map(outputs :+ _))
       case (None, _)              => Right(None)
     }

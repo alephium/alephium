@@ -819,7 +819,7 @@ class VMSpec extends AlephiumSpec {
       val block          = callTxScript(script)
       val transaction    = block.nonCoinbase.head
       val contractOutput = transaction.generatedOutputs(0).asInstanceOf[ContractOutput]
-      val tokenId        = TokenId(contractOutput.lockupScript.contractId.value)
+      val tokenId        = TokenId.unsafe(contractOutput.lockupScript.contractId.value)
       contractOutput.tokens.length is 0
       getTokenBalance(blockFlow, genesisAddress.lockupScript, tokenId) is tokenAmount
     }
@@ -1054,7 +1054,7 @@ class VMSpec extends AlephiumSpec {
 
     {
       info("Destroy a contract and and transfer value to itself")
-      val fooAddress = Address.contract(ContractId(Hash.unsafe(Hex.unsafe(fooId))))
+      val fooAddress = Address.contract(ContractId.unsafe(Hash.unsafe(Hex.unsafe(fooId))))
       val script     = Compiler.compileTxScript(destroy(fooAddress.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, ContractAssetAlreadyFlushed)
       checkContractState(fooId, fooAssetRef, true)
@@ -1095,7 +1095,7 @@ class VMSpec extends AlephiumSpec {
          |$fooCaller
          |""".stripMargin
 
-    val fooCallerContractId  = ContractId(Hash.unsafe(Hex.unsafe(fooCallerId)))
+    val fooCallerContractId  = ContractId.unsafe(Hash.unsafe(Hex.unsafe(fooCallerId)))
     val fooCallerAssetBefore = getContractAsset(fooCallerContractId, chainIndex)
     fooCallerAssetBefore.amount is ALPH.oneAlph
 
@@ -2787,7 +2787,7 @@ class VMSpec extends AlephiumSpec {
         numOfAssets = 5,
         numOfContracts = 4
       )
-      val subContractTokenId = TokenId(subContractId.value)
+      val subContractTokenId = TokenId.unsafe(subContractId.value)
       val asset              = getContractAsset(subContractId, chainIndex)
       asset.tokens is AVector((subContractTokenId, U256.unsafe(10)))
     }
@@ -2801,7 +2801,7 @@ class VMSpec extends AlephiumSpec {
         numOfAssets = 8,
         numOfContracts = 6
       )
-      val subContractTokenId = TokenId(subContractId.value)
+      val subContractTokenId = TokenId.unsafe(subContractId.value)
       val asset              = getContractAsset(subContractId, chainIndex)
       asset.tokens.length is 0
 
@@ -2844,7 +2844,7 @@ class VMSpec extends AlephiumSpec {
         numOfAssets = 6,
         numOfContracts = 5
       )
-      val tokenId = TokenId(contractId.value)
+      val tokenId = TokenId.unsafe(contractId.value)
 
       val asset = getContractAsset(contractId, chainIndex)
       asset.tokens is AVector((tokenId, U256.unsafe(10)))
@@ -2859,7 +2859,7 @@ class VMSpec extends AlephiumSpec {
         numOfAssets = 9,
         numOfContracts = 7
       )
-      val tokenId = TokenId(contractId.value)
+      val tokenId = TokenId.unsafe(contractId.value)
       val asset   = getContractAsset(contractId, chainIndex)
       asset.tokens.length is 0
 

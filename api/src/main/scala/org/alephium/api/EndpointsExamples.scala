@@ -54,7 +54,7 @@ trait EndpointsExamples extends ErrorExamples {
   val address                          = Address.Asset(lockupScript)
   val contractAddress = Address.Contract(
     LockupScript.p2c(
-      ContractId(
+      ContractId.unsafe(
         Hash.unsafe(Hex.unsafe("109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25"))
       )
     )
@@ -89,11 +89,11 @@ trait EndpointsExamples extends ErrorExamples {
   val byteString   = Hex.unsafe(hexString)
   protected val ts = TimeStamp.unsafe(1611041396892L)
   val txId =
-    TransactionId(
+    TransactionId.unsafe(
       Hash.from(Hex.unsafe("503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69")).get
     )
   val contractId =
-    ContractId(
+    ContractId.unsafe(
       Hash.from(Hex.unsafe("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")).get
     )
   private val tokens = AVector(

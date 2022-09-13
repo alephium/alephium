@@ -911,9 +911,9 @@ case object ContractIdToAddress
     with GasLow {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      contractIdRaw   <- frame.popOpStackByteVec()
-      contractIdValue <- Hash.from(contractIdRaw.bytes).toRight(Right(InvalidContractId))
-      address = Val.Address(LockupScript.p2c(ContractId(contractIdValue)))
+      contractIdRaw <- frame.popOpStackByteVec()
+      contractId    <- ContractId.from(contractIdRaw.bytes).toRight(Right(InvalidContractId))
+      address = Val.Address(LockupScript.p2c(contractId))
       _ <- frame.ctx.chargeGas(gas())
       _ <- frame.pushOpStack(address)
     } yield ()
@@ -1530,7 +1530,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
         subContractIdPreImage = parentContractId.bytes ++ path.bytes
         _ <- frame.ctx.chargeDoubleHash(subContractIdPreImage.length)
       } yield {
-        ContractId(Hash.doubleHash(subContractIdPreImage))
+        ContractId.unsafe(Hash.doubleHash(subContractIdPreImage))
       }
     } else {
       Right(ContractId.from(frame.ctx.txId, frame.ctx.nextOutputIndex))

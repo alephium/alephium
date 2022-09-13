@@ -1140,6 +1140,18 @@ object Ast {
       contracts: Seq[ContractWithState],
       dependencies: Option[Map[TypeId, Seq[TypeId]]]
   ) {
+    lazy val contractsTable = contracts.map { contract =>
+      val kind = contract match {
+        case _: Ast.ContractInterface =>
+          Compiler.ContractKind.Interface
+        case _: Ast.TxScript =>
+          Compiler.ContractKind.TxScript
+        case txContract: Ast.Contract =>
+          Compiler.ContractKind.Contract(txContract.isAbstract)
+      }
+      contract.ident -> Compiler.ContractInfo(kind, contract.funcTable)
+    }.toMap
+
     def get(contractIndex: Int): ContractWithState = {
       if (contractIndex >= 0 && contractIndex < contracts.size) {
         contracts(contractIndex)
