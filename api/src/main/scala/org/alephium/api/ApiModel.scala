@@ -418,10 +418,12 @@ trait ApiModelCodec {
     }
   }
 
-  implicit val contractEventRW: RW[ContractEvent]             = macroRW
-  implicit val eventsRW: RW[ContractEvents]                   = macroRW
-  implicit val contractEventByTxIdRW: RW[ContractEventByTxId] = macroRW
-  implicit val eventsByTxIdRW: RW[ContractEventsByTxId]       = macroRW
+  implicit val contractEventRW: RW[ContractEvent]                       = macroRW
+  implicit val eventsRW: RW[ContractEvents]                             = macroRW
+  implicit val contractEventByTxIdRW: RW[ContractEventByTxId]           = macroRW
+  implicit val eventsByTxIdRW: RW[ContractEventsByTxId]                 = macroRW
+  implicit val contractEventByBlockHashRW: RW[ContractEventByBlockHash] = macroRW
+  implicit val eventsByBlockHashRW: RW[ContractEventsByBlockHash]       = macroRW
 
   private def bytesWriter[T <: RandomBytes]: Writer[T] =
     StringWriter.comap[T](_.toHexString)

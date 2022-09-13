@@ -122,10 +122,6 @@ trait Endpoints
     eventsEndpoint
       .in("contract")
 
-  private val eventsByTxIdEndpoint: BaseEndpoint[Unit, Unit] =
-    eventsEndpoint
-      .in("tx-id")
-
   val getNodeInfo: BaseEndpoint[Unit, NodeInfo] =
     infosEndpoint.get
       .in("node")
@@ -484,11 +480,23 @@ trait Endpoints
 
   lazy val getEventsByTxId
       : BaseEndpoint[(TransactionId, Option[GroupIndex]), ContractEventsByTxId] =
-    eventsByTxIdEndpoint.get
+    eventsEndpoint
+      .in("tx-id")
+      .get
       .in(path[TransactionId]("txId"))
       .in(query[Option[GroupIndex]]("group"))
       .out(jsonBody[ContractEventsByTxId])
-      .summary("Get events for a TxScript")
+      .summary("Get contract events for a transaction")
+
+  lazy val getEventsByBlockHash
+      : BaseEndpoint[(BlockHash, Option[GroupIndex]), ContractEventsByBlockHash] =
+    eventsEndpoint
+      .in("block-hash")
+      .get
+      .in(path[BlockHash]("blockHash"))
+      .in(query[Option[GroupIndex]]("group"))
+      .out(jsonBody[ContractEventsByBlockHash])
+      .summary("Get contract events for a block")
 }
 
 object Endpoints {

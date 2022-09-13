@@ -854,7 +854,7 @@ abstract class RestServerSpec(
         s"$urlBase?start=$start&end=$end&group=${chainIndex.from.value}",
         chainIndex,
         server.port
-      )(verifyEmptyEvents)
+      )(verifyEmptyContractEvents)
     }
   }
 
@@ -871,7 +871,7 @@ abstract class RestServerSpec(
       // Ignore group if it is 1 node setup, since the events are always available
       Get(url, port).check(verifyNonEmptyEvents)
     } else {
-      Get(url, port).check(verifyEmptyEvents)
+      Get(url, port).check(verifyEmptyContractEvents)
     }
   }
   // scalastyle:on no.equal
@@ -914,8 +914,7 @@ abstract class RestServerSpec(
                      |        }
                      |      ]
                      |    }
-                     |  ],
-                     |  "nextStart": 1
+                     |  ]
                      |}
                      |""".stripMargin.filterNot(_.isWhitespace)
       }
@@ -934,11 +933,10 @@ abstract class RestServerSpec(
         s"/events/tx-id/${txId.toHexString}?group=${chainIndex.from.value}",
         chainIndex,
         server.port
-      )(verifyEmptyEvents)
+      )(verifyEmptyContractEventsByHash)
     }
   }
 
-  // scalastyle:off no.equal
   it should "get events for tx id with wrong group" in {
     val blockHash  = dummyBlock.hash
     val txId       = Hash.random
@@ -950,10 +948,85 @@ abstract class RestServerSpec(
       // Ignore group if it is 1 node setup, since the events are always available
       Get(url, port).check(verifyNonEmptyEvents)
     } else {
-      Get(url, port).check(verifyEmptyEvents)
+      Get(url, port).check(verifyEmptyContractEventsByHash)
     }
   }
-  // scalastyle:on no.equal
+
+  it should "get events for block hash with events" in {
+    val blockHash = dummyBlock.hash
+    val contractId = ContractId.unsafe(
+      Hash.unsafe(blockHash.bytes)
+    ) // TODO: refactor BlockFlowDummy to fix this hacky value
+
+    servers.foreach { server =>
+      val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
+      verifyResponseWithNodes(
+        s"/events/block-hash/${blockHash.toHexString}",
+        s"/events/block-hash/${blockHash.toHexString}?group=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      ) { response =>
+        response.code is StatusCode.Ok
+        val events = response.body.rightValue
+        events is s"""
+                     |{
+                     |  "events": [
+                     |    {
+                     |      "txId": "${dummyTx.id.toHexString}",
+                     |      "contractAddress": "${Address.contract(contractId).toBase58}",
+                     |      "eventIndex": 0,
+                     |      "fields": [
+                     |        {
+                     |          "type": "U256",
+                     |          "value": "4"
+                     |        },
+                     |        {
+                     |          "type": "Address",
+                     |          "value": "16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS"
+                     |        },
+                     |        {
+                     |          "type": "Address",
+                     |          "value": "27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi"
+                     |        }
+                     |      ]
+                     |    }
+                     |  ]
+                     |}
+                     |""".stripMargin.filterNot(_.isWhitespace)
+      }
+    }
+  }
+
+  it should "get events for block hash without events" in {
+    val blockHash = dummyBlock.hash
+    // No events for this blockHash, see `getEvents` method for `BlockFlowDummy` in `ServerFixture.scala`
+    val blockHashToQuery =
+      BlockHash.unsafe(hex"aab64e9c814749cea508857b23c7550da30b67216950c461ccac1a14a58661c3")
+
+    servers.foreach { server =>
+      val chainIndex = ChainIndex.from(blockHash, server.node.config.broker.groups)
+      verifyResponseWithNodes(
+        s"/events/block-hash/${blockHashToQuery.toHexString}",
+        s"/events/block-hash/${blockHashToQuery.toHexString}?group=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      )(verifyEmptyContractEventsByHash)
+    }
+  }
+
+  it should "get events for block hash with wrong group" in {
+    val blockHash  = dummyBlock.hash
+    val chainIndex = ChainIndex.from(blockHash, groupConfig.groups)
+    val wrongGroup = (chainIndex.from.value + 1) % groupConfig.groups
+    val url        = s"/events/block-hash/${blockHash.toHexString}?group=${wrongGroup}"
+
+    if (nbOfNodes === 1) {
+      // Ignore group if it is 1 node setup, since the events are always available
+      Get(url, port).check(verifyNonEmptyEvents)
+    } else {
+      Get(url, port).check(verifyEmptyContractEventsByHash)
+    }
+  }
 
   it should "get current events count for a contract" in {
     val url = s"/events/contract/$dummyContractAddress/current-count"
@@ -963,7 +1036,7 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "get current events count for a TxScript" in {
+  it should "get current events count for a transaction" in {
     val blockHash = dummyBlock.hash
 
     servers.foreach { server =>
@@ -980,15 +1053,24 @@ abstract class RestServerSpec(
   def verifyNonEmptyEvents(response: Response[Either[String, String]]): Assertion = {
     response.code is StatusCode.Ok
     val events = response.body.rightValue
-    events.startsWith(s"""{"events":[{"blockHash":"${dummyBlock.hash.toHexString}""") is true
+    events.startsWith(s"""{"events":[{"""") is true
   }
 
-  def verifyEmptyEvents(response: Response[Either[String, String]]): Assertion = {
+  def verifyEmptyContractEvents(response: Response[Either[String, String]]): Assertion = {
     response.code is StatusCode.Ok
     response.body.rightValue is s"""
                                    |{
                                    |  "events": [],
                                    |  "nextStart": 0
+                                   |}
+                                   |""".stripMargin.filterNot(_.isWhitespace)
+  }
+
+  def verifyEmptyContractEventsByHash(response: Response[Either[String, String]]): Assertion = {
+    response.code is StatusCode.Ok
+    response.body.rightValue is s"""
+                                   |{
+                                   |  "events": []
                                    |}
                                    |""".stripMargin.filterNot(_.isWhitespace)
   }

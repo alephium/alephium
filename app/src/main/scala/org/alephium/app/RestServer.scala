@@ -114,6 +114,7 @@ class RestServer(
       getContractEventsLogic,
       getContractEventsCurrentCountLogic,
       getEventsByTxIdLogic,
+      getEventsByBlockHashLogic,
       metricsLogic
     ).map(route(_)) ++ swaggerUiRoute
 

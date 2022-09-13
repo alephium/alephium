@@ -454,7 +454,19 @@ class ServerUtils(implicit
     wrapResult(
       blockFlow.getEventsByHash(Byte32.unsafe(txId.bytes)).map { logs =>
         val events = logs.map(p => ContractEventByTxId.from(p._1, p._2, p._3))
-        ContractEventsByTxId(events, if (events.isEmpty) 0 else 1)
+        ContractEventsByTxId(events)
+      }
+    )
+  }
+
+  def getEventsByBlockHash(
+      blockFlow: BlockFlow,
+      blockHash: BlockHash
+  ): Try[ContractEventsByBlockHash] = {
+    wrapResult(
+      blockFlow.getEventsByHash(Byte32.unsafe(blockHash.bytes)).map { logs =>
+        val events = logs.map(p => ContractEventByBlockHash.from(p._2, p._3))
+        ContractEventsByBlockHash(events)
       }
     )
   }

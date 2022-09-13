@@ -641,6 +641,19 @@ trait EndpointsLogic extends Endpoints {
     }
   )
 
+  val getEventsByBlockHashLogic = serverLogicRedirect(getEventsByBlockHash)(
+    { case (blockHash, _) =>
+      Future.successful {
+        serverUtils.getEventsByBlockHash(blockFlow, blockHash)
+      }
+    },
+    {
+      case (_, groupIndexOpt) => {
+        getGroupIndex(groupIndexOpt)
+      }
+    }
+  )
+
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   val metricsLogic = metrics.serverLogic[Future] { _ =>
     Future.successful {
