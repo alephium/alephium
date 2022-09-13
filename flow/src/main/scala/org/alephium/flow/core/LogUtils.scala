@@ -21,17 +21,19 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.Byte32
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.model.{BlockHash, ChainIndex, ContractId}
+import org.alephium.protocol.model.{BlockHash, ContractId}
 import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates, LogStatesId}
 import org.alephium.util.AVector
 
 trait LogUtils { Self: FlowUtils =>
 
+  // end is exclusive
   def getEvents(
       contractId: ContractId,
       start: Int,
       end: Int
   ): IOResult[(Int, AVector[LogStates])] = {
+    assume(start < end)
     val allLogStates: ArrayBuffer[LogStates] = ArrayBuffer.empty
     var nextCount                            = start
 
@@ -41,13 +43,12 @@ trait LogUtils { Self: FlowUtils =>
     ): IOResult[Unit] = {
       logStorage.logState.getOpt(logStatesId) match {
         case Right(Some(logStates)) =>
-          assume(logStates.states.nonEmpty)
+          allLogStates += logStates
           nextCount = logStatesId.counter + 1
-          if (end < nextCount) {
-            Right(())
-          } else {
-            allLogStates += logStates
+          if (nextCount < end) {
             rec(LogStatesId(contractId, nextCount))
+          } else {
+            Right(())
           }
         case Right(None) =>
           Right(())
@@ -73,18 +74,12 @@ trait LogUtils { Self: FlowUtils =>
         logStates.states
           .get(ref.offset)
           .map(state => (logStates.blockHash, ref, state))
-          .toRight(IOError.Other(new Throwable(s"Invalid state ref: $ref")))
+          .toRight(IOError.Other(new Throwable(s"Invalid log ref: $ref")))
       case None => Left(IOError.keyNotFound(ref.id, "LogUtils.getEventByRef"))
     }
   }
 
-  def getEventsCurrentCount(
-      chainIndex: ChainIndex,
-      eventKey: ContractId
-  ): IOResult[Option[Int]] = {
-    for {
-      worldState <- blockFlow.getBestPersistedWorldState(chainIndex.from)
-      count      <- worldState.logStorage.logCounterState.getOpt(eventKey)
-    } yield count
+  def getEventsCurrentCount(contractId: ContractId): IOResult[Option[Int]] = {
+    logStorage.logCounterState.getOpt(contractId)
   }
 }

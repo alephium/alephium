@@ -2520,7 +2520,7 @@ class VMSpec extends AlephiumSpec {
       info("All events emitted from the contract after the second method call")
 
       val (nextCount1, _) = getEvents(blockFlow, contractId, 0, 1)
-      nextCount1.value is 2
+      nextCount1.value is 1
       val (nextCount2, _) = getEvents(blockFlow, contractId, 0, 2)
       nextCount2 is 2
 

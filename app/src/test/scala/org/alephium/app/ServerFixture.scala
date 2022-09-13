@@ -420,10 +420,7 @@ object ServerFixture {
       }
     }
 
-    override def getEventsCurrentCount(
-        chainIndex: ChainIndex,
-        eventKey: ContractId
-    ): IOResult[Option[Int]] = {
+    override def getEventsCurrentCount(eventKey: ContractId): IOResult[Option[Int]] = {
       Right(Some(10))
     }
 

@@ -360,9 +360,7 @@ class ServerUtils(implicit
   ): Try[Int] = {
     val contractId = contractAddress.lockupScript.contractId
     for {
-      groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
-      chainIndex = ChainIndex(groupIndex, groupIndex)
-      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId))
+      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(contractId))
       count    <- countOpt.toRight(notFound(s"Current events count for contract $contractAddress"))
     } yield count
   }
