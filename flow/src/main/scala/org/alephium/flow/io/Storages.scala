@@ -20,12 +20,15 @@ import java.nio.file.Path
 
 import org.rocksdb.WriteOptions
 
+import org.alephium.crypto.Byte32
 import org.alephium.io._
 import org.alephium.io.RocksDBSource.ColumnFamily._
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.{LogStates, LogStatesId, WorldState}
+import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.vm.{LogStateRef, LogStates, LogStatesId, WorldState}
+import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.util.AVector
 
 object Storages {
@@ -47,11 +50,13 @@ object Storages {
     val txStorage         = TxRocksDBStorage(db, All, writeOptions)
     val nodeStateStorage  = NodeStateRockDBStorage(db, All, writeOptions)
     val trieStorage       = RocksDBKeyValueStorage[Hash, Node](db, Trie, writeOptions)
-    val logStorage        = RocksDBKeyValueStorage[LogStatesId, LogStates](db, Log, writeOptions)
-    val logCounterStorage = RocksDBKeyValueStorage[Hash, Int](db, LogCounter, writeOptions)
+    val logStateStorage   = RocksDBKeyValueStorage[LogStatesId, LogStates](db, Log, writeOptions)
+    val logRefStorage = RocksDBKeyValueStorage[Byte32, AVector[LogStateRef]](db, Log, writeOptions)
+    val logCounterStorage = RocksDBKeyValueStorage[ContractId, Int](db, LogCounter, writeOptions)
+    val logStorage        = LogStorage(logStateStorage, logRefStorage, logCounterStorage)
     val worldStateStorage =
-      WorldStateRockDBStorage(trieStorage, logStorage, logCounterStorage, db, All, writeOptions)
-    val emptyWorldState  = WorldState.emptyPersisted(trieStorage, logStorage, logCounterStorage)
+      WorldStateRockDBStorage(trieStorage, logStorage, db, All, writeOptions)
+    val emptyWorldState  = WorldState.emptyPersisted(trieStorage, logStorage)
     val pendingTxStorage = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
     val readyTxStorage   = ReadyTxRocksDBStorage(db, ReadyTx, writeOptions)
     val brokerStorage    = BrokerRocksDBStorage(db, Broker, writeOptions)
@@ -90,7 +95,7 @@ final case class Storages(
     pendingTxStorage: PendingTxStorage,
     readyTxStorage: ReadyTxStorage,
     brokerStorage: BrokerStorage,
-    logStorage: KeyValueStorage[LogStatesId, LogStates]
+    logStorage: LogStorage
 ) extends KeyValueSource {
   def close(): IOResult[Unit] = sources.foreachE(_.close())
 

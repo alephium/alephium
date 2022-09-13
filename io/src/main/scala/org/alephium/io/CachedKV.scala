@@ -84,8 +84,8 @@ abstract class CachedKV[K, V, C >: Modified[V] <: Cache[V]] extends MutableKV[K,
 }
 
 object CachedKV {
-  def getOptFromUnderlying[K, V](
-      storage: KeyValueStorage[K, V],
+  @inline def getOptFromUnderlying[K, V](
+      storage: ReadableKV[K, V],
       caches: mutable.Map[K, Cache[V]],
       key: K
   ): IOResult[Option[V]] = {
@@ -93,22 +93,5 @@ object CachedKV {
       valueOpt.foreach(value => caches.addOne(key -> Cached(value)))
       valueOpt
     }
-  }
-
-  def persist[K, V](
-      storage: KeyValueStorage[K, V],
-      caches: mutable.Map[K, Cache[V]]
-  ): IOResult[KeyValueStorage[K, V]] = {
-    storage
-      .putBatch { putAccumulate =>
-        caches.foreach {
-          case (_, Cached(_))         => Right(())
-          case (key, Updated(value))  => putAccumulate(key, value)
-          case (key, Inserted(value)) => putAccumulate(key, value)
-          case (_, Removed()) =>
-            throw new RuntimeException("Unexpected `Remove` action")
-        }
-      }
-      .map(_ => storage)
   }
 }

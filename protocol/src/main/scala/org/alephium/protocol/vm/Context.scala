@@ -348,7 +348,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
     val result = (blockEnv.blockId, contractIdOpt) match {
       case (Some(blockId), Some(contractId))
           if logConfig.logContractEnabled(Address.contract(contractId)) =>
-        worldState.writeLogForContract(
+        worldState.logState.putLog(
           blockId,
           txId,
           contractId,

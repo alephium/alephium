@@ -21,7 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{BlockHash, ChainIndex}
+import org.alephium.protocol.model.{BlockHash, ChainIndex, ContractId}
 import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates, LogStatesId}
 import org.alephium.util.AVector
 
@@ -39,7 +39,7 @@ trait LogUtils { Self: FlowUtils =>
     def rec(
         logStatesId: LogStatesId
     ): IOResult[Unit] = {
-      logStorage.getOpt(logStatesId) match {
+      logStorage.logState.getOpt(logStatesId) match {
         case Right(Some(logStates)) =>
           assume(logStates.states.nonEmpty)
           nextCount = logStatesId.counter + 1
@@ -62,7 +62,7 @@ trait LogUtils { Self: FlowUtils =>
   def getEventByRef(
       ref: LogStateRef
   ): IOResult[(BlockHash, LogStateRef, LogState)] = {
-    logStorage.getOpt(ref.id) match {
+    logStorage.logState.getOpt(ref.id) match {
       case Right(Some(logStates)) =>
         logStates.states
           .get(ref.offset)
@@ -75,11 +75,11 @@ trait LogUtils { Self: FlowUtils =>
 
   def getEventsCurrentCount(
       chainIndex: ChainIndex,
-      eventKey: Hash
+      eventKey: ContractId
   ): IOResult[Option[Int]] = {
     for {
       worldState <- blockFlow.getBestPersistedWorldState(chainIndex.from)
-      count      <- worldState.logCounterState.getOpt(eventKey)
+      count      <- worldState.logStorage.logCounterState.getOpt(eventKey)
     } yield count
   }
 }

@@ -37,6 +37,9 @@ final case class LogStateRef(id: LogStatesId, offset: Int) {
 }
 
 object LogStateRef {
+  implicit val serde: Serde[LogStateRef] =
+    Serde.forProduct2(LogStateRef(_, _), t => (t.id, t.offset))
+
   private def fieldToHash(field: Val): Option[Hash] = {
     field match {
       case Val.ByteVec(bytes) => Hash.from(bytes)

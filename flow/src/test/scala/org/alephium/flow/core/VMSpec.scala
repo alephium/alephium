@@ -2350,7 +2350,7 @@ class VMSpec extends AlephiumSpec {
 
     getLogStates(blockFlow, chainIndex.from, contractId, 0) isnot None
     val txId = callingBlock.nonCoinbase.head.id
-    getLogStatesByTxId(blockFlow, chainIndex.from, txId) is None
+    getLogStatesByTxId(blockFlow, chainIndex.from, txId).isEmpty is true
   }
 
   it should "write to the log storage with tx id indexing" in new EventFixtureWithContract {
@@ -2363,7 +2363,7 @@ class VMSpec extends AlephiumSpec {
 
     getLogStates(blockFlow, chainIndex.from, contractId, 0) isnot None
     val txId = callingBlock.nonCoinbase.head.id
-    getLogStatesByTxId(blockFlow, chainIndex.from, txId) isnot None
+    getLogStatesByTxId(blockFlow, chainIndex.from, txId).isEmpty is false
   }
 
   it should "write script events to log storage" in new EventFixture {
@@ -2401,16 +2401,12 @@ class VMSpec extends AlephiumSpec {
     contractLogStates.states(0) is LogState(txId, 0, fields)
     contractLogStates.states(1) is LogState(txId, 1, fields)
 
-    val txIdLogStates = getLogStatesByTxId(blockFlow, chainIndex.from, txId).value
-    txIdLogStates.blockHash is callingBlock.hash
-    txIdLogStates.eventKey is txId.value
-    txIdLogStates.states.length is 2
+    val txIdLogRefs = getLogStatesByTxId(blockFlow, chainIndex.from, txId)
+    txIdLogRefs.length is 2
 
     val logStatesId = LogStatesId(contractId.value, 0)
-    txIdLogStates
-      .states(0) is LogState(txId, txEventRefIndex, LogStateRef(logStatesId, 0).toFields)
-    txIdLogStates
-      .states(1) is LogState(txId, txEventRefIndex, LogStateRef(logStatesId, 1).toFields)
+    txIdLogRefs(0) is LogStateRef(logStatesId, 0)
+    txIdLogRefs(1) is LogStateRef(logStatesId, 1)
   }
 
   it should "emit events with all supported field types" in new EventFixture {
@@ -2596,9 +2592,11 @@ class VMSpec extends AlephiumSpec {
       blockFlow: BlockFlow,
       groupIndex: GroupIndex,
       txId: TransactionId
-  ): Option[LogStates] = {
-    val logStatesId = LogStatesId(txId.value, 0)
-    getLogStates(blockFlow, groupIndex, logStatesId)
+  ): AVector[LogStateRef] = {
+    (for {
+      worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
+      logRefOpt  <- worldState.logStorage.logRefState.getOpt(Byte32.unsafe(txId.bytes))
+    } yield logRefOpt.getOrElse(AVector.empty)).rightValue
   }
 
   private def getLogStates(
@@ -2608,7 +2606,7 @@ class VMSpec extends AlephiumSpec {
   ): Option[LogStates] = {
     (for {
       worldState   <- blockFlow.getBestPersistedWorldState(groupIndex)
-      logStatesOpt <- worldState.logState.getOpt(logStatesId)
+      logStatesOpt <- worldState.logStorage.logState.getOpt(logStatesId)
     } yield logStatesOpt).rightValue
   }
 
@@ -3581,7 +3579,7 @@ class VMSpec extends AlephiumSpec {
   ): Option[Int] = {
     (for {
       worldState <- blockFlow.getBestPersistedWorldState(groupIndex)
-      countOpt   <- worldState.logCounterState.getOpt(contractId.value)
+      countOpt   <- worldState.logStorage.logCounterState.getOpt(contractId)
     } yield countOpt).rightValue
   }
 }

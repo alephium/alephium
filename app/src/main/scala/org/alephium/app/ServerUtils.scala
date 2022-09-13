@@ -361,7 +361,7 @@ class ServerUtils(implicit
     for {
       groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
       chainIndex = ChainIndex(groupIndex, groupIndex)
-      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId.value))
+      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId))
       count    <- countOpt.toRight(notFound(s"Current events count for contract $contractAddress"))
     } yield count
   }

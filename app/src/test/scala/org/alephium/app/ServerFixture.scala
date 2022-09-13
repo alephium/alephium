@@ -408,7 +408,7 @@ object ServerFixture {
 
     override def getEventsCurrentCount(
         chainIndex: ChainIndex,
-        eventKey: Hash
+        eventKey: ContractId
     ): IOResult[Option[Int]] = {
       Right(Some(10))
     }

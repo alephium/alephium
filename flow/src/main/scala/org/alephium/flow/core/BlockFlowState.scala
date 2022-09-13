@@ -22,11 +22,12 @@ import scala.reflect.ClassTag
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.io.{IOResult, KeyValueStorage}
+import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
+import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -67,7 +68,7 @@ trait BlockFlowState extends FlowTipsUtil {
     }
   }
 
-  val logStorage: KeyValueStorage[LogStatesId, LogStates] = {
+  val logStorage: LogStorage = {
     assume(intraGroupBlockChains.nonEmpty, "No intraGroupBlockChains")
     intraGroupBlockChains.head.worldStateStorage.logStorage
   }
