@@ -55,14 +55,14 @@ trait MutableLog {
   ): IOResult[LogStateRef] = {
     for {
       initialCount <- eventLogPageCounter.getInitialCount(contractId)
-      id = LogStatesId(contractId.value, initialCount)
+      id = LogStatesId(contractId, initialCount)
       logStatesOpt <- eventLog.getOpt(id)
       _ <- logStatesOpt match {
         case Some(logStates) =>
           assume(logStates.blockHash == blockHash)
           eventLog.put(id, logStates.copy(states = logStates.states :+ state))
         case None =>
-          eventLog.put(id, LogStates(blockHash, contractId.value, AVector(state)))
+          eventLog.put(id, LogStates(blockHash, contractId, AVector(state)))
       }
       _ <- eventLogPageCounter.counter.put(contractId, initialCount + 1)
     } yield LogStateRef(id, getLogOffset(logStatesOpt))

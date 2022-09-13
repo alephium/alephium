@@ -19,8 +19,8 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
+import org.alephium.crypto.Byte32
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.Hash
 import org.alephium.protocol.model.{BlockHash, ChainIndex, ContractId}
 import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates, LogStatesId}
 import org.alephium.util.AVector
@@ -28,7 +28,7 @@ import org.alephium.util.AVector
 trait LogUtils { Self: FlowUtils =>
 
   def getEvents(
-      eventKey: Hash,
+      contractId: ContractId,
       start: Int,
       end: Int
   ): IOResult[(Int, AVector[LogStates])] = {
@@ -47,7 +47,7 @@ trait LogUtils { Self: FlowUtils =>
             Right(())
           } else {
             allLogStates += logStates
-            rec(LogStatesId(eventKey, nextCount))
+            rec(LogStatesId(contractId, nextCount))
           }
         case Right(None) =>
           Right(())
@@ -56,20 +56,25 @@ trait LogUtils { Self: FlowUtils =>
       }
     }
 
-    rec(LogStatesId(eventKey, nextCount)).map(_ => (nextCount, AVector.from(allLogStates)))
+    rec(LogStatesId(contractId, nextCount)).map(_ => (nextCount, AVector.from(allLogStates)))
   }
 
-  def getEventByRef(
-      ref: LogStateRef
-  ): IOResult[(BlockHash, LogStateRef, LogState)] = {
-    logStorage.logState.getOpt(ref.id) match {
-      case Right(Some(logStates)) =>
+  // TODO: optimize this by caching contract events
+  def getEventsByHash(hash: Byte32): IOResult[AVector[(BlockHash, LogStateRef, LogState)]] = {
+    logStorage.logRefState.getOpt(hash) flatMap {
+      case Some(logRefs) => logRefs.mapE(getEventByRef)
+      case None          => Right(AVector.empty)
+    }
+  }
+
+  private def getEventByRef(ref: LogStateRef): IOResult[(BlockHash, LogStateRef, LogState)] = {
+    logStorage.logState.getOpt(ref.id) flatMap {
+      case Some(logStates) =>
         logStates.states
           .get(ref.offset)
           .map(state => (logStates.blockHash, ref, state))
           .toRight(IOError.Other(new Throwable(s"Invalid state ref: $ref")))
-      case Right(None) => Left(IOError.keyNotFound(ref.id, "LogUtils.getEventByRef"))
-      case Left(error) => Left(error)
+      case None => Left(IOError.keyNotFound(ref.id, "LogUtils.getEventByRef"))
     }
   }
 

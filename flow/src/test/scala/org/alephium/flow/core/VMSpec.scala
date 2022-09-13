@@ -2135,7 +2135,7 @@ class VMSpec extends AlephiumSpec {
       getLogStates(blockFlow, chainIndex.from, contractId, 0).value is
         LogStates(
           block.hash,
-          contractId.value,
+          contractId,
           AVector(
             LogState(txId, 0, AVector(Val.U256(1))),
             LogState(txId, 1, AVector(Val.U256(1))),
@@ -2218,7 +2218,7 @@ class VMSpec extends AlephiumSpec {
         currentCount: Int
     ) = {
       logStates.blockHash is block.hash
-      logStates.eventKey is contractId.value
+      logStates.contractId is contractId
       logStates.states.length is 2
 
       getCurrentCount(blockFlow, chainIndex.from, contractId).value is currentCount
@@ -2255,7 +2255,7 @@ class VMSpec extends AlephiumSpec {
       val logStates = logStatesOpt.value
 
       logStates.blockHash is createContractBlock.hash
-      logStates.eventKey is createContractEventId.value
+      logStates.contractId is createContractEventId
       logStates.states.length is 1
 
       getCurrentCount(blockFlow, chainIndex.from, createContractEventId).value is 1
@@ -2287,7 +2287,7 @@ class VMSpec extends AlephiumSpec {
       val logStates = logStatesOpt.value
 
       logStates.blockHash is destroyContractBlock.hash
-      logStates.eventKey is destroyContractEventId.value
+      logStates.contractId is destroyContractEventId
       logStates.states.length is 1
 
       getCurrentCount(blockFlow, chainIndex.from, destroyContractEventId).value is 1
@@ -2395,7 +2395,7 @@ class VMSpec extends AlephiumSpec {
     val contractLogStates = getLogStates(blockFlow, chainIndex.from, contractId, 0).value
     val txId              = callingBlock.nonCoinbase.head.id
     contractLogStates.blockHash is callingBlock.hash
-    contractLogStates.eventKey is contractId.value
+    contractLogStates.contractId is contractId
     contractLogStates.states.length is 2
     val fields = AVector[Val](Val.U256(1), Val.U256(2))
     contractLogStates.states(0) is LogState(txId, 0, fields)
@@ -2404,7 +2404,7 @@ class VMSpec extends AlephiumSpec {
     val txIdLogRefs = getLogStatesByTxId(blockFlow, chainIndex.from, txId)
     txIdLogRefs.length is 2
 
-    val logStatesId = LogStatesId(contractId.value, 0)
+    val logStatesId = LogStatesId(contractId, 0)
     txIdLogRefs(0) is LogStateRef(logStatesId, 0)
     txIdLogRefs(1) is LogStateRef(logStatesId, 1)
   }
@@ -2445,7 +2445,7 @@ class VMSpec extends AlephiumSpec {
     val logStates    = logStatesOpt.value
 
     logStates.blockHash is callingBlock.hash
-    logStates.eventKey is contractId.value
+    logStates.contractId is contractId
     logStates.states.length is 2
 
     getCurrentCount(blockFlow, chainIndex.from, contractId).value is 1
@@ -2496,7 +2496,7 @@ class VMSpec extends AlephiumSpec {
     val logStates    = logStatesOpt.value
 
     logStates.blockHash is callingBlock.hash
-    logStates.eventKey is contractId.value
+    logStates.contractId is contractId
     logStates.states.length is 1
     val logState = logStates.states.head
     logState.index is 0.toByte
@@ -2548,7 +2548,7 @@ class VMSpec extends AlephiumSpec {
       verifyCallingEvents(logStates1, callingBlock, result = 10, currentCount = 2)
 
       logStates2.blockHash is secondCallingBlock.hash
-      logStates2.eventKey is contractId.value
+      logStates2.contractId is contractId
       logStates2.states.length is 2
 
       val addingLogState = logStates2.states(0)
@@ -2584,7 +2584,7 @@ class VMSpec extends AlephiumSpec {
       contractId: ContractId,
       count: Int
   ): Option[LogStates] = {
-    val logStatesId = LogStatesId(contractId.value, count)
+    val logStatesId = LogStatesId(contractId, count)
     getLogStates(blockFlow, groupIndex, logStatesId)
   }
 
@@ -3569,7 +3569,7 @@ class VMSpec extends AlephiumSpec {
       start: Int,
       end: Int = Int.MaxValue
   ): (Int, AVector[LogStates]) = {
-    blockFlow.getEvents(contractId.value, start, end).rightValue
+    blockFlow.getEvents(contractId, start, end).rightValue
   }
 
   private def getCurrentCount(

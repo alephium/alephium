@@ -25,6 +25,7 @@ import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, TransactionTemplate => _, _}
+import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
@@ -453,32 +454,9 @@ class ServerUtils(implicit
       txId: TransactionId
   ): Try[ContractEventsByTxId] = {
     wrapResult(
-      for {
-        result <- blockFlow.getEvents(txId.value, 0, CounterRange.MaxCounterRange)
-        (nextStart, logStatesVec) = result
-        events <- logStatesVec.flatMapE { logStates =>
-          logStates.states
-            .mapE { state =>
-              if (state.isRef) {
-                LogStateRef
-                  .fromFields(state.fields)
-                  .toRight(IOError.Other(new Throwable(s"Invalid state ref: ${state.fields}")))
-                  .flatMap(blockFlow.getEventByRef(_))
-                  .map(p => ContractEventByTxId.from(p._1, p._2, p._3))
-              } else {
-                Right(
-                  ContractEventByTxId(
-                    logStates.blockHash,
-                    Address.contract(ContractId.unsafe(logStates.eventKey)),
-                    state.index.toInt,
-                    state.fields.map(Val.from)
-                  )
-                )
-              }
-            }
-        }
-      } yield {
-        ContractEventsByTxId(events, nextStart)
+      blockFlow.getEventsByHash(Byte32.unsafe(txId.bytes)).map { logs =>
+        val events = logs.map(p => ContractEventByTxId.from(p._1, p._2, p._3))
+        ContractEventsByTxId(events, if (events.isEmpty) 0 else 1)
       }
     )
   }
@@ -489,13 +467,10 @@ class ServerUtils(implicit
       endOpt: Option[Int],
       contractId: ContractId
   ): Try[ContractEvents] = {
+    val end = endOpt.getOrElse(start + CounterRange.MaxCounterRange)
     wrapResult(
       blockFlow
-        .getEvents(
-          contractId.value,
-          start,
-          endOpt.getOrElse(start + CounterRange.MaxCounterRange)
-        )
+        .getEvents(contractId, start, end)
         .map {
           case (nextStart, logStatesVec) => {
             ContractEvents.from(logStatesVec, nextStart)
@@ -1006,24 +981,18 @@ class ServerUtils(implicit
     }
   }
 
-  private def fetchContractEvents(
-      worldState: WorldState.Staging
-  ): AVector[ContractEventByTxId] = {
+  private def fetchContractEvents(worldState: WorldState.Staging): AVector[ContractEventByTxId] = {
     val allLogStates = worldState.logState.getNewLogs()
     allLogStates.flatMap(logStates =>
       logStates.states.flatMap(state =>
-        if (state.isRef) {
-          AVector.empty
-        } else {
-          AVector(
-            ContractEventByTxId(
-              logStates.blockHash,
-              Address.contract(ContractId.unsafe(logStates.eventKey)),
-              state.index.toInt,
-              state.fields.map(Val.from)
-            )
+        AVector(
+          ContractEventByTxId(
+            logStates.blockHash,
+            Address.contract(logStates.contractId),
+            state.index.toInt,
+            state.fields.map(Val.from)
           )
-        }
+        )
       )
     )
   }

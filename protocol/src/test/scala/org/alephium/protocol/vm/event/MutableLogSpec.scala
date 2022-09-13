@@ -36,8 +36,8 @@ class MutableLogSpec extends AlephiumSpec with Fixture with NumericHelpers {
     val contractId = ContractId.random
     val fields     = AVector[Val](Val.I256(I256.from(2)), Val.True, Val.False)
     val logState   = LogState(txId, 2.toByte, fields.tail)
-    val logStates  = LogStates(blockHash, contractId.value, AVector(logState))
-    val logId      = LogStatesId(contractId.value, 0)
+    val logStates  = LogStates(blockHash, contractId, AVector(logState))
+    val logId      = LogStatesId(contractId, 0)
 
     def persist() = {
       mutableLog match {
@@ -69,17 +69,17 @@ class MutableLogSpec extends AlephiumSpec with Fixture with NumericHelpers {
 
   it should "put events" in new LogFixture {
     mutableLog.putLog(blockHash, txId, contractId, fields, false, false) isE ()
-    mutableLog.eventLog.get(LogStatesId(contractId.value, 0)) isE logStates
+    mutableLog.eventLog.get(LogStatesId(contractId, 0)) isE logStates
 
     mutableLog.putLog(blockHash, txId, contractId, fields, false, false) isE ()
-    mutableLog.eventLog.get(LogStatesId(contractId.value, 0)) isE
+    mutableLog.eventLog.get(LogStatesId(contractId, 0)) isE
       logStates.copy(states = AVector(logState, logState))
   }
 
   it should "update initial value once persisted" in new LogFixture {
     mutableLog.putLog(blockHash, txId, contractId, fields, false, false) isE ()
-    mutableLog.eventLog.get(LogStatesId(contractId.value, 0)) isE logStates
-    mutableLog.eventLog.exists(LogStatesId(contractId.value, 1)) isE false
+    mutableLog.eventLog.get(LogStatesId(contractId, 0)) isE logStates
+    mutableLog.eventLog.exists(LogStatesId(contractId, 1)) isE false
 
     persist()
 
@@ -88,8 +88,8 @@ class MutableLogSpec extends AlephiumSpec with Fixture with NumericHelpers {
     newLog.putLog(newBlockHash, txId, contractId, fields, false, false) isE ()
     newLog.putLog(newBlockHash, txId, contractId, fields, false, false) isE ()
     newLog.eventLogPageCounter.getInitialCount(contractId) isE 1
-    newLog.eventLog.get(LogStatesId(contractId.value, 0)) isE logStates
-    newLog.eventLog.get(LogStatesId(contractId.value, 1)) isE
+    newLog.eventLog.get(LogStatesId(contractId, 0)) isE logStates
+    newLog.eventLog.get(LogStatesId(contractId, 1)) isE
       logStates.copy(blockHash = newBlockHash, states = AVector(logState, logState))
   }
 

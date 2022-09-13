@@ -162,7 +162,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         false
       )
 
-      LogStates(blockHash, contractId.value, AVector(LogState(txId, 0, fields.tail)))
+      LogStates(blockHash, contractId, AVector(LogState(txId, 0, fields.tail)))
     }
 
     val newLogs = worldState.logState.getNewLogs()

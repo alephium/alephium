@@ -915,7 +915,7 @@ abstract class RestServerSpec(
                      |      ]
                      |    }
                      |  ],
-                     |  "nextStart": 2
+                     |  "nextStart": 1
                      |}
                      |""".stripMargin.filterNot(_.isWhitespace)
       }
