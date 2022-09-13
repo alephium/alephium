@@ -38,7 +38,7 @@ object CachedKVStorage {
     new CachedKVStorage[K, V](storage, mutable.LinkedHashMap.empty)
   }
 
-  @inline private def accumulateUpdates[K, V](
+  @inline private[io] def accumulateUpdates[K, V](
       putAccumulate: (K, V) => Unit,
       caches: mutable.LinkedHashMap[K, Cache[V]]
   ): Unit = {

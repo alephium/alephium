@@ -35,7 +35,7 @@ trait MutableLog {
       indexByTxId: Boolean,
       indexByBlockHash: Boolean
   ): IOResult[Unit] = {
-    getIndex(fields) match {
+    MutableLog.getEventIndex(fields) match {
       case Some(index) =>
         val state = LogState(txId, index, fields.tail)
         putLogByContractId(blockHash, contractId, state).flatMap { logRef =>
@@ -48,7 +48,7 @@ trait MutableLog {
     }
   }
 
-  def putLogByContractId(
+  private[event] def putLogByContractId(
       blockHash: BlockHash,
       contractId: ContractId,
       state: LogState
@@ -59,6 +59,7 @@ trait MutableLog {
       logStatesOpt <- eventLog.getOpt(id)
       _ <- logStatesOpt match {
         case Some(logStates) =>
+          assume(logStates.blockHash == blockHash)
           eventLog.put(id, logStates.copy(states = logStates.states :+ state))
         case None =>
           eventLog.put(id, LogStates(blockHash, contractId.value, AVector(state)))
@@ -74,15 +75,24 @@ trait MutableLog {
     }
   }
 
-  @inline def putLogIndexByTxId(txId: TransactionId, logRef: LogStateRef): IOResult[Unit] = {
+  @inline private[event] def putLogIndexByTxId(
+      txId: TransactionId,
+      logRef: LogStateRef
+  ): IOResult[Unit] = {
     putLogIndexByByte32(Byte32.unsafe(txId.bytes), logRef)
   }
 
-  @inline def putLogIndexByBlockHash(blockHash: BlockHash, logRef: LogStateRef): IOResult[Unit] = {
+  @inline private[event] def putLogIndexByBlockHash(
+      blockHash: BlockHash,
+      logRef: LogStateRef
+  ): IOResult[Unit] = {
     putLogIndexByByte32(Byte32.unsafe(blockHash.bytes), logRef)
   }
 
-  def putLogIndexByByte32(byte32: Byte32, logRef: LogStateRef): IOResult[Unit] = {
+  @inline private[event] def putLogIndexByByte32(
+      byte32: Byte32,
+      logRef: LogStateRef
+  ): IOResult[Unit] = {
     for {
       eventIndexOpt <- eventLogByHash.getOpt(byte32)
       _ <- eventIndexOpt match {
@@ -93,18 +103,18 @@ trait MutableLog {
       }
     } yield ()
   }
-
-  @inline private def getIndex(fields: AVector[Val]): Option[Byte] = {
-    fields.headOption.flatMap {
-      case Val.I256(i) => i.toByte
-      case _           => None
-    }
-  }
 }
 
 object MutableLog {
   trait LogPageCounter[K] {
     def counter: MutableKV[K, Int, Unit]
     def getInitialCount(key: K): IOResult[Int]
+  }
+
+  @inline private[event] def getEventIndex(fields: AVector[Val]): Option[Byte] = {
+    fields.headOption.flatMap {
+      case Val.I256(i) => i.toByte
+      case _           => None
+    }
   }
 }
