@@ -59,13 +59,30 @@ abstract class RestServerSpec(
     val apiKeyEnabled: Boolean = false,
     val utxosLimit: Int = Int.MaxValue
 ) extends RestServerFixture {
-  it should "call GET /blockflow" in {
+  it should "call GET /blockflow/blocks" in {
     Get(blockflowFromTo(0, 1)) check { response =>
       response.code is StatusCode.Ok
-      response.as[FetchResponse] is dummyFetchResponse
+      response.as[BlocksPerTimeStampRange] is dummyFetchResponse
     }
 
     Get(blockflowFromTo(10, 0)) check { response =>
+      response.code is StatusCode.BadRequest
+      response.as[ApiError.BadRequest] is ApiError.BadRequest(
+        """Invalid value (expected value to pass validation: `fromTs` must be before `toTs`, but was: TimeInterval(TimeStamp(10ms),Some(TimeStamp(0ms))))"""
+      )
+    }
+  }
+
+  it should "call GET /blockflow/blocks-with-events" in {
+    Get(blocksWithEvents(0, 1)) check { response =>
+      response.code is StatusCode.Ok
+      response.as[BlocksAndEventsPerTimeStampRange] is
+        BlocksAndEventsPerTimeStampRange(
+          AVector(AVector(BlockAndEvents(dummyBlockEntry, AVector.empty)))
+        )
+    }
+
+    Get(blocksWithEvents(10, 0)) check { response =>
       response.code is StatusCode.BadRequest
       response.as[ApiError.BadRequest] is ApiError.BadRequest(
         """Invalid value (expected value to pass validation: `fromTs` must be before `toTs`, but was: TimeInterval(TimeStamp(10ms),Some(TimeStamp(0ms))))"""
@@ -78,15 +95,29 @@ abstract class RestServerSpec(
       Get(s"/blockflow/blocks/${dummyBlockHeader.hash.toHexString}", server.port) check {
         response =>
           val chainIndex = ChainIndex.from(dummyBlockHeader.hash)
-          if (
-            server.brokerConfig
-              .contains(chainIndex.from) || server.brokerConfig.contains(chainIndex.to)
-          ) {
+          if (chainIndex.relateTo(server.brokerConfig)) {
             response.code is StatusCode.Ok
             response.as[BlockEntry] is dummyBlockEntry
           } else {
             response.code is StatusCode.BadRequest
           }
+      }
+    }
+  }
+
+  it should "call GET /blockflow/blocks-with-events/<hash>" in {
+    servers.foreach { server =>
+      Get(
+        s"/blockflow/blocks-with-events/${dummyBlockHeader.hash.toHexString}",
+        server.port
+      ) check { response =>
+        val chainIndex = ChainIndex.from(dummyBlockHeader.hash)
+        if (chainIndex.relateTo(server.brokerConfig)) {
+          response.code is StatusCode.Ok
+          response.as[BlockAndEvents].block is dummyBlockEntry
+        } else {
+          response.code is StatusCode.BadRequest
+        }
       }
     }
   }
@@ -1237,7 +1268,11 @@ trait RestServerFixture
   }
 
   def blockflowFromTo(from: Long, to: Long): String = {
-    s"/blockflow?fromTs=$from&toTs=$to"
+    s"/blockflow/blocks?fromTs=$from&toTs=$to"
+  }
+
+  def blocksWithEvents(from: Long, to: Long): String = {
+    s"/blockflow/blocks-with-events?fromTs=$from&toTs=$to"
   }
 
   private def buildServers(nb: Int) = {

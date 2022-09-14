@@ -60,7 +60,7 @@ trait ServerFixture
   lazy val dummyBlockHeader =
     blockGen.sample.get.header.copy(timestamp = (TimeStamp.now() - Duration.ofMinutes(5).get).get)
   lazy val dummyBlock = blockGen.sample.get.copy(header = dummyBlockHeader)
-  lazy val dummyFetchResponse = FetchResponse(
+  lazy val dummyFetchResponse = BlocksPerTimeStampRange(
     AVector(AVector(BlockEntry.from(dummyBlock, 1)))
   )
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo

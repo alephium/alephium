@@ -18,4 +18,4 @@ package org.alephium.api.model
 
 import org.alephium.util.AVector
 
-final case class FetchResponse(blocks: AVector[AVector[BlockEntry]])
+final case class BlockAndEvents(block: BlockEntry, events: AVector[ContractEventByBlockHash])

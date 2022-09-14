@@ -153,13 +153,13 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
       val toTs = TimeStamp.now()
       eventually {
         val blockflow1 = selfClique1.nodes.flatMap { peer =>
-          request[FetchResponse](
+          request[BlocksPerTimeStampRange](
             blockflowFetch(fromTs, toTs),
             peer.restPort
           ).blocks
         }
         val blockflow2 = selfClique2.nodes.flatMap { peer =>
-          request[FetchResponse](
+          request[BlocksPerTimeStampRange](
             blockflowFetch(fromTs, toTs),
             peer.restPort
           ).blocks

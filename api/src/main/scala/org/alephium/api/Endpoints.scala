@@ -202,11 +202,19 @@ trait Endpoints
       .out(jsonBody[HashRateResponse])
       .summary("Get average hashrate from `now - timespan(millis)` to `now`")
 
-  val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
+  val getBlocks: BaseEndpoint[TimeInterval, BlocksPerTimeStampRange] =
     blockflowEndpoint.get
+      .in("blocks")
       .in(timeIntervalQuery)
-      .out(jsonBody[FetchResponse])
+      .out(jsonBody[BlocksPerTimeStampRange])
       .summary("List blocks on the given time interval")
+
+  val getBlocksAndEvents: BaseEndpoint[TimeInterval, BlocksAndEventsPerTimeStampRange] =
+    blockflowEndpoint.get
+      .in("blocks-with-events")
+      .in(timeIntervalQuery)
+      .out(jsonBody[BlocksAndEventsPerTimeStampRange])
+      .summary("List blocks with events on the given time interval")
 
   val getBlock: BaseEndpoint[BlockHash, BlockEntry] =
     blockflowEndpoint.get
@@ -214,6 +222,13 @@ trait Endpoints
       .in(path[BlockHash]("block_hash"))
       .out(jsonBody[BlockEntry])
       .summary("Get a block with hash")
+
+  val getBlockAndEvents: BaseEndpoint[BlockHash, BlockAndEvents] =
+    blockflowEndpoint.get
+      .in("blocks-with-events")
+      .in(path[BlockHash]("block_hash"))
+      .out(jsonBody[BlockAndEvents])
+      .summary("Get a block and events with hash")
 
   val isBlockInMainChain: BaseEndpoint[BlockHash, Boolean] =
     blockflowEndpoint.get

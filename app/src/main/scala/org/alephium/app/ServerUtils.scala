@@ -62,11 +62,27 @@ class ServerUtils(implicit
     } yield blocks
   }
 
-  def getBlockflow(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[FetchResponse] = {
+  def getBlocks(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[BlocksPerTimeStampRange] = {
     getHeightedBlocks(blockFlow, timeInterval).map { heightedBlocks =>
-      FetchResponse(heightedBlocks.map(_._2.map { case (block, height) =>
+      BlocksPerTimeStampRange(heightedBlocks.map(_._2.map { case (block, height) =>
         BlockEntry.from(block, height)
       }))
+    }
+  }
+
+  def getBlocksAndEvents(
+      blockFlow: BlockFlow,
+      timeInterval: TimeInterval
+  ): Try[BlocksAndEventsPerTimeStampRange] = {
+    getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
+      heightedBlocks
+        .mapE(_._2.mapE { case (block, height) =>
+          val blockEntry = BlockEntry.from(block, height)
+          getEventsByBlockHash(blockFlow, blockEntry.hash).map(events =>
+            BlockAndEvents(blockEntry, events.events)
+          )
+        })
+        .map(BlocksAndEventsPerTimeStampRange)
     }
   }
 
@@ -365,18 +381,24 @@ class ServerUtils(implicit
     } yield count
   }
 
-  def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =
+  def getBlock(blockFlow: BlockFlow, hash: BlockHash): Try[BlockEntry] =
     for {
-      _ <- checkHashChainIndex(query.hash)
+      _ <- checkHashChainIndex(hash)
       block <- blockFlow
-        .getBlock(query.hash)
+        .getBlock(hash)
         .left
-        .map(_ => failed(s"Fail fetching block with header ${query.hash.toHexString}"))
+        .map(_ => failed(s"Fail fetching block with header ${hash.toHexString}"))
       height <- blockFlow
         .getHeight(block.header)
         .left
         .map(failedInIO)
     } yield BlockEntry.from(block, height)
+
+  def getBlockAndEvents(blockFlow: BlockFlow, hash: BlockHash): Try[BlockAndEvents] =
+    for {
+      block  <- getBlock(blockFlow, hash)
+      events <- getEventsByBlockHash(blockFlow, hash)
+    } yield BlockAndEvents(block, events.events)
 
   def isBlockInMainChain(blockFlow: BlockFlow, blockHash: BlockHash): Try[Boolean] = {
     for {
