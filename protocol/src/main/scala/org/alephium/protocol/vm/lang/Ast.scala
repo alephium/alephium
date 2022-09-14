@@ -940,7 +940,7 @@ object Ast {
     }
   }
 
-  sealed trait ContractWithState extends ContractT[StatefulContext] {
+  sealed trait ContractWithState extends ContractT[StatefulContext] with UniqueDef {
     def ident: TypeId
     def name: String = ident.name
     def inheritances: Seq[Inheritance]
@@ -1226,11 +1226,17 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def extendedContracts(): MultiContract = {
+      var txScriptDef: Seq[TxScript]           = Seq.empty
+      var contractDef: Seq[Contract]           = Seq.empty
+      var interfaceDef: Seq[ContractInterface] = Seq.empty
+
       val parentsCache = buildDependencies()
       val newContracts: Seq[ContractWithState] = contracts.map {
         case script: TxScript =>
+          txScriptDef = txScriptDef :+ script
           script
         case c: Contract =>
+          contractDef = contractDef :+ c
           val (funcs, events, constantVars, enums) = MultiContract.extractDefs(parentsCache, c)
           Contract(
             c.isAbstract,
@@ -1244,9 +1250,13 @@ object Ast {
             c.inheritances
           )
         case i: ContractInterface =>
+          interfaceDef = interfaceDef :+ i
           val (funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
           ContractInterface(i.ident, funcs, events, i.inheritances)
       }
+      UniqueDef.checkDuplicates(txScriptDef, "TxScript")
+      UniqueDef.checkDuplicates(contractDef, "Contract")
+      UniqueDef.checkDuplicates(interfaceDef, "Interface")
       val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
       MultiContract(newContracts, Some(dependencies))
     }
