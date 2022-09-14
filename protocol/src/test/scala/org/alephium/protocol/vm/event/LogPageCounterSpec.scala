@@ -47,5 +47,11 @@ class LogPageCounterSpec extends AlephiumSpec with Fixture {
     stagingCounter.getInitialCount(key1)
     cachedCounter.initialCounts(key0) is 0
     cachedCounter.initialCounts(key1) is 0
+    cachedCounter.getInitialCount(key0).rightValue is 0
+    stagingCounter.getInitialCount(key1).rightValue is 0
+
+    cachedCounter.counter.put(key0, 1) isE ()
+    cachedCounter.initialCounts(key0) is 0
+    cachedCounter.getInitialCount(key0).rightValue is 0
   }
 }

@@ -16,8 +16,6 @@
 
 package org.alephium.protocol.vm.event
 
-import scala.collection.mutable
-
 import org.alephium.crypto.Byte32
 import org.alephium.io.{CachedKVStorage, IOResult}
 import org.alephium.protocol.model.ContractId
@@ -28,7 +26,6 @@ final class CachedLog(
     val eventLog: CachedKVStorage[LogStatesId, LogStates],
     val eventLogByHash: CachedKVStorage[Byte32, AVector[LogStateRef]],
     val eventLogPageCounter: CachedLogPageCounter[ContractId],
-    val initialCounts: mutable.Map[ContractId, Int],
     logStorage: LogStorage
 ) extends MutableLog {
   def persist(): IOResult[LogStorage] = {
@@ -54,7 +51,6 @@ object CachedLog {
       CachedKVStorage.from(logStorage.logState),
       CachedKVStorage.from(logStorage.logRefState),
       CachedLogPageCounter.from(logStorage.logCounterState),
-      mutable.HashMap.empty,
       logStorage
     )
   }
