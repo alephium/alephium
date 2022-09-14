@@ -76,10 +76,8 @@ abstract class RestServerSpec(
   it should "call GET /blockflow/blocks-with-events" in {
     Get(blocksWithEvents(0, 1)) check { response =>
       response.code is StatusCode.Ok
-      response.as[BlocksAndEventsPerTimeStampRange] is
-        BlocksAndEventsPerTimeStampRange(
-          AVector(AVector(BlockAndEvents(dummyBlockEntry, AVector.empty)))
-        )
+      response.as[BlocksAndEventsPerTimeStampRange].blocksAndEvents.map(_.map(_.block)) is
+        dummyFetchResponse.blocks
     }
 
     Get(blocksWithEvents(10, 0)) check { response =>

@@ -180,6 +180,13 @@ trait EndpointsExamples extends ErrorExamples {
     hash.bytes
   )
 
+  private val eventByBlockHash = ContractEventByBlockHash(
+    txId,
+    Address.contract(contractId),
+    eventIndex = 1,
+    fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
+  )
+
   private val blockAndEvents = BlockAndEvents(blockEntry, AVector(eventByBlockHash))
 
   private val blockCandidate = BlockCandidate(
@@ -213,13 +220,6 @@ trait EndpointsExamples extends ErrorExamples {
 
   private val eventByTxId = ContractEventByTxId(
     blockHash,
-    Address.contract(contractId),
-    eventIndex = 1,
-    fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
-  )
-
-  private val eventByBlockHash = ContractEventByBlockHash(
-    txId,
     Address.contract(contractId),
     eventIndex = 1,
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
