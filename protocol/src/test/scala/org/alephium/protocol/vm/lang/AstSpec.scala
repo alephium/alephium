@@ -378,117 +378,35 @@ class AstSpec extends AlephiumSpec {
     contracts.foreach(_._3.isEmpty is true)
   }
 
-  it should "check Contract duplicate" in {
-    val code =
-      s"""
-         |Contract A() {
-         |  pub fn a() -> () {}
-         |}
-         |
-         |Contract A() {
-         |  pub fn a1() -> () {}
-         |}
-         |
-         |""".stripMargin
-    val error = Compiler.compileProject(code).leftValue
-    error.message is "These Contract are defined multiple times: A"
+  behavior of "Compiler"
 
-    val code1 =
-      s"""
-         |Abstract Contract Foo() {
-         |  fn foo0() -> U256 {
-         |    return 0
-         |  }
-         |
-         |  fn foo1() -> () {
-         |    let _ = foo0()
-         |  }
-         |}
-         |
-         |Contract Bar() extends Foo() {
-         |  pub fn bar() -> () { foo1() }
-         |}
-         |
-         |Contract Bar() extends Foo() {
-         |  pub fn baz() -> () { foo1() }
-         |}
-         |
-         |Contract Bar1() extends Foo() {
-         |  pub fn baz() -> () { foo1() }
-         |}
-         |
-         |Contract Bar1() extends Foo() {
-         |  pub fn baz1() -> () { foo1() }
-         |}
-         |
-         |Contract A() {
-         |  pub fn a() -> () {}
-         |}
-         |
-         |Contract A() {
-         |  pub fn a1() -> () {}
-         |}
-         |
-         |""".stripMargin
-    val error1 = Compiler.compileProject(code1).leftValue
-    error1.message is "These Contract are defined multiple times: A, Bar1, Bar"
-  }
-
-  it should "check Interface duplicate" in {
-    val code =
-      s"""
-         |Interface Base {
-         |  pub fn base() -> ()
-         |}
-         |
-         |Interface Base {
-         |  pub fn base1() -> ()
-         |}
-         |
-         |Contract Foo() implements Base {
-         |  pub fn base() -> () {
-         |    checkCaller!(true, 0)
-         |  }
-         |}
-         |Abstract Contract A() implements Base {
-         |  fn a() -> () {
-         |    checkCaller!(true, 0)
-         |  }
-         |}
-         |Contract Bar() extends A() {
-         |  pub fn base() -> () {
-         |    a()
-         |  }
-         |}
-         |Contract Baz() implements Base {
-         |  pub fn base() -> () {}
-         |}
-         |""".stripMargin
+  it should "check unique TxScript/Contract/Interface name" in {
+    val code = s"""
+                  |Abstract Contract Foo() {
+                  |  fn foo() -> () {}
+                  |}
+                  |
+                  |Contract Bar() extends Foo() {
+                  |  fn foo() -> () {}
+                  |}
+                  |
+                  |Contract Bar() extends Foo() {
+                  |  fn bar() -> () {}
+                  |}
+                  |
+                  |Interface Foo {
+                  |  fn foo() -> ()
+                  |}
+                  |
+                  |Interface Main {
+                  |  fn foo() -> ()
+                  |}
+                  |
+                  |TxScript Main {
+                  |  return
+                  |}
+                  |""".stripMargin
     val error = Compiler.compileProject(code).leftValue
-    error.message is "These Interface are defined multiple times: Base"
-  }
-
-  it should "check TxScript duplicate" in {
-    val code =
-      s"""
-         |Interface Base {
-         |  pub fn base() -> ()
-         |}
-         |
-         |Interface Base {
-         |  pub fn base1() -> ()
-         |}
-         |
-         |@using(preapprovedAssets = false)
-         |TxScript Main {
-         |  return
-         |}
-         |
-         |TxScript Main {
-         |  return
-         |}
-         |""".stripMargin
-    val error = Compiler.compileProject(code).leftValue
-    error.message is "These TxScript are defined multiple times: Main"
+    error.message is "These TxScript/Contract/Interface are defined multiple times: Bar, Foo, Main"
   }
 }
