@@ -377,4 +377,36 @@ class AstSpec extends AlephiumSpec {
     contracts.length is 2
     contracts.foreach(_._3.isEmpty is true)
   }
+
+  behavior of "Compiler"
+
+  it should "check unique TxScript/Contract/Interface name" in {
+    val code = s"""
+                  |Abstract Contract Foo() {
+                  |  fn foo() -> () {}
+                  |}
+                  |
+                  |Contract Bar() extends Foo() {
+                  |  fn foo() -> () {}
+                  |}
+                  |
+                  |Contract Bar() extends Foo() {
+                  |  fn bar() -> () {}
+                  |}
+                  |
+                  |Interface Foo {
+                  |  fn foo() -> ()
+                  |}
+                  |
+                  |Interface Main {
+                  |  fn foo() -> ()
+                  |}
+                  |
+                  |TxScript Main {
+                  |  return
+                  |}
+                  |""".stripMargin
+    val error = Compiler.compileProject(code).leftValue
+    error.message is "These TxScript/Contract/Interface are defined multiple times: Bar, Foo, Main"
+  }
 }
