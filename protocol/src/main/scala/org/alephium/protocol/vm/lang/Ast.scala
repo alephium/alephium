@@ -469,7 +469,7 @@ object Ast {
     }
   }
 
-  sealed trait UniqueDef {
+  trait UniqueDef {
     def name: String
   }
 
@@ -868,11 +868,13 @@ object Ast {
       exprs.flatMap(_.genCode(state)) :+ Return
   }
 
-  trait ContractT[Ctx <: StatelessContext] {
+  trait ContractT[Ctx <: StatelessContext] extends UniqueDef {
     def ident: TypeId
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
     def funcs: Seq[FuncDef[Ctx]]
+
+    def name: String = ident.name
 
     def builtInContractFuncs(): Seq[Compiler.ContractFunc[Ctx]]
 
@@ -941,8 +943,6 @@ object Ast {
   }
 
   sealed trait ContractWithState extends ContractT[StatefulContext] {
-    def ident: TypeId
-    def name: String = ident.name
     def inheritances: Seq[Inheritance]
 
     def templateVars: Seq[Argument]
@@ -1226,6 +1226,8 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def extendedContracts(): MultiContract = {
+      UniqueDef.checkDuplicates(contracts, "TxScript/Contract/Interface")
+
       val parentsCache = buildDependencies()
       val newContracts: Seq[ContractWithState] = contracts.map {
         case script: TxScript =>
