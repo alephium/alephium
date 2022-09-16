@@ -171,11 +171,9 @@ object WalletSetting {
 
 final case class NodeSetting(
     dbSyncWrite: Boolean,
-    eventLog: Option[LogConfig]
+    eventLog: LogConfig
 ) {
-  lazy val logConfig: LogConfig = {
-    eventLog.getOrElse(LogConfig.disabled())
-  }
+  def eventLogConfig: LogConfig = eventLog
 }
 
 final case class Allocation(

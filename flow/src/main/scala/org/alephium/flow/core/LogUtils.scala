@@ -19,19 +19,21 @@ package org.alephium.flow.core
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
+import org.alephium.crypto.Byte32
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{BlockHash, ChainIndex}
+import org.alephium.protocol.model.{BlockHash, ContractId}
 import org.alephium.protocol.vm.{LogState, LogStateRef, LogStates, LogStatesId}
 import org.alephium.util.AVector
 
 trait LogUtils { Self: FlowUtils =>
 
+  // end is exclusive
   def getEvents(
-      eventKey: Hash,
+      contractId: ContractId,
       start: Int,
       end: Int
   ): IOResult[(Int, AVector[LogStates])] = {
+    assume(start < end)
     val allLogStates: ArrayBuffer[LogStates] = ArrayBuffer.empty
     var nextCount                            = start
 
@@ -39,15 +41,14 @@ trait LogUtils { Self: FlowUtils =>
     def rec(
         logStatesId: LogStatesId
     ): IOResult[Unit] = {
-      logStorage.getOpt(logStatesId) match {
+      logStorage.logState.getOpt(logStatesId) match {
         case Right(Some(logStates)) =>
-          assume(logStates.states.nonEmpty)
+          allLogStates += logStates
           nextCount = logStatesId.counter + 1
-          if (end < nextCount) {
-            Right(())
+          if (nextCount < end) {
+            rec(LogStatesId(contractId, nextCount))
           } else {
-            allLogStates += logStates
-            rec(LogStatesId(eventKey, nextCount))
+            Right(())
           }
         case Right(None) =>
           Right(())
@@ -56,30 +57,29 @@ trait LogUtils { Self: FlowUtils =>
       }
     }
 
-    rec(LogStatesId(eventKey, nextCount)).map(_ => (nextCount, AVector.from(allLogStates)))
+    rec(LogStatesId(contractId, nextCount)).map(_ => (nextCount, AVector.from(allLogStates)))
   }
 
-  def getEventByRef(
-      ref: LogStateRef
-  ): IOResult[(BlockHash, LogStateRef, LogState)] = {
-    logStorage.getOpt(ref.id) match {
-      case Right(Some(logStates)) =>
-        logStates.states
-          .get(ref.offset)
-          .map(state => (logStates.blockHash, ref, state))
-          .toRight(IOError.Other(new Throwable(s"Invalid state ref: $ref")))
-      case Right(None) => Left(IOError.keyNotFound(ref.id, "LogUtils.getEventByRef"))
-      case Left(error) => Left(error)
+  // TODO: optimize this by caching contract events
+  def getEventsByHash(hash: Byte32): IOResult[AVector[(BlockHash, LogStateRef, LogState)]] = {
+    logStorage.logRefState.getOpt(hash) flatMap {
+      case Some(logRefs) => logRefs.mapE(getEventByRef)
+      case None          => Right(AVector.empty)
     }
   }
 
-  def getEventsCurrentCount(
-      chainIndex: ChainIndex,
-      eventKey: Hash
-  ): IOResult[Option[Int]] = {
-    for {
-      worldState <- blockFlow.getBestPersistedWorldState(chainIndex.from)
-      count      <- worldState.logCounterState.getOpt(eventKey)
-    } yield count
+  private def getEventByRef(ref: LogStateRef): IOResult[(BlockHash, LogStateRef, LogState)] = {
+    logStorage.logState.getOpt(ref.id) flatMap {
+      case Some(logStates) =>
+        logStates.states
+          .get(ref.offset)
+          .map(state => (logStates.blockHash, ref, state))
+          .toRight(IOError.Other(new Throwable(s"Invalid log ref: $ref")))
+      case None => Left(IOError.keyNotFound(ref.id, "LogUtils.getEventByRef"))
+    }
+  }
+
+  def getEventsCurrentCount(contractId: ContractId): IOResult[Option[Int]] = {
+    logStorage.logCounterState.getOpt(contractId)
   }
 }

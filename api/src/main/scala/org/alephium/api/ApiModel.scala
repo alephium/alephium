@@ -178,7 +178,9 @@ trait ApiModelCodec {
 
   implicit val hashrateResponseRW: RW[HashRateResponse] = macroRW
 
-  implicit val fetchResponseRW: RW[FetchResponse] = macroRW
+  implicit val blocksPerTimeStampRangeRW: RW[BlocksPerTimeStampRange] = macroRW
+
+  implicit val blocksAndEventsPerTimeStampRangeRW: RW[BlocksAndEventsPerTimeStampRange] = macroRW
 
   implicit val unconfirmedTransactionsRW: RW[UnconfirmedTransactions] = macroRW
 
@@ -210,6 +212,8 @@ trait ApiModelCodec {
   implicit val exportFileRW: RW[ExportFile] = macroRW
 
   implicit val blockEntryRW: RW[BlockEntry] = macroRW
+
+  implicit val blockAndEventsRW: RW[BlockAndEvents] = macroRW
 
   implicit val blockHeaderEntryRW: RW[BlockHeaderEntry] = macroRW
 
@@ -418,10 +422,12 @@ trait ApiModelCodec {
     }
   }
 
-  implicit val contractEventRW: RW[ContractEvent]             = macroRW
-  implicit val eventsRW: RW[ContractEvents]                   = macroRW
-  implicit val contractEventByTxIdRW: RW[ContractEventByTxId] = macroRW
-  implicit val eventsByTxIdRW: RW[ContractEventsByTxId]       = macroRW
+  implicit val contractEventRW: RW[ContractEvent]                       = macroRW
+  implicit val eventsRW: RW[ContractEvents]                             = macroRW
+  implicit val contractEventByTxIdRW: RW[ContractEventByTxId]           = macroRW
+  implicit val eventsByTxIdRW: RW[ContractEventsByTxId]                 = macroRW
+  implicit val contractEventByBlockHashRW: RW[ContractEventByBlockHash] = macroRW
+  implicit val eventsByBlockHashRW: RW[ContractEventsByBlockHash]       = macroRW
 
   private def bytesWriter[T <: RandomBytes]: Writer[T] =
     StringWriter.comap[T](_.toHexString)

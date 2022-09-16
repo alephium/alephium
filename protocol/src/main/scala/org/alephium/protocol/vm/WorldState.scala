@@ -21,6 +21,7 @@ import akka.util.ByteString
 import org.alephium.io._
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.event.{CachedLog, LogStorage, MutableLog, StagingLog}
 import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
 
@@ -238,8 +239,7 @@ object WorldState {
       outputState: SparseMerkleTrie[TxOutputRef, TxOutput],
       contractState: SparseMerkleTrie[ContractId, ContractState],
       codeState: SparseMerkleTrie[Hash, CodeRecord],
-      logState: KeyValueStorage[LogStatesId, LogStates],
-      logCounterState: KeyValueStorage[Hash, Int]
+      logStorage: LogStorage
   ) extends ImmutableWorldState {
     def getAssetOutputs(
         outputRefPrefix: ByteString,
@@ -276,7 +276,7 @@ object WorldState {
     def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Persisted] = {
       outputState
         .put(outputRef, output)
-        .map(Persisted(_, contractState, codeState, logState, logCounterState))
+        .map(Persisted(_, contractState, codeState, logStorage))
     }
 
     private[WorldState] def putOutput(
@@ -285,7 +285,7 @@ object WorldState {
     ): IOResult[Persisted] = {
       outputState
         .put(outputRef, output)
-        .map(Persisted(_, contractState, codeState, logState, logCounterState))
+        .map(Persisted(_, contractState, codeState, logStorage))
     }
 
     def createContractUnsafe(
@@ -301,13 +301,13 @@ object WorldState {
         newContractState <- contractState.put(contractId, state)
         recordOpt        <- codeState.getOpt(code.hash)
         newCodeState     <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
-      } yield Persisted(newOutputState, newContractState, newCodeState, logState, logCounterState)
+      } yield Persisted(newOutputState, newContractState, newCodeState, logStorage)
     }
 
     def updateContract(key: ContractId, state: ContractState): IOResult[Persisted] = {
       contractState
         .put(key, state)
-        .map(Persisted(outputState, _, codeState, logState, logCounterState))
+        .map(Persisted(outputState, _, codeState, logStorage))
     }
 
     def updateContract(
@@ -319,13 +319,13 @@ object WorldState {
         state            <- getContractState(key)
         newOutputState   <- outputState.put(outputRef, output)
         newContractState <- contractState.put(key, state.updateOutputRef(outputRef))
-      } yield Persisted(newOutputState, newContractState, codeState, logState, logCounterState)
+      } yield Persisted(newOutputState, newContractState, codeState, logStorage)
     }
 
     def removeAsset(outputRef: TxOutputRef): IOResult[Persisted] = {
       outputState
         .remove(outputRef)
-        .map(Persisted(_, contractState, codeState, logState, logCounterState))
+        .map(Persisted(_, contractState, codeState, logStorage))
     }
 
     def removeContract(contractKey: ContractId): IOResult[Persisted] = {
@@ -335,23 +335,21 @@ object WorldState {
         newContractState <- contractState.remove(contractKey)
         codeRecord       <- codeState.get(state.codeHash)
         newCodeState     <- removeContractCode(state, codeRecord)
-      } yield Persisted(newOutputState, newContractState, newCodeState, logState, logCounterState)
+      } yield Persisted(newOutputState, newContractState, newCodeState, logStorage)
     }
 
     def persist(): IOResult[WorldState.Persisted] = Right(this)
 
     def cached(): WorldState.Cached = {
-      val outputStateCache     = CachedSMT.from(outputState)
-      val contractOutputCache  = CachedSMT.from(contractState)
-      val codeStateCache       = CachedSMT.from(codeState)
-      val logStatesCache       = CachedLogStates.from(logState)
-      val logCounterStateCache = CachedLogCounterState.from(logCounterState)
+      val outputStateCache    = CachedSMT.from(outputState)
+      val contractOutputCache = CachedSMT.from(contractState)
+      val codeStateCache      = CachedSMT.from(codeState)
+      val logStatesCache      = CachedLog.from(logStorage)
       Cached(
         outputStateCache,
         contractOutputCache,
         codeStateCache,
-        logStatesCache,
-        logCounterStateCache
+        logStatesCache
       )
     }
 
@@ -363,8 +361,7 @@ object WorldState {
     def outputState: MutableKV[TxOutputRef, TxOutput, Unit]
     def contractState: MutableKV[ContractId, ContractState, Unit]
     def codeState: MutableKV[Hash, CodeRecord, Unit]
-    def logState: MutableKV[LogStatesId, LogStates, Unit]
-    def logCounterState: MutableKV[Hash, Int, Unit] with MutableKV.WithInitialValue[Hash, Int, Unit]
+    def logState: MutableLog
 
     def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[Unit] = {
       outputState.put(outputRef, output)
@@ -441,91 +438,25 @@ object WorldState {
         maxOutputs: Int,
         predicate: (TxOutputRef, TxOutput) => Boolean
     ): IOResult[AVector[(AssetOutputRef, AssetOutput)]] = ???
-
-    def writeLogForContract(
-        blockHash: BlockHash,
-        txId: TransactionId,
-        contractId: ContractId,
-        fields: AVector[Val],
-        indexByTxId: Boolean
-    ): IOResult[Unit] = {
-      getIndex(fields) match {
-        case Some(index) =>
-          val state = LogState(txId, index, fields.tail)
-          writeLog(blockHash, contractId.value, state).flatMap { case (id, offset) =>
-            if (indexByTxId) {
-              writeLogIndexByTxId(blockHash, txId, id, offset)
-            } else {
-              Right(())
-            }
-          }
-        case None => Right(())
-      }
-    }
-
-    private[WorldState] def writeLog(
-        blockHash: BlockHash,
-        eventKey: Hash,
-        state: LogState
-    ): IOResult[(LogStatesId, Int)] = {
-      for {
-        initialCount <- logCounterState.getInitialValue(eventKey).map(_.getOrElse(0))
-        id = LogStatesId(eventKey, initialCount)
-        logStatesOpt <- logState.getOpt(id)
-        _ <- logStatesOpt match {
-          case Some(logStates) =>
-            logState.put(id, logStates.copy(states = logStates.states :+ state))
-          case None =>
-            logState.put(id, LogStates(blockHash, eventKey, AVector(state)))
-        }
-        _ <- logCounterState.put(
-          eventKey,
-          initialCount + 1
-        ) // TODO: optimize this since initialCount is the same for the same block
-      } yield (id, logStatesOpt.map(_.states.length).getOrElse(0))
-    }
-
-    private[WorldState] def writeLogIndexByTxId(
-        blockHash: BlockHash,
-        txId: TransactionId,
-        id: LogStatesId,
-        offset: Int
-    ): IOResult[Unit] = {
-      val logRef = LogStateRef(id, offset)
-      val state  = LogState(txId, eventRefIndex, logRef.toFields)
-      writeLog(blockHash, txId.value, state).map(_ => ())
-    }
-
-    private[WorldState] def getIndex(
-        fields: AVector[Val]
-    ): Option[Byte] = {
-      fields.headOption.flatMap {
-        case Val.I256(i) => i.toByte
-        case _           => None
-      }
-    }
   }
 
   final case class Cached(
       outputState: CachedSMT[TxOutputRef, TxOutput],
       contractState: CachedSMT[ContractId, ContractState],
       codeState: CachedSMT[Hash, CodeRecord],
-      logState: CachedLogStates,
-      logCounterState: CachedLogCounterState
+      logState: CachedLog
   ) extends AbstractCached {
     def persist(): IOResult[Persisted] = {
       for {
-        outputStateNew     <- outputState.persist()
-        contractStateNew   <- contractState.persist()
-        codeStateNew       <- codeState.persist()
-        logStateNew        <- logState.persist()
-        logCounterStateNew <- logCounterState.persist()
+        outputStateNew   <- outputState.persist()
+        contractStateNew <- contractState.persist()
+        codeStateNew     <- codeState.persist()
+        logStorage       <- logState.persist()
       } yield Persisted(
         outputStateNew,
         contractStateNew,
         codeStateNew,
-        logStateNew,
-        logCounterStateNew
+        logStorage
       )
     }
 
@@ -534,8 +465,7 @@ object WorldState {
         outputState.staging(),
         contractState.staging(),
         codeState.staging(),
-        logState.staging(),
-        logCounterState.staging()
+        logState.staging()
       )
   }
 
@@ -543,15 +473,13 @@ object WorldState {
       outputState: StagingSMT[TxOutputRef, TxOutput],
       contractState: StagingSMT[ContractId, ContractState],
       codeState: StagingSMT[Hash, CodeRecord],
-      logState: StagingLogStates,
-      logCounterState: StagingLogCounterState
+      logState: StagingLog
   ) extends AbstractCached {
     def commit(): Unit = {
       outputState.commit()
       contractState.commit()
       codeState.commit()
       logState.commit()
-      logCounterState.commit()
     }
 
     def rollback(): Unit = {
@@ -559,7 +487,6 @@ object WorldState {
       contractState.rollback()
       codeState.rollback()
       logState.rollback()
-      logCounterState.rollback()
     }
 
     def persist(): IOResult[Persisted] = ??? // should not be called
@@ -567,8 +494,7 @@ object WorldState {
 
   def emptyPersisted(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      logStorage: KeyValueStorage[LogStatesId, LogStates],
-      logCounterStorage: KeyValueStorage[Hash, Int]
+      logStorage: LogStorage
   ): Persisted = {
     val genesisRef  = ContractOutputRef.forSMT
     val emptyOutput = TxOutput.forSMT
@@ -579,36 +505,33 @@ object WorldState {
     val emptyCode         = CodeRecord(StatefulContract.forSMT, 0)
     val emptyContractTrie = SparseMerkleTrie.unsafe(trieStorage, ContractId.zero, emptyState)
     val emptyCodeTrie     = SparseMerkleTrie.unsafe(trieStorage, Hash.zero, emptyCode)
-    Persisted(emptyOutputTrie, emptyContractTrie, emptyCodeTrie, logStorage, logCounterStorage)
+    Persisted(emptyOutputTrie, emptyContractTrie, emptyCodeTrie, logStorage)
   }
 
   def emptyCached(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      logStorage: KeyValueStorage[LogStatesId, LogStates],
-      logCounterStorage: KeyValueStorage[Hash, Int]
+      logStorage: LogStorage
   ): Cached = {
-    emptyPersisted(trieStorage, logStorage, logCounterStorage).cached()
+    emptyPersisted(trieStorage, logStorage).cached()
   }
 
   final case class Hashes(outputStateHash: Hash, contractStateHash: Hash, codeStateHash: Hash) {
     def toPersistedWorldState(
         trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-        logStorage: KeyValueStorage[LogStatesId, LogStates],
-        logCounterStorage: KeyValueStorage[Hash, Int]
+        logStorage: LogStorage
     ): Persisted = {
       val outputState = SparseMerkleTrie[TxOutputRef, TxOutput](outputStateHash, trieStorage)
       val contractState =
         SparseMerkleTrie[ContractId, ContractState](contractStateHash, trieStorage)
       val codeState = SparseMerkleTrie[Hash, CodeRecord](codeStateHash, trieStorage)
-      Persisted(outputState, contractState, codeState, logStorage, logCounterStorage)
+      Persisted(outputState, contractState, codeState, logStorage)
     }
 
     def toCachedWorldState(
         trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-        logStorage: KeyValueStorage[LogStatesId, LogStates],
-        logCounterStorage: KeyValueStorage[Hash, Int]
+        logStorage: LogStorage
     ): Cached = {
-      toPersistedWorldState(trieStorage, logStorage, logCounterStorage).cached()
+      toPersistedWorldState(trieStorage, logStorage).cached()
     }
 
     def stateHash: Hash = Hash.hash(outputStateHash.bytes ++ contractStateHash.bytes)

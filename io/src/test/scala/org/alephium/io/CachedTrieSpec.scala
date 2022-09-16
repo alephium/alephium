@@ -136,6 +136,7 @@ class CachedTrieSpec extends AlephiumSpec {
     stagingSMT.caches(key0) is Updated(value1)
 
     stagingSMT.commit()
+    stagingSMT.caches.contains(key0) is false
     stagingSMT.underlying.caches(key0) is Inserted(value1)
   }
 
@@ -150,7 +151,41 @@ class CachedTrieSpec extends AlephiumSpec {
     stagingSMT.caches(key0) is a[Removed[_]]
 
     stagingSMT.commit()
+    stagingSMT.caches.contains(key0) is false
     stagingSMT.underlying.caches.contains(key0) is false
+  }
+
+  it should "test special case: update -> staging -> update" in new Fixture {
+    val (key0, value0) = generateKV()
+    val (_, value1)    = generateKV()
+    val (_, value2)    = generateKV()
+
+    val cachedSMT = CachedSMT.from(unCached.put(key0, value0).rightValue)
+    cachedSMT.put(key0, value1) isE ()
+    cachedSMT.caches(key0) is Updated(value1)
+
+    val stagingSMT = cachedSMT.staging()
+    stagingSMT.put(key0, value2) isE ()
+    stagingSMT.caches(key0) is Updated(value2)
+
+    stagingSMT.commit()
+    stagingSMT.underlying.caches(key0) is Updated(value2)
+  }
+
+  it should "test special case: update -> staging -> remove" in new Fixture {
+    val (key0, value0) = generateKV()
+    val (_, value1)    = generateKV()
+
+    val cachedSMT = CachedSMT.from(unCached.put(key0, value0).rightValue)
+    cachedSMT.put(key0, value1) isE ()
+    cachedSMT.caches(key0) is Updated(value1)
+
+    val stagingSMT = cachedSMT.staging()
+    stagingSMT.remove(key0) isE ()
+    stagingSMT.caches(key0) is a[Removed[_]]
+
+    stagingSMT.commit()
+    stagingSMT.underlying.caches(key0) is a[Removed[_]]
   }
 
   it should "test special case: remove -> staging -> insert" in new Fixture {
@@ -167,6 +202,17 @@ class CachedTrieSpec extends AlephiumSpec {
 
     stagingSMT.commit()
     stagingSMT.underlying.caches(key0) is Updated(value1)
+  }
+
+  it should "test special case: remove -> remove" in new Fixture {
+    val (key0, value0) = generateKV()
+
+    val cachedSMT = CachedSMT.from(unCached.put(key0, value0).rightValue)
+    cachedSMT.remove(key0) isE ()
+    cachedSMT.caches(key0) is a[Removed[_]]
+
+    cachedSMT.remove(key0).leftValue.toString() is
+      IOError.keyNotFound(key0, "CachedTrie.remove").toString()
   }
 }
 

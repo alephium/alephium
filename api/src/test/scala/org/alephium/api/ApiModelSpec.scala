@@ -120,16 +120,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     parseFail[Amount.Hint](""""1 alph"""")
   }
 
-  it should "encode/decode empty FetchResponse" in {
-    val response = FetchResponse(AVector.empty)
+  it should "encode/decode empty BlocksPerTimeStampRange" in {
+    val response = BlocksPerTimeStampRange(AVector.empty)
     val jsonRaw =
       """{"blocks":[]}"""
     checkData(response, jsonRaw)
   }
 
-  it should "encode/decode FetchResponse" in {
+  it should "encode/decode BlocksPerTimeStampRange" in {
     val entries  = AVector.tabulate(2)(entryDummy)
-    val response = FetchResponse(AVector(entries))
+    val response = BlocksPerTimeStampRange(AVector(entries))
     val jsonRaw =
       s"""{"blocks":[[${blockEntryJson(entries.head)},${blockEntryJson(entries.last)}]]}"""
     checkData(response, jsonRaw)

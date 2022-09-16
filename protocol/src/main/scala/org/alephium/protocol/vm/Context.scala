@@ -104,22 +104,29 @@ object TxEnv {
 final case class LogConfig(
     enabled: Boolean,
     indexByTxId: Boolean,
+    indexByBlockHash: Boolean,
     contractAddresses: Option[AVector[Address.Contract]]
 ) {
   def logContractEnabled(contractAddress: Address.Contract): Boolean = {
-    val allowAllContracts = contractAddresses.isEmpty
-    val allowThisContract = contractAddresses.exists(_.contains(contractAddress))
-    enabled && (allowAllContracts || allowThisContract)
+    enabled && {
+      contractAddresses.isEmpty ||                          // allow all contracts
+      contractAddresses.exists(_.contains(contractAddress)) // allow the contract
+    }
   }
 }
 
 object LogConfig {
   def disabled(): LogConfig = {
-    LogConfig(enabled = false, indexByTxId = false, contractAddresses = None)
+    LogConfig(
+      enabled = false,
+      indexByTxId = false,
+      indexByBlockHash = false,
+      contractAddresses = None
+    )
   }
 
   def allEnabled(): LogConfig = {
-    LogConfig(enabled = true, indexByTxId = true, contractAddresses = None)
+    LogConfig(enabled = true, indexByTxId = true, indexByBlockHash = true, contractAddresses = None)
   }
 }
 
@@ -341,7 +348,14 @@ trait StatefulContext extends StatelessContext with ContractPool {
     val result = (blockEnv.blockId, contractIdOpt) match {
       case (Some(blockId), Some(contractId))
           if logConfig.logContractEnabled(Address.contract(contractId)) =>
-        worldState.writeLogForContract(blockId, txId, contractId, fields, logConfig.indexByTxId)
+        worldState.logState.putLog(
+          blockId,
+          txId,
+          contractId,
+          fields,
+          logConfig.indexByTxId,
+          logConfig.indexByBlockHash
+        )
       case _ => Right(())
     }
 

@@ -223,8 +223,9 @@ class AlephiumConfigSpec extends AlephiumSpec {
       val address1 = address("109b05391a240a0d21671720f62fe39138aaca562676053900b348a51e11ba25")
       val address2 = address("1a21d30793fdf47bf07694017d0d721e94b78dffdc9c8e0b627833b66e5c75d8")
       val logConfig = LogConfig(
-        enabled = true,
-        indexByTxId = true,
+        enabled = false,
+        indexByTxId = false,
+        indexByBlockHash = false,
         contractAddresses = Some(AVector(address1, address2))
       )
 
@@ -232,8 +233,9 @@ class AlephiumConfigSpec extends AlephiumSpec {
         s"""
            |{
            |  event-log {
-           |    enabled = true
-           |    index-by-tx-id = true
+           |    enabled = false
+           |    index-by-tx-id = false
+           |    index-by-block-hash = false
            |    contract-addresses = [
            |      ${address1.toBase58}
            |      ${address2.toBase58}
@@ -256,6 +258,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
            |  event-log {
            |    enabled = true
            |    index-by-tx-id = true
+           |    index-by-block-hash = true
            |  }
            |}
            |""".stripMargin

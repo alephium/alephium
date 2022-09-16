@@ -22,6 +22,7 @@ import org.scalacheck.Gen
 import org.alephium.io.{IOResult, RocksDBSource, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.util.{AlephiumSpec, AVector, I256}
 
 class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with StorageFixture {
@@ -31,6 +32,14 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       assetOutputRef <- assetOutputRefGen(groupIndex)
       assetOutput    <- assetOutputGen(groupIndex)()
     } yield (assetOutputRef, assetOutput)
+  }
+
+  def newLogStorage(dbSource: RocksDBSource): LogStorage = {
+    LogStorage(
+      newDB(dbSource, RocksDBSource.ColumnFamily.Log),
+      newDB(dbSource, RocksDBSource.ColumnFamily.Log),
+      newDB(dbSource, RocksDBSource.ColumnFamily.LogCounter)
+    )
   }
 
   // scalastyle:off method.length
@@ -112,8 +121,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     test(
       WorldState.emptyCached(
         newDB(storage, RocksDBSource.ColumnFamily.All),
-        newDB(storage, RocksDBSource.ColumnFamily.Log),
-        newDB(storage, RocksDBSource.ColumnFamily.LogCounter)
+        newLogStorage(storage)
       )
     )
   }
@@ -123,8 +131,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     test(
       WorldState.emptyPersisted(
         newDB(storage, RocksDBSource.ColumnFamily.All),
-        newDB(storage, RocksDBSource.ColumnFamily.Log),
-        newDB(storage, RocksDBSource.ColumnFamily.LogCounter)
+        newLogStorage(storage)
       )
     )
   }
@@ -138,8 +145,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val worldState = WorldState
       .emptyCached(
         newDB(storage, RocksDBSource.ColumnFamily.All),
-        newDB(storage, RocksDBSource.ColumnFamily.Log),
-        newDB(storage, RocksDBSource.ColumnFamily.LogCounter)
+        newLogStorage(storage)
       )
       .staging()
 
@@ -147,15 +153,16 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val fields =
       AVector[Val](Val.I256(I256.from(0)), Val.I256(I256.from(1))) // the first field is event code
     val logStates = logInputs.map { case (blockHash, txId, contractId) =>
-      worldState.writeLogForContract(
+      worldState.logState.putLog(
         blockHash,
         txId,
         contractId,
         fields,
+        false,
         false
       )
 
-      LogStates(blockHash, contractId.value, AVector(LogState(txId, 0, fields.tail)))
+      LogStates(blockHash, contractId, AVector(LogState(txId, 0, fields.tail)))
     }
 
     val newLogs = worldState.logState.getNewLogs()
@@ -171,8 +178,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val storage = newDBStorage()
     val worldState = WorldState.emptyCached(
       newDB(storage, RocksDBSource.ColumnFamily.All),
-      newDB(storage, RocksDBSource.ColumnFamily.Log),
-      newDB(storage, RocksDBSource.ColumnFamily.LogCounter)
+      newLogStorage(storage)
     )
     val staging = worldState.staging()
 

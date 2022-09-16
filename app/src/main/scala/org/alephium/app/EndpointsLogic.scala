@@ -67,7 +67,7 @@ trait EndpointsLogic extends Endpoints {
   implicit lazy val groupConfig: GroupConfig         = brokerConfig
   implicit lazy val networkConfig: NetworkSetting    = node.config.network
   implicit lazy val consenseConfig: ConsensusSetting = node.config.consensus
-  implicit lazy val logConfig: LogConfig             = node.config.node.logConfig
+  implicit lazy val logConfig: LogConfig             = node.config.node.eventLogConfig
   implicit lazy val askTimeout: Timeout              = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
@@ -157,12 +157,20 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(result)
   }
 
-  val getBlockflowLogic = serverLogic(getBlockflow) { timeInterval =>
-    Future.successful(serverUtils.getBlockflow(blockFlow, timeInterval))
+  val getBlocksLogic = serverLogic(getBlocks) { timeInterval =>
+    Future.successful(serverUtils.getBlocks(blockFlow, timeInterval))
+  }
+
+  val getBlocksAndEventsLogic = serverLogic(getBlocksAndEvents) { timeInterval =>
+    Future.successful(serverUtils.getBlocksAndEvents(blockFlow, timeInterval))
   }
 
   val getBlockLogic = serverLogic(getBlock) { hash =>
-    Future.successful(serverUtils.getBlock(blockFlow, GetBlock(hash)))
+    Future.successful(serverUtils.getBlock(blockFlow, hash))
+  }
+
+  val getBlockAndEventsLogic = serverLogic(getBlockAndEvents) { hash =>
+    Future.successful(serverUtils.getBlockAndEvents(blockFlow, hash))
   }
 
   val isBlockInMainChainLogic = serverLogic(isBlockInMainChain) { hash =>
@@ -608,7 +616,7 @@ trait EndpointsLogic extends Endpoints {
           serverUtils.getEventsByContractId(
             blockFlow,
             counterRange.start,
-            counterRange.endOpt,
+            counterRange.limitOpt.getOrElse(CounterRange.MaxCounterRange),
             contractAddress.lockupScript.contractId
           )
         }
@@ -632,6 +640,19 @@ trait EndpointsLogic extends Endpoints {
     { case (txId, _) =>
       Future.successful {
         serverUtils.getEventsByTxId(blockFlow, txId)
+      }
+    },
+    {
+      case (_, groupIndexOpt) => {
+        getGroupIndex(groupIndexOpt)
+      }
+    }
+  )
+
+  val getEventsByBlockHashLogic = serverLogicRedirect(getEventsByBlockHash)(
+    { case (blockHash, _) =>
+      Future.successful {
+        serverUtils.getEventsByBlockHash(blockFlow, blockHash)
       }
     },
     {

@@ -18,34 +18,36 @@ package org.alephium.io
 
 import scala.collection.mutable
 
-import org.alephium.util.EitherF
-
-final class CachedSMT[K, V](
-    val underlying: SparseMerkleTrie[K, V],
-    val caches: mutable.Map[K, Cache[V]]
+final class CachedKVStorage[K, V](
+    val underlying: KeyValueStorage[K, V],
+    val caches: mutable.LinkedHashMap[K, Cache[V]]
 ) extends CachedKV[K, V, Cache[V]] {
   protected def getOptFromUnderlying(key: K): IOResult[Option[V]] = {
     CachedKV.getOptFromUnderlying(underlying, caches, key)
   }
 
-  def persist(): IOResult[SparseMerkleTrie[K, V]] = {
-    val inMemoryTrie = underlying.inMemory()
-    for {
-      _ <- EitherF.foreachTry(caches) {
-        case (_, Cached(_))         => Right(())
-        case (key, Updated(value))  => inMemoryTrie.put(key, value)
-        case (key, Inserted(value)) => inMemoryTrie.put(key, value)
-        case (key, Removed())       => inMemoryTrie.remove(key)
-      }
-      persisted <- inMemoryTrie.persistInBatch()
-    } yield persisted
+  def persist(): IOResult[Unit] = {
+    underlying.putBatch(CachedKVStorage.accumulateUpdates(_, caches))
   }
 
-  def staging(): StagingSMT[K, V] = new StagingSMT[K, V](this, mutable.Map.empty)
+  def staging(): StagingKVStorage[K, V] = new StagingKVStorage(this, mutable.LinkedHashMap.empty)
 }
 
-object CachedSMT {
-  def from[K, V](trie: SparseMerkleTrie[K, V]): CachedSMT[K, V] = {
-    new CachedSMT(trie, mutable.Map.empty)
+object CachedKVStorage {
+  def from[K, V](storage: KeyValueStorage[K, V]): CachedKVStorage[K, V] = {
+    new CachedKVStorage[K, V](storage, mutable.LinkedHashMap.empty)
+  }
+
+  @inline private[io] def accumulateUpdates[K, V](
+      putAccumulate: (K, V) => Unit,
+      caches: mutable.LinkedHashMap[K, Cache[V]]
+  ): Unit = {
+    caches.foreach {
+      case (_, Cached(_))         => Right(())
+      case (key, Updated(value))  => putAccumulate(key, value)
+      case (key, Inserted(value)) => putAccumulate(key, value)
+      case (_, Removed()) =>
+        throw new RuntimeException("Unexpected `Remove` action")
+    }
   }
 }

@@ -41,8 +41,10 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     discoveryAction,
     getHistoryHashRate,
     getCurrentHashRate,
-    getBlockflow,
+    getBlocks,
+    getBlocksAndEvents,
     getBlock,
+    getBlockAndEvents,
     isBlockInMainChain,
     getBalance,
     getUTXOs,
@@ -75,7 +77,8 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     minerUpdateAddresses,
     getContractEvents,
     getContractEventsCurrentCount,
-    getEventsByTxId
+    getEventsByTxId,
+    getEventsByBlockHash
   )
 
   private lazy val servers = List(

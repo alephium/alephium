@@ -26,7 +26,7 @@ import org.scalacheck.Gen
 
 import org.alephium.api.ApiModelCodec
 import org.alephium.api.model.{AssetOutput => _, ContractOutput => _, Transaction => _, _}
-import org.alephium.crypto.Blake2b
+import org.alephium.crypto.{Blake2b, Byte32}
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.core.BlockChain.TxIndex
@@ -60,7 +60,7 @@ trait ServerFixture
   lazy val dummyBlockHeader =
     blockGen.sample.get.header.copy(timestamp = (TimeStamp.now() - Duration.ofMinutes(5).get).get)
   lazy val dummyBlock = blockGen.sample.get.copy(header = dummyBlockHeader)
-  lazy val dummyFetchResponse = FetchResponse(
+  lazy val dummyFetchResponse = BlocksPerTimeStampRange(
     AVector(AVector(BlockEntry.from(dummyBlock, 1)))
   )
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
@@ -367,25 +367,29 @@ object ServerFixture {
     }
 
     override def getEvents(
-        eventKey: Hash,
+        contractId: ContractId,
         start: Int,
         end: Int
     ): IOResult[(Int, AVector[LogStates])] = {
       lazy val address1 = Address.fromBase58("16BCZkZzGb3QnycJQefDHqeZcTA5RhrwYUDsAYkCf7RhS").get
       lazy val address2 = Address.fromBase58("27gAhB8JB6UtE9tC3PwGRbXHiZJ9ApuCMoHqe1T4VzqFi").get
 
-      val eventKeysWithoutEvents: Seq[Hash] = Seq(
-        Blake2b.unsafe(hex"aab64e9c814749cea508857b23c7550da30b67216950c461ccac1a14a58661c3"),
-        Blake2b.unsafe(hex"e939f9c5d2ad12ea2375dcc5231f5f25db0a2ac8af426f547819e13559aa693e")
+      val eventKeysWithoutEvents: Seq[ContractId] = Seq(
+        ContractId.unsafe(
+          Blake2b.unsafe(hex"aab64e9c814749cea508857b23c7550da30b67216950c461ccac1a14a58661c3")
+        ),
+        ContractId.unsafe(
+          Blake2b.unsafe(hex"e939f9c5d2ad12ea2375dcc5231f5f25db0a2ac8af426f547819e13559aa693e")
+        )
       )
-      val isBlackListed           = eventKeysWithoutEvents.contains(eventKey)
+      val isBlackListed           = eventKeysWithoutEvents.contains(contractId)
       val blockChainIndex         = ChainIndex.from(block.hash, config.broker.groups)
       val chainOnCurrentNode      = brokerConfig.chainIndexes.contains(blockChainIndex)
       val shouldReturnEmptyEvents = !chainOnCurrentNode || isBlackListed
 
       val logStates = LogStates(
         block.hash,
-        eventKey,
+        contractId,
         states = AVector(
           LogState(
             txId = dummyTx.id,
@@ -406,10 +410,17 @@ object ServerFixture {
       }
     }
 
-    override def getEventsCurrentCount(
-        chainIndex: ChainIndex,
-        eventKey: Hash
-    ): IOResult[Option[Int]] = {
+    override def getEventsByHash(
+        hash: Byte32
+    ): IOResult[AVector[(BlockHash, LogStateRef, LogState)]] = {
+      getEvents(ContractId.unsafe(Hash.unsafe(hash.bytes)), 0, 1).map { case (_, states) =>
+        states.map(states =>
+          (states.blockHash, LogStateRef(LogStatesId(states.contractId, 0), 0), states.states.head)
+        )
+      }
+    }
+
+    override def getEventsCurrentCount(eventKey: ContractId): IOResult[Option[Int]] = {
       Right(Some(10))
     }
 

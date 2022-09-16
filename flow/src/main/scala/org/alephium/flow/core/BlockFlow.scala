@@ -131,7 +131,7 @@ object BlockFlow extends StrictLogging {
       config.network,
       config.consensus,
       config.mempool,
-      config.node.logConfig
+      config.node.eventLogConfig
     )
   }
 
@@ -141,7 +141,7 @@ object BlockFlow extends StrictLogging {
       config.network,
       config.consensus,
       config.mempool,
-      config.node.logConfig
+      config.node.eventLogConfig
     )
   }
 
@@ -168,7 +168,7 @@ object BlockFlow extends StrictLogging {
       config.network,
       config.consensus,
       config.mempool,
-      config.node.logConfig
+      config.node.eventLogConfig
     )
   }
 

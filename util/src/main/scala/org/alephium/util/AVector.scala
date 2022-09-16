@@ -39,7 +39,7 @@ final class AVector[@sp A](
     with IterableOnce[A] { self =>
   import HPC.cfor
 
-  final def capacity: Int = elems.length
+  def capacity: Int = elems.length
 
   @inline def length: Int = end - start
 

@@ -26,8 +26,11 @@ final case class ContractEvents(
 )
 
 final case class ContractEventsByTxId(
-    events: AVector[ContractEventByTxId],
-    nextStart: Int
+    events: AVector[ContractEventByTxId]
+)
+
+final case class ContractEventsByBlockHash(
+    events: AVector[ContractEventByBlockHash]
 )
 
 final case class ContractEvent(
@@ -55,7 +58,25 @@ object ContractEventByTxId {
   def from(blockHash: BlockHash, ref: LogStateRef, logState: LogState): ContractEventByTxId = {
     ContractEventByTxId(
       blockHash,
-      Address.contract(ContractId.unsafe(ref.id.eventKey)),
+      Address.contract(ref.id.contractId),
+      logState.index.toInt,
+      logState.fields.map(Val.from)
+    )
+  }
+}
+
+final case class ContractEventByBlockHash(
+    txId: TransactionId,
+    contractAddress: Address.Contract,
+    eventIndex: Int,
+    fields: AVector[Val]
+)
+
+object ContractEventByBlockHash {
+  def from(ref: LogStateRef, logState: LogState): ContractEventByBlockHash = {
+    ContractEventByBlockHash(
+      logState.txId,
+      Address.contract(ref.id.contractId),
       logState.index.toInt,
       logState.fields.map(Val.from)
     )

@@ -14,23 +14,27 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm
+package org.alephium.protocol.vm.event
 
 import org.alephium.crypto.Byte32
-import org.alephium.io.{RocksDBSource, SparseMerkleTrie, StorageFixture}
-import org.alephium.protocol.Hash
+import org.alephium.io.{RocksDBSource, StorageFixture}
 import org.alephium.protocol.model.ContractId
-import org.alephium.protocol.vm.event.LogStorage
+import org.alephium.protocol.vm.{LogStateRef, LogStates, LogStatesId}
 import org.alephium.util.AVector
 
-trait VMFactory extends StorageFixture {
-  lazy val cachedWorldState: WorldState.Cached = {
-    val storage      = newDBStorage()
-    val trieDb       = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.All)
+trait Fixture extends StorageFixture {
+  def newLogStorage(storage: RocksDBSource): LogStorage = {
     val logDb        = newDB[LogStatesId, LogStates](storage, RocksDBSource.ColumnFamily.Log)
     val logRefDb     = newDB[Byte32, AVector[LogStateRef]](storage, RocksDBSource.ColumnFamily.Log)
     val logCounterDb = newDB[ContractId, Int](storage, RocksDBSource.ColumnFamily.LogCounter)
-    val logStorage   = LogStorage(logDb, logRefDb, logCounterDb)
-    WorldState.emptyCached(trieDb, logStorage)
+    LogStorage(logDb, logRefDb, logCounterDb)
+  }
+
+  def newCachedLog(storage: RocksDBSource): CachedLog = {
+    CachedLog.from(newLogStorage(storage))
+  }
+
+  def newStagingLog(storage: RocksDBSource): StagingLog = {
+    CachedLog.from(newLogStorage(storage)).staging()
   }
 }

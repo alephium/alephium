@@ -25,6 +25,7 @@ import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, TransactionTemplate => _, _}
+import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
@@ -61,11 +62,27 @@ class ServerUtils(implicit
     } yield blocks
   }
 
-  def getBlockflow(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[FetchResponse] = {
+  def getBlocks(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[BlocksPerTimeStampRange] = {
     getHeightedBlocks(blockFlow, timeInterval).map { heightedBlocks =>
-      FetchResponse(heightedBlocks.map(_._2.map { case (block, height) =>
+      BlocksPerTimeStampRange(heightedBlocks.map(_._2.map { case (block, height) =>
         BlockEntry.from(block, height)
       }))
+    }
+  }
+
+  def getBlocksAndEvents(
+      blockFlow: BlockFlow,
+      timeInterval: TimeInterval
+  ): Try[BlocksAndEventsPerTimeStampRange] = {
+    getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
+      heightedBlocks
+        .mapE(_._2.mapE { case (block, height) =>
+          val blockEntry = BlockEntry.from(block, height)
+          getEventsByBlockHash(blockFlow, blockEntry.hash).map(events =>
+            BlockAndEvents(blockEntry, events.events)
+          )
+        })
+        .map(BlocksAndEventsPerTimeStampRange)
     }
   }
 
@@ -359,25 +376,29 @@ class ServerUtils(implicit
   ): Try[Int] = {
     val contractId = contractAddress.lockupScript.contractId
     for {
-      groupIndex <- blockFlow.getGroupForContract(contractId).left.map(failed)
-      chainIndex = ChainIndex(groupIndex, groupIndex)
-      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(chainIndex, contractId.value))
+      countOpt <- wrapResult(blockFlow.getEventsCurrentCount(contractId))
       count    <- countOpt.toRight(notFound(s"Current events count for contract $contractAddress"))
     } yield count
   }
 
-  def getBlock(blockFlow: BlockFlow, query: GetBlock): Try[BlockEntry] =
+  def getBlock(blockFlow: BlockFlow, hash: BlockHash): Try[BlockEntry] =
     for {
-      _ <- checkHashChainIndex(query.hash)
+      _ <- checkHashChainIndex(hash)
       block <- blockFlow
-        .getBlock(query.hash)
+        .getBlock(hash)
         .left
-        .map(_ => failed(s"Fail fetching block with header ${query.hash.toHexString}"))
+        .map(_ => failed(s"Fail fetching block with header ${hash.toHexString}"))
       height <- blockFlow
         .getHeight(block.header)
         .left
         .map(failedInIO)
     } yield BlockEntry.from(block, height)
+
+  def getBlockAndEvents(blockFlow: BlockFlow, hash: BlockHash): Try[BlockAndEvents] =
+    for {
+      block  <- getBlock(blockFlow, hash)
+      events <- getEventsByBlockHash(blockFlow, hash)
+    } yield BlockAndEvents(block, events.events)
 
   def isBlockInMainChain(blockFlow: BlockFlow, blockHash: BlockHash): Try[Boolean] = {
     for {
@@ -453,32 +474,21 @@ class ServerUtils(implicit
       txId: TransactionId
   ): Try[ContractEventsByTxId] = {
     wrapResult(
-      for {
-        result <- blockFlow.getEvents(txId.value, 0, CounterRange.MaxCounterRange)
-        (nextStart, logStatesVec) = result
-        events <- logStatesVec.flatMapE { logStates =>
-          logStates.states
-            .mapE { state =>
-              if (state.isRef) {
-                LogStateRef
-                  .fromFields(state.fields)
-                  .toRight(IOError.Other(new Throwable(s"Invalid state ref: ${state.fields}")))
-                  .flatMap(blockFlow.getEventByRef(_))
-                  .map(p => ContractEventByTxId.from(p._1, p._2, p._3))
-              } else {
-                Right(
-                  ContractEventByTxId(
-                    logStates.blockHash,
-                    Address.contract(ContractId.unsafe(logStates.eventKey)),
-                    state.index.toInt,
-                    state.fields.map(Val.from)
-                  )
-                )
-              }
-            }
-        }
-      } yield {
-        ContractEventsByTxId(events, nextStart)
+      blockFlow.getEventsByHash(Byte32.unsafe(txId.bytes)).map { logs =>
+        val events = logs.map(p => ContractEventByTxId.from(p._1, p._2, p._3))
+        ContractEventsByTxId(events)
+      }
+    )
+  }
+
+  def getEventsByBlockHash(
+      blockFlow: BlockFlow,
+      blockHash: BlockHash
+  ): Try[ContractEventsByBlockHash] = {
+    wrapResult(
+      blockFlow.getEventsByHash(Byte32.unsafe(blockHash.bytes)).map { logs =>
+        val events = logs.map(p => ContractEventByBlockHash.from(p._2, p._3))
+        ContractEventsByBlockHash(events)
       }
     )
   }
@@ -486,16 +496,12 @@ class ServerUtils(implicit
   def getEventsByContractId(
       blockFlow: BlockFlow,
       start: Int,
-      endOpt: Option[Int],
+      limit: Int,
       contractId: ContractId
   ): Try[ContractEvents] = {
     wrapResult(
       blockFlow
-        .getEvents(
-          contractId.value,
-          start,
-          endOpt.getOrElse(start + CounterRange.MaxCounterRange)
-        )
+        .getEvents(contractId, start, start + limit)
         .map {
           case (nextStart, logStatesVec) => {
             ContractEvents.from(logStatesVec, nextStart)
@@ -1006,24 +1012,18 @@ class ServerUtils(implicit
     }
   }
 
-  private def fetchContractEvents(
-      worldState: WorldState.Staging
-  ): AVector[ContractEventByTxId] = {
+  private def fetchContractEvents(worldState: WorldState.Staging): AVector[ContractEventByTxId] = {
     val allLogStates = worldState.logState.getNewLogs()
     allLogStates.flatMap(logStates =>
       logStates.states.flatMap(state =>
-        if (state.isRef) {
-          AVector.empty
-        } else {
-          AVector(
-            ContractEventByTxId(
-              logStates.blockHash,
-              Address.contract(ContractId.unsafe(logStates.eventKey)),
-              state.index.toInt,
-              state.fields.map(Val.from)
-            )
+        AVector(
+          ContractEventByTxId(
+            logStates.blockHash,
+            Address.contract(logStates.contractId),
+            state.index.toInt,
+            state.fields.map(Val.from)
           )
-        }
+        )
       )
     )
   }

@@ -18,7 +18,7 @@ package org.alephium.api.model
 
 import sttp.tapir.{ValidationResult, Validator}
 
-final case class CounterRange(start: Int, endOpt: Option[Int])
+final case class CounterRange(start: Int, limitOpt: Option[Int])
 
 object CounterRange {
   val MaxCounterRange: Int = 100
@@ -27,13 +27,13 @@ object CounterRange {
     if (counterRange.start < 0) {
       ValidationResult.Invalid(s"`start` must not be negative")
     } else {
-      counterRange.endOpt match {
-        case Some(end) =>
-          if (end <= counterRange.start) {
-            ValidationResult.Invalid(s"`end` must be larger than `start`")
-          } else if (end - counterRange.start > MaxCounterRange) {
+      counterRange.limitOpt match {
+        case Some(limit) =>
+          if (limit <= 0) {
+            ValidationResult.Invalid(s"`limit` must be larger than 0")
+          } else if (limit > MaxCounterRange) {
             ValidationResult.Invalid(
-              s"`end` must be smaller than ${counterRange.start + MaxCounterRange}"
+              s"`limit` must not be larger than ${MaxCounterRange}"
             )
           } else {
             ValidationResult.Valid

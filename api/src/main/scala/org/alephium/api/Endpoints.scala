@@ -57,9 +57,9 @@ trait Endpoints
 
   private val counterQuery: EndpointInput[CounterRange] =
     query[Int]("start")
-      .and(query[Option[Int]]("end"))
-      .map { case (start, endOpt) => CounterRange(start, endOpt) }(counterQuery =>
-        (counterQuery.start, counterQuery.endOpt)
+      .and(query[Option[Int]]("limit"))
+      .map { case (start, limitOpt) => CounterRange(start, limitOpt) }(counterQuery =>
+        (counterQuery.start, counterQuery.limitOpt)
       )
       .validate(CounterRange.validator)
 
@@ -121,10 +121,6 @@ trait Endpoints
   private val contractEventsEndpoint: BaseEndpoint[Unit, Unit] =
     eventsEndpoint
       .in("contract")
-
-  private val eventsByTxIdEndpoint: BaseEndpoint[Unit, Unit] =
-    eventsEndpoint
-      .in("tx-id")
 
   val getNodeInfo: BaseEndpoint[Unit, NodeInfo] =
     infosEndpoint.get
@@ -206,11 +202,19 @@ trait Endpoints
       .out(jsonBody[HashRateResponse])
       .summary("Get average hashrate from `now - timespan(millis)` to `now`")
 
-  val getBlockflow: BaseEndpoint[TimeInterval, FetchResponse] =
+  val getBlocks: BaseEndpoint[TimeInterval, BlocksPerTimeStampRange] =
     blockflowEndpoint.get
+      .in("blocks")
       .in(timeIntervalQuery)
-      .out(jsonBody[FetchResponse])
+      .out(jsonBody[BlocksPerTimeStampRange])
       .summary("List blocks on the given time interval")
+
+  val getBlocksAndEvents: BaseEndpoint[TimeInterval, BlocksAndEventsPerTimeStampRange] =
+    blockflowEndpoint.get
+      .in("blocks-with-events")
+      .in(timeIntervalQuery)
+      .out(jsonBody[BlocksAndEventsPerTimeStampRange])
+      .summary("List blocks with events on the given time interval")
 
   val getBlock: BaseEndpoint[BlockHash, BlockEntry] =
     blockflowEndpoint.get
@@ -218,6 +222,13 @@ trait Endpoints
       .in(path[BlockHash]("block_hash"))
       .out(jsonBody[BlockEntry])
       .summary("Get a block with hash")
+
+  val getBlockAndEvents: BaseEndpoint[BlockHash, BlockAndEvents] =
+    blockflowEndpoint.get
+      .in("blocks-with-events")
+      .in(path[BlockHash]("block_hash"))
+      .out(jsonBody[BlockAndEvents])
+      .summary("Get a block and events with hash")
 
   val isBlockInMainChain: BaseEndpoint[BlockHash, Boolean] =
     blockflowEndpoint.get
@@ -484,11 +495,23 @@ trait Endpoints
 
   lazy val getEventsByTxId
       : BaseEndpoint[(TransactionId, Option[GroupIndex]), ContractEventsByTxId] =
-    eventsByTxIdEndpoint.get
+    eventsEndpoint
+      .in("tx-id")
+      .get
       .in(path[TransactionId]("txId"))
       .in(query[Option[GroupIndex]]("group"))
       .out(jsonBody[ContractEventsByTxId])
-      .summary("Get events for a TxScript")
+      .summary("Get contract events for a transaction")
+
+  lazy val getEventsByBlockHash
+      : BaseEndpoint[(BlockHash, Option[GroupIndex]), ContractEventsByBlockHash] =
+    eventsEndpoint
+      .in("block-hash")
+      .get
+      .in(path[BlockHash]("blockHash"))
+      .in(query[Option[GroupIndex]]("group"))
+      .out(jsonBody[ContractEventsByBlockHash])
+      .summary("Get contract events for a block")
 }
 
 object Endpoints {

@@ -740,7 +740,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost(s"/export-blocks", Some(s"""{"filename": "${filename}"}"""))
 
   def blockflowFetch(fromTs: TimeStamp, toTs: TimeStamp) =
-    httpGet(s"/blockflow?fromTs=${fromTs.millis}&toTs=${toTs.millis}")
+    httpGet(s"/blockflow/blocks?fromTs=${fromTs.millis}&toTs=${toTs.millis}")
 
   case class Clique(servers: AVector[Server]) {
     def coordinator    = servers.head

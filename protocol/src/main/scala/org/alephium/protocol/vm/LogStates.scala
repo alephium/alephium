@@ -16,61 +16,29 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{BlockHash, TransactionId}
+import org.alephium.protocol.model.{BlockHash, ContractId, TransactionId}
 import org.alephium.serde.Serde
-import org.alephium.util.{AVector, I256}
+import org.alephium.util.AVector
 
-final case class LogStatesId(eventKey: Hash, counter: Int)
+final case class LogStatesId(contractId: ContractId, counter: Int)
 
 object LogStatesId {
   implicit val serde: Serde[LogStatesId] =
-    Serde.forProduct2(LogStatesId.apply, id => (id.eventKey, id.counter))
+    Serde.forProduct2(LogStatesId.apply, id => (id.contractId, id.counter))
 }
 
-final case class LogStateRef(id: LogStatesId, offset: Int) {
-  def toFields: AVector[Val] = AVector(
-    Val.ByteVec(id.eventKey.bytes),
-    Val.I256(I256.from(id.counter)),
-    Val.I256(I256.from(offset))
-  )
-}
+final case class LogStateRef(id: LogStatesId, offset: Int)
 
 object LogStateRef {
-  private def fieldToHash(field: Val): Option[Hash] = {
-    field match {
-      case Val.ByteVec(bytes) => Hash.from(bytes)
-      case _                  => None
-    }
-  }
-
-  private def fieldToInt(field: Val): Option[Int] = {
-    field match {
-      case Val.I256(value) => value.toInt
-      case _               => None
-    }
-  }
-
-  def fromFields(fields: AVector[Val]): Option[LogStateRef] = {
-    if (fields.length != 3) {
-      None
-    } else {
-      for {
-        eventKey <- fieldToHash(fields(0))
-        counter  <- fieldToInt(fields(1))
-        offset   <- fieldToInt(fields(2))
-      } yield LogStateRef(LogStatesId(eventKey, counter), offset)
-    }
-  }
+  implicit val serde: Serde[LogStateRef] =
+    Serde.forProduct2(LogStateRef(_, _), t => (t.id, t.offset))
 }
 
 final case class LogState(
     txId: TransactionId,
     index: Byte,
     fields: AVector[Val]
-) {
-  def isRef: Boolean = index == eventRefIndex
-}
+)
 
 object LogState {
   implicit val serde: Serde[LogState] =
@@ -79,11 +47,11 @@ object LogState {
 
 final case class LogStates(
     blockHash: BlockHash,
-    eventKey: Hash,
+    contractId: ContractId,
     states: AVector[LogState]
 )
 
 object LogStates {
   implicit val serde: Serde[LogStates] =
-    Serde.forProduct3(LogStates.apply, s => (s.blockHash, s.eventKey, s.states))
+    Serde.forProduct3(LogStates.apply, s => (s.blockHash, s.contractId, s.states))
 }

@@ -3384,13 +3384,13 @@
         }
       }
     },
-    "/blockflow": {
+    "/blockflow/blocks": {
       "get": {
         "tags": [
           "Blockflow"
         ],
         "summary": "List blocks on the given time interval",
-        "operationId": "getBlockflow",
+        "operationId": "getBlockflowBlocks",
         "parameters": [
           {
             "name": "fromTs",
@@ -3418,7 +3418,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FetchResponse"
+                  "$ref": "#/components/schemas/BlocksPerTimeStampRange"
                 },
                 "example": {
                   "blocks": [
@@ -3529,6 +3529,246 @@
                         "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                         "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                         "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blockflow/blocks-with-events": {
+      "get": {
+        "tags": [
+          "Blockflow"
+        ],
+        "summary": "List blocks with events on the given time interval",
+        "operationId": "getBlockflowBlocks-with-events",
+        "parameters": [
+          {
+            "name": "fromTs",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": "0"
+            }
+          },
+          {
+            "name": "toTs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": "0"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlocksAndEventsPerTimeStampRange"
+                },
+                "example": {
+                  "blocksAndEvents": [
+                    [
+                      {
+                        "block": {
+                          "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                          "timestamp": 1611041396892,
+                          "chainFrom": 1,
+                          "chainTo": 2,
+                          "height": 42,
+                          "deps": [
+                            "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                            "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                          ],
+                          "transactions": [
+                            {
+                              "unsigned": {
+                                "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                                "version": 1,
+                                "networkId": 1,
+                                "gasAmount": 20000,
+                                "gasPrice": "100000000000",
+                                "inputs": [
+                                  {
+                                    "outputRef": {
+                                      "hint": 23412,
+                                      "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                                    },
+                                    "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                                  }
+                                ],
+                                "fixedOutputs": [
+                                  {
+                                    "hint": 1,
+                                    "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                                    "attoAlphAmount": "2000000000000000000",
+                                    "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                                    "tokens": [
+                                      {
+                                        "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                        "amount": "42000000000000000000"
+                                      },
+                                      {
+                                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                        "amount": "1000000000000000000000"
+                                      }
+                                    ],
+                                    "lockTime": 1611041396892,
+                                    "message": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                                  }
+                                ]
+                              },
+                              "scriptExecutionOk": true,
+                              "contractInputs": [
+                                {
+                                  "hint": 23412,
+                                  "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                                }
+                              ],
+                              "generatedOutputs": [
+                                {
+                                  "type": "AssetOutput",
+                                  "hint": 1,
+                                  "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                                  "attoAlphAmount": "2000000000000000000",
+                                  "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                                  "tokens": [
+                                    {
+                                      "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                      "amount": "42000000000000000000"
+                                    },
+                                    {
+                                      "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                      "amount": "1000000000000000000000"
+                                    }
+                                  ],
+                                  "lockTime": 1611041396892,
+                                  "message": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                                },
+                                {
+                                  "type": "ContractOutput",
+                                  "hint": 1,
+                                  "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                                  "attoAlphAmount": "2000000000000000000",
+                                  "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                                  "tokens": [
+                                    {
+                                      "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                      "amount": "42000000000000000000"
+                                    },
+                                    {
+                                      "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                      "amount": "1000000000000000000000"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "inputSignatures": [
+                                "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
+                              ],
+                              "scriptSignatures": [
+                                "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
+                              ]
+                            }
+                          ],
+                          "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "version": 1,
+                          "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                        },
+                        "events": [
+                          {
+                            "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                            "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq",
+                            "eventIndex": 1,
+                            "fields": [
+                              {
+                                "type": "Address",
+                                "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                              },
+                              {
+                                "type": "U256",
+                                "value": "10"
+                              }
+                            ]
+                          }
+                        ]
                       }
                     ]
                   ]
@@ -3735,6 +3975,228 @@
                   "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blockflow/blocks-with-events/{block_hash}": {
+      "get": {
+        "tags": [
+          "Blockflow"
+        ],
+        "summary": "Get a block and events with hash",
+        "operationId": "getBlockflowBlocks-with-eventsBlock_hash",
+        "parameters": [
+          {
+            "name": "block_hash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockAndEvents"
+                },
+                "example": {
+                  "block": {
+                    "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                    "timestamp": 1611041396892,
+                    "chainFrom": 1,
+                    "chainTo": 2,
+                    "height": 42,
+                    "deps": [
+                      "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                    ],
+                    "transactions": [
+                      {
+                        "unsigned": {
+                          "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                          "version": 1,
+                          "networkId": 1,
+                          "gasAmount": 20000,
+                          "gasPrice": "100000000000",
+                          "inputs": [
+                            {
+                              "outputRef": {
+                                "hint": 23412,
+                                "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                              },
+                              "unlockScript": "00d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                            }
+                          ],
+                          "fixedOutputs": [
+                            {
+                              "hint": 1,
+                              "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                              "attoAlphAmount": "2000000000000000000",
+                              "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                              "tokens": [
+                                {
+                                  "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                  "amount": "42000000000000000000"
+                                },
+                                {
+                                  "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                  "amount": "1000000000000000000000"
+                                }
+                              ],
+                              "lockTime": 1611041396892,
+                              "message": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                            }
+                          ]
+                        },
+                        "scriptExecutionOk": true,
+                        "contractInputs": [
+                          {
+                            "hint": 23412,
+                            "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                          }
+                        ],
+                        "generatedOutputs": [
+                          {
+                            "type": "AssetOutput",
+                            "hint": 1,
+                            "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                            "attoAlphAmount": "2000000000000000000",
+                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                            "tokens": [
+                              {
+                                "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                "amount": "42000000000000000000"
+                              },
+                              {
+                                "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                "amount": "1000000000000000000000"
+                              }
+                            ],
+                            "lockTime": 1611041396892,
+                            "message": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                          },
+                          {
+                            "type": "ContractOutput",
+                            "hint": 1,
+                            "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                            "attoAlphAmount": "2000000000000000000",
+                            "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                            "tokens": [
+                              {
+                                "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                                "amount": "42000000000000000000"
+                              },
+                              {
+                                "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                "amount": "1000000000000000000000"
+                              }
+                            ]
+                          }
+                        ],
+                        "inputSignatures": [
+                          "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
+                        ],
+                        "scriptSignatures": [
+                          "9e1a35b2931bd04e6780d01c36e3e5337941aa80f173cfe4f4e249c44ab135272b834c1a639db9c89d673a8a30524042b0469672ca845458a5a0cf2cad53221b"
+                        ]
+                      }
+                    ],
+                    "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                    "version": 1,
+                    "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                    "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                    "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                  },
+                  "events": [
+                    {
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq",
+                      "eventIndex": 1,
+                      "fields": [
+                        {
+                          "type": "Address",
+                          "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                        },
+                        {
+                          "type": "U256",
+                          "value": "10"
+                        }
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -7844,7 +8306,7 @@
             }
           },
           {
-            "name": "end",
+            "name": "limit",
             "in": "query",
             "required": false,
             "schema": {
@@ -8064,7 +8526,7 @@
         "tags": [
           "Events"
         ],
-        "summary": "Get events for a TxScript",
+        "summary": "Get contract events for a transaction",
         "operationId": "getEventsTx-idTxid",
         "parameters": [
           {
@@ -8109,8 +8571,131 @@
                         }
                       ]
                     }
-                  ],
-                  "nextStart": 2
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/block-hash/{blockHash}": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Get contract events for a block",
+        "operationId": "getEventsBlock-hashBlockhash",
+        "parameters": [
+          {
+            "name": "blockHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractEventsByBlockHash"
+                },
+                "example": {
+                  "events": [
+                    {
+                      "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                      "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq",
+                      "eventIndex": 1,
+                      "fields": [
+                        {
+                          "type": "Address",
+                          "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                        },
+                        {
+                          "type": "U256",
+                          "value": "10"
+                        }
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -8466,6 +9051,24 @@
           }
         }
       },
+      "BlockAndEvents": {
+        "required": [
+          "block",
+          "events"
+        ],
+        "type": "object",
+        "properties": {
+          "block": {
+            "$ref": "#/components/schemas/BlockEntry"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractEventByBlockHash"
+            }
+          }
+        }
+      },
       "BlockEntry": {
         "required": [
           "hash",
@@ -8573,6 +9176,40 @@
             "items": {
               "type": "string",
               "format": "block-hash"
+            }
+          }
+        }
+      },
+      "BlocksAndEventsPerTimeStampRange": {
+        "required": [
+          "blocksAndEvents"
+        ],
+        "type": "object",
+        "properties": {
+          "blocksAndEvents": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/BlockAndEvents"
+              }
+            }
+          }
+        }
+      },
+      "BlocksPerTimeStampRange": {
+        "required": [
+          "blocks"
+        ],
+        "type": "object",
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/BlockEntry"
+              }
             }
           }
         }
@@ -9336,6 +9973,35 @@
           }
         }
       },
+      "ContractEventByBlockHash": {
+        "required": [
+          "txId",
+          "contractAddress",
+          "eventIndex",
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "txId": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "contractAddress": {
+            "type": "string",
+            "format": "address"
+          },
+          "eventIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          }
+        }
+      },
       "ContractEventByTxId": {
         "required": [
           "blockHash",
@@ -9384,10 +10050,23 @@
           }
         }
       },
+      "ContractEventsByBlockHash": {
+        "required": [
+          "events"
+        ],
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractEventByBlockHash"
+            }
+          }
+        }
+      },
       "ContractEventsByTxId": {
         "required": [
-          "events",
-          "nextStart"
+          "events"
         ],
         "type": "object",
         "properties": {
@@ -9396,10 +10075,6 @@
             "items": {
               "$ref": "#/components/schemas/ContractEventByTxId"
             }
-          },
-          "nextStart": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },
@@ -9579,23 +10254,6 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
-          }
-        }
-      },
-      "FetchResponse": {
-        "required": [
-          "blocks"
-        ],
-        "type": "object",
-        "properties": {
-          "blocks": {
-            "type": "array",
-            "items": {
-              "type": "array",
-              "items": {
-                "$ref": "#/components/schemas/BlockEntry"
-              }
             }
           }
         }

@@ -76,8 +76,10 @@ class RestServer(
       discoveryActionLogic,
       getHistoryHashRateLogic,
       getCurrentHashRateLogic,
-      getBlockflowLogic,
+      getBlocksLogic,
+      getBlocksAndEventsLogic,
       getBlockLogic,
+      getBlockAndEventsLogic,
       isBlockInMainChainLogic,
       getBalanceLogic,
       getUTXOsLogic,
@@ -114,6 +116,7 @@ class RestServer(
       getContractEventsLogic,
       getContractEventsCurrentCountLogic,
       getEventsByTxIdLogic,
+      getEventsByBlockHashLogic,
       metricsLogic
     ).map(route(_)) ++ swaggerUiRoute
 
