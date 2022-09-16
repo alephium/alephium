@@ -110,4 +110,14 @@ class MutableLogSpec extends AlephiumSpec with Fixture with NumericHelpers {
     mutableLog.eventLogByHash.get(Byte32.unsafe(blockHash.bytes)) isE
       AVector(LogStateRef(logId, 0), LogStateRef(logId, 2))
   }
+
+  it should "log event for both tx id and block hash" in new LogFixture {
+    mutableLog.putLog(blockHash, txId, contractId, fields, true, true) isE ()
+    mutableLog.putLog(blockHash, txId, contractId, fields, false, false) isE ()
+    mutableLog.putLog(blockHash, txId, contractId, fields, true, true) isE ()
+    mutableLog.eventLogByHash.get(Byte32.unsafe(txId.bytes)) isE
+      AVector(LogStateRef(logId, 0), LogStateRef(logId, 2))
+    mutableLog.eventLogByHash.get(Byte32.unsafe(blockHash.bytes)) isE
+      AVector(LogStateRef(logId, 0), LogStateRef(logId, 2))
+  }
 }

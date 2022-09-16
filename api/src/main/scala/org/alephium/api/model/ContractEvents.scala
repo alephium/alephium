@@ -70,7 +70,7 @@ final case class ContractEventByBlockHash(
     contractAddress: Address.Contract,
     eventIndex: Int,
     fields: AVector[Val]
-) {}
+)
 
 object ContractEventByBlockHash {
   def from(ref: LogStateRef, logState: LogState): ContractEventByBlockHash = {
