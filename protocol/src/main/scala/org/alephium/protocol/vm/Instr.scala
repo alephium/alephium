@@ -24,6 +24,7 @@ import org.alephium.crypto
 import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
+import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput, ContractId, TokenId}
 import org.alephium.protocol.vm.TokenIssuance.{
   IssueTokenAndTransfer,
@@ -154,7 +155,7 @@ object Instr {
     Log6, Log7, Log8, Log9,
     ContractIdToAddress,
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
-    BlockHash
+    BlockHash, DEBUG
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -2003,9 +2004,29 @@ case object BlockHash
 final case class TemplateVariable(name: String, tpe: Val.Type, index: Int) extends StatelessInstr {
   def serialize(): ByteString = ???
   def code: Byte              = ???
-  def runWith[C <: StatelessContext](
-      frame: Frame[C]
-  ): ExeResult[Unit] = ???
+
+  def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = ???
 
   override def toTemplateString(): String = s"{$index}"
 }
+
+final case class DEBUG(message: Val.ByteVec)
+    extends LemanInstrWithSimpleGas[StatelessContext]
+    with GasBase {
+  def code: Byte = DEBUG.code
+
+  def serialize(): ByteString =
+    ByteString(code) ++ serdeImpl[Val.ByteVec].serialize(message)
+
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    if (frame.ctx.networkConfig.networkId == model.NetworkId.AlephiumMainNet) {
+      failed(DebugIsNotSupportedForMainnet)
+    } else {
+      frame.ctx.writeLog(
+        Some(frame.obj.contractIdOpt.getOrElse(ContractId.zero)),
+        AVector(debugEventIndex, message)
+      )
+    }
+  }
+}
+object DEBUG extends StatelessInstrCompanion1[Val.ByteVec]

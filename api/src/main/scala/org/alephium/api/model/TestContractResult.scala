@@ -28,5 +28,8 @@ final case class TestContractResult(
     contracts: AVector[ContractState],
     txInputs: AVector[Address],
     txOutputs: AVector[Output],
-    events: AVector[ContractEventByTxId]
+    events: AVector[ContractEventByTxId],
+    debugMessages: AVector[DebugMessage]
 )
+
+final case class DebugMessage(contractAddress: Address.Contract, message: String)

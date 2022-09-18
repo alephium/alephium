@@ -1168,7 +1168,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "PayToContractAddressNotInCallerTrace"
   }
 
-  it should "test blockHash function" in new TestContractFixture {
+  it should "test blockHash function for Ralph" in new TestContractFixture {
     val blockHash = BlockHash.random
     val contract =
       s"""
@@ -1190,6 +1190,25 @@ class ServerUtilsSpec extends AlephiumSpec {
       TestContract(bytecode = code, blockHash = Some(blockHash)).toComplete().rightValue
     val testResult1 = serverUtils.runTestContract(blockFlow, testContract1).rightValue
     testResult1.returns.head is api.ValByteVec(blockHash.bytes)
+  }
+
+  it should "test debug function for Ralph" in new Fixture {
+    val contract: String =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    debug!(`Hello, World!`)
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).rightValue
+
+    val testContract = TestContract(bytecode = code).toComplete().rightValue
+    val serverUtils  = new ServerUtils()
+    val testResult   = serverUtils.runTestContract(blockFlow, testContract).rightValue
+    testResult.debugMessages is AVector(
+      DebugMessage(Address.contract(testContract.contractId), "Hello, World!")
+    )
   }
 
   trait TestContractFixture extends Fixture {

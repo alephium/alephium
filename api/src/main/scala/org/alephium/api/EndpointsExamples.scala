@@ -708,7 +708,8 @@ trait EndpointsExamples extends ErrorExamples {
         txInputs = AVector(contractAddress),
         txOutputs =
           AVector(ContractOutput(1234, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
-        events = AVector(eventByTxId)
+        events = AVector(eventByTxId),
+        debugMessages = AVector(DebugMessage(contractAddress, "Debugging!"))
       )
     )
 

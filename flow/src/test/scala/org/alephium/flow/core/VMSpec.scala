@@ -3553,6 +3553,34 @@ class VMSpec extends AlephiumSpec {
     fooOutputRefNew.asInstanceOf[TxOutputRef] is TxOutputRef.unsafe(tx, 0)
   }
 
+  it should "test debug function" in new EventFixture {
+    override def contractRaw: String =
+      s"""
+         |Contract Foo(x: U256) {
+         |  pub fn foo() -> () {
+         |    debug!(`Hello, World!`)
+         |  }
+         |}
+         |""".stripMargin
+
+    override def callingScriptRaw: String =
+      s"""
+         |$contractRaw
+         |
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  Foo(#${contractId.toHexString}).foo()
+         |}
+         |""".stripMargin
+
+    val logStates = getLogStates(blockFlow, contractId, 0).value
+    logStates.blockHash is callingBlock.hash
+    logStates.states.length is 1
+    val event = logStates.states.head
+    event.index is debugEventIndex.v.v.toInt.toByte
+    event.fields is AVector[Val](Val.ByteVec(ByteString.fromString("Hello, World!")))
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

@@ -18,6 +18,7 @@ package org.alephium.protocol.vm.lang
 
 import scala.collection.mutable
 
+import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{Contract => VmContract, _}
 import org.alephium.protocol.vm.lang.LogicalOperator.Not
 import org.alephium.util.{AVector, I256, U256}
@@ -866,6 +867,12 @@ object Ast {
     }
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       exprs.flatMap(_.genCode(state)) :+ Return
+  }
+
+  final case class DEBUG[Ctx <: StatelessContext](message: Val.ByteVec) extends Statement[Ctx] {
+    def check(state: Compiler.State[Ctx]): Unit = ()
+
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = Seq(vm.DEBUG(message))
   }
 
   trait ContractT[Ctx <: StatelessContext] extends UniqueDef {

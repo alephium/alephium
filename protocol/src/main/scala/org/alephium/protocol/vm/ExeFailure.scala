@@ -113,6 +113,7 @@ case object UnexpectedRecursiveCallInMigration                 extends ExeFailur
 case object InvalidAssetAddress                                extends ExeFailure
 final case class ContractAlreadyExists(contractId: ContractId) extends ExeFailure
 case object NoBlockHashAvailable                               extends ExeFailure
+case object DebugIsNotSupportedForMainnet                      extends ExeFailure
 
 final case class UncaughtKeyNotFoundError(error: IOError.KeyNotFound) extends ExeFailure
 final case class UncaughtSerdeError(error: IOError.Serde)             extends ExeFailure

@@ -947,6 +947,7 @@ class ServerUtils(implicit
       events = fetchContractEvents(worldState)
       contractIds <- getCreatedAndDestroyedContractIds(events)
       postState   <- fetchContractsState(worldState, testContract, contractIds._1, contractIds._2)
+      eventsSplit <- extractDebugMessages(events)
     } yield {
       val executionOutputs = executionResultPair._1
       val executionResult  = executionResultPair._2
@@ -961,8 +962,27 @@ class ServerUtils(implicit
         txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, TransactionId.zero, index)
         },
-        events = events
+        events = eventsSplit._1,
+        debugMessages = eventsSplit._2
       )
+    }
+  }
+
+  def extractDebugMessage(event: ContractEventByTxId): Try[DebugMessage] = {
+    if (event.fields.length == 1 && event.fields(0).isInstanceOf[ValByteVec]) {
+      val message = event.fields(0).asInstanceOf[ValByteVec]
+      Right(DebugMessage(event.contractAddress, message.value.utf8String))
+    } else {
+      Left(failed("Invalid debug message"))
+    }
+  }
+
+  def extractDebugMessages(
+      events: AVector[ContractEventByTxId]
+  ): Try[(AVector[ContractEventByTxId], AVector[DebugMessage])] = {
+    val nonDebugEvents = events.filter(e => I256.from(e.eventIndex) != debugEventIndex.v)
+    events.filter(e => I256.from(e.eventIndex) == debugEventIndex.v).mapE(extractDebugMessage).map {
+      debugEvents => nonDebugEvents -> debugEvents
     }
   }
 

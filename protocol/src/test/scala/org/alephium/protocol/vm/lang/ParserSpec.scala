@@ -171,6 +171,8 @@ class ParserSpec extends AlephiumSpec {
       .parse("for (let mut i = 0; i < 10; i = i + 1) { x = x + 1 }", StatelessParser.statement(_))
       .get
       .value is a[Ast.ForLoop[StatelessContext]]
+    fastparse.parse("debug!(`Hello, World!`)", StatelessParser.debug(_)).get.value is
+      Ast.DEBUG[StatelessContext](Val.ByteVec(ByteString.fromString("Hello, World!")))
   }
 
   it should "parse if-else statements" in {
