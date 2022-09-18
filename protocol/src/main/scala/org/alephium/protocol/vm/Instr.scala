@@ -165,7 +165,8 @@ object Instr {
     MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
     CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
     LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
-    CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken
+    CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
+    NullContractAddress
   )
   // format: on
 
@@ -1976,6 +1977,15 @@ object Log6 extends LemanLogInstr   { val n: Int = 6 }
 object Log7 extends LemanLogInstr   { val n: Int = 7 }
 object Log8 extends LemanLogInstr   { val n: Int = 8 }
 object Log9 extends LemanLogInstr   { val n: Int = 9 }
+
+case object NullContractAddress
+    extends LemanInstrWithSimpleGas[StatefulContext]
+    with StatefulInstrCompanion0
+    with GasBase {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.pushOpStack(Val.NullContractAddress)
+  }
+}
 
 final case class TemplateVariable(name: String, tpe: Val.Type, index: Int) extends StatelessInstr {
   def serialize(): ByteString = ???

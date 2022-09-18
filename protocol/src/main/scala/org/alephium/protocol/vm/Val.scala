@@ -18,6 +18,7 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
+import org.alephium.protocol.model.ContractId
 import org.alephium.serde.{_deserialize => decode, serialize => encode, _}
 import org.alephium.util
 import org.alephium.util._
@@ -195,5 +196,6 @@ object Val {
 
   val True: Bool  = Bool(true)
   val False: Bool = Bool(false)
+  val NullContractAddress: Val.Address = Val.Address(LockupScript.p2c(ContractId.zero))
 }
 // scalastyle:on number.of.methods

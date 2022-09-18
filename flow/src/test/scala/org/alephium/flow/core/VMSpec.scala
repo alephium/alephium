@@ -754,8 +754,8 @@ class VMSpec extends AlephiumSpec {
          |  assert!(size!(toByteVec!(@${address.toBase58})) == 33, 0)
          |  assert!(size!(#${bytes0} ++ #${bytes1}) == 64, 0)
          |  assert!(zeros!(2) == #0000, 0)
-         |  assert!(nullAddress!() == @${Address.contract(ContractId.zero)}, 0)
-         |  assert!(nullAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, 0)
+         |  assert!(nullContractAddress!() == @${Address.contract(ContractId.zero)}, 0)
+         |  assert!(nullContractAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, 0)
          |}
          |""".stripMargin
 

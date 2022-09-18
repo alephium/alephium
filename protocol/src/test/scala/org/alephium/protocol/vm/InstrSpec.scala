@@ -78,7 +78,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
       LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
-      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken
+      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
+      NullContractAddress
     )
     // format: on
   }
@@ -106,11 +107,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "fail if the fork is not activated yet for stateful instrs" in new LemanForkFixture
     with StatefulFixture {
     val frame0 = prepareFrame()(NetworkConfigFixture.Leman) // Leman is activated
-    lemanStatefulInstrs.foreach(instr =>
-      instr.runWith(frame0).leftValue isnotE InactiveInstr(instr)
-    )
+    lemanStatefulInstrs.foreach { instr =>
+      val result = instr.runWith(frame0)
+      if (result.isLeft) {
+        result.leftValue isnotE InactiveInstr(instr)
+      }
+    }
     val frame1 = prepareFrame()(NetworkConfigFixture.PreLeman) // Leman is not activated yet
-    lemanStatelessInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
+    lemanStatefulInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
   }
 
   trait GenFixture extends ContextGenerators {
@@ -3078,6 +3082,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.top.get is Val.ByteVec(frame.obj.code.hash.bytes)
   }
 
+  it should "NullContractAddress" in new StatefulInstrFixture {
+    runAndCheckGas(NullContractAddress)
+    frame.opStack.pop() isE Val.NullContractAddress
+    frame.opStack.isEmpty is true
+  }
+
   it should "test gas amount" in new FrameFixture {
     val bytes      = AVector[Byte](0, 255.toByte, Byte.MaxValue, Byte.MinValue)
     val ints       = AVector[Int](0, 1 << 16, -(1 << 16))
@@ -3126,7 +3136,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       BurnToken -> 30, LockApprovedAssets -> 30,
       CreateSubContract -> 32000, CreateSubContractWithToken -> 32000, CopyCreateSubContract -> 24000, CopyCreateSubContractWithToken -> 24000,
       LoadFieldByIndex -> 5, StoreFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
-      CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000
+      CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
+      NullContractAddress -> 2
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -3251,7 +3262,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       BurnToken -> 189, LockApprovedAssets -> 190,
       CreateSubContract -> 191, CreateSubContractWithToken -> 192, CopyCreateSubContract -> 193, CopyCreateSubContractWithToken -> 194,
       LoadFieldByIndex -> 195, StoreFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
-      CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201
+      CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
+      NullContractAddress -> 202
     )
     // format: on
 
@@ -3307,7 +3319,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
       LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
-      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken
+      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
+      NullContractAddress
     )
     // format: on
   }

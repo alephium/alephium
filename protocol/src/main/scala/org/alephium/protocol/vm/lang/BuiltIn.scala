@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.model.{dustUtxoAmount, ContractId}
+import org.alephium.protocol.model.dustUtxoAmount
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
 import org.alephium.util.AVector
@@ -405,14 +405,6 @@ object BuiltIn {
       ContractIdToAddress
     )
 
-  val nullAddress: SimpleBuiltIn[StatelessContext] =
-    SimpleBuiltIn(
-      "nullAddress",
-      Seq.empty,
-      Seq[Type](Type.Address),
-      AddressConst(Val.Address(LockupScript.p2c(ContractId.zero)))
-    )
-
   val dustAmount: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn(
       "dustAmount",
@@ -484,7 +476,6 @@ object BuiltIn {
     byteVecToAddress,
     ethEcRecover,
     contractIdToAddress,
-    nullAddress,
     dustAmount,
     panic
   ).map(f => f.name -> f).toMap
@@ -849,6 +840,14 @@ object BuiltIn {
     }
   }
 
+  val nullContractAddress: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn(
+      "nullContractAddress",
+      Seq.empty,
+      Seq[Type](Type.Address),
+      NullContractAddress
+    )
+
   val statefulFuncs: Map[String, FuncInfo[StatefulContext]] =
     statelessFuncs ++ Seq(
       approveAlph,
@@ -887,6 +886,7 @@ object BuiltIn {
       contractInitialStateHash,
       contractCodeHash,
       subContractId,
-      subContractIdOf
+      subContractIdOf,
+      nullContractAddress
     ).map(f => f.name -> f)
 }
