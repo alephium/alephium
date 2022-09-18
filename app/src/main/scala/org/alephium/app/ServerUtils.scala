@@ -434,7 +434,7 @@ class ServerUtils(implicit
       hashes <- blockFlow
         .getHashes(chainIndex, query.height)
         .left
-        .map(_ => failedInIO)
+        .map(failedInIO)
     } yield HashesAtHeight(hashes)
 
   def getChainInfo(blockFlow: BlockFlow, chainIndex: ChainIndex): Try[ChainInfo] =
@@ -442,7 +442,7 @@ class ServerUtils(implicit
       maxHeight <- blockFlow
         .getMaxHeight(chainIndex)
         .left
-        .map(_ => failedInIO)
+        .map(failedInIO)
     } yield ChainInfo(maxHeight)
 
   def searchLocalTransactionStatus(

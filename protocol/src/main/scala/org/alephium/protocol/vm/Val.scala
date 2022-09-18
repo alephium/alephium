@@ -194,8 +194,8 @@ object Val {
     override def toString: String   = s"[$baseType;$size]"
   }
 
-  val True: Bool  = Bool(true)
-  val False: Bool = Bool(false)
+  val True: Bool                       = Bool(true)
+  val False: Bool                      = Bool(false)
   val NullContractAddress: Val.Address = Val.Address(LockupScript.p2c(ContractId.zero))
 }
 // scalastyle:on number.of.methods

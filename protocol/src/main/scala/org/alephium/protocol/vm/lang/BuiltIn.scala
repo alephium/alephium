@@ -47,7 +47,7 @@ object BuiltIn {
       if (inputType == argsType) {
         returnType
       } else {
-        throw Error(s"Invalid args type $inputType for builtin func $name")
+        throw Error(s"Invalid args type $inputType for builtin func $name, expected $argsType")
       }
     }
 
@@ -433,6 +433,14 @@ object BuiltIn {
     }
   }
 
+  val blockHash: BuiltIn[StatelessContext] =
+    SimpleBuiltIn(
+      "blockHash",
+      Seq.empty,
+      Seq(Type.ByteVec),
+      BlockHash
+    )
+
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
     keccak256,
@@ -477,7 +485,8 @@ object BuiltIn {
     ethEcRecover,
     contractIdToAddress,
     dustAmount,
-    panic
+    panic,
+    blockHash
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleBuiltIn[StatefulContext] =

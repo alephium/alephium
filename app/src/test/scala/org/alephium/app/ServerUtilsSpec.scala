@@ -1168,6 +1168,30 @@ class ServerUtilsSpec extends AlephiumSpec {
       .detail is "PayToContractAddressNotInCallerTrace"
   }
 
+  it should "test blockHash function" in new TestContractFixture {
+    val blockHash = BlockHash.random
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  fn foo() -> (ByteVec) {
+         |    assert!(blockHash!() == #${blockHash.toHexString}, 0)
+         |    return blockHash!()
+         |  }
+         |}
+         |""".stripMargin
+
+    val code = Compiler.compileContract(contract).rightValue
+
+    val testContract0 = TestContract(bytecode = code).toComplete().rightValue
+    val testResult0   = serverUtils.runTestContract(blockFlow, testContract0).leftValue
+    testResult0.detail is s"VM execution error: AssertionFailedWithErrorCode(${ContractId.zero.toHexString},0)"
+
+    val testContract1 =
+      TestContract(bytecode = code, blockHash = Some(blockHash)).toComplete().rightValue
+    val testResult1 = serverUtils.runTestContract(blockFlow, testContract1).rightValue
+    testResult1.returns.head is api.ValByteVec(blockHash.bytes)
+  }
+
   trait TestContractFixture extends Fixture {
     val tokenId         = TokenId.random
     val (_, pubKey)     = SignatureSchema.generatePriPub()

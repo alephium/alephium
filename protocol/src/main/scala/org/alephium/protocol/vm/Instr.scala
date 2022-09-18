@@ -153,7 +153,8 @@ object Instr {
     EthEcRecover,
     Log6, Log7, Log8, Log9,
     ContractIdToAddress,
-    LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap
+    LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
+    BlockHash
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadField, StoreField, CallExternal,
@@ -1984,6 +1985,18 @@ case object NullContractAddress
     with GasBase {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.NullContractAddress)
+  }
+}
+
+case object BlockHash
+    extends LemanInstrWithSimpleGas[StatelessContext]
+    with StatelessInstrCompanion0
+    with GasBase {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.ctx.blockEnv.blockId match {
+      case Some(blockHash) => frame.pushOpStack(Val.ByteVec(blockHash.bytes))
+      case None            => failed(NoBlockHashAvailable)
+    }
   }
 }
 

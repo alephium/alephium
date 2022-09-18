@@ -35,8 +35,6 @@ package object api {
   def badRequest(error: String): ApiError[_ <: StatusCode] = ApiError.BadRequest(error)
   def failed(error: String): ApiError[_ <: StatusCode] =
     ApiError.InternalServerError(error)
-  val failedInIO: ApiError[_ <: StatusCode] =
-    ApiError.InternalServerError("Failed in IO")
   def failedInIO(error: IOError): ApiError[_ <: StatusCode] =
     ApiError.InternalServerError(s"Failed in IO: $error")
   def failed[T](error: IOError): Try[T] = Left(failedInIO(error))
@@ -44,9 +42,10 @@ package object api {
   def wrapResult[T](result: IOResult[T]): Try[T] = {
     result.left.map(failedInIO(_))
   }
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def wrapExeResult[T](result: ExeResult[T]): Try[T] = result match {
     case Left(Left(ioFailure))   => Left(failedInIO(ioFailure.error))
-    case Left(Right(exeFailure)) => Left(failed(exeFailure.name))
+    case Left(Right(exeFailure)) => Left(failed(s"VM execution error: ${exeFailure.toString()}"))
     case Right(t)                => Right(t)
   }
 

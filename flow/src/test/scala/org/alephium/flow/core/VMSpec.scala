@@ -756,6 +756,7 @@ class VMSpec extends AlephiumSpec {
          |  assert!(zeros!(2) == #0000, 0)
          |  assert!(nullContractAddress!() == @${Address.contract(ContractId.zero)}, 0)
          |  assert!(nullContractAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, 0)
+         |  assert!(blockHash!() != #${Hash.zero.toHexString}, 0)
          |}
          |""".stripMargin
 
