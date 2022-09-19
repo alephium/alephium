@@ -869,10 +869,18 @@ object Ast {
       exprs.flatMap(_.genCode(state)) :+ Return
   }
 
-  final case class DEBUG[Ctx <: StatelessContext](message: Val.ByteVec) extends Statement[Ctx] {
-    def check(state: Compiler.State[Ctx]): Unit = ()
+  final case class DEBUG[Ctx <: StatelessContext](
+      stringParts: AVector[Val.ByteVec],
+      interpolationParts: Seq[Expr[Ctx]]
+  ) extends Statement[Ctx] {
+    def check(state: Compiler.State[Ctx]): Unit = {
+      interpolationParts.foreach(_.getType(state))
+    }
 
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = Seq(vm.DEBUG(message))
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      interpolationParts.flatMap(_.genCode(state)) :+
+        vm.DEBUG(stringParts)
+    }
   }
 
   trait ContractT[Ctx <: StatelessContext] extends UniqueDef {

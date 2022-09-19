@@ -28,6 +28,8 @@ sealed trait Val extends Any {
 
   def toByteVec(): Val.ByteVec
 
+  def toDebugString(): ByteString
+
   def estimateByteSize(): Int
 
   def toConstInstr: Instr[StatelessContext]
@@ -94,6 +96,8 @@ object Val {
 
     override def toByteVec(): ByteVec = ByteVec(encode(v))
 
+    override def toDebugString(): ByteString = ByteString.fromString(v.toString)
+
     override def estimateByteSize(): Int = 1
 
     override def toConstInstr: Instr[StatelessContext] = if (v) ConstTrue else ConstFalse
@@ -103,6 +107,8 @@ object Val {
 
     override def toByteVec(): ByteVec = ByteVec(encode(v))
 
+    override def toDebugString(): ByteString = ByteString.fromString(v.toString)
+
     override def estimateByteSize(): Int = 32
 
     override def toConstInstr: Instr[StatelessContext] = ConstInstr.i256(this)
@@ -111,6 +117,8 @@ object Val {
     def tpe: Val.Type = U256
 
     override def toByteVec(): ByteVec = ByteVec(encode(v))
+
+    override def toDebugString(): ByteString = ByteString.fromString(v.toString)
 
     override def estimateByteSize(): Int = 32
 
@@ -122,6 +130,8 @@ object Val {
 
     override def toByteVec(): ByteVec = this
 
+    override def toDebugString(): ByteString = bytes
+
     override def estimateByteSize(): Int = bytes.length
 
     override def toConstInstr: Instr[StatelessContext] = BytesConst(this)
@@ -131,6 +141,8 @@ object Val {
 
     override def toByteVec(): ByteVec = ByteVec(encode(lockupScript))
     def toBase58: String              = Base58.encode(encode(lockupScript))
+
+    override def toDebugString(): ByteString = ByteString.fromString(toBase58)
 
     override def estimateByteSize(): Int = lockupScript match {
       case LockupScript.P2MPKH(mpkh, _) => mpkh.length * 32
@@ -178,6 +190,8 @@ object Val {
     override def toString: String = "ByteVec"
 
     def from(bytes: RandomBytes): ByteVec = ByteVec(bytes.bytes)
+
+    def fromString(string: String): ByteVec = ByteVec(ByteString.fromString(string))
   }
   object Address extends Type {
     implicit val serde: Serde[Address] = serdeImpl[LockupScript].xmap(Address(_), _.lockupScript)

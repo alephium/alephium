@@ -2010,23 +2010,36 @@ final case class TemplateVariable(name: String, tpe: Val.Type, index: Int) exten
   override def toTemplateString(): String = s"{$index}"
 }
 
-final case class DEBUG(message: Val.ByteVec)
+final case class DEBUG(stringParts: AVector[Val.ByteVec])
     extends LemanInstrWithSimpleGas[StatelessContext]
-    with GasBase {
+    with GasZero {
   def code: Byte = DEBUG.code
 
   def serialize(): ByteString =
-    ByteString(code) ++ serdeImpl[Val.ByteVec].serialize(message)
+    ByteString(code) ++ serdeImpl[AVector[Val.ByteVec]].serialize(stringParts)
+
+  @inline private[vm] def combineUnsafe(values: AVector[Val]): Val.ByteVec = {
+    var result = ByteString.empty
+    values.indices.foreach { k =>
+      result = result ++ stringParts(k).bytes ++ values(k).toDebugString()
+    }
+    Val.ByteVec(result ++ stringParts.last.bytes)
+  }
 
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     if (frame.ctx.networkConfig.networkId == model.NetworkId.AlephiumMainNet) {
       failed(DebugIsNotSupportedForMainnet)
+    } else if (stringParts.isEmpty) {
+      failed(DebugMessageIsEmpty)
     } else {
-      frame.ctx.writeLog(
-        Some(frame.obj.contractIdOpt.getOrElse(ContractId.zero)),
-        AVector(debugEventIndex, message)
-      )
+      for {
+        interpolationParts <- frame.opStack.pop(stringParts.length - 1)
+        _ <- frame.ctx.writeLog(
+          Some(frame.obj.contractIdOpt.getOrElse(ContractId.zero)),
+          AVector(debugEventIndex, combineUnsafe(interpolationParts))
+        )
+      } yield ()
     }
   }
 }
-object DEBUG extends StatelessInstrCompanion1[Val.ByteVec]
+object DEBUG extends StatelessInstrCompanion1[AVector[Val.ByteVec]]

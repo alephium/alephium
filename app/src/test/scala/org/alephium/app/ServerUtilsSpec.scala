@@ -1192,22 +1192,55 @@ class ServerUtilsSpec extends AlephiumSpec {
     testResult1.returns.head is api.ValByteVec(blockHash.bytes)
   }
 
+  it should "extract debug message from contract event" in new Fixture {
+    val serverUtils     = new ServerUtils()
+    val contractAddress = Address.contract(ContractId.random)
+    def buildEvent(fields: Val*): ContractEventByTxId = {
+      ContractEventByTxId(BlockHash.random, contractAddress, 0, AVector.from(fields))
+    }
+
+    serverUtils
+      .extractDebugMessage(buildEvent())
+      .leftValue
+      .detail is "Invalid debug message"
+
+    serverUtils
+      .extractDebugMessage(buildEvent(ValBool(true)))
+      .leftValue
+      .detail is "Invalid debug message"
+
+    serverUtils
+      .extractDebugMessage(buildEvent(ValByteVec(ByteString.fromString("Hello, Alephium!")))) isE
+      DebugMessage(contractAddress, "Hello, Alephium!")
+
+    serverUtils
+      .extractDebugMessage(
+        buildEvent(ValByteVec(ByteString.fromString("Hello, Alephium!")), ValBool(true))
+      )
+      .leftValue
+      .detail is "Invalid debug message"
+  }
+
   it should "test debug function for Ralph" in new Fixture {
     val contract: String =
       s"""
-         |Contract Foo() {
+         |Contract Foo(name: ByteVec) {
          |  pub fn foo() -> () {
-         |    debug!(`Hello, World!`)
+         |    debug!(`Hello, $${name}!`)
          |  }
          |}
          |""".stripMargin
     val code = Compiler.compileContract(contract).rightValue
 
-    val testContract = TestContract(bytecode = code).toComplete().rightValue
-    val serverUtils  = new ServerUtils()
-    val testResult   = serverUtils.runTestContract(blockFlow, testContract).rightValue
+    val testContract = TestContract(
+      bytecode = code,
+      initialFields = Some(AVector(ValByteVec(ByteString.fromString("Alephium"))))
+    ).toComplete().rightValue
+    val serverUtils = new ServerUtils()
+    val testResult  = serverUtils.runTestContract(blockFlow, testContract).rightValue
+    testResult.events.isEmpty is true
     testResult.debugMessages is AVector(
-      DebugMessage(Address.contract(testContract.contractId), "Hello, World!")
+      DebugMessage(Address.contract(testContract.contractId), "Hello, Alephium!")
     )
   }
 

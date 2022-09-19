@@ -171,8 +171,36 @@ class ParserSpec extends AlephiumSpec {
       .parse("for (let mut i = 0; i < 10; i = i + 1) { x = x + 1 }", StatelessParser.statement(_))
       .get
       .value is a[Ast.ForLoop[StatelessContext]]
-    fastparse.parse("debug!(`Hello, World!`)", StatelessParser.debug(_)).get.value is
-      Ast.DEBUG[StatelessContext](Val.ByteVec(ByteString.fromString("Hello, World!")))
+  }
+
+  it should "parse debug statements" in {
+    fastparse.parse("", Lexer.stringChars(_)).get.value is ""
+    fastparse.parse("a", Lexer.stringChars(_)).get.value is "a"
+    fastparse.parse(" ", Lexer.stringChars(_)).get.value is " "
+    fastparse.parse("a b c$", Lexer.stringChars(_)).get.value is "a b c"
+
+    fastparse.parse(s"$${a}", StatelessParser.stringInterpolator(_)).get.value is
+      Variable[StatelessContext](Ident("a"))
+    fastparse.parse(s"$${ x + y }", StatelessParser.stringInterpolator(_)).get.value is
+      Binop[StatelessContext](Add, Variable(Ident("x")), Variable(Ident("y")))
+
+    fastparse.parse(s"debug!(``)", StatelessParser.debug(_)).get.value is
+      Ast.DEBUG[StatelessContext](AVector(Val.ByteVec(ByteString.empty)), Seq.empty)
+    fastparse.parse(s"debug!(`$${a}`)", StatelessParser.debug(_)).get.value is
+      Ast.DEBUG[StatelessContext](
+        AVector(Val.ByteVec(ByteString.empty), Val.ByteVec(ByteString.empty)),
+        Seq(Variable(Ident("a")))
+      )
+    fastparse.parse(s"debug!(`Hello, $${a}$${b} $${c} !`)", StatelessParser.debug(_)).get.value is
+      Ast.DEBUG[StatelessContext](
+        AVector(
+          Val.ByteVec(ByteString.fromString("Hello, ")),
+          Val.ByteVec(ByteString.empty),
+          Val.ByteVec(ByteString.fromString(" ")),
+          Val.ByteVec(ByteString.fromString(" !"))
+        ),
+        Seq(Variable(Ident("a")), Variable(Ident("b")), Variable(Ident("c")))
+      )
   }
 
   it should "parse if-else statements" in {

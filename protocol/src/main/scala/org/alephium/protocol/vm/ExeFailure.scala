@@ -114,6 +114,7 @@ case object InvalidAssetAddress                                extends ExeFailur
 final case class ContractAlreadyExists(contractId: ContractId) extends ExeFailure
 case object NoBlockHashAvailable                               extends ExeFailure
 case object DebugIsNotSupportedForMainnet                      extends ExeFailure
+case object DebugMessageIsEmpty                                extends ExeFailure
 
 final case class UncaughtKeyNotFoundError(error: IOError.KeyNotFound) extends ExeFailure
 final case class UncaughtSerdeError(error: IOError.Serde)             extends ExeFailure

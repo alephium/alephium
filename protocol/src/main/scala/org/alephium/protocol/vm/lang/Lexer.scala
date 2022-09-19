@@ -25,7 +25,7 @@ import fastparse.NoWhitespace._
 
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.Address
-import org.alephium.protocol.vm.{LockupScript, Val}
+import org.alephium.protocol.vm.{LockupScript, StatelessContext, Val}
 import org.alephium.protocol.vm.Val.ByteVec
 import org.alephium.protocol.vm.lang.ArithOperator._
 import org.alephium.protocol.vm.lang.LogicalOperator._
@@ -137,6 +137,23 @@ object Lexer {
       case "true" => Val.Bool(true)
       case _      => Val.Bool(false)
     }
+
+  def stringNoChar[Unknown: P]: P[String] =
+    Pass("")
+  def stringChars[Unknown: P]: P[String] =
+    P(CharsWhile(c => c != '$' && c != '`').! | stringNoChar)
+  def stringChained[Ctx <: StatelessContext, T, Unknown: P](
+      stringInterpolator: () => P[T]
+  ): P[(AVector[String], Seq[T])] =
+    P(stringChars ~ (stringInterpolator() ~ stringChars).rep).map { case (firstStringPart, pairs) =>
+      val stringParts        = AVector(firstStringPart) ++ AVector.from(pairs.view.map(_._2))
+      val interpolationParts = pairs.map(_._1)
+      AVector.from(stringParts) -> interpolationParts
+    }
+  def string[Ctx <: StatelessContext, T, Unknown: P](
+      stringInterpolator: () => P[T]
+  ): P[(AVector[String], Seq[T])] =
+    P(stringChained(stringInterpolator))
 
   def `abstract`[Unknown: P]: P[Boolean] = P(keyword("Abstract").?.!).map(_.nonEmpty)
 

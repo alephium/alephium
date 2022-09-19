@@ -969,11 +969,11 @@ class ServerUtils(implicit
   }
 
   def extractDebugMessage(event: ContractEventByTxId): Try[DebugMessage] = {
-    if (event.fields.length == 1 && event.fields(0).isInstanceOf[ValByteVec]) {
-      val message = event.fields(0).asInstanceOf[ValByteVec]
-      Right(DebugMessage(event.contractAddress, message.value.utf8String))
-    } else {
-      Left(failed("Invalid debug message"))
+    (event.fields.length, event.fields.headOption) match {
+      case (1, Some(message: ValByteVec)) =>
+        Right(DebugMessage(event.contractAddress, message.value.utf8String))
+      case _ =>
+        Left(failed("Invalid debug message"))
     }
   }
 

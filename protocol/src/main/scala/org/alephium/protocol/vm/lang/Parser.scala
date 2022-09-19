@@ -155,9 +155,16 @@ abstract class Parser[Ctx <: StatelessContext] {
   def normalRet[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
     P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.ReturnStmt.apply[Ctx])
 
+  def stringInterpolator[Unknown: P]: P[Ast.Expr[Ctx]] =
+    P("${" ~ expr ~ "}")
+
   def debug[Unknown: P]: P[Ast.DEBUG[Ctx]] =
-    P("debug!" ~ "(" ~ "`" ~ CharsWhile(c => c != '`').! ~ "`" ~ ")").map { message =>
-      Ast.DEBUG(Val.ByteVec(ByteString.fromString(message)))
+    P("debug!" ~ "(" ~ "`" ~~ Lexer.string(() => stringInterpolator) ~~ "`" ~ ")").map {
+      case (stringParts, interpolationParts) =>
+        Ast.DEBUG(
+          stringParts.map(s => Val.ByteVec(ByteString.fromString(s))),
+          interpolationParts
+        )
     }
 
   def anonymousVar[Unknown: P]: P[Ast.VarDeclaration] = P("_").map(_ => Ast.AnonymousVar)

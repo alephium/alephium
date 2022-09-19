@@ -3554,11 +3554,12 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "test debug function" in new EventFixture {
+    override lazy val initialState: AVector[Val] = AVector(Val.ByteVec.fromString("Alephium"))
     override def contractRaw: String =
       s"""
-         |Contract Foo(x: U256) {
+         |Contract Foo(name: ByteVec) {
          |  pub fn foo() -> () {
-         |    debug!(`Hello, World!`)
+         |    debug!(`Hello, $${name}!`)
          |  }
          |}
          |""".stripMargin
@@ -3578,7 +3579,7 @@ class VMSpec extends AlephiumSpec {
     logStates.states.length is 1
     val event = logStates.states.head
     event.index is debugEventIndex.v.v.toInt.toByte
-    event.fields is AVector[Val](Val.ByteVec(ByteString.fromString("Hello, World!")))
+    event.fields is AVector[Val](Val.ByteVec(ByteString.fromString("Hello, Alephium!")))
   }
 
   private def getEvents(

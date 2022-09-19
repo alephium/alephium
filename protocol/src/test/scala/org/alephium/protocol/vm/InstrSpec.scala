@@ -73,7 +73,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
-      vm.BlockHash
+      vm.BlockHash, DEBUG(AVector.empty)
     )
     val lemanStatefulInstrs = AVector[LemanInstr[StatefulContext]](
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
@@ -3107,6 +3107,45 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     vm.BlockHash.runWith(frameWithoutBlockHash).leftValue isE NoBlockHashAvailable
   }
 
+  it should "combine debug messages" in {
+    DEBUG(AVector(Val.ByteVec.fromString("Hello"))).combineUnsafe(AVector.empty) is
+      Val.ByteVec.fromString("Hello")
+    DEBUG(AVector(Val.ByteVec.fromString("Hello "), Val.ByteVec.fromString("!")))
+      .combineUnsafe(AVector(Val.ByteVec.fromString("Alephium"))) is
+      Val.ByteVec.fromString("Hello Alephium!")
+  }
+
+  it should "Debug" in new StatefulInstrFixture {
+    {
+      info("No debug message")
+      DEBUG(AVector.empty).runWith(frame).leftValue isE DebugMessageIsEmpty
+    }
+
+    {
+      info("Simple message")
+      DEBUG(AVector(Val.ByteVec.fromString("Hello, Alephium!"))).runWith(frame) isE ()
+    }
+
+    {
+      info("Interpolation")
+      val frame = prepareFrame()
+      DEBUG(AVector(Val.ByteVec.fromString("Hello, "), Val.ByteVec.fromString("!")))
+        .runWith(frame)
+        .leftValue isE
+        StackUnderflow
+
+      frame.pushOpStack(Val.ByteVec.fromString("Alephium"))
+      DEBUG(AVector(Val.ByteVec.fromString("Hello, "), Val.ByteVec.fromString("!")))
+        .runWith(frame) isE ()
+      frame.ctx.worldState.logState.eventLog
+        .get(LogStatesId(frame.obj.contractIdOpt.value, 0))
+        .rightValue
+        .states
+        .head
+        .fields is AVector[Val](Val.ByteVec.fromString("Hello, Alephium!"))
+    }
+  }
+
   it should "test gas amount" in new FrameFixture {
     val bytes      = AVector[Byte](0, 255.toByte, Byte.MaxValue, Byte.MinValue)
     val ints       = AVector[Int](0, 1 << 16, -(1 << 16))
@@ -3143,7 +3182,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280,
       ContractIdToAddress -> 5,
       LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2, AssertWithErrorCode -> 3, Swap -> 2,
-      vm.BlockHash -> 2
+      vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -3271,7 +3310,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6 -> 115, Log7 -> 116, Log8 -> 117, Log9 -> 118,
       ContractIdToAddress -> 119,
       LoadLocalByIndex -> 120, StoreLocalByIndex -> 121, Dup -> 122, AssertWithErrorCode -> 123, Swap -> 124,
-      vm.BlockHash -> 125,
+      vm.BlockHash -> 125, DEBUG(AVector.empty) -> 126,
       // stateful instructions
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -3329,7 +3368,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
-      vm.BlockHash
+      vm.BlockHash, DEBUG(AVector.empty)
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
