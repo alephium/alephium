@@ -140,12 +140,17 @@ object Lexer {
 
   def stringNoChar[Unknown: P]: P[String] =
     Pass("")
+  def stringEscaping[Unknown: P]: P[String] =
+    P("$$" | "$`").!.map(_.tail)
   def stringChars[Unknown: P]: P[String] =
-    P(CharsWhile(c => c != '$' && c != '`').! | stringNoChar)
+    P(CharsWhile(c => c != '$' && c != '`').!)
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  def stringPart[Unknown: P]: P[String] =
+    P((stringChars | stringEscaping).rep(1).map(_.reduce(_ ++ _)) | stringNoChar)
   def stringChained[Ctx <: StatelessContext, T, Unknown: P](
       stringInterpolator: () => P[T]
   ): P[(AVector[String], Seq[T])] =
-    P(stringChars ~ (stringInterpolator() ~ stringChars).rep).map { case (firstStringPart, pairs) =>
+    P(stringPart ~ (stringInterpolator() ~ stringPart).rep).map { case (firstStringPart, pairs) =>
       val stringParts        = AVector(firstStringPart) ++ AVector.from(pairs.view.map(_._2))
       val interpolationParts = pairs.map(_._1)
       AVector.from(stringParts) -> interpolationParts
@@ -153,7 +158,7 @@ object Lexer {
   def string[Ctx <: StatelessContext, T, Unknown: P](
       stringInterpolator: () => P[T]
   ): P[(AVector[String], Seq[T])] =
-    P(stringChained(stringInterpolator))
+    P("`" ~ stringChained(stringInterpolator) ~ "`")
 
   def `abstract`[Unknown: P]: P[Boolean] = P(keyword("Abstract").?.!).map(_.nonEmpty)
 

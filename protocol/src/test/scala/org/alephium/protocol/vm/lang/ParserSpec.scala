@@ -174,11 +174,6 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse debug statements" in {
-    fastparse.parse("", Lexer.stringChars(_)).get.value is ""
-    fastparse.parse("a", Lexer.stringChars(_)).get.value is "a"
-    fastparse.parse(" ", Lexer.stringChars(_)).get.value is " "
-    fastparse.parse("a b c$", Lexer.stringChars(_)).get.value is "a b c"
-
     fastparse.parse(s"$${a}", StatelessParser.stringInterpolator(_)).get.value is
       Variable[StatelessContext](Ident("a"))
     fastparse.parse(s"$${ x + y }", StatelessParser.stringInterpolator(_)).get.value is
@@ -191,13 +186,16 @@ class ParserSpec extends AlephiumSpec {
         AVector(Val.ByteVec(ByteString.empty), Val.ByteVec(ByteString.empty)),
         Seq(Variable(Ident("a")))
       )
-    fastparse.parse(s"debug!(`Hello, $${a}$${b} $${c} !`)", StatelessParser.debug(_)).get.value is
+    fastparse
+      .parse(s"debug!(`Hello, $${a}$${b} $${c} $$$$ $$` !`)", StatelessParser.debug(_))
+      .get
+      .value is
       Ast.DEBUG[StatelessContext](
         AVector(
           Val.ByteVec(ByteString.fromString("Hello, ")),
           Val.ByteVec(ByteString.empty),
           Val.ByteVec(ByteString.fromString(" ")),
-          Val.ByteVec(ByteString.fromString(" !"))
+          Val.ByteVec(ByteString.fromString(" $ ` !"))
         ),
         Seq(Variable(Ident("a")), Variable(Ident("b")), Variable(Ident("c")))
       )
