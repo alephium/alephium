@@ -24,12 +24,23 @@ import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Ast.MultiContract
 import org.alephium.util.AVector
 
+final case class CompiledContract(
+    code: StatefulContract,
+    ast: Ast.Contract,
+    warnings: AVector[String],
+    debugCode: StatefulContract
+)
+final case class CompiledScript(
+    code: StatefulScript,
+    ast: Ast.TxScript,
+    warnings: AVector[String],
+    debugCode: StatefulScript
+)
+
 // scalastyle:off number.of.methods
 // scalastyle:off file.size.limit
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object Compiler {
-  type CompiledContract = (StatefulContract, Ast.Contract, AVector[String])
-  type CompiledScript   = (StatefulScript, Ast.TxScript, AVector[String])
 
   def compileAssetScript(
       input: String,
@@ -52,7 +63,7 @@ object Compiler {
       index: Int = 0,
       compilerOptions: CompilerOptions = CompilerOptions.Default
   ): Either[Error, StatefulScript] =
-    compileTxScriptFull(input, index, compilerOptions).map(_._1)
+    compileTxScriptFull(input, index, compilerOptions).map(_.debugCode)
 
   def compileTxScriptFull(
       input: String,
@@ -66,7 +77,7 @@ object Compiler {
       index: Int = 0,
       compilerOptions: CompilerOptions = CompilerOptions.Default
   ): Either[Error, StatefulContract] =
-    compileContractFull(input, index, compilerOptions).map(_._1)
+    compileContractFull(input, index, compilerOptions).map(_.debugCode)
 
   def compileContractFull(
       input: String,
@@ -90,7 +101,7 @@ object Compiler {
     try {
       compileMultiContract(input).map { multiContract =>
         val statefulContracts =
-          multiContract.genStatefulContracts()(compilerOptions).map(c => (c._1, c._2, c._3))
+          multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
         val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
         (statefulContracts, statefulScripts)
       }
@@ -417,10 +428,12 @@ object Compiler {
   }
 
   // scalastyle:off number.of.methods
-  sealed trait State[Ctx <: StatelessContext] extends CallGraph with Warnings {
+  sealed trait State[Ctx <: StatelessContext] extends CallGraph with Warnings with CheckState {
     def typeId: Ast.TypeId
     def varTable: mutable.HashMap[String, VarInfo]
     var scope: Ast.FuncId
+    var allowDebug: Boolean = false
+
     var varIndex: Int
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]

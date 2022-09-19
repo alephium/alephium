@@ -180,9 +180,9 @@ class ParserSpec extends AlephiumSpec {
       Binop[StatelessContext](Add, Variable(Ident("x")), Variable(Ident("y")))
 
     fastparse.parse(s"debug!(``)", StatelessParser.debug(_)).get.value is
-      Ast.DEBUG[StatelessContext](AVector(Val.ByteVec(ByteString.empty)), Seq.empty)
+      Ast.Debug[StatelessContext](AVector(Val.ByteVec(ByteString.empty)), Seq.empty)
     fastparse.parse(s"debug!(`$${a}`)", StatelessParser.debug(_)).get.value is
-      Ast.DEBUG[StatelessContext](
+      Ast.Debug[StatelessContext](
         AVector(Val.ByteVec(ByteString.empty), Val.ByteVec(ByteString.empty)),
         Seq(Variable(Ident("a")))
       )
@@ -190,7 +190,7 @@ class ParserSpec extends AlephiumSpec {
       .parse(s"debug!(`Hello, $${a}$${b} $${c} $$$$ $$` !`)", StatelessParser.debug(_))
       .get
       .value is
-      Ast.DEBUG[StatelessContext](
+      Ast.Debug[StatelessContext](
         AVector(
           Val.ByteVec(ByteString.fromString("Hello, ")),
           Val.ByteVec(ByteString.empty),

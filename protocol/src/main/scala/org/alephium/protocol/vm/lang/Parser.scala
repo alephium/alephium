@@ -158,10 +158,10 @@ abstract class Parser[Ctx <: StatelessContext] {
   def stringInterpolator[Unknown: P]: P[Ast.Expr[Ctx]] =
     P("${" ~ expr ~ "}")
 
-  def debug[Unknown: P]: P[Ast.DEBUG[Ctx]] =
+  def debug[Unknown: P]: P[Ast.Debug[Ctx]] =
     P("debug!" ~ "(" ~ Lexer.string(() => stringInterpolator) ~ ")").map {
       case (stringParts, interpolationParts) =>
-        Ast.DEBUG(
+        Ast.Debug(
           stringParts.map(s => Val.ByteVec(ByteString.fromString(s))),
           interpolationParts
         )

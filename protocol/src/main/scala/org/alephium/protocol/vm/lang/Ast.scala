@@ -550,7 +550,7 @@ object Ast {
       }
     }
 
-    def check(state: Compiler.State[Ctx]): Unit = {
+    def check(state: Compiler.State[Ctx]): Unit = state.checkIfNot(name) {
       state.checkArguments(args)
       args.foreach(arg =>
         state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, isGenerated = false)
@@ -610,13 +610,16 @@ object Ast {
       }
     }
 
-    def toMethod(state: Compiler.State[Ctx]): Method[Ctx] = {
+    def toMethodAndCheck(state: Compiler.State[Ctx]): Method[Ctx] = {
       state.setFuncScope(id)
       check(state)
 
       val instrs    = body.flatMap(_.genCode(state))
       val localVars = state.getLocalVars(id)
-      ContractAssets.checkCodeUsingContractAssets(instrs, useAssetsInContract, state.typeId, id)
+      state.checkLast(name)(
+        ContractAssets.checkCodeUsingContractAssets(instrs, useAssetsInContract, state.typeId, id)
+      )
+
       Method[Ctx](
         isPublic,
         usePreapprovedAssets,
@@ -869,7 +872,7 @@ object Ast {
       exprs.flatMap(_.genCode(state)) :+ Return
   }
 
-  final case class DEBUG[Ctx <: StatelessContext](
+  final case class Debug[Ctx <: StatelessContext](
       stringParts: AVector[Val.ByteVec],
       interpolationParts: Seq[Expr[Ctx]]
   ) extends Statement[Ctx] {
@@ -878,8 +881,12 @@ object Ast {
     }
 
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      interpolationParts.flatMap(_.genCode(state)) :+
-        vm.DEBUG(stringParts)
+      if (state.allowDebug) {
+        interpolationParts.flatMap(_.genCode(state)) :+
+          vm.DEBUG(stringParts)
+      } else {
+        Seq.empty
+      }
     }
   }
 
@@ -915,7 +922,7 @@ object Ast {
       }
     }
 
-    def check(state: Compiler.State[Ctx]): Unit = {
+    def checkBasics(state: Compiler.State[Ctx]): Unit = state.checkIfNot(name) {
       state.checkArguments(fields)
       templateVars.zipWithIndex.foreach { case (temp, index) =>
         state.addTemplateVariable(temp.ident, temp.tpe, index)
@@ -931,9 +938,9 @@ object Ast {
       )
     }
 
-    def getMethods(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
-      val methods = AVector.from(funcs.view.map(_.toMethod(state)))
-      state.checkUnusedFields()
+    def getMethodsAndCheck(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
+      val methods = AVector.from(funcs.view.map(_.toMethodAndCheck(state)))
+      state.checkIfNot(name)(state.checkUnusedFields())
       methods
     }
 
@@ -950,10 +957,12 @@ object Ast {
     def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatelessContext]] = Seq.empty
 
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
-      check(state)
-      StatelessScript
-        .from(getMethods(state))
+      checkBasics(state)
+      val script = StatelessScript
+        .from(getMethodsAndCheck(state))
         .getOrElse(throw Compiler.Error(s"No methods found in ${quote(ident.name)}"))
+      state.setChecked(name)
+      script
     }
   }
 
@@ -999,8 +1008,8 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
-      check(state)
-      val methods = getMethods(state)
+      checkBasics(state)
+      val methods = getMethodsAndCheck(state)
       val script = StatefulScript
         .from(methods)
         .getOrElse(
@@ -1011,9 +1020,11 @@ object Ast {
       // skip check readonly for main function
       val methodsExceptMain = methods.tail
       val funcsExceptMain   = funcs.tail
-      methodsExceptMain.foreachWithIndex { case (method, index) =>
-        funcsExceptMain(index).checkReadonly(state, method.instrs)
-      }
+      state.checkLast(name)(
+        methodsExceptMain.foreachWithIndex { case (method, index) =>
+          funcsExceptMain(index).checkReadonly(state, method.instrs)
+        }
+      )
       script
     }
   }
@@ -1076,22 +1087,25 @@ object Ast {
       }
     }
 
-    override def check(state: Compiler.State[StatefulContext]): Unit = {
-      checkFuncs()
-      checkConstants(state)
-      checkInheritances(state)
-      super.check(state)
-    }
+    override def checkBasics(state: Compiler.State[StatefulContext]): Unit =
+      state.checkIfNot(name) {
+        checkFuncs()
+        checkConstants(state)
+        checkInheritances(state)
+        super.checkBasics(state)
+      }
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
-      check(state)
-      val methods  = getMethods(state)
+      checkBasics(state)
+      val methods  = getMethodsAndCheck(state)
       val contract = StatefulContract(Type.flattenTypeLength(fields.map(_.tpe)), methods)
-      methods.foreachWithIndex { case (method, index) =>
-        funcs(index).checkReadonly(state, method.instrs)
+      state.checkLast(name) {
+        methods.foreachWithIndex { case (method, index) =>
+          funcs(index).checkReadonly(state, method.instrs)
+        }
+        checkIfPrivateMethodsUsed(state)
       }
-      checkIfPrivateMethodsUsed(state)
       contract
     }
 
@@ -1268,21 +1282,24 @@ object Ast {
       MultiContract(newContracts, Some(dependencies))
     }
 
-    def genStatefulScripts()(implicit
-        compilerOptions: CompilerOptions
-    ): AVector[(StatefulScript, TxScript, AVector[String])] = {
+    def genStatefulScripts()(implicit compilerOptions: CompilerOptions): AVector[CompiledScript] = {
       AVector.from(contracts.view.zipWithIndex.collect { case (_: TxScript, index) =>
         genStatefulScript(index)
       })
     }
 
-    def genStatefulScript(
-        contractIndex: Int
-    )(implicit compilerOptions: CompilerOptions): (StatefulScript, TxScript, AVector[String]) = {
+    def genStatefulScript(contractIndex: Int)(implicit
+        compilerOptions: CompilerOptions
+    ): CompiledScript = {
       val state = Compiler.State.buildFor(this, contractIndex)
       get(contractIndex) match {
-        case script: TxScript => (script.genCode(state), script, state.getWarnings)
-        case _: Contract      => throw Compiler.Error(s"The code is for Contract, not for TxScript")
+        case script: TxScript =>
+          val statefulScript = script.genCode(state)
+          val warnings       = state.getWarnings
+          state.allowDebug = true
+          val statefulDebugScript = script.genCode(state)
+          CompiledScript(statefulScript, script, warnings, statefulDebugScript)
+        case _: Contract => throw Compiler.Error(s"The code is for Contract, not for TxScript")
         case _: ContractInterface =>
           throw Compiler.Error(s"The code is for Interface, not for TxScript")
       }
@@ -1334,7 +1351,7 @@ object Ast {
 
     def genStatefulContracts()(implicit
         compilerOptions: CompilerOptions
-    ): AVector[(StatefulContract, Contract, AVector[String], Int)] = {
+    ): AVector[(CompiledContract, Int)] = {
       val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
       val externalCallCheckTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
       val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
@@ -1354,13 +1371,20 @@ object Ast {
       }
       statefulContracts.map { case (statefulContract, contract, state, index) =>
         checkExternalCallPermissions(state, contract, externalCallCheckTables)
-        (statefulContract, contract, state.getWarnings, index)
+        state.allowDebug = true
+        val statefulDebugContract = contract.genCode(state)
+        CompiledContract(
+          statefulContract,
+          contract,
+          state.getWarnings,
+          statefulDebugContract
+        ) -> index
       }
     }
 
-    def genStatefulContract(
-        contractIndex: Int
-    )(implicit compilerOptions: CompilerOptions): (StatefulContract, Contract, AVector[String]) = {
+    def genStatefulContract(contractIndex: Int)(implicit
+        compilerOptions: CompilerOptions
+    ): CompiledContract = {
       get(contractIndex) match {
         case contract: Contract =>
           if (contract.isAbstract) {
@@ -1369,8 +1393,8 @@ object Ast {
             )
           }
           val statefulContracts = genStatefulContracts()
-          statefulContracts.find(_._4 == contractIndex) match {
-            case Some(v) => (v._1, v._2, v._3)
+          statefulContracts.find(_._2 == contractIndex) match {
+            case Some(v) => v._1
             case None => // should never happen
               throw Compiler.Error(s"Failed to compile contract ${contract.ident.name}")
           }

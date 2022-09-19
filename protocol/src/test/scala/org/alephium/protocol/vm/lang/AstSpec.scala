@@ -47,10 +47,10 @@ class AstSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val (_, contractAst, _) = Compiler.compileContractFull(code).rightValue
-    val foo                 = contractAst.funcs(0)
-    val bar                 = contractAst.funcs(1)
-    val baz                 = contractAst.funcs(2)
+    val contractAst = Compiler.compileContractFull(code).rightValue.ast
+    val foo         = contractAst.funcs(0)
+    val bar         = contractAst.funcs(1)
+    val baz         = contractAst.funcs(2)
     foo.id.name is "foo"
     foo.hasDirectExternalCallCheck() is false
     bar.id.name is "bar"
@@ -216,7 +216,7 @@ class AstSpec extends AlephiumSpec {
   }
 
   it should "check permission for external calls" in new ExternalCallsFixture {
-    val (_, _, warnings) = Compiler.compileContractFull(externalCalls, 0).rightValue
+    val warnings = Compiler.compileContractFull(externalCalls, 0).rightValue.warnings
     externalCallCheckWarnings(warnings).toSet is Set(
       Warnings.noExternalCallCheckMsg("InternalCalls", "c"),
       Warnings.noExternalCallCheckMsg("InternalCalls", "f"),
@@ -245,7 +245,7 @@ class AstSpec extends AlephiumSpec {
   }
 
   it should "not check permission for mutual recursive calls" in new MutualRecursionFixture {
-    val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
+    val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
     externalCallCheckWarnings(warnings).toSet is Set(
       Warnings.noExternalCallCheckMsg("Bar", "a")
     )
@@ -297,9 +297,9 @@ class AstSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      val (_, _, warnings0) = Compiler.compileContractFull(code(true), 0).rightValue
+      val warnings0 = Compiler.compileContractFull(code(true), 0).rightValue.warnings
       warnings0.isEmpty is true
-      val (_, _, warnings1) = Compiler.compileContractFull(code(false), 0).rightValue
+      val warnings1 = Compiler.compileContractFull(code(false), 0).rightValue.warnings
       warnings1.isEmpty is true
     }
 
@@ -323,7 +323,7 @@ class AstSpec extends AlephiumSpec {
            |}
            |""".stripMargin
 
-      val (_, _, warnings) = Compiler.compileContractFull(code, 0).rightValue
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings.isEmpty is true
     }
   }
@@ -349,7 +349,7 @@ class AstSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val (_, _, warnings0) = Compiler.compileContractFull(code0, 0).rightValue
+    val warnings0 = Compiler.compileContractFull(code0, 0).rightValue.warnings
     warnings0 is AVector("Private function Foo.private1 is not used")
 
     val code1 =
@@ -375,7 +375,7 @@ class AstSpec extends AlephiumSpec {
          |""".stripMargin
     val (contracts, _) = Compiler.compileProject(code1).rightValue
     contracts.length is 2
-    contracts.foreach(_._3.isEmpty is true)
+    contracts.foreach(_.warnings.isEmpty is true)
   }
 
   behavior of "Compiler"

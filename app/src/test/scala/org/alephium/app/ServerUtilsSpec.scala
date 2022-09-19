@@ -1709,12 +1709,12 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts.length is 1
     contracts.length is 1
     val contractCode = result.contracts(0).bytecode
-    contractCode is Hex.toHexString(serialize(contracts(0)._1))
+    contractCode is Hex.toHexString(serialize(contracts(0).code))
 
     result.scripts.length is 1
     scripts.length is 1
     val scriptCode = result.scripts(0).bytecodeTemplate
-    scriptCode is scripts(0)._1.toTemplateString()
+    scriptCode is scripts(0).code.toTemplateString()
   }
 
   it should "compile script" in new Fixture {
