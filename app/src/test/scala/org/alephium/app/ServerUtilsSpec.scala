@@ -1165,7 +1165,27 @@ class ServerUtilsSpec extends AlephiumSpec {
         testContractParams.toComplete().rightValue
       )
       .leftValue
-      .detail is "PayToContractAddressNotInCallerTrace"
+      .detail is "VM execution error: PayToContractAddressNotInCallerTrace"
+  }
+
+  it should "show debug message when contract execution failed" in new Fixture {
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  fn foo() -> () {
+         |    debug!(`Hello, Alephium!`)
+         |    assert!(false, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).rightValue
+
+    val serverUtils  = new ServerUtils()
+    val testContract = TestContract(bytecode = code).toComplete().rightValue
+    val testError    = serverUtils.runTestContract(blockFlow, testContract).leftValue.detail
+    testError is
+      s"DEBUG - ${Address.contract(testContract.contractId).toBase58} - Hello, Alephium!\n" ++
+      "VM execution error: AssertionFailedWithErrorCode(0000000000000000000000000000000000000000000000000000000000000000,0)"
   }
 
   it should "test blockHash function for Ralph" in new TestContractFixture {

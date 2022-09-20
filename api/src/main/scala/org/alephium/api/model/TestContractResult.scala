@@ -32,4 +32,6 @@ final case class TestContractResult(
     debugMessages: AVector[DebugMessage]
 )
 
-final case class DebugMessage(contractAddress: Address.Contract, message: String)
+final case class DebugMessage(contractAddress: Address.Contract, message: String) {
+  override def toString(): String = s"DEBUG - ${contractAddress.toBase58} - $message"
+}

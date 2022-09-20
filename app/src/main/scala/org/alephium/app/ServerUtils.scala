@@ -1113,7 +1113,29 @@ class ServerUtils(implicit
         )
       )
     )
-    wrapExeResult(StatefulVM.runTxScriptWithOutputs(context, script))
+    runWithDebugError(context, script)
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def runWithDebugError(
+      context: StatefulContext,
+      script: StatefulScript
+  ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    StatefulVM.runTxScriptWithOutputs(context, script) match {
+      case Right(result)         => Right(result)
+      case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
+      case Left(Right(exeFailure)) =>
+        val errorString = s"VM execution error: ${exeFailure.toString()}"
+        val events      = fetchContractEvents(context.worldState)
+        extractDebugMessages(events).flatMap { case (_, debugMessages) =>
+          val detail = if (debugMessages.isEmpty) {
+            errorString
+          } else {
+            debugMessages.mkString("", "\n", "\n") ++ errorString
+          }
+          Left(failed(detail))
+        }
+    }
   }
 
   private def approveAsset(
