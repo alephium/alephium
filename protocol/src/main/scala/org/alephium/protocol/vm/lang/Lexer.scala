@@ -155,7 +155,7 @@ object Lexer {
       val interpolationParts = pairs.map(_._1)
       AVector.from(stringParts) -> interpolationParts
     }
-  def string[Ctx <: StatelessContext, T, Unknown: P](
+  def string[T, Unknown: P](
       stringInterpolator: () => P[T]
   ): P[(AVector[String], Seq[T])] =
     P("`" ~ stringChained(stringInterpolator) ~ "`")

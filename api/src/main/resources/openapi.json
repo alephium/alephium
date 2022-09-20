@@ -5940,7 +5940,7 @@
                 "example": {
                   "name": "Main",
                   "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
-                  "bytecodeDebugPatch": "e:1,d:1,i:ef",
+                  "bytecodeDebugPatch": "=1-1+ef",
                   "fields": {
                     "names": [
                       "aa",
@@ -6241,7 +6241,7 @@
                 "example": {
                   "name": "Foo",
                   "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
-                  "bytecodeDebugPatch": "e:1,d:1,i:ef",
+                  "bytecodeDebugPatch": "=1-1+ef",
                   "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
                     "names": [
@@ -6429,7 +6429,7 @@
                     {
                       "name": "Foo",
                       "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
-                      "bytecodeDebugPatch": "e:1,d:1,i:ef",
+                      "bytecodeDebugPatch": "=1-1+ef",
                       "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                       "fields": {
                         "names": [
@@ -6515,7 +6515,7 @@
                     {
                       "name": "Main",
                       "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
-                      "bytecodeDebugPatch": "e:1,d:1,i:ef",
+                      "bytecodeDebugPatch": "=1-1+ef",
                       "fields": {
                         "names": [
                           "aa",

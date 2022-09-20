@@ -547,7 +547,7 @@ trait EndpointsExamples extends ErrorExamples {
   private val compileScriptResult = CompileScriptResult(
     name = "Main",
     bytecodeTemplate = hexString,
-    bytecodeDebugPatch = CompileProjectResult.Patch("e:1,d:1,i:ef"),
+    bytecodeDebugPatch = CompileProjectResult.Patch("=1-1+ef"),
     fields = CompileResult.FieldsSig(
       names = AVector("aa", "bb", "cc", "dd", "ee"),
       types = AVector("Bool", "U256", "I256", "ByteVec", "Address"),
@@ -573,7 +573,7 @@ trait EndpointsExamples extends ErrorExamples {
   private val compileContractResult = CompileContractResult(
     name = "Foo",
     bytecode = hexString,
-    bytecodeDebugPatch = CompileProjectResult.Patch("e:1,d:1,i:ef"),
+    bytecodeDebugPatch = CompileProjectResult.Patch("=1-1+ef"),
     codeHash = hash,
     fields = CompileResult.FieldsSig(
       names = AVector("aa", "bb", "cc", "dd", "ee"),
