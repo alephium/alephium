@@ -5940,6 +5940,7 @@
                 "example": {
                   "name": "Main",
                   "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
+                  "bytecodeDebugPatch": "e:1,d:1,i:ef",
                   "fields": {
                     "names": [
                       "aa",
@@ -6240,6 +6241,7 @@
                 "example": {
                   "name": "Foo",
                   "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
+                  "bytecodeDebugPatch": "e:1,d:1,i:ef",
                   "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
                     "names": [
@@ -6427,6 +6429,7 @@
                     {
                       "name": "Foo",
                       "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "bytecodeDebugPatch": "e:1,d:1,i:ef",
                       "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                       "fields": {
                         "names": [
@@ -6512,6 +6515,7 @@
                     {
                       "name": "Main",
                       "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "bytecodeDebugPatch": "e:1,d:1,i:ef",
                       "fields": {
                         "names": [
                           "aa",
@@ -7067,6 +7071,12 @@
                           "value": "10"
                         }
                       ]
+                    }
+                  ],
+                  "debugMessages": [
+                    {
+                      "contractAddress": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                      "message": "Debugging!"
                     }
                   ]
                 }
@@ -9776,6 +9786,7 @@
         "required": [
           "name",
           "bytecode",
+          "bytecodeDebugPatch",
           "codeHash",
           "fields",
           "functions",
@@ -9788,6 +9799,9 @@
             "type": "string"
           },
           "bytecode": {
+            "type": "string"
+          },
+          "bytecodeDebugPatch": {
             "type": "string"
           },
           "codeHash": {
@@ -9842,6 +9856,7 @@
         "required": [
           "name",
           "bytecodeTemplate",
+          "bytecodeDebugPatch",
           "fields",
           "functions",
           "warnings"
@@ -9852,6 +9867,9 @@
             "type": "string"
           },
           "bytecodeTemplate": {
+            "type": "string"
+          },
+          "bytecodeDebugPatch": {
             "type": "string"
           },
           "fields": {
@@ -10150,6 +10168,22 @@
           },
           "asset": {
             "$ref": "#/components/schemas/AssetState"
+          }
+        }
+      },
+      "DebugMessage": {
+        "required": [
+          "contractAddress",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "contractAddress": {
+            "type": "string",
+            "format": "address"
+          },
+          "message": {
+            "type": "string"
           }
         }
       },
@@ -11027,7 +11061,8 @@
           "contracts",
           "txInputs",
           "txOutputs",
-          "events"
+          "events",
+          "debugMessages"
         ],
         "type": "object",
         "properties": {
@@ -11072,6 +11107,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ContractEventByTxId"
+            }
+          },
+          "debugMessages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DebugMessage"
             }
           }
         }
