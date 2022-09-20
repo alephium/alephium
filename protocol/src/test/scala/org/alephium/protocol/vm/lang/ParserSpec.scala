@@ -326,15 +326,6 @@ class ParserSpec extends AlephiumSpec {
     parsed3.useAssetsInContract is true
     parsed3.useExternalCallCheck is true
     parsed3.useReadonly is true
-
-    val error = intercept[Compiler.Error](
-      fastparse.parse(
-        """@using(assetsInContract = true)
-          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
-        StatelessParser.assetScriptFunc(_)
-      )
-    )
-    error.message is "AssetScript does not support using annotation"
   }
 
   it should "parser contract initial states" in {

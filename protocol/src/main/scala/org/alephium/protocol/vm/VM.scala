@@ -490,6 +490,29 @@ object StatefulVM {
     vm.executeWithOutputs(obj, methodIndex, args)
   }
 
+  def executeWithOutputsWithDebug(
+      context: StatefulContext,
+      obj: ContractObj[StatefulContext],
+      args: AVector[Val],
+      methodIndex: Int
+  ): ExeResult[AVector[Val]] = {
+    val results = executeWithOutputs(context, obj, args, methodIndex)
+    context.worldState.logState.getNewLogs().map { logStates =>
+      logStates.states.foreach { logState =>
+        if (logState.index == debugEventIndex.v.v.intValue().toByte) {
+          logState.fields.headOption.foreach {
+            case Val.ByteVec(bytes) =>
+              print(
+                s"Debug - ${Address.contract(logStates.contractId).toBase58} - ${bytes.utf8String}\n"
+              )
+            case _ => ()
+          }
+        }
+      }
+    }
+    results
+  }
+
   def executeWithOutputs(
       context: StatefulContext,
       obj: ContractObj[StatefulContext],

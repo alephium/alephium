@@ -50,7 +50,7 @@ object Compiler {
       fastparse.parse(input, StatelessParser.assetScript(_)) match {
         case Parsed.Success(script, _) =>
           val state = State.buildFor(script)(compilerOptions)
-          Right((script.genCode(state), state.getWarnings))
+          Right((script.genCodeFull(state), state.getWarnings))
         case failure: Parsed.Failure =>
           Left(Error.parse(failure))
       }
@@ -337,7 +337,6 @@ object Compiler {
       StateForScript(
         script.ident,
         mutable.HashMap.empty,
-        Ast.FuncId.empty,
         0,
         script.funcTable,
         immutable.Map(script.ident -> ContractInfo(ContractKind.TxScript, script.funcTable))
@@ -353,7 +352,6 @@ object Compiler {
         contract.ident,
         contract.isInstanceOf[Ast.TxScript],
         mutable.HashMap.empty,
-        Ast.FuncId.empty,
         0,
         contract.funcTable,
         contract.eventsInfo(),
@@ -393,14 +391,14 @@ object Compiler {
   )
 
   trait CallGraph {
-    def scope: Ast.FuncId
+    def currentScope: Ast.FuncId
 
     // caller -> callees
     val internalCalls = mutable.HashMap.empty[Ast.FuncId, mutable.Set[Ast.FuncId]]
     def addInternalCall(callee: Ast.FuncId): Unit = {
-      internalCalls.get(scope) match {
+      internalCalls.get(currentScope) match {
         case Some(callees) => callees += callee
-        case None          => internalCalls.update(scope, mutable.Set(callee))
+        case None          => internalCalls.update(currentScope, mutable.Set(callee))
       }
     }
     // callee -> callers
@@ -420,43 +418,32 @@ object Compiler {
     val externalCalls = mutable.HashMap.empty[Ast.FuncId, mutable.Set[(Ast.TypeId, Ast.FuncId)]]
     def addExternalCall(contract: Ast.TypeId, func: Ast.FuncId): Unit = {
       val funcRef = contract -> func
-      externalCalls.get(scope) match {
+      externalCalls.get(currentScope) match {
         case Some(callees) => callees += funcRef
-        case None          => externalCalls.update(scope, mutable.Set(funcRef))
+        case None          => externalCalls.update(currentScope, mutable.Set(funcRef))
       }
     }
   }
 
   // scalastyle:off number.of.methods
-  sealed trait State[Ctx <: StatelessContext] extends CallGraph with Warnings with CheckState {
+  sealed trait State[Ctx <: StatelessContext]
+      extends CallGraph
+      with Warnings
+      with Scope
+      with PhaseLike {
     def typeId: Ast.TypeId
     def varTable: mutable.HashMap[String, VarInfo]
-    var scope: Ast.FuncId
     var allowDebug: Boolean = false
 
-    var varIndex: Int
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
-    private var freshNameIndex: Int              = 0
-    private var arrayIndexVar: Option[Ast.Ident] = None
-    val usedVars: mutable.Set[String]            = mutable.Set.empty[String]
+    val usedVars: mutable.Set[String] = mutable.Set.empty[String]
     def eventsInfo: Seq[EventInfo]
 
-    @inline final def freshName(): String = {
-      val name = s"_generated#$freshNameIndex"
-      freshNameIndex += 1
-      name
-    }
-
     def getArrayIndexVar(): Ast.Ident = {
-      arrayIndexVar match {
-        case Some(ident) => ident
-        case None =>
-          val ident = Ast.Ident(freshName())
-          addLocalVariable(ident, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
-          arrayIndexVar = Some(ident)
-          ident
-      }
+      getArrayIndexVar(
+        addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
+      )
     }
 
     @SuppressWarnings(
@@ -499,6 +486,7 @@ object Compiler {
     ): Unit = {
       val sname = checkNewVariable(ident)
       varTable(sname) = VarInfo.ArrayRef(isMutable, isUnused, isGenerated, arrayRef)
+      trackGenCodePhaseNewVars(sname)
     }
 
     def getArrayRef(ident: Ast.Ident): ArrayTransformer.ArrayRef[Ctx] = {
@@ -508,14 +496,12 @@ object Compiler {
       }
     }
 
-    def setFuncScope(funcId: Ast.FuncId): Unit = {
-      scope = funcId
-      varIndex = 0
-      arrayIndexVar = None
+    protected def scopedName(name: String): String = {
+      if (currentScope == Ast.FuncId.empty) name else scopedName(currentScope, name)
     }
 
-    protected def scopedName(name: String): String = {
-      if (scope == Ast.FuncId.empty) name else s"${scope.name}.$name"
+    protected def scopedName(scopeId: Ast.FuncId, name: String): String = {
+      s"${scopeId.name}.$name"
     }
 
     def addTemplateVariable(ident: Ast.Ident, tpe: Type, index: Int): Unit = {
@@ -573,12 +559,20 @@ object Compiler {
           ()
         case c: Type.Contract =>
           val varType = Type.Contract.local(c.id, ident)
-          varTable(sname) =
-            varInfoBuilder(varType, isMutable, isUnused, varIndex.toByte, isGenerated)
-          varIndex += 1
+          varTable(sname) = varInfoBuilder(
+            varType,
+            isMutable,
+            isUnused,
+            currentScopeState.varIndex.toByte,
+            isGenerated
+          )
+          trackGenCodePhaseNewVars(sname)
+          currentScopeState.varIndex += 1
         case _ =>
-          varTable(sname) = varInfoBuilder(tpe, isMutable, isUnused, varIndex.toByte, isGenerated)
-          varIndex += 1
+          varTable(sname) =
+            varInfoBuilder(tpe, isMutable, isUnused, currentScopeState.varIndex.toByte, isGenerated)
+          trackGenCodePhaseNewVars(sname)
+          currentScopeState.varIndex += 1
       }
     }
     def addConstantVariable(ident: Ast.Ident, tpe: Type, instrs: Seq[Instr[Ctx]]): Unit = {
@@ -593,7 +587,7 @@ object Compiler {
         throw Error(s"Global variable has the same name as local variable: $name")
       } else if (varTable.contains(sname)) {
         throw Error(s"Local variables have the same name: $name")
-      } else if (varIndex >= State.maxVarIndex) {
+      } else if (currentScopeState.varIndex >= State.maxVarIndex) {
         throw Error(s"Number of variables more than ${State.maxVarIndex}")
       }
       sname
@@ -769,7 +763,7 @@ object Compiler {
     }
 
     def checkReturn(returnType: Seq[Type]): Unit = {
-      val rtype = funcIdents(scope).returnType
+      val rtype = funcIdents(currentScope).returnType
       if (returnType != rtype) {
         throw Error(s"Invalid return types: expected ${quote(rtype)}, got ${quote(returnType)}")
       }
@@ -781,7 +775,6 @@ object Compiler {
   final case class StateForScript(
       typeId: Ast.TypeId,
       varTable: mutable.HashMap[String, VarInfo],
-      var scope: Ast.FuncId,
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatelessContext]],
       contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatelessContext]]
@@ -854,7 +847,6 @@ object Compiler {
       typeId: Ast.TypeId,
       isTxScript: Boolean,
       varTable: mutable.HashMap[String, VarInfo],
-      var scope: Ast.FuncId,
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatefulContext]],
       eventsInfo: Seq[EventInfo],
@@ -901,7 +893,7 @@ object Compiler {
     def genStoreCode(
         offset: ArrayTransformer.ArrayVarOffset[StatefulContext],
         isLocal: Boolean
-    ): Seq[Instr[StatefulContext]] =
+    ): Seq[Instr[StatefulContext]] = {
       genVarIndexCode(
         offset,
         isLocal,
@@ -910,6 +902,7 @@ object Compiler {
         StoreLocalByIndex,
         StoreFieldByIndex
       )
+    }
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {

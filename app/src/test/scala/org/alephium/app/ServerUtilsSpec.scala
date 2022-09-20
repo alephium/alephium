@@ -1185,7 +1185,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testError    = serverUtils.runTestContract(blockFlow, testContract).leftValue.detail
     testError is
       s"DEBUG - ${Address.contract(testContract.contractId).toBase58} - Hello, Alephium!\n" ++
-      "VM execution error: AssertionFailedWithErrorCode(0000000000000000000000000000000000000000000000000000000000000000,0)"
+      "VM execution error: AssertionFailedWithErrorCode(tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq,0)"
   }
 
   it should "test blockHash function for Ralph" in new TestContractFixture {
@@ -1204,7 +1204,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContract0 = TestContract(bytecode = code).toComplete().rightValue
     val testResult0   = serverUtils.runTestContract(blockFlow, testContract0).leftValue
-    testResult0.detail is s"VM execution error: AssertionFailedWithErrorCode(${ContractId.zero.toHexString},0)"
+    testResult0.detail is s"VM execution error: AssertionFailedWithErrorCode(tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq,0)"
 
     val testContract1 =
       TestContract(bytecode = code, blockHash = Some(blockHash)).toComplete().rightValue

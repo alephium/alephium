@@ -456,18 +456,10 @@ object StatelessParser extends Parser[StatelessContext] {
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
     P(varDef | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret)
 
-  def assetScriptFunc[Unknown: P]: P[Ast.FuncDef[StatelessContext]] =
-    func.map { f =>
-      if (f.annotations.exists(_.id.name == Parser.usingAnnotationId)) {
-        throw new Compiler.Error("AssetScript does not support using annotation")
-      }
-      f
-    }
-
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
       Start ~ Lexer.keyword("AssetScript") ~/ Lexer.typeId ~ templateParams.? ~
-        "{" ~ assetScriptFunc.rep(1) ~ "}"
+        "{" ~ func.rep(1) ~ "}"
     ).map { case (typeId, templateVars, funcs) =>
       Ast.AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
     }

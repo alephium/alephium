@@ -121,6 +121,7 @@ class AstSpec extends AlephiumSpec {
     val contracts = fastparse.parse(internalCalls, StatefulParser.multiContract(_)).get.value
     val state     = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
     val contract  = contracts.contracts(0).asInstanceOf[Ast.Contract]
+    contract.check(state)
     contract.genCode(state)
     val interallCalls = state.internalCalls
       .map { case (caller, callees) =>

@@ -49,6 +49,6 @@ class BuiltInSpec extends AlephiumSpec {
             .asInstanceOf[Seq[Instr[_]]]
         case _: Any => Seq.empty[Instr[_]]
       }
-      .toSet is Ast.ContractAssets.contractAssetsInstrs.-(SelfAddress)
+      .toSet is StaticAnalysis.contractAssetsInstrs.-(SelfAddress)
   }
 }

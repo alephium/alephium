@@ -31,6 +31,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |// comment
          |AssetScript Foo {
+         |  @using(readonly = true)
          |  pub fn bar(a: U256, b: U256) -> (U256) {
          |    return (a + b)
          |  }
@@ -447,11 +448,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         fields: AVector[Val] = AVector.empty,
         methodIndex: Int = 0
     ): Assertion = {
-      val contract = Compiler.compileContract(input).rightValue
+      val compiled = Compiler.compileContractFull(input).rightValue
+      compiled.code is compiled.debugCode
+      val contract = compiled.code
 
       deserialize[StatefulContract](serialize(contract)) isE contract
       val (obj, context) = prepareContract(contract, fields)
-      StatefulVM.executeWithOutputs(context, obj, args, methodIndex) isE output
+      StatefulVM.executeWithOutputsWithDebug(context, obj, args, methodIndex) isE output
     }
 
     def fail(
@@ -1174,7 +1177,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    i = 0
            |    while (i < 2) {
            |      assert!(x[i][0] == i, 0)
-           |      assert!(x[i][1] == i + 1, 0)
+           |      assert!(x[i][1] == i + 1, 1)
            |      i = i + 1
            |    }
            |  }
@@ -1479,6 +1482,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     // TODO: optimize following cases
     testConstantFolding("2 * 4 + 4 * i - 2 * 3", "8 + 4 * i - 6")
     testConstantFolding("a + 2 + 3", "a + 2 + 3")
+  }
+
+  it should "use the same generated variable for both production and debug code" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    assert!(bar() == 0, 0)
+         |    assert!(bas()[0] == 1, 0)
+         |    assert!(bat()[0][1] == 0, 0)
+         |  }
+         |  fn bar() -> U256 {
+         |    return 0
+         |  }
+         |  fn bas() -> [U256; 3] {
+         |    return [0, 1, 2]
+         |  }
+         |  fn bat() -> [[U256; 3]; 2] {
+         |    return [[0, 1, 2]; 2]
+         |  }
+         |}
+         |""".stripMargin
+    val compiled = Compiler.compileContractFull(code).rightValue
+    compiled.code is compiled.debugCode
   }
 
   it should "compile return multiple values failed" in {
@@ -2682,6 +2709,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |AssetScript Foo {
+           |  @using(readonly = true)
            |  pub fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 2

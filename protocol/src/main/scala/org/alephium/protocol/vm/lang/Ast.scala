@@ -43,7 +43,7 @@ object Ast {
   final case class Annotation(id: Ident, fields: Seq[AnnotationField])
 
   object FuncId {
-    def empty: FuncId = FuncId("", isBuiltIn = false)
+    lazy val empty: FuncId = FuncId("", isBuiltIn = false)
   }
 
   def funcName(typeId: TypeId, funcId: FuncId): String = quote(s"${typeId.name}.${funcId.name}")
@@ -107,30 +107,6 @@ object Ast {
         case _ => ()
       }
       approveAssets.flatMap(_.genCode(state))
-    }
-  }
-  object ContractAssets {
-    val contractAssetsInstrs: Set[Instr[_]] =
-      Set(
-        TransferAlphFromSelf,
-        TransferTokenFromSelf,
-        TransferAlphToSelf,
-        TransferTokenToSelf,
-        DestroySelf,
-        SelfAddress
-      )
-
-    def checkCodeUsingContractAssets[Ctx <: StatelessContext](
-        instrs: Seq[Instr[Ctx]],
-        useAssetsInContract: Boolean,
-        typeId: TypeId,
-        funcId: FuncId
-    ): Unit = {
-      if (useAssetsInContract && !instrs.exists(contractAssetsInstrs.contains(_))) {
-        throw Compiler.Error(
-          s"Function ${funcName(typeId, funcId)} does not use contract assets, but its annotation of contract assets is turn on"
-        )
-      }
     }
   }
 
@@ -265,7 +241,9 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      state.addInternalCall(id)
+      state.addInternalCall(
+        id
+      ) // don't put this in _getType, otherwise the statement might get skipped
       val func = state.getFunc(id)
       genApproveCode(state, func) ++
         args.flatMap(_.genCode(state)) ++
@@ -550,7 +528,8 @@ object Ast {
       }
     }
 
-    def check(state: Compiler.State[Ctx]): Unit = state.checkIfNot(name) {
+    def check(state: Compiler.State[Ctx]): Unit = {
+      state.setFuncScope(id)
       state.checkArguments(args)
       args.foreach(arg =>
         state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, isGenerated = false)
@@ -568,57 +547,10 @@ object Ast {
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
 
-    def checkReadonly(state: Compiler.State[Ctx], instrs: AVector[Instr[Ctx]]): Unit = {
-      val changeState = instrs.exists {
-        case _: StoreField | _: StoreFieldByIndex.type | _: LogInstr => true
-        case _                                                       => false
-      }
-      val internalCalls        = state.internalCalls.getOrElse(id, mutable.Set.empty)
-      val invalidInternalCalls = internalCalls.filterNot(state.getFunc(_).isReadonly)
-      val externalCalls        = state.externalCalls.getOrElse(id, mutable.Set.empty)
-      val invalidExternalCalls = externalCalls.filterNot { case (typeId, funcId) =>
-        state.getFunc(typeId, funcId).isReadonly
-      }
-
-      val isReadonly =
-        !changeState && invalidInternalCalls.isEmpty && invalidExternalCalls.isEmpty
-      if (!isReadonly && useReadonly) {
-        if (changeState) {
-          throw Compiler.Error(s"Readonly function ${funcName(state.typeId, id)} changes state")
-        }
-        if (invalidInternalCalls.nonEmpty) {
-          throw Compiler.Error(
-            s"Readonly function ${funcName(state.typeId, id)} have invalid internal calls: ${quote(
-                invalidInternalCalls.map(_.name).mkString(", ")
-              )}"
-          )
-        }
-        if (invalidExternalCalls.nonEmpty) {
-          val msg = invalidExternalCalls
-            .map { case (typeId, funcId) =>
-              s"${typeId.name}.${funcId.name}"
-            }
-            .mkString(", ")
-          throw Compiler.Error(
-            s"Readonly function ${funcName(state.typeId, id)} have invalid external calls: ${quote(msg)}"
-          )
-        }
-      }
-
-      if (isReadonly && !useReadonly) {
-        state.warnReadonlyCheck(state.typeId, id)
-      }
-    }
-
-    def toMethodAndCheck(state: Compiler.State[Ctx]): Method[Ctx] = {
+    def genMethod(state: Compiler.State[Ctx]): Method[Ctx] = {
       state.setFuncScope(id)
-      check(state)
-
       val instrs    = body.flatMap(_.genCode(state))
       val localVars = state.getLocalVars(id)
-      state.checkLast(name)(
-        ContractAssets.checkCodeUsingContractAssets(instrs, useAssetsInContract, state.typeId, id)
-      )
 
       Method[Ctx](
         isPublic,
@@ -764,10 +696,13 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
       funcInfo.getReturnType(args.flatMap(_.getType(state)))
-      state.addInternalCall(id)
+      ()
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      state.addInternalCall(
+        id
+      ) // don't put this in _getType, otherwise the statement might get skipped
       val func       = state.getFunc(id)
       val argsType   = args.flatMap(_.getType(state))
       val returnType = func.getReturnType(argsType)
@@ -914,15 +849,8 @@ object Ast {
       table
     }
 
-    def checkIfPrivateMethodsUsed(state: Compiler.State[Ctx]): Unit = {
-      funcs.foreach { func =>
-        if (func.isPrivate && !state.internalCallsReversed.get(func.id).exists(_.nonEmpty)) {
-          state.warnUnusedPrivateFunction(ident, func.id)
-        }
-      }
-    }
-
-    def checkBasics(state: Compiler.State[Ctx]): Unit = state.checkIfNot(name) {
+    def check(state: Compiler.State[Ctx]): Unit = {
+      state.setCheckPhase()
       state.checkArguments(fields)
       templateVars.zipWithIndex.foreach { case (temp, index) =>
         state.addTemplateVariable(temp.ident, temp.tpe, index)
@@ -936,12 +864,12 @@ object Ast {
           isGenerated = false
         )
       )
+      funcs.foreach(_.check(state))
+      state.checkUnusedFields()
     }
 
-    def getMethodsAndCheck(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
-      val methods = AVector.from(funcs.view.map(_.toMethodAndCheck(state)))
-      state.checkIfNot(name)(state.checkUnusedFields())
-      methods
+    def genMethods(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {
+      AVector.from(funcs.view.map(_.genMethod(state)))
     }
 
     def genCode(state: Compiler.State[Ctx]): VmContract[Ctx]
@@ -957,11 +885,16 @@ object Ast {
     def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatelessContext]] = Seq.empty
 
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
-      checkBasics(state)
-      val script = StatelessScript
-        .from(getMethodsAndCheck(state))
+      state.setGenCodePhase()
+      StatelessScript
+        .from(genMethods(state))
         .getOrElse(throw Compiler.Error(s"No methods found in ${quote(ident.name)}"))
-      state.setChecked(name)
+    }
+
+    def genCodeFull(state: Compiler.State[StatelessContext]): StatelessScript = {
+      check(state)
+      val script = genCode(state)
+      StaticAnalysis.checkMethodsStateless(this, script.methods, state)
       script
     }
   }
@@ -1008,23 +941,21 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
-      checkBasics(state)
-      val methods = getMethodsAndCheck(state)
-      val script = StatefulScript
+      state.setGenCodePhase()
+      val methods = genMethods(state)
+      StatefulScript
         .from(methods)
         .getOrElse(
           throw Compiler.Error(
             "Expected the 1st function to be public and the other functions to be private for tx script"
           )
         )
-      // skip check readonly for main function
-      val methodsExceptMain = methods.tail
-      val funcsExceptMain   = funcs.tail
-      state.checkLast(name)(
-        methodsExceptMain.foreachWithIndex { case (method, index) =>
-          funcsExceptMain(index).checkReadonly(state, method.instrs)
-        }
-      )
+    }
+
+    def genCodeFull(state: Compiler.State[StatefulContext]): StatefulScript = {
+      check(state)
+      val script = genCode(state)
+      StaticAnalysis.checkMethodsStateful(this, script.methods, state)
       script
     }
   }
@@ -1087,26 +1018,19 @@ object Ast {
       }
     }
 
-    override def checkBasics(state: Compiler.State[StatefulContext]): Unit =
-      state.checkIfNot(name) {
-        checkFuncs()
-        checkConstants(state)
-        checkInheritances(state)
-        super.checkBasics(state)
-      }
+    override def check(state: Compiler.State[StatefulContext]): Unit = {
+      state.setCheckPhase()
+      checkFuncs()
+      checkConstants(state)
+      checkInheritances(state)
+      super.check(state)
+    }
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
-      checkBasics(state)
-      val methods  = getMethodsAndCheck(state)
-      val contract = StatefulContract(Type.flattenTypeLength(fields.map(_.tpe)), methods)
-      state.checkLast(name) {
-        methods.foreachWithIndex { case (method, index) =>
-          funcs(index).checkReadonly(state, method.instrs)
-        }
-        checkIfPrivateMethodsUsed(state)
-      }
-      contract
+      state.setGenCodePhase()
+      val methods = genMethods(state)
+      StatefulContract(Type.flattenTypeLength(fields.map(_.tpe)), methods)
     }
 
     // the state must have been updated in the check pass
@@ -1198,7 +1122,7 @@ object Ast {
       }
     }
 
-    private def isContract(typeId: TypeId): Boolean = {
+    def isContract(typeId: TypeId): Boolean = {
       contracts.find(_.ident == typeId) match {
         case None => throw Compiler.Error(s"Contract ${quote(typeId.name)} does not exist")
         case Some(contract: Contract) if !contract.isAbstract => true
@@ -1206,7 +1130,7 @@ object Ast {
       }
     }
 
-    private def getInterface(typeId: TypeId): ContractInterface = {
+    def getInterface(typeId: TypeId): ContractInterface = {
       getContract(typeId) match {
         case interface: ContractInterface => interface
         case _ => throw Compiler.Error(s"Interface ${typeId.name} does not exist")
@@ -1294,7 +1218,7 @@ object Ast {
       val state = Compiler.State.buildFor(this, contractIndex)
       get(contractIndex) match {
         case script: TxScript =>
-          val statefulScript = script.genCode(state)
+          val statefulScript = script.genCodeFull(state)
           val warnings       = state.getWarnings
           state.allowDebug = true
           val statefulDebugScript = script.genCode(state)
@@ -1305,74 +1229,22 @@ object Ast {
       }
     }
 
-    private[vm] def checkExternalCallPermissions(
-        contractState: Compiler.State[StatefulContext],
-        contract: Contract,
-        externalCallCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
-    ): Unit = {
-      val allNoExternalCallChecks: mutable.Set[(TypeId, FuncId)] = mutable.Set.empty
-      contract.funcs.foreach { func =>
-        // To check that external calls should have external call checks
-        contractState.externalCalls.get(func.id) match {
-          case Some(callees) if callees.nonEmpty =>
-            callees.foreach { case funcRef @ (typeId, funcId) =>
-              if (!externalCallCheckTables(typeId)(funcId)) {
-                allNoExternalCallChecks.addOne(funcRef)
-              }
-            }
-          case _ => ()
-        }
-      }
-      allNoExternalCallChecks.foreach { case (typeId, funcId) =>
-        contractState.warnExternalCallCheck(typeId, funcId)
-      }
-    }
-
-    def checkInterfaceExternalCallCheck(
-        interfaceTypeId: TypeId,
-        externalCallCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
-    ): Unit = {
-      assume(dependencies.isDefined)
-      val children = dependencies
-        .map(_.filter { case (child, parents) =>
-          parents.contains(interfaceTypeId) && isContract(child)
-        }.keys.toSeq)
-        .getOrElse(Seq.empty)
-      val interface = getInterface(interfaceTypeId)
-      children.foreach { case contractId =>
-        val table = externalCallCheckTables(contractId)
-        interface.funcs.foreach { func =>
-          if (func.useExternalCallCheck && !table(func.id)) {
-            throw Compiler.Error(Warnings.noExternalCallCheckMsg(contractId.name, func.id.name))
-          }
-        }
-      }
-    }
-
     def genStatefulContracts()(implicit
         compilerOptions: CompilerOptions
     ): AVector[(CompiledContract, Int)] = {
       val states = AVector.tabulate(contracts.length)(Compiler.State.buildFor(this, _))
-      val externalCallCheckTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
       val statefulContracts = AVector.from(contracts.view.zipWithIndex.collect {
         case (contract: Contract, index) if !contract.isAbstract =>
-          val state            = states(index)
+          val state = states(index)
+          contract.check(state)
           val statefulContract = contract.genCode(state)
-          val table            = contract.buildExternalCallCheckTable(state)
-          externalCallCheckTables.update(contract.ident, table)
           (statefulContract, contract, state, index)
       })
-      contracts.foreach {
-        case interface: ContractInterface =>
-          checkInterfaceExternalCallCheck(interface.ident, externalCallCheckTables)
-          val table = mutable.Map.from(interface.funcs.map(_.id -> true))
-          externalCallCheckTables.update(interface.ident, table)
-        case _ => ()
-      }
+      StaticAnalysis.checkExternalCalls(this, states)
       statefulContracts.map { case (statefulContract, contract, state, index) =>
-        checkExternalCallPermissions(state, contract, externalCallCheckTables)
         state.allowDebug = true
         val statefulDebugContract = contract.genCode(state)
+        StaticAnalysis.checkMethods(contract, statefulContract, state)
         CompiledContract(
           statefulContract,
           contract,
