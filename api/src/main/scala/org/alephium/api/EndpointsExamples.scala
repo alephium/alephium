@@ -575,6 +575,7 @@ trait EndpointsExamples extends ErrorExamples {
     bytecode = hexString,
     bytecodeDebugPatch = CompileProjectResult.Patch("=1-1+ef"),
     codeHash = hash,
+    codeHashDebug = hash,
     fields = CompileResult.FieldsSig(
       names = AVector("aa", "bb", "cc", "dd", "ee"),
       types = AVector("Bool", "U256", "I256", "ByteVec", "Address"),

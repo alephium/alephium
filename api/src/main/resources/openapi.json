@@ -6243,6 +6243,7 @@
                   "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "bytecodeDebugPatch": "=1-1+ef",
                   "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "codeHashDebug": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
                     "names": [
                       "aa",
@@ -6431,6 +6432,7 @@
                       "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "bytecodeDebugPatch": "=1-1+ef",
                       "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "codeHashDebug": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                       "fields": {
                         "names": [
                           "aa",
@@ -9788,6 +9790,7 @@
           "bytecode",
           "bytecodeDebugPatch",
           "codeHash",
+          "codeHashDebug",
           "fields",
           "functions",
           "events",
@@ -9805,6 +9808,10 @@
             "type": "string"
           },
           "codeHash": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "codeHashDebug": {
             "type": "string",
             "format": "32-byte-hash"
           },
