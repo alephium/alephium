@@ -16,7 +16,7 @@
 
 package org.alephium.wallet
 
-import java.nio.file.Paths
+import java.nio.file.{Files, Path, Paths}
 
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -33,12 +33,14 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.{AVector, Service}
 import org.alephium.wallet.config.WalletConfig
 import org.alephium.wallet.service.WalletService
+import org.alephium.wallet.storage.SecretStorage
 import org.alephium.wallet.web._
 
 class WalletApp(config: WalletConfig)(implicit
     val executionContext: ExecutionContext
 ) extends Service
     with StrictLogging {
+  WalletApp.checkSecretFilePermission(config.secretDir)
 
   implicit private val groupConfig = new GroupConfig {
     override def groups: Int = config.blockflow.groups
@@ -125,4 +127,14 @@ class WalletApp(config: WalletConfig)(implicit
           logger.info("Wallet stopped")
         }
     }
+}
+
+object WalletApp {
+  def checkSecretFilePermission(walletDir: Path): Unit = {
+    if (Files.exists(walletDir)) {
+      Files.list(walletDir).forEach { path =>
+        SecretStorage.setPermission600(path.toFile)
+      }
+    }
+  }
 }
