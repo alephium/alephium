@@ -901,6 +901,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
   it should "compute diff of bytecode and debug bytecode" in new TypeSignatureFixture {
     CompileProjectResult.diffPatch("", "").value is ""
+    CompileProjectResult.diffPatch("Hello", "Hello").value is ""
 
     val bytecode = Hex.toHexString(serialize(compiledContract.code))
     bytecode is "0701402901010707061005a000a001a003a00461b413c40de0b6b3a7640000a916011602160316041605160602"

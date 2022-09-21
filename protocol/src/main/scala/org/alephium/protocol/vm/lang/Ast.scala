@@ -1237,20 +1237,33 @@ object Ast {
         case (contract: Contract, index) if !contract.isAbstract =>
           val state = states(index)
           contract.check(state)
-          val statefulContract = contract.genCode(state)
-          (statefulContract, contract, state, index)
+          state.allowDebug = true
+          val statefulDebugContract = contract.genCode(state)
+          (statefulDebugContract, contract, state, index)
       })
       StaticAnalysis.checkExternalCalls(this, states)
-      statefulContracts.map { case (statefulContract, contract, state, index) =>
-        state.allowDebug = true
-        val statefulDebugContract = contract.genCode(state)
-        StaticAnalysis.checkMethods(contract, statefulContract, state)
+      statefulContracts.map { case (statefulDebugContract, contract, state, index) =>
+        val statefulContract = genReleaseCode(contract, statefulDebugContract, state)
+        StaticAnalysis.checkMethods(contract, statefulDebugContract, state)
         CompiledContract(
           statefulContract,
           contract,
           state.getWarnings,
           statefulDebugContract
         ) -> index
+      }
+    }
+
+    def genReleaseCode(
+        contract: Contract,
+        debugCode: StatefulContract,
+        state: Compiler.State[StatefulContext]
+    ): StatefulContract = {
+      if (debugCode.methods.exists(_.instrs.exists(_.isInstanceOf[DEBUG]))) {
+        state.allowDebug = false
+        contract.genCode(state)
+      } else {
+        debugCode
       }
     }
 

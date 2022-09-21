@@ -108,14 +108,19 @@ object CompileProjectResult {
 
   def diffPatch(code: String, debugCode: String): Patch = {
     val diffs = new DiffMatchPatch().diff_main(code, debugCode)
-    val diffsConverted = diffs.iterator().asScala.map { diff =>
-      diff.operation match {
-        case DiffMatchPatch.Operation.EQUAL  => s"=${diff.text.length}"
-        case DiffMatchPatch.Operation.DELETE => s"-${diff.text.length}"
-        case DiffMatchPatch.Operation.INSERT => s"+${diff.text}"
+    if (diffs.size() == 1 && diffs.get(0).operation == DiffMatchPatch.Operation.EQUAL) {
+      // both are equal, no need to patch
+      Patch("")
+    } else {
+      val diffsConverted = diffs.iterator().asScala.map { diff =>
+        diff.operation match {
+          case DiffMatchPatch.Operation.EQUAL  => s"=${diff.text.length}"
+          case DiffMatchPatch.Operation.DELETE => s"-${diff.text.length}"
+          case DiffMatchPatch.Operation.INSERT => s"+${diff.text}"
+        }
       }
+      Patch(diffsConverted.mkString(""))
     }
-    Patch(diffsConverted.mkString(""))
   }
 
   def applyPatchUnsafe(code: String, patch: Patch): String = {
