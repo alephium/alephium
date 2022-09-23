@@ -292,6 +292,8 @@ trait ApiModelCodec {
 
   implicit val compileProjectRW: RW[Compile.Project] = macroRW
 
+  implicit val compilePatchRW: RW[CompileProjectResult.Patch] =
+    readwriter[String].bimap(_.value, CompileProjectResult.Patch(_))
   implicit val compileResultFieldsRW: RW[CompileResult.FieldsSig]     = macroRW
   implicit val compileResultFunctionRW: RW[CompileResult.FunctionSig] = macroRW
   implicit val compileResultEventRW: RW[CompileResult.EventSig]       = macroRW
@@ -314,6 +316,7 @@ trait ApiModelCodec {
   implicit val existingContractRW: ReadWriter[ContractState]        = macroRW
   implicit val testContractInputAssetRW: ReadWriter[TestInputAsset] = macroRW
   implicit val testContractRW: ReadWriter[TestContract]             = macroRW
+  implicit val debugMessageRW: ReadWriter[DebugMessage]             = macroRW
   implicit val testContractResultRW: ReadWriter[TestContractResult] = macroRW
 
   implicit val callContractRW: ReadWriter[CallContract]             = macroRW

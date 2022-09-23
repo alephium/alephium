@@ -65,20 +65,22 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   trait LemanForkFixture extends AllInstrsFixture {
     // format: off
-    val lemanStatelessInstrs = AVector(
+    val lemanStatelessInstrs = AVector[LemanInstr[StatelessContext]](
       ByteVecSlice, ByteVecToAddress, Encode, Zeros,
       U256To1Byte, U256To2Byte, U256To4Byte, U256To8Byte, U256To16Byte, U256To32Byte,
       U256From1Byte, U256From2Byte, U256From4Byte, U256From8Byte, U256From16Byte, U256From32Byte,
       EthEcRecover,
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
-      LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap
+      LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
+      vm.BlockHash, DEBUG(AVector.empty)
     )
-    val lemanStatefulInstrs = AVector(
+    val lemanStatefulInstrs = AVector[LemanInstr[StatefulContext]](
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
       LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
-      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken
+      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
+      NullContractAddress
     )
     // format: on
   }
@@ -96,7 +98,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     with StatelessFixture {
     val frame0 = prepareFrame(AVector.empty)(NetworkConfigFixture.Leman) // Leman is activated
     lemanStatelessInstrs.foreach { instr =>
-      instr.runWith(frame0).leftValue isnotE InactiveInstr(instr)
+      val result = instr.runWith(frame0)
+      if (result.isLeft) {
+        result.leftValue isnotE InactiveInstr(instr)
+      }
     }
     val frame1 =
       prepareFrame(AVector.empty)(NetworkConfigFixture.PreLeman) // Leman is not activated yet
@@ -106,11 +111,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "fail if the fork is not activated yet for stateful instrs" in new LemanForkFixture
     with StatefulFixture {
     val frame0 = prepareFrame()(NetworkConfigFixture.Leman) // Leman is activated
-    lemanStatefulInstrs.foreach(instr =>
-      instr.runWith(frame0).leftValue isnotE InactiveInstr(instr)
-    )
+    lemanStatefulInstrs.foreach { instr =>
+      val result = instr.runWith(frame0)
+      if (result.isLeft) {
+        result.leftValue isnotE InactiveInstr(instr)
+      }
+    }
     val frame1 = prepareFrame()(NetworkConfigFixture.PreLeman) // Leman is not activated yet
-    lemanStatelessInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
+    lemanStatefulInstrs.foreach(instr => instr.runWith(frame1).leftValue isE InactiveInstr(instr))
   }
 
   trait GenFixture extends ContextGenerators {
@@ -167,7 +175,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     lazy val context = frame.ctx
     lazy val locals  = frame.locals
 
-    def runAndCheckGas[I <: Instr[StatelessContext] with GasSimple](instr: I) = {
+    def runAndCheckGas[I <: Instr[StatelessContext] with GasSimple](
+        instr: I,
+        frame: Frame[StatelessContext] = frame
+    ) = {
+      val context    = frame.ctx
       val initialGas = context.gasRemaining
       instr.runWith(frame) isE ()
       initialGas.subUnsafe(context.gasRemaining) is instr.gas()
@@ -3078,6 +3090,62 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.top.get is Val.ByteVec(frame.obj.code.hash.bytes)
   }
 
+  it should "NullContractAddress" in new StatefulInstrFixture {
+    runAndCheckGas(NullContractAddress)
+    frame.opStack.pop() isE Val.NullContractAddress
+    frame.opStack.isEmpty is true
+  }
+
+  it should "BlockHash" in new StatelessInstrFixture {
+    val frameWithBlockHash = prepareFrame(AVector.empty)
+    frameWithBlockHash.ctx.blockEnv.blockId.nonEmpty is true
+    runAndCheckGas(vm.BlockHash, frameWithBlockHash)
+
+    val frameWithoutBlockHash =
+      prepareFrame(AVector.empty, Some(genBlockEnv().copy(blockId = None)))
+    frameWithoutBlockHash.ctx.blockEnv.blockId.nonEmpty is false
+    vm.BlockHash.runWith(frameWithoutBlockHash).leftValue isE NoBlockHashAvailable
+  }
+
+  it should "combine debug messages" in {
+    DEBUG(AVector(Val.ByteVec.fromString("Hello"))).combineUnsafe(AVector.empty) is
+      Val.ByteVec.fromString("Hello")
+    DEBUG(AVector(Val.ByteVec.fromString("Hello "), Val.ByteVec.fromString("!")))
+      .combineUnsafe(AVector(Val.ByteVec.fromString("Alephium"))) is
+      Val.ByteVec.fromString("Hello Alephium!")
+  }
+
+  it should "Debug" in new StatefulInstrFixture {
+    {
+      info("No debug message")
+      DEBUG(AVector.empty).runWith(frame).leftValue isE DebugMessageIsEmpty
+    }
+
+    {
+      info("Simple message")
+      DEBUG(AVector(Val.ByteVec.fromString("Hello, Alephium!"))).runWith(frame) isE ()
+    }
+
+    {
+      info("Interpolation")
+      val frame = prepareFrame()
+      DEBUG(AVector(Val.ByteVec.fromString("Hello, "), Val.ByteVec.fromString("!")))
+        .runWith(frame)
+        .leftValue isE
+        StackUnderflow
+
+      frame.pushOpStack(Val.ByteVec.fromString("Alephium"))
+      DEBUG(AVector(Val.ByteVec.fromString("Hello, "), Val.ByteVec.fromString("!")))
+        .runWith(frame) isE ()
+      frame.ctx.worldState.logState.eventLog
+        .get(LogStatesId(frame.obj.contractIdOpt.value, 0))
+        .rightValue
+        .states
+        .head
+        .fields is AVector[Val](Val.ByteVec.fromString("Hello, Alephium!"))
+    }
+  }
+
   it should "test gas amount" in new FrameFixture {
     val bytes      = AVector[Byte](0, 255.toByte, Byte.MaxValue, Byte.MinValue)
     val ints       = AVector[Int](0, 1 << 16, -(1 << 16))
@@ -3113,7 +3181,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover -> 2500,
       Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280,
       ContractIdToAddress -> 5,
-      LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2, AssertWithErrorCode -> 3, Swap -> 2
+      LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2, AssertWithErrorCode -> 3, Swap -> 2,
+      vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -3126,7 +3195,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       BurnToken -> 30, LockApprovedAssets -> 30,
       CreateSubContract -> 32000, CreateSubContractWithToken -> 32000, CopyCreateSubContract -> 24000, CopyCreateSubContractWithToken -> 24000,
       LoadFieldByIndex -> 5, StoreFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
-      CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000
+      CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
+      NullContractAddress -> 2
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -3240,6 +3310,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6 -> 115, Log7 -> 116, Log8 -> 117, Log9 -> 118,
       ContractIdToAddress -> 119,
       LoadLocalByIndex -> 120, StoreLocalByIndex -> 121, Dup -> 122, AssertWithErrorCode -> 123, Swap -> 124,
+      vm.BlockHash -> 125, DEBUG(AVector.empty) -> 126,
       // stateful instructions
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -3251,7 +3322,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       BurnToken -> 189, LockApprovedAssets -> 190,
       CreateSubContract -> 191, CreateSubContractWithToken -> 192, CopyCreateSubContract -> 193, CopyCreateSubContractWithToken -> 194,
       LoadFieldByIndex -> 195, StoreFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
-      CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201
+      CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
+      NullContractAddress -> 202
     )
     // format: on
 
@@ -3295,7 +3367,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       EthEcRecover,
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
-      LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap
+      LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
+      vm.BlockHash, DEBUG(AVector.empty)
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
@@ -3307,7 +3380,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
       LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
-      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken
+      CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
+      NullContractAddress
     )
     // format: on
   }

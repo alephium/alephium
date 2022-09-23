@@ -93,4 +93,15 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse(s"#${contract.toBase58}", Lexer.bytes(_)).get.value is
       Val.ByteVec(contract.contractId.bytes)
   }
+
+  it should "parse string" in {
+    fastparse.parse("", Lexer.stringPart(_)).get.value is ""
+    fastparse.parse("a", Lexer.stringPart(_)).get.value is "a"
+    fastparse.parse(" ", Lexer.stringPart(_)).get.value is " "
+    fastparse.parse("a b c$", Lexer.stringPart(_)).get.value is "a b c"
+    fastparse.parse("a b c$$$`", Lexer.stringPart(_)).get.value is "a b c$`"
+    fastparse.parse("a b c$x$$`", Lexer.stringPart(_)).get.value is "a b c"
+    fastparse.parse("$", Lexer.stringPart(_)).get.value is ""
+    fastparse.parse("`", Lexer.stringPart(_)).get.value is ""
+  }
 }

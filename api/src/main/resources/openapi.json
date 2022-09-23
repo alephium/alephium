@@ -5940,6 +5940,7 @@
                 "example": {
                   "name": "Main",
                   "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
+                  "bytecodeDebugPatch": "=1-1+ef",
                   "fields": {
                     "names": [
                       "aa",
@@ -6240,7 +6241,9 @@
                 "example": {
                   "name": "Foo",
                   "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
+                  "bytecodeDebugPatch": "=1-1+ef",
                   "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "codeHashDebug": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "fields": {
                     "names": [
                       "aa",
@@ -6427,7 +6430,9 @@
                     {
                       "name": "Foo",
                       "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "bytecodeDebugPatch": "=1-1+ef",
                       "codeHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "codeHashDebug": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                       "fields": {
                         "names": [
                           "aa",
@@ -6512,6 +6517,7 @@
                     {
                       "name": "Main",
                       "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
+                      "bytecodeDebugPatch": "=1-1+ef",
                       "fields": {
                         "names": [
                           "aa",
@@ -7067,6 +7073,12 @@
                           "value": "10"
                         }
                       ]
+                    }
+                  ],
+                  "debugMessages": [
+                    {
+                      "contractAddress": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                      "message": "Debugging!"
                     }
                   ]
                 }
@@ -9776,7 +9788,9 @@
         "required": [
           "name",
           "bytecode",
+          "bytecodeDebugPatch",
           "codeHash",
+          "codeHashDebug",
           "fields",
           "functions",
           "events",
@@ -9790,7 +9804,14 @@
           "bytecode": {
             "type": "string"
           },
+          "bytecodeDebugPatch": {
+            "type": "string"
+          },
           "codeHash": {
+            "type": "string",
+            "format": "32-byte-hash"
+          },
+          "codeHashDebug": {
             "type": "string",
             "format": "32-byte-hash"
           },
@@ -9842,6 +9863,7 @@
         "required": [
           "name",
           "bytecodeTemplate",
+          "bytecodeDebugPatch",
           "fields",
           "functions",
           "warnings"
@@ -9852,6 +9874,9 @@
             "type": "string"
           },
           "bytecodeTemplate": {
+            "type": "string"
+          },
+          "bytecodeDebugPatch": {
             "type": "string"
           },
           "fields": {
@@ -10150,6 +10175,22 @@
           },
           "asset": {
             "$ref": "#/components/schemas/AssetState"
+          }
+        }
+      },
+      "DebugMessage": {
+        "required": [
+          "contractAddress",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "contractAddress": {
+            "type": "string",
+            "format": "address"
+          },
+          "message": {
+            "type": "string"
           }
         }
       },
@@ -11027,7 +11068,8 @@
           "contracts",
           "txInputs",
           "txOutputs",
-          "events"
+          "events",
+          "debugMessages"
         ],
         "type": "object",
         "properties": {
@@ -11072,6 +11114,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ContractEventByTxId"
+            }
+          },
+          "debugMessages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DebugMessage"
             }
           }
         }

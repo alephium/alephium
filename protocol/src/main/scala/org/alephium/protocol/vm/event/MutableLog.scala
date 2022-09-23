@@ -59,7 +59,6 @@ trait MutableLog {
       logStatesOpt <- eventLog.getOpt(id)
       _ <- logStatesOpt match {
         case Some(logStates) =>
-          assume(logStates.blockHash == blockHash)
           eventLog.put(id, logStates.copy(states = logStates.states :+ state))
         case None =>
           eventLog.put(id, LogStates(blockHash, contractId, AVector(state)))

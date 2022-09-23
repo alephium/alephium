@@ -404,7 +404,8 @@ val commonSettings = publishSettings ++ Seq(
     scalacheck,
     scalatest,
     scalatestplus
-  )
+  ),
+  Compile / doc / sources ~= (_ filter (_.getName endsWith ".scala"))
 )
 
 val wartsCompileExcludes = Seq(

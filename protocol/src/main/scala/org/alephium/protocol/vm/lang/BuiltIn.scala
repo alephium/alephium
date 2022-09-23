@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm.lang
 
-import org.alephium.protocol.model.{dustUtxoAmount, ContractId}
+import org.alephium.protocol.model.dustUtxoAmount
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
 import org.alephium.util.AVector
@@ -47,7 +47,7 @@ object BuiltIn {
       if (inputType == argsType) {
         returnType
       } else {
-        throw Error(s"Invalid args type $inputType for builtin func $name")
+        throw Error(s"Invalid args type $inputType for builtin func $name, expected $argsType")
       }
     }
 
@@ -405,14 +405,6 @@ object BuiltIn {
       ContractIdToAddress
     )
 
-  val nullAddress: SimpleBuiltIn[StatelessContext] =
-    SimpleBuiltIn(
-      "nullAddress",
-      Seq.empty,
-      Seq[Type](Type.Address),
-      AddressConst(Val.Address(LockupScript.p2c(ContractId.zero)))
-    )
-
   val dustAmount: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn(
       "dustAmount",
@@ -440,6 +432,14 @@ object BuiltIn {
       }
     }
   }
+
+  val blockHash: BuiltIn[StatelessContext] =
+    SimpleBuiltIn(
+      "blockHash",
+      Seq.empty,
+      Seq(Type.ByteVec),
+      BlockHash
+    )
 
   val statelessFuncs: Map[String, FuncInfo[StatelessContext]] = Seq(
     blake2b,
@@ -484,9 +484,9 @@ object BuiltIn {
     byteVecToAddress,
     ethEcRecover,
     contractIdToAddress,
-    nullAddress,
     dustAmount,
-    panic
+    panic,
+    blockHash
   ).map(f => f.name -> f).toMap
 
   val approveAlph: SimpleBuiltIn[StatefulContext] =
@@ -849,6 +849,14 @@ object BuiltIn {
     }
   }
 
+  val nullContractAddress: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn(
+      "nullContractAddress",
+      Seq.empty,
+      Seq[Type](Type.Address),
+      NullContractAddress
+    )
+
   val statefulFuncs: Map[String, FuncInfo[StatefulContext]] =
     statelessFuncs ++ Seq(
       approveAlph,
@@ -887,6 +895,7 @@ object BuiltIn {
       contractInitialStateHash,
       contractCodeHash,
       subContractId,
-      subContractIdOf
+      subContractIdOf,
+      nullContractAddress
     ).map(f => f.name -> f)
 }

@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm.lang
 
+import akka.util.ByteString
 import fastparse._
 
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
@@ -153,6 +154,18 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   def normalRet[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
     P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.ReturnStmt.apply[Ctx])
+
+  def stringInterpolator[Unknown: P]: P[Ast.Expr[Ctx]] =
+    P("${" ~ expr ~ "}")
+
+  def debug[Unknown: P]: P[Ast.Debug[Ctx]] =
+    P("debug!" ~ "(" ~ Lexer.string(() => stringInterpolator) ~ ")").map {
+      case (stringParts, interpolationParts) =>
+        Ast.Debug(
+          stringParts.map(s => Val.ByteVec(ByteString.fromString(s))),
+          interpolationParts
+        )
+    }
 
   def anonymousVar[Unknown: P]: P[Ast.VarDeclaration] = P("_").map(_ => Ast.AnonymousVar)
   def namedVar[Unknown: P]: P[Ast.VarDeclaration] =
@@ -441,20 +454,12 @@ object StatelessParser extends Parser[StatelessContext] {
     P(const | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr)
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
-    P(varDef | assign | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret)
-
-  def assetScriptFunc[Unknown: P]: P[Ast.FuncDef[StatelessContext]] =
-    func.map { f =>
-      if (f.annotations.exists(_.id.name == Parser.usingAnnotationId)) {
-        throw new Compiler.Error("AssetScript does not support using annotation")
-      }
-      f
-    }
+    P(varDef | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret)
 
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
       Start ~ Lexer.keyword("AssetScript") ~/ Lexer.typeId ~ templateParams.? ~
-        "{" ~ assetScriptFunc.rep(1) ~ "}"
+        "{" ~ func.rep(1) ~ "}"
     ).map { case (typeId, templateVars, funcs) =>
       Ast.AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
     }
@@ -486,7 +491,7 @@ object StatefulParser extends Parser[StatefulContext] {
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | assign | funcCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | assign | debug | funcCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
   def contractFields[Unknown: P]: P[Seq[Ast.Argument]] = P("(" ~ contractField.rep(0, ",") ~ ")")

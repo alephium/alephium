@@ -173,6 +173,34 @@ class ParserSpec extends AlephiumSpec {
       .value is a[Ast.ForLoop[StatelessContext]]
   }
 
+  it should "parse debug statements" in {
+    fastparse.parse(s"$${a}", StatelessParser.stringInterpolator(_)).get.value is
+      Variable[StatelessContext](Ident("a"))
+    fastparse.parse(s"$${ x + y }", StatelessParser.stringInterpolator(_)).get.value is
+      Binop[StatelessContext](Add, Variable(Ident("x")), Variable(Ident("y")))
+
+    fastparse.parse(s"debug!(``)", StatelessParser.debug(_)).get.value is
+      Ast.Debug[StatelessContext](AVector(Val.ByteVec(ByteString.empty)), Seq.empty)
+    fastparse.parse(s"debug!(`$${a}`)", StatelessParser.debug(_)).get.value is
+      Ast.Debug[StatelessContext](
+        AVector(Val.ByteVec(ByteString.empty), Val.ByteVec(ByteString.empty)),
+        Seq(Variable(Ident("a")))
+      )
+    fastparse
+      .parse(s"debug!(`Hello, $${a}$${b} $${c} $$$$ $$` !`)", StatelessParser.debug(_))
+      .get
+      .value is
+      Ast.Debug[StatelessContext](
+        AVector(
+          Val.ByteVec(ByteString.fromString("Hello, ")),
+          Val.ByteVec(ByteString.empty),
+          Val.ByteVec(ByteString.fromString(" ")),
+          Val.ByteVec(ByteString.fromString(" $ ` !"))
+        ),
+        Seq(Variable(Ident("a")), Variable(Ident("b")), Variable(Ident("c")))
+      )
+  }
+
   it should "parse if-else statements" in {
     fastparse
       .parse("if (x) { return }", StatelessParser.statement(_))
@@ -298,15 +326,6 @@ class ParserSpec extends AlephiumSpec {
     parsed3.useAssetsInContract is true
     parsed3.useExternalCallCheck is true
     parsed3.useReadonly is true
-
-    val error = intercept[Compiler.Error](
-      fastparse.parse(
-        """@using(assetsInContract = true)
-          |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
-        StatelessParser.assetScriptFunc(_)
-      )
-    )
-    error.message is "AssetScript does not support using annotation"
   }
 
   it should "parser contract initial states" in {

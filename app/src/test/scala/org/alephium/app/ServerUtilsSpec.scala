@@ -1165,7 +1165,103 @@ class ServerUtilsSpec extends AlephiumSpec {
         testContractParams.toComplete().rightValue
       )
       .leftValue
-      .detail is "PayToContractAddressNotInCallerTrace"
+      .detail is "VM execution error: PayToContractAddressNotInCallerTrace"
+  }
+
+  it should "show debug message when contract execution failed" in new Fixture {
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  fn foo() -> () {
+         |    debug!(`Hello, Alephium!`)
+         |    assert!(false, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).rightValue
+
+    val serverUtils  = new ServerUtils()
+    val testContract = TestContract(bytecode = code).toComplete().rightValue
+    val testError    = serverUtils.runTestContract(blockFlow, testContract).leftValue.detail
+    testError is
+      s"DEBUG - ${Address.contract(testContract.contractId).toBase58} - Hello, Alephium!\n" ++
+      "VM execution error: AssertionFailedWithErrorCode(tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq,0)"
+  }
+
+  it should "test blockHash function for Ralph" in new TestContractFixture {
+    val blockHash = BlockHash.random
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  fn foo() -> (ByteVec) {
+         |    assert!(blockHash!() == #${blockHash.toHexString}, 0)
+         |    return blockHash!()
+         |  }
+         |}
+         |""".stripMargin
+
+    val code = Compiler.compileContract(contract).rightValue
+
+    val testContract0 = TestContract(bytecode = code).toComplete().rightValue
+    val testResult0   = serverUtils.runTestContract(blockFlow, testContract0).leftValue
+    testResult0.detail is s"VM execution error: AssertionFailedWithErrorCode(tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq,0)"
+
+    val testContract1 =
+      TestContract(bytecode = code, blockHash = Some(blockHash)).toComplete().rightValue
+    val testResult1 = serverUtils.runTestContract(blockFlow, testContract1).rightValue
+    testResult1.returns.head is api.ValByteVec(blockHash.bytes)
+  }
+
+  it should "extract debug message from contract event" in new Fixture {
+    val serverUtils     = new ServerUtils()
+    val contractAddress = Address.contract(ContractId.random)
+    def buildEvent(fields: Val*): ContractEventByTxId = {
+      ContractEventByTxId(BlockHash.random, contractAddress, 0, AVector.from(fields))
+    }
+
+    serverUtils
+      .extractDebugMessage(buildEvent())
+      .leftValue
+      .detail is "Invalid debug message"
+
+    serverUtils
+      .extractDebugMessage(buildEvent(ValBool(true)))
+      .leftValue
+      .detail is "Invalid debug message"
+
+    serverUtils
+      .extractDebugMessage(buildEvent(ValByteVec(ByteString.fromString("Hello, Alephium!")))) isE
+      DebugMessage(contractAddress, "Hello, Alephium!")
+
+    serverUtils
+      .extractDebugMessage(
+        buildEvent(ValByteVec(ByteString.fromString("Hello, Alephium!")), ValBool(true))
+      )
+      .leftValue
+      .detail is "Invalid debug message"
+  }
+
+  it should "test debug function for Ralph" in new Fixture {
+    val contract: String =
+      s"""
+         |Contract Foo(name: ByteVec) {
+         |  pub fn foo() -> () {
+         |    debug!(`Hello, $${name}!`)
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).rightValue
+
+    val testContract = TestContract(
+      bytecode = code,
+      initialFields = Some(AVector(ValByteVec(ByteString.fromString("Alephium"))))
+    ).toComplete().rightValue
+    val serverUtils = new ServerUtils()
+    val testResult  = serverUtils.runTestContract(blockFlow, testContract).rightValue
+    testResult.events.isEmpty is true
+    testResult.debugMessages is AVector(
+      DebugMessage(Address.contract(testContract.contractId), "Hello, Alephium!")
+    )
   }
 
   trait TestContractFixture extends Fixture {
@@ -1633,12 +1729,12 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts.length is 1
     contracts.length is 1
     val contractCode = result.contracts(0).bytecode
-    contractCode is Hex.toHexString(serialize(contracts(0)._1))
+    contractCode is Hex.toHexString(serialize(contracts(0).code))
 
     result.scripts.length is 1
     scripts.length is 1
     val scriptCode = result.scripts(0).bytecodeTemplate
-    scriptCode is scripts(0)._1.toTemplateString()
+    scriptCode is scripts(0).code.toTemplateString()
   }
 
   it should "compile script" in new Fixture {

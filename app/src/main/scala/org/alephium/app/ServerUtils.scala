@@ -434,7 +434,7 @@ class ServerUtils(implicit
       hashes <- blockFlow
         .getHashes(chainIndex, query.height)
         .left
-        .map(_ => failedInIO)
+        .map(failedInIO)
     } yield HashesAtHeight(hashes)
 
   def getChainInfo(blockFlow: BlockFlow, chainIndex: ChainIndex): Try[ChainInfo] =
@@ -442,7 +442,7 @@ class ServerUtils(implicit
       maxHeight <- blockFlow
         .getMaxHeight(chainIndex)
         .left
-        .map(_ => failedInIO)
+        .map(failedInIO)
     } yield ChainInfo(maxHeight)
 
   def searchLocalTransactionStatus(
@@ -844,7 +844,7 @@ class ServerUtils(implicit
   def compileScript(query: Compile.Script): Try[CompileScriptResult] = {
     Compiler
       .compileTxScriptFull(query.code, compilerOptions = query.getLangCompilerOptions())
-      .map(p => CompileScriptResult.from(p._1, p._2, p._3))
+      .map(CompileScriptResult.from)
       .left
       .map(error => failed(error.toString))
   }
@@ -853,7 +853,7 @@ class ServerUtils(implicit
   def compileContract(query: Compile.Contract): Try[CompileContractResult] = {
     Compiler
       .compileContractFull(query.code, compilerOptions = query.getLangCompilerOptions())
-      .map(p => CompileContractResult.from(p._1, p._2, p._3))
+      .map(CompileContractResult.from)
       .left
       .map(error => failed(error.toString))
   }
@@ -947,10 +947,12 @@ class ServerUtils(implicit
       events = fetchContractEvents(worldState)
       contractIds <- getCreatedAndDestroyedContractIds(events)
       postState   <- fetchContractsState(worldState, testContract, contractIds._1, contractIds._2)
+      eventsSplit <- extractDebugMessages(events)
     } yield {
       val executionOutputs = executionResultPair._1
       val executionResult  = executionResultPair._2
       val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
+      logger.info("\n" + showDebugMessages(eventsSplit._2))
       TestContractResult(
         address = Address.contract(testContract.contractId),
         codeHash = postState._2,
@@ -961,8 +963,27 @@ class ServerUtils(implicit
         txOutputs = executionResult.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, TransactionId.zero, index)
         },
-        events = events
+        events = eventsSplit._1,
+        debugMessages = eventsSplit._2
       )
+    }
+  }
+
+  def extractDebugMessage(event: ContractEventByTxId): Try[DebugMessage] = {
+    (event.fields.length, event.fields.headOption) match {
+      case (1, Some(message: ValByteVec)) =>
+        Right(DebugMessage(event.contractAddress, message.value.utf8String))
+      case _ =>
+        Left(failed("Invalid debug message"))
+    }
+  }
+
+  def extractDebugMessages(
+      events: AVector[ContractEventByTxId]
+  ): Try[(AVector[ContractEventByTxId], AVector[DebugMessage])] = {
+    val nonDebugEvents = events.filter(e => I256.from(e.eventIndex) != debugEventIndex.v)
+    events.filter(e => I256.from(e.eventIndex) == debugEventIndex.v).mapE(extractDebugMessage).map {
+      debugMessages => nonDebugEvents -> debugMessages
     }
   }
 
@@ -1093,7 +1114,34 @@ class ServerUtils(implicit
         )
       )
     )
-    wrapExeResult(StatefulVM.runTxScriptWithOutputs(context, script))
+    runWithDebugError(context, script)
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def runWithDebugError(
+      context: StatefulContext,
+      script: StatefulScript
+  ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    StatefulVM.runTxScriptWithOutputs(context, script) match {
+      case Right(result)         => Right(result)
+      case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
+      case Left(Right(exeFailure)) =>
+        val errorString = s"VM execution error: ${exeFailure.toString()}"
+        val events      = fetchContractEvents(context.worldState)
+        extractDebugMessages(events).flatMap { case (_, debugMessages) =>
+          val detail = showDebugMessages(debugMessages) ++ errorString
+          logger.info("\n" + detail)
+          Left(failed(detail))
+        }
+    }
+  }
+
+  def showDebugMessages(messages: AVector[DebugMessage]): String = {
+    if (messages.isEmpty) {
+      ""
+    } else {
+      messages.mkString("", "\n", "\n")
+    }
   }
 
   private def approveAsset(

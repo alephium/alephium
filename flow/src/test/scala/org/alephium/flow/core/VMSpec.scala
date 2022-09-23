@@ -754,8 +754,9 @@ class VMSpec extends AlephiumSpec {
          |  assert!(size!(toByteVec!(@${address.toBase58})) == 33, 0)
          |  assert!(size!(#${bytes0} ++ #${bytes1}) == 64, 0)
          |  assert!(zeros!(2) == #0000, 0)
-         |  assert!(nullAddress!() == @${Address.contract(ContractId.zero)}, 0)
-         |  assert!(nullAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, 0)
+         |  assert!(nullContractAddress!() == @${Address.contract(ContractId.zero)}, 0)
+         |  assert!(nullContractAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, 0)
+         |  assert!(blockHash!() != #${Hash.zero.toHexString}, 0)
          |}
          |""".stripMargin
 
@@ -3481,7 +3482,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     val script = Compiler.compileTxScript(main).rightValue
     intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage is
-      s"Right(TxScriptExeFailed(AssertionFailedWithErrorCode(${fooId.toHexString},0)))"
+      s"Right(TxScriptExeFailed(AssertionFailedWithErrorCode(${Address.contract(fooId).toBase58},0)))"
   }
 
   it should "test Contract type" in new ContractFixture {
@@ -3550,6 +3551,35 @@ class VMSpec extends AlephiumSpec {
     val fooOutputNew = worldState.getContractOutput(fooOutputRefNew).rightValue
     fooOutputRefNew is ContractOutputRef.from(tx.id, fooOutputNew, 0)
     fooOutputRefNew.asInstanceOf[TxOutputRef] is TxOutputRef.unsafe(tx, 0)
+  }
+
+  it should "test debug function" in new EventFixture {
+    override lazy val initialState: AVector[Val] = AVector(Val.ByteVec.fromString("Alephium"))
+    override def contractRaw: String =
+      s"""
+         |Contract Foo(name: ByteVec) {
+         |  pub fn foo() -> () {
+         |    debug!(`Hello, $${name}!`)
+         |  }
+         |}
+         |""".stripMargin
+
+    override def callingScriptRaw: String =
+      s"""
+         |$contractRaw
+         |
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  Foo(#${contractId.toHexString}).foo()
+         |}
+         |""".stripMargin
+
+    val logStates = getLogStates(blockFlow, contractId, 0).value
+    logStates.blockHash is callingBlock.hash
+    logStates.states.length is 1
+    val event = logStates.states.head
+    event.index is debugEventIndex.v.v.toInt.toByte
+    event.fields is AVector[Val](Val.ByteVec(ByteString.fromString("Hello, Alephium!")))
   }
 
   private def getEvents(

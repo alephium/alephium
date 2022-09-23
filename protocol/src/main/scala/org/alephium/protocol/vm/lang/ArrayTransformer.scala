@@ -33,7 +33,7 @@ object ArrayTransformer {
       isGenerated: Boolean,
       varInfoBuilder: Compiler.VarInfoBuilder
   ): ArrayRef[Ctx] = {
-    val offset = ConstantArrayVarOffset[Ctx](state.varIndex)
+    val offset = ConstantArrayVarOffset[Ctx](state.currentScopeState.varIndex)
     initArrayVars(state, tpe, baseName, isMutable, isUnused, isLocal, varInfoBuilder)
     val ref = ArrayRef[Ctx](isLocal, tpe, offset)
     state.addArrayRef(Ident(baseName), isMutable, isUnused, isGenerated, ref)

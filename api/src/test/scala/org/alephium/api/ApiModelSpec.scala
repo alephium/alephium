@@ -30,6 +30,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
 import org.alephium.protocol.vm.lang.TypeSignatureFixture
+import org.alephium.serde.serialize
 import org.alephium.util._
 import org.alephium.util.Hex.HexStringSyntax
 
@@ -898,14 +899,30 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(state, jsonRaw)
   }
 
+  it should "compute diff of bytecode and debug bytecode" in new TypeSignatureFixture {
+    CompileProjectResult.diffPatch("", "").value is ""
+    CompileProjectResult.diffPatch("Hello", "Hello").value is ""
+
+    val bytecode = Hex.toHexString(serialize(compiledContract.code))
+    bytecode is "0701402901010707061005a000a001a003a00461b413c40de0b6b3a7640000a916011602160316041605160602"
+    val debugBytecode = Hex.toHexString(serialize(compiledContract.debugCode))
+    debugBytecode is "0701402e01010707061105a000a001a003a004617e01027878b413c40de0b6b3a7640000a916011602160316041605160602"
+    val diff = CompileProjectResult.diffPatch(bytecode, debugBytecode)
+    diff.value is "=7-1+e=11-1+1=20+7e01027878=50"
+    val patchedCode = CompileProjectResult.applyPatchUnsafe(bytecode, diff)
+    patchedCode is debugBytecode
+  }
+
   it should "encode/decode CompilerResult" in new TypeSignatureFixture {
-    val result0 = CompileContractResult.from(contract, contractAst, contractWarnings)
+    val result0 = CompileContractResult.from(compiledContract)
     val jsonRaw0 =
       """
         |{
         |  "name": "Foo",
         |  "bytecode": "0701402901010707061005a000a001a003a00461b413c40de0b6b3a7640000a916011602160316041605160602",
+        |  "bytecodeDebugPatch": "=7-1+e=11-1+1=20+7e01027878=50",
         |  "codeHash": "eff62a4b2d4d4936a84e360c916a398d80d5000497ccd4afbd80bfe254d62096",
+        |  "codeHashDebug":"f3070fa7f7893529d5dfdd647aa7a0facb637f2339097dea543c3a6c7716b670",
         |  "fields": {
         |    "names": ["aa","bb","cc","dd","ee","ff"],
         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
@@ -938,12 +955,13 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         |""".stripMargin
     write(result0).filter(!_.isWhitespace) is jsonRaw0.filter(!_.isWhitespace)
 
-    val result1 = CompileScriptResult.from(script, scriptAst, scriptWarnings)
+    val result1 = CompileScriptResult.from(compiledScript)
     val jsonRaw1 =
       """
         |{
         |  "name": "Foo",
         |  "bytecodeTemplate": "020103000000010201000707060716011602160316041605160602",
+        |  "bytecodeDebugPatch": "=27+8=1+e01027878=26",
         |  "fields": {
         |    "names": ["aa","bb","cc","dd","ee"],
         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address"],

@@ -25,7 +25,7 @@ import fastparse.NoWhitespace._
 
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.Address
-import org.alephium.protocol.vm.{LockupScript, Val}
+import org.alephium.protocol.vm.{LockupScript, StatelessContext, Val}
 import org.alephium.protocol.vm.Val.ByteVec
 import org.alephium.protocol.vm.lang.ArithOperator._
 import org.alephium.protocol.vm.lang.LogicalOperator._
@@ -137,6 +137,28 @@ object Lexer {
       case "true" => Val.Bool(true)
       case _      => Val.Bool(false)
     }
+
+  def stringNoChar[Unknown: P]: P[String] =
+    Pass("")
+  def stringEscaping[Unknown: P]: P[String] =
+    P("$$" | "$`").!.map(_.tail)
+  def stringChars[Unknown: P]: P[String] =
+    P(CharsWhile(c => c != '$' && c != '`').!)
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  def stringPart[Unknown: P]: P[String] =
+    P((stringChars | stringEscaping).rep(1).map(_.reduce(_ ++ _)) | stringNoChar)
+  def stringChained[Ctx <: StatelessContext, T, Unknown: P](
+      stringInterpolator: () => P[T]
+  ): P[(AVector[String], Seq[T])] =
+    P(stringPart ~ (stringInterpolator() ~ stringPart).rep).map { case (firstStringPart, pairs) =>
+      val stringParts        = AVector(firstStringPart) ++ AVector.from(pairs.view.map(_._2))
+      val interpolationParts = pairs.map(_._1)
+      AVector.from(stringParts) -> interpolationParts
+    }
+  def string[T, Unknown: P](
+      stringInterpolator: () => P[T]
+  ): P[(AVector[String], Seq[T])] =
+    P("`" ~ stringChained(stringInterpolator) ~ "`")
 
   def `abstract`[Unknown: P]: P[Boolean] = P(keyword("Abstract").?.!).map(_.nonEmpty)
 
