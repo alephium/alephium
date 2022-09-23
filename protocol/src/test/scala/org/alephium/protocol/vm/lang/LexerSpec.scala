@@ -101,5 +101,7 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse("a b c$", Lexer.stringPart(_)).get.value is "a b c"
     fastparse.parse("a b c$$$`", Lexer.stringPart(_)).get.value is "a b c$`"
     fastparse.parse("a b c$x$$`", Lexer.stringPart(_)).get.value is "a b c"
+    fastparse.parse("$", Lexer.stringPart(_)).get.value is ""
+    fastparse.parse("`", Lexer.stringPart(_)).get.value is ""
   }
 }

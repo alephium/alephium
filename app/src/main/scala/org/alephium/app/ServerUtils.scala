@@ -952,6 +952,7 @@ class ServerUtils(implicit
       val executionOutputs = executionResultPair._1
       val executionResult  = executionResultPair._2
       val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
+      logger.info("\n" + showDebugMessages(eventsSplit._2))
       TestContractResult(
         address = Address.contract(testContract.contractId),
         codeHash = postState._2,
@@ -982,7 +983,7 @@ class ServerUtils(implicit
   ): Try[(AVector[ContractEventByTxId], AVector[DebugMessage])] = {
     val nonDebugEvents = events.filter(e => I256.from(e.eventIndex) != debugEventIndex.v)
     events.filter(e => I256.from(e.eventIndex) == debugEventIndex.v).mapE(extractDebugMessage).map {
-      debugEvents => nonDebugEvents -> debugEvents
+      debugMessages => nonDebugEvents -> debugMessages
     }
   }
 
@@ -1128,13 +1129,18 @@ class ServerUtils(implicit
         val errorString = s"VM execution error: ${exeFailure.toString()}"
         val events      = fetchContractEvents(context.worldState)
         extractDebugMessages(events).flatMap { case (_, debugMessages) =>
-          val detail = if (debugMessages.isEmpty) {
-            errorString
-          } else {
-            debugMessages.mkString("", "\n", "\n") ++ errorString
-          }
+          val detail = showDebugMessages(debugMessages) ++ errorString
+          logger.info("\n" + detail)
           Left(failed(detail))
         }
+    }
+  }
+
+  def showDebugMessages(messages: AVector[DebugMessage]): String = {
+    if (messages.isEmpty) {
+      ""
+    } else {
+      messages.mkString("", "\n", "\n")
     }
   }
 
