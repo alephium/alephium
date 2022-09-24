@@ -2810,6 +2810,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("No warnings for used fields")
       val code =
         s"""
            |Interface I {
@@ -2837,7 +2838,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       val result = Compiler.compileProject(code).rightValue
-      result._1.flatMap(_.warnings) is AVector("Found unused fields in Foo: v")
+      result._1.flatMap(_.warnings) is AVector.empty[String]
     }
 
     {

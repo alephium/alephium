@@ -604,7 +604,7 @@ object Compiler {
             case None          => throw Error(s"Variable $sname does not exist")
           }
       }
-      usedVars.add(varName)
+      currentScopeUsedVars.add(varName)
       varInfo
     }
 

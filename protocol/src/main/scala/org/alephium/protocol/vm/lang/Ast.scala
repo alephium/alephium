@@ -539,9 +539,10 @@ object Ast {
           state.addUsedVars(vars)
           body.foreach(_.check(state))
         case None =>
-          val prevUsedVars = mutable.Set.from(state.usedVars)
           body.foreach(_.check(state))
-          usedVars = Some(Set.from(state.usedVars.diff(prevUsedVars)))
+          val currentScopeUsedVars = Set.from(state.currentScopeUsedVars)
+          usedVars = Some(currentScopeUsedVars)
+          state.addUsedVars(currentScopeUsedVars)
       }
       state.checkUnusedLocalVars(id)
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
