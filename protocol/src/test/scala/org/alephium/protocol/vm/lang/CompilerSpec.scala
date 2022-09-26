@@ -2810,6 +2810,38 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("No warnings for used fields")
+      val code =
+        s"""
+           |Interface I {
+           |  @using(readonly = true, externalCallCheck = false)
+           |  pub fn i() -> ()
+           |}
+           |Abstract Contract Base(v: U256) {
+           |  @using(readonly = true)
+           |  fn base() -> () {
+           |    assert!(v == 0, 0)
+           |  }
+           |}
+           |Contract Bar(v: U256) extends Base(v) implements I {
+           |  @using(readonly = true, externalCallCheck = false)
+           |  pub fn i() -> () {
+           |    assert!(v == 0, 0)
+           |    base()
+           |  }
+           |}
+           |Contract Foo(v: U256) extends Base(v) {
+           |  @using(readonly = true)
+           |  pub fn foo() -> () {
+           |    base()
+           |  }
+           |}
+           |""".stripMargin
+      val result = Compiler.compileProject(code).rightValue
+      result._1.flatMap(_.warnings) is AVector.empty[String]
+    }
+
+    {
       info("Check unused constants in Contract")
       val code =
         s"""
