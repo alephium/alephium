@@ -2842,6 +2842,24 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Unused variable in abstract contract")
+      val code =
+        s"""
+           |Abstract Contract Foo() {
+           |  @using(readonly = true)
+           |  pub fn foo(x: U256) -> () {}
+           |}
+           |Contract Bar() extends Foo() {}
+           |Contract Baz() extends Foo() {}
+           |""".stripMargin
+      val result = Compiler.compileProject(code).rightValue
+      result._1.flatMap(_.warnings) is AVector(
+        "Found unused variables in Bar: foo.x",
+        "Found unused variables in Baz: foo.x"
+      )
+    }
+
+    {
       info("Check unused constants in Contract")
       val code =
         s"""
