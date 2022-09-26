@@ -1173,7 +1173,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"""
          |Contract Foo() {
          |  fn foo() -> () {
-         |    debug!(`Hello, Alephium!`)
+         |    emit Debug(`Hello, Alephium!`)
          |    assert!(false, 0)
          |  }
          |}
@@ -1246,7 +1246,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"""
          |Contract Foo(name: ByteVec) {
          |  pub fn foo() -> () {
-         |    debug!(`Hello, $${name}!`)
+         |    emit Debug(`Hello, $${name}!`)
          |  }
          |}
          |""".stripMargin
