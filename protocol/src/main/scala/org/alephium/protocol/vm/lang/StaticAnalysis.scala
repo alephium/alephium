@@ -97,8 +97,8 @@ object StaticAnalysis {
       method: vm.Method[Ctx]
   ): Unit = {
     val changeState = method.instrs.exists {
-      case _: vm.StoreField | _: vm.StoreFieldByIndex.type | _: vm.LogInstr => true
-      case _                                                                => false
+      case _: vm.StoreField | _: vm.StoreFieldByIndex.type => true
+      case _                                               => false
     }
     val internalCalls        = state.internalCalls.getOrElse(func.id, mutable.Set.empty)
     val invalidInternalCalls = internalCalls.filterNot(state.getFunc(_).isReadonly)

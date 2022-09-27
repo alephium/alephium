@@ -3170,19 +3170,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Readonly functions emit events")
+      info("Treat log instructions as readonly")
       val code =
         s"""
            |Contract Foo() {
            |  event E(v: U256)
-           |  @using(readonly = true)
            |  pub fn foo() -> () {
+           |    checkCaller!(true, 0)
            |    emit E(0)
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Readonly function \"Foo.foo\" changes state"
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      warnings is AVector(
+        "Function Foo.foo is readonly, please use @using(readonly = true) for the function"
+      )
     }
 
     {
