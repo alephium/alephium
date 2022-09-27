@@ -484,6 +484,12 @@ object Ast {
     def isPrivate: Boolean        = !isPublic
     val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
+    def hasReadonlyAnnotation: Boolean =
+      annotations
+        .find(_.id.name == Parser.usingAnnotationId)
+        .flatMap(_.fields.find(_.ident.name == Parser.useReadonlyKey))
+        .nonEmpty
+
     private var usedVars: Option[Set[String]] = None
 
     def signature: String = {

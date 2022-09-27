@@ -182,6 +182,19 @@ object StaticAnalysis {
     }
   }
 
+  private def checkNoExternalCallFuncReadonly(
+      contract: Contract,
+      externalCallCheckTable: mutable.Map[FuncId, Boolean],
+      state: Compiler.State[vm.StatefulContext]
+  ): Unit = {
+    contract.funcs.foreach { func =>
+      val noExternalCallCheck = !func.useExternalCallCheck || !externalCallCheckTable(func.id)
+      if (noExternalCallCheck && !func.hasReadonlyAnnotation && func.isPublic) {
+        state.warnNonReadonlyAndNoExternalCallCheck(contract.ident, func.id)
+      }
+    }
+  }
+
   def checkExternalCalls(
       multiContract: MultiContract,
       states: AVector[Compiler.State[vm.StatefulContext]]
@@ -192,6 +205,7 @@ object StaticAnalysis {
         val state = states(index)
         val table = contract.buildExternalCallCheckTable(state)
         externalCallCheckTables.update(contract.ident, table)
+        checkNoExternalCallFuncReadonly(contract, table, state)
       case (interface: ContractInterface, _) =>
         val table = mutable.Map.from(interface.funcs.map(_.id -> true))
         externalCallCheckTables.update(interface.ident, table)

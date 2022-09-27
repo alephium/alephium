@@ -69,7 +69,7 @@ trait TypeSignatureFixture extends AlephiumFixture {
        |Contract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2]) {
        |  event Bar(a: Bool, b: U256, d: ByteVec, e: Address)
        |
-       |  @using(preapprovedAssets = true, assetsInContract = true)
+       |  @using(preapprovedAssets = true, assetsInContract = true, readonly = false)
        |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
        |    emit Bar(aa, bb, dd, ee)
        |    debug!(`xx`)
