@@ -3559,7 +3559,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |Contract Foo(name: ByteVec) {
          |  pub fn foo() -> () {
-         |    debug!(`Hello, $${name}!`)
+         |    emit Debug(`Hello, $${name}!`)
          |  }
          |}
          |""".stripMargin

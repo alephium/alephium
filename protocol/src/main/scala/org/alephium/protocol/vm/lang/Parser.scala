@@ -159,7 +159,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     P("${" ~ expr ~ "}")
 
   def debug[Unknown: P]: P[Ast.Debug[Ctx]] =
-    P("debug!" ~ "(" ~ Lexer.string(() => stringInterpolator) ~ ")").map {
+    P("emit" ~ "Debug" ~/ "(" ~ Lexer.string(() => stringInterpolator) ~ ")").map {
       case (stringParts, interpolationParts) =>
         Ast.Debug(
           stringParts.map(s => Val.ByteVec(ByteString.fromString(s))),
@@ -269,6 +269,9 @@ abstract class Parser[Ctx <: StatelessContext] {
       .map { case (typeId, fields) =>
         if (fields.length >= Instr.allLogInstrs.length) {
           throw Compiler.Error("Max 8 fields allowed for contract events")
+        }
+        if (typeId.name == "Debug") {
+          throw Compiler.Error("Debug is a built-in event name")
         }
         Ast.EventDef(typeId, fields)
       }
