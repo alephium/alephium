@@ -58,7 +58,7 @@ object SwaggerUI {
     val swaggerInitializerJsWithExtended =
       s"""|window.onload = function() {
           |  window.ui = SwaggerUIBundle({
-          |    url: "/docs/openapi.json",
+          |    url: "/docs/$openapiFileName",
           |    tryItOutEnabled: true,
           |    dom_id: '#swagger-ui',
           |    deepLinking: true,
