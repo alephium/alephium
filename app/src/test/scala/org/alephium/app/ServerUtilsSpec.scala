@@ -1882,6 +1882,54 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "test utxo splits for generated outputs" in new Fixture {
+    val tokenId = TokenId.random
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), #${tokenId.toHexString}, 1)
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).toOption.get
+
+    val caller = Address.p2pkh(PublicKey.generate)
+    val inputAssets = TestInputAsset(
+      caller,
+      AssetState(
+        ALPH.alph(3),
+        Some(AVector.fill(2 * maxTokenPerUtxo)(Token(TokenId.random, 1)))
+      )
+    )
+    val testContract = TestContract(
+      blockHash = Some(BlockHash.random),
+      txId = Some(TransactionId.random),
+      bytecode = code,
+      initialFields = Some(AVector.empty[Val]),
+      initialAsset = Some(AssetState(ALPH.oneAlph, Some(AVector(Token(tokenId, 10))))),
+      args = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))),
+      inputAssets = Some(AVector(inputAssets))
+    ).toComplete().rightValue
+
+    val serverUtils  = new ServerUtils()
+    val tokensSorted = (inputAssets.asset.tokens.get :+ Token(tokenId, 1)).sortBy(_.id)
+    val testResult   = serverUtils.runTestContract(blockFlow, testContract).rightValue
+    testResult.txOutputs.length is 4
+    testResult.txOutputs(0).address is caller
+    testResult.txOutputs(0).tokens.length is maxTokenPerUtxo
+    testResult.txOutputs(0).tokens is tokensSorted.slice(0, maxTokenPerUtxo)
+    testResult.txOutputs(1).address is caller
+    testResult.txOutputs(1).tokens.length is maxTokenPerUtxo
+    testResult.txOutputs(1).tokens is tokensSorted
+      .slice(maxTokenPerUtxo, 2 * maxTokenPerUtxo)
+    testResult.txOutputs(2).address is caller
+    testResult.txOutputs(2).tokens.length is 1
+    testResult.txOutputs(2).tokens is tokensSorted.slice(2 * maxTokenPerUtxo, tokensSorted.length)
+    testResult.txOutputs(3).address is Address.contract(testContract.contractId)
+  }
+
   private def generateDestination(
       chainIndex: ChainIndex,
       message: ByteString = ByteString.empty

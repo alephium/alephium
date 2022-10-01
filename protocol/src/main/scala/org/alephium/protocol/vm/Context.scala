@@ -23,7 +23,7 @@ import org.alephium.protocol.Signature
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.TokenIssuance
-import org.alephium.util.{discard, AVector, TimeStamp, U256}
+import org.alephium.util.{discard, AVector, EitherF, TimeStamp, U256}
 
 final case class BlockEnv(
     networkId: NetworkId,
@@ -232,9 +232,12 @@ trait StatefulContext extends StatelessContext with ContractPool {
         } else {
           generateContractOutputSimple(contractId, contractOutput)
         }
-      case _ =>
-        generatedOutputs.addOne(output)
-        chargeGeneratedOutput()
+      case assetOutput: AssetOutput =>
+        if (getHardFork().isLemanEnabled()) {
+          generateAssetOutputLeman(assetOutput)
+        } else {
+          generateAssetOutputSimple(assetOutput)
+        }
     }
   }
 
@@ -271,6 +274,37 @@ trait StatefulContext extends StatelessContext with ContractPool {
       generatedOutputs.addOne(contractOutput)
       ()
     }
+  }
+
+  def generateAssetOutputLeman(assetOutput: AssetOutput): ExeResult[Unit] = {
+    if (assetOutput.tokens.length <= maxTokenPerUtxo) {
+      generateAssetOutputSimple(assetOutput)
+    } else {
+      val tokenLength       = assetOutput.tokens.length
+      val outputNum         = (tokenLength - 1) / maxTokenPerUtxo + 1
+      val alphAmountAverage = assetOutput.amount.divUnsafe(U256.unsafe(outputNum))
+      EitherF.foreachTry(0 until outputNum) { k =>
+        val tokenIndexStart = maxTokenPerUtxo * k
+        val newOutput = if (k < outputNum - 1) {
+          assetOutput.copy(
+            amount = alphAmountAverage,
+            tokens = assetOutput.tokens.slice(tokenIndexStart, tokenIndexStart + maxTokenPerUtxo)
+          )
+        } else {
+          assetOutput.copy(
+            amount =
+              alphAmountAverage.addUnsafe(assetOutput.amount.modUnsafe(U256.unsafe(outputNum))),
+            tokens = assetOutput.tokens.slice(tokenIndexStart, tokenLength)
+          )
+        }
+        generateAssetOutputSimple(newOutput)
+      }
+    }
+  }
+
+  def generateAssetOutputSimple(assetOutput: AssetOutput): ExeResult[Unit] = {
+    generatedOutputs.addOne(assetOutput)
+    chargeGeneratedOutput()
   }
 
   def contractExists(contractId: ContractId): ExeResult[Boolean] = {

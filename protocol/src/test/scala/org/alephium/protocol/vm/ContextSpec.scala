@@ -16,11 +16,15 @@
 
 package org.alephium.protocol.vm
 
+import scala.util.Random
+
+import akka.util.ByteString
 import org.scalacheck.Gen
 
+import org.alephium.protocol.{ALPH, PublicKey}
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 class ContextSpec
     extends AlephiumSpec
@@ -65,7 +69,9 @@ class ContextSpec
   }
 
   it should "generate asset output" in new Fixture {
-    val assetOutput = assetOutputGen(GroupIndex.unsafe(0))().sample.get
+    val assetOutput = assetOutputGen(GroupIndex.unsafe(0))(_tokensGen =
+      tokensGen(1, Gen.choose(1, maxTokenPerUtxo))
+    ).sample.get
     context.generateOutput(assetOutput) isE ()
     initialGas.use(GasSchedule.txOutputBaseGas) isE context.gasRemaining
     context.generatedOutputs.size is 1
@@ -161,7 +167,7 @@ class ContextSpec
     context.gasRemaining is expected1
   }
 
-  trait OutputFixture extends NetworkConfigFixture.Default {
+  trait ContractOutputFixture extends NetworkConfigFixture.Default {
     val contractId = ContractId.random
     val tokenId0   = TokenId.random
     val tokenId1   = TokenId.random
@@ -205,12 +211,16 @@ class ContextSpec
     }
   }
 
-  trait MainnetOutputFixture extends OutputFixture {
+  trait MainnetContractOutputFixture extends ContractOutputFixture {
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
     context.getHardFork() is HardFork.Mainnet
   }
 
-  it should "generate output when the output is the same as input for Mainnet hardfork" in new MainnetOutputFixture {
+  trait LemanContractOutputFixture extends ContractOutputFixture {
+    context.getHardFork() is HardFork.Leman
+  }
+
+  it should "generate output when the output is the same as input for Mainnet hardfork" in new MainnetContractOutputFixture {
     val initialGas = context.gasRemaining
     context.generateOutput(output) isE ()
     context.contractInputs.toSeq is Seq(outputRef -> output)
@@ -218,16 +228,16 @@ class ContextSpec
     context.gasRemaining is initialGas.subUnsafe(GasSchedule.txOutputBaseGas)
   }
 
-  it should "generate output when the output is not the same as input for Mainnet hardfork" in new MainnetOutputFixture {
+  it should "generate output when the output is not the same as input for Mainnet hardfork" in new MainnetContractOutputFixture {
     testOutputDifferentFromInput()
   }
 
-  it should "fail to generate output when contract asset is not loaded for Mainnet hardfork" in new MainnetOutputFixture {
+  it should "fail to generate output when contract asset is not loaded for Mainnet hardfork" in new MainnetContractOutputFixture {
     val newContext = genStatefulContext()
     newContext.generateOutput(output).leftValue isE ContractAssetUnloaded
   }
 
-  it should "ignore output when the output is the same as input for Leman hardfork" in new OutputFixture {
+  it should "ignore output when the output is the same as input for Leman hardfork" in new LemanContractOutputFixture {
     val initialGas = context.gasRemaining
     context.getHardFork() is HardFork.Leman
     context.generateOutput(output) isE ()
@@ -236,14 +246,87 @@ class ContextSpec
     context.gasRemaining is initialGas
   }
 
-  it should "generate output when the output is not the same as input for Leman hardfork" in new OutputFixture {
+  it should "generate output when the output is not the same as input for Leman hardfork" in new LemanContractOutputFixture {
     context.getHardFork() is HardFork.Leman
     testOutputDifferentFromInput()
   }
 
-  it should "fail to generate output when contract asset is not loaded for Leman hardfork" in new OutputFixture {
+  it should "fail to generate output when contract asset is not loaded for Leman hardfork" in new LemanContractOutputFixture {
     val newContext = genStatefulContext()
     newContext.getHardFork() is HardFork.Leman
     newContext.generateOutput(output).leftValue isE ContractAssetUnloaded
+  }
+
+  trait AssetOutputFixture extends Fixture {
+    def prepareOutput(alphAmount: U256, tokenNum: Int): AssetOutput = {
+      AssetOutput(
+        alphAmount,
+        LockupScript.p2pkh(PublicKey.generate),
+        TimeStamp.zero,
+        AVector.fill(tokenNum)((TokenId.random, U256.One)),
+        ByteString.empty
+      )
+    }
+  }
+
+  trait MainnetAssetOutputFixture extends AssetOutputFixture {
+    override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    context.getHardFork() is HardFork.Mainnet
+  }
+
+  trait LemanAssetOutputFixture extends AssetOutputFixture {
+    context.getHardFork() is HardFork.Leman
+  }
+
+  it should "generate single output when token number <= maxTokenPerUTXO for Mainnet hardfork" in new MainnetAssetOutputFixture {
+    (0 to maxTokenPerUtxo).foreach { num =>
+      val output = prepareOutput(ALPH.oneAlph, num)
+      context.generatedOutputs.clear()
+      context.generateOutput(output) isE ()
+      context.generatedOutputs.toSeq is Seq(output)
+    }
+  }
+
+  it should "generate single output when token number > maxTokenPerUTXO for Mainnet hardfork" in new MainnetAssetOutputFixture {
+    (maxTokenPerUtxo + 1 to 5 * maxTokenPerUtxo).foreach { num =>
+      val output = prepareOutput(ALPH.oneAlph, num)
+      context.generatedOutputs.clear()
+      context.generateOutput(output) isE ()
+      context.generatedOutputs.toSeq is Seq(output)
+    }
+  }
+
+  it should "generate single output when token number <= maxTokenPerUTXO for Leman hardfork" in new LemanAssetOutputFixture {
+    (0 to maxTokenPerUtxo).foreach { num =>
+      val output = prepareOutput(ALPH.oneAlph, num)
+      context.generatedOutputs.clear()
+      context.generateOutput(output) isE ()
+      context.generatedOutputs.toSeq is Seq(output)
+    }
+  }
+
+  it should "generate single output when token number > maxTokenPerUTXO for Leman hardfork" in new LemanAssetOutputFixture {
+    def test(output: AssetOutput, expectedAlph: Seq[U256], expectedTokenNum: Seq[Int]) = {
+      expectedAlph.length is expectedTokenNum.length
+      expectedTokenNum.sum is output.tokens.length
+      context.generatedOutputs.clear()
+      context.generateOutput(output) isE ()
+      expectedAlph.indices.foreach { k =>
+        context.generatedOutputs(k).amount is expectedAlph(k)
+        context.generatedOutputs(k).tokens.length is expectedTokenNum(k)
+        context.generatedOutputs(k).tokens is output.tokens.slice(
+          expectedTokenNum.take(k).sum,
+          expectedTokenNum.take(k + 1).sum
+        )
+      }
+    }
+
+    val k      = Random.nextInt(5) + 1
+    val output = prepareOutput(ALPH.alph(k.toLong), k * maxTokenPerUtxo)
+    test(output, Seq.fill(k)(ALPH.oneAlph), Seq.fill(k)(maxTokenPerUtxo))
+    (1 until maxTokenPerUtxo).foreach { r =>
+      val output = prepareOutput(ALPH.alph(k.toLong + 1), k * maxTokenPerUtxo + r)
+      test(output, Seq.fill(k + 1)(ALPH.oneAlph), Seq.fill(k)(maxTokenPerUtxo) :+ r)
+    }
   }
 }
