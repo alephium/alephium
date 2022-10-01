@@ -58,7 +58,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   }
 
   def genStatefulContext(
-      scriptOpt: Option[StatefulScript],
+      scriptOpt: Option[StatefulScript] = None,
       gasLimit: GasBox = minimalGas,
       signatures: AVector[Signature] = AVector.empty
   )(implicit networkConfig: NetworkConfig): StatefulContext = {

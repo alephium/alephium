@@ -3582,6 +3582,29 @@ class VMSpec extends AlephiumSpec {
     event.fields is AVector[Val](Val.ByteVec(ByteString.fromString("Hello, Alephium!")))
   }
 
+  it should "test contract asset only function" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    assert!(alphRemaining!(selfAddress!()) == 1 alph, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val contractId = createContract(foo, AVector.empty)._1
+
+    val script =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main() {
+         |  Foo(#${contractId.toHexString}).foo()
+         |}
+         |$foo
+         |""".stripMargin
+    testSimpleScript(script)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

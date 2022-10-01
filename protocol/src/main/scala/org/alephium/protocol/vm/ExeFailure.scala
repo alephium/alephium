@@ -139,9 +139,9 @@ sealed trait IOFailure extends Product {
   def error: IOError
   def name: String = productPrefix
 }
-final case class IOErrorUpdateState(error: IOError)     extends IOFailure
-final case class IOErrorRemoveContract(error: IOError)  extends IOFailure
-final case class IOErrorLoadContract(error: IOError)    extends IOFailure
-final case class IOErrorLoadOutputs(error: IOError)     extends IOFailure
-final case class IOErrorMigrateContract(error: IOError) extends IOFailure
-final case class IOErrorWriteLog(error: IOError)        extends IOFailure
+final case class IOErrorUpdateState(error: IOError)          extends IOFailure
+final case class IOErrorRemoveContract(error: IOError)       extends IOFailure
+final case class IOErrorAddBackContractAsset(error: IOError) extends IOFailure
+final case class IOErrorLoadContract(error: IOError)         extends IOFailure
+final case class IOErrorMigrateContract(error: IOError)      extends IOFailure
+final case class IOErrorWriteLog(error: IOError)             extends IOFailure

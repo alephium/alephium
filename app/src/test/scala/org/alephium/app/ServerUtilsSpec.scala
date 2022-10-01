@@ -1264,6 +1264,24 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
+  it should "test contract asset only function" in new Fixture {
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    assert!(alphRemaining!(selfAddress!()) == 1 alph, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val code         = Compiler.compileContract(contract).rightValue
+    val testContract = TestContract(bytecode = code).toComplete().rightValue
+    val serverUtils  = new ServerUtils()
+    val testResult   = serverUtils.runTestContract(blockFlow, testContract).rightValue
+    testResult.txInputs.isEmpty is true
+    testResult.txOutputs.isEmpty is true
+  }
+
   trait TestContractFixture extends Fixture {
     val tokenId         = TokenId.random
     val (_, pubKey)     = SignatureSchema.generatePriPub()

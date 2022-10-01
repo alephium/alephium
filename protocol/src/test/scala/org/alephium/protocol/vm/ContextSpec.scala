@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import org.scalacheck.Gen
 
 import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfigFixture}
-import org.alephium.protocol.model.{ContractId, GroupIndex, HardFork, TxGenerators}
+import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class ContextSpec
@@ -77,7 +77,7 @@ class ContextSpec
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
     context.generateOutput(newOutput).leftValue isE ContractAssetUnloaded
-    initialGas.use(GasSchedule.txOutputBaseGas) isE context.gasRemaining
+    context.gasRemaining is initialGas
     context.worldState.getContractAsset(contractId) isE oldOutput
     context.generatedOutputs.size is 1
   }
@@ -159,5 +159,91 @@ class ContextSpec
     context.chargeGasWithSizeLeman(ByteVecConcat, 7)
     val expected1 = expected0.use(GasBox.unsafe(10)).rightValue
     context.gasRemaining is expected1
+  }
+
+  trait OutputFixture extends NetworkConfigFixture.Default {
+    val contractId = ContractId.random
+    val tokenId0   = TokenId.random
+    val tokenId1   = TokenId.random
+    val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
+    val output =
+      ContractOutput(100, LockupScript.p2c(contractId), AVector(tokenId0 -> 200, tokenId1 -> 300))
+    val modifiedOutputs = Seq(
+      ContractOutput(101, LockupScript.p2c(contractId), AVector(tokenId0 -> 200, tokenId1 -> 300)),
+      ContractOutput(100, LockupScript.p2c(contractId), AVector(tokenId0 -> 201, tokenId1 -> 300)),
+      ContractOutput(100, LockupScript.p2c(contractId), AVector(tokenId0 -> 200, tokenId1 -> 301)),
+      ContractOutput(100, LockupScript.p2c(contractId), AVector(tokenId0 -> 200)),
+      ContractOutput(100, LockupScript.p2c(contractId), AVector(tokenId1 -> 300)),
+      ContractOutput(100, LockupScript.p2c(contractId), AVector(tokenId1 -> 200, tokenId0 -> 300))
+    )
+    lazy val context = {
+      lazy val initialGas = 1000000
+      lazy val context    = genStatefulContext(None, gasLimit = initialGas)
+      context.contractInputs.clear()
+      context.contractInputs += outputRef -> output
+      context.markAssetInUsing(contractId)
+      context.worldState.createContractUnsafe(
+        contractId,
+        StatefulContract.forSMT,
+        AVector.empty,
+        outputRef,
+        output
+      )
+      context
+    }
+
+    def testOutputDifferentFromInput() = {
+      modifiedOutputs.foreach { modifiedOutput =>
+        val initialGas = context.gasRemaining
+        context.generatedOutputs.clear()
+        context.assetStatus.put(contractId, ContractPool.ContractAssetInUsing)
+        context.generateOutput(modifiedOutput) isE ()
+        context.contractInputs.toSeq is Seq(outputRef -> output)
+        context.generatedOutputs.toSeq is Seq(modifiedOutput)
+        context.gasRemaining is initialGas.subUnsafe(GasSchedule.txOutputBaseGas) // no refund
+      }
+    }
+  }
+
+  trait MainnetOutputFixture extends OutputFixture {
+    override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    context.getHardFork() is HardFork.Mainnet
+  }
+
+  it should "generate output when the output is the same as input for Mainnet hardfork" in new MainnetOutputFixture {
+    val initialGas = context.gasRemaining
+    context.generateOutput(output) isE ()
+    context.contractInputs.toSeq is Seq(outputRef -> output)
+    context.generatedOutputs.toSeq is Seq(output)
+    context.gasRemaining is initialGas.subUnsafe(GasSchedule.txOutputBaseGas)
+  }
+
+  it should "generate output when the output is not the same as input for Mainnet hardfork" in new MainnetOutputFixture {
+    testOutputDifferentFromInput()
+  }
+
+  it should "fail to generate output when contract asset is not loaded for Mainnet hardfork" in new MainnetOutputFixture {
+    val newContext = genStatefulContext()
+    newContext.generateOutput(output).leftValue isE ContractAssetUnloaded
+  }
+
+  it should "ignore output when the output is the same as input for Leman hardfork" in new OutputFixture {
+    val initialGas = context.gasRemaining
+    context.getHardFork() is HardFork.Leman
+    context.generateOutput(output) isE ()
+    context.contractInputs.isEmpty is true
+    context.generatedOutputs.isEmpty is true
+    context.gasRemaining is initialGas
+  }
+
+  it should "generate output when the output is not the same as input for Leman hardfork" in new OutputFixture {
+    context.getHardFork() is HardFork.Leman
+    testOutputDifferentFromInput()
+  }
+
+  it should "fail to generate output when contract asset is not loaded for Leman hardfork" in new OutputFixture {
+    val newContext = genStatefulContext()
+    newContext.getHardFork() is HardFork.Leman
+    newContext.generateOutput(output).leftValue isE ContractAssetUnloaded
   }
 }

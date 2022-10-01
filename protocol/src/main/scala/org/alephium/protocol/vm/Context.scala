@@ -224,21 +224,52 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def nextContractOutputRef(output: ContractOutput): ContractOutputRef =
     ContractOutputRef.from(txId, output, nextOutputIndex)
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def generateOutput(output: TxOutput): ExeResult[Unit] = {
     output match {
       case contractOutput @ ContractOutput(_, LockupScript.P2C(contractId), _) =>
-        val outputRef = nextContractOutputRef(contractOutput)
-        for {
-          _ <- chargeGeneratedOutput()
-          _ <- updateContractAsset(contractId, outputRef, contractOutput)
-        } yield {
-          generatedOutputs.addOne(output)
-          ()
+        if (getHardFork().isLemanEnabled()) {
+          generateContractOutputLeman(contractId, contractOutput)
+        } else {
+          generateContractOutputSimple(contractId, contractOutput)
         }
       case _ =>
         generatedOutputs.addOne(output)
         chargeGeneratedOutput()
+    }
+  }
+
+  def generateContractOutputLeman(
+      contractId: ContractId,
+      contractOutput: ContractOutput
+  ): ExeResult[Unit] = {
+    val inputIndex = contractInputs.indexWhere(_._2.lockupScript.contractId == contractId)
+    if (inputIndex == -1) {
+      failed(ContractAssetUnloaded)
+    } else {
+      val (inputRef, input) = contractInputs(inputIndex)
+      if (contractOutput == input) {
+        contractInputs.remove(inputIndex)
+        for {
+          _ <- addBackUnusedContractAssets(inputRef, input)
+          _ <- markAssetFlushed(contractId)
+        } yield ()
+      } else {
+        generateContractOutputSimple(contractId, contractOutput)
+      }
+    }
+  }
+
+  def generateContractOutputSimple(
+      contractId: ContractId,
+      contractOutput: ContractOutput
+  ): ExeResult[Unit] = {
+    val outputRef = nextContractOutputRef(contractOutput)
+    for {
+      _ <- chargeGeneratedOutput()
+      _ <- updateContractAsset(contractId, outputRef, contractOutput)
+    } yield {
+      generatedOutputs.addOne(contractOutput)
+      ()
     }
   }
 

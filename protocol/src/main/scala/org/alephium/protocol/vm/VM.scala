@@ -349,7 +349,14 @@ final class StatefulVM(
         _ <- ctx.checkAllAssetsFlushed()
       } yield ()
     } else {
-      Right(())
+      if (ctx.getHardFork().isLemanEnabled()) {
+        for {
+          _ <- outputGeneratedBalances(ctx.outputBalances)
+          _ <- ctx.checkAllAssetsFlushed()
+        } yield ()
+      } else {
+        Right(())
+      }
     }
   }
 

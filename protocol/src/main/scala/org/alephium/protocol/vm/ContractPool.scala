@@ -116,7 +116,6 @@ trait ContractPool extends CostStrategy {
     worldState.updateContractUnsafe(contractId, state).left.map(e => Left(IOErrorUpdateState(e)))
   }
 
-  // note: we don't charge gas here as it's charged by tx input already
   def useContractAssets(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
     for {
       _ <- chargeContractInput()
@@ -130,6 +129,16 @@ trait ContractPool extends CostStrategy {
         .map(e => Left(IOErrorLoadContract(e)))
       _ <- markAssetInUsing(contractId)
     } yield balances
+  }
+
+  def addBackUnusedContractAssets(
+      contractOutputRef: ContractOutputRef,
+      contractOutput: ContractOutput
+  ): ExeResult[Unit] = {
+    worldState
+      .addAsset(contractOutputRef, contractOutput)
+      .left
+      .map(e => Left(IOErrorAddBackContractAsset(e)))
   }
 
   def markAssetInUsing(contractId: ContractId): ExeResult[Unit] = {
