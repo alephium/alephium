@@ -20,26 +20,6 @@
     "doc": "Creates a new contract with token issuance by copying another contract's code. This costs less gas than createContract!(...)"
   },
   {
-    "name": "contractExists",
-    "category": "Contract",
-    "doc": "Checks whether the input contract id exists."
-  },
-  {
-    "name": "destroySelf",
-    "category": "Contract",
-    "doc": "Destroys the contract."
-  },
-  {
-    "name": "migrate",
-    "category": "Contract",
-    "doc": "Migrates the code of the contract."
-  },
-  {
-    "name": "migrateWithFields",
-    "category": "Contract",
-    "doc": "Migrates both the code and the fields of the contract."
-  },
-  {
     "name": "selfAddress",
     "category": "Contract",
     "doc": "Returns the address (Address) of the contract."
@@ -65,9 +45,14 @@
     "doc": "Returns the address of the caller."
   },
   {
-    "name": "isCalledFromTxScript",
+    "name": "contractInitialStateHash",
     "category": "Contract",
-    "doc": "Checks whether the function is called by a TxScript."
+    "doc": "Returns the initial state hash of the contract."
+  },
+  {
+    "name": "contractCodeHash",
+    "category": "Contract",
+    "doc": "Returns the contract code hash of the contract."
   },
   {
     "name": "callerInitialStateHash",
@@ -80,14 +65,29 @@
     "doc": "Returns the contract code hash of the caller contract."
   },
   {
-    "name": "contractInitialStateHash",
+    "name": "contractExists",
     "category": "Contract",
-    "doc": "Returns the initial state hash of the contract."
+    "doc": "Checks whether the input contract id exists."
   },
   {
-    "name": "contractCodeHash",
+    "name": "destroySelf",
     "category": "Contract",
-    "doc": "Returns the contract code hash of the contract."
+    "doc": "Destroys the contract."
+  },
+  {
+    "name": "migrate",
+    "category": "Contract",
+    "doc": "Migrates the code of the contract."
+  },
+  {
+    "name": "migrateWithFields",
+    "category": "Contract",
+    "doc": "Migrates both the code and the fields of the contract."
+  },
+  {
+    "name": "isCalledFromTxScript",
+    "category": "Contract",
+    "doc": "Checks whether the function is called by a TxScript."
   },
   {
     "name": "createSubContract",
@@ -225,6 +225,11 @@
     "doc": "Returns the network id."
   },
   {
+    "name": "blockHash",
+    "category": "Chain",
+    "doc": "Returns the block hash of the current block."
+  },
+  {
     "name": "blockTimeStamp",
     "category": "Chain",
     "doc": "Returns the block timestamp."
@@ -265,11 +270,6 @@
     "doc": "Returns the dust amount of an UTXO."
   },
   {
-    "name": "blockHash",
-    "category": "Chain",
-    "doc": "Returns the block hash of the current block."
-  },
-  {
     "name": "toI256",
     "category": "Conversion",
     "doc": "Converts U256 to I256."
@@ -283,6 +283,16 @@
     "name": "toByteVec",
     "category": "Conversion",
     "doc": "Converts Bool/I256/U256/Address to ByteVec"
+  },
+  {
+    "name": "contractIdToAddress",
+    "category": "Conversion",
+    "doc": "Converts contract id (ByteVec) to contract address (Address)."
+  },
+  {
+    "name": "byteVecToAddress",
+    "category": "Conversion",
+    "doc": "Converts ByteVec to Address."
   },
   {
     "name": "u256To1Byte",
@@ -343,16 +353,6 @@
     "name": "u256From32Byte",
     "category": "Conversion",
     "doc": "Converts 32 byte to U256."
-  },
-  {
-    "name": "byteVecToAddress",
-    "category": "Conversion",
-    "doc": "Converts ByteVec to Address."
-  },
-  {
-    "name": "contractIdToAddress",
-    "category": "Conversion",
-    "doc": "Converts contract id (ByteVec) to contract address (Address)."
   },
   {
     "name": "size",
