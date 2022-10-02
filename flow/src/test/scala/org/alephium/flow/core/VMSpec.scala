@@ -886,8 +886,6 @@ class VMSpec extends AlephiumSpec {
          |    assert!(contractInitialStateHash!(barId) == barHash, 0)
          |    Foo(#$fooId).foo(fooId, fooHash, fooCodeHash, barId, barHash, barCodeHash, barAddress)
          |    assert!(isCalledFromTxScript!() == true, 0)
-         |    assert!(isPaying!(@$genesisAddress) == true, 0)
-         |    assert!(isPaying!(selfAddress!()) == false, 0)
          |    assert!(isAssetAddress!(@$genesisAddress) == true, 0)
          |    assert!(isContractAddress!(@$genesisAddress) == false, 0)
          |  }
@@ -902,9 +900,7 @@ class VMSpec extends AlephiumSpec {
          |TxScript Main {
          |  Bar(#$barId).bar{ @$genesisAddress -> 1 alph }(#$fooId, #$fooHash, #$fooCodeHash, #$barId, #$barHash, #$barCodeHash, @$barAddress)
          |  copyCreateContract!{ @$genesisAddress -> 1 alph }(#$fooId, #$state)
-         |  assert!(isPaying!(@$genesisAddress) == true, 0)
          |}
-         |
          |$bar
          |""".stripMargin
 

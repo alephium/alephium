@@ -140,11 +140,6 @@
     "doc": "Returns the amount of the remaining token amount in the input assets of the function."
   },
   {
-    "name": "isPaying",
-    "category": "Asset",
-    "doc": "Returns whether the input address owns any asset in the input assets of the function."
-  },
-  {
     "name": "transferAlph",
     "category": "Asset",
     "doc": "Transfers ALPH from the input assets of the function."

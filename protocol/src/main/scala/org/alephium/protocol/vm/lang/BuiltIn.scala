@@ -672,16 +672,6 @@ object BuiltIn {
       doc = "Returns the amount of the remaining token amount in the input assets of the function."
     )
 
-  val isPaying: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn.asset(
-      "isPaying",
-      Seq(Type.Address),
-      Seq(Type.Bool),
-      IsPaying,
-      isReadonly = true,
-      doc = "Returns whether the input address owns any asset in the input assets of the function."
-    )
-
   val transferAlph: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.asset(
       "transferAlph",
@@ -1118,7 +1108,6 @@ object BuiltIn {
       approveToken,
       alphRemaining,
       tokenRemaining,
-      isPaying,
       transferAlph,
       transferAlphFromSelf,
       transferAlphToSelf,
