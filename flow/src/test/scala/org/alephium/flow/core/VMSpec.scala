@@ -1297,10 +1297,7 @@ class VMSpec extends AlephiumSpec {
          |
          |$foo
          |""".stripMargin
-    val script = Compiler.compileTxScript(main).rightValue
-    val errorMessage =
-      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
-    errorMessage.startsWith("Right(TxScriptExeFailed(UncaughtKeyNotFoundError") is true
+    failCallTxScript(main, ContractAssetAlreadyInUsing)
   }
 
   it should "fetch block env" in new ContractFixture {

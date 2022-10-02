@@ -112,6 +112,12 @@ trait ContractPool extends CostStrategy {
     }
   }
 
+  def removeOutdatedContractAssets(): ExeResult[Unit] = {
+    EitherF.foreachTry(contractInputs) { input =>
+      worldState.removeAsset(input._1).left.map(e => Left(IOErrorRemoveContractAsset(e)))
+    }
+  }
+
   private def updateState(contractId: ContractId, state: AVector[Val]): ExeResult[Unit] = {
     worldState.updateContractUnsafe(contractId, state).left.map(e => Left(IOErrorUpdateState(e)))
   }
@@ -120,7 +126,7 @@ trait ContractPool extends CostStrategy {
     for {
       _ <- chargeContractInput()
       balances <- worldState
-        .useContractAssets(contractId)
+        .loadContractAssets(contractId)
         .map { case (contractOutputRef, contractAsset) =>
           contractInputs.addOne(contractOutputRef -> contractAsset)
           MutBalancesPerLockup.from(contractAsset)
@@ -129,16 +135,6 @@ trait ContractPool extends CostStrategy {
         .map(e => Left(IOErrorLoadContract(e)))
       _ <- markAssetInUsing(contractId)
     } yield balances
-  }
-
-  def addBackUnusedContractAssets(
-      contractOutputRef: ContractOutputRef,
-      contractOutput: ContractOutput
-  ): ExeResult[Unit] = {
-    worldState
-      .addAsset(contractOutputRef, contractOutput)
-      .left
-      .map(e => Left(IOErrorAddBackContractAsset(e)))
   }
 
   def markAssetInUsing(contractId: ContractId): ExeResult[Unit] = {

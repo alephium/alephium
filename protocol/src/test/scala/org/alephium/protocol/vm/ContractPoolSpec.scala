@@ -187,6 +187,6 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.worldState.getOutputOpt(outputRef).rightValue.nonEmpty is true
     pool.useContractAssets(contractId).isRight is true
     initialGas.use(GasSchedule.txInputBaseGas) isE pool.gasRemaining
-    pool.worldState.getOutputOpt(outputRef) isE None
+    pool.worldState.getOutputOpt(outputRef) isE a[Some[_]]
   }
 }

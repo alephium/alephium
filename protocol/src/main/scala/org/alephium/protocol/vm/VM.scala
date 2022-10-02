@@ -330,6 +330,8 @@ final class StatefulVM(
     for {
       _ <- ctx.updateContractStates()
       _ <- cleanBalances(lastFrame)
+      _ <- ctx
+        .removeOutdatedContractAssets() // this must run after cleanBalances so that unused inputs are removed
     } yield ()
   }
 

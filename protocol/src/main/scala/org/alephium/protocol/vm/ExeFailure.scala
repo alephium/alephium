@@ -141,7 +141,7 @@ sealed trait IOFailure extends Product {
 }
 final case class IOErrorUpdateState(error: IOError)          extends IOFailure
 final case class IOErrorRemoveContract(error: IOError)       extends IOFailure
-final case class IOErrorAddBackContractAsset(error: IOError) extends IOFailure
+final case class IOErrorRemoveContractAsset(error: IOError)  extends IOFailure
 final case class IOErrorLoadContract(error: IOError)         extends IOFailure
 final case class IOErrorMigrateContract(error: IOError)      extends IOFailure
 final case class IOErrorWriteLog(error: IOError)             extends IOFailure

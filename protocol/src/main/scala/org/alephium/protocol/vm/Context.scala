@@ -249,11 +249,10 @@ trait StatefulContext extends StatelessContext with ContractPool {
     if (inputIndex == -1) {
       failed(ContractAssetUnloaded)
     } else {
-      val (inputRef, input) = contractInputs(inputIndex)
+      val (_, input) = contractInputs(inputIndex)
       if (contractOutput == input) {
         contractInputs.remove(inputIndex)
         for {
-          _ <- addBackUnusedContractAssets(inputRef, input)
           _ <- markAssetFlushed(contractId)
         } yield ()
       } else {
