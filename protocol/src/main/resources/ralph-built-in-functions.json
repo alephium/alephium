@@ -2,406 +2,487 @@
   {
     "name": "createContract",
     "category": "Contract",
+    "signature": "fn createContract!(code:ByteVec, encodedFields:ByteVec) -> (ByteVec)",
     "doc": "Creates a new contract without token issuance."
   },
   {
     "name": "createContractWithToken",
     "category": "Contract",
+    "signature": "fn createContractWithToken!(code:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo: Address) -> (ByteVec)",
     "doc": "Creates a new contract with token issuance."
   },
   {
     "name": "copyCreateContract",
     "category": "Contract",
+    "signature": "fn copyCreateContract!(contractId:ByteVec, encodedFields:ByteVec) -> (ByteVec)",
     "doc": "Creates a new contract without token issuance by copying another contract's code. This costs less gas than createContract!(...)"
   },
   {
     "name": "copyCreateContractWithToken",
     "category": "Contract",
+    "signature": "fn copyCreateContractWithToken!(contractId:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo: Address) -> (ByteVec)",
     "doc": "Creates a new contract with token issuance by copying another contract's code. This costs less gas than createContract!(...)"
   },
   {
     "name": "selfAddress",
     "category": "Contract",
+    "signature": "fn selfAddress!() -> (Address)",
     "doc": "Returns the address (Address) of the contract."
   },
   {
     "name": "selfContractId",
     "category": "Contract",
+    "signature": "fn selfContractId!() -> (ByteVec)",
     "doc": "Returns the id (ByteVec) of the contract."
   },
   {
     "name": "selfTokenId",
     "category": "Contract",
+    "signature": "fn selfTokenId!() -> (ByteVec)",
     "doc": "Returns the token id (ByteVec) of the contract."
   },
   {
     "name": "callerContractId",
     "category": "Contract",
+    "signature": "fn callerContractId!() -> (ByteVec)",
     "doc": "Returns the contract id of the caller."
   },
   {
     "name": "callerAddress",
     "category": "Contract",
+    "signature": "fn callerAddress!() -> (Address)",
     "doc": "Returns the address of the caller."
   },
   {
     "name": "contractInitialStateHash",
     "category": "Contract",
+    "signature": "fn contractInitialStateHash!(contractId:ByteVec) -> (ByteVec)",
     "doc": "Returns the initial state hash of the contract."
   },
   {
     "name": "contractCodeHash",
     "category": "Contract",
+    "signature": "fn contractCodeHash!(contractId:ByteVec) -> (ByteVec)",
     "doc": "Returns the contract code hash of the contract."
   },
   {
     "name": "callerInitialStateHash",
     "category": "Contract",
+    "signature": "fn callerInitialStateHash!() -> (ByteVec)",
     "doc": "Returns the initial state hash of the caller contract."
   },
   {
     "name": "callerCodeHash",
     "category": "Contract",
+    "signature": "fn callerCodeHash!() -> (ByteVec)",
     "doc": "Returns the contract code hash of the caller contract."
   },
   {
     "name": "contractExists",
     "category": "Contract",
+    "signature": "fn contractExists!(contractId:ByteVec) -> (Bool)",
     "doc": "Checks whether the input contract id exists."
   },
   {
     "name": "destroySelf",
     "category": "Contract",
+    "signature": "fn destroySelf!(refundAddress:Address) -> ()",
     "doc": "Destroys the contract."
   },
   {
     "name": "migrate",
     "category": "Contract",
+    "signature": "fn migrate!(newCode:ByteVec) -> ()",
     "doc": "Migrates the code of the contract."
   },
   {
     "name": "migrateWithFields",
     "category": "Contract",
+    "signature": "fn migrateWithFields!(newCode:ByteVec, newEncodedFields:ByteVec) -> ()",
     "doc": "Migrates both the code and the fields of the contract."
   },
   {
     "name": "isCalledFromTxScript",
     "category": "Contract",
+    "signature": "fn isCalledFromTxScript!() -> (Bool)",
     "doc": "Checks whether the function is called by a TxScript."
   },
   {
     "name": "createSubContract",
     "category": "SubContract",
+    "signature": "fn createSubContract!(subContractPath:ByteVec, code:ByteVec, encodedFields:ByteVec) -> (ByteVec)",
     "doc": "Creates a new sub-contract without token issuance."
   },
   {
     "name": "createSubContractWithToken",
     "category": "SubContract",
+    "signature": "fn createSubContractWithToken!(subContractPath:ByteVec, contractId:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo: Address) -> (ByteVec)",
     "doc": "Creates a new sub-contract with token issuance."
   },
   {
     "name": "copyCreateSubContract",
     "category": "SubContract",
+    "signature": "fn copyCreateSubContract!(subContractPath:ByteVec, contractId:ByteVec, encodedFields:ByteVec) -> (ByteVec)",
     "doc": "Creates a new sub-contract without token issuance by copying another contract's code. This costs less gas than createSubContract!(...)"
   },
   {
     "name": "copyCreateSubContractWithToken",
     "category": "SubContract",
+    "signature": "fn copyCreateSubContractWithToken!(subContractPath:ByteVec, contractId:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo: Address) -> (ByteVec)",
     "doc": "Creates a new sub-contract with token issuance by copying another contract's code. This costs less gas than createSubContractWithToken!(...)"
   },
   {
     "name": "subContractId",
     "category": "SubContract",
+    "signature": "fn subContractId!(subContractPath: ByteVec) -> (ByteVec)",
     "doc": "Returns the id of the sub contract of the contract."
   },
   {
     "name": "subContractIdOf",
     "category": "SubContract",
+    "signature": "fn subContractIdOf!(contract: <Contract>, subContractPath: ByteVec) -> (ByteVec)",
     "doc": "Returns the id of the sub contract of the input contract."
   },
   {
     "name": "approveAlph",
     "category": "Asset",
+    "signature": "fn approveAlph!(address:Address, amount:U256) -> ()",
     "doc": "Approves ALPH for usage from the input assets of the function."
   },
   {
     "name": "approveToken",
     "category": "Asset",
+    "signature": "fn approveToken!(address:Address, tokenId:ByteVec, amount:U256) -> ()",
     "doc": "Approves token for usage from the input assets of the function."
   },
   {
     "name": "alphRemaining",
     "category": "Asset",
+    "signature": "fn alphRemaining!(address:Address) -> (U256)",
     "doc": "Returns the amount of the remaining ALPH in the input assets of the function."
   },
   {
     "name": "tokenRemaining",
     "category": "Asset",
+    "signature": "fn tokenRemaining!(address:Address, tokenId:ByteVec) -> (U256)",
     "doc": "Returns the amount of the remaining token amount in the input assets of the function."
   },
   {
     "name": "transferAlph",
     "category": "Asset",
+    "signature": "fn transferAlph!(fromAddress:Address, toAddress:Address, amount:U256) -> ()",
     "doc": "Transfers ALPH from the input assets of the function."
   },
   {
     "name": "transferAlphFromSelf",
     "category": "Asset",
+    "signature": "fn transferAlphFromSelf!(toAddress:Address, amount:U256) -> ()",
     "doc": "Transfers the contract's ALPH from the input assets of the function."
   },
   {
     "name": "transferAlphToSelf",
     "category": "Asset",
+    "signature": "fn transferAlphToSelf!(fromAddress:Address, amount:U256) -> ()",
     "doc": "Transfers ALPH to the contract from the input asset of the function."
   },
   {
     "name": "transferToken",
     "category": "Asset",
+    "signature": "fn transferToken!(fromAddress:Address, toAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
     "doc": "Transfers token from the input assets of the function."
   },
   {
     "name": "transferTokenFromSelf",
     "category": "Asset",
+    "signature": "fn transferTokenFromSelf!(toAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
     "doc": "Transfers the contract's token from the input assets of the function."
   },
   {
     "name": "transferTokenToSelf",
     "category": "Asset",
+    "signature": "fn transferTokenToSelf!(fromAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
     "doc": "Transfers token to the contract from the input assets of the function."
   },
   {
     "name": "burnToken",
     "category": "Asset",
+    "signature": "fn burnToken!(address:Address, tokenId:ByteVec, amount:U256) -> ()",
     "doc": "Burns token from the input assets of the function."
   },
   {
     "name": "lockApprovedAssets",
     "category": "Asset",
+    "signature": "fn lockApprovedAssets!(address:Address, amount:U256) -> ()",
     "doc": "Lock the current approved assets."
   },
   {
     "name": "assert",
     "category": "Utils",
+    "signature": "fn assert!(condition:Bool, errorCode:U256) -> ()",
     "doc": "Tests internal errors or checks invariants."
   },
   {
     "name": "checkCaller",
     "category": "Utils",
+    "signature": "fn checkCaller!(condition:Bool, errorCode:U256) -> ()",
     "doc": "Check conditions of the external caller of the function."
   },
   {
     "name": "isAssetAddress",
     "category": "Utils",
+    "signature": "fn isAssetAddress!(address:Address) -> (Bool)",
     "doc": "Returns whether an address is an asset address."
   },
   {
     "name": "isContractAddress",
     "category": "Utils",
+    "signature": "fn isContractAddress!(address:Address) -> (Bool)",
     "doc": "Returns whether an address is a contract address."
   },
   {
     "name": "zeros",
     "category": "Utils",
+    "signature": "fn zeros!(bytes:U256) -> (ByteVec)",
     "doc": "Returns a ByteVec of zeros."
   },
   {
     "name": "panic",
     "category": "Utils",
+    "signature": "fn panic!(errorCode?: U256) -> (Never)",
     "doc": "Terminates the application immediately."
   },
   {
     "name": "nullContractAddress",
     "category": "Utils",
+    "signature": "fn nullContractAddress!() -> (Address)",
     "doc": "Returns the null contract address with contract id being zeros."
   },
   {
     "name": "networkId",
     "category": "Chain",
+    "signature": "fn networkId!() -> (ByteVec)",
     "doc": "Returns the network id."
   },
   {
     "name": "blockHash",
     "category": "Chain",
+    "signature": "fn blockHash!() -> (ByteVec)",
     "doc": "Returns the block hash of the current block."
   },
   {
     "name": "blockTimeStamp",
     "category": "Chain",
+    "signature": "fn blockTimeStamp!() -> (U256)",
     "doc": "Returns the block timestamp."
   },
   {
     "name": "blockTarget",
     "category": "Chain",
+    "signature": "fn blockTarget!() -> (U256)",
     "doc": "Returns the block difficulty target."
   },
   {
     "name": "txId",
     "category": "Chain",
+    "signature": "fn txId!() -> (ByteVec)",
     "doc": "Returns the current transaction id."
   },
   {
     "name": "txInputAddress",
     "category": "Chain",
+    "signature": "fn txInputAddress!(txInputIndex:U256) -> (Address)",
     "doc": "Returns the n-th transaction input address."
   },
   {
     "name": "txInputsSize",
     "category": "Chain",
+    "signature": "fn txInputsSize!() -> (U256)",
     "doc": "Returns the number of transaction inputs."
   },
   {
     "name": "verifyAbsoluteLocktime",
     "category": "Chain",
+    "signature": "fn verifyAbsoluteLocktime!(lockUntil:U256) -> ()",
     "doc": "Verifies the absolute locktime for block timestamp."
   },
   {
     "name": "verifyRelativeLocktime",
     "category": "Chain",
+    "signature": "fn verifyRelativeLocktime!(txInputIndex:U256, lockDuration:U256) -> ()",
     "doc": "Verifies the relative locktime for transaction input."
   },
   {
     "name": "dustAmount",
     "category": "Chain",
+    "signature": "fn dustAmount!() -> (U256)",
     "doc": "Returns the dust amount of an UTXO."
   },
   {
     "name": "toI256",
     "category": "Conversion",
+    "signature": "fn toI256!(from: U256) -> (I256)",
     "doc": "Converts U256 to I256."
   },
   {
     "name": "toU256",
     "category": "Conversion",
+    "signature": "fn toU256!(from: I256) -> (U256)",
     "doc": "Converts I256 to U256."
   },
   {
     "name": "toByteVec",
     "category": "Conversion",
+    "signature": "fn toByteVec!(from: Bool|I256|U256|Address) -> (ByteVec)",
     "doc": "Converts Bool/I256/U256/Address to ByteVec"
   },
   {
     "name": "contractIdToAddress",
     "category": "Conversion",
+    "signature": "fn contractIdToAddress!(contractId:ByteVec) -> (Address)",
     "doc": "Converts contract id (ByteVec) to contract address (Address)."
   },
   {
     "name": "byteVecToAddress",
     "category": "Conversion",
+    "signature": "fn byteVecToAddress!(bytes:ByteVec) -> (Address)",
     "doc": "Converts ByteVec to Address."
   },
   {
     "name": "u256To1Byte",
     "category": "Conversion",
+    "signature": "fn u256To1Byte!(u256:U256) -> (ByteVec)",
     "doc": "Converts U256 to 1 byte."
   },
   {
     "name": "u256To2Byte",
     "category": "Conversion",
+    "signature": "fn u256To2Byte!(u256:U256) -> (ByteVec)",
     "doc": "Converts U256 to 2 bytes."
   },
   {
     "name": "u256To4Byte",
     "category": "Conversion",
+    "signature": "fn u256To4Byte!(u256:U256) -> (ByteVec)",
     "doc": "Converts U256 to 4 bytes."
   },
   {
     "name": "u256To8Byte",
     "category": "Conversion",
+    "signature": "fn u256To8Byte!(u256:U256) -> (ByteVec)",
     "doc": "Converts U256 to 8 bytes."
   },
   {
     "name": "u256To16Byte",
     "category": "Conversion",
+    "signature": "fn u256To16Byte!(u256:U256) -> (ByteVec)",
     "doc": "Converts U256 to 16 bytes."
   },
   {
     "name": "u256To32Byte",
     "category": "Conversion",
+    "signature": "fn u256To32Byte!(u256:U256) -> (ByteVec)",
     "doc": "Converts U256 to 32 bytes."
   },
   {
     "name": "u256From1Byte",
     "category": "Conversion",
+    "signature": "fn u256From1Byte!(bytes:ByteVec) -> (U256)",
     "doc": "Converts 1 byte to U256."
   },
   {
     "name": "u256From2Byte",
     "category": "Conversion",
+    "signature": "fn u256From2Byte!(bytes:ByteVec) -> (U256)",
     "doc": "Converts 2 byte to U256."
   },
   {
     "name": "u256From4Byte",
     "category": "Conversion",
+    "signature": "fn u256From4Byte!(bytes:ByteVec) -> (U256)",
     "doc": "Converts 4 byte to U256."
   },
   {
     "name": "u256From8Byte",
     "category": "Conversion",
+    "signature": "fn u256From8Byte!(bytes:ByteVec) -> (U256)",
     "doc": "Converts 8 byte to U256."
   },
   {
     "name": "u256From16Byte",
     "category": "Conversion",
+    "signature": "fn u256From16Byte!(bytes:ByteVec) -> (U256)",
     "doc": "Converts 16 byte to U256."
   },
   {
     "name": "u256From32Byte",
     "category": "Conversion",
+    "signature": "fn u256From32Byte!(bytes:ByteVec) -> (U256)",
     "doc": "Converts 32 byte to U256."
   },
   {
     "name": "size",
     "category": "ByteVec",
+    "signature": "fn size!(bytes:ByteVec) -> (U256)",
     "doc": "Returns the size of the ByteVec."
   },
   {
     "name": "byteVecSlice",
     "category": "ByteVec",
+    "signature": "fn byteVecSlice!(bytes:ByteVec) -> (ByteVec)",
     "doc": "Selects an interval of bytes."
   },
   {
     "name": "encodeToByteVec",
     "category": "ByteVec",
+    "signature": "fn encodeToByteVec(...any) -> (ByteVec)",
     "doc": "Encodes inputs as ByteVec."
   },
   {
     "name": "blake2b",
     "category": "Cryptography",
+    "signature": "fn blake2b!(data:ByteVec) -> (ByteVec)",
     "doc": "Computes the Blake2b hash of the input."
   },
   {
     "name": "keccak256",
     "category": "Cryptography",
+    "signature": "fn keccak256!(data:ByteVec) -> (ByteVec)",
     "doc": "Computes the Keccak256 hash of the input."
   },
   {
     "name": "sha256",
     "category": "Cryptography",
+    "signature": "fn sha256!(data:ByteVec) -> (ByteVec)",
     "doc": "Computes the Sha256 hash of the input."
   },
   {
     "name": "sha3",
     "category": "Cryptography",
+    "signature": "fn sha3!(data:ByteVec) -> (ByteVec)",
     "doc": "Computes the Sha3 hash of the input."
   },
   {
     "name": "verifyTxSignature",
     "category": "Cryptography",
+    "signature": "fn verifyTxSignature!(publicKey:ByteVec) -> ()",
     "doc": "Verifies the transaction signature of a public key. The signature is signed against the transaction id."
   },
   {
     "name": "verifySecP256K1",
     "category": "Cryptography",
+    "signature": "fn verifySecP256K1!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
     "doc": "Verifies the SecP256K1 signature of the input and public key."
   },
   {
     "name": "verifyED25519",
     "category": "Cryptography",
+    "signature": "fn verifyED25519!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
     "doc": "Verifies the ED25519 signature of the input and public key."
   },
   {
     "name": "ethEcRecover",
     "category": "Cryptography",
+    "signature": "fn ethEcRecover!(data:ByteVec, signature:ByteVec) -> (ByteVec)",
     "doc": "Recovers the ETH account that signed the data."
   }
 ]
