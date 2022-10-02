@@ -1,0 +1,412 @@
+[
+  {
+    "name": "createContract",
+    "category": "Contract",
+    "doc": "Creates a new contract without token issuance."
+  },
+  {
+    "name": "createContractWithToken",
+    "category": "Contract",
+    "doc": "Creates a new contract with token issuance."
+  },
+  {
+    "name": "copyCreateContract",
+    "category": "Contract",
+    "doc": "Creates a new contract without token issuance by copying another contract's code. This costs less gas than createContract!(...)"
+  },
+  {
+    "name": "copyCreateContractWithToken",
+    "category": "Contract",
+    "doc": "Creates a new contract with token issuance by copying another contract's code. This costs less gas than createContract!(...)"
+  },
+  {
+    "name": "contractExists",
+    "category": "Contract",
+    "doc": "Checks whether the input contract id exists."
+  },
+  {
+    "name": "destroySelf",
+    "category": "Contract",
+    "doc": "Destroys the contract."
+  },
+  {
+    "name": "migrate",
+    "category": "Contract",
+    "doc": "Migrates the code of the contract."
+  },
+  {
+    "name": "migrateWithFields",
+    "category": "Contract",
+    "doc": "Migrates both the code and the fields of the contract."
+  },
+  {
+    "name": "selfAddress",
+    "category": "Contract",
+    "doc": "Returns the address (Address) of the contract."
+  },
+  {
+    "name": "selfContractId",
+    "category": "Contract",
+    "doc": "Returns the id (ByteVec) of the contract."
+  },
+  {
+    "name": "selfTokenId",
+    "category": "Contract",
+    "doc": "Returns the token id (ByteVec) of the contract."
+  },
+  {
+    "name": "callerContractId",
+    "category": "Contract",
+    "doc": "Returns the contract id of the caller."
+  },
+  {
+    "name": "callerAddress",
+    "category": "Contract",
+    "doc": "Returns the address of the caller."
+  },
+  {
+    "name": "isCalledFromTxScript",
+    "category": "Contract",
+    "doc": "Checks whether the function is called by a TxScript."
+  },
+  {
+    "name": "callerInitialStateHash",
+    "category": "Contract",
+    "doc": "Returns the initial state hash of the caller contract."
+  },
+  {
+    "name": "callerCodeHash",
+    "category": "Contract",
+    "doc": "Returns the contract code hash of the caller contract."
+  },
+  {
+    "name": "contractInitialStateHash",
+    "category": "Contract",
+    "doc": "Returns the initial state hash of the contract."
+  },
+  {
+    "name": "contractCodeHash",
+    "category": "Contract",
+    "doc": "Returns the contract code hash of the contract."
+  },
+  {
+    "name": "createSubContract",
+    "category": "SubContract",
+    "doc": "Creates a new sub-contract without token issuance."
+  },
+  {
+    "name": "createSubContractWithToken",
+    "category": "SubContract",
+    "doc": "Creates a new sub-contract with token issuance."
+  },
+  {
+    "name": "copyCreateSubContract",
+    "category": "SubContract",
+    "doc": "Creates a new sub-contract without token issuance by copying another contract's code. This costs less gas than createSubContract!(...)"
+  },
+  {
+    "name": "copyCreateSubContractWithToken",
+    "category": "SubContract",
+    "doc": "Creates a new sub-contract with token issuance by copying another contract's code. This costs less gas than createSubContractWithToken!(...)"
+  },
+  {
+    "name": "subContractId",
+    "category": "SubContract",
+    "doc": "Returns the id of the sub contract of the contract."
+  },
+  {
+    "name": "subContractIdOf",
+    "category": "SubContract",
+    "doc": "Returns the id of the sub contract of the input contract."
+  },
+  {
+    "name": "approveAlph",
+    "category": "Asset",
+    "doc": "Approves ALPH for usage from the input assets of the function."
+  },
+  {
+    "name": "approveToken",
+    "category": "Asset",
+    "doc": "Approves token for usage from the input assets of the function."
+  },
+  {
+    "name": "alphRemaining",
+    "category": "Asset",
+    "doc": "Returns the amount of the remaining ALPH in the input assets of the function."
+  },
+  {
+    "name": "tokenRemaining",
+    "category": "Asset",
+    "doc": "Returns the amount of the remaining token amount in the input assets of the function."
+  },
+  {
+    "name": "isPaying",
+    "category": "Asset",
+    "doc": "Returns whether the input address owns any asset in the input assets of the function."
+  },
+  {
+    "name": "transferAlph",
+    "category": "Asset",
+    "doc": "Transfers ALPH from the input assets of the function."
+  },
+  {
+    "name": "transferAlphFromSelf",
+    "category": "Asset",
+    "doc": "Transfers the contract's ALPH from the input assets of the function."
+  },
+  {
+    "name": "transferAlphToSelf",
+    "category": "Asset",
+    "doc": "Transfers ALPH to the contract from the input asset of the function."
+  },
+  {
+    "name": "transferToken",
+    "category": "Asset",
+    "doc": "Transfers token from the input assets of the function."
+  },
+  {
+    "name": "transferTokenFromSelf",
+    "category": "Asset",
+    "doc": "Transfers the contract's token from the input assets of the function."
+  },
+  {
+    "name": "transferTokenToSelf",
+    "category": "Asset",
+    "doc": "Transfers token to the contract from the input assets of the function."
+  },
+  {
+    "name": "burnToken",
+    "category": "Asset",
+    "doc": "Burns token from the input assets of the function."
+  },
+  {
+    "name": "lockApprovedAssets",
+    "category": "Asset",
+    "doc": "Lock the current approved assets."
+  },
+  {
+    "name": "assert",
+    "category": "Utils",
+    "doc": "Tests internal errors or checks invariants."
+  },
+  {
+    "name": "checkCaller",
+    "category": "Utils",
+    "doc": "Check conditions of the external caller of the function."
+  },
+  {
+    "name": "isAssetAddress",
+    "category": "Utils",
+    "doc": "Returns whether an address is an asset address."
+  },
+  {
+    "name": "isContractAddress",
+    "category": "Utils",
+    "doc": "Returns whether an address is a contract address."
+  },
+  {
+    "name": "zeros",
+    "category": "Utils",
+    "doc": "Returns a ByteVec of zeros."
+  },
+  {
+    "name": "panic",
+    "category": "Utils",
+    "doc": "Terminates the application immediately."
+  },
+  {
+    "name": "nullContractAddress",
+    "category": "Utils",
+    "doc": "Returns the null contract address with contract id being zeros."
+  },
+  {
+    "name": "networkId",
+    "category": "Chain",
+    "doc": "Returns the network id."
+  },
+  {
+    "name": "blockTimeStamp",
+    "category": "Chain",
+    "doc": "Returns the block timestamp."
+  },
+  {
+    "name": "blockTarget",
+    "category": "Chain",
+    "doc": "Returns the block difficulty target."
+  },
+  {
+    "name": "txId",
+    "category": "Chain",
+    "doc": "Returns the current transaction id."
+  },
+  {
+    "name": "txInputAddress",
+    "category": "Chain",
+    "doc": "Returns the n-th transaction input address."
+  },
+  {
+    "name": "txInputsSize",
+    "category": "Chain",
+    "doc": "Returns the number of transaction inputs."
+  },
+  {
+    "name": "verifyAbsoluteLocktime",
+    "category": "Chain",
+    "doc": "Verifies the absolute locktime for block timestamp."
+  },
+  {
+    "name": "verifyRelativeLocktime",
+    "category": "Chain",
+    "doc": "Verifies the relative locktime for transaction input."
+  },
+  {
+    "name": "dustAmount",
+    "category": "Chain",
+    "doc": "Returns the dust amount of an UTXO."
+  },
+  {
+    "name": "blockHash",
+    "category": "Chain",
+    "doc": "Returns the block hash of the current block."
+  },
+  {
+    "name": "toI256",
+    "category": "Conversion",
+    "doc": "Converts U256 to I256."
+  },
+  {
+    "name": "toU256",
+    "category": "Conversion",
+    "doc": "Converts I256 to U256."
+  },
+  {
+    "name": "toByteVec",
+    "category": "Conversion",
+    "doc": "Converts Bool/I256/U256/Address to ByteVec"
+  },
+  {
+    "name": "u256To1Byte",
+    "category": "Conversion",
+    "doc": "Converts U256 to 1 byte."
+  },
+  {
+    "name": "u256To2Byte",
+    "category": "Conversion",
+    "doc": "Converts U256 to 2 bytes."
+  },
+  {
+    "name": "u256To4Byte",
+    "category": "Conversion",
+    "doc": "Converts U256 to 4 bytes."
+  },
+  {
+    "name": "u256To8Byte",
+    "category": "Conversion",
+    "doc": "Converts U256 to 8 bytes."
+  },
+  {
+    "name": "u256To16Byte",
+    "category": "Conversion",
+    "doc": "Converts U256 to 16 bytes."
+  },
+  {
+    "name": "u256To32Byte",
+    "category": "Conversion",
+    "doc": "Converts U256 to 32 bytes."
+  },
+  {
+    "name": "u256From1Byte",
+    "category": "Conversion",
+    "doc": "Converts 1 byte to U256."
+  },
+  {
+    "name": "u256From2Byte",
+    "category": "Conversion",
+    "doc": "Converts 2 byte to U256."
+  },
+  {
+    "name": "u256From4Byte",
+    "category": "Conversion",
+    "doc": "Converts 4 byte to U256."
+  },
+  {
+    "name": "u256From8Byte",
+    "category": "Conversion",
+    "doc": "Converts 8 byte to U256."
+  },
+  {
+    "name": "u256From16Byte",
+    "category": "Conversion",
+    "doc": "Converts 16 byte to U256."
+  },
+  {
+    "name": "u256From32Byte",
+    "category": "Conversion",
+    "doc": "Converts 32 byte to U256."
+  },
+  {
+    "name": "byteVecToAddress",
+    "category": "Conversion",
+    "doc": "Converts ByteVec to Address."
+  },
+  {
+    "name": "contractIdToAddress",
+    "category": "Conversion",
+    "doc": "Converts contract id (ByteVec) to contract address (Address)."
+  },
+  {
+    "name": "size",
+    "category": "ByteVec",
+    "doc": "Returns the size of the ByteVec."
+  },
+  {
+    "name": "byteVecSlice",
+    "category": "ByteVec",
+    "doc": "Selects an interval of bytes."
+  },
+  {
+    "name": "encodeToByteVec",
+    "category": "ByteVec",
+    "doc": "Encodes inputs as ByteVec."
+  },
+  {
+    "name": "blake2b",
+    "category": "Cryptography",
+    "doc": "Computes the Blake2b hash of the input."
+  },
+  {
+    "name": "keccak256",
+    "category": "Cryptography",
+    "doc": "Computes the Keccak256 hash of the input."
+  },
+  {
+    "name": "sha256",
+    "category": "Cryptography",
+    "doc": "Computes the Sha256 hash of the input."
+  },
+  {
+    "name": "sha3",
+    "category": "Cryptography",
+    "doc": "Computes the Sha3 hash of the input."
+  },
+  {
+    "name": "verifyTxSignature",
+    "category": "Cryptography",
+    "doc": "Verifies the transaction signature of a public key. The signature is signed against the transaction id."
+  },
+  {
+    "name": "verifySecP256K1",
+    "category": "Cryptography",
+    "doc": "Verifies the SecP256K1 signature of the input and public key."
+  },
+  {
+    "name": "verifyED25519",
+    "category": "Cryptography",
+    "doc": "Verifies the ED25519 signature of the input and public key."
+  },
+  {
+    "name": "ethEcRecover",
+    "category": "Cryptography",
+    "doc": "Recovers the ETH account that signed the data."
+  }
+]

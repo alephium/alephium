@@ -24,7 +24,7 @@ class BuiltInSpec extends AlephiumSpec {
   it should "check all functions that can use preapproved assets" in {
     BuiltIn.statelessFuncs.values.count(_.usePreapprovedAssets) is 0
     BuiltIn.statefulFuncs.values.filter(_.usePreapprovedAssets).toSet is
-      Set[Compiler.FuncInfo[StatefulContext]](
+      Set[BuiltIn.BuiltIn[StatefulContext]](
         BuiltIn.lockApprovedAssets,
         BuiltIn.createContract,
         BuiltIn.createContractWithToken,
@@ -42,7 +42,7 @@ class BuiltInSpec extends AlephiumSpec {
     BuiltIn.statefulFuncs.values
       .filter(_.useAssetsInContract)
       .flatMap {
-        case f: SimpleBuiltIn[_] => f.instrs.asInstanceOf[Seq[Instr[_]]]
+        case f: SimpleBuiltIn[_] => f.instrs
         case f: OverloadedSimpleBuiltIn[_] =>
           f.argsTypeWithInstrs(0)
             .instrs
