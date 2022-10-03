@@ -302,7 +302,7 @@ object BuiltIn {
         "errorCode" -> "the error code to throw if the check fails"
       ),
       retComment = "true if the condition is satisfied, false otherwise",
-      doc = "Tests internal errors or checks invariants."
+      doc = "Tests the condition or checks invariants."
     )
   val verifyTxSignature: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
@@ -1039,12 +1039,12 @@ object BuiltIn {
       issueToken: Boolean,
       copy: Boolean,
       subContract: Boolean,
-      f: String = ""
+      costLessThan: String = ""
   ): String = {
     s"Creates a new ${if (subContract) "sub-" else ""}contract" +
       s" ${if (issueToken) "with" else "without"} token issuance" +
       s"${if (copy) " by copying another contract's code" else ""}." +
-      s"${if (copy) s" This costs less gas than ${f}!(...)" else ""}"
+      s"${if (copy) s" This costs less gas than ${costLessThan}!(...)" else ""}"
   }
 
   val createContract: SimpleBuiltIn[StatefulContext] =
@@ -1106,7 +1106,7 @@ object BuiltIn {
         issueToken = false,
         copy = true,
         subContract = false,
-        f = "createContract"
+        costLessThan = "createContract"
       )
     )
 
@@ -1137,7 +1137,7 @@ object BuiltIn {
         issueToken = true,
         copy = true,
         subContract = false,
-        f = "createContract"
+        costLessThan = "createContractWithToken"
       )
     )
 
@@ -1203,7 +1203,7 @@ object BuiltIn {
         issueToken = false,
         copy = true,
         subContract = true,
-        f = "createSubContract"
+        costLessThan = "createSubContract"
       )
     )
 
@@ -1235,7 +1235,7 @@ object BuiltIn {
         issueToken = true,
         copy = true,
         subContract = true,
-        f = "createSubContractWithToken"
+        costLessThan = "createSubContractWithToken"
       )
     )
 
@@ -1250,7 +1250,7 @@ object BuiltIn {
       argsName =
         Seq("refundAddress" -> "the address to receive the remaining assets in the contract"),
       retComment = "",
-      doc = "Destroys the contract."
+      doc = "Destroys the contract and transfer the remaining assets to a designated address."
     )
 
   val migrate: SimpleBuiltIn[StatefulContext] =
@@ -1288,7 +1288,7 @@ object BuiltIn {
       ContractExists,
       argsName = Seq("contractId" -> "the input contract id to be tested"),
       retComment = "ture if the contract exists on the chain, false otherwise",
-      doc = "Checks whether the input contract id exists."
+      doc = "Checks whether the contract exists with the given id."
     )
 
   val selfAddress: SimpleBuiltIn[StatefulContext] =
