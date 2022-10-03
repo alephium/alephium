@@ -2,13 +2,13 @@
   {
     "name": "createContract",
     "category": "Contract",
-    "signature": "fn createContract!(code:ByteVec, encodedFields:ByteVec) -> (ByteVec)",
+    "signature": "fn createContract!(bytecode:ByteVec, encodedFields:ByteVec) -> (ByteVec)",
     "doc": "Creates a new contract without token issuance."
   },
   {
     "name": "createContractWithToken",
     "category": "Contract",
-    "signature": "fn createContractWithToken!(code:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo: Address) -> (ByteVec)",
+    "signature": "fn createContractWithToken!(bytecode:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo?:Address) -> (ByteVec)",
     "doc": "Creates a new contract with token issuance."
   },
   {
@@ -20,7 +20,7 @@
   {
     "name": "copyCreateContractWithToken",
     "category": "Contract",
-    "signature": "fn copyCreateContractWithToken!(contractId:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo: Address) -> (ByteVec)",
+    "signature": "fn copyCreateContractWithToken!(contractId:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo?:Address) -> (ByteVec)",
     "doc": "Creates a new contract with token issuance by copying another contract's code. This costs less gas than createContract!(...)"
   },
   {
@@ -92,13 +92,13 @@
   {
     "name": "migrate",
     "category": "Contract",
-    "signature": "fn migrate!(newCode:ByteVec) -> ()",
+    "signature": "fn migrate!(newBytecode:ByteVec) -> ()",
     "doc": "Migrates the code of the contract."
   },
   {
     "name": "migrateWithFields",
     "category": "Contract",
-    "signature": "fn migrateWithFields!(newCode:ByteVec, newEncodedFields:ByteVec) -> ()",
+    "signature": "fn migrateWithFields!(newBytecode:ByteVec, newEncodedFields:ByteVec) -> ()",
     "doc": "Migrates both the code and the fields of the contract."
   },
   {
@@ -110,13 +110,13 @@
   {
     "name": "createSubContract",
     "category": "SubContract",
-    "signature": "fn createSubContract!(subContractPath:ByteVec, code:ByteVec, encodedFields:ByteVec) -> (ByteVec)",
+    "signature": "fn createSubContract!(subContractPath:ByteVec, bytecode:ByteVec, encodedFields:ByteVec) -> (ByteVec)",
     "doc": "Creates a new sub-contract without token issuance."
   },
   {
     "name": "createSubContractWithToken",
     "category": "SubContract",
-    "signature": "fn createSubContractWithToken!(subContractPath:ByteVec, contractId:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo: Address) -> (ByteVec)",
+    "signature": "fn createSubContractWithToken!(subContractPath:ByteVec, bytecode:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo?:Address) -> (ByteVec)",
     "doc": "Creates a new sub-contract with token issuance."
   },
   {
@@ -128,31 +128,31 @@
   {
     "name": "copyCreateSubContractWithToken",
     "category": "SubContract",
-    "signature": "fn copyCreateSubContractWithToken!(subContractPath:ByteVec, contractId:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo: Address) -> (ByteVec)",
+    "signature": "fn copyCreateSubContractWithToken!(subContractPath:ByteVec, contractId:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo?:Address) -> (ByteVec)",
     "doc": "Creates a new sub-contract with token issuance by copying another contract's code. This costs less gas than createSubContractWithToken!(...)"
   },
   {
     "name": "subContractId",
     "category": "SubContract",
-    "signature": "fn subContractId!(subContractPath: ByteVec) -> (ByteVec)",
+    "signature": "fn subContractId!(subContractPath:ByteVec) -> (ByteVec)",
     "doc": "Returns the id of the sub contract of the contract."
   },
   {
     "name": "subContractIdOf",
     "category": "SubContract",
-    "signature": "fn subContractIdOf!(contract: <Contract>, subContractPath: ByteVec) -> (ByteVec)",
-    "doc": "Returns the id of the sub contract of the input contract."
+    "signature": "fn subContractIdOf!(contract:<Contract>, subContractPath:ByteVec) -> (ByteVec)",
+    "doc": "Returns the id of the sub contract of the contract."
   },
   {
     "name": "approveAlph",
     "category": "Asset",
-    "signature": "fn approveAlph!(address:Address, amount:U256) -> ()",
+    "signature": "fn approveAlph!(fromAddress:Address, amount:U256) -> ()",
     "doc": "Approves ALPH for usage from the input assets of the function."
   },
   {
     "name": "approveToken",
     "category": "Asset",
-    "signature": "fn approveToken!(address:Address, tokenId:ByteVec, amount:U256) -> ()",
+    "signature": "fn approveToken!(fromAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
     "doc": "Approves token for usage from the input assets of the function."
   },
   {
@@ -212,8 +212,8 @@
   {
     "name": "lockApprovedAssets",
     "category": "Asset",
-    "signature": "fn lockApprovedAssets!(address:Address, amount:U256) -> ()",
-    "doc": "Lock the current approved assets."
+    "signature": "fn lockApprovedAssets!(address:Address, timestamp:U256) -> ()",
+    "doc": "Locks the current approved assets."
   },
   {
     "name": "assert",
@@ -225,7 +225,7 @@
     "name": "checkCaller",
     "category": "Utils",
     "signature": "fn checkCaller!(condition:Bool, errorCode:U256) -> ()",
-    "doc": "Check conditions of the external caller of the function."
+    "doc": "Checks conditions of the external caller of the function."
   },
   {
     "name": "isAssetAddress",
@@ -242,7 +242,7 @@
   {
     "name": "zeros",
     "category": "Utils",
-    "signature": "fn zeros!(bytes:U256) -> (ByteVec)",
+    "signature": "fn zeros!(n:U256) -> (ByteVec)",
     "doc": "Returns a ByteVec of zeros."
   },
   {
@@ -303,7 +303,7 @@
     "name": "verifyAbsoluteLocktime",
     "category": "Chain",
     "signature": "fn verifyAbsoluteLocktime!(lockUntil:U256) -> ()",
-    "doc": "Verifies the absolute locktime for block timestamp."
+    "doc": "Verifies the absolute locktime with the block timestamp."
   },
   {
     "name": "verifyRelativeLocktime",
@@ -320,19 +320,19 @@
   {
     "name": "toI256",
     "category": "Conversion",
-    "signature": "fn toI256!(from: U256) -> (I256)",
+    "signature": "fn toI256!(from:U256) -> (I256)",
     "doc": "Converts U256 to I256."
   },
   {
     "name": "toU256",
     "category": "Conversion",
-    "signature": "fn toU256!(from: I256) -> (U256)",
+    "signature": "fn toU256!(from:I256) -> (U256)",
     "doc": "Converts I256 to U256."
   },
   {
     "name": "toByteVec",
     "category": "Conversion",
-    "signature": "fn toByteVec!(from: Bool|I256|U256|Address) -> (ByteVec)",
+    "signature": "fn toByteVec!(from:Bool|I256|U256|Address) -> (ByteVec)",
     "doc": "Converts Bool/I256/U256/Address to ByteVec"
   },
   {
@@ -428,13 +428,13 @@
   {
     "name": "byteVecSlice",
     "category": "ByteVec",
-    "signature": "fn byteVecSlice!(bytes:ByteVec) -> (ByteVec)",
+    "signature": "fn byteVecSlice!(bytes:ByteVec, from:U256, until:U256) -> (ByteVec)",
     "doc": "Selects an interval of bytes."
   },
   {
     "name": "encodeToByteVec",
     "category": "ByteVec",
-    "signature": "fn encodeToByteVec(...any) -> (ByteVec)",
+    "signature": "fn encodeToByteVec!(...any) -> (ByteVec)",
     "doc": "Encodes inputs as ByteVec."
   },
   {
