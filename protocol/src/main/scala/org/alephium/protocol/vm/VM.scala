@@ -330,6 +330,8 @@ final class StatefulVM(
     for {
       _ <- ctx.updateContractStates()
       _ <- cleanBalances(lastFrame)
+      _ <- ctx
+        .removeOutdatedContractAssets() // this must run after cleanBalances so that unused inputs are removed
     } yield ()
   }
 
@@ -349,7 +351,14 @@ final class StatefulVM(
         _ <- ctx.checkAllAssetsFlushed()
       } yield ()
     } else {
-      Right(())
+      if (ctx.getHardFork().isLemanEnabled()) {
+        for {
+          _ <- outputGeneratedBalances(ctx.outputBalances)
+          _ <- ctx.checkAllAssetsFlushed()
+        } yield ()
+      } else {
+        Right(())
+      }
     }
   }
 
