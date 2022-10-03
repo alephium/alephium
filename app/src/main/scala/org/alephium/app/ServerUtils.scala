@@ -1121,7 +1121,7 @@ class ServerUtils(implicit
   }
 
   def checkArgs(args: AVector[Val], method: Method[StatefulContext]): Try[Unit] = {
-    if (args.length != method.argsLength) {
+    if (args.sumBy(_.flattenSize()) != method.argsLength) {
       Left(
         failed(
           "The number of parameters is different from the number specified by the target method"
