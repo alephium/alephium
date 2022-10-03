@@ -25,7 +25,7 @@ import org.alephium.protocol.vm.lang.BuiltIn
 
 object BuiltInFunctions extends App {
   val allFunctions: immutable.Iterable[FunctionInfo] = BuiltIn.statefulFuncsSeq.map { case (_, f) =>
-    FunctionInfo(f.name, f.tag.toString, f.signature, f.doc)
+    FunctionInfo(f.name, f.tag.toString, f.signature, f.doc, f.params, f.returns)
   }
   val json: String = write(allFunctions.toSeq.sorted, indent = 2)
 
@@ -35,7 +35,14 @@ object BuiltInFunctions extends App {
     close()
   }
 
-  final case class FunctionInfo(name: String, category: String, signature: String, doc: String)
+  final case class FunctionInfo(
+      name: String,
+      category: String,
+      signature: String,
+      doc: String,
+      params: Seq[String],
+      returns: String
+  )
   object FunctionInfo {
     @SuppressWarnings(Array("org.wartremover.warts.ToString"))
     implicit val rw: RW[FunctionInfo] = macroRW
