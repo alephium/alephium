@@ -200,6 +200,7 @@ class ContextSpec
 
     def testOutputDifferentFromInput() = {
       modifiedOutputs.foreach { modifiedOutput =>
+        modifiedOutput isnot output
         val initialGas = context.gasRemaining
         context.generatedOutputs.clear()
         context.assetStatus.put(contractId, ContractPool.ContractAssetInUsing)
@@ -305,7 +306,7 @@ class ContextSpec
     }
   }
 
-  it should "generate single output when token number > maxTokenPerUTXO for Leman hardfork" in new LemanAssetOutputFixture {
+  it should "generate multiple outputs when token number > maxTokenPerUTXO for Leman hardfork" in new LemanAssetOutputFixture {
     def test(output: AssetOutput, expectedAlph: Seq[U256], expectedTokenNum: Seq[Int]) = {
       expectedAlph.length is expectedTokenNum.length
       expectedTokenNum.sum is output.tokens.length

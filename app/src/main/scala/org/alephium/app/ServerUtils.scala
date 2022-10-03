@@ -1114,7 +1114,22 @@ class ServerUtils(implicit
         )
       )
     )
-    runWithDebugError(context, script)
+    for {
+      _      <- checkArgs(args, method)
+      result <- runWithDebugError(context, script)
+    } yield result
+  }
+
+  def checkArgs(args: AVector[Val], method: Method[StatefulContext]): Try[Unit] = {
+    if (args.sumBy(_.flattenSize()) != method.argsLength) {
+      Left(
+        failed(
+          "The number of parameters is different from the number specified by the target method"
+        )
+      )
+    } else {
+      Right(())
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

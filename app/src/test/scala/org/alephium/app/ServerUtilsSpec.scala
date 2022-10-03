@@ -1882,6 +1882,26 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "fail when the number of parameters is not as specified by the test method" in new Fixture {
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).toOption.get
+
+    val testContract =
+      TestContract(bytecode = code, args = Some(AVector[Val](Val.True))).toComplete().rightValue
+    val serverUtils = new ServerUtils()
+    serverUtils
+      .runTestContract(blockFlow, testContract)
+      .leftValue
+      .detail is "The number of parameters is different from the number specified by the target method"
+  }
+
   it should "test utxo splits for generated outputs" in new Fixture {
     val tokenId = TokenId.random
     val contract =
@@ -1909,7 +1929,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       bytecode = code,
       initialFields = Some(AVector.empty[Val]),
       initialAsset = Some(AssetState(ALPH.oneAlph, Some(AVector(Token(tokenId, 10))))),
-      args = Some(AVector[Val](ValArray(AVector(ValU256(U256.Zero), ValU256(U256.One))))),
+      args = Some(AVector.empty[Val]),
       inputAssets = Some(AVector(inputAssets))
     ).toComplete().rightValue
 
