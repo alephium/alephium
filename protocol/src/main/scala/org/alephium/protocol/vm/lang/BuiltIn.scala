@@ -1044,7 +1044,7 @@ object BuiltIn {
     s"Creates a new ${if (subContract) "sub-" else ""}contract" +
       s" ${if (issueToken) "with" else "without"} token issuance" +
       s"${if (copy) " by copying another contract's code" else ""}." +
-      s"${if (copy) s" This costs less gas than ${costLessThan}!(...)" else ""}"
+      s"${if (copy) s" This costs less gas than ${costLessThan}!(...)." else ""}"
   }
 
   val createContract: SimpleBuiltIn[StatefulContext] =

@@ -27,7 +27,7 @@
     "name": "copyCreateContract",
     "category": "Contract",
     "signature": "fn copyCreateContract!(contractId:ByteVec, encodedFields:ByteVec) -> (ByteVec)",
-    "doc": "Creates a new contract without token issuance by copying another contract's code. This costs less gas than createContract!(...)",
+    "doc": "Creates a new contract without token issuance by copying another contract's code. This costs less gas than createContract!(...).",
     "params": [
       "@param contractId the id of the contract to be copied",
       "@param encodedFields the encoded fields as a ByteVec"
@@ -38,7 +38,7 @@
     "name": "copyCreateContractWithToken",
     "category": "Contract",
     "signature": "fn copyCreateContractWithToken!(contractId:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo?:Address) -> (ByteVec)",
-    "doc": "Creates a new contract with token issuance by copying another contract's code. This costs less gas than createContract!(...)",
+    "doc": "Creates a new contract with token issuance by copying another contract's code. This costs less gas than createContractWithToken!(...).",
     "params": [
       "@param contractId the id of the contract to be copied",
       "@param encodedFields the encoded fields as a ByteVec",
@@ -141,7 +141,7 @@
     "name": "contractExists",
     "category": "Contract",
     "signature": "fn contractExists!(contractId:ByteVec) -> (Bool)",
-    "doc": "Checks whether the input contract id exists.",
+    "doc": "Checks whether the contract exists with the given id.",
     "params": [
       "@param contractId the input contract id to be tested"
     ],
@@ -151,7 +151,7 @@
     "name": "destroySelf",
     "category": "Contract",
     "signature": "fn destroySelf!(refundAddress:Address) -> ()",
-    "doc": "Destroys the contract.",
+    "doc": "Destroys the contract and transfer the remaining assets to a designated address.",
     "params": [
       "@param refundAddress the address to receive the remaining assets in the contract"
     ],
@@ -218,7 +218,7 @@
     "name": "copyCreateSubContract",
     "category": "SubContract",
     "signature": "fn copyCreateSubContract!(subContractPath:ByteVec, contractId:ByteVec, encodedFields:ByteVec) -> (ByteVec)",
-    "doc": "Creates a new sub-contract without token issuance by copying another contract's code. This costs less gas than createSubContract!(...)",
+    "doc": "Creates a new sub-contract without token issuance by copying another contract's code. This costs less gas than createSubContract!(...).",
     "params": [
       "@param subContractPath the path of the sub-contract to be created",
       "@param contractId the id of the contract to be copied",
@@ -230,7 +230,7 @@
     "name": "copyCreateSubContractWithToken",
     "category": "SubContract",
     "signature": "fn copyCreateSubContractWithToken!(subContractPath:ByteVec, contractId:ByteVec, encodedFields:ByteVec, issueTokenAmount:U256, issueTo?:Address) -> (ByteVec)",
-    "doc": "Creates a new sub-contract with token issuance by copying another contract's code. This costs less gas than createSubContractWithToken!(...)",
+    "doc": "Creates a new sub-contract with token issuance by copying another contract's code. This costs less gas than createSubContractWithToken!(...).",
     "params": [
       "@param subContractPath the path of the sub-contract to be created",
       "@param contractId the id of the contract to be copied",
@@ -403,7 +403,7 @@
     "name": "assert",
     "category": "Utils",
     "signature": "fn assert!(condition:Bool, errorCode:U256) -> ()",
-    "doc": "Tests internal errors or checks invariants.",
+    "doc": "Tests the condition or checks invariants.",
     "params": [
       "@param condition the condition to be checked",
       "@param errorCode the error code to throw if the check fails"
