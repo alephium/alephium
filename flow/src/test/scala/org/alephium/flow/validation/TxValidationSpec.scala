@@ -79,8 +79,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def prepareOutput(lockup: LockupScript.Asset, unlock: UnlockScript) = {
       val group                 = lockup.groupIndex
       val (genesisPriKey, _, _) = genesisKeys(group.value)
-      val block                 = transfer(blockFlow, genesisPriKey, lockup, ALPH.alph(2))
-      val output                = AVector(TxOutputInfo(lockup, ALPH.alph(1), AVector.empty, None))
+      val block =
+        transfer(blockFlow, genesisPriKey, lockup, AVector.empty[(TokenId, U256)], ALPH.alph(2))
+      val output = AVector(TxOutputInfo(lockup, ALPH.alph(1), AVector.empty, None))
       addAndCheck(blockFlow, block)
 
       blockFlow
