@@ -28,7 +28,7 @@ import org.alephium.util.AVector
 object BuiltIn {
   sealed trait BuiltIn[-Ctx <: StatelessContext] extends FuncInfo[Ctx] {
     def name: String
-    def tag: Tag
+    def category: Category
     def signature: String
     def params: Seq[String]
     def returns: String
@@ -41,18 +41,18 @@ object BuiltIn {
     }
   }
 
-  sealed trait Tag {
+  sealed trait Category {
     override def toString: String = getClass.getSimpleName.init
   }
-  object Tag {
-    case object Contract     extends Tag
-    case object SubContract  extends Tag
-    case object Asset        extends Tag
-    case object Utils        extends Tag
-    case object Chain        extends Tag
-    case object Conversion   extends Tag
-    case object ByteVec      extends Tag
-    case object Cryptography extends Tag
+  object Category {
+    case object Contract     extends Category
+    case object SubContract  extends Category
+    case object Asset        extends Category
+    case object Utils        extends Category
+    case object Chain        extends Category
+    case object Conversion   extends Category
+    case object ByteVec      extends Category
+    case object Cryptography extends Category
   }
 
   trait DocUtils {
@@ -99,7 +99,7 @@ object BuiltIn {
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean,
       isReadonly: Boolean,
-      tag: Tag,
+      category: Category,
       argsCommentedName: Seq[(String, String)],
       retComment: String,
       doc: String
@@ -114,7 +114,7 @@ object BuiltIn {
   // scalastyle:off parameter.number
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   object SimpleBuiltIn {
-    private def tag[Ctx <: StatelessContext](tag: Tag) = new {
+    private def tag[Ctx <: StatelessContext](category: Category) = new {
       def apply(
           name: String,
           argsType: Seq[Type],
@@ -135,14 +135,14 @@ object BuiltIn {
           usePreapprovedAssets,
           useAssetsInContract,
           isReadonly,
-          tag,
+          category,
           argsName,
           retComment,
           doc
         )
     }
 
-    private def simpleReturn[Ctx <: StatelessContext](tag: Tag) = new {
+    private def simpleReturn[Ctx <: StatelessContext](category: Category) = new {
       def apply(
           name: String,
           argsType: Seq[Type],
@@ -162,28 +162,28 @@ object BuiltIn {
           usePreapprovedAssets,
           useAssetsInContract,
           isReadonly,
-          tag,
+          category,
           argsName,
           retComment,
           doc = s"Returns $retComment."
         )
     }
 
-    private[lang] val cryptography = tag[StatelessContext](Tag.Cryptography)
-    private[lang] val chain        = tag[StatelessContext](Tag.Chain)
-    private[lang] val conversion   = tag[StatelessContext](Tag.Conversion)
-    private[lang] val byteVec      = tag[StatelessContext](Tag.ByteVec)
-    private[lang] val asset        = tag[StatefulContext](Tag.Asset)
-    private[lang] val contract     = tag[StatefulContext](Tag.Contract)
-    private[lang] val subContract  = tag[StatefulContext](Tag.SubContract)
+    private[lang] val cryptography = tag[StatelessContext](Category.Cryptography)
+    private[lang] val chain        = tag[StatelessContext](Category.Chain)
+    private[lang] val conversion   = tag[StatelessContext](Category.Conversion)
+    private[lang] val byteVec      = tag[StatelessContext](Category.ByteVec)
+    private[lang] val asset        = tag[StatefulContext](Category.Asset)
+    private[lang] val contract     = tag[StatefulContext](Category.Contract)
+    private[lang] val subContract  = tag[StatefulContext](Category.SubContract)
 
-    private[lang] val chainSimple    = simpleReturn[StatelessContext](Tag.Chain)
-    private[lang] val byteVecSimple  = simpleReturn[StatelessContext](Tag.ByteVec)
-    private[lang] val assetSimple    = simpleReturn[StatefulContext](Tag.Asset)
-    private[lang] val contractSimple = simpleReturn[StatefulContext](Tag.Contract)
+    private[lang] val chainSimple    = simpleReturn[StatelessContext](Category.Chain)
+    private[lang] val byteVecSimple  = simpleReturn[StatelessContext](Category.ByteVec)
+    private[lang] val assetSimple    = simpleReturn[StatefulContext](Category.Asset)
+    private[lang] val contractSimple = simpleReturn[StatefulContext](Category.Contract)
 
-    private[BuiltIn] def utils[Ctx <: StatelessContext]       = tag[Ctx](Tag.Utils)
-    private[BuiltIn] def utilsSimple[Ctx <: StatelessContext] = simpleReturn[Ctx](Tag.Utils)
+    private[BuiltIn] def utils[Ctx <: StatelessContext]       = tag[Ctx](Category.Utils)
+    private[BuiltIn] def utilsSimple[Ctx <: StatelessContext] = simpleReturn[Ctx](Category.Utils)
 
     def hash(
         name: String,
@@ -211,7 +211,7 @@ object BuiltIn {
       name: String,
       argsTypeWithInstrs: Seq[ArgsTypeWithInstrs[Ctx]],
       returnType: Seq[Type],
-      tag: Tag,
+      category: Category,
       argsCommentedName: Seq[(String, String)],
       retComment: String,
       signature: String,
@@ -246,7 +246,7 @@ object BuiltIn {
         name: String,
         argsTypeWithInstrs: Seq[ArgsTypeWithInstrs[StatefulContext]],
         returnType: Seq[Type],
-        tag: Tag,
+        category: Category,
         argsName: Seq[(String, String)],
         doc: String,
         usePreapprovedAssets: Boolean,
@@ -264,7 +264,7 @@ object BuiltIn {
         name,
         argsTypeWithInstrs,
         returnType,
-        tag,
+        category,
         argsName :+ ("issueTo (optional)" -> "a designated address to received issued token"),
         retComment = "the id of the created contract",
         signature,
@@ -449,7 +449,7 @@ object BuiltIn {
     )
 
   sealed abstract class ConversionBuiltIn(name: String) extends GenericStatelessBuiltIn(name) {
-    def tag: Tag = Tag.Conversion
+    def category: Category = Category.Conversion
 
     def toType: Type
 
@@ -573,7 +573,7 @@ object BuiltIn {
   val encodeToByteVec: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
     val name: String = "encodeToByteVec"
 
-    def tag: Tag                      = Tag.ByteVec
+    def category: Category            = Category.ByteVec
     override def isVariadic: Boolean  = true
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
@@ -765,7 +765,7 @@ object BuiltIn {
 
   val panic: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
     val name: String                  = "panic"
-    def tag: Tag                      = Tag.Utils
+    def category: Category            = Category.Utils
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
     def isReadonly                    = true
@@ -1080,7 +1080,7 @@ object BuiltIn {
       usePreapprovedAssets = true,
       useAssetsInContract = false,
       isReadonly = false,
-      tag = Tag.Contract,
+      category = Category.Contract,
       argsName = Seq(
         "bytecode"         -> "the bytecode of the contract to be created",
         "encodedFields"    -> "the encoded fields as a ByteVec",
@@ -1127,7 +1127,7 @@ object BuiltIn {
       usePreapprovedAssets = true,
       useAssetsInContract = false,
       isReadonly = false,
-      tag = Tag.Contract,
+      category = Category.Contract,
       argsName = Seq(
         "contractId"       -> "the id of the contract to be copied",
         "encodedFields"    -> "the encoded fields as a ByteVec",
@@ -1175,7 +1175,7 @@ object BuiltIn {
       usePreapprovedAssets = true,
       useAssetsInContract = false,
       isReadonly = false,
-      tag = Tag.SubContract,
+      category = Category.SubContract,
       argsName = Seq(
         "subContractPath"  -> "the path of the sub-contract to be created",
         "bytecode"         -> "the bytecode of the sub-contract to be created",
@@ -1224,7 +1224,7 @@ object BuiltIn {
       usePreapprovedAssets = true,
       useAssetsInContract = false,
       isReadonly = false,
-      tag = Tag.SubContract,
+      category = Category.SubContract,
       argsName = Seq(
         "subContractPath"  -> "the path of the sub-contract to be created",
         "contractId"       -> "the id of the contract to be copied",
@@ -1394,7 +1394,7 @@ object BuiltIn {
 
   sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] with DocUtils {
     def name: String
-    def tag: Tag                      = Tag.SubContract
+    def category: Category            = Category.SubContract
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
     def isReadonly: Boolean           = true
