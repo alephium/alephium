@@ -386,6 +386,83 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
+  it should "create contract and transfer tokens from the contract" in new ContractFixture {
+    val code =
+      s"""
+         |Contract ShinyToken() {
+         |  @using(assetsInContract = true)
+         |  pub fn transfer(to: Address, amount: U256) -> () {
+         |    transferTokenFromSelf!(to, selfContractId!(), amount)
+         |    transferAlphFromSelf!(to, dustAmount!())
+         |  }
+         |}
+         |""".stripMargin
+
+    def script(shinyTokenId: String, to: String, amount: U256): String =
+      s"""
+         |TxScript Transfer() {
+         |  ShinyToken(#$shinyTokenId).transfer(@$to, ${amount.v})
+         |}
+         |
+         |$code
+         |""".stripMargin
+
+    info("create contract with token")
+    val contractId = createContract(
+      code,
+      initialState = AVector.empty,
+      Some(TokenIssuance.Info(Val.U256.unsafe(1000), None)),
+      ALPH.alph(10000)
+    )._1
+    val tokenId = TokenId.from(contractId)
+
+    getTokenBalance(blockFlow, genesisAddress.lockupScript, tokenId) is 0
+
+    val contractAsset = getContractAsset(contractId, chainIndex)
+    contractAsset.tokens is AVector((tokenId, U256.unsafe(1000)))
+    contractAsset.amount is ALPH.alph(10000)
+
+    info("transfer token to genesisAddress")
+    callTxScript(script(tokenId.toHexString, genesisAddress.toBase58, 10))
+    getTokenBalance(blockFlow, genesisAddress.lockupScript, tokenId) is 10
+
+    info("transfer token from contract to address in group 0")
+    val (privateKey0, publicKey0) = GroupIndex.unsafe(0).generateKey
+    val address0                  = Address.p2pkh(publicKey0)
+    callTxScript(script(tokenId.toHexString, address0.toBase58, 100))
+    getTokenBalance(blockFlow, address0.lockupScript, tokenId) is 100
+    getAlphBalance(blockFlow, address0.lockupScript) is dustUtxoAmount
+
+    info("fail to transfer token from contract to address in group 1")
+    val (_, publicKey1) = GroupIndex.unsafe(1).generateKey
+    val address1        = Address.p2pkh(publicKey1)
+    address1.groupIndex.value is 1
+    intercept[AssertionError](callTxScript(script(tokenId.toHexString, address1.toBase58, 50)))
+      .getMessage() is "Right(InvalidOutputGroupIndex)"
+
+    info("transfer some ALPH to adress in group 0")
+    val genesisPrivateKey = genesisKeys(chainIndex.from.value)._1
+    val block = transfer(
+      blockFlow,
+      genesisPrivateKey,
+      address0.lockupScript,
+      AVector.empty[(TokenId, U256)],
+      ALPH.oneAlph
+    )
+    addAndCheck(blockFlow, block)
+    getAlphBalance(blockFlow, address0.lockupScript) is (dustUtxoAmount + ALPH.oneAlph)
+
+    info("transfer token from address in group 0 to address in group 1")
+    val tokens: AVector[(TokenId, U256)] = AVector(tokenId -> 10)
+    transfer(
+      blockFlow,
+      privateKey0,
+      address1.lockupScript,
+      tokens,
+      minimalAttoAlphAmountPerTxOutput(1)
+    )
+  }
+
   it should "burn token" in new ContractFixture {
     val contract =
       s"""
