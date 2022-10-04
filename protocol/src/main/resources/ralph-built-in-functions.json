@@ -19,7 +19,7 @@
       "@param bytecode the bytecode of the contract to be created",
       "@param encodedFields the encoded fields as a ByteVec",
       "@param issueTokenAmount the amount of token to be issued",
-      "@param issueTo (optional) a designated address to received issued token"
+      "@param issueTo (optional) a designated address to receive issued token"
     ],
     "returns": "@returns the id of the created contract"
   },
@@ -43,7 +43,7 @@
       "@param contractId the id of the contract to be copied",
       "@param encodedFields the encoded fields as a ByteVec",
       "@param issueTokenAmount the amount of token to be issued",
-      "@param issueTo (optional) a designated address to received issued token"
+      "@param issueTo (optional) a designated address to receive issued token"
     ],
     "returns": "@returns the id of the created contract"
   },
@@ -51,11 +51,11 @@
     "name": "selfAddress",
     "category": "Contract",
     "signature": "fn selfAddress!() -> (Address)",
-    "doc": "Returns the address (Address) of the contract.",
+    "doc": "Returns the address of the contract.",
     "params": [
       
     ],
-    "returns": "@returns the address (Address) of the contract"
+    "returns": "@returns the address of the contract"
   },
   {
     "name": "selfContractId",
@@ -210,7 +210,7 @@
       "@param bytecode the bytecode of the sub-contract to be created",
       "@param encodedFields the encoded fields as a ByteVec",
       "@param issueTokenAmount the amount of token to be issued",
-      "@param issueTo (optional) a designated address to received issued token"
+      "@param issueTo (optional) a designated address to receive issued token"
     ],
     "returns": "@returns the id of the created contract"
   },
@@ -236,7 +236,7 @@
       "@param contractId the id of the contract to be copied",
       "@param encodedFields the encoded fields as a ByteVec",
       "@param issueTokenAmount the amount of token to be issued",
-      "@param issueTo (optional) a designated address to received issued token"
+      "@param issueTo (optional) a designated address to receive issued token"
     ],
     "returns": "@returns the id of the created contract"
   },
@@ -244,31 +244,31 @@
     "name": "subContractId",
     "category": "SubContract",
     "signature": "fn subContractId!(subContractPath:ByteVec) -> (ByteVec)",
-    "doc": "Returns the id of the sub contract of the contract.",
+    "doc": "Returns the id of the sub contract.",
     "params": [
       "@param subContractPath the path of the sub-contract"
     ],
-    "returns": "@returns the id of the sub contract of the contract"
+    "returns": "@returns the id of the sub contract"
   },
   {
     "name": "subContractIdOf",
     "category": "SubContract",
     "signature": "fn subContractIdOf!(contract:<Contract>, subContractPath:ByteVec) -> (ByteVec)",
-    "doc": "Returns the id of the sub contract of the contract.",
+    "doc": "Returns the id of the sub contract.",
     "params": [
       "@param contract the parent contract of the sub-contract",
       "@param subContractPath the path of the sub-contract"
     ],
-    "returns": "@returns the id of the sub contract of the contract"
+    "returns": "@returns the id of the sub contract"
   },
   {
     "name": "approveAlph",
     "category": "Asset",
     "signature": "fn approveAlph!(fromAddress:Address, amount:U256) -> ()",
-    "doc": "Approves ALPH for usage from the input assets of the function.",
+    "doc": "Approves the usage of certain amount of ALPH from the given address",
     "params": [
       "@param fromAddress the address to approve ALPH from",
-      "@param amount the amount of atto ALPH to be approved"
+      "@param amount the amount of attoALPH to be approved"
     ],
     "returns": "@returns "
   },
@@ -276,7 +276,7 @@
     "name": "approveToken",
     "category": "Asset",
     "signature": "fn approveToken!(fromAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
-    "doc": "Approves token for usage from the input assets of the function.",
+    "doc": "Approves the usage of certain amount of token from the given address",
     "params": [
       "@param fromAddress the address to approve token from",
       "@param tokenId the token to be approved",
@@ -288,11 +288,11 @@
     "name": "alphRemaining",
     "category": "Asset",
     "signature": "fn alphRemaining!(address:Address) -> (U256)",
-    "doc": "Returns the amount of the remaining ALPH in the input assets of the function.",
+    "doc": "Returns the amount of the remaining ALPH for an address.",
     "params": [
       "@param address the input address"
     ],
-    "returns": "@returns the amount of the remaining ALPH in the input assets of the function"
+    "returns": "@returns the amount of the remaining ALPH for an address"
   },
   {
     "name": "tokenRemaining",
@@ -309,7 +309,7 @@
     "name": "transferAlph",
     "category": "Asset",
     "signature": "fn transferAlph!(fromAddress:Address, toAddress:Address, amount:U256) -> ()",
-    "doc": "Transfers ALPH from the input assets of the function.",
+    "doc": "Transfers certain amount of ALPH from one address to another",
     "params": [
       "@param fromAddress the address to transfer ALPH from",
       "@param toAddress the address to transfer ALPH to",
@@ -394,7 +394,7 @@
     "signature": "fn lockApprovedAssets!(address:Address, timestamp:U256) -> ()",
     "doc": "Locks the current approved assets.",
     "params": [
-      "@param address the address to lock assets for",
+      "@param address the address to lock assets to",
       "@param timestamp the timestamp that the assets will be locked until"
     ],
     "returns": "@returns "
@@ -419,7 +419,7 @@
       "@param condition the condition to be checked",
       "@param errorCode the error code to throw if the check fails"
     ],
-    "returns": "@returns true if the condition is satisfied, false otherwise"
+    "returns": "@returns "
   },
   {
     "name": "isAssetAddress",
@@ -475,11 +475,11 @@
     "name": "networkId",
     "category": "Chain",
     "signature": "fn networkId!() -> (ByteVec)",
-    "doc": "Returns the network id.",
+    "doc": "Returns the network id (a single byte).",
     "params": [
       
     ],
-    "returns": "@returns the network id"
+    "returns": "@returns the network id (a single byte)"
   },
   {
     "name": "blockHash",
@@ -842,7 +842,7 @@
     "signature": "fn verifyED25519!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
     "doc": "Verifies the ED25519 signature of the input and public key.",
     "params": [
-      "@param data the datat that was supposed to have been signed",
+      "@param data the data that was supposed to have been signed",
       "@param publicKey the public key of the signer",
       "@param signature the signature value"
     ],
@@ -854,7 +854,7 @@
     "signature": "fn ethEcRecover!(data:ByteVec, signature:ByteVec) -> (ByteVec)",
     "doc": "Recovers the ETH account that signed the data.",
     "params": [
-      "@param data the datat that was supposed to have been signed",
+      "@param data the data that was supposed to have been signed",
       "@param signature the signature value"
     ],
     "returns": "@returns the ETH account that signed the data"

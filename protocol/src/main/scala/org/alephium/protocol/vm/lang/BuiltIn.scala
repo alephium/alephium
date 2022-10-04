@@ -265,7 +265,7 @@ object BuiltIn {
         argsTypeWithInstrs,
         returnType,
         category,
-        argsName :+ ("issueTo (optional)" -> "a designated address to received issued token"),
+        argsName :+ ("issueTo (optional)" -> "a designated address to receive issued token"),
         retComment = "the id of the created contract",
         signature,
         doc,
@@ -339,7 +339,7 @@ object BuiltIn {
         "condition" -> "the condition to be checked",
         "errorCode" -> "the error code to throw if the check fails"
       ),
-      retComment = "true if the condition is satisfied, false otherwise",
+      retComment = "",
       doc = s"Checks conditions of the external caller of the function."
     )
   val verifyED25519: SimpleBuiltIn[StatelessContext] =
@@ -349,7 +349,7 @@ object BuiltIn {
       Seq.empty,
       VerifyED25519,
       argsName = Seq(
-        "data"      -> "the datat that was supposed to have been signed",
+        "data"      -> "the data that was supposed to have been signed",
         "publicKey" -> "the public key of the signer",
         "signature" -> "the signature value"
       ),
@@ -363,7 +363,7 @@ object BuiltIn {
       Seq(Type.ByteVec),
       EthEcRecover,
       argsName = Seq(
-        "data"      -> "the datat that was supposed to have been signed",
+        "data"      -> "the data that was supposed to have been signed",
         "signature" -> "the signature value"
       ),
       retComment = "the ETH account that signed the data",
@@ -376,7 +376,7 @@ object BuiltIn {
       Seq(Type.ByteVec),
       NetworkId,
       Seq(),
-      retComment = "the network id"
+      retComment = "the network id (a single byte)"
     )
   val blockTimeStamp: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chainSimple(
@@ -859,10 +859,10 @@ object BuiltIn {
       isReadonly = false,
       argsName = Seq(
         "fromAddress" -> "the address to approve ALPH from",
-        "amount"      -> "the amount of atto ALPH to be approved"
+        "amount"      -> "the amount of attoALPH to be approved"
       ),
       retComment = "",
-      doc = "Approves ALPH for usage from the input assets of the function."
+      doc = "Approves the usage of certain amount of ALPH from the given address"
     )
 
   val approveToken: SimpleBuiltIn[StatefulContext] =
@@ -878,7 +878,7 @@ object BuiltIn {
         "amount"      -> "the amount of the token to be approved"
       ),
       retComment = "",
-      doc = "Approves token for usage from the input assets of the function."
+      doc = "Approves the usage of certain amount of token from the given address"
     )
 
   val alphRemaining: SimpleBuiltIn[StatefulContext] =
@@ -889,7 +889,7 @@ object BuiltIn {
       AlphRemaining,
       isReadonly = true,
       argsName = Seq("address" -> "the input address"),
-      retComment = "the amount of the remaining ALPH in the input assets of the function"
+      retComment = "the amount of the remaining ALPH for an address"
     )
 
   val tokenRemaining: SimpleBuiltIn[StatefulContext] =
@@ -916,7 +916,7 @@ object BuiltIn {
         "amount"      -> "the amount of attoALPH to be transferred"
       ),
       retComment = "",
-      doc = "Transfers ALPH from the input assets of the function."
+      doc = "Transfers certain amount of ALPH from one address to another"
     )
 
   val transferAlphFromSelf: SimpleBuiltIn[StatefulContext] =
@@ -1027,7 +1027,7 @@ object BuiltIn {
       usePreapprovedAssets = true,
       isReadonly = false,
       argsName = Seq(
-        "address"   -> "the address to lock assets for",
+        "address"   -> "the address to lock assets to",
         "timestamp" -> "the timestamp that the assets will be locked until"
       ),
       retComment = "",
@@ -1298,7 +1298,7 @@ object BuiltIn {
       Seq(Type.Address),
       SelfAddress,
       argsName = Seq(),
-      retComment = "the address (Address) of the contract"
+      retComment = "the address of the contract"
     )
 
   val selfContractId: SimpleBuiltIn[StatefulContext] =
@@ -1403,7 +1403,7 @@ object BuiltIn {
 
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]]
 
-    val retComment: String = "the id of the sub contract of the contract"
+    val retComment: String = "the id of the sub contract"
     def doc: String        = s"Returns ${retComment}."
   }
 
