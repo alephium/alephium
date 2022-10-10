@@ -36,7 +36,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and publish docker image
+      - name: Build and publish docker image for stable versions
         if: ${{ !contains(steps.get_version.outputs.VERSION, '-') }}
         uses: docker/build-push-action@v2
         with:
@@ -47,4 +47,16 @@ jobs:
           tags: |
             docker.io/alephium/alephium:${{ steps.get_version.outputs.VERSION }}
             docker.io/alephium/alephium:latest
+          push: true
+
+      - name: Build and publish docker image for development
+        uses: docker/build-push-action@v2
+        with:
+          context: docker/release
+          file: ./docker/release/Dockerfile.release
+          build-args: RELEASE=${{ steps.get_version.outputs.VERSION-NO-V }}
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: |
+            docker.io/alephium/dev-alephium:${{ steps.get_version.outputs.VERSION-NO-V }}
+            docker.io/alephium/dev-alephium:latest
           push: true
