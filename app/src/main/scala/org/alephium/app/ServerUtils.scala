@@ -24,7 +24,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
-import org.alephium.api.model.{AssetOutput => _, TransactionTemplate => _, _}
+import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
@@ -451,6 +451,22 @@ class ServerUtils(implicit
       chainIndexes: AVector[ChainIndex]
   ): Try[TxStatus] = {
     blockFlow.searchLocalTransactionStatus(txId, chainIndexes).left.map(failed).map(convert)
+  }
+
+  def getTransaction(
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      chainIndex: ChainIndex
+  ): Try[Option[Transaction]] = {
+    blockFlow.getTransaction(txId, chainIndex).left.map(failed)
+  }
+
+  def searchLocalTransaction(
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      chainIndexes: AVector[ChainIndex]
+  ): Try[Option[Transaction]] = {
+    blockFlow.searchTransaction(txId, chainIndexes).left.map(failed)
   }
 
   def getChainIndexForTx(

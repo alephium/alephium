@@ -24,12 +24,12 @@ import akka.util.ByteString
 
 import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
-import org.alephium.api.model.{TransactionTemplate => _, _}
+import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow}
 import org.alephium.flow.gasestimation._
 import org.alephium.protocol._
-import org.alephium.protocol.config.GroupConfig
+import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.protocol.vm.lang.Compiler
@@ -61,6 +61,18 @@ class ServerUtilsSpec extends AlephiumSpec {
     def emptyKey(index: Int): Hash = TxOutputRef.key(TransactionId.zero, index).value
   }
 
+  trait GetTxFixture {
+    def brokerConfig: BrokerConfig
+    def serverUtils: ServerUtils
+
+    def checkTx(blockFlow: BlockFlow, tx: Transaction, chainIndex: ChainIndex) = {
+      serverUtils.getTransaction(blockFlow, tx.id, chainIndex) isE Some(tx)
+      serverUtils.searchLocalTransaction(blockFlow, tx.id, brokerConfig.chainIndexes) isE Some(tx)
+      val chainIndexes = brokerConfig.chainIndexes.filter(_.from != chainIndex.from)
+      serverUtils.searchLocalTransaction(blockFlow, tx.id, chainIndexes) isE None
+    }
+  }
+
   trait FlowFixtureWithApi extends FlowFixture with ApiConfigFixture
 
   it should "send message with tx" in new Fixture {
@@ -78,7 +90,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     unsignedTransaction.fixedOutputs.head.additionalData is message
   }
 
-  it should "check tx status for intra group txs" in new Fixture {
+  it should "check tx status for intra group txs" in new Fixture with GetTxFixture {
 
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
@@ -124,6 +136,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       checkDestinationBalance(destination1)
       checkDestinationBalance(destination2)
 
+      checkTx(blockFlow, block0.nonCoinbase.head, chainIndex)
+
       val block1 = emptyBlock(blockFlow, chainIndex)
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
@@ -134,7 +148,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "check tx status for inter group txs" in new FlowFixtureWithApi {
+  it should "check tx status for inter group txs" in new FlowFixtureWithApi with GetTxFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     implicit val serverUtils = new ServerUtils
@@ -182,6 +196,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       checkAddressBalance(destination1.address, U256.unsafe(0), 0)
       checkAddressBalance(destination2.address, U256.unsafe(0), 0)
 
+      checkTx(blockFlow, block0.nonCoinbase.head, chainIndex)
+
       val block1 = emptyBlock(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
       addAndCheck(blockFlow, block1)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
@@ -200,7 +216,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "check sweep address tx status for intra group txs" in new Fixture {
+  it should "check sweep address tx status for intra group txs" in new Fixture with GetTxFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     implicit val serverUtils = new ServerUtils
@@ -238,6 +254,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         Confirmed(block0.hash, 0, 1, 1, 1)
       checkAddressBalance(fromAddress, genesisBalance - block0.transactions.head.gasFeeUnsafe, 3)
 
+      checkTx(blockFlow, block0.nonCoinbase.head, chainIndex)
+
       info("Sweep coins from the 3 UTXOs of this public key to another address")
       val senderBalanceBeforeSweep = genesisBalance - block0.transactions.head.gasFeeUnsafe
       val sweepAddressDestination  = generateAddress(chainIndex)
@@ -273,7 +291,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "check sweep all tx status for inter group txs" in new FlowFixtureWithApi {
+  it should "check sweep all tx status for inter group txs" in new FlowFixtureWithApi
+    with GetTxFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     implicit val serverUtils = new ServerUtils
@@ -320,6 +339,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         Confirmed(block0.hash, 0, 1, 0, 0)
       checkAddressBalance(fromAddress, senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe)
       checkAddressBalance(toAddress, receiverInitialBalance)
+
+      checkTx(blockFlow, block0.nonCoinbase.head, chainIndex)
 
       val block1 = emptyBlock(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
       addAndCheck(blockFlow, block1)
