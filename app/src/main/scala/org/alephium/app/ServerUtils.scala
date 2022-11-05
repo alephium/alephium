@@ -1091,7 +1091,8 @@ class ServerUtils(implicit
       signatures = Stack.popOnly(AVector.empty[Signature]),
       prevOutputs = inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
-      gasFeeUnsafe = testGasFee,
+      gasPrice = defaultGasPrice,
+      gasAmount = maximalGasPerTx,
       isEntryMethodPayable = true
     )
     val context = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
