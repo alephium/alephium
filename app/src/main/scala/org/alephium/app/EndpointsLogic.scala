@@ -28,7 +28,7 @@ import io.prometheus.client.exporter.common.TextFormat
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.server.ServerEndpoint
 
-import org.alephium.api.{notFound, ApiError, Endpoints, Try}
+import org.alephium.api.{ApiError, Endpoints, Try}
 import org.alephium.api.model.{TransactionTemplate => _, _}
 import org.alephium.app.FutureTry
 import org.alephium.flow.client.Node
@@ -497,32 +497,12 @@ trait EndpointsLogic extends Endpoints {
 
   val getTransactionLogic = serverLogicRedirect(getTransaction)(
     { case (txId, fromGroup, toGroup) =>
-      Future.successful(getTransaction(txId, fromGroup, toGroup))
+      Future.successful(serverUtils.getTransaction(blockFlow, txId, fromGroup, toGroup))
     },
     { case (_, fromGroup, _) =>
       getGroupIndex(fromGroup)
     }
   )
-
-  private def getTransaction(
-      txId: TransactionId,
-      fromGroup: Option[GroupIndex],
-      toGroup: Option[GroupIndex]
-  ): Try[Transaction] = {
-    val result = (fromGroup, toGroup) match {
-      case (Some(from), Some(to)) =>
-        serverUtils.getTransaction(blockFlow, txId, ChainIndex(from, to))
-      case _ =>
-        val chainIndexes = brokerConfig.chainIndexes.filter { chainIndex =>
-          fromGroup.forall(_ == chainIndex.from) && toGroup.forall(_ == chainIndex.to)
-        }
-        serverUtils.searchLocalTransaction(blockFlow, txId, chainIndexes)
-    }
-    result.flatMap {
-      case Some(tx) => Right(Transaction.fromProtocol(tx))
-      case None     => Left(notFound(s"Transaction ${txId.toHexString}"))
-    }
-  }
 
   val minerActionLogic = serverLogic(minerAction) { action =>
     withSyncedClique {

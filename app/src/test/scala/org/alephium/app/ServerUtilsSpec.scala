@@ -66,10 +66,21 @@ class ServerUtilsSpec extends AlephiumSpec {
     def serverUtils: ServerUtils
 
     def checkTx(blockFlow: BlockFlow, tx: Transaction, chainIndex: ChainIndex) = {
-      serverUtils.getTransaction(blockFlow, tx.id, chainIndex) isE Some(tx)
-      serverUtils.searchLocalTransaction(blockFlow, tx.id, brokerConfig.chainIndexes) isE Some(tx)
-      val chainIndexes = brokerConfig.chainIndexes.filter(_.from != chainIndex.from)
-      serverUtils.searchLocalTransaction(blockFlow, tx.id, chainIndexes) isE None
+      val result = api.Transaction.fromProtocol(tx)
+      serverUtils.getTransaction(
+        blockFlow,
+        tx.id,
+        Some(chainIndex.from),
+        Some(chainIndex.to)
+      ) isE result
+      serverUtils.getTransaction(blockFlow, tx.id, Some(chainIndex.from), None) isE result
+      serverUtils.getTransaction(blockFlow, tx.id, None, Some(chainIndex.to)) isE result
+      serverUtils.getTransaction(blockFlow, tx.id, None, None) isE result
+      val invalidChainIndex = brokerConfig.chainIndexes.filter(_.from != chainIndex.from).head
+      serverUtils
+        .getTransaction(blockFlow, tx.id, Some(invalidChainIndex.from), None)
+        .leftValue
+        .detail is s"Transaction ${tx.id.toHexString} not found"
     }
   }
 

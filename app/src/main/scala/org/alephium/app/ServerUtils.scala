@@ -456,17 +456,22 @@ class ServerUtils(implicit
   def getTransaction(
       blockFlow: BlockFlow,
       txId: TransactionId,
-      chainIndex: ChainIndex
-  ): Try[Option[Transaction]] = {
-    blockFlow.getTransaction(txId, chainIndex).left.map(failed)
-  }
-
-  def searchLocalTransaction(
-      blockFlow: BlockFlow,
-      txId: TransactionId,
-      chainIndexes: AVector[ChainIndex]
-  ): Try[Option[Transaction]] = {
-    blockFlow.searchTransaction(txId, chainIndexes).left.map(failed)
+      fromGroup: Option[GroupIndex],
+      toGroup: Option[GroupIndex]
+  ): Try[model.Transaction] = {
+    val result = (fromGroup, toGroup) match {
+      case (Some(from), Some(to)) =>
+        blockFlow.getTransaction(txId, ChainIndex(from, to)).left.map(failed)
+      case _ =>
+        val chainIndexes = brokerConfig.chainIndexes.filter { chainIndex =>
+          fromGroup.forall(_ == chainIndex.from) && toGroup.forall(_ == chainIndex.to)
+        }
+        blockFlow.searchTransaction(txId, chainIndexes).left.map(failed)
+    }
+    result.flatMap {
+      case Some(tx) => Right(model.Transaction.fromProtocol(tx))
+      case None     => Left(notFound(s"Transaction ${txId.toHexString}"))
+    }
   }
 
   def getChainIndexForTx(
