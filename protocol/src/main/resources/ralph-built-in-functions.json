@@ -91,11 +91,11 @@
     "name": "callerAddress",
     "category": "Contract",
     "signature": "fn callerAddress!() -> (Address)",
-    "doc": "Returns the address of the caller.",
+    "doc": "Returns the address of the caller. When used in a TxScript, it returns the unique input address if the input addresses are the same, otherwise it fails.",
     "params": [
       
     ],
-    "returns": "@returns the address of the caller"
+    "returns": "@returns the address of the caller. When used in a TxScript, it returns the unique input address if the input addresses are the same, otherwise it fails"
   },
   {
     "name": "contractInitialStateHash",
