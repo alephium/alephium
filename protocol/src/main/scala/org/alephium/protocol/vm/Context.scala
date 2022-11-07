@@ -58,6 +58,8 @@ sealed trait TxEnv {
   def signatures: Stack[Signature]
   def prevOutputs: AVector[AssetOutput]
   def fixedOutputs: AVector[AssetOutput]
+  def gasPrice: GasPrice
+  def gasAmount: GasBox
   def gasFeeUnsafe: U256
 
   def isEntryMethodPayable: Boolean
@@ -75,10 +77,20 @@ object TxEnv {
       signatures: Stack[Signature],
       prevOutputs: AVector[AssetOutput],
       fixedOutputs: AVector[AssetOutput],
-      gasFeeUnsafe: U256,
+      gasPrice: GasPrice,
+      gasAmount: GasBox,
       isEntryMethodPayable: Boolean
   ): TxEnv =
-    Mockup(txId, signatures, prevOutputs, fixedOutputs, gasFeeUnsafe, isEntryMethodPayable)
+    Mockup(
+      txId,
+      signatures,
+      prevOutputs,
+      fixedOutputs,
+      gasPrice,
+      gasAmount,
+      gasPrice * gasAmount,
+      isEntryMethodPayable
+    )
 
   final case class Default(
       tx: TransactionAbstract,
@@ -87,6 +99,8 @@ object TxEnv {
   ) extends TxEnv {
     def txId: TransactionId                = tx.id
     def fixedOutputs: AVector[AssetOutput] = tx.unsigned.fixedOutputs
+    def gasPrice: GasPrice                 = tx.unsigned.gasPrice
+    def gasAmount: GasBox                  = tx.unsigned.gasAmount
     def gasFeeUnsafe: U256                 = tx.gasFeeUnsafe
     def isEntryMethodPayable: Boolean      = tx.isEntryMethodPayable
   }
@@ -96,6 +110,8 @@ object TxEnv {
       signatures: Stack[Signature],
       prevOutputs: AVector[AssetOutput],
       fixedOutputs: AVector[AssetOutput],
+      gasPrice: GasPrice,
+      gasAmount: GasBox,
       gasFeeUnsafe: U256,
       isEntryMethodPayable: Boolean
   ) extends TxEnv

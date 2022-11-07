@@ -240,9 +240,9 @@ class VMSpec extends AlephiumSpec {
       block1
     }
 
-    def testSimpleScript(main: String) = {
+    def testSimpleScript(main: String, gas: Int = 100000) = {
       val script = Compiler.compileTxScript(main).rightValue
-      val block  = simpleScript(blockFlow, chainIndex, script)
+      val block  = simpleScript(blockFlow, chainIndex, script, gas)
       addAndCheck(blockFlow, block)
     }
 
@@ -1397,7 +1397,8 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "fetch tx env" in new ContractFixture {
-    val zeroId = Hash.zero
+    val zeroId    = Hash.zero
+    val gasAmount = GasBox.unsafe(150000)
     def main(index: Int) =
       s"""
          |@using(preapprovedAssets = false)
@@ -1405,9 +1406,12 @@ class VMSpec extends AlephiumSpec {
          |  assert!(txId!() != #${zeroId.toHexString}, 0)
          |  assert!(txInputAddress!($index) == @${genesisAddress.toBase58}, 0)
          |  assert!(txInputsSize!() == 1, 0)
+         |  assert!(txGasPrice!() == ${defaultGasPrice.value}, 0)
+         |  assert!(txGasAmount!() == ${gasAmount.value}, 0)
+         |  assert!(txGasFee!() == ${defaultGasPrice * gasAmount}, 0)
          |}
          |""".stripMargin
-    testSimpleScript(main(0))
+    testSimpleScript(main(0), gasAmount.value)
     failSimpleScript(main(1), InvalidTxInputIndex)
   }
 

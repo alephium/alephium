@@ -423,6 +423,33 @@ object BuiltIn {
       Seq(),
       retComment = "the number of transaction inputs"
     )
+  val txGasPrice: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.chainSimple(
+      "txGasPrice",
+      Seq.empty,
+      Seq(Type.U256),
+      TxGasPrice,
+      Seq.empty,
+      retComment = "the current transaction gas price"
+    )
+  val txGasAmount: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.chainSimple(
+      "txGasAmount",
+      Seq.empty,
+      Seq(Type.U256),
+      TxGasAmount,
+      Seq.empty,
+      retComment = "the current transaction gas amount"
+    )
+  val txGasFee: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.chainSimple(
+      "txGasFee",
+      Seq.empty,
+      Seq(Type.U256),
+      TxGasFee,
+      Seq.empty,
+      retComment = "the current transaction gas fee"
+    )
   val verifyAbsoluteLocktime: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chain(
       "verifyAbsoluteLocktime",
@@ -818,6 +845,9 @@ object BuiltIn {
     txId,
     txInputAddress,
     txInputsSize,
+    txGasPrice,
+    txGasAmount,
+    txGasFee,
     verifyAbsoluteLocktime,
     verifyRelativeLocktime,
     toI256,
