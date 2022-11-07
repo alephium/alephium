@@ -1368,7 +1368,8 @@ object BuiltIn {
       Seq(Type.Address),
       CallerAddress,
       argsName = Seq(),
-      retComment = "the address of the caller"
+      retComment =
+        "the address of the caller. When used in a TxScript, it returns the unique input address if the input addresses are the same, otherwise it fails"
     )
 
   val isCalledFromTxScript: SimpleBuiltIn[StatefulContext] =

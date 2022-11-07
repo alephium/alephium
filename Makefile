@@ -35,5 +35,8 @@ run:
 update-openapi:
 	ALEPHIUM_ENV=test sbt "tools/runMain org.alephium.tools.OpenApiUpdate"
 
+update-builtin-doc:
+	sbt "tools/runMain org.alephium.tools.BuiltInFunctions"
+
 benchmark:
 	sbt "benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*"

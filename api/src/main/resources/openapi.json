@@ -6146,6 +6146,7 @@
                   "$ref": "#/components/schemas/CompileScriptResult"
                 },
                 "example": {
+                  "version": "v0.0.1",
                   "name": "Main",
                   "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "bytecodeDebugPatch": "=1-1+ef",
@@ -6447,6 +6448,7 @@
                   "$ref": "#/components/schemas/CompileContractResult"
                 },
                 "example": {
+                  "version": "v0.0.1",
                   "name": "Foo",
                   "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                   "bytecodeDebugPatch": "=1-1+ef",
@@ -6636,6 +6638,7 @@
                 "example": {
                   "contracts": [
                     {
+                      "version": "v0.0.1",
                       "name": "Foo",
                       "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "bytecodeDebugPatch": "=1-1+ef",
@@ -6723,6 +6726,7 @@
                   ],
                   "scripts": [
                     {
+                      "version": "v0.0.1",
                       "name": "Main",
                       "bytecodeTemplate": "35d1b2a520a0da34c5eb8d712aa9cc",
                       "bytecodeDebugPatch": "=1-1+ef",
@@ -9994,6 +9998,7 @@
       },
       "CompileContractResult": {
         "required": [
+          "version",
           "name",
           "bytecode",
           "bytecodeDebugPatch",
@@ -10006,6 +10011,9 @@
         ],
         "type": "object",
         "properties": {
+          "version": {
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },
@@ -10069,6 +10077,7 @@
       },
       "CompileScriptResult": {
         "required": [
+          "version",
           "name",
           "bytecodeTemplate",
           "bytecodeDebugPatch",
@@ -10078,6 +10087,9 @@
         ],
         "type": "object",
         "properties": {
+          "version": {
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },
