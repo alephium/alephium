@@ -1874,19 +1874,19 @@ sealed trait LemanTxInstr
     extends LemanInstrWithSimpleGas[StatelessContext]
     with StatelessInstrCompanion0
 
-object TxGasPrice extends LemanTxInstr with GasVeryLow {
+object TxGasPrice extends LemanTxInstr with GasBase {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.U256(frame.ctx.txEnv.gasPrice.value))
   }
 }
 
-object TxGasAmount extends LemanTxInstr with GasVeryLow {
+object TxGasAmount extends LemanTxInstr with GasBase {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.U256(frame.ctx.txEnv.gasAmount.toU256))
   }
 }
 
-object TxGasFee extends LemanTxInstr with GasVeryLow {
+object TxGasFee extends LemanTxInstr with GasBase {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.U256(frame.ctx.txEnv.gasFeeUnsafe))
   }

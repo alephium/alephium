@@ -3218,7 +3218,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280,
       ContractIdToAddress -> 5,
       LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2, AssertWithErrorCode -> 3, Swap -> 2,
-      vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0, TxGasPrice -> 3, TxGasAmount -> 3, TxGasFee -> 3
+      vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0, TxGasPrice -> 2, TxGasAmount -> 2, TxGasFee -> 2
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
