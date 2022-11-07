@@ -5769,13 +5769,13 @@
         }
       }
     },
-    "/transactions/{txId}": {
+    "/transactions/details/{txId}": {
       "get": {
         "tags": [
           "Transactions"
         ],
         "summary": "Get transaction details",
-        "operationId": "getTransactionsTxid",
+        "operationId": "getTransactionsDetailsTxid",
         "parameters": [
           {
             "name": "txId",

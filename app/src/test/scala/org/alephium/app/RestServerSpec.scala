@@ -424,12 +424,12 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "call GET /transactions/tx-id" in {
+  it should "call GET /transactions/details" in {
     servers.foreach { server =>
       val chainIndex = server.brokerConfig.chainIndexes.head
       verifyResponseWithNodes(
-        s"/transactions/${dummyTx.id.toHexString}",
-        s"/transactions/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
+        s"/transactions/details/${dummyTx.id.toHexString}",
+        s"/transactions/details/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
         chainIndex,
         server.port
       ) { response =>
@@ -439,8 +439,8 @@ abstract class RestServerSpec(
       }
 
       verifyResponseWithNodes(
-        s"/transactions/${dummyTx.id.toHexString}?toGroup=${chainIndex.to.value}",
-        s"/transactions/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}",
+        s"/transactions/details/${dummyTx.id.toHexString}?toGroup=${chainIndex.to.value}",
+        s"/transactions/details/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}",
         chainIndex,
         server.port
       ) { response =>
@@ -450,8 +450,8 @@ abstract class RestServerSpec(
       }
 
       verifyResponseWithNodes(
-        s"/transactions/${dummyTx.id.toHexString}",
-        s"/transactions/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}",
+        s"/transactions/details/${dummyTx.id.toHexString}",
+        s"/transactions/details/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}",
         chainIndex,
         server.port
       ) { response =>
@@ -462,8 +462,8 @@ abstract class RestServerSpec(
 
       val txId = TransactionId.generate.toHexString
       verifyResponseWithNodes(
-        s"/transactions/$txId",
-        s"/transactions/$txId?fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
+        s"/transactions/details/$txId",
+        s"/transactions/details/$txId?fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
         chainIndex,
         server.port
       ) { response =>

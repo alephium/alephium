@@ -365,6 +365,7 @@ trait Endpoints
   lazy val getTransaction
       : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), Transaction] =
     transactionsEndpoint.get
+      .in("details")
       .in(path[TransactionId]("txId"))
       .in(query[Option[GroupIndex]]("fromGroup"))
       .in(query[Option[GroupIndex]]("toGroup"))

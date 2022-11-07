@@ -583,7 +583,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
   def getTransaction(txId: TransactionId) = {
-    httpGet(s"/transactions/${txId.toHexString}")
+    httpGet(s"/transactions/details/${txId.toHexString}")
   }
 
   def compileScript(code: String) = {
