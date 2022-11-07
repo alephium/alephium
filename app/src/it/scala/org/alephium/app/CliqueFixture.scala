@@ -194,6 +194,15 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     confirmed.toGroupConfirmations > 1 is true
   }
 
+  def getTransaction(txId: TransactionId, restPort: Int): Assertion = eventually {
+    val tx = request[Transaction](getTransaction(txId), restPort)
+    tx.unsigned.txId is txId
+  }
+
+  def txNotFound(txId: TransactionId, restPort: Int): Assertion = {
+    requestFailed(getTransaction(txId), restPort, StatusCode.NotFound)
+  }
+
   def transferFromWallet(toAddress: String, amount: U256, restPort: Int): TransferResult =
     eventually {
       val walletName = "wallet-name"
@@ -572,6 +581,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpGet(
       s"/transactions/status?txId=${tx.txId.toHexString}&fromGroup=${tx.fromGroup.value}&toGroup=${tx.toGroup.value}"
     )
+  }
+  def getTransaction(txId: TransactionId) = {
+    httpGet(s"/transactions/details/${txId.toHexString}")
   }
 
   def compileScript(code: String) = {

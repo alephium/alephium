@@ -43,7 +43,7 @@ import org.alephium.flow.network.broker.MisbehaviorManager.Peers
 import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{Transaction => _, _}
 import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.serde._
 import org.alephium.util._
@@ -494,6 +494,15 @@ trait EndpointsLogic extends Endpoints {
       }
     )
   }
+
+  val getTransactionLogic = serverLogicRedirect(getTransaction)(
+    { case (txId, fromGroup, toGroup) =>
+      Future.successful(serverUtils.getTransaction(blockFlow, txId, fromGroup, toGroup))
+    },
+    { case (_, fromGroup, _) =>
+      getGroupIndex(fromGroup)
+    }
+  )
 
   val minerActionLogic = serverLogic(minerAction) { action =>
     withSyncedClique {
