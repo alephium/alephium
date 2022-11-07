@@ -542,6 +542,36 @@
     "returns": "@returns the number of transaction inputs"
   },
   {
+    "name": "txGasPrice",
+    "category": "Chain",
+    "signature": "fn txGasPrice!() -> (U256)",
+    "doc": "Returns the current transaction gas price.",
+    "params": [
+      
+    ],
+    "returns": "@returns the current transaction gas price"
+  },
+  {
+    "name": "txGasAmount",
+    "category": "Chain",
+    "signature": "fn txGasAmount!() -> (U256)",
+    "doc": "Returns the current transaction gas amount.",
+    "params": [
+      
+    ],
+    "returns": "@returns the current transaction gas amount"
+  },
+  {
+    "name": "txGasFee",
+    "category": "Chain",
+    "signature": "fn txGasFee!() -> (U256)",
+    "doc": "Returns the current transaction gas fee.",
+    "params": [
+      
+    ],
+    "returns": "@returns the current transaction gas fee"
+  },
+  {
     "name": "verifyAbsoluteLocktime",
     "category": "Chain",
     "signature": "fn verifyAbsoluteLocktime!(lockUntil:U256) -> ()",
