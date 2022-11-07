@@ -19,19 +19,21 @@ package org.alephium.api.model
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 import org.alephium.protocol.Hash
+import org.alephium.protocol.model.ReleaseVersion
 import org.alephium.protocol.vm.StatefulContext
 import org.alephium.protocol.vm.lang.{Ast, CompiledContract, CompiledScript}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, DiffMatchPatch, Hex}
 
 final case class CompileScriptResult(
+    version: String,
     name: String,
     bytecodeTemplate: String,
     bytecodeDebugPatch: CompileProjectResult.Patch,
     fields: CompileResult.FieldsSig,
     functions: AVector[CompileResult.FunctionSig],
     warnings: AVector[String]
-)
+) extends CompileResult.Versioned
 
 object CompileScriptResult {
   def from(compiled: CompiledScript): CompileScriptResult = {
@@ -44,6 +46,7 @@ object CompileScriptResult {
       scriptAst.getTemplateVarsMutability()
     )
     CompileScriptResult(
+      ReleaseVersion.current.toString(),
       scriptAst.name,
       bytecodeTemplate,
       CompileProjectResult.diffPatch(bytecodeTemplate, bytecodeDebugTemplate),
@@ -55,6 +58,7 @@ object CompileScriptResult {
 }
 
 final case class CompileContractResult(
+    version: String,
     name: String,
     bytecode: String,
     bytecodeDebugPatch: CompileProjectResult.Patch,
@@ -64,7 +68,7 @@ final case class CompileContractResult(
     functions: AVector[CompileResult.FunctionSig],
     events: AVector[CompileResult.EventSig],
     warnings: AVector[String]
-)
+) extends CompileResult.Versioned
 
 object CompileContractResult {
   def from(compiled: CompiledContract): CompileContractResult = {
@@ -78,6 +82,7 @@ object CompileContractResult {
       contractAst.getFieldMutability()
     )
     CompileContractResult(
+      ReleaseVersion.current.toString(),
       contractAst.name,
       bytecode,
       CompileProjectResult.diffPatch(bytecode, debugBytecode),
@@ -146,6 +151,9 @@ object CompileProjectResult {
 }
 
 object CompileResult {
+  trait Versioned {
+    def version: String
+  }
 
   final case class FieldsSig(
       names: AVector[String],

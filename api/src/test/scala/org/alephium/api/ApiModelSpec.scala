@@ -916,49 +916,51 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode CompilerResult" in new TypeSignatureFixture {
     val result0 = CompileContractResult.from(compiledContract)
     val jsonRaw0 =
-      """
-        |{
-        |  "name": "Foo",
-        |  "bytecode": "0701402901010707061005a000a001a003a00461b413c40de0b6b3a7640000a916011602160316041605160602",
-        |  "bytecodeDebugPatch": "=7-1+e=11-1+1=20+7e01027878=50",
-        |  "codeHash": "eff62a4b2d4d4936a84e360c916a398d80d5000497ccd4afbd80bfe254d62096",
-        |  "codeHashDebug":"f3070fa7f7893529d5dfdd647aa7a0facb637f2339097dea543c3a6c7716b670",
-        |  "fields": {
-        |    "names": ["aa","bb","cc","dd","ee","ff"],
-        |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
-        |    "isMutable": [false, true, false, true, false, false]
-        |  },
-        |  "functions": [
-        |    {
-        |      "name": "bar",
-        |      "usePreapprovedAssets": true,
-        |      "useAssetsInContract": true,
-        |      "isPublic": true,
-        |      "paramNames": ["a","b","c","d","e","f"],
-        |      "paramTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
-        |      "paramIsMutable": [false, true, false, true, false, false],
-        |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
-        |    }
-        |  ],
-        |  "events": [
-        |    {
-        |      "name": "Bar",
-        |      "fieldNames":["a","b","d","e"],
-        |      "fieldTypes": ["Bool", "U256", "ByteVec", "Address"]
-        |    }
-        |  ],
-        |  "warnings": [
-        |    "Found unused variables in Foo: bar.a",
-        |    "Found unused fields in Foo: cc, ff"
-        |  ]
-        |}
-        |""".stripMargin
+      s"""
+         |{
+         |  "version": "${ReleaseVersion.current}",
+         |  "name": "Foo",
+         |  "bytecode": "0701402901010707061005a000a001a003a00461b413c40de0b6b3a7640000a916011602160316041605160602",
+         |  "bytecodeDebugPatch": "=7-1+e=11-1+1=20+7e01027878=50",
+         |  "codeHash": "eff62a4b2d4d4936a84e360c916a398d80d5000497ccd4afbd80bfe254d62096",
+         |  "codeHashDebug":"f3070fa7f7893529d5dfdd647aa7a0facb637f2339097dea543c3a6c7716b670",
+         |  "fields": {
+         |    "names": ["aa","bb","cc","dd","ee","ff"],
+         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
+         |    "isMutable": [false, true, false, true, false, false]
+         |  },
+         |  "functions": [
+         |    {
+         |      "name": "bar",
+         |      "usePreapprovedAssets": true,
+         |      "useAssetsInContract": true,
+         |      "isPublic": true,
+         |      "paramNames": ["a","b","c","d","e","f"],
+         |      "paramTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
+         |      "paramIsMutable": [false, true, false, true, false, false],
+         |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
+         |    }
+         |  ],
+         |  "events": [
+         |    {
+         |      "name": "Bar",
+         |      "fieldNames":["a","b","d","e"],
+         |      "fieldTypes": ["Bool", "U256", "ByteVec", "Address"]
+         |    }
+         |  ],
+         |  "warnings": [
+         |    "Found unused variables in Foo: bar.a",
+         |    "Found unused fields in Foo: cc, ff"
+         |  ]
+         |}
+         |""".stripMargin
     write(result0).filter(!_.isWhitespace) is jsonRaw0.filter(!_.isWhitespace)
 
     val result1 = CompileScriptResult.from(compiledScript)
     val jsonRaw1 =
-      """
+      s"""
         |{
+        |  "version": "${ReleaseVersion.current}",
         |  "name": "Foo",
         |  "bytecodeTemplate": "020103000000010201000707060716011602160316041605160602",
         |  "bytecodeDebugPatch": "=27+8=1+e01027878=26",
