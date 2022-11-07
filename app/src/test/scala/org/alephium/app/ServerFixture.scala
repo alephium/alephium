@@ -366,6 +366,28 @@ object ServerFixture {
       }
     }
 
+    override def getTransaction(
+        txId: TransactionId,
+        chainIndex: ChainIndex
+    ): Either[String, Option[Transaction]] = {
+      if (brokerConfig.chainIndexes.contains(chainIndex) && txId == dummyTx.id) {
+        Right(Some(dummyTx))
+      } else {
+        Right(None)
+      }
+    }
+
+    override def searchTransaction(
+        txId: TransactionId,
+        chainIndexes: AVector[ChainIndex]
+    ): Either[String, Option[Transaction]] = {
+      if (chainIndexes.exists(brokerConfig.chainIndexes.contains) && txId == dummyTx.id) {
+        Right(Some(dummyTx))
+      } else {
+        Right(None)
+      }
+    }
+
     override def getEvents(
         contractId: ContractId,
         start: Int,

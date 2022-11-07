@@ -43,7 +43,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash}
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{Transaction => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.serialize
@@ -420,6 +420,55 @@ abstract class RestServerSpec(
           response.code is StatusCode.Ok
           status is dummyTxStatus
         }
+      }
+    }
+  }
+
+  it should "call GET /transactions/tx-id" in {
+    servers.foreach { server =>
+      val chainIndex = server.brokerConfig.chainIndexes.head
+      verifyResponseWithNodes(
+        s"/transactions/${dummyTx.id.toHexString}",
+        s"/transactions/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
+        chainIndex,
+        server.port
+      ) { response =>
+        val tx = response.as[Transaction]
+        response.code is StatusCode.Ok
+        tx is Transaction.fromProtocol(dummyTx)
+      }
+
+      verifyResponseWithNodes(
+        s"/transactions/${dummyTx.id.toHexString}?toGroup=${chainIndex.to.value}",
+        s"/transactions/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      ) { response =>
+        val tx = response.as[Transaction]
+        response.code is StatusCode.Ok
+        tx is Transaction.fromProtocol(dummyTx)
+      }
+
+      verifyResponseWithNodes(
+        s"/transactions/${dummyTx.id.toHexString}",
+        s"/transactions/${dummyTx.id.toHexString}?fromGroup=${chainIndex.from.value}",
+        chainIndex,
+        server.port
+      ) { response =>
+        val tx = response.as[Transaction]
+        response.code is StatusCode.Ok
+        tx is Transaction.fromProtocol(dummyTx)
+      }
+
+      val txId = TransactionId.generate.toHexString
+      verifyResponseWithNodes(
+        s"/transactions/$txId",
+        s"/transactions/$txId?fromGroup=${chainIndex.from.value}&toGroup=${chainIndex.to.value}",
+        chainIndex,
+        server.port
+      ) { response =>
+        response.code is StatusCode.NotFound
+        response.body.leftValue is s"""{"resource":"Transaction $txId","detail":"Transaction $txId not found"}"""
       }
     }
   }
