@@ -959,45 +959,45 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val result1 = CompileScriptResult.from(compiledScript)
     val jsonRaw1 =
       s"""
-        |{
-        |  "version": "${ReleaseVersion.current}",
-        |  "name": "Foo",
-        |  "bytecodeTemplate": "020103000000010201000707060716011602160316041605160602",
-        |  "bytecodeDebugPatch": "=27+8=1+e01027878=26",
-        |  "fields": {
-        |    "names": ["aa","bb","cc","dd","ee"],
-        |    "types": ["Bool", "U256", "I256", "ByteVec", "Address"],
-        |    "isMutable": [false, false, false, false, false]
-        |  },
-        |  "functions": [
-        |    {
-        |      "name": "main",
-        |      "usePreapprovedAssets": true,
-        |      "useAssetsInContract": false,
-        |      "isPublic": true,
-        |      "paramNames": [],
-        |      "paramTypes": [],
-        |      "paramIsMutable": [],
-        |      "returnTypes": []
-        |    },
-        |    {
-        |      "name": "bar",
-        |      "usePreapprovedAssets": false,
-        |      "useAssetsInContract": false,
-        |      "isPublic": true,
-        |      "paramNames": ["a","b","c","d","e","f"],
-        |      "paramTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
-        |      "paramIsMutable": [false, true, false, true, false, false],
-        |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
-        |    }
-        |  ],
-        |  "warnings": [
-        |    "Found unused variables in Foo: bar.a",
-        |    "Found unused fields in Foo: aa, bb, cc, dd, ee",
-        |    "Function Foo.bar is readonly, please use @using(readonly = true) for the function"
-        |  ]
-        |}
-        |""".stripMargin
+         |{
+         |  "version": "${ReleaseVersion.current}",
+         |  "name": "Foo",
+         |  "bytecodeTemplate": "020103000000010201000707060716011602160316041605160602",
+         |  "bytecodeDebugPatch": "=27+8=1+e01027878=26",
+         |  "fields": {
+         |    "names": ["aa","bb","cc","dd","ee"],
+         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address"],
+         |    "isMutable": [false, false, false, false, false]
+         |  },
+         |  "functions": [
+         |    {
+         |      "name": "main",
+         |      "usePreapprovedAssets": true,
+         |      "useAssetsInContract": false,
+         |      "isPublic": true,
+         |      "paramNames": [],
+         |      "paramTypes": [],
+         |      "paramIsMutable": [],
+         |      "returnTypes": []
+         |    },
+         |    {
+         |      "name": "bar",
+         |      "usePreapprovedAssets": false,
+         |      "useAssetsInContract": false,
+         |      "isPublic": true,
+         |      "paramNames": ["a","b","c","d","e","f"],
+         |      "paramTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
+         |      "paramIsMutable": [false, true, false, true, false, false],
+         |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
+         |    }
+         |  ],
+         |  "warnings": [
+         |    "Found unused variables in Foo: bar.a",
+         |    "Found unused fields in Foo: aa, bb, cc, dd, ee",
+         |    "Function Foo.bar is readonly, please use @using(readonly = true) for the function"
+         |  ]
+         |}
+         |""".stripMargin
     write(result1).filter(!_.isWhitespace) is jsonRaw1.filter(!_.isWhitespace)
 
     val result2 = CompileProjectResult(AVector(result0), AVector(result1))
