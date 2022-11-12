@@ -21,9 +21,8 @@ import org.scalacheck.Gen
 
 import org.alephium.protocol._
 import org.alephium.protocol.config.NetworkConfigFixture
-import org.alephium.protocol.model.{ContractId, TokenId}
+import org.alephium.protocol.model.{TokenId}
 import org.alephium.protocol.vm._
-import org.alephium.ralph.Compiler
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
@@ -222,23 +221,51 @@ class TransactionSpec
     {
       info("multiple contract inputs and generated outputs")
 
-      val address1 = Address.p2pkh(pubKey1).toBase58
-      val address2 = Address.p2pkh(pubKey2).toBase58
       val tokenId =
         TokenId.from(hex"342f94b2e48e687a3f985ac55658bcdddace8891919fc08d58b0db2255ca3822").value
-
-      val script =
-        s"""
-           |@using(preapprovedAssets = true, assetsInContract = true)
-           |TxScript Main {
-           |  verifyTxSignature!(#${pubKey1.toHexString})
-           |  transferAlphFromSelf!(@$address1, 1)
-           |  transferTokenToSelf!(@$address1, #${tokenId.toHexString}, 42)
-           |
-           |  verifyTxSignature!(#${pubKey2.toHexString})
-           |  transferAlphFromSelf!(@$address2, 5)
-           |}
-           |""".stripMargin
+//      val address1 = Address.p2pkh(pubKey1).toBase58
+//      val address2 = Address.p2pkh(pubKey2).toBase58
+//      val script =
+//        s"""
+//           |@using(preapprovedAssets = true, assetsInContract = true)
+//           |TxScript Main {
+//           |  verifyTxSignature!(#${pubKey1.toHexString})
+//           |  transferAlphFromSelf!(@$address1, 1)
+//           |  transferTokenToSelf!(@$address1, #${tokenId.toHexString}, 42)
+//           |
+//           |  verifyTxSignature!(#${pubKey2.toHexString})
+//           |  transferAlphFromSelf!(@$address2, 5)
+//           |}
+//           |""".stripMargin
+      // Compiled from the script above
+      val script = StatefulScript.unsafe(
+        AVector(
+          Method(
+            isPublic = true,
+            usePreapprovedAssets = true,
+            useContractAssets = true,
+            argsLength = 0,
+            localsLength = 0,
+            returnLength = 0,
+            instrs = AVector(
+              BytesConst(vm.Val.ByteVec(pubKey1.bytes)),
+              VerifyTxSignature,
+              AddressConst(vm.Val.Address(LockupScript.p2pkh(pubKey1))),
+              vm.U256Const1,
+              vm.TransferAlphFromSelf,
+              AddressConst(vm.Val.Address(LockupScript.p2pkh(pubKey1))),
+              BytesConst(vm.Val.ByteVec(tokenId.bytes)),
+              U256Const(vm.Val.U256(42)),
+              vm.TransferTokenToSelf,
+              BytesConst(vm.Val.ByteVec(pubKey2.bytes)),
+              VerifyTxSignature,
+              AddressConst(vm.Val.Address(LockupScript.p2pkh(pubKey2))),
+              vm.U256Const5,
+              vm.TransferAlphFromSelf
+            )
+          )
+        )
+      )
 
       val tx = {
         val unsignedTx = unsignedTransaction(
@@ -345,21 +372,42 @@ class TransactionSpec
     {
       info("with p2sh and p2mpkh transaction inputs")
 
-      val script = {
-        val raw =
-          s"""
-             |// comment
-             |AssetScript P2sh {
-             |  pub fn main(pubKey1: ByteVec, pubKey2: ByteVec) -> () {
-             |    verifyAbsoluteLocktime!(1630879601000)
-             |    verifyTxSignature!(pubKey1)
-             |    verifyTxSignature!(pubKey2)
-             |  }
-             |}
-             |""".stripMargin
-
-        Compiler.compileAssetScript(raw).rightValue._1
-      }
+//      val script = {
+//        val raw =
+//          s"""
+//             |// comment
+//             |AssetScript P2sh {
+//             |  pub fn main(pubKey1: ByteVec, pubKey2: ByteVec) -> () {
+//             |    verifyAbsoluteLocktime!(1630879601000)
+//             |    verifyTxSignature!(pubKey1)
+//             |    verifyTxSignature!(pubKey2)
+//             |  }
+//             |}
+//             |""".stripMargin
+//
+//        Compiler.compileAssetScript(raw).rightValue._1
+//      }
+      // Compiled from the script above
+      val script = StatelessScript.unsafe(
+        AVector(
+          Method(
+            isPublic = true,
+            usePreapprovedAssets = false,
+            useContractAssets = false,
+            argsLength = 2,
+            localsLength = 2,
+            returnLength = 0,
+            instrs = AVector(
+              U256Const(vm.Val.U256(1630879601000L)),
+              vm.VerifyAbsoluteLocktime,
+              LoadLocal(0),
+              VerifyTxSignature,
+              LoadLocal(1),
+              VerifyTxSignature
+            )
+          )
+        )
+      )
 
       val unsignedTx = UnsignedTransaction(
         DefaultTxVersion,
@@ -407,19 +455,39 @@ class TransactionSpec
       val contractLockupScript = LockupScript.P2C(
         ContractId.from(hex"0fa5e21a53aef6019606167b3aad9acca7bce6fd6a868642509b8c3dc7e27113").value
       )
-      val contractAddress = Address.Contract(contractLockupScript).toBase58
-      val script = {
-        val raw =
-          s"""
-             |@using(preapprovedAssets = true, assetsInContract = true)
-             |TxScript Main {
-             |  verifyTxSignature!(#${pubKey1.toHexString})
-             |  transferAlphFromSelf!(@$contractAddress, 1000)
-             |}
-             |""".stripMargin
-
-        Compiler.compileTxScript(raw).rightValue
-      }
+//      val contractAddress = Address.Contract(contractLockupScript).toBase58
+//      val script = {
+//        val raw =
+//          s"""
+//             |@using(preapprovedAssets = true, assetsInContract = true)
+//             |TxScript Main {
+//             |  verifyTxSignature!(#${pubKey1.toHexString})
+//             |  transferAlphFromSelf!(@$contractAddress, 1000)
+//             |}
+//             |""".stripMargin
+//
+//        Compiler.compileTxScript(raw).rightValue
+//      }
+      // Compiled from the script above
+      val script = StatefulScript.unsafe(
+        AVector(
+          Method(
+            isPublic = true,
+            usePreapprovedAssets = true,
+            useContractAssets = true,
+            argsLength = 0,
+            localsLength = 0,
+            returnLength = 0,
+            instrs = AVector(
+              BytesConst(vm.Val.ByteVec(pubKey1.bytes)),
+              VerifyTxSignature,
+              AddressConst(vm.Val.Address(contractLockupScript)),
+              U256Const(vm.Val.U256(1000)),
+              vm.TransferAlphFromSelf
+            )
+          )
+        )
+      )
 
       val unsignedTx = UnsignedTransaction(
         DefaultTxVersion,

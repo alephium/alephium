@@ -29,7 +29,6 @@ import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}
-import org.alephium.ralph.Compiler
 import org.alephium.util._
 
 trait LockupScriptGenerators extends Generators {
@@ -287,16 +286,30 @@ trait TxGenerators
   }
 
   lazy val counterContract: StatefulContract = {
-    val input =
-      s"""
-         |Contract Foo(mut x: U256) {
-         |  fn add() -> () {
-         |    x = x + 1
-         |    return
-         |  }
-         |}
-         |""".stripMargin
-    Compiler.compileContract(input).toOption.get
+//    val input =
+//      s"""
+//         |Contract Foo(mut x: U256) {
+//         |  fn add() -> () {
+//         |    x = x + 1
+//         |    return
+//         |  }
+//         |}
+//         |""".stripMargin
+    // Compiled from above script
+    StatefulContract(
+      1,
+      AVector(
+        vm.Method(
+          isPublic = false,
+          usePreapprovedAssets = false,
+          useContractAssets = false,
+          argsLength = 0,
+          localsLength = 0,
+          returnLength = 0,
+          instrs = AVector(vm.LoadField(0), vm.U256Const1, vm.U256Add, vm.StoreField(0), vm.Return)
+        )
+      )
+    )
   }
 
   lazy val assetOutputGen: Gen[AssetOutput] = for {
