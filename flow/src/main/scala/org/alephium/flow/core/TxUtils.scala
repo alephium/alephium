@@ -433,24 +433,7 @@ trait TxUtils { Self: FlowUtils =>
       txId: TransactionId,
       chainIndexes: AVector[ChainIndex]
   ): Either[String, Option[TxStatus]] = {
-    @tailrec
-    def rec(
-        indexes: AVector[ChainIndex],
-        currentRes: Either[String, Option[TxStatus]]
-    ): Either[String, Option[TxStatus]] = {
-      indexes.headOption match {
-        case Some(index) =>
-          val res = getTransactionStatus(txId, index)
-          res match {
-            case Right(None) => rec(indexes.tail, res)
-            case Right(_)    => res
-            case Left(_)     => res
-          }
-        case None =>
-          currentRes
-      }
-    }
-    rec(chainIndexes, Right(None))
+    searchByIndexes(txId, chainIndexes, getTransactionStatus)
   }
 
   def getTransactionStatus(
@@ -470,6 +453,50 @@ trait TxUtils { Self: FlowUtils =>
     } else {
       Right(None)
     }
+  }
+
+  private def searchByIndexes[T](
+      txId: TransactionId,
+      chainIndexes: AVector[ChainIndex],
+      getFromLocal: (TransactionId, ChainIndex) => Either[String, Option[T]]
+  ): Either[String, Option[T]] = {
+    @tailrec
+    def rec(
+        indexes: AVector[ChainIndex],
+        currentRes: Either[String, Option[T]]
+    ): Either[String, Option[T]] = {
+      indexes.headOption match {
+        case Some(index) =>
+          val res = getFromLocal(txId, index)
+          res match {
+            case Right(None) => rec(indexes.tail, res)
+            case Right(_)    => res
+            case Left(_)     => res
+          }
+        case None =>
+          currentRes
+      }
+    }
+    rec(chainIndexes, Right(None))
+  }
+
+  def getTransaction(
+      txId: TransactionId,
+      chainIndex: ChainIndex
+  ): Either[String, Option[Transaction]] = {
+    if (brokerConfig.contains(chainIndex.from)) {
+      val chain = Self.blockFlow.getBlockChain(chainIndex)
+      chain.getTransaction(txId).left.map(_.toString)
+    } else {
+      Right(None)
+    }
+  }
+
+  def searchTransaction(
+      txId: TransactionId,
+      chainIndexes: AVector[ChainIndex]
+  ): Either[String, Option[Transaction]] = {
+    searchByIndexes(txId, chainIndexes, getTransaction)
   }
 
   def isInMemPool(txId: TransactionId, chainIndex: ChainIndex): Boolean = {

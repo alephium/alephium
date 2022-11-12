@@ -23,7 +23,7 @@ import org.alephium.protocol.Signature
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.TokenIssuance
-import org.alephium.util.{discard, AVector, TimeStamp, U256}
+import org.alephium.util.{discard, AVector, EitherF, TimeStamp, U256}
 
 final case class BlockEnv(
     networkId: NetworkId,
@@ -58,6 +58,8 @@ sealed trait TxEnv {
   def signatures: Stack[Signature]
   def prevOutputs: AVector[AssetOutput]
   def fixedOutputs: AVector[AssetOutput]
+  def gasPrice: GasPrice
+  def gasAmount: GasBox
   def gasFeeUnsafe: U256
 
   def isEntryMethodPayable: Boolean
@@ -75,10 +77,20 @@ object TxEnv {
       signatures: Stack[Signature],
       prevOutputs: AVector[AssetOutput],
       fixedOutputs: AVector[AssetOutput],
-      gasFeeUnsafe: U256,
+      gasPrice: GasPrice,
+      gasAmount: GasBox,
       isEntryMethodPayable: Boolean
   ): TxEnv =
-    Mockup(txId, signatures, prevOutputs, fixedOutputs, gasFeeUnsafe, isEntryMethodPayable)
+    Mockup(
+      txId,
+      signatures,
+      prevOutputs,
+      fixedOutputs,
+      gasPrice,
+      gasAmount,
+      gasPrice * gasAmount,
+      isEntryMethodPayable
+    )
 
   final case class Default(
       tx: TransactionAbstract,
@@ -87,6 +99,8 @@ object TxEnv {
   ) extends TxEnv {
     def txId: TransactionId                = tx.id
     def fixedOutputs: AVector[AssetOutput] = tx.unsigned.fixedOutputs
+    def gasPrice: GasPrice                 = tx.unsigned.gasPrice
+    def gasAmount: GasBox                  = tx.unsigned.gasAmount
     def gasFeeUnsafe: U256                 = tx.gasFeeUnsafe
     def isEntryMethodPayable: Boolean      = tx.isEntryMethodPayable
   }
@@ -96,6 +110,8 @@ object TxEnv {
       signatures: Stack[Signature],
       prevOutputs: AVector[AssetOutput],
       fixedOutputs: AVector[AssetOutput],
+      gasPrice: GasPrice,
+      gasAmount: GasBox,
       gasFeeUnsafe: U256,
       isEntryMethodPayable: Boolean
   ) extends TxEnv
@@ -224,22 +240,86 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def nextContractOutputRef(output: ContractOutput): ContractOutputRef =
     ContractOutputRef.from(txId, output, nextOutputIndex)
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def generateOutput(output: TxOutput): ExeResult[Unit] = {
     output match {
       case contractOutput @ ContractOutput(_, LockupScript.P2C(contractId), _) =>
-        val outputRef = nextContractOutputRef(contractOutput)
-        for {
-          _ <- chargeGeneratedOutput()
-          _ <- updateContractAsset(contractId, outputRef, contractOutput)
-        } yield {
-          generatedOutputs.addOne(output)
-          ()
+        if (getHardFork().isLemanEnabled()) {
+          generateContractOutputLeman(contractId, contractOutput)
+        } else {
+          generateContractOutputSimple(contractId, contractOutput)
         }
-      case _ =>
-        generatedOutputs.addOne(output)
-        chargeGeneratedOutput()
+      case assetOutput: AssetOutput =>
+        if (getHardFork().isLemanEnabled()) {
+          generateAssetOutputLeman(assetOutput)
+        } else {
+          generateAssetOutputSimple(assetOutput)
+        }
     }
+  }
+
+  def generateContractOutputLeman(
+      contractId: ContractId,
+      contractOutput: ContractOutput
+  ): ExeResult[Unit] = {
+    val inputIndex = contractInputs.indexWhere(_._2.lockupScript.contractId == contractId)
+    if (inputIndex == -1) {
+      failed(ContractAssetUnloaded)
+    } else {
+      val (_, input) = contractInputs(inputIndex)
+      if (contractOutput == input) {
+        contractInputs.remove(inputIndex)
+        for {
+          _ <- markAssetFlushed(contractId)
+        } yield ()
+      } else {
+        generateContractOutputSimple(contractId, contractOutput)
+      }
+    }
+  }
+
+  def generateContractOutputSimple(
+      contractId: ContractId,
+      contractOutput: ContractOutput
+  ): ExeResult[Unit] = {
+    val outputRef = nextContractOutputRef(contractOutput)
+    for {
+      _ <- chargeGeneratedOutput()
+      _ <- updateContractAsset(contractId, outputRef, contractOutput)
+    } yield {
+      generatedOutputs.addOne(contractOutput)
+      ()
+    }
+  }
+
+  def generateAssetOutputLeman(assetOutput: AssetOutput): ExeResult[Unit] = {
+    if (assetOutput.tokens.length <= maxTokenPerUtxo) {
+      generateAssetOutputSimple(assetOutput)
+    } else {
+      val tokenLength       = assetOutput.tokens.length
+      val outputNum         = (tokenLength - 1) / maxTokenPerUtxo + 1
+      val alphAmountAverage = assetOutput.amount.divUnsafe(U256.unsafe(outputNum))
+      EitherF.foreachTry(0 until outputNum) { k =>
+        val tokenIndexStart = maxTokenPerUtxo * k
+        val newOutput = if (k < outputNum - 1) {
+          assetOutput.copy(
+            amount = alphAmountAverage,
+            tokens = assetOutput.tokens.slice(tokenIndexStart, tokenIndexStart + maxTokenPerUtxo)
+          )
+        } else {
+          assetOutput.copy(
+            amount =
+              alphAmountAverage.addUnsafe(assetOutput.amount.modUnsafe(U256.unsafe(outputNum))),
+            tokens = assetOutput.tokens.slice(tokenIndexStart, tokenLength)
+          )
+        }
+        generateAssetOutputSimple(newOutput)
+      }
+    }
+  }
+
+  def generateAssetOutputSimple(assetOutput: AssetOutput): ExeResult[Unit] = {
+    generatedOutputs.addOne(assetOutput)
+    chargeGeneratedOutput()
   }
 
   def contractExists(contractId: ContractId): ExeResult[Boolean] = {

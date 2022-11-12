@@ -32,7 +32,7 @@ import org.alephium.api.model._
 import org.alephium.json.Json.ReadWriter
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model._
+import org.alephium.protocol.model.{Transaction => _, _}
 import org.alephium.util.{AVector, TimeStamp}
 
 //scalastyle:off file.size.limit
@@ -361,6 +361,16 @@ trait Endpoints
       .in(jsonBody[DecodeUnsignedTx])
       .out(jsonBody[DecodeUnsignedTxResult])
       .summary("Decode an unsigned transaction")
+
+  lazy val getTransaction
+      : BaseEndpoint[(TransactionId, Option[GroupIndex], Option[GroupIndex]), Transaction] =
+    transactionsEndpoint.get
+      .in("details")
+      .in(path[TransactionId]("txId"))
+      .in(query[Option[GroupIndex]]("fromGroup"))
+      .in(query[Option[GroupIndex]]("toGroup"))
+      .out(jsonBody[Transaction])
+      .summary("Get transaction details")
 
   val minerAction: BaseEndpoint[MinerAction, Boolean] =
     minersEndpoint.post

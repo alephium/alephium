@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jre
+FROM adoptopenjdk:11-jre
 
 ARG RELEASE=0.0.0
 

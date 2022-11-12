@@ -24,7 +24,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.alephium.api._
 import org.alephium.api.ApiError
 import org.alephium.api.model
-import org.alephium.api.model.{AssetOutput => _, TransactionTemplate => _, _}
+import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
 import org.alephium.flow.core.UtxoSelectionAlgo._
@@ -451,6 +451,27 @@ class ServerUtils(implicit
       chainIndexes: AVector[ChainIndex]
   ): Try[TxStatus] = {
     blockFlow.searchLocalTransactionStatus(txId, chainIndexes).left.map(failed).map(convert)
+  }
+
+  def getTransaction(
+      blockFlow: BlockFlow,
+      txId: TransactionId,
+      fromGroup: Option[GroupIndex],
+      toGroup: Option[GroupIndex]
+  ): Try[model.Transaction] = {
+    val result = (fromGroup, toGroup) match {
+      case (Some(from), Some(to)) =>
+        blockFlow.getTransaction(txId, ChainIndex(from, to)).left.map(failed)
+      case _ =>
+        val chainIndexes = brokerConfig.chainIndexes.filter { chainIndex =>
+          fromGroup.forall(_ == chainIndex.from) && toGroup.forall(_ == chainIndex.to)
+        }
+        blockFlow.searchTransaction(txId, chainIndexes).left.map(failed)
+    }
+    result.flatMap {
+      case Some(tx) => Right(model.Transaction.fromProtocol(tx))
+      case None     => Left(notFound(s"Transaction ${txId.toHexString}"))
+    }
   }
 
   def getChainIndexForTx(
@@ -1091,7 +1112,8 @@ class ServerUtils(implicit
       signatures = Stack.popOnly(AVector.empty[Signature]),
       prevOutputs = inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
-      gasFeeUnsafe = testGasFee,
+      gasPrice = defaultGasPrice,
+      gasAmount = maximalGasPerTx,
       isEntryMethodPayable = true
     )
     val context = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
@@ -1114,7 +1136,22 @@ class ServerUtils(implicit
         )
       )
     )
-    runWithDebugError(context, script)
+    for {
+      _      <- checkArgs(args, method)
+      result <- runWithDebugError(context, script)
+    } yield result
+  }
+
+  def checkArgs(args: AVector[Val], method: Method[StatefulContext]): Try[Unit] = {
+    if (args.sumBy(_.flattenSize()) != method.argsLength) {
+      Left(
+        failed(
+          "The number of parameters is different from the number specified by the target method"
+        )
+      )
+    } else {
+      Right(())
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

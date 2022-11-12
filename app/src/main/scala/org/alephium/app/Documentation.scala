@@ -57,6 +57,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     buildSweepAddressTransactions,
     submitTransaction,
     decodeUnsignedTransaction,
+    getTransaction,
     getTransactionStatus,
     compileScript,
     buildExecuteScriptTx,

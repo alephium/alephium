@@ -22,11 +22,14 @@ import org.alephium.protocol.model
 import org.alephium.protocol.vm
 import org.alephium.util
 
-sealed trait Val
+sealed trait Val {
+  def flattenSize(): Int
+}
 
 object Val {
   sealed trait Primitive extends Val {
     def toVmVal: vm.Val
+    def flattenSize(): Int = 1
   }
 
   def from(value: vm.Val): Val = value match {
@@ -68,4 +71,6 @@ final case class ValAddress(value: model.Address) extends Val.Primitive {
 }
 
 @upickle.implicits.key("Array")
-final case class ValArray(value: util.AVector[Val]) extends Val
+final case class ValArray(value: util.AVector[Val]) extends Val {
+  def flattenSize(): Int = value.sumBy(_.flattenSize())
+}

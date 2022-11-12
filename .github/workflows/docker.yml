@@ -25,5 +25,5 @@ jobs:
         uses: olafurpg/setup-scala@v10
         with:
           java-version: 11
-      - run: sbt app/docker app/dockerPush
+      - run: sbt app/docker
         shell: bash

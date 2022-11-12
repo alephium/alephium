@@ -72,7 +72,7 @@ trait TypeSignatureFixture extends AlephiumFixture {
        |  @using(preapprovedAssets = true, assetsInContract = true, readonly = false)
        |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
        |    emit Bar(aa, bb, dd, ee)
-       |    debug!(`xx`)
+       |    emit Debug(`xx`)
        |    transferAlphToSelf!(callerAddress!(), 1 alph)
        |    return b, c, d, e, f
        |  }
@@ -86,7 +86,7 @@ trait TypeSignatureFixture extends AlephiumFixture {
        |TxScript Foo(aa: Bool, bb: U256, cc: I256, dd: ByteVec, ee: Address) {
        |  return
        |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
-       |    debug!(`xx`)
+       |    emit Debug(`xx`)
        |    return b, c, d, e, f
        |  }
        |}

@@ -25,7 +25,7 @@ import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALPH}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
-import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, TransactionId, Weight}
+import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}
@@ -235,23 +235,35 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
+  def getTransaction(txId: TransactionId): IOResult[Option[Transaction]] = {
+    IOUtils.tryExecute(getCanonicalTxIndex(txId)).flatMap {
+      case Some(index) => getBlock(index.hash).map(block => Some(block.transactions(index.index)))
+      case None        => Right(None)
+    }
+  }
+
   def isTxConfirmed(txId: TransactionId): IOResult[Boolean] = txStorage.exists(txId)
+
+  private def getCanonicalTxIndex(txId: TransactionId): Option[TxIndex] = {
+    txStorage.getOptUnsafe(txId).flatMap { txIndexes =>
+      val canonicalIndex = txIndexes.indexes.filter(index => isCanonicalUnsafe(index.hash))
+      if (canonicalIndex.nonEmpty) {
+        Some(canonicalIndex.head)
+      } else {
+        None
+      }
+    }
+  }
 
   def getTxStatus(txId: TransactionId): IOResult[Option[TxStatus]] =
     IOUtils.tryExecute(getTxStatusUnsafe(txId))
 
   def getTxStatusUnsafe(txId: TransactionId): Option[TxStatus] = {
-    txStorage.getOptUnsafe(txId).flatMap { txIndexes =>
-      val canonicalIndex = txIndexes.indexes.filter(index => isCanonicalUnsafe(index.hash))
-      if (canonicalIndex.nonEmpty) {
-        val selectedIndex      = canonicalIndex.head
-        val selectedHeight     = getHeightUnsafe(selectedIndex.hash)
-        val maxHeight          = maxHeightUnsafe
-        val chainConfirmations = maxHeight - selectedHeight + 1
-        Some(TxStatus(selectedIndex, chainConfirmations))
-      } else {
-        None
-      }
+    getCanonicalTxIndex(txId).flatMap { selectedIndex =>
+      val selectedHeight     = getHeightUnsafe(selectedIndex.hash)
+      val maxHeight          = maxHeightUnsafe
+      val chainConfirmations = maxHeight - selectedHeight + 1
+      Some(TxStatus(selectedIndex, chainConfirmations))
     }
   }
 

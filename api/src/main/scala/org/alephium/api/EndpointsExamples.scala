@@ -545,6 +545,7 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   private val compileScriptResult = CompileScriptResult(
+    version = "v0.0.1",
     name = "Main",
     bytecodeTemplate = hexString,
     bytecodeDebugPatch = CompileProjectResult.Patch("=1-1+ef"),
@@ -571,6 +572,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(compileScriptResult)
 
   private val compileContractResult = CompileContractResult(
+    version = "v0.0.1",
     name = "Foo",
     bytecode = hexString,
     bytecodeDebugPatch = CompileProjectResult.Patch("=1-1+ef"),

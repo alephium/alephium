@@ -112,16 +112,21 @@ trait ContractPool extends CostStrategy {
     }
   }
 
+  def removeOutdatedContractAssets(): ExeResult[Unit] = {
+    EitherF.foreachTry(contractInputs) { input =>
+      worldState.removeAsset(input._1).left.map(e => Left(IOErrorRemoveContractAsset(e)))
+    }
+  }
+
   private def updateState(contractId: ContractId, state: AVector[Val]): ExeResult[Unit] = {
     worldState.updateContractUnsafe(contractId, state).left.map(e => Left(IOErrorUpdateState(e)))
   }
 
-  // note: we don't charge gas here as it's charged by tx input already
   def useContractAssets(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {
     for {
       _ <- chargeContractInput()
       balances <- worldState
-        .useContractAssets(contractId)
+        .loadContractAssets(contractId)
         .map { case (contractOutputRef, contractAsset) =>
           contractInputs.addOne(contractOutputRef -> contractAsset)
           MutBalancesPerLockup.from(contractAsset)

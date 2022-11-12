@@ -179,15 +179,15 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse(s"$${ x + y }", StatelessParser.stringInterpolator(_)).get.value is
       Binop[StatelessContext](Add, Variable(Ident("x")), Variable(Ident("y")))
 
-    fastparse.parse(s"debug!(``)", StatelessParser.debug(_)).get.value is
+    fastparse.parse(s"emit Debug(``)", StatelessParser.debug(_)).get.value is
       Ast.Debug[StatelessContext](AVector(Val.ByteVec(ByteString.empty)), Seq.empty)
-    fastparse.parse(s"debug!(`$${a}`)", StatelessParser.debug(_)).get.value is
+    fastparse.parse(s"emit Debug(`$${a}`)", StatelessParser.debug(_)).get.value is
       Ast.Debug[StatelessContext](
         AVector(Val.ByteVec(ByteString.empty), Val.ByteVec(ByteString.empty)),
         Seq(Variable(Ident("a")))
       )
     fastparse
-      .parse(s"debug!(`Hello, $${a}$${b} $${c} $$$$ $$` !`)", StatelessParser.debug(_))
+      .parse(s"emit Debug(`Hello, $${a}$${b} $${c} $$$$ $$` !`)", StatelessParser.debug(_))
       .get
       .value is
       Ast.Debug[StatelessContext](
@@ -1107,5 +1107,19 @@ class ParserSpec extends AlephiumSpec {
     fastparse.parse(script(""), StatefulParser.txScript(_)).isSuccess is true
     fastparse.parse(script("()"), StatefulParser.txScript(_)).isSuccess is true
     fastparse.parse(script("(x: U256)"), StatefulParser.txScript(_)).isSuccess is true
+  }
+
+  it should "fail to define Debug event" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  event Debug(x: U256)
+         |  pub fn foo() -> () {
+         |    emit Debug(0)
+         |  }
+         |}
+         |""".stripMargin
+    intercept[Compiler.Error](fastparse.parse(code, StatefulParser.contract(_))).message is
+      "Debug is a built-in event name"
   }
 }

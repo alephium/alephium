@@ -81,10 +81,15 @@ class BroadcastTxTest extends AlephiumActorSpec {
     checkTx(tx1, restPort(masterPortClique1), MemPooled)
     checkTx(tx1, restPort(masterPortClique2), TxNotFound)
 
+    txNotFound(tx0.txId, restPort(masterPortClique1))
+    txNotFound(tx1.txId, restPort(masterPortClique1))
+
     clique2.startMining()
 
     confirmTx(tx0, restPort(masterPortClique1))
     confirmTx(tx1, restPort(masterPortClique1))
+    getTransaction(tx0.txId, restPort(masterPortClique1))
+    getTransaction(tx1.txId, restPort(masterPortClique1))
 
     clique2.stopMining()
     clique1.stop()

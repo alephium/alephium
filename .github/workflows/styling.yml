@@ -16,3 +16,4 @@ jobs:
       - run: sbt scalafmtSbtCheck scalafmtCheck test:scalafmtCheck it:scalafmtCheck scalastyle test:scalastyle it:scalastyle doc
       - run: make assembly
       - run: sbt app/docker
+      - run: sbt "tools/runMain org.alephium.tools.BuiltInFunctions" && test -z "$(git status --porcelain)"

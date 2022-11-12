@@ -73,7 +73,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
-      vm.BlockHash, DEBUG(AVector.empty)
+      vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee
     )
     val lemanStatefulInstrs = AVector[LemanInstr[StatefulContext]](
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
@@ -1520,6 +1520,42 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.size is 1
     stack.top.get is Val.ByteVec(tx.id.bytes)
     initialGas.subUnsafe(context.gasRemaining) is TxId.gas()
+  }
+
+  trait GasInstrFixture extends StatelessInstrFixture {
+    val gasPriceGen = Gen
+      .choose[BigInteger](minimalGasPrice.value.v, ALPH.oneAlph.v)
+      .map(v => GasPrice(U256.unsafe(v)))
+    val gasAmountGen = Gen.choose[Int](minimalGas.value, maximalGasPerTx.value).map(GasBox.unsafe)
+    val txEnv = TxEnv.mockup(
+      TransactionId.random,
+      Stack.ofCapacity(0),
+      AVector.empty,
+      AVector.empty,
+      gasPriceGen.sample.get,
+      gasAmountGen.sample.get,
+      isEntryMethodPayable = false
+    )
+
+    override lazy val frame = prepareFrame(AVector.empty, txEnv = Some(txEnv))
+  }
+
+  it should "TxGasPrice" in new GasInstrFixture {
+    runAndCheckGas(TxGasPrice, frame)
+    stack.size is 1
+    stack.top.get is Val.U256(txEnv.gasPrice.value)
+  }
+
+  it should "TxGasAmount" in new GasInstrFixture {
+    runAndCheckGas(TxGasAmount, frame)
+    stack.size is 1
+    stack.top.get is Val.U256(txEnv.gasAmount.toU256)
+  }
+
+  it should "TxGasFee" in new GasInstrFixture {
+    runAndCheckGas(TxGasFee, frame)
+    stack.size is 1
+    stack.top.get is Val.U256(txEnv.gasFeeUnsafe)
   }
 
   trait TxEnvFixture extends StatefulInstrFixture {
@@ -3182,7 +3218,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280,
       ContractIdToAddress -> 5,
       LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2, AssertWithErrorCode -> 3, Swap -> 2,
-      vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0
+      vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0, TxGasPrice -> 2, TxGasAmount -> 2, TxGasFee -> 2
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadField(byte) -> 3, StoreField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -3310,7 +3346,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6 -> 115, Log7 -> 116, Log8 -> 117, Log9 -> 118,
       ContractIdToAddress -> 119,
       LoadLocalByIndex -> 120, StoreLocalByIndex -> 121, Dup -> 122, AssertWithErrorCode -> 123, Swap -> 124,
-      vm.BlockHash -> 125, DEBUG(AVector.empty) -> 126,
+      vm.BlockHash -> 125, DEBUG(AVector.empty) -> 126, TxGasPrice -> 127, TxGasAmount -> 128, TxGasFee -> 129,
       // stateful instructions
       LoadField(byte) -> 160, StoreField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -3368,7 +3404,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
-      vm.BlockHash, DEBUG(AVector.empty)
+      vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadField(byte), StoreField(byte), CallExternal(byte),
