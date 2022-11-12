@@ -19,8 +19,7 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.protocol._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
-import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.util.{AVector, Hex, TimeStamp, U256}
 
 trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenerators {
@@ -38,7 +37,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
 
   def unsignedTransaction(
       publicKey: PublicKey,
-      scriptOpt: Option[String],
+      scriptOpt: Option[StatefulScript],
       outputs: AssetOutput*
   ): UnsignedTransaction = {
     import Hex._
@@ -46,7 +45,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
     UnsignedTransaction(
       DefaultTxVersion,
       networkId,
-      scriptOpt.map(script => Compiler.compileTxScript(script).rightValue),
+      scriptOpt,
       GasBox.unsafe(100000),
       GasPrice(U256.unsafe(1000000000)),
       AVector(

@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.lang
+package org.alephium.ralph
 
 import scala.language.reflectiveCalls
 
 import org.alephium.protocol.model.dustUtxoAmount
 import org.alephium.protocol.vm._
-import org.alephium.protocol.vm.lang.Compiler.{Error, FuncInfo}
+import org.alephium.ralph.Compiler.{Error, FuncInfo}
 import org.alephium.util.AVector
 
 // scalastyle:off file.size.limit
@@ -169,18 +169,18 @@ object BuiltIn {
         )
     }
 
-    private[lang] val cryptography = tag[StatelessContext](Category.Cryptography)
-    private[lang] val chain        = tag[StatelessContext](Category.Chain)
-    private[lang] val conversion   = tag[StatelessContext](Category.Conversion)
-    private[lang] val byteVec      = tag[StatelessContext](Category.ByteVec)
-    private[lang] val asset        = tag[StatefulContext](Category.Asset)
-    private[lang] val contract     = tag[StatefulContext](Category.Contract)
-    private[lang] val subContract  = tag[StatefulContext](Category.SubContract)
+    private[ralph] val cryptography = tag[StatelessContext](Category.Cryptography)
+    private[ralph] val chain        = tag[StatelessContext](Category.Chain)
+    private[ralph] val conversion   = tag[StatelessContext](Category.Conversion)
+    private[ralph] val byteVec      = tag[StatelessContext](Category.ByteVec)
+    private[ralph] val asset        = tag[StatefulContext](Category.Asset)
+    private[ralph] val contract     = tag[StatefulContext](Category.Contract)
+    private[ralph] val subContract  = tag[StatefulContext](Category.SubContract)
 
-    private[lang] val chainSimple    = simpleReturn[StatelessContext](Category.Chain)
-    private[lang] val byteVecSimple  = simpleReturn[StatelessContext](Category.ByteVec)
-    private[lang] val assetSimple    = simpleReturn[StatefulContext](Category.Asset)
-    private[lang] val contractSimple = simpleReturn[StatefulContext](Category.Contract)
+    private[ralph] val chainSimple    = simpleReturn[StatelessContext](Category.Chain)
+    private[ralph] val byteVecSimple  = simpleReturn[StatelessContext](Category.ByteVec)
+    private[ralph] val assetSimple    = simpleReturn[StatefulContext](Category.Asset)
+    private[ralph] val contractSimple = simpleReturn[StatefulContext](Category.Contract)
 
     private[BuiltIn] def utils[Ctx <: StatelessContext]       = tag[Ctx](Category.Utils)
     private[BuiltIn] def utilsSimple[Ctx <: StatelessContext] = simpleReturn[Ctx](Category.Utils)

@@ -32,7 +32,7 @@ import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
-import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize, Serde}
 import org.alephium.util._
 

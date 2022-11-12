@@ -37,6 +37,7 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     json,
     conf,
     protocol,
+    ralph,
     http,
     wallet,
     tools
@@ -108,6 +109,7 @@ lazy val api = project("api")
   .dependsOn(
     json,
     protocol % "test->test;compile->compile",
+    ralph    % "test->test;compile->compile",
     crypto,
     serde,
     util % "test->test;compile->compile"
@@ -274,7 +276,7 @@ lazy val flow = project("flow")
     ),
     publish / skip := true
   )
-  .dependsOn(protocol % "test->test;compile->compile")
+  .dependsOn(protocol % "test->test;compile->compile", ralph % "test->test;compile->compile")
 
 lazy val protocol = project("protocol")
   .enablePlugins(BuildInfoPlugin)
@@ -295,6 +297,9 @@ lazy val protocol = project("protocol")
       fastparse
     )
   )
+
+lazy val ralph = project("ralph")
+  .dependsOn(protocol % "test->test;compile->compile")
 
 lazy val wallet = project("wallet")
   .dependsOn(

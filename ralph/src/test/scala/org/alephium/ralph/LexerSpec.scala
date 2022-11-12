@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.lang
+package org.alephium.ralph
 
 import org.alephium.crypto.Byte32
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.protocol.vm.Val
-import org.alephium.protocol.vm.lang.ArithOperator._
+import org.alephium.ralph.ArithOperator._
 import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
 
 class LexerSpec extends AlephiumSpec {

@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.lang
+package org.alephium.ralph
 
 import akka.util.ByteString
 import fastparse._
 
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
-import org.alephium.protocol.vm.lang.Ast.{Annotation, Argument, FuncId, Statement}
+import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
 
 // scalastyle:off number.of.methods
 @SuppressWarnings(
