@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol._
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
-import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.ralph.Compiler
 import org.alephium.util.{AVector, Hex, TimeStamp, U256}
 
 trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenerators {

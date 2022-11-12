@@ -23,7 +23,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model.{ContractId, TokenId}
 import org.alephium.protocol.vm._
-import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.ralph.Compiler
 import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 

@@ -21,7 +21,7 @@ import scala.jdk.CollectionConverters.IteratorHasAsScala
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.ReleaseVersion
 import org.alephium.protocol.vm.StatefulContext
-import org.alephium.protocol.vm.lang.{Ast, CompiledContract, CompiledScript}
+import org.alephium.ralph.{Ast, CompiledContract, CompiledScript}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, DiffMatchPatch, Hex}
 

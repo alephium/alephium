@@ -36,7 +36,7 @@ import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{failed => _, ContractState => _, Val => _, _}
-import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 

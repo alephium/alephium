@@ -23,7 +23,7 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, UnlockScript, Val}
-import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.ralph.Compiler
 import org.alephium.util._
 
 class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {

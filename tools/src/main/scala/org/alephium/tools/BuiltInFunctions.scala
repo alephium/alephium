@@ -21,7 +21,7 @@ import scala.collection.immutable
 import upickle.default._
 import upickle.default.{macroRW, ReadWriter => RW}
 
-import org.alephium.protocol.vm.lang.BuiltIn
+import org.alephium.ralph.BuiltIn
 
 object BuiltInFunctions extends App {
   val allFunctions: immutable.Iterable[FunctionInfo] = BuiltIn.statefulFuncsSeq.map { case (_, f) =>

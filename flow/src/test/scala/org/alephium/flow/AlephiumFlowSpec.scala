@@ -33,7 +33,7 @@ import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
-import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.ralph.Compiler
 import org.alephium.serde.serialize
 import org.alephium.util._
 

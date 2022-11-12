@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.lang
+package org.alephium.ralph
 
 import scala.collection.mutable
 
 import org.alephium.protocol.vm
-import org.alephium.protocol.vm.lang.Ast._
+import org.alephium.ralph.Ast._
 import org.alephium.util.AVector
 
 object StaticAnalysis {
@@ -137,7 +137,7 @@ object StaticAnalysis {
     }
   }
 
-  private[vm] def checkExternalCallPermissions(
+  private[ralph] def checkExternalCallPermissions(
       contractState: Compiler.State[vm.StatefulContext],
       contract: Contract,
       externalCallCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]

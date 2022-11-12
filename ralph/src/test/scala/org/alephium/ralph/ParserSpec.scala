@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.lang
+package org.alephium.ralph
 
 import akka.util.ByteString
 
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
-import org.alephium.protocol.vm.lang.ArithOperator._
-import org.alephium.protocol.vm.lang.LogicalOperator._
-import org.alephium.protocol.vm.lang.TestOperator._
+import org.alephium.ralph.ArithOperator._
+import org.alephium.ralph.LogicalOperator._
+import org.alephium.ralph.TestOperator._
 import org.alephium.util.{AlephiumSpec, AVector, Hex, I256, U256}
 
 // scalastyle:off file.size.limit

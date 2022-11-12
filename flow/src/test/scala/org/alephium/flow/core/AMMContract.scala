@@ -16,7 +16,7 @@
 
 package org.alephium.flow.core
 
-import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.ralph.Compiler
 
 object AMMContract {
   lazy val swapContract =

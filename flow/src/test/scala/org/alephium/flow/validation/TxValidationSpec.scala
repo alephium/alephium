@@ -31,7 +31,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{InvalidSignature => _, NetworkId => _, _}
-import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.ralph.Compiler
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 // scalastyle:off number.of.methods file.size.limit

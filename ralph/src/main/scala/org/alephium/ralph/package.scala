@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm
+package org.alephium
 
-package object lang {
+package object ralph {
   def quote[T](t: T): String = s"\"${t}\""
 }

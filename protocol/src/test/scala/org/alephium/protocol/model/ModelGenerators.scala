@@ -29,7 +29,7 @@ import org.alephium.protocol._
 import org.alephium.protocol.config._
 import org.alephium.protocol.model.ModelGenerators._
 import org.alephium.protocol.vm.{LockupScript, StatefulContract, UnlockScript, Val}
-import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.ralph.Compiler
 import org.alephium.util._
 
 trait LockupScriptGenerators extends Generators {

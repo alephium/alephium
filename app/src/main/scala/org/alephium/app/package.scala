@@ -19,7 +19,7 @@ package org.alephium
 import scala.concurrent.Future
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.vm.lang.Compiler
+import org.alephium.ralph.Compiler
 
 package object app {
   type FutureTry[T] = Future[Try[T]]

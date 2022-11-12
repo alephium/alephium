@@ -16,7 +16,7 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.vm.lang
+import org.alephium.ralph
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object Compile {
@@ -24,9 +24,9 @@ object Compile {
     def code: String
     def compilerOptions: Option[CompilerOptions]
 
-    def getLangCompilerOptions(): lang.CompilerOptions = {
+    def getLangCompilerOptions(): ralph.CompilerOptions = {
       compilerOptions match {
-        case None          => lang.CompilerOptions.Default
+        case None          => ralph.CompilerOptions.Default
         case Some(options) => options.toLangCompilerOptions()
       }
     }
@@ -50,25 +50,25 @@ final case class CompilerOptions(
     ignoreReadonlyCheckWarnings: Option[Boolean] = None,
     ignoreExternalCallCheckWarnings: Option[Boolean] = None
 ) {
-  def toLangCompilerOptions(): lang.CompilerOptions = {
-    lang.CompilerOptions(
+  def toLangCompilerOptions(): ralph.CompilerOptions = {
+    ralph.CompilerOptions(
       ignoreUnusedConstantsWarnings = ignoreUnusedConstantsWarnings.getOrElse(
-        lang.CompilerOptions.Default.ignoreUnusedConstantsWarnings
+        ralph.CompilerOptions.Default.ignoreUnusedConstantsWarnings
       ),
       ignoreUnusedVariablesWarnings = ignoreUnusedVariablesWarnings.getOrElse(
-        lang.CompilerOptions.Default.ignoreUnusedVariablesWarnings
+        ralph.CompilerOptions.Default.ignoreUnusedVariablesWarnings
       ),
       ignoreUnusedFieldsWarnings = ignoreUnusedFieldsWarnings.getOrElse(
-        lang.CompilerOptions.Default.ignoreUnusedFieldsWarnings
+        ralph.CompilerOptions.Default.ignoreUnusedFieldsWarnings
       ),
       ignoreUnusedPrivateFunctionsWarnings = ignoreUnusedPrivateFunctionsWarnings.getOrElse(
-        lang.CompilerOptions.Default.ignoreUnusedPrivateFunctionsWarnings
+        ralph.CompilerOptions.Default.ignoreUnusedPrivateFunctionsWarnings
       ),
       ignoreReadonlyCheckWarnings = ignoreReadonlyCheckWarnings.getOrElse(
-        lang.CompilerOptions.Default.ignoreReadonlyCheckWarnings
+        ralph.CompilerOptions.Default.ignoreReadonlyCheckWarnings
       ),
       ignoreExternalCallCheckWarnings = ignoreExternalCallCheckWarnings.getOrElse(
-        lang.CompilerOptions.Default.ignoreExternalCallCheckWarnings
+        ralph.CompilerOptions.Default.ignoreExternalCallCheckWarnings
       )
     )
   }

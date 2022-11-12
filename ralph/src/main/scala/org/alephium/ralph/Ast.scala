@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.lang
+package org.alephium.ralph
 
 import scala.collection.mutable
 
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{Contract => VmContract, _}
-import org.alephium.protocol.vm.lang.LogicalOperator.Not
+import org.alephium.ralph.LogicalOperator.Not
 import org.alephium.util.{AVector, I256, U256}
 
 // scalastyle:off number.of.methods number.of.types file.size.limit

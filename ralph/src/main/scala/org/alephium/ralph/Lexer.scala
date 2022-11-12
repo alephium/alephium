@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm.lang
+package org.alephium.ralph
 
 import java.math.{BigDecimal, BigInteger}
 
@@ -27,9 +27,9 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.Address
 import org.alephium.protocol.vm.{LockupScript, StatelessContext, Val}
 import org.alephium.protocol.vm.Val.ByteVec
-import org.alephium.protocol.vm.lang.ArithOperator._
-import org.alephium.protocol.vm.lang.LogicalOperator._
-import org.alephium.protocol.vm.lang.TestOperator._
+import org.alephium.ralph.ArithOperator._
+import org.alephium.ralph.LogicalOperator._
+import org.alephium.ralph.TestOperator._
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -52,7 +52,7 @@ object Lexer {
       Ast.FuncId(id.name, postfix.nonEmpty)
     }
 
-  private[lang] def getSimpleName(obj: Object): String = {
+  private[ralph] def getSimpleName(obj: Object): String = {
     obj.getClass.getSimpleName.dropRight(1)
   }
 
