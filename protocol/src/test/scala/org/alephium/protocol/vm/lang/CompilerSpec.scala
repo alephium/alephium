@@ -3188,19 +3188,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Readonly functions emit events")
+      info("Treat log instructions as readonly")
       val code =
         s"""
            |Contract Foo() {
            |  event E(v: U256)
-           |  @using(readonly = true)
            |  pub fn foo() -> () {
+           |    checkCaller!(true, 0)
            |    emit E(0)
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Readonly function \"Foo.foo\" changes state"
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      warnings is AVector(
+        "Function Foo.foo is readonly, please use @using(readonly = true) for the function"
+      )
     }
 
     {
@@ -3267,13 +3269,84 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  pub fn foo() -> () {}
+           |  pub fn foo() -> () {
+           |    checkCaller!(true, 0)
+           |  }
            |}
            |""".stripMargin
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(
         "Function Foo.foo is readonly, please use @using(readonly = true) for the function"
       )
+    }
+
+    {
+      info(
+        "Warning for public functions which has no external call check and no readonly annotation"
+      )
+      def code(annotation: String, modifier: String): String =
+        s"""
+           |Contract Foo(mut a: U256) {
+           |  $annotation
+           |  $modifier fn foo() -> () {
+           |    a = a + 1
+           |  }
+           |
+           |  pub fn bar() -> () {
+           |    checkCaller!(true, 0)
+           |    foo()
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContractFull(code("", "pub"), 0).rightValue.warnings is AVector(
+        "No readonly annotation for function: Foo.foo, please use @using(readonly = true/false) for the function"
+      )
+      Compiler.compileContractFull(code("", ""), 0).rightValue.warnings.isEmpty is true
+
+      Compiler
+        .compileContractFull(code("@using(externalCallCheck = true)", "pub"), 0)
+        .rightValue
+        .warnings is AVector(
+        "No readonly annotation for function: Foo.foo, please use @using(readonly = true/false) for the function"
+      )
+      Compiler
+        .compileContractFull(code("@using(externalCallCheck = true)", ""), 0)
+        .rightValue
+        .warnings
+        .isEmpty is true
+
+      Compiler
+        .compileContractFull(code("@using(externalCallCheck = true, readonly = false)", "pub"), 0)
+        .rightValue
+        .warnings
+        .isEmpty is true
+      Compiler
+        .compileContractFull(code("@using(externalCallCheck = true, readonly = false)", ""), 0)
+        .rightValue
+        .warnings
+        .isEmpty is true
+    }
+
+    {
+      info("No warning for functions which has external call check")
+      def code(annotation: String): String =
+        s"""
+           |Contract Foo(mut a: U256) {
+           |  $annotation
+           |  pub fn foo() -> () {
+           |    checkCaller!(true, 0)
+           |    a = a + 1
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContractFull(code(""), 0).rightValue.warnings.isEmpty is true
+
+      Compiler
+        .compileContractFull(code("@using(readonly = false)"), 0)
+        .rightValue
+        .warnings
+        .isEmpty is true
     }
   }
 

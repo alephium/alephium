@@ -79,6 +79,12 @@ trait Warnings {
       warnings += Warnings.noExternalCallCheckMsg(typeId.name, funcId.name)
     }
   }
+
+  def warnNonReadonlyAndNoExternalCallCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+    if (!compilerOptions.ignoreReadonlyCheckWarnings) {
+      warnings += s"No readonly annotation for function: ${typeId.name}.${funcId.name}, please use @using(readonly = true/false) for the function"
+    }
+  }
 }
 
 object Warnings {

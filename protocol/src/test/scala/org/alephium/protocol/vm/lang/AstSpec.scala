@@ -288,12 +288,13 @@ class AstSpec extends AlephiumSpec {
       def code(externalCallCheck: Boolean) =
         s"""
            |Contract Bar() {
+           |  @using(readonly = false)
            |  pub fn bar(fooId: ByteVec) -> () {
            |    Foo(fooId).foo()
            |  }
            |}
            |Interface Foo {
-           |  @using(externalCallCheck = $externalCallCheck)
+           |  @using(externalCallCheck = $externalCallCheck, readonly = false)
            |  pub fn foo() -> ()
            |}
            |""".stripMargin
