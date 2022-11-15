@@ -178,7 +178,7 @@ trait StatelessContext extends CostStrategy {
   def getUniqueTxInputAddress(): ExeResult[Val.Address] = {
     for {
       _ <-
-        if (getHardFork().isLemanEnabled()) okay else failed(PartiallyEnabledInstr(CallerAddress))
+        if (getHardFork().isLemanEnabled()) okay else failed(PartiallyActiveInstr(CallerAddress))
       _       <- chargeGas(GasUniqueAddress.gas(txEnv.prevOutputs.length))
       address <- _getUniqueTxInputAddress()
     } yield address

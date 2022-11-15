@@ -119,9 +119,10 @@ case object DebugMessageIsEmpty                                extends ExeFailur
 final case class UncaughtKeyNotFoundError(error: IOError.KeyNotFound) extends ExeFailure
 final case class UncaughtSerdeError(error: IOError.Serde)             extends ExeFailure
 
-final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends ExeFailure
-final case class PartiallyEnabledInstr[-Ctx <: StatelessContext](instr: Instr[Ctx])
-    extends ExeFailure
+sealed trait BreakingInstr                                                  extends ExeFailure
+final case class InactiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx]) extends BreakingInstr
+final case class PartiallyActiveInstr[-Ctx <: StatelessContext](instr: Instr[Ctx])
+    extends BreakingInstr
 
 final case class InvalidErrorCode(errorCode: U256) extends ExeFailure
 final case class AssertionFailedWithErrorCode(contractIdOpt: Option[ContractId], errorCode: Int)
