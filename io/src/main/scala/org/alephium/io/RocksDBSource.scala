@@ -196,7 +196,8 @@ class RocksDBSource(val path: Path, val db: RocksDB, val cfHandles: AVector[Colu
 
   def closeUnsafe(): Unit = {
     logger.info("Closing RocksDB")
-    db.cancelAllBackgroundWork(true)
+    // fsync the WAL files, as suggested by the doc of RocksDB.close()
+    db.write(new WriteOptions().setSync(true), new WriteBatch())
     cfHandles.foreach(_.close())
     db.close()
   }
