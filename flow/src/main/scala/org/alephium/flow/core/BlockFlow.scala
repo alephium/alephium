@@ -338,8 +338,8 @@ object BlockFlow extends StrictLogging {
         .fold[(FlowTips, Weight)](tipsCur -> weightCur) { case ((maxTips, maxWeight), tip) =>
           tryMergeUnsafe(tipsCur, tip, group) match {
             case Some(merged) =>
-              val diffs  = getFlowTipsDiffUnsafe(merged, maxTips)
-              val weight = calWeightUnsafe(maxWeight, diffs)
+              val diffs  = getFlowTipsDiffUnsafe(merged, tipsCur)
+              val weight = calWeightUnsafe(weightCur, diffs)
               if (weight > maxWeight) (merged, weight) else (maxTips, maxWeight)
             case None => (maxTips, maxWeight)
           }
