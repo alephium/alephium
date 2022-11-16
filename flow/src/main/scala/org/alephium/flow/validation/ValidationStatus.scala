@@ -172,3 +172,4 @@ final case object InvalidContractInputs                         extends InvalidT
 final case object InvalidGeneratedOutputs                       extends InvalidTxStatus
 final case object InvalidRemainingBalancesForFailedScriptTx     extends InvalidTxStatus
 final case object InvalidScriptExecutionFlag                    extends InvalidTxStatus
+final case object UsingBreakingInstrs                           extends InvalidTxStatus

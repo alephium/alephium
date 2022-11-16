@@ -293,7 +293,14 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       height2: Int
   ): IOResult[Boolean] = {
     if (height1 < height2) {
-      getPredecessor(hash2, height1).map(_.equals(hash1))
+      getHashes(height1).flatMap { hashes =>
+        if (hashes.length == 1) {
+          // the only hash of height1 is hash1 (height1 is calculated from hash1)
+          Right(true)
+        } else {
+          getPredecessor(hash2, height1).map(_.equals(hash1))
+        }
+      }
     } else if (height1 == height2) {
       Right(hash1.equals(hash2))
     } else {

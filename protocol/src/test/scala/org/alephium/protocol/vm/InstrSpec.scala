@@ -3044,7 +3044,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .asInstanceOf[StatefulFrame]
         .copy(obj = script)
       val frame = prepareFrame(callerFrameOpt = Some(callerFrame))(PreLeman)
-      CallerAddress.runWith(frame).leftValue isE PartiallyEnabledInstr(CallerAddress)
+      CallerAddress.runWith(frame).leftValue isE PartiallyActiveInstr(CallerAddress)
     }
 
     {
@@ -3070,7 +3070,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val frame = prepareFrame(txEnvOpt = Some(txEnvWithUniqueAddress))(PreLeman)
         .asInstanceOf[StatefulFrame]
         .copy(obj = script)
-      CallerAddress.runWith(frame).leftValue isE PartiallyEnabledInstr(CallerAddress)
+      CallerAddress.runWith(frame).leftValue isE PartiallyActiveInstr(CallerAddress)
     }
 
     {

@@ -306,11 +306,15 @@ object BlockFlow extends StrictLogging {
       val diffs         = getFlowTipsDiffUnsafe(currentFlowTips, intraFlowTips)
 
       val intraWeight = getWeightUnsafe(intraDep)
+      calWeightUnsafe(intraWeight, diffs)
+    }
+
+    private def calWeightUnsafe(initialWeight: Weight, diffs: AVector[BlockHash]): Weight = {
       val diffsWeight = diffs.fold(Weight.zero) { case (acc, diff) =>
         acc + getBlockHeaderUnsafe(diff).weight
       }
 
-      intraWeight + diffsWeight
+      initialWeight + diffsWeight
     }
 
     def getBestTipUnsafe(): BlockHash = {
@@ -322,8 +326,8 @@ object BlockFlow extends StrictLogging {
     }
 
     def tryExtendUnsafe(
-        tipsCur: FlowTips,
-        weightCur: Weight,
+        sourceTips: FlowTips,
+        sourceWeight: Weight,
         group: GroupIndex,
         groupTip: BlockHash,
         toTry: AVector[BlockHash]
@@ -331,10 +335,11 @@ object BlockFlow extends StrictLogging {
       toTry
         .filter(isExtendingUnsafe(_, groupTip))
         .sorted(blockHashOrdering.reverse) // useful for draw situation
-        .fold[(FlowTips, Weight)](tipsCur -> weightCur) { case ((maxTips, maxWeight), tip) =>
-          tryMergeUnsafe(tipsCur, tip, group) match {
+        .fold[(FlowTips, Weight)](sourceTips -> sourceWeight) { case ((maxTips, maxWeight), tip) =>
+          tryMergeUnsafe(sourceTips, tip, group) match {
             case Some(merged) =>
-              val weight = calWeightUnsafe(merged, group)
+              val diffs  = getFlowTipsDiffUnsafe(merged, sourceTips)
+              val weight = calWeightUnsafe(sourceWeight, diffs)
               if (weight > maxWeight) (merged, weight) else (maxTips, maxWeight)
             case None => (maxTips, maxWeight)
           }
@@ -349,7 +354,7 @@ object BlockFlow extends StrictLogging {
       val bestTip    = getBestIntraGroupTip()
       val bestIndex  = ChainIndex.from(bestTip)
       val flowTips0  = getFlowTipsUnsafe(bestTip, group)
-      val weight0    = calWeightUnsafe(flowTips0, group)
+      val weight0    = getWeightUnsafe(bestTip)
       val groupOrder = BlockFlow.randomGroupOrders(bestTip)
 
       val (flowTips1, weight1) =

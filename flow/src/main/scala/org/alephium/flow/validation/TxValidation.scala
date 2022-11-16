@@ -838,6 +838,9 @@ object TxValidation {
                   stagingWorldState.commit()
                   checkScriptExeFlag(tx, true, remaining)
                 }
+              case Left(Right(_: BreakingInstr)) =>
+                // This case should already be filtered by mempool and block assembly, double check here
+                invalidTx(UsingBreakingInstrs)
               case Left(Right(_)) =>
                 checkScriptExeFlag(tx, false, GasBox.zero)
               case Left(Left(ioFalure)) => Left(Left(ioFalure.error))

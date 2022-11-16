@@ -218,12 +218,17 @@ trait FlowTipsUtil {
     }
   }
 
+  // TODO: large room for optimizations
   private[core] def tryMergeUnsafe(
       flowTips: FlowTips,
       tip: BlockHash,
       targetGroup: GroupIndex
   ): Option[FlowTips] = {
-    tryMergeUnsafe(targetGroup, flowTips, getLightTipsUnsafe(tip, targetGroup))
+    if (flowTips.outTips.contains(tip) || flowTips.inTips.contains(tip)) {
+      Some(flowTips)
+    } else {
+      tryMergeUnsafe(targetGroup, flowTips, getLightTipsUnsafe(tip, targetGroup))
+    }
   }
 
   private[core] def tryMergeUnsafe(

@@ -22,9 +22,12 @@ import org.scalatest.EitherValues._
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.core.BlockFlow
-import org.alephium.protocol.{ALPH, Signature, SignatureSchema}
+import org.alephium.flow.io.StoragesFixture
+import org.alephium.protocol.{ALPH, Hash, Signature, SignatureSchema}
+import org.alephium.protocol.config.NetworkConfigFixture
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulScript}
+import org.alephium.protocol.vm
+import org.alephium.protocol.vm.{GasBox, GasPrice, Method, StatefulScript}
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -416,5 +419,44 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     val newBlockTs = ALPH.LaunchTimestamp.plusSecondsUnsafe(10)
     val block1     = mineWithoutCoinbase(blockFlow, chainIndex, block0.nonCoinbase, newBlockTs)
     checkBlockUnit(block1, blockFlow) isE ()
+  }
+
+  it should "invalidate blocks with breaking instrs" in new Fixture {
+    override val chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+    val newStorages =
+      StoragesFixture.buildStorages(rootPath.resolveSibling(Hash.generate.toHexString))
+    val genesisNetworkConfig = new NetworkConfigFixture.Default {
+      override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    }.networkConfig
+    val lemanNetworkConfig = (new NetworkConfigFixture.Default {}).networkConfig
+
+    genesisNetworkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
+    lemanNetworkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    val blockflowGenesis = BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)(
+      implicitly,
+      genesisNetworkConfig,
+      blockFlow.consensusConfig,
+      implicitly,
+      implicitly
+    )
+    val blockflowLeman = BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)(
+      implicitly,
+      lemanNetworkConfig,
+      blockFlow.consensusConfig,
+      implicitly,
+      implicitly
+    )
+    val script =
+      StatefulScript.unsafe(AVector(Method(true, false, false, 0, 0, 0, AVector(vm.TxGasFee))))
+    val block = simpleScript(blockflowLeman, chainIndex, script)
+    intercept[AssertionError](simpleScript(blockflowGenesis, chainIndex, script)).getMessage is
+      s"Right(TxScriptExeFailed(${vm.InactiveInstr(vm.TxGasFee)}))"
+
+    val validatorGenesis = BlockValidation.build(blockflowGenesis)
+    val validatorLeman   = BlockValidation.build(blockflowLeman)
+    validatorGenesis.validate(block, blockflowGenesis).leftValue isE ExistInvalidTx(
+      UsingBreakingInstrs
+    )
+    validatorLeman.validate(block, blockflowLeman).isRight is true
   }
 }

@@ -532,6 +532,15 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.isBefore(block.hash, genesis.hash) isE false
       chain.isBefore(block.hash, chain0.last.hash) isE false
     }
+
+    val chain2 = chainGenOf(2, chain0.last).sample.get
+    addBlocks(chain, chain2)
+    chain2.foreach { block =>
+      chain.isBefore(genesis.hash, block.hash) isE true
+      chain.isBefore(block.hash, chain2.last.hash) isE true
+      chain.isBefore(chain0.last.hash, block.hash) isE true
+    }
+    chain.isBefore(chain1.last.hash, chain2.last.hash) isE false
   }
 
   it should "test getBlockHashesBetween" in new ForkedFixture {
