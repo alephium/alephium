@@ -326,8 +326,8 @@ object BlockFlow extends StrictLogging {
     }
 
     def tryExtendUnsafe(
-        tipsCur: FlowTips,
-        weightCur: Weight,
+        sourceTips: FlowTips,
+        sourceWeight: Weight,
         group: GroupIndex,
         groupTip: BlockHash,
         toTry: AVector[BlockHash]
@@ -335,11 +335,11 @@ object BlockFlow extends StrictLogging {
       toTry
         .filter(isExtendingUnsafe(_, groupTip))
         .sorted(blockHashOrdering.reverse) // useful for draw situation
-        .fold[(FlowTips, Weight)](tipsCur -> weightCur) { case ((maxTips, maxWeight), tip) =>
-          tryMergeUnsafe(tipsCur, tip, group) match {
+        .fold[(FlowTips, Weight)](sourceTips -> sourceWeight) { case ((maxTips, maxWeight), tip) =>
+          tryMergeUnsafe(sourceTips, tip, group) match {
             case Some(merged) =>
-              val diffs  = getFlowTipsDiffUnsafe(merged, tipsCur)
-              val weight = calWeightUnsafe(weightCur, diffs)
+              val diffs  = getFlowTipsDiffUnsafe(merged, sourceTips)
+              val weight = calWeightUnsafe(sourceWeight, diffs)
               if (weight > maxWeight) (merged, weight) else (maxTips, maxWeight)
             case None => (maxTips, maxWeight)
           }
