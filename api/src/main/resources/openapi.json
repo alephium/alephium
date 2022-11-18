@@ -10131,7 +10131,7 @@
           "ignoreUnusedPrivateFunctionsWarnings": {
             "type": "boolean"
           },
-          "ignoreReadonlyCheckWarnings": {
+          "ignoreUpdateFieldsCheckWarnings": {
             "type": "boolean"
           },
           "ignoreExternalCallCheckWarnings": {

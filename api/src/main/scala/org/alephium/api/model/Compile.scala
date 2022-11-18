@@ -47,7 +47,7 @@ final case class CompilerOptions(
     ignoreUnusedVariablesWarnings: Option[Boolean] = None,
     ignoreUnusedFieldsWarnings: Option[Boolean] = None,
     ignoreUnusedPrivateFunctionsWarnings: Option[Boolean] = None,
-    ignoreReadonlyCheckWarnings: Option[Boolean] = None,
+    ignoreUpdateFieldsCheckWarnings: Option[Boolean] = None,
     ignoreExternalCallCheckWarnings: Option[Boolean] = None
 ) {
   def toLangCompilerOptions(): ralph.CompilerOptions = {
@@ -64,8 +64,8 @@ final case class CompilerOptions(
       ignoreUnusedPrivateFunctionsWarnings = ignoreUnusedPrivateFunctionsWarnings.getOrElse(
         ralph.CompilerOptions.Default.ignoreUnusedPrivateFunctionsWarnings
       ),
-      ignoreReadonlyCheckWarnings = ignoreReadonlyCheckWarnings.getOrElse(
-        ralph.CompilerOptions.Default.ignoreReadonlyCheckWarnings
+      ignoreUpdateFieldsCheckWarnings = ignoreUpdateFieldsCheckWarnings.getOrElse(
+        ralph.CompilerOptions.Default.ignoreUpdateFieldsCheckWarnings
       ),
       ignoreExternalCallCheckWarnings = ignoreExternalCallCheckWarnings.getOrElse(
         ralph.CompilerOptions.Default.ignoreExternalCallCheckWarnings

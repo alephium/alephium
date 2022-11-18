@@ -34,7 +34,8 @@ object BuiltIn {
     def returns: String
     def doc: String
 
-    def isPublic: Boolean = true
+    def isPublic: Boolean       = true
+    def isUpdateFields: Boolean = false
 
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
       throw Compiler.Error(s"Built-in function $name does not belong to contract ${typeId.name}")
@@ -98,7 +99,6 @@ object BuiltIn {
       instrs: Seq[Instr[Ctx]],
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean,
-      isReadonly: Boolean,
       category: Category,
       argsCommentedName: Seq[(String, String)],
       retComment: String,
@@ -124,8 +124,7 @@ object BuiltIn {
           retComment: String,
           doc: String,
           usePreapprovedAssets: Boolean = false,
-          useAssetsInContract: Boolean = false,
-          isReadonly: Boolean = true
+          useAssetsInContract: Boolean = false
       ): SimpleBuiltIn[Ctx] =
         SimpleBuiltIn(
           name,
@@ -134,7 +133,6 @@ object BuiltIn {
           Seq(instr),
           usePreapprovedAssets,
           useAssetsInContract,
-          isReadonly,
           category,
           argsName,
           retComment,
@@ -151,8 +149,7 @@ object BuiltIn {
           argsName: Seq[(String, String)],
           retComment: String,
           usePreapprovedAssets: Boolean = false,
-          useAssetsInContract: Boolean = false,
-          isReadonly: Boolean = true
+          useAssetsInContract: Boolean = false
       ): SimpleBuiltIn[Ctx] =
         SimpleBuiltIn(
           name,
@@ -161,7 +158,6 @@ object BuiltIn {
           Seq(instr),
           usePreapprovedAssets,
           useAssetsInContract,
-          isReadonly,
           category,
           argsName,
           retComment,
@@ -217,8 +213,7 @@ object BuiltIn {
       signature: String,
       doc: String,
       usePreapprovedAssets: Boolean,
-      useAssetsInContract: Boolean,
-      isReadonly: Boolean
+      useAssetsInContract: Boolean
   ) extends BuiltIn[Ctx]
       with DocUtils {
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
@@ -250,8 +245,7 @@ object BuiltIn {
         argsName: Seq[(String, String)],
         doc: String,
         usePreapprovedAssets: Boolean,
-        useAssetsInContract: Boolean,
-        isReadonly: Boolean
+        useAssetsInContract: Boolean
     ): OverloadedSimpleBuiltIn[StatefulContext] = {
       val signature: String = {
         val args =
@@ -270,8 +264,7 @@ object BuiltIn {
         signature,
         doc,
         usePreapprovedAssets,
-        useAssetsInContract,
-        isReadonly
+        useAssetsInContract
       )
     }
   }
@@ -280,7 +273,6 @@ object BuiltIn {
       extends BuiltIn[StatelessContext] {
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
-    def isReadonly: Boolean           = true
   }
 
   val blake2b: SimpleBuiltIn[StatelessContext] =
@@ -604,7 +596,6 @@ object BuiltIn {
     override def isVariadic: Boolean  = true
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
-    def isReadonly: Boolean           = true
 
     def getReturnType(inputType: Seq[Type]): Seq[Type] = Seq(Type.ByteVec)
 
@@ -795,7 +786,6 @@ object BuiltIn {
     def category: Category            = Category.Utils
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
-    def isReadonly                    = true
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType.nonEmpty && inputType != Seq(Type.U256)) {
         throw Compiler.Error(s"Invalid argument type for $name, optional U256 expected")
@@ -886,7 +876,6 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.U256),
       Seq.empty,
       ApproveAlph,
-      isReadonly = false,
       argsName = Seq(
         "fromAddress" -> "the address to approve ALPH from",
         "amount"      -> "the amount of attoALPH to be approved"
@@ -901,7 +890,6 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.ByteVec, Type.U256),
       Seq.empty,
       ApproveToken,
-      isReadonly = false,
       argsName = Seq(
         "fromAddress" -> "the address to approve token from",
         "tokenId"     -> "the token to be approved",
@@ -917,7 +905,6 @@ object BuiltIn {
       Seq(Type.Address),
       Seq(Type.U256),
       AlphRemaining,
-      isReadonly = true,
       argsName = Seq("address" -> "the input address"),
       retComment = "the amount of the remaining ALPH for an address"
     )
@@ -928,7 +915,6 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.ByteVec),
       Seq(Type.U256),
       TokenRemaining,
-      isReadonly = true,
       argsName = Seq("address" -> "the input address", "tokenId" -> "the token id"),
       retComment = "the amount of the remaining token amount in the input assets of the function"
     )
@@ -939,7 +925,6 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.Address, Type.U256),
       Seq.empty,
       TransferAlph,
-      isReadonly = false,
       argsName = Seq(
         "fromAddress" -> "the address to transfer ALPH from",
         "toAddress"   -> "the address to transfer ALPH to",
@@ -956,7 +941,6 @@ object BuiltIn {
       Seq.empty,
       TransferAlphFromSelf,
       useAssetsInContract = true,
-      isReadonly = false,
       argsName = Seq(
         "toAddress" -> "the address to transfer ALPH to",
         "amount"    -> "the amount of attoALPH to be transferred"
@@ -972,7 +956,6 @@ object BuiltIn {
       Seq.empty,
       TransferAlphToSelf,
       useAssetsInContract = true,
-      isReadonly = false,
       argsName = Seq(
         "fromAddress" -> "the address to transfer ALPH from",
         "amount"      -> "the amount of attoALPH to be transferred"
@@ -987,7 +970,6 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.Address, Type.ByteVec, Type.U256),
       Seq.empty,
       TransferToken,
-      isReadonly = false,
       argsName = Seq(
         "fromAddress" -> "the address to transfer ALPH from",
         "toAddress"   -> "the address to transfer ALPH to",
@@ -1005,7 +987,6 @@ object BuiltIn {
       Seq.empty,
       TransferTokenFromSelf,
       useAssetsInContract = true,
-      isReadonly = false,
       argsName = Seq(
         "toAddress" -> "the address to transfer ALPH to",
         "tokenId"   -> "the token to be transferred",
@@ -1022,7 +1003,6 @@ object BuiltIn {
       Seq.empty,
       TransferTokenToSelf,
       useAssetsInContract = true,
-      isReadonly = false,
       argsName = Seq(
         "fromAddress" -> "the address to transfer ALPH from",
         "tokenId"     -> "the token to be transferred",
@@ -1038,7 +1018,6 @@ object BuiltIn {
       Seq[Type](Type.Address, Type.ByteVec, Type.U256),
       Seq.empty,
       BurnToken,
-      isReadonly = false,
       argsName = Seq(
         "address" -> "the address to burn token from",
         "tokenId" -> "the token to be burnt",
@@ -1055,7 +1034,6 @@ object BuiltIn {
       Seq.empty,
       LockApprovedAssets,
       usePreapprovedAssets = true,
-      isReadonly = false,
       argsName = Seq(
         "address"   -> "the address to lock assets to",
         "timestamp" -> "the timestamp that the assets will be locked until"
@@ -1084,7 +1062,6 @@ object BuiltIn {
       Seq[Type](Type.ByteVec),
       CreateContract,
       usePreapprovedAssets = true,
-      isReadonly = false,
       argsName = Seq(
         "bytecode"      -> "the bytecode of the contract to be created",
         "encodedFields" -> "the encoded fields as a ByteVec"
@@ -1109,7 +1086,6 @@ object BuiltIn {
       Seq[Type](Type.ByteVec),
       usePreapprovedAssets = true,
       useAssetsInContract = false,
-      isReadonly = false,
       category = Category.Contract,
       argsName = Seq(
         "bytecode"         -> "the bytecode of the contract to be created",
@@ -1126,7 +1102,6 @@ object BuiltIn {
       Seq[Type](Type.ByteVec),
       CopyCreateContract,
       usePreapprovedAssets = true,
-      isReadonly = false,
       argsName = Seq(
         "contractId"    -> "the id of the contract to be copied",
         "encodedFields" -> "the encoded fields as a ByteVec"
@@ -1156,7 +1131,6 @@ object BuiltIn {
       Seq[Type](Type.ByteVec),
       usePreapprovedAssets = true,
       useAssetsInContract = false,
-      isReadonly = false,
       category = Category.Contract,
       argsName = Seq(
         "contractId"       -> "the id of the contract to be copied",
@@ -1178,7 +1152,6 @@ object BuiltIn {
       Seq[Type](Type.ByteVec),
       CreateSubContract,
       usePreapprovedAssets = true,
-      isReadonly = false,
       argsName = Seq(
         "subContractPath" -> "the path of the sub-contract to be created",
         "bytecode"        -> "the bytecode of the sub-contract to be created",
@@ -1204,7 +1177,6 @@ object BuiltIn {
       Seq[Type](Type.ByteVec),
       usePreapprovedAssets = true,
       useAssetsInContract = false,
-      isReadonly = false,
       category = Category.SubContract,
       argsName = Seq(
         "subContractPath"  -> "the path of the sub-contract to be created",
@@ -1222,7 +1194,6 @@ object BuiltIn {
       Seq[Type](Type.ByteVec),
       CopyCreateSubContract,
       usePreapprovedAssets = true,
-      isReadonly = false,
       argsName = Seq(
         "subContractPath" -> "the path of the sub-contract to be created",
         "contractId"      -> "the id of the contract to be copied",
@@ -1253,7 +1224,6 @@ object BuiltIn {
       Seq[Type](Type.ByteVec),
       usePreapprovedAssets = true,
       useAssetsInContract = false,
-      isReadonly = false,
       category = Category.SubContract,
       argsName = Seq(
         "subContractPath"  -> "the path of the sub-contract to be created",
@@ -1276,7 +1246,6 @@ object BuiltIn {
       Seq.empty,
       DestroySelf,
       useAssetsInContract = true,
-      isReadonly = false,
       argsName =
         Seq("refundAddress" -> "the address to receive the remaining assets in the contract"),
       retComment = "",
@@ -1289,7 +1258,6 @@ object BuiltIn {
       Seq[Type](Type.ByteVec),
       Seq.empty,
       MigrateSimple,
-      isReadonly = false,
       argsName = Seq("newBytecode" -> "the new bytecode for the contract to migrate to"),
       retComment = "",
       doc = "Migrates the code of the contract."
@@ -1301,7 +1269,6 @@ object BuiltIn {
       Seq[Type](Type.ByteVec, Type.ByteVec),
       Seq.empty,
       MigrateWithFields,
-      isReadonly = false,
       argsName = Seq(
         "newBytecode"      -> "the bytecode for the contract to migrate to",
         "newEncodedFields" -> "the new fields for the contract to migrate to"
@@ -1428,7 +1395,6 @@ object BuiltIn {
     def category: Category            = Category.SubContract
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
-    def isReadonly: Boolean           = true
 
     def returnType: Seq[Type] = Seq(Type.ByteVec)
 

@@ -1742,15 +1742,15 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.warnings is AVector(
       "Found unused variables in Foo: foo.a",
       "Found unused fields in Foo: x",
-      "No readonly annotation for function: Foo.foo, please use @using(readonly = true/false) for the function",
-      "Function Foo.foo is readonly, please use @using(readonly = true) for the function"
+      "No update fields annotation for function: Foo.foo, please use @using(updateFields = true/false) for the function",
+      "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
     )
 
     info("Turn off warnings")
     val compilerOptions = CompilerOptions(
       ignoreUnusedVariablesWarnings = Some(true),
       ignoreUnusedFieldsWarnings = Some(true),
-      ignoreReadonlyCheckWarnings = Some(true)
+      ignoreUpdateFieldsCheckWarnings = Some(true)
     )
     val newResult =
       serverUtils.compileContract(query.copy(compilerOptions = Some(compilerOptions))).rightValue

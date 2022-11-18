@@ -288,13 +288,13 @@ class AstSpec extends AlephiumSpec {
       def code(externalCallCheck: Boolean) =
         s"""
            |Contract Bar() {
-           |  @using(readonly = false)
+           |  @using(updateFields = true)
            |  pub fn bar(fooId: ByteVec) -> () {
            |    Foo(fooId).foo()
            |  }
            |}
            |Interface Foo {
-           |  @using(externalCallCheck = $externalCallCheck, readonly = false)
+           |  @using(externalCallCheck = $externalCallCheck, updateFields = true)
            |  pub fn foo() -> ()
            |}
            |""".stripMargin
@@ -310,17 +310,17 @@ class AstSpec extends AlephiumSpec {
       val code =
         s"""
            |Contract Bar() implements Foo {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    bar()
            |  }
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  fn bar() -> () {
            |    checkCaller!(true, 0)
            |  }
            |}
            |Interface Foo {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> ()
            |}
            |""".stripMargin
@@ -341,11 +341,11 @@ class AstSpec extends AlephiumSpec {
     val code0 =
       s"""
          |Contract Foo() {
-         |  @using(readonly = true)
+         |  @using(updateFields = false)
          |  fn private0() -> () {}
-         |  @using(readonly = true)
+         |  @using(updateFields = false)
          |  fn private1() -> () {}
-         |  @using(readonly = true)
+         |  @using(updateFields = false)
          |  pub fn public() -> () {
          |    private0()
          |  }
@@ -357,21 +357,21 @@ class AstSpec extends AlephiumSpec {
     val code1 =
       s"""
          |Abstract Contract Foo() {
-         |  @using(readonly = true)
+         |  @using(updateFields = false)
          |  fn foo0() -> U256 {
          |    return 0
          |  }
-         |  @using(readonly = true)
+         |  @using(updateFields = false)
          |  fn foo1() -> () {
          |    let _ = foo0()
          |  }
          |}
          |Contract Bar() extends Foo() {
-         |  @using(readonly = true)
+         |  @using(updateFields = false)
          |  pub fn bar() -> () { foo1() }
          |}
          |Contract Baz() extends Foo() {
-         |  @using(readonly = true)
+         |  @using(updateFields = false)
          |  pub fn baz() -> () { foo1() }
          |}
          |""".stripMargin
