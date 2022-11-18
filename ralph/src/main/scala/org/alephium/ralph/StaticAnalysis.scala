@@ -101,10 +101,10 @@ object StaticAnalysis {
       case _                                                                              => false
     }
     val internalCalls             = state.internalCalls.getOrElse(func.id, mutable.Set.empty)
-    val internalUpdateFieldsCalls = internalCalls.filter(state.getFunc(_).isUpdateFields)
+    val internalUpdateFieldsCalls = internalCalls.filter(state.getFunc(_).useUpdateFields)
     val externalCalls             = state.externalCalls.getOrElse(func.id, mutable.Set.empty)
     val externalUpdateFieldsCalls = externalCalls.filter { case (typeId, funcId) =>
-      state.getFunc(typeId, funcId).isUpdateFields
+      state.getFunc(typeId, funcId).useUpdateFields
     }
 
     val isUpdateFields =
@@ -153,7 +153,7 @@ object StaticAnalysis {
             if (!externalCallCheckTables(typeId)(funcId)) {
               val callee = contractState.getFunc(typeId, funcId)
               if (
-                callee.isUpdateFields || callee.usePreapprovedAssets || callee.useAssetsInContract
+                callee.useUpdateFields || callee.usePreapprovedAssets || callee.useAssetsInContract
               ) {
                 allNoExternalCallChecks.addOne(funcRef)
               }

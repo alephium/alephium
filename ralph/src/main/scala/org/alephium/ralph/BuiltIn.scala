@@ -34,8 +34,8 @@ object BuiltIn {
     def returns: String
     def doc: String
 
-    def isPublic: Boolean       = true
-    def isUpdateFields: Boolean = false
+    def isPublic: Boolean        = true
+    def useUpdateFields: Boolean = false
 
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
       throw Compiler.Error(s"Built-in function $name does not belong to contract ${typeId.name}")

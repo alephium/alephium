@@ -138,7 +138,7 @@ object Compiler {
     def isVariadic: Boolean = false
     def usePreapprovedAssets: Boolean
     def useAssetsInContract: Boolean
-    def isUpdateFields: Boolean
+    def useUpdateFields: Boolean
     def getReturnType(inputType: Seq[Type]): Seq[Type]
     def getReturnLength(inputType: Seq[Type]): Int = {
       val retTypes = getReturnType(inputType)
@@ -222,7 +222,7 @@ object Compiler {
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean,
-      isUpdateFields: Boolean,
+      useUpdateFields: Boolean,
       argsType: Seq[Type],
       returnType: Seq[Type],
       index: Byte
