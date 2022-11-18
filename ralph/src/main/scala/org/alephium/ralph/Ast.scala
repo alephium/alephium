@@ -487,7 +487,7 @@ object Ast {
     def hasUpdateFieldsAnnotation: Boolean =
       annotations
         .find(_.id.name == Parser.usingAnnotationId)
-        .flatMap(_.fields.find(_.ident.name == Parser.useUpdateFieldsKeys))
+        .flatMap(_.fields.find(_.ident.name == Parser.useUpdateFieldsKey))
         .nonEmpty
 
     private var usedVars: Option[Set[String]] = None

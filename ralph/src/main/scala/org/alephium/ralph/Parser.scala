@@ -375,9 +375,9 @@ object Parser {
   val usePreapprovedAssetsKey = "preapprovedAssets"
   val useContractAssetsKey    = "assetsInContract"
   val useExternalCallCheckKey = "externalCallCheck"
-  val useUpdateFieldsKeys     = "updateFields"
+  val useUpdateFieldsKey      = "updateFields"
   val keys: Set[String] =
-    Set(usePreapprovedAssetsKey, useContractAssetsKey, useExternalCallCheckKey, useUpdateFieldsKeys)
+    Set(usePreapprovedAssetsKey, useContractAssetsKey, useExternalCallCheckKey, useUpdateFieldsKey)
 
   // scalastyle:off method.length
   def extractFuncModifier(
@@ -416,7 +416,7 @@ object Parser {
           )
           val useUpdateFields = extractAnnotationBoolean(
             useAnnotation,
-            useUpdateFieldsKeys,
+            useUpdateFieldsKey,
             useUpdateFieldsDefault
           )
           (usePreapprovedAssets, useContractAssets, useExternalCallCheck, useUpdateFields)
