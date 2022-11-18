@@ -151,7 +151,12 @@ object StaticAnalysis {
         case Some(callees) if callees.nonEmpty =>
           callees.foreach { case funcRef @ (typeId, funcId) =>
             if (!externalCallCheckTables(typeId)(funcId)) {
-              allNoExternalCallChecks.addOne(funcRef)
+              val callee = contractState.getFunc(typeId, funcId)
+              if (
+                callee.isUpdateFields || callee.usePreapprovedAssets || callee.useAssetsInContract
+              ) {
+                allNoExternalCallChecks.addOne(funcRef)
+              }
             }
           }
         case _ => ()

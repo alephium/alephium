@@ -330,6 +330,41 @@ class AstSpec extends AlephiumSpec {
     }
   }
 
+  it should "no external call check warnings for public functions which does not update fields and does not use assets" in {
+    def code(
+        updateFields: Boolean,
+        useApprovedAssets: Boolean,
+        useContractAssets: Boolean
+    ): String = {
+      s"""
+         |Contract Foo(mut a: U256, b: Address) {
+         |  @using(updateFields = $updateFields, preapprovedAssets = $useApprovedAssets, assetsInContract = $useContractAssets)
+         |  pub fn foo() -> () {
+         |    ${if (updateFields) "a = 0" else ""}
+         |    ${if (useApprovedAssets) "transferAlph!(callerAddress!(), b, 1)" else ""}
+         |    ${if (useContractAssets) "transferAlphFromSelf!(callerAddress!(), 1 alph)" else ""}
+         |  }
+         |}
+         |
+         |Contract Bar(foo: Foo) {
+         |  @using(updateFields = $updateFields, preapprovedAssets = $useApprovedAssets)
+         |  pub fn bar() -> () {
+         |    ${if (useApprovedAssets) "foo.foo{callerAddress!() -> 1}()" else "foo.foo()"}
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    val warnings0 = Compiler.compileContractFull(code(false, false, false), 1).rightValue.warnings
+    warnings0.isEmpty is true
+    val warnings1 = Compiler.compileContractFull(code(true, false, false), 1).rightValue.warnings
+    warnings1 is AVector(Warnings.noExternalCallCheckMsg("Foo", "foo"))
+    val warnings2 = Compiler.compileContractFull(code(false, true, false), 1).rightValue.warnings
+    warnings2 is AVector(Warnings.noExternalCallCheckMsg("Foo", "foo"))
+    val warnings3 = Compiler.compileContractFull(code(false, false, true), 1).rightValue.warnings
+    warnings3 is AVector(Warnings.noExternalCallCheckMsg("Foo", "foo"))
+  }
+
   it should "display the right warning message for external call check" in {
     Warnings.noExternalCallCheckMsg("Foo", "bar") is
       "No external call check for function: Foo.bar, please use checkCaller!(...) for the function or its private callees."
