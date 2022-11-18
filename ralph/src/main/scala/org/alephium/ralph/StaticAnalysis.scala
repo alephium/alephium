@@ -32,9 +32,9 @@ object StaticAnalysis {
     assume(ast.funcs.length == methods.length)
     checkIfPrivateMethodsUsed(ast, state)
     ast.funcs.zip(methods.toIterable).foreach { case (func, method) =>
-      // skip check readonly for main function
+      // skip check update fields for main function
       if (!(ast.isInstanceOf[Ast.TxScript] && (func.name == "main"))) {
-        checkReadonly(state, func, method)
+        checkUpdateFields(state, func, method)
       }
     }
   }
@@ -91,49 +91,51 @@ object StaticAnalysis {
     }
   }
 
-  def checkReadonly[Ctx <: vm.StatelessContext](
+  def checkUpdateFields[Ctx <: vm.StatelessContext](
       state: Compiler.State[Ctx],
       func: FuncDef[Ctx],
       method: vm.Method[Ctx]
   ): Unit = {
-    val changeState = method.instrs.exists {
-      case _: vm.StoreField | _: vm.StoreFieldByIndex.type => true
-      case _                                               => false
+    val updateFields = method.instrs.exists {
+      case _: vm.StoreField | _: vm.StoreFieldByIndex.type | _: vm.MigrateWithFields.type => true
+      case _                                                                              => false
     }
-    val internalCalls        = state.internalCalls.getOrElse(func.id, mutable.Set.empty)
-    val invalidInternalCalls = internalCalls.filterNot(state.getFunc(_).isReadonly)
-    val externalCalls        = state.externalCalls.getOrElse(func.id, mutable.Set.empty)
-    val invalidExternalCalls = externalCalls.filterNot { case (typeId, funcId) =>
-      state.getFunc(typeId, funcId).isReadonly
+    val internalCalls             = state.internalCalls.getOrElse(func.id, mutable.Set.empty)
+    val internalUpdateFieldsCalls = internalCalls.filter(state.getFunc(_).useUpdateFields)
+    val externalCalls             = state.externalCalls.getOrElse(func.id, mutable.Set.empty)
+    val externalUpdateFieldsCalls = externalCalls.filter { case (typeId, funcId) =>
+      state.getFunc(typeId, funcId).useUpdateFields
     }
 
-    val isReadonly =
-      !changeState && invalidInternalCalls.isEmpty && invalidExternalCalls.isEmpty
-    if (!isReadonly && func.useReadonly) {
-      if (changeState) {
-        throw Compiler.Error(s"Readonly function ${funcName(state.typeId, func.id)} changes state")
-      }
-      if (invalidInternalCalls.nonEmpty) {
+    val isUpdateFields =
+      updateFields || internalUpdateFieldsCalls.nonEmpty || externalUpdateFieldsCalls.nonEmpty
+    if (isUpdateFields && !func.useUpdateFields) {
+      if (updateFields) {
         throw Compiler.Error(
-          s"Readonly function ${funcName(state.typeId, func.id)} have invalid internal calls: ${quote(
-              invalidInternalCalls.map(_.name).mkString(", ")
+          s"Function ${funcName(state.typeId, func.id)} changes state, but has `updateFields = false`"
+        )
+      }
+      if (internalUpdateFieldsCalls.nonEmpty) {
+        throw Compiler.Error(
+          s"Function ${funcName(state.typeId, func.id)} has internal update fields calls: ${quote(
+              internalUpdateFieldsCalls.map(_.name).mkString(", ")
             )}"
         )
       }
-      if (invalidExternalCalls.nonEmpty) {
-        val msg = invalidExternalCalls
+      if (externalUpdateFieldsCalls.nonEmpty) {
+        val msg = externalUpdateFieldsCalls
           .map { case (typeId, funcId) =>
             s"${typeId.name}.${funcId.name}"
           }
           .mkString(", ")
         throw Compiler.Error(
-          s"Readonly function ${funcName(state.typeId, func.id)} have invalid external calls: ${quote(msg)}"
+          s"Function ${funcName(state.typeId, func.id)} has external update fields calls: ${quote(msg)}"
         )
       }
     }
 
-    if (isReadonly && !func.useReadonly) {
-      state.warnReadonlyCheck(state.typeId, func.id)
+    if (!isUpdateFields && func.useUpdateFields) {
+      state.warnUpdateFieldsCheck(state.typeId, func.id)
     }
   }
 
@@ -149,7 +151,12 @@ object StaticAnalysis {
         case Some(callees) if callees.nonEmpty =>
           callees.foreach { case funcRef @ (typeId, funcId) =>
             if (!externalCallCheckTables(typeId)(funcId)) {
-              allNoExternalCallChecks.addOne(funcRef)
+              val callee = contractState.getFunc(typeId, funcId)
+              if (
+                callee.useUpdateFields || callee.usePreapprovedAssets || callee.useAssetsInContract
+              ) {
+                allNoExternalCallChecks.addOne(funcRef)
+              }
             }
           }
         case _ => ()
@@ -182,15 +189,15 @@ object StaticAnalysis {
     }
   }
 
-  private def checkNoExternalCallFuncReadonly(
+  private def checkNoExternalCallFuncUpdateFields(
       contract: Contract,
       externalCallCheckTable: mutable.Map[FuncId, Boolean],
       state: Compiler.State[vm.StatefulContext]
   ): Unit = {
     contract.funcs.foreach { func =>
       val noExternalCallCheck = !func.useExternalCallCheck || !externalCallCheckTable(func.id)
-      if (noExternalCallCheck && !func.hasReadonlyAnnotation && func.isPublic) {
-        state.warnNonReadonlyAndNoExternalCallCheck(contract.ident, func.id)
+      if (noExternalCallCheck && !func.hasUpdateFieldsAnnotation && func.isPublic) {
+        state.warnNoExternalCallCheckAndUpdateFields(contract.ident, func.id)
       }
     }
   }
@@ -205,7 +212,7 @@ object StaticAnalysis {
         val state = states(index)
         val table = contract.buildExternalCallCheckTable(state)
         externalCallCheckTables.update(contract.ident, table)
-        checkNoExternalCallFuncReadonly(contract, table, state)
+        checkNoExternalCallFuncUpdateFields(contract, table, state)
       case (interface: ContractInterface, _) =>
         val table = mutable.Map.from(interface.funcs.map(_.id -> true))
         externalCallCheckTables.update(interface.ident, table)

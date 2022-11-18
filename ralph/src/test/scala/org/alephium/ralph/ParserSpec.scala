@@ -279,7 +279,7 @@ class ParserSpec extends AlephiumSpec {
 
     val parsed1 = fastparse
       .parse(
-        """@using(preapprovedAssets = true, readonly = false)
+        """@using(preapprovedAssets = true, updateFields = false)
           |pub fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }
           |""".stripMargin,
         StatelessParser.func(_)
@@ -291,7 +291,7 @@ class ParserSpec extends AlephiumSpec {
     parsed1.usePreapprovedAssets is true
     parsed1.useAssetsInContract is false
     parsed1.useExternalCallCheck is true
-    parsed1.useReadonly is false
+    parsed1.useUpdateFields is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
 
@@ -309,15 +309,15 @@ class ParserSpec extends AlephiumSpec {
     parsed2.usePreapprovedAssets is true
     parsed2.useAssetsInContract is true
     parsed2.useExternalCallCheck is true
-    parsed2.hasReadonlyAnnotation is false
-    parsed2.useReadonly is false
+    parsed2.hasUpdateFieldsAnnotation is false
+    parsed2.useUpdateFields is true
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
 
     info("More use annotation")
     val parsed3 = fastparse
       .parse(
-        """@using(assetsInContract = true, readonly = true)
+        """@using(assetsInContract = true, updateFields = true)
           |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin,
         StatelessParser.func(_)
       )
@@ -326,8 +326,8 @@ class ParserSpec extends AlephiumSpec {
     parsed3.usePreapprovedAssets is false
     parsed3.useAssetsInContract is true
     parsed3.useExternalCallCheck is true
-    parsed3.useReadonly is true
-    parsed3.hasReadonlyAnnotation is true
+    parsed3.useUpdateFields is true
+    parsed3.hasUpdateFieldsAnnotation is true
   }
 
   it should "parser contract initial states" in {
@@ -700,7 +700,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
-            false,
+            true,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -822,7 +822,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
-            false,
+            true,
             Seq.empty,
             Seq.empty,
             None
@@ -868,7 +868,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
-            false,
+            true,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -904,7 +904,7 @@ class ParserSpec extends AlephiumSpec {
             false,
             false,
             true,
-            false,
+            true,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -945,7 +945,7 @@ class ParserSpec extends AlephiumSpec {
         false,
         false,
         externalCallCheck,
-        false,
+        true,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -959,7 +959,7 @@ class ParserSpec extends AlephiumSpec {
         false,
         false,
         externalCallCheck,
-        false,
+        true,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1049,7 +1049,7 @@ class ParserSpec extends AlephiumSpec {
         usePreapprovedAssets,
         false,
         true,
-        false,
+        true,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))

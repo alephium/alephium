@@ -62,9 +62,9 @@ trait Warnings {
     }
   }
 
-  def warnReadonlyCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
-    if (!compilerOptions.ignoreReadonlyCheckWarnings) {
-      warnings += s"Function ${typeId.name}.${funcId.name} is readonly, please use @using(readonly = true) for the function"
+  def warnUpdateFieldsCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+    if (!compilerOptions.ignoreUpdateFieldsCheckWarnings) {
+      warnings += s"Function ${typeId.name}.${funcId.name} does not update fields, please use @using(updateFields = false) for the function"
     }
   }
 
@@ -80,9 +80,9 @@ trait Warnings {
     }
   }
 
-  def warnNonReadonlyAndNoExternalCallCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
-    if (!compilerOptions.ignoreReadonlyCheckWarnings) {
-      warnings += s"No readonly annotation for function: ${typeId.name}.${funcId.name}, please use @using(readonly = true/false) for the function"
+  def warnNoExternalCallCheckAndUpdateFields(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+    if (!compilerOptions.ignoreUpdateFieldsCheckWarnings) {
+      warnings += s"No update fields annotation for function: ${typeId.name}.${funcId.name}, please use @using(updateFields = true/false) for the function"
     }
   }
 }

@@ -31,7 +31,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |// comment
          |AssetScript Foo {
-         |  @using(readonly = true)
+         |  @using(updateFields = false)
          |  pub fn bar(a: U256, b: U256) -> (U256) {
          |    return (a + b)
          |  }
@@ -2709,7 +2709,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |AssetScript Foo {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 2
@@ -2725,12 +2725,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Check unused local variables in TxScript")
       val code =
         s"""
-           |@using(readonly = true)
+           |@using(updateFields = false)
            |TxScript Foo {
            |  let b = 1
            |  foo()
            |
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  fn foo() -> () {
            |  }
            |}
@@ -2743,11 +2743,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Check unused template variables in TxScript")
       val code =
         s"""
-           |@using(readonly = true)
+           |@using(updateFields = false)
            |TxScript Foo(a: U256, b: U256) {
            |  foo(a)
            |
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  fn foo(v: U256) -> () {
            |    assert!(v == 0, 0)
            |  }
@@ -2762,7 +2762,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 0
@@ -2779,7 +2779,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(a: ByteVec, b: U256, c: [U256; 2]) {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn getB() -> U256 {
            |    return b
            |  }
@@ -2794,12 +2794,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(a: U256, b: U256, c: [U256; 2]) extends Bar(a, b) {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {}
            |}
            |
            |Abstract Contract Bar(a: U256, b: U256) {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn bar() -> U256 {
            |    return a
            |  }
@@ -2814,24 +2814,24 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Interface I {
-           |  @using(readonly = true, externalCallCheck = false)
+           |  @using(updateFields = false, externalCallCheck = false)
            |  pub fn i() -> ()
            |}
            |Abstract Contract Base(v: U256) {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  fn base() -> () {
            |    assert!(v == 0, 0)
            |  }
            |}
            |Contract Bar(v: U256) extends Base(v) implements I {
-           |  @using(readonly = true, externalCallCheck = false)
+           |  @using(updateFields = false, externalCallCheck = false)
            |  pub fn i() -> () {
            |    assert!(v == 0, 0)
            |    base()
            |  }
            |}
            |Contract Foo(v: U256) extends Base(v) {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    base()
            |  }
@@ -2846,7 +2846,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Abstract Contract Foo() {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo(x: U256) -> () {}
            |}
            |Contract Bar() extends Foo() {}
@@ -2866,7 +2866,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo() {
            |  const C0 = 0
            |  const C1 = 1
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    assert!(C1 == 1, 0)
            |  }
@@ -2891,7 +2891,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    Solidity = #01
            |  }
            |
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    assert!(Chain.Alephium == 0, 0)
            |    assert!(Language.Ralph == #00, 0)
@@ -2907,17 +2907,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Abstract Contract Foo() {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  fn foo(x: U256) -> () {
            |    assert!(x == 0, 0)
            |  }
            |}
            |Contract Bar() extends Foo() {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn bar() -> () { foo(0) }
            |}
            |Contract Baz() extends Foo() {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn baz() -> () { foo(0) }
            |}
            |""".stripMargin
@@ -3042,7 +3042,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def code(unused: String) =
       s"""
          |Contract Foo($unused a: U256, $unused b: [U256; 2]) {
-         |  @using(readonly = true)
+         |  @using(updateFields = false)
          |  pub fn foo($unused x: U256, $unused y: [U256; 2]) -> () {
          |    return
          |  }
@@ -3065,9 +3065,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
-  it should "test compile readonly functions" in {
+  it should "test compile update fields functions" in {
     {
-      info("Skip check readonly for script main function")
+      info("Skip check update fields for script main function")
       val code =
         s"""
            |TxScript Main {
@@ -3079,11 +3079,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Simple readonly functions")
+      info("Simple update fields functions")
       val code =
         s"""
            |Contract Foo() {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {}
            |}
            |""".stripMargin
@@ -3091,30 +3091,30 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Readonly function change the contract state")
+      info("Function changes the contract state, but has `updateFields = false`")
       val code =
         s"""
            |Contract Foo(mut a: U256) {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    a = 0
            |  }
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function \"Foo.foo\" changes state"
+        "Function \"Foo.foo\" changes state, but has `updateFields = false`"
     }
 
     {
-      info("Call internal readonly functions")
+      info("Call internal update fields functions")
       val code =
         s"""
            |Contract Foo() {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    bar()
            |  }
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn bar() -> () {}
            |}
            |""".stripMargin
@@ -3122,13 +3122,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Call readonly builtin functions")
+      info("Call builtin functions")
       val code =
         s"""
            |Contract Foo() {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    let _ = selfContractId!()
+           |    transferAlphToSelf!(callerAddress!(), 1 alph)
            |  }
            |}
            |""".stripMargin
@@ -3136,18 +3137,18 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Invalid builtin function calls")
+      info("Migrate contract with fields")
       val code =
         s"""
            |Contract Foo() {
-           |  @using(readonly = true)
-           |  pub fn foo() -> () {
-           |    transferAlphToSelf!(callerAddress!(), 1 alph)
+           |  @using(updateFields = false)
+           |  pub fn foo(code: ByteVec, fields: ByteVec) -> () {
+           |    migrateWithFields!(code, fields)
            |  }
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function \"Foo.foo\" have invalid internal calls: \"transferAlphToSelf\""
+        "Function \"Foo.foo\" changes state, but has `updateFields = false`"
     }
 
     {
@@ -3155,16 +3156,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    bar()
            |  }
-           |  @using(readonly = false)
+           |  @using(updateFields = true)
            |  pub fn bar() -> () {}
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function \"Foo.foo\" have invalid internal calls: \"bar\""
+        "Function \"Foo.foo\" has internal update fields calls: \"bar\""
     }
 
     {
@@ -3172,7 +3173,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(bar: Bar) {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    bar.bar()
            |  }
@@ -3184,11 +3185,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function \"Foo.foo\" have invalid external calls: \"Bar.bar\""
+        "Function \"Foo.foo\" has external update fields calls: \"Bar.bar\""
     }
 
     {
-      info("Treat log instructions as readonly")
+      info("Emit events does not update fields")
       val code =
         s"""
            |Contract Foo() {
@@ -3201,16 +3202,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(
-        "Function Foo.foo is readonly, please use @using(readonly = true) for the function"
+        "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
       )
     }
 
     {
-      info("Readonly functions use preapproved assets")
+      info("Function use preapproved assets but does not update fields")
       val code =
         s"""
            |Contract Foo() {
-           |  @using(readonly = true, preapprovedAssets = true)
+           |  @using(updateFields = false, preapprovedAssets = true)
            |  pub fn foo(tokenId: ByteVec) -> () {
            |    assert!(tokenRemaining!(callerAddress!(), tokenId) == 1, 0)
            |    assert!(alphRemaining!(callerAddress!()) == 1, 0)
@@ -3225,7 +3226,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(bar: Bar, mut a: U256) {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    bar.bar()
            |  }
@@ -3234,38 +3235,38 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |Contract Bar(foo: Foo) {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn bar() -> () {
            |    foo.update()
            |  }
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Readonly function \"Bar.bar\" have invalid external calls: \"Foo.update\""
+        "Function \"Bar.bar\" has external update fields calls: \"Foo.update\""
     }
 
     {
       info("Invalid interface function calls")
-      def code(readonly: Boolean): String =
+      def code(updateFields: Boolean): String =
         s"""
            |Contract Foo() {
-           |  @using(readonly = true)
+           |  @using(updateFields = false)
            |  pub fn foo(contractId: ByteVec) -> () {
            |    Bar(contractId).bar()
            |  }
            |}
            |Interface Bar {
-           |  @using(readonly = $readonly)
+           |  @using(updateFields = $updateFields)
            |  pub fn bar() -> ()
            |}
            |""".stripMargin
-      Compiler.compileContractFull(code(true)).isRight is true
-      val error = Compiler.compileContractFull(code(false)).leftValue
-      error.message is "Readonly function \"Foo.foo\" have invalid external calls: \"Bar.bar\""
+      Compiler.compileContractFull(code(false)).isRight is true
+      val error = Compiler.compileContractFull(code(true)).leftValue
+      error.message is "Function \"Foo.foo\" has external update fields calls: \"Bar.bar\""
     }
 
     {
-      info("Warning for readonly functions")
+      info("Warning for functions which does not update fields")
       val code =
         s"""
            |Contract Foo() {
@@ -3276,13 +3277,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(
-        "Function Foo.foo is readonly, please use @using(readonly = true) for the function"
+        "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
       )
     }
 
     {
       info(
-        "Warning for public functions which has no external call check and no readonly annotation"
+        "Warning for public functions which has no external call check and no update fields annotation"
       )
       def code(annotation: String, modifier: String): String =
         s"""
@@ -3300,7 +3301,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContractFull(code("", "pub"), 0).rightValue.warnings is AVector(
-        "No readonly annotation for function: Foo.foo, please use @using(readonly = true/false) for the function"
+        "No update fields annotation for function: Foo.foo, please use @using(updateFields = true/false) for the function"
       )
       Compiler.compileContractFull(code("", ""), 0).rightValue.warnings.isEmpty is true
 
@@ -3308,7 +3309,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         .compileContractFull(code("@using(externalCallCheck = true)", "pub"), 0)
         .rightValue
         .warnings is AVector(
-        "No readonly annotation for function: Foo.foo, please use @using(readonly = true/false) for the function"
+        "No update fields annotation for function: Foo.foo, please use @using(updateFields = true/false) for the function"
       )
       Compiler
         .compileContractFull(code("@using(externalCallCheck = true)", ""), 0)
@@ -3317,12 +3318,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         .isEmpty is true
 
       Compiler
-        .compileContractFull(code("@using(externalCallCheck = true, readonly = false)", "pub"), 0)
+        .compileContractFull(
+          code("@using(externalCallCheck = true, updateFields = true)", "pub"),
+          0
+        )
         .rightValue
         .warnings
         .isEmpty is true
       Compiler
-        .compileContractFull(code("@using(externalCallCheck = true, readonly = false)", ""), 0)
+        .compileContractFull(code("@using(externalCallCheck = true, updateFields = true)", ""), 0)
         .rightValue
         .warnings
         .isEmpty is true
@@ -3343,7 +3347,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler.compileContractFull(code(""), 0).rightValue.warnings.isEmpty is true
 
       Compiler
-        .compileContractFull(code("@using(readonly = false)"), 0)
+        .compileContractFull(code("@using(updateFields = true)"), 0)
         .rightValue
         .warnings
         .isEmpty is true

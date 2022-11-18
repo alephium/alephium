@@ -475,7 +475,7 @@ object Ast {
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean,
       useExternalCallCheck: Boolean,
-      useReadonly: Boolean,
+      useUpdateFields: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -484,10 +484,10 @@ object Ast {
     def isPrivate: Boolean        = !isPublic
     val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
-    def hasReadonlyAnnotation: Boolean =
+    def hasUpdateFieldsAnnotation: Boolean =
       annotations
         .find(_.id.name == Parser.usingAnnotationId)
-        .flatMap(_.fields.find(_.ident.name == Parser.useReadonlyKey))
+        .flatMap(_.fields.find(_.ident.name == Parser.useUpdateFieldsKey))
         .nonEmpty
 
     private var usedVars: Option[Set[String]] = None
@@ -576,7 +576,7 @@ object Ast {
         stmts: Seq[Ast.Statement[StatefulContext]],
         usePreapprovedAssets: Boolean,
         useAssetsInContract: Boolean,
-        useReadonly: Boolean
+        useUpdateFields: Boolean
     ): FuncDef[StatefulContext] = {
       FuncDef[StatefulContext](
         Seq.empty,
@@ -585,7 +585,7 @@ object Ast {
         usePreapprovedAssets = usePreapprovedAssets,
         useAssetsInContract = useAssetsInContract,
         useExternalCallCheck = true,
-        useReadonly = useReadonly,
+        useUpdateFields = useUpdateFields,
         args = Seq.empty,
         rtypes = Seq.empty,
         bodyOpt = Some(stmts)
