@@ -1221,7 +1221,7 @@ trait RestServerFixture
   implicit val ec: ExecutionContext = system.dispatcher
 
   override val configValues = {
-    Map(
+    Map[String, Any](
       ("alephium.broker.broker-num", nbOfNodes),
       ("alephium.api.api-key-enabled", apiKeyEnabled),
       ("alephium.api.default-utxos-limit", utxosLimit)
