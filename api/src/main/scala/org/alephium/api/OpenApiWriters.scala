@@ -81,8 +81,17 @@ object OpenAPIWriters extends EndpointsExamples {
   )
 
   implicit def writerReferenceOr[T: Writer]: Writer[ReferenceOr[T]] = writer[ujson.Value].comap {
-    case Left(Reference(ref, _, _)) => ujson.Obj((s"$$ref", ujson.Str(ref)))
-    case Right(t)                   => writeJs(t)
+    case Left(Reference(ref, summaryOpt, descriptionOpt)) =>
+      val summary = summaryOpt
+        .map(summary => LinkedHashMap(("summary", ujson.Str(summary))))
+        .getOrElse(LinkedHashMap.empty)
+      val description = descriptionOpt
+        .map(description => LinkedHashMap(("description", ujson.Str(description))))
+        .getOrElse(LinkedHashMap.empty)
+      val value: LinkedHashMap[String, ujson.Value] =
+        LinkedHashMap((s"$$ref", ujson.Str(ref))) ++ summary ++ description
+      ujson.Obj(value)
+    case Right(t) => writeJs(t)
   }
 
   implicit val extensionValue: Writer[ExtensionValue] = writer[ujson.Value].comap {
@@ -122,8 +131,13 @@ object OpenAPIWriters extends EndpointsExamples {
     case t: BasicSchemaType => t.value
     case t: ArraySchemaType => ujson.Arr(t.value.map(_.value))
   }
-  implicit val writerSchema: Writer[Schema]                 = expandExtensions(macroW[Schema])
-  implicit val writerSchemaLike: Writer[SchemaLike]         = expandExtensions(macroW[SchemaLike])
+  implicit val writerSchema: Writer[Schema] = expandExtensions(macroW[Schema])
+  implicit def writerSchemaLike: Writer[SchemaLike] = expandExtensions(
+    writer[ujson.Value].comap {
+      case s: AnySchema => writeJs(s)
+      case s: Schema    => writeJs(s)
+    }
+  )
   implicit val writerReference: Writer[Reference]           = macroW[Reference]
   implicit val writerPattern: Writer[Pattern]               = StringWriter.comap(_.value)
   implicit val writerHeader: Writer[Header]                 = macroW[Header]

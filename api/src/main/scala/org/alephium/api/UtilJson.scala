@@ -50,7 +50,7 @@ object UtilJson {
       if (decIndex == -1 && expIndex == -1) {
         BigInteger.valueOf(Util.parseIntegralNum(s, decIndex, expIndex, index))
       } else {
-        throw upickle.core.Abort(expectedMsg + " but got float")
+        throw upickle.core.Abort(expectedMsg + " but was float")
       }
     }
   }

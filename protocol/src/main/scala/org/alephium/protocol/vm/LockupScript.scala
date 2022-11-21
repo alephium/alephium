@@ -103,7 +103,7 @@ object LockupScript {
       {
         case e: LockupScript.Asset => Right(e)
         case _ =>
-          Left(SerdeError.validation(s"Expect LockupScript.Asset, but got LockupScript.P2C"))
+          Left(SerdeError.validation(s"Expect LockupScript.Asset, but was LockupScript.P2C"))
       },
       identity
     )

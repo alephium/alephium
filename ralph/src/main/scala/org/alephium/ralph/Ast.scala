@@ -1124,7 +1124,7 @@ object Ast {
       contracts.find(_.ident == typeId) match {
         case None => throw Compiler.Error(s"Contract ${quote(typeId.name)} does not exist")
         case Some(_: TxScript) =>
-          throw Compiler.Error(s"Expected contract ${quote(typeId.name)}, but got script")
+          throw Compiler.Error(s"Expected contract ${quote(typeId.name)}, but was script")
         case Some(contract: ContractWithState) => contract
       }
     }

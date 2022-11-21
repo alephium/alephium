@@ -141,7 +141,7 @@ trait ApiModelCodec {
     Address.fromBase58(input) match {
       case Some(address: Address.Asset) => address
       case Some(_: Address.Contract) =>
-        throw Abort(s"Expect asset address, but got contract address: $input")
+        throw Abort(s"Expect asset address, but was contract address: $input")
       case None =>
         throw Abort(s"Unable to decode address from $input")
     }
@@ -153,7 +153,7 @@ trait ApiModelCodec {
       Address.fromBase58(input) match {
         case Some(address: Address.Contract) => address
         case Some(_: Address.Asset) =>
-          throw Abort(s"Expect contract address, but got asset address: $input")
+          throw Abort(s"Expect contract address, but was asset address: $input")
         case None =>
           throw Abort(s"Unable to decode address from $input")
       }

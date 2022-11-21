@@ -68,7 +68,7 @@ abstract class RestServerSpec(
     Get(blockflowFromTo(10, 0)) check { response =>
       response.code is StatusCode.BadRequest
       response.as[ApiError.BadRequest] is ApiError.BadRequest(
-        """Invalid value (expected value to pass validation: `fromTs` must be before `toTs`, but was: TimeInterval(TimeStamp(10ms),Some(TimeStamp(0ms))))"""
+        """Invalid value (expected value to pass validation: `fromTs` must be before `toTs`, but got: TimeInterval(TimeStamp(10ms),Some(TimeStamp(0ms))))"""
       )
     }
   }
@@ -83,7 +83,7 @@ abstract class RestServerSpec(
     Get(blocksWithEvents(10, 0)) check { response =>
       response.code is StatusCode.BadRequest
       response.as[ApiError.BadRequest] is ApiError.BadRequest(
-        """Invalid value (expected value to pass validation: `fromTs` must be before `toTs`, but was: TimeInterval(TimeStamp(10ms),Some(TimeStamp(0ms))))"""
+        """Invalid value (expected value to pass validation: `fromTs` must be before `toTs`, but got: TimeInterval(TimeStamp(10ms),Some(TimeStamp(0ms))))"""
       )
     }
   }
@@ -865,19 +865,19 @@ abstract class RestServerSpec(
     info("with non-positive limit")
     Get(s"$urlBase?start=$start&limit=0").check { response =>
       response.code is StatusCode.BadRequest
-      response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `limit` must be larger than 0, but was: CounterRange(10,Some(0)))"}"""
+      response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `limit` must be larger than 0, but got: CounterRange(10,Some(0)))"}"""
     }
 
     info("with limit larger than MaxCounterRange")
     Get(s"$urlBase?start=$start&limit=${CounterRange.MaxCounterRange + 1}").check { response =>
       response.code is StatusCode.BadRequest
-      response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `limit` must not be larger than 100, but was: CounterRange(10,Some(101)))"}"""
+      response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `limit` must not be larger than 100, but got: CounterRange(10,Some(101)))"}"""
     }
 
     info("with start larger than (Int.MaxValue - MaxCounterRange)")
     Get(s"$urlBase?start=${Int.MaxValue - CounterRange.MaxCounterRange + 1}").check { response =>
       response.code is StatusCode.BadRequest
-      response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `start` must be smaller than 2147483547, but was: CounterRange(2147483548,None))"}"""
+      response.body.leftValue is s"""{"detail":"Invalid value (expected value to pass validation: `start` must be smaller than 2147483547, but got: CounterRange(2147483548,None))"}"""
     }
 
     def validResponse(response: Response[Either[String, String]]): Assertion = {
