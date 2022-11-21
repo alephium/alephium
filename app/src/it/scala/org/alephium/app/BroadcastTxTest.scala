@@ -30,8 +30,8 @@ class BroadcastTxTest extends AlephiumActorSpec {
     val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, clique.masterRestPort)
     val restPort1 = clique.getServer(tx.fromGroup).config.network.restPort
     val restPort2 = clique.getServer((tx.fromGroup + 1) % groups0).config.network.restPort
-    eventually(request[TxStatus](getTransactionStatusLocal(tx), restPort1) is MemPooled)
-    eventually(request[TxStatus](getTransactionStatusLocal(tx), restPort2) is TxNotFound)
+    eventually(request[TxStatus](getTransactionStatusLocal(tx), restPort1) is MemPooled())
+    eventually(request[TxStatus](getTransactionStatusLocal(tx), restPort2) is TxNotFound())
 
     clique.stop()
   }
@@ -73,13 +73,13 @@ class BroadcastTxTest extends AlephiumActorSpec {
 
     val tx0 =
       transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
-    checkTx(tx0, restPort(masterPortClique1), MemPooled)
-    checkTx(tx0, restPort(masterPortClique2), MemPooled)
+    checkTx(tx0, restPort(masterPortClique1), MemPooled())
+    checkTx(tx0, restPort(masterPortClique2), MemPooled())
 
     val tx1 =
       transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
-    checkTx(tx1, restPort(masterPortClique1), MemPooled)
-    checkTx(tx1, restPort(masterPortClique2), TxNotFound)
+    checkTx(tx1, restPort(masterPortClique1), MemPooled())
+    checkTx(tx1, restPort(masterPortClique2), TxNotFound())
 
     txNotFound(tx0.txId, restPort(masterPortClique1))
     txNotFound(tx1.txId, restPort(masterPortClique1))

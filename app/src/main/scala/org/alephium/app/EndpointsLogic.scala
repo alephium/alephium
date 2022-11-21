@@ -444,7 +444,7 @@ trait EndpointsLogic extends Endpoints {
         )
       case (None, None) =>
         serverUtils.searchLocalTransactionStatus(blockFlow, txId, brokerConfig.chainIndexes) match {
-          case Right(TxNotFound) =>
+          case Right(TxNotFound()) =>
             searchTransactionStatusInOtherNodes(txId)
           case other => Future.successful(other)
         }
@@ -456,7 +456,7 @@ trait EndpointsLogic extends Endpoints {
   private def searchTransactionStatusInOtherNodes(txId: TransactionId): FutureTry[TxStatus] = {
     val otherGroupFrom = groupConfig.allGroups.filterNot(brokerConfig.contains)
     if (otherGroupFrom.isEmpty) {
-      Future.successful(Right(TxNotFound))
+      Future.successful(Right(TxNotFound()))
     } else {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def rec(
@@ -465,13 +465,13 @@ trait EndpointsLogic extends Endpoints {
       ): FutureTry[TxStatus] = {
         requestFromGroupIndex(
           from,
-          Future.successful(Right(TxNotFound)),
+          Future.successful(Right(TxNotFound())),
           getTransactionStatus,
           (txId, Some(from), None)
         ).flatMap {
-          case Right(TxNotFound) =>
+          case Right(TxNotFound()) =>
             if (remaining.isEmpty) {
-              Future.successful(Right(TxNotFound))
+              Future.successful(Right(TxNotFound()))
             } else {
               rec(remaining.head, remaining.tail)
             }

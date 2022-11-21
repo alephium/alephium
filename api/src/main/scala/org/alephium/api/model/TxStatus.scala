@@ -29,6 +29,6 @@ final case class Confirmed(
     toGroupConfirmations: Int
 ) extends TxStatus
 @upickle.implicits.key("MemPooled")
-final case object MemPooled extends TxStatus
+final case class MemPooled() extends TxStatus
 @upickle.implicits.key("TxNotFound")
-final case object TxNotFound extends TxStatus
+final case class TxNotFound() extends TxStatus

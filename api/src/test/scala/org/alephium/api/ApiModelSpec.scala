@@ -566,8 +566,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   }
 
   it should "encode/decode TxStatus" in {
-    checkData(MemPooled: TxStatus, s"""{"type":"MemPooled"}""")
-    checkData(TxNotFound: TxStatus, s"""{"type":"TxNotFound"}""")
+    checkData(MemPooled(): TxStatus, s"""{"type":"MemPooled"}""")
+    checkData(TxNotFound(): TxStatus, s"""{"type":"TxNotFound"}""")
   }
 
   it should "encode/decode MisbehaviorAction" in {
