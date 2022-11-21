@@ -8997,7 +8997,6 @@
   "components": {
     "schemas": {
       "AddressBalance": {
-        "type": "object",
         "required": [
           "address",
           "balance",
@@ -9005,6 +9004,7 @@
           "lockedBalance",
           "lockedBalanceHint"
         ],
+        "type": "object",
         "properties": {
           "address": {
             "type": "string",
@@ -9032,13 +9032,13 @@
         }
       },
       "AddressInfo": {
-        "type": "object",
         "required": [
           "address",
           "publicKey",
           "group",
           "path"
         ],
+        "type": "object",
         "properties": {
           "address": {
             "type": "string",
@@ -9058,11 +9058,11 @@
         }
       },
       "Addresses": {
-        "type": "object",
         "required": [
           "activeAddress",
           "addresses"
         ],
+        "type": "object",
         "properties": {
           "activeAddress": {
             "type": "string",
@@ -9077,11 +9077,11 @@
         }
       },
       "AssetInput": {
-        "type": "object",
         "required": [
           "outputRef",
           "unlockScript"
         ],
+        "type": "object",
         "properties": {
           "outputRef": {
             "$ref": "#/components/schemas/OutputRef"
@@ -9093,7 +9093,6 @@
         }
       },
       "AssetOutput": {
-        "type": "object",
         "required": [
           "hint",
           "key",
@@ -9104,6 +9103,7 @@
           "message",
           "type"
         ],
+        "type": "object",
         "properties": {
           "hint": {
             "type": "integer",
@@ -9141,10 +9141,10 @@
         }
       },
       "AssetState": {
-        "type": "object",
         "required": [
           "attoAlphAmount"
         ],
+        "type": "object",
         "properties": {
           "attoAlphAmount": {
             "type": "string",
@@ -9159,10 +9159,10 @@
         }
       },
       "BadRequest": {
-        "type": "object",
         "required": [
           "detail"
         ],
+        "type": "object",
         "properties": {
           "detail": {
             "type": "string"
@@ -9170,7 +9170,6 @@
         }
       },
       "Balance": {
-        "type": "object",
         "required": [
           "balance",
           "balanceHint",
@@ -9178,6 +9177,7 @@
           "lockedBalanceHint",
           "utxoNum"
         ],
+        "type": "object",
         "properties": {
           "balance": {
             "type": "string",
@@ -9217,12 +9217,12 @@
         }
       },
       "Balances": {
-        "type": "object",
         "required": [
           "totalBalance",
           "totalBalanceHint",
           "balances"
         ],
+        "type": "object",
         "properties": {
           "totalBalance": {
             "type": "string",
@@ -9241,11 +9241,11 @@
         }
       },
       "Ban": {
-        "type": "object",
         "required": [
           "peers",
           "type"
         ],
+        "type": "object",
         "properties": {
           "peers": {
             "type": "array",
@@ -9260,11 +9260,11 @@
         }
       },
       "Banned": {
-        "type": "object",
         "required": [
           "until",
           "type"
         ],
+        "type": "object",
         "properties": {
           "until": {
             "type": "integer",
@@ -9276,11 +9276,11 @@
         }
       },
       "BlockAndEvents": {
-        "type": "object",
         "required": [
           "block",
           "events"
         ],
+        "type": "object",
         "properties": {
           "block": {
             "$ref": "#/components/schemas/BlockEntry"
@@ -9294,7 +9294,6 @@
         }
       },
       "BlockEntry": {
-        "type": "object",
         "required": [
           "hash",
           "timestamp",
@@ -9309,6 +9308,7 @@
           "txsHash",
           "target"
         ],
+        "type": "object",
         "properties": {
           "hash": {
             "type": "string",
@@ -9365,7 +9365,6 @@
         }
       },
       "BlockHeaderEntry": {
-        "type": "object",
         "required": [
           "hash",
           "timestamp",
@@ -9374,6 +9373,7 @@
           "height",
           "deps"
         ],
+        "type": "object",
         "properties": {
           "hash": {
             "type": "string",
@@ -9405,10 +9405,10 @@
         }
       },
       "BlocksAndEventsPerTimeStampRange": {
-        "type": "object",
         "required": [
           "blocksAndEvents"
         ],
+        "type": "object",
         "properties": {
           "blocksAndEvents": {
             "type": "array",
@@ -9422,10 +9422,10 @@
         }
       },
       "BlocksPerTimeStampRange": {
-        "type": "object",
         "required": [
           "blocks"
         ],
+        "type": "object",
         "properties": {
           "blocks": {
             "type": "array",
@@ -9439,13 +9439,13 @@
         }
       },
       "BrokerInfo": {
-        "type": "object",
         "required": [
           "cliqueId",
           "brokerId",
           "brokerNum",
           "address"
         ],
+        "type": "object",
         "properties": {
           "cliqueId": {
             "type": "string",
@@ -9460,11 +9460,11 @@
             "format": "int32"
           },
           "address": {
-            "type": "object",
             "required": [
               "addr",
               "port"
             ],
+            "type": "object",
             "properties": {
               "addr": {
                 "type": "string"
@@ -9479,11 +9479,11 @@
         }
       },
       "BuildDeployContractTx": {
-        "type": "object",
         "required": [
           "fromPublicKey",
           "bytecode"
         ],
+        "type": "object",
         "properties": {
           "fromPublicKey": {
             "type": "string",
@@ -9522,7 +9522,6 @@
         }
       },
       "BuildDeployContractTxResult": {
-        "type": "object",
         "required": [
           "fromGroup",
           "toGroup",
@@ -9532,6 +9531,7 @@
           "txId",
           "contractAddress"
         ],
+        "type": "object",
         "properties": {
           "fromGroup": {
             "type": "integer",
@@ -9563,11 +9563,11 @@
         }
       },
       "BuildExecuteScriptTx": {
-        "type": "object",
         "required": [
           "fromPublicKey",
           "bytecode"
         ],
+        "type": "object",
         "properties": {
           "fromPublicKey": {
             "type": "string",
@@ -9602,7 +9602,6 @@
         }
       },
       "BuildExecuteScriptTxResult": {
-        "type": "object",
         "required": [
           "fromGroup",
           "toGroup",
@@ -9611,6 +9610,7 @@
           "gasPrice",
           "txId"
         ],
+        "type": "object",
         "properties": {
           "fromGroup": {
             "type": "integer",
@@ -9638,11 +9638,11 @@
         }
       },
       "BuildInfo": {
-        "type": "object",
         "required": [
           "releaseVersion",
           "commit"
         ],
+        "type": "object",
         "properties": {
           "releaseVersion": {
             "type": "string"
@@ -9653,12 +9653,12 @@
         }
       },
       "BuildMultisig": {
-        "type": "object",
         "required": [
           "fromAddress",
           "fromPublicKeys",
           "destinations"
         ],
+        "type": "object",
         "properties": {
           "fromAddress": {
             "type": "string",
@@ -9688,11 +9688,11 @@
         }
       },
       "BuildMultisigAddress": {
-        "type": "object",
         "required": [
           "keys",
           "mrequired"
         ],
+        "type": "object",
         "properties": {
           "keys": {
             "type": "array",
@@ -9708,10 +9708,10 @@
         }
       },
       "BuildMultisigAddressResult": {
-        "type": "object",
         "required": [
           "address"
         ],
+        "type": "object",
         "properties": {
           "address": {
             "type": "string",
@@ -9720,11 +9720,11 @@
         }
       },
       "BuildSweepAddressTransactions": {
-        "type": "object",
         "required": [
           "fromPublicKey",
           "toAddress"
         ],
+        "type": "object",
         "properties": {
           "fromPublicKey": {
             "type": "string",
@@ -9753,12 +9753,12 @@
         }
       },
       "BuildSweepAddressTransactionsResult": {
-        "type": "object",
         "required": [
           "unsignedTxs",
           "fromGroup",
           "toGroup"
         ],
+        "type": "object",
         "properties": {
           "unsignedTxs": {
             "type": "array",
@@ -9777,11 +9777,11 @@
         }
       },
       "BuildTransaction": {
-        "type": "object",
         "required": [
           "fromPublicKey",
           "destinations"
         ],
+        "type": "object",
         "properties": {
           "fromPublicKey": {
             "type": "string",
@@ -9814,7 +9814,6 @@
         }
       },
       "BuildTransactionResult": {
-        "type": "object",
         "required": [
           "unsignedTx",
           "gasAmount",
@@ -9823,6 +9822,7 @@
           "fromGroup",
           "toGroup"
         ],
+        "type": "object",
         "properties": {
           "unsignedTx": {
             "type": "string"
@@ -9850,12 +9850,12 @@
         }
       },
       "CallContract": {
-        "type": "object",
         "required": [
           "group",
           "address",
           "methodIndex"
         ],
+        "type": "object",
         "properties": {
           "group": {
             "type": "integer",
@@ -9899,7 +9899,6 @@
         }
       },
       "CallContractResult": {
-        "type": "object",
         "required": [
           "returns",
           "gasUsed",
@@ -9908,6 +9907,7 @@
           "txOutputs",
           "events"
         ],
+        "type": "object",
         "properties": {
           "returns": {
             "type": "array",
@@ -9947,10 +9947,10 @@
         }
       },
       "ChainInfo": {
-        "type": "object",
         "required": [
           "currentHeight"
         ],
+        "type": "object",
         "properties": {
           "currentHeight": {
             "type": "integer",
@@ -9959,13 +9959,13 @@
         }
       },
       "ChainParams": {
-        "type": "object",
         "required": [
           "networkId",
           "numZerosAtLeastInHash",
           "groupNumPerBroker",
           "groups"
         ],
+        "type": "object",
         "properties": {
           "networkId": {
             "type": "integer"
@@ -9985,10 +9985,10 @@
         }
       },
       "ChangeActiveAddress": {
-        "type": "object",
         "required": [
           "address"
         ],
+        "type": "object",
         "properties": {
           "address": {
             "type": "string",
@@ -9997,7 +9997,6 @@
         }
       },
       "CompileContractResult": {
-        "type": "object",
         "required": [
           "version",
           "name",
@@ -10010,6 +10009,7 @@
           "events",
           "warnings"
         ],
+        "type": "object",
         "properties": {
           "version": {
             "type": "string"
@@ -10055,11 +10055,11 @@
         }
       },
       "CompileProjectResult": {
-        "type": "object",
         "required": [
           "contracts",
           "scripts"
         ],
+        "type": "object",
         "properties": {
           "contracts": {
             "type": "array",
@@ -10076,7 +10076,6 @@
         }
       },
       "CompileScriptResult": {
-        "type": "object",
         "required": [
           "version",
           "name",
@@ -10086,6 +10085,7 @@
           "functions",
           "warnings"
         ],
+        "type": "object",
         "properties": {
           "version": {
             "type": "string"
@@ -10140,7 +10140,6 @@
         }
       },
       "Confirmed": {
-        "type": "object",
         "required": [
           "blockHash",
           "txIndex",
@@ -10149,6 +10148,7 @@
           "toGroupConfirmations",
           "type"
         ],
+        "type": "object",
         "properties": {
           "blockHash": {
             "type": "string",
@@ -10176,10 +10176,10 @@
         }
       },
       "Contract": {
-        "type": "object",
         "required": [
           "code"
         ],
+        "type": "object",
         "properties": {
           "code": {
             "type": "string"
@@ -10190,13 +10190,13 @@
         }
       },
       "ContractEvent": {
-        "type": "object",
         "required": [
           "blockHash",
           "txId",
           "eventIndex",
           "fields"
         ],
+        "type": "object",
         "properties": {
           "blockHash": {
             "type": "string",
@@ -10219,13 +10219,13 @@
         }
       },
       "ContractEventByBlockHash": {
-        "type": "object",
         "required": [
           "txId",
           "contractAddress",
           "eventIndex",
           "fields"
         ],
+        "type": "object",
         "properties": {
           "txId": {
             "type": "string",
@@ -10248,13 +10248,13 @@
         }
       },
       "ContractEventByTxId": {
-        "type": "object",
         "required": [
           "blockHash",
           "contractAddress",
           "eventIndex",
           "fields"
         ],
+        "type": "object",
         "properties": {
           "blockHash": {
             "type": "string",
@@ -10277,11 +10277,11 @@
         }
       },
       "ContractEvents": {
-        "type": "object",
         "required": [
           "events",
           "nextStart"
         ],
+        "type": "object",
         "properties": {
           "events": {
             "type": "array",
@@ -10296,10 +10296,10 @@
         }
       },
       "ContractEventsByBlockHash": {
-        "type": "object",
         "required": [
           "events"
         ],
+        "type": "object",
         "properties": {
           "events": {
             "type": "array",
@@ -10310,10 +10310,10 @@
         }
       },
       "ContractEventsByTxId": {
-        "type": "object",
         "required": [
           "events"
         ],
+        "type": "object",
         "properties": {
           "events": {
             "type": "array",
@@ -10324,7 +10324,6 @@
         }
       },
       "ContractOutput": {
-        "type": "object",
         "required": [
           "hint",
           "key",
@@ -10333,6 +10332,7 @@
           "tokens",
           "type"
         ],
+        "type": "object",
         "properties": {
           "hint": {
             "type": "integer",
@@ -10362,7 +10362,6 @@
         }
       },
       "ContractState": {
-        "type": "object",
         "required": [
           "address",
           "bytecode",
@@ -10370,6 +10369,7 @@
           "fields",
           "asset"
         ],
+        "type": "object",
         "properties": {
           "address": {
             "type": "string",
@@ -10399,11 +10399,11 @@
         }
       },
       "DebugMessage": {
-        "type": "object",
         "required": [
           "contractAddress",
           "message"
         ],
+        "type": "object",
         "properties": {
           "contractAddress": {
             "type": "string",
@@ -10415,10 +10415,10 @@
         }
       },
       "DecodeUnsignedTx": {
-        "type": "object",
         "required": [
           "unsignedTx"
         ],
+        "type": "object",
         "properties": {
           "unsignedTx": {
             "type": "string"
@@ -10426,12 +10426,12 @@
         }
       },
       "DecodeUnsignedTxResult": {
-        "type": "object",
         "required": [
           "fromGroup",
           "toGroup",
           "unsignedTx"
         ],
+        "type": "object",
         "properties": {
           "fromGroup": {
             "type": "integer",
@@ -10447,11 +10447,11 @@
         }
       },
       "Destination": {
-        "type": "object",
         "required": [
           "address",
           "attoAlphAmount"
         ],
+        "type": "object",
         "properties": {
           "address": {
             "type": "string",
@@ -10478,7 +10478,6 @@
         }
       },
       "DiscoveryAction": {
-        "type": "sttp.apispec.Schema",
         "oneOf": [
           {
             "$ref": "#/components/schemas/Reachable"
@@ -10496,12 +10495,12 @@
         }
       },
       "EventSig": {
-        "type": "object",
         "required": [
           "name",
           "fieldNames",
           "fieldTypes"
         ],
+        "type": "object",
         "properties": {
           "name": {
             "type": "string"
@@ -10521,12 +10520,12 @@
         }
       },
       "FieldsSig": {
-        "type": "object",
         "required": [
           "names",
           "types",
           "isMutable"
         ],
+        "type": "object",
         "properties": {
           "names": {
             "type": "array",
@@ -10549,7 +10548,6 @@
         }
       },
       "FixedAssetOutput": {
-        "type": "object",
         "required": [
           "hint",
           "key",
@@ -10559,6 +10557,7 @@
           "lockTime",
           "message"
         ],
+        "type": "object",
         "properties": {
           "hint": {
             "type": "integer",
@@ -10593,7 +10592,6 @@
         }
       },
       "FunctionSig": {
-        "type": "object",
         "required": [
           "name",
           "usePreapprovedAssets",
@@ -10604,6 +10602,7 @@
           "paramIsMutable",
           "returnTypes"
         ],
+        "type": "object",
         "properties": {
           "name": {
             "type": "string"
@@ -10644,10 +10643,10 @@
         }
       },
       "Group": {
-        "type": "object",
         "required": [
           "group"
         ],
+        "type": "object",
         "properties": {
           "group": {
             "type": "integer",
@@ -10656,10 +10655,10 @@
         }
       },
       "HashesAtHeight": {
-        "type": "object",
         "required": [
           "headers"
         ],
+        "type": "object",
         "properties": {
           "headers": {
             "type": "array",
@@ -10671,7 +10670,6 @@
         }
       },
       "InterCliquePeerInfo": {
-        "type": "object",
         "required": [
           "cliqueId",
           "brokerId",
@@ -10680,6 +10678,7 @@
           "isSynced",
           "clientVersion"
         ],
+        "type": "object",
         "properties": {
           "cliqueId": {
             "type": "string",
@@ -10694,11 +10693,11 @@
             "format": "int32"
           },
           "address": {
-            "type": "object",
             "required": [
               "addr",
               "port"
             ],
+            "type": "object",
             "properties": {
               "addr": {
                 "type": "string"
@@ -10719,10 +10718,10 @@
         }
       },
       "InternalServerError": {
-        "type": "object",
         "required": [
           "detail"
         ],
+        "type": "object",
         "properties": {
           "detail": {
             "type": "string"
@@ -10730,10 +10729,10 @@
         }
       },
       "MemPooled": {
-        "type": "object",
         "required": [
           "type"
         ],
+        "type": "object",
         "properties": {
           "type": {
             "type": "string"
@@ -10741,10 +10740,10 @@
         }
       },
       "MinerAddresses": {
-        "type": "object",
         "required": [
           "addresses"
         ],
+        "type": "object",
         "properties": {
           "addresses": {
             "type": "array",
@@ -10756,10 +10755,10 @@
         }
       },
       "MinerAddressesInfo": {
-        "type": "object",
         "required": [
           "addresses"
         ],
+        "type": "object",
         "properties": {
           "addresses": {
             "type": "array",
@@ -10770,7 +10769,6 @@
         }
       },
       "MisbehaviorAction": {
-        "type": "sttp.apispec.Schema",
         "oneOf": [
           {
             "$ref": "#/components/schemas/Ban"
@@ -10788,11 +10786,11 @@
         }
       },
       "NodeInfo": {
-        "type": "object",
         "required": [
           "buildInfo",
           "upnp"
         ],
+        "type": "object",
         "properties": {
           "buildInfo": {
             "$ref": "#/components/schemas/BuildInfo"
@@ -10801,11 +10799,11 @@
             "type": "boolean"
           },
           "externalAddress": {
-            "type": "object",
             "required": [
               "addr",
               "port"
             ],
+            "type": "object",
             "properties": {
               "addr": {
                 "type": "string"
@@ -10820,10 +10818,10 @@
         }
       },
       "NodeVersion": {
-        "type": "object",
         "required": [
           "version"
         ],
+        "type": "object",
         "properties": {
           "version": {
             "$ref": "#/components/schemas/ReleaseVersion"
@@ -10831,11 +10829,11 @@
         }
       },
       "NotFound": {
-        "type": "object",
         "required": [
           "detail",
           "resource"
         ],
+        "type": "object",
         "properties": {
           "detail": {
             "type": "string"
@@ -10846,7 +10844,6 @@
         }
       },
       "Output": {
-        "type": "sttp.apispec.Schema",
         "oneOf": [
           {
             "$ref": "#/components/schemas/AssetOutput"
@@ -10864,11 +10861,11 @@
         }
       },
       "OutputRef": {
-        "type": "object",
         "required": [
           "hint",
           "key"
         ],
+        "type": "object",
         "properties": {
           "hint": {
             "type": "integer",
@@ -10881,13 +10878,13 @@
         }
       },
       "PeerAddress": {
-        "type": "object",
         "required": [
           "address",
           "restPort",
           "wsPort",
           "minerApiPort"
         ],
+        "type": "object",
         "properties": {
           "address": {
             "type": "string",
@@ -10908,11 +10905,11 @@
         }
       },
       "PeerMisbehavior": {
-        "type": "object",
         "required": [
           "peer",
           "status"
         ],
+        "type": "object",
         "properties": {
           "peer": {
             "type": "string",
@@ -10924,7 +10921,6 @@
         }
       },
       "PeerStatus": {
-        "type": "sttp.apispec.Schema",
         "oneOf": [
           {
             "$ref": "#/components/schemas/Banned"
@@ -10942,11 +10938,11 @@
         }
       },
       "Penalty": {
-        "type": "object",
         "required": [
           "value",
           "type"
         ],
+        "type": "object",
         "properties": {
           "value": {
             "type": "integer",
@@ -10958,10 +10954,10 @@
         }
       },
       "Project": {
-        "type": "object",
         "required": [
           "code"
         ],
+        "type": "object",
         "properties": {
           "code": {
             "type": "string"
@@ -10972,11 +10968,11 @@
         }
       },
       "Reachable": {
-        "type": "object",
         "required": [
           "peers",
           "type"
         ],
+        "type": "object",
         "properties": {
           "peers": {
             "type": "array",
@@ -10991,12 +10987,12 @@
         }
       },
       "ReleaseVersion": {
-        "type": "object",
         "required": [
           "major",
           "minor",
           "patch"
         ],
+        "type": "object",
         "properties": {
           "major": {
             "type": "integer",
@@ -11013,10 +11009,10 @@
         }
       },
       "RevealMnemonic": {
-        "type": "object",
         "required": [
           "password"
         ],
+        "type": "object",
         "properties": {
           "password": {
             "type": "string"
@@ -11024,10 +11020,10 @@
         }
       },
       "RevealMnemonicResult": {
-        "type": "object",
         "required": [
           "mnemonic"
         ],
+        "type": "object",
         "properties": {
           "mnemonic": {
             "type": "string"
@@ -11035,10 +11031,10 @@
         }
       },
       "Script": {
-        "type": "object",
         "required": [
           "code"
         ],
+        "type": "object",
         "properties": {
           "code": {
             "type": "string"
@@ -11049,13 +11045,13 @@
         }
       },
       "SelfClique": {
-        "type": "object",
         "required": [
           "cliqueId",
           "nodes",
           "selfReady",
           "synced"
         ],
+        "type": "object",
         "properties": {
           "cliqueId": {
             "type": "string",
@@ -11076,10 +11072,10 @@
         }
       },
       "ServiceUnavailable": {
-        "type": "object",
         "required": [
           "detail"
         ],
+        "type": "object",
         "properties": {
           "detail": {
             "type": "string"
@@ -11087,10 +11083,10 @@
         }
       },
       "Sign": {
-        "type": "object",
         "required": [
           "data"
         ],
+        "type": "object",
         "properties": {
           "data": {
             "type": "string"
@@ -11098,10 +11094,10 @@
         }
       },
       "SignResult": {
-        "type": "object",
         "required": [
           "signature"
         ],
+        "type": "object",
         "properties": {
           "signature": {
             "type": "string",
@@ -11110,11 +11106,11 @@
         }
       },
       "SubmitMultisig": {
-        "type": "object",
         "required": [
           "unsignedTx",
           "signatures"
         ],
+        "type": "object",
         "properties": {
           "unsignedTx": {
             "type": "string"
@@ -11129,11 +11125,11 @@
         }
       },
       "SubmitTransaction": {
-        "type": "object",
         "required": [
           "unsignedTx",
           "signature"
         ],
+        "type": "object",
         "properties": {
           "unsignedTx": {
             "type": "string"
@@ -11145,12 +11141,12 @@
         }
       },
       "SubmitTxResult": {
-        "type": "object",
         "required": [
           "txId",
           "fromGroup",
           "toGroup"
         ],
+        "type": "object",
         "properties": {
           "txId": {
             "type": "string",
@@ -11167,10 +11163,10 @@
         }
       },
       "Sweep": {
-        "type": "object",
         "required": [
           "toAddress"
         ],
+        "type": "object",
         "properties": {
           "toAddress": {
             "type": "string",
@@ -11199,13 +11195,13 @@
         }
       },
       "SweepAddressTransaction": {
-        "type": "object",
         "required": [
           "txId",
           "unsignedTx",
           "gasAmount",
           "gasPrice"
         ],
+        "type": "object",
         "properties": {
           "txId": {
             "type": "string",
@@ -11225,10 +11221,10 @@
         }
       },
       "TestContract": {
-        "type": "object",
         "required": [
           "bytecode"
         ],
+        "type": "object",
         "properties": {
           "group": {
             "type": "integer",
@@ -11284,7 +11280,6 @@
         }
       },
       "TestContractResult": {
-        "type": "object",
         "required": [
           "address",
           "codeHash",
@@ -11296,6 +11291,7 @@
           "events",
           "debugMessages"
         ],
+        "type": "object",
         "properties": {
           "address": {
             "type": "string",
@@ -11349,11 +11345,11 @@
         }
       },
       "TestInputAsset": {
-        "type": "object",
         "required": [
           "address",
           "asset"
         ],
+        "type": "object",
         "properties": {
           "address": {
             "type": "string",
@@ -11365,11 +11361,11 @@
         }
       },
       "Token": {
-        "type": "object",
         "required": [
           "id",
           "amount"
         ],
+        "type": "object",
         "properties": {
           "id": {
             "type": "string",
@@ -11382,7 +11378,6 @@
         }
       },
       "Transaction": {
-        "type": "object",
         "required": [
           "unsigned",
           "scriptExecutionOk",
@@ -11391,6 +11386,7 @@
           "inputSignatures",
           "scriptSignatures"
         ],
+        "type": "object",
         "properties": {
           "unsigned": {
             "$ref": "#/components/schemas/UnsignedTx"
@@ -11427,12 +11423,12 @@
         }
       },
       "TransactionTemplate": {
-        "type": "object",
         "required": [
           "unsigned",
           "inputSignatures",
           "scriptSignatures"
         ],
+        "type": "object",
         "properties": {
           "unsigned": {
             "$ref": "#/components/schemas/UnsignedTx"
@@ -11454,10 +11450,10 @@
         }
       },
       "Transfer": {
-        "type": "object",
         "required": [
           "destinations"
         ],
+        "type": "object",
         "properties": {
           "destinations": {
             "type": "array",
@@ -11480,12 +11476,12 @@
         }
       },
       "TransferResult": {
-        "type": "object",
         "required": [
           "txId",
           "fromGroup",
           "toGroup"
         ],
+        "type": "object",
         "properties": {
           "txId": {
             "type": "string",
@@ -11502,10 +11498,10 @@
         }
       },
       "TransferResults": {
-        "type": "object",
         "required": [
           "results"
         ],
+        "type": "object",
         "properties": {
           "results": {
             "type": "array",
@@ -11516,10 +11512,10 @@
         }
       },
       "TxNotFound": {
-        "type": "object",
         "required": [
           "type"
         ],
+        "type": "object",
         "properties": {
           "type": {
             "type": "string"
@@ -11527,7 +11523,6 @@
         }
       },
       "TxStatus": {
-        "type": "sttp.apispec.Schema",
         "oneOf": [
           {
             "$ref": "#/components/schemas/Confirmed"
@@ -11549,7 +11544,6 @@
         }
       },
       "UTXO": {
-        "type": "object",
         "required": [
           "ref",
           "amount",
@@ -11557,6 +11551,7 @@
           "lockTime",
           "additionalData"
         ],
+        "type": "object",
         "properties": {
           "ref": {
             "$ref": "#/components/schemas/OutputRef"
@@ -11582,10 +11577,10 @@
         }
       },
       "UTXOs": {
-        "type": "object",
         "required": [
           "utxos"
         ],
+        "type": "object",
         "properties": {
           "utxos": {
             "type": "array",
@@ -11599,10 +11594,10 @@
         }
       },
       "Unauthorized": {
-        "type": "object",
         "required": [
           "detail"
         ],
+        "type": "object",
         "properties": {
           "detail": {
             "type": "string"
@@ -11610,11 +11605,11 @@
         }
       },
       "Unban": {
-        "type": "object",
         "required": [
           "peers",
           "type"
         ],
+        "type": "object",
         "properties": {
           "peers": {
             "type": "array",
@@ -11629,12 +11624,12 @@
         }
       },
       "UnconfirmedTransactions": {
-        "type": "object",
         "required": [
           "fromGroup",
           "toGroup",
           "unconfirmedTransactions"
         ],
+        "type": "object",
         "properties": {
           "fromGroup": {
             "type": "integer",
@@ -11653,11 +11648,11 @@
         }
       },
       "Unreachable": {
-        "type": "object",
         "required": [
           "peers",
           "type"
         ],
+        "type": "object",
         "properties": {
           "peers": {
             "type": "array",
@@ -11672,7 +11667,6 @@
         }
       },
       "UnsignedTx": {
-        "type": "object",
         "required": [
           "txId",
           "version",
@@ -11682,6 +11676,7 @@
           "inputs",
           "fixedOutputs"
         ],
+        "type": "object",
         "properties": {
           "txId": {
             "type": "string",
@@ -11720,7 +11715,6 @@
         }
       },
       "Val": {
-        "type": "sttp.apispec.Schema",
         "oneOf": [
           {
             "$ref": "#/components/schemas/ValAddress"
@@ -11754,11 +11748,11 @@
         }
       },
       "ValAddress": {
-        "type": "object",
         "required": [
           "value",
           "type"
         ],
+        "type": "object",
         "properties": {
           "value": {
             "type": "string",
@@ -11770,11 +11764,11 @@
         }
       },
       "ValArray": {
-        "type": "object",
         "required": [
           "value",
           "type"
         ],
+        "type": "object",
         "properties": {
           "value": {
             "type": "array",
@@ -11788,11 +11782,11 @@
         }
       },
       "ValBool": {
-        "type": "object",
         "required": [
           "value",
           "type"
         ],
+        "type": "object",
         "properties": {
           "value": {
             "type": "boolean"
@@ -11803,11 +11797,11 @@
         }
       },
       "ValByteVec": {
-        "type": "object",
         "required": [
           "value",
           "type"
         ],
+        "type": "object",
         "properties": {
           "value": {
             "type": "string",
@@ -11819,11 +11813,11 @@
         }
       },
       "ValI256": {
-        "type": "object",
         "required": [
           "value",
           "type"
         ],
+        "type": "object",
         "properties": {
           "value": {
             "type": "string",
@@ -11835,11 +11829,11 @@
         }
       },
       "ValU256": {
-        "type": "object",
         "required": [
           "value",
           "type"
         ],
+        "type": "object",
         "properties": {
           "value": {
             "type": "string",
@@ -11851,12 +11845,12 @@
         }
       },
       "VerifySignature": {
-        "type": "object",
         "required": [
           "data",
           "signature",
           "publicKey"
         ],
+        "type": "object",
         "properties": {
           "data": {
             "type": "string",
@@ -11873,11 +11867,11 @@
         }
       },
       "WalletCreation": {
-        "type": "object",
         "required": [
           "password",
           "walletName"
         ],
+        "type": "object",
         "properties": {
           "password": {
             "type": "string"
@@ -11897,11 +11891,11 @@
         }
       },
       "WalletCreationResult": {
-        "type": "object",
         "required": [
           "walletName",
           "mnemonic"
         ],
+        "type": "object",
         "properties": {
           "walletName": {
             "type": "string"
@@ -11912,10 +11906,10 @@
         }
       },
       "WalletDeletion": {
-        "type": "object",
         "required": [
           "password"
         ],
+        "type": "object",
         "properties": {
           "password": {
             "type": "string"
@@ -11923,12 +11917,12 @@
         }
       },
       "WalletRestore": {
-        "type": "object",
         "required": [
           "password",
           "mnemonic",
           "walletName"
         ],
+        "type": "object",
         "properties": {
           "password": {
             "type": "string"
@@ -11948,10 +11942,10 @@
         }
       },
       "WalletRestoreResult": {
-        "type": "object",
         "required": [
           "walletName"
         ],
+        "type": "object",
         "properties": {
           "walletName": {
             "type": "string"
@@ -11959,11 +11953,11 @@
         }
       },
       "WalletStatus": {
-        "type": "object",
         "required": [
           "walletName",
           "locked"
         ],
+        "type": "object",
         "properties": {
           "walletName": {
             "type": "string"
@@ -11974,10 +11968,10 @@
         }
       },
       "WalletUnlock": {
-        "type": "object",
         "required": [
           "password"
         ],
+        "type": "object",
         "properties": {
           "password": {
             "type": "string"
