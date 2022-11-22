@@ -92,7 +92,7 @@ trait WorldState[T, R1, R2, R3] {
       outputRaw <- getOutput(outputRef)
       output <- outputRaw match {
         case _: AssetOutput =>
-          val error = s"ContractOutput expected, but got AssetOutput at $outputRef"
+          val error = s"ContractOutput expected, but was AssetOutput at $outputRef"
           Left(IOError.Other(new RuntimeException(error)))
         case o: ContractOutput =>
           Right(o)

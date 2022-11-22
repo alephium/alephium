@@ -81,10 +81,35 @@ object OpenAPIWriters extends EndpointsExamples {
   )
 
   implicit def writerReferenceOr[T: Writer]: Writer[ReferenceOr[T]] = writer[ujson.Value].comap {
-    case Left(Reference(ref)) => ujson.Obj((s"$$ref", ujson.Str(ref)))
-    case Right(t)             => writeJs(t)
+    case Left(Reference(ref, summaryOpt, descriptionOpt)) =>
+      val summary = summaryOpt
+        .map(summary => LinkedHashMap(("summary", ujson.Str(summary))))
+        .getOrElse(LinkedHashMap.empty)
+      val description = descriptionOpt
+        .map(description => LinkedHashMap(("description", ujson.Str(description))))
+        .getOrElse(LinkedHashMap.empty)
+      val value: LinkedHashMap[String, ujson.Value] =
+        LinkedHashMap((s"$$ref", ujson.Str(ref))) ++ summary ++ description
+      ujson.Obj(value)
+    case Right(t) => writeJs(t)
   }
 
+  implicit val encoderMultipleExampleValue: Writer[ExampleMultipleValue] =
+    writer[ujson.Value].comap { e =>
+      ujson.Arr(e.values.map(v => writeJs(ExampleSingleValue(v))): _*)
+    }
+
+  def encodeExampleValue(alwaysArray: Boolean): Writer[ExampleValue] = {
+    writer[ujson.Value].comap {
+      case e: ExampleMultipleValue => writeJs(e)
+      case e: ExampleSingleValue =>
+        if (alwaysArray) {
+          writeJs(ExampleMultipleValue(List(e.value)))
+        } else {
+          writeJs(e)
+        }
+    }
+  }
   implicit val extensionValue: Writer[ExtensionValue] = writer[ujson.Value].comap {
     case ExtensionValue(value) =>
       Try(read[ujson.Value](value)).toEither.toOption.getOrElse(ujson.Str(value))
@@ -110,16 +135,64 @@ object OpenAPIWriters extends EndpointsExamples {
     // scalastyle:on null
     case ExampleSingleValue(value) => ujson.Str(value.toString)
   }
-  implicit val encoderExampleValue: Writer[ExampleValue] = writer[ujson.Value].comap {
-    case e: ExampleSingleValue => writeJs[ExampleSingleValue](e)
-    case ExampleMultipleValue(values) =>
-      ujson.Arr(
-        values.map(e => writeJs[ExampleSingleValue](ExampleSingleValue(e)))
-      )
+  implicit val encoderExampleValue: Writer[ExampleValue] = encodeExampleValue(false)
+
+  implicit val writerAnySchema: Writer[AnySchema] = writer[ujson.Value].comap(_ => ujson.Bool(true))
+  implicit val writerSchemaType: Writer[SchemaType] = writer[ujson.Value].comap {
+    case t: BasicSchemaType => t.value
+    case t: ArraySchemaType => ujson.Arr(t.value.map(_.value))
   }
-  implicit val writerSchemaType: Writer[SchemaType]         = StringWriter.comap(_.value)
-  implicit val writerSchema: Writer[Schema]                 = expandExtensions(macroW[Schema])
+  implicit val writerSchema: Writer[Schema] = expandExtensions(writer[ujson.Value].comap { schema =>
+    val minKey = if (schema.exclusiveMinimum.getOrElse(false)) "exclusiveMinimum" else "minimum"
+    val maxKey = if (schema.exclusiveMaximum.getOrElse(false)) "exclusiveMaximum" else "maximum"
+    ujson.Obj(
+      (s"$$schema", writeJs(schema.$schema)),
+      ("allOf", writeJs(schema.allOf)),
+      ("title", writeJs(schema.title)),
+      ("required", writeJs(schema.required)),
+      ("type", writeJs(schema.`type`)),
+      ("prefixItems", writeJs(schema.prefixItems)),
+      ("items", writeJs(schema.items)),
+      ("contains", writeJs(schema.contains)),
+      ("properties", writeJs(schema.properties)),
+      (
+        "patternProperties",
+        if (schema.patternProperties.nonEmpty) writeJs(schema.patternProperties) else ujson.Null
+      ),
+      ("description", writeJs(schema.description)),
+      ("format", writeJs(schema.format)),
+      ("default", writeJs(schema.default.map(writeJs(_)(encodeExampleValue(false))))),
+      ("readOnly", writeJs(schema.readOnly)),
+      ("writeOnly", writeJs(schema.writeOnly)),
+      ("example", schema.example.map(writeJs(_)(encodeExampleValue(true))).getOrElse(ujson.Null)),
+      ("deprecated", writeJs(schema.deprecated)),
+      ("oneOf", writeJs(schema.oneOf)),
+      ("discriminator", writeJs(schema.discriminator)),
+      ("additionalProperties", writeJs(schema.additionalProperties)),
+      ("pattern", writeJs(schema.pattern)),
+      ("minLength", writeJs(schema.minLength)),
+      ("maxLength", writeJs(schema.maxLength)),
+      (minKey, writeJs(schema.minimum)),
+      (maxKey, writeJs(schema.maximum)),
+      ("minItems", writeJs(schema.minItems)),
+      ("maxItems", writeJs(schema.maxItems)),
+      ("enum", writeJs(schema.`enum`)),
+      ("not", writeJs(schema.not)),
+      ("if", writeJs(schema.`if`)),
+      ("then", writeJs(schema.`then`)),
+      ("else", writeJs(schema.`else`)),
+      ("$defs", writeJs(schema.$defs)),
+      ("extensions", writeJs(schema.extensions))
+    )
+  })
+  implicit def writerSchemaLike: Writer[SchemaLike] = expandExtensions(
+    writer[ujson.Value].comap {
+      case s: AnySchema => writeJs(s)
+      case s: Schema    => writeJs(s)
+    }
+  )
   implicit val writerReference: Writer[Reference]           = macroW[Reference]
+  implicit val writerPattern: Writer[Pattern]               = StringWriter.comap(_.value)
   implicit val writerHeader: Writer[Header]                 = macroW[Header]
   implicit val writerExample: Writer[Example]               = expandExtensions(macroW[Example])
   implicit val writerLink: Writer[Link]                     = expandExtensions(macroW[Link])

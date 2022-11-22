@@ -332,9 +332,9 @@ class ServerUtils(implicit
           confirmed.toGroupConfirmations
         )
       case Some(BlockFlowState.MemPooled) =>
-        MemPooled
+        MemPooled()
       case None =>
-        TxNotFound
+        TxNotFound()
     }
   }
 
@@ -481,9 +481,9 @@ class ServerUtils(implicit
     searchLocalTransactionStatus(blockFlow, txId, brokerConfig.chainIndexes) match {
       case Right(Confirmed(blockHash, _, _, _, _)) =>
         Right(ChainIndex.from(blockHash))
-      case Right(TxNotFound) =>
+      case Right(TxNotFound()) =>
         Left(notFound(s"Transaction ${txId.toHexString}"))
-      case Right(MemPooled) =>
+      case Right(MemPooled()) =>
         Left(failed(s"Transaction ${txId.toHexString} still in mempool"))
       case Left(error) =>
         Left(error)

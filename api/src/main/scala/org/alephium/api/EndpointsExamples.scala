@@ -510,8 +510,8 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val txStatusExamples: List[Example[TxStatus]] =
     List[Example[TxStatus]](
       Example(Confirmed(blockHash, 0, 1, 2, 3), None, None),
-      Example(MemPooled, None, Some("Tx is still in mempool")),
-      Example(TxNotFound, None, Some("Cannot find tx with the id"))
+      Example(MemPooled(), None, Some("Tx is still in mempool")),
+      Example(TxNotFound(), None, Some("Cannot find tx with the id"))
     )
 
   private val compilerOptions = CompilerOptions(ignoreUnusedConstantsWarnings = Some(true))

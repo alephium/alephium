@@ -16,9 +16,11 @@
 
 package org.alephium.api
 
+import java.math.BigInteger
 import java.net.InetSocketAddress
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.json.Json._
@@ -75,5 +77,11 @@ class UtilJsonSpec extends AlephiumSpec {
 
   it should "fail to read negative TimeStamp" in {
     assertThrows[upickle.core.AbortException](read[TimeStamp]("-12345"))
+  }
+
+  it should "fail to read a Double as a BigInteger" in {
+    forAll(Gen.chooseNum(Double.MinValue, Double.MaxValue)) { double =>
+      assertThrows[upickle.core.AbortException](read[BigInteger](s"$double"))
+    }
   }
 }

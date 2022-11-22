@@ -18,9 +18,9 @@ import sbt._
 
 object Version {
   lazy val akka       = "2.6.20"
-  lazy val tapir      = "1.0.6"
+  lazy val tapir      = "1.2.2"
   lazy val sttp       = "3.5.2"
-  lazy val apispec    = "0.2.1"
+  lazy val apispec    = "0.3.1"
   lazy val prometheus = "0.16.0"
 }
 
@@ -29,18 +29,18 @@ object Dependencies {
   lazy val `akka-slf4j` = "com.typesafe.akka" %% "akka-slf4j"   % Version.akka
   lazy val `akka-test`  = "com.typesafe.akka" %% "akka-testkit" % Version.akka % Test
 
-  lazy val vertx = "io.vertx" % "vertx-core" % "4.3.3"
+  lazy val vertx = "io.vertx" % "vertx-core" % "4.3.4"
 
-  lazy val `upickle` = "com.lihaoyi" %% "upickle" % "1.6.0"
+  lazy val `upickle` = "com.lihaoyi" %% "upickle" % "2.0.0"
 
   lazy val ficus           = "com.iheart"                 %% "ficus"           % "1.5.2"
   lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk18on"  % "1.71.1"
   lazy val fastparse       = "com.lihaoyi"                %% "fastparse"       % "2.3.3"
-  lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.4.0"
+  lazy val logback         = "ch.qos.logback"              % "logback-classic" % "1.4.5"
   lazy val rocksdb         = "org.rocksdb"                 % "rocksdbjni"      % "6.29.5"
   lazy val `scala-logging` = "com.typesafe.scala-logging" %% "scala-logging"   % "3.9.5"
-  lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.16.0"  % Test
-  lazy val scalatest       = "org.scalatest"              %% "scalatest"       % "3.2.13"  % Test
+  lazy val scalacheck      = "org.scalacheck"             %% "scalacheck"      % "1.17.0"  % Test
+  lazy val scalatest       = "org.scalatest"              %% "scalatest"       % "3.2.14"  % Test
   lazy val scalatestplus   = "org.scalatestplus"          %% "scalacheck-1-14" % "3.2.2.0" % Test
   lazy val weupnp          = "org.bitlet"                  % "weupnp"          % "0.1.4"
 
