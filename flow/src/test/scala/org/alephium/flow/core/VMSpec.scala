@@ -106,7 +106,7 @@ class VMSpec extends AlephiumSpec {
     lazy val block0     = payableCall(blockFlow, chainIndex, txScript0)
     lazy val contractOutputRef0 =
       TxOutputRef.unsafe(block0.transactions.head, 0).asInstanceOf[ContractOutputRef]
-    lazy val contractId0 = ContractId.from(block0.transactions.head.id, 0)
+    lazy val contractId0 = ContractId.from(block0.transactions.head.id, 0, chainIndex.from)
 
     lazy val input1 =
       s"""
@@ -182,8 +182,10 @@ class VMSpec extends AlephiumSpec {
 
       val contractOutputRef =
         TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
-      val contractId = ContractId.from(block.transactions.head.id, 0)
-      contractId.firstOutputRef() is contractOutputRef
+      val contractId = ContractId.from(block.transactions.head.id, 0, chainIndex.from)
+      val estimated  = contractId.inaccurateFirstOutputRef()
+      estimated.hint is contractOutputRef.hint
+      estimated.key.value.bytes.init is contractOutputRef.key.value.bytes.init
 
       deserialize[StatefulContract.HalfDecoded](serialize(contract.toHalfDecoded())).rightValue
         .toContract() isE contract
@@ -2241,7 +2243,8 @@ class VMSpec extends AlephiumSpec {
       payableCall(blockFlow, chainIndex, contractCreationScript)
     lazy val contractOutputRef =
       TxOutputRef.unsafe(createContractBlock.transactions.head, 0).asInstanceOf[ContractOutputRef]
-    lazy val contractId = ContractId.from(createContractBlock.transactions.head.id, 0)
+    lazy val contractId =
+      ContractId.from(createContractBlock.transactions.head.id, 0, chainIndex.from)
 
     addAndCheck(blockFlow, createContractBlock, 1)
     checkState(blockFlow, chainIndex, contractId, initialState, contractOutputRef)
@@ -2772,7 +2775,7 @@ class VMSpec extends AlephiumSpec {
 
       callTxScript(createSubContractRaw)
 
-      val subContractId = contractId.subContractId(serialize(subContractPath))
+      val subContractId = contractId.subContractId(serialize(subContractPath), chainIndex.from)
       val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       worldState.getContractState(contractId).rightValue.fields is AVector[Val](
         Val.ByteVec(subContractId.bytes)

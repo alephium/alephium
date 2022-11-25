@@ -230,7 +230,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       netReward: U256
   ): BlockValidationResult[Unit] = {
     if (brokerConfig.contains(chainIndex.from)) {
-      val blockEnv = BlockEnv.from(block.header)
+      val blockEnv = BlockEnv.from(chainIndex, block.header)
       convert(
         nonCoinbaseValidation.checkBlockTx(
           chainIndex,
@@ -333,7 +333,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached]
   ): TxValidationResult[Unit] = {
-    val blockEnv       = BlockEnv.from(block.header)
+    val blockEnv       = BlockEnv.from(chainIndex, block.header)
     val parentHash     = block.blockDeps.uncleHash(chainIndex.to)
     val executionOrder = Block.getNonCoinbaseExecutionOrder(parentHash, block.nonCoinbase)
     executionOrder.foreachE { index =>

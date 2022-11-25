@@ -63,7 +63,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           cachedWorldState,
           preOutputs.map(_.referredOutput),
           None,
-          BlockEnv(networkConfig.networkId, headerTs, Target.Max, None)
+          BlockEnv(chainIndex, networkConfig.networkId, headerTs, Target.Max, None)
         )
       } yield ()
     }
@@ -72,7 +72,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         tx: Transaction,
         preOutputs: AVector[TxOutput]
     ): TxValidationResult[GasBox] = {
-      val blockEnv = BlockEnv(networkConfig.networkId, TimeStamp.now(), Target.Max, None)
+      val blockEnv =
+        BlockEnv(tx.chainIndex, networkConfig.networkId, TimeStamp.now(), Target.Max, None)
       checkGasAndWitnesses(tx, preOutputs, blockEnv)
     }
 
@@ -622,7 +623,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val chainIndex  = chainIndexGenForBroker(brokerConfig).sample.get
     val block       = transfer(blockFlow, chainIndex)
     val tx          = block.nonCoinbase.head
-    val blockEnv    = BlockEnv.from(block.header)
+    val blockEnv    = BlockEnv.from(chainIndex, block.header)
     val worldState  = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
     val prevOutputs = worldState.getPreOutputs(tx).rightValue
 
@@ -764,7 +765,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def tx: Transaction
     lazy val initialGas = minimalGas
     lazy val blockEnv =
-      BlockEnv(NetworkId.AlephiumMainNet, TimeStamp.now(), consensusConfig.maxMiningTarget, None)
+      BlockEnv(
+        tx.chainIndex,
+        NetworkId.AlephiumMainNet,
+        TimeStamp.now(),
+        consensusConfig.maxMiningTarget,
+        None
+      )
     lazy val prevOutputs = blockFlow
       .getBestPersistedWorldState(groupIndex)
       .rightValue
@@ -853,9 +860,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.contractInputs.length is 0
     tx.pass()
 
-    val contractId = ContractId.generate
-    val outputRef  = contractId.firstOutputRef()
-    tx.copy(contractInputs = AVector(outputRef)).fail(InvalidContractInputs)
+    val randomOutputRef = ContractId.random.inaccurateFirstOutputRef()
+    tx.copy(contractInputs = AVector(randomOutputRef)).fail(InvalidContractInputs)
 
     tx.copy(generatedOutputs = AVector(assetOutputGen.sample.get)).fail(InvalidGeneratedOutputs)
   }

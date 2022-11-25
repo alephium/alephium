@@ -26,6 +26,7 @@ import org.alephium.protocol.vm.TokenIssuance
 import org.alephium.util.{discard, AVector, EitherF, TimeStamp, U256}
 
 final case class BlockEnv(
+    chainIndex: ChainIndex,
     networkId: NetworkId,
     timeStamp: TimeStamp,
     target: Target,
@@ -36,15 +37,26 @@ final case class BlockEnv(
 }
 object BlockEnv {
   def apply(
+      chainIndex: ChainIndex,
       networkId: NetworkId,
       timeStamp: TimeStamp,
       target: Target,
       blockId: Option[BlockHash]
   )(implicit networkConfig: NetworkConfig): BlockEnv =
-    BlockEnv(networkId, timeStamp, target, blockId, networkConfig.getHardFork(timeStamp))
-
-  def from(header: BlockHeader)(implicit networkConfig: NetworkConfig): BlockEnv =
     BlockEnv(
+      chainIndex,
+      networkId,
+      timeStamp,
+      target,
+      blockId,
+      networkConfig.getHardFork(timeStamp)
+    )
+
+  def from(chainIndex: ChainIndex, header: BlockHeader)(implicit
+      networkConfig: NetworkConfig
+  ): BlockEnv =
+    BlockEnv(
+      chainIndex,
       networkConfig.networkId,
       header.timestamp,
       header.target,

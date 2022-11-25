@@ -38,8 +38,12 @@ class ContextSpec
     def createContract(): ContractId = {
       val output =
         contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(ContractId.zero))).sample.get
-      val balances   = MutBalancesPerLockup.from(output)
-      val contractId = ContractId.from(context.txId, context.txEnv.fixedOutputs.length)
+      val balances = MutBalancesPerLockup.from(output)
+      val contractId = ContractId.from(
+        context.txId,
+        context.txEnv.fixedOutputs.length,
+        context.blockEnv.chainIndex.from
+      )
       context
         .createContract(
           contractId,

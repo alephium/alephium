@@ -914,7 +914,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val script =
         contractCreation(contract, fields, lockupScript, minimalAlphInContract)
       val block      = executeScript(script)
-      val contractId = ContractId.from(block.transactions.head.id, 0)
+      val contractId = ContractId.from(block.transactions.head.id, 0, chainIndex.from)
       (block, contractId)
     }
 
@@ -1020,6 +1020,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   "the test contract endpoint" should "handle create and destroy contracts properly" in new Fixture {
+    val groupIndex   = brokerConfig.chainIndexes.sample().from
     val (_, pubKey)  = SignatureSchema.generatePriPub()
     val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
     val foo =
@@ -1050,9 +1051,10 @@ class ServerUtilsSpec extends AlephiumSpec {
          |$foo
          |""".stripMargin
 
-    val barContract            = Compiler.compileContract(bar).rightValue
-    val barContractId          = ContractId.random
-    val destroyedFooContractId = barContractId.subContractId(Hex.unsafe(destroyContractPath))
+    val barContract   = Compiler.compileContract(bar).rightValue
+    val barContractId = ContractId.random
+    val destroyedFooContractId =
+      barContractId.subContractId(Hex.unsafe(destroyContractPath), groupIndex)
     val existingContract = ContractState(
       Address.contract(destroyedFooContractId),
       fooContract,
@@ -1062,19 +1064,24 @@ class ServerUtilsSpec extends AlephiumSpec {
       AssetState(ALPH.oneAlph)
     )
     val testContractParams = TestContract(
+      group = Some(groupIndex.value),
       address = Some(Address.contract(barContractId)),
       bytecode = barContract,
       initialAsset = Some(AssetState(ALPH.alph(10))),
       existingContracts = Some(AVector(existingContract)),
       inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
-    )
+    ).toComplete().rightValue
 
-    val testFlow             = BlockFlow.emptyUnsafe(config)
-    val serverUtils          = new ServerUtils()
-    val createdFooContractId = barContractId.subContractId(Hex.unsafe(createContractPath))
+    val testFlow    = BlockFlow.emptyUnsafe(config)
+    val serverUtils = new ServerUtils()
+    val createdFooContractId =
+      barContractId.subContractId(
+        Hex.unsafe(createContractPath),
+        ChainIndex.from(testContractParams.blockHash).from
+      )
 
     val result =
-      serverUtils.runTestContract(testFlow, testContractParams.toComplete().rightValue).rightValue
+      serverUtils.runTestContract(testFlow, testContractParams).rightValue
     result.contracts.length is 2
     result.contracts(0).address is Address.contract(createdFooContractId)
     result.contracts(1).address is Address.contract(barContractId)
