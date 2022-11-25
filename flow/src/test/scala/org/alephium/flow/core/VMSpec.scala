@@ -705,7 +705,7 @@ class VMSpec extends AlephiumSpec {
       contractKey0,
       newState,
       contractOutputRef0,
-      numAssets = 5,
+      numAssets = 5, // 3 + 1 coinbase output + 1 transfer in simple script tx
       numContracts = 3
     )
   }
@@ -1673,14 +1673,28 @@ class VMSpec extends AlephiumSpec {
       tokenIssuanceInfo = Some(TokenIssuance.Info(1024))
     )._1
 
-    def checkSwapBalance(alphReserve: U256, tokenReserve: U256) = {
+    def checkSwapBalance(
+        alphReserve: U256,
+        tokenReserve: U256,
+        numAssetOutput: Int,
+        numContractOutput: Int
+    ) = {
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
       val output     = worldState.getContractAsset(swapContractId).rightValue
       output.amount is alphReserve
       output.tokens.toSeq.toMap.getOrElse(tokenId, U256.Zero) is tokenReserve
+
+      worldState
+        .getAssetOutputs(ByteString.empty, Int.MaxValue, (_, _) => true)
+        .rightValue
+        .length is numAssetOutput
+      worldState
+        .getContractOutputs(ByteString.empty, Int.MaxValue)
+        .rightValue
+        .length is numContractOutput
     }
 
-    checkSwapBalance(minimalAlphInContract, 0)
+    checkSwapBalance(minimalAlphInContract, 0, 4, 3)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -1692,7 +1706,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |${AMMContract.swapContract}
                     |""".stripMargin)
-    checkSwapBalance(minimalAlphInContract + 10, 100)
+    checkSwapBalance(minimalAlphInContract + 10, 100, 5 /* 1 more coinbase output */, 3)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -1702,7 +1716,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |${AMMContract.swapContract}
                     |""".stripMargin)
-    checkSwapBalance(minimalAlphInContract + 20, 50)
+    checkSwapBalance(minimalAlphInContract + 20, 50, 6 /* 1 more coinbase output */, 3)
 
     callTxScript(
       s"""
@@ -1714,7 +1728,7 @@ class VMSpec extends AlephiumSpec {
          |${AMMContract.swapContract}
          |""".stripMargin
     )
-    checkSwapBalance(minimalAlphInContract + 10, 100)
+    checkSwapBalance(minimalAlphInContract + 10, 100, 7 /* 1 more coinbase output */, 3)
   }
 
   it should "execute tx in random order" in new ContractFixture {
