@@ -1122,4 +1122,40 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     checkData(tx, jsonRaw)
   }
+
+  it should "encode/decode UTXO" in {
+    val tokenId = TokenId.generate
+    val amount  = Amount(123)
+
+    {
+      val utxo = UTXO(OutputRef(1, Hash.zero), amount)
+      val jsonRaw =
+        s"""
+           |{
+           |  "ref": {"hint":1,"key":"0000000000000000000000000000000000000000000000000000000000000000"},
+           |  "amount":"123"
+           |}""".stripMargin
+      checkData(utxo, jsonRaw)
+    }
+
+    {
+      val utxo = UTXO(
+        OutputRef(1, Hash.zero),
+        amount,
+        AVector(Token(tokenId, amount.value)),
+        TimeStamp.zero,
+        Hex.unsafe("FFFF")
+      )
+      val jsonRaw =
+        s"""
+           |{
+           |  "ref": {"hint":1,"key":"0000000000000000000000000000000000000000000000000000000000000000"},
+           |  "amount":"123",
+           |  "tokens":[{"id":"${tokenId.toHexString}","amount":"123"}],
+           |  "lockTime":0,
+           |  "additionalData":"ffff"
+           |}""".stripMargin
+      checkData(utxo, jsonRaw)
+    }
+  }
 }

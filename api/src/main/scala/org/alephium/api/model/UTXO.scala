@@ -26,15 +26,14 @@ import org.alephium.util.{AVector, TimeStamp}
 final case class UTXO(
     ref: OutputRef,
     amount: Amount,
-    tokens: AVector[Token],
+    tokens: Option[AVector[Token]] = None,
     lockTime: Option[TimeStamp] = None,
     additionalData: Option[ByteString] = None
 )
 
 object UTXO {
   def from(ref: TxOutputRef, output: TxOutput): UTXO = {
-    import output._
-
+    val tokens = if (output.tokens.isEmpty) None else Some(output.tokens.map(Token.tupled))
     val (lockTime, additionalData) = output match {
       case o: AssetOutput    => Some(o.lockTime) -> Some(o.additionalData)
       case _: ContractOutput => None             -> None
@@ -42,8 +41,8 @@ object UTXO {
 
     UTXO(
       OutputRef.from(ref),
-      Amount(amount),
-      tokens.map(Token.tupled),
+      Amount(output.amount),
+      tokens,
       lockTime,
       additionalData
     )
@@ -56,6 +55,6 @@ object UTXO {
       lockTime: TimeStamp,
       addtionalData: ByteString
   ): UTXO = {
-    UTXO(ref, amount, tokens, Some(lockTime), Some(addtionalData))
+    UTXO(ref, amount, Some(tokens), Some(lockTime), Some(addtionalData))
   }
 }
