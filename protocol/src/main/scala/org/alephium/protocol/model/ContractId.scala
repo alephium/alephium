@@ -51,6 +51,10 @@ object ContractId extends HashUtils[ContractId] {
     hash(txId.bytes ++ Bytes.from(outputIndex))
   }
 
+  def subContract(preImage: ByteString): ContractId = {
+    unsafe(Hash.doubleHash(preImage))
+  }
+
   @inline def hash(bytes: Seq[Byte]): ContractId = ContractId(Hash.hash(bytes))
 
   @inline def hash(str: String): ContractId = hash(ByteString(str))
