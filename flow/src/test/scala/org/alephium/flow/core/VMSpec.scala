@@ -33,7 +33,7 @@ import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
-import org.alephium.serde.{deserialize, serialize, Serde}
+import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
 
 // scalastyle:off file.size.limit method.length number.of.methods
@@ -162,36 +162,6 @@ class VMSpec extends AlephiumSpec {
     val chainIndex     = ChainIndex.unsafe(0, 0)
     val genesisLockup  = getGenesisLockupScript(chainIndex)
     val genesisAddress = Address.Asset(genesisLockup)
-
-    def createContract(
-        input: String,
-        initialState: AVector[Val],
-        tokenIssuanceInfo: Option[TokenIssuance.Info] = None,
-        initialAttoAlphAmount: U256 = minimalAlphInContract
-    ): (ContractId, ContractOutputRef) = {
-      val contract = Compiler.compileContract(input).rightValue
-      val txScript =
-        contractCreation(
-          contract,
-          initialState,
-          genesisLockup,
-          initialAttoAlphAmount,
-          tokenIssuanceInfo
-        )
-      val block = payableCall(blockFlow, chainIndex, txScript)
-
-      val contractOutputRef =
-        TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
-      val contractId = ContractId.from(block.transactions.head.id, 0, chainIndex.from)
-      val estimated  = contractId.inaccurateFirstOutputRef()
-      estimated.hint is contractOutputRef.hint
-      estimated.key.value.bytes.init is contractOutputRef.key.value.bytes.init
-
-      deserialize[StatefulContract.HalfDecoded](serialize(contract.toHalfDecoded())).rightValue
-        .toContract() isE contract
-      addAndCheck(blockFlow, block)
-      (contractId, contractOutputRef)
-    }
 
     def createContractAndCheckState(
         input: String,

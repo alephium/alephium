@@ -89,9 +89,9 @@ trait TxUtils { Self: FlowUtils =>
     getUTXOsIncludePool(lockupScript, utxosLimit).map { utxos =>
       val utxosNum = utxos.length
 
-      val (attoAlphBalance, attoAlphBlockedBalance, tokenBalances, tokenLockedBalances) =
+      val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances) =
         TxUtils.getBalance(utxos.map(_.output))
-      (attoAlphBalance, attoAlphBlockedBalance, tokenBalances, tokenLockedBalances, utxosNum)
+      (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances, utxosNum)
     }
   }
 
