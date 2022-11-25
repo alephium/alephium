@@ -1525,8 +1525,35 @@ sealed trait CreateContractAbstract extends ContractInstr {
     }
   }
 
-  protected def getContractId[C <: StatefulContext](
+  def __runWith[C <: StatefulContext](
       frame: Frame[C],
+      tokenIssuance: TokenIssuance
+  ): ExeResult[Unit] = {
+    for {
+      tokenIssuanceInfo <- getTokenIssuanceInfo(frame, tokenIssuance)
+      fields            <- frame.popFields()
+      _                 <- frame.ctx.chargeFieldSize(fields.toIterable)
+      contractCode      <- prepareContractCode(frame)
+      newContractId <- CreateContractAbstract.getContractId(
+        frame,
+        subContract,
+        frame.ctx.blockEnv.chainIndex.from
+      )
+      _ <- frame.createContract(newContractId, contractCode, fields, tokenIssuanceInfo)
+      _ <-
+        if (frame.ctx.getHardFork().isLemanEnabled()) {
+          frame.pushOpStack(Val.ByteVec(newContractId.bytes))
+        } else {
+          okay
+        }
+    } yield ()
+  }
+}
+
+object CreateContractAbstract {
+  def getContractId[C <: StatefulContext](
+      frame: Frame[C],
+      subContract: Boolean,
       groupIndex: GroupIndex
   ): ExeResult[ContractId] = {
     if (subContract) {
@@ -1549,26 +1576,6 @@ sealed trait CreateContractAbstract extends ContractInstr {
         Right(ContractId.deprecatedFrom(frame.ctx.txId, frame.ctx.nextOutputIndex))
       }
     }
-  }
-
-  def __runWith[C <: StatefulContext](
-      frame: Frame[C],
-      tokenIssuance: TokenIssuance
-  ): ExeResult[Unit] = {
-    for {
-      tokenIssuanceInfo <- getTokenIssuanceInfo(frame, tokenIssuance)
-      fields            <- frame.popFields()
-      _                 <- frame.ctx.chargeFieldSize(fields.toIterable)
-      contractCode      <- prepareContractCode(frame)
-      newContractId     <- getContractId(frame, frame.ctx.blockEnv.chainIndex.from)
-      _ <- frame.createContract(newContractId, contractCode, fields, tokenIssuanceInfo)
-      _ <-
-        if (frame.ctx.getHardFork().isLemanEnabled()) {
-          frame.pushOpStack(Val.ByteVec(newContractId.bytes))
-        } else {
-          okay
-        }
-    } yield ()
   }
 }
 

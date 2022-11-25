@@ -2259,6 +2259,27 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
+  it should "generate contract id for different network" in new StatefulInstrFixture {
+    val groupIndex   = GroupIndex.random
+    val path         = Hash.random.bytes
+    val genesisFrame = prepareFrame()(NetworkConfigFixture.PreLeman)
+    val lemanFrame   = prepareFrame()(NetworkConfigFixture.Leman)
+
+    CreateContractAbstract.getContractId(genesisFrame, false, groupIndex).rightValue is
+      ContractId.deprecatedFrom(genesisFrame.ctx.txId, 0)
+
+    CreateContractAbstract.getContractId(lemanFrame, false, groupIndex).rightValue is
+      ContractId.from(lemanFrame.ctx.txId, 0, groupIndex)
+
+    genesisFrame.pushOpStack(Val.ByteVec(path))
+    CreateContractAbstract.getContractId(genesisFrame, true, groupIndex).rightValue is
+      ContractId.deprecatedSubContract(genesisFrame.obj.getContractId().rightValue.bytes ++ path)
+
+    lemanFrame.pushOpStack(Val.ByteVec(path))
+    CreateContractAbstract.getContractId(lemanFrame, true, groupIndex).rightValue is
+      ContractId.subContract(lemanFrame.obj.getContractId().rightValue.bytes ++ path, groupIndex)
+  }
+
   trait CreateContractAbstractFixture extends StatefulInstrFixture {
     val from              = lockupScriptGen.sample.get
     val (tx, prevOutputs) = transactionGenWithPreOutputs().sample.get
