@@ -3044,6 +3044,29 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(SelfContractId, Val.ByteVec(frame.obj.contractIdOpt.get.bytes))
   }
 
+  trait SubContractIdBaseFixture extends StatefulInstrFixture {
+    def test(instr: SubContractIdBase, expected: ContractId, initialVals: Val*) = {
+      initialVals.foreach(frame.pushOpStack)
+      frame.opStack.size is initialVals.length
+      instr.runWithLeman(frame) isE ()
+      frame.popContractId().rightValue is expected
+    }
+  }
+
+  it should "SubContractId" in new SubContractIdBaseFixture {
+    val path = Hash.random.bytes
+    val expectedId =
+      frame.obj.getContractId().rightValue.subContractId(path, frame.ctx.blockEnv.chainIndex.from)
+    test(SubContractId, expectedId, Val.ByteVec(path))
+  }
+
+  it should "SubContractIdOf" in new SubContractIdBaseFixture {
+    val parentId   = ContractId.random
+    val path       = Hash.random.bytes
+    val expectedId = parentId.subContractId(path, frame.ctx.blockEnv.chainIndex.from)
+    test(SubContractIdOf, expectedId, Val.ByteVec(parentId.bytes), Val.ByteVec(path))
+  }
+
   it should "SelfAddress" in new ContractInstrFixture {
     test(SelfAddress, Val.Address(LockupScript.p2c(frame.obj.contractIdOpt.get)))
   }
