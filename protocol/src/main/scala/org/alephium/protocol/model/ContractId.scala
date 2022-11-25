@@ -20,11 +20,16 @@ import akka.util.ByteString
 
 import org.alephium.crypto.HashUtils
 import org.alephium.protocol.Hash
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Bytes
 
 final case class ContractId private (value: Hash) extends AnyVal with RandomBytes {
   def bytes: ByteString = value.bytes
+
+  def groupIndex(implicit config: GroupConfig): GroupIndex = {
+    GroupIndex.unsafe(value.bytes.last.toInt)
+  }
 
   def subContractId(path: ByteString, groupIndex: GroupIndex): ContractId = {
     ContractId.subContract(bytes ++ path, groupIndex)
