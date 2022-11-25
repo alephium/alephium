@@ -177,7 +177,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     lazy val mockBlockEnv =
       BlockEnv(
-        ChainIndex.unsafe(0),
+        ChainIndex.randomIntraGroup,
         AlephiumMainNet,
         TimeStamp.now(),
         Target.Max,
@@ -201,7 +201,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         AVector.empty,
         blockEnv = Some(
           BlockEnv(
-            ChainIndex.unsafe(0),
+            ChainIndex.randomIntraGroup,
             AlephiumMainNet,
             blockTs,
             Target.Max,
@@ -247,7 +247,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         AVector.empty,
         blockEnv = Some(
           BlockEnv(
-            ChainIndex.unsafe(0),
+            ChainIndex.randomIntraGroup,
             AlephiumMainNet,
             blockTs,
             Target.Max,
@@ -1482,7 +1482,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       private val timestamp = TimeStamp.now()
       override lazy val frame = prepareFrame(
         AVector.empty,
-        blockEnv = Some(mockBlockEnv)
+        blockEnv = Some(mockBlockEnv.copy(timeStamp = timestamp))
       )
 
       private val initialGas = context.gasRemaining

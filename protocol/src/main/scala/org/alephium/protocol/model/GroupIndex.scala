@@ -17,6 +17,7 @@
 package org.alephium.protocol.model
 
 import scala.annotation.tailrec
+import scala.util.Random
 
 import org.alephium.protocol.{Hash, PrivateKey, PublicKey, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
@@ -54,4 +55,8 @@ object GroupIndex {
   @inline
   def validate(group: Int)(implicit config: GroupConfig): Boolean =
     0 <= group && group < config.groups
+
+  def random(implicit config: GroupConfig): GroupIndex = {
+    unsafe(Random.nextInt(config.groups))
+  }
 }
