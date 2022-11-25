@@ -80,7 +80,7 @@ trait TxUtils { Self: FlowUtils =>
 
   // return the total balance, the locked balance, and the number of all utxos
   def getBalance(
-      lockupScript: LockupScript.Asset,
+      lockupScript: LockupScript,
       utxosLimit: Int
   ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
     val groupIndex = lockupScript.groupIndex
@@ -96,14 +96,24 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def getUTXOsIncludePool(
-      lockupScript: LockupScript.Asset,
+      lockupScript: LockupScript,
       utxosLimit: Int
-  ): IOResult[AVector[AssetOutputInfo]] = {
+  ): IOResult[AVector[OutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
-    getImmutableGroupViewIncludePool(groupIndex)
-      .flatMap(_.getRelevantUtxos(lockupScript, utxosLimit))
+    lockupScript match {
+      case ls: LockupScript.Asset =>
+        getImmutableGroupViewIncludePool(groupIndex).flatMap(
+          _.getRelevantUtxos(ls, utxosLimit).map(_.as[OutputInfo])
+        )
+      case ls: LockupScript.P2C =>
+        getBestPersistedWorldState(groupIndex).flatMap(
+          _.getContractOutputInfo(ls.contractId).map { case (ref, output) =>
+            AVector(ContractOutputInfo(ref, output))
+          }
+        )
+    }
   }
 
   def transfer(
@@ -654,7 +664,7 @@ object TxUtils {
   }
 
   def getBalance(
-      outputs: AVector[AssetOutput]
+      outputs: AVector[TxOutput]
   ): (U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)]) = {
     var attoAlphBalance: U256       = U256.Zero
     var attoAlphLockedBalance: U256 = U256.Zero
@@ -663,13 +673,17 @@ object TxUtils {
     val currentTs                   = TimeStamp.now()
 
     outputs.foreach { output =>
-      attoAlphBalance.add(output.amount).map(attoAlphBalance = _)
+      attoAlphBalance.add(output.amount).foreach(attoAlphBalance = _)
       output.tokens.foreach { case (tokenId, amount) =>
         tokenBalances.addToken(tokenId, amount)
       }
 
-      if (output.lockTime > currentTs) {
-        attoAlphLockedBalance.add(output.amount).map(attoAlphLockedBalance = _)
+      val isLocked = output match {
+        case o: AssetOutput    => o.lockTime > currentTs
+        case _: ContractOutput => false
+      }
+      if (isLocked) {
+        attoAlphLockedBalance.add(output.amount).foreach(attoAlphLockedBalance = _)
         output.tokens.foreach { case (tokenId, amount) =>
           tokenLockedBalances.addToken(tokenId, amount)
         }

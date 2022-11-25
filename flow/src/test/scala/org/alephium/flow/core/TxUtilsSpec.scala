@@ -21,6 +21,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -847,7 +848,10 @@ class TxUtilsSpec extends AlephiumSpec {
 
     info("With provided Utxos")
 
-    val availableUtxos = blockFlow.getUTXOsIncludePool(output.lockupScript, Int.MaxValue).rightValue
+    val availableUtxos = blockFlow
+      .getUTXOsIncludePool(output.lockupScript, Int.MaxValue)
+      .rightValue
+      .asUnsafe[AssetOutputInfo]
     val availableInputs = availableUtxos.map(_.ref)
     val outputInfo = AVector(
       TxOutputInfo(
@@ -961,7 +965,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     forAll(assetOutputsGen) { assetOutputs =>
       val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, lockedTokenBalances) =
-        TxUtils.getBalance(assetOutputs)
+        TxUtils.getBalance(assetOutputs.as[TxOutput])
 
       attoAlphBalance is U256.unsafe(assetOutputs.sumBy(_.amount.v))
       attoAlphLockedBalance is U256.unsafe(assetOutputs.filter(_.lockTime > now).sumBy(_.amount.v))

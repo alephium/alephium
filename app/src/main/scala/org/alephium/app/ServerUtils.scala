@@ -103,13 +103,13 @@ class ServerUtils(implicit
     }
   }
 
-  def getBalance(blockFlow: BlockFlow, balanceRequest: GetBalance): Try[Balance] = {
+  def getBalance(blockFlow: BlockFlow, address: Address): Try[Balance] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
     for {
-      _ <- checkGroup(balanceRequest.address.lockupScript)
+      _ <- checkGroup(address.lockupScript)
       balance <- blockFlow
         .getBalance(
-          balanceRequest.address.lockupScript,
+          address.lockupScript,
           utxosLimit
         )
         .map(Balance.from(_, utxosLimit))
@@ -118,10 +118,7 @@ class ServerUtils(implicit
     } yield balance
   }
 
-  def getUTXOsIncludePool(
-      blockFlow: BlockFlow,
-      address: Address.Asset
-  ): Try[UTXOs] = {
+  def getUTXOsIncludePool(blockFlow: BlockFlow, address: Address): Try[UTXOs] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
     for {
       _ <- checkGroup(address.lockupScript)
@@ -681,7 +678,7 @@ class ServerUtils(implicit
     )
   }
 
-  def checkGroup(lockupScript: LockupScript.Asset): Try[Unit] = {
+  def checkGroup(lockupScript: LockupScript): Try[Unit] = {
     checkGroup(
       lockupScript.groupIndex(brokerConfig),
       Some(s"Address ${Address.from(lockupScript)}")

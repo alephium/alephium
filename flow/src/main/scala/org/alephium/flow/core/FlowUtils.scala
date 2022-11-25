@@ -362,7 +362,14 @@ trait FlowUtils
 }
 
 object FlowUtils {
+  sealed trait OutputInfo {
+    def ref: TxOutputRef
+    def output: TxOutput
+  }
   final case class AssetOutputInfo(ref: AssetOutputRef, output: AssetOutput, outputType: OutputType)
+      extends OutputInfo
+  final case class ContractOutputInfo(ref: ContractOutputRef, output: ContractOutput)
+      extends OutputInfo
 
   sealed trait OutputType {
     def cachedLevel: Int

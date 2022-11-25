@@ -27,6 +27,7 @@ import org.alephium.util.Bytes
 final case class ContractId private (value: Hash) extends AnyVal with RandomBytes {
   def bytes: ByteString = value.bytes
 
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def groupIndex(implicit config: GroupConfig): GroupIndex = {
     GroupIndex.unsafe(value.bytes.last.toInt)
   }

@@ -250,7 +250,7 @@ object ServerFixture {
     }
 
     override def getBalance(
-        lockupScript: LockupScript.Asset,
+        lockupScript: LockupScript,
         utxosLimit: Int
     ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
       val tokens       = AVector((TokenId.hash("token1"), U256.One))
@@ -259,13 +259,19 @@ object ServerFixture {
     }
 
     override def getUTXOsIncludePool(
-        lockupScript: LockupScript.Asset,
+        lockupScript: LockupScript,
         utxosLimit: Int
     ): IOResult[AVector[AssetOutputInfo]] = {
       val assetOutputInfos = AVector(U256.One, U256.Two).map { amount =>
         val tokens = AVector((TokenId.hash("token1"), U256.One))
-        val output = AssetOutput(amount, lockupScript, TimeStamp.now(), tokens, ByteString.empty)
-        val ref    = AssetOutputRef.unsafe(Hint.from(output), TxOutputRef.unsafeKey(Hash.generate))
+        val output = AssetOutput(
+          amount,
+          lockupScript.asInstanceOf[LockupScript.Asset],
+          TimeStamp.now(),
+          tokens,
+          ByteString.empty
+        )
+        val ref = AssetOutputRef.unsafe(Hint.from(output), TxOutputRef.unsafeKey(Hash.generate))
         AssetOutputInfo(ref, output, FlowUtils.PersistedOutput)
       }
 

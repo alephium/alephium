@@ -87,6 +87,13 @@ trait WorldState[T, R1, R2, R3] {
     } yield output
   }
 
+  def getContractOutputInfo(id: ContractId): IOResult[(ContractOutputRef, ContractOutput)] = {
+    for {
+      state  <- getContractState(id)
+      output <- getContractAsset(state.contractOutputRef)
+    } yield state.contractOutputRef -> output
+  }
+
   def getContractAsset(outputRef: ContractOutputRef): IOResult[ContractOutput] = {
     for {
       outputRaw <- getOutput(outputRef)

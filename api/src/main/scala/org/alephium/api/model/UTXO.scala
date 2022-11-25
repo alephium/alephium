@@ -19,20 +19,26 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.api.model.Token
-import org.alephium.protocol.model.{AssetOutput, AssetOutputRef}
+import org.alephium.protocol.model.{AssetOutput, ContractOutput, TxOutput, TxOutputRef}
 import org.alephium.util.{AVector, TimeStamp}
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class UTXO(
     ref: OutputRef,
     amount: Amount,
     tokens: AVector[Token],
-    lockTime: TimeStamp,
-    additionalData: ByteString
+    lockTime: Option[TimeStamp] = None,
+    additionalData: Option[ByteString] = None
 )
 
 object UTXO {
-  def from(ref: AssetOutputRef, output: AssetOutput): UTXO = {
+  def from(ref: TxOutputRef, output: TxOutput): UTXO = {
     import output._
+
+    val (lockTime, additionalData) = output match {
+      case o: AssetOutput    => Some(o.lockTime) -> Some(o.additionalData)
+      case _: ContractOutput => None             -> None
+    }
 
     UTXO(
       OutputRef.from(ref),
@@ -41,5 +47,15 @@ object UTXO {
       lockTime,
       additionalData
     )
+  }
+
+  def apply(
+      ref: OutputRef,
+      amount: Amount,
+      tokens: AVector[Token],
+      lockTime: TimeStamp,
+      addtionalData: ByteString
+  ): UTXO = {
+    UTXO(ref, amount, tokens, Some(lockTime), Some(addtionalData))
   }
 }
