@@ -311,6 +311,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       )
     }
 
+    servers.foreach(_.config.network.networkId.id is 4.toByte)
     Clique(AVector.from(servers))
   }
 

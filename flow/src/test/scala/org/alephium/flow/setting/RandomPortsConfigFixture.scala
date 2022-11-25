@@ -16,6 +16,7 @@
 
 package org.alephium.flow.setting
 
+import org.alephium.protocol.model.NetworkId
 import org.alephium.util.{Env, SocketUtil}
 
 trait RandomPortsConfigFixture extends SocketUtil {
@@ -27,8 +28,8 @@ trait RandomPortsConfigFixture extends SocketUtil {
 
   lazy val configPortsValues: Map[String, Any] = {
     val networkId = Env.currentEnv match {
-      case Env.Integration => 1
-      case Env.Test        => 2
+      case Env.Test        => NetworkId.AlephiumDevNet.id
+      case Env.Integration => 4 // A testnet that is different from public testnet (id = 1)
       case _               => throw new RuntimeException("Invalid test env")
     }
     Map(
