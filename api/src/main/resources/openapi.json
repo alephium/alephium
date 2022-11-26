@@ -11546,10 +11546,7 @@
       "UTXO": {
         "required": [
           "ref",
-          "amount",
-          "tokens",
-          "lockTime",
-          "additionalData"
+          "amount"
         ],
         "type": "object",
         "properties": {

@@ -1128,12 +1128,15 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val amount  = Amount(123)
 
     {
-      val utxo = UTXO(OutputRef(1, Hash.zero), amount)
+      val utxo = UTXO(OutputRef(1, Hash.zero), amount, None, None, None)
       val jsonRaw =
         s"""
            |{
            |  "ref": {"hint":1,"key":"0000000000000000000000000000000000000000000000000000000000000000"},
-           |  "amount":"123"
+           |  "amount":"123",
+           |  "tokens":null,
+           |  "lockTime":null,
+           |  "additionalData":null
            |}""".stripMargin
       checkData(utxo, jsonRaw)
     }
