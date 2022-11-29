@@ -1077,7 +1077,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val createdFooContractId =
       barContractId.subContractId(
         Hex.unsafe(createContractPath),
-        ChainIndex.from(testContractParams.blockHash).from
+        ChainIndex.unsafe(testContractParams.group, testContractParams.group).from
       )
 
     val result =
