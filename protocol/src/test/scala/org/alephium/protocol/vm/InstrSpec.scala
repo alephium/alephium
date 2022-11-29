@@ -2272,8 +2272,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractId.from(lemanFrame.ctx.txId, 0, groupIndex)
 
     genesisFrame.pushOpStack(Val.ByteVec(path))
-    CreateContractAbstract.getContractId(genesisFrame, true, groupIndex).rightValue is
-      ContractId.deprecatedSubContract(genesisFrame.obj.getContractId().rightValue.bytes ++ path)
+    intercept[RuntimeException](
+      CreateContractAbstract.getContractId(genesisFrame, true, groupIndex)
+    ).getMessage is "Dead branch while creating a new contract"
 
     lemanFrame.pushOpStack(Val.ByteVec(path))
     CreateContractAbstract.getContractId(lemanFrame, true, groupIndex).rightValue is

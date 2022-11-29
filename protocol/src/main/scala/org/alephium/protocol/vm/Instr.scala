@@ -1566,7 +1566,7 @@ object CreateContractAbstract {
         if (frame.ctx.getHardFork().isLemanEnabled()) {
           ContractId.subContract(subContractIdPreImage, groupIndex)
         } else {
-          ContractId.deprecatedSubContract(subContractIdPreImage)
+          throw new RuntimeException("Dead branch while creating a new contract")
         }
       }
     } else {
