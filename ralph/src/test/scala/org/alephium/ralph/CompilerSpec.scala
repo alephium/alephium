@@ -3282,57 +3282,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info(
-        "Warning for public functions which has no external call check and no update fields annotation"
-      )
-      def code(annotation: String, modifier: String): String =
-        s"""
-           |Contract Foo(mut a: U256) {
-           |  $annotation
-           |  $modifier fn foo() -> () {
-           |    a = a + 1
-           |  }
-           |
-           |  pub fn bar() -> () {
-           |    checkCaller!(true, 0)
-           |    foo()
-           |  }
-           |}
-           |""".stripMargin
-
-      Compiler.compileContractFull(code("", "pub"), 0).rightValue.warnings is AVector(
-        "No update fields annotation for function: Foo.foo, please use @using(updateFields = true/false) for the function"
-      )
-      Compiler.compileContractFull(code("", ""), 0).rightValue.warnings.isEmpty is true
-
-      Compiler
-        .compileContractFull(code("@using(externalCallCheck = true)", "pub"), 0)
-        .rightValue
-        .warnings is AVector(
-        "No update fields annotation for function: Foo.foo, please use @using(updateFields = true/false) for the function"
-      )
-      Compiler
-        .compileContractFull(code("@using(externalCallCheck = true)", ""), 0)
-        .rightValue
-        .warnings
-        .isEmpty is true
-
-      Compiler
-        .compileContractFull(
-          code("@using(externalCallCheck = true, updateFields = true)", "pub"),
-          0
-        )
-        .rightValue
-        .warnings
-        .isEmpty is true
-      Compiler
-        .compileContractFull(code("@using(externalCallCheck = true, updateFields = true)", ""), 0)
-        .rightValue
-        .warnings
-        .isEmpty is true
-    }
-
-    {
       info("No warning for functions which has external call check")
       def code(annotation: String): String =
         s"""
