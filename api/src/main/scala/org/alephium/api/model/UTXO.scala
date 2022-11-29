@@ -48,7 +48,7 @@ object UTXO {
     )
   }
 
-  def apply(
+  def from(
       ref: OutputRef,
       amount: Amount,
       tokens: AVector[Token],

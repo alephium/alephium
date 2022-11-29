@@ -1139,7 +1139,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
 
     {
-      val utxo = UTXO(
+      val utxo = UTXO.from(
         OutputRef(1, Hash.zero),
         amount,
         AVector(Token(tokenId, amount.value)),
