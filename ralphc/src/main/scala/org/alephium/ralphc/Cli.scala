@@ -32,9 +32,8 @@ import org.alephium.util.AVector
 )
 @Command(
   name = "ralphc",
-  mixinStandardHelpOptions = true,
-  version = Array("ralphc 1.5.4"),
-  description = Array("ralph language compiler")
+  description = Array("ralph language compiler"),
+  versionProvider = classOf[org.alephium.ralphc.Version]
 )
 class Cli extends Callable[Int] {
 
