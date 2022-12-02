@@ -32,6 +32,7 @@ import org.alephium.util.AVector
 )
 @Command(
   name = "ralphc",
+  mixinStandardHelpOptions = true,
   description = Array("ralph language compiler"),
   versionProvider = classOf[org.alephium.ralphc.Version]
 )
@@ -88,7 +89,7 @@ class Cli extends Callable[Int] {
   @Option(
     names = Array("-w", "--warning"),
     defaultValue = "false",
-    description = Array("Consider warnings as errors")
+    description = Array("Consider warning as error")
   )
   var warningAsError: Boolean = false
 
@@ -126,12 +127,6 @@ class Cli extends Callable[Int] {
     } else {
       0
     }
-  }
-
-  def ok[T, O](msg: T, other: O): Int = {
-    println(other)
-    println(msg)
-    0
   }
 
   def compilerOptions(): CompilerOptions = CompilerOptions(
