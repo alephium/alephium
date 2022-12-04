@@ -79,12 +79,6 @@ trait Warnings {
       warnings += Warnings.noExternalCallCheckMsg(typeId.name, funcId.name)
     }
   }
-
-  def warnNoExternalCallCheckAndUpdateFields(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
-    if (!compilerOptions.ignoreUpdateFieldsCheckWarnings) {
-      warnings += s"No update fields annotation for function: ${typeId.name}.${funcId.name}, please use @using(updateFields = true/false) for the function"
-    }
-  }
 }
 
 object Warnings {

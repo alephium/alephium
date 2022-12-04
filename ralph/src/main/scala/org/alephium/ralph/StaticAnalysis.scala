@@ -189,19 +189,6 @@ object StaticAnalysis {
     }
   }
 
-  private def checkNoExternalCallFuncUpdateFields(
-      contract: Contract,
-      externalCallCheckTable: mutable.Map[FuncId, Boolean],
-      state: Compiler.State[vm.StatefulContext]
-  ): Unit = {
-    contract.funcs.foreach { func =>
-      val noExternalCallCheck = !func.useExternalCallCheck || !externalCallCheckTable(func.id)
-      if (noExternalCallCheck && !func.hasUpdateFieldsAnnotation && func.isPublic) {
-        state.warnNoExternalCallCheckAndUpdateFields(contract.ident, func.id)
-      }
-    }
-  }
-
   def checkExternalCalls(
       multiContract: MultiContract,
       states: AVector[Compiler.State[vm.StatefulContext]]
@@ -212,7 +199,6 @@ object StaticAnalysis {
         val state = states(index)
         val table = contract.buildExternalCallCheckTable(state)
         externalCallCheckTables.update(contract.ident, table)
-        checkNoExternalCallFuncUpdateFields(contract, table, state)
       case (interface: ContractInterface, _) =>
         val table = mutable.Map.from(interface.funcs.map(_.id -> true))
         externalCallCheckTables.update(interface.ident, table)

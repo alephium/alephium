@@ -309,7 +309,6 @@ class ParserSpec extends AlephiumSpec {
     parsed2.usePreapprovedAssets is true
     parsed2.useAssetsInContract is true
     parsed2.useExternalCallCheck is true
-    parsed2.hasUpdateFieldsAnnotation is false
     parsed2.useUpdateFields is true
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
@@ -327,7 +326,6 @@ class ParserSpec extends AlephiumSpec {
     parsed3.useAssetsInContract is true
     parsed3.useExternalCallCheck is true
     parsed3.useUpdateFields is true
-    parsed3.hasUpdateFieldsAnnotation is true
   }
 
   it should "parser contract initial states" in {
