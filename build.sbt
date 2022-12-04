@@ -352,7 +352,7 @@ lazy val ralphc = project("ralphc")
   .settings(
     libraryDependencies ++= Seq(
       upickle,
-      picocli
+      scopt
     ),
     publish / skip             := true,
     assembly / mainClass       := Some("org.alephium.ralphc.Main"),

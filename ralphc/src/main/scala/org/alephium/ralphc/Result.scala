@@ -16,7 +16,7 @@
 
 package org.alephium.ralphc
 
-import org.alephium.api.model.CompileResult
+import org.alephium.api.model.{CompileContractResult, CompileResult, CompileScriptResult}
 import org.alephium.protocol.Hash
 import org.alephium.util.AVector
 
@@ -28,6 +28,18 @@ final case class ScriptResult(
     functions: AVector[CompileResult.FunctionSig]
 ) extends CompileResult.Versioned
 
+object ScriptResult {
+  def from(s: CompileScriptResult): ScriptResult = {
+    ScriptResult(
+      s.version,
+      s.name,
+      s.bytecodeTemplate,
+      s.fields,
+      s.functions
+    )
+  }
+}
+
 final case class ContractResult(
     version: String,
     name: String,
@@ -37,3 +49,17 @@ final case class ContractResult(
     eventsSig: AVector[CompileResult.EventSig],
     functions: AVector[CompileResult.FunctionSig]
 ) extends CompileResult.Versioned
+
+object ContractResult {
+  def from(c: CompileContractResult): ContractResult = {
+    ContractResult(
+      c.version,
+      c.name,
+      c.bytecode,
+      c.codeHash,
+      c.fields,
+      c.events,
+      c.functions
+    )
+  }
+}

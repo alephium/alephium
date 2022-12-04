@@ -55,19 +55,19 @@ class TypedMatcherSpec extends AlephiumSpec {
        |""".stripMargin
 
   it should "match Contract Foo" in {
-    TypedMatcher.matcher(contract) is Some(Contract("Foo"))
+    TypedMatcher.matcher(contract) is Some("Foo")
   }
 
   it should "match TxScript Main" in {
-    TypedMatcher.matcher(script) is Some(Script("Main"))
+    TypedMatcher.matcher(script) is Some("Main")
   }
 
   it should "match Interface Foo" in {
-    TypedMatcher.matcher(interface) is Some(Interface("Foo"))
+    TypedMatcher.matcher(interface) is Some("Foo")
   }
 
   it should "match Abstract Contract Foo" in {
-    TypedMatcher.matcher(abstractContract) is Some(AbstractContract("Foo"))
+    TypedMatcher.matcher(abstractContract) is Some("Foo")
   }
 
   it should "match None" in {
