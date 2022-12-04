@@ -23,7 +23,15 @@ import org.alephium.util.{AVector, TimeStamp}
 
 trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
   def genBlockEnv()(implicit networkConfig: NetworkConfig): BlockEnv = {
-    BlockEnv(NetworkId.AlephiumDevNet, TimeStamp.now(), Target.Max, Some(BlockHash.generate))
+    val groupIndex = groupIndexGen.sample.get
+    val chainIndex = ChainIndex(groupIndex, groupIndex)
+    BlockEnv(
+      chainIndex,
+      NetworkId.AlephiumDevNet,
+      TimeStamp.now(),
+      Target.Max,
+      Some(BlockHash.generate)
+    )
   }
 
   def genTxEnv(scriptOpt: Option[StatefulScript] = None, signatures: AVector[Signature]): TxEnv = {
@@ -110,8 +118,8 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       val networkConfig: NetworkConfig   = _networkConfig
       val outputBalances: MutBalances    = MutBalances.empty
       def nextOutputIndex: Int           = 0
-      def blockEnv: BlockEnv             = genBlockEnv()
-      def txEnv: TxEnv                   = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))
+      val blockEnv: BlockEnv             = genBlockEnv()
+      val txEnv: TxEnv                   = txEnvOpt.getOrElse(genTxEnv(None, AVector.empty))
       def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
       def logConfig: LogConfig                         = LogConfig.allEnabled()
       var gasRemaining: GasBox                         = gasLimit

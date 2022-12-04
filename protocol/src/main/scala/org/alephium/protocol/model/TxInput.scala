@@ -97,7 +97,7 @@ object ContractOutputRef {
         }
       )
 
-  def firstOutput(contractId: ContractId): ContractOutputRef = {
+  def inaccurateFirstOutput(contractId: ContractId): ContractOutputRef = {
     val outputHint = Hint.ofContract(LockupScript.p2c(contractId).scriptHint)
     new ContractOutputRef(outputHint, TxOutputRef.firstContractOutputKey(contractId))
   }

@@ -27,6 +27,8 @@ import org.alephium.util.{AVector, Base58, Bytes}
 sealed trait LockupScript {
   def scriptHint: ScriptHint
 
+  def groupIndex(implicit config: GroupConfig): GroupIndex
+
   def hintBytes: ByteString
 
   def isAssetType: Boolean
@@ -143,6 +145,8 @@ object LockupScript {
     lazy val scriptHint: ScriptHint = ScriptHint.fromHash(contractId.value)
 
     def hintBytes: ByteString = serialize(Hint.ofContract(scriptHint))
+
+    def groupIndex(implicit config: GroupConfig): GroupIndex = contractId.groupIndex
 
     def isAssetType: Boolean = false
   }

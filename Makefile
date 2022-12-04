@@ -32,6 +32,8 @@ release:
 run:
 	sbt app/run
 
+update: update-openapi update-builtin-doc
+
 update-openapi:
 	ALEPHIUM_ENV=test sbt "tools/runMain org.alephium.tools.OpenApiUpdate"
 

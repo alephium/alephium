@@ -21,6 +21,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.core.FlowUtils.AssetOutputInfo
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
@@ -28,7 +29,7 @@ import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{GasBox, LockupScript, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
@@ -847,7 +848,10 @@ class TxUtilsSpec extends AlephiumSpec {
 
     info("With provided Utxos")
 
-    val availableUtxos = blockFlow.getUTXOsIncludePool(output.lockupScript, Int.MaxValue).rightValue
+    val availableUtxos = blockFlow
+      .getUTXOsIncludePool(output.lockupScript, Int.MaxValue)
+      .rightValue
+      .asUnsafe[AssetOutputInfo]
     val availableInputs = availableUtxos.map(_.ref)
     val outputInfo = AVector(
       TxOutputInfo(
@@ -961,7 +965,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     forAll(assetOutputsGen) { assetOutputs =>
       val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, lockedTokenBalances) =
-        TxUtils.getBalance(assetOutputs)
+        TxUtils.getBalance(assetOutputs.as[TxOutput])
 
       attoAlphBalance is U256.unsafe(assetOutputs.sumBy(_.amount.v))
       attoAlphLockedBalance is U256.unsafe(assetOutputs.filter(_.lockTime > now).sumBy(_.amount.v))
@@ -971,6 +975,40 @@ class TxUtilsSpec extends AlephiumSpec {
       tokenBalances.sorted is expectedTokenBalances.sorted
       lockedTokenBalances.sorted is expectedLockedTokenBalances.sorted
     }
+  }
+
+  trait ContractFixture extends FlowFixture {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val (contractId, ref) =
+      createContract(code, AVector.empty, tokenIssuanceInfo = Some(TokenIssuance.Info(1)))
+    val address = LockupScript.p2c(contractId)
+  }
+
+  it should "get balance for contract address" in new ContractFixture {
+    val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances, utxosNum) =
+      blockFlow.getBalance(address, Int.MaxValue).rightValue
+    attoAlphBalance is ALPH.oneAlph
+    attoAlphLockedBalance is U256.Zero
+    tokenBalances is AVector(TokenId.from(contractId) -> U256.unsafe(1))
+    tokenLockedBalances.length is 0
+    utxosNum is 1
+  }
+
+  it should "get UTXOs for contract address" in new ContractFixture {
+    val utxos = blockFlow.getUTXOsIncludePool(address, Int.MaxValue).rightValue
+    val utxo  = utxos.head.asInstanceOf[FlowUtils.ContractOutputInfo]
+    utxos.length is 1
+    utxo.ref is ref
+    utxo.output.lockupScript is address
+    utxo.output.amount is ALPH.oneAlph
+    utxo.output.tokens is AVector(TokenId.from(contractId) -> U256.unsafe(1))
   }
 
   private def input(

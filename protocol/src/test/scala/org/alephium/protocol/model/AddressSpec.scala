@@ -20,11 +20,33 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, PublicKey}
+import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.ContractId
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
 class AddressSpec extends AlephiumSpec {
+
+  it should "calculate group index" in new GroupConfigFixture.Default {
+    def testP2pkh(pubKey: String, expectedGroup: Int) = {
+      val publicKey = PublicKey.unsafe(Hex.unsafe(pubKey))
+      Address.p2pkh(publicKey).groupIndex.value is expectedGroup
+    }
+
+    testP2pkh("02a16415ccabeb3bc1ee21daacdd53b780fb287afc1f9ab02ae21bb7559d84dd10", 2)
+    testP2pkh("03c83325bd2c0fe1464161c6d5f42699fc9dd799dda7f984f9fbf59b01b095be19", 0)
+    testP2pkh("03c0a849d8ab8633b45b45ea7f3bb3229e1083a13fd73e027aac2bc55e7f622172", 1)
+    testP2pkh("026a1552ddf754abbfed6784f709fc94b7fe96049939986ea31e46238849953d18", 0)
+
+    def testContract(id: String) = {
+      val contractId = ContractId.unsafe(Hash.unsafe(Hex.unsafe(id)))
+      Address.contract(contractId).groupIndex.value is contractId.bytes.last.toInt
+    }
+
+    testContract("a16415ccabeb3bc1ee21daacdd53b780fb287afc1f9ab02ae21bb7559d84dd00")
+    testContract("c83325bd2c0fe1464161c6d5f42699fc9dd799dda7f984f9fbf59b01b095be01")
+    testContract("c0a849d8ab8633b45b45ea7f3bb3229e1083a13fd73e027aac2bc55e7f622102")
+  }
 
   it should "encode and decode between p2pkh address and public key" in {
     AddressVerifyP2PKH("1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3")

@@ -37,7 +37,8 @@ object BuildDeployContractTxResult {
   def from(
       unsignedTx: UnsignedTransaction
   )(implicit groupConfig: GroupConfig): BuildDeployContractTxResult = {
-    val contractId = ContractId.from(unsignedTx.id, unsignedTx.fixedOutputs.length)
+    val contractId =
+      ContractId.from(unsignedTx.id, unsignedTx.fixedOutputs.length, unsignedTx.fromGroup)
     BuildDeployContractTxResult(
       unsignedTx.fromGroup.value,
       unsignedTx.toGroup.value,

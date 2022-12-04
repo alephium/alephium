@@ -30,7 +30,7 @@ import org.alephium.crypto.{Blake2b, Byte32}
 import org.alephium.flow.client.Node
 import org.alephium.flow.core._
 import org.alephium.flow.core.BlockChain.TxIndex
-import org.alephium.flow.core.FlowUtils.AssetOutputInfo
+import org.alephium.flow.core.FlowUtils.{AssetOutputInfo, OutputInfo}
 import org.alephium.flow.handler.{AllHandlers, TxHandler}
 import org.alephium.flow.io.{Storages, StoragesFixture}
 import org.alephium.flow.mempool.MemPool
@@ -250,7 +250,7 @@ object ServerFixture {
     }
 
     override def getBalance(
-        lockupScript: LockupScript.Asset,
+        lockupScript: LockupScript,
         utxosLimit: Int
     ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
       val tokens       = AVector((TokenId.hash("token1"), U256.One))
@@ -259,17 +259,23 @@ object ServerFixture {
     }
 
     override def getUTXOsIncludePool(
-        lockupScript: LockupScript.Asset,
+        lockupScript: LockupScript,
         utxosLimit: Int
-    ): IOResult[AVector[AssetOutputInfo]] = {
+    ): IOResult[AVector[OutputInfo]] = {
       val assetOutputInfos = AVector(U256.One, U256.Two).map { amount =>
         val tokens = AVector((TokenId.hash("token1"), U256.One))
-        val output = AssetOutput(amount, lockupScript, TimeStamp.now(), tokens, ByteString.empty)
-        val ref    = AssetOutputRef.unsafe(Hint.from(output), TxOutputRef.unsafeKey(Hash.generate))
+        val output = AssetOutput(
+          amount,
+          lockupScript.asInstanceOf[LockupScript.Asset],
+          TimeStamp.now(),
+          tokens,
+          ByteString.empty
+        )
+        val ref = AssetOutputRef.unsafe(Hint.from(output), TxOutputRef.unsafeKey(Hash.generate))
         AssetOutputInfo(ref, output, FlowUtils.PersistedOutput)
       }
 
-      Right(assetOutputInfos)
+      Right(assetOutputInfos.as[OutputInfo])
     }
 
     override def transfer(

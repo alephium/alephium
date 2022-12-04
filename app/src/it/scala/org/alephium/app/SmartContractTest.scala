@@ -44,7 +44,7 @@ class SmartContractTest extends AlephiumActorSpec {
       val currentUTXOs = request[UTXOs](getUTXOs(address), restPort)
       check {
         currentUTXOs.utxos.map { utxo =>
-          (utxo.amount.value, utxo.tokens)
+          (utxo.amount.value, utxo.tokens.getOrElse(AVector.empty))
         }.toSet
       }
     }

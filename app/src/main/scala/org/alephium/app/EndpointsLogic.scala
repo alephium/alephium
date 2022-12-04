@@ -182,7 +182,7 @@ trait EndpointsLogic extends Endpoints {
   }
 
   val getBalanceLogic = serverLogic(getBalance) { address =>
-    Future.successful(serverUtils.getBalance(blockFlow, GetBalance(address)))
+    Future.successful(serverUtils.getBalance(blockFlow, address))
   }
 
   val getUTXOsLogic = serverLogic(getUTXOs) { address =>

@@ -25,15 +25,15 @@ import org.alephium.util.Base58
 sealed trait Address {
   def lockupScript: LockupScript
 
+  def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
+
   def toBase58: String = Base58.encode(serialize(lockupScript))
 
   override def toString: String = toBase58
 }
 
 object Address {
-  final case class Asset(lockupScript: LockupScript.Asset) extends Address {
-    def groupIndex(implicit config: GroupConfig): GroupIndex = lockupScript.groupIndex
-  }
+  final case class Asset(lockupScript: LockupScript.Asset) extends Address
   final case class Contract(lockupScript: LockupScript.P2C) extends Address {
     def contractId: ContractId = lockupScript.contractId
   }
