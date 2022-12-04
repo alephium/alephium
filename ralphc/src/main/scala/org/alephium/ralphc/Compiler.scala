@@ -22,7 +22,6 @@ import java.nio.file.{Path, Paths}
 import scala.collection.mutable
 import scala.io.Source
 
-import org.alephium.api.{failed, Try}
 import org.alephium.api.UtilJson.*
 import org.alephium.api.model.{
   CompileContractResult,
@@ -41,19 +40,12 @@ import org.alephium.util.AVector
   Array(
     "org.wartremover.warts.ToString",
     "org.wartremover.warts.OptionPartial",
-    "org.wartremover.warts.PublicInference",
     "org.wartremover.warts.Recursion",
     "org.wartremover.warts.JavaSerializable",
-    "org.wartremover.warts.PlatformDefault",
-    "org.wartremover.warts.DefaultArguments"
+    "org.wartremover.warts.PlatformDefault"
   )
 )
-object Compiler {
-  var compilerOptions: CompilerOptions  = CompilerOptions.Default
-  val metaInfos                         = mutable.Map.empty[String, MetaInfo]
-  var projectDir                        = "contracts"
-  var projectDirName                    = "contracts"
-  var artifactsName                     = "artifacts"
+object Codec {
   implicit val hashWriter: Writer[Hash] = StringWriter.comap[Hash](_.toHexString)
   implicit val hashReader: Reader[Hash] = byteStringReader.map(Hash.from(_).get)
   implicit val compilerOptionsRW: ReadWriter[CompilerOptions] = macroRW
@@ -69,27 +61,41 @@ object Compiler {
   implicit val compileContractResultSigRW: ReadWriter[ContractResult]         = macroRW
   implicit val codeInfoRW: ReadWriter[CodeInfo]                               = macroRW
   implicit val artifactsRW: ReadWriter[Artifacts]                             = macroRW
+}
+
+@SuppressWarnings(
+  Array(
+    "org.wartremover.warts.ToString",
+    "org.wartremover.warts.PublicInference",
+    "org.wartremover.warts.Recursion",
+    "org.wartremover.warts.JavaSerializable",
+    "org.wartremover.warts.PlatformDefault"
+  )
+)
+object Compiler {
+  val metaInfos: mutable.Map[String, MetaInfo] = mutable.Map.empty[String, MetaInfo]
+  var config: Config                           = Config()
+
+  import Codec._
 
   def getFile(file: File): Array[File] = {
-    val files = file
-      .listFiles()
-      .filter(!_.isDirectory)
-      .filter(t => t.toString.endsWith(".ral"))
-    files ++ file.listFiles().filter(_.isDirectory).flatMap(getFile)
+    val (fullFiles, fullDirs) = file.listFiles().partition(!_.isDirectory)
+    val files                 = fullFiles.filter(t => t.toString.endsWith(".ral"))
+    files ++ fullDirs.flatMap(getFile)
   }
 
-  def projectCodes(rootPath: String): String = {
-    getFile(new File(rootPath))
+  def projectCodes(): String = {
+    getFile(config.contractPath().toFile)
       .map(file => {
         val sourceCode     = Source.fromFile(file).mkString
         val sourceCodeHash = crypto.Sha256.hash(sourceCode).toHexString
         TypedMatcher
           .matcher(sourceCode)
-          .map(_.getName)
           .map(name => {
             val path       = file.toPath.toString
-            val sourcePath = Paths.get(path.substring(path.indexOf(this.projectDirName)))
-            val savePath   = Paths.get(path.replace(projectDirName, artifactsName) + ".json")
+            val sourcePath = Paths.get(path.substring(path.indexOf(this.config.contractsDirName())))
+            val savePath =
+              Paths.get(path.replace(this.config.contractsDirName(), config.artifacts) + ".json")
             val meta = MetaInfo(
               name,
               sourcePath,
@@ -103,17 +109,14 @@ object Compiler {
       .mkString
   }
 
-  def compileProject(
-      rootPath: String,
-      artifactsName: String,
-      compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Try[CompileProjectResult] = {
-    this.projectDir = rootPath
-    this.artifactsName = artifactsName
-    this.projectDirName = new File(rootPath).getName
-    this.compilerOptions = compilerOptions
+  def writer[T: Writer](s: T, path: Path): Unit = {
+    saveResult(write(s, 2), path)
+  }
+
+  def compileProject(config: Config): Either[String, CompileProjectResult] = {
+    this.config = config
     ralph.Compiler
-      .compileProject(projectCodes(rootPath), compilerOptions = compilerOptions)
+      .compileProject(projectCodes(), config.compilerOptions())
       .map(p => {
         p._1.foreach(c => saveContract(CompileContractResult.from(c)))
         p._2.foreach(s => saveScript(CompileScriptResult.from(s)))
@@ -121,55 +124,34 @@ object Compiler {
         CompileProjectResult.from(p._1, p._2)
       })
       .left
-      .map(error => failed(error.toString))
+      .map(_.toString)
   }
 
   def saveContract(c: CompileContractResult): Unit = {
-    val contract = ContractResult(
-      c.version,
-      c.name,
-      c.bytecode,
-      c.codeHash,
-      c.fields,
-      c.events,
-      c.functions
-    )
     val value = metaInfos(c.name)
     value.codeInfo.warnings = c.warnings
     value.codeInfo.bytecodeDebugPatch = c.bytecodeDebugPatch
     value.codeInfo.codeHashDebug = c.codeHashDebug
     metaInfos.addOne((c.name, value))
-
-    val code = write(contract, 2)
-    saveResult(code, metaInfos(c.name).ArtifactPath)
+    writer(ContractResult.from(c), value.ArtifactPath)
   }
 
   def saveScript(s: CompileScriptResult): Unit = {
-    val script = ScriptResult(
-      s.version,
-      s.name,
-      s.bytecodeTemplate,
-      s.fields,
-      s.functions
-    )
     val value = metaInfos(s.name)
     value.codeInfo.warnings = s.warnings
     value.codeInfo.bytecodeDebugPatch = s.bytecodeDebugPatch
     metaInfos.addOne((s.name, value))
-
-    val code = write(script, 2)
-    saveResult(code, metaInfos(s.name).ArtifactPath)
+    writer(ScriptResult.from(s), value.ArtifactPath)
   }
 
   def saveProjectArtifacts(): Unit = {
-    val codes = write(
+    writer(
       Artifacts(
-        compilerOptions,
+        config.compilerOptions(),
         metaInfos.map(item => (item._2.sourcePath.toString, item._2.codeInfo)).toMap
       ),
-      2
+      config.artifactPath()
     )
-    saveResult(codes, Paths.get(artifactsPath().toString, ".project.json"))
   }
 
   def saveResult(code: String, path: Path): Unit = {
@@ -178,11 +160,5 @@ object Compiler {
     writer.write(code)
     writer.close()
   }
-
-  def contractPath(): Path = Paths.get(projectDir)
-
-  def rootPath(): Path = contractPath().getParent
-
-  def artifactsPath(): Path = rootPath().resolve(artifactsName)
 
 }

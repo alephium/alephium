@@ -63,6 +63,5 @@ object Dependencies {
     "io.prometheus" % "simpleclient_common" % Version.prometheus
   lazy val `prometheus-simple-client-hotspot` =
     "io.prometheus" % "simpleclient_hotspot" % Version.prometheus
-
-  lazy val picocli = "info.picocli" % "picocli" % "4.6.3"
+  lazy val scopt = "com.github.scopt" %% "scopt" % "4.1.0"
 }

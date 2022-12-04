@@ -22,10 +22,8 @@ import java.nio.file.Files
 import org.alephium.util.AlephiumSpec
 
 class CompilerSpec extends AlephiumSpec {
-  val rootDir       = Files.createTempDirectory("project")
-  var artifactsName = "artifacts"
-  val sourceDirName = "contracts"
-  val sourceDir     = rootDir.resolve(sourceDirName)
+  val rootPath = Files.createTempDirectory("project")
+  val config   = Config(contractsPath = rootPath.resolve("contracts").toString)
   val contract =
     s"""
        |Contract Foo(a: Bool, b: I256, c: U256, d: ByteVec, e: Address) {
@@ -57,6 +55,7 @@ class CompilerSpec extends AlephiumSpec {
        |""".stripMargin
 
   it should "be able to compiler project" in {
+    val sourceDir = rootPath.resolve(config.contractsDirName())
     val fooDir    = sourceDir.resolve("foo")
     val mathDir   = sourceDir.resolve("math")
     val actionDir = sourceDir.resolve("action")
@@ -71,19 +70,14 @@ class CompilerSpec extends AlephiumSpec {
     Files.write(math, interface.getBytes())
     Files.write(action, abstractContract.getBytes())
     Files.write(main, script.getBytes())
-    assert(Compiler.compileProject(sourceDir.toString, artifactsName).isRight)
-    Compiler.rootPath().toString is rootDir.toString
-    Compiler.contractPath().toString is sourceDir.toString
-    Compiler.artifactsPath().toString is rootDir.resolve(artifactsName).toString
-    Compiler.artifactsName is artifactsName
-    Compiler.projectDirName is "contracts"
-    Compiler.projectDir is sourceDir.toString
+
+    assert(Compiler.compileProject(config).isRight)
     assert(Compiler.metaInfos.contains("Foo"))
     assert(Compiler.metaInfos.contains("Math"))
     assert(Compiler.metaInfos.contains("Action"))
     assert(Compiler.metaInfos.contains("Main"))
     assert(!Compiler.metaInfos.contains("main"))
-    assert(deleteFolder(rootDir.toFile))
+    assert(deleteFolder(rootPath.toFile))
   }
 
   def deleteFolder(file: File): Boolean = {
