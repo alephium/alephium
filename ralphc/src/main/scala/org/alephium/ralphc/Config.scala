@@ -16,7 +16,8 @@
 
 package org.alephium.ralphc
 
-import java.nio.file.{Path, Paths}
+import java.io.File
+import java.nio.file.Path
 
 import org.alephium.ralph.CompilerOptions
 
@@ -34,8 +35,8 @@ final case class Config(
     ignoreUpdateFieldsCheckWarnings: Boolean = false,
     ignoreUnusedPrivateFunctionsWarnings: Boolean = false,
     ignoreExternalCallCheckWarnings: Boolean = false,
-    contractsPath: String = "./contracts",
-    artifacts: String = "artifacts"
+    contracts: File = new File("contracts"),
+    artifacts: File = new File("artifacts")
 ) {
   def compilerOptions(): CompilerOptions = {
     CompilerOptions(
@@ -48,9 +49,16 @@ final case class Config(
     )
   }
 
-  def contractPath(): Path = Paths.get(contractsPath)
+  def contractsPath(): Path = {
+    val file = contracts.getCanonicalFile
+    if (file.isFile) {
+      file.getParentFile.toPath
+    } else {
+      file.toPath
+    }
+  }
 
-  def artifactPath(): Path = contractPath().getParent.resolve(artifacts).resolve(".project.json")
+  def artifactsPath(): Path = contractsPath().getParent.resolve(artifacts.toPath)
 
-  def contractsDirName(): String = contractPath().toFile.getName
+  def projectPath(): Path = contractsPath().getParent
 }

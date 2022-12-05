@@ -21,6 +21,7 @@ import java.nio.file.{Path, Paths}
 
 import scala.collection.mutable
 import scala.io.Source
+import scala.util.Using
 
 import org.alephium.api.UtilJson.*
 import org.alephium.api.model.{
@@ -65,37 +66,48 @@ object Codec {
 
 @SuppressWarnings(
   Array(
-    "org.wartremover.warts.ToString",
     "org.wartremover.warts.PublicInference",
     "org.wartremover.warts.Recursion",
-    "org.wartremover.warts.JavaSerializable",
     "org.wartremover.warts.PlatformDefault"
   )
 )
 object Compiler {
-  val metaInfos: mutable.Map[String, MetaInfo] = mutable.Map.empty[String, MetaInfo]
+  val metaInfos: mutable.Map[String, MetaInfo] = mutable.SeqMap.empty[String, MetaInfo]
   var config: Config                           = Config()
 
   import Codec._
 
-  def getFile(file: File): Array[File] = {
-    val (fullFiles, fullDirs) = file.listFiles().partition(!_.isDirectory)
-    val files                 = fullFiles.filter(t => t.toString.endsWith(".ral"))
-    files ++ fullDirs.flatMap(getFile)
+  def getSourceFiles(file: File, ext: String): Array[File] = {
+    if (file.isDirectory) {
+      val (fullFiles, fullDirs) = file.listFiles().partition(!_.isDirectory)
+      val files                 = fullFiles.filter(t => t.getPath.endsWith(ext))
+      files ++ fullDirs.flatMap(getSourceFiles(_, ext))
+    } else {
+      if (file.isFile && file.getPath.endsWith(ext)) {
+        Array(file)
+      } else {
+        Array.empty
+      }
+    }
   }
 
   def projectCodes(): String = {
-    getFile(config.contractPath().toFile)
+    getSourceFiles(config.contractsPath().toFile, ".ral")
       .map(file => {
-        val sourceCode     = Source.fromFile(file).mkString
+        val sourceCode     = Using(Source.fromFile(file)) { _.mkString }.getOrElse("")
         val sourceCodeHash = crypto.Sha256.hash(sourceCode).toHexString
         TypedMatcher
           .matcher(sourceCode)
           .map(name => {
-            val path       = file.toPath.toString
-            val sourcePath = Paths.get(path.substring(path.indexOf(this.config.contractsDirName())))
-            val savePath =
-              Paths.get(path.replace(this.config.contractsDirName(), config.artifacts) + ".json")
+            val path       = file.getCanonicalFile.toPath
+            val sourcePath = path.subpath(config.projectPath().getNameCount, path.getNameCount)
+            val savePath = Paths.get(
+              config
+                .artifactsPath()
+                .resolve(path.subpath(config.contractsPath().getNameCount, path.getNameCount))
+                .toFile
+                .getPath + ".json"
+            )
             val meta = MetaInfo(
               name,
               sourcePath,
@@ -148,9 +160,9 @@ object Compiler {
     writer(
       Artifacts(
         config.compilerOptions(),
-        metaInfos.map(item => (item._2.sourcePath.toString, item._2.codeInfo)).toMap
+        metaInfos.map(item => (item._2.sourcePath.toFile.getPath, item._2.codeInfo)).toMap
       ),
-      config.artifactPath()
+      config.artifactsPath().resolve(".project.json")
     )
   }
 

@@ -1,0 +1,71 @@
+{
+  "version": "v1.5.4",
+  "name": "Add",
+  "bytecode": "02020d40300100020402041600160100010200000202021205160016015fa00116002a16012aa101a001160016010e0da000010002",
+  "codeHash": "a20cffb6f8f9416decd7aec0375b12e04475e8cf19ba80775f8f2d7633e2556d",
+  "fieldsSig": {
+    "names": [
+      "sub",
+      "result"
+    ],
+    "types": [
+      "ByteVec",
+      "U256"
+    ],
+    "isMutable": [
+      false,
+      true
+    ]
+  },
+  "eventsSig": [
+    {
+      "name": "Add",
+      "fieldNames": [
+        "x",
+        "y"
+      ],
+      "fieldTypes": [
+        "U256",
+        "U256"
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "name": "add",
+      "usePreapprovedAssets": false,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        "array"
+      ],
+      "paramTypes": [
+        "[U256;2]"
+      ],
+      "paramIsMutable": [
+        false
+      ],
+      "returnTypes": [
+        "[U256;2]"
+      ]
+    },
+    {
+      "name": "addPrivate",
+      "usePreapprovedAssets": false,
+      "useAssetsInContract": false,
+      "isPublic": false,
+      "paramNames": [
+        "array"
+      ],
+      "paramTypes": [
+        "[U256;2]"
+      ],
+      "paramIsMutable": [
+        false
+      ],
+      "returnTypes": [
+        "[U256;2]"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "version": "v1.5.4",
+  "name": "Debug",
+  "bytecode": "000106010000000000",
+  "codeHash": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
+  "fieldsSig": {
+    "names": [
+      
+    ],
+    "types": [
+      
+    ],
+    "isMutable": [
+      
+    ]
+  },
+  "eventsSig": [
+    
+  ],
+  "functions": [
+    {
+      "name": "debug",
+      "usePreapprovedAssets": false,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        
+      ],
+      "paramTypes": [
+        
+      ],
+      "paramIsMutable": [
+        
+      ],
+      "returnTypes": [
+        
+      ]
+    }
+  ]
+}

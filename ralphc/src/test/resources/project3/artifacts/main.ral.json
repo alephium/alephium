@@ -1,0 +1,39 @@
+{
+  "version": "v1.5.4",
+  "name": "Main",
+  "bytecodeTemplate": "01010300000005{0}{1}300c7b",
+  "fieldsSig": {
+    "names": [
+      "x",
+      "y"
+    ],
+    "types": [
+      "U256",
+      "U256"
+    ],
+    "isMutable": [
+      false,
+      false
+    ]
+  },
+  "functions": [
+    {
+      "name": "main",
+      "usePreapprovedAssets": true,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        
+      ],
+      "paramTypes": [
+        
+      ],
+      "paramIsMutable": [
+        
+      ],
+      "returnTypes": [
+        
+      ]
+    }
+  ]
+}

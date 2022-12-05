@@ -1,0 +1,46 @@
+{
+  "compilerOptionsUsed": {
+    "ignoreUnusedConstantsWarnings": false,
+    "ignoreUnusedVariablesWarnings": false,
+    "ignoreUnusedFieldsWarnings": false,
+    "ignoreUnusedPrivateFunctionsWarnings": false,
+    "ignoreUpdateFieldsCheckWarnings": false,
+    "ignoreExternalCallCheckWarnings": false
+  },
+  "infos": {
+    "contract2/main.ral": {
+      "sourceCodeHash": "82cadbfc4cf9576d2ce5814fe7041a56430741a2b8e0f149558617911f0c1494",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "0000000000000000000000000000000000000000000000000000000000000000",
+      "warnings": [
+        
+      ]
+    },
+    "contract2/math/math.ral": {
+      "sourceCodeHash": "bf6305b5f82a1267b36f72b25c4f01d5fe27b3be0edff7b16200951bc0ab3c20",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "649e6f9fd0e73759cd506bc05aa80bfbf709748f2782aaa83001634ed978b4b0",
+      "warnings": [
+        
+      ]
+    },
+    "contract2/action/action.ral": {
+      "sourceCodeHash": "e7bbeddc31901f6450bae7abea9f55380228544485aae5387656b820f8e32bff",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
+      "warnings": [
+        "No update fields annotation for function: Action.action, please use @using(updateFields = true/false) for the function",
+        "Function Action.action does not update fields, please use @using(updateFields = false) for the function"
+      ]
+    },
+    "contract2/foo/foo.ral": {
+      "sourceCodeHash": "31c215eef9b9bb6faeeb0b6de689cabe4097716a15470ed0766b1bf5e4174b24",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "424c056943d4d31540aebb0537533280d9a7724264d7dd58ddcbd764e8cad3c0",
+      "warnings": [
+        "No update fields annotation for function: Foo.foo, please use @using(updateFields = true/false) for the function",
+        "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
+      ]
+    }
+  }
+}
