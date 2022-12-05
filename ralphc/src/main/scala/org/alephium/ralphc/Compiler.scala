@@ -98,7 +98,7 @@ object Compiler {
         val sourceCodeHash = crypto.Sha256.hash(sourceCode).toHexString
         TypedMatcher
           .matcher(sourceCode)
-          .map(name => {
+          .foreach(name => {
             val path       = file.getCanonicalFile.toPath
             val sourcePath = path.subpath(config.projectPath().getNameCount, path.getNameCount)
             val savePath = Paths.get(

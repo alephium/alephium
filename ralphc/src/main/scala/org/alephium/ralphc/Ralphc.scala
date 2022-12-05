@@ -51,7 +51,7 @@ object Main extends App {
         .text("Artifacts directory name, default: artifacts"),
       opt[Unit]('w', "warning")
         .action((_, c) => c.copy(warningAsError = true))
-        .text("Ignore external call check warning"),
+        .text("Consider warning as error"),
       opt[Unit]("ic")
         .action((_, c) => c.copy(ignoreUnusedConstantsWarnings = true))
         .text("Ignore unused constant warning"),
@@ -129,16 +129,16 @@ object Main extends App {
   }
 
   def result(ret: CompileProjectResult): Int = {
-    var checkWaringAsError = 0
+    var checkWarningAsError = 0
     val each = (warnings: AVector[String], name: String) => {
       if (warnings.nonEmpty) {
-        checkWaringAsError = warning(name, write(warnings, 2))
+        checkWarningAsError = warning(name, write(warnings, 2))
       }
     }
     ret.scripts.foreach(script => each(script.warnings, s"Script name: ${script.name}, waring:"))
     ret.contracts.foreach(contract =>
       each(contract.warnings, s"Contract name: ${contract.name}, waring:")
     )
-    checkWaringAsError
+    checkWarningAsError
   }
 }
