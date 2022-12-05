@@ -1,0 +1,46 @@
+{
+  "version": "v1.5.4",
+  "name": "Warnings",
+  "bytecode": "02010701000202000102",
+  "codeHash": "9a0c90d67d729a478062d6794cf7b75c27483c50f6fe2ad13c5ed8873ad1fde2",
+  "fieldsSig": {
+    "names": [
+      "a",
+      "b"
+    ],
+    "types": [
+      "U256",
+      "U256"
+    ],
+    "isMutable": [
+      false,
+      false
+    ]
+  },
+  "eventsSig": [
+    
+  ],
+  "functions": [
+    {
+      "name": "foo",
+      "usePreapprovedAssets": false,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        "x",
+        "y"
+      ],
+      "paramTypes": [
+        "U256",
+        "U256"
+      ],
+      "paramIsMutable": [
+        false,
+        false
+      ],
+      "returnTypes": [
+        
+      ]
+    }
+  ]
+}

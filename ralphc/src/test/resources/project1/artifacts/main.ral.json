@@ -1,0 +1,36 @@
+{
+  "version": "v1.5.4",
+  "name": "Main",
+  "bytecodeTemplate": "0101030001000a{0}17000e0d0e0e160001001818",
+  "fieldsSig": {
+    "names": [
+      "addContractId"
+    ],
+    "types": [
+      "ByteVec"
+    ],
+    "isMutable": [
+      false
+    ]
+  },
+  "functions": [
+    {
+      "name": "main",
+      "usePreapprovedAssets": true,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        
+      ],
+      "paramTypes": [
+        
+      ],
+      "paramIsMutable": [
+        
+      ],
+      "returnTypes": [
+        
+      ]
+    }
+  ]
+}

@@ -17,45 +17,45 @@
 package org.alephium.ralphc
 
 import java.io.File
-import java.nio.file.Files
+import java.nio.file.{Files, Paths}
 
 import org.alephium.util.AlephiumSpec
 
 class CompilerSpec extends AlephiumSpec {
-  val rootPath = Files.createTempDirectory("project")
-  val config   = Config(contractsPath = rootPath.resolve("contracts").toString)
-  val contract =
-    s"""
-       |Contract Foo(a: Bool, b: I256, c: U256, d: ByteVec, e: Address) {
-       |  pub fn foo() -> (Bool, I256, U256, ByteVec, Address) {
-       |    return a, b, c, d, e
-       |  }
-       |}
-       |""".stripMargin
 
-  val script =
-    s"""
-       |TxScript Main(x: U256, y: U256) {
-       |  assert!(x != y, 0)
-       |}
-       |""".stripMargin
+  it should "be able to compile project" in {
+    val rootPath  = Files.createTempDirectory("project")
+    val sourceDir = rootPath.resolve("contracts")
+    val config    = Config(contracts = sourceDir.toFile)
+    val contract =
+      s"""
+         |Contract Foo(a: Bool, b: I256, c: U256, d: ByteVec, e: Address) {
+         |  pub fn foo() -> (Bool, I256, U256, ByteVec, Address) {
+         |    return a, b, c, d, e
+         |  }
+         |}
+         |""".stripMargin
 
-  val interface =
-    s"""
-       |Interface Math {
-       |  pub fn math() -> U256
-       |}
-       |""".stripMargin
+    val script =
+      s"""
+         |TxScript Main(x: U256, y: U256) {
+         |  assert!(x != y, 0)
+         |}
+         |""".stripMargin
 
-  val abstractContract =
-    s"""
-       |Abstract Contract Action(){
-       |  pub fn action() -> ()
-       |}
-       |""".stripMargin
+    val interface =
+      s"""
+         |Interface Math {
+         |  pub fn math() -> U256
+         |}
+         |""".stripMargin
 
-  it should "be able to compiler project" in {
-    val sourceDir = rootPath.resolve(config.contractsDirName())
+    val abstractContract =
+      s"""
+         |Abstract Contract Action(){
+         |  pub fn action() -> ()
+         |}
+         |""".stripMargin
     val fooDir    = sourceDir.resolve("foo")
     val mathDir   = sourceDir.resolve("math")
     val actionDir = sourceDir.resolve("action")
@@ -78,6 +78,44 @@ class CompilerSpec extends AlephiumSpec {
     assert(Compiler.metaInfos.contains("Main"))
     assert(!Compiler.metaInfos.contains("main"))
     assert(deleteFolder(rootPath.toFile))
+  }
+
+  it should "be able to compile the specified directory" in {
+    val baseDir = Paths.get("src/test/resources")
+
+    def assertProjectX(source: String, artifacts: String) = {
+      val contracts = baseDir.resolve(source).toFile
+      val config = Config(
+        debug = true,
+        contracts = contracts,
+        artifacts = new File(artifacts)
+      )
+      assert(Compiler.compileProject(config).isRight)
+      val latestArchives = Compiler
+        .getSourceFiles(config.artifactsPath().toFile, ".json")
+        .map(file => {
+          val path = file.toPath
+          path.subpath(config.artifactsPath().getNameCount, path.getNameCount)
+        })
+      val artifactsPath = config.projectPath().resolve("artifacts")
+      val archives = Compiler
+        .getSourceFiles(config.projectPath().resolve("artifacts").toFile, ".json")
+        .map(file => {
+          val path = file.toPath
+          path.subpath(artifactsPath.getNameCount, path.getNameCount)
+        })
+      latestArchives is archives
+      assert(deleteFolder(config.artifactsPath().toFile))
+    }
+    assertProjectX("project1/contracts1", "artifacts1")
+    assertProjectX("project2/contracts2", "artifacts2")
+    assertProjectX("project3/contracts3", "artifacts3")
+  }
+
+  it should "not compile successfully" in {
+    val baseDir = Paths.get("src/test/")
+    assert(Compiler.compileProject(Config(contracts = baseDir.toFile)).isLeft)
+    assert(Compiler.compileProject(Config(contracts = Paths.get("").toFile)).isLeft)
   }
 
   def deleteFolder(file: File): Boolean = {

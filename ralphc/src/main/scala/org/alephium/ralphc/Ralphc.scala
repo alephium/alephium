@@ -16,6 +16,8 @@
 
 package org.alephium.ralphc
 
+import java.io.File
+
 import org.alephium.api.UtilJson.*
 import org.alephium.api.model.CompileProjectResult
 import org.alephium.json.Json.*
@@ -24,6 +26,7 @@ import org.alephium.util.AVector
 
 @SuppressWarnings(
   Array(
+    "org.wartremover.warts.ToString",
     "org.wartremover.warts.PublicInference",
     "org.wartremover.warts.JavaSerializable",
     "org.wartremover.warts.Serializable"
@@ -31,6 +34,7 @@ import org.alephium.util.AVector
 )
 object Main extends App {
   import scopt.OParser
+  import Codec._
 
   var config  = Config()
   val builder = OParser.builder[Config]
@@ -39,10 +43,10 @@ object Main extends App {
     OParser.sequence(
       programName("ralphc"),
       head("Ralph language compiler", BuildInfo.version),
-      opt[String]('p', "contracts")
-        .action((path, c) => c.copy(contractsPath = path))
-        .text("contracts path"),
-      opt[String]('a', "artifacts")
+      opt[File]('p', "contracts")
+        .action((path, c) => c.copy(contracts = path))
+        .text("Contracts path, default: contracts"),
+      opt[File]('a', "artifacts")
         .action((name, c) => c.copy(artifacts = name))
         .text("Artifacts directory name, default: artifacts"),
       opt[Unit]('w', "warning")
@@ -81,14 +85,16 @@ object Main extends App {
     case Some(c) =>
       config = c
       debug(
-        config.compilerOptions(),
-        s"projectDir: $config.projectDir",
-        s"warningAsError: $config.warningAsError"
+        s"contractsPath: ${config.contracts.getPath}",
+        s"artifacts: ${config.artifacts.getPath}",
+        s"warningAsError: ${config.warningAsError}",
+        s"compilerOptions: ${write(config.compilerOptions(), 2)}"
       )
+
       Compiler
         .compileProject(config)
         .fold(
-          err => System.exit(error(err, config.contractsPath)),
+          err => System.exit(error(err, config.contractsPath().toFile.getPath)),
           ret => System.exit(result(ret))
         )
     case _ =>
@@ -98,13 +104,17 @@ object Main extends App {
 
   def debug[O](values: O*): Unit = {
     if (config.debug) {
-      values.foreach(print(_))
+      values.foreach(value => {
+        print(value)
+        print("\n")
+      })
     }
   }
 
   def error[T, O](msg: T, other: O): Int = {
-    print(other)
     print(s"error: \n $msg \n")
+    print(other)
+    print("\n")
     -1
   }
 

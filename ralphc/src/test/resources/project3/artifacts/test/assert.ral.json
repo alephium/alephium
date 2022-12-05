@@ -1,0 +1,40 @@
+{
+  "version": "v1.5.4",
+  "name": "Assert",
+  "bytecode": "00010b0100000000050d0e2f0f7b",
+  "codeHash": "5bd05924fb9a23ea105df065a8c2dfa463b9ee53cc14a60320140d19dd6151ca",
+  "fieldsSig": {
+    "names": [
+      
+    ],
+    "types": [
+      
+    ],
+    "isMutable": [
+      
+    ]
+  },
+  "eventsSig": [
+    
+  ],
+  "functions": [
+    {
+      "name": "test",
+      "usePreapprovedAssets": false,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        
+      ],
+      "paramTypes": [
+        
+      ],
+      "paramIsMutable": [
+        
+      ],
+      "returnTypes": [
+        
+      ]
+    }
+  ]
+}
