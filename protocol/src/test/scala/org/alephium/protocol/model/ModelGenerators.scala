@@ -41,7 +41,7 @@ trait LockupScriptGenerators extends Generators {
     bytes  <- Gen.listOfN(length, arbByte.arbitrary)
   } yield ByteString(bytes)
 
-  def p2pkhLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] =
+  def p2pkhLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2PKH] =
     for {
       publicKey <- publicKeyGen(groupIndex)
     } yield LockupScript.p2pkh(publicKey)
@@ -49,7 +49,8 @@ trait LockupScriptGenerators extends Generators {
   def p2mpkhLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] =
     for {
       publicKey0 <- publicKeyGen(groupIndex)
-      moreKeys   <- Gen.nonEmptyListOf(publicKeyGen(groupIndex)).map(AVector.from)
+      numKeys    <- Gen.chooseNum(0, ALPH.MaxKeysInP2PMPK - 1) // the first key is generated already
+      moreKeys   <- Gen.listOfN(numKeys, publicKeyGen(groupIndex)).map(AVector.from)
       threshold  <- Gen.choose(1, moreKeys.length + 1)
     } yield LockupScript.p2mpkh(publicKey0 +: moreKeys, threshold).get
 

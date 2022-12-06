@@ -255,7 +255,6 @@ trait TxValidation {
       _ <- checkOutputStats(tx, hardFork)
       _ <- checkChainIndex(tx, chainIndex)
       _ <- checkUniqueInputs(tx, checkDoubleSpending)
-      _ <- checkOutputDataSize(tx)
     } yield ()
   }
   protected[validation] def checkStateful(
@@ -305,7 +304,6 @@ trait TxValidation {
   protected[validation] def getChainIndex(tx: TransactionAbstract): TxValidationResult[ChainIndex]
   protected[validation] def checkChainIndex(tx: Transaction, expected: ChainIndex): TxValidationResult[Unit]
   protected[validation] def checkUniqueInputs(tx: Transaction, checkDoubleSpending: Boolean): TxValidationResult[Unit]
-  protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit]
 
   protected[validation] def checkLockTime(preOutputs: AVector[TxOutput], headerTs: TimeStamp): TxValidationResult[Unit]
   protected[validation] def checkAlphBalance(tx: Transaction, preOutputs: AVector[TxOutput], coinbaseNetReward: Option[U256]): TxValidationResult[Unit]
@@ -460,23 +458,69 @@ object TxValidation {
         tx: Transaction,
         hardFork: HardFork
     ): TxValidationResult[Unit] = {
-      val ok = tx.unsigned.fixedOutputs.forall(checkOutputAmount(_, hardFork)) &&
-        tx.generatedOutputs.forall(checkOutputAmount(_, hardFork))
-      if (ok) validTx(()) else invalidTx(InvalidOutputStats)
+      for {
+        _ <- tx.unsigned.fixedOutputs.foreachE(checkEachOutputStat(_, hardFork))
+        _ <- tx.generatedOutputs.foreachE(checkEachOutputStat(_, hardFork))
+      } yield ()
+    }
+
+    protected[validation] def checkEachOutputStat(
+        output: TxOutput,
+        hardFork: HardFork
+    ): TxValidationResult[Unit] = {
+      for {
+        _ <- checkOutputAmount(output, hardFork)
+        _ <- checkP2MPKStat(output, hardFork)
+        _ <- checkOutputDataState(output)
+      } yield ()
     }
 
     @inline private def checkOutputAmount(
         output: TxOutput,
         hardFork: HardFork
-    ): Boolean = {
+    ): TxValidationResult[Unit] = {
       val (dustAmount, numTokenBound) = if (hardFork.isLemanEnabled()) {
         (dustUtxoAmount, maxTokenPerUtxo)
       } else {
         (deprecatedDustUtxoAmount, deprecatedMaxTokenPerUtxo)
       }
-      output.amount >= dustAmount &&
-      output.tokens.length <= numTokenBound &&
-      output.tokens.forall(_._2.nonZero)
+      val validated = output.amount >= dustAmount &&
+        output.tokens.length <= numTokenBound &&
+        output.tokens.forall(_._2.nonZero)
+      if (validated) Right(()) else invalidTx(InvalidOutputStats)
+    }
+
+    @inline private def checkP2MPKStat(
+        output: TxOutput,
+        hardFork: HardFork
+    ): TxValidationResult[Unit] = {
+      if (hardFork.isLemanEnabled()) {
+        output.lockupScript match {
+          case LockupScript.P2MPKH(pkHashes, _) =>
+            if (pkHashes.length > ALPH.MaxKeysInP2PMPK) {
+              invalidTx(TooManyKeysInMultisig)
+            } else {
+              Right(())
+            }
+          case _ => Right(())
+        }
+      } else {
+        Right(())
+      }
+    }
+
+    @inline private def checkOutputDataState(
+        output: TxOutput
+    ): TxValidationResult[Unit] = {
+      output match {
+        case output: AssetOutput =>
+          if (output.additionalData.length > ALPH.MaxOutputDataSize) {
+            invalidTx(OutputDataSizeExceeded)
+          } else {
+            Right(())
+          }
+        case _ => Right(())
+      }
     }
 
     protected[validation] def checkAlphOutputAmount(tx: Transaction): TxValidationResult[U256] = {
@@ -551,20 +595,6 @@ object TxValidation {
         }
       } else {
         validTx(())
-      }
-    }
-
-    protected[validation] def checkOutputDataSize(tx: Transaction): TxValidationResult[Unit] = {
-      EitherF.foreachTry(0 until tx.outputsLength) { outputIndex =>
-        tx.getOutput(outputIndex) match {
-          case output: AssetOutput =>
-            if (output.additionalData.length > ALPH.MaxOutputDataSize) {
-              invalidTx(OutputDataSizeExceeded)
-            } else {
-              Right(())
-            }
-          case _ => Right(())
-        }
       }
     }
 
