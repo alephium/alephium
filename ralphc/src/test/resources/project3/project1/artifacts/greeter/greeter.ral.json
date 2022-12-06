@@ -1,19 +1,16 @@
 {
   "version": "v1.5.4",
-  "name": "Warnings",
-  "bytecode": "02010701000202000102",
-  "codeHash": "9a0c90d67d729a478062d6794cf7b75c27483c50f6fe2ad13c5ed8873ad1fde2",
+  "name": "Greeter",
+  "bytecode": "01010c010000000105030c7ba00002",
+  "codeHash": "23a48462286d2c2ffc6d3a19192060dd42c178e7d331819e75e059c5be3c042f",
   "fieldsSig": {
     "names": [
-      "a",
-      "b"
+      "btcPrice"
     ],
     "types": [
-      "U256",
       "U256"
     ],
     "isMutable": [
-      false,
       false
     ]
   },
@@ -22,24 +19,21 @@
   ],
   "functions": [
     {
-      "name": "foo",
+      "name": "greet",
       "usePreapprovedAssets": false,
       "useAssetsInContract": false,
       "isPublic": true,
       "paramNames": [
-        "x",
-        "y"
+        
       ],
       "paramTypes": [
-        "U256",
-        "U256"
+        
       ],
       "paramIsMutable": [
-        false,
-        false
+        
       ],
       "returnTypes": [
-        
+        "U256"
       ]
     }
   ]

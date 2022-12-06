@@ -62,45 +62,34 @@ object Codec {
   implicit val compileContractResultSigRW: ReadWriter[ContractResult]         = macroRW
   implicit val codeInfoRW: ReadWriter[CodeInfo]                               = macroRW
   implicit val artifactsRW: ReadWriter[Artifacts]                             = macroRW
+  implicit val configRW: ReadWriter[Config]                                   = macroRW
 }
 
 @SuppressWarnings(
   Array(
     "org.wartremover.warts.PublicInference",
     "org.wartremover.warts.Recursion",
-    "org.wartremover.warts.PlatformDefault"
+    "org.wartremover.warts.PlatformDefault",
+    "org.wartremover.warts.DefaultArguments"
   )
 )
-object Compiler {
+final case class Compiler() {
   val metaInfos: mutable.Map[String, MetaInfo] = mutable.SeqMap.empty[String, MetaInfo]
   var config: Config                           = Config()
+  import Codec.*
 
-  import Codec._
-
-  def getSourceFiles(file: File, ext: String): Array[File] = {
-    if (file.isDirectory) {
-      val (fullFiles, fullDirs) = file.listFiles().partition(!_.isDirectory)
-      val files                 = fullFiles.filter(t => t.getPath.endsWith(ext))
-      files ++ fullDirs.flatMap(getSourceFiles(_, ext))
-    } else {
-      if (file.isFile && file.getPath.endsWith(ext)) {
-        Array(file)
-      } else {
-        Array.empty
-      }
-    }
-  }
-
-  def projectCodes(): String = {
-    getSourceFiles(config.contractsPath().toFile, ".ral")
+  private def analysisCodes(): String = {
+    Compiler
+      .getSourceFiles(config.contractsPath().toFile, ".ral")
       .map(file => {
         val sourceCode     = Using(Source.fromFile(file)) { _.mkString }.getOrElse("")
         val sourceCodeHash = crypto.Sha256.hash(sourceCode).toHexString
         TypedMatcher
           .matcher(sourceCode)
           .foreach(name => {
-            val path       = file.getCanonicalFile.toPath
-            val sourcePath = path.subpath(config.projectPath().getNameCount, path.getNameCount)
+            val path = file.getCanonicalFile.toPath
+            val sourcePath =
+              path.subpath(config.contractsPath().getParent.getNameCount, path.getNameCount)
             val savePath = Paths.get(
               config
                 .artifactsPath()
@@ -121,14 +110,10 @@ object Compiler {
       .mkString
   }
 
-  def writer[T: Writer](s: T, path: Path): Unit = {
-    saveResult(write(s, 2), path)
-  }
-
   def compileProject(config: Config): Either[String, CompileProjectResult] = {
     this.config = config
     ralph.Compiler
-      .compileProject(projectCodes(), config.compilerOptions())
+      .compileProject(analysisCodes(), config.compilerOptions())
       .map(p => {
         p._1.foreach(c => saveContract(CompileContractResult.from(c)))
         p._2.foreach(s => saveScript(CompileScriptResult.from(s)))
@@ -145,7 +130,7 @@ object Compiler {
     value.codeInfo.bytecodeDebugPatch = c.bytecodeDebugPatch
     value.codeInfo.codeHashDebug = c.codeHashDebug
     metaInfos.addOne((c.name, value))
-    writer(ContractResult.from(c), value.ArtifactPath)
+    Compiler.writer(ContractResult.from(c), value.ArtifactPath)
   }
 
   def saveScript(s: CompileScriptResult): Unit = {
@@ -153,11 +138,11 @@ object Compiler {
     value.codeInfo.warnings = s.warnings
     value.codeInfo.bytecodeDebugPatch = s.bytecodeDebugPatch
     metaInfos.addOne((s.name, value))
-    writer(ScriptResult.from(s), value.ArtifactPath)
+    Compiler.writer(ScriptResult.from(s), value.ArtifactPath)
   }
 
   def saveProjectArtifacts(): Unit = {
-    writer(
+    Compiler.writer(
       Artifacts(
         config.compilerOptions(),
         metaInfos.map(item => (item._2.sourcePath.toFile.getPath, item._2.codeInfo)).toMap
@@ -165,12 +150,48 @@ object Compiler {
       config.artifactsPath().resolve(".project.json")
     )
   }
+}
 
-  def saveResult(code: String, path: Path): Unit = {
+@SuppressWarnings(
+  Array(
+    "org.wartremover.warts.Recursion",
+    "org.wartremover.warts.DefaultArguments"
+  )
+)
+object Compiler {
+  def writer[T: Writer](s: T, path: Path): Unit = {
     path.getParent.toFile.mkdirs()
     val writer = new PrintWriter(path.toFile)
-    writer.write(code)
+    writer.write(write(s, 2))
     writer.close()
   }
+  def getSourceFiles(file: File, ext: String, recursive: Boolean = true): Array[File] = {
+    if (file.isDirectory) {
+      val (fullFiles, fullDirs) = file.listFiles().partition(!_.isDirectory)
+      val files                 = fullFiles.filter(t => t.getPath.endsWith(ext))
+      if (recursive) {
+        files ++ fullDirs.flatMap(getSourceFiles(_, ext))
+      } else {
+        files
+      }
+    } else {
+      if (file.isFile && file.getPath.endsWith(ext)) {
+        Array(file)
+      } else {
+        Array.empty
+      }
+    }
+  }
 
+  def deleteFile(file: File): Boolean = {
+    if (file.isDirectory) {
+      var result = false
+      for (subFile <- file.listFiles) {
+        result = deleteFile(subFile)
+      }
+      result
+    } else {
+      file.delete()
+    }
+  }
 }

@@ -16,17 +16,17 @@
 
 package org.alephium.ralphc
 
-import java.io.File
-import java.nio.file.{Files, Paths}
+import java.nio.file.Files
 
 import org.alephium.util.AlephiumSpec
 
 class CompilerSpec extends AlephiumSpec {
 
-  it should "be able to compile project" in {
+  it should "be able to call compileProject" in {
+    val compiler  = Compiler()
     val rootPath  = Files.createTempDirectory("project")
     val sourceDir = rootPath.resolve("contracts")
-    val config    = Config(contracts = sourceDir.toFile)
+    val config    = Config(contracts = sourceDir.toFile.getPath)
     val contract =
       s"""
          |Contract Foo(a: Bool, b: I256, c: U256, d: ByteVec, e: Address) {
@@ -71,61 +71,12 @@ class CompilerSpec extends AlephiumSpec {
     Files.write(action, abstractContract.getBytes())
     Files.write(main, script.getBytes())
 
-    assert(Compiler.compileProject(config).isRight)
-    assert(Compiler.metaInfos.contains("Foo"))
-    assert(Compiler.metaInfos.contains("Math"))
-    assert(Compiler.metaInfos.contains("Action"))
-    assert(Compiler.metaInfos.contains("Main"))
-    assert(!Compiler.metaInfos.contains("main"))
-    assert(deleteFolder(rootPath.toFile))
-  }
-
-  it should "be able to compile the specified directory" in {
-    val baseDir = Paths.get("src/test/resources")
-
-    def assertProjectX(source: String, artifacts: String) = {
-      val contracts = baseDir.resolve(source).toFile
-      val config = Config(
-        debug = true,
-        contracts = contracts,
-        artifacts = new File(artifacts)
-      )
-      assert(Compiler.compileProject(config).isRight)
-      val latestArchives = Compiler
-        .getSourceFiles(config.artifactsPath().toFile, ".json")
-        .map(file => {
-          val path = file.toPath
-          path.subpath(config.artifactsPath().getNameCount, path.getNameCount)
-        })
-      val artifactsPath = config.projectPath().resolve("artifacts")
-      val archives = Compiler
-        .getSourceFiles(config.projectPath().resolve("artifacts").toFile, ".json")
-        .map(file => {
-          val path = file.toPath
-          path.subpath(artifactsPath.getNameCount, path.getNameCount)
-        })
-      latestArchives is archives
-      assert(deleteFolder(config.artifactsPath().toFile))
-    }
-    assertProjectX("project1/contracts1", "artifacts1")
-    assertProjectX("project2/contracts2", "artifacts2")
-    assertProjectX("project3/contracts3", "artifacts3")
-  }
-
-  it should "not compile successfully" in {
-    val baseDir = Paths.get("src/test/")
-    assert(Compiler.compileProject(Config(contracts = baseDir.toFile)).isLeft)
-    assert(Compiler.compileProject(Config(contracts = Paths.get("").toFile)).isLeft)
-  }
-
-  def deleteFolder(file: File): Boolean = {
-    for (subFile <- file.listFiles) {
-      if (subFile.isDirectory) {
-        deleteFolder(subFile)
-      } else {
-        subFile.delete
-      }
-    }
-    file.delete()
+    assert(compiler.compileProject(config).isRight)
+    assert(compiler.metaInfos.contains("Foo"))
+    assert(compiler.metaInfos.contains("Math"))
+    assert(compiler.metaInfos.contains("Action"))
+    assert(compiler.metaInfos.contains("Main"))
+    assert(!compiler.metaInfos.contains("main"))
+    assert(Compiler.deleteFile(rootPath.toFile))
   }
 }
