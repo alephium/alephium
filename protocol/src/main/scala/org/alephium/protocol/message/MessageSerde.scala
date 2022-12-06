@@ -31,7 +31,7 @@ object MessageSerde {
   def length(data: ByteString): ByteString =
     Bytes.from(data.length)
 
-  def unwrap[M](
+  def unwrap(
       input: ByteString
   )(implicit networkConfig: NetworkConfig): SerdeResult[(ByteString, Int, ByteString)] = {
     for {
