@@ -1,0 +1,14 @@
+Contract Add(sub: Sub, mut result : U256) {
+    event Add(x: U256, y: U256)
+
+    @using(updateFields = true)
+    pub fn add(array: [U256; 2]) -> ([U256; 2]) {
+        return addPrivate(array)
+    }
+
+    fn addPrivate(array: [U256; 2]) -> ([U256; 2]) {
+        emit Add(array[0], array[1])
+        result = result + array[0] + array[1]
+        return [result, sub.sub(array)]
+    }
+}

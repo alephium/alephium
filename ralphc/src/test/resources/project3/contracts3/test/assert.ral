@@ -1,7 +1,0 @@
-Contract Assert() {
-    const Error = 3
-    @using(updateFields = false)
-    pub fn test() -> () {
-        assert!(1 == 2, Error)
-    }
-}

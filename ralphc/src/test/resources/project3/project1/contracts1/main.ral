@@ -1,0 +1,4 @@
+TxScript Main(addContractId: ByteVec) {
+    let add = Add(addContractId)
+    add.add([2, 1])
+}

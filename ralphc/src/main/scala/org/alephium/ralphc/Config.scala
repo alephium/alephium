@@ -35,8 +35,8 @@ final case class Config(
     ignoreUpdateFieldsCheckWarnings: Boolean = false,
     ignoreUnusedPrivateFunctionsWarnings: Boolean = false,
     ignoreExternalCallCheckWarnings: Boolean = false,
-    contracts: File = new File("contracts"),
-    artifacts: File = new File("artifacts")
+    contracts: String = "contracts",
+    artifacts: String = "artifacts"
 ) {
   def compilerOptions(): CompilerOptions = {
     CompilerOptions(
@@ -49,16 +49,7 @@ final case class Config(
     )
   }
 
-  def contractsPath(): Path = {
-    val file = contracts.getCanonicalFile
-    if (file.isFile) {
-      file.getParentFile.toPath
-    } else {
-      file.toPath
-    }
-  }
+  def contractsPath(): Path = new File(contracts).getCanonicalFile.toPath
 
-  def artifactsPath(): Path = contractsPath().getParent.resolve(artifacts.toPath)
-
-  def projectPath(): Path = contractsPath().getParent
+  def artifactsPath(): Path = new File(artifacts).getCanonicalFile.toPath
 }
