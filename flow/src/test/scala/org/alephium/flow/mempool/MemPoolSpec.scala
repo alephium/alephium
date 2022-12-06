@@ -45,11 +45,11 @@ class MemPoolSpec
         txTemplates.foreach(pool.contains(index, _) is false)
         pool.addToTxPool(index, txTemplates, now) is block.transactions.length
         pool.size is block.transactions.length
-        block.transactions.foreach(tx => checkTx(pool.txIndexes, tx.toTemplate))
+        block.transactions.foreach(tx => checkTx(pool.sharedTxIndexes, tx.toTemplate))
         txTemplates.foreach(pool.contains(index, _) is true)
         pool.removeFromTxPool(index, txTemplates) is block.transactions.length
         pool.size is 0
-        pool.txIndexes is emptyTxIndexes
+        pool.sharedTxIndexes is emptyTxIndexes
       } else {
         assertThrows[AssertionError](txTemplates.foreach(pool.contains(index, _)))
       }

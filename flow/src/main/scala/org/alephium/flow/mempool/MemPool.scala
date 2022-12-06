@@ -36,7 +36,7 @@ import org.alephium.util.{AVector, TimeStamp}
 class MemPool private (
     group: GroupIndex,
     sharedPools: AVector[SharedPool],
-    val txIndexes: TxIndexes,
+    val sharedTxIndexes: TxIndexes,
     val pendingPool: PendingPool
 )(implicit
     groupConfig: GroupConfig
@@ -67,11 +67,11 @@ class MemPool private (
   }
 
   def isSpent(outputRef: AssetOutputRef): Boolean = {
-    pendingPool.indexes.isSpent(outputRef) || txIndexes.isSpent(outputRef)
+    pendingPool.indexes.isSpent(outputRef) || sharedTxIndexes.isSpent(outputRef)
   }
 
   def isUnspentInPool(outputRef: AssetOutputRef): Boolean = {
-    (txIndexes.outputIndex.contains(outputRef) ||
+    (sharedTxIndexes.outputIndex.contains(outputRef) ||
       pendingPool.indexes.outputIndex.contains(outputRef)) &&
     (!isSpent(outputRef))
   }
@@ -137,16 +137,16 @@ class MemPool private (
       utxosInBlock: AVector[AssetOutputInfo]
   ): AVector[AssetOutputInfo] = {
     val newUtxos =
-      txIndexes.getRelevantUtxos(lockupScript) ++ pendingPool.getRelevantUtxos(lockupScript)
+      sharedTxIndexes.getRelevantUtxos(lockupScript) ++ pendingPool.getRelevantUtxos(lockupScript)
 
     (utxosInBlock ++ newUtxos).filterNot(asset =>
-      txIndexes.isSpent(asset) || pendingPool.indexes.isSpent(asset)
+      sharedTxIndexes.isSpent(asset) || pendingPool.indexes.isSpent(asset)
     )
   }
 
   def updatePendingPool(): AVector[(TransactionTemplate, TimeStamp)] = {
     val now              = TimeStamp.now()
-    val txsWithTimestamp = pendingPool.extractReadyTxs(txIndexes)
+    val txsWithTimestamp = pendingPool.extractReadyTxs(sharedTxIndexes)
     val txs              = txsWithTimestamp.map(_._1)
     txs.groupBy(_.chainIndex).foreach { case (chainIndex, txss) =>
       addToTxPool(chainIndex, txss, now)
@@ -165,20 +165,20 @@ class MemPool private (
   def getOutput(outputRef: AssetOutputRef): Option[TxOutput] = {
     pendingPool.getUtxo(outputRef) match {
       case Some(output) => Some(output)
-      case None         => txIndexes.getOutput(outputRef)
+      case None         => sharedTxIndexes.getOutput(outputRef)
     }
   }
 
   def clear(): Unit = {
     sharedPools.foreach(_.clear())
-    txIndexes.clear()
+    sharedTxIndexes.clear()
     pendingPool.clear()
   }
 
   def cleanPendingPool(
       blockFlow: BlockFlow
   ): IOResult[AVector[(TransactionTemplate, TimeStamp)]] = {
-    pendingPool.clean(blockFlow, txIndexes)
+    pendingPool.clean(blockFlow, sharedTxIndexes)
   }
 
   def cleanAndExtractReadyTxs(
