@@ -36,26 +36,40 @@ import org.alephium.util.AVector
 )
 final case class Cli() {
   import Codec.*
-
-  private var config: Config = Config()
-  private val builder        = OParser.builder[Config]
+  var configs: Configs = Configs()
+  private val builder  = OParser.builder[Configs]
   private val parser = {
     import builder.*
     OParser.sequence(
       programName("ralphc"),
-      head("Ralph language compiler", BuildInfo.version),
-      opt[String]('c', "contracts")
-        .validate(path => {
-          if (!new File(path).isDirectory) {
-            Left("contracts is not directory")
-          } else {
-            Right(())
-          }
-        })
-        .action((path, c) => c.copy(contracts = path))
+      head("ralphc", BuildInfo.version),
+      note(
+        """
+          |Examples:
+          |# To compile a single project contract
+          |Linux or MacOs:
+          |  $ java -jar ralphc.jar -c ./project/contracts, -a ./project/artifacts
+          |
+          |# To compile two project contracts
+          |Linux or MacOs:
+          |  $ java -jar ralphc.jar -c ./project1/contracts,./project2/contracts -a ./project1/artifacts,./project2/artifacts
+          |
+          |# To compile multi-project contracts
+          |Linux or MacOs:
+          |  $ java -jar ralphc.jar -c ./project1/contracts,./project2/contracts,./project3/contracts,... -a ./project1/artifacts,./project2/artifacts,./project3/artifacts,...
+          |
+          |""".stripMargin
+      ),
+      opt[Seq[String]]('c', "contracts")
+        .validate(
+          _.find(!new File(_).isDirectory).fold[Either[String, Unit]](Right(()))(path =>
+            Left(s"${path} is not directory")
+          )
+        )
+        .action((path, c) => c.copy(contracts = path.toArray))
         .text("Contracts path, default: contracts"),
-      opt[String]('a', "artifacts")
-        .action((a, c) => c.copy(artifacts = a))
+      opt[Seq[String]]('a', "artifacts")
+        .action((a, c) => c.copy(artifacts = a.toArray))
         .text("Artifacts path, default: artifacts"),
       opt[Unit]('w', "warning")
         .action((_, c) => c.copy(warningAsError = true))
@@ -82,33 +96,43 @@ final case class Cli() {
         .action((_, c) => c.copy(debug = true))
         .text("Debug mode"),
       help('h', "help").text("Print help information (use `--help` for more detail)"),
-      version('v', "version").text("Print version information")
+      version('v', "version").text("Print version information"),
+      checkConfig(configs => {
+        if (configs.contracts.length != configs.artifacts.length) {
+          Left("contracts or artifacts path error")
+        } else {
+          Right(())
+        }
+      })
     )
   }
 
   def call(args: Array[String]): Int = {
-    val compiler  = Compiler()
     var arguments = args
     if (arguments.isEmpty) {
       arguments = arguments :+ "-h"
     }
-    OParser.parse(parser, arguments, config) match {
-      case Some(c) =>
-        config = c
-        debug(write(config, 2))
-        compiler
-          .compileProject(config)
-          .fold(
-            err => error(err, config.contractsPath().toFile.getPath),
-            ret => result(ret)
+    OParser.parse(parser, arguments, configs) match {
+      case Some(c: Configs) =>
+        configs = c
+        debug(write(configs, 2))
+        c.configs()
+          .map(config =>
+            Compiler(config)
+              .compileProject()
+              .fold(
+                err => error(err),
+                ret => result(ret)
+              )
           )
+          .sum
       case _ =>
         -1
     }
   }
 
   private def debug[O](values: O*): Unit = {
-    if (config.debug) {
+    if (configs.debug) {
       values.foreach(value => {
         print(value)
         print("\n")
@@ -116,9 +140,8 @@ final case class Cli() {
     }
   }
 
-  private def error[T, O](msg: T, other: O): Int = {
+  private def error[T](msg: T): Int = {
     print(s"error: \n $msg \n")
-    print(other)
     print("\n")
     -1
   }
@@ -126,7 +149,7 @@ final case class Cli() {
   private def warning[T, O](msg: T, other: O): Int = {
     print(s"\n $msg")
     print(s"$other \n")
-    if (config.warningAsError) {
+    if (configs.warningAsError) {
       -1
     } else {
       0

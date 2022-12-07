@@ -16,76 +16,67 @@
 
 package org.alephium.ralphc
 
-import java.io.File
-
 import org.alephium.util.AlephiumSpec
 
 class CliSpec extends AlephiumSpec {
+  val baseDir     = "src/test/resources"
+  val project1    = baseDir + "/project1"
+  val contracts1  = project1 + "/contracts1"
+  val artifacts1  = project1 + "/artifacts1"
+  val project2    = baseDir + "/project2"
+  val project3    = baseDir + "/project3"
+  val project31   = project3 + "/project1"
+  val contracts31 = project31 + "/contracts1"
+  val artifacts31 = project31 + "/artifacts1"
+  val project32   = project3 + "/project2"
 
-  it should "be able to compile the specified directory" in {
-    val baseDir = "src/test/resources"
-
-    def assertProject(
-        sourcePath: String,
-        artifactsPath: String,
-        archivesPath: String,
-        recursive: Boolean = true
-    ) = {
-      val config = Config(contracts = sourcePath, artifacts = artifactsPath)
-      val args   = Array("-c", sourcePath, "-a", artifactsPath)
-
-      assert(Cli().call(args) == 0)
-      val latestArchives =
-        Compiler.getSourceFiles(config.artifactsPath().toFile, ".json", recursive)
-      val archivesFile = new File(archivesPath).getCanonicalFile
-      val archives = Compiler
-        .getSourceFiles(archivesFile, ".json", recursive)
-        .map(file => {
-          val path = file.toPath
-          path.subpath(archivesFile.toPath.getNameCount, path.getNameCount)
-        })
-        .sorted
-
-      latestArchives
-        .map(file => {
-          val path = file.toPath
-          path.subpath(config.artifactsPath().getNameCount, path.getNameCount)
-        })
-        .sorted is archives
-
-      latestArchives.foreach(file => {
-        print(file.getPath)
-        print("\n")
+  def assertProject(
+      sourcePath: String,
+      artifactsPath: String,
+      recursive: Boolean = true
+  ) = {
+    val cli = Cli()
+    assert(cli.call(Array("-c", sourcePath, "-a", artifactsPath)) == 0)
+    cli.configs
+      .configs()
+      .foreach(config => {
+        val latestArchives =
+          Compiler.getSourceFiles(config.artifactsPath().toFile, ".json", recursive)
+        var archivesPath = config.contractsPath().getParent.resolve("artifacts")
+        if (!recursive) {
+          archivesPath = config.contractsPath().resolve("artifacts")
+        }
+        val archivesFile = archivesPath.toFile
+        val archives = Compiler
+          .getSourceFiles(archivesFile, ".json", recursive)
+          .map(file => {
+            val path = file.toPath
+            path.subpath(archivesFile.toPath.getNameCount, path.getNameCount)
+          })
+          .sorted
+        latestArchives
+          .map(file => {
+            val path = file.toPath
+            path.subpath(config.artifactsPath().getNameCount, path.getNameCount)
+          })
+          .sorted is archives
+        latestArchives.foreach(file => assert(Compiler.deleteFile(file)))
       })
-      latestArchives.foreach(file => assert(Compiler.deleteFile(file)))
-    }
+  }
 
-    val project1 = baseDir + "/project1"
-    assertProject(
-      project1 + "/contracts1",
-      project1 + "/artifacts1",
-      project1 + "/artifacts"
-    )
+  it should "be able to compile project" in {
+    assertProject(contracts1, artifacts1)
+    assertProject(project2, project2, recursive = false)
+    assertProject(contracts31, artifacts31)
+    assertProject(project32, project32, recursive = false)
+  }
 
-    val project2 = baseDir + "/project2"
-    assertProject(
-      project2,
-      project2,
-      project2 + "/artifacts",
-      recursive = false
-    )
+  it should "be able to compile multi-project contracts" in {
+    assertProject(contracts1 + "," + contracts31, artifacts1 + "," + artifacts31)
+    assertProject(project2 + "," + project32, project2 + "," + project32, recursive = false)
+  }
 
-    val project3 = baseDir + "/project3"
-    assertProject(
-      project3 + "/project1/contracts1",
-      project3 + "/project1/artifacts1",
-      project3 + "/project1/artifacts"
-    )
-    assertProject(
-      project3 + "/project2",
-      project3 + "/project2",
-      project3 + "/project2/artifacts",
-      recursive = false
-    )
+  it should "not to compile contracts" in {
+    assert(Cli().call(Array("-c", contracts1 + "," + contracts31, "-a", artifacts1)) != 0)
   }
 }

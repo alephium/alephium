@@ -23,10 +23,11 @@ import org.alephium.ralph.CompilerOptions
 
 @SuppressWarnings(
   Array(
-    "org.wartremover.warts.DefaultArguments"
+    "org.wartremover.warts.DefaultArguments",
+    "org.wartremover.warts.ArrayEquals"
   )
 )
-final case class Config(
+final case class Configs(
     debug: Boolean = false,
     warningAsError: Boolean = false,
     ignoreUnusedConstantsWarnings: Boolean = false,
@@ -35,10 +36,10 @@ final case class Config(
     ignoreUpdateFieldsCheckWarnings: Boolean = false,
     ignoreUnusedPrivateFunctionsWarnings: Boolean = false,
     ignoreExternalCallCheckWarnings: Boolean = false,
-    contracts: String = "contracts",
-    artifacts: String = "artifacts"
+    contracts: Array[String] = Array("contracts"),
+    artifacts: Array[String] = Array("artifacts")
 ) {
-  def compilerOptions(): CompilerOptions = {
+  private def compilerOptions(): CompilerOptions = {
     CompilerOptions(
       ignoreUnusedConstantsWarnings = ignoreUnusedConstantsWarnings,
       ignoreUnusedVariablesWarnings = ignoreUnusedVariablesWarnings,
@@ -48,6 +49,28 @@ final case class Config(
       ignoreExternalCallCheckWarnings = ignoreExternalCallCheckWarnings
     )
   }
+
+  def configs(): Array[Config] = {
+    var i                    = 0
+    var array: Array[Config] = Array.empty
+    while (i < contracts.length && i < artifacts.length) {
+      array = array :+ Config(
+        options = compilerOptions(),
+        contracts = contracts(i),
+        artifacts = artifacts(i)
+      )
+      i += 1
+    }
+    array
+  }
+}
+
+final case class Config(
+    options: CompilerOptions,
+    contracts: String,
+    artifacts: String
+) {
+  def compilerOptions(): CompilerOptions = options
 
   def contractsPath(): Path = new File(contracts).getCanonicalFile.toPath
 
