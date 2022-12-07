@@ -19,19 +19,14 @@ package org.alephium.ralphc
 import scala.util.matching.Regex
 
 object TypedMatcher {
-  val abstractContractMatcher: Regex =
-    """[\S\s]*Abstract\s+Contract\s+([A-Z][a-zA-Z0-9]*)[\S\s]*""".r
-  val contractMatcher: Regex  = """[\S\s]*Contract\s+([A-Z][a-zA-Z0-9]*)[\S\s]*""".r
-  val interfaceMatcher: Regex = """[\S\s]*Interface\s+([A-Z][a-zA-Z0-9]*)[\S\s]*""".r
-  val scriptMatcher: Regex    = """[\S\s]*TxScript\s+([A-Z][a-zA-Z0-9]*)[\S\s]*""".r
+  val contractMatcher: Regex  = """Contract\s+([A-Z][a-zA-Z0-9]*)""".r
+  val interfaceMatcher: Regex = """Interface\s+([A-Z][a-zA-Z0-9]*)""".r
+  val scriptMatcher: Regex    = """TxScript\s+([A-Z][a-zA-Z0-9]*)""".r
 
-  def matcher(input: String): Option[String] = {
-    input match {
-      case abstractContractMatcher(name) => Some(name)
-      case contractMatcher(name)         => Some(name)
-      case interfaceMatcher(name)        => Some(name)
-      case scriptMatcher(name)           => Some(name)
-      case _                             => None
-    }
+  def matcher(input: String): Array[String] = {
+    val ret = contractMatcher.findAllMatchIn(input).map(f => f.group(1)) ++
+      interfaceMatcher.findAllMatchIn(input).map(f => f.group(1)) ++
+      scriptMatcher.findAllMatchIn(input).map(f => f.group(1))
+    ret.toArray
   }
 }

@@ -37,16 +37,38 @@ class TypedMatcherSpec extends AlephiumSpec {
 
   val interface =
     s"""
-       |Interface Foo {
-       |  pub fn foo() -> ()
+       |Interface Foot {
+       |  pub fn foot() -> ()
        |}
        |""".stripMargin
 
   val abstractContract =
     s"""
-       |Abstract Contract Foo() {
-       |  pub fn foo() -> ()
+       |Abstract Contract Cat() {
+       |  pub fn cat() -> ()
        |}
+       |""".stripMargin
+
+  val multiContracts =
+    s"""
+       |Abstract Contract Cat() {
+       |  pub fn cat() -> ()
+       |}
+       |
+       |Contract Foo(a: Bool, b: I256, c: U256, d: ByteVec, e: Address) {
+       |  pub fn foo() -> (Bool, I256, U256, ByteVec, Address) {
+       |    return a, b, c, d, e
+       |  }
+       |}
+       |
+       |Interface Foot {
+       |  pub fn foot() -> ()
+       |}
+       |
+       |TxScript Main(x: U256, y: U256) {
+       |  assert!(x != y, 0)
+       |}
+       |
        |""".stripMargin
 
   val text =
@@ -55,22 +77,27 @@ class TypedMatcherSpec extends AlephiumSpec {
        |""".stripMargin
 
   it should "match Contract Foo" in {
-    TypedMatcher.matcher(contract) is Some("Foo")
+    TypedMatcher.matcher(contract) is Array("Foo")
   }
 
   it should "match TxScript Main" in {
-    TypedMatcher.matcher(script) is Some("Main")
+    TypedMatcher.matcher(script) is Array("Main")
   }
 
-  it should "match Interface Foo" in {
-    TypedMatcher.matcher(interface) is Some("Foo")
+  it should "match Interface Foot" in {
+    TypedMatcher.matcher(interface) is Array("Foot")
   }
 
-  it should "match Abstract Contract Foo" in {
-    TypedMatcher.matcher(abstractContract) is Some("Foo")
+  it should "match Abstract Contract Cat" in {
+    TypedMatcher.matcher(abstractContract) is Array("Cat")
   }
 
   it should "match None" in {
-    TypedMatcher.matcher(text) is None
+    TypedMatcher.matcher(text).length is 0
   }
+
+  it should "match multi contracts" in {
+    TypedMatcher.matcher(multiContracts) is Array("Cat", "Foo", "Foot", "Main")
+  }
+
 }

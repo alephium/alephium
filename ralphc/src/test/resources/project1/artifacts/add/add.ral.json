@@ -1,70 +1,39 @@
 {
   "version": "v1.5.4",
-  "name": "Add",
-  "bytecode": "02020d40300100020402041600160100010200000202021205160016015fa00116002a16012aa101a001160016010e0da000010002",
-  "codeHash": "a20cffb6f8f9416decd7aec0375b12e04475e8cf19ba80775f8f2d7633e2556d",
+  "name": "Pow",
+  "bytecode": "000106010000000000",
+  "codeHash": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
   "fieldsSig": {
     "names": [
-      "sub",
-      "result"
+      
     ],
     "types": [
-      "ByteVec",
-      "U256"
+      
     ],
     "isMutable": [
-      false,
-      true
+      
     ]
   },
   "eventsSig": [
-    {
-      "name": "Add",
-      "fieldNames": [
-        "x",
-        "y"
-      ],
-      "fieldTypes": [
-        "U256",
-        "U256"
-      ]
-    }
+    
   ],
   "functions": [
     {
-      "name": "add",
+      "name": "pow",
       "usePreapprovedAssets": false,
       "useAssetsInContract": false,
       "isPublic": true,
       "paramNames": [
-        "array"
+        
       ],
       "paramTypes": [
-        "[U256;2]"
+        
       ],
       "paramIsMutable": [
-        false
+        
       ],
       "returnTypes": [
-        "[U256;2]"
-      ]
-    },
-    {
-      "name": "addPrivate",
-      "usePreapprovedAssets": false,
-      "useAssetsInContract": false,
-      "isPublic": false,
-      "paramNames": [
-        "array"
-      ],
-      "paramTypes": [
-        "[U256;2]"
-      ],
-      "paramIsMutable": [
-        false
-      ],
-      "returnTypes": [
-        "[U256;2]"
+        
       ]
     }
   ]
