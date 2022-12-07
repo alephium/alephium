@@ -18,15 +18,20 @@ package org.alephium.ralphc
 
 import java.nio.file.Files
 
+import org.alephium.ralph.CompilerOptions
 import org.alephium.util.AlephiumSpec
 
 class CompilerSpec extends AlephiumSpec {
 
   it should "be able to call compileProject" in {
-    val compiler  = Compiler()
     val rootPath  = Files.createTempDirectory("project")
     val sourceDir = rootPath.resolve("contracts")
-    val config    = Config(contracts = sourceDir.toFile.getPath)
+    val config = Config(
+      options = CompilerOptions.Default,
+      contracts = sourceDir.toFile.getPath,
+      artifacts = rootPath.resolve("artifacts").toFile.getPath
+    )
+    val compiler = Compiler(config)
     val contract =
       s"""
          |Contract Foo(a: Bool, b: I256, c: U256, d: ByteVec, e: Address) {
@@ -71,7 +76,7 @@ class CompilerSpec extends AlephiumSpec {
     Files.write(action, abstractContract.getBytes())
     Files.write(main, script.getBytes())
 
-    assert(compiler.compileProject(config).isRight)
+    assert(compiler.compileProject().isRight)
     assert(compiler.metaInfos.contains("Foo"))
     assert(compiler.metaInfos.contains("Math"))
     assert(compiler.metaInfos.contains("Action"))

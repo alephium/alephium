@@ -62,7 +62,7 @@ object Codec {
   implicit val compileContractResultSigRW: ReadWriter[ContractResult]         = macroRW
   implicit val codeInfoRW: ReadWriter[CodeInfo]                               = macroRW
   implicit val artifactsRW: ReadWriter[Artifacts]                             = macroRW
-  implicit val configRW: ReadWriter[Config]                                   = macroRW
+  implicit val configsRW: ReadWriter[Configs]                                 = macroRW
 }
 
 @SuppressWarnings(
@@ -73,9 +73,8 @@ object Codec {
     "org.wartremover.warts.DefaultArguments"
   )
 )
-final case class Compiler() {
+final case class Compiler(config: Config) {
   val metaInfos: mutable.Map[String, MetaInfo] = mutable.SeqMap.empty[String, MetaInfo]
-  var config: Config                           = Config()
   import Codec.*
 
   private def analysisCodes(): String = {
@@ -110,8 +109,7 @@ final case class Compiler() {
       .mkString
   }
 
-  def compileProject(config: Config): Either[String, CompileProjectResult] = {
-    this.config = config
+  def compileProject(): Either[String, CompileProjectResult] = {
     ralph.Compiler
       .compileProject(analysisCodes(), config.compilerOptions())
       .map(p => {
