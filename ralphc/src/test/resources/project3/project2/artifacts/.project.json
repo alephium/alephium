@@ -8,15 +8,18 @@
     "ignoreExternalCallCheckWarnings": false
   },
   "infos": {
-    "contracts1/add/add.ral": {
-      "sourceCodeHash": "6e59de953cd4e640c43367ab9809a72c4edf594aa16a6ad8ea3735b1af771029",
+    "Action": {
+      "sourceFile": "../action.ral",
+      "sourceCodeHash": "90e91b024b215506f579b59cb06e4d820327a87e28663ddb17c1d193118dc4f4",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "a20cffb6f8f9416decd7aec0375b12e04475e8cf19ba80775f8f2d7633e2556d",
+      "codeHashDebug": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
       "warnings": [
-        
+        "No update fields annotation for function: Action.action, please use @using(updateFields = true/false) for the function",
+        "Function Action.action does not update fields, please use @using(updateFields = false) for the function"
       ]
     },
-    "contracts2/foo.ral": {
+    "Foo": {
+      "sourceFile": "../foo.ral",
       "sourceCodeHash": "31c215eef9b9bb6faeeb0b6de689cabe4097716a15470ed0766b1bf5e4174b24",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "424c056943d4d31540aebb0537533280d9a7724264d7dd58ddcbd764e8cad3c0",
@@ -25,23 +28,8 @@
         "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
       ]
     },
-    "contracts2/math.ral": {
-      "sourceCodeHash": "bf6305b5f82a1267b36f72b25c4f01d5fe27b3be0edff7b16200951bc0ab3c20",
-      "bytecodeDebugPatch": "",
-      "codeHashDebug": "649e6f9fd0e73759cd506bc05aa80bfbf709748f2782aaa83001634ed978b4b0",
-      "warnings": [
-        
-      ]
-    },
-    "contracts1/sub/sub.ral": {
-      "sourceCodeHash": "815eb745f49f3eafc266333db2bf8d49a70f16f70b16c877a0274f51637f9620",
-      "bytecodeDebugPatch": "",
-      "codeHashDebug": "513645f5c95a28d55a51070f3d5c51edbda05a98f46b23cad59952e2ee4846a1",
-      "warnings": [
-        
-      ]
-    },
-    "contracts2/main.ral": {
+    "Main": {
+      "sourceFile": "../main.ral",
       "sourceCodeHash": "82cadbfc4cf9576d2ce5814fe7041a56430741a2b8e0f149558617911f0c1494",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -49,29 +37,13 @@
         
       ]
     },
-    "contracts1/greeter/greeter.ral": {
-      "sourceCodeHash": "3cf9e5898ff728b03630bf457ef96cbd21d345e2256f30d2ce4f6a102de51b14",
+    "Math": {
+      "sourceFile": "../math.ral",
+      "sourceCodeHash": "bf6305b5f82a1267b36f72b25c4f01d5fe27b3be0edff7b16200951bc0ab3c20",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "23a48462286d2c2ffc6d3a19192060dd42c178e7d331819e75e059c5be3c042f",
+      "codeHashDebug": "649e6f9fd0e73759cd506bc05aa80bfbf709748f2782aaa83001634ed978b4b0",
       "warnings": [
         
-      ]
-    },
-    "contracts1/greeter/greeter_interface.ral": {
-      "sourceCodeHash": "4d907712f36c242fc160513fc9d94d96e5c848ae865b89b39eaff8f9c3d48c1f",
-      "bytecodeDebugPatch": "",
-      "codeHashDebug": "0000000000000000000000000000000000000000000000000000000000000000",
-      "warnings": [
-        
-      ]
-    },
-    "contracts2/action.ral": {
-      "sourceCodeHash": "90e91b024b215506f579b59cb06e4d820327a87e28663ddb17c1d193118dc4f4",
-      "bytecodeDebugPatch": "",
-      "codeHashDebug": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
-      "warnings": [
-        "No update fields annotation for function: Action.action, please use @using(updateFields = true/false) for the function",
-        "Function Action.action does not update fields, please use @using(updateFields = false) for the function"
       ]
     }
   }

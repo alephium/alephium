@@ -24,6 +24,7 @@ import org.alephium.ralph.CompilerOptions
 import org.alephium.util.AVector
 
 final case class CodeInfo(
+    sourceFile: String,
     sourceCodeHash: String,
     var bytecodeDebugPatch: CompileProjectResult.Patch,
     var codeHashDebug: Hash,
@@ -32,4 +33,4 @@ final case class CodeInfo(
 
 final case class Artifacts(compilerOptionsUsed: CompilerOptions, infos: Map[String, CodeInfo])
 
-final case class MetaInfo(name: String, sourcePath: Path, ArtifactPath: Path, codeInfo: CodeInfo)
+final case class MetaInfo(name: String, ArtifactPath: Path, codeInfo: CodeInfo)

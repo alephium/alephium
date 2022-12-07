@@ -86,10 +86,9 @@ final case class Compiler(config: Config) {
         TypedMatcher
           .matcher(sourceCode)
           .foreach(name => {
-            val path = file.getCanonicalFile.toPath
-            val sourcePath =
-              path.subpath(config.contractsPath().getParent.getNameCount, path.getNameCount)
-            val savePath = Paths.get(
+            val path       = file.getCanonicalFile.toPath
+            val sourcePath = config.artifactsPath().relativize(path)
+            val artifactPath = Paths.get(
               config
                 .artifactsPath()
                 .resolve(path.subpath(config.contractsPath().getNameCount, path.getNameCount))
@@ -98,9 +97,14 @@ final case class Compiler(config: Config) {
             )
             val meta = MetaInfo(
               name,
-              sourcePath,
-              savePath,
-              CodeInfo(sourceCodeHash, CompileProjectResult.Patch(""), Hash.zero, AVector())
+              artifactPath,
+              CodeInfo(
+                sourcePath.toFile.getPath,
+                sourceCodeHash,
+                CompileProjectResult.Patch(""),
+                Hash.zero,
+                AVector()
+              )
             )
             metaInfos.addOne((name, meta))
           })
@@ -113,40 +117,37 @@ final case class Compiler(config: Config) {
     ralph.Compiler
       .compileProject(analysisCodes(), config.compilerOptions())
       .map(p => {
-        p._1.foreach(c => saveContract(CompileContractResult.from(c)))
-        p._2.foreach(s => saveScript(CompileScriptResult.from(s)))
-        saveProjectArtifacts()
+        val fullMetaInfos: mutable.SeqMap[String, MetaInfo] = mutable.SeqMap()
+        p._1.foreach(cc => {
+          val c     = CompileContractResult.from(cc)
+          val value = metaInfos(c.name)
+          value.codeInfo.warnings = c.warnings
+          value.codeInfo.bytecodeDebugPatch = c.bytecodeDebugPatch
+          value.codeInfo.codeHashDebug = c.codeHashDebug
+          metaInfos.addOne((c.name, value))
+          fullMetaInfos.addOne((c.name, value))
+          Compiler.writer(ContractResult.from(c), value.ArtifactPath)
+        })
+        p._2.foreach(ss => {
+          val s     = CompileScriptResult.from(ss)
+          val value = metaInfos(s.name)
+          value.codeInfo.warnings = s.warnings
+          value.codeInfo.bytecodeDebugPatch = s.bytecodeDebugPatch
+          metaInfos.addOne((s.name, value))
+          fullMetaInfos.addOne((s.name, value))
+          Compiler.writer(ScriptResult.from(s), value.ArtifactPath)
+        })
+        Compiler.writer(
+          Artifacts(
+            config.compilerOptions(),
+            fullMetaInfos.map(item => (item._2.name, item._2.codeInfo)).toSeq.sortBy(_._1).toMap
+          ),
+          config.artifactsPath().resolve(".project.json")
+        )
         CompileProjectResult.from(p._1, p._2)
       })
       .left
       .map(_.toString)
-  }
-
-  def saveContract(c: CompileContractResult): Unit = {
-    val value = metaInfos(c.name)
-    value.codeInfo.warnings = c.warnings
-    value.codeInfo.bytecodeDebugPatch = c.bytecodeDebugPatch
-    value.codeInfo.codeHashDebug = c.codeHashDebug
-    metaInfos.addOne((c.name, value))
-    Compiler.writer(ContractResult.from(c), value.ArtifactPath)
-  }
-
-  def saveScript(s: CompileScriptResult): Unit = {
-    val value = metaInfos(s.name)
-    value.codeInfo.warnings = s.warnings
-    value.codeInfo.bytecodeDebugPatch = s.bytecodeDebugPatch
-    metaInfos.addOne((s.name, value))
-    Compiler.writer(ScriptResult.from(s), value.ArtifactPath)
-  }
-
-  def saveProjectArtifacts(): Unit = {
-    Compiler.writer(
-      Artifacts(
-        config.compilerOptions(),
-        metaInfos.map(item => (item._2.sourcePath.toFile.getPath, item._2.codeInfo)).toMap
-      ),
-      config.artifactsPath().resolve(".project.json")
-    )
   }
 }
 

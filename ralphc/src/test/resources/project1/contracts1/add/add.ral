@@ -12,3 +12,7 @@ Contract Add(sub: Sub, mut result : U256) {
         return [result, sub.sub(array)]
     }
 }
+
+Contract Pow() {
+    pub fn pow() -> (){}
+}

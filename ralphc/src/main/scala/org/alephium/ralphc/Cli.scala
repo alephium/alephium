@@ -26,6 +26,7 @@ import org.alephium.json.Json.*
 import org.alephium.protocol.BuildInfo
 import org.alephium.util.AVector
 
+// scalastyle:off
 @SuppressWarnings(
   Array(
     "org.wartremover.warts.ToString",
