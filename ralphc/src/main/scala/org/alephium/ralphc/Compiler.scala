@@ -17,24 +17,20 @@
 package org.alephium.ralphc
 
 import java.io.{File, PrintWriter}
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 
 import scala.collection.mutable
 import scala.io.Source
+import scala.jdk.CollectionConverters.IteratorHasAsScala
 import scala.util.{Failure, Success, Using}
 
+import org.alephium.api.ApiModelCodec
 import org.alephium.api.UtilJson._
-import org.alephium.api.model.{
-  CompileContractResult,
-  CompileProjectResult,
-  CompileResult,
-  CompileScriptResult
-}
+import org.alephium.api.model.{CompileContractResult, CompileProjectResult, CompileScriptResult}
 import org.alephium.crypto
-import org.alephium.json.Json.*
+import org.alephium.json.Json._
 import org.alephium.protocol.Hash
 import org.alephium.ralph
-import org.alephium.ralph.CompilerOptions
 import org.alephium.util.AVector
 
 @SuppressWarnings(
@@ -46,26 +42,16 @@ import org.alephium.util.AVector
     "org.wartremover.warts.PlatformDefault"
   )
 )
-object Codec {
-  implicit val hashWriter: Writer[Hash] = StringWriter.comap[Hash](_.toHexString)
-  implicit val hashReader: Reader[Hash] = byteStringReader.map(Hash.from(_) match {
-    case Some(hash) => hash
-    case None       => throw new RuntimeException("cannot decode hash")
-  })
-  implicit val compilerOptionsRW: ReadWriter[CompilerOptions] = macroRW
-  implicit val compilePatchRW: ReadWriter[CompileProjectResult.Patch] =
-    readwriter[String].bimap(_.value, CompileProjectResult.Patch)
-  implicit val compileResultFieldsRW: ReadWriter[CompileResult.FieldsSig]     = macroRW
-  implicit val compileResultFunctionRW: ReadWriter[CompileResult.FunctionSig] = macroRW
-  implicit val compileResultEventRW: ReadWriter[CompileResult.EventSig]       = macroRW
-  implicit val compileScriptResultRW: ReadWriter[CompileScriptResult]         = macroRW
-  implicit val compileContractResultRW: ReadWriter[CompileContractResult]     = macroRW
-  implicit val compileProjectResultRW: ReadWriter[CompileProjectResult]       = macroRW
-  implicit val compileScriptResultSigRW: ReadWriter[ScriptResult]             = macroRW
-  implicit val compileContractResultSigRW: ReadWriter[ContractResult]         = macroRW
-  implicit val codeInfoRW: ReadWriter[CodeInfo]                               = macroRW
-  implicit val artifactsRW: ReadWriter[Artifacts]                             = macroRW
-  implicit val configsRW: ReadWriter[Configs]                                 = macroRW
+object Codec extends ApiModelCodec {
+  implicit val pathWriter: Writer[Path] = StringWriter.comap[Path](_.toString)
+  implicit val pathReader: Reader[Path] = StringReader.map(Paths.get(_))
+
+  implicit val ralphCompilerOptionsRW: ReadWriter[ralph.CompilerOptions] = macroRW
+  implicit val compileScriptResultSigRW: ReadWriter[ScriptResult]        = macroRW
+  implicit val compileContractResultSigRW: ReadWriter[ContractResult]    = macroRW
+  implicit val codeInfoRW: ReadWriter[CodeInfo]                          = macroRW
+  implicit val artifactsRW: ReadWriter[Artifacts]                        = macroRW
+  implicit val configsRW: ReadWriter[Configs]                            = macroRW
 }
 
 @SuppressWarnings(
@@ -81,11 +67,12 @@ final case class Compiler(config: Config) {
   val metaInfos: mutable.Map[String, MetaInfo] = mutable.SeqMap.empty[String, MetaInfo]
   import Codec._
 
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private def analysisCodes(): String = {
     Compiler
-      .getSourceFiles(config.contractsPath().toFile, ".ral")
-      .map(file => {
-        val sourceCode = Using(Source.fromFile(file)) { _.mkString } match {
+      .getSourceFiles(config.contractPath, ".ral")
+      .map(path => {
+        val sourceCode = Using(Source.fromFile(path.toFile)) { _.mkString } match {
           case Success(value)     => value
           case Failure(exception) => throw exception
         }
@@ -93,14 +80,12 @@ final case class Compiler(config: Config) {
         TypedMatcher
           .matcher(sourceCode)
           .foreach(name => {
-            val path       = file.getCanonicalFile.toPath
-            val sourcePath = config.artifactsPath().relativize(path)
+            val sourcePath = config.contractPath.relativize(path)
             val artifactPath = Paths.get(
-              config
-                .artifactsPath()
-                .resolve(path.subpath(config.contractsPath().getNameCount, path.getNameCount))
-                .toFile
-                .getPath + ".json"
+              config.artifactPath
+                .resolve(path.subpath(config.contractPath.getNameCount, path.getNameCount))
+                .toString
+                + ".json"
             )
             val meta = MetaInfo(
               name,
@@ -123,7 +108,7 @@ final case class Compiler(config: Config) {
   def compileProject(): Either[String, CompileProjectResult] = {
     val codes = analysisCodes()
     if (codes.isEmpty) {
-      Left("Contract doesn't exist")
+      Left(s"There are no contracts in the folder: <${config.contractPath}>")
     } else {
       ralph.Compiler
         .compileProject(codes, config.compilerOptions())
@@ -153,7 +138,7 @@ final case class Compiler(config: Config) {
               config.compilerOptions(),
               fullMetaInfos.map(item => (item._2.name, item._2.codeInfo)).toSeq.sortBy(_._1).toMap
             ),
-            config.artifactsPath().resolve(".project.json")
+            config.artifactPath.resolve(".project.json")
           )
           CompileProjectResult.from(p._1, p._2)
         })
@@ -176,20 +161,23 @@ object Compiler {
     writer.write(write(s, 2))
     writer.close()
   }
-  def getSourceFiles(file: File, ext: String, recursive: Boolean = true): Array[File] = {
-    if (file.isDirectory) {
-      val (fullFiles, fullDirs) = file.listFiles().partition(!_.isDirectory)
-      val files                 = fullFiles.filter(t => t.getPath.endsWith(ext))
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  def getSourceFiles(path: Path, ext: String, recursive: Boolean = true): Seq[Path] = {
+    if (Files.isDirectory(path)) {
+      val (allFiles, allDirs) =
+        Files.list(path).iterator().asScala.toSeq.partition(p => !Files.isDirectory(p))
+      val expectedFiles = allFiles.filter(p => p.toString().endsWith(ext))
       if (recursive) {
-        files ++ fullDirs.flatMap(getSourceFiles(_, ext))
+        expectedFiles ++ allDirs.flatMap(getSourceFiles(_, ext))
       } else {
-        files
+        expectedFiles
       }
     } else {
-      if (file.isFile && file.getPath.endsWith(ext)) {
-        Array(file)
+      if (Files.isRegularFile(path) && path.endsWith(ext)) {
+        Seq(path)
       } else {
-        Array.empty
+        Seq.empty
       }
     }
   }

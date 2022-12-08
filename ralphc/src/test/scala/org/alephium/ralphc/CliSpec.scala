@@ -18,6 +18,8 @@ package org.alephium.ralphc
 
 import java.nio.file.{Files, Paths}
 
+import scala.io.Source
+
 import org.alephium.util.AlephiumSpec
 
 class CliSpec extends AlephiumSpec {
@@ -37,30 +39,37 @@ class CliSpec extends AlephiumSpec {
   ) = {
     val cli = Cli()
     assert(cli.call(Array("-c", sourcePath, "-a", artifactsPath)) == 0)
+
     cli.configs
       .configs()
-      .foreach(config => {
-        val latestArtifacts =
-          Compiler.getSourceFiles(config.artifactsPath().toFile, ".json")
-        var expectedArtifactsPath = config.contractsPath().getParent.resolve("artifacts")
-        if (isRecode) {
-          expectedArtifactsPath = config.contractsPath().resolve("artifacts")
+      .foreach { config =>
+        val generatedArtifacts =
+          Compiler.getSourceFiles(config.artifactPath, ".json").sorted
+
+        val expectedArtifactsPath = if (isRecode) {
+          config.contractPath.resolve("artifacts")
+        } else {
+          config.contractPath.getParent.resolve("artifacts")
         }
-        val expectedArtifactsFile = expectedArtifactsPath.toFile
+        config.artifactPath isnot expectedArtifactsPath
+
         val expectedArtifacts = Compiler
-          .getSourceFiles(expectedArtifactsFile, ".json")
-          .map(file => {
-            val path = file.toPath
-            path.subpath(expectedArtifactsFile.toPath.getNameCount, path.getNameCount)
-          })
+          .getSourceFiles(expectedArtifactsPath, ".json")
           .sorted
-        latestArtifacts
-          .map(file => {
-            val path = file.toPath
-            path.subpath(config.artifactsPath().getNameCount, path.getNameCount)
-          })
-          .sorted is expectedArtifacts
-      })
+
+        generatedArtifacts.length is expectedArtifacts.length
+        generatedArtifacts.zip(expectedArtifacts).foreach { case (generatedPath, expectedPath) =>
+          val generatedSource = Source.fromFile(generatedPath.toFile)
+          val generated =
+            try generatedSource.mkString
+            finally generatedSource.close()
+          val expectedSource = Source.fromFile(expectedPath.toFile)
+          val expected =
+            try expectedSource.mkString
+            finally expectedSource.close()
+          generated is expected
+        }
+      }
   }
 
   it should "be able to compile project" in {

@@ -16,8 +16,7 @@
 
 package org.alephium.ralphc
 
-import java.io.File
-import java.nio.file.Path
+import java.nio.file.{Path, Paths}
 
 import scala.collection.immutable.ArraySeq
 
@@ -37,8 +36,8 @@ final case class Configs(
     ignoreUpdateFieldsCheckWarnings: Boolean = false,
     ignoreUnusedPrivateFunctionsWarnings: Boolean = false,
     ignoreExternalCallCheckWarnings: Boolean = false,
-    contracts: ArraySeq[String] = ArraySeq("contracts"),
-    artifacts: ArraySeq[String] = ArraySeq("artifacts")
+    contracts: ArraySeq[Path] = ArraySeq(Paths.get(".")),
+    artifacts: ArraySeq[Path] = ArraySeq(Paths.get("."))
 ) {
   private def compilerOptions(): CompilerOptions = {
     CompilerOptions(
@@ -57,8 +56,8 @@ final case class Configs(
       .map(value =>
         Config(
           options = compilerOptions(),
-          contracts = value._1,
-          artifacts = value._2
+          contractPath = value._1,
+          artifactPath = value._2
         )
       )
       .toArray
@@ -67,12 +66,8 @@ final case class Configs(
 
 final case class Config(
     options: CompilerOptions,
-    contracts: String,
-    artifacts: String
+    contractPath: Path,
+    artifactPath: Path
 ) {
   def compilerOptions(): CompilerOptions = options
-
-  def contractsPath(): Path = new File(contracts).getCanonicalFile.toPath
-
-  def artifactsPath(): Path = new File(artifacts).getCanonicalFile.toPath
 }

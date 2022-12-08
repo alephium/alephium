@@ -28,8 +28,8 @@ class CompilerSpec extends AlephiumSpec {
     val sourceDir = rootPath.resolve("contracts")
     val config = Config(
       options = CompilerOptions.Default,
-      contracts = sourceDir.toFile.getPath,
-      artifacts = rootPath.resolve("artifacts").toFile.getPath
+      contractPath = sourceDir,
+      artifactPath = rootPath.resolve("artifacts")
     )
     val compiler = Compiler(config)
     val contract =
