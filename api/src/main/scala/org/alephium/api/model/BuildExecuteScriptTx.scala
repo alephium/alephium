@@ -19,9 +19,9 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.model.{BlockHash, TokenId}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, U256}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildExecuteScriptTx(
@@ -32,4 +32,20 @@ final case class BuildExecuteScriptTx(
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
-) extends BuildTxCommon
+) extends BuildTxCommon {
+  def getAmounts: Either[String, (U256, AVector[(TokenId, U256)])] = {
+    val alphAmount = attoAlphAmount.map(_.value).getOrElse(U256.Zero)
+    tokens match {
+      case None => Right((alphAmount, AVector.empty))
+      case Some(tokens) =>
+        tokens.foldE((alphAmount, AVector.empty[(TokenId, U256)])) {
+          case ((alph, tokenList), token) =>
+            if (token.id == TokenId.zero) {
+              alph.add(token.amount).map(a => (a, tokenList)).toRight("ALPH amount overflow")
+            } else {
+              Right((alph, tokenList :+ (token.id, token.amount)))
+            }
+        }
+    }
+  }
+}

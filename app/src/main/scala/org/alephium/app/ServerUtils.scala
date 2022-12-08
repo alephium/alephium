@@ -840,17 +840,16 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildExecuteScriptTx
   ): Try[BuildExecuteScriptTxResult] = {
-    val attoAlphAmount = query.attoAlphAmount.map(_.value).getOrElse(U256.Zero)
-    val tokens = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
     for {
+      amounts <- query.getAmounts.left.map(badRequest)
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        attoAlphAmount,
-        tokens,
+        amounts._1,
+        amounts._2,
         query.fromPublicKey,
         query.gasAmount,
         query.gasPrice

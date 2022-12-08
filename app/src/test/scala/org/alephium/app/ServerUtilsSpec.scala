@@ -1989,6 +1989,42 @@ class ServerUtilsSpec extends AlephiumSpec {
     testResult.txOutputs(3).address is Address.contract(testContract.contractId)
   }
 
+  it should "get alph and token amounts" in {
+    val query0 = BuildExecuteScriptTx(PublicKey.generate, ByteString.empty, None, None)
+    query0.getAmounts.rightValue is (U256.Zero, AVector.empty[(TokenId, U256)])
+
+    val query1 =
+      BuildExecuteScriptTx(PublicKey.generate, ByteString.empty, Some(Amount(U256.Billion)), None)
+    query1.getAmounts.rightValue is (U256.Billion, AVector.empty[(TokenId, U256)])
+
+    val tokenId = TokenId.generate
+    val query2 = BuildExecuteScriptTx(
+      PublicKey.generate,
+      ByteString.empty,
+      Some(Amount(U256.Billion)),
+      Some(AVector(Token(tokenId, U256.Billion)))
+    )
+    query2.getAmounts.rightValue is (U256.Billion, AVector(tokenId -> U256.Billion))
+
+    val query3 = BuildExecuteScriptTx(
+      PublicKey.generate,
+      ByteString.empty,
+      Some(Amount(U256.Billion)),
+      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.zero, U256.Billion)))
+    )
+    query3.getAmounts.rightValue is (U256.Billion.mulUnsafe(U256.Two), AVector(
+      tokenId -> U256.Billion
+    ))
+
+    val query4 = BuildExecuteScriptTx(
+      PublicKey.generate,
+      ByteString.empty,
+      Some(Amount(U256.MaxValue)),
+      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.zero, U256.Billion)))
+    )
+    query4.getAmounts.leftValue is "ALPH amount overflow"
+  }
+
   private def generateDestination(
       chainIndex: ChainIndex,
       message: ByteString = ByteString.empty
