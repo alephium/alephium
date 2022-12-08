@@ -16,19 +16,18 @@
 
 package org.alephium.ralphc
 
-import java.io.File
+import java.nio.file.{Files, Path}
 
 import scala.collection.immutable.ArraySeq
 
 import scopt.OParser
 
-import org.alephium.api.UtilJson._
 import org.alephium.api.model.CompileProjectResult
 import org.alephium.json.Json._
 import org.alephium.protocol.BuildInfo
 import org.alephium.util.AVector
 
-// scalastyle:off
+// scalastyle:off regex
 @SuppressWarnings(
   Array(
     "org.wartremover.warts.ToString",
@@ -49,64 +48,50 @@ final case class Cli() {
       note(
         """
           |Examples:
-          |# To compile a single project contract
-          |Linux or MacOs:
-          |  $ java -jar ralphc.jar -c ./project/contracts, -a ./project/artifacts
-          |
-          |# To compile two project contracts
-          |Linux or MacOs:
-          |  $ java -jar ralphc.jar -c ./project1/contracts,./project2/contracts -a ./project1/artifacts,./project2/artifacts
-          |
-          |# To compile multi-project contracts
-          |Linux or MacOs:
-          |  $ java -jar ralphc.jar -c ./project1/contracts,./project2/contracts,./project3/contracts,... -a ./project1/artifacts,./project2/artifacts,./project3/artifacts,...
-          |
-          |""".stripMargin
+          |  $ java -jar ralphc.jar -c <contracts1>,<contracts2>... -a <artifacts1>,<artifacts2>... [options]
+          |""".stripMargin.trim
       ),
-      opt[Seq[String]]('c', "contracts")
-        .validate(
-          _.find(!new File(_).isDirectory).fold[Either[String, Unit]](Right(()))(path =>
-            Left(s"${path} is not directory")
-          )
-        )
+      note("\nOptions:"),
+      opt[Seq[Path]]('c', "contracts")
+        .validate(validateFolders)
         .action((path, c) => c.copy(contracts = ArraySeq.from(path)))
-        .text("Contracts path, default: contracts"),
-      opt[Seq[String]]('a', "artifacts")
+        .text("Contract folder, default: ./contracts"),
+      opt[Seq[Path]]('a', "artifacts")
         .action((a, c) => c.copy(artifacts = ArraySeq.from(a)))
-        .text("Artifacts path, default: artifacts"),
+        .text("Artifact folder, default: ./artifacts"),
       opt[Unit]('w', "werror")
         .action((_, c) => c.copy(warningAsError = true))
-        .text("Consider warning as error"),
+        .text("Treat warnings as errors"),
       opt[Unit]("ic")
         .action((_, c) => c.copy(ignoreUnusedConstantsWarnings = true))
-        .text("Ignore unused constant warning"),
+        .text("Ignore unused constant warnings"),
       opt[Unit]("iv")
         .action((_, c) => c.copy(ignoreUnusedVariablesWarnings = true))
-        .text("Ignore unused variable warning"),
+        .text("Ignore unused variable warnings"),
       opt[Unit]("if")
         .action((_, c) => c.copy(ignoreUnusedFieldsWarnings = true))
-        .text("Ignore unused field warning"),
+        .text("Ignore unused field warnings"),
       opt[Unit]("ir")
         .action((_, c) => c.copy(ignoreUpdateFieldsCheckWarnings = true))
-        .text("Ignore update field check warning"),
+        .text("Ignore update field check warnings"),
       opt[Unit]("ip")
         .action((_, c) => c.copy(ignoreUnusedPrivateFunctionsWarnings = true))
-        .text("Ignore unused private functions warning"),
+        .text("Ignore unused private functions warnings"),
       opt[Unit]("ie")
         .action((_, c) => c.copy(ignoreExternalCallCheckWarnings = true))
-        .text("Ignore external call check warning"),
+        .text("Ignore external call check warnings"),
       opt[Unit]('d', "debug")
         .action((_, c) => c.copy(debug = true))
         .text("Debug mode"),
-      help('h', "help").text("Print help information (use `--help` for more detail)"),
+      help('h', "help").text("Print this usage text"),
       version('v', "version").text("Print version information"),
       checkConfig(configs => {
         if (configs.contracts.length != configs.artifacts.length) {
-          Left("contracts and artifacts path mismatch")
+          Left("The number of contract folders and artifact folders is not equal")
         } else if (configs.contracts.distinct.length != configs.contracts.length) {
-          Left("contracts are no duplicated")
+          Left("The contract folders are not distinct")
         } else if (configs.artifacts.distinct.length != configs.artifacts.length) {
-          Left("artifacts are no duplicated")
+          Left("The artifact folders are not distinct")
         } else {
           Right(())
         }
@@ -114,12 +99,16 @@ final case class Cli() {
     )
   }
 
+  def validateFolders(paths: Seq[Path]): Either[String, Unit] = {
+    paths
+      .find(!Files.isDirectory(_))
+      .fold[Either[String, Unit]](Right(()))(path =>
+        Left(s"Expected directory, got file: <${path}>")
+      )
+  }
+
   def call(args: Array[String]): Int = {
-    var arguments = args
-    if (arguments.isEmpty) {
-      arguments = arguments :+ "-h"
-    }
-    OParser.parse(parser, arguments, configs) match {
+    OParser.parse(parser, args, configs) match {
       case Some(c: Configs) =>
         configs = c
         debug(write(configs, 2))
@@ -128,7 +117,7 @@ final case class Cli() {
             Compiler(config)
               .compileProject()
               .fold(
-                err => error(s"contracts path: ${config.contractsPath().toFile.getPath}", err),
+                err => error(config.contractPath, err),
                 ret => result(ret)
               )
           )
@@ -138,23 +127,21 @@ final case class Cli() {
     }
   }
 
-  private def debug(values: String*): Unit = {
+  private def debug(message: String): Unit = {
     if (configs.debug) {
-      values.foreach(println)
+      println(s"$message")
     }
   }
 
-  private def error(path: String, err: String): Int = {
-    println(s"""error:
-               |${path}
+  private def error(path: Path, err: String): Int = {
+    println(s"""Error while compiling contracts in the folder: <${path}>
                |$err""".stripMargin)
     -1
   }
 
-  private def warning(name: String, warningMessages: String): Int = {
-    println(s"""${name}
-               |warning:
-               |${warningMessages}""".stripMargin)
+  private def warning(name: String, warnings: AVector[String]): Int = {
+    val sep = "\n  - "
+    println(s"""Warning ($name):${warnings.mkString(sep, sep, "")}""")
     if (configs.warningAsError) {
       -1
     } else {
@@ -166,11 +153,11 @@ final case class Cli() {
     var checkWarningAsError = 0
     val each = (warnings: AVector[String], name: String) => {
       if (warnings.nonEmpty) {
-        checkWarningAsError = warning(name, write(warnings, 2))
+        checkWarningAsError = warning(name, warnings)
       }
     }
-    ret.scripts.foreach(script => each(script.warnings, s"Script name: ${script.name}"))
-    ret.contracts.foreach(contract => each(contract.warnings, s"Contract name: ${contract.name}"))
+    ret.scripts.foreach(script => each(script.warnings, s"Script `${script.name}`"))
+    ret.contracts.foreach(contract => each(contract.warnings, s"Contract `${contract.name}`"))
     checkWarningAsError
   }
 }

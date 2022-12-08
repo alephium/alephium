@@ -9,7 +9,7 @@
   },
   "infos": {
     "Greeter": {
-      "sourceFile": "../contracts1/greeter/greeter.ral",
+      "sourceFile": "greeter/greeter.ral",
       "sourceCodeHash": "3cf9e5898ff728b03630bf457ef96cbd21d345e2256f30d2ce4f6a102de51b14",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "23a48462286d2c2ffc6d3a19192060dd42c178e7d331819e75e059c5be3c042f",
@@ -18,7 +18,7 @@
       ]
     },
     "Add": {
-      "sourceFile": "../contracts1/add/add.ral",
+      "sourceFile": "add/add.ral",
       "sourceCodeHash": "344d0973bfafec47fe8e588eb4b7eb5fedf0ac4a95e84cf2dc018f2f6da8c462",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "a20cffb6f8f9416decd7aec0375b12e04475e8cf19ba80775f8f2d7633e2556d",
@@ -27,7 +27,7 @@
       ]
     },
     "Sub": {
-      "sourceFile": "../contracts1/sub/sub.ral",
+      "sourceFile": "sub/sub.ral",
       "sourceCodeHash": "815eb745f49f3eafc266333db2bf8d49a70f16f70b16c877a0274f51637f9620",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "513645f5c95a28d55a51070f3d5c51edbda05a98f46b23cad59952e2ee4846a1",
@@ -36,7 +36,7 @@
       ]
     },
     "Main": {
-      "sourceFile": "../contracts1/main.ral",
+      "sourceFile": "main.ral",
       "sourceCodeHash": "8cc5c1a2de002650a5904078f91005932982e700f7b0a393cbe4e3a64cfdf842",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -45,7 +45,7 @@
       ]
     },
     "Pow": {
-      "sourceFile": "../contracts1/add/add.ral",
+      "sourceFile": "add/add.ral",
       "sourceCodeHash": "344d0973bfafec47fe8e588eb4b7eb5fedf0ac4a95e84cf2dc018f2f6da8c462",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
