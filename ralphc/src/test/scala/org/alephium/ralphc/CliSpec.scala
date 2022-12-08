@@ -16,24 +16,24 @@
 
 package org.alephium.ralphc
 
+import java.nio.file.{Files, Paths}
+
 import org.alephium.util.AlephiumSpec
 
 class CliSpec extends AlephiumSpec {
   val baseDir     = "src/test/resources"
   val project1    = baseDir + "/project1"
-  val contracts1  = project1 + "/contracts1"
-  val artifacts1  = project1 + "/artifacts1"
   val project2    = baseDir + "/project2"
   val project3    = baseDir + "/project3"
   val project31   = project3 + "/project1"
-  val contracts31 = project31 + "/contracts1"
-  val artifacts31 = project31 + "/artifacts1"
   val project32   = project3 + "/project2"
+  val contracts1  = project1 + "/contracts"
+  val contracts31 = project31 + "/contracts"
 
   def assertProject(
       sourcePath: String,
       artifactsPath: String,
-      recursive: Boolean = true
+      isRecode: Boolean = false
   ) = {
     val cli = Cli()
     assert(cli.call(Array("-c", sourcePath, "-a", artifactsPath)) == 0)
@@ -41,14 +41,14 @@ class CliSpec extends AlephiumSpec {
       .configs()
       .foreach(config => {
         val latestArchives =
-          Compiler.getSourceFiles(config.artifactsPath().toFile, ".json", recursive)
+          Compiler.getSourceFiles(config.artifactsPath().toFile, ".json")
         var archivesPath = config.contractsPath().getParent.resolve("artifacts")
-        if (!recursive) {
+        if (isRecode) {
           archivesPath = config.contractsPath().resolve("artifacts")
         }
         val archivesFile = archivesPath.toFile
         val archives = Compiler
-          .getSourceFiles(archivesFile, ".json", recursive)
+          .getSourceFiles(archivesFile, ".json")
           .map(file => {
             val path = file.toPath
             path.subpath(archivesFile.toPath.getNameCount, path.getNameCount)
@@ -60,23 +60,42 @@ class CliSpec extends AlephiumSpec {
             path.subpath(config.artifactsPath().getNameCount, path.getNameCount)
           })
           .sorted is archives
-        latestArchives.foreach(file => assert(Compiler.deleteFile(file)))
       })
   }
 
   it should "be able to compile project" in {
+    val baseArtifacts = Files.createTempDirectory("projects").toFile.getPath
+    val artifacts1    = baseArtifacts + "/artifacts1"
+    val artifacts2    = baseArtifacts + "/artifacts2"
+    val artifacts31   = baseArtifacts + "/artifacts31"
+    val artifacts32   = baseArtifacts + "/artifacts32"
+    Paths.get(artifacts1).toFile.mkdirs()
+    Paths.get(artifacts2).toFile.mkdirs()
+    Paths.get(artifacts31).toFile.mkdirs()
+    Paths.get(artifacts32).toFile.mkdirs()
     assertProject(contracts1, artifacts1)
-    assertProject(project2, project2, recursive = false)
     assertProject(contracts31, artifacts31)
-    assertProject(project32, project32, recursive = false)
+    assertProject(project2, artifacts2, isRecode = true)
+    assertProject(project32, artifacts32, isRecode = true)
+    assert(Compiler.deleteFile(Paths.get(baseArtifacts).toFile))
   }
 
   it should "be able to compile multi-project contracts" in {
+    val baseArtifacts = Files.createTempDirectory("projects").toFile.getPath
+    val artifacts1    = baseArtifacts + "/artifacts1"
+    val artifacts2    = baseArtifacts + "/artifacts2"
+    val artifacts31   = baseArtifacts + "/artifacts31"
+    val artifacts32   = baseArtifacts + "/artifacts32"
+    Paths.get(artifacts1).toFile.mkdirs()
+    Paths.get(artifacts2).toFile.mkdirs()
+    Paths.get(artifacts31).toFile.mkdirs()
+    Paths.get(artifacts32).toFile.mkdirs()
     assertProject(contracts1 + "," + contracts31, artifacts1 + "," + artifacts31)
-    assertProject(project2 + "," + project32, project2 + "," + project32, recursive = false)
+    assertProject(project2 + "," + project32, artifacts2 + "," + artifacts32, isRecode = true)
+    assert(Compiler.deleteFile(Paths.get(baseArtifacts).toFile))
   }
 
   it should "not to compile contracts" in {
-    assert(Cli().call(Array("-c", contracts1 + "," + contracts31, "-a", artifacts1)) != 0)
+    assert(Cli().call(Array("-c", contracts1 + "," + contracts31, "-a", "")) != 0)
   }
 }
