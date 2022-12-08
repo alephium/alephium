@@ -1455,6 +1455,16 @@ object BuiltIn {
       retComment = "the null contract address with contract id being zeros"
     )
 
+  val alphTokenId: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.utilsSimple(
+      "alphTokenId",
+      Seq.empty,
+      Seq[Type](Type.ByteVec),
+      ALPHTokenId,
+      argsName = Seq(),
+      retComment = "the ALPH token id"
+    )
+
   val statefulFuncsSeq: Seq[(String, BuiltIn[StatefulContext])] =
     statelessFuncsSeq ++ Seq(
       approveAlph,
@@ -1493,7 +1503,8 @@ object BuiltIn {
       isCalledFromTxScript,
       subContractId,
       subContractIdOf,
-      nullContractAddress
+      nullContractAddress,
+      alphTokenId
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
