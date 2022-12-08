@@ -21,9 +21,9 @@ import java.nio.file.{Path, Paths}
 
 import scala.collection.mutable
 import scala.io.Source
-import scala.util.Using
+import scala.util.{Failure, Success, Using}
 
-import org.alephium.api.UtilJson.*
+import org.alephium.api.UtilJson._
 import org.alephium.api.model.{
   CompileContractResult,
   CompileProjectResult,
@@ -48,7 +48,10 @@ import org.alephium.util.AVector
 )
 object Codec {
   implicit val hashWriter: Writer[Hash] = StringWriter.comap[Hash](_.toHexString)
-  implicit val hashReader: Reader[Hash] = byteStringReader.map(Hash.from(_).get)
+  implicit val hashReader: Reader[Hash] = byteStringReader.map(Hash.from(_) match {
+    case Some(hash) => hash
+    case None       => throw new RuntimeException("cannot decode hash")
+  })
   implicit val compilerOptionsRW: ReadWriter[CompilerOptions] = macroRW
   implicit val compilePatchRW: ReadWriter[CompileProjectResult.Patch] =
     readwriter[String].bimap(_.value, CompileProjectResult.Patch)
@@ -70,18 +73,22 @@ object Codec {
     "org.wartremover.warts.PublicInference",
     "org.wartremover.warts.Recursion",
     "org.wartremover.warts.PlatformDefault",
-    "org.wartremover.warts.DefaultArguments"
+    "org.wartremover.warts.DefaultArguments",
+    "org.wartremover.warts.TryPartial"
   )
 )
 final case class Compiler(config: Config) {
   val metaInfos: mutable.Map[String, MetaInfo] = mutable.SeqMap.empty[String, MetaInfo]
-  import Codec.*
+  import Codec._
 
   private def analysisCodes(): String = {
     Compiler
       .getSourceFiles(config.contractsPath().toFile, ".ral")
       .map(file => {
-        val sourceCode     = Using(Source.fromFile(file)) { _.mkString }.getOrElse("")
+        val sourceCode = Using(Source.fromFile(file)) { _.mkString } match {
+          case Success(value)     => value
+          case Failure(exception) => throw exception
+        }
         val sourceCodeHash = crypto.Sha256.hash(sourceCode).toHexString
         TypedMatcher
           .matcher(sourceCode)
@@ -114,40 +121,45 @@ final case class Compiler(config: Config) {
   }
 
   def compileProject(): Either[String, CompileProjectResult] = {
-    ralph.Compiler
-      .compileProject(analysisCodes(), config.compilerOptions())
-      .map(p => {
-        val fullMetaInfos: mutable.SeqMap[String, MetaInfo] = mutable.SeqMap()
-        p._1.foreach(cc => {
-          val c     = CompileContractResult.from(cc)
-          val value = metaInfos(c.name)
-          value.codeInfo.warnings = c.warnings
-          value.codeInfo.bytecodeDebugPatch = c.bytecodeDebugPatch
-          value.codeInfo.codeHashDebug = c.codeHashDebug
-          metaInfos.addOne((c.name, value))
-          fullMetaInfos.addOne((c.name, value))
-          Compiler.writer(ContractResult.from(c), value.ArtifactPath)
+    val codes = analysisCodes()
+    if (codes.isEmpty) {
+      Left("Contract doesn't exist")
+    } else {
+      ralph.Compiler
+        .compileProject(codes, config.compilerOptions())
+        .map(p => {
+          val fullMetaInfos: mutable.SeqMap[String, MetaInfo] = mutable.SeqMap()
+          p._1.foreach(cc => {
+            val c     = CompileContractResult.from(cc)
+            val value = metaInfos(c.name)
+            value.codeInfo.warnings = c.warnings
+            value.codeInfo.bytecodeDebugPatch = c.bytecodeDebugPatch
+            value.codeInfo.codeHashDebug = c.codeHashDebug
+            metaInfos.addOne((c.name, value))
+            fullMetaInfos.addOne((c.name, value))
+            Compiler.writer(ContractResult.from(c), value.ArtifactPath)
+          })
+          p._2.foreach(ss => {
+            val s     = CompileScriptResult.from(ss)
+            val value = metaInfos(s.name)
+            value.codeInfo.warnings = s.warnings
+            value.codeInfo.bytecodeDebugPatch = s.bytecodeDebugPatch
+            metaInfos.addOne((s.name, value))
+            fullMetaInfos.addOne((s.name, value))
+            Compiler.writer(ScriptResult.from(s), value.ArtifactPath)
+          })
+          Compiler.writer(
+            Artifacts(
+              config.compilerOptions(),
+              fullMetaInfos.map(item => (item._2.name, item._2.codeInfo)).toSeq.sortBy(_._1).toMap
+            ),
+            config.artifactsPath().resolve(".project.json")
+          )
+          CompileProjectResult.from(p._1, p._2)
         })
-        p._2.foreach(ss => {
-          val s     = CompileScriptResult.from(ss)
-          val value = metaInfos(s.name)
-          value.codeInfo.warnings = s.warnings
-          value.codeInfo.bytecodeDebugPatch = s.bytecodeDebugPatch
-          metaInfos.addOne((s.name, value))
-          fullMetaInfos.addOne((s.name, value))
-          Compiler.writer(ScriptResult.from(s), value.ArtifactPath)
-        })
-        Compiler.writer(
-          Artifacts(
-            config.compilerOptions(),
-            fullMetaInfos.map(item => (item._2.name, item._2.codeInfo)).toSeq.sortBy(_._1).toMap
-          ),
-          config.artifactsPath().resolve(".project.json")
-        )
-        CompileProjectResult.from(p._1, p._2)
-      })
-      .left
-      .map(_.toString)
+        .left
+        .map(_.toString)
+    }
   }
 }
 

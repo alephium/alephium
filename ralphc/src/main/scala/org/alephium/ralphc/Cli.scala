@@ -18,11 +18,13 @@ package org.alephium.ralphc
 
 import java.io.File
 
+import scala.collection.immutable.ArraySeq
+
 import scopt.OParser
 
-import org.alephium.api.UtilJson.*
+import org.alephium.api.UtilJson._
 import org.alephium.api.model.CompileProjectResult
-import org.alephium.json.Json.*
+import org.alephium.json.Json._
 import org.alephium.protocol.BuildInfo
 import org.alephium.util.AVector
 
@@ -36,7 +38,7 @@ import org.alephium.util.AVector
   )
 )
 final case class Cli() {
-  import Codec.*
+  import Codec._
   var configs: Configs = Configs()
   private val builder  = OParser.builder[Configs]
   private val parser = {
@@ -67,12 +69,12 @@ final case class Cli() {
             Left(s"${path} is not directory")
           )
         )
-        .action((path, c) => c.copy(contracts = path.toArray))
+        .action((path, c) => c.copy(contracts = ArraySeq.from(path)))
         .text("Contracts path, default: contracts"),
       opt[Seq[String]]('a', "artifacts")
-        .action((a, c) => c.copy(artifacts = a.toArray))
+        .action((a, c) => c.copy(artifacts = ArraySeq.from(a)))
         .text("Artifacts path, default: artifacts"),
-      opt[Unit]('w', "warning")
+      opt[Unit]('w', "werror")
         .action((_, c) => c.copy(warningAsError = true))
         .text("Consider warning as error"),
       opt[Unit]("ic")
@@ -100,7 +102,11 @@ final case class Cli() {
       version('v', "version").text("Print version information"),
       checkConfig(configs => {
         if (configs.contracts.length != configs.artifacts.length) {
-          Left("contracts or artifacts path error")
+          Left("contracts and artifacts path mismatch")
+        } else if (configs.contracts.distinct.length != configs.contracts.length) {
+          Left("contracts are no duplicated")
+        } else if (configs.artifacts.distinct.length != configs.artifacts.length) {
+          Left("artifacts are no duplicated")
         } else {
           Right(())
         }
@@ -122,7 +128,7 @@ final case class Cli() {
             Compiler(config)
               .compileProject()
               .fold(
-                err => error(err),
+                err => error(s"contracts path: ${config.contractsPath().toFile.getPath}", err),
                 ret => result(ret)
               )
           )
@@ -132,24 +138,23 @@ final case class Cli() {
     }
   }
 
-  private def debug[O](values: O*): Unit = {
+  private def debug(values: String*): Unit = {
     if (configs.debug) {
-      values.foreach(value => {
-        print(value)
-        print("\n")
-      })
+      values.foreach(println)
     }
   }
 
-  private def error[T](msg: T): Int = {
-    print(s"error: \n $msg \n")
-    print("\n")
+  private def error(path: String, err: String): Int = {
+    println(s"""error:
+               |${path}
+               |$err""".stripMargin)
     -1
   }
 
-  private def warning[T, O](msg: T, other: O): Int = {
-    print(s"\n $msg")
-    print(s"$other \n")
+  private def warning(name: String, warningMessages: String): Int = {
+    println(s"""${name}
+               |warning:
+               |${warningMessages}""".stripMargin)
     if (configs.warningAsError) {
       -1
     } else {
@@ -164,10 +169,8 @@ final case class Cli() {
         checkWarningAsError = warning(name, write(warnings, 2))
       }
     }
-    ret.scripts.foreach(script => each(script.warnings, s"Script name: ${script.name}, waring:"))
-    ret.contracts.foreach(contract =>
-      each(contract.warnings, s"Contract name: ${contract.name}, waring:")
-    )
+    ret.scripts.foreach(script => each(script.warnings, s"Script name: ${script.name}"))
+    ret.contracts.foreach(contract => each(contract.warnings, s"Contract name: ${contract.name}"))
     checkWarningAsError
   }
 }
