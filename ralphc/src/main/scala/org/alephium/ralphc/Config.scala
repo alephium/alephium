@@ -19,12 +19,13 @@ package org.alephium.ralphc
 import java.io.File
 import java.nio.file.Path
 
+import scala.collection.immutable.ArraySeq
+
 import org.alephium.ralph.CompilerOptions
 
 @SuppressWarnings(
   Array(
-    "org.wartremover.warts.DefaultArguments",
-    "org.wartremover.warts.ArrayEquals"
+    "org.wartremover.warts.DefaultArguments"
   )
 )
 final case class Configs(
@@ -36,8 +37,8 @@ final case class Configs(
     ignoreUpdateFieldsCheckWarnings: Boolean = false,
     ignoreUnusedPrivateFunctionsWarnings: Boolean = false,
     ignoreExternalCallCheckWarnings: Boolean = false,
-    contracts: Array[String] = Array("contracts"),
-    artifacts: Array[String] = Array("artifacts")
+    contracts: ArraySeq[String] = ArraySeq("contracts"),
+    artifacts: ArraySeq[String] = ArraySeq("artifacts")
 ) {
   private def compilerOptions(): CompilerOptions = {
     CompilerOptions(
@@ -51,17 +52,16 @@ final case class Configs(
   }
 
   def configs(): Array[Config] = {
-    var i                    = 0
-    var array: Array[Config] = Array.empty
-    while (i < contracts.length && i < artifacts.length) {
-      array = array :+ Config(
-        options = compilerOptions(),
-        contracts = contracts(i),
-        artifacts = artifacts(i)
+    contracts
+      .zip(artifacts)
+      .map(value =>
+        Config(
+          options = compilerOptions(),
+          contracts = value._1,
+          artifacts = value._2
+        )
       )
-      i += 1
-    }
-    array
+      .toArray
   }
 }
 

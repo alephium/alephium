@@ -40,26 +40,26 @@ class CliSpec extends AlephiumSpec {
     cli.configs
       .configs()
       .foreach(config => {
-        val latestArchives =
+        val latestArtifacts =
           Compiler.getSourceFiles(config.artifactsPath().toFile, ".json")
-        var archivesPath = config.contractsPath().getParent.resolve("artifacts")
+        var expectedArtifactsPath = config.contractsPath().getParent.resolve("artifacts")
         if (isRecode) {
-          archivesPath = config.contractsPath().resolve("artifacts")
+          expectedArtifactsPath = config.contractsPath().resolve("artifacts")
         }
-        val archivesFile = archivesPath.toFile
-        val archives = Compiler
-          .getSourceFiles(archivesFile, ".json")
+        val expectedArtifactsFile = expectedArtifactsPath.toFile
+        val expectedArtifacts = Compiler
+          .getSourceFiles(expectedArtifactsFile, ".json")
           .map(file => {
             val path = file.toPath
-            path.subpath(archivesFile.toPath.getNameCount, path.getNameCount)
+            path.subpath(expectedArtifactsFile.toPath.getNameCount, path.getNameCount)
           })
           .sorted
-        latestArchives
+        latestArtifacts
           .map(file => {
             val path = file.toPath
             path.subpath(config.artifactsPath().getNameCount, path.getNameCount)
           })
-          .sorted is archives
+          .sorted is expectedArtifacts
       })
   }
 
@@ -97,5 +97,16 @@ class CliSpec extends AlephiumSpec {
 
   it should "not to compile contracts" in {
     assert(Cli().call(Array("-c", contracts1 + "," + contracts31, "-a", "")) != 0)
+    assert(Cli().call(Array("-c", "", "-a", "artifacts1" + "," + "artifacts31")) != 0)
+    assert(
+      Cli().call(
+        Array("-c", contracts1 + "," + contracts1, "-a", "artifacts1" + "," + "artifacts31")
+      ) != 0
+    )
+    assert(
+      Cli().call(
+        Array("-c", contracts1 + "," + contracts31, "-a", "artifacts1" + "," + "artifacts1")
+      ) != 0
+    )
   }
 }

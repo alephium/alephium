@@ -16,6 +16,16 @@
 
 package org.alephium.ralphc
 
+// scalastyle:off
 object Main extends App {
-  System.exit(Cli().call(args))
+  try {
+    System.exit(Cli().call(args))
+  } catch {
+    case e: Throwable => {
+      println(s"""Exception:
+                 |${e.getMessage}
+                 |""".stripMargin)
+      System.exit(-1)
+    }
+  }
 }
