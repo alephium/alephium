@@ -1368,17 +1368,46 @@ sealed trait Transfer extends AssetInstr {
 
   @inline def transferAlph[C <: StatefulContext](
       frame: Frame[C],
-      fromThunk: => ExeResult[LockupScript],
-      toThunk: => ExeResult[LockupScript]
+      from: LockupScript,
+      to: LockupScript,
+      amount: Val.U256
   ): ExeResult[Unit] = {
     for {
-      amount       <- frame.popOpStackU256()
-      to           <- toThunk
-      from         <- fromThunk
       balanceState <- frame.getBalanceState()
       _            <- balanceState.useAlph(from, amount.v).toRight(Right(NotEnoughBalance))
       _ <- frame.ctx.outputBalances
         .addAlph(to, amount.v)
+        .toRight(Right(BalanceOverflow))
+    } yield ()
+  }
+
+  @inline def transferAlph[C <: StatefulContext](
+      frame: Frame[C],
+      fromThunk: => ExeResult[LockupScript],
+      toThunk: => ExeResult[LockupScript]
+  ): ExeResult[Unit] = {
+    for {
+      amount <- frame.popOpStackU256()
+      to     <- toThunk
+      from   <- fromThunk
+      _      <- transferAlph(frame, from, to, amount)
+    } yield ()
+  }
+
+  @inline def transferToken[C <: StatefulContext](
+      frame: Frame[C],
+      tokenId: TokenId,
+      from: LockupScript,
+      to: LockupScript,
+      amount: Val.U256
+  ): ExeResult[Unit] = {
+    for {
+      balanceState <- frame.getBalanceState()
+      _ <- balanceState
+        .useToken(from, tokenId, amount.v)
+        .toRight(Right(NotEnoughBalance))
+      _ <- frame.ctx.outputBalances
+        .addToken(to, tokenId, amount.v)
         .toRight(Right(BalanceOverflow))
     } yield ()
   }
@@ -1389,18 +1418,17 @@ sealed trait Transfer extends AssetInstr {
       toThunk: => ExeResult[LockupScript]
   ): ExeResult[Unit] = {
     for {
-      amount       <- frame.popOpStackU256()
-      tokenIdRaw   <- frame.popOpStackByteVec()
-      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
-      to           <- toThunk
-      from         <- fromThunk
-      balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .useToken(from, tokenId, amount.v)
-        .toRight(Right(NotEnoughBalance))
-      _ <- frame.ctx.outputBalances
-        .addToken(to, tokenId, amount.v)
-        .toRight(Right(BalanceOverflow))
+      amount     <- frame.popOpStackU256()
+      tokenIdRaw <- frame.popOpStackByteVec()
+      tokenId    <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      to         <- toThunk
+      from       <- fromThunk
+      _ <-
+        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.zero) {
+          transferAlph(frame, from, to, amount)
+        } else {
+          transferToken(frame, tokenId, from, to, amount)
+        }
     } yield ()
   }
 }

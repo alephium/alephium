@@ -358,6 +358,40 @@ class VMSpec extends AlephiumSpec {
     }
   }
 
+  it should "transfer ALPH by token id" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn foo(sender: Address) -> () {
+         |    let senderAlph = alphRemaining!(sender)
+         |    let contractAlph = alphRemaining!(selfAddress!())
+         |    transferTokenToSelf!(sender, zeros!(32), 1 alph)
+         |    assert!(alphRemaining!(sender) == senderAlph - 1 alph, 0)
+         |    transferTokenFromSelf!(sender, zeros!(32), 1 alph)
+         |    assert!(alphRemaining!(selfAddress!()) == contractAlph - 1 alph, 0)
+         |    transferToken!(sender, selfAddress!(), zeros!(32), 1 alph)
+         |    assert!(alphRemaining!(sender) == senderAlph - 2 alph, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val fooId = createContract(foo, AVector.empty)._1
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooId.toHexString}).foo{@$genesisAddress -> 3 alph}(@$genesisAddress)
+         |}
+         |$foo
+         |""".stripMargin
+
+    callTxScript(script)
+
+    val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
+    val contractAsset = worldState.getContractAsset(fooId).rightValue
+    contractAsset.amount is ALPH.alph(2)
+  }
+
   it should "create contract and transfer tokens from the contract" in new ContractFixture {
     val code =
       s"""

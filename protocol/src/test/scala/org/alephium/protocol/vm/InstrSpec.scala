@@ -1840,11 +1840,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     def runAndCheckGas[I <: Instr[StatefulContext] with GasSimple](
         instr: I,
-        extraGasOpt: Option[GasBox] = None
+        extraGasOpt: Option[GasBox] = None,
+        frame: Frame[StatefulContext] = frame
     ) = {
-      val initialGas = context.gasRemaining
+      val initialGas = frame.ctx.gasRemaining
       instr.runWith(frame) isE ()
-      initialGas.subUnsafe(context.gasRemaining) is
+      initialGas.subUnsafe(frame.ctx.gasRemaining) is
         instr.gas().addUnsafe(extraGasOpt.getOrElse(GasBox.zero))
     }
   }
@@ -2180,26 +2181,81 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
-  it should "TransferToken" in new ContractOutputFixture {
-    val from = lockupScriptGen.sample.get
-    val to   = assetLockupScriptGen.sample.get
-    val balanceState =
-      MutBalanceState.from(
-        tokenBalance(from, tokenId, ALPH.oneAlph)
+  trait TransferTokenFixture extends ContractOutputFixture {
+    def instr: Instr[StatefulContext] with GasSimple
+    def from: LockupScript
+    def to: LockupScript
+    def contractOutputOpt: Option[(ContractId, ContractOutput, ContractOutputRef)]
+    def prepareOpStack(frame: Frame[StatefulContext]): ExeResult[Unit]
+
+    def createBalanceState(tokenId: TokenId, address: LockupScript, amount: U256) = {
+      MutBalanceState.from(tokenBalance(address, tokenId, amount))
+    }
+
+    private def test(
+        frame: Frame[StatefulContext],
+        tokenId: TokenId,
+        amount: U256,
+        outputBalances: MutBalances
+    ) = {
+      prepareOpStack(frame)
+      frame.opStack.push(Val.ByteVec(tokenId.bytes))
+      frame.opStack.push(Val.U256(amount))
+
+      runAndCheckGas(instr, None, frame)
+
+      frame.ctx.outputBalances is outputBalances
+    }
+
+    def testTransferToken() = {
+      val balanceState0 = createBalanceState(tokenId, from, ALPH.oneAlph)
+      val genesisFrame0 =
+        prepareFrame(Some(balanceState0), contractOutputOpt)(NetworkConfigFixture.PreLeman)
+      val outputBalances0 = MutBalances(
+        ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
       )
+      test(genesisFrame0, tokenId, ALPH.oneNanoAlph, outputBalances0)
 
-    override lazy val frame = prepareFrame(Some(balanceState))
+      val balanceState1 = createBalanceState(TokenId.zero, from, ALPH.oneAlph)
+      val genesisFrame1 =
+        prepareFrame(Some(balanceState1), contractOutputOpt)(NetworkConfigFixture.PreLeman)
+      val outputBalances1 = MutBalances(
+        ArrayBuffer((to, MutBalancesPerLockup.token(TokenId.zero, ALPH.oneNanoAlph)))
+      )
+      test(genesisFrame1, TokenId.zero, ALPH.oneNanoAlph, outputBalances1)
 
-    stack.push(Val.Address(from))
-    stack.push(Val.Address(to))
-    stack.push(Val.ByteVec(tokenId.bytes))
-    stack.push(Val.U256(ALPH.oneNanoAlph))
+      val balanceState2 = createBalanceState(tokenId, from, ALPH.oneAlph)
+      val genesisFrame2 =
+        prepareFrame(Some(balanceState2), contractOutputOpt)(NetworkConfigFixture.Leman)
+      val outputBalances2 = MutBalances(
+        ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
+      )
+      test(genesisFrame2, tokenId, ALPH.oneNanoAlph, outputBalances2)
 
-    runAndCheckGas(TransferToken)
+      val balanceState3 = MutBalanceState.from(alphBalance(from, ALPH.oneAlph))
+      val genesisFrame3 =
+        prepareFrame(Some(balanceState3), contractOutputOpt)(NetworkConfigFixture.Leman)
+      val outputBalances3 = MutBalances(
+        ArrayBuffer((to, MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
+      )
+      test(genesisFrame3, TokenId.zero, ALPH.oneNanoAlph, outputBalances3)
+    }
+  }
 
-    frame.ctx.outputBalances is MutBalances(
-      ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
-    )
+  it should "TransferToken" in new TransferTokenFixture {
+    val instr             = TransferToken
+    val from              = lockupScriptGen.sample.get
+    val to                = assetLockupScriptGen.sample.get
+    val contractOutputOpt = None
+
+    def prepareOpStack(frame: Frame[StatefulContext]): ExeResult[Unit] = {
+      frame.opStack.push(Val.Address(from))
+      frame.opStack.push(Val.Address(to))
+    }
+
+    testTransferToken()
+
+    override lazy val frame = prepareFrame(Some(createBalanceState(tokenId, from, ALPH.oneAlph)))
 
     stack.push(Val.Address(from))
     stack.push(Val.Address(contractAddress))
@@ -2208,27 +2264,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     TransferToken.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
   }
 
-  it should "TransferTokenFromSelf" in new ContractOutputFixture {
-    val from = LockupScript.P2C(contractId)
-    val to   = assetLockupScriptGen.sample.get
+  it should "TransferTokenFromSelf" in new TransferTokenFixture {
+    val instr             = TransferTokenFromSelf
+    val from              = LockupScript.P2C(contractId)
+    val to                = assetLockupScriptGen.sample.get
+    val contractOutputOpt = Some((contractId, contractOutput, contractOutputRef))
 
-    val balanceState =
-      MutBalanceState.from(
-        tokenBalance(from, tokenId, ALPH.oneAlph)
-      )
+    def prepareOpStack(frame: Frame[StatefulContext]): ExeResult[Unit] = {
+      frame.opStack.push(Val.Address(to))
+    }
+
+    testTransferToken()
 
     override lazy val frame =
-      prepareFrame(Some(balanceState), Some((contractId, contractOutput, contractOutputRef)))
-
-    stack.push(Val.Address(to))
-    stack.push(Val.ByteVec(tokenId.bytes))
-    stack.push(Val.U256(ALPH.oneNanoAlph))
-
-    runAndCheckGas(TransferTokenFromSelf)
-
-    frame.ctx.outputBalances is MutBalances(
-      ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
-    )
+      prepareFrame(Some(createBalanceState(tokenId, from, ALPH.oneAlph)), contractOutputOpt)
 
     stack.push(Val.Address(contractAddress))
     stack.push(Val.ByteVec(tokenId.bytes))
@@ -2236,27 +2285,17 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     TransferTokenFromSelf.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
   }
 
-  it should "TransferTokenToSelf" in new ContractOutputFixture {
-    val from = lockupScriptGen.sample.get
-    val to   = LockupScript.P2C(contractId)
+  it should "TransferTokenToSelf" in new TransferTokenFixture {
+    val instr             = TransferTokenToSelf
+    val from              = lockupScriptGen.sample.get
+    val to                = LockupScript.P2C(contractId)
+    val contractOutputOpt = Some((contractId, contractOutput, contractOutputRef))
 
-    val balanceState =
-      MutBalanceState.from(
-        tokenBalance(from, tokenId, ALPH.oneAlph)
-      )
+    def prepareOpStack(frame: Frame[StatefulContext]): ExeResult[Unit] = {
+      frame.opStack.push(Val.Address(from))
+    }
 
-    override lazy val frame =
-      prepareFrame(Some(balanceState), Some((contractId, contractOutput, contractOutputRef)))
-
-    stack.push(Val.Address(from))
-    stack.push(Val.ByteVec(tokenId.bytes))
-    stack.push(Val.U256(ALPH.oneNanoAlph))
-
-    runAndCheckGas(TransferTokenToSelf)
-
-    frame.ctx.outputBalances is MutBalances(
-      ArrayBuffer((to, MutBalancesPerLockup.token(tokenId, ALPH.oneNanoAlph)))
-    )
+    testTransferToken()
   }
 
   it should "generate contract id for different network" in new StatefulInstrFixture {
