@@ -1240,9 +1240,14 @@ object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       fromAddress  <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .useToken(fromAddress.lockupScript, tokenId, tokenAmount.v)
-        .toRight(Right(NotEnoughBalance))
+      _ <-
+        if (tokenId == TokenId.zero) {
+          Left(Right(InvalidTokenId))
+        } else {
+          balanceState
+            .useToken(fromAddress.lockupScript, tokenId, tokenAmount.v)
+            .toRight(Right(NotEnoughBalance))
+        }
     } yield ()
   }
 }
@@ -1303,9 +1308,14 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .approveToken(address.lockupScript, tokenId, amount.v)
-        .toRight(Right(NotEnoughBalance))
+      _ <-
+        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.zero) {
+          balanceState.approveALPH(address.lockupScript, amount.v).toRight(Right(NotEnoughBalance))
+        } else {
+          balanceState
+            .approveToken(address.lockupScript, tokenId, amount.v)
+            .toRight(Right(NotEnoughBalance))
+        }
     } yield ()
   }
 }
@@ -1330,9 +1340,16 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
       address      <- frame.popOpStackAddress()
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       balanceState <- frame.getBalanceState()
-      amount <- balanceState
-        .tokenRemaining(address.lockupScript, tokenId)
-        .toRight(Right(NoTokenBalanceForTheAddress))
+      amount <-
+        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.zero) {
+          balanceState
+            .alphRemaining(address.lockupScript)
+            .toRight(Right(NoAlphBalanceForTheAddress))
+        } else {
+          balanceState
+            .tokenRemaining(address.lockupScript, tokenId)
+            .toRight(Right(NoTokenBalanceForTheAddress))
+        }
       _ <- frame.pushOpStack(Val.U256(amount))
     } yield ()
   }

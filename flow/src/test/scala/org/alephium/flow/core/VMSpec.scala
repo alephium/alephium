@@ -365,7 +365,10 @@ class VMSpec extends AlephiumSpec {
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn foo(sender: Address) -> () {
          |    let senderAlph = alphRemaining!(sender)
+         |    assert!(tokenRemaining!(sender, zeros!(32)) == senderAlph, 0)
          |    let contractAlph = alphRemaining!(selfAddress!())
+         |    assert!(tokenRemaining!(selfAddress!(), zeros!(32)) == contractAlph, 0)
+         |
          |    transferTokenToSelf!(sender, zeros!(32), 1 alph)
          |    assert!(alphRemaining!(sender) == senderAlph - 1 alph, 0)
          |    transferTokenFromSelf!(sender, zeros!(32), 1 alph)
@@ -380,7 +383,7 @@ class VMSpec extends AlephiumSpec {
     val script =
       s"""
          |TxScript Main {
-         |  Foo(#${fooId.toHexString}).foo{@$genesisAddress -> 3 alph}(@$genesisAddress)
+         |  Foo(#${fooId.toHexString}).foo{@$genesisAddress -> zeros!(32): 3 alph}(@$genesisAddress)
          |}
          |$foo
          |""".stripMargin

@@ -18,6 +18,7 @@ package org.alephium.protocol.vm
 
 import java.math.BigInteger
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import akka.util.ByteString
@@ -1803,6 +1804,25 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MutBalances(ArrayBuffer((lockupScript, MutBalancesPerLockup.token(tokenId, amount))))
     }
 
+    def balances(
+        lockupScript: LockupScript,
+        alphAmount: Option[U256],
+        tokens: Map[TokenId, U256]
+    ): MutBalances = {
+      MutBalances(
+        ArrayBuffer(
+          (
+            lockupScript,
+            MutBalancesPerLockup(
+              alphAmount.getOrElse(U256.Zero),
+              mutable.Map.from(tokens),
+              0
+            )
+          )
+        )
+      )
+    }
+
     def prepareFrame(
         balanceState: Option[MutBalanceState] = None,
         contractOutputOpt: Option[(ContractId, ContractOutput, ContractOutputRef)] = None,
@@ -1928,23 +1948,95 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "ApproveToken" in new StatefulInstrFixture {
     val lockupScript = lockupScriptGen.sample.get
-    val balanceState =
+
+    def test(
+        frame: Frame[StatefulContext],
+        initBalanceState: MutBalanceState,
+        tokenId: TokenId,
+        amount: U256,
+        remainBalanceState: MutBalanceState
+    ) = {
+      frame.opStack.push(Val.Address(lockupScript))
+      frame.opStack.push(Val.ByteVec(tokenId.bytes))
+      frame.opStack.push(Val.U256(amount))
+      frame.balanceStateOpt.get is initBalanceState
+
+      runAndCheckGas(ApproveToken, None, frame)
+
+      frame.balanceStateOpt.get is remainBalanceState
+    }
+
+    val initBalanceState0 =
       MutBalanceState.from(
-        tokenBalance(lockupScript, tokenId, ALPH.oneAlph)
+        balances(lockupScript, None, Map(tokenId -> ALPH.oneAlph, TokenId.zero -> ALPH.oneAlph))
       )
-    override lazy val frame = prepareFrame(Some(balanceState))
+    val genesisFrame = prepareFrame(Some(initBalanceState0))(NetworkConfigFixture.PreLeman)
+    test(
+      genesisFrame,
+      initBalanceState0,
+      tokenId,
+      ALPH.oneNanoAlph,
+      MutBalanceState(
+        balances(
+          lockupScript,
+          None,
+          Map(tokenId -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph), TokenId.zero -> ALPH.oneAlph)
+        ),
+        tokenBalance(lockupScript, tokenId, ALPH.oneNanoAlph)
+      )
+    )
+    test(
+      genesisFrame,
+      initBalanceState0,
+      TokenId.zero,
+      ALPH.oneNanoAlph,
+      MutBalanceState(
+        balances(
+          lockupScript,
+          None,
+          Map(
+            tokenId      -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph),
+            TokenId.zero -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)
+          )
+        ),
+        balances(
+          lockupScript,
+          None,
+          Map(tokenId -> ALPH.oneNanoAlph, TokenId.zero -> ALPH.oneNanoAlph)
+        )
+      )
+    )
 
-    stack.push(Val.Address(lockupScript))
-    stack.push(Val.ByteVec(tokenId.bytes))
-    stack.push(Val.U256(ALPH.oneNanoAlph))
-
-    frame.balanceStateOpt.get is balanceState
-
-    runAndCheckGas(ApproveToken)
-
-    frame.balanceStateOpt.get is MutBalanceState(
-      tokenBalance(lockupScript, tokenId, ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)),
-      tokenBalance(lockupScript, tokenId, ALPH.oneNanoAlph)
+    val initBalanceState1 =
+      MutBalanceState.from(balances(lockupScript, Some(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph)))
+    val lemanFrame = prepareFrame(Some(initBalanceState1))(NetworkConfigFixture.Leman)
+    test(
+      lemanFrame,
+      initBalanceState1,
+      tokenId,
+      ALPH.oneNanoAlph,
+      MutBalanceState(
+        balances(
+          lockupScript,
+          Some(ALPH.oneAlph),
+          Map(tokenId -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph))
+        ),
+        tokenBalance(lockupScript, tokenId, ALPH.oneNanoAlph)
+      )
+    )
+    test(
+      lemanFrame,
+      initBalanceState1,
+      TokenId.zero,
+      ALPH.oneNanoAlph,
+      MutBalanceState(
+        balances(
+          lockupScript,
+          Some(ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)),
+          Map(tokenId -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph))
+        ),
+        balances(lockupScript, Some(ALPH.oneNanoAlph), Map(tokenId -> ALPH.oneNanoAlph))
+      )
     )
   }
 
@@ -1964,19 +2056,31 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "TokenRemaining" in new StatefulInstrFixture {
     val lockupScript = lockupScriptGen.sample.get
-    val balanceState =
+
+    def test(frame: Frame[StatefulContext], tokenId: TokenId, amount: U256) = {
+      frame.opStack.push(Val.Address(lockupScript))
+      frame.opStack.push(Val.ByteVec(tokenId.bytes))
+
+      runAndCheckGas(TokenRemaining, None, frame)
+
+      frame.opStack.size is 1
+      frame.opStack.top.get is Val.U256(amount)
+      frame.opStack.pop()
+    }
+
+    val balanceState0 =
       MutBalanceState.from(
-        tokenBalance(lockupScript, tokenId, ALPH.oneAlph)
+        balances(lockupScript, None, Map(tokenId -> ALPH.oneAlph, TokenId.zero -> ALPH.oneAlph))
       )
-    override lazy val frame = prepareFrame(Some(balanceState))
+    val genesisFrame = prepareFrame(Some(balanceState0))(NetworkConfigFixture.PreLeman)
+    test(genesisFrame, tokenId, ALPH.oneAlph)
+    test(genesisFrame, TokenId.zero, ALPH.oneAlph)
 
-    stack.push(Val.Address(lockupScript))
-    stack.push(Val.ByteVec(tokenId.bytes))
-
-    runAndCheckGas(TokenRemaining)
-
-    stack.size is 1
-    stack.top.get is Val.U256(ALPH.oneAlph)
+    val balanceState1 =
+      MutBalanceState.from(balances(lockupScript, Some(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph)))
+    val lemanFrame = prepareFrame(Some(balanceState1))(NetworkConfigFixture.Leman)
+    test(lemanFrame, tokenId, ALPH.oneAlph)
+    test(lemanFrame, TokenId.zero, ALPH.oneAlph)
   }
 
   it should "IsPaying" in new StatefulFixture {
@@ -2058,6 +2162,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(ALPH.alph(2)))
 
     BurnToken.runWith(frame).leftValue isE NotEnoughBalance
+
+    stack.push(Val.Address(from))
+    stack.push(Val.ByteVec(TokenId.zero.bytes))
+    stack.push(Val.U256(ALPH.alph(2)))
+
+    BurnToken.runWith(frame).leftValue isE InvalidTokenId
   }
 
   it should "LockApprovedAssets" in new StatefulInstrFixture {
