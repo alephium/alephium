@@ -23,6 +23,7 @@ import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.io.RocksDBSource.Settings
 import org.alephium.protocol.ALPH
+import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{BlockDeps, Target}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{Env, Math}
@@ -46,10 +47,16 @@ object ValidateDifficultyBombPatch extends App {
     val depTargets =
       template.deps.map(hash => blockFlow.getHeaderChain(hash).getBlockHeaderUnsafe(hash).target)
     val weightedTarget = Target.average(target, depTargets)(config.broker)
-    val result = Target.clipByTwoTimes(depTargets.fold(weightedTarget)(Math.max), weightedTarget)
-    if (result != template.target) {
+    val expectecTarget =
+      Target.clipByTwoTimes(depTargets.fold(weightedTarget)(Math.max), weightedTarget)
+
+    val hashrate =
+      HashRate.from(template.target, config.consensus.blockTargetTime)(config.broker).MHs
+    val expectedHashRate =
+      HashRate.from(expectecTarget, config.consensus.blockTargetTime)(config.broker).MHs
+    if (expectecTarget != template.target) {
       throw new RuntimeException(
-        s"ChainIndex: $chainIndex, parent: ${parent.toHexString}, expected: $result, have: ${template.target}"
+        s"ChainIndex: $chainIndex, parent: ${parent.toHexString}, expected: $expectedHashRate, have: $hashrate"
       )
     }
   }

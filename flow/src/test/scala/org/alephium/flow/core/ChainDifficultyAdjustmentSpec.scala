@@ -75,9 +75,17 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         chainInfo(hash) = height -> timestamp
       }
     }
+    def calTimeSpan(
+        hash: BlockHash
+    ): IOResult[Option[Duration]] = {
+      calTimeSpan(hash, TimeStamp.now())
+    }
 
-    def calTimeSpan(hash: BlockHash): IOResult[Option[Duration]] = {
-      calTimeSpan(hash, getHeight(hash).rightValue)
+    def calTimeSpan(
+        hash: BlockHash,
+        nextTimeStamp: TimeStamp
+    ): IOResult[Option[Duration]] = {
+      calTimeSpan(hash, getHeight(hash).rightValue, nextTimeStamp)
     }
   }
 
@@ -113,7 +121,8 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       fixture.calNextHashTargetRaw(
         latestHash,
         currentTarget,
-        ALPH.LaunchTimestamp
+        ALPH.LaunchTimestamp,
+        TimeStamp.now()
       ) isE currentTarget
     }
   }
@@ -128,8 +137,15 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(Random.nextLong(Long.MaxValue)))
-      calTimeSpan(hash, height) isE Some(data(height)._2 deltaUnsafe data(height - 17)._2)
-      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE currentTarget
+      calTimeSpan(hash, height, TimeStamp.now()) isE Some(
+        data(height)._2 deltaUnsafe data(height - 17)._2
+      )
+      calNextHashTargetRaw(
+        hash,
+        currentTarget,
+        ALPH.LaunchTimestamp,
+        TimeStamp.now()
+      ) isE currentTarget
     }
   }
 
@@ -147,8 +163,10 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
-      calTimeSpan(hash, height) isE Some(data(height)._2 deltaUnsafe data(height - 17)._2)
-      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
+      calTimeSpan(hash, height, TimeStamp.now()) isE Some(
+        data(height)._2 deltaUnsafe data(height - 17)._2
+      )
+      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp, TimeStamp.now()) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMax.millis)
     }
   }
@@ -167,8 +185,10 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
-      calTimeSpan(hash, height) isE Some(data(height)._2 deltaUnsafe data(height - 17)._2)
-      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
+      calTimeSpan(hash, height, TimeStamp.now()) isE Some(
+        data(height)._2 deltaUnsafe data(height - 17)._2
+      )
+      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp, TimeStamp.now()) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
   }
@@ -218,7 +238,12 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     val initialTarget =
       Target.unsafe(consensusConfig.maxMiningTarget.value.divide(BigInteger.valueOf(128)))
     var currentTarget =
-      calNextHashTargetRaw(getHash(currentHeight), initialTarget, ALPH.LaunchTimestamp).rightValue
+      calNextHashTargetRaw(
+        getHash(currentHeight),
+        initialTarget,
+        ALPH.LaunchTimestamp,
+        TimeStamp.now()
+      ).rightValue
     currentTarget is initialTarget
     def stepSimulation(finalTarget: Target) = {
       val ratio =
@@ -228,7 +253,12 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val nextTs   = currentTs.plusMillisUnsafe(duration.toLong)
       val newHash  = BlockHash.random
       addNew(newHash, nextTs)
-      currentTarget = calNextHashTargetRaw(newHash, currentTarget, ALPH.LaunchTimestamp).rightValue
+      currentTarget = calNextHashTargetRaw(
+        newHash,
+        currentTarget,
+        ALPH.LaunchTimestamp,
+        TimeStamp.now()
+      ).rightValue
     }
 
     def checkRatio(ratio: Double, expected: Double) = {
@@ -273,25 +303,39 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
     (threshold until threshold * 2).foreach { height =>
       val hash = getHash(height)
-      calTimeSpan(hash, height) isE Some(data(height)._2 deltaUnsafe data(height - 17)._2)
-      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
+      calTimeSpan(hash, height, getTimestamp(hash).rightValue) isE
+        Some(data(height)._2 deltaUnsafe data(height - 17)._2)
+      calNextHashTargetRaw(
+        hash,
+        currentTarget,
+        ALPH.LaunchTimestamp,
+        getTimestamp(hash).rightValue
+      ) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
 
     (threshold * 2 until threshold * 3 - 1).foreach { height =>
       val hash = getHash(height)
-      calTimeSpan(hash, height) isE None
+      calTimeSpan(hash, height, getTimestamp(hash).rightValue) isE None
       calNextHashTargetRaw(
         hash,
         currentTarget,
-        ALPH.LaunchTimestamp
+        ALPH.LaunchTimestamp,
+        getTimestamp(hash).rightValue
       ) isE difficultyBombPatchTarget
     }
 
     ((threshold * 3 - 1) until (threshold * 4 - 1)).foreach { height =>
       val hash = getHash(height)
-      calTimeSpan(hash, height) isE Some(data(height)._2 deltaUnsafe data(height - 17)._2)
-      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
+      calTimeSpan(hash, height, getTimestamp(hash).rightValue) isE Some(
+        data(height)._2 deltaUnsafe data(height - 17)._2
+      )
+      calNextHashTargetRaw(
+        hash,
+        currentTarget,
+        ALPH.LaunchTimestamp,
+        getTimestamp(hash).rightValue
+      ) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
   }

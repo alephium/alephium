@@ -148,17 +148,17 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
     }
   }
 
-  def getNextHashTargetRaw(hash: BlockHash): IOResult[Target] = {
+  def getNextHashTargetRaw(hash: BlockHash, nextTimeStamp: TimeStamp): IOResult[Target] = {
     for {
       header    <- getBlockHeader(hash)
-      newTarget <- calNextHashTargetRaw(hash, header.target, header.timestamp)
+      newTarget <- calNextHashTargetRaw(hash, header.target, header.timestamp, nextTimeStamp)
     } yield newTarget
   }
 
   def getDryrunBlockEnv(): IOResult[BlockEnv] = {
     for {
       tip    <- getBestTip()
-      target <- getNextHashTargetRaw(tip)
+      target <- getNextHashTargetRaw(tip, TimeStamp.now())
     } yield BlockEnv(networkConfig.networkId, TimeStamp.now(), target, Some(tip))
   }
 

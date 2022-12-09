@@ -47,7 +47,8 @@ trait ChainDifficultyAdjustment {
   // TODO: optimize this
   final protected[core] def calTimeSpan(
       hash: BlockHash,
-      height: Int
+      height: Int,
+      nextTimeStamp: TimeStamp
   ): IOResult[Option[Duration]] = {
     val earlyHeight = height - consensusConfig.powAveragingWindow - 1
     assume(earlyHeight >= ALPH.GenesisHeight)
@@ -57,7 +58,7 @@ trait ChainDifficultyAdjustment {
       timestampLast <- getTimestamp(hashes.head)
     } yield {
       if (
-        timestampLast < difficultyBombPatchConfig.enabledTimeStamp && difficultyBombPatchConfig.enabledTimeStamp <= timestampNow
+        timestampLast < difficultyBombPatchConfig.enabledTimeStamp && difficultyBombPatchConfig.enabledTimeStamp <= nextTimeStamp
       ) {
         None
       } else {
@@ -97,11 +98,12 @@ trait ChainDifficultyAdjustment {
   final protected[core] def calNextHashTargetRaw(
       hash: BlockHash,
       currentTarget: Target,
-      timestamp: TimeStamp
+      currentTimeStamp: TimeStamp,
+      nextTimeStamp: TimeStamp
   ): IOResult[Target] = {
     getHeight(hash).flatMap {
       case height if height >= ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1 =>
-        calTimeSpan(hash, height).flatMap {
+        calTimeSpan(hash, height, nextTimeStamp).flatMap {
           case Some(timeSpan) =>
             var clippedTimeSpan =
               consensusConfig.expectedWindowTimeSpan.millis + (timeSpan.millis - consensusConfig.expectedWindowTimeSpan.millis) / 4
@@ -111,7 +113,7 @@ trait ChainDifficultyAdjustment {
               clippedTimeSpan = consensusConfig.windowTimeSpanMax.millis
             }
             val target = reTarget(currentTarget, clippedTimeSpan)
-            Right(calIceAgeTarget(target, timestamp))
+            Right(calIceAgeTarget(target, currentTimeStamp))
           case None =>
             getTarget(height - difficultyBombPatchConfig.heightDiff)
         }

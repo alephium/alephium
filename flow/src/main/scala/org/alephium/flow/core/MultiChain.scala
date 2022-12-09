@@ -142,11 +142,15 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
   def getMaxHeight(chainIndex: ChainIndex): IOResult[Int] =
     getHeaderChain(chainIndex).maxHeight
 
-  def getNextHashTarget(chainIndex: ChainIndex, deps: BlockDeps): IOResult[Target] = {
+  def getNextHashTarget(
+      chainIndex: ChainIndex,
+      deps: BlockDeps,
+      nextTimeStamp: TimeStamp
+  ): IOResult[Target] = {
     for {
       newTarget <- {
         val tip = deps.uncleHash(chainIndex.to)
-        getHeaderChain(tip).getNextHashTargetRaw(tip)
+        getHeaderChain(tip).getNextHashTargetRaw(tip, nextTimeStamp)
       }
       depTargets <- deps.deps.mapE(hash => getHeaderChain(hash).getTarget(hash))
     } yield {

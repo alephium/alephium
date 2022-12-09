@@ -425,7 +425,11 @@ class BlockFlowSpec extends AlephiumSpec {
         } else {
           addAndCheck(blockFlow, block)
           val bestDep = blockFlow.getBestDeps(chainIndex.from)
-          blockFlow.getNextHashTarget(chainIndex, bestDep) isE consensusConfig.maxMiningTarget
+          blockFlow.getNextHashTarget(
+            chainIndex,
+            bestDep,
+            TimeStamp.now()
+          ) isE consensusConfig.maxMiningTarget
         }
       }
     }
@@ -437,11 +441,12 @@ class BlockFlowSpec extends AlephiumSpec {
     val bestDeps = blockFlow.getBestDeps(chainIndex.from)
     val nextTargetRaw = blockFlow
       .getHeaderChain(chainIndex)
-      .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to))
+      .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
       .rightValue
       .value
     (BigInt(nextTargetRaw) < BigInt(consensusConfig.maxMiningTarget.value) / 2) is true
-    val nextTargetClipped = blockFlow.getNextHashTarget(chainIndex, bestDeps).rightValue
+    val nextTargetClipped =
+      blockFlow.getNextHashTarget(chainIndex, bestDeps, TimeStamp.now()).rightValue
     (nextTargetClipped > Target.unsafe(consensusConfig.maxMiningTarget.value / 2)) is true
   }
 
@@ -451,11 +456,12 @@ class BlockFlowSpec extends AlephiumSpec {
     val bestDeps = blockFlow.getBestDeps(chainIndex.from)
     val nextTargetRaw = blockFlow
       .getHeaderChain(chainIndex)
-      .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to))
+      .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
       .rightValue
       .value
     (BigInt(nextTargetRaw) < BigInt(consensusConfig.maxMiningTarget.value) / 2) is true
-    val nextTargetClipped = blockFlow.getNextHashTarget(chainIndex, bestDeps).rightValue
+    val nextTargetClipped =
+      blockFlow.getNextHashTarget(chainIndex, bestDeps, TimeStamp.now()).rightValue
     nextTargetClipped is Target.unsafe(consensusConfig.maxMiningTarget.value / 2)
   }
 
