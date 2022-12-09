@@ -27,7 +27,7 @@ import org.alephium.protocol.model.{BlockDeps, Target}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{Env, Math}
 
-object ValidateDifficultyBombHardFork extends App {
+object ValidateDifficultyBombPatch extends App {
   private val rootPath: Path = Platform.getRootPath()
   private val typesafeConfig = Configs.parseConfigAndValidate(Env.Prod, rootPath, overwrite = true)
   implicit private val config: AlephiumConfig = AlephiumConfig.load(typesafeConfig, "alephium")
@@ -41,7 +41,7 @@ object ValidateDifficultyBombHardFork extends App {
     val miner          = LockupScript.p2pkh(publicKey)
     val template       = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     val parent         = BlockDeps.build(template.deps)(config.broker).uncleHash(chainIndex.to)
-    val height         = chain.getHeightUnsafe(parent) - ALPH.DifficultyBombHardForkHeightDiff
+    val height         = chain.getHeightUnsafe(parent) - ALPH.DifficultyBombPatchHeightDiff
     val target         = chain.getBlockUnsafe(chain.getHashesUnsafe(height).head).target
     val depTargets =
       template.deps.map(hash => blockFlow.getHeaderChain(hash).getBlockHeaderUnsafe(hash).target)

@@ -40,14 +40,14 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     implicit override def networkConfig: NetworkConfig = NetworkConfigFixture.Leman
 
     val enabledDurationAfterNow = Duration.ofDaysUnsafe(10)
-    override val difficultyBombHardForkConfig =
-      new ChainDifficultyAdjustment.DifficultyBombHardForkConfig {
+    override val difficultyBombPatchConfig =
+      new ChainDifficultyAdjustment.DifficultyBombPatchConfig {
         val enabledTimeStamp: TimeStamp = TimeStamp.now().plusUnsafe(enabledDurationAfterNow)
         val heightDiff                  = 100
       }
 
-    val difficultyBombHardForkTarget             = Target.unsafe(BigInteger.ONE.shiftLeft(100))
-    def getTarget(height: Int): IOResult[Target] = Right(difficultyBombHardForkTarget)
+    val difficultyBombPatchTarget                = Target.unsafe(BigInteger.ONE.shiftLeft(100))
+    def getTarget(height: Int): IOResult[Target] = Right(difficultyBombPatchTarget)
 
     val chainInfo =
       mutable.HashMap.empty[BlockHash, (Int, TimeStamp)] // block hash -> (height, timestamp)
@@ -250,8 +250,8 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     checkRatio(ratio.toDouble, 100.0) is true
   }
 
-  it should "test difficulty bomb hard fork" in new MockFixture {
-    val enabledTimeStamp = difficultyBombHardForkConfig.enabledTimeStamp
+  it should "test difficulty bomb patch" in new MockFixture {
+    val enabledTimeStamp = difficultyBombPatchConfig.enabledTimeStamp
     val data0 = AVector.tabulate(threshold)(_ =>
       BlockHash.random -> enabledTimeStamp.minusUnsafe(Duration.ofMinutesUnsafe(1))
     )
@@ -285,7 +285,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         hash,
         currentTarget,
         ALPH.LaunchTimestamp
-      ) isE difficultyBombHardForkTarget
+      ) isE difficultyBombPatchTarget
     }
 
     ((threshold * 3 - 1) until (threshold * 4 - 1)).foreach { height =>

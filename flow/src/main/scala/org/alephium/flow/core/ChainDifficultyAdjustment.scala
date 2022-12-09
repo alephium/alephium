@@ -30,10 +30,10 @@ trait ChainDifficultyAdjustment {
   implicit def networkConfig: NetworkConfig
 
   // TODO: tbd
-  val difficultyBombHardForkConfig =
-    new ChainDifficultyAdjustment.DifficultyBombHardForkConfig {
-      val enabledTimeStamp: TimeStamp = ALPH.DifficultyBombHardForkEnabledTimeStamp
-      val heightDiff: Int             = ALPH.DifficultyBombHardForkHeightDiff
+  val difficultyBombPatchConfig =
+    new ChainDifficultyAdjustment.DifficultyBombPatchConfig {
+      val enabledTimeStamp: TimeStamp = ALPH.DifficultyBombPatchEnabledTimeStamp
+      val heightDiff: Int             = ALPH.DifficultyBombPatchHeightDiff
     }
 
   def getHeight(hash: BlockHash): IOResult[Int]
@@ -57,7 +57,7 @@ trait ChainDifficultyAdjustment {
       timestampLast <- getTimestamp(hashes.head)
     } yield {
       if (
-        timestampLast < difficultyBombHardForkConfig.enabledTimeStamp && difficultyBombHardForkConfig.enabledTimeStamp <= timestampNow
+        timestampLast < difficultyBombPatchConfig.enabledTimeStamp && difficultyBombPatchConfig.enabledTimeStamp <= timestampNow
       ) {
         None
       } else {
@@ -113,7 +113,7 @@ trait ChainDifficultyAdjustment {
             val target = reTarget(currentTarget, clippedTimeSpan)
             Right(calIceAgeTarget(target, timestamp))
           case None =>
-            getTarget(height - difficultyBombHardForkConfig.heightDiff)
+            getTarget(height - difficultyBombPatchConfig.heightDiff)
         }
       case _ => Right(currentTarget)
     }
@@ -132,7 +132,7 @@ trait ChainDifficultyAdjustment {
 }
 
 object ChainDifficultyAdjustment {
-  trait DifficultyBombHardForkConfig {
+  trait DifficultyBombPatchConfig {
     def enabledTimeStamp: TimeStamp
     def heightDiff: Int
   }
