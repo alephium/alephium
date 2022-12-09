@@ -278,7 +278,7 @@ object HeaderValidation {
         blockFlow: BlockFlow
     ): HeaderValidationResult[Unit] = {
       ValidationStatus
-        .from(blockFlow.getNextHashTarget(header.chainIndex, header.blockDeps))
+        .from(blockFlow.getNextHashTarget(header.chainIndex, header.blockDeps, header.timestamp))
         .flatMap { target =>
           if (target == header.target) validHeader(()) else invalidHeader(InvalidWorkTarget)
         }

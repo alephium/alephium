@@ -201,7 +201,7 @@ trait FlowUtils
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
       loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs)
-      target       <- getNextHashTarget(chainIndex, loosenDeps)
+      target       <- getNextHashTarget(chainIndex, loosenDeps, templateTs)
       groupView    <- getMutableGroupView(chainIndex.from, loosenDeps)
       txCandidates <- collectTransactions(chainIndex, groupView, bestDeps)
       template <- prepareBlockFlow(

@@ -21,13 +21,15 @@ import java.math.BigInteger
 import scala.collection.mutable
 import scala.util.Random
 
+import akka.util.ByteString
+
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.{BlockHash, Target}
+import org.alephium.protocol.model.{BlockHash, HardFork, NetworkId, Target}
 import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
 
 class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
@@ -38,6 +40,16 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       ConsensusSetting(blockTargetTime, blockTargetTime, 18, 25, emission)
     }
     implicit override def networkConfig: NetworkConfig = NetworkConfigFixture.Leman
+
+    val enabledDurationAfterNow = Duration.ofDaysUnsafe(10)
+    override val difficultyBombPatchConfig =
+      new ChainDifficultyAdjustment.DifficultyBombPatchConfig {
+        val enabledTimeStamp: TimeStamp = TimeStamp.now().plusUnsafe(enabledDurationAfterNow)
+        val heightDiff                  = 100
+      }
+
+    val difficultyBombPatchTarget                = Target.unsafe(BigInteger.ONE.shiftLeft(100))
+    def getTarget(height: Int): IOResult[Target] = Right(difficultyBombPatchTarget)
 
     val chainInfo =
       mutable.HashMap.empty[BlockHash, (Int, TimeStamp)] // block hash -> (height, timestamp)
@@ -65,9 +77,17 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         chainInfo(hash) = height -> timestamp
       }
     }
+    def calTimeSpan(
+        hash: BlockHash
+    ): IOResult[Option[Duration]] = {
+      calTimeSpan(hash, TimeStamp.now())
+    }
 
-    def calTimeSpan(hash: BlockHash): IOResult[Duration] = {
-      calTimeSpan(hash, getHeight(hash).rightValue)
+    def calTimeSpan(
+        hash: BlockHash,
+        nextTimeStamp: TimeStamp
+    ): IOResult[Option[Duration]] = {
+      calTimeSpan(hash, getHeight(hash).rightValue, nextTimeStamp)
     }
   }
 
@@ -89,7 +109,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
     val median1 = data(18)._2
     val median2 = data(1)._2
-    calTimeSpan(data.last._1) isE (median1 deltaUnsafe median2)
+    calTimeSpan(data.last._1) isE Some(median1 deltaUnsafe median2)
   }
 
   it should "return initial target when few blocks" in {
@@ -103,7 +123,8 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       fixture.calNextHashTargetRaw(
         latestHash,
         currentTarget,
-        ALPH.LaunchTimestamp
+        ALPH.LaunchTimestamp,
+        TimeStamp.now()
       ) isE currentTarget
     }
   }
@@ -118,8 +139,15 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(Random.nextLong(Long.MaxValue)))
-      calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
-      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE currentTarget
+      calTimeSpan(hash, height, TimeStamp.now()) isE Some(
+        data(height)._2 deltaUnsafe data(height - 17)._2
+      )
+      calNextHashTargetRaw(
+        hash,
+        currentTarget,
+        ALPH.LaunchTimestamp,
+        TimeStamp.now()
+      ) isE currentTarget
     }
   }
 
@@ -137,8 +165,10 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
-      calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
-      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
+      calTimeSpan(hash, height, TimeStamp.now()) isE Some(
+        data(height)._2 deltaUnsafe data(height - 17)._2
+      )
+      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp, TimeStamp.now()) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMax.millis)
     }
   }
@@ -157,37 +187,88 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
-      calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
-      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
+      calTimeSpan(hash, height, TimeStamp.now()) isE Some(
+        data(height)._2 deltaUnsafe data(height - 17)._2
+      )
+      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp, TimeStamp.now()) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
   }
 
   it should "decrease the target when difficulty bomb enabled" in new MockFixture {
-    val currentTarget = consensusConfig.maxMiningTarget
-    val timestamp0 =
-      ALPH.LemanDifficultyBombEnabledTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
-    calIceAgeTarget(currentTarget, timestamp0) is currentTarget
+    implicit override def networkConfig: NetworkConfig = new NetworkConfig {
+      override def networkId: NetworkId       = NetworkId.AlephiumMainNet
+      override def noPreMineProof: ByteString = ByteString.empty
+      override def lemanHardForkTimestamp: TimeStamp =
+        ALPH.DifficultyBombPatchEnabledTimeStamp.plusHoursUnsafe(100)
+    }
 
+    final def calIceAgeTarget(
+        currentTarget: Target,
+        currentTimeStamp: TimeStamp
+    ): Target = {
+      calIceAgeTarget(
+        currentTarget,
+        currentTimeStamp,
+        currentTimeStamp.plusUnsafe(Duration.ofSecondsUnsafe(1))
+      )
+    }
+
+    val currentTarget           = consensusConfig.maxMiningTarget
+    val diffBombEnabledTs       = ALPH.PreLemanDifficultyBombEnabledTimestamp
+    val diffBombFirstAdjustment = diffBombEnabledTs.plusUnsafe(ALPH.ExpDiffPeriod)
+
+    info("Before the diff bomb")
     calIceAgeTarget(
       currentTarget,
-      ALPH.PreLemanDifficultyBombEnabledTimestamp.plusUnsafe(ALPH.ExpDiffPeriod)
+      diffBombEnabledTs.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    ) is currentTarget
+
+    info("The diff bomb is enabled, no change for the first period")
+    calIceAgeTarget(
+      currentTarget,
+      diffBombEnabledTs
     ) is currentTarget
     calIceAgeTarget(
       currentTarget,
-      ALPH.LemanDifficultyBombEnabledTimestamp.plusUnsafe(ALPH.ExpDiffPeriod)
+      diffBombFirstAdjustment.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    ) is currentTarget
+
+    info("The diff bomb is enabled and diff starts to change too")
+    calIceAgeTarget(
+      currentTarget,
+      diffBombFirstAdjustment
     ) isnot currentTarget
 
-    (0 until 20).foreach { i =>
-      val period    = ALPH.ExpDiffPeriod.timesUnsafe(i.toLong)
-      val timestamp = ALPH.LemanDifficultyBombEnabledTimestamp.plusUnsafe(period)
-      val target    = calIceAgeTarget(currentTarget, timestamp)
-      target is Target.unsafe(currentTarget.value.shiftRight(i))
-    }
+    info("The diff bomb patch is not enabled yet")
+    calIceAgeTarget(
+      currentTarget,
+      ALPH.DifficultyBombPatchEnabledTimeStamp.minusUnsafe(Duration.ofSecondsUnsafe(2)),
+      ALPH.DifficultyBombPatchEnabledTimeStamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    ) isnot currentTarget
 
-    val period     = ALPH.ExpDiffPeriod.timesUnsafe(256)
-    val timestamp1 = ALPH.LemanDifficultyBombEnabledTimestamp.plusUnsafe(period)
-    calIceAgeTarget(currentTarget, timestamp1) is Target.Zero
+    info("The diff bomb patch is enabled")
+    calIceAgeTarget(
+      currentTarget,
+      ALPH.DifficultyBombPatchEnabledTimeStamp.minusUnsafe(Duration.ofSecondsUnsafe(1)),
+      ALPH.DifficultyBombPatchEnabledTimeStamp
+    ) is currentTarget
+
+    info("Leman hardfork is not enabled yet")
+    val lemanNotEnabledTs =
+      networkConfig.lemanHardForkTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    networkConfig.getHardFork(lemanNotEnabledTs) is HardFork.Mainnet
+    calIceAgeTarget(
+      currentTarget,
+      lemanNotEnabledTs
+    ) is currentTarget
+
+    info("Leman hardfork is enabled yet")
+    networkConfig.getHardFork(networkConfig.lemanHardForkTimestamp) is HardFork.Leman
+    calIceAgeTarget(
+      currentTarget,
+      networkConfig.lemanHardForkTimestamp
+    ) is currentTarget
   }
 
   trait SimulationFixture extends MockFixture {
@@ -208,7 +289,12 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     val initialTarget =
       Target.unsafe(consensusConfig.maxMiningTarget.value.divide(BigInteger.valueOf(128)))
     var currentTarget =
-      calNextHashTargetRaw(getHash(currentHeight), initialTarget, ALPH.LaunchTimestamp).rightValue
+      calNextHashTargetRaw(
+        getHash(currentHeight),
+        initialTarget,
+        ALPH.LaunchTimestamp,
+        TimeStamp.now()
+      ).rightValue
     currentTarget is initialTarget
     def stepSimulation(finalTarget: Target) = {
       val ratio =
@@ -218,7 +304,12 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       val nextTs   = currentTs.plusMillisUnsafe(duration.toLong)
       val newHash  = BlockHash.random
       addNew(newHash, nextTs)
-      currentTarget = calNextHashTargetRaw(newHash, currentTarget, ALPH.LaunchTimestamp).rightValue
+      currentTarget = calNextHashTargetRaw(
+        newHash,
+        currentTarget,
+        ALPH.LaunchTimestamp,
+        TimeStamp.now()
+      ).rightValue
     }
 
     def checkRatio(ratio: Double, expected: Double) = {
@@ -238,5 +329,65 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (0 until 1000).foreach { _ => stepSimulation(finalTarget) }
     val ratio = BigDecimal(currentTarget.value) / BigDecimal(initialTarget.value)
     checkRatio(ratio.toDouble, 100.0) is true
+  }
+
+  it should "test difficulty bomb patch" in new MockFixture {
+    val enabledTimeStamp = difficultyBombPatchConfig.enabledTimeStamp
+    val data0 = AVector.tabulate(threshold)(_ =>
+      BlockHash.random -> enabledTimeStamp.minusUnsafe(Duration.ofMinutesUnsafe(1))
+    )
+    val data1 = AVector.tabulate(threshold) { i =>
+      val timestamp = enabledTimeStamp.minusUnsafe(Duration.ofSecondsUnsafe((threshold - i).toLong))
+      BlockHash.random -> timestamp
+    }
+    val data2 = AVector.tabulate(threshold - 1) { i =>
+      val timestamp = enabledTimeStamp.plusUnsafe(Duration.ofSecondsUnsafe(i.toLong))
+      BlockHash.random -> timestamp
+    }
+    val data3 = AVector.tabulate(threshold) { i =>
+      val timestamp = enabledTimeStamp.plusUnsafe(Duration.ofSecondsUnsafe(i.toLong))
+      BlockHash.random -> timestamp
+    }
+    val data = data0 ++ data1 ++ data2 ++ data3
+    setup(data)
+
+    val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
+    (threshold until threshold * 2).foreach { height =>
+      val hash = getHash(height)
+      calTimeSpan(hash, height, getTimestamp(hash).rightValue) isE
+        Some(data(height)._2 deltaUnsafe data(height - 17)._2)
+      calNextHashTargetRaw(
+        hash,
+        currentTarget,
+        ALPH.LaunchTimestamp,
+        getTimestamp(hash).rightValue
+      ) isE
+        reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
+    }
+
+    (threshold * 2 until threshold * 3 - 1).foreach { height =>
+      val hash = getHash(height)
+      calTimeSpan(hash, height, getTimestamp(hash).rightValue) isE None
+      calNextHashTargetRaw(
+        hash,
+        currentTarget,
+        ALPH.LaunchTimestamp,
+        getTimestamp(hash).rightValue
+      ) isE difficultyBombPatchTarget
+    }
+
+    ((threshold * 3 - 1) until (threshold * 4 - 1)).foreach { height =>
+      val hash = getHash(height)
+      calTimeSpan(hash, height, getTimestamp(hash).rightValue) isE Some(
+        data(height)._2 deltaUnsafe data(height - 17)._2
+      )
+      calNextHashTargetRaw(
+        hash,
+        currentTarget,
+        ALPH.LaunchTimestamp,
+        getTimestamp(hash).rightValue
+      ) isE
+        reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
+    }
   }
 }
