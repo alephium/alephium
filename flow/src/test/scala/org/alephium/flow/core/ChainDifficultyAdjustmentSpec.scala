@@ -39,6 +39,16 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     }
     implicit override def networkConfig: NetworkConfig = NetworkConfigFixture.Leman
 
+    val enabledDurationAfterNow = Duration.ofDaysUnsafe(10)
+    override val difficultyBombHardForkConfig =
+      new ChainDifficultyAdjustment.DifficultyBombHardForkConfig {
+        val enabledTimeStamp: TimeStamp = TimeStamp.now().plusUnsafe(enabledDurationAfterNow)
+        val heightDiff                  = 100
+      }
+
+    val difficultyBombHardForkTarget             = Target.unsafe(BigInteger.ONE.shiftLeft(100))
+    def getTarget(height: Int): IOResult[Target] = Right(difficultyBombHardForkTarget)
+
     val chainInfo =
       mutable.HashMap.empty[BlockHash, (Int, TimeStamp)] // block hash -> (height, timestamp)
     val threshold = consensusConfig.powAveragingWindow + 1
@@ -66,7 +76,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       }
     }
 
-    def calTimeSpan(hash: BlockHash): IOResult[Duration] = {
+    def calTimeSpan(hash: BlockHash): IOResult[Option[Duration]] = {
       calTimeSpan(hash, getHeight(hash).rightValue)
     }
   }
@@ -89,7 +99,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
     val median1 = data(18)._2
     val median2 = data(1)._2
-    calTimeSpan(data.last._1) isE (median1 deltaUnsafe median2)
+    calTimeSpan(data.last._1) isE Some(median1 deltaUnsafe median2)
   }
 
   it should "return initial target when few blocks" in {
@@ -118,7 +128,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(Random.nextLong(Long.MaxValue)))
-      calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
+      calTimeSpan(hash, height) isE Some(data(height)._2 deltaUnsafe data(height - 17)._2)
       calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE currentTarget
     }
   }
@@ -137,7 +147,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
-      calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
+      calTimeSpan(hash, height) isE Some(data(height)._2 deltaUnsafe data(height - 17)._2)
       calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMax.millis)
     }
@@ -157,7 +167,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (threshold until 2 * threshold).foreach { height =>
       val hash          = getHash(height)
       val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
-      calTimeSpan(hash, height) isE (data(height)._2 deltaUnsafe data(height - 17)._2)
+      calTimeSpan(hash, height) isE Some(data(height)._2 deltaUnsafe data(height - 17)._2)
       calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
         reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
@@ -238,5 +248,51 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     (0 until 1000).foreach { _ => stepSimulation(finalTarget) }
     val ratio = BigDecimal(currentTarget.value) / BigDecimal(initialTarget.value)
     checkRatio(ratio.toDouble, 100.0) is true
+  }
+
+  it should "test difficulty bomb hard fork" in new MockFixture {
+    val enabledTimeStamp = difficultyBombHardForkConfig.enabledTimeStamp
+    val data0 = AVector.tabulate(threshold)(_ =>
+      BlockHash.random -> enabledTimeStamp.minusUnsafe(Duration.ofMinutesUnsafe(1))
+    )
+    val data1 = AVector.tabulate(threshold) { i =>
+      val timestamp = enabledTimeStamp.minusUnsafe(Duration.ofSecondsUnsafe((threshold - i).toLong))
+      BlockHash.random -> timestamp
+    }
+    val data2 = AVector.tabulate(threshold - 1) { i =>
+      val timestamp = enabledTimeStamp.plusUnsafe(Duration.ofSecondsUnsafe(i.toLong))
+      BlockHash.random -> timestamp
+    }
+    val data3 = AVector.tabulate(threshold) { i =>
+      val timestamp = enabledTimeStamp.plusUnsafe(Duration.ofSecondsUnsafe(i.toLong))
+      BlockHash.random -> timestamp
+    }
+    val data = data0 ++ data1 ++ data2 ++ data3
+    setup(data)
+
+    val currentTarget = Target.unsafe(BigInteger.valueOf(1024))
+    (threshold until threshold * 2).foreach { height =>
+      val hash = getHash(height)
+      calTimeSpan(hash, height) isE Some(data(height)._2 deltaUnsafe data(height - 17)._2)
+      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
+        reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
+    }
+
+    (threshold * 2 until threshold * 3 - 1).foreach { height =>
+      val hash = getHash(height)
+      calTimeSpan(hash, height) isE None
+      calNextHashTargetRaw(
+        hash,
+        currentTarget,
+        ALPH.LaunchTimestamp
+      ) isE difficultyBombHardForkTarget
+    }
+
+    ((threshold * 3 - 1) until (threshold * 4 - 1)).foreach { height =>
+      val hash = getHash(height)
+      calTimeSpan(hash, height) isE Some(data(height)._2 deltaUnsafe data(height - 17)._2)
+      calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp) isE
+        reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
+    }
   }
 }

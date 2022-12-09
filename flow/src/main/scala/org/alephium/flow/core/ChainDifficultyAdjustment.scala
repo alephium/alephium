@@ -29,21 +29,41 @@ trait ChainDifficultyAdjustment {
   implicit def consensusConfig: ConsensusSetting
   implicit def networkConfig: NetworkConfig
 
+  // TODO: tbd
+  val difficultyBombHardForkConfig =
+    new ChainDifficultyAdjustment.DifficultyBombHardForkConfig {
+      val enabledTimeStamp: TimeStamp = TimeStamp.now()
+      val heightDiff: Int             = 1350
+    }
+
   def getHeight(hash: BlockHash): IOResult[Int]
 
   def getTimestamp(hash: BlockHash): IOResult[TimeStamp]
 
   def chainBackUntil(hash: BlockHash, heightUntil: Int): IOResult[AVector[BlockHash]]
 
+  def getTarget(height: Int): IOResult[Target]
+
   // TODO: optimize this
-  final protected[core] def calTimeSpan(hash: BlockHash, height: Int): IOResult[Duration] = {
+  final protected[core] def calTimeSpan(
+      hash: BlockHash,
+      height: Int
+  ): IOResult[Option[Duration]] = {
     val earlyHeight = height - consensusConfig.powAveragingWindow - 1
     assume(earlyHeight >= ALPH.GenesisHeight)
     for {
       hashes        <- chainBackUntil(hash, earlyHeight)
       timestampNow  <- getTimestamp(hash)
       timestampLast <- getTimestamp(hashes.head)
-    } yield timestampNow.deltaUnsafe(timestampLast)
+    } yield {
+      if (
+        timestampLast < difficultyBombHardForkConfig.enabledTimeStamp && difficultyBombHardForkConfig.enabledTimeStamp <= timestampNow
+      ) {
+        None
+      } else {
+        Some(timestampNow.deltaUnsafe(timestampLast))
+      }
+    }
   }
 
   final def calIceAgeTarget(
@@ -81,16 +101,19 @@ trait ChainDifficultyAdjustment {
   ): IOResult[Target] = {
     getHeight(hash).flatMap {
       case height if height >= ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1 =>
-        calTimeSpan(hash, height).map { timeSpan =>
-          var clippedTimeSpan =
-            consensusConfig.expectedWindowTimeSpan.millis + (timeSpan.millis - consensusConfig.expectedWindowTimeSpan.millis) / 4
-          if (clippedTimeSpan < consensusConfig.windowTimeSpanMin.millis) {
-            clippedTimeSpan = consensusConfig.windowTimeSpanMin.millis
-          } else if (clippedTimeSpan > consensusConfig.windowTimeSpanMax.millis) {
-            clippedTimeSpan = consensusConfig.windowTimeSpanMax.millis
-          }
-          val target = reTarget(currentTarget, clippedTimeSpan)
-          calIceAgeTarget(target, timestamp)
+        calTimeSpan(hash, height).flatMap {
+          case Some(timeSpan) =>
+            var clippedTimeSpan =
+              consensusConfig.expectedWindowTimeSpan.millis + (timeSpan.millis - consensusConfig.expectedWindowTimeSpan.millis) / 4
+            if (clippedTimeSpan < consensusConfig.windowTimeSpanMin.millis) {
+              clippedTimeSpan = consensusConfig.windowTimeSpanMin.millis
+            } else if (clippedTimeSpan > consensusConfig.windowTimeSpanMax.millis) {
+              clippedTimeSpan = consensusConfig.windowTimeSpanMax.millis
+            }
+            val target = reTarget(currentTarget, clippedTimeSpan)
+            Right(calIceAgeTarget(target, timestamp))
+          case None =>
+            getTarget(height - difficultyBombHardForkConfig.heightDiff)
         }
       case _ => Right(currentTarget)
     }
@@ -105,5 +128,12 @@ trait ChainDifficultyAdjustment {
     } else {
       consensusConfig.maxMiningTarget
     }
+  }
+}
+
+object ChainDifficultyAdjustment {
+  trait DifficultyBombHardForkConfig {
+    def enabledTimeStamp: TimeStamp
+    def heightDiff: Int
   }
 }
