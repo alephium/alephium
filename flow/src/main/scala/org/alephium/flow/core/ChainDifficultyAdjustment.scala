@@ -29,7 +29,6 @@ trait ChainDifficultyAdjustment {
   implicit def consensusConfig: ConsensusSetting
   implicit def networkConfig: NetworkConfig
 
-  // TODO: tbd
   val difficultyBombPatchConfig =
     new ChainDifficultyAdjustment.DifficultyBombPatchConfig {
       val enabledTimeStamp: TimeStamp = ALPH.DifficultyBombPatchEnabledTimeStamp
