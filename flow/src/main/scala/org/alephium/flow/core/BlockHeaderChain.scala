@@ -23,7 +23,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSetting
-import org.alephium.io.IOResult
+import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model.{BlockHash, BlockHeader, ChainIndex, Target, Weight}
@@ -61,6 +61,15 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
 
   def getTarget(hash: BlockHash): IOResult[Target] = {
     getBlockHeader(hash).map(_.target)
+  }
+
+  def getTarget(height: Int): IOResult[Target] = {
+    getHashes(height).flatMap { hashes =>
+      hashes.headOption match {
+        case Some(head) => getTarget(head)
+        case None       => Left(IOError.Other(new RuntimeException(s"No block for height $height")))
+      }
+    }
   }
 
   def add(header: BlockHeader, weight: Weight): IOResult[Unit] = {
@@ -139,17 +148,17 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
     }
   }
 
-  def getNextHashTargetRaw(hash: BlockHash): IOResult[Target] = {
+  def getNextHashTargetRaw(hash: BlockHash, nextTimeStamp: TimeStamp): IOResult[Target] = {
     for {
       header    <- getBlockHeader(hash)
-      newTarget <- calNextHashTargetRaw(hash, header.target, header.timestamp)
+      newTarget <- calNextHashTargetRaw(hash, header.target, header.timestamp, nextTimeStamp)
     } yield newTarget
   }
 
   def getDryrunBlockEnv(): IOResult[BlockEnv] = {
     for {
       tip    <- getBestTip()
-      target <- getNextHashTargetRaw(tip)
+      target <- getNextHashTargetRaw(tip, TimeStamp.now())
     } yield BlockEnv(networkConfig.networkId, TimeStamp.now(), target, Some(tip))
   }
 
