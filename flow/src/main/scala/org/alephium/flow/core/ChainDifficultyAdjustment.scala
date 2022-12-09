@@ -73,9 +73,7 @@ trait ChainDifficultyAdjustment {
       nextTimeStamp: TimeStamp
   ): Target = {
     val hardFork = networkConfig.getHardFork(currentTimeStamp)
-    if (
-      hardFork.isLemanEnabled() || ALPH.DifficultyBombPatchEnabledTimeStamp <= nextTimeStamp
-    ) {
+    if (hardFork.isLemanEnabled() || ALPH.DifficultyBombPatchEnabledTimeStamp <= nextTimeStamp) {
       currentTarget
     } else {
       _calIceAgeTarget(currentTarget, currentTimeStamp, ALPH.PreLemanDifficultyBombEnabledTimestamp)

@@ -241,7 +241,6 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     ) isnot currentTarget
 
     info("The diff bomb patch is not enabled yet")
-    ALPH.PreLemanDifficultyBombEnabledTimestamp.plusUnsafe(ALPH.ExpDiffPeriod)
     calIceAgeTarget(
       currentTarget,
       ALPH.DifficultyBombPatchEnabledTimeStamp.minusUnsafe(Duration.ofSecondsUnsafe(2)),
