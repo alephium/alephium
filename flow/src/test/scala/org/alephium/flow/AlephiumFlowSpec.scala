@@ -376,7 +376,7 @@ trait FlowFixture
     val parentTs         = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
     val blockTs          = FlowUtils.nextTimeStamp(parentTs)
 
-    val target     = blockFlow.getNextHashTarget(chainIndex, deps).rightValue
+    val target     = blockFlow.getNextHashTarget(chainIndex, deps, blockTs).rightValue
     val coinbaseTx = Transaction.coinbase(chainIndex, txs, lockupScript, target, blockTs)
     mine0(blockFlow, chainIndex, deps, txs :+ coinbaseTx, blockTs, target)
   }
