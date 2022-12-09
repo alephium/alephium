@@ -21,13 +21,15 @@ import java.math.BigInteger
 import scala.collection.mutable
 import scala.util.Random
 
+import akka.util.ByteString
+
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.{BlockHash, Target}
+import org.alephium.protocol.model.{BlockHash, HardFork, NetworkId, Target}
 import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
 
 class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
@@ -194,30 +196,80 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   }
 
   it should "decrease the target when difficulty bomb enabled" in new MockFixture {
-    val currentTarget = consensusConfig.maxMiningTarget
-    val timestamp0 =
-      ALPH.LemanDifficultyBombEnabledTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
-    calIceAgeTarget(currentTarget, timestamp0) is currentTarget
+    implicit override def networkConfig: NetworkConfig = new NetworkConfig {
+      override def networkId: NetworkId       = NetworkId.AlephiumMainNet
+      override def noPreMineProof: ByteString = ByteString.empty
+      override def lemanHardForkTimestamp: TimeStamp =
+        ALPH.DifficultyBombPatchEnabledTimeStamp.plusHoursUnsafe(100)
+    }
 
+    final def calIceAgeTarget(
+        currentTarget: Target,
+        currentTimeStamp: TimeStamp
+    ): Target = {
+      calIceAgeTarget(
+        currentTarget,
+        currentTimeStamp,
+        currentTimeStamp.plusUnsafe(Duration.ofSecondsUnsafe(1))
+      )
+    }
+
+    val currentTarget           = consensusConfig.maxMiningTarget
+    val diffBombEnabledTs       = ALPH.PreLemanDifficultyBombEnabledTimestamp
+    val diffBombFirstAdjustment = diffBombEnabledTs.plusUnsafe(ALPH.ExpDiffPeriod)
+
+    info("Before the diff bomb")
     calIceAgeTarget(
       currentTarget,
-      ALPH.PreLemanDifficultyBombEnabledTimestamp.plusUnsafe(ALPH.ExpDiffPeriod)
+      diffBombEnabledTs.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    ) is currentTarget
+
+    info("The diff bomb is enabled, no change for the first period")
+    calIceAgeTarget(
+      currentTarget,
+      diffBombEnabledTs
     ) is currentTarget
     calIceAgeTarget(
       currentTarget,
-      ALPH.LemanDifficultyBombEnabledTimestamp.plusUnsafe(ALPH.ExpDiffPeriod)
+      diffBombFirstAdjustment.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    ) is currentTarget
+
+    info("The diff bomb is enabled and diff starts to change too")
+    calIceAgeTarget(
+      currentTarget,
+      diffBombFirstAdjustment
     ) isnot currentTarget
 
-    (0 until 20).foreach { i =>
-      val period    = ALPH.ExpDiffPeriod.timesUnsafe(i.toLong)
-      val timestamp = ALPH.LemanDifficultyBombEnabledTimestamp.plusUnsafe(period)
-      val target    = calIceAgeTarget(currentTarget, timestamp)
-      target is Target.unsafe(currentTarget.value.shiftRight(i))
-    }
+    info("The diff bomb patch is not enabled yet")
+    ALPH.PreLemanDifficultyBombEnabledTimestamp.plusUnsafe(ALPH.ExpDiffPeriod)
+    calIceAgeTarget(
+      currentTarget,
+      ALPH.DifficultyBombPatchEnabledTimeStamp.minusUnsafe(Duration.ofSecondsUnsafe(2)),
+      ALPH.DifficultyBombPatchEnabledTimeStamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    ) isnot currentTarget
 
-    val period     = ALPH.ExpDiffPeriod.timesUnsafe(256)
-    val timestamp1 = ALPH.LemanDifficultyBombEnabledTimestamp.plusUnsafe(period)
-    calIceAgeTarget(currentTarget, timestamp1) is Target.Zero
+    info("The diff bomb patch is enabled")
+    calIceAgeTarget(
+      currentTarget,
+      ALPH.DifficultyBombPatchEnabledTimeStamp.minusUnsafe(Duration.ofSecondsUnsafe(1)),
+      ALPH.DifficultyBombPatchEnabledTimeStamp
+    ) is currentTarget
+
+    info("Leman hardfork is not enabled yet")
+    val lemanNotEnabledTs =
+      networkConfig.lemanHardForkTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    networkConfig.getHardFork(lemanNotEnabledTs) is HardFork.Mainnet
+    calIceAgeTarget(
+      currentTarget,
+      lemanNotEnabledTs
+    ) is currentTarget
+
+    info("Leman hardfork is enabled yet")
+    networkConfig.getHardFork(networkConfig.lemanHardForkTimestamp) is HardFork.Leman
+    calIceAgeTarget(
+      currentTarget,
+      networkConfig.lemanHardForkTimestamp
+    ) is currentTarget
   }
 
   trait SimulationFixture extends MockFixture {

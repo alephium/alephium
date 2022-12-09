@@ -69,17 +69,20 @@ trait ChainDifficultyAdjustment {
 
   final def calIceAgeTarget(
       currentTarget: Target,
-      timestamp: TimeStamp
+      currentTimeStamp: TimeStamp,
+      nextTimeStamp: TimeStamp
   ): Target = {
-    val hardFork = networkConfig.getHardFork(timestamp)
-    if (hardFork.isLemanEnabled()) {
-      calIceAgeTarget(currentTarget, timestamp, ALPH.LemanDifficultyBombEnabledTimestamp)
+    val hardFork = networkConfig.getHardFork(currentTimeStamp)
+    if (
+      hardFork.isLemanEnabled() || ALPH.DifficultyBombPatchEnabledTimeStamp <= nextTimeStamp
+    ) {
+      currentTarget
     } else {
-      calIceAgeTarget(currentTarget, timestamp, ALPH.PreLemanDifficultyBombEnabledTimestamp)
+      _calIceAgeTarget(currentTarget, currentTimeStamp, ALPH.PreLemanDifficultyBombEnabledTimestamp)
     }
   }
 
-  final def calIceAgeTarget(
+  final def _calIceAgeTarget(
       currentTarget: Target,
       timestamp: TimeStamp,
       difficultyBombEnabledTimestamp: TimeStamp
@@ -113,7 +116,7 @@ trait ChainDifficultyAdjustment {
               clippedTimeSpan = consensusConfig.windowTimeSpanMax.millis
             }
             val target = reTarget(currentTarget, clippedTimeSpan)
-            Right(calIceAgeTarget(target, currentTimeStamp))
+            Right(calIceAgeTarget(target, currentTimeStamp, nextTimeStamp))
           case None =>
             getTarget(height - difficultyBombPatchConfig.heightDiff)
         }
