@@ -41,15 +41,16 @@ object ValidateDifficultyBombHardFork extends App {
     val miner          = LockupScript.p2pkh(publicKey)
     val template       = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     val parent         = BlockDeps.build(template.deps)(config.broker).uncleHash(chainIndex.to)
-    chain.loadStateFromStorage()
-    val height = chain.getHeightUnsafe(parent) - ALPH.DifficultyBombHardForkHeightDiff
-    val target = chain.getBlockUnsafe(chain.getHashesUnsafe(height).head).target
+    val height         = chain.getHeightUnsafe(parent) - ALPH.DifficultyBombHardForkHeightDiff
+    val target         = chain.getBlockUnsafe(chain.getHashesUnsafe(height).head).target
     val depTargets =
       template.deps.map(hash => blockFlow.getHeaderChain(hash).getBlockHeaderUnsafe(hash).target)
     val weightedTarget = Target.average(target, depTargets)(config.broker)
     val result = Target.clipByTwoTimes(depTargets.fold(weightedTarget)(Math.max), weightedTarget)
     if (result != template.target) {
-      throw new RuntimeException(s"ChainIndex: $chainIndex, parent: ${parent.toHexString}, expected: $result, have: ${template.target}")
+      throw new RuntimeException(
+        s"ChainIndex: $chainIndex, parent: ${parent.toHexString}, expected: $result, have: ${template.target}"
+      )
     }
   }
 }
