@@ -32,8 +32,8 @@ trait ChainDifficultyAdjustment {
   // TODO: tbd
   val difficultyBombHardForkConfig =
     new ChainDifficultyAdjustment.DifficultyBombHardForkConfig {
-      val enabledTimeStamp: TimeStamp = TimeStamp.now()
-      val heightDiff: Int             = 1350
+      val enabledTimeStamp: TimeStamp = ALPH.DifficultyBombHardForkEnabledTimeStamp
+      val heightDiff: Int             = ALPH.DifficultyBombHardForkHeightDiff
     }
 
   def getHeight(hash: BlockHash): IOResult[Int]

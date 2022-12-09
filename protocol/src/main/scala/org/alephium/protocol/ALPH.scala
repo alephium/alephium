@@ -37,6 +37,8 @@ object ALPH {
   val LemanDifficultyBombEnabledTimestamp: TimeStamp    = LaunchTimestamp.plusUnsafe(OneAndHalfYear)
   val PreLemanDifficultyBombEnabledTimestamp: TimeStamp = LaunchTimestamp.plusUnsafe(OneYear)
   val ExpDiffPeriod: Duration                           = Duration.ofDaysUnsafe(30)
+  val DifficultyBombHardForkEnabledTimeStamp: TimeStamp = TimeStamp.unsafe(1670536761330L)
+  val DifficultyBombHardForkHeightDiff: Int             = 1350
 
   val MaxTxInputNum: Int     = 256
   val MaxTxOutputNum: Int    = 256
