@@ -28,14 +28,6 @@ import org.alephium.protocol.BuildInfo
 import org.alephium.util.AVector
 
 // scalastyle:off regex
-@SuppressWarnings(
-  Array(
-    "org.wartremover.warts.ToString",
-    "org.wartremover.warts.PublicInference",
-    "org.wartremover.warts.JavaSerializable",
-    "org.wartremover.warts.Serializable"
-  )
-)
 final case class Cli() {
   import Codec._
   var configs: Configs = Configs()

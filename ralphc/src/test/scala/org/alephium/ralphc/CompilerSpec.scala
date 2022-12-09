@@ -27,7 +27,7 @@ class CompilerSpec extends AlephiumSpec {
     val rootPath  = Files.createTempDirectory("project")
     val sourceDir = rootPath.resolve("contracts")
     val config = Config(
-      options = CompilerOptions.Default,
+      compilerOptions = CompilerOptions.Default,
       contractPath = sourceDir,
       artifactPath = rootPath.resolve("artifacts")
     )

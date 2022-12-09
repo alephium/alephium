@@ -22,11 +22,7 @@ import scala.collection.immutable.ArraySeq
 
 import org.alephium.ralph.CompilerOptions
 
-@SuppressWarnings(
-  Array(
-    "org.wartremover.warts.DefaultArguments"
-  )
-)
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class Configs(
     debug: Boolean = false,
     warningAsError: Boolean = false,
@@ -55,7 +51,7 @@ final case class Configs(
       .zip(artifacts)
       .map(value =>
         Config(
-          options = compilerOptions(),
+          compilerOptions = compilerOptions(),
           contractPath = value._1,
           artifactPath = value._2
         )
@@ -65,9 +61,7 @@ final case class Configs(
 }
 
 final case class Config(
-    options: CompilerOptions,
+    compilerOptions: CompilerOptions,
     contractPath: Path,
     artifactPath: Path
-) {
-  def compilerOptions(): CompilerOptions = options
-}
+)
