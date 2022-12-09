@@ -33,15 +33,7 @@ import org.alephium.protocol.Hash
 import org.alephium.ralph
 import org.alephium.util.AVector
 
-@SuppressWarnings(
-  Array(
-    "org.wartremover.warts.ToString",
-    "org.wartremover.warts.OptionPartial",
-    "org.wartremover.warts.Recursion",
-    "org.wartremover.warts.JavaSerializable",
-    "org.wartremover.warts.PlatformDefault"
-  )
-)
+@SuppressWarnings(Array("org.wartremover.warts.ToString"))
 object Codec extends ApiModelCodec {
   implicit val pathWriter: Writer[Path] = StringWriter.comap[Path](_.toString)
   implicit val pathReader: Reader[Path] = StringReader.map(Paths.get(_))
@@ -54,20 +46,17 @@ object Codec extends ApiModelCodec {
   implicit val configsRW: ReadWriter[Configs]                            = macroRW
 }
 
-@SuppressWarnings(
-  Array(
-    "org.wartremover.warts.PublicInference",
-    "org.wartremover.warts.Recursion",
-    "org.wartremover.warts.PlatformDefault",
-    "org.wartremover.warts.DefaultArguments",
-    "org.wartremover.warts.TryPartial"
-  )
-)
 final case class Compiler(config: Config) {
   val metaInfos: mutable.Map[String, MetaInfo] = mutable.SeqMap.empty[String, MetaInfo]
   import Codec._
 
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  @SuppressWarnings(
+    Array(
+      "org.wartremover.warts.ToString",
+      "org.wartremover.warts.TryPartial",
+      "org.wartremover.warts.PlatformDefault"
+    )
+  )
   private def analysisCodes(): String = {
     Compiler
       .getSourceFiles(config.contractPath, ".ral")
@@ -111,7 +100,7 @@ final case class Compiler(config: Config) {
       Left(s"There are no contracts in the folder: <${config.contractPath}>")
     } else {
       ralph.Compiler
-        .compileProject(codes, config.compilerOptions())
+        .compileProject(codes, config.compilerOptions)
         .map(p => {
           val fullMetaInfos: mutable.SeqMap[String, MetaInfo] = mutable.SeqMap()
           p._1.foreach(cc => {
@@ -135,7 +124,7 @@ final case class Compiler(config: Config) {
           })
           Compiler.writer(
             Artifacts(
-              config.compilerOptions(),
+              config.compilerOptions,
               fullMetaInfos.map(item => (item._2.name, item._2.codeInfo)).toSeq.sortBy(_._1).toMap
             ),
             config.artifactPath.resolve(".project.json")
@@ -148,12 +137,6 @@ final case class Compiler(config: Config) {
   }
 }
 
-@SuppressWarnings(
-  Array(
-    "org.wartremover.warts.Recursion",
-    "org.wartremover.warts.DefaultArguments"
-  )
-)
 object Compiler {
   def writer[T: Writer](s: T, path: Path): Unit = {
     path.getParent.toFile.mkdirs()
@@ -162,7 +145,13 @@ object Compiler {
     writer.close()
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  @SuppressWarnings(
+    Array(
+      "org.wartremover.warts.ToString",
+      "org.wartremover.warts.DefaultArguments",
+      "org.wartremover.warts.Recursion"
+    )
+  )
   def getSourceFiles(path: Path, ext: String, recursive: Boolean = true): Seq[Path] = {
     if (Files.isDirectory(path)) {
       val (allFiles, allDirs) =
@@ -182,6 +171,11 @@ object Compiler {
     }
   }
 
+  @SuppressWarnings(
+    Array(
+      "org.wartremover.warts.Recursion"
+    )
+  )
   def deleteFile(file: File): Boolean = {
     if (file.isDirectory) {
       var result = false

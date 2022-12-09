@@ -16,7 +16,7 @@
 
 package org.alephium.ralphc
 
-// scalastyle:off
+// scalastyle:off regex
 object Main extends App {
   try {
     System.exit(Cli().call(args))

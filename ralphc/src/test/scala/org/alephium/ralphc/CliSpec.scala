@@ -89,6 +89,78 @@ class CliSpec extends AlephiumSpec {
     assert(Compiler.deleteFile(Paths.get(baseArtifacts).toFile))
   }
 
+  def assertProjectWithArgs(
+      args: Array[String],
+      expected: Int = 0,
+      isRecode: Boolean = false
+  ): Unit = {
+    val cli = Cli()
+    assert(cli.call(args) == expected)
+    cli.configs
+      .configs()
+      .foreach { config =>
+        val generatedArtifacts =
+          Compiler.getSourceFiles(config.artifactPath, ".json").sorted
+        val expectedArtifactsPath = if (isRecode) {
+          config.contractPath.resolve("artifacts")
+        } else {
+          config.contractPath.getParent.resolve("artifacts")
+        }
+        config.artifactPath isnot expectedArtifactsPath
+        val expectedArtifacts = Compiler
+          .getSourceFiles(expectedArtifactsPath, ".json")
+          .sorted
+        generatedArtifacts.length is expectedArtifacts.length
+      }
+  }
+
+  it should "be able to compile project with compile option" in {
+    val baseArtifacts = Files.createTempDirectory("projects").toFile.getPath
+    val artifacts1    = baseArtifacts + "/artifacts1"
+    val artifacts2    = baseArtifacts + "/artifacts2"
+    Paths.get(artifacts1).toFile.mkdirs()
+    Paths.get(artifacts2).toFile.mkdirs()
+    assertProjectWithArgs(
+      Array(
+        "-d",
+        "--ic",
+        "--iv",
+        "--if",
+        "--ip",
+        "--ir",
+        "--ie",
+        "-c",
+        contracts1,
+        "-a",
+        artifacts1
+      )
+    )
+    assertProjectWithArgs(
+      Array(
+        "-d",
+        "-w",
+        "-c",
+        contracts1,
+        "-a",
+        artifacts1
+      ),
+      -1
+    )
+    assertProjectWithArgs(
+      Array(
+        "-d",
+        "-w",
+        "-c",
+        project2,
+        "-a",
+        artifacts2
+      ),
+      -1,
+      isRecode = true
+    )
+    assert(Compiler.deleteFile(Paths.get(baseArtifacts).toFile))
+  }
+
   it should "be able to compile multi-project contracts" in {
     val baseArtifacts = Files.createTempDirectory("projects").toFile.getPath
     val artifacts1    = baseArtifacts + "/artifacts1"
