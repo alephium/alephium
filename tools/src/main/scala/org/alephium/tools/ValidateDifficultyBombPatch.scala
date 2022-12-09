@@ -58,6 +58,8 @@ object ValidateDifficultyBombPatch extends App {
       throw new RuntimeException(
         s"ChainIndex: $chainIndex, parent: ${parent.toHexString}, expected: $expectedHashRate, have: $hashrate"
       )
+    } else {
+      print(s"Succeeded ${hashrate}!\n")
     }
   }
 }

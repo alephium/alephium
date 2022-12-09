@@ -37,8 +37,9 @@ object ALPH {
   val PreLemanDifficultyBombEnabledTimestamp: TimeStamp = LaunchTimestamp.plusUnsafe(OneYear)
   val ExpDiffPeriod: Duration                           = Duration.ofDaysUnsafe(30)
   // TODO: set a proper timestamp
-  val DifficultyBombPatchEnabledTimeStamp: TimeStamp = TimeStamp.unsafe(1670698800000L)
-  val DifficultyBombPatchHeightDiff: Int             = 1350
+  val DifficultyBombPatchEnabledTimeStamp: TimeStamp =
+    TimeStamp.unsafe(1670698800000L) // Dec 10 2022 19:00:00 GMT+0000
+  val DifficultyBombPatchHeightDiff: Int = 2700 // around 2 days
 
   val MaxTxInputNum: Int     = 256
   val MaxTxOutputNum: Int    = 256
