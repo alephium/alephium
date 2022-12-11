@@ -18,8 +18,9 @@ package org.alephium.ralphc
 
 import java.nio.file.Path
 
+import scala.collection.mutable
+
 import org.alephium.api.model.CompileProjectResult
-import org.alephium.protocol.Hash
 import org.alephium.ralph.CompilerOptions
 import org.alephium.util.AVector
 
@@ -27,10 +28,13 @@ final case class CodeInfo(
     sourceFile: String,
     sourceCodeHash: String,
     var bytecodeDebugPatch: CompileProjectResult.Patch,
-    var codeHashDebug: Hash,
+    var codeHashDebug: String,
     var warnings: AVector[String]
 )
 
-final case class Artifacts(compilerOptionsUsed: CompilerOptions, infos: Map[String, CodeInfo])
+final case class Artifacts(
+    compilerOptionsUsed: CompilerOptions,
+    infos: mutable.Map[String, CodeInfo]
+)
 
 final case class MetaInfo(name: String, ArtifactPath: Path, codeInfo: CodeInfo)

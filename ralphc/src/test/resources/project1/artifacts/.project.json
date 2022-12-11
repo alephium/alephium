@@ -8,15 +8,6 @@
     "ignoreExternalCallCheckWarnings": false
   },
   "infos": {
-    "Greeter": {
-      "sourceFile": "greeter/greeter.ral",
-      "sourceCodeHash": "3cf9e5898ff728b03630bf457ef96cbd21d345e2256f30d2ce4f6a102de51b14",
-      "bytecodeDebugPatch": "",
-      "codeHashDebug": "23a48462286d2c2ffc6d3a19192060dd42c178e7d331819e75e059c5be3c042f",
-      "warnings": [
-        
-      ]
-    },
     "Add": {
       "sourceFile": "add/add.ral",
       "sourceCodeHash": "85bdd0f1de41418bd039102d1b3d8bfb934537ee1ee55295f8f921c023f2aaee",
@@ -26,11 +17,20 @@
         
       ]
     },
-    "Sub": {
-      "sourceFile": "sub/sub.ral",
-      "sourceCodeHash": "815eb745f49f3eafc266333db2bf8d49a70f16f70b16c877a0274f51637f9620",
+    "Greeter": {
+      "sourceFile": "greeter/greeter.ral",
+      "sourceCodeHash": "3cf9e5898ff728b03630bf457ef96cbd21d345e2256f30d2ce4f6a102de51b14",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "513645f5c95a28d55a51070f3d5c51edbda05a98f46b23cad59952e2ee4846a1",
+      "codeHashDebug": "23a48462286d2c2ffc6d3a19192060dd42c178e7d331819e75e059c5be3c042f",
+      "warnings": [
+        
+      ]
+    },
+    "GreeterInterface": {
+      "sourceFile": "greeter/greeter_interface.ral",
+      "sourceCodeHash": "4d907712f36c242fc160513fc9d94d96e5c848ae865b89b39eaff8f9c3d48c1f",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "",
       "warnings": [
         
       ]
@@ -39,7 +39,7 @@
       "sourceFile": "main.ral",
       "sourceCodeHash": "8cc5c1a2de002650a5904078f91005932982e700f7b0a393cbe4e3a64cfdf842",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "0000000000000000000000000000000000000000000000000000000000000000",
+      "codeHashDebug": "",
       "warnings": [
         
       ]
@@ -52,6 +52,15 @@
       "warnings": [
         "No update fields annotation for function: Pow.pow, please use @using(updateFields = true/false) for the function",
         "Function Pow.pow does not update fields, please use @using(updateFields = false) for the function"
+      ]
+    },
+    "Sub": {
+      "sourceFile": "sub/sub.ral",
+      "sourceCodeHash": "815eb745f49f3eafc266333db2bf8d49a70f16f70b16c877a0274f51637f9620",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "513645f5c95a28d55a51070f3d5c51edbda05a98f46b23cad59952e2ee4846a1",
+      "warnings": [
+        
       ]
     }
   }
