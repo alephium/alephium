@@ -29,7 +29,6 @@ import org.alephium.api.UtilJson._
 import org.alephium.api.model.{CompileContractResult, CompileProjectResult, CompileScriptResult}
 import org.alephium.crypto
 import org.alephium.json.Json._
-import org.alephium.protocol.Hash
 import org.alephium.ralph
 import org.alephium.util.AVector
 
@@ -83,7 +82,7 @@ final case class Compiler(config: Config) {
                 sourcePath.toFile.getPath,
                 sourceCodeHash,
                 CompileProjectResult.Patch(""),
-                Hash.zero,
+                "",
                 AVector()
               )
             )
@@ -102,15 +101,13 @@ final case class Compiler(config: Config) {
       ralph.Compiler
         .compileProject(codes, config.compilerOptions)
         .map(p => {
-          val fullMetaInfos: mutable.SeqMap[String, MetaInfo] = mutable.SeqMap()
           p._1.foreach(cc => {
             val c     = CompileContractResult.from(cc)
             val value = metaInfos(c.name)
             value.codeInfo.warnings = c.warnings
             value.codeInfo.bytecodeDebugPatch = c.bytecodeDebugPatch
-            value.codeInfo.codeHashDebug = c.codeHashDebug
-            metaInfos.addOne((c.name, value))
-            fullMetaInfos.addOne((c.name, value))
+            value.codeInfo.codeHashDebug = c.codeHashDebug.toHexString
+            metaInfos.update(c.name, value)
             Compiler.writer(ContractResult.from(c), value.ArtifactPath)
           })
           p._2.foreach(ss => {
@@ -118,14 +115,18 @@ final case class Compiler(config: Config) {
             val value = metaInfos(s.name)
             value.codeInfo.warnings = s.warnings
             value.codeInfo.bytecodeDebugPatch = s.bytecodeDebugPatch
-            metaInfos.addOne((s.name, value))
-            fullMetaInfos.addOne((s.name, value))
+            metaInfos.update(s.name, value)
             Compiler.writer(ScriptResult.from(s), value.ArtifactPath)
           })
           Compiler.writer(
             Artifacts(
               config.compilerOptions,
-              fullMetaInfos.map(item => (item._2.name, item._2.codeInfo)).toSeq.sortBy(_._1).toMap
+              mutable.SeqMap(
+                metaInfos
+                  .map(item => (item._2.name, item._2.codeInfo))
+                  .toSeq
+                  .sortWith(_._1 < _._1) *
+              )
             ),
             config.artifactPath.resolve(".project.json")
           )
