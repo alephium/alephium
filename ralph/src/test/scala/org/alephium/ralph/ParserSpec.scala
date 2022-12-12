@@ -309,7 +309,7 @@ class ParserSpec extends AlephiumSpec {
     parsed2.usePreapprovedAssets is true
     parsed2.useAssetsInContract is true
     parsed2.useExternalCallCheck is true
-    parsed2.useUpdateFields is true
+    parsed2.useUpdateFields is false
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
 
@@ -694,11 +694,11 @@ class ParserSpec extends AlephiumSpec {
           FuncDef(
             Seq.empty,
             FuncId("foo", false),
-            false,
-            false,
-            false,
-            true,
-            true,
+            isPublic = false,
+            usePreapprovedAssets = false,
+            useAssetsInContract = false,
+            useExternalCallCheck = true,
+            useUpdateFields = false,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -816,11 +816,11 @@ class ParserSpec extends AlephiumSpec {
           FuncDef(
             Seq.empty,
             FuncId("foo", false),
-            false,
-            false,
-            false,
-            true,
-            true,
+            isPublic = false,
+            usePreapprovedAssets = false,
+            useAssetsInContract = false,
+            useExternalCallCheck = true,
+            useUpdateFields = false,
             Seq.empty,
             Seq.empty,
             None
@@ -862,11 +862,11 @@ class ParserSpec extends AlephiumSpec {
           FuncDef(
             Seq.empty,
             FuncId("foo", false),
-            false,
-            false,
-            false,
-            true,
-            true,
+            isPublic = false,
+            usePreapprovedAssets = false,
+            useAssetsInContract = false,
+            useExternalCallCheck = true,
+            useUpdateFields = false,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -898,11 +898,11 @@ class ParserSpec extends AlephiumSpec {
           FuncDef(
             Seq.empty,
             FuncId("foo", false),
-            false,
-            false,
-            false,
-            true,
-            true,
+            isPublic = false,
+            usePreapprovedAssets = false,
+            useAssetsInContract = false,
+            useExternalCallCheck = true,
+            useUpdateFields = false,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -939,11 +939,11 @@ class ParserSpec extends AlephiumSpec {
       FuncDef[StatefulContext](
         Seq.empty,
         FuncId("foo", false),
-        false,
-        false,
-        false,
+        isPublic = false,
+        usePreapprovedAssets = false,
+        useAssetsInContract = false,
         externalCallCheck,
-        true,
+        useUpdateFields = false,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -953,11 +953,11 @@ class ParserSpec extends AlephiumSpec {
       FuncDef[StatefulContext](
         Seq.empty,
         FuncId("bar", false),
-        false,
-        false,
-        false,
+        isPublic = false,
+        usePreapprovedAssets = false,
+        useAssetsInContract = false,
         externalCallCheck,
-        true,
+        useUpdateFields = false,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1043,11 +1043,11 @@ class ParserSpec extends AlephiumSpec {
       FuncDef(
         Seq.empty,
         FuncId("main", false),
-        true,
+        isPublic = true,
         usePreapprovedAssets,
-        false,
-        true,
-        true,
+        useAssetsInContract = false,
+        useExternalCallCheck = true,
+        useUpdateFields = false,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))

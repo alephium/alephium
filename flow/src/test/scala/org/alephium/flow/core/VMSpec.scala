@@ -88,6 +88,7 @@ class VMSpec extends AlephiumSpec {
     lazy val input0 =
       s"""
          |Contract Foo(mut x: U256) {
+         |  @using(updateFields = true)
          |  $access fn add(a: U256) -> () {
          |    x = x + a
          |    if (a > 0) {
@@ -111,6 +112,7 @@ class VMSpec extends AlephiumSpec {
     lazy val input1 =
       s"""
          |Contract Foo(mut x: U256) {
+         |  @using(updateFields = true)
          |  pub fn add(a: U256) -> () {
          |    x = x + a
          |    if (a > 0) {
@@ -605,6 +607,7 @@ class VMSpec extends AlephiumSpec {
          |    return x
          |  }
          |
+         |  @using(updateFields = true)
          |  pub fn foo(foo: ByteVec, bar: ByteVec) -> () {
          |    x = x + 10
          |    x = Bar(bar).bar(foo)
@@ -633,6 +636,7 @@ class VMSpec extends AlephiumSpec {
          |    return x
          |  }
          |
+         |  @using(updateFields = true)
          |  pub fn foo(foo: ByteVec, bar: ByteVec) -> () {
          |    x = x + 10
          |    x = Bar(bar).bar(foo)
@@ -656,6 +660,7 @@ class VMSpec extends AlephiumSpec {
          |    return x
          |  }
          |
+         |  @using(updateFields = true)
          |  pub fn foo(foo: ByteVec, bar: ByteVec) -> () {
          |    x = x + 10
          |    x = Bar(bar).bar(foo)
@@ -1038,7 +1043,7 @@ class VMSpec extends AlephiumSpec {
     val foo =
       s"""
          |Contract Foo(mut x: U256) {
-         |  @using(assetsInContract = true)
+         |  @using(assetsInContract = true, updateFields = true)
          |  pub fn destroy(targetAddress: Address) -> () {
          |    x = x + 1
          |    destroySelf!(targetAddress) // in practice, the contract should check the caller before destruction
@@ -1199,6 +1204,7 @@ class VMSpec extends AlephiumSpec {
     val fooV1 =
       s"""
          |Contract Foo(x: Bool) {
+         |  @using(updateFields = true)
          |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
          |    // in practice, we should check the permission for migration
          |    if (!changeState) {
@@ -1217,6 +1223,7 @@ class VMSpec extends AlephiumSpec {
     val fooV2 =
       s"""
          |Contract Foo(x: Bool) {
+         |  @using(updateFields = true)
          |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
          |    if (changeState) {
          |      migrateWithFields!(code, #010000)
@@ -1705,6 +1712,7 @@ class VMSpec extends AlephiumSpec {
     val testContract =
       s"""
          |Contract Foo(mut x: U256) {
+         |  @using(updateFields = true)
          |  pub fn foo(y: U256) -> () {
          |    x = x * 10 + y
          |  }
@@ -1732,7 +1740,7 @@ class VMSpec extends AlephiumSpec {
     val testContract =
       s"""
          |Contract Foo(mut x: U256) {
-         |  @using(assetsInContract = true)
+         |  @using(assetsInContract = true, updateFields = true)
          |  pub fn foo(address: Address) -> () {
          |    x = x + 1
          |    transferAlphFromSelf!(address, ${ALPH.cent(1).v})
@@ -1823,6 +1831,7 @@ class VMSpec extends AlephiumSpec {
            |Abstract Contract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
+           |  @using(updateFields = true)
            |  fn gp() -> () {
            |    x = x + 1
            |    emit GP(x)
@@ -1867,6 +1876,7 @@ class VMSpec extends AlephiumSpec {
            |Abstract Contract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
+           |  @using(updateFields = true)
            |  fn gp() -> ()
            |}
            |
@@ -1882,6 +1892,7 @@ class VMSpec extends AlephiumSpec {
            |Abstract Contract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
+           |  @using(updateFields = true)
            |  fn gp() -> () {
            |    x = x + 1
            |    emit GP(x)
@@ -1903,6 +1914,7 @@ class VMSpec extends AlephiumSpec {
       val contract: String =
         s"""
            |Contract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  @using(updateFields = true)
            |  fn gp() -> () {
            |    x = x + 1
            |    emit GP(x)
@@ -1918,6 +1930,7 @@ class VMSpec extends AlephiumSpec {
            |Abstract Contract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
+           |  @using(updateFields = true)
            |  fn gp() -> ()
            |}
            |
@@ -1968,6 +1981,7 @@ class VMSpec extends AlephiumSpec {
            |  @using(externalCallCheck = false)
            |  fn ggp() -> () {}
            |
+           |  @using(updateFields = true)
            |  fn gp() -> ()
            |}
            |
@@ -1983,6 +1997,7 @@ class VMSpec extends AlephiumSpec {
            |Abstract Contract Parent1(mut x: U256) extends Grandparent(x) {
            |  event Parent1(x: U256)
            |
+           |  @using(updateFields = true)
            |  fn gp() -> () {
            |    x = x + 1
            |    emit GP(x)
@@ -2004,6 +2019,7 @@ class VMSpec extends AlephiumSpec {
       val contract: String =
         s"""
            |Contract Child(mut x: U256) extends Parent0(x), Parent1(x) {
+           |  @using(updateFields = true)
            |  fn gp() -> () {
            |    x = x + 1
            |    emit GP(x)
@@ -2012,6 +2028,8 @@ class VMSpec extends AlephiumSpec {
            |
            |Abstract Contract Grandparent(mut x: U256) {
            |  event GP(value: U256)
+           |
+           |  @using(updateFields = true)
            |  fn gp() -> ()
            |}
            |
@@ -2246,6 +2264,7 @@ class VMSpec extends AlephiumSpec {
          |  event Adding(a: U256, b: U256)
          |  event Added()
          |
+         |  @using(updateFields = true)
          |  pub fn add(a: U256) -> (U256) {
          |    emit Adding(a, result)
          |    result = result + a
@@ -2667,7 +2686,7 @@ class VMSpec extends AlephiumSpec {
          |Contract Foo(mut subContractId: ByteVec) {
          |  event Create(subContractId: ByteVec)
          |
-         |  @using(preapprovedAssets = true)
+         |  @using(preapprovedAssets = true, updateFields = true)
          |  pub fn foo() -> () {
          |    subContractId = copyCreateContract!{callerAddress!() -> $minimalAlphInContract}(selfContractId!(), #010300)
          |    emit Create(subContractId)
@@ -2725,7 +2744,7 @@ class VMSpec extends AlephiumSpec {
       val contractRaw: String =
         s"""
            |Contract Foo(mut subContractId: ByteVec) {
-           |  @using(preapprovedAssets = true)
+           |  @using(preapprovedAssets = true, updateFields = true)
            |  pub fn createSubContract() -> () {
            |    subContractId = $createContractStmt
            |  }
@@ -2790,7 +2809,7 @@ class VMSpec extends AlephiumSpec {
       val contractRaw: String =
         s"""
            |Contract Foo(mut subContractId: ByteVec) {
-           |  @using(preapprovedAssets = true)
+           |  @using(preapprovedAssets = true, updateFields = true)
            |  pub fn createSubContract() -> () {
            |    subContractId = $createContractStmt
            |  }
@@ -3017,7 +3036,7 @@ class VMSpec extends AlephiumSpec {
     val contract: String =
       s"""
          |Contract Foo(mut subContractId: ByteVec) {
-         |  @using(preapprovedAssets = true)
+         |  @using(preapprovedAssets = true, updateFields = true)
          |  pub fn foo() -> () {
          |    subContractId = copyCreateContract!{
          |      callerAddress!() -> ${ALPH.nanoAlph(1000).v}
