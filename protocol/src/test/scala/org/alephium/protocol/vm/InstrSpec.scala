@@ -81,7 +81,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
       LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
-      NullContractAddress, SubContractId, SubContractIdOf
+      NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId
     )
     // format: on
   }
@@ -3223,6 +3223,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(SubContractIdOf, expectedId, Val.ByteVec(parentId.bytes), Val.ByteVec(path))
   }
 
+  it should "ALPHTokenId" in new StatefulInstrFixture {
+    stack.size is 0
+    runAndCheckGas(ALPHTokenId)
+    stack.size is 1
+    stack.top.get is Val.ByteVec(TokenId.alph.bytes)
+  }
+
   it should "SelfAddress" in new ContractInstrFixture {
     test(SelfAddress, Val.Address(LockupScript.p2c(frame.obj.contractIdOpt.get)))
   }
@@ -3445,7 +3452,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateSubContract -> 32000, CreateSubContractWithToken -> 32000, CopyCreateSubContract -> 24000, CopyCreateSubContractWithToken -> 24000,
       LoadFieldByIndex -> 5, StoreFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
       CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
-      NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199
+      NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199, ALPHTokenId -> 2
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -3572,7 +3579,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateSubContract -> 191, CreateSubContractWithToken -> 192, CopyCreateSubContract -> 193, CopyCreateSubContractWithToken -> 194,
       LoadFieldByIndex -> 195, StoreFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
       CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
-      NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204
+      NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204, ALPHTokenId -> 205
     )
     // format: on
 
@@ -3630,7 +3637,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
       LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
-      NullContractAddress, SubContractId, SubContractIdOf
+      NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId
     )
     // format: on
   }

@@ -19,7 +19,7 @@ package org.alephium.ralph
 import scala.collection.mutable
 
 import org.alephium.protocol.vm
-import org.alephium.protocol.vm.{Contract => VmContract, _}
+import org.alephium.protocol.vm.{ALPHTokenId => ALPHTokenIdInstr, Contract => VmContract, _}
 import org.alephium.ralph.LogicalOperator.Not
 import org.alephium.util.{AVector, I256, U256}
 
@@ -71,7 +71,7 @@ object Ast {
       val approveCount = tokenAmounts.length
       assume(approveCount >= 1)
       val approveTokens: Seq[Instr[Ctx]] = tokenAmounts.flatMap {
-        case (Const(Lexer.ALPHTokenId), amount) =>
+        case (ALPHTokenId(), amount) =>
           amount.genCode(state) :+ ApproveAlph.asInstanceOf[Instr[Ctx]]
         case (tokenId, amount) =>
           tokenId.genCode(state) ++ amount.genCode(state) :+ ApproveToken.asInstanceOf[Instr[Ctx]]
@@ -121,6 +121,14 @@ object Ast {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
 
+  final case class ALPHTokenId[Ctx <: StatelessContext]() extends Expr[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.ByteVec)
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = Seq(
+      ALPHTokenIdInstr.asInstanceOf[Instr[Ctx]]
+    )
+  }
   final case class Const[Ctx <: StatelessContext](v: Val) extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.fromVal(v.tpe))
 

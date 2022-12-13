@@ -33,9 +33,7 @@ import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
 abstract class Parser[Ctx <: StatelessContext] {
   implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] => Lexer.emptyChars(ctx) }
 
-  def value[Unknown: P]: P[Val] = P(
-    Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address | Lexer.alphTokenId
-  )
+  def value[Unknown: P]: P[Val] = P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address)
   def const[Unknown: P]: P[Ast.Const[Ctx]] = value.map(Ast.Const.apply[Ctx])
   def createArray1[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
     P("[" ~ expr.rep(1, ",") ~ "]").map(Ast.CreateArrayExpr.apply)
@@ -46,6 +44,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def arrayExpr[Unknown: P]: P[Ast.Expr[Ctx]] = P(createArray1 | createArray2)
   def variable[Unknown: P]: P[Ast.Variable[Ctx]] =
     P(Lexer.ident | Lexer.constantIdent).map(Ast.Variable.apply[Ctx])
+  def alphTokenId[Unknown: P]: P[Ast.Expr[Ctx]] = Lexer.keyword("ALPH").map(_ => Ast.ALPHTokenId())
 
   def alphAmount[Unknown: P]: P[Ast.Expr[Ctx]]                       = expr
   def tokenAmount[Unknown: P]: P[(Ast.Expr[Ctx], Ast.Expr[Ctx])]     = P(expr ~ ":" ~ expr)
@@ -452,7 +451,7 @@ object Parser {
 )
 object StatelessParser extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
-    P(const | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr)
+    P(const | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr)
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
     P(varDef | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret)
@@ -476,7 +475,7 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
+      const | alphTokenId | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.ContractCallExpr] =

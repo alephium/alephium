@@ -97,13 +97,13 @@ class ParserSpec extends AlephiumSpec {
           Ast.ApproveAsset(
             Variable(Ident("x")),
             Seq(
-              Const(Lexer.ALPHTokenId) -> Const(Val.U256(U256.One)),
+              Ast.ALPHTokenId()        -> Const(Val.U256(U256.One)),
               Variable(Ident("token")) -> Const(Val.U256(U256.Two))
             )
           ),
           Ast.ApproveAsset(
             Variable(Ident("y")),
-            Seq(Const(Lexer.ALPHTokenId) -> Const(Val.U256(U256.unsafe(3))))
+            Seq(Ast.ALPHTokenId() -> Const(Val.U256(U256.unsafe(3))))
           )
         ),
         List(Variable(Ident("z")))
@@ -134,7 +134,7 @@ class ParserSpec extends AlephiumSpec {
         Seq(
           Ast.ApproveAsset(
             Variable(Ident("z")),
-            Seq(Const(Lexer.ALPHTokenId) -> Const(Val.U256(U256.One)))
+            Seq(ALPHTokenId() -> Const(Val.U256(U256.One)))
           )
         ),
         List(Variable(Ident("x")))
@@ -156,9 +156,7 @@ class ParserSpec extends AlephiumSpec {
         Seq(Ast.NamedVar(false, Ident("bytes"))),
         Const(Val.ByteVec(ByteString.empty))
       )
-    fastparse.parse("ALPH", StatefulParser.expr(_)).get.value is Const[StatefulContext](
-      Lexer.ALPHTokenId
-    )
+    fastparse.parse("ALPH", StatefulParser.expr(_)).get.value is ALPHTokenId[StatefulContext]()
   }
 
   it should "parse return" in {
