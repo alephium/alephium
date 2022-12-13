@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import scala.annotation.{switch, tailrec}
 
-import org.alephium.protocol.model.ContractId
+import org.alephium.protocol.model.{ContractId, TokenId}
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.protocol.vm.TokenIssuance
 import org.alephium.serde.deserialize
@@ -354,6 +354,14 @@ final case class StatefulFrame(
     }
   }
 
+  def checkContractId(contractId: ContractId): ExeResult[Unit] = {
+    if (ctx.getHardFork().isLemanEnabled() && contractId.bytes == TokenId.alph.bytes) {
+      failed(ZeroContractId)
+    } else {
+      Right(())
+    }
+  }
+
   def createContract(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
@@ -361,6 +369,7 @@ final case class StatefulFrame(
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId] = {
     for {
+      _            <- checkContractId(contractId)
       balanceState <- getBalanceState()
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
       _            <- ctx.createContract(contractId, code, balances, fields, tokenIssuanceInfo)
