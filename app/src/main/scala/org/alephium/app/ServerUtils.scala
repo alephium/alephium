@@ -1344,7 +1344,7 @@ object ServerUtils {
     }
 
     val create = if (initialTokenAmounts.isEmpty) {
-      val approveAssets = s"{@$address -> ${initialAttoAlphAmount.v}}"
+      val approveAssets = s"{@$address -> ALPH: ${initialAttoAlphAmount.v}}"
       toCreate(approveAssets)
     } else {
       val approveTokens = initialTokenAmounts
@@ -1352,7 +1352,7 @@ object ServerUtils {
           s"#${token.id.toHexString}: ${token.amount.v}"
         }
         .mkString(", ")
-      val approveAssets = s"{@$address -> ${initialAttoAlphAmount.v}, $approveTokens}"
+      val approveAssets = s"{@$address -> ALPH: ${initialAttoAlphAmount.v}, $approveTokens}"
       toCreate(approveAssets)
     }
     s"""

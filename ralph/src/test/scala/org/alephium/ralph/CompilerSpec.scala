@@ -2205,9 +2205,25 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     script.toTemplateString() is "0101030001000c{3}1700{0}{1}{2}a3{0}{2}0e0c16000100"
   }
 
+  it should "use ApproveAlph instr for approve ALPH" in {
+    val code =
+      s"""
+         |TxScript Main(address: Address, fooId: ByteVec) {
+         |  Foo(fooId).foo{address -> ALPH: 1}()
+         |}
+         |
+         |Interface Foo {
+         |  @using(preapprovedAssets = true)
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+    val script = Compiler.compileTxScript(code).rightValue
+    script.toTemplateString() is "01010300000007{0}0da20c0c{1}0100"
+  }
+
   it should "use braces syntax for functions that uses preapproved assets" in {
     def code(
-        bracesPart: String = "{callerAddress!() -> amount}",
+        bracesPart: String = "{callerAddress!() -> ALPH: amount}",
         usePreapprovedAssets: Boolean = true,
         useAssetsInContract: Boolean = false
     ): String =
@@ -2260,7 +2276,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "check types for braces syntax" in {
     def code(
         address: String = "Address",
-        amount: String = "U256",
         tokenId: String = "ByteVec",
         tokenAmount: String = "U256"
     ): String =
@@ -2268,12 +2283,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |TxScript Main(
          |  fooContractId: ByteVec,
          |  address: ${address},
-         |  amount: ${amount},
          |  tokenId: ${tokenId},
          |  tokenAmount: ${tokenAmount}
          |) {
          |  let foo = Foo(fooContractId)
-         |  foo.foo{address -> amount, tokenId: tokenAmount}()
+         |  foo.foo{address -> tokenId: tokenAmount}()
          |}
          |
          |Interface Foo {
@@ -2284,8 +2298,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     Compiler.compileTxScript(code()).isRight is true
     Compiler.compileTxScript(code(address = "Bool")).leftValue.message is
       "Invalid address type: Variable(Ident(address))"
-    Compiler.compileTxScript(code(amount = "Bool")).leftValue.message is
-      "Invalid amount type: Some(Variable(Ident(amount)))"
     Compiler.compileTxScript(code(tokenId = "Bool")).leftValue.message is
       "Invalid token amount type: List((Variable(Ident(tokenId)),Variable(Ident(tokenAmount))))"
     Compiler.compileTxScript(code(tokenAmount = "Bool")).leftValue.message is

@@ -50,17 +50,11 @@ object Ast {
 
   final case class ApproveAsset[Ctx <: StatelessContext](
       address: Expr[Ctx],
-      attoAlphAmountOpt: Option[Expr[Ctx]],
       tokenAmounts: Seq[(Expr[Ctx], Expr[Ctx])]
   ) {
-    lazy val approveCount = (if (attoAlphAmountOpt.isEmpty) 0 else 1) + tokenAmounts.length
-
     def check(state: Compiler.State[Ctx]): Unit = {
       if (address.getType(state) != Seq(Type.Address)) {
         throw Compiler.Error(s"Invalid address type: ${address}")
-      }
-      if (attoAlphAmountOpt.exists(_.getType(state) != Seq(Type.U256))) {
-        throw Compiler.Error(s"Invalid amount type: ${attoAlphAmountOpt}")
       }
       if (
         tokenAmounts
@@ -74,15 +68,15 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val approveCount = tokenAmounts.length
       assume(approveCount >= 1)
-      val approveAlph: Seq[Instr[Ctx]] = attoAlphAmountOpt match {
-        case Some(amount) => amount.genCode(state) :+ ApproveAlph.asInstanceOf[Instr[Ctx]]
-        case None         => Seq.empty
+      val approveTokens: Seq[Instr[Ctx]] = tokenAmounts.flatMap {
+        case (Const(Lexer.ALPHTokenId), amount) =>
+          amount.genCode(state) :+ ApproveAlph.asInstanceOf[Instr[Ctx]]
+        case (tokenId, amount) =>
+          tokenId.genCode(state) ++ amount.genCode(state) :+ ApproveToken.asInstanceOf[Instr[Ctx]]
       }
-      val approveTokens: Seq[Instr[Ctx]] = tokenAmounts.flatMap { case (tokenId, amount) =>
-        tokenId.genCode(state) ++ amount.genCode(state) :+ ApproveToken.asInstanceOf[Instr[Ctx]]
-      }
-      address.genCode(state) ++ Seq.fill(approveCount - 1)(Dup) ++ approveAlph ++ approveTokens
+      address.genCode(state) ++ Seq.fill(approveCount - 1)(Dup) ++ approveTokens
     }
   }
 

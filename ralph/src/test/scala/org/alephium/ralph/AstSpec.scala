@@ -349,7 +349,7 @@ class AstSpec extends AlephiumSpec {
          |Contract Bar(foo: Foo) {
          |  @using(updateFields = $updateFields, preapprovedAssets = $useApprovedAssets)
          |  pub fn bar() -> () {
-         |    ${if (useApprovedAssets) "foo.foo{callerAddress!() -> 1}()" else "foo.foo()"}
+         |    ${if (useApprovedAssets) "foo.foo{callerAddress!() -> ALPH: 1}()" else "foo.foo()"}
          |  }
          |}
          |""".stripMargin

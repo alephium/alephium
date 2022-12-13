@@ -69,13 +69,13 @@ object AMMContract {
        |  @using(preapprovedAssets = true)
        |  pub fn addLiquidity(lp: Address, attoAlphAmount: U256, tokenAmount: U256) -> () {
        |    swapContract.addLiquidity{
-       |      lp -> attoAlphAmount, tokenId: tokenAmount
+       |      lp -> ALPH: attoAlphAmount, tokenId: tokenAmount
        |    }(lp, attoAlphAmount, tokenAmount)
        |  }
        |
        |  @using(preapprovedAssets = true)
        |  pub fn swapToken(buyer: Address, attoAlphAmount: U256) -> () {
-       |    swapContract.swapToken{buyer -> attoAlphAmount}(buyer, attoAlphAmount)
+       |    swapContract.swapToken{buyer -> ALPH: attoAlphAmount}(buyer, attoAlphAmount)
        |  }
        |
        |  @using(preapprovedAssets = true)
