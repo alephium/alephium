@@ -848,9 +848,7 @@ class ParserSpec extends AlephiumSpec {
       val code =
         s"""
            |Contract Child() implements Parent {
-           |  fn foo() -> () {
-           |    return
-           |  }
+           |  fn bar() -> () {}
            |}
            |""".stripMargin
       fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
@@ -861,7 +859,7 @@ class ParserSpec extends AlephiumSpec {
         Seq(
           FuncDef(
             Seq.empty,
-            FuncId("foo", false),
+            FuncId("bar", false),
             isPublic = false,
             usePreapprovedAssets = false,
             useAssetsInContract = false,
@@ -869,7 +867,7 @@ class ParserSpec extends AlephiumSpec {
             useUpdateFields = false,
             Seq.empty,
             Seq.empty,
-            Some(Seq(ReturnStmt(Seq.empty)))
+            Some(Seq.empty)
           )
         ),
         Seq.empty,
