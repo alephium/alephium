@@ -364,17 +364,17 @@ class VMSpec extends AlephiumSpec {
          |Contract Foo() {
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn foo(sender: Address) -> () {
-         |    let senderAlph = alphRemaining!(sender)
+         |    let senderAlph = tokenRemaining!(sender, ALPH)
          |    assert!(tokenRemaining!(sender, ALPH) == senderAlph, 0)
-         |    let contractAlph = alphRemaining!(selfAddress!())
+         |    let contractAlph = tokenRemaining!(selfAddress!(), ALPH)
          |    assert!(tokenRemaining!(selfAddress!(), ALPH) == contractAlph, 0)
          |
          |    transferTokenToSelf!(sender, ALPH, 1 alph)
-         |    assert!(alphRemaining!(sender) == senderAlph - 1 alph, 0)
+         |    assert!(tokenRemaining!(sender, ALPH) == senderAlph - 1 alph, 0)
          |    transferTokenFromSelf!(sender, ALPH, 1 alph)
-         |    assert!(alphRemaining!(selfAddress!()) == contractAlph - 1 alph, 0)
+         |    assert!(tokenRemaining!(selfAddress!(), ALPH) == contractAlph - 1 alph, 0)
          |    transferToken!(sender, selfAddress!(), ALPH, 1 alph)
-         |    assert!(alphRemaining!(sender) == senderAlph - 2 alph, 0)
+         |    assert!(tokenRemaining!(sender, ALPH) == senderAlph - 2 alph, 0)
          |  }
          |}
          |""".stripMargin
@@ -402,7 +402,7 @@ class VMSpec extends AlephiumSpec {
          |  @using(assetsInContract = true)
          |  pub fn transfer(to: Address, amount: U256) -> () {
          |    transferTokenFromSelf!(to, selfContractId!(), amount)
-         |    transferAlphFromSelf!(to, dustAmount!())
+         |    transferTokenFromSelf!(to, ALPH, dustAmount!())
          |  }
          |}
          |""".stripMargin
@@ -613,7 +613,7 @@ class VMSpec extends AlephiumSpec {
         |Contract Foo() {
         |  @using(assetsInContract = true)
         |  pub fn foo(address: Address) -> () {
-        |    transferAlphFromSelf!(address, alphRemaining!(selfAddress!()))
+        |    transferTokenFromSelf!(address, ALPH, tokenRemaining!(selfAddress!(), ALPH))
         |  }
         |}
         |""".stripMargin
@@ -1212,7 +1212,7 @@ class VMSpec extends AlephiumSpec {
          |Contract Foo() {
          |  @using(assetsInContract = $useAssetsInContract)
          |  pub fn destroy(targetAddress: Address) -> () {
-         |    approveAlph!(selfAddress!(), 2 alph)
+         |    approveToken!(selfAddress!(), ALPH, 2 alph)
          |    destroySelf!(targetAddress)
          |  }
          |}
@@ -1360,7 +1360,7 @@ class VMSpec extends AlephiumSpec {
          |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn foo(targetAddress: Address) -> () {
-         |    approveAlph!(selfAddress!(), alphRemaining!(selfAddress!()))
+         |    approveToken!(selfAddress!(), ALPH, tokenRemaining!(selfAddress!(), ALPH))
          |    destroy(targetAddress)
          |  }
          |
@@ -1620,7 +1620,7 @@ class VMSpec extends AlephiumSpec {
          |    @using(preapprovedAssets = true, assetsInContract = true)
          |    pub fn buy(buyer: Address) -> ()
          |    {
-         |        transferAlph!(buyer, author, price)
+         |        transferToken!(buyer, author, ALPH, price)
          |        transferTokenFromSelf!(buyer, selfTokenId!(), 1)
          |        destroySelf!(author)
          |    }
@@ -1774,7 +1774,7 @@ class VMSpec extends AlephiumSpec {
          |  @using(assetsInContract = true)
          |  pub fn foo(address: Address) -> () {
          |    x = x + 1
-         |    transferAlphFromSelf!(address, ${ALPH.cent(1).v})
+         |    transferTokenFromSelf!(address, ALPH, ${ALPH.cent(1).v})
          |  }
          |}
          |""".stripMargin
@@ -3161,7 +3161,7 @@ class VMSpec extends AlephiumSpec {
       s"""
          |TxScript Main {
          |  Foo(#${fooId.toHexString}).foo()
-         |  transferAlph!(callerAddress!(), @${fooAddress}, 1 alph)
+         |  transferToken!(callerAddress!(), @${fooAddress}, ALPH, 1 alph)
          |}
          |
          |$foo
@@ -3390,7 +3390,7 @@ class VMSpec extends AlephiumSpec {
 
     def createFooContract(transferAlph: Boolean): String = {
       val maybeTransfer = if (transferAlph) {
-        s"transferAlphFromSelf!(contractAddress, ${minimalAlphInContract.v})"
+        s"transferTokenFromSelf!(contractAddress, ALPH, ${minimalAlphInContract.v})"
       } else {
         ""
       }
@@ -3438,7 +3438,7 @@ class VMSpec extends AlephiumSpec {
         s"""
            |TxScript Main {
            |  let caller = callerAddress!()
-           |  transferAlph!(caller, @${randomContract}, 0.01 alph)
+           |  transferToken!(caller, @${randomContract}, ALPH, 0.01 alph)
            |}
            |""".stripMargin
       failCallTxScript(script, PayToContractAddressNotInCallerTrace)
@@ -3452,7 +3452,7 @@ class VMSpec extends AlephiumSpec {
            |Contract Foo() {
            |  @using(assetsInContract = true)
            |  pub fn foo() -> () {
-           |    transferAlphFromSelf!(@${randomContract}, 0.01 alph)
+           |    transferTokenFromSelf!(@${randomContract}, ALPH, 0.01 alph)
            |  }
            |}
            |""".stripMargin
@@ -3463,7 +3463,7 @@ class VMSpec extends AlephiumSpec {
         s"""
            |TxScript Main {
            |  let caller = callerAddress!()
-           |  transferAlph!(caller, @${fooAddress}, 0.01 alph)
+           |  transferToken!(caller, @${fooAddress}, ALPH, 0.01 alph)
            |  let foo = Foo(#${fooId.toHexString})
            |  foo.foo()
            |}
@@ -3480,7 +3480,7 @@ class VMSpec extends AlephiumSpec {
            |Contract Foo() {
            |  @using(assetsInContract = true)
            |  pub fn foo(to: Address) -> () {
-           |    transferAlphFromSelf!(to, 0.01 alph)
+           |    transferTokenFromSelf!(to, ALPH, 0.01 alph)
            |  }
            |}
            |""".stripMargin
@@ -3496,7 +3496,7 @@ class VMSpec extends AlephiumSpec {
            |      foo.foo(to)
            |    } else {
            |      let bar = Bar(nextBarId)
-           |      transferAlphFromSelf!(selfAddress!(), 0) // dirty hack
+           |      transferTokenFromSelf!(selfAddress!(), ALPH, 0) // dirty hack
            |      bar.bar(to)
            |    }
            |  }
@@ -3536,7 +3536,7 @@ class VMSpec extends AlephiumSpec {
          |
          |  @using(preapprovedAssets = true)
          |  pub fn bar() -> () {
-         |    transferAlphToSelf!(selfAddress!(), 0.1 alph)
+         |    transferTokenToSelf!(selfAddress!(), ALPH, 0.1 alph)
          |  }
          |}
          |""".stripMargin
@@ -3628,7 +3628,7 @@ class VMSpec extends AlephiumSpec {
          |Contract Foo() {
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn foo() -> () {
-         |    transferAlphToSelf!(callerAddress!(), 0.01 alph)
+         |    transferTokenToSelf!(callerAddress!(), ALPH, 0.01 alph)
          |  }
          |}
          |""".stripMargin
@@ -3688,7 +3688,7 @@ class VMSpec extends AlephiumSpec {
          |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn foo() -> () {
-         |    assert!(alphRemaining!(selfAddress!()) == 1 alph, 0)
+         |    assert!(tokenRemaining!(selfAddress!(), ALPH) == 1 alph, 0)
          |  }
          |}
          |""".stripMargin

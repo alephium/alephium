@@ -18,8 +18,7 @@ package org.alephium.ralph
 
 import scala.collection.mutable
 
-import org.alephium.util.AlephiumSpec
-import org.alephium.util.AVector
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class AstSpec extends AlephiumSpec {
 
@@ -336,13 +335,14 @@ class AstSpec extends AlephiumSpec {
         useApprovedAssets: Boolean,
         useContractAssets: Boolean
     ): String = {
+      // format: off
       s"""
          |Contract Foo(mut a: U256, b: Address) {
          |  @using(updateFields = $updateFields, preapprovedAssets = $useApprovedAssets, assetsInContract = $useContractAssets)
          |  pub fn foo() -> () {
          |    ${if (updateFields) "a = 0" else ""}
-         |    ${if (useApprovedAssets) "transferAlph!(callerAddress!(), b, 1)" else ""}
-         |    ${if (useContractAssets) "transferAlphFromSelf!(callerAddress!(), 1 alph)" else ""}
+         |    ${if (useApprovedAssets) "transferToken!(callerAddress!(), b, ALPH, 1)" else ""}
+         |    ${if (useContractAssets) "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)" else ""}
          |  }
          |}
          |
@@ -353,6 +353,7 @@ class AstSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
+      // format: on
     }
 
     val warnings0 = Compiler.compileContractFull(code(false, false, false), 1).rightValue.warnings

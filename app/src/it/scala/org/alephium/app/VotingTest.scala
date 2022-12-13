@@ -175,7 +175,7 @@ trait VotingFixture extends WalletFixture {
     val allocationTransfers = voters.zipWithIndex
       .map { case (_, i) =>
         s"""
-           |transferAlph!(admin, voters[$i], $dustAmount)
+           |transferToken!(admin, voters[$i], ALPH, $dustAmount)
            |transferTokenFromSelf!(voters[$i], selfTokenId!(), 1)""".stripMargin
       }
       .mkString("\n")
@@ -209,7 +209,7 @@ trait VotingFixture extends WalletFixture {
                             |  @using(preapprovedAssets = true, assetsInContract = true)
                             |  pub fn vote(choice: Bool, voter: Address) -> () {
                             |    assert!(initialized == true && isClosed == false, 0)
-                            |    transferAlph!(voter, admin, $dustAmount)
+                            |    transferToken!(voter, admin, ALPH, $dustAmount)
                             |    transferTokenToSelf!(voter, selfTokenId!(), 1)
                             |
                             |    emit VoteCasted(voter, choice)

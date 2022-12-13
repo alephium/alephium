@@ -934,7 +934,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |Contract Foo(mut value: U256) {
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn addOne() -> U256 {
-         |    transferAlphToSelf!(@$callerAddress, ${ALPH.oneNanoAlph})
+         |    transferTokenToSelf!(@$callerAddress, ALPH, ${ALPH.oneNanoAlph})
          |    value = value + 1
          |    let bar = Bar(#${barId.toHexString})
          |    bar.addOne()
@@ -1309,7 +1309,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn foo() -> () {
-         |    assert!(alphRemaining!(selfAddress!()) == 1 alph, 0)
+         |    assert!(tokenRemaining!(selfAddress!(), ALPH) == 1 alph, 0)
          |  }
          |}
          |""".stripMargin

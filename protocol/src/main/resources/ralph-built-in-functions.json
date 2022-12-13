@@ -262,17 +262,6 @@
     "returns": "@returns the id of the sub contract"
   },
   {
-    "name": "approveAlph",
-    "category": "Asset",
-    "signature": "fn approveAlph!(fromAddress:Address, amount:U256) -> ()",
-    "doc": "Approves the usage of certain amount of ALPH from the given address",
-    "params": [
-      "@param fromAddress the address to approve ALPH from",
-      "@param amount the amount of attoALPH to be approved"
-    ],
-    "returns": "@returns "
-  },
-  {
     "name": "approveToken",
     "category": "Asset",
     "signature": "fn approveToken!(fromAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
@@ -283,16 +272,6 @@
       "@param amount the amount of the token to be approved"
     ],
     "returns": "@returns "
-  },
-  {
-    "name": "alphRemaining",
-    "category": "Asset",
-    "signature": "fn alphRemaining!(address:Address) -> (U256)",
-    "doc": "Returns the amount of the remaining ALPH for an address.",
-    "params": [
-      "@param address the input address"
-    ],
-    "returns": "@returns the amount of the remaining ALPH for an address"
   },
   {
     "name": "tokenRemaining",
@@ -306,47 +285,13 @@
     "returns": "@returns the amount of the remaining token amount in the input assets of the function"
   },
   {
-    "name": "transferAlph",
-    "category": "Asset",
-    "signature": "fn transferAlph!(fromAddress:Address, toAddress:Address, amount:U256) -> ()",
-    "doc": "Transfers certain amount of ALPH from one address to another",
-    "params": [
-      "@param fromAddress the address to transfer ALPH from",
-      "@param toAddress the address to transfer ALPH to",
-      "@param amount the amount of attoALPH to be transferred"
-    ],
-    "returns": "@returns "
-  },
-  {
-    "name": "transferAlphFromSelf",
-    "category": "Asset",
-    "signature": "fn transferAlphFromSelf!(toAddress:Address, amount:U256) -> ()",
-    "doc": "Transfers the contract's ALPH from the input assets of the function.",
-    "params": [
-      "@param toAddress the address to transfer ALPH to",
-      "@param amount the amount of attoALPH to be transferred"
-    ],
-    "returns": "@returns "
-  },
-  {
-    "name": "transferAlphToSelf",
-    "category": "Asset",
-    "signature": "fn transferAlphToSelf!(fromAddress:Address, amount:U256) -> ()",
-    "doc": "Transfers ALPH to the contract from the input asset of the function.",
-    "params": [
-      "@param fromAddress the address to transfer ALPH from",
-      "@param amount the amount of attoALPH to be transferred"
-    ],
-    "returns": "@returns "
-  },
-  {
     "name": "transferToken",
     "category": "Asset",
     "signature": "fn transferToken!(fromAddress:Address, toAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
     "doc": "Transfers token from the input assets of the function.",
     "params": [
-      "@param fromAddress the address to transfer ALPH from",
-      "@param toAddress the address to transfer ALPH to",
+      "@param fromAddress the address to transfer token from",
+      "@param toAddress the address to transfer token to",
       "@param tokenId the token to be transferred",
       "@param amount the amount of token to be transferred"
     ],
@@ -358,7 +303,7 @@
     "signature": "fn transferTokenFromSelf!(toAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
     "doc": "Transfers the contract's token from the input assets of the function.",
     "params": [
-      "@param toAddress the address to transfer ALPH to",
+      "@param toAddress the address to transfer token to",
       "@param tokenId the token to be transferred",
       "@param amount the amount of token to be transferred"
     ],
@@ -370,7 +315,7 @@
     "signature": "fn transferTokenToSelf!(fromAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
     "doc": "Transfers token to the contract from the input assets of the function.",
     "params": [
-      "@param fromAddress the address to transfer ALPH from",
+      "@param fromAddress the address to transfer token from",
       "@param tokenId the token to be transferred",
       "@param amount the amount of token to be transferred"
     ],

@@ -581,7 +581,7 @@ object SwapContracts {
        |
        |  @using(preapprovedAssets = true, assetsInContract = true)
        |  pub fn addLiquidity(lp: Address, attoAlphAmount: U256, tokenAmount: U256) -> () {
-       |    transferAlphToSelf!(lp, attoAlphAmount)
+       |    transferTokenToSelf!(lp, ALPH, attoAlphAmount)
        |    transferTokenToSelf!(lp, tokenId, tokenAmount)
        |    alphReserve = attoAlphAmount
        |    tokenReserve = tokenAmount
@@ -590,7 +590,7 @@ object SwapContracts {
        |  @using(preapprovedAssets = true, assetsInContract = true)
        |  pub fn swapToken(buyer: Address, attoAlphAmount: U256) -> () {
        |    let tokenAmount = tokenReserve - alphReserve * tokenReserve / (alphReserve + attoAlphAmount)
-       |    transferAlphToSelf!(buyer, attoAlphAmount)
+       |    transferTokenToSelf!(buyer, ALPH, attoAlphAmount)
        |    transferTokenFromSelf!(buyer, tokenId, tokenAmount)
        |    alphReserve = alphReserve + attoAlphAmount
        |    tokenReserve = tokenReserve - tokenAmount
@@ -600,7 +600,7 @@ object SwapContracts {
        |  pub fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
        |    let attoAlphAmount = alphReserve - alphReserve * tokenReserve / (tokenReserve + tokenAmount)
        |    transferTokenToSelf!(buyer, tokenId, tokenAmount)
-       |    transferAlphFromSelf!(buyer, attoAlphAmount)
+       |    transferTokenFromSelf!(buyer, ALPH, attoAlphAmount)
        |    alphReserve = alphReserve - attoAlphAmount
        |    tokenReserve = tokenReserve + tokenAmount
        |  }

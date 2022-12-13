@@ -27,6 +27,7 @@ import org.alephium.util.AVector
 // scalastyle:off number.of.methods
 object BuiltIn {
   sealed trait BuiltIn[-Ctx <: StatelessContext] extends FuncInfo[Ctx] {
+    lazy val funcId: Ast.FuncId = Ast.FuncId(name, isBuiltIn = true)
     def name: String
     def category: Category
     def signature: String
@@ -870,20 +871,6 @@ object BuiltIn {
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap
 
-  val approveAlph: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn.asset(
-      "approveAlph",
-      Seq[Type](Type.Address, Type.U256),
-      Seq.empty,
-      ApproveAlph,
-      argsName = Seq(
-        "fromAddress" -> "the address to approve ALPH from",
-        "amount"      -> "the amount of attoALPH to be approved"
-      ),
-      retComment = "",
-      doc = "Approves the usage of certain amount of ALPH from the given address"
-    )
-
   val approveToken: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.asset(
       "approveToken",
@@ -899,16 +886,6 @@ object BuiltIn {
       doc = "Approves the usage of certain amount of token from the given address"
     )
 
-  val alphRemaining: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn.assetSimple(
-      "alphRemaining",
-      Seq(Type.Address),
-      Seq(Type.U256),
-      AlphRemaining,
-      argsName = Seq("address" -> "the input address"),
-      retComment = "the amount of the remaining ALPH for an address"
-    )
-
   val tokenRemaining: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.assetSimple(
       "tokenRemaining",
@@ -919,51 +896,6 @@ object BuiltIn {
       retComment = "the amount of the remaining token amount in the input assets of the function"
     )
 
-  val transferAlph: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn.asset(
-      "transferAlph",
-      Seq[Type](Type.Address, Type.Address, Type.U256),
-      Seq.empty,
-      TransferAlph,
-      argsName = Seq(
-        "fromAddress" -> "the address to transfer ALPH from",
-        "toAddress"   -> "the address to transfer ALPH to",
-        "amount"      -> "the amount of attoALPH to be transferred"
-      ),
-      retComment = "",
-      doc = "Transfers certain amount of ALPH from one address to another"
-    )
-
-  val transferAlphFromSelf: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn.asset(
-      "transferAlphFromSelf",
-      Seq[Type](Type.Address, Type.U256),
-      Seq.empty,
-      TransferAlphFromSelf,
-      useAssetsInContract = true,
-      argsName = Seq(
-        "toAddress" -> "the address to transfer ALPH to",
-        "amount"    -> "the amount of attoALPH to be transferred"
-      ),
-      retComment = "",
-      doc = "Transfers the contract's ALPH from the input assets of the function."
-    )
-
-  val transferAlphToSelf: SimpleBuiltIn[StatefulContext] =
-    SimpleBuiltIn.asset(
-      "transferAlphToSelf",
-      Seq[Type](Type.Address, Type.U256),
-      Seq.empty,
-      TransferAlphToSelf,
-      useAssetsInContract = true,
-      argsName = Seq(
-        "fromAddress" -> "the address to transfer ALPH from",
-        "amount"      -> "the amount of attoALPH to be transferred"
-      ),
-      retComment = "",
-      doc = "Transfers ALPH to the contract from the input asset of the function."
-    )
-
   val transferToken: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.asset(
       "transferToken",
@@ -971,8 +903,8 @@ object BuiltIn {
       Seq.empty,
       TransferToken,
       argsName = Seq(
-        "fromAddress" -> "the address to transfer ALPH from",
-        "toAddress"   -> "the address to transfer ALPH to",
+        "fromAddress" -> "the address to transfer token from",
+        "toAddress"   -> "the address to transfer token to",
         "tokenId"     -> "the token to be transferred",
         "amount"      -> "the amount of token to be transferred"
       ),
@@ -988,7 +920,7 @@ object BuiltIn {
       TransferTokenFromSelf,
       useAssetsInContract = true,
       argsName = Seq(
-        "toAddress" -> "the address to transfer ALPH to",
+        "toAddress" -> "the address to transfer token to",
         "tokenId"   -> "the token to be transferred",
         "amount"    -> "the amount of token to be transferred"
       ),
@@ -1004,7 +936,7 @@ object BuiltIn {
       TransferTokenToSelf,
       useAssetsInContract = true,
       argsName = Seq(
-        "fromAddress" -> "the address to transfer ALPH from",
+        "fromAddress" -> "the address to transfer token from",
         "tokenId"     -> "the token to be transferred",
         "amount"      -> "the amount of token to be transferred"
       ),
@@ -1457,13 +1389,8 @@ object BuiltIn {
 
   val statefulFuncsSeq: Seq[(String, BuiltIn[StatefulContext])] =
     statelessFuncsSeq ++ Seq(
-      approveAlph,
       approveToken,
-      alphRemaining,
       tokenRemaining,
-      transferAlph,
-      transferAlphFromSelf,
-      transferAlphToSelf,
       transferToken,
       transferTokenFromSelf,
       transferTokenToSelf,

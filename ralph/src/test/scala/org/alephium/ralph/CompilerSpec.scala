@@ -2262,10 +2262,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     Compiler.compileContract(code()).isRight is true
     Compiler
-      .compileContract(code(true, "transferAlphFromSelf!(callerAddress!(), 1 alph)"))
+      .compileContract(code(true, "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
       .isRight is true
     Compiler
-      .compileContract(code(false, "transferAlphFromSelf!(callerAddress!(), 1 alph)"))
+      .compileContract(code(false, "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
       .isRight is true
     Compiler
       .compileContract(code(true))
@@ -3141,7 +3141,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    let _ = selfContractId!()
-           |    transferAlphToSelf!(callerAddress!(), 1 alph)
+           |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
            |  }
            |}
            |""".stripMargin
@@ -3226,7 +3226,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  @using(updateFields = false, preapprovedAssets = true)
            |  pub fn foo(tokenId: ByteVec) -> () {
            |    assert!(tokenRemaining!(callerAddress!(), tokenId) == 1, 0)
-           |    assert!(alphRemaining!(callerAddress!()) == 1, 0)
+           |    assert!(tokenRemaining!(callerAddress!(), ALPH) == 1, 0)
            |  }
            |}
            |""".stripMargin
@@ -3351,5 +3351,51 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     scripts.length is 2
     scripts(0).ast.ident.name is "M1"
     scripts(1).ast.ident.name is "M2"
+  }
+
+  it should "use alph instructions in code generation" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn foo(from: Address, to: Address) -> () {
+         |    approveToken!(from, ALPH, 1 alph)
+         |    tokenRemaining!(from, ALPH)
+         |    transferToken!(from, to, ALPH, 1 alph)
+         |    transferTokenToSelf!(from, ALPH, 1 alph)
+         |    transferTokenFromSelf!(to, ALPH, 1 alph)
+         |  }
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn bar(from: Address, to: Address, tokenId: ByteVec) -> () {
+         |    approveToken!(from, tokenId, 1)
+         |    tokenRemaining!(from, tokenId)
+         |    transferToken!(from, to, tokenId, 1)
+         |    transferTokenToSelf!(from, tokenId, 1)
+         |    transferTokenFromSelf!(to, tokenId, 1)
+         |  }
+         |}
+         |""".stripMargin
+    val tokenInstrs = Seq(
+      ApproveToken,
+      TokenRemaining,
+      TransferToken,
+      TransferTokenToSelf,
+      TransferTokenFromSelf
+    )
+    val alphInstrs = Seq(
+      ApproveAlph,
+      AlphRemaining,
+      TransferAlph,
+      TransferAlphToSelf,
+      TransferAlphFromSelf
+    )
+    val method0 = Compiler.compileContract(code).rightValue.methods(0)
+    tokenInstrs.foreach(instr => method0.instrs.contains(instr) is false)
+    alphInstrs.foreach(instr => method0.instrs.contains(instr) is true)
+
+    val method1 = Compiler.compileContract(code).rightValue.methods(1)
+    tokenInstrs.foreach(instr => method1.instrs.contains(instr) is true)
+    alphInstrs.foreach(instr => method1.instrs.contains(instr) is false)
   }
 }
