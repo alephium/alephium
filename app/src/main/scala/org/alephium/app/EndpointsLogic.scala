@@ -364,6 +364,10 @@ trait EndpointsLogic extends Endpoints {
     bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
   )
 
+  val buildMultisigDeployContractTxLogic = serverLogic(buildMultisigDeployContractTx) { query =>
+    Future.successful(serverUtils.buildMultisigDeployContractTx(blockFlow, query))
+  }
+
   val buildSweepAddressTransactionsLogic = serverLogicRedirect(buildSweepAddressTransactions)(
     buildSweepAddressTransactions =>
       withSyncedClique {

@@ -7819,6 +7819,147 @@
         }
       }
     },
+    "/multisig/unsigned-tx/deploy-contract": {
+      "post": {
+        "tags": [
+          "Multi-signature"
+        ],
+        "summary": "Build a multisig unsigned contract",
+        "operationId": "postMultisigUnsigned-txDeploy-contract",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildMultisigDeployContractTx"
+              },
+              "examples": {
+                "Example0": {
+                  "summary": "Default",
+                  "value": {
+                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                    "fromPublicKeys": [
+                      "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                    ],
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc"
+                  }
+                },
+                "Example1": {
+                  "summary": "More settings",
+                  "value": {
+                    "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                    "fromPublicKeys": [
+                      "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                    ],
+                    "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
+                    "initialAttoAlphAmount": "2000000000000000000",
+                    "initialTokenAmounts": [
+                      {
+                        "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                        "amount": "42000000000000000000"
+                      },
+                      {
+                        "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                        "amount": "1000000000000000000000"
+                      }
+                    ],
+                    "issueTokenAmount": "2000000000000000000",
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildDeployContractTxResult"
+                },
+                "example": {
+                  "fromGroup": 2,
+                  "toGroup": 2,
+                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                  "gasAmount": 20000,
+                  "gasPrice": "100000000000",
+                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                  "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/multisig/submit": {
       "post": {
         "tags": [
@@ -9716,6 +9857,57 @@
           "address": {
             "type": "string",
             "format": "address"
+          }
+        }
+      },
+      "BuildMultisigDeployContractTx": {
+        "required": [
+          "fromAddress",
+          "fromPublicKeys",
+          "bytecode"
+        ],
+        "type": "object",
+        "properties": {
+          "fromAddress": {
+            "type": "string",
+            "format": "address"
+          },
+          "fromPublicKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "public-key"
+            }
+          },
+          "bytecode": {
+            "type": "string",
+            "format": "hex-string"
+          },
+          "initialAttoAlphAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "initialTokenAmounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Token"
+            }
+          },
+          "issueTokenAmount": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "targetBlockHash": {
+            "type": "string",
+            "format": "block-hash"
           }
         }
       },

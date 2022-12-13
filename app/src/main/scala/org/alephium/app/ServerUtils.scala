@@ -224,6 +224,38 @@ class ServerUtils(implicit
     }
   }
 
+  def buildMultisigDeployContractTx(
+      blockFlow: BlockFlow,
+      query: BuildMultisigDeployContractTx
+  ): Try[BuildDeployContractTxResult] = {
+    for {
+      initialAttoAlphAmount <- getInitialAttoAlphAmount(query.initialAttoAlphAmount)
+      code                  <- BuildDeployContractTx.decode(query.bytecode)
+      _                     <- checkGroup(query.fromAddress.lockupScript)
+      script <- buildDeployContractTxWithParsedState(
+        code.contract,
+        query.fromAddress,
+        code.initialFields,
+        initialAttoAlphAmount,
+        query.initialTokenAmounts.getOrElse(AVector.empty),
+        query.issueTokenAmount.map(_.value)
+      )
+      unlockScript <- buildUnlockScript(query.fromAddress.lockupScript, query.fromPublicKeys)
+      utx <- unsignedTxFromScript(
+        blockFlow,
+        script,
+        query.fromAddress.lockupScript,
+        unlockScript,
+        initialAttoAlphAmount,
+        AVector.empty,
+        query.gasAmount,
+        query.gasPrice
+      )
+    } yield {
+      BuildDeployContractTxResult.from(utx)
+    }
+  }
+
   private def buildUnlockScript(
       lockupScript: LockupScript,
       pubKeys: AVector[PublicKey]
@@ -736,7 +768,7 @@ class ServerUtils(implicit
     }
   }
 
-  private def unsignedTxFromScript(
+  private def unsignedTxFromScriptWithPublickey(
       blockFlow: BlockFlow,
       script: StatefulScript,
       amount: U256,
@@ -747,7 +779,29 @@ class ServerUtils(implicit
   ): Try[UnsignedTransaction] = {
     val lockupScript = LockupScript.p2pkh(fromPublicKey)
     val unlockScript = UnlockScript.p2pkh(fromPublicKey)
-    val utxosLimit   = apiConfig.defaultUtxosLimit
+    unsignedTxFromScript(
+      blockFlow,
+      script,
+      lockupScript,
+      unlockScript,
+      amount,
+      tokens,
+      gas,
+      gasPrice
+    )
+  }
+
+  private def unsignedTxFromScript(
+      blockFlow: BlockFlow,
+      script: StatefulScript,
+      lockupScript: LockupScript.Asset,
+      unlockScript: UnlockScript,
+      amount: U256,
+      tokens: AVector[(TokenId, U256)],
+      gas: Option[GasBox],
+      gasPrice: Option[GasPrice]
+  ): Try[UnsignedTransaction] = {
+    val utxosLimit = apiConfig.defaultUtxosLimit
     for {
       allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
       allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
@@ -792,7 +846,7 @@ class ServerUtils(implicit
         query.initialTokenAmounts.getOrElse(AVector.empty),
         query.issueTokenAmount.map(_.value)
       )
-      utx <- unsignedTxFromScript(
+      utx <- unsignedTxFromScriptWithPublickey(
         blockFlow,
         script,
         initialAttoAlphAmount,
@@ -846,7 +900,7 @@ class ServerUtils(implicit
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
-      utx <- unsignedTxFromScript(
+      utx <- unsignedTxFromScriptWithPublickey(
         blockFlow,
         script,
         attoAlphAmount,

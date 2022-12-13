@@ -38,7 +38,7 @@ import org.alephium.serde._
 import org.alephium.util._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-// scalastyle:off magic.number
+// scalastyle:off magic.number file.size.limit
 trait EndpointsExamples extends ErrorExamples {
 
   private val networkId = NetworkId.AlephiumMainNet
@@ -471,6 +471,29 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       BuildMultisigAddressResult(
         address
+      )
+    )
+
+  implicit val buildMultiDeployContractTxExamples: List[Example[BuildMultisigDeployContractTx]] =
+    List(
+      defaultExample(
+        BuildMultisigDeployContractTx(
+          address,
+          AVector(publicKey),
+          bytecode = byteString
+        )
+      ),
+      moreSettingsExample(
+        BuildMultisigDeployContractTx(
+          address,
+          AVector(publicKey),
+          bytecode = byteString,
+          Some(bigAmount),
+          Some(tokens),
+          Some(bigAmount),
+          Some(model.minimalGas),
+          Some(model.defaultGasPrice)
+        )
       )
     )
 
