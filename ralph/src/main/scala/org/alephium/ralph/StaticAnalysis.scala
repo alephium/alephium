@@ -100,41 +100,14 @@ object StaticAnalysis {
       case _: vm.StoreField | _: vm.StoreFieldByIndex.type | _: vm.MigrateWithFields.type => true
       case _                                                                              => false
     }
-    val internalCalls             = state.internalCalls.getOrElse(func.id, mutable.Set.empty)
-    val internalUpdateFieldsCalls = internalCalls.filter(state.getFunc(_).useUpdateFields)
-    val externalCalls             = state.externalCalls.getOrElse(func.id, mutable.Set.empty)
-    val externalUpdateFieldsCalls = externalCalls.filter { case (typeId, funcId) =>
-      state.getFunc(typeId, funcId).useUpdateFields
+
+    if (updateFields && !func.useUpdateFields) {
+      throw Compiler.Error(
+        s"Function ${funcName(state.typeId, func.id)} changes state, please use @using(updateFields = true) for the function"
+      )
     }
 
-    val isUpdateFields =
-      updateFields || internalUpdateFieldsCalls.nonEmpty || externalUpdateFieldsCalls.nonEmpty
-    if (isUpdateFields && !func.useUpdateFields) {
-      if (updateFields) {
-        throw Compiler.Error(
-          s"Function ${funcName(state.typeId, func.id)} changes state, but has `updateFields = false`"
-        )
-      }
-      if (internalUpdateFieldsCalls.nonEmpty) {
-        throw Compiler.Error(
-          s"Function ${funcName(state.typeId, func.id)} has internal update fields calls: ${quote(
-              internalUpdateFieldsCalls.map(_.name).mkString(", ")
-            )}"
-        )
-      }
-      if (externalUpdateFieldsCalls.nonEmpty) {
-        val msg = externalUpdateFieldsCalls
-          .map { case (typeId, funcId) =>
-            s"${typeId.name}.${funcId.name}"
-          }
-          .mkString(", ")
-        throw Compiler.Error(
-          s"Function ${funcName(state.typeId, func.id)} has external update fields calls: ${quote(msg)}"
-        )
-      }
-    }
-
-    if (!isUpdateFields && func.useUpdateFields) {
+    if (!updateFields && func.useUpdateFields) {
       state.warnUpdateFieldsCheck(state.typeId, func.id)
     }
   }
@@ -151,12 +124,7 @@ object StaticAnalysis {
         case Some(callees) if callees.nonEmpty =>
           callees.foreach { case funcRef @ (typeId, funcId) =>
             if (!externalCallCheckTables(typeId)(funcId)) {
-              val callee = contractState.getFunc(typeId, funcId)
-              if (
-                callee.useUpdateFields || callee.usePreapprovedAssets || callee.useAssetsInContract
-              ) {
-                allNoExternalCallChecks.addOne(funcRef)
-              }
+              allNoExternalCallChecks.addOne(funcRef)
             }
           }
         case _ => ()

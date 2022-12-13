@@ -921,6 +921,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val barCode =
       s"""
          |Contract Bar(mut value: U256) {
+         |  @using(updateFields = true)
          |  pub fn addOne() -> () {
          |    value = value + 1
          |  }
@@ -932,7 +933,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooCode =
       s"""
          |Contract Foo(mut value: U256) {
-         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
          |  pub fn addOne() -> U256 {
          |    transferAlphToSelf!(@$callerAddress, ${ALPH.oneNanoAlph})
          |    value = value + 1
@@ -1666,6 +1667,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contract =
       s"""
          |Contract ArrayTest(mut array: [U256; 2]) {
+         |  @using(updateFields = true)
          |  ${isPublic} fn swap(input: [U256; 2]) -> ([U256; 2]) {
          |    array[0] = input[1]
          |    array[1] = input[0]
@@ -1748,8 +1750,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
     result.warnings is AVector(
       "Found unused variables in Foo: foo.a",
-      "Found unused fields in Foo: x",
-      "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
+      "Found unused fields in Foo: x"
     )
 
     info("Turn off warnings")

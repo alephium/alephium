@@ -64,7 +64,7 @@ trait Warnings {
 
   def warnUpdateFieldsCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
     if (!compilerOptions.ignoreUpdateFieldsCheckWarnings) {
-      warnings += s"Function ${typeId.name}.${funcId.name} does not update fields, please use @using(updateFields = false) for the function"
+      warnings += s"Function ${typeId.name}.${funcId.name} does not update fields, please remove @using(updateFields = true) for the function"
     }
   }
 
