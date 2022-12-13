@@ -1968,7 +1968,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val initBalanceState0 =
       MutBalanceState.from(
-        balances(lockupScript, None, Map(tokenId -> ALPH.oneAlph, TokenId.zero -> ALPH.oneAlph))
+        balances(lockupScript, None, Map(tokenId -> ALPH.oneAlph, TokenId.alph -> ALPH.oneAlph))
       )
     val genesisFrame = prepareFrame(Some(initBalanceState0))(NetworkConfigFixture.PreLeman)
     test(
@@ -1980,7 +1980,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         balances(
           lockupScript,
           None,
-          Map(tokenId -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph), TokenId.zero -> ALPH.oneAlph)
+          Map(tokenId -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph), TokenId.alph -> ALPH.oneAlph)
         ),
         tokenBalance(lockupScript, tokenId, ALPH.oneNanoAlph)
       )
@@ -1988,7 +1988,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(
       genesisFrame,
       initBalanceState0,
-      TokenId.zero,
+      TokenId.alph,
       ALPH.oneNanoAlph,
       MutBalanceState(
         balances(
@@ -1996,13 +1996,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           None,
           Map(
             tokenId      -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph),
-            TokenId.zero -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)
+            TokenId.alph -> ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)
           )
         ),
         balances(
           lockupScript,
           None,
-          Map(tokenId -> ALPH.oneNanoAlph, TokenId.zero -> ALPH.oneNanoAlph)
+          Map(tokenId -> ALPH.oneNanoAlph, TokenId.alph -> ALPH.oneNanoAlph)
         )
       )
     )
@@ -2027,7 +2027,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(
       lemanFrame,
       initBalanceState1,
-      TokenId.zero,
+      TokenId.alph,
       ALPH.oneNanoAlph,
       MutBalanceState(
         balances(
@@ -2070,17 +2070,23 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val balanceState0 =
       MutBalanceState.from(
-        balances(lockupScript, None, Map(tokenId -> ALPH.oneAlph, TokenId.zero -> ALPH.oneAlph))
+        balances(lockupScript, None, Map(tokenId -> ALPH.oneAlph, TokenId.alph -> ALPH.oneAlph))
       )
     val genesisFrame = prepareFrame(Some(balanceState0))(NetworkConfigFixture.PreLeman)
     test(genesisFrame, tokenId, ALPH.oneAlph)
-    test(genesisFrame, TokenId.zero, ALPH.oneAlph)
+    test(genesisFrame, TokenId.alph, ALPH.oneAlph)
 
     val balanceState1 =
-      MutBalanceState.from(balances(lockupScript, Some(ALPH.oneAlph), Map(tokenId -> ALPH.oneAlph)))
+      MutBalanceState.from(
+        balances(
+          lockupScript,
+          Some(ALPH.oneAlph),
+          Map(tokenId -> ALPH.oneAlph, TokenId.alph -> ALPH.oneNanoAlph)
+        )
+      )
     val lemanFrame = prepareFrame(Some(balanceState1))(NetworkConfigFixture.Leman)
     test(lemanFrame, tokenId, ALPH.oneAlph)
-    test(lemanFrame, TokenId.zero, ALPH.oneAlph)
+    test(lemanFrame, TokenId.alph, ALPH.oneAlph)
   }
 
   it should "IsPaying" in new StatefulFixture {
@@ -2164,7 +2170,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     BurnToken.runWith(frame).leftValue isE NotEnoughBalance
 
     stack.push(Val.Address(from))
-    stack.push(Val.ByteVec(TokenId.zero.bytes))
+    stack.push(Val.ByteVec(TokenId.alph.bytes))
     stack.push(Val.U256(ALPH.alph(2)))
 
     BurnToken.runWith(frame).leftValue isE InvalidTokenId
@@ -2326,13 +2332,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       )
       test(genesisFrame0, tokenId, ALPH.oneNanoAlph, outputBalances0)
 
-      val balanceState1 = createBalanceState(TokenId.zero, from, ALPH.oneAlph)
+      val balanceState1 = createBalanceState(TokenId.alph, from, ALPH.oneAlph)
       val genesisFrame1 =
         prepareFrame(Some(balanceState1), contractOutputOpt)(NetworkConfigFixture.PreLeman)
       val outputBalances1 = MutBalances(
-        ArrayBuffer((to, MutBalancesPerLockup.token(TokenId.zero, ALPH.oneNanoAlph)))
+        ArrayBuffer((to, MutBalancesPerLockup.token(TokenId.alph, ALPH.oneNanoAlph)))
       )
-      test(genesisFrame1, TokenId.zero, ALPH.oneNanoAlph, outputBalances1)
+      test(genesisFrame1, TokenId.alph, ALPH.oneNanoAlph, outputBalances1)
 
       val balanceState2 = createBalanceState(tokenId, from, ALPH.oneAlph)
       val genesisFrame2 =
@@ -2348,7 +2354,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val outputBalances3 = MutBalances(
         ArrayBuffer((to, MutBalancesPerLockup.alph(ALPH.oneNanoAlph)))
       )
-      test(genesisFrame3, TokenId.zero, ALPH.oneNanoAlph, outputBalances3)
+      test(genesisFrame3, TokenId.alph, ALPH.oneNanoAlph, outputBalances3)
     }
   }
 
@@ -3221,7 +3227,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.size is 0
     runAndCheckGas(ALPHTokenId)
     stack.size is 1
-    stack.top.get is Val.ByteVec(TokenId.zero.bytes)
+    stack.top.get is Val.ByteVec(TokenId.alph.bytes)
   }
 
   it should "SelfAddress" in new ContractInstrFixture {

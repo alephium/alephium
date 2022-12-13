@@ -2010,7 +2010,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       PublicKey.generate,
       ByteString.empty,
       Some(Amount(U256.Billion)),
-      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.zero, U256.Billion)))
+      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.alph, U256.Billion)))
     )
     query3.getAmounts.rightValue is (U256.Billion.mulUnsafe(U256.Two), AVector(
       tokenId -> U256.Billion
@@ -2020,7 +2020,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       PublicKey.generate,
       ByteString.empty,
       Some(Amount(U256.MaxValue)),
-      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.zero, U256.Billion)))
+      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.alph, U256.Billion)))
     )
     query4.getAmounts.leftValue is "ALPH amount overflow"
   }

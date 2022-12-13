@@ -40,7 +40,7 @@ final case class BuildExecuteScriptTx(
       case Some(tokens) =>
         tokens.foldE((alphAmount, AVector.empty[(TokenId, U256)])) {
           case ((alph, tokenList), token) =>
-            if (token.id == TokenId.zero) {
+            if (token.id == TokenId.alph) {
               alph.add(token.amount).map(a => (a, tokenList)).toRight("ALPH amount overflow")
             } else {
               Right((alph, tokenList :+ (token.id, token.amount)))

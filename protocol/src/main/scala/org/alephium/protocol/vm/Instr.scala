@@ -1241,7 +1241,7 @@ object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
       fromAddress  <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
       _ <-
-        if (tokenId == TokenId.zero) {
+        if (tokenId == TokenId.alph) {
           Left(Right(InvalidTokenId))
         } else {
           balanceState
@@ -1309,7 +1309,7 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
       _ <-
-        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.zero) {
+        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
           balanceState.approveALPH(address.lockupScript, amount.v).toRight(Right(NotEnoughBalance))
         } else {
           balanceState
@@ -1341,7 +1341,7 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       balanceState <- frame.getBalanceState()
       amount <-
-        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.zero) {
+        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
           balanceState
             .alphRemaining(address.lockupScript)
             .toRight(Right(NoAlphBalanceForTheAddress))
@@ -1441,7 +1441,7 @@ sealed trait Transfer extends AssetInstr {
       to         <- toThunk
       from       <- fromThunk
       _ <-
-        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.zero) {
+        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
           transferAlph(frame, from, to, amount)
         } else {
           transferToken(frame, tokenId, from, to, amount)
@@ -1858,7 +1858,7 @@ object ALPHTokenId
     with StatefulInstrCompanion0
     with GasBase {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.pushOpStack(Val.ByteVec(TokenId.zero.bytes))
+    frame.pushOpStack(Val.ByteVec(TokenId.alph.bytes))
   }
 }
 
