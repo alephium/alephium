@@ -365,15 +365,15 @@ class VMSpec extends AlephiumSpec {
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn foo(sender: Address) -> () {
          |    let senderAlph = alphRemaining!(sender)
-         |    assert!(tokenRemaining!(sender, alphTokenId!()) == senderAlph, 0)
+         |    assert!(tokenRemaining!(sender, ALPH) == senderAlph, 0)
          |    let contractAlph = alphRemaining!(selfAddress!())
-         |    assert!(tokenRemaining!(selfAddress!(), alphTokenId!()) == contractAlph, 0)
+         |    assert!(tokenRemaining!(selfAddress!(), ALPH) == contractAlph, 0)
          |
-         |    transferTokenToSelf!(sender, alphTokenId!(), 1 alph)
+         |    transferTokenToSelf!(sender, ALPH, 1 alph)
          |    assert!(alphRemaining!(sender) == senderAlph - 1 alph, 0)
-         |    transferTokenFromSelf!(sender, alphTokenId!(), 1 alph)
+         |    transferTokenFromSelf!(sender, ALPH, 1 alph)
          |    assert!(alphRemaining!(selfAddress!()) == contractAlph - 1 alph, 0)
-         |    transferToken!(sender, selfAddress!(), alphTokenId!(), 1 alph)
+         |    transferToken!(sender, selfAddress!(), ALPH, 1 alph)
          |    assert!(alphRemaining!(sender) == senderAlph - 2 alph, 0)
          |  }
          |}
@@ -383,7 +383,7 @@ class VMSpec extends AlephiumSpec {
     val script =
       s"""
          |TxScript Main {
-         |  Foo(#${fooId.toHexString}).foo{@$genesisAddress -> alphTokenId!(): 3 alph}(@$genesisAddress)
+         |  Foo(#${fooId.toHexString}).foo{@$genesisAddress -> ALPH: 3 alph}(@$genesisAddress)
          |}
          |$foo
          |""".stripMargin
@@ -843,8 +843,8 @@ class VMSpec extends AlephiumSpec {
          |  assert!(nullContractAddress!() == @${Address.contract(ContractId.zero)}, 0)
          |  assert!(nullContractAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, 0)
          |  assert!(blockHash!() != #${Hash.zero.toHexString}, 0)
-         |  assert!(alphTokenId!() == zeros!(32), 0)
-         |  assert!(alphTokenId!() == #0000000000000000000000000000000000000000000000000000000000000000, 0)
+         |  assert!(ALPH == zeros!(32), 0)
+         |  assert!(ALPH == #0000000000000000000000000000000000000000000000000000000000000000, 0)
          |}
          |""".stripMargin
 

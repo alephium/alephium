@@ -140,6 +140,9 @@ class ParserSpec extends AlephiumSpec {
         Seq(Ast.NamedVar(false, Ident("bytes"))),
         Const(Val.ByteVec(ByteString.empty))
       )
+    fastparse.parse("ALPH", StatefulParser.expr(_)).get.value is Const[StatefulContext](
+      Lexer.ALPHTokenId
+    )
   }
 
   it should "parse return" in {

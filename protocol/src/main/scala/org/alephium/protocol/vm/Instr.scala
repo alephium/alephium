@@ -168,7 +168,7 @@ object Instr {
     CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
     LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
     CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
-    NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId
+    NullContractAddress, SubContractId, SubContractIdOf
   )
   // format: on
 
@@ -1850,15 +1850,6 @@ object SubContractId extends SubContractIdBase {
 object SubContractIdOf extends SubContractIdBase {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     runWithLeman(frame, isParentContractSelf = false)
-  }
-}
-
-object ALPHTokenId
-    extends LemanInstrWithSimpleGas[StatefulContext]
-    with StatefulInstrCompanion0
-    with GasBase {
-  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.pushOpStack(Val.ByteVec(TokenId.alph.bytes))
   }
 }
 

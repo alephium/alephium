@@ -33,7 +33,9 @@ import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
 abstract class Parser[Ctx <: StatelessContext] {
   implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] => Lexer.emptyChars(ctx) }
 
-  def value[Unknown: P]: P[Val] = P(Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address)
+  def value[Unknown: P]: P[Val] = P(
+    Lexer.typedNum | Lexer.bool | Lexer.bytes | Lexer.address | Lexer.alphTokenId
+  )
   def const[Unknown: P]: P[Ast.Const[Ctx]] = value.map(Ast.Const.apply[Ctx])
   def createArray1[Unknown: P]: P[Ast.CreateArrayExpr[Ctx]] =
     P("[" ~ expr.rep(1, ",") ~ "]").map(Ast.CreateArrayExpr.apply)

@@ -24,7 +24,7 @@ import fastparse._
 import fastparse.NoWhitespace._
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.Address
+import org.alephium.protocol.model.{Address, TokenId}
 import org.alephium.protocol.vm.{LockupScript, StatelessContext, Val}
 import org.alephium.protocol.vm.Val.ByteVec
 import org.alephium.ralph.ArithOperator._
@@ -34,6 +34,8 @@ import org.alephium.util._
 
 // scalastyle:off number.of.methods
 object Lexer {
+  private[ralph] val ALPHTokenId = Val.ByteVec(TokenId.alph.bytes)
+
   def lowercase[Unknown: P]: P[Unit] = P(CharIn("a-z"))
   def uppercase[Unknown: P]: P[Unit] = P(CharIn("A-Z"))
   def digit[Unknown: P]: P[Unit]     = P(CharIn("0-9"))
@@ -68,6 +70,8 @@ object Lexer {
 
   def lineComment[Unknown: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
   def emptyChars[Unknown: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
+
+  def alphTokenId[Unknown: P]: P[Val.ByteVec] = P("ALPH").map(_ => ALPHTokenId)
 
   def hexNum[Unknown: P]: P[BigInteger] = P("0x") ~ hex.!.map(new BigInteger(_, 16))
   def decNum[Unknown: P]: P[BigInteger] = P(
@@ -219,7 +223,8 @@ object Lexer {
     "alph",
     "const",
     "enum",
-    "Abstract"
+    "Abstract",
+    "ALPH"
   )
 
   val primTpes: Map[String, Type] =
