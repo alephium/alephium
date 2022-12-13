@@ -781,15 +781,16 @@ class ServerUtils(implicit
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
     for {
-      initialAttoAlphAmount <- getInitialAttoAlphAmount(query.initialAttoAlphAmount)
-      code                  <- BuildDeployContractTx.decode(query.bytecode)
+      initialAttoAlphAmountOpt <- query.getInitialAttoAlphAmount.left.map(badRequest)
+      initialAttoAlphAmount    <- getInitialAttoAlphAmount(initialAttoAlphAmountOpt)
+      code                     <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildDeployContractTxWithParsedState(
         code.contract,
         address,
         code.initialFields,
         initialAttoAlphAmount,
-        query.initialTokenAmounts.getOrElse(AVector.empty),
+        query.getInitialTokenAmounts,
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
@@ -804,10 +805,10 @@ class ServerUtils(implicit
     } yield BuildDeployContractTxResult.from(utx)
   }
 
-  def getInitialAttoAlphAmount(amountOption: Option[Amount]): Try[U256] = {
+  def getInitialAttoAlphAmount(amountOption: Option[U256]): Try[U256] = {
     amountOption match {
       case Some(amount) =>
-        if (amount.value >= minimalAlphInContract) { Right(amount.value) }
+        if (amount >= minimalAlphInContract) { Right(amount) }
         else {
           val error =
             s"Expect ${Amount.toAlphString(minimalAlphInContract)} deposit to deploy a new contract"

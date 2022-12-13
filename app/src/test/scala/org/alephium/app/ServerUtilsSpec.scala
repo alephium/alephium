@@ -828,10 +828,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils = new ServerUtils
     serverUtils.getInitialAttoAlphAmount(None) isE minimalAlphInContract
     serverUtils.getInitialAttoAlphAmount(
-      Some(Amount(minimalAlphInContract))
+      Some(minimalAlphInContract)
     ) isE minimalAlphInContract
     serverUtils
-      .getInitialAttoAlphAmount(Some(Amount(minimalAlphInContract - 1)))
+      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1))
       .leftValue
       .detail is "Expect 1 ALPH deposit to deploy a new contract"
   }
@@ -1990,16 +1990,18 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "get alph and token amounts" in {
-    val query0 = BuildExecuteScriptTx(PublicKey.generate, ByteString.empty, None, None)
+    val publicKey = PublicKey.generate
+
+    val query0 = BuildExecuteScriptTx(publicKey, ByteString.empty, None, None)
     query0.getAmounts.rightValue is (U256.Zero, AVector.empty[(TokenId, U256)])
 
     val query1 =
-      BuildExecuteScriptTx(PublicKey.generate, ByteString.empty, Some(Amount(U256.Billion)), None)
+      BuildExecuteScriptTx(publicKey, ByteString.empty, Some(Amount(U256.Billion)), None)
     query1.getAmounts.rightValue is (U256.Billion, AVector.empty[(TokenId, U256)])
 
     val tokenId = TokenId.generate
     val query2 = BuildExecuteScriptTx(
-      PublicKey.generate,
+      publicKey,
       ByteString.empty,
       Some(Amount(U256.Billion)),
       Some(AVector(Token(tokenId, U256.Billion)))
@@ -2007,7 +2009,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     query2.getAmounts.rightValue is (U256.Billion, AVector(tokenId -> U256.Billion))
 
     val query3 = BuildExecuteScriptTx(
-      PublicKey.generate,
+      publicKey,
       ByteString.empty,
       Some(Amount(U256.Billion)),
       Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.alph, U256.Billion)))
@@ -2017,12 +2019,53 @@ class ServerUtilsSpec extends AlephiumSpec {
     ))
 
     val query4 = BuildExecuteScriptTx(
-      PublicKey.generate,
+      publicKey,
       ByteString.empty,
       Some(Amount(U256.MaxValue)),
       Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.alph, U256.Billion)))
     )
     query4.getAmounts.leftValue is "ALPH amount overflow"
+  }
+
+  it should "get initial alph and tokens amounts" in {
+    val publicKey = PublicKey.generate
+
+    val query0 = BuildDeployContractTx(publicKey, ByteString.empty, None, None)
+    query0.getInitialAttoAlphAmount.rightValue is None
+    query0.getInitialTokenAmounts is AVector.empty[Token]
+
+    val query1 =
+      BuildDeployContractTx(publicKey, ByteString.empty, Some(Amount(U256.Billion)), None)
+    query1.getInitialAttoAlphAmount.rightValue is Some(U256.Billion)
+    query1.getInitialTokenAmounts is AVector.empty[Token]
+
+    val tokenId = TokenId.generate
+    val query2 = BuildDeployContractTx(
+      publicKey,
+      ByteString.empty,
+      Some(Amount(U256.Billion)),
+      Some(AVector(Token(tokenId, U256.Billion)))
+    )
+    query2.getInitialAttoAlphAmount.rightValue is Some(U256.Billion)
+    query2.getInitialTokenAmounts is AVector(Token(tokenId, U256.Billion))
+
+    val query3 = BuildDeployContractTx(
+      publicKey,
+      ByteString.empty,
+      Some(Amount(U256.Billion)),
+      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.alph, U256.Billion)))
+    )
+    query3.getInitialAttoAlphAmount.rightValue is Some(U256.Billion.mulUnsafe(U256.Two))
+    query3.getInitialTokenAmounts is AVector(Token(tokenId, U256.Billion))
+
+    val query4 = BuildDeployContractTx(
+      publicKey,
+      ByteString.empty,
+      Some(Amount(U256.MaxValue)),
+      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.alph, U256.Billion)))
+    )
+    query4.getInitialAttoAlphAmount.leftValue is "ALPH amount overflow"
+    query4.getInitialTokenAmounts is AVector(Token(tokenId, U256.Billion))
   }
 
   private def generateDestination(
