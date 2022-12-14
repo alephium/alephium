@@ -993,8 +993,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  ],
          |  "warnings": [
          |    "Found unused variables in Foo: bar.a",
-         |    "Found unused fields in Foo: aa, bb, cc, dd, ee",
-         |    "Function Foo.bar does not update fields, please use @using(updateFields = false) for the function"
+         |    "Found unused fields in Foo: aa, bb, cc, dd, ee"
          |  ]
          |}
          |""".stripMargin

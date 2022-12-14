@@ -230,7 +230,13 @@ abstract class Parser[Ctx <: StatelessContext] {
       } else {
         val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
         val (usePreapprovedAssets, useContractAssets, useExternalCallCheck, useUpdateFields) =
-          Parser.extractFuncModifier(annotations, false, false, true, true)
+          Parser.extractFuncModifier(
+            annotations,
+            usePreapprovedAssetsDefault = false,
+            useContractAssetsDefault = false,
+            useExternalCallCheckDefault = true,
+            useUpdateFieldsDefault = false
+          )
         FuncDefTmp(
           annotations,
           funcId,
@@ -512,10 +518,10 @@ object StatefulParser extends Parser[StatefulContext] {
           val (usePreapprovedAssets, useContractAssets, _, useUpdateFields) =
             Parser.extractFuncModifier(
               annotations,
-              true,
-              false,
-              true,
-              true
+              usePreapprovedAssetsDefault = true,
+              useContractAssetsDefault = false,
+              useExternalCallCheckDefault = true,
+              useUpdateFieldsDefault = false
             )
           Ast.TxScript(
             typeId,

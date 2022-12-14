@@ -287,7 +287,6 @@ class AstSpec extends AlephiumSpec {
       def code(externalCallCheck: Boolean) =
         s"""
            |Contract Bar() {
-           |  @using(updateFields = true)
            |  pub fn bar(fooId: ByteVec) -> () {
            |    Foo(fooId).foo()
            |  }
@@ -309,17 +308,14 @@ class AstSpec extends AlephiumSpec {
       val code =
         s"""
            |Contract Bar() implements Foo {
-           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    bar()
            |  }
-           |  @using(updateFields = false)
            |  fn bar() -> () {
            |    checkCaller!(true, 0)
            |  }
            |}
            |Interface Foo {
-           |  @using(updateFields = false)
            |  pub fn foo() -> ()
            |}
            |""".stripMargin
@@ -327,43 +323,6 @@ class AstSpec extends AlephiumSpec {
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings.isEmpty is true
     }
-  }
-
-  it should "no external call check warnings for public functions which does not update fields and does not use assets" in {
-    def code(
-        updateFields: Boolean,
-        useApprovedAssets: Boolean,
-        useContractAssets: Boolean
-    ): String = {
-      // format: off
-      s"""
-         |Contract Foo(mut a: U256, b: Address) {
-         |  @using(updateFields = $updateFields, preapprovedAssets = $useApprovedAssets, assetsInContract = $useContractAssets)
-         |  pub fn foo() -> () {
-         |    ${if (updateFields) "a = 0" else ""}
-         |    ${if (useApprovedAssets) "transferToken!(callerAddress!(), b, ALPH, 1)" else ""}
-         |    ${if (useContractAssets) "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)" else ""}
-         |  }
-         |}
-         |
-         |Contract Bar(foo: Foo) {
-         |  @using(updateFields = $updateFields, preapprovedAssets = $useApprovedAssets)
-         |  pub fn bar() -> () {
-         |    ${if (useApprovedAssets) "foo.foo{callerAddress!() -> ALPH: 1}()" else "foo.foo()"}
-         |  }
-         |}
-         |""".stripMargin
-      // format: on
-    }
-
-    val warnings0 = Compiler.compileContractFull(code(false, false, false), 1).rightValue.warnings
-    warnings0.isEmpty is true
-    val warnings1 = Compiler.compileContractFull(code(true, false, false), 1).rightValue.warnings
-    warnings1 is AVector(Warnings.noExternalCallCheckMsg("Foo", "foo"))
-    val warnings2 = Compiler.compileContractFull(code(false, true, false), 1).rightValue.warnings
-    warnings2 is AVector(Warnings.noExternalCallCheckMsg("Foo", "foo"))
-    val warnings3 = Compiler.compileContractFull(code(false, false, true), 1).rightValue.warnings
-    warnings3 is AVector(Warnings.noExternalCallCheckMsg("Foo", "foo"))
   }
 
   it should "display the right warning message for external call check" in {
@@ -377,11 +336,8 @@ class AstSpec extends AlephiumSpec {
     val code0 =
       s"""
          |Contract Foo() {
-         |  @using(updateFields = false)
          |  fn private0() -> () {}
-         |  @using(updateFields = false)
          |  fn private1() -> () {}
-         |  @using(updateFields = false)
          |  pub fn public() -> () {
          |    private0()
          |  }
@@ -393,21 +349,17 @@ class AstSpec extends AlephiumSpec {
     val code1 =
       s"""
          |Abstract Contract Foo() {
-         |  @using(updateFields = false)
          |  fn foo0() -> U256 {
          |    return 0
          |  }
-         |  @using(updateFields = false)
          |  fn foo1() -> () {
          |    let _ = foo0()
          |  }
          |}
          |Contract Bar() extends Foo() {
-         |  @using(updateFields = false)
          |  pub fn bar() -> () { foo1() }
          |}
          |Contract Baz() extends Foo() {
-         |  @using(updateFields = false)
          |  pub fn baz() -> () { foo1() }
          |}
          |""".stripMargin

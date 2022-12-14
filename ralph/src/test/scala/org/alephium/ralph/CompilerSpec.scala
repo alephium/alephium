@@ -31,7 +31,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |// comment
          |AssetScript Foo {
-         |  @using(updateFields = false)
          |  pub fn bar(a: U256, b: U256) -> (U256) {
          |    return (a + b)
          |  }
@@ -108,6 +107,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    return (x + y)
            |  }
            |
+           |  @using(updateFields = true)
            |  fn add2(d: U256) -> () {
            |    let mut z = 0u
            |    z = d
@@ -181,6 +181,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val contract =
         s"""
            |Contract Foo($xMut x: U256) {
+           |  @using(updateFields = true)
            |  pub fn add($a: $aType, $b: $bType) -> ($rType) {
            |    x = a + b
            |    return (a - b)
@@ -723,6 +724,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  mut alphReserve: U256,
          |  mut btcReserve: U256
          |) {
+         |  @using(updateFields = true)
          |  pub fn exchange(attoAlphAmount: U256) -> (U256) {
          |    let tokenAmount = btcReserve * attoAlphAmount / (alphReserve + attoAlphAmount)
          |    alphReserve = alphReserve + attoAlphAmount
@@ -1309,6 +1311,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |    x[idx1][idx2] = 0
          |  }
          |
+         |  @using(updateFields = true)
          |  pub fn test2(idx1: U256, idx2: U256) -> () {
          |    array[idx1][idx2] = 0
          |  }
@@ -1344,6 +1347,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract ArrayTest(mut array: [[U256; 2]; 4]) {
+           |  @using(updateFields = true)
            |  pub fn test(a: [[U256; 2]; 4]) -> () {
            |    array = a
            |    let mut i = 0
@@ -1382,6 +1386,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    assert!(x == 9, 0)
            |  }
            |
+           |  @using(updateFields = true)
            |  fn foo() -> U256 {
            |    x = x + 1
            |    return x
@@ -1396,6 +1401,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract ArrayTest(mut array: [[U256; 2]; 4]) {
+           |  @using(updateFields = true)
            |  pub fn test() -> () {
            |    let mut i = 0
            |    let mut j = 0
@@ -1429,6 +1435,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(mut array: [[U256; 2]; 4], mut x: U256) {
+           |  @using(updateFields = true)
            |  pub fn test() -> () {
            |    let mut i = 0
            |    while (i < 4) {
@@ -1448,6 +1455,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    }
            |  }
            |
+           |  @using(updateFields = true)
            |  fn foo() -> U256 {
            |    let v = x
            |    x = x + 1
@@ -1612,6 +1620,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(mut array: [U256; 3]) {
+           |  @using(updateFields = true)
            |  pub fn test() -> () {
            |    array = [1, 2, 3]
            |    let mut x = [[0; 3]; 3]
@@ -1630,6 +1639,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    )
            |  }
            |
+           |  @using(updateFields = true)
            |  pub fn foo(value: U256) -> ([U256; 3], U256) {
            |    let mut i = 0
            |    while (i < 3) {
@@ -1671,6 +1681,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val code: String =
       s"""
          |Contract Foo(mut value: U256) {
+         |  @using(updateFields = true)
          |  pub fn test() -> U256 {
          |    if (true) {
          |      value = 1
@@ -1986,6 +1997,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Grandparent(mut x: U256) {
            |  event GP(value: U256)
            |
+           |  @using(updateFields = true)
            |  fn gp(a: Bool) -> () {
            |    x = x + 1
            |    emit GP(x)
@@ -2721,7 +2733,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |AssetScript Foo {
-           |  @using(updateFields = false)
            |  pub fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 2
@@ -2737,12 +2748,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Check unused local variables in TxScript")
       val code =
         s"""
-           |@using(updateFields = false)
            |TxScript Foo {
            |  let b = 1
            |  foo()
            |
-           |  @using(updateFields = false)
            |  fn foo() -> () {
            |  }
            |}
@@ -2755,11 +2764,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Check unused template variables in TxScript")
       val code =
         s"""
-           |@using(updateFields = false)
            |TxScript Foo(a: U256, b: U256) {
            |  foo(a)
            |
-           |  @using(updateFields = false)
            |  fn foo(v: U256) -> () {
            |    assert!(v == 0, 0)
            |  }
@@ -2774,7 +2781,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  @using(updateFields = false)
            |  pub fn foo(a: U256) -> U256 {
            |    let b = 1
            |    let c = 0
@@ -2791,7 +2797,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(a: ByteVec, b: U256, c: [U256; 2]) {
-           |  @using(updateFields = false)
            |  pub fn getB() -> U256 {
            |    return b
            |  }
@@ -2806,12 +2811,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo(a: U256, b: U256, c: [U256; 2]) extends Bar(a, b) {
-           |  @using(updateFields = false)
            |  pub fn foo() -> () {}
            |}
            |
            |Abstract Contract Bar(a: U256, b: U256) {
-           |  @using(updateFields = false)
            |  pub fn bar() -> U256 {
            |    return a
            |  }
@@ -2826,24 +2829,22 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Interface I {
-           |  @using(updateFields = false, externalCallCheck = false)
+           |  @using(externalCallCheck = false)
            |  pub fn i() -> ()
            |}
            |Abstract Contract Base(v: U256) {
-           |  @using(updateFields = false)
            |  fn base() -> () {
            |    assert!(v == 0, 0)
            |  }
            |}
            |Contract Bar(v: U256) extends Base(v) implements I {
-           |  @using(updateFields = false, externalCallCheck = false)
+           |  @using(externalCallCheck = false)
            |  pub fn i() -> () {
            |    assert!(v == 0, 0)
            |    base()
            |  }
            |}
            |Contract Foo(v: U256) extends Base(v) {
-           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    base()
            |  }
@@ -2858,7 +2859,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Abstract Contract Foo() {
-           |  @using(updateFields = false)
            |  pub fn foo(x: U256) -> () {}
            |}
            |Contract Bar() extends Foo() {}
@@ -2878,7 +2878,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |Contract Foo() {
            |  const C0 = 0
            |  const C1 = 1
-           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    assert!(C1 == 1, 0)
            |  }
@@ -2903,7 +2902,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    Solidity = #01
            |  }
            |
-           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    assert!(Chain.Alephium == 0, 0)
            |    assert!(Language.Ralph == #00, 0)
@@ -2919,17 +2917,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Abstract Contract Foo() {
-           |  @using(updateFields = false)
            |  fn foo(x: U256) -> () {
            |    assert!(x == 0, 0)
            |  }
            |}
            |Contract Bar() extends Foo() {
-           |  @using(updateFields = false)
            |  pub fn bar() -> () { foo(0) }
            |}
            |Contract Baz() extends Foo() {
-           |  @using(updateFields = false)
            |  pub fn baz() -> () { foo(0) }
            |}
            |""".stripMargin
@@ -3054,7 +3049,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     def code(unused: String) =
       s"""
          |Contract Foo($unused a: U256, $unused b: [U256; 2]) {
-         |  @using(updateFields = false)
          |  pub fn foo($unused x: U256, $unused y: [U256; 2]) -> () {
          |    return
          |  }
@@ -3095,7 +3089,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  @using(updateFields = false)
            |  pub fn foo() -> () {}
            |}
            |""".stripMargin
@@ -3114,19 +3107,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Function \"Foo.foo\" changes state, but has `updateFields = false`"
+        "Function \"Foo.foo\" changes state, please use @using(updateFields = true) for the function"
     }
 
     {
-      info("Call internal update fields functions")
+      info("Call internal function which does not update fields")
       val code =
         s"""
            |Contract Foo() {
-           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    bar()
            |  }
-           |  @using(updateFields = false)
            |  pub fn bar() -> () {}
            |}
            |""".stripMargin
@@ -3138,7 +3129,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    let _ = selfContractId!()
            |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
@@ -3153,51 +3143,49 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  @using(updateFields = false)
            |  pub fn foo(code: ByteVec, fields: ByteVec) -> () {
            |    migrateWithFields!(code, fields)
            |  }
            |}
            |""".stripMargin
       Compiler.compileContract(code).leftValue.message is
-        "Function \"Foo.foo\" changes state, but has `updateFields = false`"
+        "Function \"Foo.foo\" changes state, please use @using(updateFields = true) for the function"
     }
 
     {
-      info("Invalid internal function calls")
+      info("Call internal update fields functions")
       val code =
         s"""
-           |Contract Foo() {
-           |  @using(updateFields = false)
+           |Contract Foo(mut a: U256) {
            |  pub fn foo() -> () {
            |    bar()
            |  }
            |  @using(updateFields = true)
-           |  pub fn bar() -> () {}
+           |  pub fn bar() -> () {
+           |    a = 0
+           |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Function \"Foo.foo\" has internal update fields calls: \"bar\""
+      Compiler.compileContract(code).isRight is true
     }
 
     {
-      info("Invalid external function calls")
+      info("Call external update fields functions")
       val code =
         s"""
            |Contract Foo(bar: Bar) {
-           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    bar.bar()
            |  }
            |}
            |Contract Bar(mut x: [U256; 2]) {
+           |  @using(updateFields = true)
            |  pub fn bar() -> () {
            |    x[0] = 0
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Function \"Foo.foo\" has external update fields calls: \"Bar.bar\""
+      Compiler.compileContract(code).isRight is true
     }
 
     {
@@ -3212,10 +3200,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
-      warnings is AVector(
-        "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
-      )
+      Compiler.compileContractFull(code, 0).rightValue.warnings is AVector.empty[String]
     }
 
     {
@@ -3223,7 +3208,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
-           |  @using(updateFields = false, preapprovedAssets = true)
+           |  @using(preapprovedAssets = true)
            |  pub fn foo(tokenId: ByteVec) -> () {
            |    assert!(tokenRemaining!(callerAddress!(), tokenId) == 1, 0)
            |    assert!(tokenRemaining!(callerAddress!(), ALPH) == 1, 0)
@@ -3234,35 +3219,32 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Invalid mutual function calls")
+      info("Mutual function calls")
       val code =
         s"""
            |Contract Foo(bar: Bar, mut a: U256) {
-           |  @using(updateFields = false)
            |  pub fn foo() -> () {
            |    bar.bar()
            |  }
+           |  @using(updateFields = true)
            |  pub fn update() -> () {
            |    a = 0
            |  }
            |}
            |Contract Bar(foo: Foo) {
-           |  @using(updateFields = false)
            |  pub fn bar() -> () {
            |    foo.update()
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Function \"Bar.bar\" has external update fields calls: \"Foo.update\""
+      Compiler.compileContract(code).isRight is true
     }
 
     {
-      info("Invalid interface function calls")
+      info("Call interface update fields functions")
       def code(updateFields: Boolean): String =
         s"""
            |Contract Foo() {
-           |  @using(updateFields = false)
            |  pub fn foo(contractId: ByteVec) -> () {
            |    Bar(contractId).bar()
            |  }
@@ -3273,15 +3255,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       Compiler.compileContractFull(code(false)).isRight is true
-      val error = Compiler.compileContractFull(code(true)).leftValue
-      error.message is "Function \"Foo.foo\" has external update fields calls: \"Bar.bar\""
+      Compiler.compileContractFull(code(true)).isRight is true
     }
 
     {
-      info("Warning for functions which does not update fields")
+      info("Warning for functions which does not update fields but has @using(updateFields = true)")
       val code =
         s"""
            |Contract Foo() {
+           |  @using(updateFields = true)
            |  pub fn foo() -> () {
            |    checkCaller!(true, 0)
            |  }
@@ -3289,29 +3271,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(
-        "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
+        "Function Foo.foo does not update fields, please remove @using(updateFields = true) for the function"
       )
-    }
-
-    {
-      info("No warning for functions which has external call check")
-      def code(annotation: String): String =
-        s"""
-           |Contract Foo(mut a: U256) {
-           |  $annotation
-           |  pub fn foo() -> () {
-           |    checkCaller!(true, 0)
-           |    a = a + 1
-           |  }
-           |}
-           |""".stripMargin
-      Compiler.compileContractFull(code(""), 0).rightValue.warnings.isEmpty is true
-
-      Compiler
-        .compileContractFull(code("@using(updateFields = true)"), 0)
-        .rightValue
-        .warnings
-        .isEmpty is true
     }
   }
 

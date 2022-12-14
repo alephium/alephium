@@ -28,7 +28,7 @@ object AMMContract {
        |  event SwapToken(buyer: Address, attoAlphAmount: U256)
        |  event SwapAlph(buyer: Address, tokenAmount: U256)
        |
-       |  @using(preapprovedAssets = true, assetsInContract = true)
+       |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
        |  pub fn addLiquidity(lp: Address, attoAlphAmount: U256, tokenAmount: U256) -> () {
        |    emit AddLiquidity(lp, attoAlphAmount, tokenAmount)
        |
@@ -38,7 +38,7 @@ object AMMContract {
        |    tokenReserve = tokenReserve + tokenAmount
        |  }
        |
-       |  @using(preapprovedAssets = true, assetsInContract = true)
+       |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
        |  pub fn swapToken(buyer: Address, attoAlphAmount: U256) -> () {
        |    emit SwapToken(buyer, attoAlphAmount)
        |
@@ -49,7 +49,7 @@ object AMMContract {
        |    tokenReserve = tokenReserve - tokenAmount
        |  }
        |
-       |  @using(preapprovedAssets = true, assetsInContract = true)
+       |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
        |  pub fn swapAlph(buyer: Address, tokenAmount: U256) -> () {
        |    emit SwapAlph(buyer, tokenAmount)
        |
