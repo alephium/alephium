@@ -20,10 +20,10 @@ import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
 import org.alephium.protocol.{vm, PublicKey}
-import org.alephium.protocol.model.{BlockHash, TokenId}
+import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
 import org.alephium.serde._
-import org.alephium.util.{AVector, U256}
+import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildDeployContractTx(
@@ -35,25 +35,7 @@ final case class BuildDeployContractTx(
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
-) extends BuildTxCommon {
-  def getInitialAttoAlphAmount: Either[String, Option[U256]] = {
-    val alphTokenOpt = initialTokenAmounts.flatMap(_.find(_.id == TokenId.alph))
-    (initialAttoAlphAmount, alphTokenOpt) match {
-      case (Some(attoAlphAmount), Some(alphToken)) =>
-        attoAlphAmount.value.add(alphToken.amount) match {
-          case Some(amount) => Right(Some(amount))
-          case None         => Left("ALPH amount overflow")
-        }
-      case (Some(attoAlphAmount), None) => Right(Some(attoAlphAmount.value))
-      case (None, Some(alphToken))      => Right(Some(alphToken.amount))
-      case (None, None)                 => Right(None)
-    }
-  }
-
-  def getInitialTokenAmounts: AVector[Token] = {
-    initialTokenAmounts.map(_.filterNot(_.id == TokenId.alph)).getOrElse(AVector.empty[Token])
-  }
-}
+) extends BuildTxCommon
 
 object BuildDeployContractTx {
   final case class Code(contract: StatefulContract, initialFields: AVector[vm.Val])

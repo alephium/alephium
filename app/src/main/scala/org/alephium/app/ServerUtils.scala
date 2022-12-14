@@ -781,16 +781,19 @@ class ServerUtils(implicit
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
     for {
-      initialAttoAlphAmountOpt <- query.getInitialAttoAlphAmount.left.map(badRequest)
-      initialAttoAlphAmount    <- getInitialAttoAlphAmount(initialAttoAlphAmountOpt)
-      code                     <- BuildDeployContractTx.decode(query.bytecode)
+      amounts <- BuildTxCommon
+        .getAlphAndTokenAmounts(query.initialAttoAlphAmount, query.initialTokenAmounts)
+        .left
+        .map(badRequest)
+      initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1)
+      code                  <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildDeployContractTxWithParsedState(
         code.contract,
         address,
         code.initialFields,
         initialAttoAlphAmount,
-        query.getInitialTokenAmounts,
+        amounts._2,
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScript(
@@ -842,14 +845,17 @@ class ServerUtils(implicit
       query: BuildExecuteScriptTx
   ): Try[BuildExecuteScriptTxResult] = {
     for {
-      amounts <- query.getAmounts.left.map(badRequest)
+      amounts <- BuildTxCommon
+        .getAlphAndTokenAmounts(query.attoAlphAmount, query.tokens)
+        .left
+        .map(badRequest)
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        amounts._1,
+        amounts._1.getOrElse(U256.Zero),
         amounts._2,
         query.fromPublicKey,
         query.gasAmount,
@@ -1295,7 +1301,7 @@ object ServerUtils {
       address: Address,
       initialState: Option[String],
       initialAttoAlphAmount: U256,
-      initialTokenAmounts: AVector[Token],
+      initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
     parseState(initialState).flatMap { state =>
@@ -1315,7 +1321,7 @@ object ServerUtils {
       address: Address,
       initialFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
-      initialTokenAmounts: AVector[Token],
+      initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
     buildDeployContractScriptWithParsedState(
@@ -1333,7 +1339,7 @@ object ServerUtils {
       address: Address,
       initialFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
-      initialTokenAmounts: AVector[Token],
+      initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): String = {
     val stateRaw = Hex.toHexString(serialize(initialFields))
@@ -1348,8 +1354,8 @@ object ServerUtils {
       toCreate(approveAssets)
     } else {
       val approveTokens = initialTokenAmounts
-        .map { token =>
-          s"#${token.id.toHexString}: ${token.amount.v}"
+        .map { case (tokenId, amount) =>
+          s"#${tokenId.toHexString}: ${amount.v}"
         }
         .mkString(", ")
       val approveAssets = s"{@$address -> ALPH: ${initialAttoAlphAmount.v}, $approveTokens}"
@@ -1367,7 +1373,7 @@ object ServerUtils {
       address: Address,
       initialFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
-      initialTokenAmounts: AVector[Token],
+      initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
     val scriptRaw = buildDeployContractScriptRawWithParsedState(

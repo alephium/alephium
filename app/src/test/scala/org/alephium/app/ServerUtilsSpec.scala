@@ -1891,7 +1891,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           fromAddress,
           initialFields,
           U256.unsafe(10),
-          AVector(Token(token1, U256.unsafe(10)), Token(token2, U256.unsafe(20))),
+          AVector((token1, U256.unsafe(10)), (token2, U256.unsafe(20))),
           Some(U256.unsafe(50))
         ) is expected
     }
@@ -1987,85 +1987,6 @@ class ServerUtilsSpec extends AlephiumSpec {
     testResult.txOutputs(2).tokens.length is 1
     testResult.txOutputs(2).tokens is tokensSorted.slice(2 * maxTokenPerUtxo, tokensSorted.length)
     testResult.txOutputs(3).address is Address.contract(testContract.contractId)
-  }
-
-  it should "get alph and token amounts" in {
-    val publicKey = PublicKey.generate
-
-    val query0 = BuildExecuteScriptTx(publicKey, ByteString.empty, None, None)
-    query0.getAmounts.rightValue is (U256.Zero, AVector.empty[(TokenId, U256)])
-
-    val query1 =
-      BuildExecuteScriptTx(publicKey, ByteString.empty, Some(Amount(U256.Billion)), None)
-    query1.getAmounts.rightValue is (U256.Billion, AVector.empty[(TokenId, U256)])
-
-    val tokenId = TokenId.generate
-    val query2 = BuildExecuteScriptTx(
-      publicKey,
-      ByteString.empty,
-      Some(Amount(U256.Billion)),
-      Some(AVector(Token(tokenId, U256.Billion)))
-    )
-    query2.getAmounts.rightValue is (U256.Billion, AVector(tokenId -> U256.Billion))
-
-    val query3 = BuildExecuteScriptTx(
-      publicKey,
-      ByteString.empty,
-      Some(Amount(U256.Billion)),
-      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.alph, U256.Billion)))
-    )
-    query3.getAmounts.rightValue is (U256.Billion.mulUnsafe(U256.Two), AVector(
-      tokenId -> U256.Billion
-    ))
-
-    val query4 = BuildExecuteScriptTx(
-      publicKey,
-      ByteString.empty,
-      Some(Amount(U256.MaxValue)),
-      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.alph, U256.Billion)))
-    )
-    query4.getAmounts.leftValue is "ALPH amount overflow"
-  }
-
-  it should "get initial alph and tokens amounts" in {
-    val publicKey = PublicKey.generate
-
-    val query0 = BuildDeployContractTx(publicKey, ByteString.empty, None, None)
-    query0.getInitialAttoAlphAmount.rightValue is None
-    query0.getInitialTokenAmounts is AVector.empty[Token]
-
-    val query1 =
-      BuildDeployContractTx(publicKey, ByteString.empty, Some(Amount(U256.Billion)), None)
-    query1.getInitialAttoAlphAmount.rightValue is Some(U256.Billion)
-    query1.getInitialTokenAmounts is AVector.empty[Token]
-
-    val tokenId = TokenId.generate
-    val query2 = BuildDeployContractTx(
-      publicKey,
-      ByteString.empty,
-      Some(Amount(U256.Billion)),
-      Some(AVector(Token(tokenId, U256.Billion)))
-    )
-    query2.getInitialAttoAlphAmount.rightValue is Some(U256.Billion)
-    query2.getInitialTokenAmounts is AVector(Token(tokenId, U256.Billion))
-
-    val query3 = BuildDeployContractTx(
-      publicKey,
-      ByteString.empty,
-      Some(Amount(U256.Billion)),
-      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.alph, U256.Billion)))
-    )
-    query3.getInitialAttoAlphAmount.rightValue is Some(U256.Billion.mulUnsafe(U256.Two))
-    query3.getInitialTokenAmounts is AVector(Token(tokenId, U256.Billion))
-
-    val query4 = BuildDeployContractTx(
-      publicKey,
-      ByteString.empty,
-      Some(Amount(U256.MaxValue)),
-      Some(AVector(Token(tokenId, U256.Billion), Token(TokenId.alph, U256.Billion)))
-    )
-    query4.getInitialAttoAlphAmount.leftValue is "ALPH amount overflow"
-    query4.getInitialTokenAmounts is AVector(Token(tokenId, U256.Billion))
   }
 
   private def generateDestination(
