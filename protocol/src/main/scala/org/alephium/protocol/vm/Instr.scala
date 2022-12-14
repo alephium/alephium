@@ -1242,7 +1242,7 @@ object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
       balanceState <- frame.getBalanceState()
       _ <-
         if (tokenId == TokenId.alph) {
-          Left(Right(InvalidTokenId))
+          Left(Right(BurningAlphNotAllowed))
         } else {
           balanceState
             .useToken(fromAddress.lockupScript, tokenId, tokenAmount.v)

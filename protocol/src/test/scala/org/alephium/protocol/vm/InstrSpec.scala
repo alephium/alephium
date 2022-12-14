@@ -2173,7 +2173,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(TokenId.alph.bytes))
     stack.push(Val.U256(ALPH.alph(2)))
 
-    BurnToken.runWith(frame).leftValue isE InvalidTokenId
+    BurnToken.runWith(frame).leftValue isE BurningAlphNotAllowed
   }
 
   it should "LockApprovedAssets" in new StatefulInstrFixture {
