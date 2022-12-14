@@ -675,6 +675,31 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost("/contracts/unsigned-tx/deploy-contract", Some(query))
   }
 
+  def buildMultisigDeployContractTx(
+      fromAddress: String,
+      fromPublicKeys: AVector[String],
+      code: String,
+      gas: Option[Int] = Some(100000),
+      gasPrice: Option[GasPrice] = None,
+      initialFields: Option[AVector[vm.Val]] = None,
+      issueTokenAmount: Option[U256] = None
+  ) = {
+    val bytecode = code + Hex.toHexString(serialize(initialFields.getOrElse(AVector.empty)))
+    val query = {
+      s"""
+         |{
+         |  "fromAddress": "${fromAddress}",
+         |  "fromPublicKeys": ["$fromPublicKeys"],
+         |  "bytecode": "$bytecode"
+         |  ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
+         |  ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
+         |  ${issueTokenAmount.map(v => s""","issueTokenAmount": "${v.v}"""").getOrElse("")}
+         |}
+         |""".stripMargin
+    }
+    httpPost("/multisig/unsigned-tx/deploy-contract", Some(query))
+  }
+
   def buildExecuteScriptTx(
       fromPublicKey: String,
       code: String,
