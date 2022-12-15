@@ -46,16 +46,19 @@ class MultisigSmartContractTest extends AlephiumActorSpec {
 
     val multisigAddress =
       request[BuildMultisigAddressResult](
-        multisig(AVector(publicKey, publicKey2), 2),
+        multisig(AVector(publicKey), 1),
         restPort
       ).address.toBase58
+
+    val tx = transfer(publicKey, multisigAddress, transferAmount * 10, privateKey, restPort)
+    confirmTx(tx, restPort)
   }
 
   it should "build multisig DeployContractTx" in new MultisigSmartContractFixture {
     val contract =
       s"""
          |Contract Foo(a: Bool, b: I256, c: U256, d: ByteVec) {
-         |  pub fn foo() -> (Bool, I256, U256, ByteVec, Address) {
+         |  pub fn foo() -> (Bool, I256, U256, ByteVec) {
          |    return a, b, c, d
          |  }
          |}
@@ -73,9 +76,30 @@ class MultisigSmartContractTest extends AlephiumActorSpec {
     unitRequest(
       buildMultisigDeployContractTx(
         multisigAddress,
-        AVector(publicKey, publicKey2),
+        AVector(publicKey),
         compileResult.bytecode,
         initialFields = validFields
+      ),
+      restPort
+    )
+    clique.stopMining()
+    clique.stop()
+  }
+
+  it should "build multisig TxScript" in new MultisigSmartContractFixture {
+    val script =
+      s"""
+         |TxScript Main {
+         |  assert!(1 == 2, 0)
+         |}
+         |""".stripMargin
+    val compileResult = request[CompileScriptResult](compileScript(script), restPort)
+
+    unitRequest(
+      buildMultisigExecuteScriptTx(
+        multisigAddress,
+        AVector(publicKey),
+        compileResult.bytecodeTemplate
       ),
       restPort
     )

@@ -912,6 +912,30 @@ class ServerUtils(implicit
     } yield BuildExecuteScriptTxResult.from(utx)
   }
 
+  def buildMultisigExecuteScriptTx(
+      blockFlow: BlockFlow,
+      query: BuildMultisigExecuteScriptTx
+  ): Try[BuildExecuteScriptTxResult] = {
+    val attoAlphAmount = query.attoAlphAmount.map(_.value).getOrElse(U256.Zero)
+    val tokens = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
+    for {
+      script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
+        badRequest(serdeError.getMessage)
+      )
+      unlockScript <- buildUnlockScript(query.fromAddress.lockupScript, query.fromPublicKeys)
+      utx <- unsignedTxFromScript(
+        blockFlow,
+        script,
+        query.fromAddress.lockupScript,
+        unlockScript,
+        attoAlphAmount,
+        tokens,
+        query.gasAmount,
+        query.gasPrice
+      )
+    } yield BuildExecuteScriptTxResult.from(utx)
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def compileScript(query: Compile.Script): Try[CompileScriptResult] = {
     Compiler

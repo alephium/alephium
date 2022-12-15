@@ -497,6 +497,28 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
+  implicit val BuildMultisigExecuteScriptTxExamples: List[Example[BuildMultisigExecuteScriptTx]] =
+    List(
+      defaultExample(
+        BuildMultisigExecuteScriptTx(
+          address,
+          AVector(publicKey),
+          bytecode = byteString
+        )
+      ),
+      moreSettingsExample(
+        BuildMultisigExecuteScriptTx(
+          address,
+          AVector(publicKey),
+          bytecode = byteString,
+          Some(Amount(model.dustUtxoAmount)),
+          Some(tokens),
+          Some(model.minimalGas),
+          Some(model.defaultGasPrice)
+        )
+      )
+    )
+
   implicit val buildMultisigTransactionExamples: List[Example[BuildMultisig]] = List(
     defaultExample(
       BuildMultisig(

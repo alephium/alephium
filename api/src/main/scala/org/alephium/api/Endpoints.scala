@@ -339,6 +339,14 @@ trait Endpoints
       .out(jsonBody[BuildDeployContractTxResult])
       .summary("Build a multisig unsigned contract")
 
+  lazy val buildMultisigExecuteScriptTx
+      : BaseEndpoint[BuildMultisigExecuteScriptTx, BuildExecuteScriptTxResult] =
+    multisigContractsUnsignedTxEndpoint.post
+      .in("execute-script")
+      .in(jsonBody[BuildMultisigExecuteScriptTx])
+      .out(jsonBody[BuildExecuteScriptTxResult])
+      .summary("Build a multisig unsigned script")
+
   val submitMultisigTransaction: BaseEndpoint[SubmitMultisig, SubmitTxResult] =
     multisigEndpoint.post
       .in("submit")

@@ -368,6 +368,10 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.buildMultisigDeployContractTx(blockFlow, query))
   }
 
+  val buildMultisigExecuteScriptTxLogic = serverLogic(buildMultisigExecuteScriptTx) { query =>
+    Future.successful(serverUtils.buildMultisigExecuteScriptTx(blockFlow, query))
+  }
+
   val buildSweepAddressTransactionsLogic = serverLogicRedirect(buildSweepAddressTransactions)(
     buildSweepAddressTransactions =>
       withSyncedClique {

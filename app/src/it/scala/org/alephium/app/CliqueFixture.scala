@@ -689,7 +689,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       s"""
          |{
          |  "fromAddress": "${fromAddress}",
-         |  "fromPublicKeys": ["$fromPublicKeys"],
+         |  "fromPublicKeys": ${write(fromPublicKeys)},
          |  "bytecode": "$bytecode"
          |  ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
          |  ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
@@ -698,6 +698,28 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
          |""".stripMargin
     }
     httpPost("/multisig/unsigned-tx/deploy-contract", Some(query))
+  }
+
+  def buildMultisigExecuteScriptTx(
+      fromAddress: String,
+      fromPublicKeys: AVector[String],
+      code: String,
+      attoAlphAmount: Option[Amount] = None,
+      gas: Option[Int] = Some(100000),
+      gasPrice: Option[GasPrice] = None
+  ) = {
+    val query =
+      s"""
+         {
+           "fromAddress": "${fromAddress}",
+           "fromPublicKeys": ${write(fromPublicKeys)},
+           "bytecode": "$code"
+           ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
+           ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
+           ${attoAlphAmount.map(a => s""","attoAlphAmount": "${a.value.v}"""").getOrElse("")}
+         }
+        """
+    httpPost("/multisig/unsigned-tx/execute-script", Some(query))
   }
 
   def buildExecuteScriptTx(
