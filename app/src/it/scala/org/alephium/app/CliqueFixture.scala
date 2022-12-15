@@ -547,17 +547,17 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       )
     }
     submitMultisigTransaction(
-      buildTransactionResult,
+      buildTransactionResult.unsignedTx,
       signatures
     )
   }
 
   def submitMultisigTransaction(
-      buildTransactionResult: BuildTransactionResult,
+      unsignedTx: String,
       signatures: AVector[Signature]
   ) = {
     val body =
-      s"""{"unsignedTx":"${buildTransactionResult.unsignedTx}","signatures":${write(
+      s"""{"unsignedTx":"${unsignedTx}","signatures":${write(
           signatures.map(_.toHexString)
         )}}"""
     httpPost(
@@ -720,6 +720,54 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
          }
         """
     httpPost("/multisig/unsigned-tx/execute-script", Some(query))
+  }
+
+  def buildMultisigDeployContractTxWithPort(
+      fromAddress: String,
+      fromPublicKeys: AVector[String],
+      code: String,
+      restPort: Int,
+      gas: Option[Int] = Some(100000),
+      gasPrice: Option[GasPrice] = None,
+      initialFields: Option[AVector[vm.Val]] = None,
+      issueTokenAmount: Option[U256] = None
+  ): BuildDeployContractTxResult = {
+    val compileResult = request[CompileContractResult](compileContract(code), restPort)
+    request[BuildDeployContractTxResult](
+      buildMultisigDeployContractTx(
+        fromAddress = fromAddress,
+        fromPublicKeys = fromPublicKeys,
+        code = compileResult.bytecode,
+        gas,
+        gasPrice,
+        initialFields,
+        issueTokenAmount
+      ),
+      restPort
+    )
+  }
+
+  def buildMultiExecuteScriptTxWithPort(
+      fromAddress: String,
+      fromPublicKeys: AVector[String],
+      code: String,
+      restPort: Int,
+      attoAlphAmount: Option[Amount] = None,
+      gas: Option[Int] = None,
+      gasPrice: Option[GasPrice] = None
+  ): BuildExecuteScriptTxResult = {
+    val compileResult = request[CompileScriptResult](compileScript(code), restPort)
+    request[BuildExecuteScriptTxResult](
+      buildMultisigExecuteScriptTx(
+        fromAddress = fromAddress,
+        fromPublicKeys = fromPublicKeys,
+        code = compileResult.bytecodeTemplate,
+        attoAlphAmount,
+        gas,
+        gasPrice
+      ),
+      restPort
+    )
   }
 
   def buildExecuteScriptTx(

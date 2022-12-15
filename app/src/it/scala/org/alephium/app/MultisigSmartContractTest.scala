@@ -16,94 +16,179 @@
 
 package org.alephium.app
 
-import akka.util.ByteString
-
 import org.alephium.api.model._
-import org.alephium.protocol.vm
+import org.alephium.protocol._
+import org.alephium.protocol.model._
+import org.alephium.protocol.vm.GasPrice
+import org.alephium.serde._
 import org.alephium.util._
 import org.alephium.wallet.api.model.{Addresses, AddressInfo, WalletCreationResult}
 
 class MultisigSmartContractTest extends AlephiumActorSpec {
-  trait MultisigSmartContractFixture extends CliqueFixture {
-    val clique = bootClique(nbOfNodes = 1)
-    clique.start()
-    val group    = clique.getGroup(address)
-    val restPort = clique.getRestPort(group.group)
-    request[Balance](getBalance(address), restPort) is initialBalance
-    clique.startMining()
-
-    val walletName = "wallet-name"
-    request[WalletCreationResult](createWallet(password, walletName), restPort)
-
-    val address2 =
-      request[Addresses](getAddresses(walletName), restPort).activeAddress
-
-    val publicKey2 =
-      request[AddressInfo](
-        getAddressInfo(walletName, address2.toBase58),
-        restPort
-      ).publicKey.toHexString
-
-    val multisigAddress =
-      request[BuildMultisigAddressResult](
-        multisig(AVector(publicKey), 1),
-        restPort
-      ).address.toBase58
-
-    val tx = transfer(publicKey, multisigAddress, transferAmount * 10, privateKey, restPort)
-    confirmTx(tx, restPort)
+  it should "build multisig DeployContractTx" in new MultisigSmartContractFixture {
+    buildMultiDeployContractTx(
+      SwapContracts.tokenContract,
+      gas = Some(100000),
+      initialFields = None,
+      issueTokenAmount = Some(1024)
+    )
+    clique.stopMining()
+    clique.stop()
   }
 
-  it should "build multisig DeployContractTx" in new MultisigSmartContractFixture {
-    val contract =
-      s"""
-         |Contract Foo(a: Bool, b: I256, c: U256, d: ByteVec) {
-         |  pub fn foo() -> (Bool, I256, U256, ByteVec) {
-         |    return a, b, c, d
-         |  }
-         |}
-         |""".stripMargin
+  it should "compile/execute the multisig swap contracts successfully" in new MultisigSmartContractFixture {
+    info("Create token contract")
+    val tokenContractBuildResult = buildMultiDeployContractTx(
+      SwapContracts.tokenContract,
+      gas = Some(100000),
+      initialFields = None,
+      issueTokenAmount = Some(1024)
+    )
 
-    val compileResult = request[CompileContractResult](compileContract(contract), restPort)
-    val validFields = Some(
-      AVector[vm.Val](
-        vm.Val.True,
-        vm.Val.I256(I256.unsafe(1000)),
-        vm.Val.U256(U256.unsafe(1000)),
-        vm.Val.ByteVec(ByteString(0, 0))
+    val tokenContractId = tokenContractBuildResult.contractAddress.contractId
+
+    info("Transfer 1024 token back to self")
+    buildMultiExecuteScriptTx(
+      SwapContracts.tokenWithdrawTxScript(multisigAddress, tokenContractId, U256.unsafe(1024))
+    )
+
+    info("Create the ALPH/token swap contract")
+    val swapContractBuildResult = buildMultiDeployContractTx(
+      SwapContracts.swapContract,
+      initialFields = Some(
+        AVector[vm.Val](
+          vm.Val.ByteVec(tokenContractId.bytes),
+          vm.Val.U256(U256.Zero),
+          vm.Val.U256(U256.Zero)
+        )
+      ),
+      issueTokenAmount = Some(10000)
+    )
+
+    val swapContractKey = swapContractBuildResult.contractAddress.contractId
+    info(swapContractKey.toHexString)
+
+    // TODO
+//    info("Swap ALPH with tokens")
+//    buildMultiExecuteScriptTx(
+//      SwapContracts.swapAlphForTokenTxScript(multisigAddress, swapContractKey, ALPH.alph(10))
+//    )
+
+    info("Swap tokens with ALPH")
+    val tokenId = TokenId.from(tokenContractId)
+    buildMultiExecuteScriptTx(
+      SwapContracts.swapTokenForAlphTxScript(
+        multisigAddress,
+        swapContractKey,
+        tokenId,
+        U256.unsafe(50)
       )
     )
-    unitRequest(
-      buildMultisigDeployContractTx(
-        multisigAddress,
-        AVector(publicKey),
-        compileResult.bytecode,
-        initialFields = validFields
-      ),
-      restPort
-    )
+
+    eventually {
+      request[Balance](getBalance(multisigAddress), restPort) isnot initialBalance
+    }
+
     clique.stopMining()
     clique.stop()
   }
+}
 
-  it should "build multisig TxScript" in new MultisigSmartContractFixture {
-    val script =
-      s"""
-         |TxScript Main {
-         |  assert!(1 == 2, 0)
-         |}
-         |""".stripMargin
-    val compileResult = request[CompileScriptResult](compileScript(script), restPort)
+trait MultisigSmartContractFixture extends CliqueFixture {
+  val clique = bootClique(nbOfNodes = 1)
+  clique.start()
+  clique.startWs()
 
-    unitRequest(
-      buildMultisigExecuteScriptTx(
-        multisigAddress,
-        AVector(publicKey),
-        compileResult.bytecodeTemplate
-      ),
+  val group    = request[Group](getGroup(address), clique.masterRestPort)
+  val restPort = clique.getRestPort(group.group)
+
+  request[Balance](getBalance(address), restPort) is initialBalance
+  clique.startMining()
+
+  val walletName = "wallet-name"
+  request[WalletCreationResult](createWallet(password, walletName), restPort)
+
+  val address2 =
+    request[Addresses](getAddresses(walletName), restPort).activeAddress
+
+  val publicKey2 =
+    request[AddressInfo](
+      getAddressInfo(walletName, address2.toBase58),
+      restPort
+    ).publicKey.toHexString
+
+  val multisigAddress =
+    request[BuildMultisigAddressResult](
+      multisig(AVector(publicKey, publicKey2), 1),
+      restPort
+    ).address.toBase58
+
+  val tx = transfer(publicKey, multisigAddress, transferAmount * 10, privateKey, restPort)
+  confirmTx(tx, restPort)
+
+  def buildMultiDeployContractTx(
+      code: String,
+      gas: Option[Int] = Some(100000),
+      gasPrice: Option[GasPrice] = None,
+      initialFields: Option[AVector[vm.Val]] = None,
+      issueTokenAmount: Option[U256] = None
+  ) = {
+    val buildResult = buildMultisigDeployContractTxWithPort(
+      multisigAddress,
+      AVector(publicKey),
+      code,
+      restPort,
+      gas,
+      gasPrice,
+      initialFields,
+      issueTokenAmount
+    )
+    submitMultisigTx(buildResult.unsignedTx, buildResult.txId)
+    buildResult
+  }
+
+  def buildMultiExecuteScriptTx(
+      code: String,
+      attoAlphAmount: Option[Amount] = None,
+      gas: Option[Int] = Some(100000),
+      gasPrice: Option[GasPrice] = None
+  ): BuildExecuteScriptTxResult = {
+
+    val buildResult = buildMultiExecuteScriptTxWithPort(
+      multisigAddress,
+      AVector(publicKey),
+      code,
+      restPort,
+      attoAlphAmount,
+      gas,
+      gasPrice
+    )
+    submitMultisigTx(buildResult.unsignedTx, buildResult.txId)
+    buildResult
+  }
+
+  def submitMultisigTx(unsignedTx: String, txId: TransactionId): TransactionId = {
+    val txResult = request[SubmitTxResult](
+      signMultisigTx(unsignedTx, txId),
       restPort
     )
-    clique.stopMining()
-    clique.stop()
+    confirmTx(txResult, restPort)
+    txResult.txId
+  }
+
+  def signMultisigTx(unsignedTxStr: String, txId: TransactionId) = {
+    val unsignedTx =
+      deserialize[UnsignedTransaction](Hex.from(unsignedTxStr).get).rightValue
+    val signature1: Signature = SignatureSchema.sign(
+      unsignedTx.id,
+      PrivateKey.unsafe(Hex.unsafe(privateKey))
+    )
+
+    request[Boolean](
+      verify(txId.toHexString, signature1, publicKey),
+      restPort
+    ) is true
+
+    submitMultisigTransaction(unsignedTxStr, AVector(signature1))
   }
 }
