@@ -747,7 +747,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
-  def buildMultiExecuteScriptTxWithPort(
+  def buildMultisigExecuteScriptTxWithPort(
       fromAddress: String,
       fromPublicKeys: AVector[String],
       code: String,

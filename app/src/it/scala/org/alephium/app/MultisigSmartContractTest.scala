@@ -26,7 +26,7 @@ import org.alephium.wallet.api.model.{Addresses, AddressInfo, WalletCreationResu
 
 class MultisigSmartContractTest extends AlephiumActorSpec {
   it should "build multisig DeployContractTx" in new MultisigSmartContractFixture {
-    buildMultiDeployContractTx(
+    contract(
       SwapContracts.tokenContract,
       gas = Some(100000),
       initialFields = None,
@@ -38,55 +38,60 @@ class MultisigSmartContractTest extends AlephiumActorSpec {
 
   it should "compile/execute the multisig swap contracts successfully" in new MultisigSmartContractFixture {
     info("Create token contract")
-    val tokenContractBuildResult = buildMultiDeployContractTx(
+    val tokenContractBuildResult = contract(
       SwapContracts.tokenContract,
       gas = Some(100000),
       initialFields = None,
       issueTokenAmount = Some(1024)
     )
-
     val tokenContractId = tokenContractBuildResult.contractAddress.contractId
+    val tokenId         = TokenId.from(tokenContractId)
 
     info("Transfer 1024 token back to self")
-    buildMultiExecuteScriptTx(
-      SwapContracts.tokenWithdrawTxScript(multisigAddress, tokenContractId, U256.unsafe(1024))
-    )
+    script(SwapContracts.tokenWithdrawTxScript(multisigAddress, tokenContractId, U256.unsafe(1024)))
 
     info("Create the ALPH/token swap contract")
-    val swapContractBuildResult = buildMultiDeployContractTx(
+    val swapContractBuildResult = contract(
       SwapContracts.swapContract,
       initialFields = Some(
         AVector[vm.Val](
           vm.Val.ByteVec(tokenContractId.bytes),
-          vm.Val.U256(U256.Zero),
-          vm.Val.U256(U256.Zero)
+          vm.Val.U256.unsafe(1),
+          vm.Val.U256.unsafe(1)
         )
       ),
       issueTokenAmount = Some(10000)
     )
-
     val swapContractKey = swapContractBuildResult.contractAddress.contractId
-    info(swapContractKey.toHexString)
 
-    // TODO
-//    info("Swap ALPH with tokens")
-//    buildMultiExecuteScriptTx(
-//      SwapContracts.swapAlphForTokenTxScript(multisigAddress, swapContractKey, ALPH.alph(10))
-//    )
+    info("Add liquidity to the swap contract")
+    script(
+      SwapContracts.addLiquidityTxScript(
+        multisigAddress,
+        ALPH.alph(1),
+        tokenId,
+        U256.unsafe(100),
+        swapContractKey
+      )
+    )
+
+    info("Swap ALPH with tokens")
+    script(SwapContracts.swapAlphForTokenTxScript(multisigAddress, swapContractKey, ALPH.alph(1)))
 
     info("Swap tokens with ALPH")
-    val tokenId = TokenId.from(tokenContractId)
-    buildMultiExecuteScriptTx(
+    script(
       SwapContracts.swapTokenForAlphTxScript(
         multisigAddress,
         swapContractKey,
         tokenId,
-        U256.unsafe(50)
+        U256.unsafe(500)
       )
     )
 
     eventually {
-      request[Balance](getBalance(multisigAddress), restPort) isnot initialBalance
+      request[Balance](getBalance(multisigAddress), restPort).tokenBalances is Some(
+        AVector(Token(tokenId, U256.unsafe(474)))
+      )
     }
 
     clique.stopMining()
@@ -123,10 +128,10 @@ trait MultisigSmartContractFixture extends CliqueFixture {
       restPort
     ).address.toBase58
 
-  val tx = transfer(publicKey, multisigAddress, transferAmount * 10, privateKey, restPort)
+  val tx = transfer(publicKey, multisigAddress, transferAmount * 200, privateKey, restPort)
   confirmTx(tx, restPort)
 
-  def buildMultiDeployContractTx(
+  def contract(
       code: String,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None,
@@ -147,14 +152,14 @@ trait MultisigSmartContractFixture extends CliqueFixture {
     buildResult
   }
 
-  def buildMultiExecuteScriptTx(
+  def script(
       code: String,
       attoAlphAmount: Option[Amount] = None,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None
   ): BuildExecuteScriptTxResult = {
 
-    val buildResult = buildMultiExecuteScriptTxWithPort(
+    val buildResult = buildMultisigExecuteScriptTxWithPort(
       multisigAddress,
       AVector(publicKey),
       code,
