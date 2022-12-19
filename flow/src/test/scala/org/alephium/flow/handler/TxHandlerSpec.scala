@@ -34,6 +34,33 @@ import org.alephium.util._
 
 class TxHandlerSpec extends AlephiumFlowActorSpec {
 
+  it should "add intra-clique transactions to mempool" in new Fixture {
+    brokerConfig.brokerNum is 3
+    brokerConfig.brokerId is 0
+    override lazy val chainIndex = ChainIndex.unsafe(1, 0)
+    val tx = (new FlowFixture {
+      override val configValues = Map(("alephium.broker.broker-id", 1))
+      val block                 = transfer(blockFlow, chainIndex)
+      val tx                    = block.nonCoinbase.head
+    }).tx
+
+    setSynced()
+
+    txHandler ! addTx(tx, isIntraCliqueSyncing = true)
+    val mempool = blockFlow.getMemPool(GroupIndex.unsafe(0))
+    eventually {
+      mempool.contains(tx.id) is true
+      brokerConfig.cliqueChainIndexes.foreach { index =>
+        val n = mempool.flow.takeSourceNodes(index.flattenIndex, Int.MaxValue, identity).length
+        if (index != chainIndex) {
+          n is 0
+        } else {
+          n is 1
+        }
+      }
+    }
+  }
+
   it should "broadcast valid transactions for single-broker clique" in new Fixture {
     override val configValues = Map(
       ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"),

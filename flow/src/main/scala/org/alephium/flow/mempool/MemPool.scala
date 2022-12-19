@@ -124,7 +124,7 @@ class MemPool private (
       }
     }
 
-  private[mempool] def addXGroupTx(
+  def addXGroupTx(
       index: ChainIndex,
       tx: TransactionTemplate,
       timestamp: TimeStamp

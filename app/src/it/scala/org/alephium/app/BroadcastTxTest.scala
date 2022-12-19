@@ -19,19 +19,63 @@ package org.alephium.app
 import java.net.InetSocketAddress
 
 import org.alephium.api.model._
-import org.alephium.protocol.model.BrokerInfo
+import org.alephium.protocol.model.{Address, BrokerInfo, GroupIndex}
 import org.alephium.util._
 
 class BroadcastTxTest extends AlephiumActorSpec {
-  it should "not broadcast tx between intra clique node" in new CliqueFixture {
+  it should "broadcast cross-group txs inside a clique" in new CliqueFixture {
     val clique = bootClique(nbOfNodes = 2)
     clique.start()
 
-    val tx = transfer(publicKey, transferAddress, transferAmount, privateKey, clique.masterRestPort)
-    val restPort1 = clique.getServer(tx.fromGroup).config.network.restPort
-    val restPort2 = clique.getServer((tx.fromGroup + 1) % groups0).config.network.restPort
-    eventually(request[TxStatus](getTransactionStatusLocal(tx), restPort1) is MemPooled())
-    eventually(request[TxStatus](getTransactionStatusLocal(tx), restPort2) is TxNotFound())
+    val fromAddressGroup = Address.fromBase58(address).get.groupIndex
+
+    {
+      info("intra-group transaction")
+      val tx =
+        transfer(publicKey, address, transferAmount, privateKey, clique.masterRestPort)
+      val restPort1 = clique.getServer(tx.fromGroup).config.network.restPort
+      eventually {
+        clique.getServer(0).node.blockFlow.getMemPool(fromAddressGroup).contains(tx.txId) is true
+        assertThrows[AssertionError](
+          clique.getServer(1).node.blockFlow.getMemPool(fromAddressGroup).contains(tx.txId)
+        )
+      }
+
+      clique.startMining()
+      confirmTx(tx, restPort1)
+      clique.stopMining()
+    }
+
+    {
+      info("cross-group transaction")
+      val toAddressGroup       = GroupIndex.unsafe(fromAddressGroup.value + 1)
+      val (toPriKey, toPubKey) = toAddressGroup.generateKey
+      val toAddress            = Address.p2pkh(toPubKey)
+      val tx0 =
+        transfer(publicKey, toAddress.toBase58, transferAmount, privateKey, clique.masterRestPort)
+      tx0.fromGroup is fromAddressGroup.value
+      tx0.toGroup is toAddressGroup.value
+
+      eventually {
+        clique.getServer(0).node.blockFlow.getMemPool(fromAddressGroup).contains(tx0.txId) is true
+        clique.getServer(1).node.blockFlow.getMemPool(toAddressGroup).contains(tx0.txId) is true
+      }
+
+      val tx1 = transfer(
+        toPubKey.toHexString,
+        address,
+        transferAmount.divUnsafe(2),
+        toPriKey.toHexString,
+        clique.masterRestPort
+      )
+      tx1.fromGroup is toAddressGroup.value
+      tx1.toGroup is fromAddressGroup.value
+
+      eventually {
+        clique.getServer(0).node.blockFlow.getMemPool(fromAddressGroup).contains(tx0.txId) is true
+        clique.getServer(1).node.blockFlow.getMemPool(toAddressGroup).contains(tx0.txId) is true
+      }
+    }
 
     clique.stop()
   }

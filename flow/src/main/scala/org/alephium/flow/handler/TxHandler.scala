@@ -56,7 +56,6 @@ object TxHandler {
   sealed trait Command
   final case class AddToSharedPool(txs: AVector[TransactionTemplate], isIntraCliqueSyncing: Boolean)
       extends Command
-  final case class AddToGrandPool(txs: AVector[TransactionTemplate]) extends Command
   final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
@@ -206,19 +205,20 @@ class TxHandler(
 
   // scalastyle:off method.length
   def handleCommand: Receive = {
-    case TxHandler.AddToSharedPool(txs, _) =>
+    case TxHandler.AddToSharedPool(txs, isIntraCliqueSyncing) =>
       if (!memPoolSetting.autoMineForDev) {
-        txs.foreach(
-          handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate, None, acknowledge = true)
-        )
-      } else {
-        mineTxsForDev(txs)
-      }
-    case TxHandler.AddToGrandPool(txs) =>
-      if (!memPoolSetting.autoMineForDev) {
-        txs.foreach(
-          handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate, None, acknowledge = true)
-        )
+        if (isIntraCliqueSyncing) {
+          txs.foreach(handleIntraCliqueSyncingTx)
+        } else {
+          txs.foreach(
+            handleInterCliqueTx(
+              _,
+              nonCoinbaseValidation.validateMempoolTxTemplate,
+              None,
+              acknowledge = true
+            )
+          )
+        }
       } else {
         mineTxsForDev(txs)
       }
@@ -278,7 +278,7 @@ class TxHandler(
         groupViews(index).getPreOutputs(tx.unsigned.inputs).flatMap {
           case Some(_) =>
             valid += 1
-            handleTx(
+            handleInterCliqueTx(
               tx,
               nonCoinbaseValidation.validateMempoolTxTemplate,
               Some(persistedTxId),
@@ -339,14 +339,15 @@ class TxHandler(
     Hex.toHexString(serialize(tx))
   }
 
-  def handleTx(
+  def handleInterCliqueTx(
       tx: TransactionTemplate,
       validate: (TransactionTemplate, BlockFlow) => TxValidationResult[Unit],
       persistedTxIdOpt: Option[PersistedTxId],
       acknowledge: Boolean
   ): Unit = {
     val chainIndex = tx.chainIndex
-    val mempool    = blockFlow.getMemPool(chainIndex.from)
+    assume(!brokerConfig.isIncomingChain(chainIndex))
+    val mempool = blockFlow.getMemPool(chainIndex.from)
     if (!TxHandler.checkHighGasPrice(tx)) {
       addFailed(tx, s"tx has lower gas price than ${defaultGasPrice}")
     } else if (mempool.contains(tx)) {
@@ -364,6 +365,12 @@ class TxHandler(
           addFailed(tx, s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}")
       }
     }
+  }
+
+  def handleIntraCliqueSyncingTx(tx: TransactionTemplate): Unit = {
+    val chainIndex = tx.chainIndex
+    assume(brokerConfig.isIncomingChain(chainIndex))
+    blockFlow.getMemPool(chainIndex.to).addXGroupTx(chainIndex, tx, TimeStamp.now())
   }
 
   private def handleValidTx(

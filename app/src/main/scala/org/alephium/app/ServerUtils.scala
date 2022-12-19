@@ -530,7 +530,7 @@ class ServerUtils(implicit
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
   ): FutureTry[SubmitTxResult] = {
-    val message = TxHandler.AddToGrandPool(AVector(tx))
+    val message = TxHandler.AddToSharedPool(AVector(tx), isIntraCliqueSyncing = false)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
         Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))

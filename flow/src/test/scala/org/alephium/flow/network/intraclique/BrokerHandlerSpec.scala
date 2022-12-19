@@ -34,8 +34,8 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.{BlocksRequest, HeadersRequest, Message, NewInv, Payload, RequestId, TxsResponse}
-import org.alephium.protocol.model.{BlockHash, BrokerInfo, ChainIndex, CliqueInfo, GroupIndex, ModelGenerators}
+import org.alephium.protocol.message._
+import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector}
 
 class BrokerHandlerSpec extends AlephiumActorSpec {
@@ -98,18 +98,21 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
 
   it should "handle TxsResponse" in new Fixture with ModelGenerators {
     def txGen(chainIndexGen: Gen[ChainIndex]) = {
-      AVector.from(Gen.listOfN(4, transactionGen(chainIndexGen = chainIndexGen)).sample.get)
+      AVector
+        .from(Gen.listOfN(4, transactionGen(chainIndexGen = chainIndexGen)).sample.get)
         .map(_.toTemplate)
     }
 
     brokerConfig.brokerId is 0
     brokerConfig.brokerNum is 3
-    val validIndexesGen   = chainIndexGen.retryUntil(index => index.from.value != 0 && index.to.value == 0)
-    val inValidIndexesGen = chainIndexGen.retryUntil(index => index.from.value == 0 || index.to.value != 0)
-    val validTxs = txGen(validIndexesGen)
-    val invalidTxs = txGen(inValidIndexesGen)
-    val validResponse = TxsResponse(RequestId.unsafe(0), (validTxs))
-    val invalidResponse = TxsResponse(RequestId.unsafe(0), (invalidTxs))
+    val validIndexesGen =
+      chainIndexGen.retryUntil(index => index.from.value != 0 && index.to.value == 0)
+    val inValidIndexesGen =
+      chainIndexGen.retryUntil(index => index.from.value == 0 || index.to.value != 0)
+    val validTxs        = txGen(validIndexesGen)
+    val invalidTxs      = txGen(inValidIndexesGen)
+    val validResponse   = TxsResponse(RequestId.unsafe(0), validTxs)
+    val invalidResponse = TxsResponse(RequestId.unsafe(0), invalidTxs)
 
     brokerHandler ! BaseBrokerHandler.Received(validResponse)
     allHandlerProbes.txHandler.expectMsg(
