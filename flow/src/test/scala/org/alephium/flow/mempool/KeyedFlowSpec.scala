@@ -44,9 +44,11 @@ class KeyedFlowSpec extends AlephiumSpec {
   behavior of "Path"
 
   it should "test `addNewNode`" in new PathFixture {
+    flow.size is N
     flow.isEmpty is false
     flow.checkSources(0)
     (0 until N).foreach { n =>
+      flow.contains(n) is true
       val node = flow.allNodes.unsafe(n)
       node.value is n
       if (n > 0) {
@@ -100,7 +102,9 @@ class KeyedFlowSpec extends AlephiumSpec {
   behavior of "Grid"
 
   it should "test `addNewNode`" in new GridFixture {
+    flow.size is (N * M)
     flow.isEmpty is false
+    (1 until N * M).foreach(k => flow.contains(k) is true)
     flow.checkSourcess(Seq.tabulate(M)(k => Seq(k * N)): _*)
     nodess.zipWithIndex.foreach { case (nodes, n) =>
       nodes.map(_.value) is IndexedSeq.tabulate(M)(_ * N + n)
@@ -118,6 +122,15 @@ class KeyedFlowSpec extends AlephiumSpec {
           children is Set.tabulate(M)(_ * N + n + 1)
         }
       }
+    }
+  }
+
+  it should "test `takeSourceNodes`" in new GridFixture {
+    (1 until M).foreach { g =>
+      val buffer = mutable.ArrayBuffer.empty[N]
+      flow.takeSourceNodes(g, Int.MaxValue, buffer.addOne)
+      buffer.length is 1
+      buffer.head.value is (g * N)
     }
   }
 
@@ -177,8 +190,9 @@ class KeyedFlowSpec extends AlephiumSpec {
   }
 
   it should "test `addNewNode`" in new GraphFixture {
-    flow.allNodes.size is N
+    flow.size is N
     flow.checkEdges()
+    (0 until N).foreach(k => flow.contains(k) is true)
   }
 
   it should "test `removeSourceNode`" in new GraphFixture {
@@ -207,6 +221,12 @@ class KeyedFlowSpec extends AlephiumSpec {
       flow.removeNodeAndDescendants(node, _ => ())
       flow.checkEdges()
     }
+  }
+
+  it should "test `clear`" in new GraphFixture {
+    flow.clear()
+    flow.sourceNodes.foreach(_.isEmpty is true)
+    flow.allNodes.isEmpty is true
   }
 }
 

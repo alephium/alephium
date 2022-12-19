@@ -43,10 +43,10 @@ class KeyedFlow[K, N <: KeyedFlow.Node[K, N]](
     allNodes.clear()
   }
 
-  @inline def _addSourceNode(node: N): Unit = {
+  @inline private def _addSourceNode(node: N): Unit = {
     sourceNodeGroups(node.getGroup()).put(node.key, node)
   }
-  @inline def _removeSourceNode(node: N): Unit = {
+  @inline private def _removeSourceNode(node: N): Unit = {
     sourceNodeGroups(node.getGroup()).remove(node.key)
     ()
   }
@@ -101,7 +101,7 @@ class KeyedFlow[K, N <: KeyedFlow.Node[K, N]](
     allNodes.get(key).foreach(removeSourceNode)
   }
 
-  @inline def removeSourceNode(node: N): Unit = {
+  @inline private def removeSourceNode(node: N): Unit = {
     assume(node.isSource())
     val key = node.key
     allNodes.remove(key)
@@ -136,7 +136,7 @@ class KeyedFlow[K, N <: KeyedFlow.Node[K, N]](
     }
   }
 
-  @inline def removeSinkNode(node: N): Unit = {
+  @inline private def removeSinkNode(node: N): Unit = {
     val key = node.key
     assume(node.isSink())
     node.getParents().foreach(_.foreach(_.removeChild(node)))
