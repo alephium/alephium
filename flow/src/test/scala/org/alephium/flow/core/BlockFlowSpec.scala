@@ -769,7 +769,7 @@ class BlockFlowSpec extends AlephiumSpec {
       blocks.foreachWithIndex { case (block, to) =>
         block.transactions.foreachWithIndex { case (tx, index) =>
           from is to
-          blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+          blockFlow.getTxConfirmedStatus(tx.id, ChainIndex.unsafe(from, to)) isE
             Some(Confirmed(TxIndex(block.hash, index), 1, 1, 1))
         }
       }
@@ -798,7 +798,7 @@ class BlockFlowSpec extends AlephiumSpec {
             count(newIndexes0.contains(ChainIndex.unsafe(from, from)))
           val toConfirmations = 1 +
             count(newIndexes0.contains(ChainIndex.unsafe(to, to)))
-          blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+          blockFlow.getTxConfirmedStatus(tx.id, ChainIndex.unsafe(from, to)) isE
             Some(
               Confirmed(
                 TxIndex(block.hash, index),
@@ -815,7 +815,7 @@ class BlockFlowSpec extends AlephiumSpec {
     blockFlow.genesisBlocks.foreachWithIndex { case (blocks, from) =>
       blocks.foreachWithIndex { case (block, to) =>
         block.transactions.foreachWithIndex { case (tx, index) =>
-          blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+          blockFlow.getTxConfirmedStatus(tx.id, ChainIndex.unsafe(from, to)) isE
             Some(Confirmed(TxIndex(block.hash, index), 2, 2, 2))
         }
       }
@@ -831,10 +831,10 @@ class BlockFlowSpec extends AlephiumSpec {
       val blockFlow0 = isolatedBlockFlow()
       val chainIndex = ChainIndex.unsafe(targetGroup, targetGroup)
       val block      = transfer(blockFlow0, chainIndex)
-      blockFlow0.getTxStatus(block.transactions.head.id, chainIndex) isE None
+      blockFlow0.getTxConfirmedStatus(block.transactions.head.id, chainIndex) isE None
 
       addAndCheck(blockFlow0, block)
-      blockFlow0.getTxStatus(block.transactions.head.id, chainIndex) isE
+      blockFlow0.getTxConfirmedStatus(block.transactions.head.id, chainIndex) isE
         Some(Confirmed(TxIndex(block.hash, 0), 1, 1, 1))
     }
   }
@@ -850,20 +850,20 @@ class BlockFlowSpec extends AlephiumSpec {
       val blockFlow0 = isolatedBlockFlow()
       val chainIndex = ChainIndex.unsafe(from, to)
       val block0     = transfer(blockFlow0, chainIndex)
-      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE None
+      blockFlow0.getTxConfirmedStatus(block0.transactions.head.id, chainIndex) isE None
 
       addAndCheck(blockFlow0, block0)
-      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE
+      blockFlow0.getTxConfirmedStatus(block0.transactions.head.id, chainIndex) isE
         Some(Confirmed(TxIndex(block0.hash, 0), 1, 0, 0))
 
       val block1 = emptyBlock(blockFlow0, ChainIndex.unsafe(from, from))
       addAndCheck(blockFlow0, block1)
-      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE
+      blockFlow0.getTxConfirmedStatus(block0.transactions.head.id, chainIndex) isE
         Some(Confirmed(TxIndex(block0.hash, 0), 1, 1, 0))
 
       val block2 = emptyBlock(blockFlow0, ChainIndex.unsafe(to, to))
       addAndCheck(blockFlow0, block2)
-      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE
+      blockFlow0.getTxConfirmedStatus(block0.transactions.head.id, chainIndex) isE
         Some(Confirmed(TxIndex(block0.hash, 0), 1, 1, 1))
     }
   }

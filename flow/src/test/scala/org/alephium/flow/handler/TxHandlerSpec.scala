@@ -278,7 +278,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     expectMsg(TxHandler.AddSucceeded(tx.id))
     eventually(blockFlow.getMemPool(chainIndex).size is 0)
 
-    val status = blockFlow.getTxStatus(tx.id, chainIndex).rightValue.get
+    val status = blockFlow.getTransactionStatus(tx.id, chainIndex).rightValue.get
     status is a[BlockFlowState.Confirmed]
     val confirmed = status.asInstanceOf[BlockFlowState.Confirmed]
     confirmed.chainConfirmations is 1
@@ -340,7 +340,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     expectMsg(TxHandler.AddSucceeded(tx.id))
     eventually(blockFlow.getMemPool(index).size is 0)
 
-    val status = blockFlow.getTxStatus(tx.id, index).rightValue.get
+    val status = blockFlow.getTransactionStatus(tx.id, index).rightValue.get
     status is a[BlockFlowState.Confirmed]
     val confirmed = status.asInstanceOf[BlockFlowState.Confirmed]
     confirmed.chainConfirmations is 1
