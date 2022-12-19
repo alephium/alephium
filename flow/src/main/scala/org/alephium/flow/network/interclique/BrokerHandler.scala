@@ -203,7 +203,7 @@ trait BrokerHandler extends BaseBrokerHandler {
       if (txs.exists(tx => !brokerConfig.contains(tx.chainIndex.from))) {
         handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
       } else {
-        allHandlers.txHandler ! TxHandler.AddToSharedPool(txs)
+        allHandlers.txHandler ! TxHandler.AddToSharedPool(txs, isIntraCliqueSyncing = false)
       }
     }
   }

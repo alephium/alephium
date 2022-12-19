@@ -17,6 +17,7 @@
 package org.alephium.flow.handler
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 import akka.actor.Props
 
@@ -26,7 +27,7 @@ import org.alephium.flow.io.{PendingTxStorage, ReadyTxStorage}
 import org.alephium.flow.mempool.{GrandPool, MemPool}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.{DataOrigin, MiningBlob, PersistedTxId, ReadyTxInfo}
-import org.alephium.flow.network.InterCliqueManager
+import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
 import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
@@ -53,8 +54,9 @@ object TxHandler {
     Props(new TxHandler(blockFlow, pendingTxStorage, readyTxStorage))
 
   sealed trait Command
-  final case class AddToSharedPool(txs: AVector[TransactionTemplate]) extends Command
-  final case class AddToGrandPool(txs: AVector[TransactionTemplate])  extends Command
+  final case class AddToSharedPool(txs: AVector[TransactionTemplate], isIntraCliqueSyncing: Boolean)
+      extends Command
+  final case class AddToGrandPool(txs: AVector[TransactionTemplate]) extends Command
   final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
@@ -200,11 +202,11 @@ class TxHandler(
 
   override def receive: Receive = handleCommand orElse updateNodeSyncStatus
 
-  type TxsPerChainId = mutable.Map[ChainIndex, mutable.ArrayBuffer[TransactionId]]
+  type TxsPerChain[T] = mutable.Map[ChainIndex, mutable.ArrayBuffer[T]]
 
   // scalastyle:off method.length
   def handleCommand: Receive = {
-    case TxHandler.AddToSharedPool(txs) =>
+    case TxHandler.AddToSharedPool(txs, _) =>
       if (!memPoolSetting.autoMineForDev) {
         txs.foreach(
           handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate, None, acknowledge = true)
@@ -297,11 +299,12 @@ class TxHandler(
   private def downloadTxs(): Unit = {
     log.debug("Start to download txs")
     if (announcements.nonEmpty) {
-      val downloads = mutable.Map.empty[ActorRefT[BrokerHandler.Command], TxsPerChainId]
+      val downloads =
+        mutable.Map.empty[ActorRefT[BrokerHandler.Command], TxsPerChain[TransactionId]]
       announcements.keys().foreach { announcement =>
         downloads.get(announcement.brokerHandler) match {
           case Some(chainIndexedHashes) =>
-            updateChainIndexHashes(announcement.hash, announcement.chainIndex, chainIndexedHashes)
+            updateChainIndexTxs(announcement.hash, announcement.chainIndex, chainIndexedHashes)
           case None =>
             val hashes             = mutable.ArrayBuffer(announcement.hash)
             val chainIndexedHashes = mutable.Map(announcement.chainIndex -> hashes)
@@ -309,7 +312,7 @@ class TxHandler(
         }
       }
       downloads.foreach { case (brokerHandler, chainIndexedHashes) =>
-        val txHashes = chainIndexedHashesToAVector(chainIndexedHashes)
+        val txHashes = chainIndexedTxsToAVector(chainIndexedHashes)
         log.debug(s"Download tx announcements ${Utils.showChainIndexedDigest(txHashes)}")
         brokerHandler ! BrokerHandler.DownloadTxs(txHashes)
       }
@@ -387,41 +390,43 @@ class TxHandler(
     }
   }
 
-  private def updateChainIndexHashes(
-      hash: TransactionId,
+  private def updateChainIndexTxs[T](
+      tx: T,
       chainIndex: ChainIndex,
-      hashes: TxsPerChainId
+      txs: TxsPerChain[T]
   ): Unit = {
-    hashes.get(chainIndex) match {
-      case Some(chainIndexHashes) => chainIndexHashes += hash
+    txs.get(chainIndex) match {
+      case Some(chainIndexHashes) => chainIndexHashes += tx
       case None =>
-        val chainIndexedHashes = mutable.ArrayBuffer(hash)
-        hashes(chainIndex) = chainIndexedHashes
+        val chainIndexedHashes = mutable.ArrayBuffer(tx)
+        txs(chainIndex) = chainIndexedHashes
     }
   }
 
-  private def chainIndexedHashesToAVector(
-      hashes: TxsPerChainId
-  ): AVector[(ChainIndex, AVector[TransactionId])] = {
-    hashes.foldLeft(AVector.empty[(ChainIndex, AVector[TransactionId])]) {
-      case (acc, (chainIndex, hashes)) =>
-        acc :+ (chainIndex -> AVector.from(hashes))
+  private def chainIndexedTxsToAVector[T: ClassTag](
+      txs: TxsPerChain[T]
+  ): AVector[(ChainIndex, AVector[T])] = {
+    txs.foldLeft(AVector.empty[(ChainIndex, AVector[T])]) { case (acc, (chainIndex, txs)) =>
+      acc :+ (chainIndex -> AVector.from(txs))
     }
   }
 
   private def broadcastTxs(): Unit = {
     log.debug("Start to broadcast txs")
-    val broadcasts = mutable.Map.empty[ChainIndex, mutable.ArrayBuffer[TransactionId]]
+    val broadcasts = mutable.Map.empty[ChainIndex, mutable.ArrayBuffer[TransactionTemplate]]
     if (txsBuffer.nonEmpty) {
       txsBuffer.keys().foreach { tx =>
-        updateChainIndexHashes(tx.id, tx.chainIndex, broadcasts)
+        updateChainIndexTxs(tx, tx.chainIndex, broadcasts)
       }
       txsBuffer.clear()
     }
 
     if (broadcasts.nonEmpty) {
-      val txHashes = chainIndexedHashesToAVector(broadcasts)
-      publishEvent(InterCliqueManager.BroadCastTx(txHashes))
+      val txs = chainIndexedTxsToAVector(broadcasts)
+      publishEvent(InterCliqueManager.BroadCastTx(txs.map(p => p._1 -> p._2.map(_.id))))
+      if (brokerConfig.brokerNum > 1) {
+        publishEvent(IntraCliqueManager.BroadCastTx(txs))
+      }
     }
     scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
   }

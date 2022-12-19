@@ -24,7 +24,7 @@ import org.scalacheck.Gen
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlowState
 import org.alephium.flow.core.BlockFlowState.MemPooled
-import org.alephium.flow.network.InterCliqueManager
+import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.validation.NonExistInput
 import org.alephium.protocol.ALPH
@@ -34,7 +34,7 @@ import org.alephium.util._
 
 class TxHandlerSpec extends AlephiumFlowActorSpec {
 
-  it should "broadcast valid transactions" in new Fixture {
+  it should "broadcast valid transactions for single-broker clique" in new Fixture {
     override val configValues = Map(
       ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"),
       ("alephium.broker.groups", 4),
@@ -49,13 +49,27 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     txHandler.underlyingActor.txsBuffer.isEmpty is true
 
     val txs0 = txs.take(2)
-    checkBroadcast(txs0)
+    checkInterCliqueBroadcast(txs0)
+    intraCliqueProbe.expectNoMessage()
 
     val txs1 = txs.drop(2)
-    checkBroadcast(txs1)
+    checkInterCliqueBroadcast(txs1)
+    intraCliqueProbe.expectNoMessage()
 
     // won't broadcast when there are no txs in buffer
-    broadcastTxProbe.expectNoMessage()
+    interCliqueProbe.expectNoMessage()
+  }
+
+  it should "broadcast valid transactions for multi-broker clique" in new Fixture {
+    override lazy val chainIndex = ChainIndex.unsafe(0, 1)
+
+    setSynced()
+
+    val block = transfer(blockFlow, chainIndex)
+    val txs   = block.nonCoinbase
+    checkInterCliqueBroadcast(txs)
+    val broadcastMsg = AVector(chainIndex -> txs.map(_.toTemplate))
+    intraCliqueProbe.expectMsg(IntraCliqueManager.BroadCastTx(broadcastMsg))
   }
 
   it should "not broadcast invalid tx" in new Fixture {
@@ -68,7 +82,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
         s"Failed in validating tx ${tx.id.toHexString} due to ${NonExistInput}: ${hex(tx)}"
       )
     )
-    broadcastTxProbe.expectNoMessage()
+    interCliqueProbe.expectNoMessage()
   }
 
   // FIXME: persist mempool txs
@@ -100,7 +114,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     setSynced()
     txHandler ! addTx(tx)
     expectMsg(TxHandler.AddSucceeded(tx.id))
-    broadcastTxProbe.expectMsg(
+    interCliqueProbe.expectMsg(
       InterCliqueManager.BroadCastTx(AVector((chainIndex, AVector(tx.id))))
     )
 
@@ -109,7 +123,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       expectMsg(
         TxHandler.AddFailed(tx.id, s"tx ${tx.id.toHexString} is already included")
       )
-      broadcastTxProbe.expectNoMessage()
+      interCliqueProbe.expectNoMessage()
     }
   }
 
@@ -122,7 +136,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     setSynced()
     txHandler ! addTx(tx0)
     expectMsg(TxHandler.AddSucceeded(tx0.id))
-    broadcastTxProbe.expectMsg(
+    interCliqueProbe.expectMsg(
       InterCliqueManager.BroadCastTx(AVector((chainIndex, AVector(tx0.id))))
     )
 
@@ -132,7 +146,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
         TxHandler
           .AddFailed(tx1.id, s"tx ${tx1.id.shortHex} is double spending: ${hex(tx1)}")
       )
-      broadcastTxProbe.expectNoMessage()
+      interCliqueProbe.expectNoMessage()
     }
   }
 
@@ -370,8 +384,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
         TxHandler.props(blockFlow, storages.pendingTxStorage, storages.readyTxStorage)
       )
 
-    def addTx(tx: Transaction) = TxHandler.AddToSharedPool(AVector(tx.toTemplate))
-    def hex(tx: Transaction)   = Hex.toHexString(serialize(tx.toTemplate))
+    def addTx(tx: Transaction, isIntraCliqueSyncing: Boolean = false) =
+      TxHandler.AddToSharedPool(AVector(tx.toTemplate), isIntraCliqueSyncing)
+    def hex(tx: Transaction) = Hex.toHexString(serialize(tx.toTemplate))
     def setSynced() = {
       txHandler ! InterCliqueManager.SyncedResult(true)
       eventually {
@@ -383,15 +398,17 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       }
     }
 
-    val broadcastTxProbe = TestProbe()
-    system.eventStream.subscribe(broadcastTxProbe.ref, classOf[InterCliqueManager.BroadCastTx])
+    val interCliqueProbe = TestProbe()
+    system.eventStream.subscribe(interCliqueProbe.ref, classOf[InterCliqueManager.BroadCastTx])
+    val intraCliqueProbe = TestProbe()
+    system.eventStream.subscribe(intraCliqueProbe.ref, classOf[IntraCliqueManager.BroadCastTx])
 
-    def checkBroadcast(txs: AVector[Transaction]) = {
+    def checkInterCliqueBroadcast(txs: AVector[Transaction]) = {
       txs.foreach(txHandler ! addTx(_))
       txs.foreach(tx => expectMsg(TxHandler.AddSucceeded(tx.id)))
-      broadcastTxProbe.expectMsgPF() { case InterCliqueManager.BroadCastTx(indexedHashes) =>
+      interCliqueProbe.expectMsgPF() { case InterCliqueManager.BroadCastTx(indexedHashes) =>
         val hashes = indexedHashes.flatMap(_._2)
-        hashes.length is 2
+        hashes.length is txs.length
         hashes.contains(txs.head.id) is true
         hashes.contains(txs.last.id) is true
       }

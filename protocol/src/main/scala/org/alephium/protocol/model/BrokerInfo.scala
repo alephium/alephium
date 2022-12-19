@@ -47,6 +47,10 @@ trait BrokerGroupInfo {
       (brokerNum % another.brokerNum == 0) && (brokerId % another.brokerNum == another.brokerId)
     }
   }
+
+  def isIncomingChain(chainIndex: ChainIndex): Boolean = {
+    !contains(chainIndex.from) && contains(chainIndex.to)
+  }
 }
 
 final case class BrokerInfo private (
