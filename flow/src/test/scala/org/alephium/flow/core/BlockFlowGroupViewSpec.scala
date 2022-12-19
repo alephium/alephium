@@ -45,9 +45,8 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
     groupView1.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
       block0.nonCoinbase.head.unsigned.fixedOutputs.tail
-    mempool.addNewTx(block1.chainIndex, tx1, TimeStamp.now())
-    mempool.contains(block1.chainIndex, tx1) is true
-    mempool.pendingPool.contains(tx1.id) is false
+    mempool.add(block1.chainIndex, tx1, TimeStamp.now())
+    mempool.contains(tx1) is true
 
     val tx2        = block2.nonCoinbase.head.toTemplate
     val groupView2 = blockFlow.getImmutableGroupViewIncludePool(mainGroup).rightValue
@@ -56,9 +55,8 @@ class BlockFlowGroupViewSpec extends AlephiumSpec {
       block1.nonCoinbase.head.unsigned.fixedOutputs.tail
     groupView2.getRelevantUtxos(lockupScript, Int.MaxValue).rightValue.map(_.output) is
       block1.nonCoinbase.head.unsigned.fixedOutputs.tail
-    mempool.addNewTx(block2.chainIndex, tx2, TimeStamp.now())
-    mempool.contains(block1.chainIndex, tx2) is true
-    mempool.pendingPool.contains(tx2.id) is true
+    mempool.add(block2.chainIndex, tx2, TimeStamp.now())
+    mempool.contains(tx2) is true
 
     val tx3        = block3.nonCoinbase.head.toTemplate
     val groupView3 = blockFlow.getImmutableGroupViewIncludePool(mainGroup).rightValue

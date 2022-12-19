@@ -510,7 +510,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def isInMemPool(txId: TransactionId, chainIndex: ChainIndex): Boolean = {
-    Self.blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
+    Self.blockFlow.getMemPool(chainIndex).contains(txId)
   }
 
   def checkTxChainIndex(chainIndex: ChainIndex, tx: TransactionId): Either[String, Unit] = {

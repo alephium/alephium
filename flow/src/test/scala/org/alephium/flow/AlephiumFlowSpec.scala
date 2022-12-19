@@ -206,7 +206,7 @@ trait FlowFixture
     val tx            = Transaction.from(newUnsignedTx, privateKey)
 
     val txValidation = TxValidation.build
-    txValidation.validateGrandPoolTxTemplate(tx.toTemplate, blockFlow) isE ()
+    txValidation.validateMempoolTxTemplate(tx.toTemplate, blockFlow) isE ()
 
     AVector(tx)
   }

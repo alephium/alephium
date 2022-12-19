@@ -358,6 +358,7 @@ final case class TransactionTemplate(
   override def outputsLength: Int = unsigned.fixedOutputs.length
 
   override def getOutput(index: Int): TxOutput = unsigned.fixedOutputs(index)
+
 }
 
 object TransactionTemplate {

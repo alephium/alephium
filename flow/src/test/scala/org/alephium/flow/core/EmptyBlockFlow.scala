@@ -22,7 +22,7 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.WorldState
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.AVector
 
 trait EmptyBlockFlow extends BlockFlow {
   def storages: Storages
@@ -46,8 +46,8 @@ trait EmptyBlockFlow extends BlockFlow {
   def getAllTips: AVector[BlockHash]                                                           = ???
   def getBestTipUnsafe(): BlockHash                                                            = ???
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps                                          = ???
-  def updateBestDeps(): IOResult[AVector[(TransactionTemplate, TimeStamp)]]                    = ???
-  def updateBestDepsUnsafe(): AVector[(TransactionTemplate, TimeStamp)]                        = ???
+  def updateBestDeps(): IOResult[Unit]                                                         = ???
+  def updateBestDepsUnsafe(): Unit                                                             = ???
   def getBestIntraGroupTip(): BlockHash                                                        = ???
   def add(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit]              = ???
   def add(header: BlockHeader): IOResult[Unit]                                                 = ???

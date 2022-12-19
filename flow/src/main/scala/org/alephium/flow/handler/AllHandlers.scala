@@ -128,7 +128,7 @@ object AllHandlers {
         s"DependencyHandler$namePostfix"
       )
 
-    val viewHandlerProps = ViewHandler.props(blockFlow, txHandler).withDispatcher(MiningDispatcher)
+    val viewHandlerProps = ViewHandler.props(blockFlow).withDispatcher(MiningDispatcher)
     val viewHandler      = ActorRefT.build[ViewHandler.Command](system, viewHandlerProps)
 
     AllHandlers(

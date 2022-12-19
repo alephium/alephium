@@ -44,4 +44,6 @@ trait SimpleMap[K, V] {
   def values(): Iterator[V] = underlying.values().iterator().asScala
 
   def entries(): Iterator[Map.Entry[K, V]] = underlying.entrySet().iterator().asScala
+
+  def clear(): Unit
 }

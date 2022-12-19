@@ -163,7 +163,7 @@ class BlockFlowSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block11, 1)
       addAndCheck(blockFlow, block12, 1)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block11, block12))
-      blockFlow.grandPool.cleanAndExtractReadyTxs(
+      blockFlow.grandPool.clean(
         blockFlow,
         TimeStamp.now()
       ) // remove double spending tx
@@ -244,7 +244,7 @@ class BlockFlowSpec extends AlephiumSpec {
         if (blockAdded equals block12.hash) {
           val conflictedTx = block11.nonCoinbase.head
           blockFlow.getMemPool(chainIndex).size is 1 // the conflicted tx is kept
-          blockFlow.getMemPool(chainIndex).contains(chainIndex, conflictedTx.id) is true
+          blockFlow.getMemPool(chainIndex).contains(conflictedTx.id) is true
           val miner    = getGenesisLockupScript(chainIndex)
           val template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
           template.transactions.length is 1 // the conflicted tx will not be used, only coinbase tx
@@ -678,8 +678,8 @@ class BlockFlowSpec extends AlephiumSpec {
       val tx = TransactionTemplate.from(unsignedTx, fromPriKey)
 
       tx.chainIndex is chainIndex
-      theMemPool.addNewTx(chainIndex, tx, TimeStamp.now())
-      theMemPool.contains(tx.chainIndex, tx.id) is true
+      theMemPool.add(chainIndex, tx, TimeStamp.now())
+      theMemPool.contains(tx.id) is true
 
       val balance = initialAmount - (ALPH.oneAlph + defaultGasFee).mulUnsafe(txCount)
       blockFlow
@@ -699,30 +699,34 @@ class BlockFlowSpec extends AlephiumSpec {
     val tx1         = transfer()
     val tx2         = transfer()
     val fromBalance = blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue
-    theMemPool.pendingPool.contains(tx0.id) is false
-    theMemPool.pendingPool.contains(tx1.id) is true
-    theMemPool.pendingPool.contains(tx2.id) is true
+    theMemPool.contains(tx0.id) is true
+    theMemPool.contains(tx1.id) is true
+    theMemPool.contains(tx2.id) is true
+    theMemPool.isReady(tx0.id) is true
+    theMemPool.isReady(tx1.id) is false
+    theMemPool.isReady(tx2.id) is false
 
     val block0 = mineFromMemPool(blockFlow, tx0.chainIndex)
     addAndCheck(blockFlow, block0)
-    theMemPool.contains(tx0.chainIndex, tx0.id) is false
-    theMemPool.contains(tx1.chainIndex, tx1.id) is true
-    theMemPool.pendingPool.contains(tx1.id) is false
-    theMemPool.pendingPool.contains(tx2.id) is true
+    theMemPool.contains(tx0.id) is false
+    theMemPool.contains(tx1.id) is true
+    theMemPool.contains(tx2.id) is true
+    theMemPool.isReady(tx1.id) is true
+    theMemPool.isReady(tx2.id) is false
     blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block0.hash) is true
     blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue is fromBalance
 
     val block1 = mineFromMemPool(blockFlow, tx1.chainIndex)
     addAndCheck(blockFlow, block1)
-    theMemPool.contains(tx1.chainIndex, tx1.id) is false
-    theMemPool.contains(tx2.chainIndex, tx2.id) is true
-    theMemPool.pendingPool.contains(tx2.id) is false
+    theMemPool.contains(tx1.id) is false
+    theMemPool.contains(tx2.id) is true
+    theMemPool.isReady(tx2.id) is true
     blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block1.hash) is true
     blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue is fromBalance
 
     val block2 = mineFromMemPool(blockFlow, tx2.chainIndex)
     addAndCheck(blockFlow, block2)
-    theMemPool.contains(tx2.chainIndex, tx2.id) is false
+    theMemPool.contains(tx2.id) is false
     blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block2.hash) is true
     blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue is fromBalance
   }

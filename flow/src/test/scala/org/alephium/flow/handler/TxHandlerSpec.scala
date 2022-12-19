@@ -23,7 +23,7 @@ import org.scalacheck.Gen
 
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlowState
-import org.alephium.flow.model.{PersistedTxId, ReadyTxInfo}
+import org.alephium.flow.core.BlockFlowState.MemPooled
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.validation.NonExistInput
@@ -42,37 +42,23 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       ("alephium.broker.broker-id", 0)
     )
 
+    val tmpBlockFlow = isolatedBlockFlow()
     def createTx(chainIndex: ChainIndex): Transaction = {
-      transferTxs(blockFlow, chainIndex, ALPH.alph(1), 1, None, true, None).head
+      val block = transfer(tmpBlockFlow, chainIndex)
+      addAndCheck(tmpBlockFlow, block)
+      block.nonCoinbase.head
     }
 
     setSynced()
-    val txs =
-      AVector.tabulate(groupConfig.groups)(groupId => createTx(ChainIndex.unsafe(groupId, groupId)))
+    val txs = AVector.fill(groupConfig.groups)(createTx(ChainIndex.random))
     txs.length is 4
     txHandler.underlyingActor.txsBuffer.isEmpty is true
 
     val txs0 = txs.take(2)
-    txs0.foreach(txHandler ! addTx(_))
-    txs0.foreach(tx => expectMsg(TxHandler.AddSucceeded(tx.id)))
-    broadcastTxProbe.expectMsgPF() { case InterCliqueManager.BroadCastTx(hashes) =>
-      hashes.length is 2
-      hashes.contains((ChainIndex.unsafe(0, 0), AVector(txs0.head.id))) is true
-      hashes.contains((ChainIndex.unsafe(1, 1), AVector(txs0.last.id))) is true
-    }
-    // use eventually here to avoid test failure on windows
-    eventually(txHandler.underlyingActor.txsBuffer.isEmpty is true)
+    checkBroadcast(txs0)
 
     val txs1 = txs.drop(2)
-    txs1.foreach(txHandler ! addTx(_))
-    txs1.foreach(tx => expectMsg(TxHandler.AddSucceeded(tx.id)))
-    broadcastTxProbe.expectMsgPF() { case InterCliqueManager.BroadCastTx(hashes) =>
-      hashes.length is 2
-      hashes.contains((ChainIndex.unsafe(2, 2), AVector(txs1.head.id))) is true
-      hashes.contains((ChainIndex.unsafe(3, 3), AVector(txs1.last.id))) is true
-    }
-    // use eventually here to avoid test failure on windows
-    eventually(txHandler.underlyingActor.txsBuffer.isEmpty is true)
+    checkBroadcast(txs1)
 
     // won't broadcast when there are no txs in buffer
     broadcastTxProbe.expectNoMessage()
@@ -91,84 +77,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     broadcastTxProbe.expectNoMessage()
   }
 
-  it should "delay txs broadcast if the dependent outputs persisted a short time ago" in new Fixture {
-    override val configValues = Map(
-      ("alephium.network.txs-broadcast-delay", "1 s"),
-      ("alephium.mempool.batch-broadcast-txs-frequency", "200 ms")
-    )
-
-    val (privKey0, pubKey0)    = GroupIndex.unsafe(0).generateKey
-    val (privKey1, pubKey1, _) = genesisKeys(0)
-    val block0                 = transfer(blockFlow, privKey1, pubKey0, ALPH.alph(3))
-    val tx0                    = block0.nonCoinbase.head.toTemplate
-    val mempool                = blockFlow.getMemPool(tx0.chainIndex)
-
-    setSynced()
-    txHandler ! TxHandler.AddToSharedPool(AVector(tx0))
-    expectMsg(TxHandler.AddSucceeded(tx0.id))
-    eventually {
-      mempool.getSharedPool(tx0.chainIndex).contains(tx0.id) is true
-      txHandler.underlyingActor.txsBuffer.contains(tx0) is true
-      txHandler.underlyingActor.delayedTxs.contains(tx0) is false
-    }
-
-    addAndCheck(blockFlow, block0)
-    val block1     = transfer(blockFlow, privKey0, pubKey1, ALPH.alph(1))
-    val tx1        = block1.nonCoinbase.head.toTemplate
-    val worldState = blockFlow.getBestPersistedWorldState(tx1.chainIndex.from).rightValue
-
-    worldState.existOutput(tx1.unsigned.inputs.head.outputRef) isE true
-    txHandler ! TxHandler.AddToSharedPool(AVector(tx1))
-    expectMsg(TxHandler.AddSucceeded(tx1.id))
-    eventually {
-      mempool.getSharedPool(tx1.chainIndex).contains(tx1.id) is true
-      txHandler.underlyingActor.txsBuffer.contains(tx1) is false
-      txHandler.underlyingActor.delayedTxs.contains(tx1) is true
-    }
-
-    broadcastTxProbe.expectMsg(
-      InterCliqueManager.BroadCastTx(AVector(tx0.chainIndex -> AVector(tx0.id)))
-    )
-    txHandler.underlyingActor.txsBuffer.isEmpty is true
-    txHandler.underlyingActor.delayedTxs.contains(tx1) is true
-    broadcastTxProbe.expectMsg(
-      InterCliqueManager.BroadCastTx(AVector(tx1.chainIndex -> AVector(tx1.id)))
-    )
-    txHandler.underlyingActor.delayedTxs.isEmpty is true
-  }
-
-  it should "delay txs broadcast if the dependent outputs in block cache" in new Fixture {
-    override val configValues = Map(
-      ("alephium.broker.broker-num", 1),
-      ("alephium.network.txs-broadcast-delay", "1 s"),
-      ("alephium.mempool.batch-broadcast-txs-frequency", "200 ms")
-    )
-
-    val (privKey0, pubKey0, _) = genesisKeys(0)
-    val (privKey1, pubKey1)    = GroupIndex.unsafe(1).generateKey
-    val block0                 = transfer(blockFlow, privKey0, pubKey1, ALPH.alph(3))
-    addAndCheck(blockFlow, block0)
-    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
-
-    val block1     = transfer(blockFlow, privKey1, pubKey0, ALPH.alph(2))
-    val tx         = block1.nonCoinbase.head.toTemplate
-    val worldState = blockFlow.getBestPersistedWorldState(block0.chainIndex.from).rightValue
-
-    setSynced()
-    worldState.existOutput(tx.unsigned.inputs.head.outputRef) isE false
-    txHandler ! TxHandler.AddToSharedPool(AVector(tx))
-    expectMsg(TxHandler.AddSucceeded(tx.id))
-    eventually {
-      txHandler.underlyingActor.txsBuffer.contains(tx) is false
-      txHandler.underlyingActor.delayedTxs.contains(tx) is true
-    }
-    broadcastTxProbe.expectMsg(
-      InterCliqueManager.BroadCastTx(AVector(tx.chainIndex -> AVector(tx.id)))
-    )
-    txHandler.underlyingActor.delayedTxs.isEmpty is true
-  }
-
-  it should "load persisted pending txs only once when node synced" in new FlowFixture {
+  // FIXME: persist mempool txs
+  ignore should "load persisted pending txs only once when node synced" in new FlowFixture {
     implicit lazy val system = createSystem(Some(AlephiumActorSpec.infoConfig))
     val txHandler = TestActorRef[TxHandler](
       TxHandler.props(blockFlow, storages.pendingTxStorage, storages.readyTxStorage)
@@ -185,202 +95,6 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     EventFilter.info(start = "Start to load", occurrences = 0).intercept {
       txHandler ! InterCliqueManager.SyncedResult(true)
       txHandler ! InterCliqueManager.SyncedResult(true)
-    }
-  }
-
-  trait PersistenceFixture extends Fixture {
-    val (privKey0, pubKey0, _) = genesisKeys(0)
-    val (privKey1, pubKey1)    = chainIndex.from.generateKey
-    val mempool                = blockFlow.getMemPool(chainIndex)
-    val sharedPool             = mempool.getSharedPool(chainIndex)
-    val pendingPool            = mempool.pendingPool
-    val pendingTxStorage       = storages.pendingTxStorage
-    val readyTxStorage         = storages.readyTxStorage
-
-    lazy val block0 = transfer(blockFlow, privKey0, pubKey1, ALPH.alph(4))
-    lazy val tx0    = block0.firstTx
-    lazy val block1 = transfer(blockFlow, privKey1, pubKey0, ALPH.alph(1))
-    lazy val tx1    = block1.firstTx
-    lazy val block2 = transfer(blockFlow, privKey1, pubKey0, ALPH.alph(1))
-    lazy val tx2    = block2.firstTx
-
-    implicit class FirstTxOfBlock(block: Block) {
-      def firstTx: TransactionTemplate = block.nonCoinbase.head.toTemplate
-    }
-
-    def addReadyTx(tx: TransactionTemplate) = {
-      txHandler ! TxHandler.AddToSharedPool(AVector(tx))
-      eventually {
-        sharedPool.contains(tx.id) is true
-        txHandler.underlyingActor.txsBuffer.contains(tx) is true
-        broadcastTxProbe.expectMsg(
-          InterCliqueManager.BroadCastTx(AVector(chainIndex -> AVector(tx.id)))
-        )
-      }
-    }
-
-    def addPendingTx(tx: TransactionTemplate): PersistedTxId = {
-      txHandler ! TxHandler.AddToGrandPool(AVector(tx))
-      eventually {
-        pendingPool.contains(tx.id) is true
-        val timestamp     = pendingPool.timestamps.unsafe(tx.id)
-        val persistedTxId = PersistedTxId(timestamp, tx.id)
-        pendingTxStorage.get(persistedTxId) isE tx
-        persistedTxId
-      }(patienceConfig, implicitly, implicitly)
-    }
-
-    def removeReadyTxs(txs: AVector[TransactionTemplate]) = {
-      sharedPool.remove(txs) is txs.length
-      eventually {
-        txs.foreach(tx => sharedPool.contains(tx.id) is false)
-      }
-    }
-
-    def removePendingTxs(txs: AVector[TransactionTemplate]) = {
-      pendingPool.remove(txs)
-      eventually {
-        txs.foreach(tx => pendingPool.contains(tx.id) is false)
-      }
-    }
-
-    setSynced()
-  }
-
-  it should "persist pending txs" in new PersistenceFixture {
-    addReadyTx(tx0)
-    val persistedTxId = addPendingTx(tx1)
-    info("Pending tx becomes ready")
-    eventually(readyTxStorage.exists(tx1.id) isE false)
-    txHandler ! TxHandler.Broadcast(AVector(tx1 -> persistedTxId.timestamp))
-    eventually {
-      txHandler.underlyingActor.delayedTxs.contains(tx1) is true
-      pendingTxStorage.get(persistedTxId) isE tx1
-      readyTxStorage.get(tx1.id) isE ReadyTxInfo(tx1.chainIndex, persistedTxId.timestamp)
-    }
-
-    info("Remove pending tx from storage when confirmed")
-    addAndCheck(blockFlow, block0)
-    blockFlow.isTxConfirmed(tx1.id, tx1.chainIndex) isE false
-    val newBlock = mineWithoutCoinbase(blockFlow, chainIndex, block1.nonCoinbase, block1.timestamp)
-    addAndCheck(blockFlow, newBlock)
-    blockFlow.isTxConfirmed(tx1.id, tx1.chainIndex) isE true
-    txHandler ! TxHandler.CleanPendingPool
-    eventually {
-      pendingTxStorage.exists(persistedTxId) isE false
-      readyTxStorage.exists(tx1.id) isE false
-    }
-  }
-
-  it should "load persisted pending txs" in new PersistenceFixture {
-    addReadyTx(tx0)
-    val persistedTxId1 = addPendingTx(tx1)
-    val persistedTxId2 = addPendingTx(tx2)
-    removeReadyTxs(AVector(tx0))
-    removePendingTxs(AVector(tx1, tx2))
-    sharedPool.txs.isEmpty is true
-    pendingPool.txs.isEmpty is true
-    pendingTxStorage.exists(persistedTxId1) isE true
-    pendingTxStorage.exists(persistedTxId2) isE true
-
-    info("Remove invalid persisted pending txs from storage")
-    txHandler.underlyingActor.clearStorageAndLoadTxs()
-    sharedPool.txs.isEmpty is true
-    pendingPool.txs.isEmpty is true
-    pendingTxStorage.exists(persistedTxId1) isE false
-    pendingTxStorage.exists(persistedTxId2) isE false
-
-    info("Load persisted pending tx to shared pool")
-    pendingTxStorage.put(persistedTxId1, tx1) isE ()
-    pendingTxStorage.put(persistedTxId2, tx2) isE ()
-    addAndCheck(blockFlow, block0)
-    txHandler.underlyingActor.clearStorageAndLoadTxs()
-    sharedPool.contains(tx1.id) is true
-    pendingPool.contains(tx1.id) is false
-    txHandler.underlyingActor.delayedTxs.contains(tx1) is true
-    pendingTxStorage.get(persistedTxId1) isE tx1
-    readyTxStorage.get(tx1.id) isE ReadyTxInfo(tx1.chainIndex, persistedTxId1.timestamp)
-
-    info("Load persisted pending tx to pending pool")
-    sharedPool.contains(tx2.id) is false
-    pendingPool.contains(tx2.id) is true
-    val timestamp         = pendingPool.timestamps.unsafe(tx2.id)
-    val newPersistedTxId2 = PersistedTxId(timestamp, tx2.id)
-    pendingTxStorage.get(newPersistedTxId2) isE tx2
-    pendingTxStorage.exists(persistedTxId2) isE false
-    readyTxStorage.exists(tx2.id) isE false
-  }
-
-  it should "cleanup storages if ready tx is invalid" in new PersistenceFixture {
-    addReadyTx(tx0)
-
-    // create a forked chain
-    val blockFlow0   = isolatedBlockFlow()
-    val forkedBlock0 = emptyBlock(blockFlow0, chainIndex)
-    addAndCheck(blockFlow0, forkedBlock0)
-    val forkedBlock1 = emptyBlock(blockFlow0, chainIndex)
-    addAndCheck(blockFlow0, forkedBlock1)
-
-    val persistedTxId1 = addPendingTx(tx1)
-    addAndCheck(blockFlow, block0)
-    sharedPool.contains(tx1.id) is true
-    pendingPool.contains(tx1.id) is false
-
-    // update timestamp because shared pool only check old txs
-    val expiredTs = TimeStamp.now().minusUnsafe(memPoolSetting.cleanSharedPoolFrequency)
-    sharedPool.timestamps.put(tx1.id, expiredTs)
-    txHandler ! TxHandler.Broadcast(AVector(tx1 -> persistedTxId1.timestamp))
-    eventually {
-      readyTxStorage.get(tx1.id) isE ReadyTxInfo(tx1.chainIndex, persistedTxId1.timestamp)
-      pendingTxStorage.get(persistedTxId1) isE tx1
-    }
-
-    // tx1 is invalid because of reorg
-    addAndCheck(blockFlow, forkedBlock0)
-    addAndCheck(blockFlow, forkedBlock1)
-    txHandler ! TxHandler.CleanSharedPool
-    eventually {
-      readyTxStorage.exists(tx1.id) isE false
-      pendingTxStorage.exists(persistedTxId1) isE false
-    }
-  }
-
-  it should "remove invalid txs from storage when clean up pending pool" in new PersistenceFixture {
-    addReadyTx(tx0)
-
-    {
-      info("Pending txs are valid")
-      val persistedTxId1 = addPendingTx(tx1)
-      val persistedTxId2 = addPendingTx(tx2)
-      txHandler ! TxHandler.CleanPendingPool
-      eventually {
-        pendingTxStorage.get(persistedTxId1) isE tx1
-        pendingTxStorage.get(persistedTxId2) isE tx2
-        pendingPool.contains(tx1.id) is true
-        pendingPool.contains(tx2.id) is true
-      }
-
-      info("Remove invalid tx(tx2)")
-      removePendingTxs(AVector(tx1))
-      txHandler ! TxHandler.CleanPendingPool
-      eventually {
-        pendingTxStorage.exists(persistedTxId2) isE false
-        pendingPool.contains(tx2.id) is false
-      }
-    }
-
-    {
-      info("Remove invalid txs(tx1 & tx2)")
-      val persistedTxId1 = addPendingTx(tx1)
-      val persistedTxId2 = addPendingTx(tx2)
-      removeReadyTxs(AVector(tx0))
-      txHandler ! TxHandler.CleanPendingPool
-      eventually {
-        pendingTxStorage.exists(persistedTxId1) isE false
-        pendingTxStorage.exists(persistedTxId2) isE false
-        pendingPool.contains(tx1.id) is false
-        pendingPool.contains(tx2.id) is false
-      }
     }
   }
 
@@ -476,9 +190,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val txHash3 = TransactionId.generate
     val txHash4 = TransactionId.generate
     val mempool = blockFlow.getMemPool(chain02)
-    mempool.contains(chain02, tx2.id) is false
-    mempool.addNewTx(chain02, tx2, TimeStamp.now())
-    mempool.contains(chain02, tx2.id) is true
+    mempool.contains(tx2.id) is false
+    mempool.add(chain02, tx2, TimeStamp.now())
+    mempool.contains(tx2.id) is true
 
     txHandler ! TxHandler.TxAnnouncements(
       AVector(
@@ -533,12 +247,6 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     test("Start to clean shared pools")
   }
 
-  it should "clean pending pools regularly" in new PeriodicTaskFixture {
-    override val configValues = Map(("alephium.mempool.clean-pending-pool-frequency", "300 ms"))
-
-    test("Start to clean pending pools")
-  }
-
   it should "reject tx with low gas price" in new Fixture {
     val tx            = transactionGen().sample.get
     val lowGasPriceTx = tx.copy(unsigned = tx.unsigned.copy(gasPrice = minimalGasPrice))
@@ -580,11 +288,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     blockFlow.getBestDeps(chainIndex.from).deps.contains(blockHash) is true
   }
 
-  it should "check force mine block for dev if auto-mine is enabled" in new Fixture {
+  it should "auto mine new blocks if auto-mine is enabled" in new Fixture {
     override val configValues = Map(("alephium.mempool.auto-mine-for-dev", true))
     config.mempool.autoMineForDev is true
     val old = blockFlow.getBlockChain(chainIndex).maxHeight.rightValue
-    TxHandler.forceMineForDev(blockFlow, chainIndex) is Right(())
+    TxHandler.forceMineForDev(blockFlow, chainIndex, Env.Prod, _ => ()) is Right(())
     (old + 1) is blockFlow.getBlockChain(chainIndex).maxHeight.rightValue
     txHandler ! TxHandler.MineOneBlock(chainIndex)
     eventually(
@@ -592,12 +300,19 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     )
   }
 
+  it should "auto mine new blocks if env is not PROD" in new Fixture {
+    override val configValues = Map(("alephium.mempool.auto-mine-for-dev", false))
+    config.mempool.autoMineForDev is false
+    TxHandler.forceMineForDev(blockFlow, chainIndex, Env.Test, _ => ()) isE ()
+    TxHandler.forceMineForDev(blockFlow, chainIndex, Env.Prod, _ => ()).isLeft is true
+  }
+
   it should "check force mine block for dev if auto-mine is disabled" in new Fixture {
     override val configValues = Map(("alephium.mempool.auto-mine-for-dev", false))
     config.mempool.autoMineForDev is false
     val old = blockFlow.getBlockChain(chainIndex).maxHeight.rightValue
-    TxHandler.forceMineForDev(blockFlow, chainIndex) is Left(
-      "CPU mining for dev is not enabled, please turn it on in config:\\n alephium.mempool.auto-mine-for-dev = true"
+    TxHandler.forceMineForDev(blockFlow, chainIndex, Env.Prod, _ => ()) is Left(
+      "CPU mining for dev is not enabled, please turn it on in config:\n alephium.mempool.auto-mine-for-dev = true"
     )
     old is blockFlow.getBlockChain(chainIndex).maxHeight.rightValue
     txHandler ! TxHandler.MineOneBlock(chainIndex)
@@ -674,5 +389,22 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     val broadcastTxProbe = TestProbe()
     system.eventStream.subscribe(broadcastTxProbe.ref, classOf[InterCliqueManager.BroadCastTx])
+
+    def checkBroadcast(txs: AVector[Transaction]) = {
+      txs.foreach(txHandler ! addTx(_))
+      txs.foreach(tx => expectMsg(TxHandler.AddSucceeded(tx.id)))
+      broadcastTxProbe.expectMsgPF() { case InterCliqueManager.BroadCastTx(indexedHashes) =>
+        val hashes = indexedHashes.flatMap(_._2)
+        hashes.length is 2
+        hashes.contains(txs.head.id) is true
+        hashes.contains(txs.last.id) is true
+      }
+      // use eventually here to avoid test failure on windows
+      eventually(txHandler.underlyingActor.txsBuffer.isEmpty is true)
+      txs.foreach { tx =>
+        txHandler.underlyingActor.blockFlow.getTransactionStatus(tx.id, tx.chainIndex) isE
+          Option(MemPooled)
+      }
+    }
   }
 }

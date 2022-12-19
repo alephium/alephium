@@ -25,7 +25,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.{PendingTxStorage, ReadyTxStorage}
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.{MiningBlob, PersistedTxId, ReadyTxInfo}
+import org.alephium.flow.model.{DataOrigin, MiningBlob, PersistedTxId, ReadyTxInfo}
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
@@ -33,6 +33,7 @@ import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
 import org.alephium.flow.validation._
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.message.{Message, NewBlock}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.serde.serialize
@@ -52,9 +53,8 @@ object TxHandler {
     Props(new TxHandler(blockFlow, pendingTxStorage, readyTxStorage))
 
   sealed trait Command
-  final case class AddToSharedPool(txs: AVector[TransactionTemplate])        extends Command
-  final case class Broadcast(txs: AVector[(TransactionTemplate, TimeStamp)]) extends Command
-  final case class AddToGrandPool(txs: AVector[TransactionTemplate])         extends Command
+  final case class AddToSharedPool(txs: AVector[TransactionTemplate]) extends Command
+  final case class AddToGrandPool(txs: AVector[TransactionTemplate])  extends Command
   final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
@@ -93,56 +93,65 @@ object TxHandler {
     }
   }
 
-  def mineTxForDev(blockFlow: BlockFlow, txTemplate: TransactionTemplate)(implicit
+  def mineTxForDev(
+      blockFlow: BlockFlow,
+      txTemplate: TransactionTemplate,
+      publishBlock: Block => Unit
+  )(implicit
       groupConfig: GroupConfig
   ): Either[String, Unit] = {
     val chainIndex = txTemplate.chainIndex
     val memPool    = blockFlow.getMemPool(chainIndex)
-    memPool.addNewTx(chainIndex, txTemplate, TimeStamp.now()) match {
-      case MemPool.AddedToSharedPool =>
+    memPool.add(chainIndex, txTemplate, TimeStamp.now()) match {
+      case MemPool.AddedToMemPool =>
         for {
-          _ <- mineTxForDev(blockFlow, chainIndex)
+          _ <- mineTxForDev(blockFlow, chainIndex, publishBlock)
           _ <-
             if (!chainIndex.isIntraGroup) {
-              mineTxForDev(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
+              mineTxForDev(blockFlow, ChainIndex(chainIndex.from, chainIndex.from), publishBlock)
             } else {
               Right(())
             }
         } yield ()
       case _ =>
-        memPool.clear()
         Left("Unable to add the tx the mempool: maybe the parent tx is not confirmed")
     }
   }
 
-  def mineTxForDev(blockFlow: BlockFlow, chainIndex: ChainIndex)(implicit
-      groupConfig: GroupConfig
+  def mineTxForDev(blockFlow: BlockFlow, chainIndex: ChainIndex, publishBlock: Block => Unit)(
+      implicit groupConfig: GroupConfig
   ): Either[String, Unit] = {
-    val memPool = blockFlow.getMemPool(chainIndex)
-    try {
-      val (_, minerPubKey) = chainIndex.to.generateKey
-      val miner            = LockupScript.p2pkh(minerPubKey)
-      val flowTemplate     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-      val miningBlob       = MiningBlob.from(flowTemplate)
-      val block            = Miner.mineForDev(chainIndex, miningBlob)
-      validateAndAddBlock(blockFlow, block)
-    } catch {
-      case error: Throwable =>
-        Left(error.getMessage)
-    } finally {
+    val memPool          = blockFlow.getMemPool(chainIndex)
+    val (_, minerPubKey) = chainIndex.to.generateKey
+    val miner            = LockupScript.p2pkh(minerPubKey)
+    val result = for {
+      flowTemplate <- blockFlow.prepareBlockFlow(chainIndex, miner).left.map(_.getMessage)
+      miningBlob = MiningBlob.from(flowTemplate)
+      block      = Miner.mineForDev(chainIndex, miningBlob)
+      _ <- validateAndAddBlock(blockFlow, block)
+    } yield {
+      publishBlock(block)
+    }
+    if (result.isLeft) {
       memPool.clear()
     }
+    result
   }
 
-  def forceMineForDev(blockFlow: BlockFlow, chainIndex: ChainIndex)(implicit
+  def forceMineForDev(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      env: Env,
+      publishBlock: Block => Unit
+  )(implicit
       groupConfig: GroupConfig,
       memPoolSetting: MemPoolSetting
   ): Either[String, Unit] = {
-    if (memPoolSetting.autoMineForDev) {
-      mineTxForDev(blockFlow, chainIndex)
+    if (env != Env.Prod || memPoolSetting.autoMineForDev) {
+      mineTxForDev(blockFlow, chainIndex, publishBlock)
     } else {
       Left(
-        "CPU mining for dev is not enabled, please turn it on in config:\\n alephium.mempool.auto-mine-for-dev = true"
+        "CPU mining for dev is not enabled, please turn it on in config:\n alephium.mempool.auto-mine-for-dev = true"
       )
     }
   }
@@ -163,9 +172,9 @@ object TxHandler {
 }
 
 class TxHandler(
-    blockFlow: BlockFlow,
-    pendingTxStorage: PendingTxStorage,
-    readyTxStorage: ReadyTxStorage
+    val blockFlow: BlockFlow,
+    val pendingTxStorage: PendingTxStorage,
+    val readyTxStorage: ReadyTxStorage
 )(implicit
     brokerConfig: BrokerConfig,
     memPoolSetting: MemPoolSetting,
@@ -206,82 +215,40 @@ class TxHandler(
     case TxHandler.AddToGrandPool(txs) =>
       if (!memPoolSetting.autoMineForDev) {
         txs.foreach(
-          handleTx(_, nonCoinbaseValidation.validateGrandPoolTxTemplate, None, acknowledge = true)
+          handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate, None, acknowledge = true)
         )
       } else {
         mineTxsForDev(txs)
       }
-    case TxHandler.Broadcast(txs)       => handleReadyTxsFromPendingPool(txs)
     case TxHandler.TxAnnouncements(txs) => handleAnnouncements(txs)
     case TxHandler.BroadcastTxs         => broadcastTxs()
     case TxHandler.DownloadTxs          => downloadTxs()
     case TxHandler.MineOneBlock(chainIndex) =>
-      TxHandler.forceMineForDev(blockFlow, chainIndex).swap.foreach(log.error(_))
+      TxHandler
+        .forceMineForDev(blockFlow, chainIndex, Env.currentEnv, publishBlock)
+        .swap
+        .foreach(log.error(_))
     case TxHandler.CleanSharedPool =>
       log.debug("Start to clean shared pools")
-      val results = blockFlow.grandPool.cleanAndExtractReadyTxs(
+      blockFlow.grandPool.clean(
         blockFlow,
         TimeStamp.now().minusUnsafe(memPoolSetting.cleanSharedPoolFrequency)
       )
-      results.foreach { result =>
-        result.invalidTxss.foreach(escapeIOError(_)(_.foreach { tx =>
-          escapeIOError(readyTxStorage.getOpt(tx.id).flatMap {
-            case Some(info) =>
-              val persistedTxId = PersistedTxId(info.timestamp, tx.id)
-              readyTxStorage
-                .delete(tx.id)
-                .flatMap(_ => pendingTxStorage.delete(persistedTxId))
-            case None =>
-              Right(())
-          })
-        }))
-        handleReadyTxsFromPendingPool(result.readyTxs)
-      }
-    case TxHandler.CleanPendingPool =>
-      log.debug("Start to clean pending pools")
-      blockFlow.grandPool.cleanPendingPool(blockFlow).foreach { result =>
-        escapeIOError(result) { invalidPendingTxs =>
-          invalidPendingTxs.foreach { case (tx, timestamp) =>
-            val persistedTxId = PersistedTxId(timestamp, tx.id)
-            escapeIOError(pendingTxStorage.delete(persistedTxId))
-          }
-        }
-      }
-      removeConfirmedTxsFromStorage()
   }
 
   def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
     txs.foreach { tx =>
-      TxHandler.mineTxForDev(blockFlow, tx) match {
+      TxHandler.mineTxForDev(blockFlow, tx, publishBlock) match {
         case Left(error) => addFailed(tx, error)
         case Right(_)    => addSucceeded(tx)
       }
     }
   }
 
-  private def removeConfirmedTxsFromStorage(): Unit = {
-    escapeIOError(readyTxStorage.iterateE { (txId, info) =>
-      blockFlow.isTxConfirmed(txId, info.chainIndex).flatMap { confirmed =>
-        if (confirmed) {
-          val persistedTxId = PersistedTxId(info.timestamp, txId)
-          readyTxStorage.delete(txId).flatMap(_ => pendingTxStorage.delete(persistedTxId))
-        } else {
-          Right(())
-        }
-      }
-    })
-  }
-
-  private def handleReadyTxsFromPendingPool(
-      txs: AVector[(TransactionTemplate, TimeStamp)]
-  ): Unit = {
-    // delay this broadcast so that peers have download this block
-    val broadcastTs = TimeStamp.now().plusUnsafe(networkSetting.txsBroadcastDelay)
-    txs.foreach { case (tx, timestamp) =>
-      delayedTxs.put(tx, broadcastTs)
-      val info = ReadyTxInfo(tx.chainIndex, timestamp)
-      escapeIOError(readyTxStorage.put(tx.id, info))
-    }
+  def publishBlock(block: Block): Unit = {
+    val blockMessage = Message.serialize(NewBlock(block))
+    val event        = InterCliqueManager.BroadCastBlock(block, blockMessage, DataOrigin.Local)
+    publishEvent(event)
   }
 
   override def onFirstTimeSynced(): Unit = {
@@ -311,7 +278,7 @@ class TxHandler(
             valid += 1
             handleTx(
               tx,
-              nonCoinbaseValidation.validateGrandPoolTxTemplate,
+              nonCoinbaseValidation.validateMempoolTxTemplate,
               Some(persistedTxId),
               acknowledge = false
             )
@@ -357,10 +324,7 @@ class TxHandler(
     txs.foreach { case (chainIndex, txs) =>
       val mempool = blockFlow.getMemPool(chainIndex)
       txs.foreach { tx =>
-        if (
-          fetching.needToFetch(tx, timestamp) &&
-          !mempool.contains(chainIndex, tx)
-        ) {
+        if (fetching.needToFetch(tx, timestamp) && !mempool.contains(tx)) {
           val announcement = TxHandler.Announcement(brokerHandler, chainIndex, tx)
           announcements.put(announcement, ())
         }
@@ -382,7 +346,7 @@ class TxHandler(
     val mempool    = blockFlow.getMemPool(chainIndex)
     if (!TxHandler.checkHighGasPrice(tx)) {
       addFailed(tx, s"tx has lower gas price than ${defaultGasPrice}")
-    } else if (mempool.contains(chainIndex, tx)) {
+    } else if (mempool.contains(tx)) {
       addFailed(tx, s"tx ${tx.id.toHexString} is already included")
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
       addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}")
@@ -398,22 +362,6 @@ class TxHandler(
     }
   }
 
-  private def needToDelay(chainIndex: ChainIndex, tx: TransactionTemplate): Boolean = {
-    val outputOpt =
-      blockFlow.getBestPersistedWorldState(chainIndex.from).flatMap { persistedWS =>
-        persistedWS.getPreOutputsForAssetInputs(tx).map(_.map(_.maxBy(_.lockTime)))
-      }
-
-    escapeIOError[Option[AssetOutput], Boolean](
-      outputOpt,
-      {
-        case Some(output) =>
-          output.lockTime.plusUnsafe(TxHandler.PersistenceDuration) > TimeStamp.now()
-        case None => true // some of the inputs are from block caches outputs
-      }
-    )(false)
-  }
-
   private def handleValidTx(
       chainIndex: ChainIndex,
       tx: TransactionTemplate,
@@ -422,26 +370,14 @@ class TxHandler(
       acknowledge: Boolean
   ): Unit = {
     val currentTs = TimeStamp.now()
-    val result    = mempool.addNewTx(chainIndex, tx, currentTs)
+    val result    = mempool.add(chainIndex, tx, currentTs)
     log.debug(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
-      case MemPool.AddedToSharedPool =>
-        if (needToDelay(chainIndex, tx)) {
-          delayedTxs.put(tx, currentTs.plusUnsafe(networkSetting.txsBroadcastDelay))
-        } else {
-          txsBuffer.put(tx, ())
-        }
+      case MemPool.AddedToMemPool =>
+        txsBuffer.put(tx, ())
         persistedTxIdOpt.foreach { persistedTxId =>
           val info = ReadyTxInfo(chainIndex, persistedTxId.timestamp)
           escapeIOError(readyTxStorage.put(tx.id, info))
-        }
-      case MemPool.AddedToPendingPool => // We don't broadcast txs that are pending locally
-        val newPersistedTxId = PersistedTxId(currentTs, tx.id)
-        persistedTxIdOpt match {
-          case Some(oldPersistedTxId) =>
-            escapeIOError(pendingTxStorage.replace(oldPersistedTxId, newPersistedTxId, tx))
-          case None =>
-            escapeIOError(pendingTxStorage.put(newPersistedTxId, tx))
         }
       case _ => ()
     }
@@ -480,20 +416,6 @@ class TxHandler(
         updateChainIndexHashes(tx.id, tx.chainIndex, broadcasts)
       }
       txsBuffer.clear()
-    }
-
-    if (delayedTxs.nonEmpty) {
-      val currentTs = TimeStamp.now()
-      val removed   = mutable.ArrayBuffer.empty[TransactionTemplate]
-      delayedTxs
-        .entries()
-        .takeWhile(_.getValue <= currentTs)
-        .foreach { entry =>
-          val tx = entry.getKey
-          removed += tx
-          updateChainIndexHashes(tx.id, tx.chainIndex, broadcasts)
-        }
-      removed.foreach(delayedTxs.remove)
     }
 
     if (broadcasts.nonEmpty) {

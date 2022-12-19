@@ -862,9 +862,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     implicit val serverUtils = new ServerUtils()
 
-    val emptyMempool = serverUtils.listUnconfirmedTransactions(blockFlow)
-
-    emptyMempool.rightValue is AVector.empty[UnconfirmedTransactions]
+    val emptyMempool = serverUtils.listUnconfirmedTransactions(blockFlow).rightValue
+    emptyMempool is AVector.empty[UnconfirmedTransactions]
 
     val chainIndex                         = chainIndexGen.sample.get
     val fromGroup                          = chainIndex.from
@@ -2025,7 +2024,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     serverUtils.getTransactionStatus(blockFlow, txId, chainIndex) isE TxNotFound()
 
-    blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate), TimeStamp.now())
+    blockFlow.getMemPool(chainIndex).add(chainIndex, AVector(txTemplate), TimeStamp.now())
     serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled()
 
     txTemplate

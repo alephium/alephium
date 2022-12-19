@@ -71,11 +71,11 @@ trait FlowUtils
       val oldDep       = oldOutDeps(toGroup)
       val newDep       = newOutDeps(toGroup)
       val index        = ChainIndex(mainGroup, toGroupIndex)
-      getBlockChain(index).calBlockDiffUnsafe(newDep, oldDep)
+      getBlockChain(index).calBlockDiffUnsafe(index, newDep, oldDep)
     }
-    val toRemove = diffs.map(_.toAdd.flatMap(_.nonCoinbase))
-    val toAdd    = diffs.map(_.toRemove.flatMap(_.nonCoinbase))
-    if (toAdd.sumBy(_.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)
+    val toRemove = diffs.map(diff => diff.chainIndex -> diff.toAdd.flatMap(_.nonCoinbase))
+    val toAdd    = diffs.map(diff => diff.chainIndex -> diff.toRemove.flatMap(_.nonCoinbase))
+    if (toAdd.sumBy(_._2.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)
   }
 
   def updateGrandPoolUnsafe(
@@ -83,14 +83,11 @@ trait FlowUtils
       newDeps: BlockDeps,
       oldDeps: BlockDeps,
       maxHeightGap: Int
-  ): AVector[(TransactionTemplate, TimeStamp)] = {
+  ): Unit = {
     val newHeight = getHeightUnsafe(newDeps.uncleHash(mainGroup))
     val oldHeight = getHeightUnsafe(oldDeps.uncleHash(mainGroup))
     if (newHeight <= oldHeight + maxHeightGap) {
       updateMemPoolUnsafe(mainGroup, newDeps, oldDeps)
-      getMemPool(mainGroup).updatePendingPool()
-    } else { // we don't update tx pool when the node is syncing
-      AVector.empty
     }
   }
 
@@ -98,17 +95,15 @@ trait FlowUtils
       mainGroup: GroupIndex,
       newDeps: BlockDeps,
       oldDeps: BlockDeps
-  ): AVector[(TransactionTemplate, TimeStamp)] = {
+  ): Unit = {
     updateGrandPoolUnsafe(mainGroup, newDeps, oldDeps, maxSyncBlocksPerChain)
   }
 
   def updateMemPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps, oldDeps: BlockDeps): Unit = {
     calMemPoolChangesUnsafe(mainGroup, oldDeps, newDeps) match {
       case Normal(toRemove) =>
-        val removed = toRemove.foldWithIndex(0) { (sum, txs, toGroup) =>
-          val toGroupIndex = GroupIndex.unsafe(toGroup)
-          val index        = ChainIndex(mainGroup, toGroupIndex)
-          sum + getMemPool(mainGroup).removeFromTxPool(index, txs.map(_.toTemplate))
+        val removed = toRemove.fold(0) { case (sum, (_, txs)) =>
+          sum + getMemPool(mainGroup).removeUsedTxs(txs.map(_.toTemplate))
         }
         if (removed > 0) {
           logger.debug(s"Normal update for #$mainGroup mempool: #$removed removed")
@@ -121,9 +116,9 @@ trait FlowUtils
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps
 
-  def updateBestDeps(): IOResult[AVector[(TransactionTemplate, TimeStamp)]]
+  def updateBestDeps(): IOResult[Unit]
 
-  def updateBestDepsUnsafe(): AVector[(TransactionTemplate, TimeStamp)]
+  def updateBestDepsUnsafe(): Unit
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 

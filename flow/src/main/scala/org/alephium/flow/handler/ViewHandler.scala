@@ -27,20 +27,19 @@ import org.alephium.flow.network.InterCliqueManager
 import org.alephium.flow.setting.MiningSetting
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Address, ChainIndex, TransactionTemplate}
+import org.alephium.protocol.model.{Address, ChainIndex}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util._
 import org.alephium.util.EventStream.{Publisher, Subscriber}
 
 object ViewHandler {
   def props(
-      blockFlow: BlockFlow,
-      txHandler: ActorRefT[TxHandler.Command]
+      blockFlow: BlockFlow
   )(implicit
       brokerConfig: BrokerConfig,
       miningSetting: MiningSetting
   ): Props = Props(
-    new ViewHandler(blockFlow, txHandler, miningSetting.minerAddresses.map(_.map(_.lockupScript)))
+    new ViewHandler(blockFlow, miningSetting.minerAddresses.map(_.map(_.lockupScript)))
   )
 
   sealed trait Command
@@ -77,7 +76,6 @@ object ViewHandler {
 
 class ViewHandler(
     val blockFlow: BlockFlow,
-    txHandler: ActorRefT[TxHandler.Command],
     var minerAddressesOpt: Option[AVector[LockupScript.Asset]]
 )(implicit
     val brokerConfig: BrokerConfig,
@@ -96,9 +94,7 @@ class ViewHandler(
       //  1. the block belongs to the groups of the node
       //  2. the header belongs to intra-group chain
       if (isNodeSynced && ViewHandler.needUpdate(data.chainIndex)) {
-        escapeIOError(blockFlow.updateBestDeps()) { newReadyTxs =>
-          broadcastReadyTxs(newReadyTxs)
-        }
+        blockFlow.updateBestDeps()
       }
       if (isNodeSynced) { updateSubscribers() }
 
@@ -112,12 +108,6 @@ class ViewHandler(
         case Right(_)    => minerAddressesOpt = Some(addresses.map(_.lockupScript))
         case Left(error) => log.error(s"Updating invalid miner addresses: $error")
       }
-  }
-
-  def broadcastReadyTxs(txs: AVector[(TransactionTemplate, TimeStamp)]): Unit = {
-    if (txs.nonEmpty) {
-      txHandler ! TxHandler.Broadcast(txs)
-    }
   }
 }
 

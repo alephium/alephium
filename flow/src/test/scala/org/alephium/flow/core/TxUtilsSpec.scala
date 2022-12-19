@@ -71,11 +71,10 @@ class TxUtilsSpec extends AlephiumSpec {
     def testUnsignedTx(unsignedTx: UnsignedTransaction, genesisPriKey: PrivateKey) = {
       val tx         = TransactionTemplate.from(unsignedTx, genesisPriKey)
       val chainIndex = tx.chainIndex
-      TxValidation.build.validateGrandPoolTxTemplate(tx, blockFlow) isE ()
+      TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
       blockFlow
         .getMemPool(chainIndex)
-        .addNewTx(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToSharedPool
-      TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
+        .add(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToMemPool
     }
   }
 
@@ -178,7 +177,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "calculate preOutputs for txs in shared pool" in new FlowFixture with Generators {
+  it should "calculate preOutputs for txs in mempool" in new FlowFixture with Generators {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     forAll(groupIndexGen, groupIndexGen) { (fromGroup, toGroup) =>
@@ -186,7 +185,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val block = transfer(blockFlow, chainIndex)
       val tx    = block.nonCoinbase.head
-      blockFlow.getMemPool(chainIndex).addNewTx(chainIndex, tx.toTemplate, TimeStamp.now())
+      blockFlow.getMemPool(chainIndex).add(chainIndex, tx.toTemplate, TimeStamp.now())
 
       {
         val groupView = blockFlow.getMutableGroupView(fromGroup).rightValue
@@ -203,7 +202,11 @@ class TxUtilsSpec extends AlephiumSpec {
           if (output.toGroup equals chainIndex.from) {
             groupView.getPreOutput(outputRef) isE Some(output)
           } else {
-            groupView.getPreOutput(outputRef) isE None
+            if (output.toGroup == chainIndex.from) {
+              groupView.getPreOutput(outputRef) isE None
+            } else {
+              assertThrows[AssertionError](groupView.getPreOutput(outputRef))
+            }
           }
         }
       }

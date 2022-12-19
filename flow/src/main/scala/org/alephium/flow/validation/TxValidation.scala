@@ -150,18 +150,6 @@ trait TxValidation {
     for {
       chainIndex <- getChainIndex(tx)
       blockEnv   <- from(flow.getDryrunBlockEnv(chainIndex))
-      groupView  <- from(flow.getMutableGroupView(chainIndex.from))
-      _          <- validateTxTemplate(tx, chainIndex, groupView, blockEnv)
-    } yield ()
-  }
-
-  def validateGrandPoolTxTemplate(
-      tx: TransactionTemplate,
-      flow: BlockFlow
-  ): TxValidationResult[Unit] = {
-    for {
-      chainIndex <- getChainIndex(tx)
-      blockEnv   <- from(flow.getDryrunBlockEnv(chainIndex))
       groupView  <- from(flow.getMutableGroupViewIncludePool(chainIndex.from))
       _          <- validateTxTemplate(tx, chainIndex, groupView, blockEnv)
     } yield ()

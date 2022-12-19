@@ -27,7 +27,7 @@ import org.scalatest.Assertion
 
 import org.alephium.crypto._
 import org.alephium.flow.FlowFixture
-import org.alephium.flow.mempool.MemPool.AddedToSharedPool
+import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model._
@@ -1820,7 +1820,7 @@ class VMSpec extends AlephiumSpec {
 
     val validator = TxValidation.build
     val simpleTx  = transfer(blockFlow, chainIndex).nonCoinbase.head.toTemplate
-    blockFlow.getMemPool(chainIndex).addNewTx(chainIndex, simpleTx, TimeStamp.now())
+    blockFlow.getMemPool(chainIndex).add(chainIndex, simpleTx, TimeStamp.now())
     newAddresses.foreachWithIndex { case (address, index) =>
       val gas    = if (index % 2 == 0) 20000 else 200000
       val script = Compiler.compileTxScript(main(address)).rightValue
@@ -1841,7 +1841,7 @@ class VMSpec extends AlephiumSpec {
       }
       blockFlow
         .getMemPool(chainIndex)
-        .addNewTx(chainIndex, tx, TimeStamp.now()) is AddedToSharedPool
+        .add(chainIndex, tx, TimeStamp.now()) is AddedToMemPool
     }
 
     val blockTemplate =

@@ -22,30 +22,28 @@ import org.alephium.flow.core.FlowUtils._
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AVector, RWLock}
+import org.alephium.util.AVector
 
 final case class TxIndexes(
     mainGroup: GroupIndex,
-    inputIndex: mutable.HashSet[AssetOutputRef],
-    outputIndex: mutable.HashMap[AssetOutputRef, AssetOutput],
+    inputIndex: mutable.HashMap[AssetOutputRef, TransactionTemplate],
+    outputIndex: mutable.HashMap[AssetOutputRef, (AssetOutput, TransactionTemplate)],
     addressIndex: mutable.HashMap[LockupScript, mutable.ArrayBuffer[AssetOutputRef]],
     outputType: OutputType
-)(implicit groupConfig: GroupConfig)
-    extends RWLock {
-  def add(transaction: TransactionTemplate): Unit = writeOnly {
-    _add(transaction)
-  }
+)(implicit groupConfig: GroupConfig) {
+  def add[T](
+      transaction: TransactionTemplate,
+      sideEffect: TransactionTemplate => T
+  ): (Option[mutable.ArrayBuffer[T]], Option[mutable.ArrayBuffer[T]]) = {
+    val outputRefs = transaction.assetOutputRefs
+    val parents    = getParentTxs(transaction, sideEffect)
+    val children   = getChildTxs(outputRefs, sideEffect)
 
-  def add(transactions: AVector[TransactionTemplate]): Unit = writeOnly {
-    transactions.foreach(_add)
-  }
-
-  private def _add(transaction: TransactionTemplate): Unit = {
-    transaction.unsigned.inputs.foreach(input => inputIndex.addOne(input.outputRef))
+    transaction.unsigned.inputs.foreach(input => inputIndex.addOne(input.outputRef -> transaction))
     transaction.unsigned.fixedOutputs.foreachWithIndex { case (output, index) =>
+      val outputRef = outputRefs(index)
       if (output.toGroup == mainGroup) {
-        val outputRef = AssetOutputRef.from(output, TxOutputRef.key(transaction.id, index))
-        outputIndex.addOne(outputRef -> output)
+        outputIndex.addOne(outputRef -> (output, transaction))
         addressIndex.get(output.lockupScript) match {
           case Some(outputs) =>
             if (!outputs.contains(outputRef)) {
@@ -55,13 +53,15 @@ final case class TxIndexes(
         }
       }
     }
+
+    parents -> children
   }
 
-  def remove(transaction: TransactionTemplate): Unit = writeOnly {
+  def remove(transaction: TransactionTemplate): Unit = {
     _remove(transaction)
   }
 
-  def remove(transactions: AVector[TransactionTemplate]): Unit = writeOnly {
+  def remove(transactions: AVector[TransactionTemplate]): Unit = {
     transactions.foreach(_remove)
   }
 
@@ -81,26 +81,24 @@ final case class TxIndexes(
 
   def isSpent(asset: AssetOutputInfo): Boolean = isSpent(asset.ref)
 
-  def isSpent(asset: AssetOutputRef): Boolean = readOnly {
+  def isSpent(asset: AssetOutputRef): Boolean = {
     inputIndex.contains(asset)
   }
 
+  def isDoubleSpending(tx: TransactionTemplate): Boolean = {
+    tx.unsigned.inputs.exists(txInput => isSpent(txInput.outputRef))
+  }
+
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = readOnly {
+  def getRelevantUtxos(lockupScript: LockupScript): AVector[AssetOutputInfo] = {
     addressIndex
       .get(lockupScript)
       .map { refs =>
         AVector.from(
-          refs.view.map(ref =>
-            AssetOutputInfo(ref, outputIndex(ref).asInstanceOf[AssetOutput], outputType)
-          )
+          refs.view.map(ref => AssetOutputInfo(ref, outputIndex(ref)._1, outputType))
         )
       }
       .getOrElse(AVector.empty)
-  }
-
-  def getOutput(outputRef: AssetOutputRef): Option[TxOutput] = readOnly {
-    outputIndex.get(outputRef)
   }
 
   def clear(): Unit = {
@@ -108,13 +106,45 @@ final case class TxIndexes(
     outputIndex.clear()
     addressIndex.clear()
   }
+
+  @inline private def getParentTxs[T](
+      tx: TransactionTemplate,
+      sideEffect: TransactionTemplate => T
+  ): Option[mutable.ArrayBuffer[T]] = {
+    var result: Option[mutable.ArrayBuffer[T]] = None
+    tx.unsigned.inputs.foreach { input =>
+      outputIndex.get(input.outputRef).foreach { case (_, tx) =>
+        result match {
+          case None         => result = Some(mutable.ArrayBuffer(sideEffect(tx)))
+          case Some(buffer) => buffer.append(sideEffect(tx))
+        }
+      }
+    }
+    result
+  }
+
+  @inline private def getChildTxs[T](
+      outputRefs: AVector[AssetOutputRef],
+      sideEffect: TransactionTemplate => T
+  ): Option[mutable.ArrayBuffer[T]] = {
+    var result: Option[mutable.ArrayBuffer[T]] = None
+    outputRefs.foreach { outputRef =>
+      inputIndex.get(outputRef).foreach { tx =>
+        result match {
+          case None         => result = Some(mutable.ArrayBuffer(sideEffect(tx)))
+          case Some(buffer) => buffer.append(sideEffect(tx))
+        }
+      }
+    }
+    result
+  }
 }
 
 object TxIndexes {
   def emptySharedPool(mainGroup: GroupIndex)(implicit groupConfig: GroupConfig): TxIndexes =
     TxIndexes(
       mainGroup,
-      mutable.HashSet.empty,
+      mutable.HashMap.empty,
       mutable.HashMap.empty,
       mutable.HashMap.empty,
       SharedPoolOutput
@@ -123,7 +153,7 @@ object TxIndexes {
   def emptyPendingPool(mainGroup: GroupIndex)(implicit groupConfig: GroupConfig): TxIndexes =
     TxIndexes(
       mainGroup,
-      mutable.HashSet.empty,
+      mutable.HashMap.empty,
       mutable.HashMap.empty,
       mutable.HashMap.empty,
       PendingPoolOutput
