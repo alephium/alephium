@@ -315,7 +315,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val txs = AVector.fill(4)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     txs.foreach { tx =>
       val mempool = blockFlow.getMemPool(chainIndex)
-      mempool.add(chainIndex, tx, TimeStamp.now())
+      blockFlow.getGrandPool().add(chainIndex, tx, TimeStamp.now())
       mempool.contains(tx.id) is true
     }
 

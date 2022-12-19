@@ -19,7 +19,7 @@ package org.alephium.flow.mempool
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{ChainIndex, GroupIndex}
+import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionTemplate}
 import org.alephium.util.{AVector, TimeStamp}
 
 class GrandPool(val mempools: AVector[MemPool])(implicit
@@ -29,8 +29,29 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
     mempools(brokerConfig.groupIndexOfBroker(mainGroup))
   }
 
-  @inline def getMemPool(chainIndex: ChainIndex): MemPool = {
-    getMemPool(chainIndex.from)
+  def add(
+      index: ChainIndex,
+      transactions: AVector[TransactionTemplate],
+      timeStamp: TimeStamp
+  ): Int = {
+    transactions.sumBy(add(index, _, timeStamp).addedCount)
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+  def add(
+      index: ChainIndex,
+      tx: TransactionTemplate,
+      timestamp: TimeStamp
+  ): MemPool.NewTxCategory = {
+    val result = getMemPool(index.from).add(index, tx, timestamp)
+    if (index.isIntraGroup) {
+      result
+    } else {
+      if (!result.isInstanceOf[MemPool.AddTxFailed] && brokerConfig.contains(index.to)) {
+        getMemPool(index.to).addXGroupTx(index, tx, timestamp)
+      }
+      result
+    }
   }
 
   def clean(

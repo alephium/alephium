@@ -124,7 +124,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     val groupIndex = GroupIndex.unsafe(fromGroup)
     val tx1        = block1.nonCoinbase.head.toTemplate
     blockFlow.isTxConflicted(groupIndex, tx1) is true
-    blockFlow.getMemPool(groupIndex).add(chainIndex1, tx1, TimeStamp.now())
+    blockFlow.getGrandPool().add(chainIndex1, tx1, TimeStamp.now())
 
     val miner    = getGenesisLockupScript(chainIndex1)
     val template = blockFlow.prepareBlockFlowUnsafe(chainIndex1, miner)
@@ -159,8 +159,9 @@ class FlowUtilsSpec extends AlephiumSpec {
     // generate the block using mineFromMemPool as it uses FlowUtils.prepareBlockFlow
     val transferBlock = {
       val tmpBlock = transfer(blockFlow, chainIndex)
-      val mempool  = blockFlow.getMemPool(chainIndex)
-      mempool.add(chainIndex, tmpBlock.nonCoinbase.head.toTemplate, TimeStamp.now())
+      blockFlow
+        .getGrandPool()
+        .add(chainIndex, tmpBlock.nonCoinbase.head.toTemplate, TimeStamp.now())
       mineFromMemPool(blockFlow, chainIndex)
     }
     transferBlock.coinbaseReward is consensusConfig.emission
@@ -180,16 +181,14 @@ class FlowUtilsSpec extends AlephiumSpec {
     val tx1    = block1.nonCoinbase.head
     addAndCheck(blockFlow1, block1)
 
-    val pool = blockFlow.getMemPool(index)
-    pool.add(index, AVector(tx0.toTemplate, tx1.toTemplate), TimeStamp.now())
+    blockFlow.getGrandPool().add(index, AVector(tx0.toTemplate, tx1.toTemplate), TimeStamp.now())
     val miner = getGenesisLockupScript(index)
     blockFlow.prepareBlockFlowUnsafe(index, miner).transactions.init is AVector(tx0)
   }
 
   it should "include failed contract tx in block assembly" in new FlowFixture {
     val index = ChainIndex.unsafe(0, 0)
-    val pool  = blockFlow.getMemPool(index)
-    pool.add(index, outOfGasTxTemplate, TimeStamp.now())
+    blockFlow.getGrandPool().add(index, outOfGasTxTemplate, TimeStamp.now())
     val miner    = getGenesisLockupScript(index)
     val template = blockFlow.prepareBlockFlowUnsafe(index, miner)
     template.transactions.length is 2 // it should include the invalid tx
@@ -224,31 +223,62 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow1, block5)
     val block6 = transfer(blockFlow1, ChainIndex.unsafe(0, 2))
     addAndCheck(blockFlow1, block6)
+    val block7 = transfer(blockFlow1, ChainIndex.unsafe(1, 0))
+    addAndCheck(blockFlow1, block7)
+    val block8 = transfer(blockFlow1, ChainIndex.unsafe(1, 1))
+    addAndCheck(blockFlow1, block8)
+    val block9 = transfer(blockFlow1, ChainIndex.unsafe(1, 0))
+    addAndCheck(blockFlow1, block9)
 
     addAndCheck(blockFlow, block3)
     addAndCheck(blockFlow, block4)
     addAndCheck(blockFlow, block5)
     addAndCheck(blockFlow, block6)
+    addAndCheck(blockFlow, block7)
+    addAndCheck(blockFlow, block8)
+    addAndCheck(blockFlow, block9)
     val deps2 = blockFlow.getBestDeps(mainGroup)
 
     blockFlow.calMemPoolChangesUnsafe(mainGroup, deps0, deps1) is
       Normal(
-        AVector
-          .tabulate(groups0)(ChainIndex.unsafe(mainGroup.value, _) -> AVector.empty[Transaction])
-          .replace(0, block0.chainIndex -> block0.nonCoinbase)
-          .replace(1, block1.chainIndex -> (block1.nonCoinbase ++ block2.nonCoinbase))
+        AVector.from(
+          brokerConfig.allGroups
+            .filter(_ != mainGroup)
+            .map(fromGroup => ChainIndex(fromGroup, mainGroup) -> AVector.empty[Transaction])
+        ) ++
+          AVector
+            .tabulate(groups0)(ChainIndex.unsafe(mainGroup.value, _) -> AVector.empty[Transaction])
+            .replace(0, block0.chainIndex -> block0.nonCoinbase)
+            .replace(1, block1.chainIndex -> (block1.nonCoinbase ++ block2.nonCoinbase))
       )
     blockFlow.calMemPoolChangesUnsafe(mainGroup, deps1, deps2) is
       Reorg(
-        toRemove = AVector
-          .tabulate(groups0)(ChainIndex.unsafe(mainGroup.value, _) -> AVector.empty[Transaction])
-          .replace(0, block4.chainIndex -> block4.nonCoinbase)
-          .replace(1, block5.chainIndex -> block5.nonCoinbase)
-          .replace(2, block6.chainIndex -> block6.nonCoinbase),
-        toAdd = AVector
-          .tabulate(groups0)(ChainIndex.unsafe(mainGroup.value, _) -> AVector.empty[Transaction])
-          .replace(0, block0.chainIndex -> block0.nonCoinbase)
-          .replace(1, block2.chainIndex -> (block2.nonCoinbase ++ block1.nonCoinbase))
+        toRemove = AVector.from(
+          brokerConfig.allGroups
+            .filter(_ != mainGroup)
+            .map { fromGroup =>
+              ChainIndex(fromGroup, mainGroup) ->
+                (if (fromGroup.value == 1) {
+                   block7.nonCoinbase
+                 } else {
+                   AVector.empty[Transaction]
+                 })
+            }
+        ) ++
+          AVector
+            .tabulate(groups0)(ChainIndex.unsafe(mainGroup.value, _) -> AVector.empty[Transaction])
+            .replace(0, block4.chainIndex -> block4.nonCoinbase)
+            .replace(1, block5.chainIndex -> block5.nonCoinbase)
+            .replace(2, block6.chainIndex -> block6.nonCoinbase),
+        toAdd = AVector.from(
+          brokerConfig.allGroups
+            .filter(_ != mainGroup)
+            .map(fromGroup => ChainIndex(fromGroup, mainGroup) -> AVector.empty[Transaction])
+        ) ++
+          AVector
+            .tabulate(groups0)(ChainIndex.unsafe(mainGroup.value, _) -> AVector.empty[Transaction])
+            .replace(0, block0.chainIndex -> block0.nonCoinbase)
+            .replace(1, block2.chainIndex -> (block2.nonCoinbase ++ block1.nonCoinbase))
       )
   }
 
@@ -263,9 +293,10 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     def test(heightGap: Int, expected: AVector[TransactionTemplate]) = {
       val blockFlow = isolatedBlockFlow()
+      val grandPool = blockFlow.getGrandPool()
       val mempool   = blockFlow.getMemPool(chainIndex)
-      mempool.add(chainIndex, tx0, currentTs)
-      mempool.add(chainIndex, tx1, currentTs)
+      grandPool.add(chainIndex, tx0, currentTs)
+      grandPool.add(chainIndex, tx1, currentTs)
       mempool.contains(tx0.id) is true
       mempool.contains(tx1.id) is true
       mempool.isReady(tx0.id) is true

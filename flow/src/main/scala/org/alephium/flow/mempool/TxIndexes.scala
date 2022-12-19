@@ -40,6 +40,25 @@ final case class TxIndexes(
     val children   = getChildTxs(outputRefs, sideEffect)
 
     transaction.unsigned.inputs.foreach(input => inputIndex.addOne(input.outputRef -> transaction))
+    addRelevantOutputs(transaction, outputRefs)
+
+    parents -> children
+  }
+
+  def addXGroupTx[T](
+      transaction: TransactionTemplate,
+      sideEffect: TransactionTemplate => T
+  ): Option[mutable.ArrayBuffer[T]] = {
+    val outputRefs = transaction.assetOutputRefs
+    val children   = getChildTxs(outputRefs, sideEffect)
+    addRelevantOutputs(transaction, outputRefs)
+    children
+  }
+
+  private def addRelevantOutputs(
+      transaction: TransactionTemplate,
+      outputRefs: AVector[AssetOutputRef]
+  ): Unit = {
     transaction.unsigned.fixedOutputs.foreachWithIndex { case (output, index) =>
       val outputRef = outputRefs(index)
       if (output.toGroup == mainGroup) {
@@ -53,8 +72,6 @@ final case class TxIndexes(
         }
       }
     }
-
-    parents -> children
   }
 
   def remove(transaction: TransactionTemplate): Unit = {

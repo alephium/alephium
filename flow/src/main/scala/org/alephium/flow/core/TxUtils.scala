@@ -456,7 +456,7 @@ trait TxUtils { Self: FlowUtils =>
     if (brokerConfig.contains(chainIndex.from)) {
       for {
         status <- getTxConfirmedStatus(txId, chainIndex)
-          .map {
+          .map[Option[TxStatus]] {
             case Some(status) => Some(status)
             case None         => if (isInMemPool(txId, chainIndex)) Some(MemPooled) else None
           }

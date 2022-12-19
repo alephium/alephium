@@ -23,7 +23,7 @@ import akka.actor.Props
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.{PendingTxStorage, ReadyTxStorage}
-import org.alephium.flow.mempool.MemPool
+import org.alephium.flow.mempool.{GrandPool, MemPool}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.{DataOrigin, MiningBlob, PersistedTxId, ReadyTxInfo}
 import org.alephium.flow.network.InterCliqueManager
@@ -101,8 +101,8 @@ object TxHandler {
       groupConfig: GroupConfig
   ): Either[String, Unit] = {
     val chainIndex = txTemplate.chainIndex
-    val memPool    = blockFlow.getMemPool(chainIndex)
-    memPool.add(chainIndex, txTemplate, TimeStamp.now()) match {
+    val grandPool  = blockFlow.getGrandPool()
+    grandPool.add(chainIndex, txTemplate, TimeStamp.now()) match {
       case MemPool.AddedToMemPool =>
         for {
           _ <- mineTxForDev(blockFlow, chainIndex, publishBlock)
@@ -343,7 +343,7 @@ class TxHandler(
       acknowledge: Boolean
   ): Unit = {
     val chainIndex = tx.chainIndex
-    val mempool    = blockFlow.getMemPool(chainIndex)
+    val mempool    = blockFlow.getMemPool(chainIndex.from)
     if (!TxHandler.checkHighGasPrice(tx)) {
       addFailed(tx, s"tx has lower gas price than ${defaultGasPrice}")
     } else if (mempool.contains(tx)) {
@@ -355,7 +355,8 @@ class TxHandler(
         case Left(Right(s: InvalidTxStatus)) =>
           addFailed(tx, s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}")
         case Right(_) =>
-          handleValidTx(chainIndex, tx, mempool, persistedTxIdOpt, acknowledge)
+          val grandPool = blockFlow.getGrandPool()
+          handleValidTx(chainIndex, tx, grandPool, persistedTxIdOpt, acknowledge)
         case Left(Left(e)) =>
           addFailed(tx, s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}")
       }
@@ -365,12 +366,12 @@ class TxHandler(
   private def handleValidTx(
       chainIndex: ChainIndex,
       tx: TransactionTemplate,
-      mempool: MemPool,
+      grandPool: GrandPool,
       persistedTxIdOpt: Option[PersistedTxId],
       acknowledge: Boolean
   ): Unit = {
     val currentTs = TimeStamp.now()
-    val result    = mempool.add(chainIndex, tx, currentTs)
+    val result    = grandPool.add(chainIndex, tx, currentTs)
     log.debug(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
       case MemPool.AddedToMemPool =>

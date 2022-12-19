@@ -27,9 +27,12 @@ trait BrokerGroupInfo {
   def brokerNum: Int
 
   @inline def groupIndexOfBroker(group: GroupIndex): Int = groupIndexOfBrokerUnsafe(group.value)
-  @inline def groupIndexOfBrokerUnsafe(group: Int): Int  = group / brokerNum
-  @inline def brokerIndex(group: GroupIndex): Int        = brokerIndexUnsafe(group.value)
-  @inline def brokerIndexUnsafe(group: Int): Int         = group % brokerNum
+  @inline def groupIndexOfBrokerUnsafe(group: Int): Int = {
+    assume(brokerIndexUnsafe(group) == brokerId)
+    group / brokerNum
+  }
+  @inline def brokerIndex(group: GroupIndex): Int = brokerIndexUnsafe(group.value)
+  @inline def brokerIndexUnsafe(group: Int): Int  = group % brokerNum
 
   def contains(index: GroupIndex): Boolean = containsRaw(index.value)
 

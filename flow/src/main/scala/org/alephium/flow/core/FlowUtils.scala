@@ -51,12 +51,14 @@ trait FlowUtils
 
   val grandPool = GrandPool.empty
 
+  def getGrandPool(): GrandPool = grandPool
+
   def getMemPool(mainGroup: GroupIndex): MemPool = {
     grandPool.getMemPool(mainGroup)
   }
 
   def getMemPool(chainIndex: ChainIndex): MemPool = {
-    grandPool.getMemPool(chainIndex)
+    grandPool.getMemPool(chainIndex.from)
   }
 
   def calMemPoolChangesUnsafe(
@@ -66,13 +68,27 @@ trait FlowUtils
   ): MemPoolChanges = {
     val oldOutDeps = oldDeps.outDeps
     val newOutDeps = newDeps.outDeps
-    val diffs = AVector.tabulate(brokerConfig.groups) { toGroup =>
+    val outDiffs = AVector.tabulate(brokerConfig.groups) { toGroup =>
       val toGroupIndex = GroupIndex.unsafe(toGroup)
       val oldDep       = oldOutDeps(toGroup)
       val newDep       = newOutDeps(toGroup)
-      val index        = ChainIndex(mainGroup, toGroupIndex)
-      getBlockChain(index).calBlockDiffUnsafe(index, newDep, oldDep)
+      val chainIndex   = ChainIndex(mainGroup, toGroupIndex)
+      getBlockChain(chainIndex).calBlockDiffUnsafe(chainIndex, newDep, oldDep)
     }
+    val inDiffs = newDeps.inDeps.mapWithIndex { case (newInIntraDep, k) =>
+      val intraIndex  = ChainIndex.from(newInIntraDep)
+      val fromGroup   = intraIndex.from
+      val targetIndex = ChainIndex(fromGroup, mainGroup)
+      assume(intraIndex.isIntraGroup)
+      val oldInIntraDep = oldDeps.inDeps(k)
+      assume(ChainIndex.from(oldInIntraDep) == intraIndex)
+      val newInDep = getOutTipsUnsafe(newInIntraDep)(mainGroup.value)
+      val oldInDep = getOutTipsUnsafe(oldInIntraDep)(mainGroup.value)
+      assume(ChainIndex.from(newInDep) == targetIndex)
+      assume(ChainIndex.from(oldInDep) == targetIndex)
+      getBlockChain(targetIndex).calBlockDiffUnsafe(targetIndex, newInDep, oldInDep)
+    }
+    val diffs    = inDiffs ++ outDiffs
     val toRemove = diffs.map(diff => diff.chainIndex -> diff.toAdd.flatMap(_.nonCoinbase))
     val toAdd    = diffs.map(diff => diff.chainIndex -> diff.toRemove.flatMap(_.nonCoinbase))
     if (toAdd.sumBy(_._2.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)

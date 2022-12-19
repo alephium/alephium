@@ -2024,7 +2024,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     serverUtils.getTransactionStatus(blockFlow, txId, chainIndex) isE TxNotFound()
 
-    blockFlow.getMemPool(chainIndex).add(chainIndex, AVector(txTemplate), TimeStamp.now())
+    blockFlow.getGrandPool().add(chainIndex, AVector(txTemplate), TimeStamp.now())
     serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled()
 
     txTemplate

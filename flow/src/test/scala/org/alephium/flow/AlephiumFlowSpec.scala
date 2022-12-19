@@ -730,6 +730,31 @@ trait FlowFixture
     addAndCheck(blockFlow, block)
     (contractId, contractOutputRef)
   }
+
+  def prepareRandomSequentialTxs(n: Int): AVector[Transaction] = {
+    val tmpBlockFlow                  = isolatedBlockFlow()
+    val startGroup                    = brokerConfig.randomGroupIndex()
+    val (startPriKey, startPubKey, _) = genesisKeys(startGroup.value)
+    var keys                          = AVector((startPriKey, startPubKey, ALPH.alph(1024)))
+    def createTx(): Transaction = {
+      val (fromPriKey, _, lastAmount) = keys.last
+      val (toPriKey, toPubKey)        = brokerConfig.randomGroupIndex().generateKey
+      val amount                      = lastAmount.divUnsafe(2)
+      val block                       = transfer(tmpBlockFlow, fromPriKey, toPubKey, amount)
+      val chainIndex                  = block.chainIndex
+      addAndCheck(tmpBlockFlow, block)
+      if (!chainIndex.isIntraGroup) {
+        // To confirm the transaction so its cross-chain output can be used
+        addAndCheck(
+          tmpBlockFlow,
+          emptyBlock(tmpBlockFlow, ChainIndex(chainIndex.from, chainIndex.from))
+        )
+      }
+      keys = keys :+ (toPriKey, toPubKey, amount)
+      block.nonCoinbase.head
+    }
+    AVector.fill(n)(createTx())
+  }
 }
 
 trait AlephiumFlowSpec extends AlephiumSpec with BeforeAndAfterAll with FlowFixture {

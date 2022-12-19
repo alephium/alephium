@@ -653,6 +653,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val fromGroup             = GroupIndex.unsafe(Random.nextInt(groupConfig.groups))
     val (fromPriKey, fromPubKey, initialAmount) = genesisKeys(fromGroup.value)
     val fromLockup                              = LockupScript.p2pkh(fromPubKey)
+    val theGrandPool                            = blockFlow.getGrandPool()
     val theMemPool                              = blockFlow.getMemPool(fromGroup)
 
     var txCount = 0
@@ -678,7 +679,7 @@ class BlockFlowSpec extends AlephiumSpec {
       val tx = TransactionTemplate.from(unsignedTx, fromPriKey)
 
       tx.chainIndex is chainIndex
-      theMemPool.add(chainIndex, tx, TimeStamp.now())
+      theGrandPool.add(chainIndex, tx, TimeStamp.now())
       theMemPool.contains(tx.id) is true
 
       val balance = initialAmount - (ALPH.oneAlph + defaultGasFee).mulUnsafe(txCount)

@@ -1820,7 +1820,7 @@ class VMSpec extends AlephiumSpec {
 
     val validator = TxValidation.build
     val simpleTx  = transfer(blockFlow, chainIndex).nonCoinbase.head.toTemplate
-    blockFlow.getMemPool(chainIndex).add(chainIndex, simpleTx, TimeStamp.now())
+    blockFlow.getGrandPool().add(chainIndex, simpleTx, TimeStamp.now())
     newAddresses.foreachWithIndex { case (address, index) =>
       val gas    = if (index % 2 == 0) 20000 else 200000
       val script = Compiler.compileTxScript(main(address)).rightValue
@@ -1840,7 +1840,7 @@ class VMSpec extends AlephiumSpec {
         validator.validateMempoolTxTemplate(tx, blockFlow) isE ()
       }
       blockFlow
-        .getMemPool(chainIndex)
+        .getGrandPool()
         .add(chainIndex, tx, TimeStamp.now()) is AddedToMemPool
     }
 

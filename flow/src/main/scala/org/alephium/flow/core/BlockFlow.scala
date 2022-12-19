@@ -377,7 +377,7 @@ object BlockFlow extends StrictLogging {
     }
 
     def updateBestDepsUnsafe(): Unit =
-      brokerConfig.groupRange.foreach { case (mainGroup) =>
+      brokerConfig.groupRange.foreach { mainGroup =>
         val mainGroupIndex = GroupIndex.unsafe(mainGroup)
         val oldDeps        = getBestDeps(mainGroupIndex)
         val newDeps        = calBestDepsUnsafe(mainGroupIndex)

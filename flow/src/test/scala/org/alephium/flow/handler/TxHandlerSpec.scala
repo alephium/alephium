@@ -34,7 +34,7 @@ import org.alephium.util._
 
 class TxHandlerSpec extends AlephiumFlowActorSpec {
 
-  it should "broadcast valid tx" in new Fixture {
+  it should "broadcast valid transactions" in new Fixture {
     override val configValues = Map(
       ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"),
       ("alephium.broker.groups", 4),
@@ -42,15 +42,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       ("alephium.broker.broker-id", 0)
     )
 
-    val tmpBlockFlow = isolatedBlockFlow()
-    def createTx(chainIndex: ChainIndex): Transaction = {
-      val block = transfer(tmpBlockFlow, chainIndex)
-      addAndCheck(tmpBlockFlow, block)
-      block.nonCoinbase.head
-    }
-
     setSynced()
-    val txs = AVector.fill(groupConfig.groups)(createTx(ChainIndex.random))
+
+    val txs = prepareRandomSequentialTxs(groupConfig.groups)
     txs.length is 4
     txHandler.underlyingActor.txsBuffer.isEmpty is true
 
@@ -191,7 +185,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val txHash4 = TransactionId.generate
     val mempool = blockFlow.getMemPool(chain02)
     mempool.contains(tx2.id) is false
-    mempool.add(chain02, tx2, TimeStamp.now())
+    blockFlow.getGrandPool().add(chain02, tx2, TimeStamp.now())
     mempool.contains(tx2.id) is true
 
     txHandler ! TxHandler.TxAnnouncements(
@@ -248,6 +242,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   }
 
   it should "reject tx with low gas price" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
     val tx            = transactionGen().sample.get
     val lowGasPriceTx = tx.copy(unsigned = tx.unsigned.copy(gasPrice = minimalGasPrice))
 

@@ -102,7 +102,11 @@ class MemPool private (
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-  def add(index: ChainIndex, tx: TransactionTemplate, timeStamp: TimeStamp): MemPool.NewTxCategory =
+  private[mempool] def add(
+      index: ChainIndex,
+      tx: TransactionTemplate,
+      timeStamp: TimeStamp
+  ): MemPool.NewTxCategory =
     writeOnly {
       if (_contains(tx.id)) {
         MemPool.AlreadyExisted
@@ -117,6 +121,19 @@ class MemPool private (
         }
       } else {
         _add(index, tx, timeStamp)
+      }
+    }
+
+  private[mempool] def addXGroupTx(
+      index: ChainIndex,
+      tx: TransactionTemplate,
+      timestamp: TimeStamp
+  ): Unit =
+    writeOnly {
+      if (!_contains(tx.id)) {
+        val children = sharedTxIndexes.addXGroupTx(tx, tx => flow.unsafe(tx.id))
+        flow.addNewNode(MemPool.FlowNode(tx.id, tx, timestamp, index.flattenIndex, None, children))
+        timestamps.put(tx.id, timestamp)
       }
     }
 
@@ -135,7 +152,7 @@ class MemPool private (
     }
   }
 
-  def add(
+  private[mempool] def add(
       index: ChainIndex,
       transactions: AVector[TransactionTemplate],
       timeStamp: TimeStamp
@@ -154,7 +171,7 @@ class MemPool private (
       _remove: TransactionId => Unit
   ): Int = writeOnly {
     val sizeBefore = size
-    transactions.foreach(tx => _remove(tx.id))
+    transactions.foreach(tx => if (_contains(tx.id)) _remove(tx.id))
 //      measureTransactionsTotal()
     val sizeAfter = size
     sizeBefore - sizeAfter
@@ -177,7 +194,7 @@ class MemPool private (
       toRemove: AVector[(ChainIndex, AVector[Transaction])],
       toAdd: AVector[(ChainIndex, AVector[Transaction])]
   ): (Int, Int) = {
-    assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
+    assume(toRemove.length == groupConfig.depsNum && toAdd.length == groupConfig.depsNum)
     val now = TimeStamp.now()
 
     // First, add transactions from short chains, then remove transactions from canonical chains

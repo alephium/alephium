@@ -73,7 +73,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val chainIndex = tx.chainIndex
       TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
       blockFlow
-        .getMemPool(chainIndex)
+        .getGrandPool()
         .add(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToMemPool
     }
   }
@@ -185,7 +185,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       val block = transfer(blockFlow, chainIndex)
       val tx    = block.nonCoinbase.head
-      blockFlow.getMemPool(chainIndex).add(chainIndex, tx.toTemplate, TimeStamp.now())
+      blockFlow.getGrandPool().add(chainIndex, tx.toTemplate, TimeStamp.now())
 
       {
         val groupView = blockFlow.getMutableGroupView(fromGroup).rightValue
