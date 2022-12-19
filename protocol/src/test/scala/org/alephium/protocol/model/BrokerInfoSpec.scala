@@ -74,8 +74,8 @@ class BrokerInfoSpec extends AlephiumSpec {
     val address    = socketAddressGen.sample.get
     val brokerInfo = BrokerInfo.unsafe(CliqueId.generate, 1, 3, address)
     for {
-      from <- groupConfig.allGroups
-      to   <- groupConfig.allGroups
+      from <- groupConfig.cliqueGroups
+      to   <- groupConfig.cliqueGroups
     } {
       val index = ChainIndex(from, to)
       if (index == ChainIndex.unsafe(0, 1) || index == ChainIndex.unsafe(2, 1)) {

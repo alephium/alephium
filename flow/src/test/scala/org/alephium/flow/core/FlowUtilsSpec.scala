@@ -242,7 +242,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     blockFlow.calMemPoolChangesUnsafe(mainGroup, deps0, deps1) is
       Normal(
         AVector.from(
-          brokerConfig.allGroups
+          brokerConfig.cliqueGroups
             .filter(_ != mainGroup)
             .map(fromGroup => ChainIndex(fromGroup, mainGroup) -> AVector.empty[Transaction])
         ) ++
@@ -254,7 +254,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     blockFlow.calMemPoolChangesUnsafe(mainGroup, deps1, deps2) is
       Reorg(
         toRemove = AVector.from(
-          brokerConfig.allGroups
+          brokerConfig.cliqueGroups
             .filter(_ != mainGroup)
             .map { fromGroup =>
               ChainIndex(fromGroup, mainGroup) ->
@@ -271,7 +271,7 @@ class FlowUtilsSpec extends AlephiumSpec {
             .replace(1, block5.chainIndex -> block5.nonCoinbase)
             .replace(2, block6.chainIndex -> block6.nonCoinbase),
         toAdd = AVector.from(
-          brokerConfig.allGroups
+          brokerConfig.cliqueGroups
             .filter(_ != mainGroup)
             .map(fromGroup => ChainIndex(fromGroup, mainGroup) -> AVector.empty[Transaction])
         ) ++

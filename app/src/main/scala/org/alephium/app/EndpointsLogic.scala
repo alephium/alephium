@@ -198,7 +198,7 @@ trait EndpointsLogic extends Endpoints {
           Left(ApiError.NotFound(s"Group not found. Please check another broker"))
             .withRight[Group]
         )
-      brokerConfig.allGroups.take(brokerConfig.brokerNum).fold(failure) {
+      brokerConfig.cliqueGroups.take(brokerConfig.brokerNum).fold(failure) {
         case (prevResult, currentGroup: GroupIndex) =>
           prevResult flatMap {
             case Right(_) =>
@@ -454,7 +454,7 @@ trait EndpointsLogic extends Endpoints {
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def searchTransactionStatusInOtherNodes(txId: TransactionId): FutureTry[TxStatus] = {
-    val otherGroupFrom = groupConfig.allGroups.filterNot(brokerConfig.contains)
+    val otherGroupFrom = groupConfig.cliqueGroups.filterNot(brokerConfig.contains)
     if (otherGroupFrom.isEmpty) {
       Future.successful(Right(TxNotFound()))
     } else {
