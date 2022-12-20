@@ -88,7 +88,7 @@ class ParserSpec extends AlephiumSpec {
         )
       )
     fastparse
-      .parse("foo{ x -> 1e-18 alph, token: 2; y -> 3 }(z)", StatefulParser.expr(_))
+      .parse("foo{ x -> ALPH: 1e-18 alph, token: 2; y -> ALPH: 3 }(z)", StatefulParser.expr(_))
       .get
       .value is
       CallExpr[StatefulContext](
@@ -96,19 +96,24 @@ class ParserSpec extends AlephiumSpec {
         Seq(
           Ast.ApproveAsset(
             Variable(Ident("x")),
-            Some(Const(Val.U256(U256.One))),
-            Seq(Variable(Ident("token")) -> Const(Val.U256(U256.Two)))
+            Seq(
+              Ast.ALPHTokenId()        -> Const(Val.U256(U256.One)),
+              Variable(Ident("token")) -> Const(Val.U256(U256.Two))
+            )
           ),
-          Ast.ApproveAsset(Variable(Ident("y")), Some(Const(Val.U256(U256.unsafe(3)))), Seq.empty)
+          Ast.ApproveAsset(
+            Variable(Ident("y")),
+            Seq(Ast.ALPHTokenId() -> Const(Val.U256(U256.unsafe(3))))
+          )
         ),
         List(Variable(Ident("z")))
       )
 
     info("Braces syntax")
-    fastparse.parse("{ x -> 1 alph }", StatelessParser.approveAssets(_)).isSuccess is true
+    fastparse.parse("{ x -> ALPH: 1 alph }", StatelessParser.approveAssets(_)).isSuccess is true
     fastparse.parse("{ x -> tokenId: 2 }", StatelessParser.approveAssets(_)).isSuccess is true
     fastparse
-      .parse("{ x -> 1 alph, tokenId: 2; y -> 3 }", StatelessParser.approveAssets(_))
+      .parse("{ x -> ALPH: 1 alph, tokenId: 2; y -> ALPH: 3 }", StatelessParser.approveAssets(_))
       .isSuccess is true
 
     info("Contract call")
@@ -119,13 +124,24 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         List(Variable(Ident("x")))
       )
-    fastparse.parse("Foo(x).bar{ z -> 1 }(x)", StatefulParser.contractCallExpr(_)).get.value is
+    fastparse
+      .parse("Foo(x).bar{ z -> ALPH: 1 }(x)", StatefulParser.contractCallExpr(_))
+      .get
+      .value is
       ContractCallExpr(
         ContractConv[StatefulContext](Ast.TypeId("Foo"), Variable(Ident("x"))),
         FuncId("bar", false),
-        Seq(Ast.ApproveAsset(Variable(Ident("z")), Some(Const(Val.U256(U256.One))), Seq.empty)),
+        Seq(
+          Ast.ApproveAsset(
+            Variable(Ident("z")),
+            Seq(ALPHTokenId() -> Const(Val.U256(U256.One)))
+          )
+        ),
         List(Variable(Ident("x")))
       )
+    intercept[Compiler.Error](
+      fastparse.parse("Foo(x).bar{ z -> }(x)", StatefulParser.contractCallExpr(_))
+    ).message is "Empty asset for address: Variable(Ident(z))"
   }
 
   it should "parse ByteVec" in {
@@ -140,6 +156,7 @@ class ParserSpec extends AlephiumSpec {
         Seq(Ast.NamedVar(false, Ident("bytes"))),
         Const(Val.ByteVec(ByteString.empty))
       )
+    fastparse.parse("ALPH", StatefulParser.expr(_)).get.value is ALPHTokenId[StatefulContext]()
   }
 
   it should "parse return" in {

@@ -659,13 +659,13 @@ trait FlowFixture
     val stateRaw = Hex.toHexString(serialize(initialState))
     val creation = tokenIssuanceInfo match {
       case Some(TokenIssuance.Info(amount, None)) =>
-        s"createContractWithToken!{@$address -> ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw, ${amount.v})"
+        s"createContractWithToken!{@$address -> ALPH: ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw, ${amount.v})"
       case Some(TokenIssuance.Info(amount, Some(transferTo))) => {
         val toAddress = Address.from(transferTo).toBase58
-        s"createContractWithToken!{@$address -> ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw, ${amount.v}, @${toAddress})"
+        s"createContractWithToken!{@$address -> ALPH: ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw, ${amount.v}, @${toAddress})"
       }
       case None =>
-        s"createContract!{@$address -> ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw)"
+        s"createContract!{@$address -> ALPH: ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw)"
     }
     val scriptRaw =
       s"""

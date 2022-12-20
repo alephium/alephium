@@ -168,7 +168,7 @@ object Instr {
     CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
     LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
     CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
-    NullContractAddress, SubContractId, SubContractIdOf
+    NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId
   )
   // format: on
 
@@ -1240,9 +1240,14 @@ object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       fromAddress  <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .useToken(fromAddress.lockupScript, tokenId, tokenAmount.v)
-        .toRight(Right(NotEnoughBalance))
+      _ <-
+        if (tokenId == TokenId.alph) {
+          Left(Right(BurningAlphNotAllowed))
+        } else {
+          balanceState
+            .useToken(fromAddress.lockupScript, tokenId, tokenAmount.v)
+            .toRight(Right(NotEnoughBalance))
+        }
     } yield ()
   }
 }
@@ -1303,9 +1308,14 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       address      <- frame.popOpStackAddress()
       balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .approveToken(address.lockupScript, tokenId, amount.v)
-        .toRight(Right(NotEnoughBalance))
+      _ <-
+        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
+          balanceState.approveALPH(address.lockupScript, amount.v).toRight(Right(NotEnoughBalance))
+        } else {
+          balanceState
+            .approveToken(address.lockupScript, tokenId, amount.v)
+            .toRight(Right(NotEnoughBalance))
+        }
     } yield ()
   }
 }
@@ -1330,9 +1340,16 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
       address      <- frame.popOpStackAddress()
       tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
       balanceState <- frame.getBalanceState()
-      amount <- balanceState
-        .tokenRemaining(address.lockupScript, tokenId)
-        .toRight(Right(NoTokenBalanceForTheAddress))
+      amount <-
+        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
+          balanceState
+            .alphRemaining(address.lockupScript)
+            .toRight(Right(NoAlphBalanceForTheAddress))
+        } else {
+          balanceState
+            .tokenRemaining(address.lockupScript, tokenId)
+            .toRight(Right(NoTokenBalanceForTheAddress))
+        }
       _ <- frame.pushOpStack(Val.U256(amount))
     } yield ()
   }
@@ -1368,17 +1385,46 @@ sealed trait Transfer extends AssetInstr {
 
   @inline def transferAlph[C <: StatefulContext](
       frame: Frame[C],
-      fromThunk: => ExeResult[LockupScript],
-      toThunk: => ExeResult[LockupScript]
+      from: LockupScript,
+      to: LockupScript,
+      amount: Val.U256
   ): ExeResult[Unit] = {
     for {
-      amount       <- frame.popOpStackU256()
-      to           <- toThunk
-      from         <- fromThunk
       balanceState <- frame.getBalanceState()
       _            <- balanceState.useAlph(from, amount.v).toRight(Right(NotEnoughBalance))
       _ <- frame.ctx.outputBalances
         .addAlph(to, amount.v)
+        .toRight(Right(BalanceOverflow))
+    } yield ()
+  }
+
+  @inline def transferAlph[C <: StatefulContext](
+      frame: Frame[C],
+      fromThunk: => ExeResult[LockupScript],
+      toThunk: => ExeResult[LockupScript]
+  ): ExeResult[Unit] = {
+    for {
+      amount <- frame.popOpStackU256()
+      to     <- toThunk
+      from   <- fromThunk
+      _      <- transferAlph(frame, from, to, amount)
+    } yield ()
+  }
+
+  @inline def transferToken[C <: StatefulContext](
+      frame: Frame[C],
+      tokenId: TokenId,
+      from: LockupScript,
+      to: LockupScript,
+      amount: Val.U256
+  ): ExeResult[Unit] = {
+    for {
+      balanceState <- frame.getBalanceState()
+      _ <- balanceState
+        .useToken(from, tokenId, amount.v)
+        .toRight(Right(NotEnoughBalance))
+      _ <- frame.ctx.outputBalances
+        .addToken(to, tokenId, amount.v)
         .toRight(Right(BalanceOverflow))
     } yield ()
   }
@@ -1389,18 +1435,17 @@ sealed trait Transfer extends AssetInstr {
       toThunk: => ExeResult[LockupScript]
   ): ExeResult[Unit] = {
     for {
-      amount       <- frame.popOpStackU256()
-      tokenIdRaw   <- frame.popOpStackByteVec()
-      tokenId      <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
-      to           <- toThunk
-      from         <- fromThunk
-      balanceState <- frame.getBalanceState()
-      _ <- balanceState
-        .useToken(from, tokenId, amount.v)
-        .toRight(Right(NotEnoughBalance))
-      _ <- frame.ctx.outputBalances
-        .addToken(to, tokenId, amount.v)
-        .toRight(Right(BalanceOverflow))
+      amount     <- frame.popOpStackU256()
+      tokenIdRaw <- frame.popOpStackByteVec()
+      tokenId    <- TokenId.from(tokenIdRaw.bytes).toRight(Right(InvalidTokenId))
+      to         <- toThunk
+      from       <- fromThunk
+      _ <-
+        if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
+          transferAlph(frame, from, to, amount)
+        } else {
+          transferToken(frame, tokenId, from, to, amount)
+        }
     } yield ()
   }
 }
@@ -1805,6 +1850,16 @@ object SubContractId extends SubContractIdBase {
 object SubContractIdOf extends SubContractIdBase {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     runWithLeman(frame, isParentContractSelf = false)
+  }
+}
+
+object ALPHTokenId
+    extends LemanInstrWithSimpleGas[StatefulContext]
+    with StatefulInstrCompanion0
+    with GasBase {
+  private val alphTokenId = Val.ByteVec(TokenId.alph.bytes)
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.pushOpStack(alphTokenId)
   }
 }
 

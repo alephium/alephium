@@ -828,10 +828,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils = new ServerUtils
     serverUtils.getInitialAttoAlphAmount(None) isE minimalAlphInContract
     serverUtils.getInitialAttoAlphAmount(
-      Some(Amount(minimalAlphInContract))
+      Some(minimalAlphInContract)
     ) isE minimalAlphInContract
     serverUtils
-      .getInitialAttoAlphAmount(Some(Amount(minimalAlphInContract - 1)))
+      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1))
       .leftValue
       .detail is "Expect 1 ALPH deposit to deploy a new contract"
   }
@@ -935,7 +935,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |Contract Foo(mut value: U256) {
          |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
          |  pub fn addOne() -> U256 {
-         |    transferAlphToSelf!(@$callerAddress, ${ALPH.oneNanoAlph})
+         |    transferTokenToSelf!(@$callerAddress, ALPH, ${ALPH.oneNanoAlph})
          |    value = value + 1
          |    let bar = Bar(#${barId.toHexString})
          |    bar.addOne()
@@ -954,7 +954,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |@using(preapprovedAssets = true)
          |TxScript Main {
          |  let foo = Foo(#${fooId.toHexString})
-         |  foo.addOne{@$callerAddress -> 1 alph}()
+         |  foo.addOne{@$callerAddress -> ALPH: 1 alph}()
          |}
          |
          |$fooCode
@@ -1044,7 +1044,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |Contract Bar() {
          |  @using(assetsInContract = true)
          |  pub fn bar() -> () {
-         |    createSubContract!{selfAddress!() -> 1 alph}(#$createContractPath, #$fooByteCode, #$encodedState)
+         |    createSubContract!{selfAddress!() -> ALPH: 1 alph}(#$createContractPath, #$fooByteCode, #$encodedState)
          |    Foo(subContractId!(#$destroyContractPath)).destroy()
          |  }
          |}
@@ -1310,7 +1310,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn foo() -> () {
-         |    assert!(alphRemaining!(selfAddress!()) == 1 alph, 0)
+         |    assert!(tokenRemaining!(selfAddress!(), ALPH) == 1 alph, 0)
          |  }
          |}
          |""".stripMargin
@@ -1882,7 +1882,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, 50)
+           |  createContractWithToken!{@$fromAddress -> ALPH: 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
@@ -1892,7 +1892,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           fromAddress,
           initialFields,
           U256.unsafe(10),
-          AVector(Token(token1, U256.unsafe(10)), Token(token2, U256.unsafe(20))),
+          AVector((token1, U256.unsafe(10)), (token2, U256.unsafe(20))),
           Some(U256.unsafe(50))
         ) is expected
     }
@@ -1906,7 +1906,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> 10}(#$codeRaw, #$stateRaw, 50)
+           |  createContractWithToken!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true

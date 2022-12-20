@@ -175,7 +175,7 @@ trait VotingFixture extends WalletFixture {
     val allocationTransfers = voters.zipWithIndex
       .map { case (_, i) =>
         s"""
-           |transferAlph!(admin, voters[$i], $dustAmount)
+           |transferToken!(admin, voters[$i], ALPH, $dustAmount)
            |transferTokenFromSelf!(voters[$i], selfTokenId!(), 1)""".stripMargin
       }
       .mkString("\n")
@@ -210,7 +210,7 @@ trait VotingFixture extends WalletFixture {
          |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
          |  pub fn vote(choice: Bool, voter: Address) -> () {
          |    assert!(initialized == true && isClosed == false, 0)
-         |    transferAlph!(voter, admin, $dustAmount)
+         |    transferToken!(voter, admin, ALPH, $dustAmount)
          |    transferTokenToSelf!(voter, selfTokenId!(), 1)
          |
          |    emit VoteCasted(voter, choice)
@@ -262,7 +262,7 @@ trait VotingFixture extends WalletFixture {
          |TxScript TokenAllocation {
          |  let voting = Voting(#${contractId})
          |  let caller = callerAddress!()
-         |  voting.allocateTokens{caller -> $dustAmount * ${votersWallets.size}}()
+         |  voting.allocateTokens{caller -> ALPH: $dustAmount * ${votersWallets.size}}()
          |}
         $contractCode
       """.stripMargin
@@ -275,12 +275,13 @@ trait VotingFixture extends WalletFixture {
       choice: Boolean,
       contractCode: String
   ): SubmitTxResult = {
-    val votingScript = s"""
-                          |TxScript VotingScript {
-                          |  let caller = callerAddress!()
-                          |  let voting = Voting(#$contractId)
-                          |  voting.vote{caller -> $dustAmount, #$contractId: 1}($choice, caller)
-                          |}
+    val votingScript =
+      s"""
+         |TxScript VotingScript {
+         |  let caller = callerAddress!()
+         |  let voting = Voting(#$contractId)
+         |  voting.vote{caller -> ALPH: $dustAmount, #$contractId: 1}($choice, caller)
+         |}
       $contractCode
       """.stripMargin
     script(voterWallet.publicKey.toHexString, votingScript, voterWallet.creation.walletName)

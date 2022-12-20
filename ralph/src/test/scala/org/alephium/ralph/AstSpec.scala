@@ -18,8 +18,7 @@ package org.alephium.ralph
 
 import scala.collection.mutable
 
-import org.alephium.util.AlephiumSpec
-import org.alephium.util.AVector
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class AstSpec extends AlephiumSpec {
 

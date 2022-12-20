@@ -115,6 +115,8 @@ final case class ContractAlreadyExists(contractId: ContractId) extends ExeFailur
 case object NoBlockHashAvailable                               extends ExeFailure
 case object DebugIsNotSupportedForMainnet                      extends ExeFailure
 case object DebugMessageIsEmpty                                extends ExeFailure
+case object ZeroContractId                                     extends ExeFailure
+case object BurningAlphNotAllowed                              extends ExeFailure
 
 final case class UncaughtKeyNotFoundError(error: IOError.KeyNotFound) extends ExeFailure
 final case class UncaughtSerdeError(error: IOError.Serde)             extends ExeFailure

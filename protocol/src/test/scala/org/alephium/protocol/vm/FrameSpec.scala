@@ -23,6 +23,7 @@ import scala.reflect.ClassTag
 
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
+import org.alephium.protocol.model.{ContractId, TokenId}
 import org.alephium.protocol.vm.ContractPool.ContractAssetInUsing
 import org.alephium.util.{AlephiumSpec, AVector}
 
@@ -131,6 +132,20 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     test(lemanFrame, contract1, emptyOutput = true)
     test(lemanFrame, contract2, emptyOutput = false)
     test(lemanFrame, contract3, emptyOutput = false)
+  }
+
+  it should "check contract id" in {
+    val genesisFrame = genStatefulFrame()(NetworkConfigFixture.PreLeman)
+    val lemanFrame   = genStatefulFrame()(NetworkConfigFixture.Leman)
+
+    val randomContractId = ContractId.generate
+    val zeroContractId   = ContractId.unsafe(TokenId.alph.value)
+
+    genesisFrame.checkContractId(randomContractId).rightValue is ()
+    genesisFrame.checkContractId(zeroContractId).rightValue is ()
+
+    lemanFrame.checkContractId(randomContractId).rightValue is ()
+    lemanFrame.checkContractId(zeroContractId).leftValue is Right(ZeroContractId)
   }
 }
 

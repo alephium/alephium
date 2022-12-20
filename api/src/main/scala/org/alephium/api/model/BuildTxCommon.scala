@@ -16,8 +16,9 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.model.{BlockHash, TokenId}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
+import org.alephium.util.{AVector, U256}
 
 trait BuildTxCommon {
   def gasAmount: Option[GasBox]
@@ -25,6 +26,38 @@ trait BuildTxCommon {
   def gasPrice: Option[GasPrice]
 
   def targetBlockHash: Option[BlockHash]
+}
+
+object BuildTxCommon {
+  def getAlphAndTokenAmounts(
+      attoAlphAmount: Option[Amount],
+      tokensAmount: Option[AVector[Token]]
+  ): Either[String, (Option[U256], AVector[(TokenId, U256)])] = {
+    val alphAmountOpt = attoAlphAmount.map(_.value)
+    tokensAmount match {
+      case None => Right((alphAmountOpt, AVector.empty))
+      case Some(tokens) =>
+        val amounts = tokens.foldE((alphAmountOpt, Map.empty[TokenId, U256])) {
+          case ((Some(alphAmount), tokenList), Token(TokenId.alph, tokenAmount)) =>
+            alphAmount
+              .add(tokenAmount)
+              .toRight("ALPH amount overflow")
+              .map(v => (Some(v), tokenList))
+          case ((None, tokenList), Token(TokenId.alph, tokenAmount)) =>
+            Right((Some(tokenAmount), tokenList))
+          case ((alphOpt, tokenList), Token(tokenId, tokenAmount)) =>
+            if (tokenList.contains(tokenId)) {
+              tokenList(tokenId)
+                .add(tokenAmount)
+                .toRight(s"Token $tokenId amount overflow")
+                .map(v => (alphOpt, tokenList + (tokenId -> v)))
+            } else {
+              Right((alphOpt, tokenList + (tokenId -> tokenAmount)))
+            }
+        }
+        amounts.map(v => (v._1, AVector.from(v._2)))
+    }
+  }
 }
 
 trait GasInfo {
