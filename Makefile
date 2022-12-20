@@ -1,5 +1,5 @@
 assembly:
-	sbt app/assembly wallet/assembly
+	sbt app/assembly wallet/assembly ralphc/assembly
 
 package:
 	sbt app/universal:packageBin

@@ -679,7 +679,11 @@ object TxValidation {
       for {
         remaining <- EitherF.foldTry(inputs.indices, gasRemaining) { case (gasRemaining, idx) =>
           val unlockScript = inputs(idx).unlockScript
-          if (idx > 0 && unlockScript == inputs(idx - 1).unlockScript) {
+          if (
+            idx > 0 &&
+            preOutputs(idx).lockupScript == preOutputs(idx - 1).lockupScript &&
+            unlockScript == inputs(idx - 1).unlockScript
+          ) {
             validTx(gasRemaining)
           } else {
             checkLockupScript(

@@ -3106,8 +3106,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Function \"Foo.foo\" changes state, please use @using(updateFields = true) for the function"
+      Compiler.compileContractFull(code).rightValue.warnings is
+        AVector(
+          "Function \"Foo.foo\" changes state, please use @using(updateFields = true) for the function"
+        )
     }
 
     {
@@ -3148,8 +3150,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "Function \"Foo.foo\" changes state, please use @using(updateFields = true) for the function"
+      Compiler.compileContractFull(code).rightValue.warnings is
+        AVector(
+          "Function \"Foo.foo\" changes state, please use @using(updateFields = true) for the function"
+        )
     }
 
     {
