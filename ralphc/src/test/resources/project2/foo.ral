@@ -1,0 +1,5 @@
+Contract Foo(a: Bool, b: I256, c: U256, d: ByteVec, e: Address) {
+  pub fn foo() -> (Bool, I256, U256, ByteVec, Address) {
+    return a, b, c, d, e
+  }
+}

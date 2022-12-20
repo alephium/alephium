@@ -1,0 +1,50 @@
+{
+  "version": "v1.5.4",
+  "name": "Sub",
+  "bytecode": "01011901000202010c05160016015fa00016002a16012ba100a00002",
+  "codeHash": "513645f5c95a28d55a51070f3d5c51edbda05a98f46b23cad59952e2ee4846a1",
+  "fieldsSig": {
+    "names": [
+      "result"
+    ],
+    "types": [
+      "U256"
+    ],
+    "isMutable": [
+      true
+    ]
+  },
+  "eventsSig": [
+    {
+      "name": "Sub",
+      "fieldNames": [
+        "x",
+        "y"
+      ],
+      "fieldTypes": [
+        "U256",
+        "U256"
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "name": "sub",
+      "usePreapprovedAssets": false,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        "array"
+      ],
+      "paramTypes": [
+        "[U256;2]"
+      ],
+      "paramIsMutable": [
+        false
+      ],
+      "returnTypes": [
+        "U256"
+      ]
+    }
+  ]
+}

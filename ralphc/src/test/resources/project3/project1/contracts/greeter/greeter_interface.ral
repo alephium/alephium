@@ -1,0 +1,4 @@
+Interface GreeterInterface {
+    @using(updateFields = false)
+    pub fn greet() -> U256
+}

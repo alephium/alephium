@@ -1,0 +1,85 @@
+{
+  "version": "v1.5.4",
+  "name": "Math",
+  "bytecode": "000340254042405f0100020401130d17020c170316031601314c09160216002c170216030d2a17034a3316020201000202010e16011308334c081600130a160113082b00002d0216000201000202010e16011308334c081600130a160113082b00002c02160002",
+  "codeHash": "649e6f9fd0e73759cd506bc05aa80bfbf709748f2782aaa83001634ed978b4b0",
+  "fieldsSig": {
+    "names": [
+      
+    ],
+    "types": [
+      
+    ],
+    "isMutable": [
+      
+    ]
+  },
+  "eventsSig": [
+    
+  ],
+  "functions": [
+    {
+      "name": "pow",
+      "usePreapprovedAssets": false,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        "x",
+        "y"
+      ],
+      "paramTypes": [
+        "U256",
+        "U256"
+      ],
+      "paramIsMutable": [
+        false,
+        false
+      ],
+      "returnTypes": [
+        "U256"
+      ]
+    },
+    {
+      "name": "normalizeAmount",
+      "usePreapprovedAssets": false,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        "amount",
+        "decimals"
+      ],
+      "paramTypes": [
+        "U256",
+        "U256"
+      ],
+      "paramIsMutable": [
+        false,
+        false
+      ],
+      "returnTypes": [
+        "U256"
+      ]
+    },
+    {
+      "name": "deNormalizeAmount",
+      "usePreapprovedAssets": false,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        "amount",
+        "decimals"
+      ],
+      "paramTypes": [
+        "U256",
+        "U256"
+      ],
+      "paramIsMutable": [
+        false,
+        false
+      ],
+      "returnTypes": [
+        "U256"
+      ]
+    }
+  ]
+}

@@ -40,6 +40,7 @@ lazy val root: Project = Project("alephium-scala-blockflow", file("."))
     ralph,
     http,
     wallet,
+    ralphc,
     tools
   )
 
@@ -330,6 +331,34 @@ lazy val wallet = project("wallet")
         MergeStrategy.first
       case PathList("META-INF", "io.netty.versions.properties", xs @ _*) =>
         MergeStrategy.first
+      case PathList("module-info.class") =>
+        MergeStrategy.discard
+      case x if x.endsWith("module-info.class") =>
+        MergeStrategy.discard
+      case other =>
+        assemblyMergeStrategy.value(other)
+    }
+  )
+
+lazy val ralphc = project("ralphc")
+  .dependsOn(
+    json,
+    api,
+    crypto,
+    ralph,
+    util     % "test->test",
+    protocol % "compile->compile;test->test"
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      upickle,
+      scopt
+    ),
+    publish / skip             := true,
+    assembly / mainClass       := Some("org.alephium.ralphc.Main"),
+    assembly / assemblyJarName := s"alephium-ralphc-${version.value}.jar",
+    assembly / test            := {},
+    assemblyMergeStrategy := {
       case PathList("module-info.class") =>
         MergeStrategy.discard
       case x if x.endsWith("module-info.class") =>
