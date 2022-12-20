@@ -993,8 +993,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  ],
          |  "warnings": [
          |    "Found unused variables in Foo: bar.a",
-         |    "Found unused fields in Foo: aa, bb, cc, dd, ee",
-         |    "Function Foo.bar does not update fields, please use @using(updateFields = false) for the function"
+         |    "Found unused fields in Foo: aa, bb, cc, dd, ee"
          |  ]
          |}
          |""".stripMargin
@@ -1121,5 +1120,41 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                      |}""".stripMargin
 
     checkData(tx, jsonRaw)
+  }
+
+  it should "encode/decode UTXO" in {
+    val tokenId = TokenId.generate
+    val amount  = Amount(123)
+
+    {
+      val utxo = UTXO(OutputRef(1, Hash.zero), amount)
+      val jsonRaw =
+        s"""
+           |{
+           |  "ref": {"hint":1,"key":"0000000000000000000000000000000000000000000000000000000000000000"},
+           |  "amount":"123"
+           |}""".stripMargin
+      checkData(utxo, jsonRaw)
+    }
+
+    {
+      val utxo = UTXO.from(
+        OutputRef(1, Hash.zero),
+        amount,
+        AVector(Token(tokenId, amount.value)),
+        TimeStamp.zero,
+        Hex.unsafe("FFFF")
+      )
+      val jsonRaw =
+        s"""
+           |{
+           |  "ref": {"hint":1,"key":"0000000000000000000000000000000000000000000000000000000000000000"},
+           |  "amount":"123",
+           |  "tokens":[{"id":"${tokenId.toHexString}","amount":"123"}],
+           |  "lockTime":0,
+           |  "additionalData":"ffff"
+           |}""".stripMargin
+      checkData(utxo, jsonRaw)
+    }
   }
 }

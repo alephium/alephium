@@ -32,7 +32,7 @@ final case class CallContract(
     existingContracts: Option[AVector[Address.Contract]] = None,
     inputAssets: Option[AVector[TestInputAsset]] = None
 ) {
-  def validate()(implicit brokerConfig: BrokerConfig): Try[ChainIndex] = {
+  def validate()(implicit brokerConfig: BrokerConfig): Try[GroupIndex] = {
     for {
       _ <-
         if (GroupIndex.validate(group)) {
@@ -47,6 +47,6 @@ final case class CallContract(
         } else {
           Right(())
         }
-    } yield chainIndex
+    } yield chainIndex.from
   }
 }

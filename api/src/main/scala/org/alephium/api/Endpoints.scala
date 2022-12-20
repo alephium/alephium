@@ -237,17 +237,17 @@ trait Endpoints
       .out(jsonBody[Boolean])
       .summary("Check if the block is in main chain")
 
-  val getBalance: BaseEndpoint[Address.Asset, Balance] =
+  val getBalance: BaseEndpoint[Address, Balance] =
     addressesEndpoint.get
-      .in(path[Address.Asset]("address"))
+      .in(path[Address]("address"))
       .in("balance")
       .out(jsonBodyWithAlph[Balance])
       .summary("Get the balance of an address")
 
   // TODO: query based on token id?
-  val getUTXOs: BaseEndpoint[Address.Asset, UTXOs] =
+  val getUTXOs: BaseEndpoint[Address, UTXOs] =
     addressesEndpoint.get
-      .in(path[Address.Asset]("address"))
+      .in(path[Address]("address"))
       .in("utxos")
       .out(jsonBody[UTXOs])
       .summary("Get the UTXOs of an address")

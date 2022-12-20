@@ -34,7 +34,7 @@ import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
-import org.alephium.serde.serialize
+import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -627,8 +627,13 @@ trait FlowFixture
     val initialGas  = tx0.unsigned.gasAmount
     val worldState  = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
     val prevOutputs = worldState.getPreOutputs(tx0).rightValue
-    val blockEnv =
-      BlockEnv(networkConfig.networkId, TimeStamp.now(), consensusConfig.maxMiningTarget, None)
+    val blockEnv = BlockEnv(
+      chainIndex,
+      networkConfig.networkId,
+      TimeStamp.now(),
+      consensusConfig.maxMiningTarget,
+      None
+    )
     val txValidation = TxValidation.build
     val gasLeft      = txValidation.checkGasAndWitnesses(tx0, prevOutputs, blockEnv).rightValue
     val gasUsed      = initialGas.use(gasLeft).rightValue
@@ -692,6 +697,38 @@ trait FlowFixture
       33000,
       validation = false
     )
+  }
+
+  def createContract(
+      input: String,
+      initialState: AVector[Val],
+      tokenIssuanceInfo: Option[TokenIssuance.Info] = None,
+      initialAttoAlphAmount: U256 = minimalAlphInContract,
+      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+  ): (ContractId, ContractOutputRef) = {
+    val genesisLockup = getGenesisLockupScript(chainIndex)
+    val contract      = Compiler.compileContract(input).rightValue
+    val txScript =
+      contractCreation(
+        contract,
+        initialState,
+        genesisLockup,
+        initialAttoAlphAmount,
+        tokenIssuanceInfo
+      )
+    val block = payableCall(blockFlow, chainIndex, txScript)
+
+    val contractOutputRef =
+      TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
+    val contractId = ContractId.from(block.transactions.head.id, 0, chainIndex.from)
+    val estimated  = contractId.inaccurateFirstOutputRef()
+    estimated.hint is contractOutputRef.hint
+    estimated.key.value.bytes.init is contractOutputRef.key.value.bytes.init
+
+    deserialize[StatefulContract.HalfDecoded](serialize(contract.toHalfDecoded())).rightValue
+      .toContract() isE contract
+    addAndCheck(blockFlow, block)
+    (contractId, contractOutputRef)
   }
 }
 

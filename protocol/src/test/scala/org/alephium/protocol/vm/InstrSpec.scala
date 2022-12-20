@@ -80,7 +80,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
       LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
-      NullContractAddress
+      NullContractAddress, SubContractId, SubContractIdOf
     )
     // format: on
   }
@@ -175,6 +175,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     lazy val context = frame.ctx
     lazy val locals  = frame.locals
 
+    lazy val mockBlockEnv =
+      BlockEnv(
+        ChainIndex.randomIntraGroup,
+        AlephiumMainNet,
+        TimeStamp.now(),
+        Target.Max,
+        Some(BlockHash.generate)
+      )
+
     def runAndCheckGas[I <: Instr[StatelessContext] with GasSimple](
         instr: I,
         frame: Frame[StatelessContext] = frame
@@ -192,6 +201,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         AVector.empty,
         blockEnv = Some(
           BlockEnv(
+            ChainIndex.randomIntraGroup,
             AlephiumMainNet,
             blockTs,
             Target.Max,
@@ -237,6 +247,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         AVector.empty,
         blockEnv = Some(
           BlockEnv(
+            ChainIndex.randomIntraGroup,
             AlephiumMainNet,
             blockTs,
             Target.Max,
@@ -1456,8 +1467,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "NetworkId" in new StatelessInstrFixture {
     override lazy val frame = prepareFrame(
       AVector.empty,
-      blockEnv =
-        Some(BlockEnv(AlephiumMainNet, TimeStamp.now(), Target.Max, Some(BlockHash.generate)))
+      blockEnv = Some(mockBlockEnv)
     )
 
     val initialGas = context.gasRemaining
@@ -1472,7 +1482,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       private val timestamp = TimeStamp.now()
       override lazy val frame = prepareFrame(
         AVector.empty,
-        blockEnv = Some(BlockEnv(AlephiumMainNet, timestamp, Target.Max, Some(BlockHash.generate)))
+        blockEnv = Some(mockBlockEnv.copy(timeStamp = timestamp))
       )
 
       private val initialGas = context.gasRemaining
@@ -1486,7 +1496,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val timestamp = new TimeStamp(-1)
       override lazy val frame = prepareFrame(
         AVector.empty,
-        blockEnv = Some(BlockEnv(AlephiumMainNet, timestamp, Target.Max, Some(BlockHash.generate)))
+        blockEnv = Some(mockBlockEnv.copy(timeStamp = timestamp))
       )
 
       BlockTimeStamp.runWith(frame).leftValue isE NegativeTimeStamp(-1)
@@ -1496,8 +1506,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   it should "BlockTarget" in new StatelessInstrFixture {
     override lazy val frame = prepareFrame(
       AVector.empty,
-      blockEnv =
-        Some(BlockEnv(AlephiumMainNet, TimeStamp.now(), Target.Max, Some(BlockHash.generate)))
+      blockEnv = Some(mockBlockEnv)
     )
 
     private val initialGas = context.gasRemaining
@@ -2250,6 +2259,28 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
+  it should "generate contract id for different network" in new StatefulInstrFixture {
+    val groupIndex   = GroupIndex.random
+    val path         = Hash.random.bytes
+    val genesisFrame = prepareFrame()(NetworkConfigFixture.PreLeman)
+    val lemanFrame   = prepareFrame()(NetworkConfigFixture.Leman)
+
+    CreateContractAbstract.getContractId(genesisFrame, false, groupIndex).rightValue is
+      ContractId.deprecatedFrom(genesisFrame.ctx.txId, 0)
+
+    CreateContractAbstract.getContractId(lemanFrame, false, groupIndex).rightValue is
+      ContractId.from(lemanFrame.ctx.txId, 0, groupIndex)
+
+    genesisFrame.pushOpStack(Val.ByteVec(path))
+    intercept[RuntimeException](
+      CreateContractAbstract.getContractId(genesisFrame, true, groupIndex)
+    ).getMessage is "Dead branch while creating a new contract"
+
+    lemanFrame.pushOpStack(Val.ByteVec(path))
+    CreateContractAbstract.getContractId(lemanFrame, true, groupIndex).rightValue is
+      ContractId.subContract(lemanFrame.obj.getContractId().rightValue.bytes ++ path, groupIndex)
+  }
+
   trait CreateContractAbstractFixture extends StatefulInstrFixture {
     val from              = lockupScriptGen.sample.get
     val (tx, prevOutputs) = transactionGenWithPreOutputs().sample.get
@@ -2271,6 +2302,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       callerFrameOpt = Some(callerFrame)
     )
     lazy val fromContractId = frame.obj.contractIdOpt.get
+
+    def getSubContractId(path: String): ContractId = {
+      fromContractId.subContractId(serialize(path), frame.ctx.blockEnv.chainIndex.from)
+    }
 
     def test(
         instr: CreateContractAbstract,
@@ -2390,7 +2425,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(contractBytes))
     stack.push(Val.ByteVec(serialize(fields)))
 
-    val subContractId = fromContractId.subContractId(serialize("nft-01"))
+    val subContractId = getSubContractId("nft-01")
     test(CreateSubContract, ALPH.oneAlph, AVector.empty, None, Some(subContractId))
   }
 
@@ -2406,7 +2441,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(serialize(fields)))
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
-    val subContractId = fromContractId.subContractId(serialize("nft-01"))
+    val subContractId = getSubContractId("nft-01")
     test(
       CreateSubContractWithToken,
       U256.Zero,
@@ -2434,7 +2469,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(Val.U256(ALPH.oneNanoAlph))
       stack.push(Val.Address(assetLockupScriptGen.sample.get))
 
-      val subContractId = fromContractId.subContractId(serialize("nft-01"))
+      val subContractId = getSubContractId("nft-01")
       test(
         CreateSubContractAndTransferToken,
         U256.Zero,
@@ -2699,7 +2734,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(fromContractId.bytes))
     stack.push(Val.ByteVec(serialize(AVector[Val](Val.True))))
 
-    val subContractId = fromContractId.subContractId(serialize("nft-01"))
+    val subContractId = getSubContractId("nft-01")
     test(CopyCreateSubContract, ALPH.oneAlph, AVector.empty, None, Some(subContractId))
   }
 
@@ -2721,7 +2756,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(state)
     stack.push(Val.U256(ALPH.oneNanoAlph))
 
-    val subContractId = fromContractId.subContractId(serialize("nft-01"))
+    val subContractId = getSubContractId("nft-01")
     test(
       CopyCreateSubContractWithToken,
       U256.Zero,
@@ -2750,7 +2785,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(Val.U256(ALPH.oneNanoAlph))
       stack.push(assetAddress)
 
-      val subContractId = fromContractId.subContractId(serialize("nft-01"))
+      val subContractId = getSubContractId("nft-01")
       test(
         CopyCreateSubContractAndTransferToken,
         U256.Zero,
@@ -3010,6 +3045,29 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(SelfContractId, Val.ByteVec(frame.obj.contractIdOpt.get.bytes))
   }
 
+  trait SubContractIdBaseFixture extends StatefulInstrFixture {
+    def test(instr: SubContractIdBase, expected: ContractId, initialVals: Val*) = {
+      initialVals.foreach(frame.pushOpStack)
+      frame.opStack.size is initialVals.length
+      instr.runWithLeman(frame) isE ()
+      frame.popContractId().rightValue is expected
+    }
+  }
+
+  it should "SubContractId" in new SubContractIdBaseFixture {
+    val path = Hash.random.bytes
+    val expectedId =
+      frame.obj.getContractId().rightValue.subContractId(path, frame.ctx.blockEnv.chainIndex.from)
+    test(SubContractId, expectedId, Val.ByteVec(path))
+  }
+
+  it should "SubContractIdOf" in new SubContractIdBaseFixture {
+    val parentId   = ContractId.random
+    val path       = Hash.random.bytes
+    val expectedId = parentId.subContractId(path, frame.ctx.blockEnv.chainIndex.from)
+    test(SubContractIdOf, expectedId, Val.ByteVec(parentId.bytes), Val.ByteVec(path))
+  }
+
   it should "SelfAddress" in new ContractInstrFixture {
     test(SelfAddress, Val.Address(LockupScript.p2c(frame.obj.contractIdOpt.get)))
   }
@@ -3232,7 +3290,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateSubContract -> 32000, CreateSubContractWithToken -> 32000, CopyCreateSubContract -> 24000, CopyCreateSubContractWithToken -> 24000,
       LoadFieldByIndex -> 5, StoreFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
       CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
-      NullContractAddress -> 2
+      NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -3359,7 +3417,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateSubContract -> 191, CreateSubContractWithToken -> 192, CopyCreateSubContract -> 193, CopyCreateSubContractWithToken -> 194,
       LoadFieldByIndex -> 195, StoreFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
       CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
-      NullContractAddress -> 202
+      NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204
     )
     // format: on
 
@@ -3417,7 +3475,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
       LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
-      NullContractAddress
+      NullContractAddress, SubContractId, SubContractIdOf
     )
     // format: on
   }

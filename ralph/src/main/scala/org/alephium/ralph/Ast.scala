@@ -484,12 +484,6 @@ object Ast {
     def isPrivate: Boolean        = !isPublic
     val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
-    def hasUpdateFieldsAnnotation: Boolean =
-      annotations
-        .find(_.id.name == Parser.usingAnnotationId)
-        .flatMap(_.fields.find(_.ident.name == Parser.useUpdateFieldsKey))
-        .nonEmpty
-
     private var usedVars: Option[Set[String]] = None
 
     def signature: String = {

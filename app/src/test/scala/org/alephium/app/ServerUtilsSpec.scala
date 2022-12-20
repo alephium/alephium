@@ -914,13 +914,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       val script =
         contractCreation(contract, fields, lockupScript, minimalAlphInContract)
       val block      = executeScript(script)
-      val contractId = ContractId.from(block.transactions.head.id, 0)
+      val contractId = ContractId.from(block.transactions.head.id, 0, chainIndex.from)
       (block, contractId)
     }
 
     val barCode =
       s"""
          |Contract Bar(mut value: U256) {
+         |  @using(updateFields = true)
          |  pub fn addOne() -> () {
          |    value = value + 1
          |  }
@@ -932,7 +933,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooCode =
       s"""
          |Contract Foo(mut value: U256) {
-         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
          |  pub fn addOne() -> U256 {
          |    transferAlphToSelf!(@$callerAddress, ${ALPH.oneNanoAlph})
          |    value = value + 1
@@ -1020,6 +1021,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   "the test contract endpoint" should "handle create and destroy contracts properly" in new Fixture {
+    val groupIndex   = brokerConfig.chainIndexes.sample().from
     val (_, pubKey)  = SignatureSchema.generatePriPub()
     val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
     val foo =
@@ -1050,9 +1052,10 @@ class ServerUtilsSpec extends AlephiumSpec {
          |$foo
          |""".stripMargin
 
-    val barContract            = Compiler.compileContract(bar).rightValue
-    val barContractId          = ContractId.random
-    val destroyedFooContractId = barContractId.subContractId(Hex.unsafe(destroyContractPath))
+    val barContract   = Compiler.compileContract(bar).rightValue
+    val barContractId = ContractId.random
+    val destroyedFooContractId =
+      barContractId.subContractId(Hex.unsafe(destroyContractPath), groupIndex)
     val existingContract = ContractState(
       Address.contract(destroyedFooContractId),
       fooContract,
@@ -1062,19 +1065,24 @@ class ServerUtilsSpec extends AlephiumSpec {
       AssetState(ALPH.oneAlph)
     )
     val testContractParams = TestContract(
+      group = Some(groupIndex.value),
       address = Some(Address.contract(barContractId)),
       bytecode = barContract,
       initialAsset = Some(AssetState(ALPH.alph(10))),
       existingContracts = Some(AVector(existingContract)),
       inputAssets = Some(AVector(TestInputAsset(assetAddress, AssetState(ALPH.oneAlph))))
-    )
+    ).toComplete().rightValue
 
-    val testFlow             = BlockFlow.emptyUnsafe(config)
-    val serverUtils          = new ServerUtils()
-    val createdFooContractId = barContractId.subContractId(Hex.unsafe(createContractPath))
+    val testFlow    = BlockFlow.emptyUnsafe(config)
+    val serverUtils = new ServerUtils()
+    val createdFooContractId =
+      barContractId.subContractId(
+        Hex.unsafe(createContractPath),
+        ChainIndex.unsafe(testContractParams.group, testContractParams.group).from
+      )
 
     val result =
-      serverUtils.runTestContract(testFlow, testContractParams.toComplete().rightValue).rightValue
+      serverUtils.runTestContract(testFlow, testContractParams).rightValue
     result.contracts.length is 2
     result.contracts(0).address is Address.contract(createdFooContractId)
     result.contracts(1).address is Address.contract(barContractId)
@@ -1659,6 +1667,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contract =
       s"""
          |Contract ArrayTest(mut array: [U256; 2]) {
+         |  @using(updateFields = true)
          |  ${isPublic} fn swap(input: [U256; 2]) -> ([U256; 2]) {
          |    array[0] = input[1]
          |    array[1] = input[0]
@@ -1741,9 +1750,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
     result.warnings is AVector(
       "Found unused variables in Foo: foo.a",
-      "Found unused fields in Foo: x",
-      "No update fields annotation for function: Foo.foo, please use @using(updateFields = true/false) for the function",
-      "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
+      "Found unused fields in Foo: x"
     )
 
     info("Turn off warnings")
@@ -2028,7 +2035,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    serverUtils.getBalance(blockFlow, GetBalance(address)) isE Balance.from(
+    serverUtils.getBalance(blockFlow, address) isE Balance.from(
       Amount(amount),
       Amount.Zero,
       None,

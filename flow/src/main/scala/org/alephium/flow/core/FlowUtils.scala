@@ -235,7 +235,7 @@ trait FlowUtils
       templateTs: TimeStamp,
       miner: LockupScript.Asset
   ): IOResult[BlockFlowTemplate] = {
-    val blockEnv = BlockEnv(networkConfig.networkId, templateTs, target, None)
+    val blockEnv = BlockEnv(chainIndex, networkConfig.networkId, templateTs, target, None)
     for {
       fullTxs      <- executeTxTemplates(chainIndex, blockEnv, loosenDeps, groupView, candidates)
       depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)
@@ -362,7 +362,14 @@ trait FlowUtils
 }
 
 object FlowUtils {
+  sealed trait OutputInfo {
+    def ref: TxOutputRef
+    def output: TxOutput
+  }
   final case class AssetOutputInfo(ref: AssetOutputRef, output: AssetOutput, outputType: OutputType)
+      extends OutputInfo
+  final case class ContractOutputInfo(ref: ContractOutputRef, output: ContractOutput)
+      extends OutputInfo
 
   sealed trait OutputType {
     def cachedLevel: Int

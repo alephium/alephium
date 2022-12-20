@@ -1413,7 +1413,7 @@ object BuiltIn {
     )
 
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
-      Seq(SelfContractId, Swap, ByteVecConcat, Blake2b, Blake2b)
+      Seq(SubContractId)
     }
   }
 
@@ -1432,7 +1432,7 @@ object BuiltIn {
       }
     }
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
-      Seq[Instr[StatefulContext]](ByteVecConcat, Blake2b, Blake2b)
+      Seq[Instr[StatefulContext]](SubContractIdOf)
     }
 
     val argsCommentedName: Seq[(String, String)] =

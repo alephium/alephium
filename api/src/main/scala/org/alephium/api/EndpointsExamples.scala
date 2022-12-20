@@ -157,7 +157,7 @@ trait EndpointsExamples extends ErrorExamples {
     AVector(signature.bytes)
   )
 
-  private val utxo = UTXO(
+  private val utxo = UTXO.from(
     outputRef,
     balance,
     tokens,

@@ -103,13 +103,13 @@ class ServerUtils(implicit
     }
   }
 
-  def getBalance(blockFlow: BlockFlow, balanceRequest: GetBalance): Try[Balance] = {
+  def getBalance(blockFlow: BlockFlow, address: Address): Try[Balance] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
     for {
-      _ <- checkGroup(balanceRequest.address.lockupScript)
+      _ <- checkGroup(address.lockupScript)
       balance <- blockFlow
         .getBalance(
-          balanceRequest.address.lockupScript,
+          address.lockupScript,
           utxosLimit
         )
         .map(Balance.from(_, utxosLimit))
@@ -118,10 +118,7 @@ class ServerUtils(implicit
     } yield balance
   }
 
-  def getUTXOsIncludePool(
-      blockFlow: BlockFlow,
-      address: Address.Asset
-  ): Try[UTXOs] = {
+  def getUTXOsIncludePool(blockFlow: BlockFlow, address: Address): Try[UTXOs] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
     for {
       _ <- checkGroup(address.lockupScript)
@@ -681,7 +678,7 @@ class ServerUtils(implicit
     )
   }
 
-  def checkGroup(lockupScript: LockupScript.Asset): Try[Unit] = {
+  def checkGroup(lockupScript: LockupScript): Try[Unit] = {
     checkGroup(
       lockupScript.groupIndex(brokerConfig),
       Some(s"Address ${Address.from(lockupScript)}")
@@ -901,10 +898,10 @@ class ServerUtils(implicit
 
   def callContract(blockFlow: BlockFlow, params: CallContract): Try[CallContractResult] = {
     for {
-      chainIndex <- params.validate()
-      _          <- checkGroup(chainIndex.from)
+      groupIndex <- params.validate()
+      _          <- checkGroup(groupIndex)
       blockHash = params.worldStateBlockHash.getOrElse(
-        blockFlow.getBestDeps(chainIndex.from).uncleHash(chainIndex.from)
+        blockFlow.getBestDeps(groupIndex).uncleHash(groupIndex)
       )
       worldState <- wrapResult(
         blockFlow.getPersistedWorldState(blockHash).map(_.cached().staging())
@@ -915,6 +912,7 @@ class ServerUtils(implicit
       txId = params.txId.getOrElse(TransactionId.random)
       resultPair <- executeContractMethod(
         worldState,
+        groupIndex,
         contractId,
         txId,
         blockHash,
@@ -957,6 +955,7 @@ class ServerUtils(implicit
       method     <- wrapExeResult(testContract.code.getMethod(testContract.testMethodIndex))
       executionResultPair <- executeContractMethod(
         worldState,
+        groupIndex,
         contractId,
         testContract.txId,
         testContract.blockHash,
@@ -1090,8 +1089,10 @@ class ServerUtils(implicit
     wrapResult(result)
   }
 
+  // scalastyle:off method.length parameter.number
   private def executeContractMethod(
       worldState: WorldState.Staging,
+      groupIndex: GroupIndex,
       contractId: ContractId,
       txId: TransactionId,
       blockHash: BlockHash,
@@ -1101,6 +1102,7 @@ class ServerUtils(implicit
       method: Method[StatefulContext]
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
     val blockEnv = BlockEnv(
+      ChainIndex(groupIndex, groupIndex),
       networkConfig.networkId,
       TimeStamp.now(),
       consensusConfig.maxMiningTarget,
@@ -1141,6 +1143,7 @@ class ServerUtils(implicit
       result <- runWithDebugError(context, script)
     } yield result
   }
+  // scalastyle:on method.length parameter.number
 
   def checkArgs(args: AVector[Val], method: Method[StatefulContext]): Try[Unit] = {
     if (args.sumBy(_.flattenSize()) != method.argsLength) {
@@ -1241,7 +1244,7 @@ class ServerUtils(implicit
       initialState: AVector[vm.Val],
       asset: AssetState
   ): Try[Unit] = {
-    val outputRef = contractId.firstOutputRef()
+    val outputRef = contractId.inaccurateFirstOutputRef()
     val output    = asset.toContractOutput(contractId)
     wrapResult(
       worldState.createContractUnsafe(

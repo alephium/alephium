@@ -23,9 +23,9 @@ import akka.util.ByteString
 import org.alephium.crypto
 import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
-import org.alephium.protocol.{Hash, PublicKey, SignatureSchema}
+import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{AssetOutput, ContractId, TokenId}
+import org.alephium.protocol.model.{AssetOutput, ContractId, GroupIndex, TokenId}
 import org.alephium.protocol.vm.TokenIssuance.{
   IssueTokenAndTransfer,
   IssueTokenWithoutTransfer,
@@ -168,7 +168,7 @@ object Instr {
     CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
     LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
     CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
-    NullContractAddress
+    NullContractAddress, SubContractId, SubContractIdOf
   )
   // format: on
 
@@ -1525,21 +1525,6 @@ sealed trait CreateContractAbstract extends ContractInstr {
     }
   }
 
-  protected def getContractId[C <: StatefulContext](frame: Frame[C]): ExeResult[ContractId] = {
-    if (subContract) {
-      for {
-        parentContractId <- frame.obj.getContractId()
-        path             <- frame.popOpStackByteVec()
-        subContractIdPreImage = parentContractId.bytes ++ path.bytes
-        _ <- frame.ctx.chargeDoubleHash(subContractIdPreImage.length)
-      } yield {
-        ContractId.unsafe(Hash.doubleHash(subContractIdPreImage))
-      }
-    } else {
-      Right(ContractId.from(frame.ctx.txId, frame.ctx.nextOutputIndex))
-    }
-  }
-
   def __runWith[C <: StatefulContext](
       frame: Frame[C],
       tokenIssuance: TokenIssuance
@@ -1549,7 +1534,11 @@ sealed trait CreateContractAbstract extends ContractInstr {
       fields            <- frame.popFields()
       _                 <- frame.ctx.chargeFieldSize(fields.toIterable)
       contractCode      <- prepareContractCode(frame)
-      newContractId     <- getContractId(frame)
+      newContractId <- CreateContractAbstract.getContractId(
+        frame,
+        subContract,
+        frame.ctx.blockEnv.chainIndex.from
+      )
       _ <- frame.createContract(newContractId, contractCode, fields, tokenIssuanceInfo)
       _ <-
         if (frame.ctx.getHardFork().isLemanEnabled()) {
@@ -1558,6 +1547,35 @@ sealed trait CreateContractAbstract extends ContractInstr {
           okay
         }
     } yield ()
+  }
+}
+
+object CreateContractAbstract {
+  def getContractId[C <: StatefulContext](
+      frame: Frame[C],
+      subContract: Boolean,
+      groupIndex: GroupIndex
+  ): ExeResult[ContractId] = {
+    if (subContract) {
+      for {
+        parentContractId <- frame.obj.getContractId()
+        path             <- frame.popOpStackByteVec()
+        subContractIdPreImage = parentContractId.bytes ++ path.bytes
+        _ <- frame.ctx.chargeDoubleHash(subContractIdPreImage.length)
+      } yield {
+        if (frame.ctx.getHardFork().isLemanEnabled()) {
+          ContractId.subContract(subContractIdPreImage, groupIndex)
+        } else {
+          throw new RuntimeException("Dead branch while creating a new contract")
+        }
+      }
+    } else {
+      if (frame.ctx.getHardFork().isLemanEnabled()) {
+        Right(ContractId.from(frame.ctx.txId, frame.ctx.nextOutputIndex, groupIndex))
+      } else {
+        Right(ContractId.deprecatedFrom(frame.ctx.txId, frame.ctx.nextOutputIndex))
+      }
+    }
   }
 }
 
@@ -1745,6 +1763,48 @@ object SelfContractId extends ContractInstr with GasVeryLow {
       contractId <- frame.obj.getContractId()
       _          <- frame.pushOpStack(Val.ByteVec(contractId.bytes))
     } yield ()
+  }
+}
+
+sealed trait SubContractIdBase
+    extends LemanInstr[StatefulContext]
+    with StatefulInstrCompanion0
+    with GasFormula {
+  def gas(pathLength: Int): GasBox = {
+    val byteLength = 32 + pathLength
+    ByteVecConcat.gas(byteLength).addUnsafe(GasHash.gas(byteLength)).addUnsafe(GasHash.gas(32))
+  }
+
+  def runWithLeman[C <: StatefulContext](
+      frame: Frame[C],
+      isParentContractSelf: Boolean
+  ): ExeResult[Unit] = {
+    for {
+      path <- frame.popOpStackByteVec()
+      contractId <-
+        if (isParentContractSelf) {
+          frame.obj.getContractId()
+        } else {
+          frame.popContractId()
+        }
+      _ <- frame.ctx.chargeGasWithSize(this, path.bytes.length)
+      _ <- {
+        val subContractId = contractId.subContractId(path.bytes, frame.ctx.blockEnv.chainIndex.from)
+        frame.pushOpStack(Val.ByteVec(subContractId.bytes))
+      }
+    } yield {}
+  }
+}
+
+object SubContractId extends SubContractIdBase {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    runWithLeman(frame, isParentContractSelf = true)
+  }
+}
+
+object SubContractIdOf extends SubContractIdBase {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    runWithLeman(frame, isParentContractSelf = false)
   }
 }
 

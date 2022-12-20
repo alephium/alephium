@@ -20,18 +20,25 @@ import akka.util.ByteString
 
 import org.alephium.crypto.HashUtils
 import org.alephium.protocol.Hash
+import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.{RandomBytes, Serde}
 import org.alephium.util.Bytes
 
 final case class ContractId private (value: Hash) extends AnyVal with RandomBytes {
   def bytes: ByteString = value.bytes
 
-  def subContractId(path: ByteString): ContractId = {
-    ContractId(Hash.doubleHash(bytes ++ path))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  def groupIndex(implicit config: GroupConfig): GroupIndex = {
+    GroupIndex.unsafe(value.bytes.last.toInt)
   }
 
-  def firstOutputRef(): ContractOutputRef = {
-    ContractOutputRef.firstOutput(this)
+  def subContractId(path: ByteString, groupIndex: GroupIndex): ContractId = {
+    ContractId.subContract(bytes ++ path, groupIndex)
+  }
+
+  // The last byte of the contract output ref cannot be recovered since Leman upgrade
+  def inaccurateFirstOutputRef(): ContractOutputRef = {
+    ContractOutputRef.inaccurateFirstOutput(this)
   }
 }
 
@@ -47,8 +54,26 @@ object ContractId extends HashUtils[ContractId] {
     Hash.from(bytes).map(ContractId.apply)
   }
 
-  def from(txId: TransactionId, outputIndex: Int): ContractId = {
+  private def lemanUnsafe(deprecated: ContractId, groupIndex: GroupIndex): ContractId = {
+    unsafe(Hash.unsafe(deprecated.bytes.dropRight(1) ++ ByteString(groupIndex.value.toByte)))
+  }
+
+  def deprecatedFrom(txId: TransactionId, outputIndex: Int): ContractId = {
     hash(txId.bytes ++ Bytes.from(outputIndex))
+  }
+
+  def from(txId: TransactionId, outputIndex: Int, groupIndex: GroupIndex): ContractId = {
+    val deprecated = deprecatedFrom(txId, outputIndex)
+    lemanUnsafe(deprecated, groupIndex)
+  }
+
+  def deprecatedSubContract(preImage: ByteString): ContractId = {
+    unsafe(Hash.doubleHash(preImage))
+  }
+
+  def subContract(preImage: ByteString, groupIndex: GroupIndex): ContractId = {
+    val deprecated = deprecatedSubContract(preImage)
+    lemanUnsafe(deprecated, groupIndex)
   }
 
   @inline def hash(bytes: Seq[Byte]): ContractId = ContractId(Hash.hash(bytes))
