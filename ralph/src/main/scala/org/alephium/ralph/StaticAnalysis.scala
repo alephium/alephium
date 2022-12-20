@@ -102,13 +102,11 @@ object StaticAnalysis {
     }
 
     if (updateFields && !func.useUpdateFields) {
-      throw Compiler.Error(
-        s"Function ${funcName(state.typeId, func.id)} changes state, please use @using(updateFields = true) for the function"
-      )
+      state.warnNoUpdateFieldsCheck(state.typeId, func.id)
     }
 
     if (!updateFields && func.useUpdateFields) {
-      state.warnUpdateFieldsCheck(state.typeId, func.id)
+      state.warnUnnecessaryUpdateFieldsCheck(state.typeId, func.id)
     }
   }
 

@@ -1,0 +1,3 @@
+TxScript Main(x: U256, y: U256) {
+  assert!(x != y, 0)
+}

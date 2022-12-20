@@ -62,7 +62,13 @@ trait Warnings {
     }
   }
 
-  def warnUpdateFieldsCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+  def warnNoUpdateFieldsCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+    if (!compilerOptions.ignoreUpdateFieldsCheckWarnings) {
+      warnings += s"Function ${Ast.funcName(typeId, funcId)} changes state, please use @using(updateFields = true) for the function"
+    }
+  }
+
+  def warnUnnecessaryUpdateFieldsCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
     if (!compilerOptions.ignoreUpdateFieldsCheckWarnings) {
       warnings += s"Function ${typeId.name}.${funcId.name} does not update fields, please remove @using(updateFields = true) for the function"
     }

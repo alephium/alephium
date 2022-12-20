@@ -1,0 +1,5 @@
+Contract Action(mut x: U256){
+  pub fn action() -> (){
+    x = x + 1
+  }
+}
