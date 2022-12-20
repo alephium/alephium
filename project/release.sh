@@ -22,10 +22,15 @@ if [[ ! -z $(git status --porcelain) ]]; then
   exit 1
 fi
 
+regex0='s/"version": "[0-9\.]+"/"version": "'"${new_version_without_postfix}"'"/g'
+regex1='s/"version": "v[0-9\.]+"/"version": "'"v${new_version_without_postfix}"'"/g'
+
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-  sed -E -i 's/"version": "[0-9\.]+"/"version": "'"${new_version_without_postfix}"'"/g' $openapi_json
+  sed -E -i "${regex0}" $openapi_json
+  find ralphc/src/test/resources -name "*.json" -type f -exec sed -E -i "$regex1" {} \;
 elif [[ "$OSTYPE" == "darwin"* ]]; then
-  sed -E -i '' 's/"version": "[0-9\.]+"/"version": "'"${new_version_without_postfix}"'"/g' $openapi_json
+  sed -E -i '' "$regex0" $openapi_json
+  find ralphc/src/test/resources -name "*.json" -type f -exec sed -E -i '' "$regex1" {} \;
 else
   echo "Unsupported system $OSTYPE"
   exit 1
