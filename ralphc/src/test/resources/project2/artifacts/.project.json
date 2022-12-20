@@ -10,12 +10,11 @@
   "infos": {
     "Action": {
       "sourceFile": "action.ral",
-      "sourceCodeHash": "90e91b024b215506f579b59cb06e4d820327a87e28663ddb17c1d193118dc4f4",
+      "sourceCodeHash": "422dedf65e0f287e36425e6b4884978fc39f84cd97ac80ede278cf1662b0f00f",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
+      "codeHashDebug": "688246f68470f32c1e2669b9e94f5a92e6db393d87cf86935ff39dfcd75445f8",
       "warnings": [
-        "No update fields annotation for function: Action.action, please use @using(updateFields = true/false) for the function",
-        "Function Action.action does not update fields, please use @using(updateFields = false) for the function"
+        "Function \"Action.action\" changes state, please use @using(updateFields = true) for the function"
       ]
     },
     "Foo": {
@@ -24,8 +23,7 @@
       "bytecodeDebugPatch": "",
       "codeHashDebug": "424c056943d4d31540aebb0537533280d9a7724264d7dd58ddcbd764e8cad3c0",
       "warnings": [
-        "No update fields annotation for function: Foo.foo, please use @using(updateFields = true/false) for the function",
-        "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
+        
       ]
     },
     "Main": {

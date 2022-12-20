@@ -14,8 +14,7 @@
       "bytecodeDebugPatch": "",
       "codeHashDebug": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
       "warnings": [
-        "No update fields annotation for function: Action.action, please use @using(updateFields = true/false) for the function",
-        "Function Action.action does not update fields, please use @using(updateFields = false) for the function"
+        
       ]
     },
     "Foo": {
@@ -24,8 +23,7 @@
       "bytecodeDebugPatch": "",
       "codeHashDebug": "424c056943d4d31540aebb0537533280d9a7724264d7dd58ddcbd764e8cad3c0",
       "warnings": [
-        "No update fields annotation for function: Foo.foo, please use @using(updateFields = true/false) for the function",
-        "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
+        
       ]
     },
     "Main": {

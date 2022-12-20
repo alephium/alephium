@@ -1,17 +1,17 @@
 {
   "version": "v1.5.5",
   "name": "Action",
-  "bytecode": "000106010000000000",
-  "codeHash": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
+  "bytecode": "01010c010000000004a0000d2aa100",
+  "codeHash": "688246f68470f32c1e2669b9e94f5a92e6db393d87cf86935ff39dfcd75445f8",
   "fieldsSig": {
     "names": [
-      
+      "x"
     ],
     "types": [
-      
+      "U256"
     ],
     "isMutable": [
-      
+      true
     ]
   },
   "eventsSig": [

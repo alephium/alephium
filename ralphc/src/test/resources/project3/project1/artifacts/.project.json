@@ -10,11 +10,11 @@
   "infos": {
     "Add": {
       "sourceFile": "add/add.ral",
-      "sourceCodeHash": "344d0973bfafec47fe8e588eb4b7eb5fedf0ac4a95e84cf2dc018f2f6da8c462",
+      "sourceCodeHash": "6089a405f7c0596fb72ec2bd0cea578422be360371c4c5d3e5a72e1acb8d4751",
       "bytecodeDebugPatch": "",
       "codeHashDebug": "a20cffb6f8f9416decd7aec0375b12e04475e8cf19ba80775f8f2d7633e2556d",
       "warnings": [
-        
+        "Function \"Add.addPrivate\" changes state, please use @using(updateFields = true) for the function"
       ]
     },
     "Greeter": {
@@ -42,16 +42,6 @@
       "codeHashDebug": "",
       "warnings": [
         
-      ]
-    },
-    "Pow": {
-      "sourceFile": "add/add.ral",
-      "sourceCodeHash": "344d0973bfafec47fe8e588eb4b7eb5fedf0ac4a95e84cf2dc018f2f6da8c462",
-      "bytecodeDebugPatch": "",
-      "codeHashDebug": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
-      "warnings": [
-        "No update fields annotation for function: Pow.pow, please use @using(updateFields = true/false) for the function",
-        "Function Pow.pow does not update fields, please use @using(updateFields = false) for the function"
       ]
     },
     "Sub": {
