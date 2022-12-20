@@ -32,6 +32,10 @@ class CliSpec extends AlephiumSpec {
   val contracts1  = project1 + "/contracts"
   val contracts31 = project31 + "/contracts"
 
+  def dePlatform(string: String): String = {
+    string.replace("\r\n", "\n").replace("\\\\", "/")
+  }
+
   def assertProject(
       sourcePath: String,
       artifactsPath: String,
@@ -67,7 +71,7 @@ class CliSpec extends AlephiumSpec {
           val expected =
             try expectedSource.mkString
             finally expectedSource.close()
-          generated is expected
+          dePlatform(generated) is dePlatform(expected)
         }
       }
   }

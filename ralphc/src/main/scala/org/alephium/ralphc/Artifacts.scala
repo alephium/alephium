@@ -37,4 +37,4 @@ final case class Artifacts(
     infos: mutable.Map[String, CodeInfo]
 )
 
-final case class MetaInfo(name: String, ArtifactPath: Path, codeInfo: CodeInfo)
+final case class MetaInfo(name: String, artifactPath: Path, codeInfo: CodeInfo)

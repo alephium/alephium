@@ -59,19 +59,21 @@ final case class Compiler(config: Config) {
   private def analysisCodes(): String = {
     Compiler
       .getSourceFiles(config.contractPath, ".ral")
-      .map(path => {
-        val sourceCode = Using(Source.fromFile(path.toFile)) { _.mkString } match {
-          case Success(value)     => value
+      .map(sourcePath => {
+        val sourceCode = Using(Source.fromFile(sourcePath.toFile)) { _.mkString } match {
+          case Success(value) =>
+            value.replace("\r\n", "\n") // to make sure same source hash for different OS
           case Failure(exception) => throw exception
         }
         val sourceCodeHash = crypto.Sha256.hash(sourceCode).toHexString
         TypedMatcher
           .matcher(sourceCode)
           .foreach(name => {
-            val sourcePath = config.contractPath.relativize(path)
             val artifactPath = Paths.get(
               config.artifactPath
-                .resolve(path.subpath(config.contractPath.getNameCount, path.getNameCount))
+                .resolve(
+                  sourcePath.subpath(config.contractPath.getNameCount, sourcePath.getNameCount)
+                )
                 .toString
                 + ".json"
             )
@@ -79,7 +81,7 @@ final case class Compiler(config: Config) {
               name,
               artifactPath,
               CodeInfo(
-                sourcePath.toFile.getPath,
+                config.contractPath.relativize(sourcePath).toString,
                 sourceCodeHash,
                 CompileProjectResult.Patch(""),
                 "",
@@ -108,7 +110,7 @@ final case class Compiler(config: Config) {
             value.codeInfo.bytecodeDebugPatch = c.bytecodeDebugPatch
             value.codeInfo.codeHashDebug = c.codeHashDebug.toHexString
             metaInfos.update(c.name, value)
-            Compiler.writer(ContractResult.from(c), value.ArtifactPath)
+            Compiler.writer(ContractResult.from(c), value.artifactPath)
           })
           p._2.foreach(ss => {
             val s     = CompileScriptResult.from(ss)
@@ -116,7 +118,7 @@ final case class Compiler(config: Config) {
             value.codeInfo.warnings = s.warnings
             value.codeInfo.bytecodeDebugPatch = s.bytecodeDebugPatch
             metaInfos.update(s.name, value)
-            Compiler.writer(ScriptResult.from(s), value.ArtifactPath)
+            Compiler.writer(ScriptResult.from(s), value.artifactPath)
           })
           Compiler.writer(
             Artifacts(
