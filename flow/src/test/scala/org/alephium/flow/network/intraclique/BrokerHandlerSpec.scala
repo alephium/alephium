@@ -116,7 +116,7 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
 
     brokerHandler ! BaseBrokerHandler.Received(validResponse)
     allHandlerProbes.txHandler.expectMsg(
-      TxHandler.AddToSharedPool(validTxs, isIntraCliqueSyncing = true)
+      TxHandler.AddToMemPool(validTxs, isIntraCliqueSyncing = true)
     )
 
     watch(brokerHandler)

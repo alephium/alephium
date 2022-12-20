@@ -158,21 +158,12 @@ final case class TxIndexes(
 }
 
 object TxIndexes {
-  def emptySharedPool(mainGroup: GroupIndex)(implicit groupConfig: GroupConfig): TxIndexes =
+  def emptyMemPool(mainGroup: GroupIndex)(implicit groupConfig: GroupConfig): TxIndexes =
     TxIndexes(
       mainGroup,
       mutable.HashMap.empty,
       mutable.HashMap.empty,
       mutable.HashMap.empty,
-      SharedPoolOutput
-    )
-
-  def emptyPendingPool(mainGroup: GroupIndex)(implicit groupConfig: GroupConfig): TxIndexes =
-    TxIndexes(
-      mainGroup,
-      mutable.HashMap.empty,
-      mutable.HashMap.empty,
-      mutable.HashMap.empty,
-      PendingPoolOutput
+      MemPoolOutput
     )
 }

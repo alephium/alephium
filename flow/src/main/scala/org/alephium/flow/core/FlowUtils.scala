@@ -391,11 +391,8 @@ object FlowUtils {
   case object UnpersistedBlockOutput extends OutputType {
     val cachedLevel = 1
   }
-  case object SharedPoolOutput extends OutputType {
+  case object MemPoolOutput extends OutputType {
     val cachedLevel = 2
-  }
-  case object PendingPoolOutput extends OutputType {
-    val cachedLevel = 3
   }
 
   def filterDoubleSpending[T <: TransactionAbstract: ClassTag](txs: AVector[T]): AVector[T] = {

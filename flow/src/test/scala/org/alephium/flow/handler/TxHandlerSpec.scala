@@ -276,10 +276,10 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     test("Start to download txs")
   }
 
-  it should "clean shared pools regularly" in new PeriodicTaskFixture {
-    override val configValues = Map(("alephium.mempool.clean-shared-pool-frequency", "300 ms"))
+  it should "clean mempools regularly" in new PeriodicTaskFixture {
+    override val configValues = Map(("alephium.mempool.clean-mempool-frequency", "300 ms"))
 
-    test("Start to clean shared pools")
+    test("Start to clean mempools")
   }
 
   it should "reject tx with low gas price" in new Fixture {
@@ -412,7 +412,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       )
 
     def addTx(tx: Transaction, isIntraCliqueSyncing: Boolean = false) =
-      TxHandler.AddToSharedPool(AVector(tx.toTemplate), isIntraCliqueSyncing)
+      TxHandler.AddToMemPool(AVector(tx.toTemplate), isIntraCliqueSyncing)
     def hex(tx: Transaction) = Hex.toHexString(serialize(tx.toTemplate))
     def setSynced() = {
       txHandler ! InterCliqueManager.SyncedResult(true)

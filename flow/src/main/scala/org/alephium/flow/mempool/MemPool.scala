@@ -264,7 +264,7 @@ object MemPool {
   def empty(
       mainGroup: GroupIndex
   )(implicit groupConfig: GroupConfig, memPoolSetting: MemPoolSetting): MemPool = {
-    val sharedTxIndex = TxIndexes.emptySharedPool(mainGroup)
+    val sharedTxIndex = TxIndexes.emptyMemPool(mainGroup)
     new MemPool(
       mainGroup,
       Flow.empty,

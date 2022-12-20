@@ -28,7 +28,7 @@ class MemPoolSpec
   def now = TimeStamp.now()
 
   val mainGroup      = GroupIndex.unsafe(0)
-  val emptyTxIndexes = TxIndexes.emptySharedPool(mainGroup)
+  val emptyTxIndexes = TxIndexes.emptyMemPool(mainGroup)
 
   it should "initialize an empty pool" in {
     val pool = MemPool.empty(mainGroup)

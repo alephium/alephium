@@ -156,7 +156,7 @@ final case class MemPoolSetting(
     sharedPoolCapacity: Int,
     pendingPoolCapacity: Int,
     txMaxNumberPerBlock: Int,
-    cleanSharedPoolFrequency: Duration,
+    cleanMempoolFrequency: Duration,
     cleanPendingPoolFrequency: Duration,
     batchBroadcastTxsFrequency: Duration,
     batchDownloadTxsFrequency: Duration,

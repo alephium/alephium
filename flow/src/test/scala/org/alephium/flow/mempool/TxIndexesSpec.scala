@@ -26,7 +26,7 @@ class TxIndexesSpec
     with TxIndexesSpec.Fixture
     with LockFixture
     with NoIndexModelGeneratorsLike {
-  def emptyTxIndexes = TxIndexes.emptySharedPool(GroupIndex.unsafe(0))
+  def emptyTxIndexes = TxIndexes.emptyMemPool(GroupIndex.unsafe(0))
 
   it should "add txs" in {
     val tx      = transactionGen().sample.get

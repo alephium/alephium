@@ -257,7 +257,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val txs = AVector.fill(10)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     brokerHandler ! BaseBrokerHandler.Received(TxsResponse(RequestId.random(), txs))
     allHandlerProbes.txHandler.expectMsg(
-      TxHandler.AddToSharedPool(txs, isIntraCliqueSyncing = false)
+      TxHandler.AddToMemPool(txs, isIntraCliqueSyncing = false)
     )
     txs.foreach { tx =>
       brokerHandlerActor.seenTxs.contains(tx.id) is false
@@ -342,7 +342,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val response = TxsResponse(RequestId.random(), txs)
     brokerHandler ! BaseBrokerHandler.Received(response)
     allHandlerProbes.txHandler.expectMsg(
-      TxHandler.AddToSharedPool(txs, isIntraCliqueSyncing = false)
+      TxHandler.AddToMemPool(txs, isIntraCliqueSyncing = false)
     )
 
     val invalidTx =

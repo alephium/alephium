@@ -54,12 +54,12 @@ object TxHandler {
     Props(new TxHandler(blockFlow, pendingTxStorage, readyTxStorage))
 
   sealed trait Command
-  final case class AddToSharedPool(txs: AVector[TransactionTemplate], isIntraCliqueSyncing: Boolean)
+  final case class AddToMemPool(txs: AVector[TransactionTemplate], isIntraCliqueSyncing: Boolean)
       extends Command
   final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
-  case object CleanSharedPool                           extends Command
+  case object CleanMemPool                              extends Command
   case object CleanPendingPool                          extends Command
   private case object BroadcastTxs                      extends Command
   private case object DownloadTxs                       extends Command
@@ -205,7 +205,7 @@ class TxHandler(
 
   // scalastyle:off method.length
   def handleCommand: Receive = {
-    case TxHandler.AddToSharedPool(txs, isIntraCliqueSyncing) =>
+    case TxHandler.AddToMemPool(txs, isIntraCliqueSyncing) =>
       if (!memPoolSetting.autoMineForDev) {
         if (isIntraCliqueSyncing) {
           txs.foreach(handleIntraCliqueSyncingTx)
@@ -230,11 +230,11 @@ class TxHandler(
         .forceMineForDev(blockFlow, chainIndex, Env.currentEnv, publishBlock)
         .swap
         .foreach(log.error(_))
-    case TxHandler.CleanSharedPool =>
-      log.debug("Start to clean shared pools")
+    case TxHandler.CleanMemPool =>
+      log.debug("Start to clean mempools")
       blockFlow.grandPool.clean(
         blockFlow,
-        TimeStamp.now().minusUnsafe(memPoolSetting.cleanSharedPoolFrequency)
+        TimeStamp.now().minusUnsafe(memPoolSetting.cleanMempoolFrequency)
       )
   }
 
@@ -255,7 +255,7 @@ class TxHandler(
 
   override def onFirstTimeSynced(): Unit = {
     clearStorageAndLoadTxs()
-    schedule(self, TxHandler.CleanSharedPool, memPoolSetting.cleanSharedPoolFrequency)
+    schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
     schedule(self, TxHandler.CleanPendingPool, memPoolSetting.cleanPendingPoolFrequency)
     scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
     scheduleOnce(self, TxHandler.DownloadTxs, memPoolSetting.batchDownloadTxsFrequency)
