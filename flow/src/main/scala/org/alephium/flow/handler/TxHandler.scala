@@ -171,7 +171,8 @@ final class TxHandler(val blockFlow: BlockFlow)(implicit
     memPoolSetting: MemPoolSetting,
     val networkSetting: NetworkSetting,
     logConfig: LogConfig
-) extends BroadcastTxsHandler
+) extends TxCoreHandler
+    with BroadcastTxsHandler
     with DownloadTxsHandler
     with AutoMineHandler
     with IOBaseActor
@@ -245,10 +246,12 @@ final class TxHandler(val blockFlow: BlockFlow)(implicit
       }
     }
   }
+}
 
-  private def hex(tx: TransactionTemplate): String = {
-    Hex.toHexString(serialize(tx))
-  }
+trait TxCoreHandler extends TxHandlerUtils {
+  def blockFlow: BlockFlow
+  implicit def brokerConfig: BrokerConfig
+  def txsBuffer: Cache[TransactionTemplate, Unit]
 
   def handleInterCliqueTx(
       tx: TransactionTemplate,
@@ -301,11 +304,14 @@ final class TxHandler(val blockFlow: BlockFlow)(implicit
     val result    = grandPool.add(chainIndex, tx, currentTs)
     log.debug(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
-      case MemPool.AddedToMemPool =>
-        txsBuffer.put(tx, ())
-      case _ => ()
+      case MemPool.AddedToMemPool => txsBuffer.put(tx, ())
+      case _                      => ()
     }
     addSucceeded(tx, acknowledge)
+  }
+
+  private def hex(tx: TransactionTemplate): String = {
+    Hex.toHexString(serialize(tx))
   }
 }
 
@@ -393,7 +399,7 @@ trait AutoMineHandler extends TxHandlerUtils {
   }
 }
 
-trait TxHandlerUtils extends BaseActor with EventStream.Publisher {
+trait TxHandlerUtils extends IOBaseActor with EventStream.Publisher {
   type TxsPerChain[T] = mutable.Map[ChainIndex, mutable.ArrayBuffer[T]]
 
   protected def updateChainIndexTxs[T](
