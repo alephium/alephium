@@ -172,7 +172,7 @@ object TxHandler {
   }
 }
 
-class TxHandler(
+final class TxHandler(
     val blockFlow: BlockFlow,
     val pendingTxStorage: PendingTxStorage,
     val readyTxStorage: ReadyTxStorage
@@ -238,8 +238,8 @@ class TxHandler(
   def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
     txs.foreach { tx =>
       TxHandler.mineTxForDev(blockFlow, tx, publishBlock) match {
-        case Left(error) => addFailed(tx, error)
-        case Right(_)    => addSucceeded(tx)
+        case Left(error) => addFailed(tx, error, acknowledge = true)
+        case Right(_)    => addSucceeded(tx, acknowledge = true)
       }
     }
   }
@@ -346,20 +346,28 @@ class TxHandler(
     assume(!brokerConfig.isIncomingChain(chainIndex))
     val mempool = blockFlow.getMemPool(chainIndex.from)
     if (!TxHandler.checkHighGasPrice(tx)) {
-      addFailed(tx, s"tx has lower gas price than ${defaultGasPrice}")
+      addFailed(tx, s"tx has lower gas price than ${defaultGasPrice}", acknowledge)
     } else if (mempool.contains(tx)) {
-      addFailed(tx, s"tx ${tx.id.toHexString} is already included")
+      addFailed(tx, s"tx ${tx.id.toHexString} is already included", acknowledge)
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
-      addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}")
+      addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}", acknowledge)
     } else {
       validate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
-          addFailed(tx, s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}")
+          addFailed(
+            tx,
+            s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}",
+            acknowledge
+          )
         case Right(_) =>
           val grandPool = blockFlow.getGrandPool()
           handleValidTx(chainIndex, tx, grandPool, persistedTxIdOpt, acknowledge)
         case Left(Left(e)) =>
-          addFailed(tx, s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}")
+          addFailed(
+            tx,
+            s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}",
+            acknowledge
+          )
       }
     }
   }
@@ -389,17 +397,7 @@ class TxHandler(
         }
       case _ => ()
     }
-    if (acknowledge) {
-      addSucceeded(tx)
-    }
-  }
-
-  def addSucceeded(tx: TransactionTemplate): Unit = {
-    sender() ! TxHandler.AddSucceeded(tx.id)
-  }
-
-  def addFailed(tx: TransactionTemplate, reason: String): Unit = {
-    sender() ! TxHandler.AddFailed(tx.id, reason: String)
+    addSucceeded(tx, acknowledge)
   }
 }
 
@@ -454,6 +452,22 @@ trait TxHandlerUtils extends BaseActor with EventStream.Publisher {
   ): AVector[(ChainIndex, AVector[T])] = {
     txs.foldLeft(AVector.empty[(ChainIndex, AVector[T])]) { case (acc, (chainIndex, txs)) =>
       acc :+ (chainIndex -> AVector.from(txs))
+    }
+  }
+
+  @inline protected def addSucceeded(tx: TransactionTemplate, acknowledge: Boolean): Unit = {
+    if (acknowledge) {
+      sender() ! TxHandler.AddSucceeded(tx.id)
+    }
+  }
+
+  @inline protected def addFailed(
+      tx: TransactionTemplate,
+      reason: => String,
+      acknowledge: Boolean
+  ): Unit = {
+    if (acknowledge) {
+      sender() ! TxHandler.AddFailed(tx.id, reason: String)
     }
   }
 }
