@@ -179,10 +179,11 @@ final class TxHandler(
 )(implicit
     val brokerConfig: BrokerConfig,
     memPoolSetting: MemPoolSetting,
-    networkSetting: NetworkSetting,
+    val networkSetting: NetworkSetting,
     logConfig: LogConfig
 ) extends BroadcastTxsHandler
     with DownloadTxsHandler
+    with AutoMineHandler
     with IOBaseActor
     with EventStream.Publisher
     with InterCliqueManager.NodeSyncStatus {
@@ -233,21 +234,6 @@ final class TxHandler(
         blockFlow,
         TimeStamp.now().minusUnsafe(memPoolSetting.cleanMempoolFrequency)
       )
-  }
-
-  def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
-    txs.foreach { tx =>
-      TxHandler.mineTxForDev(blockFlow, tx, publishBlock) match {
-        case Left(error) => addFailed(tx, error, acknowledge = true)
-        case Right(_)    => addSucceeded(tx, acknowledge = true)
-      }
-    }
-  }
-
-  def publishBlock(block: Block): Unit = {
-    val blockMessage = Message.serialize(NewBlock(block))
-    val event        = InterCliqueManager.BroadCastBlock(block, blockMessage, DataOrigin.Local)
-    publishEvent(event)
   }
 
   override def onFirstTimeSynced(): Unit = {
@@ -436,6 +422,27 @@ trait BroadcastTxsHandler extends TxHandlerUtils {
       }
     }
     scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
+  }
+}
+
+trait AutoMineHandler extends TxHandlerUtils {
+  def blockFlow: BlockFlow
+  implicit def brokerConfig: BrokerConfig
+  implicit def networkSetting: NetworkSetting
+
+  def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
+    txs.foreach { tx =>
+      TxHandler.mineTxForDev(blockFlow, tx, publishBlock) match {
+        case Left(error) => addFailed(tx, error, acknowledge = true)
+        case Right(_)    => addSucceeded(tx, acknowledge = true)
+      }
+    }
+  }
+
+  def publishBlock(block: Block): Unit = {
+    val blockMessage = Message.serialize(NewBlock(block))
+    val event        = InterCliqueManager.BroadCastBlock(block, blockMessage, DataOrigin.Local)
+    publishEvent(event)
   }
 }
 
