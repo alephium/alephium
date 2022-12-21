@@ -61,8 +61,8 @@ object TxHandler {
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
   case object CleanMemPool                              extends Command
   case object CleanPendingPool                          extends Command
-  private case object BroadcastTxs                      extends Command
-  private case object DownloadTxs                       extends Command
+  private[handler] case object BroadcastTxs             extends Command
+  private[handler] case object DownloadTxs              extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: TransactionId)              extends Event
@@ -177,31 +177,28 @@ class TxHandler(
     val pendingTxStorage: PendingTxStorage,
     val readyTxStorage: ReadyTxStorage
 )(implicit
-    brokerConfig: BrokerConfig,
+    val brokerConfig: BrokerConfig,
     memPoolSetting: MemPoolSetting,
     networkSetting: NetworkSetting,
     logConfig: LogConfig
-) extends IOBaseActor
+) extends BroadcastTxsHandler
+    with IOBaseActor
     with EventStream.Publisher
     with InterCliqueManager.NodeSyncStatus {
+  val txBufferMaxCapacity: Int = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
+  val batchBroadcastTxsFrequency: Duration = memPoolSetting.batchBroadcastTxsFrequency
+
   private val nonCoinbaseValidation = TxValidation.build
-  val maxCapacity: Int = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
   val fetching: FetchState[TransactionId] =
     FetchState[TransactionId](
-      maxCapacity,
+      txBufferMaxCapacity,
       networkSetting.syncExpiryPeriod,
       TxHandler.MaxDownloadTimes
     )
-  val txsBuffer: Cache[TransactionTemplate, Unit] =
-    Cache.fifo[TransactionTemplate, Unit](maxCapacity)
-  val delayedTxs: Cache[TransactionTemplate, TimeStamp] =
-    Cache.fifo[TransactionTemplate, TimeStamp](maxCapacity)
   val announcements: Cache[TxHandler.Announcement, Unit] =
-    Cache.fifo[TxHandler.Announcement, Unit](maxCapacity)
+    Cache.fifo[TxHandler.Announcement, Unit](txBufferMaxCapacity)
 
   override def receive: Receive = handleCommand orElse updateNodeSyncStatus
-
-  type TxsPerChain[T] = mutable.Map[ChainIndex, mutable.ArrayBuffer[T]]
 
   // scalastyle:off method.length
   def handleCommand: Receive = {
@@ -397,28 +394,25 @@ class TxHandler(
     }
   }
 
-  private def updateChainIndexTxs[T](
-      tx: T,
-      chainIndex: ChainIndex,
-      txs: TxsPerChain[T]
-  ): Unit = {
-    txs.get(chainIndex) match {
-      case Some(chainIndexHashes) => chainIndexHashes += tx
-      case None =>
-        val chainIndexedHashes = mutable.ArrayBuffer(tx)
-        txs(chainIndex) = chainIndexedHashes
-    }
+  def addSucceeded(tx: TransactionTemplate): Unit = {
+    sender() ! TxHandler.AddSucceeded(tx.id)
   }
 
-  private def chainIndexedTxsToAVector[T: ClassTag](
-      txs: TxsPerChain[T]
-  ): AVector[(ChainIndex, AVector[T])] = {
-    txs.foldLeft(AVector.empty[(ChainIndex, AVector[T])]) { case (acc, (chainIndex, txs)) =>
-      acc :+ (chainIndex -> AVector.from(txs))
-    }
+  def addFailed(tx: TransactionTemplate, reason: String): Unit = {
+    sender() ! TxHandler.AddFailed(tx.id, reason: String)
+  }
+}
+
+trait BroadcastTxsHandler extends TxHandlerUtils {
+  implicit def brokerConfig: BrokerConfig
+  def txBufferMaxCapacity: Int
+  def batchBroadcastTxsFrequency: Duration
+
+  lazy val txsBuffer: Cache[TransactionTemplate, Unit] = {
+    Cache.fifo[TransactionTemplate, Unit](txBufferMaxCapacity)
   }
 
-  private def broadcastTxs(): Unit = {
+  protected def broadcastTxs(): Unit = {
     log.debug("Start to broadcast txs")
     val broadcasts = mutable.Map.empty[ChainIndex, mutable.ArrayBuffer[TransactionTemplate]]
     if (txsBuffer.nonEmpty) {
@@ -435,14 +429,31 @@ class TxHandler(
         publishEvent(IntraCliqueManager.BroadCastTx(txs))
       }
     }
-    scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
+    scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
+  }
+}
+
+trait TxHandlerUtils extends BaseActor with EventStream.Publisher {
+  type TxsPerChain[T] = mutable.Map[ChainIndex, mutable.ArrayBuffer[T]]
+
+  protected def updateChainIndexTxs[T](
+      tx: T,
+      chainIndex: ChainIndex,
+      txs: TxsPerChain[T]
+  ): Unit = {
+    txs.get(chainIndex) match {
+      case Some(chainIndexHashes) => chainIndexHashes += tx
+      case None =>
+        val chainIndexedHashes = mutable.ArrayBuffer(tx)
+        txs(chainIndex) = chainIndexedHashes
+    }
   }
 
-  def addSucceeded(tx: TransactionTemplate): Unit = {
-    sender() ! TxHandler.AddSucceeded(tx.id)
-  }
-
-  def addFailed(tx: TransactionTemplate, reason: String): Unit = {
-    sender() ! TxHandler.AddFailed(tx.id, reason: String)
+  protected def chainIndexedTxsToAVector[T: ClassTag](
+      txs: TxsPerChain[T]
+  ): AVector[(ChainIndex, AVector[T])] = {
+    txs.foldLeft(AVector.empty[(ChainIndex, AVector[T])]) { case (acc, (chainIndex, txs)) =>
+      acc :+ (chainIndex -> AVector.from(txs))
+    }
   }
 }

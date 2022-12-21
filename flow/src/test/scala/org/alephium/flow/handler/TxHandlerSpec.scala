@@ -205,7 +205,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val maxCapacity = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
 
     setSynced()
-    txHandler.underlyingActor.maxCapacity is maxCapacity
+    txHandler.underlyingActor.txBufferMaxCapacity is maxCapacity
     txHandler.underlyingActor.announcements.isEmpty is true
 
     (0 until TxHandler.MaxDownloadTimes)
