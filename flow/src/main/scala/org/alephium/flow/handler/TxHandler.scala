@@ -182,11 +182,13 @@ final class TxHandler(
     networkSetting: NetworkSetting,
     logConfig: LogConfig
 ) extends BroadcastTxsHandler
+    with DownloadTxsHandler
     with IOBaseActor
     with EventStream.Publisher
     with InterCliqueManager.NodeSyncStatus {
   val txBufferMaxCapacity: Int = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
   val batchBroadcastTxsFrequency: Duration = memPoolSetting.batchBroadcastTxsFrequency
+  val batchDownloadTxsFrequency: Duration  = memPoolSetting.batchDownloadTxsFrequency
 
   private val nonCoinbaseValidation = TxValidation.build
   val fetching: FetchState[TransactionId] =
@@ -195,8 +197,6 @@ final class TxHandler(
       networkSetting.syncExpiryPeriod,
       TxHandler.MaxDownloadTimes
     )
-  val announcements: Cache[TxHandler.Announcement, Unit] =
-    Cache.fifo[TxHandler.Announcement, Unit](txBufferMaxCapacity)
 
   override def receive: Receive = handleCommand orElse updateNodeSyncStatus
 
@@ -293,31 +293,6 @@ final class TxHandler(
     )
   }
 
-  private def downloadTxs(): Unit = {
-    log.debug("Start to download txs")
-    if (announcements.nonEmpty) {
-      val downloads =
-        mutable.Map.empty[ActorRefT[BrokerHandler.Command], TxsPerChain[TransactionId]]
-      announcements.keys().foreach { announcement =>
-        downloads.get(announcement.brokerHandler) match {
-          case Some(chainIndexedHashes) =>
-            updateChainIndexTxs(announcement.hash, announcement.chainIndex, chainIndexedHashes)
-          case None =>
-            val hashes             = mutable.ArrayBuffer(announcement.hash)
-            val chainIndexedHashes = mutable.Map(announcement.chainIndex -> hashes)
-            downloads(announcement.brokerHandler) = chainIndexedHashes
-        }
-      }
-      downloads.foreach { case (brokerHandler, chainIndexedHashes) =>
-        val txHashes = chainIndexedTxsToAVector(chainIndexedHashes)
-        log.debug(s"Download tx announcements ${Utils.showChainIndexedDigest(txHashes)}")
-        brokerHandler ! BrokerHandler.DownloadTxs(txHashes)
-      }
-      announcements.clear()
-    }
-    scheduleOnce(self, TxHandler.DownloadTxs, memPoolSetting.batchDownloadTxsFrequency)
-  }
-
   private def handleAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
     val timestamp     = TimeStamp.now()
     val brokerHandler = ActorRefT[BrokerHandler.Command](sender())
@@ -398,6 +373,39 @@ final class TxHandler(
       case _ => ()
     }
     addSucceeded(tx, acknowledge)
+  }
+}
+
+trait DownloadTxsHandler extends TxHandlerUtils {
+  def txBufferMaxCapacity: Int
+  def batchDownloadTxsFrequency: Duration
+
+  lazy val announcements: Cache[TxHandler.Announcement, Unit] =
+    Cache.fifo[TxHandler.Announcement, Unit](txBufferMaxCapacity)
+
+  protected def downloadTxs(): Unit = {
+    log.debug("Start to download txs")
+    if (announcements.nonEmpty) {
+      val downloads =
+        mutable.Map.empty[ActorRefT[BrokerHandler.Command], TxsPerChain[TransactionId]]
+      announcements.keys().foreach { announcement =>
+        downloads.get(announcement.brokerHandler) match {
+          case Some(chainIndexedHashes) =>
+            updateChainIndexTxs(announcement.hash, announcement.chainIndex, chainIndexedHashes)
+          case None =>
+            val hashes             = mutable.ArrayBuffer(announcement.hash)
+            val chainIndexedHashes = mutable.Map(announcement.chainIndex -> hashes)
+            downloads(announcement.brokerHandler) = chainIndexedHashes
+        }
+      }
+      downloads.foreach { case (brokerHandler, chainIndexedHashes) =>
+        val txHashes = chainIndexedTxsToAVector(chainIndexedHashes)
+        log.debug(s"Download tx announcements ${Utils.showChainIndexedDigest(txHashes)}")
+        brokerHandler ! BrokerHandler.DownloadTxs(txHashes)
+      }
+      announcements.clear()
+    }
+    scheduleOnce(self, TxHandler.DownloadTxs, batchDownloadTxsFrequency)
   }
 }
 
