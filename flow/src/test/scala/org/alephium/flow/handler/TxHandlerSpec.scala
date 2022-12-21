@@ -116,7 +116,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   ignore should "load persisted pending txs only once when node synced" in new FlowFixture {
     implicit lazy val system = createSystem(Some(AlephiumActorSpec.infoConfig))
     val txHandler = TestActorRef[TxHandler](
-      TxHandler.props(blockFlow, storages.pendingTxStorage, storages.readyTxStorage)
+      TxHandler.props(blockFlow)
     )
 
     EventFilter.info(start = "Start to load", occurrences = 0).intercept {
@@ -257,7 +257,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     def test(message: String) = {
       EventFilter.debug(message, occurrences = 5).intercept {
         val txHandler = system.actorOf(
-          TxHandler.props(blockFlow, storages.pendingTxStorage, storages.readyTxStorage)
+          TxHandler.props(blockFlow)
         )
         txHandler ! InterCliqueManager.SyncedResult(true)
       }
@@ -408,7 +408,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
     lazy val txHandler =
       newTestActorRef[TxHandler](
-        TxHandler.props(blockFlow, storages.pendingTxStorage, storages.readyTxStorage)
+        TxHandler.props(blockFlow)
       )
 
     def addTx(tx: Transaction, isIntraCliqueSyncing: Boolean = false) =

@@ -115,7 +115,9 @@ object AllHandlers {
       memPoolSetting: MemPoolSetting,
       logConfig: LogConfig
   ): AllHandlers = {
-    val txProps   = TxHandler.props(blockFlow, storages.pendingTxStorage, storages.readyTxStorage)
+    assume(storages.sources.nonEmpty) // FIXME: Get ride of unused warning for now
+
+    val txProps   = TxHandler.props(blockFlow)
     val txHandler = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
     val blockHandlers  = buildBlockHandlers(system, blockFlow, eventBus, namePostfix)
     val headerHandlers = buildHeaderHandlers(system, blockFlow, namePostfix)

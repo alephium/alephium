@@ -23,10 +23,9 @@ import akka.actor.Props
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.io.{PendingTxStorage, ReadyTxStorage}
 import org.alephium.flow.mempool.{GrandPool, MemPool}
 import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.{DataOrigin, MiningBlob, PersistedTxId, ReadyTxInfo}
+import org.alephium.flow.model.{DataOrigin, MiningBlob}
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
@@ -41,17 +40,12 @@ import org.alephium.serde.serialize
 import org.alephium.util._
 
 object TxHandler {
-  def props(
-      blockFlow: BlockFlow,
-      pendingTxStorage: PendingTxStorage,
-      readyTxStorage: ReadyTxStorage
-  )(implicit
+  def props(blockFlow: BlockFlow)(implicit
       brokerConfig: BrokerConfig,
       memPoolSetting: MemPoolSetting,
       networkSetting: NetworkSetting,
       logConfig: LogConfig
-  ): Props =
-    Props(new TxHandler(blockFlow, pendingTxStorage, readyTxStorage))
+  ): Props = Props(new TxHandler(blockFlow))
 
   sealed trait Command
   final case class AddToMemPool(txs: AVector[TransactionTemplate], isIntraCliqueSyncing: Boolean)
@@ -172,11 +166,7 @@ object TxHandler {
   }
 }
 
-final class TxHandler(
-    val blockFlow: BlockFlow,
-    val pendingTxStorage: PendingTxStorage,
-    val readyTxStorage: ReadyTxStorage
-)(implicit
+final class TxHandler(val blockFlow: BlockFlow)(implicit
     val brokerConfig: BrokerConfig,
     memPoolSetting: MemPoolSetting,
     val networkSetting: NetworkSetting,
@@ -212,7 +202,6 @@ final class TxHandler(
             handleInterCliqueTx(
               _,
               nonCoinbaseValidation.validateMempoolTxTemplate,
-              None,
               acknowledge = true
             )
           )
@@ -237,46 +226,10 @@ final class TxHandler(
   }
 
   override def onFirstTimeSynced(): Unit = {
-    clearStorageAndLoadTxs()
     schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
     schedule(self, TxHandler.CleanPendingPool, memPoolSetting.cleanPendingPoolFrequency)
     scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
     scheduleOnce(self, TxHandler.DownloadTxs, memPoolSetting.batchDownloadTxsFrequency)
-  }
-
-  def clearStorageAndLoadTxs(): Unit = {
-    escapeIOError(readyTxStorage.clear())
-    log.info("Start to load persisted pending txs")
-    var (valid, invalid) = (0, 0)
-    escapeIOError(for {
-      groupViews <- AVector
-        .tabulateE(brokerConfig.groupNumPerBroker) { index =>
-          val groupIndex = GroupIndex.unsafe(brokerConfig.groupRange(index))
-          blockFlow.getImmutableGroupViewIncludePool(groupIndex)
-        }
-      _ <- pendingTxStorage.iterateE { (persistedTxId, tx) =>
-        val chainIndex = tx.chainIndex
-        val groupIndex = chainIndex.from
-        val index      = brokerConfig.groupIndexOfBroker(groupIndex)
-        groupViews(index).getPreOutputs(tx.unsigned.inputs).flatMap {
-          case Some(_) =>
-            valid += 1
-            handleInterCliqueTx(
-              tx,
-              nonCoinbaseValidation.validateMempoolTxTemplate,
-              Some(persistedTxId),
-              acknowledge = false
-            )
-            Right(())
-          case None =>
-            invalid += 1
-            pendingTxStorage.delete(persistedTxId)
-        }
-      }
-    } yield ())
-    log.info(
-      s"Load persisted pending txs completed, valid: #$valid, invalid: #$invalid (not precise though..)"
-    )
   }
 
   private def handleAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
@@ -300,7 +253,6 @@ final class TxHandler(
   def handleInterCliqueTx(
       tx: TransactionTemplate,
       validate: (TransactionTemplate, BlockFlow) => TxValidationResult[Unit],
-      persistedTxIdOpt: Option[PersistedTxId],
       acknowledge: Boolean
   ): Unit = {
     val chainIndex = tx.chainIndex
@@ -322,7 +274,7 @@ final class TxHandler(
           )
         case Right(_) =>
           val grandPool = blockFlow.getGrandPool()
-          handleValidTx(chainIndex, tx, grandPool, persistedTxIdOpt, acknowledge)
+          handleValidTx(chainIndex, tx, grandPool, acknowledge)
         case Left(Left(e)) =>
           addFailed(
             tx,
@@ -343,7 +295,6 @@ final class TxHandler(
       chainIndex: ChainIndex,
       tx: TransactionTemplate,
       grandPool: GrandPool,
-      persistedTxIdOpt: Option[PersistedTxId],
       acknowledge: Boolean
   ): Unit = {
     val currentTs = TimeStamp.now()
@@ -352,10 +303,6 @@ final class TxHandler(
     result match {
       case MemPool.AddedToMemPool =>
         txsBuffer.put(tx, ())
-        persistedTxIdOpt.foreach { persistedTxId =>
-          val info = ReadyTxInfo(chainIndex, persistedTxId.timestamp)
-          escapeIOError(readyTxStorage.put(tx.id, info))
-        }
       case _ => ()
     }
     addSucceeded(tx, acknowledge)
