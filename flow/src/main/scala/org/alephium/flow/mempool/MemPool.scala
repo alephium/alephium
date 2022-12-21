@@ -270,7 +270,7 @@ object MemPool {
       Flow.empty,
       ValueSortedMap.empty,
       sharedTxIndex,
-      memPoolSetting.sharedPoolCapacity * groupConfig.groups
+      memPoolSetting.mempoolCapacityPerChain * groupConfig.groups
     )
   }
 

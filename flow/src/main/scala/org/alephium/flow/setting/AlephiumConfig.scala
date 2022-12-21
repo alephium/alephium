@@ -153,11 +153,9 @@ final case class DiscoverySetting(
 ) extends DiscoveryConfig
 
 final case class MemPoolSetting(
-    sharedPoolCapacity: Int,
-    pendingPoolCapacity: Int,
+    mempoolCapacityPerChain: Int,
     txMaxNumberPerBlock: Int,
     cleanMempoolFrequency: Duration,
-    cleanPendingPoolFrequency: Duration,
     batchBroadcastTxsFrequency: Duration,
     batchDownloadTxsFrequency: Duration,
     autoMineForDev: Boolean // for dev only

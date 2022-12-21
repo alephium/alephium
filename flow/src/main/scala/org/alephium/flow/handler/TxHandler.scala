@@ -54,7 +54,6 @@ object TxHandler {
       extends Command
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
   case object CleanMemPool                              extends Command
-  case object CleanPendingPool                          extends Command
   private[handler] case object BroadcastTxs             extends Command
   private[handler] case object DownloadTxs              extends Command
 
@@ -228,9 +227,8 @@ final class TxHandler(val blockFlow: BlockFlow)(implicit
 
   override def onFirstTimeSynced(): Unit = {
     schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
-    schedule(self, TxHandler.CleanPendingPool, memPoolSetting.cleanPendingPoolFrequency)
-    scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
-    scheduleOnce(self, TxHandler.DownloadTxs, memPoolSetting.batchDownloadTxsFrequency)
+    scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
+    scheduleOnce(self, TxHandler.DownloadTxs, batchDownloadTxsFrequency)
   }
 
   private def handleAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
