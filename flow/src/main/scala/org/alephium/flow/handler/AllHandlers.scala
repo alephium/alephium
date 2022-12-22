@@ -115,8 +115,6 @@ object AllHandlers {
       memPoolSetting: MemPoolSetting,
       logConfig: LogConfig
   ): AllHandlers = {
-    assume(storages.sources.nonEmpty) // FIXME: Get ride of unused warning for now
-
     val txProps   = TxHandler.props(blockFlow, storages.pendingTxStorage)
     val txHandler = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
     val blockHandlers  = buildBlockHandlers(system, blockFlow, eventBus, namePostfix)
