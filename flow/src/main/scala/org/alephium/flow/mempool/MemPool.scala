@@ -141,6 +141,7 @@ class MemPool private (
   ): Unit =
     writeOnly {
       if (!_contains(tx.id)) {
+        assume(index.from != group)
         val children = sharedTxIndexes.addXGroupTx(tx, tx => flow.unsafe(tx.id))
         flow.addNewNode(MemPool.FlowNode(tx.id, tx, timestamp, index.flattenIndex, None, children))
         timestamps.put(tx.id, timestamp)
@@ -158,6 +159,7 @@ class MemPool private (
       val (parents, children) = sharedTxIndexes.add(tx, tx => flow.unsafe(tx.id))
       flow.addNewNode(MemPool.FlowNode(tx.id, tx, timestamp, index.flattenIndex, parents, children))
       timestamps.put(tx.id, timestamp)
+      measureTransactionsTotalInc(index.flattenIndex)
       MemPool.AddedToMemPool
     }
   }
@@ -182,20 +184,20 @@ class MemPool private (
   ): Int = writeOnly {
     val sizeBefore = size
     transactions.foreach(tx => if (_contains(tx.id)) _remove(tx.id))
-//      measureTransactionsTotal()
     val sizeAfter = size
     sizeBefore - sizeAfter
   }
 
-  private def _removeUsedTx(txId: TransactionId): Unit = {
+  @inline private def _removeUsedTx(txId: TransactionId): Unit = {
     flow.removeNodeAndAncestors(txId, removeSideEffect)
   }
 
-  private def _removeUnusedTx(txId: TransactionId): Unit = {
+  @inline private def _removeUnusedTx(txId: TransactionId): Unit = {
     flow.removeNodeAndDescendants(txId, removeSideEffect)
   }
 
-  private def removeSideEffect(node: MemPool.FlowNode): Unit = {
+  @inline private def removeSideEffect(node: MemPool.FlowNode): Unit = {
+    measureTransactionsTotalDec(node.chainIndex)
     timestamps.remove(node.tx.id)
     sharedTxIndexes.remove(node.tx)
   }
@@ -243,6 +245,7 @@ class MemPool private (
     flow.clear()
     timestamps.clear()
     sharedTxIndexes.clear()
+    transactionsTotalLabeled.foreach(_.set(0.0))
   }
 
   private def _takeOldTxs(
@@ -266,6 +269,23 @@ class MemPool private (
     val oldTxs = _takeOldTxs(timeStampThreshold)
     blockFlow.recheckInputs(group, oldTxs).foreach { invalidTxs =>
       removeUnusedTxs(invalidTxs)
+    }
+  }
+
+  private val transactionsTotalLabeled = {
+    groupConfig.cliqueChainIndexes.map(chainIndex =>
+      MemPool.sharedPoolTransactionsTotal
+        .labels(chainIndex.from.value.toString, chainIndex.to.value.toString)
+    )
+  }
+
+  def measureTransactionsTotalInc(index: Int): Unit = {
+    transactionsTotalLabeled(index).inc()
+  }
+
+  def measureTransactionsTotalDec(index: Int): Unit = {
+    if (ChainIndex.checkFromGroup(index, group)) {
+      transactionsTotalLabeled(index).dec()
     }
   }
 }
@@ -334,13 +354,5 @@ object MemPool {
       "Number of transactions in shared pool"
     )
     .labelNames("group_index", "chain_index")
-    .register()
-
-  val pendingPoolTransactionsTotal: Gauge = Gauge
-    .build(
-      "alephium_mempool_pending_pool_transactions_total",
-      "Number of transactions in pending pool"
-    )
-    .labelNames("group_index")
     .register()
 }

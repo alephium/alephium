@@ -20,7 +20,7 @@ import scala.util.Random
 
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, ModelGenerators}
-import org.alephium.util.{AlephiumSpec, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp}
 
 class GrandPoolSpec extends AlephiumSpec {
   behavior of "Single Broker"
@@ -60,6 +60,39 @@ class GrandPoolSpec extends AlephiumSpec {
   it should "add cross-group transactions" in new MultiBrokerFixture {
     val chainIndex = ChainIndex.unsafe(0, Random.between(1, brokerConfig.groups))
     testXGroupTx(chainIndex)
+  }
+
+  behavior of "Pool"
+
+  it should "measure transactions" in new SingleBrokerFixture {
+    def generateTx(from: Int, to: Int) = {
+      val index = ChainIndex.unsafe(from, to)
+      transactionGen().retryUntil(_.chainIndex equals index).sample.get.toTemplate
+    }
+    def checkMetrics(indexesWithTx: AVector[ChainIndex]) = {
+      groupConfig.cliqueChainIndexes.map { chainIndex =>
+        val expected = if (indexesWithTx.contains(chainIndex)) 1 else 0
+        MemPool.sharedPoolTransactionsTotal
+          .labels(chainIndex.from.value.toString, chainIndex.to.value.toString)
+          .get() is expected.toDouble
+      }
+    }
+    val txs     = AVector(generateTx(0, 1), generateTx(1, 1), generateTx(1, 0))
+    val indexes = txs.map(_.chainIndex)
+    checkMetrics(AVector.empty)
+
+    txs.foreach(tx => pool.add(tx.chainIndex, tx, TimeStamp.now()))
+    checkMetrics(indexes)
+
+    txs.foreach { tx =>
+      val mempool = pool.getMemPool(tx.chainIndex.from)
+      if (Random.nextBoolean()) {
+        mempool.removeUsedTxs(AVector(tx))
+      } else {
+        mempool.removeUnusedTxs(AVector(tx))
+      }
+    }
+    checkMetrics(AVector.empty)
   }
 
   trait Fixture extends FlowFixture {
