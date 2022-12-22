@@ -41,7 +41,7 @@ class MemPool private (
     // We could merge the following index into flow with multi-index sorted map
     timestamps: ValueSortedMap[TransactionId, TimeStamp],
     val sharedTxIndexes: TxIndexes,
-    capacity: Int
+    val capacity: Int
 )(implicit
     groupConfig: GroupConfig
 ) extends RWLock {
@@ -301,6 +301,20 @@ object MemPool {
       ValueSortedMap.empty,
       sharedTxIndex,
       memPoolSetting.mempoolCapacityPerChain * groupConfig.groups
+    )
+  }
+
+  def ofCapacity(
+      mainGroup: GroupIndex,
+      capacity: Int
+  )(implicit groupConfig: GroupConfig): MemPool = {
+    val sharedTxIndex = TxIndexes.emptyMemPool(mainGroup)
+    new MemPool(
+      mainGroup,
+      Flow.empty,
+      ValueSortedMap.empty,
+      sharedTxIndex,
+      capacity
     )
   }
 

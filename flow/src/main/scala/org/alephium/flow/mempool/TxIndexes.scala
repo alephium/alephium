@@ -78,10 +78,6 @@ final case class TxIndexes(
     _remove(transaction)
   }
 
-  def remove(transactions: AVector[TransactionTemplate]): Unit = {
-    transactions.foreach(_remove)
-  }
-
   private def _remove(transaction: TransactionTemplate): Unit = {
     transaction.unsigned.inputs.foreach(input => inputIndex.remove(input.outputRef))
     transaction.unsigned.fixedOutputs.foreachWithIndex { case (output, index) =>
@@ -95,8 +91,6 @@ final case class TxIndexes(
       }
     }
   }
-
-  def isSpent(asset: AssetOutputInfo): Boolean = isSpent(asset.ref)
 
   def isSpent(asset: AssetOutputRef): Boolean = {
     inputIndex.contains(asset)

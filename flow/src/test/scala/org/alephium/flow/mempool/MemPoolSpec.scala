@@ -18,6 +18,7 @@ package org.alephium.flow.mempool
 
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model._
+import org.alephium.protocol.vm.GasPrice
 import org.alephium.util.{AVector, LockFixture, TimeStamp, UnsecureRandom}
 
 class MemPoolSpec
@@ -62,6 +63,27 @@ class MemPoolSpec
     val tx1 = transactionGen().sample.get.toTemplate
     pool.add(ChainIndex.unsafe(0, 1), tx1, now)
     pool.size is 2
+  }
+
+  it should "check capacity" in {
+    val pool       = MemPool.ofCapacity(mainGroup, 1)
+    val tx0        = transactionGen().sample.get.toTemplate
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    pool.add(chainIndex, tx0, TimeStamp.now()) is MemPool.AddedToMemPool
+    pool.isFull() is true
+    pool.contains(tx0.id) is true
+
+    val higherGasPrice = GasPrice(tx0.unsigned.gasPrice.value.addUnsafe(1))
+    val tx1            = tx0.copy(unsigned = tx0.unsigned.copy(gasPrice = higherGasPrice))
+    pool.add(chainIndex, tx1, TimeStamp.now()) is MemPool.AddedToMemPool
+    pool.isFull() is true
+    pool.contains(tx0.id) is false
+    pool.contains(tx1.id) is true
+
+    pool.add(chainIndex, tx0, TimeStamp.now()) is MemPool.MemPoolIsFull
+    pool.isFull() is true
+    pool.contains(tx0.id) is false
+    pool.contains(tx1.id) is true
   }
 
   trait Fixture {
