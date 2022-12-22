@@ -136,9 +136,13 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "load all of the pending txs once the node is synced" in new Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
-    val txs = prepareRandomSequentialTxs(4)
-    txs.foreach { tx =>
-      storages.pendingTxStorage.put(PersistedTxId(TimeStamp.now(), tx.id), tx.toTemplate) isE ()
+    val txs     = prepareRandomSequentialTxs(4)
+    val startTs = TimeStamp.now()
+    txs.foreachWithIndex { case (tx, index) =>
+      storages.pendingTxStorage.put(
+        PersistedTxId(startTs.plusSecondsUnsafe(index.toLong), tx.id),
+        tx.toTemplate
+      ) isE ()
     }
     blockFlow.getGrandPool().mempools.foreach(_.size is 0)
 

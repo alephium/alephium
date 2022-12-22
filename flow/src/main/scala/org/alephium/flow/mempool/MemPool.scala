@@ -73,7 +73,7 @@ class MemPool private (
     AVector.from(flow.allTxs.values().map(_.tx))
   }
 
-  def getOutTxsWithTimestamp(): AVector[(TimeStamp, TransactionTemplate)] = {
+  def getOutTxsWithTimestamp(): AVector[(TimeStamp, TransactionTemplate)] = readOnly {
     AVector.from(
       timestamps
         .entries()

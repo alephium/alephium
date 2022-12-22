@@ -77,6 +77,14 @@ class GrandPoolSpec extends AlephiumSpec {
           .get() is expected.toDouble
       }
     }
+
+    // Reset the metrics
+    groupConfig.cliqueChainIndexes.foreach { chainIndex =>
+      MemPool.sharedPoolTransactionsTotal
+        .labels(chainIndex.from.value.toString, chainIndex.to.value.toString)
+        .set(0)
+    }
+
     val txs     = AVector(generateTx(0, 1), generateTx(1, 1), generateTx(1, 0))
     val indexes = txs.map(_.chainIndex)
     checkMetrics(AVector.empty)
