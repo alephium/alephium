@@ -24,6 +24,7 @@ import org.scalacheck.Gen
 import org.alephium.flow.{AlephiumFlowActorSpec, FlowFixture}
 import org.alephium.flow.core.BlockFlowState
 import org.alephium.flow.core.BlockFlowState.MemPooled
+import org.alephium.flow.model.PersistedTxId
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.validation.NonExistInput
@@ -112,11 +113,10 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     interCliqueProbe.expectNoMessage()
   }
 
-  // FIXME: persist mempool txs
-  ignore should "load persisted pending txs only once when node synced" in new FlowFixture {
+  it should "load persisted pending txs only once when node synced" in new FlowFixture {
     implicit lazy val system = createSystem(Some(AlephiumActorSpec.infoConfig))
     val txHandler = TestActorRef[TxHandler](
-      TxHandler.props(blockFlow)
+      TxHandler.props(blockFlow, storages.pendingTxStorage)
     )
 
     EventFilter.info(start = "Start to load", occurrences = 0).intercept {
@@ -131,6 +131,36 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       txHandler ! InterCliqueManager.SyncedResult(true)
       txHandler ! InterCliqueManager.SyncedResult(true)
     }
+  }
+
+  it should "load all of the pending txs once the node is synced" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val txs = prepareRandomSequentialTxs(4)
+    txs.foreach { tx =>
+      storages.pendingTxStorage.put(PersistedTxId(TimeStamp.now(), tx.id), tx.toTemplate) isE ()
+    }
+    blockFlow.getGrandPool().mempools.foreach(_.size is 0)
+
+    setSynced()
+    eventually {
+      blockFlow.getGrandPool().getOutTxsWithTimestamp().map(_._2.id).sorted is
+        txs.map(_.id).sorted
+    }
+  }
+
+  it should "persist all of the pending txs once the handler is stopped" in new Fixture {
+    implicit lazy val system  = createSystem(Some(AlephiumActorSpec.infoConfig))
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val txs = prepareRandomSequentialTxs(4)
+    txs.foreach(tx => blockFlow.getGrandPool().add(tx.chainIndex, tx.toTemplate, TimeStamp.now()))
+    blockFlow.getGrandPool().getOutTxsWithTimestamp().map(_._2.id).sorted is
+      txs.map(_.id).sorted
+    checkPersistedTxs(AVector.empty)
+
+    system.stop(txHandler)
+    eventually(checkPersistedTxs(txs))
   }
 
   it should "fail in case of duplicate txs" in new Fixture {
@@ -257,7 +287,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     def test(message: String) = {
       EventFilter.debug(message, occurrences = 5).intercept {
         val txHandler = system.actorOf(
-          TxHandler.props(blockFlow)
+          TxHandler.props(blockFlow, storages.pendingTxStorage)
         )
         txHandler ! InterCliqueManager.SyncedResult(true)
       }
@@ -408,7 +438,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     lazy val chainIndex = ChainIndex.unsafe(0, 0)
     lazy val txHandler =
       newTestActorRef[TxHandler](
-        TxHandler.props(blockFlow)
+        TxHandler.props(blockFlow, storages.pendingTxStorage)
       )
 
     def addTx(tx: Transaction, isIntraCliqueSyncing: Boolean = false) =
@@ -425,9 +455,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       }
     }
 
-    val interCliqueProbe = TestProbe()
+    lazy val interCliqueProbe = TestProbe()
     system.eventStream.subscribe(interCliqueProbe.ref, classOf[InterCliqueManager.BroadCastTx])
-    val intraCliqueProbe = TestProbe()
+    lazy val intraCliqueProbe = TestProbe()
     system.eventStream.subscribe(intraCliqueProbe.ref, classOf[IntraCliqueManager.BroadCastTx])
 
     def checkInterCliqueBroadcast(txs: AVector[Transaction]) = {
@@ -445,6 +475,14 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
         txHandler.underlyingActor.blockFlow.getTransactionStatus(tx.id, tx.chainIndex) isE
           Option(MemPooled)
       }
+    }
+
+    def checkPersistedTxs(txs: AVector[Transaction]) = {
+      var buffer = AVector.empty[TransactionId]
+      storages.pendingTxStorage.iterate { case (persistedId, _) =>
+        buffer = buffer :+ persistedId.txId
+      }
+      buffer.sorted is txs.map(_.id).sorted
     }
   }
 }

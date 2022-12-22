@@ -54,6 +54,10 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
     }
   }
 
+  def getOutTxsWithTimestamp(): AVector[(TimeStamp, TransactionTemplate)] = {
+    mempools.flatMap(_.getOutTxsWithTimestamp())
+  }
+
   def clean(
       blockFlow: BlockFlow,
       timeStampThreshold: TimeStamp

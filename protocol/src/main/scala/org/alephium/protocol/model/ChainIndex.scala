@@ -110,4 +110,10 @@ object ChainIndex {
     val groupIndex = GroupIndex.random
     ChainIndex(groupIndex, groupIndex)
   }
+
+  def checkFromGroup(index: Int, targetGroup: GroupIndex)(implicit
+      groupConfig: GroupConfig
+  ): Boolean = {
+    (index / groupConfig.groups) == targetGroup.value
+  }
 }

@@ -117,7 +117,7 @@ object AllHandlers {
   ): AllHandlers = {
     assume(storages.sources.nonEmpty) // FIXME: Get ride of unused warning for now
 
-    val txProps   = TxHandler.props(blockFlow)
+    val txProps   = TxHandler.props(blockFlow, storages.pendingTxStorage)
     val txHandler = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
     val blockHandlers  = buildBlockHandlers(system, blockFlow, eventBus, namePostfix)
     val headerHandlers = buildHeaderHandlers(system, blockFlow, namePostfix)

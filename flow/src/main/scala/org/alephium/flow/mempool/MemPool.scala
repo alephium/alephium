@@ -73,6 +73,16 @@ class MemPool private (
     AVector.from(flow.allTxs.values().map(_.tx))
   }
 
+  def getOutTxsWithTimestamp(): AVector[(TimeStamp, TransactionTemplate)] = {
+    AVector.from(
+      timestamps
+        .entries()
+        .map(e => e.getValue -> flow.unsafe(e.getKey))
+        .filter(p => ChainIndex.checkFromGroup(p._2.chainIndex, group))
+        .map(p => p._1 -> p._2.tx)
+    )
+  }
+
   def getTxs(txIds: AVector[TransactionId]): AVector[TransactionTemplate] = {
     txIds.fold(AVector.empty[TransactionTemplate]) { (acc, txId) =>
       readOnly(flow.get(txId)) match {
@@ -298,11 +308,11 @@ object MemPool {
       key: TransactionId,
       tx: TransactionTemplate,
       timestamp: TimeStamp,
-      groupIndex: Int,
+      chainIndex: Int,
       var _parents: Option[mutable.ArrayBuffer[FlowNode]],
       var _children: Option[mutable.ArrayBuffer[FlowNode]]
   ) extends KeyedFlow.Node[TransactionId, FlowNode] {
-    def getGroup(): Int = groupIndex
+    def getGroup(): Int = chainIndex
   }
 
   final case class Flow(

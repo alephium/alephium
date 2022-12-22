@@ -23,9 +23,10 @@ import akka.actor.Props
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.io.PendingTxStorage
 import org.alephium.flow.mempool.{GrandPool, MemPool}
 import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.{DataOrigin, MiningBlob}
+import org.alephium.flow.model.{DataOrigin, MiningBlob, PersistedTxId}
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
@@ -40,12 +41,12 @@ import org.alephium.serde.serialize
 import org.alephium.util._
 
 object TxHandler {
-  def props(blockFlow: BlockFlow)(implicit
+  def props(blockFlow: BlockFlow, txStorage: PendingTxStorage)(implicit
       brokerConfig: BrokerConfig,
       memPoolSetting: MemPoolSetting,
       networkSetting: NetworkSetting,
       logConfig: LogConfig
-  ): Props = Props(new TxHandler(blockFlow))
+  ): Props = Props(new TxHandler(blockFlow, txStorage))
 
   sealed trait Command
   final case class AddToMemPool(txs: AVector[TransactionTemplate], isIntraCliqueSyncing: Boolean)
@@ -165,12 +166,13 @@ object TxHandler {
   }
 }
 
-final class TxHandler(val blockFlow: BlockFlow)(implicit
+final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxStorage)(implicit
     val brokerConfig: BrokerConfig,
     memPoolSetting: MemPoolSetting,
     val networkSetting: NetworkSetting,
     logConfig: LogConfig
 ) extends TxCoreHandler
+    with TxHandlerPersistence
     with BroadcastTxsHandler
     with DownloadTxsHandler
     with AutoMineHandler
@@ -226,9 +228,21 @@ final class TxHandler(val blockFlow: BlockFlow)(implicit
   }
 
   override def onFirstTimeSynced(): Unit = {
+    clearStorageAndLoadTxs(
+      handleInterCliqueTx(
+        _,
+        nonCoinbaseValidation.validateMempoolTxTemplate,
+        acknowledge = false
+      )
+    )
     schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
     scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
     scheduleOnce(self, TxHandler.DownloadTxs, batchDownloadTxsFrequency)
+  }
+
+  override def postStop(): Unit = {
+    super.postStop()
+    persistMempoolTxs()
   }
 
   private def handleAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
@@ -394,6 +408,51 @@ trait AutoMineHandler extends TxHandlerUtils {
     val blockMessage = Message.serialize(NewBlock(block))
     val event        = InterCliqueManager.BroadCastBlock(block, blockMessage, DataOrigin.Local)
     publishEvent(event)
+  }
+}
+
+trait TxHandlerPersistence extends TxHandlerUtils {
+  def blockFlow: BlockFlow
+  implicit def brokerConfig: BrokerConfig
+  def pendingTxStorage: PendingTxStorage
+
+  def clearStorageAndLoadTxs(handlePendingTx: TransactionTemplate => Unit): Unit = {
+    log.info("Start to load persisted pending txs")
+    var (valid, invalid) = (0, 0)
+    escapeIOError(for {
+      groupViews <- AVector
+        .tabulateE(brokerConfig.groupNumPerBroker) { index =>
+          val groupIndex = GroupIndex.unsafe(brokerConfig.groupRange(index))
+          blockFlow.getImmutableGroupViewIncludePool(groupIndex)
+        }
+      _ <- pendingTxStorage.iterateE { (_, tx) =>
+        val chainIndex = tx.chainIndex
+        val groupIndex = chainIndex.from
+        val index      = brokerConfig.groupIndexOfBroker(groupIndex)
+        groupViews(index).getPreOutputs(tx.unsigned.inputs).map {
+          case Some(_) =>
+            valid += 1
+            handlePendingTx(tx)
+          case None =>
+            invalid += 1
+        }
+      }
+    } yield ())
+    log.info(
+      s"Load persisted pending txs completed, valid: #$valid, invalid: #$invalid (not precise though..)"
+    )
+  }
+
+  def persistMempoolTxs(): Unit = {
+    log.info("Start to persist pending txs")
+    escapeIOError(pendingTxStorage.iterateE { (txId, _) =>
+      pendingTxStorage.delete(txId)
+    })
+    escapeIOError(
+      blockFlow.getGrandPool().getOutTxsWithTimestamp().foreachE { case (timestamp, tx) =>
+        pendingTxStorage.put(PersistedTxId(timestamp, tx.id), tx)
+      }
+    )
   }
 }
 
