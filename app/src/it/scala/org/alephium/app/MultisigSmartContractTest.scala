@@ -122,9 +122,11 @@ trait MultisigSmartContractFixture extends CliqueFixture {
       restPort
     ).publicKey.toHexString
 
+  val (address3, publicKey3, privateKey3) = generateAccount
+
   val multisigAddress =
     request[BuildMultisigAddressResult](
-      multisig(AVector(publicKey, publicKey2), 1),
+      multisig(AVector(publicKey, publicKey2, publicKey3), 2),
       restPort
     ).address.toBase58
 
@@ -140,7 +142,7 @@ trait MultisigSmartContractFixture extends CliqueFixture {
   ) = {
     val buildResult = buildMultisigDeployContractTxWithPort(
       multisigAddress,
-      AVector(publicKey),
+      AVector(publicKey, publicKey3),
       code,
       restPort,
       gas,
@@ -161,7 +163,7 @@ trait MultisigSmartContractFixture extends CliqueFixture {
 
     val buildResult = buildMultisigExecuteScriptTxWithPort(
       multisigAddress,
-      AVector(publicKey),
+      AVector(publicKey, publicKey3),
       code,
       restPort,
       attoAlphAmount,
@@ -184,16 +186,26 @@ trait MultisigSmartContractFixture extends CliqueFixture {
   def signMultisigTx(unsignedTxStr: String, txId: TransactionId) = {
     val unsignedTx =
       deserialize[UnsignedTransaction](Hex.from(unsignedTxStr).get).rightValue
-    val signature1: Signature = SignatureSchema.sign(
+    val signature: Signature = SignatureSchema.sign(
       unsignedTx.id,
       PrivateKey.unsafe(Hex.unsafe(privateKey))
     )
 
     request[Boolean](
-      verify(txId.toHexString, signature1, publicKey),
+      verify(txId.toHexString, signature, publicKey),
       restPort
     ) is true
 
-    submitMultisigTransaction(unsignedTxStr, AVector(signature1))
+    val signature3: Signature = SignatureSchema.sign(
+      unsignedTx.id,
+      PrivateKey.unsafe(Hex.unsafe(privateKey3))
+    )
+
+    request[Boolean](
+      verify(txId.toHexString, signature3, publicKey3),
+      restPort
+    ) is true
+
+    submitMultisigTransaction(unsignedTxStr, AVector(signature, signature3))
   }
 }

@@ -739,11 +739,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(buildDeployContractTx, jsonRaw)
   }
 
-  it should "encode/decode BuildMultisigContract" in {
+  it should "encode/decode BuildMultisigDeployContractTx" in {
     val publicKey1      = PublicKey.generate
     val publicKey2      = PublicKey.generate
-    val multisigAddress = Address.Asset(LockupScript.p2mpkh(AVector(publicKey1, publicKey2), 1).get)
-    val buildDeployContractTx = BuildMultisigDeployContractTx(
+    val multisigAddress = Address.Asset(LockupScript.p2mpkh(AVector(publicKey1, publicKey2), 2).get)
+    val buildMultisigDeployContractTx = BuildMultisigDeployContractTx(
       fromAddress = multisigAddress,
       fromPublicKeys = AVector(publicKey1, publicKey2),
       bytecode = ByteString(0, 0),
@@ -762,7 +762,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "gasPrice": "1"
          |}
          |""".stripMargin
-    checkData(buildDeployContractTx, jsonRaw)
+    checkData(buildMultisigDeployContractTx, jsonRaw)
   }
 
   it should "encode/decode BuildDeployContractTxResult" in {
@@ -790,6 +790,30 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |}
          |""".stripMargin
     checkData(buildDeployContractTxResult, jsonRaw)
+  }
+
+  it should "encode/decode BuildMultisigExecuteScriptTx" in {
+    val publicKey1      = PublicKey.generate
+    val publicKey2      = PublicKey.generate
+    val multisigAddress = Address.Asset(LockupScript.p2mpkh(AVector(publicKey1, publicKey2), 2).get)
+    val buildMultisigExecuteScriptTx = BuildMultisigExecuteScriptTx(
+      fromAddress = multisigAddress,
+      fromPublicKeys = AVector(publicKey1, publicKey2),
+      bytecode = ByteString(0, 0),
+      gasAmount = Some(GasBox.unsafe(1)),
+      gasPrice = Some(GasPrice(1))
+    )
+    val jsonRaw =
+      s"""
+         |{
+         |  "fromAddress": "${multisigAddress.toBase58}",
+         |  "fromPublicKeys": ["${publicKey1.toHexString}", "${publicKey2.toHexString}"],
+         |  "bytecode": "0000",
+         |  "gasAmount": 1,
+         |  "gasPrice": "1"
+         |}
+         |""".stripMargin
+    checkData(buildMultisigExecuteScriptTx, jsonRaw)
   }
 
   it should "encode/decode BuildScriptTx" in {

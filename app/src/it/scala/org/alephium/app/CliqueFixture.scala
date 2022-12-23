@@ -678,19 +678,19 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def buildMultisigDeployContractTx(
       fromAddress: String,
       fromPublicKeys: AVector[String],
-      code: String,
+      bytecode: String,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None,
       initialFields: Option[AVector[vm.Val]] = None,
       issueTokenAmount: Option[U256] = None
   ) = {
-    val bytecode = code + Hex.toHexString(serialize(initialFields.getOrElse(AVector.empty)))
+    val fullBytecode = bytecode + Hex.toHexString(serialize(initialFields.getOrElse(AVector.empty)))
     val query = {
       s"""
          |{
          |  "fromAddress": "${fromAddress}",
          |  "fromPublicKeys": ${write(fromPublicKeys)},
-         |  "bytecode": "$bytecode"
+         |  "bytecode": "$fullBytecode"
          |  ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
          |  ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
          |  ${issueTokenAmount.map(v => s""","issueTokenAmount": "${v.v}"""").getOrElse("")}
@@ -703,7 +703,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def buildMultisigExecuteScriptTx(
       fromAddress: String,
       fromPublicKeys: AVector[String],
-      code: String,
+      bytecode: String,
       attoAlphAmount: Option[Amount] = None,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None
@@ -713,7 +713,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
          {
            "fromAddress": "${fromAddress}",
            "fromPublicKeys": ${write(fromPublicKeys)},
-           "bytecode": "$code"
+           "bytecode": "$bytecode"
            ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
            ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
            ${attoAlphAmount.map(a => s""","attoAlphAmount": "${a.value.v}"""").getOrElse("")}
@@ -737,7 +737,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       buildMultisigDeployContractTx(
         fromAddress = fromAddress,
         fromPublicKeys = fromPublicKeys,
-        code = compileResult.bytecode,
+        bytecode = compileResult.bytecode,
         gas,
         gasPrice,
         initialFields,
@@ -761,7 +761,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       buildMultisigExecuteScriptTx(
         fromAddress = fromAddress,
         fromPublicKeys = fromPublicKeys,
-        code = compileResult.bytecodeTemplate,
+        bytecode = compileResult.bytecodeTemplate,
         attoAlphAmount,
         gas,
         gasPrice
