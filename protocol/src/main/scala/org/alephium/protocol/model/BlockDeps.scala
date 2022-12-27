@@ -39,7 +39,15 @@ final case class BlockDeps private (deps: AVector[BlockHash]) extends AnyVal {
 
   def inDeps: AVector[BlockHash] = deps.take(deps.length / 2)
 
-  def intraDep(chainIndex: ChainIndex): BlockHash = getOutDep(chainIndex.from)
+  @inline def intraDep(chainIndex: ChainIndex): BlockHash = getOutDep(chainIndex.from)
+
+  @inline def unorderedIntraDeps(
+      groupOfTheDeps: GroupIndex
+  )(implicit groupConfig: GroupConfig): AVector[BlockHash] = {
+    val intraUncleHash = uncleHash(groupOfTheDeps)
+    assume(ChainIndex.from(intraUncleHash).isIntraGroup)
+    inDeps :+ uncleHash(groupOfTheDeps)
+  }
 }
 
 object BlockDeps {

@@ -32,6 +32,8 @@ import org.alephium.util.{AVector, Bytes, Duration, Hex, Number}
 final case class Target(bits: ByteString) extends Ordered[Target] {
   lazy val value: BigInteger = Target.fromCompactBitsUnsafe(bits)
 
+  def getDifficulty(): Difficulty = Difficulty.unsafe(Target.maxBigInt.divide(value))
+
   override def compare(that: Target): Int = this.value.compareTo(that.value)
 
   def toHexString: String = Hex.toHexString(bits)
