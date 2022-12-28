@@ -24,7 +24,7 @@ import org.alephium.crypto.{Blake2b, Blake3, MerkleHashable}
 import org.alephium.protocol._
 import org.alephium.protocol.vm.{GasPrice, LockupScript, StatefulScript}
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, Math, TimeStamp, U256}
 
 class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde" in {
@@ -135,7 +135,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         U256.Zero,
         LockupScript.p2pkh(PublicKey.generate),
         Target.Max,
-        ALPH.LaunchTimestamp
+        Math.max(networkConfig.lemanHardForkTimestamp, ALPH.LaunchTimestamp)
       )
 
       val block0 = Block(header, AVector(tx0, tx1, coinbase))
