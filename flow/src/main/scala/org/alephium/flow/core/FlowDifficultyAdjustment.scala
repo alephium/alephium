@@ -24,7 +24,7 @@ import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, Duration, Math, TimeStamp}
+import org.alephium.util.{AVector, Cache, Duration, Math, TimeStamp}
 
 trait FlowDifficultyAdjustment {
   implicit def brokerConfig: BrokerConfig
@@ -104,43 +104,64 @@ trait FlowDifficultyAdjustment {
 
   def getOutTips(header: BlockHeader): AVector[BlockHash]
 
+  private[core] val diffAndTimeSpanCache = Cache.fifoSafe[BlockHash, (Difficulty, Duration)](
+    consensusConfig.blockCacheCapacityPerChain * brokerConfig.chainNum * 8
+  )
   def getDiffAndTimeSpanUnsafe(hash: BlockHash): (Difficulty, Duration) = {
-    if (hash == BlockHash.zero) {
-      (
-        consensusConfig.maxMiningTarget.getDifficulty(),
-        consensusConfig.expectedWindowTimeSpan
-      )
-    } else {
-      val diff   = getBlockHeaderUnsafe(hash).target.getDifficulty()
-      val height = getHeightUnsafe(hash)
-      if (ChainDifficultyAdjustment.enoughHeight(height)) {
-        val (timestampLast, timestampNow) =
-          Utils.unsafe(getHashChain(hash).calTimeSpan(hash, height))
-        (diff, timestampNow.deltaUnsafe(timestampLast))
+    diffAndTimeSpanCache.get(hash).getOrElse {
+      if (hash == BlockHash.zero) {
+        (
+          consensusConfig.maxMiningTarget.getDifficulty(),
+          consensusConfig.expectedWindowTimeSpan
+        )
       } else {
-        (diff, consensusConfig.expectedWindowTimeSpan)
+        val diff   = getBlockHeaderUnsafe(hash).target.getDifficulty()
+        val height = getHeightUnsafe(hash)
+        if (ChainDifficultyAdjustment.enoughHeight(height)) {
+          val (timestampLast, timestampNow) =
+            Utils.unsafe(getHashChain(hash).calTimeSpan(hash, height))
+          (diff, timestampNow.deltaUnsafe(timestampLast))
+        } else {
+          (diff, consensusConfig.expectedWindowTimeSpan)
+        }
       }
     }
   }
 
+  private[core] val diffAndTimeSpanForIntraDepCache =
+    Cache.fifoSafe[BlockHash, (Difficulty, Duration)](
+      consensusConfig.blockCacheCapacityPerChain * brokerConfig.chainNum * 8
+    )
   def getDiffAndTimeSpanForIntraDepUnsafe(intraDep: BlockHash): (Difficulty, Duration) = {
-    if (intraDep == BlockHash.zero) {
-      (
-        consensusConfig.maxMiningTarget.getDifficulty().times(brokerConfig.groups),
-        consensusConfig.expectedWindowTimeSpan.timesUnsafe(brokerConfig.groups.toLong)
-      )
-    } else {
-      assume(ChainIndex.from(intraDep).isIntraGroup)
+    diffAndTimeSpanForIntraDepCache.get(intraDep).getOrElse {
+      if (intraDep == BlockHash.zero) {
+        (
+          consensusConfig.maxMiningTarget.getDifficulty().times(brokerConfig.groups),
+          consensusConfig.expectedWindowTimeSpan.timesUnsafe(brokerConfig.groups.toLong)
+        )
+      } else {
+        assume(ChainIndex.from(intraDep).isIntraGroup)
 
-      var diffSum     = Difficulty.zero.value
-      var timeSpanSum = Duration.zero
-      val outDeps     = getOutTips(getBlockHeaderUnsafe(intraDep))
-      outDeps.foreach { dep =>
-        val (diff, timeSpan) = getDiffAndTimeSpanUnsafe(dep)
-        diffSum = diffSum.add(diff.value)
-        timeSpanSum = timeSpanSum + timeSpan
+        var diffSum     = Difficulty.zero.value
+        var timeSpanSum = Duration.zero
+        val outDeps     = getOutTips(getBlockHeaderUnsafe(intraDep))
+        outDeps.foreach { dep =>
+          val (diff, timeSpan) = getDiffAndTimeSpanUnsafe(dep)
+          diffSum = diffSum.add(diff.value)
+          timeSpanSum = timeSpanSum + timeSpan
+        }
+        (Difficulty.unsafe(diffSum), timeSpanSum)
       }
-      (Difficulty.unsafe(diffSum), timeSpanSum)
+    }
+  }
+
+  def cacheDiffAndTimeSpan(header: BlockHeader): Unit = {
+    diffAndTimeSpanCache.put(header.hash, getDiffAndTimeSpanUnsafe(header.hash))
+    if (header.chainIndex.isIntraGroup) {
+      diffAndTimeSpanForIntraDepCache.put(
+        header.hash,
+        getDiffAndTimeSpanForIntraDepUnsafe(header.hash)
+      )
     }
   }
 

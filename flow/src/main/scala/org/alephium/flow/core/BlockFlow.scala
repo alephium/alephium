@@ -255,7 +255,9 @@ object BlockFlow extends StrictLogging {
       for {
         weight <- calWeight(block)
         _      <- getBlockChain(index).add(block, weight, worldStateOpt)
-      } yield ()
+      } yield {
+        cacheDiffAndTimeSpan(block.header)
+      }
     }
 
     def addAndUpdateView(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit] = {
@@ -272,7 +274,9 @@ object BlockFlow extends StrictLogging {
       for {
         weight <- calWeight(header)
         _      <- getHeaderChain(index).add(header, weight)
-      } yield ()
+      } yield {
+        cacheDiffAndTimeSpan(header)
+      }
     }
 
     def addAndUpdateView(header: BlockHeader): IOResult[Unit] = {

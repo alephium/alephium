@@ -493,6 +493,33 @@ class BlockFlowSpec extends AlephiumSpec {
     blockFlow1.getBestIntraGroupTip() is block.hash
   }
 
+  it should "cache diff and timespan" in new InterGroupFixture {
+    val fromGroup = UnsecureRandom.sample(brokerConfig.groupRange)
+
+    {
+      info("Intra group block")
+      val block = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, fromGroup))
+      addAndCheck(blockFlow0, block)
+      addAndCheck(blockFlow1, block.header)
+      blockFlow0.diffAndTimeSpanCache.contains(block.hash) is true
+      blockFlow0.diffAndTimeSpanForIntraDepCache.contains(block.hash) is true
+      blockFlow1.diffAndTimeSpanCache.contains(block.hash) is true
+      blockFlow1.diffAndTimeSpanForIntraDepCache.contains(block.hash) is true
+    }
+
+    {
+      info("Inter group block")
+      val toGroup = UnsecureRandom.sample(blockFlow1.brokerConfig.groupRange)
+      val block   = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
+      addAndCheck(blockFlow0, block)
+      blockFlow1.addAndUpdateView(block, None)
+      blockFlow0.diffAndTimeSpanCache.contains(block.hash) is true
+      blockFlow0.diffAndTimeSpanForIntraDepCache.contains(block.hash) is false
+      blockFlow1.diffAndTimeSpanCache.contains(block.hash) is true
+      blockFlow1.diffAndTimeSpanForIntraDepCache.contains(block.hash) is false
+    }
+  }
+
   it should "cache blocks & headers during initialization" in new FlowFixture {
     blockFlow.getGroupCache(GroupIndex.unsafe(0)).size is 5
 
