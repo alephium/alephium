@@ -388,16 +388,24 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "reduce target gradually and reach a stable target eventually" in new FlowFixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    def step() = {
+      val blocks = brokerConfig.chainIndexes.map(emptyBlock(blockFlow, _))
+      blocks.foreach(addAndCheck(blockFlow, _))
+      val targets = blocks.map(_.target).toSet
+      targets.size is 1
+      targets.head
+    }
+
     var lastTarget = consensusConfig.maxMiningTarget
     while ({
-      val block = emptyBlock(blockFlow, chainIndex)
-      addAndCheck(blockFlow, block)
+      val newTarget = step()
       if (lastTarget != Target.Max) {
-        if (block.target < lastTarget) {
-          lastTarget = block.target
+        if (newTarget < lastTarget) {
+          lastTarget = newTarget
           true
-        } else if (block.target equals lastTarget) {
+        } else if (newTarget equals lastTarget) {
           false
         } else {
           // the target is increasing, which is wrong
@@ -405,7 +413,7 @@ class BlockFlowSpec extends AlephiumSpec {
           true
         }
       } else {
-        lastTarget = block.target
+        lastTarget = newTarget
         true
       }
     }) {}
