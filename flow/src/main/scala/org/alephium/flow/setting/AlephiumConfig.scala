@@ -36,7 +36,7 @@ import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.{Address, Block, NetworkId, Target, Weight}
+import org.alephium.protocol.model.{Address, Block, Difficulty, NetworkId, Target, Weight}
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util._
 
@@ -55,7 +55,8 @@ final case class ConsensusSetting(
 ) extends ConsensusConfig {
   val maxMiningTarget: Target =
     Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
-  val minBlockWeight: Weight = Weight.from(maxMiningTarget)
+  val minMiningDiff: Difficulty = maxMiningTarget.getDifficulty()
+  val minBlockWeight: Weight    = Weight.from(maxMiningTarget)
 
   val expectedTimeSpan: Duration       = blockTargetTime
   val powAveragingWindow: Int          = 17
