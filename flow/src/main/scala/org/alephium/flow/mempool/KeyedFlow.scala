@@ -185,12 +185,8 @@ object KeyedFlow {
   ): Unit = {
     val buffer = getter
     buffer match {
-      case Some(nodes) =>
-        // TODO: remove this
-        assume(!nodes.exists(_.key == node.key))
-        nodes.addOne(node)
-      case None =>
-        setter(Some(mutable.ArrayBuffer(node)))
+      case Some(nodes) => nodes.addOne(node)
+      case None        => setter(Some(mutable.ArrayBuffer(node)))
     }
   }
 

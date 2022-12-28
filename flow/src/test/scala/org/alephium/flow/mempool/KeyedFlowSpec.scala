@@ -283,10 +283,10 @@ object KeyedFlowSpec extends AlephiumSpec {
         node.key is key
         node
           .getChildren()
-          .foreach(_.foreach(child => child._parents.exists(_.exists(_ eq child))))
+          .foreach(_.foreach(child => child._parents.exists(_.exists(_ eq node))))
         node
           .getParents()
-          .foreach(_.foreach(parent => parent._children.exists(_.exists(_ eq parent))))
+          .foreach(_.foreach(parent => parent._children.exists(_.exists(_ eq node))))
       }
     }
   }

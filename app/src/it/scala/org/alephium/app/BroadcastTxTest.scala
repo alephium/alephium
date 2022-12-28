@@ -34,6 +34,7 @@ class BroadcastTxTest extends AlephiumActorSpec {
       val tx =
         transfer(publicKey, address, transferAmount, privateKey, clique.masterRestPort)
       val restPort1 = clique.getServer(tx.fromGroup).config.network.restPort
+      tx.fromGroup is tx.toGroup
       eventually {
         clique.getServer(0).node.blockFlow.getMemPool(fromAddressGroup).contains(tx.txId) is true
         assertThrows[AssertionError](
@@ -72,8 +73,8 @@ class BroadcastTxTest extends AlephiumActorSpec {
       tx1.toGroup is fromAddressGroup.value
 
       eventually {
-        clique.getServer(0).node.blockFlow.getMemPool(fromAddressGroup).contains(tx0.txId) is true
-        clique.getServer(1).node.blockFlow.getMemPool(toAddressGroup).contains(tx0.txId) is true
+        clique.getServer(0).node.blockFlow.getMemPool(fromAddressGroup).contains(tx1.txId) is true
+        clique.getServer(1).node.blockFlow.getMemPool(toAddressGroup).contains(tx1.txId) is true
       }
     }
 

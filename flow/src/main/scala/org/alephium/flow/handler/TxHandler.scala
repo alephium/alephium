@@ -108,8 +108,8 @@ object TxHandler {
               Right(())
             }
         } yield ()
-      case _ =>
-        Left("Unable to add the tx the mempool: maybe the parent tx is not confirmed")
+      case error =>
+        Left(s"Unable to add the tx the mempool: ${error}")
     }
   }
 

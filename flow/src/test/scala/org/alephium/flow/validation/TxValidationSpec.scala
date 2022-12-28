@@ -456,7 +456,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       val chainIndex = tx.chainIndex
       val p2pkh      = p2pkhLockupGen(chainIndex.from).sample.get
       val invalidP2MPK = LockupScript.P2MPKH
-        .unsafe(AVector(p2pkh.pkHash) ++ AVector.fill(ALPH.MaxKeysInP2PMPK)(Hash.generate), 1)
+        .unsafe(AVector(p2pkh.pkHash) ++ AVector.fill(ALPH.MaxKeysInP2MPK)(Hash.generate), 1)
 
       val updateFixedOutput = Random.nextInt(tx.outputsLength) < tx.unsigned.fixedOutputs.length
       val txNew = if (updateFixedOutput) {
@@ -470,7 +470,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       txNew.fail(TooManyKeysInMultisig)
     }
 
-    val keys       = AVector.fill(ALPH.MaxKeysInP2PMPK)(PublicKey.generate)
+    val keys       = AVector.fill(ALPH.MaxKeysInP2MPK)(PublicKey.generate)
     val validP2MPK = LockupScript.p2mpkh(keys, 1).value
     val tx =
       transactionGen().sample.get.updateRandomFixedOutputs(_.copy(lockupScript = validP2MPK))
@@ -478,9 +478,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check the number of public keys in p2mpk for Mainnet fork" in new Fixture {
-    val tooManyKeys = AVector.fill(ALPH.MaxKeysInP2PMPK + 1)(PublicKey.generate)
+    val tooManyKeys = AVector.fill(ALPH.MaxKeysInP2MPK + 1)(PublicKey.generate)
     val p2mpkh0     = LockupScript.p2mpkh(tooManyKeys.init, 1).value
-    val p2mpkh1     = LockupScript.p2mpkh(tooManyKeys.init, 1).value
+    val p2mpkh1     = LockupScript.p2mpkh(tooManyKeys, ALPH.MaxKeysInP2MPK + 1).value
     val tx0 =
       transactionGen().sample.get.updateRandomFixedOutputs(_.copy(lockupScript = p2mpkh0))
     val tx1 =

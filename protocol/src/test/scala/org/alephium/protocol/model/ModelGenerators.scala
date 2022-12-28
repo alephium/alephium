@@ -48,11 +48,10 @@ trait LockupScriptGenerators extends Generators {
 
   def p2mpkhLockupGen(groupIndex: GroupIndex): Gen[LockupScript.Asset] =
     for {
-      publicKey0 <- publicKeyGen(groupIndex)
-      numKeys    <- Gen.chooseNum(0, ALPH.MaxKeysInP2PMPK - 1) // the first key is generated already
-      moreKeys   <- Gen.listOfN(numKeys, publicKeyGen(groupIndex)).map(AVector.from)
-      threshold  <- Gen.choose(1, moreKeys.length + 1)
-    } yield LockupScript.p2mpkh(publicKey0 +: moreKeys, threshold).get
+      numKeys   <- Gen.chooseNum(1, ALPH.MaxKeysInP2MPK)
+      keys      <- Gen.listOfN(numKeys, publicKeyGen(groupIndex)).map(AVector.from)
+      threshold <- Gen.choose(1, keys.length)
+    } yield LockupScript.p2mpkh(keys, threshold).get
 
   def p2mpkhLockupGen(n: Int, m: Int, groupIndex: GroupIndex): Gen[LockupScript.Asset] = {
     assume(m <= n)

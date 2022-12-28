@@ -202,11 +202,7 @@ class TxUtilsSpec extends AlephiumSpec {
           if (output.toGroup equals chainIndex.from) {
             groupView.getPreOutput(outputRef) isE Some(output)
           } else {
-            if (output.toGroup == chainIndex.from) {
-              groupView.getPreOutput(outputRef) isE None
-            } else {
-              assertThrows[AssertionError](groupView.getPreOutput(outputRef))
-            }
+            assertThrows[AssertionError](groupView.getPreOutput(outputRef))
           }
         }
       }

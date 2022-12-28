@@ -485,7 +485,7 @@ object TxValidation {
       if (hardFork.isLemanEnabled()) {
         output.lockupScript match {
           case LockupScript.P2MPKH(pkHashes, _) =>
-            if (pkHashes.length > ALPH.MaxKeysInP2PMPK) {
+            if (pkHashes.length > ALPH.MaxKeysInP2MPK) {
               invalidTx(TooManyKeysInMultisig)
             } else {
               Right(())

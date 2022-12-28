@@ -89,13 +89,18 @@ class IntraCliqueManagerSpec extends AlephiumActorSpec {
     inboundConnection.expectNoMessage()
     outboundConnection.expectNoMessage()
 
-    val tx = block.transactions.head.toTemplate
+    val tx        = block.transactions.head.toTemplate
+    val invalidTx = block.transactions.head.toTemplate
     val txs = AVector(
       ChainIndex.unsafe(1, 0) -> AVector(tx),
       ChainIndex.unsafe(1, 2) -> AVector(tx)
     )
-    val broadcastTxMsg = Message.serialize(TxsResponse(RequestId.unsafe(0), AVector(tx)))
-    intraCliqueManager ! IntraCliqueManager.BroadCastTx(txs)
+    val invalidTxs = AVector(
+      ChainIndex.unsafe(1, 1) -> AVector(invalidTx)
+    )
+    val broadcastTxMsg =
+      Message.serialize(TxsResponse(RequestId.unsafe(0), AVector(tx)))
+    intraCliqueManager ! IntraCliqueManager.BroadCastTx(invalidTxs ++ txs)
     inboundConnection.expectMsg(BrokerHandler.Send(broadcastTxMsg))
     outboundConnection.expectMsg(BrokerHandler.Send(broadcastTxMsg))
   }
