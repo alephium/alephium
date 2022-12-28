@@ -411,60 +411,6 @@ class BlockFlowSpec extends AlephiumSpec {
     }) {}
   }
 
-  trait DifficultyFixture extends FlowFixture {
-    val chainIndex = ChainIndex.unsafe(0, 1)
-
-    def prepareBlocks(scale: Int): Unit = {
-      (0 until consensusConfig.powAveragingWindow + 1).foreach { k =>
-        val block = emptyBlock(blockFlow, chainIndex)
-        // we increase the difficulty for the last block of the DAA window (17 blocks)
-        if (k equals consensusConfig.powAveragingWindow) {
-          val newTarget = Target.unsafe(consensusConfig.maxMiningTarget.value.divide(scale))
-          val newBlock  = block.copy(header = block.header.copy(target = newTarget))
-          blockFlow.addAndUpdateView(reMine(blockFlow, chainIndex, newBlock), None)
-        } else {
-          addAndCheck(blockFlow, block)
-          val bestDep = blockFlow.getBestDeps(chainIndex.from)
-          blockFlow.getNextHashTarget(
-            chainIndex,
-            bestDep,
-            TimeStamp.now()
-          ) isE consensusConfig.maxMiningTarget
-        }
-      }
-    }
-  }
-
-  it should "calculate weighted target" in new DifficultyFixture {
-    prepareBlocks(2)
-
-    val bestDeps = blockFlow.getBestDeps(chainIndex.from)
-    val nextTargetRaw = blockFlow
-      .getHeaderChain(chainIndex)
-      .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
-      .rightValue
-      .value
-    (BigInt(nextTargetRaw) < BigInt(consensusConfig.maxMiningTarget.value) / 2) is true
-    val nextTargetClipped =
-      blockFlow.getNextHashTarget(chainIndex, bestDeps, TimeStamp.now()).rightValue
-    (nextTargetClipped > Target.unsafe(consensusConfig.maxMiningTarget.value / 2)) is true
-  }
-
-  it should "clip target" in new DifficultyFixture {
-    prepareBlocks(8 * groups0)
-
-    val bestDeps = blockFlow.getBestDeps(chainIndex.from)
-    val nextTargetRaw = blockFlow
-      .getHeaderChain(chainIndex)
-      .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
-      .rightValue
-      .value
-    (BigInt(nextTargetRaw) < BigInt(consensusConfig.maxMiningTarget.value) / 2) is true
-    val nextTargetClipped =
-      blockFlow.getNextHashTarget(chainIndex, bestDeps, TimeStamp.now()).rightValue
-    nextTargetClipped is Target.unsafe(consensusConfig.maxMiningTarget.value / 2)
-  }
-
   behavior of "Balance"
 
   it should "transfer token inside a same group" in new FlowFixture {
