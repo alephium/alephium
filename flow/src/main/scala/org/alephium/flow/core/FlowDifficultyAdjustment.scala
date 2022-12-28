@@ -31,6 +31,8 @@ trait FlowDifficultyAdjustment {
   implicit def consensusConfig: ConsensusSetting
   implicit def networkConfig: NetworkConfig
 
+  def genesisHashes: AVector[AVector[BlockHash]]
+
   def getBlockHeaderUnsafe(hash: BlockHash): BlockHeader
   def getHeightUnsafe(hash: BlockHash): Int
   def getHeaderChain(hash: BlockHash): BlockHeaderChain
@@ -88,7 +90,7 @@ trait FlowDifficultyAdjustment {
       headerOfIntraDeps
         .map { header =>
           if (header.isGenesis) {
-            header.hash -> ALPH.GenesisHeight
+            genesisHashes(groupIndex.value)(groupIndex.value) -> ALPH.GenesisHeight
           } else {
             val intraDep = header.getIntraDep(groupIndex)
             val height   = if (header.isGenesis) ALPH.GenesisHeight else getHeightUnsafe(intraDep)
@@ -106,7 +108,7 @@ trait FlowDifficultyAdjustment {
     if (hash == BlockHash.zero) {
       (
         consensusConfig.maxMiningTarget.getDifficulty(),
-        consensusConfig.blockTargetTime
+        consensusConfig.expectedWindowTimeSpan
       )
     } else {
       val diff   = getBlockHeaderUnsafe(hash).target.getDifficulty()
@@ -116,7 +118,7 @@ trait FlowDifficultyAdjustment {
           Utils.unsafe(getHashChain(hash).calTimeSpan(hash, height))
         (diff, timestampNow.deltaUnsafe(timestampLast))
       } else {
-        (diff, consensusConfig.blockTargetTime)
+        (diff, consensusConfig.expectedWindowTimeSpan)
       }
     }
   }
@@ -125,7 +127,7 @@ trait FlowDifficultyAdjustment {
     if (intraDep == BlockHash.zero) {
       (
         consensusConfig.maxMiningTarget.getDifficulty().times(brokerConfig.groups),
-        consensusConfig.blockTargetTime.timesUnsafe(brokerConfig.groups.toLong)
+        consensusConfig.expectedWindowTimeSpan.timesUnsafe(brokerConfig.groups.toLong)
       )
     } else {
       assume(ChainIndex.from(intraDep).isIntraGroup)
