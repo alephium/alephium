@@ -93,7 +93,7 @@ trait FlowDifficultyAdjustment {
             genesisHashes(groupIndex.value)(groupIndex.value) -> ALPH.GenesisHeight
           } else {
             val intraDep = header.getIntraDep(groupIndex)
-            val height   = if (header.isGenesis) ALPH.GenesisHeight else getHeightUnsafe(intraDep)
+            val height   = getHeightUnsafe(intraDep)
             intraDep -> height
           }
         }

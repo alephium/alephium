@@ -77,7 +77,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
           if (height < ALPH.GenesisHeight + 2) {
             intraDeps is brokerConfig.cliqueGroupIndexes
               .map(group => blockFlow.genesisHashes(group.value)(group.value))
-          } else if (height < ALPH.GenesisHeight + 2) {
+          } else {
             intraDeps is brokerConfig.cliqueChainIndexes
               .filter(_.isIntraGroup)
               .map(blockFlow.getBlockChain(_).getHashesUnsafe(height - 2).head)
