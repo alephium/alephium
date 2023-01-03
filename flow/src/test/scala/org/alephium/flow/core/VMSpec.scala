@@ -161,9 +161,9 @@ class VMSpec extends AlephiumSpec {
   }
 
   trait ContractFixture extends FlowFixture {
-    val chainIndex     = ChainIndex.unsafe(0, 0)
-    val genesisLockup  = getGenesisLockupScript(chainIndex)
-    val genesisAddress = Address.Asset(genesisLockup)
+    lazy val chainIndex     = ChainIndex.unsafe(0, 0)
+    lazy val genesisLockup  = getGenesisLockupScript(chainIndex)
+    lazy val genesisAddress = Address.Asset(genesisLockup)
 
     def createContractAndCheckState(
         input: String,
@@ -202,12 +202,13 @@ class VMSpec extends AlephiumSpec {
       block
     }
 
-    def callTxScriptMulti(input: Int => String): Block = {
+    def callTxScriptMulti(input: Int => String, func: StatefulScript => StatefulScript): Block = {
       val block0 = transfer(blockFlow, chainIndex, numReceivers = 10)
       addAndCheck(blockFlow, block0)
       val newAddresses = block0.nonCoinbase.head.unsigned.fixedOutputs.init.map(_.lockupScript)
       val scripts = AVector.tabulate(newAddresses.length) { index =>
-        Compiler.compileTxScript(input(index)).fold(throw _, identity)
+        val script = Compiler.compileTxScript(input(index)).fold(throw _, identity)
+        func(script)
       }
       val block1 = simpleScriptMulti(blockFlow, chainIndex, newAddresses, scripts)
       addAndCheck(blockFlow, block1)
@@ -1747,7 +1748,7 @@ class VMSpec extends AlephiumSpec {
     checkSwapBalance(minimalAlphInContract + 10, 100, 7 /* 1 more coinbase output */, 3)
   }
 
-  it should "execute tx in random order" in new ContractFixture {
+  trait TxExecutionOrderFixture extends ContractFixture {
     val testContract =
       s"""
          |Contract Foo(mut x: U256) {
@@ -1757,22 +1758,107 @@ class VMSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
+
+    def callScript(contractId: ContractId, func: StatefulScript => StatefulScript) = {
+      callTxScriptMulti(
+        index => s"""
+                    |@using(preapprovedAssets = false)
+                    |TxScript Main {
+                    |  let foo = Foo(#${contractId.toHexString})
+                    |  foo.foo($index)
+                    |}
+                    |
+                    |$testContract
+                    |""".stripMargin,
+        func
+      )
+    }
+
+    def checkState(expected: Long, contractId: ContractId) = {
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val contractState = worldState.getContractState(contractId).fold(throw _, identity)
+      contractState.fields is AVector[Val](Val.U256(U256.unsafe(expected)))
+    }
+  }
+
+  it should "execute tx in random order" in new TxExecutionOrderFixture {
+    override val configValues = Map(
+      ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis)
+    )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
+
+    def contractCreationPreLeman(
+        code: StatefulContract,
+        initialState: AVector[Val],
+        lockupScript: LockupScript.Asset,
+        attoAlphAmount: U256
+    ): StatefulScript = {
+      val codeRaw  = serialize(code)
+      val stateRaw = serialize(initialState)
+      val instrs = AVector[Instr[StatefulContext]](
+        AddressConst(Val.Address(lockupScript)),
+        U256Const(Val.U256(attoAlphAmount)),
+        ApproveAlph,
+        BytesConst(Val.ByteVec(codeRaw)),
+        BytesConst(Val.ByteVec(stateRaw)),
+        CreateContract
+      )
+      val method = Method[StatefulContext](
+        isPublic = true,
+        usePreapprovedAssets = true,
+        useContractAssets = true,
+        argsLength = 0,
+        localsLength = 0,
+        returnLength = 0,
+        instrs = instrs
+      )
+      StatefulScript.unsafe(AVector(method))
+    }
+
+    def createContractPreLeman() = {
+      val contract      = Compiler.compileContract(testContract).rightValue
+      val genesisLockup = getGenesisLockupScript(chainIndex)
+      val initialState  = AVector[Val](Val.U256(0))
+      val txScript =
+        contractCreationPreLeman(contract, initialState, genesisLockup, minimalAlphInContract)
+      val block = payableCall(blockFlow, chainIndex, txScript)
+      addAndCheck(blockFlow, block)
+
+      val contractOutputRef =
+        TxOutputRef.unsafe(block.transactions.head, 0).asInstanceOf[ContractOutputRef]
+      val contractId = ContractId.deprecatedFrom(block.transactions.head.id, 0)
+      val estimated  = contractId.inaccurateFirstOutputRef()
+      estimated.hint is contractOutputRef.hint
+      estimated.key.value.bytes.init is contractOutputRef.key.value.bytes.init
+
+      checkState(blockFlow, chainIndex, contractId, initialState, contractOutputRef, 2, 2)
+      contractId
+    }
+
+    val contractId = createContractPreLeman()
+    val block = callScript(
+      contractId,
+      script => {
+        script.methods.length is 1
+        val method = script.methods(0)
+        method.instrs.length is 7
+        method.instrs(3) is U256Const1 // arg length
+        method.instrs(4) is U256Const0 // return length
+        val newMethod = method.copy(instrs = method.instrs.slice(0, 3) ++ method.instrs.slice(5, 7))
+        StatefulScript.unsafe(AVector(newMethod))
+      }
+    )
+    val expected = block.getNonCoinbaseExecutionOrder.fold(0L)(_ * 10 + _)
+    checkState(expected, contractId)
+  }
+
+  it should "execute tx in sequential order" in new TxExecutionOrderFixture {
     val contractId = createContractAndCheckState(testContract, 2, 2)._1
+    val block      = callScript(contractId, identity)
+    networkConfig.getHardFork(block.timestamp) is HardFork.Leman
 
-    val block = callTxScriptMulti(index => s"""
-                                              |@using(preapprovedAssets = false)
-                                              |TxScript Main {
-                                              |  let foo = Foo(#${contractId.toHexString})
-                                              |  foo.foo($index)
-                                              |}
-                                              |
-                                              |$testContract
-                                              |""".stripMargin)
-
-    val expected   = block.getNonCoinbaseExecutionOrder.fold(0L)(_ * 10 + _)
-    val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
-    val contractState = worldState.getContractState(contractId).fold(throw _, identity)
-    contractState.fields is AVector[Val](Val.U256(U256.unsafe(expected)))
+    val expected = (0L until block.nonCoinbaseLength.toLong).fold(0L)(_ * 10 + _)
+    checkState(expected, contractId)
   }
 
   it should "be able to call a contract multiple times in a block" in new ContractFixture {

@@ -179,7 +179,7 @@ trait FlowUtils
   ): IOResult[AVector[Transaction]] = {
     if (chainIndex.isIntraGroup) {
       val parentHash = deps.getOutDep(chainIndex.to)
-      val order      = Block.getScriptExecutionOrder(parentHash, txTemplates)
+      val order = Block.getScriptExecutionOrder(parentHash, txTemplates, blockEnv.getHardFork())
       val fullTxs =
         Array.ofDim[Transaction](txTemplates.length + 1) // reserve 1 slot for coinbase tx
       txTemplates.foreachWithIndex { case (tx, index) =>

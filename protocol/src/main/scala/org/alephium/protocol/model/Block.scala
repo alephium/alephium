@@ -147,6 +147,18 @@ object Block {
     AVector.from(scriptOrders)
   }
 
+  def getScriptExecutionOrder[T <: TransactionAbstract](
+      parentHash: BlockHash,
+      nonCoinbase: AVector[T],
+      hardFork: HardFork
+  ): AVector[Int] = {
+    if (hardFork.isLemanEnabled()) {
+      AVector.from(scriptIndexes(nonCoinbase))
+    } else {
+      getScriptExecutionOrder(parentHash, nonCoinbase)
+    }
+  }
+
   def getNonCoinbaseExecutionOrder[T <: TransactionAbstract](
       parentHash: BlockHash,
       nonCoinbase: AVector[T]
@@ -155,6 +167,18 @@ object Block {
       AVector.empty[Int]
     ) { case (acc, tx, index) =>
       if (tx.unsigned.scriptOpt.isEmpty) acc :+ index else acc
+    }
+  }
+
+  def getNonCoinbaseExecutionOrder[T <: TransactionAbstract](
+      parentHash: BlockHash,
+      nonCoinbase: AVector[T],
+      hardFork: HardFork
+  ): AVector[Int] = {
+    if (hardFork.isLemanEnabled()) {
+      AVector.tabulate(nonCoinbase.length)(identity)
+    } else {
+      getNonCoinbaseExecutionOrder(parentHash, nonCoinbase)
     }
   }
 }
