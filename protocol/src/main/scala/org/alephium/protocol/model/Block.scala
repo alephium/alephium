@@ -17,6 +17,7 @@
 package org.alephium.protocol.model
 
 import scala.annotation.tailrec
+import scala.collection.IndexedSeqView
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable.ArrayBuffer
 
@@ -174,11 +175,11 @@ object Block {
       parentHash: BlockHash,
       nonCoinbase: AVector[T],
       hardFork: HardFork
-  ): AVector[Int] = {
+  ): IndexedSeqView[Int] = {
     if (hardFork.isLemanEnabled()) {
-      AVector.tabulate(nonCoinbase.length)(identity)
+      nonCoinbase.indices.view
     } else {
-      getNonCoinbaseExecutionOrder(parentHash, nonCoinbase)
+      getNonCoinbaseExecutionOrder(parentHash, nonCoinbase).view
     }
   }
 }

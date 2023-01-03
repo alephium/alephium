@@ -24,7 +24,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, GasPrice, LogConfig, WorldState}
 import org.alephium.serde._
-import org.alephium.util.U256
+import org.alephium.util.{EitherF, U256}
 
 trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[WorldState.Cached]] {
   import ValidationStatus._
@@ -139,10 +139,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       flow: BlockFlow
   ): BlockValidationResult[Option[WorldState.Cached]] = {
     if (brokerConfig.contains(chainIndex.from)) {
+      val hardFork = networkConfig.getHardFork(block.timestamp)
       for {
         groupView <- from(flow.getMutableGroupView(chainIndex.from, block.blockDeps))
-        hardFork = networkConfig.getHardFork(block.timestamp)
-        _ <- checkNonCoinbases(chainIndex, block, groupView, hardFork)
+        _         <- checkNonCoinbases(chainIndex, block, groupView, hardFork)
         _ <- checkCoinbase(
           chainIndex,
           block,
@@ -345,7 +345,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     val blockEnv       = BlockEnv.from(chainIndex, block.header)
     val parentHash     = block.blockDeps.uncleHash(chainIndex.to)
     val executionOrder = Block.getNonCoinbaseExecutionOrder(parentHash, block.nonCoinbase, hardFork)
-    executionOrder.foreachE { index =>
+    EitherF.foreachTry(executionOrder) { index =>
       val tx = block.transactions(index)
       val txValidationResult = nonCoinbaseValidation.checkBlockTx(
         chainIndex,
