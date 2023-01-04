@@ -68,6 +68,17 @@ final case class BlockHeader(
     blockDeps.intraDep(chainIndex)
   }
 
+  def getIntraDep(targetGroup: GroupIndex): BlockHash = {
+    assume(!isGenesis)
+    if (targetGroup.value < chainIndex.from.value) {
+      blockDeps.deps(targetGroup.value)
+    } else if (targetGroup.value > chainIndex.from.value) {
+      blockDeps.deps(targetGroup.value - 1)
+    } else {
+      uncleHash(targetGroup)
+    }
+  }
+
   def getOutTip(toIndex: GroupIndex): BlockHash = {
     assume(!isGenesis)
     if (toIndex == chainIndex.to) hash else blockDeps.getOutDep(toIndex)

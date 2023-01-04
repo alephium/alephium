@@ -24,7 +24,7 @@ import org.alephium.crypto.{Blake2b, Blake3, MerkleHashable}
 import org.alephium.protocol._
 import org.alephium.protocol.vm.{GasPrice, LockupScript, StatefulScript}
 import org.alephium.serde._
-import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, Math, TimeStamp, U256}
 
 class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
   it should "serde" in {
@@ -99,6 +99,48 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
     }
   }
 
+  trait TxExecutionOrderFixture {
+    def genTxs(num: Int): AVector[Transaction] = {
+      val chainIndex = ChainIndex.unsafe(0, 0)
+      AVector.tabulate(num)(index => {
+        val scriptOpt  = if (index % 2 == 0) None else Some(StatefulScript.unsafe(AVector.empty))
+        val assetInfos = assetsToSpendGen(scriptGen = p2pkScriptGen(chainIndex.from))
+        val gen = unsignedTxGen(chainIndex)(assetInfos).map(tx =>
+          Transaction.from(tx.copy(scriptOpt = scriptOpt), AVector.empty[Signature])
+        )
+        gen.sample.get
+      })
+    }
+
+    val txs                                   = genTxs(20)
+    val hash                                  = BlockHash.random
+    val txIndexes                             = Seq.from(0 until 20)
+    val (nonScriptTxIndexes, scriptTxIndexes) = txIndexes.partition(_ % 2 == 0)
+  }
+
+  it should "get non coinbase txs execution order" in new TxExecutionOrderFixture {
+    val preLemanOrder = Block.getNonCoinbaseExecutionOrder(hash, txs, HardFork.Mainnet)
+    preLemanOrder.length is 20
+    preLemanOrder.toSeq isnot txIndexes
+    preLemanOrder.slice(10, 20).toSeq is nonScriptTxIndexes
+    preLemanOrder.toSet is Set.from(txIndexes)
+
+    val lemanOrder = Block.getNonCoinbaseExecutionOrder(BlockHash.random, txs, HardFork.Leman)
+    lemanOrder.length is 20
+    lemanOrder.toSeq is txIndexes
+  }
+
+  it should "get script execution order" in new TxExecutionOrderFixture {
+    val preLemanOrder = Block.getScriptExecutionOrder(hash, txs, HardFork.Mainnet)
+    preLemanOrder.length is 10
+    preLemanOrder.toSeq isnot scriptTxIndexes
+    preLemanOrder.toSet is Set.from(scriptTxIndexes)
+
+    val lemanOrder = Block.getScriptExecutionOrder(BlockHash.random, txs, HardFork.Leman)
+    lemanOrder.length is 10
+    lemanOrder.toSeq is scriptTxIndexes
+  }
+
   it should "put non-script txs at the last" in {
     forAll(posLongGen, posLongGen) { (gasPrice0: Long, gasPrice1: Long) =>
       val header: BlockHeader =
@@ -135,7 +177,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         U256.Zero,
         LockupScript.p2pkh(PublicKey.generate),
         Target.Max,
-        ALPH.LaunchTimestamp
+        Math.max(networkConfig.lemanHardForkTimestamp, ALPH.LaunchTimestamp)
       )
 
       val block0 = Block(header, AVector(tx0, tx1, coinbase))

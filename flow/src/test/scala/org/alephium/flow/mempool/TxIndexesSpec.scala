@@ -26,23 +26,23 @@ class TxIndexesSpec
     with TxIndexesSpec.Fixture
     with LockFixture
     with NoIndexModelGeneratorsLike {
-  def emptyTxIndexes = TxIndexes.emptySharedPool(GroupIndex.unsafe(0))
+  def emptyTxIndexes = TxIndexes.emptyMemPool(GroupIndex.unsafe(0))
 
   it should "add txs" in {
     val tx      = transactionGen().sample.get
     val indexes = emptyTxIndexes
-    indexes.add(tx.toTemplate)
+    indexes.add(tx.toTemplate, _ => ())
     checkTx(indexes, tx.toTemplate)
   }
 
   it should "be idempotent for adding" in {
     val tx       = transactionGen().sample.get
     val indexes0 = emptyTxIndexes
-    indexes0.add(tx.toTemplate)
+    indexes0.add(tx.toTemplate, _ => ())
 
     val indexes1 = emptyTxIndexes
-    indexes1.add(tx.toTemplate)
-    indexes1.add(tx.toTemplate)
+    indexes1.add(tx.toTemplate, _ => ())
+    indexes1.add(tx.toTemplate, _ => ())
 
     indexes0 is indexes1
   }
@@ -50,26 +50,13 @@ class TxIndexesSpec
   it should "remove tx" in {
     val tx      = transactionGen().sample.get
     val indexes = emptyTxIndexes
-    indexes.add(tx.toTemplate)
+    indexes.add(tx.toTemplate, _ => ())
     indexes.remove(tx.toTemplate)
     indexes is emptyTxIndexes
 
     // check for idempotent
     indexes.remove(tx.toTemplate)
     indexes is emptyTxIndexes
-  }
-
-  trait LockFixture extends WithLock {
-    val indexes  = emptyTxIndexes
-    lazy val rwl = indexes._getLock
-
-    val tx = transactionGen().sample.get.toTemplate
-  }
-
-  it should "use locks" in new LockFixture {
-    checkReadLock(rwl)(true, indexes.isSpent(tx.unsigned.inputs.head.outputRef), false)
-    checkWriteLock(rwl)(0, { indexes.add(tx); indexes.inputIndex.size }, tx.unsigned.inputs.length)
-    checkWriteLock(rwl)(100, { indexes.remove(tx); indexes.inputIndex.size }, 0)
   }
 }
 

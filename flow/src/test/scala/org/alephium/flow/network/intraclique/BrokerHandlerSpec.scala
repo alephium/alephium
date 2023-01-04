@@ -21,10 +21,11 @@ import java.net.InetSocketAddress
 import akka.actor.Props
 import akka.io.Tcp
 import akka.testkit.{TestActorRef, TestProbe}
+import org.scalacheck.Gen
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils}
+import org.alephium.flow.handler.{AllHandlers, FlowHandler, TestUtils, TxHandler}
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{InboundBrokerHandler => BaseInboundBrokerHandler}
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
@@ -33,8 +34,8 @@ import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.Generators
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.{BlocksRequest, HeadersRequest, Message, NewInv, Payload}
-import org.alephium.protocol.model.{BlockHash, BrokerInfo, CliqueInfo, GroupIndex, ModelGenerators}
+import org.alephium.protocol.message._
+import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector}
 
 class BrokerHandlerSpec extends AlephiumActorSpec {
@@ -95,11 +96,39 @@ class BrokerHandlerSpec extends AlephiumActorSpec {
     connectionHandler.expectMsg(ConnectionHandler.Send(message))
   }
 
+  it should "handle TxsResponse" in new Fixture with ModelGenerators {
+    def txGen(chainIndexGen: Gen[ChainIndex]) = {
+      AVector
+        .from(Gen.listOfN(4, transactionGen(chainIndexGen = chainIndexGen)).sample.get)
+        .map(_.toTemplate)
+    }
+
+    brokerConfig.brokerId is 0
+    brokerConfig.brokerNum is 3
+    val validIndexesGen =
+      chainIndexGen.retryUntil(index => index.from.value != 0 && index.to.value == 0)
+    val inValidIndexesGen =
+      chainIndexGen.retryUntil(index => index.from.value == 0 || index.to.value != 0)
+    val validTxs        = txGen(validIndexesGen)
+    val invalidTxs      = txGen(inValidIndexesGen)
+    val validResponse   = TxsResponse(RequestId.unsafe(0), validTxs)
+    val invalidResponse = TxsResponse(RequestId.unsafe(0), invalidTxs)
+
+    brokerHandler ! BaseBrokerHandler.Received(validResponse)
+    allHandlerProbes.txHandler.expectMsg(
+      TxHandler.AddToMemPool(validTxs, isIntraCliqueSyncing = true)
+    )
+
+    watch(brokerHandler)
+    brokerHandler ! BaseBrokerHandler.Received(invalidResponse)
+    expectTerminated(brokerHandler)
+  }
+
   trait Fixture extends FlowFixture {
     val connectionHandler = TestProbe()
     lazy val cliqueInfo   = Generators.cliqueInfoGen.sample.get
 
-    lazy val (allHandler, _) = TestUtils.createAllHandlersProbe
+    lazy val (allHandler, allHandlerProbes) = TestUtils.createAllHandlersProbe
     lazy val brokerHandler = TestActorRef[TestBrokerHandler](
       TestBrokerHandler.props(
         cliqueInfo,

@@ -256,7 +256,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val chainIndexGen = Gen.const(chainIndex)
     val txs = AVector.fill(10)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     brokerHandler ! BaseBrokerHandler.Received(TxsResponse(RequestId.random(), txs))
-    allHandlerProbes.txHandler.expectMsg(TxHandler.AddToSharedPool(txs))
+    allHandlerProbes.txHandler.expectMsg(
+      TxHandler.AddToMemPool(txs, isIntraCliqueSyncing = false)
+    )
     txs.foreach { tx =>
       brokerHandlerActor.seenTxs.contains(tx.id) is false
     }
@@ -315,8 +317,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val txs = AVector.fill(4)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     txs.foreach { tx =>
       val mempool = blockFlow.getMemPool(chainIndex)
-      mempool.addNewTx(chainIndex, tx, TimeStamp.now())
-      mempool.getSharedPool(chainIndex).contains(tx.id) is true
+      blockFlow.getGrandPool().add(chainIndex, tx, TimeStamp.now())
+      mempool.contains(tx.id) is true
     }
 
     val txHashes = txs.take(3).map(_.id) :+ TransactionId.generate
@@ -339,7 +341,9 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val txs = AVector.fill(4)(transactionGen(chainIndexGen = chainIndexGen).sample.get.toTemplate)
     val response = TxsResponse(RequestId.random(), txs)
     brokerHandler ! BaseBrokerHandler.Received(response)
-    allHandlerProbes.txHandler.expectMsg(TxHandler.AddToSharedPool(txs))
+    allHandlerProbes.txHandler.expectMsg(
+      TxHandler.AddToMemPool(txs, isIntraCliqueSyncing = false)
+    )
 
     val invalidTx =
       transactionGen(chainIndexGen = Gen.const(invalidChainIndex)).sample.get.toTemplate

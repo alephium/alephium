@@ -183,8 +183,7 @@ trait BrokerHandler extends BaseBrokerHandler {
         if (!brokerConfig.contains(chainIndex.from)) {
           Left(())
         } else {
-          val sharedPool = blockflow.getMemPool(chainIndex).getSharedPool(chainIndex)
-          val txs        = sharedPool.getTxs(txHashes)
+          val txs = blockflow.getMemPool(chainIndex).getTxs(txHashes)
           Right(acc ++ txs)
         }
     }
@@ -197,14 +196,14 @@ trait BrokerHandler extends BaseBrokerHandler {
   }
 
   private def handleTxsResponse(id: RequestId, txs: AVector[TransactionTemplate]): Unit = {
-    log.debug(
+    log.info(
       s"Received #${txs.length} txs ${Utils.showDigest(txs.map(_.id))} from $remoteAddress with $id"
     )
     if (txs.nonEmpty) {
       if (txs.exists(tx => !brokerConfig.contains(tx.chainIndex.from))) {
         handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
       } else {
-        allHandlers.txHandler ! TxHandler.AddToSharedPool(txs)
+        allHandlers.txHandler ! TxHandler.AddToMemPool(txs, isIntraCliqueSyncing = false)
       }
     }
   }

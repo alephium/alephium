@@ -17,7 +17,7 @@
 package org.alephium.flow
 
 import org.alephium.io.IOResult
-import org.alephium.protocol.model.{ChainIndex, FlowData, TransactionId}
+import org.alephium.protocol.model.{ChainIndex, FlowData, TransactionId, TransactionTemplate}
 import org.alephium.serde.RandomBytes
 import org.alephium.util.AVector
 
@@ -26,8 +26,12 @@ object Utils {
     if (elems.isEmpty) "[]" else s"[ ${elems.head.shortHex} .. ${elems.last.shortHex} ]"
   }
 
+  def showTxs(elems: AVector[TransactionTemplate]): String = {
+    if (elems.isEmpty) "[]" else s"[ ${elems.head.id.shortHex} .. ${elems.last.id.shortHex} ]"
+  }
+
   def showFlow[T <: RandomBytes](elems: AVector[AVector[T]]): String = {
-    elems.map(showDigest).mkString(", ")
+    elems.map(showDigest(_)).mkString(", ")
   }
 
   def showDataDigest[T <: FlowData](elems: AVector[T]): String = {

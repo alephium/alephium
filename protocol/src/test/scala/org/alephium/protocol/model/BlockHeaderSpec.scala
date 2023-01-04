@@ -74,7 +74,21 @@ class BlockHeaderSpec
     assertThrows[AssertionError](genesis.inDeps)
     assertThrows[AssertionError](genesis.outDeps)
     assertThrows[AssertionError](genesis.outTips)
-    assertThrows[AssertionError](genesis.uncleHash(GroupIndex.unsafe(0)))
+    assertThrows[AssertionError](genesis.uncleHash(GroupIndex.Zero))
+    assertThrows[AssertionError](genesis.getIntraDep(GroupIndex.Zero))
+  }
+
+  it should "calculate the right intra deps" in new NoIndexModelGenerators {
+    groupConfig.cliqueGroupIndexes.foreach { mainGroup =>
+      val blockHeader = blockGen(ChainIndex(mainGroup, mainGroup)).sample.value.header
+      (0 until mainGroup.value).foreach { group =>
+        blockHeader.getIntraDep(GroupIndex.unsafe(group)) is blockHeader.inDeps(group)
+      }
+      blockHeader.getIntraDep(mainGroup) is blockHeader.outDeps(mainGroup.value)
+      (mainGroup.value + 1 until groups).foreach { group =>
+        blockHeader.getIntraDep(GroupIndex.unsafe(group)) is blockHeader.inDeps(group - 1)
+      }
+    }
   }
 
   it should "handle version properly" in {

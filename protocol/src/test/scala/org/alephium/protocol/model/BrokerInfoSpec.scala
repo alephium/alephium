@@ -69,4 +69,20 @@ class BrokerInfoSpec extends AlephiumSpec {
     BrokerInfo.intersect(1, 2, 0, 2) is true
     BrokerInfo.intersect(1, 2, 0, 1) is false
   }
+
+  it should "test `isIncomingChain`" in new Generators with GroupConfigFixture.Default {
+    val address    = socketAddressGen.sample.get
+    val brokerInfo = BrokerInfo.unsafe(CliqueId.generate, 1, 3, address)
+    for {
+      from <- groupConfig.cliqueGroups
+      to   <- groupConfig.cliqueGroups
+    } {
+      val index = ChainIndex(from, to)
+      if (index == ChainIndex.unsafe(0, 1) || index == ChainIndex.unsafe(2, 1)) {
+        brokerInfo.isIncomingChain(index) is true
+      } else {
+        brokerInfo.isIncomingChain(index) is false
+      }
+    }
+  }
 }

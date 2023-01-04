@@ -23,6 +23,10 @@ import org.alephium.protocol.model.BlockHash
 import org.alephium.util.Bytes
 
 class ChainIndex(val from: GroupIndex, val to: GroupIndex) {
+  def flattenIndex(implicit groupConfig: GroupConfig): Int = {
+    from.value * groupConfig.groups + to.value
+  }
+
   def relateTo(brokerInfo: BrokerGroupInfo): Boolean = {
     brokerInfo.contains(from) || brokerInfo.contains(to)
   }
@@ -105,5 +109,11 @@ object ChainIndex {
   def randomIntraGroup(implicit groupConfig: GroupConfig): ChainIndex = {
     val groupIndex = GroupIndex.random
     ChainIndex(groupIndex, groupIndex)
+  }
+
+  def checkFromGroup(index: Int, targetGroup: GroupIndex)(implicit
+      groupConfig: GroupConfig
+  ): Boolean = {
+    (index / groupConfig.groups) == targetGroup.value
   }
 }

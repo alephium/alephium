@@ -24,9 +24,9 @@ import org.alephium.flow.handler.TestUtils
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.bootstrap.InfoFixture
 import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection, OutboundConnection}
-import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
+import org.alephium.protocol.message.{Message, NewBlock, NewHeader, RequestId, TxsResponse}
 import org.alephium.protocol.model.{BrokerInfo, ChainIndex}
-import org.alephium.util.{ActorRefT, AlephiumActorSpec}
+import org.alephium.util.{ActorRefT, AlephiumActorSpec, AVector}
 
 class IntraCliqueManagerSpec extends AlephiumActorSpec {
   it should "sync with other brokers" in new Fixture {
@@ -67,6 +67,8 @@ class IntraCliqueManagerSpec extends AlephiumActorSpec {
     )
     cliqueManagerProbe.expectMsg(IntraCliqueManager.Ready)
 
+    info("Broadcast Blocks")
+
     intraCliqueManager ! broadcastBlockMsg
     inboundConnection.expectMsg(BrokerHandler.Send(broadcastBlockMsg.headerMsg))
     outboundConnection.expectMsg(BrokerHandler.Send(broadcastBlockMsg.headerMsg))
@@ -80,6 +82,27 @@ class IntraCliqueManagerSpec extends AlephiumActorSpec {
     intraCliqueManager ! message2
     inboundConnection.expectMsg(BrokerHandler.Send(message2.blockMsg))
     outboundConnection.expectMsg(BrokerHandler.Send(message2.headerMsg))
+
+    info("Broadcast Txs")
+
+    intraCliqueManager ! IntraCliqueManager.BroadCastTx(AVector.empty)
+    inboundConnection.expectNoMessage()
+    outboundConnection.expectNoMessage()
+
+    val tx        = block.transactions.head.toTemplate
+    val invalidTx = block.transactions.head.toTemplate
+    val txs = AVector(
+      ChainIndex.unsafe(1, 0) -> AVector(tx),
+      ChainIndex.unsafe(1, 2) -> AVector(tx)
+    )
+    val invalidTxs = AVector(
+      ChainIndex.unsafe(1, 1) -> AVector(invalidTx)
+    )
+    val broadcastTxMsg =
+      Message.serialize(TxsResponse(RequestId.unsafe(0), AVector(tx)))
+    intraCliqueManager ! IntraCliqueManager.BroadCastTx(invalidTxs ++ txs)
+    inboundConnection.expectMsg(BrokerHandler.Send(broadcastTxMsg))
+    outboundConnection.expectMsg(BrokerHandler.Send(broadcastTxMsg))
   }
 
   it should "become ready immediately in single broker clique" in new Fixture {
