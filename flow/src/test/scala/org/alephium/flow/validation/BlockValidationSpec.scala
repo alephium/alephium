@@ -211,7 +211,7 @@ class BlockValidationSpec extends AlephiumSpec {
     val block = emptyBlock(blockFlow, chainIndex)
     implicit val validator = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
-      checkCoinbase(blk.chainIndex, blk, groupView)
+      checkCoinbase(blk.chainIndex, blk, groupView, HardFork.Leman)
     }
 
     val miningReward = consensusConfig.emission.reward(block.header).miningReward
@@ -225,7 +225,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
     implicit val validator = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
-      checkCoinbase(blk.chainIndex, blk, groupView)
+      checkCoinbase(blk.chainIndex, blk, groupView, HardFork.Mainnet)
     }
 
     val block0 = transfer(blockFlow, chainIndex)
@@ -252,7 +252,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
     implicit val validator = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
-      checkCoinbase(blk.chainIndex, blk, groupView)
+      checkCoinbase(blk.chainIndex, blk, groupView, HardFork.Leman)
     }
 
     val block = transfer(blockFlow, chainIndex)

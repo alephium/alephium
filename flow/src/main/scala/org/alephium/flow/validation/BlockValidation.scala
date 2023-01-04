@@ -24,7 +24,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, GasPrice, LogConfig, WorldState}
 import org.alephium.serde._
-import org.alephium.util.U256
+import org.alephium.util.{EitherF, U256}
 
 trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[WorldState.Cached]] {
   import ValidationStatus._
@@ -139,10 +139,16 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       flow: BlockFlow
   ): BlockValidationResult[Option[WorldState.Cached]] = {
     if (brokerConfig.contains(chainIndex.from)) {
+      val hardFork = networkConfig.getHardFork(block.timestamp)
       for {
         groupView <- from(flow.getMutableGroupView(chainIndex.from, block.blockDeps))
-        _         <- checkNonCoinbases(chainIndex, block, groupView)
-        _ <- checkCoinbase(chainIndex, block, groupView) // validate non-coinbase first for gas fee
+        _         <- checkNonCoinbases(chainIndex, block, groupView, hardFork)
+        _ <- checkCoinbase(
+          chainIndex,
+          block,
+          groupView,
+          hardFork
+        ) // validate non-coinbase first for gas fee
       } yield {
         if (chainIndex.isIntraGroup) Some(groupView.worldState) else None
       }
@@ -189,9 +195,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   private[validation] def checkCoinbase(
       chainIndex: ChainIndex,
       block: Block,
-      groupView: BlockFlowGroupView[WorldState.Cached]
+      groupView: BlockFlowGroupView[WorldState.Cached],
+      hardFork: HardFork
   ): BlockValidationResult[Unit] = {
-    val hardFork = networkConfig.getHardFork(block.timestamp)
     val result = consensusConfig.emission.reward(block.header) match {
       case Emission.PoW(miningReward) =>
         val netReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
@@ -315,14 +321,15 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   private[validation] def checkNonCoinbases(
       chainIndex: ChainIndex,
       block: Block,
-      groupView: BlockFlowGroupView[WorldState.Cached]
+      groupView: BlockFlowGroupView[WorldState.Cached],
+      hardFork: HardFork
   ): BlockValidationResult[Unit] = {
     assume(chainIndex.relateTo(brokerConfig))
 
     if (brokerConfig.contains(chainIndex.from)) {
       for {
         _ <- checkBlockDoubleSpending(block)
-        _ <- convert(checkNonCoinbasesEach(chainIndex, block, groupView))
+        _ <- convert(checkNonCoinbasesEach(chainIndex, block, groupView, hardFork))
       } yield ()
     } else {
       validBlock(())
@@ -332,12 +339,13 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   private[validation] def checkNonCoinbasesEach(
       chainIndex: ChainIndex,
       block: Block,
-      groupView: BlockFlowGroupView[WorldState.Cached]
+      groupView: BlockFlowGroupView[WorldState.Cached],
+      hardFork: HardFork
   ): TxValidationResult[Unit] = {
     val blockEnv       = BlockEnv.from(chainIndex, block.header)
     val parentHash     = block.blockDeps.uncleHash(chainIndex.to)
-    val executionOrder = Block.getNonCoinbaseExecutionOrder(parentHash, block.nonCoinbase)
-    executionOrder.foreachE { index =>
+    val executionOrder = Block.getNonCoinbaseExecutionOrder(parentHash, block.nonCoinbase, hardFork)
+    EitherF.foreachTry(executionOrder) { index =>
       val tx = block.transactions(index)
       val txValidationResult = nonCoinbaseValidation.checkBlockTx(
         chainIndex,
