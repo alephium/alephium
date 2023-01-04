@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.config
 
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.model.{ChainIndex, GroupIndex}
 import org.alephium.util.{AlephiumSpec, AVector}
 
 class BrokerConfigSpec extends AlephiumSpec {
@@ -89,6 +89,12 @@ class BrokerConfigSpec extends AlephiumSpec {
       from <- Seq(1, 3)
       to   <- 0 until 4
     } yield ChainIndex.unsafe(from, to)(config0))
+  }
+
+  it should "calculate correct group indexes" in {
+    val config = buildConfig(1, 2, 4)
+    config.cliqueGroupIndexes is AVector.tabulate(4)(GroupIndex.unsafe(_)(config))
+    config.groupRange.toList is List(1, 3)
   }
 
   def buildConfig(_brokerId: Int, _brokerNum: Int, _groups: Int): BrokerConfig = new BrokerConfig {

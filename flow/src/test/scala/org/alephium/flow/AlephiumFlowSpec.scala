@@ -93,7 +93,7 @@ trait FlowFixture
   }
 
   def emptyBlock(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
-    mine(blockFlow, chainIndex)((_, _) => AVector.empty[Transaction])
+    mineWithTxs(blockFlow, chainIndex)((_, _) => AVector.empty[Transaction])
   }
 
   def simpleScript(
@@ -103,7 +103,7 @@ trait FlowFixture
       gas: Int = 100000
   ): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from) && chainIndex.isIntraGroup)
-    mine(blockFlow, chainIndex)(
+    mineWithTxs(blockFlow, chainIndex)(
       transferTxs(_, _, ALPH.alph(1), 1, Some(txScript), true, scriptGas = gas)
     )
   }
@@ -118,7 +118,7 @@ trait FlowFixture
     val zipped = invokers.mapWithIndex { case (invoker, index) =>
       invoker -> txScripts(index)
     }
-    mine(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALPH.alph(1) / 100))
+    mineWithTxs(blockFlow, chainIndex)(transferTxsMulti(_, _, zipped, ALPH.alph(1) / 100))
   }
 
   def transfer(
@@ -130,7 +130,7 @@ trait FlowFixture
       lockTimeOpt: Option[TimeStamp] = None
   ): Block = {
     assume(blockFlow.brokerConfig.contains(chainIndex.from))
-    mine(blockFlow, chainIndex)(
+    mineWithTxs(blockFlow, chainIndex)(
       transferTxs(_, _, amount, numReceivers, None, gasFeeInTheAmount, lockTimeOpt)
     )
   }
@@ -158,7 +158,7 @@ trait FlowFixture
       .rightValue
     val tx         = Transaction.from(unsigned, from)
     val chainIndex = tx.chainIndex
-    mine(blockFlow, chainIndex)((_, _) => AVector(tx))
+    mineWithTxs(blockFlow, chainIndex)((_, _) => AVector(tx))
   }
 
   def transferTxs(
@@ -288,7 +288,7 @@ trait FlowFixture
       initialGas: Int = 200000,
       validation: Boolean = true
   ): Block = {
-    mine(blockFlow, chainIndex)(payableCallTxs(_, _, script, initialGas, validation))
+    mineWithTxs(blockFlow, chainIndex)(payableCallTxs(_, _, script, initialGas, validation))
   }
 
   def payableCallTxTemplate(
@@ -340,7 +340,7 @@ trait FlowFixture
   def mineFromMemPool(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
     val miner         = getGenesisLockupScript(chainIndex.to)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    val block         = mine(blockFlow, chainIndex)((_, _) => blockTemplate.transactions.init)
+    val block = mineWithTxs(blockFlow, chainIndex)((_, _) => blockTemplate.transactions.init)
 
     block.chainIndex is chainIndex
 
@@ -352,7 +352,7 @@ trait FlowFixture
       chainIndex: ChainIndex,
       txs: AVector[Transaction]
   ): Block = {
-    val block = mine(blockFlow, chainIndex)((_, _) => txs)
+    val block = mineWithTxs(blockFlow, chainIndex)((_, _) => txs)
     block.chainIndex is chainIndex
     block
   }
@@ -366,7 +366,7 @@ trait FlowFixture
     iter(mineFromMemPool(blockFlow, chainIndex))
   }
 
-  def mine(blockFlow: BlockFlow, chainIndex: ChainIndex)(
+  def mineWithTxs(blockFlow: BlockFlow, chainIndex: ChainIndex)(
       prepareTxs: (BlockFlow, ChainIndex) => AVector[Transaction]
   ): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)

@@ -191,12 +191,13 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached]
   ): BlockValidationResult[Unit] = {
+    val hardFork = networkConfig.getHardFork(block.timestamp)
     val result = consensusConfig.emission.reward(block.header) match {
       case Emission.PoW(miningReward) =>
-        val netReward = Transaction.totalReward(block.gasFee, miningReward)
+        val netReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
         checkCoinbase(chainIndex, block, groupView, 1, netReward, netReward)
       case Emission.PoLW(miningReward, burntAmount) =>
-        val lockedReward = Transaction.totalReward(block.gasFee, miningReward)
+        val lockedReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
         val netReward    = lockedReward.subUnsafe(burntAmount)
         checkCoinbase(chainIndex, block, groupView, 2, netReward, lockedReward)
     }

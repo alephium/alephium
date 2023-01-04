@@ -20,22 +20,23 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
-import org.alephium.flow.AlephiumFlowSpec
+import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.StoragesFixture
 import org.alephium.protocol.{ALPH, Hash, Signature, SignatureSchema}
-import org.alephium.protocol.config.NetworkConfigFixture
+import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{GasBox, GasPrice, Method, StatefulScript}
 import org.alephium.serde.serialize
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
-class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
+class BlockValidationSpec extends AlephiumSpec {
 
-  trait Fixture extends BlockValidation.Impl() {
-    val blockFlow  = isolatedBlockFlow()
-    val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+  trait Fixture extends BlockValidation with FlowFixture with NoIndexModelGeneratorsLike {
+    lazy val chainIndex = chainIndexGenForBroker(brokerConfig).sample.value
+    override def headerValidation: HeaderValidation  = HeaderValidation.build
+    override def nonCoinbaseValidation: TxValidation = TxValidation.build
 
     implicit class RichBlock(block: Block) {
       object Coinbase {
@@ -84,6 +85,13 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     def checkBlockUnit(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
       checkBlock(block, flow).map(_ => ())
     }
+  }
+
+  trait GenesisForkFixture extends Fixture {
+    override val configValues = Map(
+      ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(1).millis)
+    )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
   }
 
   it should "validate group for block" in new Fixture {
@@ -213,7 +221,8 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     block.Coinbase.output(_.copy(amount = invalidMiningReward)).fail(InvalidCoinbaseReward)
   }
 
-  it should "check gas reward cap" in new Fixture {
+  it should "check gas reward cap for Genesis fork" in new GenesisForkFixture {
+
     implicit val validator = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
       checkCoinbase(blk.chainIndex, blk, groupView)
@@ -236,6 +245,21 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
     info("adjust the miningReward to account for the adjusted gas reward")
     block2.Coinbase.output(_.copy(amount = miningReward * 2)).pass()
+  }
+
+  it should "check gas reward for Leman fork" in new Fixture {
+    networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled() is true
+
+    implicit val validator = (blk: Block) => {
+      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      checkCoinbase(blk.chainIndex, blk, groupView)
+    }
+
+    val block = transfer(blockFlow, chainIndex)
+    block.pass()
+
+    val miningReward = consensusConfig.emission.reward(block.header).miningReward
+    block.coinbase.unsigned.fixedOutputs.head.amount is miningReward
   }
 
   it should "check non-empty txs" in new Fixture {
@@ -297,7 +321,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
   it should "check double spending in a same tx" in new Fixture {
     val invalidTx = doubleSpendingTx(blockFlow, chainIndex)
-    val block     = mine(blockFlow, chainIndex)((_, _) => AVector(invalidTx))
+    val block     = mineWithTxs(blockFlow, chainIndex)((_, _) => AVector(invalidTx))
 
     block.fail(BlockDoubleSpending)(checkBlockDoubleSpending)
     block.fail(BlockDoubleSpending)(checkBlockUnit(_, blockFlow))
@@ -312,7 +336,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
     block0.pass()
 
     val block1 =
-      mine(blockFlow, intraChainIndex)((_, _) => block0.nonCoinbase ++ block0.nonCoinbase)
+      mineWithTxs(blockFlow, intraChainIndex)((_, _) => block0.nonCoinbase ++ block0.nonCoinbase)
     block1.nonCoinbase.length is 2
     block1.fail(BlockDoubleSpending)
     block1.fail(BlockDoubleSpending)(checkBlockUnit(_, blockFlow))
@@ -325,8 +349,9 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
 
       for (to <- 0 until brokerConfig.groups) {
         // UTXOs spent by `block0.nonCoinbase` can not be spent again
-        val from  = block0.chainIndex.from.value
-        val block = mine(blockFlow, ChainIndex.unsafe(from, to))((_, _) => block0.nonCoinbase)
+        val from = block0.chainIndex.from.value
+        val block =
+          mineWithTxs(blockFlow, ChainIndex.unsafe(from, to))((_, _) => block0.nonCoinbase)
         block.nonCoinbaseLength is 1
         checkFlow(block, blockFlow) is Left(Right(InvalidFlowTxs))
       }
@@ -414,7 +439,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
       Set(block0.hash, block1.hash, block2.hash)
   }
 
-  it should "validate old blocks" in new Fixture {
+  it should "validate old blocks" in new GenesisForkFixture {
     val block0     = transfer(blockFlow, chainIndex)
     val newBlockTs = ALPH.LaunchTimestamp.plusSecondsUnsafe(10)
     val block1     = mineWithoutCoinbase(blockFlow, chainIndex, block0.nonCoinbase, newBlockTs)
@@ -422,7 +447,7 @@ class BlockValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLi
   }
 
   it should "invalidate blocks with breaking instrs" in new Fixture {
-    override val chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+    override lazy val chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
     val newStorages =
       StoragesFixture.buildStorages(rootPath.resolveSibling(Hash.generate.toHexString))
     val genesisNetworkConfig = new NetworkConfigFixture.Default {

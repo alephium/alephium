@@ -33,6 +33,8 @@ import org.alephium.protocol.model.{BlockHash, HardFork, NetworkId, Target}
 import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
 
 class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
+  import ChainDifficultyAdjustment._
+
   trait MockFixture extends ChainDifficultyAdjustment with NumericHelpers {
     implicit val consensusConfig: ConsensusSetting = {
       val blockTargetTime = Duration.ofSecondsUnsafe(64)

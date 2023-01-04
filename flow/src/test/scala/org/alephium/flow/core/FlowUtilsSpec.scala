@@ -167,7 +167,6 @@ class FlowUtilsSpec extends AlephiumSpec {
     transferBlock.coinbaseReward is consensusConfig.emission
       .reward(transferBlock.header)
       .miningReward
-      .addUnsafe(defaultGasFee / 2) // 50% is burnt
     addAndCheck(blockFlow, transferBlock)
   }
 

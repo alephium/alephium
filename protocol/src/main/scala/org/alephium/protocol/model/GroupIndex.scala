@@ -39,6 +39,8 @@ class GroupIndex(val value: Int) extends AnyVal {
 }
 
 object GroupIndex {
+  val Zero: GroupIndex = new GroupIndex(0)
+
   def unsafe(group: Int)(implicit config: GroupConfig): GroupIndex = {
     assume(validate(group))
     new GroupIndex(group)

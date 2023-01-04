@@ -14,27 +14,28 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.config
+package org.alephium.protocol.model
 
 import java.math.BigInteger
 
-import org.alephium.protocol.model.{ChainIndex, GroupIndex}
-import org.alephium.util.AVector
+final case class Difficulty private (value: BigInteger) extends AnyVal {
+  def average(n: Int): Difficulty = new Difficulty(value.divide(BigInteger.valueOf(n.toLong)))
 
-trait GroupConfig {
-  def groups: Int
+  // WARN: use it with caution because this conversion might lose precision
+  // i.e. `diff.getTarget().getDifficulty()` might not be equal to `diff`
+  def getTarget(): Target = {
+    if (value == BigInteger.ONE) {
+      Target.Max
+    } else {
+      Target.unsafe(Target.maxBigInt.divide(value))
+    }
+  }
 
-  lazy val chainNum: Int = groups * groups
+  def times(n: Int): Difficulty = Difficulty.unsafe(value.multiply(BigInteger.valueOf(n.toLong)))
+}
 
-  lazy val depsNum: Int = 2 * groups - 1
+object Difficulty {
+  def unsafe(value: BigInteger): Difficulty = new Difficulty(value)
 
-  lazy val cliqueGroups: AVector[GroupIndex] = AVector.tabulate(groups)(GroupIndex.unsafe(_)(this))
-
-  lazy val targetAverageCount: BigInteger = BigInteger.valueOf((4 * groups).toLong)
-
-  lazy val cliqueChainIndexes: AVector[ChainIndex] =
-    AVector.tabulate(chainNum)(ChainIndex.unsafe(_)(this))
-
-  lazy val cliqueGroupIndexes: AVector[GroupIndex] =
-    AVector.tabulate(groups)(GroupIndex.unsafe(_)(this))
+  val zero: Difficulty = Difficulty(BigInteger.valueOf(0))
 }

@@ -23,10 +23,10 @@ import org.alephium.io.IOResult
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, WorldState}
-import org.alephium.util.{AVector, Cache, Math, RWLock, TimeStamp}
+import org.alephium.util.{AVector, Cache, RWLock, TimeStamp}
 
 // scalastyle:off number.of.methods
-trait MultiChain extends BlockPool with BlockHeaderPool {
+trait MultiChain extends BlockPool with BlockHeaderPool with FlowDifficultyAdjustment {
   implicit def brokerConfig: BrokerConfig
 
   def groups: Int
@@ -141,24 +141,6 @@ trait MultiChain extends BlockPool with BlockHeaderPool {
 
   def getMaxHeight(chainIndex: ChainIndex): IOResult[Int] =
     getHeaderChain(chainIndex).maxHeight
-
-  def getNextHashTarget(
-      chainIndex: ChainIndex,
-      deps: BlockDeps,
-      nextTimeStamp: TimeStamp
-  ): IOResult[Target] = {
-    for {
-      newTarget <- {
-        val tip = deps.uncleHash(chainIndex.to)
-        getHeaderChain(tip).getNextHashTargetRaw(tip, nextTimeStamp)
-      }
-      depTargets <- deps.deps.mapE(hash => getHeaderChain(hash).getTarget(hash))
-    } yield {
-      val weightedTarget = Target.average(newTarget, depTargets)
-      val maxTarget      = depTargets.fold(weightedTarget)(Math.max)
-      Target.clipByTwoTimes(maxTarget, weightedTarget)
-    }
-  }
 
   def getDryrunBlockEnv(chainIndex: ChainIndex): IOResult[BlockEnv] = {
     getHeaderChain(chainIndex).getDryrunBlockEnv()
