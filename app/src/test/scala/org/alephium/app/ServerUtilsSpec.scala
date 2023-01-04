@@ -196,16 +196,16 @@ class ServerUtilsSpec extends AlephiumSpec {
         genesisBalance - destination1.attoAlphAmount.value - destination2.attoAlphAmount.value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
-      checkAddressBalance(destination1.address, U256.unsafe(0), 0)
-      checkAddressBalance(destination2.address, U256.unsafe(0), 0)
+      checkAddressBalance(destination1.address, ALPH.oneAlph, 1)
+      checkAddressBalance(destination2.address, ALPH.oneAlph, 1)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block0)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 0, 0)
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
-      checkAddressBalance(destination1.address, U256.unsafe(0), 0)
-      checkAddressBalance(destination2.address, U256.unsafe(0), 0)
+      checkAddressBalance(destination1.address, ALPH.oneAlph, 1)
+      checkAddressBalance(destination2.address, ALPH.oneAlph, 1)
 
       checkTx(blockFlow, block0.nonCoinbase.head, chainIndex)
 
@@ -349,7 +349,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 0, 0)
       checkAddressBalance(fromAddress, senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe)
-      checkAddressBalance(toAddress, receiverInitialBalance)
+      checkAddressBalance(toAddress, receiverInitialBalance.addUnsafe(ALPH.alph(10)), 11)
 
       checkTx(blockFlow, block0.nonCoinbase.head, chainIndex)
 
@@ -862,9 +862,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     implicit val serverUtils = new ServerUtils()
 
-    val emptyMempool = serverUtils.listUnconfirmedTransactions(blockFlow)
-
-    emptyMempool.rightValue is AVector.empty[UnconfirmedTransactions]
+    val emptyMempool = serverUtils.listUnconfirmedTransactions(blockFlow).rightValue
+    emptyMempool is AVector.empty[UnconfirmedTransactions]
 
     val chainIndex                         = chainIndexGen.sample.get
     val fromGroup                          = chainIndex.from
@@ -2025,7 +2024,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     serverUtils.getTransactionStatus(blockFlow, txId, chainIndex) isE TxNotFound()
 
-    blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate), TimeStamp.now())
+    blockFlow.getGrandPool().add(chainIndex, AVector(txTemplate), TimeStamp.now())
     serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled()
 
     txTemplate

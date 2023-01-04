@@ -117,14 +117,26 @@ class TransactionSpec
 
   it should "cap the gas reward" in {
     val hardReward = ALPH.oneAlph
-    Transaction.totalReward(1, 100) is U256.unsafe(100)
-    Transaction.totalReward(2, 100) is U256.unsafe(101)
-    Transaction.totalReward(200, 100) is U256.unsafe(200)
-    Transaction.totalReward(202, 100) is U256.unsafe(201)
-    Transaction.totalReward(hardReward * 2, hardReward) is (hardReward * 2)
-    Transaction.totalReward(hardReward * 2 + 2, hardReward) is (hardReward * 2)
-    Transaction.totalReward(hardReward * 2, 0) is hardReward
-    Transaction.totalReward(hardReward * 2 + 2, 0) is hardReward
+    Transaction.totalReward(1, 100, HardFork.Mainnet) is U256.unsafe(100)
+    Transaction.totalReward(2, 100, HardFork.Mainnet) is U256.unsafe(101)
+    Transaction.totalReward(200, 100, HardFork.Mainnet) is U256.unsafe(200)
+    Transaction.totalReward(202, 100, HardFork.Mainnet) is U256.unsafe(201)
+    Transaction.totalReward(hardReward * 2, hardReward, HardFork.Mainnet) is (hardReward * 2)
+    Transaction.totalReward(hardReward * 2 + 2, hardReward, HardFork.Mainnet) is (hardReward * 2)
+    Transaction.totalReward(hardReward * 2, 0, HardFork.Mainnet) is hardReward
+    Transaction.totalReward(hardReward * 2 + 2, 0, HardFork.Mainnet) is hardReward
+  }
+
+  it should "ignore gas fee for Leman upgrade" in {
+    val hardReward = ALPH.oneAlph
+    Transaction.totalReward(1, 100, HardFork.Leman) is U256.unsafe(100)
+    Transaction.totalReward(2, 100, HardFork.Leman) is U256.unsafe(100)
+    Transaction.totalReward(200, 100, HardFork.Leman) is U256.unsafe(100)
+    Transaction.totalReward(202, 100, HardFork.Leman) is U256.unsafe(100)
+    Transaction.totalReward(hardReward * 2, hardReward, HardFork.Leman) is hardReward
+    Transaction.totalReward(hardReward * 2 + 2, hardReward, HardFork.Leman) is hardReward
+    Transaction.totalReward(hardReward * 2, 0, HardFork.Leman) is 0
+    Transaction.totalReward(hardReward * 2 + 2, 0, HardFork.Leman) is 0
   }
 
   it should "seder the snapshots properly" in new TransactionSnapshotsFixture {

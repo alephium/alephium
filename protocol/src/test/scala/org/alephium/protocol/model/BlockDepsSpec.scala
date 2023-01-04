@@ -51,4 +51,37 @@ class BlockDepsSpec extends AlephiumSpec with GroupConfigFixture.Default {
       blockDeps.getOutDep(GroupIndex.unsafe(i)) is blockDeps.deps(2 + i)
     }
   }
+
+  it should "calculate unordered intra dependencies" in new Fixture {
+    val group0     = GroupIndex.unsafe(0)
+    val group1     = GroupIndex.unsafe(1)
+    val deps0      = genBlockDeps(group0)
+    val deps1      = genBlockDeps(group1)
+    val intraDeps0 = deps0.unorderedIntraDeps(group0)
+    val intraDeps1 = deps1.unorderedIntraDeps(group1)
+    intraDeps0.init is deps0.inDeps
+    intraDeps1.init is deps1.inDeps
+    intraDeps0.last is deps0.outDeps(0)
+    intraDeps1.last is deps1.outDeps(1)
+  }
+
+  trait Fixture {
+    def genBlockHash(chainIndex: ChainIndex): BlockHash = {
+      val hash = BlockHash.random
+      if (ChainIndex.from(hash) == chainIndex) {
+        hash
+      } else {
+        genBlockHash(chainIndex)
+      }
+    }
+
+    def genBlockDeps(mainGroup: GroupIndex): BlockDeps = {
+      val inDeps = groupConfig.cliqueGroupIndexes
+        .filter(_ != mainGroup)
+        .map(index => genBlockHash(ChainIndex(index, index)))
+      val outDeps =
+        groupConfig.cliqueGroupIndexes.map(index => genBlockHash(ChainIndex(mainGroup, index)))
+      BlockDeps.build(inDeps ++ outDeps)
+    }
+  }
 }

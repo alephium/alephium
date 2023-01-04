@@ -17,51 +17,46 @@
 package org.alephium.flow.handler
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 import akka.actor.Props
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.io.{PendingTxStorage, ReadyTxStorage}
-import org.alephium.flow.mempool.MemPool
+import org.alephium.flow.io.PendingTxStorage
+import org.alephium.flow.mempool.{GrandPool, MemPool}
 import org.alephium.flow.mining.Miner
-import org.alephium.flow.model.{MiningBlob, PersistedTxId, ReadyTxInfo}
-import org.alephium.flow.network.InterCliqueManager
+import org.alephium.flow.model.{DataOrigin, MiningBlob, PersistedTxId}
+import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
 import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
 import org.alephium.flow.validation._
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
+import org.alephium.protocol.message.{Message, NewBlock}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{LockupScript, LogConfig}
 import org.alephium.serde.serialize
 import org.alephium.util._
 
 object TxHandler {
-  def props(
-      blockFlow: BlockFlow,
-      pendingTxStorage: PendingTxStorage,
-      readyTxStorage: ReadyTxStorage
-  )(implicit
+  def props(blockFlow: BlockFlow, txStorage: PendingTxStorage)(implicit
       brokerConfig: BrokerConfig,
       memPoolSetting: MemPoolSetting,
       networkSetting: NetworkSetting,
       logConfig: LogConfig
-  ): Props =
-    Props(new TxHandler(blockFlow, pendingTxStorage, readyTxStorage))
+  ): Props = Props(new TxHandler(blockFlow, txStorage))
 
   sealed trait Command
-  final case class AddToSharedPool(txs: AVector[TransactionTemplate])        extends Command
-  final case class Broadcast(txs: AVector[(TransactionTemplate, TimeStamp)]) extends Command
-  final case class AddToGrandPool(txs: AVector[TransactionTemplate])         extends Command
+  final case class AddToMemPool(txs: AVector[TransactionTemplate], isIntraCliqueSyncing: Boolean)
+      extends Command
   final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
-  case object CleanSharedPool                           extends Command
-  case object CleanPendingPool                          extends Command
-  private case object BroadcastTxs                      extends Command
-  private case object DownloadTxs                       extends Command
+  case object CleanMemPool                              extends Command
+  private[handler] case object BroadcastTxs             extends Command
+  private[handler] case object DownloadTxs              extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: TransactionId)              extends Event
@@ -93,56 +88,65 @@ object TxHandler {
     }
   }
 
-  def mineTxForDev(blockFlow: BlockFlow, txTemplate: TransactionTemplate)(implicit
+  def mineTxForDev(
+      blockFlow: BlockFlow,
+      txTemplate: TransactionTemplate,
+      publishBlock: Block => Unit
+  )(implicit
       groupConfig: GroupConfig
   ): Either[String, Unit] = {
     val chainIndex = txTemplate.chainIndex
-    val memPool    = blockFlow.getMemPool(chainIndex)
-    memPool.addNewTx(chainIndex, txTemplate, TimeStamp.now()) match {
-      case MemPool.AddedToSharedPool =>
+    val grandPool  = blockFlow.getGrandPool()
+    grandPool.add(chainIndex, txTemplate, TimeStamp.now()) match {
+      case MemPool.AddedToMemPool =>
         for {
-          _ <- mineTxForDev(blockFlow, chainIndex)
+          _ <- mineTxForDev(blockFlow, chainIndex, publishBlock)
           _ <-
             if (!chainIndex.isIntraGroup) {
-              mineTxForDev(blockFlow, ChainIndex(chainIndex.from, chainIndex.from))
+              mineTxForDev(blockFlow, ChainIndex(chainIndex.from, chainIndex.from), publishBlock)
             } else {
               Right(())
             }
         } yield ()
-      case _ =>
-        memPool.clear()
-        Left("Unable to add the tx the mempool: maybe the parent tx is not confirmed")
+      case error =>
+        Left(s"Unable to add the tx the mempool: ${error}")
     }
   }
 
-  def mineTxForDev(blockFlow: BlockFlow, chainIndex: ChainIndex)(implicit
-      groupConfig: GroupConfig
+  def mineTxForDev(blockFlow: BlockFlow, chainIndex: ChainIndex, publishBlock: Block => Unit)(
+      implicit groupConfig: GroupConfig
   ): Either[String, Unit] = {
-    val memPool = blockFlow.getMemPool(chainIndex)
-    try {
-      val (_, minerPubKey) = chainIndex.to.generateKey
-      val miner            = LockupScript.p2pkh(minerPubKey)
-      val flowTemplate     = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-      val miningBlob       = MiningBlob.from(flowTemplate)
-      val block            = Miner.mineForDev(chainIndex, miningBlob)
-      validateAndAddBlock(blockFlow, block)
-    } catch {
-      case error: Throwable =>
-        Left(error.getMessage)
-    } finally {
+    val memPool          = blockFlow.getMemPool(chainIndex)
+    val (_, minerPubKey) = chainIndex.to.generateKey
+    val miner            = LockupScript.p2pkh(minerPubKey)
+    val result = for {
+      flowTemplate <- blockFlow.prepareBlockFlow(chainIndex, miner).left.map(_.getMessage)
+      miningBlob = MiningBlob.from(flowTemplate)
+      block      = Miner.mineForDev(chainIndex, miningBlob)
+      _ <- validateAndAddBlock(blockFlow, block)
+    } yield {
+      publishBlock(block)
+    }
+    if (result.isLeft) {
       memPool.clear()
     }
+    result
   }
 
-  def forceMineForDev(blockFlow: BlockFlow, chainIndex: ChainIndex)(implicit
+  def forceMineForDev(
+      blockFlow: BlockFlow,
+      chainIndex: ChainIndex,
+      env: Env,
+      publishBlock: Block => Unit
+  )(implicit
       groupConfig: GroupConfig,
       memPoolSetting: MemPoolSetting
   ): Either[String, Unit] = {
-    if (memPoolSetting.autoMineForDev) {
-      mineTxForDev(blockFlow, chainIndex)
+    if (env != Env.Prod || memPoolSetting.autoMineForDev) {
+      mineTxForDev(blockFlow, chainIndex, publishBlock)
     } else {
       Left(
-        "CPU mining for dev is not enabled, please turn it on in config:\\n alephium.mempool.auto-mine-for-dev = true"
+        "CPU mining for dev is not enabled, please turn it on in config:\n alephium.mempool.auto-mine-for-dev = true"
       )
     }
   }
@@ -162,193 +166,83 @@ object TxHandler {
   }
 }
 
-class TxHandler(
-    blockFlow: BlockFlow,
-    pendingTxStorage: PendingTxStorage,
-    readyTxStorage: ReadyTxStorage
-)(implicit
-    brokerConfig: BrokerConfig,
+final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxStorage)(implicit
+    val brokerConfig: BrokerConfig,
     memPoolSetting: MemPoolSetting,
-    networkSetting: NetworkSetting,
+    val networkSetting: NetworkSetting,
     logConfig: LogConfig
-) extends IOBaseActor
+) extends TxCoreHandler
+    with TxHandlerPersistence
+    with BroadcastTxsHandler
+    with DownloadTxsHandler
+    with AutoMineHandler
+    with IOBaseActor
     with EventStream.Publisher
     with InterCliqueManager.NodeSyncStatus {
+  val txBufferMaxCapacity: Int = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
+  val batchBroadcastTxsFrequency: Duration = memPoolSetting.batchBroadcastTxsFrequency
+  val batchDownloadTxsFrequency: Duration  = memPoolSetting.batchDownloadTxsFrequency
+
   private val nonCoinbaseValidation = TxValidation.build
-  val maxCapacity: Int = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
   val fetching: FetchState[TransactionId] =
     FetchState[TransactionId](
-      maxCapacity,
+      txBufferMaxCapacity,
       networkSetting.syncExpiryPeriod,
       TxHandler.MaxDownloadTimes
     )
-  val txsBuffer: Cache[TransactionTemplate, Unit] =
-    Cache.fifo[TransactionTemplate, Unit](maxCapacity)
-  val delayedTxs: Cache[TransactionTemplate, TimeStamp] =
-    Cache.fifo[TransactionTemplate, TimeStamp](maxCapacity)
-  val announcements: Cache[TxHandler.Announcement, Unit] =
-    Cache.fifo[TxHandler.Announcement, Unit](maxCapacity)
 
   override def receive: Receive = handleCommand orElse updateNodeSyncStatus
 
-  type TxsPerChainId = mutable.Map[ChainIndex, mutable.ArrayBuffer[TransactionId]]
-
   // scalastyle:off method.length
   def handleCommand: Receive = {
-    case TxHandler.AddToSharedPool(txs) =>
+    case TxHandler.AddToMemPool(txs, isIntraCliqueSyncing) =>
       if (!memPoolSetting.autoMineForDev) {
-        txs.foreach(
-          handleTx(_, nonCoinbaseValidation.validateMempoolTxTemplate, None, acknowledge = true)
-        )
+        if (isIntraCliqueSyncing) {
+          txs.foreach(handleIntraCliqueSyncingTx)
+        } else {
+          txs.foreach(
+            handleInterCliqueTx(
+              _,
+              nonCoinbaseValidation.validateMempoolTxTemplate,
+              acknowledge = true
+            )
+          )
+        }
       } else {
         mineTxsForDev(txs)
       }
-    case TxHandler.AddToGrandPool(txs) =>
-      if (!memPoolSetting.autoMineForDev) {
-        txs.foreach(
-          handleTx(_, nonCoinbaseValidation.validateGrandPoolTxTemplate, None, acknowledge = true)
-        )
-      } else {
-        mineTxsForDev(txs)
-      }
-    case TxHandler.Broadcast(txs)       => handleReadyTxsFromPendingPool(txs)
     case TxHandler.TxAnnouncements(txs) => handleAnnouncements(txs)
     case TxHandler.BroadcastTxs         => broadcastTxs()
     case TxHandler.DownloadTxs          => downloadTxs()
     case TxHandler.MineOneBlock(chainIndex) =>
-      TxHandler.forceMineForDev(blockFlow, chainIndex).swap.foreach(log.error(_))
-    case TxHandler.CleanSharedPool =>
-      log.debug("Start to clean shared pools")
-      val results = blockFlow.grandPool.cleanAndExtractReadyTxs(
+      TxHandler
+        .forceMineForDev(blockFlow, chainIndex, Env.currentEnv, publishBlock)
+        .swap
+        .foreach(log.error(_))
+    case TxHandler.CleanMemPool =>
+      log.debug("Start to clean mempools")
+      blockFlow.grandPool.clean(
         blockFlow,
-        TimeStamp.now().minusUnsafe(memPoolSetting.cleanSharedPoolFrequency)
+        TimeStamp.now().minusUnsafe(memPoolSetting.cleanMempoolFrequency)
       )
-      results.foreach { result =>
-        result.invalidTxss.foreach(escapeIOError(_)(_.foreach { tx =>
-          escapeIOError(readyTxStorage.getOpt(tx.id).flatMap {
-            case Some(info) =>
-              val persistedTxId = PersistedTxId(info.timestamp, tx.id)
-              readyTxStorage
-                .delete(tx.id)
-                .flatMap(_ => pendingTxStorage.delete(persistedTxId))
-            case None =>
-              Right(())
-          })
-        }))
-        handleReadyTxsFromPendingPool(result.readyTxs)
-      }
-    case TxHandler.CleanPendingPool =>
-      log.debug("Start to clean pending pools")
-      blockFlow.grandPool.cleanPendingPool(blockFlow).foreach { result =>
-        escapeIOError(result) { invalidPendingTxs =>
-          invalidPendingTxs.foreach { case (tx, timestamp) =>
-            val persistedTxId = PersistedTxId(timestamp, tx.id)
-            escapeIOError(pendingTxStorage.delete(persistedTxId))
-          }
-        }
-      }
-      removeConfirmedTxsFromStorage()
-  }
-
-  def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
-    txs.foreach { tx =>
-      TxHandler.mineTxForDev(blockFlow, tx) match {
-        case Left(error) => addFailed(tx, error)
-        case Right(_)    => addSucceeded(tx)
-      }
-    }
-  }
-
-  private def removeConfirmedTxsFromStorage(): Unit = {
-    escapeIOError(readyTxStorage.iterateE { (txId, info) =>
-      blockFlow.isTxConfirmed(txId, info.chainIndex).flatMap { confirmed =>
-        if (confirmed) {
-          val persistedTxId = PersistedTxId(info.timestamp, txId)
-          readyTxStorage.delete(txId).flatMap(_ => pendingTxStorage.delete(persistedTxId))
-        } else {
-          Right(())
-        }
-      }
-    })
-  }
-
-  private def handleReadyTxsFromPendingPool(
-      txs: AVector[(TransactionTemplate, TimeStamp)]
-  ): Unit = {
-    // delay this broadcast so that peers have download this block
-    val broadcastTs = TimeStamp.now().plusUnsafe(networkSetting.txsBroadcastDelay)
-    txs.foreach { case (tx, timestamp) =>
-      delayedTxs.put(tx, broadcastTs)
-      val info = ReadyTxInfo(tx.chainIndex, timestamp)
-      escapeIOError(readyTxStorage.put(tx.id, info))
-    }
   }
 
   override def onFirstTimeSynced(): Unit = {
-    clearStorageAndLoadTxs()
-    schedule(self, TxHandler.CleanSharedPool, memPoolSetting.cleanSharedPoolFrequency)
-    schedule(self, TxHandler.CleanPendingPool, memPoolSetting.cleanPendingPoolFrequency)
-    scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
-    scheduleOnce(self, TxHandler.DownloadTxs, memPoolSetting.batchDownloadTxsFrequency)
-  }
-
-  def clearStorageAndLoadTxs(): Unit = {
-    escapeIOError(readyTxStorage.clear())
-    log.info("Start to load persisted pending txs")
-    var (valid, invalid) = (0, 0)
-    escapeIOError(for {
-      groupViews <- AVector
-        .tabulateE(brokerConfig.groupNumPerBroker) { index =>
-          val groupIndex = GroupIndex.unsafe(brokerConfig.groupRange(index))
-          blockFlow.getImmutableGroupViewIncludePool(groupIndex)
-        }
-      _ <- pendingTxStorage.iterateE { (persistedTxId, tx) =>
-        val chainIndex = tx.chainIndex
-        val groupIndex = chainIndex.from
-        val index      = brokerConfig.groupIndexOfBroker(groupIndex)
-        groupViews(index).getPreOutputs(tx.unsigned.inputs).flatMap {
-          case Some(_) =>
-            valid += 1
-            handleTx(
-              tx,
-              nonCoinbaseValidation.validateGrandPoolTxTemplate,
-              Some(persistedTxId),
-              acknowledge = false
-            )
-            Right(())
-          case None =>
-            invalid += 1
-            pendingTxStorage.delete(persistedTxId)
-        }
-      }
-    } yield ())
-    log.info(
-      s"Load persisted pending txs completed, valid: #$valid, invalid: #$invalid (not precise though..)"
+    clearStorageAndLoadTxs(
+      handleInterCliqueTx(
+        _,
+        nonCoinbaseValidation.validateMempoolTxTemplate,
+        acknowledge = false
+      )
     )
+    schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
+    scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
+    scheduleOnce(self, TxHandler.DownloadTxs, batchDownloadTxsFrequency)
   }
 
-  private def downloadTxs(): Unit = {
-    log.debug("Start to download txs")
-    if (announcements.nonEmpty) {
-      val downloads = mutable.Map.empty[ActorRefT[BrokerHandler.Command], TxsPerChainId]
-      announcements.keys().foreach { announcement =>
-        downloads.get(announcement.brokerHandler) match {
-          case Some(chainIndexedHashes) =>
-            updateChainIndexHashes(announcement.hash, announcement.chainIndex, chainIndexedHashes)
-          case None =>
-            val hashes             = mutable.ArrayBuffer(announcement.hash)
-            val chainIndexedHashes = mutable.Map(announcement.chainIndex -> hashes)
-            downloads(announcement.brokerHandler) = chainIndexedHashes
-        }
-      }
-      downloads.foreach { case (brokerHandler, chainIndexedHashes) =>
-        val txHashes = chainIndexedHashesToAVector(chainIndexedHashes)
-        log.debug(s"Download tx announcements ${Utils.showChainIndexedDigest(txHashes)}")
-        brokerHandler ! BrokerHandler.DownloadTxs(txHashes)
-      }
-      announcements.clear()
-    }
-    scheduleOnce(self, TxHandler.DownloadTxs, memPoolSetting.batchDownloadTxsFrequency)
+  override def postStop(): Unit = {
+    super.postStop()
+    persistMempoolTxs()
   }
 
   private def handleAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
@@ -357,157 +251,248 @@ class TxHandler(
     txs.foreach { case (chainIndex, txs) =>
       val mempool = blockFlow.getMemPool(chainIndex)
       txs.foreach { tx =>
-        if (
-          fetching.needToFetch(tx, timestamp) &&
-          !mempool.contains(chainIndex, tx)
-        ) {
+        if (fetching.needToFetch(tx, timestamp) && !mempool.contains(tx)) {
           val announcement = TxHandler.Announcement(brokerHandler, chainIndex, tx)
           announcements.put(announcement, ())
         }
       }
     }
   }
+}
 
-  private def hex(tx: TransactionTemplate): String = {
-    Hex.toHexString(serialize(tx))
-  }
+trait TxCoreHandler extends TxHandlerUtils {
+  def blockFlow: BlockFlow
+  implicit def brokerConfig: BrokerConfig
+  def txsBuffer: Cache[TransactionTemplate, Unit]
 
-  def handleTx(
+  def handleInterCliqueTx(
       tx: TransactionTemplate,
       validate: (TransactionTemplate, BlockFlow) => TxValidationResult[Unit],
-      persistedTxIdOpt: Option[PersistedTxId],
       acknowledge: Boolean
   ): Unit = {
     val chainIndex = tx.chainIndex
-    val mempool    = blockFlow.getMemPool(chainIndex)
+    assume(!brokerConfig.isIncomingChain(chainIndex))
+    val mempool = blockFlow.getMemPool(chainIndex.from)
     if (!TxHandler.checkHighGasPrice(tx)) {
-      addFailed(tx, s"tx has lower gas price than ${defaultGasPrice}")
-    } else if (mempool.contains(chainIndex, tx)) {
-      addFailed(tx, s"tx ${tx.id.toHexString} is already included")
+      addFailed(tx, s"tx has lower gas price than ${defaultGasPrice}", acknowledge)
+    } else if (mempool.contains(tx)) {
+      addFailed(tx, s"tx ${tx.id.toHexString} is already included", acknowledge)
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
-      addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}")
+      addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}", acknowledge)
     } else {
       validate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
-          addFailed(tx, s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}")
+          addFailed(
+            tx,
+            s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}",
+            acknowledge
+          )
         case Right(_) =>
-          handleValidTx(chainIndex, tx, mempool, persistedTxIdOpt, acknowledge)
+          val grandPool = blockFlow.getGrandPool()
+          handleValidTx(chainIndex, tx, grandPool, acknowledge)
         case Left(Left(e)) =>
-          addFailed(tx, s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}")
+          addFailed(
+            tx,
+            s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}",
+            acknowledge
+          )
       }
     }
   }
 
-  private def needToDelay(chainIndex: ChainIndex, tx: TransactionTemplate): Boolean = {
-    val outputOpt =
-      blockFlow.getBestPersistedWorldState(chainIndex.from).flatMap { persistedWS =>
-        persistedWS.getPreOutputsForAssetInputs(tx).map(_.map(_.maxBy(_.lockTime)))
-      }
-
-    escapeIOError[Option[AssetOutput], Boolean](
-      outputOpt,
-      {
-        case Some(output) =>
-          output.lockTime.plusUnsafe(TxHandler.PersistenceDuration) > TimeStamp.now()
-        case None => true // some of the inputs are from block caches outputs
-      }
-    )(false)
+  def handleIntraCliqueSyncingTx(tx: TransactionTemplate): Unit = {
+    val chainIndex = tx.chainIndex
+    assume(brokerConfig.isIncomingChain(chainIndex))
+    blockFlow.getMemPool(chainIndex.to).addXGroupTx(chainIndex, tx, TimeStamp.now())
   }
 
   private def handleValidTx(
       chainIndex: ChainIndex,
       tx: TransactionTemplate,
-      mempool: MemPool,
-      persistedTxIdOpt: Option[PersistedTxId],
+      grandPool: GrandPool,
       acknowledge: Boolean
   ): Unit = {
     val currentTs = TimeStamp.now()
-    val result    = mempool.addNewTx(chainIndex, tx, currentTs)
+    val result    = grandPool.add(chainIndex, tx, currentTs)
     log.debug(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
-      case MemPool.AddedToSharedPool =>
-        if (needToDelay(chainIndex, tx)) {
-          delayedTxs.put(tx, currentTs.plusUnsafe(networkSetting.txsBroadcastDelay))
-        } else {
-          txsBuffer.put(tx, ())
-        }
-        persistedTxIdOpt.foreach { persistedTxId =>
-          val info = ReadyTxInfo(chainIndex, persistedTxId.timestamp)
-          escapeIOError(readyTxStorage.put(tx.id, info))
-        }
-      case MemPool.AddedToPendingPool => // We don't broadcast txs that are pending locally
-        val newPersistedTxId = PersistedTxId(currentTs, tx.id)
-        persistedTxIdOpt match {
-          case Some(oldPersistedTxId) =>
-            escapeIOError(pendingTxStorage.replace(oldPersistedTxId, newPersistedTxId, tx))
+      case MemPool.AddedToMemPool => txsBuffer.put(tx, ())
+      case _                      => ()
+    }
+    addSucceeded(tx, acknowledge)
+  }
+
+  private def hex(tx: TransactionTemplate): String = {
+    Hex.toHexString(serialize(tx))
+  }
+}
+
+trait DownloadTxsHandler extends TxHandlerUtils {
+  def txBufferMaxCapacity: Int
+  def batchDownloadTxsFrequency: Duration
+
+  lazy val announcements: Cache[TxHandler.Announcement, Unit] =
+    Cache.fifo[TxHandler.Announcement, Unit](txBufferMaxCapacity)
+
+  protected def downloadTxs(): Unit = {
+    log.debug("Start to download txs")
+    if (announcements.nonEmpty) {
+      val downloads =
+        mutable.Map.empty[ActorRefT[BrokerHandler.Command], TxsPerChain[TransactionId]]
+      announcements.keys().foreach { announcement =>
+        downloads.get(announcement.brokerHandler) match {
+          case Some(chainIndexedHashes) =>
+            updateChainIndexTxs(announcement.hash, announcement.chainIndex, chainIndexedHashes)
           case None =>
-            escapeIOError(pendingTxStorage.put(newPersistedTxId, tx))
+            val hashes             = mutable.ArrayBuffer(announcement.hash)
+            val chainIndexedHashes = mutable.Map(announcement.chainIndex -> hashes)
+            downloads(announcement.brokerHandler) = chainIndexedHashes
         }
-      case _ => ()
+      }
+      downloads.foreach { case (brokerHandler, chainIndexedHashes) =>
+        val txHashes = chainIndexedTxsToAVector(chainIndexedHashes)
+        log.debug(s"Download tx announcements ${Utils.showChainIndexedDigest(txHashes)}")
+        brokerHandler ! BrokerHandler.DownloadTxs(txHashes)
+      }
+      announcements.clear()
     }
-    if (acknowledge) {
-      addSucceeded(tx)
-    }
+    scheduleOnce(self, TxHandler.DownloadTxs, batchDownloadTxsFrequency)
+  }
+}
+
+trait BroadcastTxsHandler extends TxHandlerUtils {
+  implicit def brokerConfig: BrokerConfig
+  def txBufferMaxCapacity: Int
+  def batchBroadcastTxsFrequency: Duration
+
+  lazy val txsBuffer: Cache[TransactionTemplate, Unit] = {
+    Cache.fifo[TransactionTemplate, Unit](txBufferMaxCapacity)
   }
 
-  private def updateChainIndexHashes(
-      hash: TransactionId,
-      chainIndex: ChainIndex,
-      hashes: TxsPerChainId
-  ): Unit = {
-    hashes.get(chainIndex) match {
-      case Some(chainIndexHashes) => chainIndexHashes += hash
-      case None =>
-        val chainIndexedHashes = mutable.ArrayBuffer(hash)
-        hashes(chainIndex) = chainIndexedHashes
-    }
-  }
-
-  private def chainIndexedHashesToAVector(
-      hashes: TxsPerChainId
-  ): AVector[(ChainIndex, AVector[TransactionId])] = {
-    hashes.foldLeft(AVector.empty[(ChainIndex, AVector[TransactionId])]) {
-      case (acc, (chainIndex, hashes)) =>
-        acc :+ (chainIndex -> AVector.from(hashes))
-    }
-  }
-
-  private def broadcastTxs(): Unit = {
+  protected def broadcastTxs(): Unit = {
     log.debug("Start to broadcast txs")
-    val broadcasts = mutable.Map.empty[ChainIndex, mutable.ArrayBuffer[TransactionId]]
+    val broadcasts = mutable.Map.empty[ChainIndex, mutable.ArrayBuffer[TransactionTemplate]]
     if (txsBuffer.nonEmpty) {
       txsBuffer.keys().foreach { tx =>
-        updateChainIndexHashes(tx.id, tx.chainIndex, broadcasts)
+        updateChainIndexTxs(tx, tx.chainIndex, broadcasts)
       }
       txsBuffer.clear()
     }
 
-    if (delayedTxs.nonEmpty) {
-      val currentTs = TimeStamp.now()
-      val removed   = mutable.ArrayBuffer.empty[TransactionTemplate]
-      delayedTxs
-        .entries()
-        .takeWhile(_.getValue <= currentTs)
-        .foreach { entry =>
-          val tx = entry.getKey
-          removed += tx
-          updateChainIndexHashes(tx.id, tx.chainIndex, broadcasts)
-        }
-      removed.foreach(delayedTxs.remove)
-    }
-
     if (broadcasts.nonEmpty) {
-      val txHashes = chainIndexedHashesToAVector(broadcasts)
-      publishEvent(InterCliqueManager.BroadCastTx(txHashes))
+      val txs = chainIndexedTxsToAVector(broadcasts)
+      publishEvent(InterCliqueManager.BroadCastTx(txs.map(p => p._1 -> p._2.map(_.id))))
+      if (brokerConfig.brokerNum > 1) {
+        publishEvent(IntraCliqueManager.BroadCastTx(txs))
+      }
     }
-    scheduleOnce(self, TxHandler.BroadcastTxs, memPoolSetting.batchBroadcastTxsFrequency)
+    scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
+  }
+}
+
+trait AutoMineHandler extends TxHandlerUtils {
+  def blockFlow: BlockFlow
+  implicit def brokerConfig: BrokerConfig
+  implicit def networkSetting: NetworkSetting
+
+  def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
+    txs.foreach { tx =>
+      TxHandler.mineTxForDev(blockFlow, tx, publishBlock) match {
+        case Left(error) => addFailed(tx, error, acknowledge = true)
+        case Right(_)    => addSucceeded(tx, acknowledge = true)
+      }
+    }
   }
 
-  def addSucceeded(tx: TransactionTemplate): Unit = {
-    sender() ! TxHandler.AddSucceeded(tx.id)
+  def publishBlock(block: Block): Unit = {
+    val blockMessage = Message.serialize(NewBlock(block))
+    val event        = InterCliqueManager.BroadCastBlock(block, blockMessage, DataOrigin.Local)
+    publishEvent(event)
+  }
+}
+
+trait TxHandlerPersistence extends TxHandlerUtils {
+  def blockFlow: BlockFlow
+  implicit def brokerConfig: BrokerConfig
+  def pendingTxStorage: PendingTxStorage
+
+  def clearStorageAndLoadTxs(handlePendingTx: TransactionTemplate => Unit): Unit = {
+    log.info("Start to load persisted pending txs")
+    var (valid, invalid) = (0, 0)
+    escapeIOError(for {
+      groupViews <- AVector
+        .tabulateE(brokerConfig.groupNumPerBroker) { index =>
+          val groupIndex = GroupIndex.unsafe(brokerConfig.groupRange(index))
+          blockFlow.getImmutableGroupViewIncludePool(groupIndex)
+        }
+      _ <- pendingTxStorage.iterateE { (_, tx) =>
+        val chainIndex = tx.chainIndex
+        val groupIndex = chainIndex.from
+        val index      = brokerConfig.groupIndexOfBroker(groupIndex)
+        groupViews(index).getPreOutputs(tx.unsigned.inputs).map {
+          case Some(_) =>
+            valid += 1
+            handlePendingTx(tx)
+          case None =>
+            invalid += 1
+        }
+      }
+    } yield ())
+    log.info(
+      s"Load persisted pending txs completed, valid: #$valid, invalid: #$invalid (not precise though..)"
+    )
   }
 
-  def addFailed(tx: TransactionTemplate, reason: String): Unit = {
-    sender() ! TxHandler.AddFailed(tx.id, reason: String)
+  def persistMempoolTxs(): Unit = {
+    log.info("Start to persist pending txs")
+    escapeIOError(pendingTxStorage.iterateE { (txId, _) =>
+      pendingTxStorage.delete(txId)
+    })
+    escapeIOError(
+      blockFlow.getGrandPool().getOutTxsWithTimestamp().foreachE { case (timestamp, tx) =>
+        pendingTxStorage.put(PersistedTxId(timestamp, tx.id), tx)
+      }
+    )
+  }
+}
+
+trait TxHandlerUtils extends IOBaseActor with EventStream.Publisher {
+  type TxsPerChain[T] = mutable.Map[ChainIndex, mutable.ArrayBuffer[T]]
+
+  protected def updateChainIndexTxs[T](
+      tx: T,
+      chainIndex: ChainIndex,
+      txs: TxsPerChain[T]
+  ): Unit = {
+    txs.get(chainIndex) match {
+      case Some(chainIndexHashes) => chainIndexHashes += tx
+      case None =>
+        val chainIndexedHashes = mutable.ArrayBuffer(tx)
+        txs(chainIndex) = chainIndexedHashes
+    }
+  }
+
+  protected def chainIndexedTxsToAVector[T: ClassTag](
+      txs: TxsPerChain[T]
+  ): AVector[(ChainIndex, AVector[T])] = {
+    txs.foldLeft(AVector.empty[(ChainIndex, AVector[T])]) { case (acc, (chainIndex, txs)) =>
+      acc :+ (chainIndex -> AVector.from(txs))
+    }
+  }
+
+  @inline protected def addSucceeded(tx: TransactionTemplate, acknowledge: Boolean): Unit = {
+    if (acknowledge) {
+      sender() ! TxHandler.AddSucceeded(tx.id)
+    }
+  }
+
+  @inline protected def addFailed(
+      tx: TransactionTemplate,
+      reason: => String,
+      acknowledge: Boolean
+  ): Unit = {
+    if (acknowledge) {
+      sender() ! TxHandler.AddFailed(tx.id, reason: String)
+    }
   }
 }

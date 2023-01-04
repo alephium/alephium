@@ -143,6 +143,7 @@ final case object DuplicatedInputs                              extends InvalidT
 final case object InvalidInputGroupIndex                        extends InvalidTxStatus
 final case object InvalidOutputGroupIndex                       extends InvalidTxStatus
 final case object TxDoubleSpending                              extends InvalidTxStatus
+final case object TooManyKeysInMultisig                         extends InvalidTxStatus
 final case object OutputDataSizeExceeded                        extends InvalidTxStatus
 final case object NonExistInput                                 extends InvalidTxStatus
 final case object TimeLockedTx                                  extends InvalidTxStatus

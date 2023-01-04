@@ -167,20 +167,23 @@ class ServerUtils(implicit
   def listUnconfirmedTransactions(
       blockFlow: BlockFlow
   ): Try[AVector[UnconfirmedTransactions]] = {
-    Right(
-      brokerConfig.chainIndexes
-        .map { chainIndex =>
+    val result = brokerConfig.groupRange.foldLeft(
+      AVector.ofCapacity[UnconfirmedTransactions](brokerConfig.chainNum)
+    ) { case (acc, group) =>
+      val groupIndex = GroupIndex.unsafe(group)
+      val txs        = blockFlow.getMemPool(groupIndex).getAll()
+      val groupedTxs = txs.filter(_.chainIndex.from == groupIndex).groupBy(_.chainIndex)
+      acc ++ AVector.from(
+        groupedTxs.map { case (chainIndex, txs) =>
           UnconfirmedTransactions(
             chainIndex.from.value,
             chainIndex.to.value,
-            blockFlow
-              .getMemPool(chainIndex)
-              .getAll(chainIndex)
-              .map(model.TransactionTemplate.fromProtocol(_))
+            txs.map(model.TransactionTemplate.fromProtocol)
           )
         }
-        .filter(_.unconfirmedTransactions.nonEmpty)
-    )
+      )
+    }
+    Right(result)
   }
 
   def buildTransaction(
@@ -363,10 +366,6 @@ class ServerUtils(implicit
     }
   }
 
-  def isInMemPool(blockFlow: BlockFlow, txId: TransactionId, chainIndex: ChainIndex): Boolean = {
-    blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
-  }
-
   def getEventsForContractCurrentCount(
       blockFlow: BlockFlow,
       contractAddress: Address.Contract
@@ -531,7 +530,7 @@ class ServerUtils(implicit
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
   ): FutureTry[SubmitTxResult] = {
-    val message = TxHandler.AddToGrandPool(AVector(tx))
+    val message = TxHandler.AddToMemPool(AVector(tx), isIntraCliqueSyncing = false)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
         Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))

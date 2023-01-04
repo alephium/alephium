@@ -44,6 +44,7 @@ object ALPH {
   val MaxTxOutputNum: Int    = 256
   val MaxOutputDataSize: Int = 256
   val MaxScriptSigNum: Int   = 32
+  val MaxKeysInP2MPK: Int    = 16
   // scalastyle:on magic.number
 
   def alph(amount: U256): Option[U256] = amount.mul(CoinInOneALPH)

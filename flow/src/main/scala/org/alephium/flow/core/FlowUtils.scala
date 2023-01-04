@@ -51,12 +51,14 @@ trait FlowUtils
 
   val grandPool = GrandPool.empty
 
+  def getGrandPool(): GrandPool = grandPool
+
   def getMemPool(mainGroup: GroupIndex): MemPool = {
     grandPool.getMemPool(mainGroup)
   }
 
   def getMemPool(chainIndex: ChainIndex): MemPool = {
-    grandPool.getMemPool(chainIndex)
+    grandPool.getMemPool(chainIndex.from)
   }
 
   def calMemPoolChangesUnsafe(
@@ -66,16 +68,30 @@ trait FlowUtils
   ): MemPoolChanges = {
     val oldOutDeps = oldDeps.outDeps
     val newOutDeps = newDeps.outDeps
-    val diffs = AVector.tabulate(brokerConfig.groups) { toGroup =>
+    val outDiffs = AVector.tabulate(brokerConfig.groups) { toGroup =>
       val toGroupIndex = GroupIndex.unsafe(toGroup)
       val oldDep       = oldOutDeps(toGroup)
       val newDep       = newOutDeps(toGroup)
-      val index        = ChainIndex(mainGroup, toGroupIndex)
-      getBlockChain(index).calBlockDiffUnsafe(newDep, oldDep)
+      val chainIndex   = ChainIndex(mainGroup, toGroupIndex)
+      getBlockChain(chainIndex).calBlockDiffUnsafe(chainIndex, newDep, oldDep)
     }
-    val toRemove = diffs.map(_.toAdd.flatMap(_.nonCoinbase))
-    val toAdd    = diffs.map(_.toRemove.flatMap(_.nonCoinbase))
-    if (toAdd.sumBy(_.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)
+    val inDiffs = newDeps.inDeps.mapWithIndex { case (newInIntraDep, k) =>
+      val intraIndex  = ChainIndex.from(newInIntraDep)
+      val fromGroup   = intraIndex.from
+      val targetIndex = ChainIndex(fromGroup, mainGroup)
+      assume(intraIndex.isIntraGroup)
+      val oldInIntraDep = oldDeps.inDeps(k)
+      assume(ChainIndex.from(oldInIntraDep) == intraIndex)
+      val newInDep = getOutTipsUnsafe(newInIntraDep)(mainGroup.value)
+      val oldInDep = getOutTipsUnsafe(oldInIntraDep)(mainGroup.value)
+      assume(ChainIndex.from(newInDep) == targetIndex)
+      assume(ChainIndex.from(oldInDep) == targetIndex)
+      getBlockChain(targetIndex).calBlockDiffUnsafe(targetIndex, newInDep, oldInDep)
+    }
+    val diffs    = inDiffs ++ outDiffs
+    val toRemove = diffs.map(diff => diff.chainIndex -> diff.toAdd.flatMap(_.nonCoinbase))
+    val toAdd    = diffs.map(diff => diff.chainIndex -> diff.toRemove.flatMap(_.nonCoinbase))
+    if (toAdd.sumBy(_._2.length) == 0) Normal(toRemove) else Reorg(toRemove, toAdd)
   }
 
   def updateGrandPoolUnsafe(
@@ -83,14 +99,11 @@ trait FlowUtils
       newDeps: BlockDeps,
       oldDeps: BlockDeps,
       maxHeightGap: Int
-  ): AVector[(TransactionTemplate, TimeStamp)] = {
+  ): Unit = {
     val newHeight = getHeightUnsafe(newDeps.uncleHash(mainGroup))
     val oldHeight = getHeightUnsafe(oldDeps.uncleHash(mainGroup))
     if (newHeight <= oldHeight + maxHeightGap) {
       updateMemPoolUnsafe(mainGroup, newDeps, oldDeps)
-      getMemPool(mainGroup).updatePendingPool()
-    } else { // we don't update tx pool when the node is syncing
-      AVector.empty
     }
   }
 
@@ -98,17 +111,15 @@ trait FlowUtils
       mainGroup: GroupIndex,
       newDeps: BlockDeps,
       oldDeps: BlockDeps
-  ): AVector[(TransactionTemplate, TimeStamp)] = {
+  ): Unit = {
     updateGrandPoolUnsafe(mainGroup, newDeps, oldDeps, maxSyncBlocksPerChain)
   }
 
   def updateMemPoolUnsafe(mainGroup: GroupIndex, newDeps: BlockDeps, oldDeps: BlockDeps): Unit = {
     calMemPoolChangesUnsafe(mainGroup, oldDeps, newDeps) match {
       case Normal(toRemove) =>
-        val removed = toRemove.foldWithIndex(0) { (sum, txs, toGroup) =>
-          val toGroupIndex = GroupIndex.unsafe(toGroup)
-          val index        = ChainIndex(mainGroup, toGroupIndex)
-          sum + getMemPool(mainGroup).removeFromTxPool(index, txs.map(_.toTemplate))
+        val removed = toRemove.fold(0) { case (sum, (_, txs)) =>
+          sum + getMemPool(mainGroup).removeUsedTxs(txs.map(_.toTemplate))
         }
         if (removed > 0) {
           logger.debug(s"Normal update for #$mainGroup mempool: #$removed removed")
@@ -121,9 +132,9 @@ trait FlowUtils
 
   def getBestDeps(groupIndex: GroupIndex): BlockDeps
 
-  def updateBestDeps(): IOResult[AVector[(TransactionTemplate, TimeStamp)]]
+  def updateBestDeps(): IOResult[Unit]
 
-  def updateBestDepsUnsafe(): AVector[(TransactionTemplate, TimeStamp)]
+  def updateBestDepsUnsafe(): Unit
 
   def calBestDepsUnsafe(group: GroupIndex): BlockDeps
 
@@ -168,7 +179,7 @@ trait FlowUtils
   ): IOResult[AVector[Transaction]] = {
     if (chainIndex.isIntraGroup) {
       val parentHash = deps.getOutDep(chainIndex.to)
-      val order      = Block.getScriptExecutionOrder(parentHash, txTemplates)
+      val order = Block.getScriptExecutionOrder(parentHash, txTemplates, blockEnv.getHardFork())
       val fullTxs =
         Array.ofDim[Transaction](txTemplates.length + 1) // reserve 1 slot for coinbase tx
       txTemplates.foreachWithIndex { case (tx, index) =>
@@ -380,11 +391,8 @@ object FlowUtils {
   case object UnpersistedBlockOutput extends OutputType {
     val cachedLevel = 1
   }
-  case object SharedPoolOutput extends OutputType {
+  case object MemPoolOutput extends OutputType {
     val cachedLevel = 2
-  }
-  case object PendingPoolOutput extends OutputType {
-    val cachedLevel = 3
   }
 
   def filterDoubleSpending[T <: TransactionAbstract: ClassTag](txs: AVector[T]): AVector[T] = {

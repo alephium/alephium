@@ -20,6 +20,7 @@ import java.math.BigInteger
 
 import scala.math.BigInt.javaBigInteger2bigInt
 
+import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.config.{GroupConfig, GroupConfigFixture}
@@ -106,6 +107,18 @@ class TargetSpec extends AlephiumSpec with GroupConfigFixture {
       val target   = Target.from(hashrate, Duration.ofSecondsUnsafe(1))
       HashRate.from(target, Duration.ofSecondsUnsafe(1)) is hashrate
     }
+  }
+
+  it should "convert to difficulty" in {
+    (1 until 256).foreach { k =>
+      val target = Target.unsafe(BigInteger.ONE.shiftLeft(k))
+      target.getDifficulty().value is Target.maxBigInt.divide(target.value)
+      target.getDifficulty().getTarget() is target
+    }
+
+    info("Precision might be lost")
+    val target = Target.unsafe(ByteString(1, -55, 24, -80))
+    target.getDifficulty().getTarget() isnot target
   }
 
   it should "scale correctly according to block time" in {
