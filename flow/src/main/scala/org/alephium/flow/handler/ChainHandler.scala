@@ -89,10 +89,10 @@ object ChainHandler {
     .labelNames("chain_from", "chain_to")
     .register()
 
-  val currentDifficulty: Gauge = Gauge
+  val difficultyOfChain: Gauge = Gauge
     .build(
-      "alephium_current_difficulty",
-      "current difficulty"
+      "alephium_difficulty_of_chain",
+      "Difficulty Per Chain"
     )
     .labelNames("chain_from", "chain_to")
     .register()
@@ -231,7 +231,7 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
     val hashRate = HashRate.from(header.target, consensusConfig.blockTargetTime)
     targetHashRateHertzLabeled.set(hashRate.value.doubleValue)
 
-    currentDifficultyLabeled.set(header.target.getDifficulty().value.doubleValue())
+    difficultyOfChainLabeled.set(header.target.getDifficulty().value.doubleValue())
     chain
   }
 
@@ -247,6 +247,6 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
   private val targetHashRateHertzLabeled = targetHashRateHertz
     .labels(chainIndexFromString, chainIndexToString)
 
-  private val currentDifficultyLabeled = currentDifficulty
+  private val difficultyOfChainLabeled = difficultyOfChain
     .labels(chainIndexFromString, chainIndexToString)
 }
