@@ -29,6 +29,8 @@ jobs:
              sha256sum "alephium-${{ steps.get_version.outputs.VERSION }}.jar" > "alephium-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum"
              cd ../../../wallet/target/scala-2.13/
              sha256sum "alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar" > "alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum"
+             cd ../../../ralphc/target/scala-2.13/
+             sha256sum "alephium-ralphc-${{ steps.get_version.outputs.VERSION }}.jar" > "alephium-ralphc-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum"
              cd ../../../
       
       - name: Release
@@ -40,3 +42,5 @@ jobs:
             app/target/scala-2.13/alephium-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum
             wallet/target/scala-2.13/alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar
             wallet/target/scala-2.13/alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum
+            ralphc/target/scala-2.13/alephium-ralphc-${{ steps.get_version.outputs.VERSION }}.jar
+            ralphc/target/scala-2.13/alephium-ralphc-${{ steps.get_version.outputs.VERSION }}.jar.sha256.checksum
