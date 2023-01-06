@@ -113,30 +113,30 @@ object StaticAnalysis {
   private[ralph] def checkExternalCallPermissions(
       contractState: Compiler.State[vm.StatefulContext],
       contract: Contract,
-      externalCallCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
+      checkExternalCallerTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
   ): Unit = {
-    val allNoExternalCallChecks: mutable.Set[(TypeId, FuncId)] = mutable.Set.empty
+    val allNoCheckExternalCallers: mutable.Set[(TypeId, FuncId)] = mutable.Set.empty
     contract.funcs.foreach { func =>
-      // To check that external calls should have external call checks
+      // To check that external calls should have check external callers
       contractState.externalCalls.get(func.id) match {
         case Some(callees) if callees.nonEmpty =>
           callees.foreach { case funcRef @ (typeId, funcId) =>
-            if (!externalCallCheckTables(typeId)(funcId)) {
-              allNoExternalCallChecks.addOne(funcRef)
+            if (!checkExternalCallerTables(typeId)(funcId)) {
+              allNoCheckExternalCallers.addOne(funcRef)
             }
           }
         case _ => ()
       }
     }
-    allNoExternalCallChecks.foreach { case (typeId, funcId) =>
-      contractState.warnExternalCallCheck(typeId, funcId)
+    allNoCheckExternalCallers.foreach { case (typeId, funcId) =>
+      contractState.warnCheckExternalCaller(typeId, funcId)
     }
   }
 
-  def checkInterfaceExternalCallCheck(
+  def checkInterfaceCheckExternalCaller(
       multiContract: MultiContract,
       interfaceTypeId: TypeId,
-      externalCallCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
+      checkExternalCallerTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
   ): Unit = {
     assume(multiContract.dependencies.isDefined)
     val children = multiContract.dependencies
@@ -146,10 +146,10 @@ object StaticAnalysis {
       .getOrElse(Seq.empty)
     val interface = multiContract.getInterface(interfaceTypeId)
     children.foreach { contractId =>
-      val table = externalCallCheckTables(contractId)
+      val table = checkExternalCallerTables(contractId)
       interface.funcs.foreach { func =>
-        if (func.useExternalCallCheck && !table(func.id)) {
-          throw Compiler.Error(Warnings.noExternalCallCheckMsg(contractId.name, func.id.name))
+        if (func.useCheckExternalCaller && !table(func.id)) {
+          throw Compiler.Error(Warnings.noCheckExternalCallerMsg(contractId.name, func.id.name))
         }
       }
     }
@@ -159,23 +159,23 @@ object StaticAnalysis {
       multiContract: MultiContract,
       states: AVector[Compiler.State[vm.StatefulContext]]
   ): Unit = {
-    val externalCallCheckTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
+    val checkExternalCallerTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
     multiContract.contracts.zipWithIndex.foreach {
       case (contract: Contract, index) if !contract.isAbstract =>
         val state = states(index)
-        val table = contract.buildExternalCallCheckTable(state)
-        externalCallCheckTables.update(contract.ident, table)
+        val table = contract.buildCheckExternalCallerTable(state)
+        checkExternalCallerTables.update(contract.ident, table)
       case (interface: ContractInterface, _) =>
         val table = mutable.Map.from(interface.funcs.map(_.id -> true))
-        externalCallCheckTables.update(interface.ident, table)
+        checkExternalCallerTables.update(interface.ident, table)
       case _ => ()
     }
     multiContract.contracts.zipWithIndex.foreach {
       case (contract: Contract, index) if !contract.isAbstract =>
         val state = states(index)
-        checkExternalCallPermissions(state, contract, externalCallCheckTables)
+        checkExternalCallPermissions(state, contract, checkExternalCallerTables)
       case (interface: ContractInterface, _) =>
-        checkInterfaceExternalCallCheck(multiContract, interface.ident, externalCallCheckTables)
+        checkInterfaceCheckExternalCaller(multiContract, interface.ident, checkExternalCallerTables)
       case _ =>
     }
   }

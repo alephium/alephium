@@ -22,13 +22,13 @@ import org.alephium.util.{AlephiumSpec, AVector}
 
 class AstSpec extends AlephiumSpec {
 
-  behavior of "External call check"
+  behavior of "Check external caller"
 
-  def externalCallCheckWarnings(warnings: AVector[String]): AVector[String] = {
-    warnings.filter(_.startsWith("No external call check"))
+  def checkExternalCallerWarnings(warnings: AVector[String]): AVector[String] = {
+    warnings.filter(_.startsWith("No check external caller"))
   }
 
-  it should "detect direct external call check" in {
+  it should "detect direct check external caller" in {
     val code =
       s"""
          |Contract Foo() {
@@ -40,7 +40,7 @@ class AstSpec extends AlephiumSpec {
          |    checkCaller!(false, 1)
          |  }
          |
-         |  @using(externalCallCheck = false)
+         |  @using(checkExternalCaller = false)
          |  fn baz() -> () {
          |    return
          |  }
@@ -51,11 +51,11 @@ class AstSpec extends AlephiumSpec {
     val bar         = contractAst.funcs(1)
     val baz         = contractAst.funcs(2)
     foo.id.name is "foo"
-    foo.hasDirectExternalCallCheck() is false
+    foo.hasDirectCheckExternalCaller() is false
     bar.id.name is "bar"
-    bar.hasDirectExternalCallCheck() is true
+    bar.hasDirectCheckExternalCaller() is true
     baz.id.name is "baz"
-    baz.hasDirectExternalCallCheck() is true
+    baz.hasDirectCheckExternalCaller() is true
   }
 
   trait InternalCallFixture {
@@ -90,7 +90,7 @@ class AstSpec extends AlephiumSpec {
          |    checkCaller!(true, 0)
          |  }
          |
-         |  // external call check in another public function does not help
+         |  // check external caller in another public function does not help
          |  pub fn f() -> () {
          |    e()
          |  }
@@ -108,7 +108,7 @@ class AstSpec extends AlephiumSpec {
          |    b()
          |  }
          |
-         |  @using(externalCallCheck = false)
+         |  @using(checkExternalCaller = false)
          |  pub fn i() -> () {
          |    noCheck()
          |  }
@@ -116,7 +116,7 @@ class AstSpec extends AlephiumSpec {
          |""".stripMargin
   }
 
-  it should "build external call check table" in new InternalCallFixture {
+  it should "build check external caller table" in new InternalCallFixture {
     val contracts = fastparse.parse(internalCalls, StatefulParser.multiContract(_)).get.value
     val state     = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
     val contract  = contracts.contracts(0).asInstanceOf[Ast.Contract]
@@ -139,7 +139,7 @@ class AstSpec extends AlephiumSpec {
     )
     state.externalCalls.isEmpty is true
 
-    val table = contract.buildExternalCallCheckTable(state)
+    val table = contract.buildCheckExternalCallerTable(state)
     table.map { case (fundId, checked) => fundId.name -> checked } is
       mutable.Map(
         "noCheck" -> false,
@@ -217,10 +217,10 @@ class AstSpec extends AlephiumSpec {
 
   it should "check permission for external calls" in new ExternalCallsFixture {
     val warnings = Compiler.compileContractFull(externalCalls, 0).rightValue.warnings
-    externalCallCheckWarnings(warnings).toSet is Set(
-      Warnings.noExternalCallCheckMsg("InternalCalls", "c"),
-      Warnings.noExternalCallCheckMsg("InternalCalls", "f"),
-      Warnings.noExternalCallCheckMsg("InternalCalls", "g")
+    checkExternalCallerWarnings(warnings).toSet is Set(
+      Warnings.noCheckExternalCallerMsg("InternalCalls", "c"),
+      Warnings.noCheckExternalCallerMsg("InternalCalls", "f"),
+      Warnings.noCheckExternalCallerMsg("InternalCalls", "g")
     )
   }
 
@@ -246,14 +246,14 @@ class AstSpec extends AlephiumSpec {
 
   it should "not check permission for mutual recursive calls" in new MutualRecursionFixture {
     val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
-    externalCallCheckWarnings(warnings).toSet is Set(
-      Warnings.noExternalCallCheckMsg("Bar", "a")
+    checkExternalCallerWarnings(warnings).toSet is Set(
+      Warnings.noCheckExternalCallerMsg("Bar", "a")
     )
   }
 
-  it should "test external call check for interface" in {
+  it should "test check external caller for interface" in {
     {
-      info("All contracts that inherit from the interface should have external call check")
+      info("All contracts that inherit from the interface should have check external caller")
       val code =
         s"""
            |Interface Base {
@@ -279,12 +279,12 @@ class AstSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val error = Compiler.compileProject(code).leftValue
-      error.message is Warnings.noExternalCallCheckMsg("Baz", "base")
+      error.message is Warnings.noCheckExternalCallerMsg("Baz", "base")
     }
 
     {
-      info("not check external call check for interface function calls")
-      def code(externalCallCheck: Boolean) =
+      info("not check external caller for interface function calls")
+      def code(checkExternalCaller: Boolean) =
         s"""
            |Contract Bar() {
            |  pub fn bar(fooId: ByteVec) -> () {
@@ -292,7 +292,7 @@ class AstSpec extends AlephiumSpec {
            |  }
            |}
            |Interface Foo {
-           |  @using(externalCallCheck = $externalCallCheck, updateFields = true)
+           |  @using(checkExternalCaller = $checkExternalCaller, updateFields = true)
            |  pub fn foo() -> ()
            |}
            |""".stripMargin
@@ -304,7 +304,7 @@ class AstSpec extends AlephiumSpec {
     }
 
     {
-      info("implemented function have external call check in private callee")
+      info("implemented function have check external caller in private callee")
       val code =
         s"""
            |Contract Bar() implements Foo {
@@ -325,9 +325,9 @@ class AstSpec extends AlephiumSpec {
     }
   }
 
-  it should "display the right warning message for external call check" in {
-    Warnings.noExternalCallCheckMsg("Foo", "bar") is
-      "No external call check for function: Foo.bar, please use checkCaller!(...) for the function or its private callees."
+  it should "display the right warning message for check external caller" in {
+    Warnings.noCheckExternalCallerMsg("Foo", "bar") is
+      "No check external caller for function: Foo.bar, please use checkCaller!(...) for the function or its private callees."
   }
 
   behavior of "Private function usage"

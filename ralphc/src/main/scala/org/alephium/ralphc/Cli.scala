@@ -70,8 +70,8 @@ final case class Cli() {
         .action((_, c) => c.copy(ignoreUnusedPrivateFunctionsWarnings = true))
         .text("Ignore unused private functions warnings"),
       opt[Unit]("ie")
-        .action((_, c) => c.copy(ignoreExternalCallCheckWarnings = true))
-        .text("Ignore external call check warnings"),
+        .action((_, c) => c.copy(ignoreCheckExternalCallerWarnings = true))
+        .text("Ignore check external caller warnings"),
       opt[Unit]('d', "debug")
         .action((_, c) => c.copy(debug = true))
         .text("Debug mode"),
