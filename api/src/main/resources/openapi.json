@@ -10134,7 +10134,7 @@
           "ignoreUpdateFieldsCheckWarnings": {
             "type": "boolean"
           },
-          "ignoreExternalCallCheckWarnings": {
+          "ignoreCheckExternalCallerWarnings": {
             "type": "boolean"
           }
         }

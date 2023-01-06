@@ -2028,13 +2028,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       def code(flag: Boolean) =
         s"""
            |Contract Foo() implements Bar {
-           |  @using(externalCallCheck = $flag)
+           |  @using(checkExternalCaller = $flag)
            |  fn bar() -> () {
            |    return
            |  }
            |}
            |Interface Bar {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn bar() -> ()
            |}
            |""".stripMargin
@@ -2063,14 +2063,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val foo =
         s"""
            |Interface Foo {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn foo() -> ()
            |}
            |""".stripMargin
       val bar =
         s"""
            |Interface Bar extends Foo {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn foo() -> ()
            |}
            |
@@ -2085,14 +2085,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val foo =
         s"""
            |Interface Foo {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn foo() -> ()
            |}
            |""".stripMargin
       val bar =
         s"""
            |Contract Bar() implements Foo {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  pub fn foo() -> () {
            |    return
            |  }
@@ -2109,14 +2109,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val a =
         s"""
            |Interface A {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  pub fn a() -> ()
            |}
            |""".stripMargin
       val b =
         s"""
            |Interface B extends A {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  pub fn b(x: Bool) -> ()
            |}
            |
@@ -2125,7 +2125,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val c =
         s"""
            |Interface C extends B {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  pub fn c(x: Bool, y: Bool) -> ()
            |}
            |
@@ -2138,11 +2138,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() implements C {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  pub fn c(x: Bool, y: Bool) -> () {}
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  pub fn a() -> () {}
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  pub fn b(x: Bool) -> () {}
            |  pub fn d(x: Bool, y: Bool, z: Bool) -> () {
            |    a()
@@ -2163,21 +2163,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val foo1: String =
         s"""
            |Abstract Contract Foo1() {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn foo1() -> () {}
            |}
            |""".stripMargin
       val foo2: String =
         s"""
            |Interface Foo2 {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn foo2() -> ()
            |}
            |""".stripMargin
       val bar1: String =
         s"""
            |Contract Bar1() extends Foo1() implements Foo2 {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn foo2() -> () {}
            |}
            |$foo1
@@ -2186,7 +2186,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val bar2: String =
         s"""
            |Contract Bar2() extends Foo1() implements Foo2 {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn foo2() -> () {}
            |}
            |$foo1
@@ -2829,7 +2829,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Interface I {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  pub fn i() -> ()
            |}
            |Abstract Contract Base(v: U256) {
@@ -2838,7 +2838,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |Contract Bar(v: U256) extends Base(v) implements I {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  pub fn i() -> () {
            |    assert!(v == 0, 0)
            |    base()

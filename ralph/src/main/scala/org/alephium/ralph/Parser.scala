@@ -229,12 +229,12 @@ abstract class Parser[Ctx <: StatelessContext] {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
       } else {
         val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
-        val (usePreapprovedAssets, useContractAssets, useExternalCallCheck, useUpdateFields) =
+        val (usePreapprovedAssets, useContractAssets, useCheckExternalCaller, useUpdateFields) =
           Parser.extractFuncModifier(
             annotations,
             usePreapprovedAssetsDefault = false,
             useContractAssetsDefault = false,
-            useExternalCallCheckDefault = true,
+            useCheckExternalCallerDefault = true,
             useUpdateFieldsDefault = false
           )
         FuncDefTmp(
@@ -243,7 +243,7 @@ abstract class Parser[Ctx <: StatelessContext] {
           isPublic,
           usePreapprovedAssets,
           useContractAssets,
-          useExternalCallCheck,
+          useCheckExternalCaller,
           useUpdateFields,
           params,
           returnType,
@@ -258,7 +258,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       f.isPublic,
       f.usePreapprovedAssets,
       f.useContractAssets,
-      f.useExternalCallCheck,
+      f.useCheckExternalCaller,
       f.useUpdateFields,
       f.args,
       f.rtypes,
@@ -366,7 +366,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     isPublic: Boolean,
     usePreapprovedAssets: Boolean,
     useContractAssets: Boolean,
-    useExternalCallCheck: Boolean,
+    useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
     args: Seq[Argument],
     rtypes: Seq[Type],
@@ -374,20 +374,25 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
 )
 
 object Parser {
-  val usingAnnotationId       = "using"
-  val usePreapprovedAssetsKey = "preapprovedAssets"
-  val useContractAssetsKey    = "assetsInContract"
-  val useExternalCallCheckKey = "externalCallCheck"
-  val useUpdateFieldsKey      = "updateFields"
+  val usingAnnotationId         = "using"
+  val usePreapprovedAssetsKey   = "preapprovedAssets"
+  val useContractAssetsKey      = "assetsInContract"
+  val useCheckExternalCallerKey = "checkExternalCaller"
+  val useUpdateFieldsKey        = "updateFields"
   val keys: Set[String] =
-    Set(usePreapprovedAssetsKey, useContractAssetsKey, useExternalCallCheckKey, useUpdateFieldsKey)
+    Set(
+      usePreapprovedAssetsKey,
+      useContractAssetsKey,
+      useCheckExternalCallerKey,
+      useUpdateFieldsKey
+    )
 
   // scalastyle:off method.length
   def extractFuncModifier(
       annotations: Seq[Annotation],
       usePreapprovedAssetsDefault: Boolean,
       useContractAssetsDefault: Boolean,
-      useExternalCallCheckDefault: Boolean,
+      useCheckExternalCallerDefault: Boolean,
       useUpdateFieldsDefault: Boolean
   ): (Boolean, Boolean, Boolean, Boolean) = {
     if (annotations.exists(_.id.name != usingAnnotationId)) {
@@ -412,22 +417,22 @@ object Parser {
             useContractAssetsKey,
             useContractAssetsDefault
           )
-          val useExternalCallCheck = extractAnnotationBoolean(
+          val useCheckExternalCaller = extractAnnotationBoolean(
             useAnnotation,
-            useExternalCallCheckKey,
-            useExternalCallCheckDefault
+            useCheckExternalCallerKey,
+            useCheckExternalCallerDefault
           )
           val useUpdateFields = extractAnnotationBoolean(
             useAnnotation,
             useUpdateFieldsKey,
             useUpdateFieldsDefault
           )
-          (usePreapprovedAssets, useContractAssets, useExternalCallCheck, useUpdateFields)
+          (usePreapprovedAssets, useContractAssets, useCheckExternalCaller, useUpdateFields)
         case None =>
           (
             usePreapprovedAssetsDefault,
             useContractAssetsDefault,
-            useExternalCallCheckDefault,
+            useCheckExternalCallerDefault,
             useUpdateFieldsDefault
           )
       }
@@ -520,7 +525,7 @@ object StatefulParser extends Parser[StatefulContext] {
               annotations,
               usePreapprovedAssetsDefault = true,
               useContractAssetsDefault = false,
-              useExternalCallCheckDefault = true,
+              useCheckExternalCallerDefault = true,
               useUpdateFieldsDefault = false
             )
           Ast.TxScript(
@@ -625,7 +630,7 @@ object StatefulParser extends Parser[StatefulContext] {
             f.isPublic,
             f.usePreapprovedAssets,
             f.useContractAssets,
-            f.useExternalCallCheck,
+            f.useCheckExternalCaller,
             f.useUpdateFields,
             f.args,
             f.rtypes,
