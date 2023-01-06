@@ -5,7 +5,7 @@
     "ignoreUnusedFieldsWarnings": false,
     "ignoreUnusedPrivateFunctionsWarnings": false,
     "ignoreUpdateFieldsCheckWarnings": false,
-    "ignoreExternalCallCheckWarnings": false
+    "ignoreCheckExternalCallerWarnings": false
   },
   "infos": {
     "Action": {
