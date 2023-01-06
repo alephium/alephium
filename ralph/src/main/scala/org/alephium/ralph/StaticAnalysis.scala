@@ -110,7 +110,21 @@ object StaticAnalysis {
     }
   }
 
+  private def isSimpleViewFunction(
+      contractState: Compiler.State[vm.StatefulContext],
+      funcId: FuncId
+  ): Boolean = {
+    val func = contractState.getFunc(funcId)
+    !(
+      func.useUpdateFields ||
+        func.usePreapprovedAssets ||
+        func.useAssetsInContract ||
+        contractState.hasSubFunctionCall(funcId)
+    )
+  }
+
   private[ralph] def checkExternalCallPermissions(
+      allStates: AVector[Compiler.State[vm.StatefulContext]],
       contractState: Compiler.State[vm.StatefulContext],
       contract: Contract,
       checkExternalCallerTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
@@ -122,7 +136,14 @@ object StaticAnalysis {
         case Some(callees) if callees.nonEmpty =>
           callees.foreach { case funcRef @ (typeId, funcId) =>
             if (!checkExternalCallerTables(typeId)(funcId)) {
-              allNoCheckExternalCallers.addOne(funcRef)
+              val calleeContractState = allStates
+                .find(_.typeId == typeId)
+                .getOrElse(
+                  throw Compiler.Error(s"No state for contract $typeId") // this should never happen
+                )
+              if (!isSimpleViewFunction(calleeContractState, funcId)) {
+                allNoCheckExternalCallers.addOne(funcRef)
+              }
             }
           }
         case _ => ()
@@ -173,7 +194,7 @@ object StaticAnalysis {
     multiContract.contracts.zipWithIndex.foreach {
       case (contract: Contract, index) if !contract.isAbstract =>
         val state = states(index)
-        checkExternalCallPermissions(state, contract, checkExternalCallerTables)
+        checkExternalCallPermissions(states, state, contract, checkExternalCallerTables)
       case (interface: ContractInterface, _) =>
         checkInterfaceCheckExternalCaller(multiContract, interface.ident, checkExternalCallerTables)
       case _ =>

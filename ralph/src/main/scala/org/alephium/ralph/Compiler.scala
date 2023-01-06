@@ -423,6 +423,10 @@ object Compiler {
         case None          => externalCalls.update(currentScope, mutable.Set(funcRef))
       }
     }
+
+    def hasSubFunctionCall(funcId: Ast.FuncId): Boolean = {
+      internalCalls.contains(funcId) || externalCalls.contains(funcId)
+    }
   }
 
   // scalastyle:off number.of.methods

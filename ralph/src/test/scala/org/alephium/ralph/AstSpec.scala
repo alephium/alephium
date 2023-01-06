@@ -137,6 +137,10 @@ class AstSpec extends AlephiumSpec {
       "h" -> Seq("a", "b", "c", "e"),
       "i" -> Seq("noCheck")
     )
+    state.internalCalls.foreach { case (funcId, _) =>
+      state.hasSubFunctionCall(funcId) is true
+    }
+    state.hasSubFunctionCall(Ast.FuncId("noCheck", false)) is false
     state.externalCalls.isEmpty is true
 
     val table = contract.buildCheckExternalCallerTable(state)
@@ -216,6 +220,16 @@ class AstSpec extends AlephiumSpec {
   }
 
   it should "check permission for external calls" in new ExternalCallsFixture {
+    val contracts = fastparse.parse(externalCalls, StatefulParser.multiContract(_)).get.value
+    val state     = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
+    state.internalCalls.foreach { case (funcId, _) =>
+      state.hasSubFunctionCall(funcId) is true
+    }
+    state.externalCalls.foreach { case (funcId, _) =>
+      state.hasSubFunctionCall(funcId) is true
+    }
+    state.hasSubFunctionCall(Ast.FuncId("noCheckPri", false)) is false
+
     val warnings = Compiler.compileContractFull(externalCalls, 0).rightValue.warnings
     checkExternalCallerWarnings(warnings).toSet is Set(
       Warnings.noCheckExternalCallerMsg("InternalCalls", "c"),
@@ -322,6 +336,144 @@ class AstSpec extends AlephiumSpec {
 
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings.isEmpty is true
+    }
+  }
+
+  it should "skip check external caller for simple view functions" in {
+    {
+      info("No warnings for simple view function")
+      val code =
+        s"""
+           |Contract Foo(state: U256) {
+           |  pub fn getState() -> U256 {
+           |    return state
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  pub fn getState() -> U256 {
+           |    return foo.getState()
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      warnings.isEmpty is true
+    }
+
+    {
+      info("Warning if the function has internal calls")
+      val code =
+        s"""
+           |Contract Foo(state: U256) {
+           |  pub fn getState() -> U256 {
+           |    doNothing()
+           |    return state
+           |  }
+           |
+           |  fn doNothing() -> () {
+           |    return
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  pub fn getState() -> U256 {
+           |    return foo.getState()
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
+    }
+
+    {
+      info("Warning if the function has external calls")
+      val code =
+        s"""
+           |Contract Foo(state: U256, bar: Bar) {
+           |  pub fn getState() -> U256 {
+           |    bar.doNothing()
+           |    return state
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  pub fn getState() -> U256 {
+           |    return foo.getState()
+           |  }
+           |
+           |  pub fn doNothing() -> () {
+           |    return
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
+    }
+
+    {
+      info("Warning if the function changes contract fields")
+      val code =
+        s"""
+           |Contract Foo(mut state: U256) {
+           |  @using(updateFields = true)
+           |  pub fn getState() -> U256 {
+           |    state = 0
+           |    return state
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  pub fn getState() -> U256 {
+           |    return foo.getState()
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
+    }
+
+    {
+      info("Warning if the function use preapproved assets")
+      val code =
+        s"""
+           |Contract Foo(state: U256) {
+           |  @using(preapprovedAssets = true)
+           |  pub fn getState() -> U256 {
+           |    return state
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  @using(preapprovedAssets = true)
+           |  pub fn getState() -> U256 {
+           |    return foo.getState{callerAddress!() -> ALPH: 1 alph}()
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
+    }
+
+    {
+      info("Warning if the function use contract assets")
+      val code =
+        s"""
+           |Contract Foo(state: U256) {
+           |  @using(assetsInContract = true)
+           |  pub fn getState(address: Address) -> U256 {
+           |    transferTokenFromSelf!(address, ALPH, 1 alph)
+           |    return state
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  pub fn getState() -> U256 {
+           |    return foo.getState(callerAddress!())
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
   }
 
