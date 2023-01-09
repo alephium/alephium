@@ -147,7 +147,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
         transferFromP2sh(lockup, unlock)
 
         val estimator = assetScriptGasEstimator(lockup, unlock)
-        GasEstimation.estimateInputGas(unlock, estimator).rightValue
+        GasEstimation.estimateInputGas(unlock, None, estimator).rightValue
       }
 
       p2shNoSignature(4) is GasBox.unsafe(2815)
@@ -179,7 +179,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
 
       val estimator = assetScriptGasEstimator(lockup, unlock)
       GasEstimation
-        .estimateInputGas(unlock, estimator)
+        .estimateInputGas(unlock, None, estimator)
         .leftValue is "Please use binary search to set the gas manually as signature is required in P2SH script"
     }
 
@@ -204,7 +204,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
 
       val estimator = assetScriptGasEstimator(lockup, unlock)
       GasEstimation
-        .estimateInputGas(unlock, estimator)
+        .estimateInputGas(unlock, None, estimator)
         .leftValue
         .startsWith("Execution error when estimating gas for P2SH script: ArithmeticError") is true
     }
@@ -268,6 +268,22 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       ).leftValue is "Execution error when estimating gas for tx script or contract: AssertionFailedWithErrorCode(null,0)"
       // scalastyle:on no.equal
     }
+  }
+
+  "GasEstimation.estimateInputGas" should "estimate the gas for SameAsPrevious unlock script properly" in {
+    GasEstimation.estimateInputGas(
+      UnlockScript.SameAsPrevious,
+      Some(GasBox.unsafe(1111)),
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(1111)
+
+    GasEstimation
+      .estimateInputGas(
+        UnlockScript.SameAsPrevious,
+        None,
+        AssetScriptGasEstimator.NotImplemented
+      )
+      .leftValue is "Error estimating gas for SameAsPrevious unlock script"
   }
 
   private def transferFromP2sh(

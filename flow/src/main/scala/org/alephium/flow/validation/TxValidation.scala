@@ -684,6 +684,18 @@ object TxValidation {
       gasRemaining.sub(totalBasicGas).toRight(Right(OutOfGas))
     }
 
+    @inline private def sameUnlockScriptAsPrevious(
+        unlockScript: UnlockScript,
+        previousUnlockScript: UnlockScript,
+        hardFork: HardFork
+    ): Boolean = {
+      if (hardFork.isLemanEnabled()) {
+        unlockScript == UnlockScript.SameAsPrevious
+      } else {
+        unlockScript == previousUnlockScript
+      }
+    }
+
     protected[validation] def checkWitnesses(
         tx: Transaction,
         preOutputs: AVector[TxOutput],
@@ -700,7 +712,11 @@ object TxValidation {
           if (
             idx > 0 &&
             preOutputs(idx).lockupScript == preOutputs(idx - 1).lockupScript &&
-            unlockScript == inputs(idx - 1).unlockScript
+            sameUnlockScriptAsPrevious(
+              unlockScript,
+              inputs(idx - 1).unlockScript,
+              blockEnv.getHardFork()
+            )
           ) {
             validTx(gasRemaining)
           } else {

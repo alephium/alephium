@@ -82,6 +82,31 @@ object UnsignedTransaction {
     t => (t.version, t.networkId, t.scriptOpt, t.gasAmount, t.gasPrice, t.inputs, t.fixedOutputs)
   )
 
+  def from(
+      scriptOpt: Option[StatefulScript],
+      startGas: GasBox,
+      gasPrice: GasPrice,
+      inputs: AVector[TxInput],
+      fixedOutputs: AVector[AssetOutput]
+  )(implicit networkConfig: NetworkConfig): UnsignedTransaction = {
+    val newInputs =
+      if (inputs.length > 1 && inputs.tail.forall(_.unlockScript == inputs.head.unlockScript)) {
+        val tail = inputs.tail.map(_.copy(unlockScript = UnlockScript.SameAsPrevious))
+        inputs.head +: tail
+      } else {
+        inputs
+      }
+    UnsignedTransaction(
+      DefaultTxVersion,
+      networkConfig.networkId,
+      scriptOpt,
+      startGas,
+      gasPrice,
+      newInputs,
+      fixedOutputs
+    )
+  }
+
   def apply(
       scriptOpt: Option[StatefulScript],
       startGas: GasBox,
@@ -89,15 +114,7 @@ object UnsignedTransaction {
       inputs: AVector[TxInput],
       fixedOutputs: AVector[AssetOutput]
   )(implicit networkConfig: NetworkConfig): UnsignedTransaction = {
-    new UnsignedTransaction(
-      DefaultTxVersion,
-      networkConfig.networkId,
-      scriptOpt,
-      startGas,
-      gasPrice,
-      inputs,
-      fixedOutputs
-    )
+    from(scriptOpt, startGas, gasPrice, inputs, fixedOutputs)
   }
 
   def apply(
@@ -105,43 +122,19 @@ object UnsignedTransaction {
       inputs: AVector[TxInput],
       fixedOutputs: AVector[AssetOutput]
   )(implicit networkConfig: NetworkConfig): UnsignedTransaction = {
-    UnsignedTransaction(
-      DefaultTxVersion,
-      networkConfig.networkId,
-      txScriptOpt,
-      minimalGas,
-      defaultGasPrice,
-      inputs,
-      fixedOutputs
-    )
+    from(txScriptOpt, minimalGas, defaultGasPrice, inputs, fixedOutputs)
   }
 
   def apply(inputs: AVector[TxInput], fixedOutputs: AVector[AssetOutput])(implicit
       networkConfig: NetworkConfig
   ): UnsignedTransaction = {
-    UnsignedTransaction(
-      DefaultTxVersion,
-      networkConfig.networkId,
-      None,
-      minimalGas,
-      defaultGasPrice,
-      inputs,
-      fixedOutputs
-    )
+    from(None, minimalGas, defaultGasPrice, inputs, fixedOutputs)
   }
 
   def coinbase(inputs: AVector[TxInput], fixedOutputs: AVector[AssetOutput])(implicit
       networkConfig: NetworkConfig
   ): UnsignedTransaction = {
-    UnsignedTransaction(
-      DefaultTxVersion,
-      networkConfig.networkId,
-      None,
-      minimalGas,
-      minimalGasPrice,
-      inputs,
-      fixedOutputs
-    )
+    from(None, minimalGas, minimalGasPrice, inputs, fixedOutputs)
   }
 
   def build(
@@ -180,17 +173,10 @@ object UnsignedTransaction {
         txOutputs = txOutputs :+ changeOutput
       }
 
-      UnsignedTransaction(
-        DefaultTxVersion,
-        networkConfig.networkId,
-        scriptOpt = None,
-        gas,
-        gasPrice,
-        inputs.map { case (ref, _) =>
-          TxInput(ref, fromUnlockScript)
-        },
-        txOutputs
-      )
+      val txInputs = inputs.map { case (ref, _) =>
+        TxInput(ref, fromUnlockScript)
+      }
+      from(None, gas, gasPrice, txInputs, txOutputs)
     }
   }
 

@@ -39,6 +39,7 @@ object UnlockScript {
           case p2pkh: P2PKH   => ByteString(0) ++ serdeImpl[PublicKey].serialize(p2pkh.publicKey)
           case p2mpkh: P2MPKH => ByteString(1) ++ p2mpkhSerde.serialize(p2mpkh)
           case p2sh: P2SH     => ByteString(2) ++ p2shSerde.serialize(p2sh)
+          case SameAsPrevious => ByteString(3)
         }
       }
 
@@ -48,6 +49,7 @@ object UnlockScript {
             serdeImpl[PublicKey]._deserialize(content).map(_.mapValue(P2PKH))
           case Staging(1, content) => p2mpkhSerde._deserialize(content)
           case Staging(2, content) => p2shSerde._deserialize(content)
+          case Staging(3, content) => Right(Staging(SameAsPrevious, content))
           case Staging(n, _) => Left(SerdeError.wrongFormat(s"Invalid unlock script prefix $n"))
         }
       }
@@ -68,4 +70,5 @@ object UnlockScript {
   final case class P2PKH(publicKey: PublicKey)                          extends UnlockScript
   final case class P2MPKH(indexedPublicKeys: AVector[(PublicKey, Int)]) extends UnlockScript
   final case class P2SH(script: StatelessScript, params: AVector[Val])  extends UnlockScript
+  case object SameAsPrevious                                            extends UnlockScript
 }
