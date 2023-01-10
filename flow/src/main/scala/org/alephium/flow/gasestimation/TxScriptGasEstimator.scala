@@ -50,7 +50,7 @@ object TxScriptGasEstimator {
         )
 
         val result =
-          VM.checkTxScriptCodeSize(maximalGasPerTx, script.bytes, blockEnv.getHardFork()).flatMap {
+          VM.checkCodeSize(maximalGasPerTx, script.bytes, blockEnv.getHardFork()).flatMap {
             remainingGas =>
               StatefulVM.runTxScript(
                 groupView.worldState.staging(),

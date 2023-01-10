@@ -838,7 +838,7 @@ object TxValidation {
       } else {
         fromExeResult(
           for {
-            remaining0 <- VM.checkAssetScriptCodeSize(gasRemaining, script.bytes)
+            remaining0 <- VM.checkCodeSize(gasRemaining, script.bytes, blockEnv.getHardFork())
             remaining1 <- remaining0.use(GasHash.gas(script.bytes.length))
             exeResult  <- StatelessVM.runAssetScript(blockEnv, txEnv, remaining1, script, params)
           } yield exeResult.gasRemaining,
@@ -915,7 +915,7 @@ object TxValidation {
         blockEnv: BlockEnv
     ): ExeResult[StatefulVM.TxScriptExecution] = {
       for {
-        remaining <- VM.checkTxScriptCodeSize(gasRemaining, script.bytes, blockEnv.getHardFork())
+        remaining <- VM.checkCodeSize(gasRemaining, script.bytes, blockEnv.getHardFork())
         result <-
           StatefulVM.runTxScript(
             worldState,
