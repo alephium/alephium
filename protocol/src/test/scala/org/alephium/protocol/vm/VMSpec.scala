@@ -484,19 +484,32 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
   }
 
   it should "check code size" in {
-    VM
-      .checkCodeSize(minimalGas, ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024 + 1)))
+    def genCodeBytes(length: Int): ByteString = {
+      ByteString.fromArrayUnsafe(Array.ofDim[Byte](length))
+    }
+
+    VM.checkAssetScriptCodeSize(minimalGas, genCodeBytes(12 * 1024)) isE GasBox.unsafe(7512)
+    VM.checkAssetScriptCodeSize(minimalGas, genCodeBytes(12 * 1024 + 1))
       .leftValue isE CodeSizeTooLarge
-    VM
-      .checkCodeSize(
-        GasBox.unsafe(200 + 12 * 1024 - 1),
-        ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024))
-      )
+    VM.checkAssetScriptCodeSize(200 + 12 * 1024 - 1, genCodeBytes(12 * 1024)).leftValue isE OutOfGas
+
+    VM.checkTxScriptCodeSize(minimalGas, genCodeBytes(12 * 1024), HardFork.Mainnet) isE GasBox
+      .unsafe(7512)
+    VM.checkTxScriptCodeSize(minimalGas, genCodeBytes(12 * 1024 + 1), HardFork.Mainnet)
+      .leftValue isE CodeSizeTooLarge
+    VM.checkTxScriptCodeSize(200 + 12 * 1024 - 1, genCodeBytes(12 * 1024), HardFork.Mainnet)
       .leftValue isE OutOfGas
-    VM.checkCodeSize(
-      GasBox.unsafe(200 + 12 * 1024),
-      ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024))
-    ) isE GasBox.zero
+    VM.checkTxScriptCodeSize(minimalGas, genCodeBytes(1 * 1024), HardFork.Leman) isE GasBox.unsafe(
+      18776
+    )
+    VM.checkTxScriptCodeSize(minimalGas, genCodeBytes(1 * 1024 + 1), HardFork.Leman)
+      .leftValue isE CodeSizeTooLarge
+    VM.checkTxScriptCodeSize(200 + 1 * 1024 - 1, genCodeBytes(1 * 1024), HardFork.Leman)
+      .leftValue isE OutOfGas
+
+    VM.checkContractCodeSize(minimalGas, genCodeBytes(12 * 1024)) isE GasBox.unsafe(7512)
+    VM.checkContractCodeSize(minimalGas, genCodeBytes(12 * 1024 + 1)).leftValue isE CodeSizeTooLarge
+    VM.checkContractCodeSize(200 + 12 * 1024 - 1, genCodeBytes(12 * 1024)).leftValue isE OutOfGas
   }
 
   it should "check field size" in {

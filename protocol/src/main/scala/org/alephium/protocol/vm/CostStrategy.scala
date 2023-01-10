@@ -58,8 +58,8 @@ trait CostStrategy {
     updateGas(VM.checkFieldSize(gasRemaining, fields))
   }
 
-  def chargeCodeSize(codeBytes: ByteString): ExeResult[Unit] = {
-    updateGas(VM.checkCodeSize(gasRemaining, codeBytes))
+  def chargeContractCodeSize(codeBytes: ByteString): ExeResult[Unit] = {
+    updateGas(VM.checkContractCodeSize(gasRemaining, codeBytes))
   }
 
   def chargeHash(byteLength: Int): ExeResult[Unit] = {

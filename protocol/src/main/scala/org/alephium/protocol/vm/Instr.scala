@@ -1564,7 +1564,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
           Right(SerdeErrorCreateContract(e))
         )
         _ <- contractCode.checkAssetsModifier(frame.ctx)
-        _ <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
+        _ <- frame.ctx.chargeContractCodeSize(contractCodeRaw.bytes)
         _ <- StatefulContract.check(contractCode, frame.ctx.getHardFork())
       } yield contractCode.toHalfDecoded()
     }
@@ -1768,7 +1768,7 @@ sealed trait MigrateBase
   ): ExeResult[Unit] = {
     for {
       contractCodeRaw <- frame.popOpStackByteVec()
-      _               <- frame.ctx.chargeCodeSize(contractCodeRaw.bytes)
+      _               <- frame.ctx.chargeContractCodeSize(contractCodeRaw.bytes)
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )

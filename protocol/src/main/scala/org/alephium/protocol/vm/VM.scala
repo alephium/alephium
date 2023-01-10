@@ -161,12 +161,34 @@ object VM {
   val noReturnTo: AVector[Val] => ExeResult[Unit] = returns =>
     if (returns.nonEmpty) failed(NonEmptyReturnForMainFunction) else okay
 
-  def checkCodeSize(initialGas: GasBox, codeBytes: ByteString): ExeResult[GasBox] = {
-    if (codeBytes.length > maximalScriptSize) {
+  @inline private def checkCodeSize(
+      initialGas: GasBox,
+      codeBytes: ByteString,
+      maximalSize: Int
+  ): ExeResult[GasBox] = {
+    if (codeBytes.length > maximalSize) {
       failed(CodeSizeTooLarge)
     } else {
       initialGas.use(GasCall.scriptBaseGas(codeBytes.length))
     }
+  }
+
+  def checkAssetScriptCodeSize(initialGas: GasBox, codeBytes: ByteString): ExeResult[GasBox] = {
+    checkCodeSize(initialGas, codeBytes, maximalAssetScriptSize)
+  }
+
+  def checkTxScriptCodeSize(
+      initialGas: GasBox,
+      codeBytes: ByteString,
+      hardFork: HardFork
+  ): ExeResult[GasBox] = {
+    val maximalTxScriptSize =
+      if (hardFork.isLemanEnabled()) maximalTxScriptSizeLeman else maximalTxScriptSizePreLeman
+    checkCodeSize(initialGas, codeBytes, maximalTxScriptSize)
+  }
+
+  def checkContractCodeSize(initialGas: GasBox, codeBytes: ByteString): ExeResult[GasBox] = {
+    checkCodeSize(initialGas, codeBytes, maximalContractCodeSize)
   }
 
   def checkFieldSize(initialGas: GasBox, fields: Iterable[Val]): ExeResult[GasBox] = {
