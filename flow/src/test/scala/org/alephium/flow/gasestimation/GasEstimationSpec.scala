@@ -270,7 +270,21 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
     }
   }
 
-  "GasEstimation.estimateInputGas" should "estimate the gas for SameAsPrevious unlock script properly" in {
+  "GasEstimation.estimate" should "estimate the gas for SameAsPrevious unlock script properly" in {
+    val groupIndex         = groupIndexGen.sample.value
+    val p2mpkhUnlockScript = p2mpkhUnlockGen(3, 2, groupIndex).sample.value
+    val p2pkhUnlockScript  = p2pkhUnlockGen(groupIndex).sample.value
+    GasEstimation.estimate(
+      AVector(
+        p2pkhUnlockScript,
+        UnlockScript.SameAsPrevious,
+        p2mpkhUnlockScript,
+        UnlockScript.SameAsPrevious
+      ),
+      1,
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(25860)
+
     GasEstimation.estimateInputGas(
       UnlockScript.SameAsPrevious,
       Some(GasBox.unsafe(1111)),

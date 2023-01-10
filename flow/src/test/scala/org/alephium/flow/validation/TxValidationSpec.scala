@@ -24,7 +24,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
-import org.alephium.flow.validation.ValidationStatus.{invalidTx, validTx}
+import org.alephium.flow.validation.ValidationStatus.{from, invalidTx, validTx}
 import org.alephium.io.IOError
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
@@ -756,13 +756,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx1.unsigned.inputs.length is 2
     tx1.inputSignatures.length is 1
     tx1.pass()(validatorPreLeman)
-    tx1.fail(NotEnoughSignature)(validatorLeman)
+    tx1.pass()(validatorLeman)
 
     val tx2 = tx1.copy(inputSignatures = tx1.inputSignatures ++ tx1.inputSignatures)
     tx2.unsigned.inputs.length is 2
     tx2.inputSignatures.length is 2
     tx2.fail(TooManyInputSignatures)(validatorPreLeman)
-    tx2.pass()(validatorLeman)
+    tx2.fail(TooManyInputSignatures)(validatorLeman)
   }
 
   trait CompressUnlockScriptsFixture extends Fixture {
@@ -771,13 +771,39 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     def toSignedTx(unsignedTx: UnsignedTransaction): Transaction
 
+    val preLemanValidator = (tx: Transaction) => {
+      for {
+        chainIndex <- getChainIndex(tx)
+        bestDeps = blockFlow.getBestDeps(chainIndex.from)
+        groupView <- from(blockFlow.getMutableGroupView(chainIndex.from, bestDeps))
+        blockEnv  <- from(blockFlow.getDryrunBlockEnv(chainIndex))
+        _ <- validateTx(
+          tx,
+          chainIndex,
+          groupView,
+          blockEnv.copy(hardFork = HardFork.Mainnet),
+          None,
+          checkDoubleSpending = true
+        )
+      } yield ()
+    }
+    val lemanValidator = validateTxOnlyForTest(_, blockFlow)
+
     def validate() = {
-      val unsignedTx = prepareOutputs(lockup, unlock, 2)
-      unsignedTx.inputs.length is 3
-      unsignedTx.inputs.head.unlockScript is unlock
-      unsignedTx.inputs.tail.foreach(_.unlockScript is UnlockScript.SameAsPrevious)
-      val tx = toSignedTx(unsignedTx)
-      tx.pass()(validateTxOnlyForTest(_, blockFlow))
+      val unsignedTx0 = prepareOutputs(lockup, unlock, 2)
+      unsignedTx0.inputs.length is 3
+      unsignedTx0.inputs.foreach(_.unlockScript is unlock)
+      val tx0 = toSignedTx(unsignedTx0)
+      tx0.pass()(lemanValidator)
+      tx0.pass()(preLemanValidator)
+
+      val newInputs = unsignedTx0.inputs.head +: unsignedTx0.inputs.tail.map(
+        _.copy(unlockScript = UnlockScript.SameAsPrevious)
+      )
+      val unsignedTx1 = unsignedTx0.copy(inputs = newInputs)
+      val tx1         = toSignedTx(unsignedTx1)
+      tx1.pass()(lemanValidator)
+      tx1.fail(InvalidUnlockScriptType)(preLemanValidator)
     }
   }
 

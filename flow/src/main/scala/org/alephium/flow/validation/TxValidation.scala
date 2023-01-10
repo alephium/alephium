@@ -175,7 +175,7 @@ trait TxValidation {
     } yield ()
   }
 
-  private def validateTx(
+  private[validation] def validateTx(
       tx: Transaction,
       chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
@@ -690,7 +690,8 @@ object TxValidation {
         hardFork: HardFork
     ): Boolean = {
       if (hardFork.isLemanEnabled()) {
-        unlockScript == UnlockScript.SameAsPrevious
+        // Make `SameAsPrevious` optional to keep backward compatibility
+        unlockScript == UnlockScript.SameAsPrevious || unlockScript == previousUnlockScript
       } else {
         unlockScript == previousUnlockScript
       }
