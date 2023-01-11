@@ -232,7 +232,11 @@ class ServerUtils(implicit
       query: BuildMultisigDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
     for {
-      initialAttoAlphAmount <- getInitialAttoAlphAmount(query.initialAttoAlphAmount)
+      amounts <- BuildTxCommon
+        .getAlphAndTokenAmounts(query.initialAttoAlphAmount, query.initialTokenAmounts)
+        .left
+        .map(badRequest)
+      initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1)
       code                  <- BuildDeployContractTx.decode(query.bytecode)
       _                     <- checkGroup(query.fromAddress.lockupScript)
       script <- buildDeployContractTxWithParsedState(
@@ -240,7 +244,7 @@ class ServerUtils(implicit
         query.fromAddress,
         code.initialFields,
         initialAttoAlphAmount,
-        query.initialTokenAmounts.getOrElse(AVector.empty),
+        amounts._2,
         query.issueTokenAmount.map(_.value)
       )
       unlockScript <- buildUnlockScript(query.fromAddress.lockupScript, query.fromPublicKeys)
@@ -776,13 +780,11 @@ class ServerUtils(implicit
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Try[UnsignedTransaction] = {
-    val lockupScript = LockupScript.p2pkh(fromPublicKey)
-    val unlockScript = UnlockScript.p2pkh(fromPublicKey)
     unsignedTxFromScript(
       blockFlow,
       script,
-      lockupScript,
-      unlockScript,
+      LockupScript.p2pkh(fromPublicKey),
+      UnlockScript.p2pkh(fromPublicKey),
       amount,
       tokens,
       gas,
@@ -800,9 +802,11 @@ class ServerUtils(implicit
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Try[UnsignedTransaction] = {
-    val utxosLimit = apiConfig.defaultUtxosLimit
     for {
-      allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
+      allUtxos <- blockFlow
+        .getUsableUtxos(lockupScript, apiConfig.defaultUtxosLimit)
+        .left
+        .map(failedInIO)
       allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
       unsignedTx <- UtxoSelectionAlgo
         .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(defaultGasPrice)))
@@ -921,9 +925,11 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildMultisigExecuteScriptTx
   ): Try[BuildExecuteScriptTxResult] = {
-    val attoAlphAmount = query.attoAlphAmount.map(_.value).getOrElse(U256.Zero)
-    val tokens = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
     for {
+      amounts <- BuildTxCommon
+        .getAlphAndTokenAmounts(query.attoAlphAmount, query.tokens)
+        .left
+        .map(badRequest)
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
@@ -933,8 +939,8 @@ class ServerUtils(implicit
         script,
         query.fromAddress.lockupScript,
         unlockScript,
-        attoAlphAmount,
-        tokens,
+        amounts._1.getOrElse(U256.Zero),
+        amounts._2,
         query.gasAmount,
         query.gasPrice
       )
