@@ -684,7 +684,7 @@ object TxValidation {
       gasRemaining.sub(totalBasicGas).toRight(Right(OutOfGas))
     }
 
-    @inline private def sameUnlockScriptAsPrevious(
+    @inline private[validation] def sameUnlockScriptAsPrevious(
         unlockScript: UnlockScript,
         previousUnlockScript: UnlockScript,
         hardFork: HardFork

@@ -852,6 +852,36 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     validate()
   }
 
+  it should "check if it is the same unlock script as previous" in new Fixture {
+    def unlockScriptGen(): Gen[UnlockScript] = {
+      groupIndexGen.flatMap { groupIndex =>
+        Gen.oneOf(p2pkhUnlockGen(groupIndex), p2mpkhUnlockGen(3, 2, groupIndex))
+      }
+    }
+
+    forAll(unlockScriptGen()) { unlockScript =>
+      sameUnlockScriptAsPrevious(unlockScript, unlockScript, HardFork.Mainnet) is true
+      sameUnlockScriptAsPrevious(unlockScript, unlockScript, HardFork.Leman) is true
+      sameUnlockScriptAsPrevious(
+        UnlockScript.SameAsPrevious,
+        unlockScript,
+        HardFork.Mainnet
+      ) is false
+      sameUnlockScriptAsPrevious(UnlockScript.SameAsPrevious, unlockScript, HardFork.Leman) is true
+    }
+
+    sameUnlockScriptAsPrevious(
+      UnlockScript.SameAsPrevious,
+      UnlockScript.SameAsPrevious,
+      HardFork.Leman
+    ) is true
+    sameUnlockScriptAsPrevious(
+      UnlockScript.SameAsPrevious,
+      UnlockScript.SameAsPrevious,
+      HardFork.Mainnet
+    ) is true
+  }
+
   behavior of "lockup script"
 
   it should "validate p2pkh" in new Fixture {
