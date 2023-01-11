@@ -288,11 +288,35 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
     GasEstimation.estimate(
       AVector(
         p2pkhUnlockScript,
+        p2pkhUnlockScript,
+        p2mpkhUnlockScript,
+        p2mpkhUnlockScript
+      ),
+      1,
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(25860)
+
+    GasEstimation.estimate(
+      AVector(
+        p2pkhUnlockScript,
         UnlockScript.SameAsPrevious,
         UnlockScript.SameAsPrevious,
         p2mpkhUnlockScript,
         UnlockScript.SameAsPrevious,
         UnlockScript.SameAsPrevious
+      ),
+      1,
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(36040)
+
+    GasEstimation.estimate(
+      AVector(
+        p2pkhUnlockScript,
+        p2pkhUnlockScript,
+        p2pkhUnlockScript,
+        p2mpkhUnlockScript,
+        p2mpkhUnlockScript,
+        p2mpkhUnlockScript
       ),
       1,
       AssetScriptGasEstimator.NotImplemented
