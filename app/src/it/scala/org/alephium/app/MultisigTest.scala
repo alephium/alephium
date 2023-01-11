@@ -207,7 +207,7 @@ class MultisigTest extends AlephiumActorSpec {
     ) is false
 
     val submitMultisigTx =
-      submitMultisigTransaction(buildTxResult, AVector(signature1, signature2))
+      submitMultisigTransaction(buildTxResult.unsignedTx, AVector(signature1, signature2))
 
     val multisigTx = request[SubmitTxResult](submitMultisigTx, restPort)
 

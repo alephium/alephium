@@ -227,6 +227,42 @@ class ServerUtils(implicit
     }
   }
 
+  def buildMultisigDeployContractTx(
+      blockFlow: BlockFlow,
+      query: BuildMultisigDeployContractTx
+  ): Try[BuildDeployContractTxResult] = {
+    for {
+      amounts <- BuildTxCommon
+        .getAlphAndTokenAmounts(query.initialAttoAlphAmount, query.initialTokenAmounts)
+        .left
+        .map(badRequest)
+      initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1)
+      code                  <- BuildDeployContractTx.decode(query.bytecode)
+      _                     <- checkGroup(query.fromAddress.lockupScript)
+      script <- buildDeployContractTxWithParsedState(
+        code.contract,
+        query.fromAddress,
+        code.initialFields,
+        initialAttoAlphAmount,
+        amounts._2,
+        query.issueTokenAmount.map(_.value)
+      )
+      unlockScript <- buildUnlockScript(query.fromAddress.lockupScript, query.fromPublicKeys)
+      utx <- unsignedTxFromScript(
+        blockFlow,
+        script,
+        query.fromAddress.lockupScript,
+        unlockScript,
+        initialAttoAlphAmount,
+        AVector.empty,
+        query.gasAmount,
+        query.gasPrice
+      )
+    } yield {
+      BuildDeployContractTxResult.from(utx)
+    }
+  }
+
   private def buildUnlockScript(
       lockupScript: LockupScript,
       pubKeys: AVector[PublicKey]
@@ -735,7 +771,7 @@ class ServerUtils(implicit
     }
   }
 
-  private def unsignedTxFromScript(
+  private def unsignedTxFromScriptWithPublickey(
       blockFlow: BlockFlow,
       script: StatefulScript,
       amount: U256,
@@ -744,11 +780,33 @@ class ServerUtils(implicit
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Try[UnsignedTransaction] = {
-    val lockupScript = LockupScript.p2pkh(fromPublicKey)
-    val unlockScript = UnlockScript.p2pkh(fromPublicKey)
-    val utxosLimit   = apiConfig.defaultUtxosLimit
+    unsignedTxFromScript(
+      blockFlow,
+      script,
+      LockupScript.p2pkh(fromPublicKey),
+      UnlockScript.p2pkh(fromPublicKey),
+      amount,
+      tokens,
+      gas,
+      gasPrice
+    )
+  }
+
+  private def unsignedTxFromScript(
+      blockFlow: BlockFlow,
+      script: StatefulScript,
+      lockupScript: LockupScript.Asset,
+      unlockScript: UnlockScript,
+      amount: U256,
+      tokens: AVector[(TokenId, U256)],
+      gas: Option[GasBox],
+      gasPrice: Option[GasPrice]
+  ): Try[UnsignedTransaction] = {
     for {
-      allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
+      allUtxos <- blockFlow
+        .getUsableUtxos(lockupScript, apiConfig.defaultUtxosLimit)
+        .left
+        .map(failedInIO)
       allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
       unsignedTx <- UtxoSelectionAlgo
         .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(defaultGasPrice)))
@@ -795,7 +853,7 @@ class ServerUtils(implicit
         amounts._2,
         query.issueTokenAmount.map(_.value)
       )
-      utx <- unsignedTxFromScript(
+      utx <- unsignedTxFromScriptWithPublickey(
         blockFlow,
         script,
         initialAttoAlphAmount,
@@ -851,12 +909,38 @@ class ServerUtils(implicit
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
-      utx <- unsignedTxFromScript(
+      utx <- unsignedTxFromScriptWithPublickey(
         blockFlow,
         script,
         amounts._1.getOrElse(U256.Zero),
         amounts._2,
         query.fromPublicKey,
+        query.gasAmount,
+        query.gasPrice
+      )
+    } yield BuildExecuteScriptTxResult.from(utx)
+  }
+
+  def buildMultisigExecuteScriptTx(
+      blockFlow: BlockFlow,
+      query: BuildMultisigExecuteScriptTx
+  ): Try[BuildExecuteScriptTxResult] = {
+    for {
+      amounts <- BuildTxCommon
+        .getAlphAndTokenAmounts(query.attoAlphAmount, query.tokens)
+        .left
+        .map(badRequest)
+      script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
+        badRequest(serdeError.getMessage)
+      )
+      unlockScript <- buildUnlockScript(query.fromAddress.lockupScript, query.fromPublicKeys)
+      utx <- unsignedTxFromScript(
+        blockFlow,
+        script,
+        query.fromAddress.lockupScript,
+        unlockScript,
+        amounts._1.getOrElse(U256.Zero),
+        amounts._2,
         query.gasAmount,
         query.gasPrice
       )

@@ -94,6 +94,8 @@ class RestServer(
       submitTransactionLogic,
       buildMultisigAddressLogic,
       buildMultisigLogic,
+      buildMultisigDeployContractTxLogic,
+      buildMultisigExecuteScriptTxLogic,
       submitMultisigTransactionLogic,
       getTransactionStatusLogic,
       getTransactionStatusLocalLogic,

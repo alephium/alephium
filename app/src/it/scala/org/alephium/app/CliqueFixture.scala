@@ -561,17 +561,17 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       )
     }
     submitMultisigTransaction(
-      buildTransactionResult,
+      buildTransactionResult.unsignedTx,
       signatures
     )
   }
 
   def submitMultisigTransaction(
-      buildTransactionResult: BuildTransactionResult,
+      unsignedTx: String,
       signatures: AVector[Signature]
   ) = {
     val body =
-      s"""{"unsignedTx":"${buildTransactionResult.unsignedTx}","signatures":${write(
+      s"""{"unsignedTx":"${unsignedTx}","signatures":${write(
           signatures.map(_.toHexString)
         )}}"""
     httpPost(
@@ -687,6 +687,101 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
          |""".stripMargin
     }
     httpPost("/contracts/unsigned-tx/deploy-contract", Some(query))
+  }
+
+  def buildMultisigDeployContractTx(
+      fromAddress: String,
+      fromPublicKeys: AVector[String],
+      bytecode: String,
+      gas: Option[Int] = Some(100000),
+      gasPrice: Option[GasPrice] = None,
+      initialFields: Option[AVector[vm.Val]] = None,
+      issueTokenAmount: Option[U256] = None
+  ) = {
+    val fullBytecode = bytecode + Hex.toHexString(serialize(initialFields.getOrElse(AVector.empty)))
+    val query = {
+      s"""
+         |{
+         |  "fromAddress": "${fromAddress}",
+         |  "fromPublicKeys": ${write(fromPublicKeys)},
+         |  "bytecode": "$fullBytecode"
+         |  ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
+         |  ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
+         |  ${issueTokenAmount.map(v => s""","issueTokenAmount": "${v.v}"""").getOrElse("")}
+         |}
+         |""".stripMargin
+    }
+    httpPost("/multisig/unsigned-tx/deploy-contract", Some(query))
+  }
+
+  def buildMultisigExecuteScriptTx(
+      fromAddress: String,
+      fromPublicKeys: AVector[String],
+      bytecode: String,
+      attoAlphAmount: Option[Amount] = None,
+      gas: Option[Int] = Some(100000),
+      gasPrice: Option[GasPrice] = None
+  ) = {
+    val query =
+      s"""
+         {
+           "fromAddress": "${fromAddress}",
+           "fromPublicKeys": ${write(fromPublicKeys)},
+           "bytecode": "$bytecode"
+           ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
+           ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
+           ${attoAlphAmount.map(a => s""","attoAlphAmount": "${a.value.v}"""").getOrElse("")}
+         }
+        """
+    httpPost("/multisig/unsigned-tx/execute-script", Some(query))
+  }
+
+  def buildMultisigDeployContractTxWithPort(
+      fromAddress: String,
+      fromPublicKeys: AVector[String],
+      code: String,
+      restPort: Int,
+      gas: Option[Int] = Some(100000),
+      gasPrice: Option[GasPrice] = None,
+      initialFields: Option[AVector[vm.Val]] = None,
+      issueTokenAmount: Option[U256] = None
+  ): BuildDeployContractTxResult = {
+    val compileResult = request[CompileContractResult](compileContract(code), restPort)
+    request[BuildDeployContractTxResult](
+      buildMultisigDeployContractTx(
+        fromAddress = fromAddress,
+        fromPublicKeys = fromPublicKeys,
+        bytecode = compileResult.bytecode,
+        gas,
+        gasPrice,
+        initialFields,
+        issueTokenAmount
+      ),
+      restPort
+    )
+  }
+
+  def buildMultisigExecuteScriptTxWithPort(
+      fromAddress: String,
+      fromPublicKeys: AVector[String],
+      code: String,
+      restPort: Int,
+      attoAlphAmount: Option[Amount] = None,
+      gas: Option[Int] = None,
+      gasPrice: Option[GasPrice] = None
+  ): BuildExecuteScriptTxResult = {
+    val compileResult = request[CompileScriptResult](compileScript(code), restPort)
+    request[BuildExecuteScriptTxResult](
+      buildMultisigExecuteScriptTx(
+        fromAddress = fromAddress,
+        fromPublicKeys = fromPublicKeys,
+        bytecode = compileResult.bytecodeTemplate,
+        attoAlphAmount,
+        gas,
+        gasPrice
+      ),
+      restPort
+    )
   }
 
   def buildExecuteScriptTx(
