@@ -49,16 +49,18 @@ object TxScriptGasEstimator {
           scriptSignatures = AVector.empty
         )
 
-        val result = VM.checkCodeSize(maximalGasPerTx, script.bytes).flatMap { remainingGas =>
-          StatefulVM.runTxScript(
-            groupView.worldState.staging(),
-            blockEnv,
-            txTemplate,
-            preOutputs,
-            script,
-            remainingGas
-          )
-        }
+        val result =
+          VM.checkCodeSize(maximalGasPerTx, script.bytes, blockEnv.getHardFork()).flatMap {
+            remainingGas =>
+              StatefulVM.runTxScript(
+                groupView.worldState.staging(),
+                blockEnv,
+                txTemplate,
+                preOutputs,
+                script,
+                remainingGas
+              )
+          }
 
         result.left.map {
           case Right(InvalidPublicKey) =>

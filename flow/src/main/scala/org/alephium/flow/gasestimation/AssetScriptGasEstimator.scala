@@ -65,7 +65,7 @@ object AssetScriptGasEstimator {
         )
 
         val result = for {
-          remaining0 <- VM.checkCodeSize(maximalGasPerTx, p2sh.script.bytes)
+          remaining0 <- VM.checkCodeSize(maximalGasPerTx, p2sh.script.bytes, blockEnv.getHardFork())
           remaining1 <- remaining0.use(GasHash.gas(p2sh.script.bytes.length))
           exeResult <- StatelessVM.runAssetScript(
             blockEnv,

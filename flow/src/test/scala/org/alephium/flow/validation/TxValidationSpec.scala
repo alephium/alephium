@@ -32,7 +32,7 @@ import org.alephium.protocol.model.ModelGenerators.AssetInputInfo
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{InvalidSignature => _, NetworkId => _, _}
 import org.alephium.ralph.Compiler
-import org.alephium.util.{AVector, TimeStamp, U256}
+import org.alephium.util.{AVector, Duration, TimeStamp, U256}
 
 // scalastyle:off number.of.methods file.size.limit
 class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
@@ -72,17 +72,37 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         tx: Transaction,
         preOutputs: AVector[TxOutput]
     ): TxValidationResult[GasBox] = {
+      checkWitnesses(tx, preOutputs, TimeStamp.now())
+    }
+
+    def checkWitnesses(
+        tx: Transaction,
+        preOutputs: AVector[TxOutput],
+        timestamp: TimeStamp
+    ): TxValidationResult[GasBox] = {
       val blockEnv =
-        BlockEnv(tx.chainIndex, networkConfig.networkId, TimeStamp.now(), Target.Max, None)
+        BlockEnv(tx.chainIndex, networkConfig.networkId, timestamp, Target.Max, None)
       checkGasAndWitnesses(tx, preOutputs, blockEnv)
     }
 
-    def prepareOutput(lockup: LockupScript.Asset, unlock: UnlockScript) = {
+    def prepareOutputs(lockup: LockupScript.Asset, unlock: UnlockScript, outputsNum: Int) = {
       val group                 = lockup.groupIndex
       val (genesisPriKey, _, _) = genesisKeys(group.value)
-      val block =
-        transfer(blockFlow, genesisPriKey, lockup, AVector.empty[(TokenId, U256)], ALPH.alph(2))
-      val output = AVector(TxOutputInfo(lockup, ALPH.alph(1), AVector.empty, None))
+      val outputs =
+        AVector.fill(outputsNum + 1)(TxOutputInfo(lockup, ALPH.alph(1), AVector.empty, None))
+      val unsignedTx = blockFlow
+        .transfer(
+          genesisPriKey.publicKey,
+          outputs,
+          None,
+          defaultGasPrice,
+          defaultUtxoLimit
+        )
+        .rightValue
+        .rightValue
+      val tx         = Transaction.from(unsignedTx, genesisPriKey)
+      val chainIndex = tx.chainIndex
+      val block      = mineWithTxs(blockFlow, chainIndex)((_, _) => AVector(tx))
       addAndCheck(blockFlow, block)
 
       blockFlow
@@ -90,13 +110,17 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           None,
           lockup,
           unlock,
-          output,
+          outputs.tail,
           None,
           defaultGasPrice,
           defaultUtxoLimit
         )
         .rightValue
         .rightValue
+    }
+
+    def prepareOutput(lockup: LockupScript.Asset, unlock: UnlockScript) = {
+      prepareOutputs(lockup, unlock, 1)
     }
 
     def sign(unsigned: UnsignedTransaction, privateKeys: PrivateKey*): Transaction = {
@@ -118,7 +142,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       (transaction: Transaction) => {
         for {
           result <- validator(transaction)
-          _      <- validateTxOnlyForTest(transaction, blockFlow)
+          _      <- validateTxOnlyForTest(transaction, blockFlow, None)
           _      <- validateMempoolTxTemplate(transaction.toTemplate, blockFlow)
         } yield result
       }
@@ -244,6 +268,10 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   it should "pass valid transactions" in new Fixture {
     forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
+      checkBlockTx(tx, preOutputs).pass()
+    }
+
+    forAll(transactionGenWithCompressedUnlockScripts()) { case (tx, preOutputs) =>
       checkBlockTx(tx, preOutputs).pass()
     }
   }
@@ -714,29 +742,135 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val tx         = transfer(blockFlow, chainIndex).nonCoinbase.head
     val unsigned1  = tx.unsigned.copy(inputs = tx.unsigned.inputs ++ tx.unsigned.inputs)
     val tx1        = Transaction.from(unsigned1, genesisKeys(0)._1)
-    val preOutputs =
-      blockFlow
-        .getBestPersistedWorldState(chainIndex.from)
-        .rightValue
-        .getPreOutputs(tx1)
-        .rightValue
+    val preOutputs = blockFlow
+      .getBestPersistedWorldState(chainIndex.from)
+      .rightValue
+      .getPreOutputs(tx1)
+      .rightValue
 
-    implicit val validator = checkWitnesses(_: Transaction, preOutputs)
+    val preLemanTimeStamp =
+      networkConfig.lemanHardForkTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    val validatorPreLeman = checkWitnesses(_: Transaction, preOutputs, preLemanTimeStamp)
+    val validatorLeman    = checkWitnesses(_: Transaction, preOutputs)
 
     tx1.unsigned.inputs.length is 2
     tx1.inputSignatures.length is 1
-    tx1.pass()
+    tx1.pass()(validatorPreLeman)
+    tx1.pass()(validatorLeman)
 
     val tx2 = tx1.copy(inputSignatures = tx1.inputSignatures ++ tx1.inputSignatures)
     tx2.unsigned.inputs.length is 2
     tx2.inputSignatures.length is 2
-    tx2.fail(TooManyInputSignatures)
+    tx2.fail(TooManyInputSignatures)(validatorPreLeman)
+    tx2.fail(TooManyInputSignatures)(validatorLeman)
+  }
+
+  trait CompressUnlockScriptsFixture extends Fixture {
+    def lockup: LockupScript.Asset
+    def unlock: UnlockScript
+
+    def toSignedTx(unsignedTx: UnsignedTransaction): Transaction
+
+    val preLemanValidator = validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet))
+    val lemanValidator    = validateTxOnlyForTest(_, blockFlow, None)
+
+    def validate() = {
+      val unsignedTx0 = prepareOutputs(lockup, unlock, 2)
+      unsignedTx0.inputs.length is 3
+      unsignedTx0.inputs.foreach(_.unlockScript is unlock)
+      val tx0 = toSignedTx(unsignedTx0)
+      tx0.pass()(lemanValidator)
+      tx0.pass()(preLemanValidator)
+
+      val newInputs = unsignedTx0.inputs.head +: unsignedTx0.inputs.tail.map(
+        _.copy(unlockScript = UnlockScript.SameAsPrevious)
+      )
+      val unsignedTx1 = unsignedTx0.copy(inputs = newInputs)
+      val tx1         = toSignedTx(unsignedTx1)
+      tx1.pass()(lemanValidator)
+      tx1.fail(InvalidUnlockScriptType)(preLemanValidator)
+    }
+  }
+
+  it should "compress p2pkh unlock scripts" in new CompressUnlockScriptsFixture {
+    val (priKey, pubKey) = keypairGen.sample.get
+    val lockup           = LockupScript.p2pkh(pubKey)
+    val unlock           = UnlockScript.p2pkh(pubKey)
+
+    def toSignedTx(unsignedTx: UnsignedTransaction): Transaction = {
+      Transaction.from(unsignedTx, priKey)
+    }
+
+    validate()
+  }
+
+  it should "compress p2mpkh unlock scripts" in new CompressUnlockScriptsFixture {
+    val (priKey0, pubKey0) = keypairGen.sample.value
+    val (priKey1, pubKey1) = keypairGen.sample.value
+    val (_, pubKey2)       = keypairGen.sample.value
+    val lockup             = LockupScript.p2mpkhUnsafe(AVector(pubKey0, pubKey1, pubKey2), 2)
+    val unlock             = UnlockScript.p2mpkh(AVector.from(Seq(pubKey0 -> 0, pubKey1 -> 1)))
+
+    def toSignedTx(unsignedTx: UnsignedTransaction): Transaction = {
+      sign(unsignedTx, priKey0, priKey1)
+    }
+
+    validate()
+  }
+
+  it should "compress p2sh unlock scripts" in new CompressUnlockScriptsFixture {
+    val assetScript =
+      s"""
+         |AssetScript P2sh {
+         |  pub fn main() -> () {}
+         |}
+         |""".stripMargin
+
+    val script = Compiler.compileAssetScript(assetScript).rightValue._1
+    val lockup = LockupScript.p2sh(script)
+    val unlock = UnlockScript.p2sh(script, AVector.empty)
+
+    def toSignedTx(unsignedTx: UnsignedTransaction): Transaction = {
+      Transaction.from(unsignedTx, AVector.empty[Signature])
+    }
+
+    validate()
+  }
+
+  it should "check if it is the same unlock script as previous" in new Fixture {
+    def unlockScriptGen(): Gen[UnlockScript] = {
+      groupIndexGen.flatMap { groupIndex =>
+        Gen.oneOf(p2pkhUnlockGen(groupIndex), p2mpkhUnlockGen(3, 2, groupIndex))
+      }
+    }
+
+    forAll(unlockScriptGen()) { unlockScript =>
+      sameUnlockScriptAsPrevious(unlockScript, unlockScript, HardFork.Mainnet) is true
+      sameUnlockScriptAsPrevious(unlockScript, unlockScript, HardFork.Leman) is true
+      sameUnlockScriptAsPrevious(
+        UnlockScript.SameAsPrevious,
+        unlockScript,
+        HardFork.Mainnet
+      ) is false
+      sameUnlockScriptAsPrevious(UnlockScript.SameAsPrevious, unlockScript, HardFork.Leman) is true
+    }
+
+    sameUnlockScriptAsPrevious(
+      UnlockScript.SameAsPrevious,
+      UnlockScript.SameAsPrevious,
+      HardFork.Leman
+    ) is true
+    sameUnlockScriptAsPrevious(
+      UnlockScript.SameAsPrevious,
+      UnlockScript.SameAsPrevious,
+      HardFork.Mainnet
+    ) is true
   }
 
   behavior of "lockup script"
 
   it should "validate p2pkh" in new Fixture {
-    implicit val validator = validateTxOnlyForTest(_, blockFlow)
+    implicit val validator = validateTxOnlyForTest(_, blockFlow, None)
 
     forAll(keypairGen) { case (priKey, pubKey) =>
       val lockup   = LockupScript.p2pkh(pubKey)
@@ -762,7 +896,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       sign(unsigned, priKey0, priKey1)
     }
 
-    implicit val validator = validateTxOnlyForTest(_, blockFlow)
+    implicit val validator = validateTxOnlyForTest(_, blockFlow, None)
 
     tx(pubKey0 -> 0).fail(InvalidNumberOfPublicKey)
     tx(pubKey0 -> 0, pubKey1 -> 1, pubKey2 -> 2).fail(InvalidNumberOfPublicKey)
@@ -793,7 +927,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val unlock   = UnlockScript.p2sh(script, AVector(Val.U256(51)))
     val unsigned = prepareOutput(lockup, unlock)
 
-    implicit val validator = validateTxOnlyForTest(_, blockFlow)
+    implicit val validator = validateTxOnlyForTest(_, blockFlow, None)
 
     val tx0 = Transaction.from(unsigned, AVector.empty[Signature])
     tx0.pass()

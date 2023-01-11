@@ -50,6 +50,10 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     val unlock = UnlockScript.p2sh(dummyScript, AVector.empty)
     deserialize[UnlockScript](serialize[UnlockScript](unlock)) isE unlock
+
+    deserialize[UnlockScript](
+      serialize[UnlockScript](UnlockScript.SameAsPrevious)
+    ) isE UnlockScript.SameAsPrevious
   }
 
   it should "serialize examples" in {
@@ -65,6 +69,8 @@ class UnlockScriptSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     val unlock2 = UnlockScript.p2sh(dummyScript, AVector.empty)
     serialize[UnlockScript](unlock2) is Hex.unsafe(s"020101000000000000")
+
+    serialize[UnlockScript](UnlockScript.SameAsPrevious) is Hex.unsafe(s"03")
   }
 
   it should "validate multisig" in {

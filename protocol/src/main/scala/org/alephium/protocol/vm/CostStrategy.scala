@@ -18,6 +18,8 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
+import org.alephium.protocol.model.HardFork
+
 trait CostStrategy {
   var gasRemaining: GasBox
 
@@ -58,8 +60,8 @@ trait CostStrategy {
     updateGas(VM.checkFieldSize(gasRemaining, fields))
   }
 
-  def chargeCodeSize(codeBytes: ByteString): ExeResult[Unit] = {
-    updateGas(VM.checkCodeSize(gasRemaining, codeBytes))
+  def chargeContractCodeSize(codeBytes: ByteString, hardFork: HardFork): ExeResult[Unit] = {
+    updateGas(VM.checkCodeSize(gasRemaining, codeBytes, hardFork))
   }
 
   def chargeHash(byteLength: Int): ExeResult[Unit] = {

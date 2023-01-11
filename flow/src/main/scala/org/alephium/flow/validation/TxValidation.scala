@@ -157,7 +157,8 @@ trait TxValidation {
 
   def validateTxOnlyForTest(
       tx: Transaction,
-      flow: BlockFlow
+      flow: BlockFlow,
+      hardForkOpt: Option[HardFork]
   ): TxValidationResult[Unit] = {
     for {
       chainIndex <- getChainIndex(tx)
@@ -168,14 +169,14 @@ trait TxValidation {
         tx,
         chainIndex,
         groupView,
-        blockEnv,
+        hardForkOpt.map(hardFork => blockEnv.copy(hardFork = hardFork)).getOrElse(blockEnv),
         None,
         checkDoubleSpending = true
       )
     } yield ()
   }
 
-  private def validateTx(
+  private[validation] def validateTx(
       tx: Transaction,
       chainIndex: ChainIndex,
       groupView: BlockFlowGroupView[WorldState.Cached],
@@ -684,6 +685,19 @@ object TxValidation {
       gasRemaining.sub(totalBasicGas).toRight(Right(OutOfGas))
     }
 
+    @inline private[validation] def sameUnlockScriptAsPrevious(
+        unlockScript: UnlockScript,
+        previousUnlockScript: UnlockScript,
+        hardFork: HardFork
+    ): Boolean = {
+      if (hardFork.isLemanEnabled()) {
+        // Make `SameAsPrevious` optional to keep backward compatibility
+        unlockScript == UnlockScript.SameAsPrevious || unlockScript == previousUnlockScript
+      } else {
+        unlockScript == previousUnlockScript
+      }
+    }
+
     protected[validation] def checkWitnesses(
         tx: Transaction,
         preOutputs: AVector[TxOutput],
@@ -700,7 +714,11 @@ object TxValidation {
           if (
             idx > 0 &&
             preOutputs(idx).lockupScript == preOutputs(idx - 1).lockupScript &&
-            unlockScript == inputs(idx - 1).unlockScript
+            sameUnlockScriptAsPrevious(
+              unlockScript,
+              inputs(idx - 1).unlockScript,
+              blockEnv.getHardFork()
+            )
           ) {
             validTx(gasRemaining)
           } else {
@@ -822,7 +840,7 @@ object TxValidation {
       } else {
         fromExeResult(
           for {
-            remaining0 <- VM.checkCodeSize(gasRemaining, script.bytes)
+            remaining0 <- VM.checkCodeSize(gasRemaining, script.bytes, blockEnv.getHardFork())
             remaining1 <- remaining0.use(GasHash.gas(script.bytes.length))
             exeResult  <- StatelessVM.runAssetScript(blockEnv, txEnv, remaining1, script, params)
           } yield exeResult.gasRemaining,
@@ -899,7 +917,7 @@ object TxValidation {
         blockEnv: BlockEnv
     ): ExeResult[StatefulVM.TxScriptExecution] = {
       for {
-        remaining <- VM.checkCodeSize(gasRemaining, script.bytes)
+        remaining <- VM.checkCodeSize(gasRemaining, script.bytes, blockEnv.getHardFork())
         result <-
           StatefulVM.runTxScript(
             worldState,

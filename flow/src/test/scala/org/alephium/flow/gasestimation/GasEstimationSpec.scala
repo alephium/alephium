@@ -147,7 +147,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
         transferFromP2sh(lockup, unlock)
 
         val estimator = assetScriptGasEstimator(lockup, unlock)
-        GasEstimation.estimateInputGas(unlock, estimator).rightValue
+        GasEstimation.estimateInputGas(unlock, None, estimator).rightValue
       }
 
       p2shNoSignature(4) is GasBox.unsafe(2815)
@@ -179,7 +179,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
 
       val estimator = assetScriptGasEstimator(lockup, unlock)
       GasEstimation
-        .estimateInputGas(unlock, estimator)
+        .estimateInputGas(unlock, None, estimator)
         .leftValue is "Please use binary search to set the gas manually as signature is required in P2SH script"
     }
 
@@ -204,7 +204,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
 
       val estimator = assetScriptGasEstimator(lockup, unlock)
       GasEstimation
-        .estimateInputGas(unlock, estimator)
+        .estimateInputGas(unlock, None, estimator)
         .leftValue
         .startsWith("Execution error when estimating gas for P2SH script: ArithmeticError") is true
     }
@@ -268,6 +268,73 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       ).leftValue is "Execution error when estimating gas for tx script or contract: AssertionFailedWithErrorCode(null,0)"
       // scalastyle:on no.equal
     }
+  }
+
+  "GasEstimation.estimate" should "estimate the gas for SameAsPrevious unlock script properly" in {
+    val groupIndex         = groupIndexGen.sample.value
+    val p2mpkhUnlockScript = p2mpkhUnlockGen(3, 2, groupIndex).sample.value
+    val p2pkhUnlockScript  = p2pkhUnlockGen(groupIndex).sample.value
+    GasEstimation.estimate(
+      AVector(
+        p2pkhUnlockScript,
+        UnlockScript.SameAsPrevious,
+        p2mpkhUnlockScript,
+        UnlockScript.SameAsPrevious
+      ),
+      1,
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(25860)
+
+    GasEstimation.estimate(
+      AVector(
+        p2pkhUnlockScript,
+        p2pkhUnlockScript,
+        p2mpkhUnlockScript,
+        p2mpkhUnlockScript
+      ),
+      1,
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(25860)
+
+    GasEstimation.estimate(
+      AVector(
+        p2pkhUnlockScript,
+        UnlockScript.SameAsPrevious,
+        UnlockScript.SameAsPrevious,
+        p2mpkhUnlockScript,
+        UnlockScript.SameAsPrevious,
+        UnlockScript.SameAsPrevious
+      ),
+      1,
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(36040)
+
+    GasEstimation.estimate(
+      AVector(
+        p2pkhUnlockScript,
+        p2pkhUnlockScript,
+        p2pkhUnlockScript,
+        p2mpkhUnlockScript,
+        p2mpkhUnlockScript,
+        p2mpkhUnlockScript
+      ),
+      1,
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(36040)
+
+    GasEstimation.estimateInputGas(
+      UnlockScript.SameAsPrevious,
+      Some(GasBox.unsafe(1111)),
+      AssetScriptGasEstimator.NotImplemented
+    ) isE GasBox.unsafe(1111)
+
+    GasEstimation
+      .estimateInputGas(
+        UnlockScript.SameAsPrevious,
+        None,
+        AssetScriptGasEstimator.NotImplemented
+      )
+      .leftValue is "Error estimating gas for SameAsPrevious unlock script"
   }
 
   private def transferFromP2sh(

@@ -485,17 +485,43 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check code size" in {
     VM
-      .checkCodeSize(minimalGas, ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024 + 1)))
+      .checkCodeSize(
+        minimalGas,
+        ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024 + 1)),
+        HardFork.Mainnet
+      )
       .leftValue isE CodeSizeTooLarge
     VM
       .checkCodeSize(
         GasBox.unsafe(200 + 12 * 1024 - 1),
-        ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024))
+        ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024)),
+        HardFork.Mainnet
       )
       .leftValue isE OutOfGas
     VM.checkCodeSize(
       GasBox.unsafe(200 + 12 * 1024),
-      ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024))
+      ByteString.fromArrayUnsafe(Array.ofDim[Byte](12 * 1024)),
+      HardFork.Mainnet
+    ) isE GasBox.zero
+
+    VM
+      .checkCodeSize(
+        minimalGas,
+        ByteString.fromArrayUnsafe(Array.ofDim[Byte](4 * 1024 + 1)),
+        HardFork.Leman
+      )
+      .leftValue isE CodeSizeTooLarge
+    VM
+      .checkCodeSize(
+        GasBox.unsafe(200 + 4 * 1024 - 1),
+        ByteString.fromArrayUnsafe(Array.ofDim[Byte](4 * 1024)),
+        HardFork.Leman
+      )
+      .leftValue isE OutOfGas
+    VM.checkCodeSize(
+      GasBox.unsafe(200 + 4 * 1024),
+      ByteString.fromArrayUnsafe(Array.ofDim[Byte](4 * 1024)),
+      HardFork.Leman
     ) isE GasBox.zero
   }
 

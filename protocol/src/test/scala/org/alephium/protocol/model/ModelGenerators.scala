@@ -425,6 +425,45 @@ trait TxGenerators
       tx -> assetInfos
     }
 
+  def transactionGenWithCompressedUnlockScripts(
+      unlockScriptsNumGen: Gen[Int] = Gen.choose(1, 4),
+      inputsNumGen: Gen[Int] = Gen.choose(1, 4),
+      tokensNumGen: Gen[Int] = Gen.const(0),
+      chainIndexGen: Gen[ChainIndex] = chainIndexGen,
+      scriptGen: IndexScriptPairGen = p2pkScriptGen,
+      lockupGen: IndexLockupScriptGen = assetLockupGen,
+      lockTimeGen: Gen[TimeStamp] = Gen.const(TimeStamp.zero)
+  ): Gen[(Transaction, AVector[AssetInputInfo])] = {
+    for {
+      chainIndex       <- chainIndexGen
+      unlockScriptsNum <- unlockScriptsNumGen
+      scriptPairs      <- Gen.listOfN(unlockScriptsNum, scriptGen(chainIndex.from))
+      assetInfoss <- Gen.sequence[Seq[AVector[AssetInputInfo]], AVector[AssetInputInfo]](
+        (0 until unlockScriptsNum).map { index =>
+          assetsToSpendGen(
+            inputsNumGen,
+            tokensNumGen,
+            Gen.const(scriptPairs(index)),
+            lockTimeGen
+          )
+        }
+      )
+      assetInfos = AVector.from(
+        assetInfoss.flatMap(infos =>
+          infos.head +: infos.tail.map(info =>
+            info.copy(txInput = info.txInput.copy(unlockScript = UnlockScript.SameAsPrevious))
+          )
+        )
+      )
+      unsignedTx <- unsignedTxGen(chainIndex)(Gen.const(assetInfos), lockupGen)
+    } yield {
+      val signatures =
+        AVector.from(scriptPairs.map(pair => SignatureSchema.sign(unsignedTx.id, pair.privateKey)))
+      val tx = Transaction.from(unsignedTx, signatures)
+      tx -> assetInfos
+    }
+  }
+
   def transactionGen(
       numInputsGen: Gen[Int] = Gen.choose(1, 10),
       numTokensGen: Gen[Int] = Gen.choose(0, maxTokenPerUtxo),

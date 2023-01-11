@@ -18,7 +18,7 @@ package org.alephium.protocol.vm
 
 import akka.util.ByteString
 
-import org.alephium.protocol.model.minimalGas
+import org.alephium.protocol.model.{minimalGas, HardFork}
 import org.alephium.util.AlephiumSpec
 
 class CostStrategySpec extends AlephiumSpec {
@@ -37,7 +37,8 @@ class CostStrategySpec extends AlephiumSpec {
     test(_.chargeContractLoad(123), 800 + (123 + 7) / 8)
     test(_.chargeContractStateUpdate(Seq(Val.ByteVec(bytes))), 5000 + 123)
     test(_.chargeGas(GasBox.unsafe(100)), 100)
-    test(_.chargeCodeSize(bytes), 200 + 123)
+    test(_.chargeContractCodeSize(bytes, HardFork.Mainnet), 200 + 123)
+    test(_.chargeContractCodeSize(bytes, HardFork.Leman), 200 + 123)
     test(_.chargeFieldSize(Seq(Val.ByteVec(bytes))), 123)
   }
 }

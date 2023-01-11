@@ -161,8 +161,14 @@ object VM {
   val noReturnTo: AVector[Val] => ExeResult[Unit] = returns =>
     if (returns.nonEmpty) failed(NonEmptyReturnForMainFunction) else okay
 
-  def checkCodeSize(initialGas: GasBox, codeBytes: ByteString): ExeResult[GasBox] = {
-    if (codeBytes.length > maximalScriptSize) {
+  def checkCodeSize(
+      initialGas: GasBox,
+      codeBytes: ByteString,
+      hardFork: HardFork
+  ): ExeResult[GasBox] = {
+    val maximalCodeSize =
+      if (hardFork.isLemanEnabled()) maximalCodeSizeLeman else maximalCodeSizePreLeman
+    if (codeBytes.length > maximalCodeSize) {
       failed(CodeSizeTooLarge)
     } else {
       initialGas.use(GasCall.scriptBaseGas(codeBytes.length))

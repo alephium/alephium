@@ -48,11 +48,15 @@ object GasEstimation extends StrictLogging {
       numOutputs: Int,
       assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, GasBox] = {
-    val inputGas: Either[String, GasBox] = unlockScripts.foldE(GasBox.zero) { (gas, unlock) =>
-      estimateInputGas(unlock, assetScriptGasEstimator).map(gas.addUnsafe)
-    }
+    val inputGas: Either[String, (GasBox, Option[GasBox])] =
+      unlockScripts.foldE((GasBox.zero, None: Option[GasBox])) {
+        case ((sum, previousGas), unlock) =>
+          estimateInputGas(unlock, previousGas, assetScriptGasEstimator).map { gas =>
+            (sum.addUnsafe(gas), Some(gas))
+          }
+      }
 
-    inputGas.map(estimate(_, numOutputs))
+    inputGas.map { case (gas, _) => estimate(gas, numOutputs) }
   }
 
   def estimate(inputGas: GasBox, numOutputs: Int): GasBox = {
@@ -72,6 +76,7 @@ object GasEstimation extends StrictLogging {
 
   private[gasestimation] def estimateInputGas(
       unlockScript: UnlockScript,
+      previousGas: Option[GasBox],
       assetScriptGasEstimator: AssetScriptGasEstimator
   ): Either[String, GasBox] = {
     unlockScript match {
@@ -87,6 +92,8 @@ object GasEstimation extends StrictLogging {
         assetScriptGasEstimator
           .estimate(p2sh)
           .map(GasSchedule.txInputBaseGas.addUnsafe(_))
+      case UnlockScript.SameAsPrevious =>
+        previousGas.toRight("Error estimating gas for SameAsPrevious unlock script")
     }
   }
 }
