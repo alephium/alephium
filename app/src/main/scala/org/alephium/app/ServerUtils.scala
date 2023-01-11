@@ -167,20 +167,23 @@ class ServerUtils(implicit
   def listUnconfirmedTransactions(
       blockFlow: BlockFlow
   ): Try[AVector[UnconfirmedTransactions]] = {
-    Right(
-      brokerConfig.chainIndexes
-        .map { chainIndex =>
+    val result = brokerConfig.groupRange.foldLeft(
+      AVector.ofCapacity[UnconfirmedTransactions](brokerConfig.chainNum)
+    ) { case (acc, group) =>
+      val groupIndex = GroupIndex.unsafe(group)
+      val txs        = blockFlow.getMemPool(groupIndex).getAll()
+      val groupedTxs = txs.filter(_.chainIndex.from == groupIndex).groupBy(_.chainIndex)
+      acc ++ AVector.from(
+        groupedTxs.map { case (chainIndex, txs) =>
           UnconfirmedTransactions(
             chainIndex.from.value,
             chainIndex.to.value,
-            blockFlow
-              .getMemPool(chainIndex)
-              .getAll(chainIndex)
-              .map(model.TransactionTemplate.fromProtocol(_))
+            txs.map(model.TransactionTemplate.fromProtocol)
           )
         }
-        .filter(_.unconfirmedTransactions.nonEmpty)
-    )
+      )
+    }
+    Right(result)
   }
 
   def buildTransaction(
@@ -395,10 +398,6 @@ class ServerUtils(implicit
     }
   }
 
-  def isInMemPool(blockFlow: BlockFlow, txId: TransactionId, chainIndex: ChainIndex): Boolean = {
-    blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
-  }
-
   def getEventsForContractCurrentCount(
       blockFlow: BlockFlow,
       contractAddress: Address.Contract
@@ -563,7 +562,7 @@ class ServerUtils(implicit
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
   ): FutureTry[SubmitTxResult] = {
-    val message = TxHandler.AddToGrandPool(AVector(tx))
+    val message = TxHandler.AddToMemPool(AVector(tx), isIntraCliqueSyncing = false)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
         Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
@@ -835,7 +834,11 @@ class ServerUtils(implicit
       query: BuildDeployContractTx
   ): Try[BuildDeployContractTxResult] = {
     for {
-      initialAttoAlphAmount <- getInitialAttoAlphAmount(query.initialAttoAlphAmount)
+      amounts <- BuildTxCommon
+        .getAlphAndTokenAmounts(query.initialAttoAlphAmount, query.initialTokenAmounts)
+        .left
+        .map(badRequest)
+      initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1)
       code                  <- BuildDeployContractTx.decode(query.bytecode)
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildDeployContractTxWithParsedState(
@@ -843,7 +846,7 @@ class ServerUtils(implicit
         address,
         code.initialFields,
         initialAttoAlphAmount,
-        query.initialTokenAmounts.getOrElse(AVector.empty),
+        amounts._2,
         query.issueTokenAmount.map(_.value)
       )
       utx <- unsignedTxFromScriptWithPublickey(
@@ -858,10 +861,10 @@ class ServerUtils(implicit
     } yield BuildDeployContractTxResult.from(utx)
   }
 
-  def getInitialAttoAlphAmount(amountOption: Option[Amount]): Try[U256] = {
+  def getInitialAttoAlphAmount(amountOption: Option[U256]): Try[U256] = {
     amountOption match {
       case Some(amount) =>
-        if (amount.value >= minimalAlphInContract) { Right(amount.value) }
+        if (amount >= minimalAlphInContract) { Right(amount) }
         else {
           val error =
             s"Expect ${Amount.toAlphString(minimalAlphInContract)} deposit to deploy a new contract"
@@ -894,17 +897,19 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       query: BuildExecuteScriptTx
   ): Try[BuildExecuteScriptTxResult] = {
-    val attoAlphAmount = query.attoAlphAmount.map(_.value).getOrElse(U256.Zero)
-    val tokens = query.tokens.getOrElse(AVector.empty).map(token => (token.id, token.amount))
     for {
+      amounts <- BuildTxCommon
+        .getAlphAndTokenAmounts(query.attoAlphAmount, query.tokens)
+        .left
+        .map(badRequest)
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
       utx <- unsignedTxFromScriptWithPublickey(
         blockFlow,
         script,
-        attoAlphAmount,
-        tokens,
+        amounts._1.getOrElse(U256.Zero),
+        amounts._2,
         query.fromPublicKey,
         query.gasAmount,
         query.gasPrice
@@ -1373,7 +1378,7 @@ object ServerUtils {
       address: Address,
       initialState: Option[String],
       initialAttoAlphAmount: U256,
-      initialTokenAmounts: AVector[Token],
+      initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
     parseState(initialState).flatMap { state =>
@@ -1393,7 +1398,7 @@ object ServerUtils {
       address: Address,
       initialFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
-      initialTokenAmounts: AVector[Token],
+      initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
     buildDeployContractScriptWithParsedState(
@@ -1411,7 +1416,7 @@ object ServerUtils {
       address: Address,
       initialFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
-      initialTokenAmounts: AVector[Token],
+      initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): String = {
     val stateRaw = Hex.toHexString(serialize(initialFields))
@@ -1422,15 +1427,15 @@ object ServerUtils {
     }
 
     val create = if (initialTokenAmounts.isEmpty) {
-      val approveAssets = s"{@$address -> ${initialAttoAlphAmount.v}}"
+      val approveAssets = s"{@$address -> ALPH: ${initialAttoAlphAmount.v}}"
       toCreate(approveAssets)
     } else {
       val approveTokens = initialTokenAmounts
-        .map { token =>
-          s"#${token.id.toHexString}: ${token.amount.v}"
+        .map { case (tokenId, amount) =>
+          s"#${tokenId.toHexString}: ${amount.v}"
         }
         .mkString(", ")
-      val approveAssets = s"{@$address -> ${initialAttoAlphAmount.v}, $approveTokens}"
+      val approveAssets = s"{@$address -> ALPH: ${initialAttoAlphAmount.v}, $approveTokens}"
       toCreate(approveAssets)
     }
     s"""
@@ -1445,7 +1450,7 @@ object ServerUtils {
       address: Address,
       initialFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
-      initialTokenAmounts: AVector[Token],
+      initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
     val scriptRaw = buildDeployContractScriptRawWithParsedState(

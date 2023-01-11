@@ -1,0 +1,10 @@
+Contract Sub(mut result : U256) {
+    event Sub(x: U256, y: U256)
+
+    @using(checkExternalCaller = false, updateFields = true)
+    pub fn sub(array: [U256; 2]) -> U256 {
+        emit Sub(array[0], array[1])
+        result = result + array[0] - array[1]
+        return result
+    }
+}

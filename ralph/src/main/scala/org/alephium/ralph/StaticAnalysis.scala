@@ -100,77 +100,64 @@ object StaticAnalysis {
       case _: vm.StoreField | _: vm.StoreFieldByIndex.type | _: vm.MigrateWithFields.type => true
       case _                                                                              => false
     }
-    val internalCalls             = state.internalCalls.getOrElse(func.id, mutable.Set.empty)
-    val internalUpdateFieldsCalls = internalCalls.filter(state.getFunc(_).useUpdateFields)
-    val externalCalls             = state.externalCalls.getOrElse(func.id, mutable.Set.empty)
-    val externalUpdateFieldsCalls = externalCalls.filter { case (typeId, funcId) =>
-      state.getFunc(typeId, funcId).useUpdateFields
+
+    if (updateFields && !func.useUpdateFields) {
+      state.warnNoUpdateFieldsCheck(state.typeId, func.id)
     }
 
-    val isUpdateFields =
-      updateFields || internalUpdateFieldsCalls.nonEmpty || externalUpdateFieldsCalls.nonEmpty
-    if (isUpdateFields && !func.useUpdateFields) {
-      if (updateFields) {
-        throw Compiler.Error(
-          s"Function ${funcName(state.typeId, func.id)} changes state, but has `updateFields = false`"
-        )
-      }
-      if (internalUpdateFieldsCalls.nonEmpty) {
-        throw Compiler.Error(
-          s"Function ${funcName(state.typeId, func.id)} has internal update fields calls: ${quote(
-              internalUpdateFieldsCalls.map(_.name).mkString(", ")
-            )}"
-        )
-      }
-      if (externalUpdateFieldsCalls.nonEmpty) {
-        val msg = externalUpdateFieldsCalls
-          .map { case (typeId, funcId) =>
-            s"${typeId.name}.${funcId.name}"
-          }
-          .mkString(", ")
-        throw Compiler.Error(
-          s"Function ${funcName(state.typeId, func.id)} has external update fields calls: ${quote(msg)}"
-        )
-      }
-    }
-
-    if (!isUpdateFields && func.useUpdateFields) {
-      state.warnUpdateFieldsCheck(state.typeId, func.id)
+    if (!updateFields && func.useUpdateFields) {
+      state.warnUnnecessaryUpdateFieldsCheck(state.typeId, func.id)
     }
   }
 
+  private def isSimpleViewFunction(
+      contractState: Compiler.State[vm.StatefulContext],
+      funcId: FuncId
+  ): Boolean = {
+    val func = contractState.getFunc(funcId)
+    !(
+      func.useUpdateFields ||
+        func.usePreapprovedAssets ||
+        func.useAssetsInContract ||
+        contractState.hasSubFunctionCall(funcId)
+    )
+  }
+
   private[ralph] def checkExternalCallPermissions(
+      allStates: AVector[Compiler.State[vm.StatefulContext]],
       contractState: Compiler.State[vm.StatefulContext],
       contract: Contract,
-      externalCallCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
+      checkExternalCallerTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
   ): Unit = {
-    val allNoExternalCallChecks: mutable.Set[(TypeId, FuncId)] = mutable.Set.empty
+    val allNoCheckExternalCallers: mutable.Set[(TypeId, FuncId)] = mutable.Set.empty
     contract.funcs.foreach { func =>
-      // To check that external calls should have external call checks
+      // To check that external calls should have check external callers
       contractState.externalCalls.get(func.id) match {
         case Some(callees) if callees.nonEmpty =>
           callees.foreach { case funcRef @ (typeId, funcId) =>
-            if (!externalCallCheckTables(typeId)(funcId)) {
-              val callee = contractState.getFunc(typeId, funcId)
-              if (
-                callee.useUpdateFields || callee.usePreapprovedAssets || callee.useAssetsInContract
-              ) {
-                allNoExternalCallChecks.addOne(funcRef)
+            if (!checkExternalCallerTables(typeId)(funcId)) {
+              val calleeContractState = allStates
+                .find(_.typeId == typeId)
+                .getOrElse(
+                  throw Compiler.Error(s"No state for contract $typeId") // this should never happen
+                )
+              if (!isSimpleViewFunction(calleeContractState, funcId)) {
+                allNoCheckExternalCallers.addOne(funcRef)
               }
             }
           }
         case _ => ()
       }
     }
-    allNoExternalCallChecks.foreach { case (typeId, funcId) =>
-      contractState.warnExternalCallCheck(typeId, funcId)
+    allNoCheckExternalCallers.foreach { case (typeId, funcId) =>
+      contractState.warnCheckExternalCaller(typeId, funcId)
     }
   }
 
-  def checkInterfaceExternalCallCheck(
+  def checkInterfaceCheckExternalCaller(
       multiContract: MultiContract,
       interfaceTypeId: TypeId,
-      externalCallCheckTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
+      checkExternalCallerTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
   ): Unit = {
     assume(multiContract.dependencies.isDefined)
     val children = multiContract.dependencies
@@ -180,10 +167,10 @@ object StaticAnalysis {
       .getOrElse(Seq.empty)
     val interface = multiContract.getInterface(interfaceTypeId)
     children.foreach { contractId =>
-      val table = externalCallCheckTables(contractId)
+      val table = checkExternalCallerTables(contractId)
       interface.funcs.foreach { func =>
-        if (func.useExternalCallCheck && !table(func.id)) {
-          throw Compiler.Error(Warnings.noExternalCallCheckMsg(contractId.name, func.id.name))
+        if (func.useCheckExternalCaller && !table(func.id)) {
+          throw Compiler.Error(Warnings.noCheckExternalCallerMsg(contractId.name, func.id.name))
         }
       }
     }
@@ -193,23 +180,23 @@ object StaticAnalysis {
       multiContract: MultiContract,
       states: AVector[Compiler.State[vm.StatefulContext]]
   ): Unit = {
-    val externalCallCheckTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
+    val checkExternalCallerTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
     multiContract.contracts.zipWithIndex.foreach {
       case (contract: Contract, index) if !contract.isAbstract =>
         val state = states(index)
-        val table = contract.buildExternalCallCheckTable(state)
-        externalCallCheckTables.update(contract.ident, table)
+        val table = contract.buildCheckExternalCallerTable(state)
+        checkExternalCallerTables.update(contract.ident, table)
       case (interface: ContractInterface, _) =>
         val table = mutable.Map.from(interface.funcs.map(_.id -> true))
-        externalCallCheckTables.update(interface.ident, table)
+        checkExternalCallerTables.update(interface.ident, table)
       case _ => ()
     }
     multiContract.contracts.zipWithIndex.foreach {
       case (contract: Contract, index) if !contract.isAbstract =>
         val state = states(index)
-        checkExternalCallPermissions(state, contract, externalCallCheckTables)
+        checkExternalCallPermissions(states, state, contract, checkExternalCallerTables)
       case (interface: ContractInterface, _) =>
-        checkInterfaceExternalCallCheck(multiContract, interface.ident, externalCallCheckTables)
+        checkInterfaceCheckExternalCaller(multiContract, interface.ident, checkExternalCallerTables)
       case _ =>
     }
   }

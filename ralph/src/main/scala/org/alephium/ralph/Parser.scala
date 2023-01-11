@@ -44,20 +44,17 @@ abstract class Parser[Ctx <: StatelessContext] {
   def arrayExpr[Unknown: P]: P[Ast.Expr[Ctx]] = P(createArray1 | createArray2)
   def variable[Unknown: P]: P[Ast.Variable[Ctx]] =
     P(Lexer.ident | Lexer.constantIdent).map(Ast.Variable.apply[Ctx])
+  def alphTokenId[Unknown: P]: P[Ast.Expr[Ctx]] = Lexer.keyword("ALPH").map(_ => Ast.ALPHTokenId())
 
-  def alphAmount[Unknown: P]: P[Ast.Expr[Ctx]]                   = expr
-  def tokenAmount[Unknown: P]: P[(Ast.Expr[Ctx], Ast.Expr[Ctx])] = P(expr ~ ":" ~ expr)
-  def amountList[Unknown: P]: P[(Option[Ast.Expr[Ctx]], Seq[(Ast.Expr[Ctx], Ast.Expr[Ctx])])] =
-    P((alphAmount ~ ",").? ~ tokenAmount.rep(1, ","))
-  def amountSimple[Unknown: P]: P[(Option[Ast.Expr[Ctx]], Seq[(Ast.Expr[Ctx], Ast.Expr[Ctx])])] =
-    P(alphAmount).map(amount => (Some(amount), Seq.empty))
+  def alphAmount[Unknown: P]: P[Ast.Expr[Ctx]]                       = expr
+  def tokenAmount[Unknown: P]: P[(Ast.Expr[Ctx], Ast.Expr[Ctx])]     = P(expr ~ ":" ~ expr)
+  def amountList[Unknown: P]: P[Seq[(Ast.Expr[Ctx], Ast.Expr[Ctx])]] = P(tokenAmount.rep(0, ","))
   def approveAssetPerAddress[Unknown: P]: P[Ast.ApproveAsset[Ctx]] =
-    P(expr ~ "->" ~ (amountList | amountSimple)).map { case (address, amounts) =>
-      val node = Ast.ApproveAsset(address, amounts._1, amounts._2)
-      if (node.approveCount == 0) {
-        throw Compiler.Error(s"Empty asset for address: ${address}")
+    P(expr ~ "->" ~ amountList).map { case (address, amounts) =>
+      if (amounts.isEmpty) {
+        throw Compiler.Error(s"Empty asset for address: $address")
       }
-      node
+      Ast.ApproveAsset(address, amounts)
     }
   def approveAssets[Unknown: P]: P[Seq[Ast.ApproveAsset[Ctx]]] =
     P("{" ~ approveAssetPerAddress.rep(1, ";") ~ ";".? ~ "}")
@@ -232,15 +229,21 @@ abstract class Parser[Ctx <: StatelessContext] {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
       } else {
         val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
-        val (usePreapprovedAssets, useContractAssets, useExternalCallCheck, useUpdateFields) =
-          Parser.extractFuncModifier(annotations, false, false, true, true)
+        val (usePreapprovedAssets, useContractAssets, useCheckExternalCaller, useUpdateFields) =
+          Parser.extractFuncModifier(
+            annotations,
+            usePreapprovedAssetsDefault = false,
+            useContractAssetsDefault = false,
+            useCheckExternalCallerDefault = true,
+            useUpdateFieldsDefault = false
+          )
         FuncDefTmp(
           annotations,
           funcId,
           isPublic,
           usePreapprovedAssets,
           useContractAssets,
-          useExternalCallCheck,
+          useCheckExternalCaller,
           useUpdateFields,
           params,
           returnType,
@@ -255,7 +258,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       f.isPublic,
       f.usePreapprovedAssets,
       f.useContractAssets,
-      f.useExternalCallCheck,
+      f.useCheckExternalCaller,
       f.useUpdateFields,
       f.args,
       f.rtypes,
@@ -363,7 +366,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     isPublic: Boolean,
     usePreapprovedAssets: Boolean,
     useContractAssets: Boolean,
-    useExternalCallCheck: Boolean,
+    useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
     args: Seq[Argument],
     rtypes: Seq[Type],
@@ -371,20 +374,25 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
 )
 
 object Parser {
-  val usingAnnotationId       = "using"
-  val usePreapprovedAssetsKey = "preapprovedAssets"
-  val useContractAssetsKey    = "assetsInContract"
-  val useExternalCallCheckKey = "externalCallCheck"
-  val useUpdateFieldsKey      = "updateFields"
+  val usingAnnotationId         = "using"
+  val usePreapprovedAssetsKey   = "preapprovedAssets"
+  val useContractAssetsKey      = "assetsInContract"
+  val useCheckExternalCallerKey = "checkExternalCaller"
+  val useUpdateFieldsKey        = "updateFields"
   val keys: Set[String] =
-    Set(usePreapprovedAssetsKey, useContractAssetsKey, useExternalCallCheckKey, useUpdateFieldsKey)
+    Set(
+      usePreapprovedAssetsKey,
+      useContractAssetsKey,
+      useCheckExternalCallerKey,
+      useUpdateFieldsKey
+    )
 
   // scalastyle:off method.length
   def extractFuncModifier(
       annotations: Seq[Annotation],
       usePreapprovedAssetsDefault: Boolean,
       useContractAssetsDefault: Boolean,
-      useExternalCallCheckDefault: Boolean,
+      useCheckExternalCallerDefault: Boolean,
       useUpdateFieldsDefault: Boolean
   ): (Boolean, Boolean, Boolean, Boolean) = {
     if (annotations.exists(_.id.name != usingAnnotationId)) {
@@ -409,22 +417,22 @@ object Parser {
             useContractAssetsKey,
             useContractAssetsDefault
           )
-          val useExternalCallCheck = extractAnnotationBoolean(
+          val useCheckExternalCaller = extractAnnotationBoolean(
             useAnnotation,
-            useExternalCallCheckKey,
-            useExternalCallCheckDefault
+            useCheckExternalCallerKey,
+            useCheckExternalCallerDefault
           )
           val useUpdateFields = extractAnnotationBoolean(
             useAnnotation,
             useUpdateFieldsKey,
             useUpdateFieldsDefault
           )
-          (usePreapprovedAssets, useContractAssets, useExternalCallCheck, useUpdateFields)
+          (usePreapprovedAssets, useContractAssets, useCheckExternalCaller, useUpdateFields)
         case None =>
           (
             usePreapprovedAssetsDefault,
             useContractAssetsDefault,
-            useExternalCallCheckDefault,
+            useCheckExternalCallerDefault,
             useUpdateFieldsDefault
           )
       }
@@ -454,7 +462,7 @@ object Parser {
 )
 object StatelessParser extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
-    P(const | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr)
+    P(const | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr)
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
     P(varDef | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret)
@@ -478,7 +486,7 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
+      const | alphTokenId | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.ContractCallExpr] =
@@ -515,10 +523,10 @@ object StatefulParser extends Parser[StatefulContext] {
           val (usePreapprovedAssets, useContractAssets, _, useUpdateFields) =
             Parser.extractFuncModifier(
               annotations,
-              true,
-              false,
-              true,
-              true
+              usePreapprovedAssetsDefault = true,
+              useContractAssetsDefault = false,
+              useCheckExternalCallerDefault = true,
+              useUpdateFieldsDefault = false
             )
           Ast.TxScript(
             typeId,
@@ -622,7 +630,7 @@ object StatefulParser extends Parser[StatefulContext] {
             f.isPublic,
             f.usePreapprovedAssets,
             f.useContractAssets,
-            f.useExternalCallCheck,
+            f.useCheckExternalCaller,
             f.useUpdateFields,
             f.args,
             f.rtypes,

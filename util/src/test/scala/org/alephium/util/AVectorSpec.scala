@@ -670,6 +670,12 @@ class IntAVectorSpec extends AVectorSpec[Int] {
     vc2.appendable is true
     (vc2.elems eq vc1.elems) is true
   }
+
+  it should "view" in new Fixture {
+    forAll(vectorGen) { vc =>
+      AVector.from(vc.view) is vc
+    }
+  }
 }
 
 class SpecialAVectorSpec extends AlephiumSpec {

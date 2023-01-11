@@ -1,0 +1,40 @@
+{
+  "version": "v1.6.0",
+  "name": "Greeter",
+  "bytecode": "01010c010000000105030c7ba00002",
+  "codeHash": "23a48462286d2c2ffc6d3a19192060dd42c178e7d331819e75e059c5be3c042f",
+  "fieldsSig": {
+    "names": [
+      "btcPrice"
+    ],
+    "types": [
+      "U256"
+    ],
+    "isMutable": [
+      false
+    ]
+  },
+  "eventsSig": [
+    
+  ],
+  "functions": [
+    {
+      "name": "greet",
+      "usePreapprovedAssets": false,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        
+      ],
+      "paramTypes": [
+        
+      ],
+      "paramIsMutable": [
+        
+      ],
+      "returnTypes": [
+        "U256"
+      ]
+    }
+  ]
+}

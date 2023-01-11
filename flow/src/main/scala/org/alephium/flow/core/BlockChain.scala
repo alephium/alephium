@@ -267,9 +267,9 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
-  def calBlockDiffUnsafe(newTip: BlockHash, oldTip: BlockHash): ChainDiff = {
+  def calBlockDiffUnsafe(index: ChainIndex, newTip: BlockHash, oldTip: BlockHash): ChainDiff = {
     val hashDiff = Utils.unsafe(calHashDiff(newTip, oldTip))
-    ChainDiff(hashDiff.toRemove.map(getBlockUnsafe), hashDiff.toAdd.map(getBlockUnsafe))
+    ChainDiff(index, hashDiff.toRemove.map(getBlockUnsafe), hashDiff.toAdd.map(getBlockUnsafe))
   }
 
   def getLatestHashesUnsafe(): AVector[BlockHash] = {
@@ -339,7 +339,11 @@ object BlockChain {
     chain.loadFromStorage()
   }
 
-  final case class ChainDiff(toRemove: AVector[Block], toAdd: AVector[Block])
+  final case class ChainDiff(
+      chainIndex: ChainIndex,
+      toRemove: AVector[Block],
+      toAdd: AVector[Block]
+  )
 
   final case class TxIndex(hash: BlockHash, index: Int)
   object TxIndex {

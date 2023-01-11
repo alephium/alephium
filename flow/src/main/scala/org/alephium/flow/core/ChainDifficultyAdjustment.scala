@@ -51,19 +51,29 @@ trait ChainDifficultyAdjustment {
   ): IOResult[Option[Duration]] = {
     val earlyHeight = height - consensusConfig.powAveragingWindow - 1
     assume(earlyHeight >= ALPH.GenesisHeight)
-    for {
-      hashes        <- chainBackUntil(hash, earlyHeight)
-      timestampNow  <- getTimestamp(hash)
-      timestampLast <- getTimestamp(hashes.head)
-    } yield {
+    calTimeSpan(hash, height).map { case (timestampLast, timestampNow) =>
       if (
-        timestampLast < difficultyBombPatchConfig.enabledTimeStamp && difficultyBombPatchConfig.enabledTimeStamp <= nextTimeStamp
+        timestampLast < difficultyBombPatchConfig.enabledTimeStamp &&
+        difficultyBombPatchConfig.enabledTimeStamp <= nextTimeStamp
       ) {
         None
       } else {
         Some(timestampNow.deltaUnsafe(timestampLast))
       }
     }
+  }
+
+  final protected[core] def calTimeSpan(
+      hash: BlockHash,
+      height: Int
+  ): IOResult[(TimeStamp, TimeStamp)] = {
+    val earlyHeight = height - consensusConfig.powAveragingWindow - 1
+    assume(earlyHeight >= ALPH.GenesisHeight)
+    for {
+      hashes        <- chainBackUntil(hash, earlyHeight)
+      timestampNow  <- getTimestamp(hash)
+      timestampLast <- getTimestamp(hashes.head)
+    } yield (timestampLast, timestampNow)
   }
 
   final def calIceAgeTarget(
@@ -102,33 +112,18 @@ trait ChainDifficultyAdjustment {
       nextTimeStamp: TimeStamp
   ): IOResult[Target] = {
     getHeight(hash).flatMap {
-      case height if height >= ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1 =>
+      case height if ChainDifficultyAdjustment.enoughHeight(height) =>
         calTimeSpan(hash, height, nextTimeStamp).flatMap {
           case Some(timeSpan) =>
-            var clippedTimeSpan =
-              consensusConfig.expectedWindowTimeSpan.millis + (timeSpan.millis - consensusConfig.expectedWindowTimeSpan.millis) / 4
-            if (clippedTimeSpan < consensusConfig.windowTimeSpanMin.millis) {
-              clippedTimeSpan = consensusConfig.windowTimeSpanMin.millis
-            } else if (clippedTimeSpan > consensusConfig.windowTimeSpanMax.millis) {
-              clippedTimeSpan = consensusConfig.windowTimeSpanMax.millis
-            }
-            val target = reTarget(currentTarget, clippedTimeSpan)
+            val target = ChainDifficultyAdjustment.calNextHashTargetRaw(
+              currentTarget,
+              timeSpan
+            )
             Right(calIceAgeTarget(target, currentTimeStamp, nextTimeStamp))
           case None =>
             getTarget(height - difficultyBombPatchConfig.heightDiff)
         }
       case _ => Right(currentTarget)
-    }
-  }
-
-  final protected def reTarget(currentTarget: Target, timeSpanMs: Long): Target = {
-    val nextTarget = currentTarget.value
-      .multiply(BigInteger.valueOf(timeSpanMs))
-      .divide(BigInteger.valueOf(consensusConfig.expectedWindowTimeSpan.millis))
-    if (nextTarget.compareTo(consensusConfig.maxMiningTarget.value) <= 0) {
-      Target.unsafe(nextTarget)
-    } else {
-      consensusConfig.maxMiningTarget
     }
   }
 }
@@ -137,5 +132,36 @@ object ChainDifficultyAdjustment {
   trait DifficultyBombPatchConfig {
     def enabledTimeStamp: TimeStamp
     def heightDiff: Int
+  }
+
+  def enoughHeight(height: Int)(implicit consensusConfig: ConsensusSetting): Boolean = {
+    height >= ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1
+  }
+
+  def calNextHashTargetRaw(
+      currentTarget: Target,
+      lastWindowTimeSpan: Duration
+  )(implicit consensusConfig: ConsensusSetting): Target = {
+    var clippedTimeSpan =
+      consensusConfig.expectedWindowTimeSpan.millis + (lastWindowTimeSpan.millis - consensusConfig.expectedWindowTimeSpan.millis) / 4
+    if (clippedTimeSpan < consensusConfig.windowTimeSpanMin.millis) {
+      clippedTimeSpan = consensusConfig.windowTimeSpanMin.millis
+    } else if (clippedTimeSpan > consensusConfig.windowTimeSpanMax.millis) {
+      clippedTimeSpan = consensusConfig.windowTimeSpanMax.millis
+    }
+    reTarget(currentTarget, clippedTimeSpan)
+  }
+
+  @inline def reTarget(currentTarget: Target, timeSpanMs: Long)(implicit
+      consensusConfig: ConsensusSetting
+  ): Target = {
+    val nextTarget = currentTarget.value
+      .multiply(BigInteger.valueOf(timeSpanMs))
+      .divide(BigInteger.valueOf(consensusConfig.expectedWindowTimeSpan.millis))
+    if (nextTarget.compareTo(consensusConfig.maxMiningTarget.value) <= 0) {
+      Target.unsafe(nextTarget)
+    } else {
+      consensusConfig.maxMiningTarget
+    }
   }
 }

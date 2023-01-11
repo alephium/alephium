@@ -1,0 +1,40 @@
+{
+  "version": "v1.6.0",
+  "name": "Action",
+  "bytecode": "01010c010000000004a0000d2aa100",
+  "codeHash": "688246f68470f32c1e2669b9e94f5a92e6db393d87cf86935ff39dfcd75445f8",
+  "fieldsSig": {
+    "names": [
+      "x"
+    ],
+    "types": [
+      "U256"
+    ],
+    "isMutable": [
+      true
+    ]
+  },
+  "eventsSig": [
+    
+  ],
+  "functions": [
+    {
+      "name": "action",
+      "usePreapprovedAssets": false,
+      "useAssetsInContract": false,
+      "isPublic": true,
+      "paramNames": [
+        
+      ],
+      "paramTypes": [
+        
+      ],
+      "paramIsMutable": [
+        
+      ],
+      "returnTypes": [
+        
+      ]
+    }
+  ]
+}

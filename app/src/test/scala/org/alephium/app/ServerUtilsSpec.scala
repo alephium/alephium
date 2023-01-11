@@ -196,16 +196,16 @@ class ServerUtilsSpec extends AlephiumSpec {
         genesisBalance - destination1.attoAlphAmount.value - destination2.attoAlphAmount.value
 
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
-      checkAddressBalance(destination1.address, U256.unsafe(0), 0)
-      checkAddressBalance(destination2.address, U256.unsafe(0), 0)
+      checkAddressBalance(destination1.address, ALPH.oneAlph, 1)
+      checkAddressBalance(destination2.address, ALPH.oneAlph, 1)
 
       val block0 = mineFromMemPool(blockFlow, chainIndex)
       addAndCheck(blockFlow, block0)
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 0, 0)
       checkAddressBalance(fromAddress, senderBalanceWithGas - txTemplate.gasFeeUnsafe)
-      checkAddressBalance(destination1.address, U256.unsafe(0), 0)
-      checkAddressBalance(destination2.address, U256.unsafe(0), 0)
+      checkAddressBalance(destination1.address, ALPH.oneAlph, 1)
+      checkAddressBalance(destination2.address, ALPH.oneAlph, 1)
 
       checkTx(blockFlow, block0.nonCoinbase.head, chainIndex)
 
@@ -349,7 +349,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE
         Confirmed(block0.hash, 0, 1, 0, 0)
       checkAddressBalance(fromAddress, senderBalanceWithGas - block0.transactions.head.gasFeeUnsafe)
-      checkAddressBalance(toAddress, receiverInitialBalance)
+      checkAddressBalance(toAddress, receiverInitialBalance.addUnsafe(ALPH.alph(10)), 11)
 
       checkTx(blockFlow, block0.nonCoinbase.head, chainIndex)
 
@@ -828,10 +828,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils = new ServerUtils
     serverUtils.getInitialAttoAlphAmount(None) isE minimalAlphInContract
     serverUtils.getInitialAttoAlphAmount(
-      Some(Amount(minimalAlphInContract))
+      Some(minimalAlphInContract)
     ) isE minimalAlphInContract
     serverUtils
-      .getInitialAttoAlphAmount(Some(Amount(minimalAlphInContract - 1)))
+      .getInitialAttoAlphAmount(Some(minimalAlphInContract - 1))
       .leftValue
       .detail is "Expect 1 ALPH deposit to deploy a new contract"
   }
@@ -862,9 +862,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     implicit val serverUtils = new ServerUtils()
 
-    val emptyMempool = serverUtils.listUnconfirmedTransactions(blockFlow)
-
-    emptyMempool.rightValue is AVector.empty[UnconfirmedTransactions]
+    val emptyMempool = serverUtils.listUnconfirmedTransactions(blockFlow).rightValue
+    emptyMempool is AVector.empty[UnconfirmedTransactions]
 
     val chainIndex                         = chainIndexGen.sample.get
     val fromGroup                          = chainIndex.from
@@ -921,6 +920,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val barCode =
       s"""
          |Contract Bar(mut value: U256) {
+         |  @using(updateFields = true)
          |  pub fn addOne() -> () {
          |    value = value + 1
          |  }
@@ -932,9 +932,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     val fooCode =
       s"""
          |Contract Foo(mut value: U256) {
-         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
          |  pub fn addOne() -> U256 {
-         |    transferAlphToSelf!(@$callerAddress, ${ALPH.oneNanoAlph})
+         |    transferTokenToSelf!(@$callerAddress, ALPH, ${ALPH.oneNanoAlph})
          |    value = value + 1
          |    let bar = Bar(#${barId.toHexString})
          |    bar.addOne()
@@ -953,7 +953,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |@using(preapprovedAssets = true)
          |TxScript Main {
          |  let foo = Foo(#${fooId.toHexString})
-         |  foo.addOne{@$callerAddress -> 1 alph}()
+         |  foo.addOne{@$callerAddress -> ALPH: 1 alph}()
          |}
          |
          |$fooCode
@@ -1043,7 +1043,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |Contract Bar() {
          |  @using(assetsInContract = true)
          |  pub fn bar() -> () {
-         |    createSubContract!{selfAddress!() -> 1 alph}(#$createContractPath, #$fooByteCode, #$encodedState)
+         |    createSubContract!{selfAddress!() -> ALPH: 1 alph}(#$createContractPath, #$fooByteCode, #$encodedState)
          |    Foo(subContractId!(#$destroyContractPath)).destroy()
          |  }
          |}
@@ -1309,7 +1309,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |Contract Foo() {
          |  @using(assetsInContract = true)
          |  pub fn foo() -> () {
-         |    assert!(alphRemaining!(selfAddress!()) == 1 alph, 0)
+         |    assert!(tokenRemaining!(selfAddress!(), ALPH) == 1 alph, 0)
          |  }
          |}
          |""".stripMargin
@@ -1666,6 +1666,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val contract =
       s"""
          |Contract ArrayTest(mut array: [U256; 2]) {
+         |  @using(updateFields = true)
          |  ${isPublic} fn swap(input: [U256; 2]) -> ([U256; 2]) {
          |    array[0] = input[1]
          |    array[1] = input[0]
@@ -1748,8 +1749,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
     result.warnings is AVector(
       "Found unused variables in Foo: foo.a",
-      "Found unused fields in Foo: x",
-      "Function Foo.foo does not update fields, please use @using(updateFields = false) for the function"
+      "Found unused fields in Foo: x"
     )
 
     info("Turn off warnings")
@@ -1881,7 +1881,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, 50)
+           |  createContractWithToken!{@$fromAddress -> ALPH: 10, #${token1.toHexString}: 10, #${token2.toHexString}: 20}(#$codeRaw, #$stateRaw, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
@@ -1891,7 +1891,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           fromAddress,
           initialFields,
           U256.unsafe(10),
-          AVector(Token(token1, U256.unsafe(10)), Token(token2, U256.unsafe(20))),
+          AVector((token1, U256.unsafe(10)), (token2, U256.unsafe(20))),
           Some(U256.unsafe(50))
         ) is expected
     }
@@ -1905,7 +1905,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val expected =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{@$fromAddress -> 10}(#$codeRaw, #$stateRaw, 50)
+           |  createContractWithToken!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, 50)
            |}
            |""".stripMargin
       Compiler.compileTxScript(expected).isRight is true
@@ -2024,7 +2024,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     serverUtils.getTransactionStatus(blockFlow, txId, chainIndex) isE TxNotFound()
 
-    blockFlow.getMemPool(chainIndex).addToTxPool(chainIndex, AVector(txTemplate), TimeStamp.now())
+    blockFlow.getGrandPool().add(chainIndex, AVector(txTemplate), TimeStamp.now())
     serverUtils.getTransactionStatus(blockFlow, txTemplate.id, chainIndex) isE MemPooled()
 
     txTemplate

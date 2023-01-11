@@ -20,11 +20,19 @@ import java.util.{LinkedHashMap, Map}
 
 object Cache {
   def lru[K, V](maxCapacity: Int): Cache[K, V] = {
-    Cache(maxCapacity, accessOrder = true)
+    Cache.threadUnsafe(maxCapacity, accessOrder = true)
   }
 
   def fifo[K, V](maxCapacity: Int): Cache[K, V] = {
-    Cache(maxCapacity, accessOrder = false)
+    Cache.threadUnsafe(maxCapacity, accessOrder = false)
+  }
+
+  def lruSafe[K, V](maxCapacity: Int): Cache[K, V] = {
+    Cache.threadSafe(maxCapacity, accessOrder = true)
+  }
+
+  def fifoSafe[K, V](maxCapacity: Int): Cache[K, V] = {
+    Cache.threadSafe(maxCapacity, accessOrder = false)
   }
 
   def fifo[K, V](
@@ -32,29 +40,37 @@ object Cache {
       getTimeStamp: V => TimeStamp,
       expiryDuration: Duration
   ): Cache[K, V] = {
-    Cache(maxCapacity, getTimeStamp, expiryDuration, accessOrder = false)
+    Cache.threadUnsafe(maxCapacity, getTimeStamp, expiryDuration, accessOrder = false)
   }
 
   def fifo[K, V](
       removal: (LinkedHashMap[K, V], Map.Entry[K, V]) => Unit
   ): Cache[K, V] = {
-    apply(removal, accessOrder = false)
+    threadUnsafe(removal, accessOrder = false)
   }
 
-  private def apply[K, V](maxCapacity: Int, accessOrder: Boolean): Cache[K, V] = {
-    Cache[K, V](
+  private def threadUnsafe[K, V](maxCapacity: Int, accessOrder: Boolean): Cache[K, V] = {
+    Cache.threadUnsafe[K, V](
       (map: LinkedHashMap[K, V], eldest: Map.Entry[K, V]) =>
         if (map.size() > maxCapacity) { map.remove(eldest.getKey()); () },
       accessOrder
     )
   }
 
-  private def apply[K, V](
+  private def threadSafe[K, V](maxCapacity: Int, accessOrder: Boolean): Cache[K, V] = {
+    Cache.threadSafe[K, V](
+      (map: LinkedHashMap[K, V], eldest: Map.Entry[K, V]) =>
+        if (map.size() > maxCapacity) { map.remove(eldest.getKey()); () },
+      accessOrder
+    )
+  }
+
+  private def threadUnsafe[K, V](
       maxCapacity: Int,
       getTimeStamp: V => TimeStamp,
       expiryDuration: Duration,
       accessOrder: Boolean
-  ): Cache[K, V] = {
+  ): Cache[K, V] = new Cache[K, V] with NoLock {
     val m = new Inner[K, V](
       removeEldest = (map, eldest) => {
         if (map.size > maxCapacity) {
@@ -77,18 +93,27 @@ object Cache {
       0.75f,
       accessOrder
     )
-    new Cache[K, V](m)
   }
 
-  private def apply[K, V](
+  private def threadUnsafe[K, V](
       removal: (LinkedHashMap[K, V], Map.Entry[K, V]) => Unit,
       accessOrder: Boolean
   ): Cache[K, V] = {
-    val m = new Inner(removal, 32, 0.75f, accessOrder)
-    new Cache[K, V](m)
+    new Cache[K, V] with NoLock {
+      val m = new Inner(removal, 32, 0.75f, accessOrder)
+    }
   }
 
-  private class Inner[K, V](
+  private def threadSafe[K, V](
+      removal: (LinkedHashMap[K, V], Map.Entry[K, V]) => Unit,
+      accessOrder: Boolean
+  ): Cache[K, V] = {
+    new Cache[K, V] with RWLock {
+      val m = new Inner(removal, 32, 0.75f, accessOrder)
+    }
+  }
+
+  class Inner[K, V](
       removeEldest: (LinkedHashMap[K, V], Map.Entry[K, V]) => Unit,
       initialCapacity: Int,
       loadFactor: Float,
@@ -101,28 +126,38 @@ object Cache {
   }
 }
 
-class Cache[K, V](m: Cache.Inner[K, V]) extends SimpleMap[K, V] {
+trait Cache[K, V] extends SimpleMap[K, V] with Lock {
+  def m: Cache.Inner[K, V]
+
   protected def underlying: Map[K, V] = m
 
-  def contains(key: K): Boolean = m.containsKey(key)
+  def contains(key: K): Boolean = readOnly {
+    m.containsKey(key)
+  }
 
-  def unsafe(key: K): V = m.get(key)
+  def unsafe(key: K): V = readOnly {
+    m.get(key)
+  }
 
-  def get(key: K): Option[V] = Option(m.get(key))
+  def get(key: K): Option[V] = readOnly {
+    Option(m.get(key))
+  }
 
-  def put(key: K, value: V): Unit = {
+  def put(key: K, value: V): Unit = writeOnly {
     m.put(key, value)
     ()
   }
 
-  def remove(key: K): Option[V] = {
+  def remove(key: K): Option[V] = writeOnly {
     Option(m.remove(key))
   }
 
-  def removeIf(p: (K, V) => Boolean): Unit = {
+  def removeIf(p: (K, V) => Boolean): Unit = writeOnly {
     m.entrySet().removeIf(entry => p(entry.getKey, entry.getValue))
     ()
   }
 
-  def clear(): Unit = m.clear()
+  def clear(): Unit = writeOnly {
+    m.clear()
+  }
 }

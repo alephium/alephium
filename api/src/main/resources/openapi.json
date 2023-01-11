@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "1.5.5"
+    "version": "1.6.0"
   },
   "servers": [
     {
@@ -10512,7 +10512,7 @@
           "ignoreUpdateFieldsCheckWarnings": {
             "type": "boolean"
           },
-          "ignoreExternalCallCheckWarnings": {
+          "ignoreCheckExternalCallerWarnings": {
             "type": "boolean"
           }
         }

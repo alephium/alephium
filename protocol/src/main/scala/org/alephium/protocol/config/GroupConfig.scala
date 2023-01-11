@@ -18,7 +18,7 @@ package org.alephium.protocol.config
 
 import java.math.BigInteger
 
-import org.alephium.protocol.model.GroupIndex
+import org.alephium.protocol.model.{ChainIndex, GroupIndex}
 import org.alephium.util.AVector
 
 trait GroupConfig {
@@ -28,7 +28,13 @@ trait GroupConfig {
 
   lazy val depsNum: Int = 2 * groups - 1
 
-  lazy val allGroups: AVector[GroupIndex] = AVector.tabulate(groups)(GroupIndex.unsafe(_)(this))
+  lazy val cliqueGroups: AVector[GroupIndex] = AVector.tabulate(groups)(GroupIndex.unsafe(_)(this))
 
   lazy val targetAverageCount: BigInteger = BigInteger.valueOf((4 * groups).toLong)
+
+  lazy val cliqueChainIndexes: AVector[ChainIndex] =
+    AVector.tabulate(chainNum)(ChainIndex.unsafe(_)(this))
+
+  lazy val cliqueGroupIndexes: AVector[GroupIndex] =
+    AVector.tabulate(groups)(GroupIndex.unsafe(_)(this))
 }

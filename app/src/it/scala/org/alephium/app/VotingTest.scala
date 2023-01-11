@@ -175,60 +175,62 @@ trait VotingFixture extends WalletFixture {
     val allocationTransfers = voters.zipWithIndex
       .map { case (_, i) =>
         s"""
-           |transferAlph!(admin, voters[$i], $dustAmount)
+           |transferToken!(admin, voters[$i], ALPH, $dustAmount)
            |transferTokenFromSelf!(voters[$i], selfTokenId!(), 1)""".stripMargin
       }
       .mkString("\n")
     // scalastyle:off no.equal
-    val votingContract = s"""
-                            |Contract Voting(
-                            |  mut yes: U256,
-                            |  mut no: U256,
-                            |  mut isClosed: Bool,
-                            |  mut initialized: Bool,
-                            |  admin: Address,
-                            |  voters: [Address; ${voters.size}]
-                            |) {
-                            |
-                            |  event VotingStarted()
-                            |  event VoteCasted(voter: Address, result: Bool)
-                            |  event VotingClosed()
-                            |
-                            |  @using(preapprovedAssets = true, assetsInContract = true)
-                            |  pub fn allocateTokens() -> () {
-                            |     assert!(initialized == false, 0)
-                            |     assert!(callerAddress!() == admin, 0)
-                            |     ${allocationTransfers}
-                            |     yes = 0
-                            |     no = 0
-                            |     initialized = true
-                            |
-                            |     emit VotingStarted()
-                            |  }
-                            |
-                            |  @using(preapprovedAssets = true, assetsInContract = true)
-                            |  pub fn vote(choice: Bool, voter: Address) -> () {
-                            |    assert!(initialized == true && isClosed == false, 0)
-                            |    transferAlph!(voter, admin, $dustAmount)
-                            |    transferTokenToSelf!(voter, selfTokenId!(), 1)
-                            |
-                            |    emit VoteCasted(voter, choice)
-                            |
-                            |    if (choice == true) {
-                            |       yes = yes + 1
-                            |    } else {
-                            |       no = no + 1
-                            |    }
-                            |  }
-                            |
-                            |   pub fn close() -> () {
-                            |     assert!(initialized == true && isClosed == false, 0)
-                            |     assert!(callerAddress!() == admin, 0)
-                            |     isClosed = true
-                            |
-                            |     emit VotingClosed()
-                            |   }
-                            | }
+    val votingContract =
+      s"""
+         |Contract Voting(
+         |  mut yes: U256,
+         |  mut no: U256,
+         |  mut isClosed: Bool,
+         |  mut initialized: Bool,
+         |  admin: Address,
+         |  voters: [Address; ${voters.size}]
+         |) {
+         |
+         |  event VotingStarted()
+         |  event VoteCasted(voter: Address, result: Bool)
+         |  event VotingClosed()
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
+         |  pub fn allocateTokens() -> () {
+         |     assert!(initialized == false, 0)
+         |     assert!(callerAddress!() == admin, 0)
+         |     ${allocationTransfers}
+         |     yes = 0
+         |     no = 0
+         |     initialized = true
+         |
+         |     emit VotingStarted()
+         |  }
+         |
+         |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
+         |  pub fn vote(choice: Bool, voter: Address) -> () {
+         |    assert!(initialized == true && isClosed == false, 0)
+         |    transferToken!(voter, admin, ALPH, $dustAmount)
+         |    transferTokenToSelf!(voter, selfTokenId!(), 1)
+         |
+         |    emit VoteCasted(voter, choice)
+         |
+         |    if (choice == true) {
+         |       yes = yes + 1
+         |    } else {
+         |       no = no + 1
+         |    }
+         |  }
+         |
+         |   @using(updateFields = true)
+         |   pub fn close() -> () {
+         |     assert!(initialized == true && isClosed == false, 0)
+         |     assert!(callerAddress!() == admin, 0)
+         |     isClosed = true
+         |
+         |     emit VotingClosed()
+         |   }
+         | }
       """.stripMargin
     // scalastyle:on no.equal
     val votersList: AVector[vm.Val] =
@@ -260,7 +262,7 @@ trait VotingFixture extends WalletFixture {
          |TxScript TokenAllocation {
          |  let voting = Voting(#${contractId})
          |  let caller = callerAddress!()
-         |  voting.allocateTokens{caller -> $dustAmount * ${votersWallets.size}}()
+         |  voting.allocateTokens{caller -> ALPH: $dustAmount * ${votersWallets.size}}()
          |}
         $contractCode
       """.stripMargin
@@ -273,12 +275,13 @@ trait VotingFixture extends WalletFixture {
       choice: Boolean,
       contractCode: String
   ): SubmitTxResult = {
-    val votingScript = s"""
-                          |TxScript VotingScript {
-                          |  let caller = callerAddress!()
-                          |  let voting = Voting(#$contractId)
-                          |  voting.vote{caller -> $dustAmount, #$contractId: 1}($choice, caller)
-                          |}
+    val votingScript =
+      s"""
+         |TxScript VotingScript {
+         |  let caller = callerAddress!()
+         |  let voting = Voting(#$contractId)
+         |  voting.vote{caller -> ALPH: $dustAmount, #$contractId: 1}($choice, caller)
+         |}
       $contractCode
       """.stripMargin
     script(voterWallet.publicKey.toHexString, votingScript, voterWallet.creation.walletName)

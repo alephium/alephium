@@ -1,0 +1,48 @@
+{
+  "compilerOptionsUsed": {
+    "ignoreUnusedConstantsWarnings": false,
+    "ignoreUnusedVariablesWarnings": false,
+    "ignoreUnusedFieldsWarnings": false,
+    "ignoreUnusedPrivateFunctionsWarnings": false,
+    "ignoreUpdateFieldsCheckWarnings": false,
+    "ignoreCheckExternalCallerWarnings": false
+  },
+  "infos": {
+    "Action": {
+      "sourceFile": "action.ral",
+      "sourceCodeHash": "90e91b024b215506f579b59cb06e4d820327a87e28663ddb17c1d193118dc4f4",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "928360bf58942dd1fdd8d197e0e2ef59ecddbf71a6e8fe25d2c0665274f80ce3",
+      "warnings": [
+        
+      ]
+    },
+    "Foo": {
+      "sourceFile": "foo.ral",
+      "sourceCodeHash": "31c215eef9b9bb6faeeb0b6de689cabe4097716a15470ed0766b1bf5e4174b24",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "424c056943d4d31540aebb0537533280d9a7724264d7dd58ddcbd764e8cad3c0",
+      "warnings": [
+        
+      ]
+    },
+    "Main": {
+      "sourceFile": "main.ral",
+      "sourceCodeHash": "82cadbfc4cf9576d2ce5814fe7041a56430741a2b8e0f149558617911f0c1494",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "",
+      "warnings": [
+        
+      ]
+    },
+    "Math": {
+      "sourceFile": "math.ral",
+      "sourceCodeHash": "bf6305b5f82a1267b36f72b25c4f01d5fe27b3be0edff7b16200951bc0ab3c20",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "649e6f9fd0e73759cd506bc05aa80bfbf709748f2782aaa83001634ed978b4b0",
+      "warnings": [
+        
+      ]
+    }
+  }
+}

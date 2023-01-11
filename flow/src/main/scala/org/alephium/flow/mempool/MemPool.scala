@@ -16,118 +16,208 @@
 
 package org.alephium.flow.mempool
 
+import scala.collection.mutable
+
 import io.prometheus.client.Gauge
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
-import org.alephium.flow.mempool.MemPool.CleanupResult
 import org.alephium.flow.setting.MemPoolSetting
-import org.alephium.io.IOResult
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.util.{AVector, RWLock, SimpleMap, TimeStamp, U256, ValueSortedMap}
 
 /*
  * MemPool is the class to store all the unconfirmed transactions
  *
  * Transactions should be ordered according to weights. The weight is calculated based on fees
  */
+// scalastyle:off number.of.methods
 class MemPool private (
     group: GroupIndex,
-    sharedPools: AVector[SharedPool],
-    val txIndexes: TxIndexes,
-    val pendingPool: PendingPool
+    val flow: MemPool.Flow,
+    // We could merge the following index into flow with multi-index sorted map
+    timestamps: ValueSortedMap[TransactionId, TimeStamp],
+    val sharedTxIndexes: TxIndexes,
+    val capacity: Int
 )(implicit
     groupConfig: GroupConfig
-) {
-  def getSharedPool(index: ChainIndex): SharedPool = {
-    assume(group == index.from)
-    sharedPools(index.to.value)
+) extends RWLock {
+  def size: Int = readOnly(timestamps.size)
+
+  private def _isFull(): Boolean = size >= capacity
+
+  def isFull(): Boolean = readOnly(_isFull())
+
+  def contains(transaction: TransactionTemplate): Boolean = {
+    contains(transaction.id)
   }
 
-  def size: Int = sharedPools.sumBy(_.size) + pendingPool.size
+  def contains(txId: TransactionId): Boolean = readOnly(_contains(txId))
 
-  def contains(index: ChainIndex, transaction: TransactionTemplate): Boolean = {
-    contains(index, transaction.id)
+  private def _contains(txId: TransactionId): Boolean = {
+    timestamps.contains(txId)
   }
 
-  def contains(index: ChainIndex, txId: TransactionId): Boolean =
-    getSharedPool(index).contains(txId) || pendingPool.contains(txId)
+  def isReady(txId: TransactionId): Boolean = readOnly {
+    _contains(txId) && flow.unsafe(txId).isSource()
+  }
 
-  def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] =
-    getSharedPool(index).collectForBlock(maxNum)
+  def collectForBlock(index: ChainIndex, maxNum: Int): AVector[TransactionTemplate] = readOnly {
+    flow.takeSourceNodes(index.flattenIndex, maxNum, _.tx)
+  }
 
-  def getAll(index: ChainIndex): AVector[TransactionTemplate] =
-    getSharedPool(index).getAll() ++ pendingPool.getAll(index)
+  def getAll(): AVector[TransactionTemplate] = readOnly {
+    AVector.from(flow.allTxs.values().map(_.tx))
+  }
+
+  def getOutTxsWithTimestamp(): AVector[(TimeStamp, TransactionTemplate)] = readOnly {
+    AVector.from(
+      timestamps
+        .entries()
+        .map(e => e.getValue -> flow.unsafe(e.getKey))
+        .filter(p => ChainIndex.checkFromGroup(p._2.chainIndex, group))
+        .map(p => p._1 -> p._2.tx)
+    )
+  }
+
+  def getTxs(txIds: AVector[TransactionId]): AVector[TransactionTemplate] = {
+    txIds.fold(AVector.empty[TransactionTemplate]) { (acc, txId) =>
+      readOnly(flow.get(txId)) match {
+        case Some(node) => acc :+ node.tx
+        case None       => acc
+      }
+    }
+  }
 
   def isSpent(outputRef: TxOutputRef): Boolean = outputRef match {
     case ref: AssetOutputRef => isSpent(ref)
     case _                   => false
   }
 
-  def isSpent(outputRef: AssetOutputRef): Boolean = {
-    pendingPool.indexes.isSpent(outputRef) || txIndexes.isSpent(outputRef)
+  def isSpent(outputRef: AssetOutputRef): Boolean = readOnly {
+    assume(outputRef.fromGroup == group)
+    _isSpent(outputRef)
   }
 
-  def isUnspentInPool(outputRef: AssetOutputRef): Boolean = {
-    (txIndexes.outputIndex.contains(outputRef) ||
-      pendingPool.indexes.outputIndex.contains(outputRef)) &&
-    (!isSpent(outputRef))
+  @inline private def _isSpent(outputRef: AssetOutputRef): Boolean = {
+    sharedTxIndexes.isSpent(outputRef)
   }
 
-  def isDoubleSpending(index: ChainIndex, tx: TransactionTemplate): Boolean = {
+  def isDoubleSpending(index: ChainIndex, tx: TransactionTemplate): Boolean = readOnly {
     assume(index.from == group)
-    tx.unsigned.inputs.exists(input => isSpent(input.outputRef))
+    tx.unsigned.inputs.exists(input => _isSpent(input.outputRef))
   }
 
-  def addNewTx(
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  private[mempool] def add(
       index: ChainIndex,
       tx: TransactionTemplate,
-      currentTs: TimeStamp
+      timeStamp: TimeStamp
+  ): MemPool.NewTxCategory =
+    writeOnly {
+      if (_contains(tx.id)) {
+        MemPool.AlreadyExisted
+      } else if (_isFull()) {
+        val lowestWeightTxId = flow.allTxs.min
+        val lowestWeightTx   = flow.unsafe(lowestWeightTxId).tx
+        if (MemPool.txOrdering.gt(tx, lowestWeightTx)) {
+          _removeUnusedTx(lowestWeightTxId)
+          _add(index, tx, timeStamp)
+        } else {
+          MemPool.MemPoolIsFull
+        }
+      } else {
+        _add(index, tx, timeStamp)
+      }
+    }
+
+  def addXGroupTx(
+      index: ChainIndex,
+      tx: TransactionTemplate,
+      timestamp: TimeStamp
+  ): Unit =
+    writeOnly {
+      if (!_contains(tx.id)) {
+        assume(index.from != group)
+        val children = sharedTxIndexes.addXGroupTx(tx, tx => flow.unsafe(tx.id))
+        flow.addNewNode(MemPool.FlowNode(tx.id, tx, timestamp, index.flattenIndex, None, children))
+        timestamps.put(tx.id, timestamp)
+      }
+    }
+
+  private def _add(
+      index: ChainIndex,
+      tx: TransactionTemplate,
+      timestamp: TimeStamp
   ): MemPool.NewTxCategory = {
-    if (tx.unsigned.inputs.exists(input => isUnspentInPool(input.outputRef))) {
-      if (pendingPool.add(tx, currentTs)) {
-        MemPool.AddedToPendingPool
-      } else {
-        MemPool.PendingPoolIsFull
-      }
+    if (sharedTxIndexes.isDoubleSpending(tx)) {
+      MemPool.DoubleSpending
     } else {
-      if (getSharedPool(index).add(tx, currentTs)) {
-        MemPool.AddedToSharedPool
-      } else {
-        MemPool.SharedPoolIsFull
-      }
+      val (parents, children) = sharedTxIndexes.add(tx, tx => flow.unsafe(tx.id))
+      flow.addNewNode(MemPool.FlowNode(tx.id, tx, timestamp, index.flattenIndex, parents, children))
+      timestamps.put(tx.id, timestamp)
+      measureTransactionsTotalInc(index.flattenIndex)
+      MemPool.AddedToMemPool
     }
   }
 
-  def addToTxPool(
+  private[mempool] def add(
       index: ChainIndex,
       transactions: AVector[TransactionTemplate],
       timeStamp: TimeStamp
   ): Int = {
-    getSharedPool(index).add(transactions, timeStamp)
+    transactions.sumBy(add(index, _, timeStamp).addedCount)
   }
 
-  def removeFromTxPool(index: ChainIndex, transactions: AVector[TransactionTemplate]): Int = {
-    val sharedPool = getSharedPool(index)
-    sharedPool.remove(transactions)
+  def removeUsedTxs(transactions: AVector[TransactionTemplate]): Int =
+    remove(transactions, _removeUsedTx)
+
+  def removeUnusedTxs(transactions: AVector[TransactionTemplate]): Int =
+    remove(transactions, _removeUnusedTx)
+
+  @inline private def remove(
+      transactions: AVector[TransactionTemplate],
+      _remove: TransactionId => Unit
+  ): Int = writeOnly {
+    val sizeBefore = size
+    transactions.foreach(tx => if (_contains(tx.id)) _remove(tx.id))
+    val sizeAfter = size
+    sizeBefore - sizeAfter
+  }
+
+  @inline private def _removeUsedTx(txId: TransactionId): Unit = {
+    flow.removeNodeAndAncestors(txId, removeSideEffect)
+  }
+
+  @inline private def _removeUnusedTx(txId: TransactionId): Unit = {
+    flow.removeNodeAndDescendants(txId, removeSideEffect)
+  }
+
+  @inline private def removeSideEffect(node: MemPool.FlowNode): Unit = {
+    measureTransactionsTotalDec(node.chainIndex)
+    timestamps.remove(node.tx.id)
+    sharedTxIndexes.remove(node.tx)
   }
 
   def reorg(
-      toRemove: AVector[AVector[Transaction]],
-      toAdd: AVector[AVector[Transaction]]
+      toRemove: AVector[(ChainIndex, AVector[Transaction])],
+      toAdd: AVector[(ChainIndex, AVector[Transaction])]
   ): (Int, Int) = {
-    assume(toRemove.length == groupConfig.groups && toAdd.length == groupConfig.groups)
+    assume(toRemove.length == groupConfig.depsNum && toAdd.length == groupConfig.depsNum)
     val now = TimeStamp.now()
 
     // First, add transactions from short chains, then remove transactions from canonical chains
-    val added = toAdd.foldWithIndex(0)((sum, txs, toGroup) =>
-      sum + sharedPools(toGroup).add(txs.map(_.toTemplate), now)
-    )
-    val removed = toRemove.foldWithIndex(0)((sum, txs, toGroup) =>
-      sum + sharedPools(toGroup).remove(txs.map(_.toTemplate))
-    )
+    val added =
+      toAdd.fold(0) { case (sum, (index, txs)) =>
+        sum + add(index, txs.map(_.toTemplate), now)
+      }
+    val removed =
+      toRemove.fold(0) { case (sum, (_, txs)) =>
+        sum + removeUsedTxs(txs.map(_.toTemplate))
+      }
 
     (removed, added)
   }
@@ -135,25 +225,10 @@ class MemPool private (
   def getRelevantUtxos(
       lockupScript: LockupScript,
       utxosInBlock: AVector[AssetOutputInfo]
-  ): AVector[AssetOutputInfo] = {
-    val newUtxos =
-      txIndexes.getRelevantUtxos(lockupScript) ++ pendingPool.getRelevantUtxos(lockupScript)
+  ): AVector[AssetOutputInfo] = readOnly {
+    val newUtxos = sharedTxIndexes.getRelevantUtxos(lockupScript)
 
-    (utxosInBlock ++ newUtxos).filterNot(asset =>
-      txIndexes.isSpent(asset) || pendingPool.indexes.isSpent(asset)
-    )
-  }
-
-  def updatePendingPool(): AVector[(TransactionTemplate, TimeStamp)] = {
-    val now              = TimeStamp.now()
-    val txsWithTimestamp = pendingPool.extractReadyTxs(txIndexes)
-    val txs              = txsWithTimestamp.map(_._1)
-    txs.groupBy(_.chainIndex).foreach { case (chainIndex, txss) =>
-      addToTxPool(chainIndex, txss, now)
-    }
-    pendingPool.remove(txs)
-    pendingPool.measureTransactionsTotal()
-    txsWithTimestamp
+    (utxosInBlock ++ newUtxos).filterNot(asset => _isSpent(asset.ref))
   }
 
   def getOutput(outputRef: TxOutputRef): Option[TxOutput] = outputRef match {
@@ -162,32 +237,56 @@ class MemPool private (
   }
 
   // the output might have been spent
-  def getOutput(outputRef: AssetOutputRef): Option[TxOutput] = {
-    pendingPool.getUtxo(outputRef) match {
-      case Some(output) => Some(output)
-      case None         => txIndexes.getOutput(outputRef)
+  def getOutput(outputRef: AssetOutputRef): Option[TxOutput] = readOnly {
+    sharedTxIndexes.outputIndex.get(outputRef).map(_._1)
+  }
+
+  def clear(): Unit = writeOnly {
+    flow.clear()
+    timestamps.clear()
+    sharedTxIndexes.clear()
+    transactionsTotalLabeled.foreach(_.set(0.0))
+  }
+
+  private def _takeOldTxs(
+      timeStampThreshold: TimeStamp
+  ): AVector[TransactionTemplate] = {
+    var buffer = AVector.empty[TransactionTemplate]
+    flow.sourceTxs.foreach(
+      _.values().foreach(node =>
+        if (node.timestamp <= timeStampThreshold) {
+          buffer = buffer :+ node.tx
+        }
+      )
+    )
+    buffer
+  }
+
+  def clean(
+      blockFlow: BlockFlow,
+      timeStampThreshold: TimeStamp
+  ): Unit = writeOnly {
+    val oldTxs = _takeOldTxs(timeStampThreshold)
+    blockFlow.recheckInputs(group, oldTxs).foreach { invalidTxs =>
+      removeUnusedTxs(invalidTxs)
     }
   }
 
-  def clear(): Unit = {
-    sharedPools.foreach(_.clear())
-    txIndexes.clear()
-    pendingPool.clear()
+  private val transactionsTotalLabeled = {
+    groupConfig.cliqueChainIndexes.map(chainIndex =>
+      MemPool.sharedPoolTransactionsTotal
+        .labels(chainIndex.from.value.toString, chainIndex.to.value.toString)
+    )
   }
 
-  def cleanPendingPool(
-      blockFlow: BlockFlow
-  ): IOResult[AVector[(TransactionTemplate, TimeStamp)]] = {
-    pendingPool.clean(blockFlow, txIndexes)
+  def measureTransactionsTotalInc(index: Int): Unit = {
+    transactionsTotalLabeled(index).inc()
   }
 
-  def cleanAndExtractReadyTxs(
-      blockFlow: BlockFlow,
-      timeStampThreshold: TimeStamp
-  ): MemPool.CleanupResult = {
-    val invalidTxss = sharedPools.map(_.clean(blockFlow, timeStampThreshold))
-    val readyTxs    = updatePendingPool()
-    CleanupResult(invalidTxss, readyTxs)
+  def measureTransactionsTotalDec(index: Int): Unit = {
+    if (ChainIndex.checkFromGroup(index, group)) {
+      transactionsTotalLabeled(index).dec()
+    }
   }
 }
 
@@ -195,26 +294,73 @@ object MemPool {
   def empty(
       mainGroup: GroupIndex
   )(implicit groupConfig: GroupConfig, memPoolSetting: MemPoolSetting): MemPool = {
-    val sharedTxIndex = TxIndexes.emptySharedPool(mainGroup)
-    val sharedPools =
-      AVector.tabulate(groupConfig.groups) { toGroup =>
-        val chainIndex = ChainIndex.unsafe(mainGroup.value, toGroup)
-        SharedPool.empty(chainIndex, memPoolSetting.sharedPoolCapacity, sharedTxIndex)
-      }
-    val pendingPool = PendingPool.empty(mainGroup, memPoolSetting.pendingPoolCapacity)
-    new MemPool(mainGroup, sharedPools, sharedTxIndex, pendingPool)
+    val sharedTxIndex = TxIndexes.emptyMemPool(mainGroup)
+    new MemPool(
+      mainGroup,
+      Flow.empty,
+      ValueSortedMap.empty,
+      sharedTxIndex,
+      memPoolSetting.mempoolCapacityPerChain * groupConfig.groups
+    )
   }
 
-  final case class CleanupResult(
-      invalidTxss: AVector[IOResult[AVector[TransactionTemplate]]],
-      readyTxs: AVector[(TransactionTemplate, TimeStamp)]
-  )
+  def ofCapacity(
+      mainGroup: GroupIndex,
+      capacity: Int
+  )(implicit groupConfig: GroupConfig): MemPool = {
+    val sharedTxIndex = TxIndexes.emptyMemPool(mainGroup)
+    new MemPool(
+      mainGroup,
+      Flow.empty,
+      ValueSortedMap.empty,
+      sharedTxIndex,
+      capacity
+    )
+  }
 
-  sealed trait NewTxCategory
-  case object AddedToSharedPool  extends NewTxCategory
-  case object SharedPoolIsFull   extends NewTxCategory
-  case object AddedToPendingPool extends NewTxCategory
-  case object PendingPoolIsFull  extends NewTxCategory
+  sealed trait NewTxCategory {
+    def addedCount: Int
+  }
+  case object AddedToMemPool extends NewTxCategory {
+    def addedCount: Int = 1
+  }
+  sealed trait AddTxFailed extends NewTxCategory {
+    def addedCount: Int = 0
+  }
+  case object MemPoolIsFull  extends AddTxFailed
+  case object DoubleSpending extends AddTxFailed
+  case object AlreadyExisted extends AddTxFailed
+
+  val txOrdering: Ordering[TransactionTemplate] =
+    Ordering.by[TransactionTemplate, (U256, Hash)](tx => (tx.unsigned.gasPrice.value, tx.id.value))
+
+  implicit val nodeOrdering: Ordering[FlowNode] = {
+    Ordering.by[FlowNode, TransactionTemplate](_.tx)(txOrdering)
+  }
+
+  final case class FlowNode(
+      key: TransactionId,
+      tx: TransactionTemplate,
+      timestamp: TimeStamp,
+      chainIndex: Int,
+      var _parents: Option[mutable.ArrayBuffer[FlowNode]],
+      var _children: Option[mutable.ArrayBuffer[FlowNode]]
+  ) extends KeyedFlow.Node[TransactionId, FlowNode] {
+    def getGroup(): Int = chainIndex
+  }
+
+  final case class Flow(
+      sourceTxs: AVector[ValueSortedMap[TransactionId, FlowNode]],
+      allTxs: ValueSortedMap[TransactionId, FlowNode]
+  ) extends KeyedFlow[TransactionId, FlowNode](
+        sourceTxs.as[SimpleMap[TransactionId, FlowNode]],
+        allTxs
+      ) {}
+
+  object Flow {
+    def empty(implicit groupConfig: GroupConfig): Flow =
+      Flow(AVector.fill(groupConfig.chainNum)(ValueSortedMap.empty), ValueSortedMap.empty)
+  }
 
   val sharedPoolTransactionsTotal: Gauge = Gauge
     .build(
@@ -223,13 +369,4 @@ object MemPool {
     )
     .labelNames("group_index", "chain_index")
     .register()
-
-  val pendingPoolTransactionsTotal: Gauge = Gauge
-    .build(
-      "alephium_mempool_pending_pool_transactions_total",
-      "Number of transactions in pending pool"
-    )
-    .labelNames("group_index")
-    .register()
-
 }

@@ -19,7 +19,7 @@ package org.alephium.ralph
 import scala.collection.mutable
 
 import org.alephium.protocol.vm
-import org.alephium.protocol.vm.{Contract => VmContract, _}
+import org.alephium.protocol.vm.{ALPHTokenId => ALPHTokenIdInstr, Contract => VmContract, _}
 import org.alephium.ralph.LogicalOperator.Not
 import org.alephium.util.{AVector, I256, U256}
 
@@ -50,17 +50,11 @@ object Ast {
 
   final case class ApproveAsset[Ctx <: StatelessContext](
       address: Expr[Ctx],
-      attoAlphAmountOpt: Option[Expr[Ctx]],
       tokenAmounts: Seq[(Expr[Ctx], Expr[Ctx])]
   ) {
-    lazy val approveCount = (if (attoAlphAmountOpt.isEmpty) 0 else 1) + tokenAmounts.length
-
     def check(state: Compiler.State[Ctx]): Unit = {
       if (address.getType(state) != Seq(Type.Address)) {
         throw Compiler.Error(s"Invalid address type: ${address}")
-      }
-      if (attoAlphAmountOpt.exists(_.getType(state) != Seq(Type.U256))) {
-        throw Compiler.Error(s"Invalid amount type: ${attoAlphAmountOpt}")
       }
       if (
         tokenAmounts
@@ -74,15 +68,15 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val approveCount = tokenAmounts.length
       assume(approveCount >= 1)
-      val approveAlph: Seq[Instr[Ctx]] = attoAlphAmountOpt match {
-        case Some(amount) => amount.genCode(state) :+ ApproveAlph.asInstanceOf[Instr[Ctx]]
-        case None         => Seq.empty
+      val approveTokens: Seq[Instr[Ctx]] = tokenAmounts.flatMap {
+        case (ALPHTokenId(), amount) =>
+          amount.genCode(state) :+ ApproveAlph.asInstanceOf[Instr[Ctx]]
+        case (tokenId, amount) =>
+          tokenId.genCode(state) ++ amount.genCode(state) :+ ApproveToken.asInstanceOf[Instr[Ctx]]
       }
-      val approveTokens: Seq[Instr[Ctx]] = tokenAmounts.flatMap { case (tokenId, amount) =>
-        tokenId.genCode(state) ++ amount.genCode(state) :+ ApproveToken.asInstanceOf[Instr[Ctx]]
-      }
-      address.genCode(state) ++ Seq.fill(approveCount - 1)(Dup) ++ approveAlph ++ approveTokens
+      address.genCode(state) ++ Seq.fill(approveCount - 1)(Dup) ++ approveTokens
     }
   }
 
@@ -127,6 +121,14 @@ object Ast {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
 
+  final case class ALPHTokenId[Ctx <: StatelessContext]() extends Expr[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.ByteVec)
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = Seq(
+      ALPHTokenIdInstr.asInstanceOf[Instr[Ctx]]
+    )
+  }
   final case class Const[Ctx <: StatelessContext](v: Val) extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.fromVal(v.tpe))
 
@@ -228,12 +230,56 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       address.genCode(state)
   }
+
+  sealed trait CallAst[Ctx <: StatelessContext] extends ApproveAssets[Ctx] {
+    def id: FuncId
+    def args: Seq[Expr[Ctx]]
+    def ignoreReturn: Boolean
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def _genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      (id, args) match {
+        case (BuiltIn.approveToken.funcId, Seq(from, ALPHTokenId(), amount)) =>
+          Seq(from, amount).flatMap(_.genCode(state)) :+ ApproveAlph.asInstanceOf[Instr[Ctx]]
+        case (BuiltIn.tokenRemaining.funcId, Seq(from, ALPHTokenId())) =>
+          val instrs = from.genCode(state) :+ AlphRemaining.asInstanceOf[Instr[Ctx]]
+          if (ignoreReturn) instrs :+ Pop.asInstanceOf[Instr[Ctx]] else instrs
+        case (BuiltIn.transferToken.funcId, Seq(from, to, ALPHTokenId(), amount)) =>
+          Seq(from, to, amount).flatMap(_.genCode(state)) :+ TransferAlph.asInstanceOf[Instr[Ctx]]
+        case (BuiltIn.transferTokenFromSelf.funcId, Seq(to, ALPHTokenId(), amount)) =>
+          Seq(to, amount).flatMap(_.genCode(state)) :+ TransferAlphFromSelf.asInstanceOf[Instr[Ctx]]
+        case (BuiltIn.transferTokenToSelf.funcId, Seq(from, ALPHTokenId(), amount)) =>
+          Seq(from, amount).flatMap(_.genCode(state)) :+ TransferAlphToSelf.asInstanceOf[Instr[Ctx]]
+        case _ =>
+          val func     = state.getFunc(id)
+          val argsType = args.flatMap(_.getType(state))
+          val variadicInstrs = if (func.isVariadic) {
+            Seq(U256Const(Val.U256.unsafe(args.length)))
+          } else {
+            Seq.empty
+          }
+          val instrs = genApproveCode(state, func) ++
+            args.flatMap(_.genCode(state)) ++
+            variadicInstrs ++
+            func.genCode(argsType)
+          if (ignoreReturn) {
+            val returnType = func.getReturnType(argsType)
+            instrs ++ Seq.fill(Type.flattenTypeLength(returnType))(Pop)
+          } else {
+            instrs
+          }
+      }
+    }
+  }
+
   final case class CallExpr[Ctx <: StatelessContext](
       id: FuncId,
       approveAssets: Seq[ApproveAsset[Ctx]],
       args: Seq[Expr[Ctx]]
   ) extends Expr[Ctx]
-      with ApproveAssets[Ctx] {
+      with CallAst[Ctx] {
+    def ignoreReturn: Boolean = false
+
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
@@ -244,11 +290,7 @@ object Ast {
       state.addInternalCall(
         id
       ) // don't put this in _getType, otherwise the statement might get skipped
-      val func = state.getFunc(id)
-      genApproveCode(state, func) ++
-        args.flatMap(_.genCode(state)) ++
-        (if (func.isVariadic) Seq(U256Const(Val.U256.unsafe(args.length))) else Seq.empty) ++
-        func.genCode(args.flatMap(_.getType(state)))
+      _genCode(state)
     }
   }
 
@@ -474,7 +516,7 @@ object Ast {
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean,
-      useExternalCallCheck: Boolean,
+      useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
@@ -507,8 +549,8 @@ object Ast {
     def getArgMutability(): AVector[Boolean]    = AVector.from(args.view.map(_.isMutable))
     def getReturnSignatures(): AVector[String]  = AVector.from(rtypes.view.map(_.signature))
 
-    def hasDirectExternalCallCheck(): Boolean = {
-      !useExternalCallCheck || // external call check manually disabled
+    def hasDirectCheckExternalCaller(): Boolean = {
+      !useCheckExternalCaller || // check external caller manually disabled
       body.exists {
         case FuncCall(id, _, _) => id.isBuiltIn && id.name == "checkCaller"
         case _                  => false
@@ -578,7 +620,7 @@ object Ast {
         isPublic = true,
         usePreapprovedAssets = usePreapprovedAssets,
         useAssetsInContract = useAssetsInContract,
-        useExternalCallCheck = true,
+        useCheckExternalCaller = true,
         useUpdateFields = useUpdateFields,
         args = Seq.empty,
         rtypes = Seq.empty,
@@ -692,7 +734,9 @@ object Ast {
       approveAssets: Seq[ApproveAsset[Ctx]],
       args: Seq[Expr[Ctx]]
   ) extends Statement[Ctx]
-      with ApproveAssets[Ctx] {
+      with CallAst[Ctx] {
+    def ignoreReturn: Boolean = true
+
     override def check(state: Compiler.State[Ctx]): Unit = {
       checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
@@ -704,14 +748,7 @@ object Ast {
       state.addInternalCall(
         id
       ) // don't put this in _getType, otherwise the statement might get skipped
-      val func       = state.getFunc(id)
-      val argsType   = args.flatMap(_.getType(state))
-      val returnType = func.getReturnType(argsType)
-      genApproveCode(state, func) ++
-        args.flatMap(_.genCode(state)) ++
-        (if (func.isVariadic) Seq(U256Const(Val.U256(U256.unsafe(args.length)))) else Seq.empty) ++
-        func.genCode(argsType) ++
-        Seq.fill(Type.flattenTypeLength(returnType))(Pop)
+      _genCode(state)
     }
   }
   final case class ContractCall(
@@ -1035,11 +1072,11 @@ object Ast {
     }
 
     // the state must have been updated in the check pass
-    def buildExternalCallCheckTable(
+    def buildCheckExternalCallerTable(
         state: Compiler.State[StatefulContext]
     ): mutable.Map[FuncId, Boolean] = {
-      val externalCallCheckedTable = mutable.Map.empty[FuncId, Boolean]
-      funcs.foreach(func => externalCallCheckedTable(func.id) = false)
+      val checkExternalCallerTable = mutable.Map.empty[FuncId, Boolean]
+      funcs.foreach(func => checkExternalCallerTable(func.id) = false)
 
       // TODO: optimize these two functions
       def updateCheckedRecursivelyForPrivateMethod(checkedPrivateCalleeId: FuncId): Unit = {
@@ -1052,20 +1089,20 @@ object Ast {
         }
       }
       def updateCheckedRecursively(func: FuncDef[StatefulContext]): Unit = {
-        if (!externalCallCheckedTable(func.id)) {
-          externalCallCheckedTable(func.id) = true
-          if (func.isPrivate) { // indirect external call check should be in private methods
+        if (!checkExternalCallerTable(func.id)) {
+          checkExternalCallerTable(func.id) = true
+          if (func.isPrivate) { // indirect check external caller should be in private methods
             updateCheckedRecursivelyForPrivateMethod(func.id)
           }
         }
       }
 
       funcs.foreach { func =>
-        if (func.hasDirectExternalCallCheck()) {
+        if (func.hasDirectCheckExternalCaller()) {
           updateCheckedRecursively(func)
         }
       }
-      externalCallCheckedTable
+      checkExternalCallerTable
     }
   }
 

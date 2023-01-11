@@ -399,7 +399,7 @@ class WalletAppSpec
       response.code is StatusCode.Ok
     }
 
-    groupConfig.allGroups.foreach { group =>
+    groupConfig.cliqueGroups.foreach { group =>
       deriveAddressWithGroup(group.value) check { response =>
         response.as[AddressInfo].group is group
       }

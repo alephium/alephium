@@ -1043,8 +1043,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  ],
          |  "warnings": [
          |    "Found unused variables in Foo: bar.a",
-         |    "Found unused fields in Foo: aa, bb, cc, dd, ee",
-         |    "Function Foo.bar does not update fields, please use @using(updateFields = false) for the function"
+         |    "Found unused fields in Foo: aa, bb, cc, dd, ee"
          |  ]
          |}
          |""".stripMargin
@@ -1207,5 +1206,55 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
            |}""".stripMargin
       checkData(utxo, jsonRaw)
     }
+  }
+
+  it should "get alph and token amounts" in {
+    BuildTxCommon
+      .getAlphAndTokenAmounts(None, None) isE (None, AVector.empty[(TokenId, U256)])
+    BuildTxCommon.getAlphAndTokenAmounts(Some(Amount(U256.One)), None) isE
+      (Some(U256.One), AVector.empty[(TokenId, U256)])
+
+    val tokenId = TokenId.generate
+    BuildTxCommon
+      .getAlphAndTokenAmounts(None, Some(AVector(Token(tokenId, U256.One)))) isE
+      (None, AVector(tokenId -> U256.One))
+    BuildTxCommon.getAlphAndTokenAmounts(
+      Some(Amount(U256.One)),
+      Some(AVector(Token(tokenId, U256.One)))
+    ) isE (Some(U256.One), AVector(tokenId -> U256.One))
+    BuildTxCommon.getAlphAndTokenAmounts(
+      Some(Amount(U256.One)),
+      Some(
+        AVector(
+          Token(tokenId, U256.One),
+          Token(TokenId.alph, U256.One),
+          Token(TokenId.alph, U256.One)
+        )
+      )
+    ) isE (Some(U256.unsafe(3)), AVector(tokenId -> U256.One))
+    BuildTxCommon.getAlphAndTokenAmounts(
+      Some(Amount(U256.One)),
+      Some(
+        AVector(
+          Token(tokenId, U256.One),
+          Token(TokenId.alph, U256.One),
+          Token(TokenId.alph, U256.One),
+          Token(tokenId, U256.One)
+        )
+      )
+    ) isE (Some(U256.unsafe(3)), AVector(tokenId -> U256.Two))
+
+    BuildTxCommon
+      .getAlphAndTokenAmounts(
+        Some(Amount(U256.MaxValue)),
+        Some(AVector(Token(TokenId.alph, U256.One)))
+      )
+      .leftValue is "ALPH amount overflow"
+    BuildTxCommon
+      .getAlphAndTokenAmounts(
+        None,
+        Some(AVector(Token(tokenId, U256.MaxValue), Token(tokenId, U256.One)))
+      )
+      .leftValue is s"Token $tokenId amount overflow"
   }
 }

@@ -88,7 +88,7 @@ class ParserSpec extends AlephiumSpec {
         )
       )
     fastparse
-      .parse("foo{ x -> 1e-18 alph, token: 2; y -> 3 }(z)", StatefulParser.expr(_))
+      .parse("foo{ x -> ALPH: 1e-18 alph, token: 2; y -> ALPH: 3 }(z)", StatefulParser.expr(_))
       .get
       .value is
       CallExpr[StatefulContext](
@@ -96,19 +96,24 @@ class ParserSpec extends AlephiumSpec {
         Seq(
           Ast.ApproveAsset(
             Variable(Ident("x")),
-            Some(Const(Val.U256(U256.One))),
-            Seq(Variable(Ident("token")) -> Const(Val.U256(U256.Two)))
+            Seq(
+              Ast.ALPHTokenId()        -> Const(Val.U256(U256.One)),
+              Variable(Ident("token")) -> Const(Val.U256(U256.Two))
+            )
           ),
-          Ast.ApproveAsset(Variable(Ident("y")), Some(Const(Val.U256(U256.unsafe(3)))), Seq.empty)
+          Ast.ApproveAsset(
+            Variable(Ident("y")),
+            Seq(Ast.ALPHTokenId() -> Const(Val.U256(U256.unsafe(3))))
+          )
         ),
         List(Variable(Ident("z")))
       )
 
     info("Braces syntax")
-    fastparse.parse("{ x -> 1 alph }", StatelessParser.approveAssets(_)).isSuccess is true
+    fastparse.parse("{ x -> ALPH: 1 alph }", StatelessParser.approveAssets(_)).isSuccess is true
     fastparse.parse("{ x -> tokenId: 2 }", StatelessParser.approveAssets(_)).isSuccess is true
     fastparse
-      .parse("{ x -> 1 alph, tokenId: 2; y -> 3 }", StatelessParser.approveAssets(_))
+      .parse("{ x -> ALPH: 1 alph, tokenId: 2; y -> ALPH: 3 }", StatelessParser.approveAssets(_))
       .isSuccess is true
 
     info("Contract call")
@@ -119,13 +124,24 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         List(Variable(Ident("x")))
       )
-    fastparse.parse("Foo(x).bar{ z -> 1 }(x)", StatefulParser.contractCallExpr(_)).get.value is
+    fastparse
+      .parse("Foo(x).bar{ z -> ALPH: 1 }(x)", StatefulParser.contractCallExpr(_))
+      .get
+      .value is
       ContractCallExpr(
         ContractConv[StatefulContext](Ast.TypeId("Foo"), Variable(Ident("x"))),
         FuncId("bar", false),
-        Seq(Ast.ApproveAsset(Variable(Ident("z")), Some(Const(Val.U256(U256.One))), Seq.empty)),
+        Seq(
+          Ast.ApproveAsset(
+            Variable(Ident("z")),
+            Seq(ALPHTokenId() -> Const(Val.U256(U256.One)))
+          )
+        ),
         List(Variable(Ident("x")))
       )
+    intercept[Compiler.Error](
+      fastparse.parse("Foo(x).bar{ z -> }(x)", StatefulParser.contractCallExpr(_))
+    ).message is "Empty asset for address: Variable(Ident(z))"
   }
 
   it should "parse ByteVec" in {
@@ -140,6 +156,7 @@ class ParserSpec extends AlephiumSpec {
         Seq(Ast.NamedVar(false, Ident("bytes"))),
         Const(Val.ByteVec(ByteString.empty))
       )
+    fastparse.parse("ALPH", StatefulParser.expr(_)).get.value is ALPHTokenId[StatefulContext]()
   }
 
   it should "parse return" in {
@@ -290,7 +307,7 @@ class ParserSpec extends AlephiumSpec {
     parsed1.isPublic is true
     parsed1.usePreapprovedAssets is true
     parsed1.useAssetsInContract is false
-    parsed1.useExternalCallCheck is true
+    parsed1.useCheckExternalCaller is true
     parsed1.useUpdateFields is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
@@ -308,8 +325,8 @@ class ParserSpec extends AlephiumSpec {
     parsed2.isPublic is true
     parsed2.usePreapprovedAssets is true
     parsed2.useAssetsInContract is true
-    parsed2.useExternalCallCheck is true
-    parsed2.useUpdateFields is true
+    parsed2.useCheckExternalCaller is true
+    parsed2.useUpdateFields is false
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
 
@@ -324,7 +341,7 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed3.usePreapprovedAssets is false
     parsed3.useAssetsInContract is true
-    parsed3.useExternalCallCheck is true
+    parsed3.useCheckExternalCaller is true
     parsed3.useUpdateFields is true
   }
 
@@ -694,11 +711,11 @@ class ParserSpec extends AlephiumSpec {
           FuncDef(
             Seq.empty,
             FuncId("foo", false),
-            false,
-            false,
-            false,
-            true,
-            true,
+            isPublic = false,
+            usePreapprovedAssets = false,
+            useAssetsInContract = false,
+            useCheckExternalCaller = true,
+            useUpdateFields = false,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -816,11 +833,11 @@ class ParserSpec extends AlephiumSpec {
           FuncDef(
             Seq.empty,
             FuncId("foo", false),
-            false,
-            false,
-            false,
-            true,
-            true,
+            isPublic = false,
+            usePreapprovedAssets = false,
+            useAssetsInContract = false,
+            useCheckExternalCaller = true,
+            useUpdateFields = false,
             Seq.empty,
             Seq.empty,
             None
@@ -848,9 +865,7 @@ class ParserSpec extends AlephiumSpec {
       val code =
         s"""
            |Contract Child() implements Parent {
-           |  fn foo() -> () {
-           |    return
-           |  }
+           |  fn bar() -> () {}
            |}
            |""".stripMargin
       fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
@@ -861,15 +876,15 @@ class ParserSpec extends AlephiumSpec {
         Seq(
           FuncDef(
             Seq.empty,
-            FuncId("foo", false),
-            false,
-            false,
-            false,
-            true,
-            true,
+            FuncId("bar", false),
+            isPublic = false,
+            usePreapprovedAssets = false,
+            useAssetsInContract = false,
+            useCheckExternalCaller = true,
+            useUpdateFields = false,
             Seq.empty,
             Seq.empty,
-            Some(Seq(ReturnStmt(Seq.empty)))
+            Some(Seq.empty)
           )
         ),
         Seq.empty,
@@ -898,11 +913,11 @@ class ParserSpec extends AlephiumSpec {
           FuncDef(
             Seq.empty,
             FuncId("foo", false),
-            false,
-            false,
-            false,
-            true,
-            true,
+            isPublic = false,
+            usePreapprovedAssets = false,
+            useAssetsInContract = false,
+            useCheckExternalCaller = true,
+            useUpdateFields = false,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -935,29 +950,29 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "test abstract contract parser" in {
-    def fooFuncDef(isAbstract: Boolean, externalCallCheck: Boolean = true) =
+    def fooFuncDef(isAbstract: Boolean, checkExternalCaller: Boolean = true) =
       FuncDef[StatefulContext](
         Seq.empty,
         FuncId("foo", false),
-        false,
-        false,
-        false,
-        externalCallCheck,
-        true,
+        isPublic = false,
+        usePreapprovedAssets = false,
+        useAssetsInContract = false,
+        checkExternalCaller,
+        useUpdateFields = false,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
       )
 
-    def barFuncDef(isAbstract: Boolean, externalCallCheck: Boolean = true) =
+    def barFuncDef(isAbstract: Boolean, checkExternalCaller: Boolean = true) =
       FuncDef[StatefulContext](
         Seq.empty,
         FuncId("bar", false),
-        false,
-        false,
-        false,
-        externalCallCheck,
-        true,
+        isPublic = false,
+        usePreapprovedAssets = false,
+        useAssetsInContract = false,
+        checkExternalCaller,
+        useUpdateFields = false,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -992,7 +1007,7 @@ class ParserSpec extends AlephiumSpec {
       val bar =
         s"""
            |Interface Bar {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn bar() -> ()
            |}
            |""".stripMargin
@@ -1000,7 +1015,7 @@ class ParserSpec extends AlephiumSpec {
       val code =
         s"""
            |Abstract Contract Foo() implements Bar {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn foo() -> () {
            |    return
            |  }
@@ -1013,7 +1028,7 @@ class ParserSpec extends AlephiumSpec {
       val annotations = Seq(
         Annotation(
           Ident(Parser.usingAnnotationId),
-          Seq(AnnotationField(Ident(Parser.useExternalCallCheckKey), Val.False))
+          Seq(AnnotationField(Ident(Parser.useCheckExternalCallerKey), Val.False))
         )
       )
       fooContract is Contract(
@@ -1043,11 +1058,11 @@ class ParserSpec extends AlephiumSpec {
       FuncDef(
         Seq.empty,
         FuncId("main", false),
-        true,
+        isPublic = true,
         usePreapprovedAssets,
-        false,
-        true,
-        true,
+        useAssetsInContract = false,
+        useCheckExternalCaller = true,
+        useUpdateFields = false,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))

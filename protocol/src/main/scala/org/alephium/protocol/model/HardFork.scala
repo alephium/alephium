@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.model
 
+import scala.collection.immutable.ArraySeq
+
 sealed class HardFork(val version: Int) extends Ordered[HardFork] {
   def compare(that: HardFork): Int = this.version.compareTo(that.version)
 
@@ -24,4 +26,6 @@ sealed class HardFork(val version: Int) extends Ordered[HardFork] {
 object HardFork {
   object Mainnet extends HardFork(0)
   object Leman   extends HardFork(1)
+
+  val All: ArraySeq[HardFork] = ArraySeq(Mainnet, Leman)
 }

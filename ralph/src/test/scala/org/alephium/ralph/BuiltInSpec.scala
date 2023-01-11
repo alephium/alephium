@@ -16,7 +16,7 @@
 
 package org.alephium.ralph
 
-import org.alephium.protocol.vm.{Instr, SelfAddress, StatefulContext}
+import org.alephium.protocol.vm._
 import org.alephium.ralph.BuiltIn.{OverloadedSimpleBuiltIn, SimpleBuiltIn}
 import org.alephium.util.AlephiumSpec
 
@@ -49,6 +49,8 @@ class BuiltInSpec extends AlephiumSpec {
             .asInstanceOf[Seq[Instr[_]]]
         case _: Any => Seq.empty[Instr[_]]
       }
-      .toSet is StaticAnalysis.contractAssetsInstrs.-(SelfAddress)
+      .toSet is StaticAnalysis.contractAssetsInstrs.--(
+      Set(SelfAddress, TransferAlphFromSelf, TransferAlphToSelf)
+    )
   }
 }

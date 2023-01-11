@@ -341,7 +341,10 @@ trait TxUtils { Self: FlowUtils =>
     chain.isTxConfirmed(txId)
   }
 
-  def getTxStatus(txId: TransactionId, chainIndex: ChainIndex): IOResult[Option[TxStatus]] =
+  def getTxConfirmedStatus(
+      txId: TransactionId,
+      chainIndex: ChainIndex
+  ): IOResult[Option[Confirmed]] =
     IOUtils.tryExecute {
       assume(brokerConfig.contains(chainIndex.from))
       val chain = getBlockChain(chainIndex)
@@ -452,8 +455,8 @@ trait TxUtils { Self: FlowUtils =>
   ): Either[String, Option[TxStatus]] = {
     if (brokerConfig.contains(chainIndex.from)) {
       for {
-        status <- getTxStatus(txId, chainIndex)
-          .map {
+        status <- getTxConfirmedStatus(txId, chainIndex)
+          .map[Option[TxStatus]] {
             case Some(status) => Some(status)
             case None         => if (isInMemPool(txId, chainIndex)) Some(MemPooled) else None
           }
@@ -510,7 +513,7 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def isInMemPool(txId: TransactionId, chainIndex: ChainIndex): Boolean = {
-    Self.blockFlow.getMemPool(chainIndex).contains(chainIndex, txId)
+    Self.blockFlow.getMemPool(chainIndex).contains(txId)
   }
 
   def checkTxChainIndex(chainIndex: ChainIndex, tx: TransactionId): Either[String, Unit] = {

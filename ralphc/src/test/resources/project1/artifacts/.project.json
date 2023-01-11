@@ -1,0 +1,57 @@
+{
+  "compilerOptionsUsed": {
+    "ignoreUnusedConstantsWarnings": false,
+    "ignoreUnusedVariablesWarnings": false,
+    "ignoreUnusedFieldsWarnings": false,
+    "ignoreUnusedPrivateFunctionsWarnings": false,
+    "ignoreUpdateFieldsCheckWarnings": false,
+    "ignoreCheckExternalCallerWarnings": false
+  },
+  "infos": {
+    "Add": {
+      "sourceFile": "add/add.ral",
+      "sourceCodeHash": "c1e952e47d26bdf616ba4254030a830a477e6a3e1bb5cb551b63fab877d574c8",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "a20cffb6f8f9416decd7aec0375b12e04475e8cf19ba80775f8f2d7633e2556d",
+      "warnings": [
+        "Function \"Add.addPrivate\" changes state, please use @using(updateFields = true) for the function"
+      ]
+    },
+    "Greeter": {
+      "sourceFile": "greeter/greeter.ral",
+      "sourceCodeHash": "3cf9e5898ff728b03630bf457ef96cbd21d345e2256f30d2ce4f6a102de51b14",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "23a48462286d2c2ffc6d3a19192060dd42c178e7d331819e75e059c5be3c042f",
+      "warnings": [
+        
+      ]
+    },
+    "GreeterInterface": {
+      "sourceFile": "greeter/greeter_interface.ral",
+      "sourceCodeHash": "4d907712f36c242fc160513fc9d94d96e5c848ae865b89b39eaff8f9c3d48c1f",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "",
+      "warnings": [
+        
+      ]
+    },
+    "Main": {
+      "sourceFile": "main.ral",
+      "sourceCodeHash": "8cc5c1a2de002650a5904078f91005932982e700f7b0a393cbe4e3a64cfdf842",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "",
+      "warnings": [
+        
+      ]
+    },
+    "Sub": {
+      "sourceFile": "sub/sub.ral",
+      "sourceCodeHash": "c8b669babea2f36bdb8f92afb17747bfb9eecb13ac17c5a02388426c91a4434e",
+      "bytecodeDebugPatch": "",
+      "codeHashDebug": "513645f5c95a28d55a51070f3d5c51edbda05a98f46b23cad59952e2ee4846a1",
+      "warnings": [
+        
+      ]
+    }
+  }
+}

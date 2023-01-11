@@ -449,6 +449,46 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
   }
 
+  it should "check the number of public keys in p2mpk for leman fork" in new Fixture {
+    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
+      implicit val validator = nestedValidator(checkOutputStats(_, HardFork.Leman), preOutputs)
+
+      val chainIndex = tx.chainIndex
+      val p2pkh      = p2pkhLockupGen(chainIndex.from).sample.get
+      val invalidP2MPK = LockupScript.P2MPKH
+        .unsafe(AVector(p2pkh.pkHash) ++ AVector.fill(ALPH.MaxKeysInP2MPK)(Hash.generate), 1)
+
+      val updateFixedOutput = Random.nextInt(tx.outputsLength) < tx.unsigned.fixedOutputs.length
+      val txNew = if (updateFixedOutput) {
+        tx.updateRandomFixedOutputs(_.copy(lockupScript = invalidP2MPK))
+      } else {
+        tx.updateRandomGeneratedOutputs {
+          case o: AssetOutput    => o.copy(lockupScript = invalidP2MPK)
+          case o: ContractOutput => o
+        }
+      }
+      txNew.fail(TooManyKeysInMultisig)
+    }
+
+    val keys       = AVector.fill(ALPH.MaxKeysInP2MPK)(PublicKey.generate)
+    val validP2MPK = LockupScript.p2mpkh(keys, 1).value
+    val tx =
+      transactionGen().sample.get.updateRandomFixedOutputs(_.copy(lockupScript = validP2MPK))
+    checkOutputStats(tx, HardFork.Leman).isRight is true
+  }
+
+  it should "check the number of public keys in p2mpk for Mainnet fork" in new Fixture {
+    val tooManyKeys = AVector.fill(ALPH.MaxKeysInP2MPK + 1)(PublicKey.generate)
+    val p2mpkh0     = LockupScript.p2mpkh(tooManyKeys.init, 1).value
+    val p2mpkh1     = LockupScript.p2mpkh(tooManyKeys, ALPH.MaxKeysInP2MPK + 1).value
+    val tx0 =
+      transactionGen().sample.get.updateRandomFixedOutputs(_.copy(lockupScript = p2mpkh0))
+    val tx1 =
+      transactionGen().sample.get.updateRandomFixedOutputs(_.copy(lockupScript = p2mpkh1))
+    checkOutputStats(tx0, HardFork.Mainnet).isRight is true
+    checkOutputStats(tx1, HardFork.Mainnet).isRight is true
+  }
+
   it should "check the inputs indexes" in new Fixture {
     forAll(transactionGenWithPreOutputs(inputsNumGen = Gen.choose(2, 10))) {
       case (tx, preOutputs) =>
@@ -502,24 +542,30 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check output data size" in new Fixture {
-    val oversizedData = ByteString.fromArrayUnsafe(Array.fill(ALPH.MaxOutputDataSize + 1)(0))
+    val oversizedData  = ByteString.fromArrayUnsafe(Array.fill(ALPH.MaxOutputDataSize + 1)(0))
+    val justEnoughData = ByteString.fromArrayUnsafe(Array.fill(ALPH.MaxOutputDataSize)(0))
     oversizedData.length is ALPH.MaxOutputDataSize + 1
+    justEnoughData.length is ALPH.MaxOutputDataSize
 
-    forAll(transactionGenWithPreOutputs()) { case (tx, preOutputs) =>
-      implicit val validator = nestedValidator(checkOutputDataSize, preOutputs)
+    forAll(transactionGenWithPreOutputs(), Gen.oneOf(HardFork.Mainnet, HardFork.Leman)) {
+      case ((tx, preOutputs), hardFork) =>
+        implicit val validator = nestedValidator(checkOutputStats(_, hardFork), preOutputs)
 
-      val updateFixedOutput = Random.nextInt(tx.outputsLength) < tx.unsigned.fixedOutputs.length
-      val txNew = if (updateFixedOutput) {
-        tx.updateRandomFixedOutputs(_.copy(additionalData = oversizedData))
-      } else {
-        tx.updateRandomGeneratedOutputs {
-          case o: AssetOutput    => o.copy(additionalData = oversizedData)
-          case o: ContractOutput => o
+        val updateFixedOutput = Random.nextInt(tx.outputsLength) < tx.unsigned.fixedOutputs.length
+        val txNew = if (updateFixedOutput) {
+          tx.updateRandomFixedOutputs(_.copy(additionalData = oversizedData))
+        } else {
+          tx.updateRandomGeneratedOutputs {
+            case o: AssetOutput    => o.copy(additionalData = oversizedData)
+            case o: ContractOutput => o
+          }
         }
-      }
-
-      txNew.fail(OutputDataSizeExceeded)
+        txNew.fail(OutputDataSizeExceeded)
     }
+
+    val tx =
+      transactionGen().sample.get.updateRandomFixedOutputs(_.copy(additionalData = justEnoughData))
+    HardFork.All.foreach { hf => checkOutputStats(tx, hf).isRight is true }
   }
 
   behavior of "stateful validation"
