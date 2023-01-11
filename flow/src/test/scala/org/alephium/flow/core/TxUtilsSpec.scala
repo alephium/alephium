@@ -615,7 +615,7 @@ class TxUtilsSpec extends AlephiumSpec {
       unsignedTx.fixedOutputs.length is 1
       unsignedTx.gasAmount is GasEstimation.sweepAddress(inputNum, 1)
       val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
-      txValidation.validateTxOnlyForTest(sweepTx, blockflow) isE ()
+      txValidation.validateTxOnlyForTest(sweepTx, blockflow, None) isE ()
     }
 
     (1 to 10).foreach(test)
@@ -826,7 +826,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val tx0 = Transaction.from(unsignedTx0, keyManager(output.lockupScript))
     tx0.unsigned.inputs.length is ALPH.MaxTxInputNum
     tx0.inputSignatures.length is 1
-    txValidation.validateTxOnlyForTest(tx0, blockFlow) isE ()
+    txValidation.validateTxOnlyForTest(tx0, blockFlow, None) isE ()
 
     blockFlow
       .transfer(
@@ -936,7 +936,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     unsignedTxs.foreach { unsignedTx =>
       val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
-      txValidation.validateTxOnlyForTest(sweepTx, blockFlow) isE ()
+      txValidation.validateTxOnlyForTest(sweepTx, blockFlow, None) isE ()
     }
   }
 

@@ -24,7 +24,7 @@ import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import org.alephium.flow.{AlephiumFlowSpec, FlowFixture}
-import org.alephium.flow.validation.ValidationStatus.{from, invalidTx, validTx}
+import org.alephium.flow.validation.ValidationStatus.{invalidTx, validTx}
 import org.alephium.io.IOError
 import org.alephium.protocol.{ALPH, Hash, PrivateKey, PublicKey, Signature, SignatureSchema}
 import org.alephium.protocol.model._
@@ -142,7 +142,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       (transaction: Transaction) => {
         for {
           result <- validator(transaction)
-          _      <- validateTxOnlyForTest(transaction, blockFlow)
+          _      <- validateTxOnlyForTest(transaction, blockFlow, None)
           _      <- validateMempoolTxTemplate(transaction.toTemplate, blockFlow)
         } yield result
       }
@@ -771,23 +771,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
     def toSignedTx(unsignedTx: UnsignedTransaction): Transaction
 
-    val preLemanValidator = (tx: Transaction) => {
-      for {
-        chainIndex <- getChainIndex(tx)
-        bestDeps = blockFlow.getBestDeps(chainIndex.from)
-        groupView <- from(blockFlow.getMutableGroupView(chainIndex.from, bestDeps))
-        blockEnv  <- from(blockFlow.getDryrunBlockEnv(chainIndex))
-        _ <- validateTx(
-          tx,
-          chainIndex,
-          groupView,
-          blockEnv.copy(hardFork = HardFork.Mainnet),
-          None,
-          checkDoubleSpending = true
-        )
-      } yield ()
-    }
-    val lemanValidator = validateTxOnlyForTest(_, blockFlow)
+    val preLemanValidator = validateTxOnlyForTest(_, blockFlow, Some(HardFork.Mainnet))
+    val lemanValidator    = validateTxOnlyForTest(_, blockFlow, None)
 
     def validate() = {
       val unsignedTx0 = prepareOutputs(lockup, unlock, 2)
@@ -885,7 +870,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   behavior of "lockup script"
 
   it should "validate p2pkh" in new Fixture {
-    implicit val validator = validateTxOnlyForTest(_, blockFlow)
+    implicit val validator = validateTxOnlyForTest(_, blockFlow, None)
 
     forAll(keypairGen) { case (priKey, pubKey) =>
       val lockup   = LockupScript.p2pkh(pubKey)
@@ -911,7 +896,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       sign(unsigned, priKey0, priKey1)
     }
 
-    implicit val validator = validateTxOnlyForTest(_, blockFlow)
+    implicit val validator = validateTxOnlyForTest(_, blockFlow, None)
 
     tx(pubKey0 -> 0).fail(InvalidNumberOfPublicKey)
     tx(pubKey0 -> 0, pubKey1 -> 1, pubKey2 -> 2).fail(InvalidNumberOfPublicKey)
@@ -942,7 +927,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     val unlock   = UnlockScript.p2sh(script, AVector(Val.U256(51)))
     val unsigned = prepareOutput(lockup, unlock)
 
-    implicit val validator = validateTxOnlyForTest(_, blockFlow)
+    implicit val validator = validateTxOnlyForTest(_, blockFlow, None)
 
     val tx0 = Transaction.from(unsigned, AVector.empty[Signature])
     tx0.pass()

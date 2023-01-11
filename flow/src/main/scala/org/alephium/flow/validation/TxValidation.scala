@@ -157,7 +157,8 @@ trait TxValidation {
 
   def validateTxOnlyForTest(
       tx: Transaction,
-      flow: BlockFlow
+      flow: BlockFlow,
+      hardForkOpt: Option[HardFork]
   ): TxValidationResult[Unit] = {
     for {
       chainIndex <- getChainIndex(tx)
@@ -168,7 +169,7 @@ trait TxValidation {
         tx,
         chainIndex,
         groupView,
-        blockEnv,
+        hardForkOpt.map(hardFork => blockEnv.copy(hardFork = hardFork)).getOrElse(blockEnv),
         None,
         checkDoubleSpending = true
       )
