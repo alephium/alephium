@@ -36,7 +36,7 @@ class ConcurrentHashMap[K, V] private (m: JCHashMap[K, V]) extends SimpleMap[K, 
   }
 
   def get(k: K): Option[V] = {
-    Option(m.get(k))
+    Option(unsafe(k))
   }
 
   def contains(k: K): Boolean = m.containsKey(k)
@@ -50,5 +50,7 @@ class ConcurrentHashMap[K, V] private (m: JCHashMap[K, V]) extends SimpleMap[K, 
     Option(m.remove(k))
   }
 
-  def unsafe(key: K): V = ???
+  def unsafe(k: K): V = m.get(k)
+
+  def clear(): Unit = m.clear()
 }

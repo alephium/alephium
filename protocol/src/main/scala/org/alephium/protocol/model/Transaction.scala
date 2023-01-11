@@ -227,8 +227,16 @@ object Transaction {
     )
   }
 
+  def totalReward(gasFee: U256, miningReward: U256, hardFork: HardFork): U256 = {
+    if (hardFork.isLemanEnabled()) {
+      miningReward
+    } else {
+      totalRewardPreLeman(gasFee, miningReward)
+    }
+  }
+
   // PoLW burning is not considered
-  def totalReward(gasFee: U256, miningReward: U256): U256 = {
+  @inline def totalRewardPreLeman(gasFee: U256, miningReward: U256): U256 = {
     val threshold = Math.max(miningReward, ALPH.oneAlph)
     val gasReward = gasFee.divUnsafe(U256.Two)
     if (gasReward >= threshold) {
@@ -282,8 +290,9 @@ object Transaction {
     val outputData   = serialize(coinbaseData) ++ minerData
     val lockTime     = blockTs + networkConfig.coinbaseLockupPeriod
     val miningReward = emissionConfig.emission.reward(target, blockTs, ALPH.LaunchTimestamp)
+    val hardFork     = networkConfig.getHardFork(blockTs)
     val netReward = miningReward match {
-      case Emission.PoW(miningReward) => totalReward(gasFee, miningReward)
+      case Emission.PoW(miningReward) => totalReward(gasFee, miningReward, hardFork)
       case _: Emission.PoLW           => ??? // TODO: when hashrate is high enough
     }
 
@@ -358,6 +367,7 @@ final case class TransactionTemplate(
   override def outputsLength: Int = unsigned.fixedOutputs.length
 
   override def getOutput(index: Int): TxOutput = unsigned.fixedOutputs(index)
+
 }
 
 object TransactionTemplate {

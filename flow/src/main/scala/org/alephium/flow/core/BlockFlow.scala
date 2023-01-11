@@ -255,7 +255,9 @@ object BlockFlow extends StrictLogging {
       for {
         weight <- calWeight(block)
         _      <- getBlockChain(index).add(block, weight, worldStateOpt)
-      } yield ()
+      } yield {
+        cacheDiffAndTimeSpan(block.header)
+      }
     }
 
     def addAndUpdateView(block: Block, worldStateOpt: Option[WorldState.Cached]): IOResult[Unit] = {
@@ -272,7 +274,9 @@ object BlockFlow extends StrictLogging {
       for {
         weight <- calWeight(header)
         _      <- getHeaderChain(index).add(header, weight)
-      } yield ()
+      } yield {
+        cacheDiffAndTimeSpan(header)
+      }
     }
 
     def addAndUpdateView(header: BlockHeader): IOResult[Unit] = {
@@ -376,16 +380,13 @@ object BlockFlow extends StrictLogging {
       flowTips2.toBlockDeps
     }
 
-    def updateBestDepsUnsafe(): AVector[(TransactionTemplate, TimeStamp)] =
-      brokerConfig.groupRange.foldLeft(
-        AVector.empty[(TransactionTemplate, TimeStamp)]
-      ) { case (acc, mainGroup) =>
+    def updateBestDepsUnsafe(): Unit =
+      brokerConfig.groupRange.foreach { mainGroup =>
         val mainGroupIndex = GroupIndex.unsafe(mainGroup)
         val oldDeps        = getBestDeps(mainGroupIndex)
         val newDeps        = calBestDepsUnsafe(mainGroupIndex)
-        val result         = acc ++ updateGrandPoolUnsafe(mainGroupIndex, newDeps, oldDeps)
+        updateGrandPoolUnsafe(mainGroupIndex, newDeps, oldDeps)
         updateBestDeps(mainGroup, newDeps) // this update must go after pool updates
-        result
       }
 
     def updateBestDepsAfterLoadingUnsafe(): Unit =
@@ -394,7 +395,7 @@ object BlockFlow extends StrictLogging {
         updateBestDeps(mainGroup, deps)
       }
 
-    def updateBestDeps(): IOResult[AVector[(TransactionTemplate, TimeStamp)]] = {
+    def updateBestDeps(): IOResult[Unit] = {
       IOUtils.tryExecute(updateBestDepsUnsafe())
     }
   }

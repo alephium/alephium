@@ -115,7 +115,7 @@ object AllHandlers {
       memPoolSetting: MemPoolSetting,
       logConfig: LogConfig
   ): AllHandlers = {
-    val txProps   = TxHandler.props(blockFlow, storages.pendingTxStorage, storages.readyTxStorage)
+    val txProps   = TxHandler.props(blockFlow, storages.pendingTxStorage)
     val txHandler = ActorRefT.build[TxHandler.Command](system, txProps, s"TxHandler$namePostfix")
     val blockHandlers  = buildBlockHandlers(system, blockFlow, eventBus, namePostfix)
     val headerHandlers = buildHeaderHandlers(system, blockFlow, namePostfix)
@@ -128,7 +128,7 @@ object AllHandlers {
         s"DependencyHandler$namePostfix"
       )
 
-    val viewHandlerProps = ViewHandler.props(blockFlow, txHandler).withDispatcher(MiningDispatcher)
+    val viewHandlerProps = ViewHandler.props(blockFlow).withDispatcher(MiningDispatcher)
     val viewHandler      = ActorRefT.build[ViewHandler.Command](system, viewHandlerProps)
 
     AllHandlers(

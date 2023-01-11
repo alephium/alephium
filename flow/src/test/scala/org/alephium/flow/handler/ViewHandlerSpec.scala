@@ -20,12 +20,13 @@ import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
 
 import org.alephium.flow.FlowFixture
+import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.InterCliqueManager
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Address, ChainIndex, GroupIndex, LockupScriptGenerators}
 import org.alephium.protocol.vm.LockupScript
-import org.alephium.util._
+import org.alephium.util.*
 
 class ViewHandlerSpec extends AlephiumActorSpec {
   it should "update when necessary" in {
@@ -52,12 +53,11 @@ class ViewHandlerSpec extends AlephiumActorSpec {
 
   trait Fixture extends FlowFixture with LockupScriptGenerators {
 
-    val txProbe = TestProbe()
     lazy val minderAddresses =
       AVector.tabulate(groupConfig.groups)(i =>
         Address.Asset(addressGen(GroupIndex.unsafe(i)).sample.get._1)
       )
-    lazy val viewHandler = TestActorRef[ViewHandler](ViewHandler.props(blockFlow, txProbe.ref))
+    lazy val viewHandler = TestActorRef[ViewHandler](ViewHandler.props(blockFlow))
   }
 
   trait SyncedFixture extends Fixture {
@@ -94,16 +94,28 @@ class ViewHandlerSpec extends AlephiumActorSpec {
     addAndCheck(blockFlow1, block0)
     val block1 = transfer(blockFlow1, chainIndex)
 
+    val tx0       = block0.nonCoinbase.head.toTemplate
     val tx1       = block1.nonCoinbase.head.toTemplate
     val currentTs = TimeStamp.now()
-    blockFlow.getMemPool(chainIndex).pendingPool.add(tx1, currentTs)
+    val mempool   = blockFlow.getMemPool(chainIndex)
+    blockFlow.getGrandPool().add(chainIndex, tx0, currentTs) is MemPool.AddedToMemPool
+    blockFlow.getGrandPool().add(chainIndex, tx1, currentTs) is MemPool.AddedToMemPool
+    mempool.contains(tx0) is true
+    mempool.contains(tx1) is true
+    mempool.isReady(tx0.id) is true
+    mempool.isReady(tx1.id) is false
     addWithoutViewUpdate(blockFlow, block0)
 
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
     viewHandler ! ViewHandler.Subscribe
     viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())
     eventually(expectMsg(ViewHandler.SubscribeResult(succeeded = true)))
-    eventually(txProbe.expectMsg(TxHandler.Broadcast(AVector(tx1 -> currentTs))))
+    eventually {
+      mempool.contains(tx0) is false
+      mempool.contains(tx1) is true
+      mempool.isReady(tx0.id) is false
+      mempool.isReady(tx1.id) is true
+    }
 
     viewHandler ! ViewHandler.UpdateMinerAddresses(minderAddresses)
     viewHandler ! ChainHandler.FlowDataAdded(block0, DataOrigin.Local, TimeStamp.now())

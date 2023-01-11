@@ -42,7 +42,7 @@ object HashRate {
 
   // scalastyle:off magic.number
   def from(target: Target, blockTime: Duration)(implicit groupConfig: GroupConfig): HashRate = {
-    val hashDone = Target.maxBigInt.divide(target.value)
+    val hashDone = target.getDifficulty().value
     val rate =
       hashDone
         // multiply the hashrate due to: multiple chains and chain index encoding in block hash

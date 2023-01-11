@@ -16,7 +16,9 @@
 
 package org.alephium.protocol.config
 
-import org.alephium.protocol.model.{BrokerGroupInfo, ChainIndex}
+import scala.util.Random
+
+import org.alephium.protocol.model.{BrokerGroupInfo, ChainIndex, GroupIndex}
 import org.alephium.util.AVector
 
 trait BrokerConfig extends GroupConfig with CliqueConfig with BrokerGroupInfo {
@@ -25,6 +27,10 @@ trait BrokerConfig extends GroupConfig with CliqueConfig with BrokerGroupInfo {
   lazy val groupNumPerBroker: Int = groups / brokerNum
 
   lazy val groupRange: Range = BrokerConfig.range(brokerId, groups, brokerNum)
+
+  def randomGroupIndex(): GroupIndex = {
+    GroupIndex.unsafe(groupRange(Random.nextInt(groupRange.size)))(this)
+  }
 
   @inline def remoteRange(remote: BrokerGroupInfo): Range =
     BrokerConfig.range(remote.brokerId, groups, remote.brokerNum)

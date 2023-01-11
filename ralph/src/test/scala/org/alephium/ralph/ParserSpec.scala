@@ -307,7 +307,7 @@ class ParserSpec extends AlephiumSpec {
     parsed1.isPublic is true
     parsed1.usePreapprovedAssets is true
     parsed1.useAssetsInContract is false
-    parsed1.useExternalCallCheck is true
+    parsed1.useCheckExternalCaller is true
     parsed1.useUpdateFields is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
@@ -325,7 +325,7 @@ class ParserSpec extends AlephiumSpec {
     parsed2.isPublic is true
     parsed2.usePreapprovedAssets is true
     parsed2.useAssetsInContract is true
-    parsed2.useExternalCallCheck is true
+    parsed2.useCheckExternalCaller is true
     parsed2.useUpdateFields is false
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
@@ -341,7 +341,7 @@ class ParserSpec extends AlephiumSpec {
       .value
     parsed3.usePreapprovedAssets is false
     parsed3.useAssetsInContract is true
-    parsed3.useExternalCallCheck is true
+    parsed3.useCheckExternalCaller is true
     parsed3.useUpdateFields is true
   }
 
@@ -714,7 +714,7 @@ class ParserSpec extends AlephiumSpec {
             isPublic = false,
             usePreapprovedAssets = false,
             useAssetsInContract = false,
-            useExternalCallCheck = true,
+            useCheckExternalCaller = true,
             useUpdateFields = false,
             Seq.empty,
             Seq.empty,
@@ -836,7 +836,7 @@ class ParserSpec extends AlephiumSpec {
             isPublic = false,
             usePreapprovedAssets = false,
             useAssetsInContract = false,
-            useExternalCallCheck = true,
+            useCheckExternalCaller = true,
             useUpdateFields = false,
             Seq.empty,
             Seq.empty,
@@ -880,7 +880,7 @@ class ParserSpec extends AlephiumSpec {
             isPublic = false,
             usePreapprovedAssets = false,
             useAssetsInContract = false,
-            useExternalCallCheck = true,
+            useCheckExternalCaller = true,
             useUpdateFields = false,
             Seq.empty,
             Seq.empty,
@@ -916,7 +916,7 @@ class ParserSpec extends AlephiumSpec {
             isPublic = false,
             usePreapprovedAssets = false,
             useAssetsInContract = false,
-            useExternalCallCheck = true,
+            useCheckExternalCaller = true,
             useUpdateFields = false,
             Seq.empty,
             Seq.empty,
@@ -950,28 +950,28 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "test abstract contract parser" in {
-    def fooFuncDef(isAbstract: Boolean, externalCallCheck: Boolean = true) =
+    def fooFuncDef(isAbstract: Boolean, checkExternalCaller: Boolean = true) =
       FuncDef[StatefulContext](
         Seq.empty,
         FuncId("foo", false),
         isPublic = false,
         usePreapprovedAssets = false,
         useAssetsInContract = false,
-        externalCallCheck,
+        checkExternalCaller,
         useUpdateFields = false,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
       )
 
-    def barFuncDef(isAbstract: Boolean, externalCallCheck: Boolean = true) =
+    def barFuncDef(isAbstract: Boolean, checkExternalCaller: Boolean = true) =
       FuncDef[StatefulContext](
         Seq.empty,
         FuncId("bar", false),
         isPublic = false,
         usePreapprovedAssets = false,
         useAssetsInContract = false,
-        externalCallCheck,
+        checkExternalCaller,
         useUpdateFields = false,
         Seq.empty,
         Seq.empty,
@@ -1007,7 +1007,7 @@ class ParserSpec extends AlephiumSpec {
       val bar =
         s"""
            |Interface Bar {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn bar() -> ()
            |}
            |""".stripMargin
@@ -1015,7 +1015,7 @@ class ParserSpec extends AlephiumSpec {
       val code =
         s"""
            |Abstract Contract Foo() implements Bar {
-           |  @using(externalCallCheck = false)
+           |  @using(checkExternalCaller = false)
            |  fn foo() -> () {
            |    return
            |  }
@@ -1028,7 +1028,7 @@ class ParserSpec extends AlephiumSpec {
       val annotations = Seq(
         Annotation(
           Ident(Parser.usingAnnotationId),
-          Seq(AnnotationField(Ident(Parser.useExternalCallCheckKey), Val.False))
+          Seq(AnnotationField(Ident(Parser.useCheckExternalCallerKey), Val.False))
         )
       )
       fooContract is Contract(
@@ -1061,7 +1061,7 @@ class ParserSpec extends AlephiumSpec {
         isPublic = true,
         usePreapprovedAssets,
         useAssetsInContract = false,
-        useExternalCallCheck = true,
+        useCheckExternalCaller = true,
         useUpdateFields = false,
         Seq.empty,
         Seq.empty,

@@ -80,14 +80,14 @@ trait Warnings {
     }
   }
 
-  def warnExternalCallCheck(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
-    if (!compilerOptions.ignoreExternalCallCheckWarnings) {
-      warnings += Warnings.noExternalCallCheckMsg(typeId.name, funcId.name)
+  def warnCheckExternalCaller(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+    if (!compilerOptions.ignoreCheckExternalCallerWarnings) {
+      warnings += Warnings.noCheckExternalCallerMsg(typeId.name, funcId.name)
     }
   }
 }
 
 object Warnings {
-  def noExternalCallCheckMsg(typeId: String, funcId: String): String =
-    s"No external call check for function: ${typeId}.${funcId}, please use checkCaller!(...) for the function or its private callees."
+  def noCheckExternalCallerMsg(typeId: String, funcId: String): String =
+    s"No check external caller for function: ${typeId}.${funcId}, please use checkCaller!(...) for the function or its private callees."
 }

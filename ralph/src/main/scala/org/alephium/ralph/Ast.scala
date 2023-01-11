@@ -516,7 +516,7 @@ object Ast {
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean,
-      useExternalCallCheck: Boolean,
+      useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
       args: Seq[Argument],
       rtypes: Seq[Type],
@@ -549,8 +549,8 @@ object Ast {
     def getArgMutability(): AVector[Boolean]    = AVector.from(args.view.map(_.isMutable))
     def getReturnSignatures(): AVector[String]  = AVector.from(rtypes.view.map(_.signature))
 
-    def hasDirectExternalCallCheck(): Boolean = {
-      !useExternalCallCheck || // external call check manually disabled
+    def hasDirectCheckExternalCaller(): Boolean = {
+      !useCheckExternalCaller || // check external caller manually disabled
       body.exists {
         case FuncCall(id, _, _) => id.isBuiltIn && id.name == "checkCaller"
         case _                  => false
@@ -620,7 +620,7 @@ object Ast {
         isPublic = true,
         usePreapprovedAssets = usePreapprovedAssets,
         useAssetsInContract = useAssetsInContract,
-        useExternalCallCheck = true,
+        useCheckExternalCaller = true,
         useUpdateFields = useUpdateFields,
         args = Seq.empty,
         rtypes = Seq.empty,
@@ -1072,11 +1072,11 @@ object Ast {
     }
 
     // the state must have been updated in the check pass
-    def buildExternalCallCheckTable(
+    def buildCheckExternalCallerTable(
         state: Compiler.State[StatefulContext]
     ): mutable.Map[FuncId, Boolean] = {
-      val externalCallCheckedTable = mutable.Map.empty[FuncId, Boolean]
-      funcs.foreach(func => externalCallCheckedTable(func.id) = false)
+      val checkExternalCallerTable = mutable.Map.empty[FuncId, Boolean]
+      funcs.foreach(func => checkExternalCallerTable(func.id) = false)
 
       // TODO: optimize these two functions
       def updateCheckedRecursivelyForPrivateMethod(checkedPrivateCalleeId: FuncId): Unit = {
@@ -1089,20 +1089,20 @@ object Ast {
         }
       }
       def updateCheckedRecursively(func: FuncDef[StatefulContext]): Unit = {
-        if (!externalCallCheckedTable(func.id)) {
-          externalCallCheckedTable(func.id) = true
-          if (func.isPrivate) { // indirect external call check should be in private methods
+        if (!checkExternalCallerTable(func.id)) {
+          checkExternalCallerTable(func.id) = true
+          if (func.isPrivate) { // indirect check external caller should be in private methods
             updateCheckedRecursivelyForPrivateMethod(func.id)
           }
         }
       }
 
       funcs.foreach { func =>
-        if (func.hasDirectExternalCallCheck()) {
+        if (func.hasDirectCheckExternalCaller()) {
           updateCheckedRecursively(func)
         }
       }
-      externalCallCheckedTable
+      checkExternalCallerTable
     }
   }
 

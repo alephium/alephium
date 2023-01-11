@@ -52,4 +52,11 @@ class ChainIndexSpec extends AlephiumSpec with NoIndexModelGenerators {
     val index2 = new ChainIndex(new GroupIndex(999999), new GroupIndex(999999))
     index1 is index2
   }
+
+  it should "check from group" in {
+    ChainIndex.checkFromGroup(ChainIndex.unsafe(0, 1).flattenIndex, GroupIndex.unsafe(0)) is true
+    ChainIndex.checkFromGroup(ChainIndex.unsafe(0, 1).flattenIndex, GroupIndex.unsafe(1)) is false
+    ChainIndex.checkFromGroup(ChainIndex.unsafe(1, 0).flattenIndex, GroupIndex.unsafe(0)) is false
+    ChainIndex.checkFromGroup(ChainIndex.unsafe(1, 1).flattenIndex, GroupIndex.unsafe(1)) is true
+  }
 }

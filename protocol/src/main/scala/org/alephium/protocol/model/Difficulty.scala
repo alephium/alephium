@@ -16,16 +16,26 @@
 
 package org.alephium.protocol.model
 
-import scala.collection.immutable.ArraySeq
+import java.math.BigInteger
 
-sealed class HardFork(val version: Int) extends Ordered[HardFork] {
-  def compare(that: HardFork): Int = this.version.compareTo(that.version)
+final case class Difficulty private (value: BigInteger) extends AnyVal {
+  def average(n: Int): Difficulty = new Difficulty(value.divide(BigInteger.valueOf(n.toLong)))
 
-  def isLemanEnabled(): Boolean = this >= HardFork.Leman
+  // WARN: use it with caution because this conversion might lose precision
+  // i.e. `diff.getTarget().getDifficulty()` might not be equal to `diff`
+  def getTarget(): Target = {
+    if (value == BigInteger.ONE) {
+      Target.Max
+    } else {
+      Target.unsafe(Target.maxBigInt.divide(value))
+    }
+  }
+
+  def times(n: Int): Difficulty = Difficulty.unsafe(value.multiply(BigInteger.valueOf(n.toLong)))
 }
-object HardFork {
-  object Mainnet extends HardFork(0)
-  object Leman   extends HardFork(1)
 
-  val All: ArraySeq[HardFork] = ArraySeq(Mainnet, Leman)
+object Difficulty {
+  def unsafe(value: BigInteger): Difficulty = new Difficulty(value)
+
+  val zero: Difficulty = Difficulty(BigInteger.valueOf(0))
 }

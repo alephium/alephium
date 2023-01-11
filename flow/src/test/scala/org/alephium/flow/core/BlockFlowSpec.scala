@@ -163,7 +163,7 @@ class BlockFlowSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block11, 1)
       addAndCheck(blockFlow, block12, 1)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block11, block12))
-      blockFlow.grandPool.cleanAndExtractReadyTxs(
+      blockFlow.grandPool.clean(
         blockFlow,
         TimeStamp.now()
       ) // remove double spending tx
@@ -244,7 +244,7 @@ class BlockFlowSpec extends AlephiumSpec {
         if (blockAdded equals block12.hash) {
           val conflictedTx = block11.nonCoinbase.head
           blockFlow.getMemPool(chainIndex).size is 1 // the conflicted tx is kept
-          blockFlow.getMemPool(chainIndex).contains(chainIndex, conflictedTx.id) is true
+          blockFlow.getMemPool(chainIndex).contains(conflictedTx.id) is true
           val miner    = getGenesisLockupScript(chainIndex)
           val template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
           template.transactions.length is 1 // the conflicted tx will not be used, only coinbase tx
@@ -388,16 +388,24 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "reduce target gradually and reach a stable target eventually" in new FlowFixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    def step() = {
+      val blocks = brokerConfig.chainIndexes.map(emptyBlock(blockFlow, _))
+      blocks.foreach(addAndCheck(blockFlow, _))
+      val targets = blocks.map(_.target).toSet
+      targets.size is 1
+      targets.head
+    }
+
     var lastTarget = consensusConfig.maxMiningTarget
     while ({
-      val block = emptyBlock(blockFlow, chainIndex)
-      addAndCheck(blockFlow, block)
+      val newTarget = step()
       if (lastTarget != Target.Max) {
-        if (block.target < lastTarget) {
-          lastTarget = block.target
+        if (newTarget < lastTarget) {
+          lastTarget = newTarget
           true
-        } else if (block.target equals lastTarget) {
+        } else if (newTarget equals lastTarget) {
           false
         } else {
           // the target is increasing, which is wrong
@@ -405,64 +413,10 @@ class BlockFlowSpec extends AlephiumSpec {
           true
         }
       } else {
-        lastTarget = block.target
+        lastTarget = newTarget
         true
       }
     }) {}
-  }
-
-  trait DifficultyFixture extends FlowFixture {
-    val chainIndex = ChainIndex.unsafe(0, 1)
-
-    def prepareBlocks(scale: Int): Unit = {
-      (0 until consensusConfig.powAveragingWindow + 1).foreach { k =>
-        val block = emptyBlock(blockFlow, chainIndex)
-        // we increase the difficulty for the last block of the DAA window (17 blocks)
-        if (k equals consensusConfig.powAveragingWindow) {
-          val newTarget = Target.unsafe(consensusConfig.maxMiningTarget.value.divide(scale))
-          val newBlock  = block.copy(header = block.header.copy(target = newTarget))
-          blockFlow.addAndUpdateView(reMine(blockFlow, chainIndex, newBlock), None)
-        } else {
-          addAndCheck(blockFlow, block)
-          val bestDep = blockFlow.getBestDeps(chainIndex.from)
-          blockFlow.getNextHashTarget(
-            chainIndex,
-            bestDep,
-            TimeStamp.now()
-          ) isE consensusConfig.maxMiningTarget
-        }
-      }
-    }
-  }
-
-  it should "calculate weighted target" in new DifficultyFixture {
-    prepareBlocks(2)
-
-    val bestDeps = blockFlow.getBestDeps(chainIndex.from)
-    val nextTargetRaw = blockFlow
-      .getHeaderChain(chainIndex)
-      .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
-      .rightValue
-      .value
-    (BigInt(nextTargetRaw) < BigInt(consensusConfig.maxMiningTarget.value) / 2) is true
-    val nextTargetClipped =
-      blockFlow.getNextHashTarget(chainIndex, bestDeps, TimeStamp.now()).rightValue
-    (nextTargetClipped > Target.unsafe(consensusConfig.maxMiningTarget.value / 2)) is true
-  }
-
-  it should "clip target" in new DifficultyFixture {
-    prepareBlocks(8 * groups0)
-
-    val bestDeps = blockFlow.getBestDeps(chainIndex.from)
-    val nextTargetRaw = blockFlow
-      .getHeaderChain(chainIndex)
-      .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
-      .rightValue
-      .value
-    (BigInt(nextTargetRaw) < BigInt(consensusConfig.maxMiningTarget.value) / 2) is true
-    val nextTargetClipped =
-      blockFlow.getNextHashTarget(chainIndex, bestDeps, TimeStamp.now()).rightValue
-    nextTargetClipped is Target.unsafe(consensusConfig.maxMiningTarget.value / 2)
   }
 
   behavior of "Balance"
@@ -537,6 +491,33 @@ class BlockFlowSpec extends AlephiumSpec {
 
     blockFlow0.getBestIntraGroupTip() is block.hash
     blockFlow1.getBestIntraGroupTip() is block.hash
+  }
+
+  it should "cache diff and timespan" in new InterGroupFixture {
+    val fromGroup = UnsecureRandom.sample(brokerConfig.groupRange)
+
+    {
+      info("Intra group block")
+      val block = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, fromGroup))
+      addAndCheck(blockFlow0, block)
+      addAndCheck(blockFlow1, block.header)
+      blockFlow0.diffAndTimeSpanCache.contains(block.hash) is true
+      blockFlow0.diffAndTimeSpanForIntraDepCache.contains(block.hash) is true
+      blockFlow1.diffAndTimeSpanCache.contains(block.hash) is true
+      blockFlow1.diffAndTimeSpanForIntraDepCache.contains(block.hash) is true
+    }
+
+    {
+      info("Inter group block")
+      val toGroup = UnsecureRandom.sample(blockFlow1.brokerConfig.groupRange)
+      val block   = transfer(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
+      addAndCheck(blockFlow0, block)
+      blockFlow1.addAndUpdateView(block, None)
+      blockFlow0.diffAndTimeSpanCache.contains(block.hash) is true
+      blockFlow0.diffAndTimeSpanForIntraDepCache.contains(block.hash) is false
+      blockFlow1.diffAndTimeSpanCache.contains(block.hash) is true
+      blockFlow1.diffAndTimeSpanForIntraDepCache.contains(block.hash) is false
+    }
   }
 
   it should "cache blocks & headers during initialization" in new FlowFixture {
@@ -653,6 +634,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val fromGroup             = GroupIndex.unsafe(Random.nextInt(groupConfig.groups))
     val (fromPriKey, fromPubKey, initialAmount) = genesisKeys(fromGroup.value)
     val fromLockup                              = LockupScript.p2pkh(fromPubKey)
+    val theGrandPool                            = blockFlow.getGrandPool()
     val theMemPool                              = blockFlow.getMemPool(fromGroup)
 
     var txCount = 0
@@ -678,8 +660,8 @@ class BlockFlowSpec extends AlephiumSpec {
       val tx = TransactionTemplate.from(unsignedTx, fromPriKey)
 
       tx.chainIndex is chainIndex
-      theMemPool.addNewTx(chainIndex, tx, TimeStamp.now())
-      theMemPool.contains(tx.chainIndex, tx.id) is true
+      theGrandPool.add(chainIndex, tx, TimeStamp.now())
+      theMemPool.contains(tx.id) is true
 
       val balance = initialAmount - (ALPH.oneAlph + defaultGasFee).mulUnsafe(txCount)
       blockFlow
@@ -699,30 +681,34 @@ class BlockFlowSpec extends AlephiumSpec {
     val tx1         = transfer()
     val tx2         = transfer()
     val fromBalance = blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue
-    theMemPool.pendingPool.contains(tx0.id) is false
-    theMemPool.pendingPool.contains(tx1.id) is true
-    theMemPool.pendingPool.contains(tx2.id) is true
+    theMemPool.contains(tx0.id) is true
+    theMemPool.contains(tx1.id) is true
+    theMemPool.contains(tx2.id) is true
+    theMemPool.isReady(tx0.id) is true
+    theMemPool.isReady(tx1.id) is false
+    theMemPool.isReady(tx2.id) is false
 
     val block0 = mineFromMemPool(blockFlow, tx0.chainIndex)
     addAndCheck(blockFlow, block0)
-    theMemPool.contains(tx0.chainIndex, tx0.id) is false
-    theMemPool.contains(tx1.chainIndex, tx1.id) is true
-    theMemPool.pendingPool.contains(tx1.id) is false
-    theMemPool.pendingPool.contains(tx2.id) is true
+    theMemPool.contains(tx0.id) is false
+    theMemPool.contains(tx1.id) is true
+    theMemPool.contains(tx2.id) is true
+    theMemPool.isReady(tx1.id) is true
+    theMemPool.isReady(tx2.id) is false
     blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block0.hash) is true
     blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue is fromBalance
 
     val block1 = mineFromMemPool(blockFlow, tx1.chainIndex)
     addAndCheck(blockFlow, block1)
-    theMemPool.contains(tx1.chainIndex, tx1.id) is false
-    theMemPool.contains(tx2.chainIndex, tx2.id) is true
-    theMemPool.pendingPool.contains(tx2.id) is false
+    theMemPool.contains(tx1.id) is false
+    theMemPool.contains(tx2.id) is true
+    theMemPool.isReady(tx2.id) is true
     blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block1.hash) is true
     blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue is fromBalance
 
     val block2 = mineFromMemPool(blockFlow, tx2.chainIndex)
     addAndCheck(blockFlow, block2)
-    theMemPool.contains(tx2.chainIndex, tx2.id) is false
+    theMemPool.contains(tx2.id) is false
     blockFlow.getBestDeps(fromLockup.groupIndex).deps.contains(block2.hash) is true
     blockFlow.getBalance(fromLockup, Int.MaxValue).rightValue is fromBalance
   }
@@ -765,7 +751,7 @@ class BlockFlowSpec extends AlephiumSpec {
       blocks.foreachWithIndex { case (block, to) =>
         block.transactions.foreachWithIndex { case (tx, index) =>
           from is to
-          blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+          blockFlow.getTxConfirmedStatus(tx.id, ChainIndex.unsafe(from, to)) isE
             Some(Confirmed(TxIndex(block.hash, index), 1, 1, 1))
         }
       }
@@ -794,7 +780,7 @@ class BlockFlowSpec extends AlephiumSpec {
             count(newIndexes0.contains(ChainIndex.unsafe(from, from)))
           val toConfirmations = 1 +
             count(newIndexes0.contains(ChainIndex.unsafe(to, to)))
-          blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+          blockFlow.getTxConfirmedStatus(tx.id, ChainIndex.unsafe(from, to)) isE
             Some(
               Confirmed(
                 TxIndex(block.hash, index),
@@ -811,7 +797,7 @@ class BlockFlowSpec extends AlephiumSpec {
     blockFlow.genesisBlocks.foreachWithIndex { case (blocks, from) =>
       blocks.foreachWithIndex { case (block, to) =>
         block.transactions.foreachWithIndex { case (tx, index) =>
-          blockFlow.getTxStatus(tx.id, ChainIndex.unsafe(from, to)) isE
+          blockFlow.getTxConfirmedStatus(tx.id, ChainIndex.unsafe(from, to)) isE
             Some(Confirmed(TxIndex(block.hash, index), 2, 2, 2))
         }
       }
@@ -827,10 +813,10 @@ class BlockFlowSpec extends AlephiumSpec {
       val blockFlow0 = isolatedBlockFlow()
       val chainIndex = ChainIndex.unsafe(targetGroup, targetGroup)
       val block      = transfer(blockFlow0, chainIndex)
-      blockFlow0.getTxStatus(block.transactions.head.id, chainIndex) isE None
+      blockFlow0.getTxConfirmedStatus(block.transactions.head.id, chainIndex) isE None
 
       addAndCheck(blockFlow0, block)
-      blockFlow0.getTxStatus(block.transactions.head.id, chainIndex) isE
+      blockFlow0.getTxConfirmedStatus(block.transactions.head.id, chainIndex) isE
         Some(Confirmed(TxIndex(block.hash, 0), 1, 1, 1))
     }
   }
@@ -846,20 +832,20 @@ class BlockFlowSpec extends AlephiumSpec {
       val blockFlow0 = isolatedBlockFlow()
       val chainIndex = ChainIndex.unsafe(from, to)
       val block0     = transfer(blockFlow0, chainIndex)
-      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE None
+      blockFlow0.getTxConfirmedStatus(block0.transactions.head.id, chainIndex) isE None
 
       addAndCheck(blockFlow0, block0)
-      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE
+      blockFlow0.getTxConfirmedStatus(block0.transactions.head.id, chainIndex) isE
         Some(Confirmed(TxIndex(block0.hash, 0), 1, 0, 0))
 
       val block1 = emptyBlock(blockFlow0, ChainIndex.unsafe(from, from))
       addAndCheck(blockFlow0, block1)
-      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE
+      blockFlow0.getTxConfirmedStatus(block0.transactions.head.id, chainIndex) isE
         Some(Confirmed(TxIndex(block0.hash, 0), 1, 1, 0))
 
       val block2 = emptyBlock(blockFlow0, ChainIndex.unsafe(to, to))
       addAndCheck(blockFlow0, block2)
-      blockFlow0.getTxStatus(block0.transactions.head.id, chainIndex) isE
+      blockFlow0.getTxConfirmedStatus(block0.transactions.head.id, chainIndex) isE
         Some(Confirmed(TxIndex(block0.hash, 0), 1, 1, 1))
     }
   }

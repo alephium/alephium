@@ -20,6 +20,7 @@ import akka.actor.{ActorRef, Props, Terminated}
 import akka.io.Tcp
 import akka.util.ByteString
 
+import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.model.DataOrigin
@@ -28,8 +29,9 @@ import org.alephium.flow.network.intraclique.{InboundBrokerHandler, OutboundBrok
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{Block, BrokerInfo, CliqueInfo}
-import org.alephium.util.{ActorRefT, BaseActor, EventStream}
+import org.alephium.protocol.message.{Message, RequestId, TxsResponse}
+import org.alephium.protocol.model.{Block, BrokerInfo, ChainIndex, CliqueInfo, TransactionTemplate}
+import org.alephium.util.{ActorRefT, AVector, BaseActor, EventStream}
 
 object IntraCliqueManager {
   def props(
@@ -57,6 +59,9 @@ object IntraCliqueManager {
       headerMsg: ByteString,
       origin: DataOrigin
   ) extends Command
+      with EventStream.Event
+  final case class BroadCastTx(txs: AVector[(ChainIndex, AVector[TransactionTemplate])])
+      extends Command
       with EventStream.Event
 }
 
@@ -136,6 +141,7 @@ class IntraCliqueManager(
       log.debug("All Brokers connected")
       cliqueManager ! IntraCliqueManager.Ready
       subscribeEvent(self, classOf[IntraCliqueManager.BroadCastBlock])
+      subscribeEvent(self, classOf[IntraCliqueManager.BroadCastTx])
       context become handle(newBrokers)
     } else {
       context become awaitBrokers(newBrokers)
@@ -156,6 +162,16 @@ class IntraCliqueManager(
             log.debug(s"Send header ${block.shortHex} to broker $info")
             broker ! BrokerHandler.Send(headerMsg)
           }
+        }
+      }
+    case IntraCliqueManager.BroadCastTx(txs) =>
+      brokers.foreach { case (_, (info, broker)) =>
+        val needToSend =
+          txs.view.filter(p => info.isIncomingChain(p._1)).map(_._2).fold(AVector.empty)(_ ++ _)
+        if (needToSend.nonEmpty) {
+          log.debug(s"Send txs ${Utils.showTxs(needToSend)} to broker $info")
+          val txsMessage = Message.serialize(TxsResponse(RequestId.unsafe(0), needToSend))
+          broker ! BrokerHandler.Send(txsMessage)
         }
       }
     case Terminated(actor) => handleTerminated(actor, brokers)

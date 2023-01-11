@@ -18,13 +18,13 @@ package org.alephium.flow.network.intraclique
 
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
-import org.alephium.flow.handler.FlowHandler
+import org.alephium.flow.handler.{FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.network.CliqueManager
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.message.{BlocksRequest, HeadersRequest, NewInv}
-import org.alephium.protocol.model.{BlockHash, BrokerGroupInfo, BrokerInfo, CliqueInfo}
+import org.alephium.protocol.message.{BlocksRequest, HeadersRequest, NewInv, RequestId, TxsResponse}
+import org.alephium.protocol.model._
 import org.alephium.util.{ActorRefT, AVector, Duration}
 
 trait BrokerHandler extends BaseBrokerHandler {
@@ -55,6 +55,8 @@ trait BrokerHandler extends BaseBrokerHandler {
           s"Received new inv ${Utils.showFlow(hashes)} from intra clique broker"
         )
         handleInv(hashes)
+      case BaseBrokerHandler.Received(TxsResponse(id, txs)) =>
+        handleTxsResponse(id, txs)
       case BrokerHandler.IntraSync =>
         allHandlers.flowHandler ! FlowHandler.GetIntraSyncInventories
     }
@@ -69,6 +71,16 @@ trait BrokerHandler extends BaseBrokerHandler {
       BrokerHandler.extractToSync(blockflow, hashes, remoteBrokerInfo)
     send(HeadersRequest(headersToSync))
     send(BlocksRequest(blocksToSync))
+  }
+
+  private def handleTxsResponse(id: RequestId, txs: AVector[TransactionTemplate]): Unit = {
+    log.info(
+      s"Received #${txs.length} txs ${Utils.showDigest(txs.map(_.id))} from $remoteAddress with $id"
+    )
+    if (txs.nonEmpty) {
+      assume(txs.forall(tx => brokerConfig.isIncomingChain(tx.chainIndex)))
+      allHandlers.txHandler ! TxHandler.AddToMemPool(txs, isIntraCliqueSyncing = true)
+    }
   }
 }
 
