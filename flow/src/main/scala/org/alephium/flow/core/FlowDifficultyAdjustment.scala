@@ -72,11 +72,37 @@ trait FlowDifficultyAdjustment {
       chainIndex: ChainIndex,
       deps: BlockDeps
   ): IOResult[Target] = IOUtils.tryExecute {
-    val commonIntraGroupDeps   = calCommonIntraGroupDepsUnsafe(deps, chainIndex.from)
-    val (diffSum, timeSpanSum) = getDiffAndTimeSpanUnsafe(commonIntraGroupDeps)
-    val diffAverage            = diffSum.average(brokerConfig.chainNum)
-    val timeSpanAverage        = timeSpanSum.divUnsafe(brokerConfig.chainNum.toLong)
-    ChainDifficultyAdjustment.calNextHashTargetRaw(diffAverage.getTarget(), timeSpanAverage)
+    val commonIntraGroupDeps             = calCommonIntraGroupDepsUnsafe(deps, chainIndex.from)
+    val (diffSum, timeSpanSum, oldestTs) = getDiffAndTimeSpanUnsafe(commonIntraGroupDeps)
+    val diffAverage                      = diffSum.divide(brokerConfig.chainNum)
+    val timeSpanAverage                  = timeSpanSum.divUnsafe(brokerConfig.chainNum.toLong)
+
+    val chainDep  = deps.getOutDep(chainIndex.to)
+    val heightGap = calHeightDiffUnsafe(chainDep, oldestTs)
+    val targetDiff = if (triggerDiffPenaltyLeman()) {
+      consensusConfig.penalizeDiffForHeightGapLeman(diffAverage, heightGap)
+    } else {
+      diffAverage
+    }
+    ChainDifficultyAdjustment.calNextHashTargetRaw(targetDiff.getTarget(), timeSpanAverage)
+  }
+
+  // As testnet is running with Leman hardfork already, we add another activation timestamp to trigger the penalty.
+  @inline def triggerDiffPenaltyLeman(): Boolean = {
+    networkConfig.networkId != NetworkId.AlephiumTestNet ||
+    // scalastyle:off magic.number
+    TimeStamp.now() > TimeStamp.unsafe(1674038302000L) // Jan 18 2023 11:38:22 GMT+0100
+    // scalastyle:on magic.number
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  final def calHeightDiffUnsafe(chainDep: BlockHash, oldTimeStamp: TimeStamp): Int = {
+    val header = getBlockHeaderUnsafe(chainDep)
+    if (header.timestamp <= oldTimeStamp) {
+      0
+    } else {
+      calHeightDiffUnsafe(header.parentHash, oldTimeStamp) + 1
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
@@ -129,15 +155,18 @@ trait FlowDifficultyAdjustment {
   }
 
   private[core] val diffAndTimeSpanForIntraDepCache =
-    Cache.fifoSafe[BlockHash, (Difficulty, Duration)](
+    Cache.fifoSafe[BlockHash, (Difficulty, Duration, TimeStamp)](
       consensusConfig.blockCacheCapacityPerChain * brokerConfig.chainNum * 8
     )
-  def getDiffAndTimeSpanForIntraDepUnsafe(intraDep: BlockHash): (Difficulty, Duration) = {
+  def getDiffAndTimeSpanForIntraDepUnsafe(
+      intraDep: BlockHash
+  ): (Difficulty, Duration, TimeStamp) = {
     diffAndTimeSpanForIntraDepCache.get(intraDep).getOrElse {
       if (intraDep == BlockHash.zero) {
         (
           consensusConfig.maxMiningTarget.getDifficulty().times(brokerConfig.groups),
-          consensusConfig.expectedWindowTimeSpan.timesUnsafe(brokerConfig.groups.toLong)
+          consensusConfig.expectedWindowTimeSpan.timesUnsafe(brokerConfig.groups.toLong),
+          ALPH.GenesisTimestamp
         )
       } else {
         assume(ChainIndex.from(intraDep).isIntraGroup)
@@ -150,7 +179,9 @@ trait FlowDifficultyAdjustment {
           diffSum = diffSum.add(diff.value)
           timeSpanSum = timeSpanSum + timeSpan
         }
-        (Difficulty.unsafe(diffSum), timeSpanSum)
+        @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+        val oldestTs = outDeps.view.map(dep => getHashChain(dep).getTimestampUnsafe(dep)).min
+        (Difficulty.unsafe(diffSum), timeSpanSum, oldestTs)
       }
     }
   }
@@ -165,14 +196,20 @@ trait FlowDifficultyAdjustment {
     }
   }
 
-  def getDiffAndTimeSpanUnsafe(intraGroupDeps: AVector[BlockHash]): (Difficulty, Duration) = {
+  def getDiffAndTimeSpanUnsafe(
+      intraGroupDeps: AVector[BlockHash]
+  ): (Difficulty, Duration, TimeStamp) = {
     var diffSum     = BigInteger.valueOf(0)
     var timeSpanSum = Duration.zero
+    var oldestTs    = TimeStamp.Max
     intraGroupDeps.foreach { intraDep =>
-      val (diff, timeSpan) = getDiffAndTimeSpanForIntraDepUnsafe(intraDep)
+      val (diff, timeSpan, intraOldestTs) = getDiffAndTimeSpanForIntraDepUnsafe(intraDep)
       diffSum = diffSum.add(diff.value)
       timeSpanSum = timeSpanSum + timeSpan
+      if (oldestTs > intraOldestTs) {
+        oldestTs = intraOldestTs
+      }
     }
-    (Difficulty.unsafe(diffSum), timeSpanSum)
+    (Difficulty.unsafe(diffSum), timeSpanSum, oldestTs)
   }
 }

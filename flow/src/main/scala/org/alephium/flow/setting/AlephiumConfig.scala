@@ -58,9 +58,19 @@ final case class ConsensusSetting(
   val minMiningDiff: Difficulty = maxMiningTarget.getDifficulty()
   val minBlockWeight: Weight    = Weight.from(maxMiningTarget)
 
-  val expectedTimeSpan: Duration       = blockTargetTime
-  val powAveragingWindow: Int          = 17
-  val expectedWindowTimeSpan: Duration = expectedTimeSpan.timesUnsafe(powAveragingWindow.toLong)
+  val expectedTimeSpan: Duration        = blockTargetTime
+  val powAveragingWindow: Int           = 17
+  val expectedWindowTimeSpan: Duration  = expectedTimeSpan.timesUnsafe(powAveragingWindow.toLong)
+  val crossShardHeightGapThreshold: Int = powAveragingWindow
+
+  def penalizeDiffForHeightGapLeman(diff: Difficulty, gap: Int): Difficulty = {
+    val delta = gap - crossShardHeightGapThreshold
+    if (delta > 0) {
+      diff.times(100 + 5 * delta).divide(100)
+    } else {
+      diff
+    }
+  }
 
   val diffAdjustDownMax: Int = 16
   val diffAdjustUpMax: Int   = 8

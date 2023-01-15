@@ -89,5 +89,7 @@ object TimeStamp {
 
   val zero: TimeStamp = unsafe(0)
 
+  val Max: TimeStamp = unsafe(Long.MaxValue)
+
   def now(): TimeStamp = unsafe(System.currentTimeMillis())
 }

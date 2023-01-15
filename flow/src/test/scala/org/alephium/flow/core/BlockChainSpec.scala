@@ -69,6 +69,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     chain.getHeightUnsafe(genesis.hash) is ALPH.GenesisHeight
     chain.getWeightUnsafe(genesis.hash) is ALPH.GenesisWeight
     chain.getTimestamp(genesis.hash) isE ALPH.GenesisTimestamp
+    chain.getTimestampUnsafe(genesis.hash) is ALPH.GenesisTimestamp
   }
 
   it should "validate block height" in new Fixture {
@@ -104,6 +105,8 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
     chain.getHeightUnsafe(block.hash) is (ALPH.GenesisHeight + 1)
     chain.getHeight(block.hash) isE (ALPH.GenesisHeight + 1)
+    chain.getTimestamp(block.hash) isE block.timestamp
+    chain.getTimestampUnsafe(block.hash) is block.timestamp
 
     val diff = chain.calHashDiff(block.hash, genesis.hash).rightValue
     diff.toAdd is AVector(block.hash)

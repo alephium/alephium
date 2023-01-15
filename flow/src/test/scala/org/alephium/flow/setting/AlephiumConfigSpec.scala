@@ -33,7 +33,7 @@ import org.alephium.conf._
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.mining.HashRate
-import org.alephium.protocol.model.{Address, ContractId, GroupIndex, NetworkId}
+import org.alephium.protocol.model.{Address, ContractId, Difficulty, GroupIndex, NetworkId}
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util.{AlephiumSpec, AVector, Duration, Env, Files, Hex, TimeStamp}
 
@@ -266,6 +266,23 @@ class AlephiumConfigSpec extends AlephiumSpec {
       ConfigFactory
         .parseString(configs)
         .as[LogConfig]("event-log")(ValueReader[LogConfig]) is logConfig
+    }
+  }
+
+  it should "adjust diff for height gaps across chains" in new AlephiumConfigFixture {
+    val N    = 123456
+    val diff = Difficulty.unsafe(N)
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, -1) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 0) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 1) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 17) is diff
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 18) is
+      Difficulty.unsafe(N * 105 / 100)
+    consensusConfig.penalizeDiffForHeightGapLeman(diff, 19) is
+      Difficulty.unsafe(N * 110 / 100)
+    (20 until 18 * 3).foreach { gap =>
+      consensusConfig.penalizeDiffForHeightGapLeman(diff, gap) is
+        Difficulty.unsafe(N * (100 + 5 * (gap - 17)) / 100)
     }
   }
 }

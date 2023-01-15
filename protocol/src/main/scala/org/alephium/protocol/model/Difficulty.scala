@@ -19,8 +19,6 @@ package org.alephium.protocol.model
 import java.math.BigInteger
 
 final case class Difficulty private (value: BigInteger) extends AnyVal {
-  def average(n: Int): Difficulty = new Difficulty(value.divide(BigInteger.valueOf(n.toLong)))
-
   // WARN: use it with caution because this conversion might lose precision
   // i.e. `diff.getTarget().getDifficulty()` might not be equal to `diff`
   def getTarget(): Target = {
@@ -32,6 +30,8 @@ final case class Difficulty private (value: BigInteger) extends AnyVal {
   }
 
   def times(n: Int): Difficulty = Difficulty.unsafe(value.multiply(BigInteger.valueOf(n.toLong)))
+
+  def divide(n: Int): Difficulty = new Difficulty(value.divide(BigInteger.valueOf(n.toLong)))
 }
 
 object Difficulty {
