@@ -38,7 +38,7 @@ class DifficultySpec extends AlephiumSpec {
   it should "scale difficulty" in {
     forAll(Gen.posNum[Int], Gen.posNum[Int]) { (n: Int, m: Int) =>
       val diff = Difficulty.unsafe(n)
-      diff.average(m) is Difficulty.unsafe(n / m)
+      diff.divide(m) is Difficulty.unsafe(n / m)
       diff.times(m) is Difficulty.unsafe(n * m)
     }
   }

@@ -35,6 +35,7 @@ class BlockHashChainStateSpec extends AlephiumFlowSpec { Test =>
         Test.storages.nodeStateStorage.chainStateStorage(dummyIndex)
 
       override def getTimestamp(hash: BlockHash): IOResult[TimeStamp] = ???
+      override def getTimestampUnsafe(hash: BlockHash): TimeStamp     = ???
 
       def state: BlockHashChain.State = chainStateStorage.loadState().rightValue
 

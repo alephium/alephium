@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.{ChainIndex, Target}
+import org.alephium.protocol.model.{ChainIndex, NetworkId, Target}
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AlephiumSpec, TimeStamp}
 
@@ -114,37 +114,44 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
             consensusConfig.expectedWindowTimeSpan)
 
           if (index.isIntraGroup) {
+            val earliestOutDepTs = getEarliestOutDepTs(index, height)
             blockFlow.getDiffAndTimeSpanForIntraDepUnsafe(hash) is
               (consensusConfig.minMiningDiff.times(brokerConfig.groups),
-              consensusConfig.expectedWindowTimeSpan.timesUnsafe(brokerConfig.groups.toLong))
+              consensusConfig.expectedWindowTimeSpan.timesUnsafe(brokerConfig.groups.toLong),
+              earliestOutDepTs)
           }
 
           blockFlow.getDiffAndTimeSpanUnsafe(
             blockFlow.getBlockHeaderUnsafe(hash).blockDeps.unorderedIntraDeps(index.from)
           ) is
             (consensusConfig.minMiningDiff.times(brokerConfig.chainNum),
-            consensusConfig.expectedWindowTimeSpan.timesUnsafe(brokerConfig.chainNum.toLong))
+            consensusConfig.expectedWindowTimeSpan.timesUnsafe(
+              brokerConfig.chainNum.toLong
+            ), getEarliestDepTs(height))
         }
     }
     brokerConfig.cliqueChainIndexes.foreach { index =>
+      val height = ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1
       val hash = blockFlow
         .getBlockChain(index)
-        .getHashesUnsafe(ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1)
+        .getHashesUnsafe(height)
         .head
       val (diff, timeSpan) = blockFlow.getDiffAndTimeSpanUnsafe(hash)
       diff is consensusConfig.minMiningDiff
       (timeSpan <= TimeStamp.now().deltaUnsafe(startTs)) is true
 
       if (index.isIntraGroup) {
-        val (diffSum, timeSpanSum) = blockFlow.getDiffAndTimeSpanForIntraDepUnsafe(hash)
+        val (diffSum, timeSpanSum, earliestOutDepTs) =
+          blockFlow.getDiffAndTimeSpanForIntraDepUnsafe(hash)
         diffSum is consensusConfig.minMiningDiff.times(brokerConfig.groups)
         (timeSpanSum <= TimeStamp
           .now()
           .deltaUnsafe(startTs)
           .timesUnsafe(brokerConfig.groups.toLong)) is false
+        earliestOutDepTs is getEarliestOutDepTs(index, height)
       }
 
-      val (diffSum, timeSpanSum) = blockFlow.getDiffAndTimeSpanUnsafe(
+      val (diffSum, timeSpanSum, earliestDepTs) = blockFlow.getDiffAndTimeSpanUnsafe(
         blockFlow.getBlockHeaderUnsafe(hash).blockDeps.unorderedIntraDeps(index.from)
       )
       diffSum is consensusConfig.minMiningDiff.times(brokerConfig.chainNum)
@@ -152,26 +159,30 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
         .now()
         .deltaUnsafe(startTs)
         .timesUnsafe(brokerConfig.chainNum.toLong)) is false
+      earliestDepTs is getEarliestDepTs(height)
     }
     brokerConfig.cliqueChainIndexes.foreach { index =>
+      val height = ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 2
       val hash = blockFlow
         .getBlockChain(index)
-        .getHashesUnsafe(ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 2)
+        .getHashesUnsafe(height)
         .head
       val (diff, timeSpan) = blockFlow.getDiffAndTimeSpanUnsafe(hash)
       diff is consensusConfig.minMiningDiff.times(2)
       (timeSpan <= TimeStamp.now().deltaUnsafe(startTs)) is true
 
       if (index.isIntraGroup) {
-        val (diffSum, timeSpanSum) = blockFlow.getDiffAndTimeSpanForIntraDepUnsafe(hash)
+        val (diffSum, timeSpanSum, earliestOutDepTs) =
+          blockFlow.getDiffAndTimeSpanForIntraDepUnsafe(hash)
         diffSum is consensusConfig.minMiningDiff.times(brokerConfig.groups + 1)
         (timeSpanSum <= TimeStamp
           .now()
           .deltaUnsafe(startTs)
           .timesUnsafe(brokerConfig.groups.toLong)) is true
+        earliestOutDepTs is getEarliestOutDepTs(index, height)
       }
 
-      val (diffSum, timeSpanSum) = blockFlow.getDiffAndTimeSpanUnsafe(
+      val (diffSum, timeSpanSum, earliestDepTs) = blockFlow.getDiffAndTimeSpanUnsafe(
         blockFlow.getBlockHeaderUnsafe(hash).blockDeps.unorderedIntraDeps(index.from)
       )
       diffSum is consensusConfig.minMiningDiff.times(brokerConfig.chainNum)
@@ -179,17 +190,51 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
         .now()
         .deltaUnsafe(startTs)
         .timesUnsafe(brokerConfig.chainNum.toLong)) is false
+      earliestDepTs is getEarliestDepTs(height)
     }
     brokerConfig.cliqueGroupIndexes.foreach { groupIndex =>
-      val blockDeps              = blockFlow.getBestDeps(groupIndex)
-      val intraDeps              = blockFlow.calCommonIntraGroupDepsUnsafe(blockDeps, groupIndex)
-      val (diffSum, timeSpanSum) = blockFlow.getDiffAndTimeSpanUnsafe(intraDeps)
+      val blockDeps = blockFlow.getBestDeps(groupIndex)
+      val intraDeps = blockFlow.calCommonIntraGroupDepsUnsafe(blockDeps, groupIndex)
+      val (diffSum, timeSpanSum, earliestDepTs) = blockFlow.getDiffAndTimeSpanUnsafe(intraDeps)
       diffSum is consensusConfig.minMiningDiff.times(brokerConfig.chainNum * 2)
       (timeSpanSum <= TimeStamp
         .now()
         .deltaUnsafe(startTs)
         .timesUnsafe(brokerConfig.chainNum.toLong)) is true
+      earliestDepTs is getEarliestDepTs(
+        blockFlow.getMaxHeight(ChainIndex(groupIndex, groupIndex)).rightValue
+      )
     }
+  }
+
+  it should "use diff penalty for leman fork" in new FlowFixture {
+    override val configValues = Map(
+      ("alephium.network.network-id", NetworkId.AlephiumDevNet.id),
+      ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(-1).millis),
+      ("alephium.consensus.num-zeros-at-least-in-hash", 3)
+    )
+    config.network.networkId is NetworkId.AlephiumDevNet
+    config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is true
+    config.consensus.numZerosAtLeastInHash is 3
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    (0 until consensusConfig.powAveragingWindow).foreach { _ =>
+      val block = emptyBlock(blockFlow, chainIndex)
+      block.target is consensusConfig.maxMiningTarget
+      addAndCheck(blockFlow, block)
+    }
+    (0 until 5).foreach { k =>
+      val expectedDiff = consensusConfig.minMiningDiff.times(100 + 5 * k).divide(100)
+      val expectedTarget = ChainDifficultyAdjustment.calNextHashTargetRaw(
+        expectedDiff.getTarget(),
+        consensusConfig.blockTargetTime.timesUnsafe(consensusConfig.powAveragingWindow.toLong)
+      )
+      val block = emptyBlock(blockFlow, chainIndex)
+      block.target is expectedTarget
+      addAndCheck(blockFlow, block)
+    }
+    val block = emptyBlock(blockFlow, chainIndex)
+    (block.target < consensusConfig.maxMiningTarget) is true
   }
 
   trait PreLemanDifficultyFixture extends FlowFixture {
@@ -260,6 +305,38 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
           }
           blockFlow.addAndUpdateView(reMine(blockFlow, chainIndex, block), worldState)
         }
+      }
+    }
+
+    def getEarliestDepTs(height: Int): TimeStamp = {
+      getEarliestOutDepTs(ChainIndex.unsafe(0, 0), height - 1)
+    }
+
+    def getEarliestOutDepTs(index: ChainIndex, height: Int): TimeStamp = {
+      index.isIntraGroup is true
+
+      val earliestOutDepIndex = if (index == ChainIndex.unsafe(0, 0)) {
+        ChainIndex.unsafe(0, 1)
+      } else {
+        ChainIndex.unsafe(index.from.value, 0)
+      }
+      val earliestHeight = height - 1
+      _getEarliestTs(earliestOutDepIndex, earliestHeight)
+    }
+
+    private def _getEarliestTs(
+        earliestOutDepIndex: ChainIndex,
+        earliestHeight: Int
+    ): TimeStamp = {
+      if (earliestHeight <= ALPH.GenesisHeight) {
+        ALPH.GenesisTimestamp
+      } else {
+        blockFlow
+          .getBlockChain(earliestOutDepIndex)
+          .getMainChainBlockByHeight(earliestHeight)
+          .rightValue
+          .value
+          .timestamp
       }
     }
   }

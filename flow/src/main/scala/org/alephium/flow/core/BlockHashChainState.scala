@@ -32,6 +32,7 @@ trait BlockHashChainState {
   protected def chainStateStorage: ChainStateStorage
 
   def getTimestamp(hash: BlockHash): IOResult[TimeStamp]
+  def getTimestampUnsafe(hash: BlockHash): TimeStamp
 
   def setGenesisState(newTip: BlockHash, timeStamp: TimeStamp): IOResult[Unit] = {
     numHashes += 1

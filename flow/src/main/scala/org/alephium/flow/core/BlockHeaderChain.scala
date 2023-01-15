@@ -59,6 +59,10 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
     getBlockHeader(hash).map(_.timestamp)
   }
 
+  def getTimestampUnsafe(hash: BlockHash): TimeStamp = {
+    getBlockHeaderUnsafe(hash).timestamp
+  }
+
   def getTarget(hash: BlockHash): IOResult[Target] = {
     getBlockHeader(hash).map(_.target)
   }
