@@ -91,7 +91,7 @@ trait FlowDifficultyAdjustment {
   @inline def triggerDiffPenaltyLeman(): Boolean = {
     networkConfig.networkId != NetworkId.AlephiumTestNet ||
     // scalastyle:off magic.number
-    TimeStamp.now() > TimeStamp.unsafe(1674038302000L) // Jan 18 2023 11:38:22 GMT+0100
+    TimeStamp.now() > TimeStamp.unsafe(1674039600000L) // Jan 18 2023 12:00:00 GMT+0100
     // scalastyle:on magic.number
   }
 
