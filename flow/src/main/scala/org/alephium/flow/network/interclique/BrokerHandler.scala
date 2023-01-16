@@ -196,7 +196,7 @@ trait BrokerHandler extends BaseBrokerHandler {
   }
 
   private def handleTxsResponse(id: RequestId, txs: AVector[TransactionTemplate]): Unit = {
-    log.info(
+    log.debug(
       s"Received #${txs.length} txs ${Utils.showDigest(txs.map(_.id))} from $remoteAddress with $id"
     )
     if (txs.nonEmpty) {
