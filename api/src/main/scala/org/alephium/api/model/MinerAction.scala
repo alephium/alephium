@@ -16,8 +16,21 @@
 
 package org.alephium.api.model
 
-trait MinerAction
+sealed trait MinerAction
 object MinerAction {
   case object StartMining extends MinerAction
   case object StopMining  extends MinerAction
+
+  def validate(str: String): Option[MinerAction] =
+    str match {
+      case "start-mining" => Some(MinerAction.StartMining)
+      case "stop-mining"  => Some(MinerAction.StopMining)
+      case _              => None
+    }
+
+  def write(minerAction: MinerAction): String =
+    minerAction match {
+      case MinerAction.StartMining => "start-mining"
+      case MinerAction.StopMining  => "stop-mining"
+    }
 }

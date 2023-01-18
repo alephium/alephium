@@ -72,8 +72,18 @@ trait TapirCodecs extends ApiModelCodec {
   implicit val gasPriceCodec: PlainCodec[GasPrice] =
     u256TapirCodec.map[GasPrice](GasPrice(_))(_.value)
 
+  @SuppressWarnings(
+    Array(
+      "org.wartremover.warts.JavaSerializable",
+      "org.wartremover.warts.Product",
+      "org.wartremover.warts.Serializable"
+    )
+  ) // Wartremover is complaining, maybe because of tapir macros
   implicit val minerActionTapirCodec: PlainCodec[MinerAction] =
-    fromJson[MinerAction]
+    Codec.derivedEnumeration[String, MinerAction](
+      MinerAction.validate,
+      MinerAction.write
+    )
 
   implicit val timespanTapirCodec: PlainCodec[TimeSpan] =
     Codec.long.validate(Validator.min(1)).map(TimeSpan(_))(_.millis)
