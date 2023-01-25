@@ -226,19 +226,13 @@ trait BrokerHandler extends BaseBrokerHandler {
     if (!selfSynced) {
       log.info(s"Self synced with $remoteAddress")
       selfSynced = true
-      checkAllSynced()
+      cliqueManager ! CliqueManager.Synced(remoteBrokerInfo)
     }
   }
   def setRemoteSynced(): Unit = {
     if (!remoteSynced) {
       log.info(s"Remote $remoteAddress synced with our node")
       remoteSynced = true
-      checkAllSynced()
-    }
-  }
-  def checkAllSynced(): Unit = {
-    if (selfSynced && remoteSynced) {
-      cliqueManager ! CliqueManager.Synced(remoteBrokerInfo)
     }
   }
 
