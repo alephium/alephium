@@ -26,7 +26,7 @@ import org.alephium.flow.network._
 import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BlockHash, BrokerInfo}
+import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{ActorRefT, AVector}
 import org.alephium.util.EventStream.Subscriber
 
@@ -38,7 +38,6 @@ object BlockFlowSynchronizer {
     Props(new BlockFlowSynchronizer(blockflow, allHandlers))
 
   sealed trait Command
-  final case class HandShaked(brokerInfo: BrokerInfo)                   extends Command
   case object Sync                                                      extends Command
   final case class SyncInventories(hashes: AVector[AVector[BlockHash]]) extends Command
   final case class BlockFinalized(hash: BlockHash)                      extends Command
@@ -61,15 +60,16 @@ class BlockFlowSynchronizer(val blockflow: BlockFlow, val allHandlers: AllHandle
     super.preStart()
     schedule(self, CleanDownloading, networkSetting.syncCleanupFrequency)
     scheduleSync()
+    subscribeEvent(self, classOf[InterCliqueManager.HandShaked])
   }
 
   override def receive: Receive = handle orElse updateNodeSyncStatus
 
   def handle: Receive = {
-    case HandShaked(remoteBrokerInfo) =>
+    case InterCliqueManager.HandShaked(broker, remoteBrokerInfo, _, _) =>
       log.debug(s"HandShaked with ${remoteBrokerInfo.address}")
-      context.watch(sender())
-      brokerInfos += ActorRefT[BrokerHandler.Command](sender()) -> remoteBrokerInfo
+      context.watch(broker.ref)
+      brokerInfos += broker -> remoteBrokerInfo
     case Sync =>
       if (brokerInfos.nonEmpty) {
         log.debug(s"Send sync requests to the network")

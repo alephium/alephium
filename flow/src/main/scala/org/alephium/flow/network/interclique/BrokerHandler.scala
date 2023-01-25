@@ -20,7 +20,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.{maxForkDepth => systemMaxForkDepth}
 import org.alephium.flow.handler.{AllHandlers, DependencyHandler, FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.network.{CliqueManager, InterCliqueManager}
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler, MisbehaviorManager}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.protocol.message._
@@ -48,7 +48,13 @@ trait BrokerHandler extends BaseBrokerHandler {
 
   override def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
     remoteBrokerInfo = _remoteBrokerInfo
-    cliqueManager ! CliqueManager.HandShaked(_remoteBrokerInfo, connectionType, clientInfo)
+    val event = InterCliqueManager.HandShaked(
+      ActorRefT[BaseBrokerHandler.Command](self),
+      _remoteBrokerInfo,
+      connectionType,
+      clientInfo
+    )
+    publishEvent(event)
   }
 
   override def handleNewBlock(block: Block): Unit = {
@@ -72,52 +78,46 @@ trait BrokerHandler extends BaseBrokerHandler {
   override def exchanging: Receive = exchangingCommon orElse syncing orElse flowEvents
 
   def syncing: Receive = {
-    blockFlowSynchronizer ! BlockFlowSynchronizer.HandShaked(remoteBrokerInfo)
-
-    val receive: Receive = {
-      case BaseBrokerHandler.SyncLocators(locators) =>
-        val showLocators = Utils.showFlow(locators)
-        log.debug(s"Send sync locators to $remoteAddress: $showLocators")
-        send(InvRequest(locators))
-      case BaseBrokerHandler.Received(InvRequest(requestId, locators)) =>
-        if (validate(locators)) {
-          log.debug(s"Received sync request from $remoteAddress: ${Utils.showFlow(locators)}")
-          allHandlers.flowHandler ! FlowHandler.GetSyncInventories(
-            requestId,
-            locators,
-            remoteBrokerInfo
-          )
-        } else {
-          log.warning(s"Invalid locators from $remoteAddress: ${Utils.showFlow(locators)}")
-        }
-      case FlowHandler.SyncInventories(Some(requestId), inventories) =>
-        log.debug(s"Send sync response to $remoteAddress: ${Utils.showFlow(inventories)}")
-        if (inventories.forall(_.isEmpty)) {
-          setRemoteSynced()
-        }
-        send(InvResponse(requestId, inventories))
-      case BaseBrokerHandler.Received(InvResponse(_, hashes)) => handleInv(hashes)
-      case BaseBrokerHandler.Received(NewBlockHash(hash))     => handleNewBlockHash(hash)
-      case BaseBrokerHandler.RelayBlock(hash) =>
-        if (seenBlocks.contains(hash)) {
-          log.debug(s"Remote broker already have the block ${hash.shortHex}")
-        } else {
-          log.debug(s"Relay new block hash ${hash.shortHex} to $remoteAddress")
-          seenBlocks.put(hash, ())
-          send(NewBlockHash(hash))
-        }
-      case BaseBrokerHandler.RelayTxs(txs)                 => handleRelayTxs(txs)
-      case BaseBrokerHandler.Received(NewTxHashes(hashes)) => handleNewTxHashes(hashes)
-      case BaseBrokerHandler.DownloadTxs(txs) =>
-        log.debug(s"Download txs ${Utils.showChainIndexedDigest(txs)} from $remoteAddress")
-        send(TxsRequest(txs))
-      case BaseBrokerHandler.Received(TxsRequest(id, txs)) =>
-        handleTxsRequest(id, txs)
-      case BaseBrokerHandler.Received(TxsResponse(id, txs)) =>
-        handleTxsResponse(id, txs)
-    }
-
-    receive
+    case BaseBrokerHandler.SyncLocators(locators) =>
+      val showLocators = Utils.showFlow(locators)
+      log.debug(s"Send sync locators to $remoteAddress: $showLocators")
+      send(InvRequest(locators))
+    case BaseBrokerHandler.Received(InvRequest(requestId, locators)) =>
+      if (validate(locators)) {
+        log.debug(s"Received sync request from $remoteAddress: ${Utils.showFlow(locators)}")
+        allHandlers.flowHandler ! FlowHandler.GetSyncInventories(
+          requestId,
+          locators,
+          remoteBrokerInfo
+        )
+      } else {
+        log.warning(s"Invalid locators from $remoteAddress: ${Utils.showFlow(locators)}")
+      }
+    case FlowHandler.SyncInventories(Some(requestId), inventories) =>
+      log.debug(s"Send sync response to $remoteAddress: ${Utils.showFlow(inventories)}")
+      if (inventories.sumBy(_.length) < brokerConfig.groups) {
+        setRemoteSynced()
+      }
+      send(InvResponse(requestId, inventories))
+    case BaseBrokerHandler.Received(InvResponse(_, hashes)) => handleInv(hashes)
+    case BaseBrokerHandler.Received(NewBlockHash(hash))     => handleNewBlockHash(hash)
+    case BaseBrokerHandler.RelayBlock(hash) =>
+      if (seenBlocks.contains(hash)) {
+        log.debug(s"Remote broker already have the block ${hash.shortHex}")
+      } else {
+        log.debug(s"Relay new block hash ${hash.shortHex} to $remoteAddress")
+        seenBlocks.put(hash, ())
+        send(NewBlockHash(hash))
+      }
+    case BaseBrokerHandler.RelayTxs(txs)                 => handleRelayTxs(txs)
+    case BaseBrokerHandler.Received(NewTxHashes(hashes)) => handleNewTxHashes(hashes)
+    case BaseBrokerHandler.DownloadTxs(txs) =>
+      log.debug(s"Download txs ${Utils.showChainIndexedDigest(txs)} from $remoteAddress")
+      send(TxsRequest(txs))
+    case BaseBrokerHandler.Received(TxsRequest(id, txs)) =>
+      handleTxsRequest(id, txs)
+    case BaseBrokerHandler.Received(TxsResponse(id, txs)) =>
+      handleTxsResponse(id, txs)
   }
 
   private def handleRelayTxs(txs: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {

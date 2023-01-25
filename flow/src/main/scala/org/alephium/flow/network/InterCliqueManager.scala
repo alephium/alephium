@@ -20,7 +20,7 @@ import java.net.InetSocketAddress
 
 import scala.util.Random
 
-import akka.actor.Props
+import akka.actor.{ActorContext, Props}
 import akka.event.LoggingAdapter
 import akka.io.Tcp
 import akka.util.ByteString
@@ -60,7 +60,14 @@ object InterCliqueManager {
     )
   // scalastyle:on
 
-  sealed trait Command                     extends CliqueManager.Command
+  sealed trait Command extends CliqueManager.Command
+  final case class HandShaked(
+      broker: ActorRefT[BrokerHandler.Command],
+      brokerInfo: BrokerInfo,
+      connectionType: ConnectionType,
+      clientInfo: String
+  ) extends Command
+      with EventStream.Event
   final case object GetSyncStatuses        extends Command
   final case object IsSynced               extends Command
   final case object UpdateNodeSyncedStatus extends Command
@@ -95,6 +102,10 @@ object InterCliqueManager {
 
     def readyFor(chainIndex: ChainIndex): Boolean = {
       isSynced && info.contains(chainIndex.from)
+    }
+
+    def stopTheActor()(implicit context: ActorContext): Unit = {
+      context.stop(actor.ref)
     }
   }
 
@@ -149,6 +160,7 @@ class InterCliqueManager(
     discoveryServer ! DiscoveryServer.SendCliqueInfo(selfCliqueInfo)
     subscribeEvent(self, classOf[InterCliqueManager.BroadCastTx])
     subscribeEvent(self, classOf[InterCliqueManager.BroadCastBlock])
+    subscribeEvent(self, classOf[InterCliqueManager.HandShaked])
   }
 
   override def receive: Receive = handleMessage orElse handleConnection orElse handleNewClique
@@ -179,10 +191,10 @@ class InterCliqueManager(
       } else {
         sender() ! Tcp.Close
       }
-    case CliqueManager.HandShaked(brokerInfo, connectionType, clientInfo) =>
+    case InterCliqueManager.HandShaked(broker, brokerInfo, connectionType, clientInfo) =>
       connecting.remove(brokerInfo.address)
       val brokerState =
-        BrokerState(brokerInfo, connectionType, ActorRefT(sender()), isSynced = false, clientInfo)
+        BrokerState(brokerInfo, connectionType, broker, isSynced = false, clientInfo)
       handleNewBroker(brokerState)
     case CliqueManager.Synced(brokerInfo) =>
       log.debug(s"No new blocks from $brokerInfo")
@@ -471,11 +483,11 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       } else {
         log.warning(s"New peer connection with invalid group info: $brokerInfo")
         publishEvent(MisbehaviorManager.InvalidGroup(brokerInfo.address))
-        context.stop(sender())
+        brokerState.stopTheActor()
       }
     } else {
       log.debug(s"Too many clique connection from the same IP: $brokerInfo")
-      context.stop(sender())
+      brokerState.stopTheActor()
     }
   }
 
@@ -500,7 +512,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       addBroker(brokerState)
     } else {
       log.info(s"Too many inbound connections, ignore the one from $brokerInfo")
-      context.stop(sender())
+      brokerState.stopTheActor()
     }
   }
 
@@ -512,7 +524,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
       addBroker(brokerState)
     } else {
       log.info(s"Too many outbound connections, ignore the one from $brokerState")
-      context.stop(sender())
+      brokerState.stopTheActor()
     }
   }
 
@@ -572,7 +584,7 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
           (selfCliqueId > brokerInfo.cliqueId && existedBroker.connectionType == InboundConnection)
         ) { // keep the existed connection
           log.debug(s"Ignore valid double connection")
-          sender()
+          brokerState.actor.ref
         } else { // replace the existed connection
           log.debug(s"Replace the existed connection")
           brokers.remove(existedBroker.info.peerId)
@@ -586,8 +598,8 @@ trait InterCliqueManagerState extends BaseActor with EventStream.Publisher {
     } else {
       log.debug(s"Invalid double connection from ${brokerInfo.peerId}")
       brokers.remove(existedBroker.info.peerId)
-      context.stop(existedBroker.actor.ref)
-      context.stop(sender())
+      existedBroker.stopTheActor()
+      brokerState.stopTheActor()
     }
   }
 }

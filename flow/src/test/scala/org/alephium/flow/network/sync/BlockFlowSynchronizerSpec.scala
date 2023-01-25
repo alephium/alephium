@@ -20,7 +20,8 @@ import akka.testkit.{TestActorRef, TestProbe}
 
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.handler.TestUtils
-import org.alephium.flow.network.broker.BrokerHandler
+import org.alephium.flow.network.InterCliqueManager
+import org.alephium.flow.network.broker.{BrokerHandler, InboundConnection}
 import org.alephium.protocol.Generators
 import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{AlephiumActorSpec, AVector}
@@ -39,7 +40,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
 
     val probe  = TestProbe()
     val broker = brokerInfoGen.sample.get
-    probe.send(blockFlowSynchronizer, BlockFlowSynchronizer.HandShaked(broker))
+    probe.send(
+      blockFlowSynchronizer,
+      InterCliqueManager.HandShaked(probe.ref, broker, InboundConnection, "")
+    )
     eventually(blockFlowSynchronizerActor.brokerInfos.toMap.contains(probe.ref) is true)
 
     system.stop(probe.ref)
@@ -51,7 +55,10 @@ class BlockFlowSynchronizerSpec extends AlephiumActorSpec {
     val brokerInfo = brokerInfoGen.sample.get
     val blockHash  = BlockHash.generate
 
-    broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.HandShaked(brokerInfo))
+    broker.send(
+      blockFlowSynchronizer,
+      InterCliqueManager.HandShaked(broker.ref, brokerInfo, InboundConnection, "")
+    )
     eventually(blockFlowSynchronizerActor.brokerInfos.toMap.contains(broker.ref) is true)
     broker.send(blockFlowSynchronizer, BlockFlowSynchronizer.BlockAnnouncement(blockHash))
     broker.expectMsg(BrokerHandler.DownloadBlocks(AVector(blockHash)))

@@ -93,9 +93,6 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val block = emptyBlock(blockFlow, chainIndex)
 
     brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(block.hash))
-    blockFlowSynchronizer.expectMsg(
-      BlockFlowSynchronizer.HandShaked(brokerHandlerActor.remoteBrokerInfo)
-    )
     eventually(brokerHandlerActor.seenBlocks.contains(block.hash) is true)
     blockFlowSynchronizer.expectMsg(BlockFlowSynchronizer.BlockAnnouncement(block.hash))
     brokerHandler ! BaseBrokerHandler.Received(NewBlockHash(block.hash))
