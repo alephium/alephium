@@ -450,8 +450,8 @@ object BuiltIn {
       Seq.empty,
       VerifyAbsoluteLocktime,
       argsName = Seq("lockUntil" -> "the timestamp until which the lock is valid"),
-      retComment = "true if the lock timestamp is before the block timestamp, false otherwise",
-      doc = "Verifies the absolute locktime with the block timestamp."
+      retComment = "",
+      doc = "Verifies that the absolute locktime is before the block timestamp, otherwise it fails."
     )
   val verifyRelativeLocktime: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chain(
@@ -463,9 +463,9 @@ object BuiltIn {
         "txInputIndex" -> "the index of the transaction input",
         "lockDuration" -> "the duration that the input is locked for"
       ),
-      retComment =
-        "true if the input's creation timestamp + lock duration is before the block timestamp, false otherwise",
-      doc = "Verifies the relative locktime for transaction input."
+      retComment = "",
+      doc =
+        "Verifies that the input's creation timestamp + lock duration is before the block timestamp, otherwise it fails."
     )
 
   sealed abstract class ConversionBuiltIn(name: String) extends GenericStatelessBuiltIn(name) {

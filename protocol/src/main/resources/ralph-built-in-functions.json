@@ -520,22 +520,22 @@
     "name": "verifyAbsoluteLocktime",
     "category": "Chain",
     "signature": "fn verifyAbsoluteLocktime!(lockUntil:U256) -> ()",
-    "doc": "Verifies the absolute locktime with the block timestamp.",
+    "doc": "Verifies that the absolute locktime is before the block timestamp, otherwise it fails.",
     "params": [
       "@param lockUntil the timestamp until which the lock is valid"
     ],
-    "returns": "@returns true if the lock timestamp is before the block timestamp, false otherwise"
+    "returns": "@returns "
   },
   {
     "name": "verifyRelativeLocktime",
     "category": "Chain",
     "signature": "fn verifyRelativeLocktime!(txInputIndex:U256, lockDuration:U256) -> ()",
-    "doc": "Verifies the relative locktime for transaction input.",
+    "doc": "Verifies that the input's creation timestamp + lock duration is before the block timestamp, otherwise it fails.",
     "params": [
       "@param txInputIndex the index of the transaction input",
       "@param lockDuration the duration that the input is locked for"
     ],
-    "returns": "@returns true if the input's creation timestamp + lock duration is before the block timestamp, false otherwise"
+    "returns": "@returns "
   },
   {
     "name": "dustAmount",
