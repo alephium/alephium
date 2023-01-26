@@ -611,7 +611,7 @@
     "name": "u256To2Byte",
     "category": "Conversion",
     "signature": "fn u256To2Byte!(u256:U256) -> (ByteVec)",
-    "doc": "Converts U256 to 2 bytes.",
+    "doc": "Converts U256 to 2 big-endian bytes.",
     "params": [
       "@param u256 the input U256"
     ],
@@ -621,7 +621,7 @@
     "name": "u256To4Byte",
     "category": "Conversion",
     "signature": "fn u256To4Byte!(u256:U256) -> (ByteVec)",
-    "doc": "Converts U256 to 4 bytes.",
+    "doc": "Converts U256 to 4 big-endian bytes.",
     "params": [
       "@param u256 the input U256"
     ],
@@ -631,7 +631,7 @@
     "name": "u256To8Byte",
     "category": "Conversion",
     "signature": "fn u256To8Byte!(u256:U256) -> (ByteVec)",
-    "doc": "Converts U256 to 8 bytes.",
+    "doc": "Converts U256 to 8 big-endian bytes.",
     "params": [
       "@param u256 the input U256"
     ],
@@ -641,7 +641,7 @@
     "name": "u256To16Byte",
     "category": "Conversion",
     "signature": "fn u256To16Byte!(u256:U256) -> (ByteVec)",
-    "doc": "Converts U256 to 16 bytes.",
+    "doc": "Converts U256 to 16 big-endian bytes.",
     "params": [
       "@param u256 the input U256"
     ],
@@ -651,7 +651,7 @@
     "name": "u256To32Byte",
     "category": "Conversion",
     "signature": "fn u256To32Byte!(u256:U256) -> (ByteVec)",
-    "doc": "Converts U256 to 32 bytes.",
+    "doc": "Converts U256 to 32 big-endian bytes.",
     "params": [
       "@param u256 the input U256"
     ],
@@ -671,7 +671,7 @@
     "name": "u256From2Byte",
     "category": "Conversion",
     "signature": "fn u256From2Byte!(bytes:ByteVec) -> (U256)",
-    "doc": "Converts 2 byte to U256.",
+    "doc": "Converts 2 big-endian bytes to U256.",
     "params": [
       "@param bytes the input ByteVec"
     ],
@@ -681,7 +681,7 @@
     "name": "u256From4Byte",
     "category": "Conversion",
     "signature": "fn u256From4Byte!(bytes:ByteVec) -> (U256)",
-    "doc": "Converts 4 byte to U256.",
+    "doc": "Converts 4 big-endian bytes to U256.",
     "params": [
       "@param bytes the input ByteVec"
     ],
@@ -691,7 +691,7 @@
     "name": "u256From8Byte",
     "category": "Conversion",
     "signature": "fn u256From8Byte!(bytes:ByteVec) -> (U256)",
-    "doc": "Converts 8 byte to U256.",
+    "doc": "Converts 8 big-endian bytes to U256.",
     "params": [
       "@param bytes the input ByteVec"
     ],
@@ -701,7 +701,7 @@
     "name": "u256From16Byte",
     "category": "Conversion",
     "signature": "fn u256From16Byte!(bytes:ByteVec) -> (U256)",
-    "doc": "Converts 16 byte to U256.",
+    "doc": "Converts 16 big-endian bytes to U256.",
     "params": [
       "@param bytes the input ByteVec"
     ],
@@ -711,7 +711,7 @@
     "name": "u256From32Byte",
     "category": "Conversion",
     "signature": "fn u256From32Byte!(bytes:ByteVec) -> (U256)",
-    "doc": "Converts 32 byte to U256.",
+    "doc": "Converts 32 big-endian bytes to U256.",
     "params": [
       "@param bytes the input ByteVec"
     ],
