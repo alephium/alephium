@@ -19,7 +19,7 @@ package org.alephium.flow.network
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.io.Tcp
 import akka.testkit.{EventFilter, TestActorRef, TestProbe}
 import akka.util.Timeout
@@ -40,18 +40,20 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   implicit val timeout: Timeout  = Timeout(Duration.ofSecondsUnsafe(2).asScala)
   val clientInfo: String         = "v0.0.0"
 
-  def handShaked(
-      broker: BrokerInfo,
+  def publishHandShaked(
+      broker: ActorRef,
+      brokerInfo: BrokerInfo,
       connectionType: ConnectionType = InboundConnection
-  ): CliqueManager.HandShaked = {
-    CliqueManager.HandShaked(broker, connectionType, clientInfo)
+  )(implicit system: ActorSystem): Unit = {
+    val event = InterCliqueManager.HandShaked(broker, brokerInfo, connectionType, clientInfo)
+    system.eventStream.publish(event)
   }
 
-  def handShakedForState(
+  def publishHandShakedForState(
       broker: BrokerState,
       connectionType: ConnectionType = InboundConnection
-  ): CliqueManager.HandShaked = {
-    handShaked(broker.info, connectionType)
+  )(implicit system: ActorSystem): Unit = {
+    publishHandShaked(broker.actor.ref, broker.info, connectionType)
   }
 
   it should "publish `PeerDisconnected` on inbound peer disconnection" in new Fixture {
@@ -60,8 +62,8 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     discoveryServer.expectMsg(DiscoveryServer.GetMorePeers(brokerConfig))
     discoveryServer.expectMsg(DiscoveryServer.SendCliqueInfo(cliqueInfo))
 
+    publishHandShaked(connection.ref, peerInfo)
     eventually {
-      connection.send(interCliqueManager, handShaked(peerInfo))
       getPeers() is Seq(peer)
 
       interCliqueManagerActor.brokers(peerInfo.peerId).actor.ref is connection.ref
@@ -87,8 +89,8 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
 
     EventFilter.info(start = "Peer disconnected:").intercept {
       val connection = getActor("*")(system.dispatcher).futureValue.get
-      interCliqueManager.tell(handShaked(peerInfo, OutboundConnection), connection)
-      getPeers() is Seq(peer)
+      publishHandShaked(connection, peerInfo, OutboundConnection)
+      getPeers() willBe Seq(peer)
 
       system.stop(connection)
     }
@@ -122,14 +124,15 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     config.network.maxCliqueFromSameIp is 2
     val connection = TestProbe().ref
     watch(connection)
-    interCliqueManager.tell(handShaked(broker0, InboundConnection), connection)
-    interCliqueManagerActor.brokers.size is 1
-    interCliqueManager.tell(handShaked(broker1, InboundConnection), connection)
-    interCliqueManagerActor.brokers.size is 2
+    interCliqueManagerActor.brokers.size willBe 0 // unlazy the actor
+    publishHandShaked(connection, broker0, InboundConnection)
+    interCliqueManagerActor.brokers.size willBe 1
+    publishHandShaked(connection, broker1, InboundConnection)
+    interCliqueManagerActor.brokers.size willBe 2
     EventFilter.debug(start = "Too many clique connection from the same IP").intercept {
-      interCliqueManager.tell(handShaked(broker2, InboundConnection), connection)
+      publishHandShaked(connection, broker2, InboundConnection)
     }
-    interCliqueManagerActor.brokers.size is 2
+    interCliqueManagerActor.brokers.size willBe 2
     expectTerminated(connection)
   }
 
@@ -162,14 +165,16 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     val broker = relevantBrokerInfo()
     EventFilter.info(start = "Too many inbound connections", occurrences = 0).intercept {
       interCliqueManagerActor.handleNewBroker(broker)
+      interCliqueManagerActor.brokers.size willBe 1
     }
 
     val newBroker = newBrokerInfo(broker.info)
     EventFilter.info(start = "Too many inbound connections", occurrences = 1).intercept {
       val probe = TestProbe()
       watch(probe.ref)
-      probe.send(interCliqueManager, handShaked(newBroker, InboundConnection))
+      publishHandShaked(probe.ref, newBroker, InboundConnection)
       expectTerminated(probe.ref)
+      interCliqueManagerActor.brokers.size willBe 1
     }
   }
 
@@ -187,7 +192,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     EventFilter.info(start = "Too many outbound connections", occurrences = 1).intercept {
       val probe = TestProbe()
       watch(probe.ref)
-      probe.send(interCliqueManager, handShaked(newBroker, OutboundConnection))
+      publishHandShaked(probe.ref, newBroker, OutboundConnection)
       expectTerminated(probe.ref)
     }
   }
@@ -204,7 +209,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     EventFilter.info(start = "Too many outbound connections", occurrences = 1).intercept {
       val probe = TestProbe()
       watch(probe.ref)
-      probe.send(interCliqueManager, handShaked(newBroker, OutboundConnection))
+      publishHandShaked(probe.ref, newBroker, OutboundConnection)
       expectTerminated(probe.ref)
     }
   }
@@ -244,10 +249,10 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   }
 
   it should "deal with double connection (1)" in new DoubleConnectionFixture {
-    probe0.send(interCliqueManager, handShakedForState(broker, InboundConnection))
-    interCliqueManagerActor.brokers(broker.info.peerId).connectionType is InboundConnection
+    publishHandShakedForState(broker.copy(actor = probe0.ref), InboundConnection)
+    interCliqueManagerActor.brokers(broker.info.peerId).connectionType willBe InboundConnection
 
-    probe1.send(interCliqueManager, handShakedForState(broker, OutboundConnection))
+    publishHandShakedForState(broker.copy(actor = probe1.ref), OutboundConnection)
 
     if (cliqueInfo.id < broker.info.cliqueId) {
       // we should kill the inbound connection, and keep the outbound connection
@@ -262,10 +267,11 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   }
 
   it should "deal with double connection (2)" in new DoubleConnectionFixture {
-    probe0.send(interCliqueManager, handShakedForState(broker, OutboundConnection))
-    interCliqueManagerActor.brokers(broker.info.peerId).connectionType is OutboundConnection
+    interCliqueManagerActor.brokers.isEmpty is true // unlazy the actor
+    publishHandShakedForState(broker.copy(actor = probe0.ref), OutboundConnection)
+    interCliqueManagerActor.brokers(broker.info.peerId).connectionType willBe OutboundConnection
 
-    probe1.send(interCliqueManager, handShakedForState(broker, InboundConnection))
+    publishHandShakedForState(broker.copy(actor = probe1.ref), InboundConnection)
 
     if (cliqueInfo.id < broker.info.cliqueId) {
       // we should kill the inbound connection, and keep the outbound connection
@@ -280,17 +286,18 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
   }
 
   it should "close the double connections when they are of the same type" in new Fixture {
-    val broker = relevantBrokerInfo()
+    interCliqueManagerActor.brokers.isEmpty is true // unlazy the actor
 
+    val broker = relevantBrokerInfo()
     val probe0 = TestProbe()
     watch(probe0.ref)
-    probe0.send(interCliqueManager, handShakedForState(broker, InboundConnection))
-    interCliqueManagerActor.brokers(broker.info.peerId).connectionType is InboundConnection
+    publishHandShakedForState(broker.copy(actor = probe0.ref), InboundConnection)
+    interCliqueManagerActor.brokers(broker.info.peerId).connectionType willBe InboundConnection
 
     val probe1 = TestProbe()
     EventFilter.debug(start = "Invalid double connection").intercept {
       watch(probe1.ref)
-      probe1.send(interCliqueManager, handShakedForState(broker, InboundConnection))
+      publishHandShakedForState(broker.copy(actor = probe1.ref), InboundConnection)
     }
 
     expectTerminated(probe0.ref)
@@ -314,7 +321,7 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
         brokerHandler.ref,
         InterCliqueManager.PeerDisconnected(brokerInfo.address)
       )
-      brokerHandler.send(interCliqueManager, handShaked(brokerInfo, connectionType))
+      publishHandShaked(brokerHandler.ref, brokerInfo, connectionType)
     }
 
     test(probe0, broker0, InboundConnection)
@@ -372,7 +379,8 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
 
     def addAndCheckSynced(expected: Boolean) = {
       val broker = relevantBrokerInfo().info
-      interCliqueManager ! handShaked(broker, InboundConnection)
+      interCliqueManagerActor.brokers.contains(broker.peerId) is false
+      publishHandShaked(testActor, broker, InboundConnection)
       interCliqueManager ! CliqueManager.Synced(broker)
 
       interCliqueManager ! InterCliqueManager.IsSynced
@@ -449,14 +457,15 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     val broker2     = TestProbe()
     val broker3     = TestProbe()
 
-    broker0.send(interCliqueManager, handShaked(brokerInfo0))
-    broker1.send(interCliqueManager, handShaked(brokerInfo1))
-    broker2.send(interCliqueManager, handShaked(brokerInfo2))
-    broker3.send(interCliqueManager, handShaked(brokerInfo3))
-    interCliqueManagerActor.brokers.contains(brokerInfo0.peerId) is true
-    interCliqueManagerActor.brokers.contains(brokerInfo1.peerId) is true
-    interCliqueManagerActor.brokers.contains(brokerInfo2.peerId) is true
-    interCliqueManagerActor.brokers.contains(brokerInfo3.peerId) is false
+    interCliqueManagerActor.brokers.isEmpty is true // unlazy the actor
+    publishHandShaked(broker0.ref, brokerInfo0)
+    publishHandShaked(broker1.ref, brokerInfo1)
+    publishHandShaked(broker2.ref, brokerInfo2)
+    publishHandShaked(broker3.ref, brokerInfo3)
+    interCliqueManagerActor.brokers.contains(brokerInfo0.peerId) willBe true
+    interCliqueManagerActor.brokers.contains(brokerInfo1.peerId) willBe true
+    interCliqueManagerActor.brokers.contains(brokerInfo2.peerId) willBe true
+    interCliqueManagerActor.brokers.contains(brokerInfo3.peerId) willBe false
 
     interCliqueManager ! CliqueManager.Synced(brokerInfo0)
     interCliqueManager ! CliqueManager.Synced(brokerInfo1)
@@ -484,14 +493,15 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     val broker2     = TestProbe()
     val broker3     = TestProbe()
 
-    broker0.send(interCliqueManager, handShaked(brokerInfo0))
-    broker1.send(interCliqueManager, handShaked(brokerInfo1))
-    broker2.send(interCliqueManager, handShaked(brokerInfo2))
-    broker3.send(interCliqueManager, handShaked(brokerInfo3))
-    interCliqueManagerActor.brokers.contains(brokerInfo0.peerId) is true
-    interCliqueManagerActor.brokers.contains(brokerInfo1.peerId) is true
-    interCliqueManagerActor.brokers.contains(brokerInfo2.peerId) is true
-    interCliqueManagerActor.brokers.contains(brokerInfo3.peerId) is true
+    interCliqueManagerActor.brokers.isEmpty is true // unlazy the actor
+    publishHandShaked(broker0.ref, brokerInfo0)
+    publishHandShaked(broker1.ref, brokerInfo1)
+    publishHandShaked(broker2.ref, brokerInfo2)
+    publishHandShaked(broker3.ref, brokerInfo3)
+    interCliqueManagerActor.brokers.contains(brokerInfo0.peerId) willBe true
+    interCliqueManagerActor.brokers.contains(brokerInfo1.peerId) willBe true
+    interCliqueManagerActor.brokers.contains(brokerInfo2.peerId) willBe true
+    interCliqueManagerActor.brokers.contains(brokerInfo3.peerId) willBe true
 
     interCliqueManager ! CliqueManager.Synced(brokerInfo0)
     interCliqueManager ! CliqueManager.Synced(brokerInfo1)
@@ -522,14 +532,15 @@ class InterCliqueManagerSpec extends AlephiumActorSpec with Generators with Scal
     val broker2     = TestProbe()
     val broker3     = TestProbe()
 
-    broker0.send(interCliqueManager, handShaked(brokerInfo0))
-    broker1.send(interCliqueManager, handShaked(brokerInfo1))
-    broker2.send(interCliqueManager, handShaked(brokerInfo2))
-    broker3.send(interCliqueManager, handShaked(brokerInfo3))
-    interCliqueManagerActor.brokers.contains(brokerInfo0.peerId) is true
-    interCliqueManagerActor.brokers.contains(brokerInfo1.peerId) is true
-    interCliqueManagerActor.brokers.contains(brokerInfo2.peerId) is true
-    interCliqueManagerActor.brokers.contains(brokerInfo3.peerId) is true
+    interCliqueManagerActor.brokers.isEmpty is true // unlazy the actor
+    publishHandShaked(broker0.ref, brokerInfo0)
+    publishHandShaked(broker1.ref, brokerInfo1)
+    publishHandShaked(broker2.ref, brokerInfo2)
+    publishHandShaked(broker3.ref, brokerInfo3)
+    interCliqueManagerActor.brokers.contains(brokerInfo0.peerId) willBe true
+    interCliqueManagerActor.brokers.contains(brokerInfo1.peerId) willBe true
+    interCliqueManagerActor.brokers.contains(brokerInfo2.peerId) willBe true
+    interCliqueManagerActor.brokers.contains(brokerInfo3.peerId) willBe true
 
     interCliqueManager ! CliqueManager.Synced(brokerInfo0)
     interCliqueManager ! CliqueManager.Synced(brokerInfo1)

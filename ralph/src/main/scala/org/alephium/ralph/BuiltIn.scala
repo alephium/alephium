@@ -450,8 +450,8 @@ object BuiltIn {
       Seq.empty,
       VerifyAbsoluteLocktime,
       argsName = Seq("lockUntil" -> "the timestamp until which the lock is valid"),
-      retComment = "true if the lock timestamp is before the block timestamp, false otherwise",
-      doc = "Verifies the absolute locktime with the block timestamp."
+      retComment = "",
+      doc = "Verifies that the absolute locktime is before the block timestamp, otherwise it fails."
     )
   val verifyRelativeLocktime: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chain(
@@ -463,9 +463,9 @@ object BuiltIn {
         "txInputIndex" -> "the index of the transaction input",
         "lockDuration" -> "the duration that the input is locked for"
       ),
-      retComment =
-        "true if the input's creation timestamp + lock duration is before the block timestamp, false otherwise",
-      doc = "Verifies the relative locktime for transaction input."
+      retComment = "",
+      doc =
+        "Verifies that the input's creation timestamp + lock duration is before the block timestamp, otherwise it fails."
     )
 
   sealed abstract class ConversionBuiltIn(name: String) extends GenericStatelessBuiltIn(name) {
@@ -637,7 +637,7 @@ object BuiltIn {
       U256To2Byte,
       argsName = Seq("u256" -> "the input U256"),
       retComment = "2 bytes",
-      doc = "Converts U256 to 2 bytes."
+      doc = "Converts U256 to 2 big-endian bytes."
     )
 
   val u256To4Byte: SimpleBuiltIn[StatelessContext] =
@@ -648,7 +648,7 @@ object BuiltIn {
       U256To4Byte,
       argsName = Seq("u256" -> "the input U256"),
       retComment = "4 bytes",
-      doc = "Converts U256 to 4 bytes."
+      doc = "Converts U256 to 4 big-endian bytes."
     )
 
   val u256To8Byte: SimpleBuiltIn[StatelessContext] =
@@ -659,7 +659,7 @@ object BuiltIn {
       U256To8Byte,
       argsName = Seq("u256" -> "the input U256"),
       retComment = "8 bytes",
-      doc = "Converts U256 to 8 bytes."
+      doc = "Converts U256 to 8 big-endian bytes."
     )
 
   val u256To16Byte: SimpleBuiltIn[StatelessContext] =
@@ -670,7 +670,7 @@ object BuiltIn {
       U256To16Byte,
       argsName = Seq("u256" -> "the input U256"),
       retComment = "16 bytes",
-      doc = "Converts U256 to 16 bytes."
+      doc = "Converts U256 to 16 big-endian bytes."
     )
 
   val u256To32Byte: SimpleBuiltIn[StatelessContext] =
@@ -681,7 +681,7 @@ object BuiltIn {
       U256To32Byte,
       argsName = Seq("u256" -> "the input U256"),
       retComment = "32 bytes",
-      doc = "Converts U256 to 32 bytes."
+      doc = "Converts U256 to 32 big-endian bytes."
     )
 
   val u256From1Byte: SimpleBuiltIn[StatelessContext] =
@@ -703,7 +703,7 @@ object BuiltIn {
       U256From2Byte,
       argsName = Seq("bytes" -> "the input ByteVec"),
       retComment = "an U256",
-      doc = "Converts 2 byte to U256."
+      doc = "Converts 2 big-endian bytes to U256."
     )
 
   val u256From4Byte: SimpleBuiltIn[StatelessContext] =
@@ -714,7 +714,7 @@ object BuiltIn {
       U256From4Byte,
       argsName = Seq("bytes" -> "the input ByteVec"),
       retComment = "an U256",
-      doc = "Converts 4 byte to U256."
+      doc = "Converts 4 big-endian bytes to U256."
     )
 
   val u256From8Byte: SimpleBuiltIn[StatelessContext] =
@@ -725,7 +725,7 @@ object BuiltIn {
       U256From8Byte,
       argsName = Seq("bytes" -> "the input ByteVec"),
       retComment = "an U256",
-      doc = "Converts 8 byte to U256."
+      doc = "Converts 8 big-endian bytes to U256."
     )
 
   val u256From16Byte: SimpleBuiltIn[StatelessContext] =
@@ -736,7 +736,7 @@ object BuiltIn {
       U256From16Byte,
       argsName = Seq("bytes" -> "the input ByteVec"),
       retComment = "an U256",
-      doc = "Converts 16 byte to U256."
+      doc = "Converts 16 big-endian bytes to U256."
     )
 
   val u256From32Byte: SimpleBuiltIn[StatelessContext] =
@@ -747,7 +747,7 @@ object BuiltIn {
       U256From32Byte,
       argsName = Seq("bytes" -> "the input ByteVec"),
       retComment = "an U256",
-      doc = "Converts 32 byte to U256."
+      doc = "Converts 32 big-endian bytes to U256."
     )
 
   val byteVecToAddress: SimpleBuiltIn[StatelessContext] =

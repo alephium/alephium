@@ -21,7 +21,6 @@ import akka.io.Tcp
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
-import org.alephium.flow.network.broker.ConnectionType
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.BrokerConfig
@@ -47,12 +46,7 @@ object CliqueManager {
     )
 
   trait Command
-  final case class Start(cliqueInfo: CliqueInfo) extends Command
-  final case class HandShaked(
-      brokerInfo: BrokerInfo,
-      connectionType: ConnectionType,
-      clientInfo: String
-  ) extends Command
+  final case class Start(cliqueInfo: CliqueInfo)  extends Command
   final case class Synced(brokerInfo: BrokerInfo) extends Command
   final case object IsSelfCliqueReady             extends Command
 }

@@ -24,7 +24,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.AllHandlers
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.broker.BrokerHandler
+import org.alephium.flow.network.broker.{BrokerHandler, ConnectionType}
 import org.alephium.flow.network.intraclique.{InboundBrokerHandler, OutboundBrokerHandler}
 import org.alephium.flow.network.sync.BlockFlowSynchronizer
 import org.alephium.flow.setting.NetworkSetting
@@ -51,7 +51,12 @@ object IntraCliqueManager {
       )
     )
 
-  sealed trait Command    extends CliqueManager.Command
+  sealed trait Command extends CliqueManager.Command
+  final case class HandShaked(
+      brokerInfo: BrokerInfo,
+      connectionType: ConnectionType,
+      clientInfo: String
+  ) extends Command
   final case object Ready extends Command
   final case class BroadCastBlock(
       block: Block,
@@ -125,7 +130,7 @@ class IntraCliqueManager(
         context.watch(inbound)
         ()
       }
-    case CliqueManager.HandShaked(brokerInfo, _, _) =>
+    case IntraCliqueManager.HandShaked(brokerInfo, _, _) =>
       log.debug(s"Start syncing with intra-clique node: ${brokerInfo.address}")
       if (brokerInfo.cliqueId == cliqueInfo.id && !brokers.contains(brokerInfo.brokerId)) {
         log.debug(s"Broker connected: $brokerInfo")
