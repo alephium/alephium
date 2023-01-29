@@ -1252,7 +1252,7 @@ class ServerUtils(implicit
     val outputRef = contractId.inaccurateFirstOutputRef()
     val output    = asset.toContractOutput(contractId)
     wrapResult(
-      worldState.createContractUnsafe(
+      worldState.createContractLegacyUnsafe(
         contractId,
         code.toHalfDecoded(),
         initialState,

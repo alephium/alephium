@@ -377,7 +377,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       _ <- code.check(initialFields)
       _ <-
         worldState
-          .createContractUnsafe(contractId, code, initialFields, outputRef, contractOutput)
+          .createContractLegacyUnsafe(contractId, code, initialFields, outputRef, contractOutput)
           .map(_ => discard(generatedOutputs.addOne(contractOutput)))
           .left
           .map(e => Left(IOErrorUpdateState(e)))

@@ -104,7 +104,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     }
     val halfDecoded = contract.toHalfDecoded()
 
-    cachedWorldState.createContractUnsafe(
+    cachedWorldState.createContractLegacyUnsafe(
       contractId,
       halfDecoded,
       fields,

@@ -192,7 +192,7 @@ class ContextSpec
       context.contractInputs.clear()
       context.contractInputs += outputRef -> output
       context.markAssetInUsing(contractId)
-      context.worldState.createContractUnsafe(
+      context.worldState.createContractLegacyUnsafe(
         contractId,
         StatefulContract.forSMT,
         AVector.empty,

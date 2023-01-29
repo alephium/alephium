@@ -66,7 +66,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
     def prepareContract() = {
       val (contractId, code, state, contractOutputRef, contractOutput) =
         generateContract().sample.get
-      cachedWorldState.createContractUnsafe(
+      cachedWorldState.createContractLegacyUnsafe(
         contractId,
         code,
         state,

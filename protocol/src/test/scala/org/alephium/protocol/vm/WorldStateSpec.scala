@@ -69,7 +69,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     worldState.getOutput(assetOutputRef) isE assetOutput
 
     update(
-      worldState.createContractUnsafe(
+      worldState.createContractLegacyUnsafe(
         contractId,
         code,
         state,
@@ -88,7 +88,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val newState = AVector[Val](Val.Bool(false))
     assume(newState != state)
     update(
-      worldState.createContractUnsafe(
+      worldState.createContractLegacyUnsafe(
         contractId1,
         code,
         newState,
@@ -121,6 +121,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     test(
       WorldState.emptyCached(
         newDB(storage, RocksDBSource.ColumnFamily.All),
+        newDB(storage, RocksDBSource.ColumnFamily.All),
         newLogStorage(storage)
       )
     )
@@ -130,6 +131,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val storage = newDBStorage()
     test(
       WorldState.emptyPersisted(
+        newDB(storage, RocksDBSource.ColumnFamily.All),
         newDB(storage, RocksDBSource.ColumnFamily.All),
         newLogStorage(storage)
       )
@@ -145,13 +147,20 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val storage = newDBStorage()
     val worldState = WorldState.emptyCached(
       newDB(storage, RocksDBSource.ColumnFamily.All),
+      newDB(storage, RocksDBSource.ColumnFamily.All),
       newLogStorage(storage)
     )
     val staging = worldState.staging()
 
     val (contractId, code, state, contractOutputRef, contractOutput) = generateContract().sample.get
     val contractObj = code.toObjectUnsafe(contractId, state)
-    staging.createContractUnsafe(contractId, code, state, contractOutputRef, contractOutput) isE ()
+    staging.createContractLegacyUnsafe(
+      contractId,
+      code,
+      state,
+      contractOutputRef,
+      contractOutput
+    ) isE ()
     staging.getContractObj(contractId) isE contractObj
     worldState.getContractObj(contractId).isLeft is true
   }

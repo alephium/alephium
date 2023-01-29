@@ -18,10 +18,8 @@ package org.alephium.io
 
 import scala.collection.mutable
 import scala.util.Random
-
 import org.scalacheck.Gen
-
-import org.alephium.crypto.{Blake2b => Hash}
+import org.alephium.crypto.Blake2b as Hash
 import org.alephium.util.AlephiumSpec
 import org.alephium.util.Bytes.byteStringOrdering
 

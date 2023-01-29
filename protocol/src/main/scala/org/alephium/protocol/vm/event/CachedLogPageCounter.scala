@@ -37,7 +37,7 @@ final class CachedLogPageCounter[K](
     }
   }
 
-  def persist(): IOResult[Unit] = counter.persist()
+  def persist(): IOResult[Unit] = counter.persist().map(_ => ())
 
   def staging(): StagingLogPageCounter[K] = {
     new StagingLogPageCounter(this.counter.staging(), this)

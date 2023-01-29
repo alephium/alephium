@@ -145,7 +145,7 @@ sealed trait Contract[Ctx <: StatelessContext] {
   def hash: Hash
 
   def initialStateHash(fields: AVector[Val]): Hash =
-    Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
+    Hash.doubleHash(hash.bytes ++ ContractStorageState.fieldsSerde.serialize(fields))
 
   def checkAssetsModifier(ctx: StatelessContext): ExeResult[Unit] = {
     if (ctx.getHardFork().isLemanEnabled()) {
@@ -339,7 +339,7 @@ object StatefulContract {
         fields: AVector[Val]
     ): StatefulContractObject = {
       val initialStateHash =
-        Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
+        Hash.doubleHash(hash.bytes ++ ContractStorageState.fieldsSerde.serialize(fields))
       StatefulContractObject.unsafe(this.hash, this, initialStateHash, fields, contractId)
     }
   }

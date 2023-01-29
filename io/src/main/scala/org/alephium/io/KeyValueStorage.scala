@@ -49,7 +49,7 @@ trait AbstractKeyValueStorage[K, V] {
 trait KeyValueStorage[K, V]
     extends AbstractKeyValueStorage[K, V]
     with RawKeyValueStorage
-    with ReadableKV[K, V] {
+    with MutableKV[K, V, Unit] {
 
   protected def storageKey(key: K): ByteString = serialize(key)
 

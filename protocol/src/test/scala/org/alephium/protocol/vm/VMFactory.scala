@@ -25,12 +25,14 @@ import org.alephium.util.AVector
 
 trait VMFactory extends StorageFixture {
   lazy val cachedWorldState: WorldState.Cached = {
-    val storage      = newDBStorage()
-    val trieDb       = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.All)
+    val storage = newDBStorage()
+    val trieDb  = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.Trie)
+    val trieImmutableStateStorage =
+      newDB[Hash, ContractImmutableState](storage, RocksDBSource.ColumnFamily.Trie)
     val logDb        = newDB[LogStatesId, LogStates](storage, RocksDBSource.ColumnFamily.Log)
     val logRefDb     = newDB[Byte32, AVector[LogStateRef]](storage, RocksDBSource.ColumnFamily.Log)
     val logCounterDb = newDB[ContractId, Int](storage, RocksDBSource.ColumnFamily.LogCounter)
     val logStorage   = LogStorage(logDb, logRefDb, logCounterDb)
-    WorldState.emptyCached(trieDb, logStorage)
+    WorldState.emptyCached(trieDb, trieImmutableStateStorage, logStorage)
   }
 }

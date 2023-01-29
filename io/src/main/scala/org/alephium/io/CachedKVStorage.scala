@@ -20,14 +20,14 @@ import scala.collection.mutable
 
 final class CachedKVStorage[K, V](
     val underlying: KeyValueStorage[K, V],
-    val caches: mutable.HashMap[K, Cache[V]],
+    val caches: mutable.HashMap[K, Cache[V]]
 ) extends CachedKV[K, V, Cache[V]] {
   protected def getOptFromUnderlying(key: K): IOResult[Option[V]] = {
     CachedKV.getOptFromUnderlying(underlying, caches, key)
   }
 
-  def persist(): IOResult[Unit] = {
-    underlying.putBatch(CachedKVStorage.accumulateUpdates(_, caches))
+  def persist(): IOResult[KeyValueStorage[K, V]] = {
+    underlying.putBatch(CachedKVStorage.accumulateUpdates(_, caches)).map(_ => underlying)
   }
 
   def staging(): StagingKVStorage[K, V] = new StagingKVStorage(this, mutable.HashMap.empty)
