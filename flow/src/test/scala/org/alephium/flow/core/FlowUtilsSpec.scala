@@ -26,7 +26,7 @@ import org.alephium.flow.mempool.{Normal, Reorg}
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.protocol.{ALPH, SignatureSchema}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, StatefulScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript}
 import org.alephium.util._
 
 class FlowUtilsSpec extends AlephiumSpec {
@@ -310,5 +310,33 @@ class FlowUtilsSpec extends AlephiumSpec {
 
     test(0, AVector(tx0))
     test(1, AVector(tx1))
+  }
+
+  it should "assembly block when gas fees are different" in new FlowFixture {
+    val chainIndex                  = ChainIndex.unsafe(0)
+    val keys                        = Seq.tabulate(10)(_ => chainIndex.from.generateKey)
+    val (fromPriKey, fromPubKey, _) = genesisKeys(0)
+    keys.foreach { case (_, pubKey) =>
+      val block = transfer(blockFlow, fromPriKey, pubKey, ALPH.alph(2))
+      addAndCheck(blockFlow, block)
+      blockFlow.getBalance(LockupScript.p2pkh(pubKey), Int.MaxValue).rightValue._1 is ALPH.alph(2)
+    }
+
+    val txs = keys.zipWithIndex.map { case ((priKey, _), index) =>
+      val gasPrice = GasPrice(defaultGasPrice.value + index)
+      transferWithGas(
+        blockFlow,
+        priKey,
+        fromPubKey,
+        ALPH.oneAlph,
+        gasPrice
+      ).nonCoinbase.head.toTemplate
+    }
+    val timestamp = TimeStamp.now()
+    Random
+      .shuffle(txs)
+      .foreach(tx => blockFlow.getGrandPool().add(chainIndex, tx, timestamp))
+    val block = blockFlow.prepareBlockFlowUnsafe(chainIndex, LockupScript.p2pkh(fromPubKey))
+    block.transactions.init.map(_.toTemplate) is AVector.from(txs.reverse)
   }
 }

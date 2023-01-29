@@ -37,7 +37,7 @@ import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods file.size.limit
 trait FlowFixture
     extends AlephiumSpec
     with AlephiumConfigFixture
@@ -134,9 +134,30 @@ trait FlowFixture
       transferTxs(_, _, amount, numReceivers, None, gasFeeInTheAmount, lockTimeOpt)
     )
   }
+  def transfer(
+      blockFlow: BlockFlow,
+      from: PrivateKey,
+      to: PublicKey,
+      amount: U256
+  ): Block = {
+    transferWithGas(blockFlow, from, to, amount, defaultGasPrice)
+  }
 
-  def transfer(blockFlow: BlockFlow, from: PrivateKey, to: PublicKey, amount: U256): Block = {
-    transfer(blockFlow, from, LockupScript.p2pkh(to), AVector.empty[(TokenId, U256)], amount)
+  def transferWithGas(
+      blockFlow: BlockFlow,
+      from: PrivateKey,
+      to: PublicKey,
+      amount: U256,
+      gasPrice: GasPrice
+  ): Block = {
+    transferWithGas(
+      blockFlow,
+      from,
+      LockupScript.p2pkh(to),
+      AVector.empty[(TokenId, U256)],
+      amount,
+      gasPrice
+    )
   }
 
   def transfer(
@@ -146,12 +167,23 @@ trait FlowFixture
       tokens: AVector[(TokenId, U256)],
       amount: U256
   ): Block = {
+    transferWithGas(blockFlow, from, to, tokens, amount, defaultGasPrice)
+  }
+
+  def transferWithGas(
+      blockFlow: BlockFlow,
+      from: PrivateKey,
+      to: LockupScript.Asset,
+      tokens: AVector[(TokenId, U256)],
+      amount: U256,
+      gasPrice: GasPrice
+  ): Block = {
     val unsigned = blockFlow
       .transfer(
         from.publicKey,
         AVector(TxOutputInfo(to, amount, tokens, None)),
         None,
-        defaultGasPrice,
+        gasPrice,
         defaultUtxoLimit
       )
       .rightValue
