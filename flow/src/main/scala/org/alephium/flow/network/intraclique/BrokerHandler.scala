@@ -20,7 +20,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.handler.{FlowHandler, TxHandler}
 import org.alephium.flow.model.DataOrigin
-import org.alephium.flow.network.CliqueManager
+import org.alephium.flow.network.{CliqueManager, IntraCliqueManager}
 import org.alephium.flow.network.broker.{BrokerHandler => BaseBrokerHandler}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.message.{BlocksRequest, HeadersRequest, NewInv, RequestId, TxsResponse}
@@ -35,7 +35,7 @@ trait BrokerHandler extends BaseBrokerHandler {
   override def handleHandshakeInfo(_remoteBrokerInfo: BrokerInfo, clientInfo: String): Unit = {
     if (_remoteBrokerInfo.cliqueId == selfCliqueInfo.id) {
       remoteBrokerInfo = _remoteBrokerInfo
-      cliqueManager ! CliqueManager.HandShaked(_remoteBrokerInfo, connectionType, clientInfo)
+      cliqueManager ! IntraCliqueManager.HandShaked(_remoteBrokerInfo, connectionType, clientInfo)
     } else {
       log.warning(s"Invalid intra cliqueId")
       context stop self

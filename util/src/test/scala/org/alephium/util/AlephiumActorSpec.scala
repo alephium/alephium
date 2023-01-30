@@ -24,7 +24,10 @@ import scala.reflect.ClassTag
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Terminated}
 import akka.testkit.{TestActorRef, TestKit}
 import com.typesafe.config.{Config, ConfigFactory}
-import org.scalatest.BeforeAndAfterEach
+import org.scalactic.Equality
+import org.scalactic.source.Position
+import org.scalatest.{Assertion, BeforeAndAfterEach}
+import org.scalatest.matchers.dsl.ResultOfATypeInvocation
 
 trait AlephiumActorSpec extends AlephiumFutureSpec with BeforeAndAfterEach with ActorKit {
   implicit def actorSpec: AlephiumActorSpec = this
@@ -34,6 +37,17 @@ trait AlephiumActorSpec extends AlephiumFutureSpec with BeforeAndAfterEach with 
   val systems: ArrayBuffer[ActorSystem] = ArrayBuffer.empty[ActorSystem]
   implicit def system: ActorSystem      = systems.synchronized(systems.head)
   var testKit: TestKit                  = _
+
+  // scalastyle:off no.should
+  implicit class WillBeOps[A: Equality](left: A)(implicit pos: Position) {
+    def willBe(right: A): Assertion                          = eventually(left shouldEqual right)
+    def willBe(right: ResultOfATypeInvocation[_]): Assertion = eventually(left shouldBe right)
+
+    def willNotBe(right: A): Assertion = eventually(left should not equal right)
+    def willNotBe(right: ResultOfATypeInvocation[_]): Assertion = eventually(
+      left should not be right
+    )
+  }
 
   def createSystem(configOpt: Option[Config] = None): ActorSystem = {
     val name   = s"test-${systems.length}-${UnsecureRandom.source.nextLong()}"
