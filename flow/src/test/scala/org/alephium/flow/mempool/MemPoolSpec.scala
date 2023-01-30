@@ -16,6 +16,8 @@
 
 package org.alephium.flow.mempool
 
+import scala.util.Random
+
 import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasPrice
@@ -205,5 +207,23 @@ class MemPoolSpec
     tx0.unsigned.inputs.foreach(input => pool.isSpent(input.outputRef) is true)
     pool.clear()
     tx0.unsigned.inputs.foreach(input => pool.isSpent(input.outputRef) is false)
+  }
+
+  it should "collect transactions based on gas price" in {
+    val pool = MemPool.empty(mainGroup)
+    pool.size is 0
+
+    val index = ChainIndex.unsafe(0)
+    val txs = Seq.tabulate(10) { k =>
+      val tx = transactionGen().sample.get
+      tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(defaultGasPrice.value + k)))
+        .toTemplate
+    }
+    val timeStamp = TimeStamp.now()
+    Random.shuffle(txs).foreach(tx => pool.add(index, tx, timeStamp))
+
+    pool.collectForBlock(index, Int.MaxValue) is AVector.from(
+      txs.sortBy(_.unsigned.gasPrice.value).reverse
+    )
   }
 }
