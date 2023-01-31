@@ -36,7 +36,7 @@ class BrokerStorageSpec
     val brokerInfos = AVector.fill(10)(Generators.brokerInfoGen.sample.get)
     brokerInfos.foreach(storage.addBroker(_) isE ())
     storage.activeBrokers().rightValue.toSet is brokerInfos.toSet
-    brokerInfos.foreach(info => storage.delete(info.peerId) isE ())
+    brokerInfos.foreach(info => storage.remove(info.peerId) isE ())
     storage.activeBrokers().rightValue is AVector.empty[BrokerInfo]
   }
 }

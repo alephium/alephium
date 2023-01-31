@@ -42,7 +42,7 @@ class PendingTxStorageSpec
       storage.put(id, tx) isE ()
       storage.exists(id) isE true
       storage.get(id) isE tx
-      storage.delete(id) isE ()
+      storage.remove(id) isE ()
       storage.exists(id) isE false
     }
   }
@@ -85,7 +85,7 @@ class PendingTxStorageSpec
     val pendingTxs = AVector.fill(txsSize)(genPendingTx(currentTs))
     var index      = 0
     storage.iterate { (txId, _) =>
-      storage.delete(txId) isE ()
+      storage.remove(txId) isE ()
       val (newTxId, newTx) = pendingTxs(index)
       storage.put(newTxId, newTx) isE ()
       index += 1

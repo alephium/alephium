@@ -52,6 +52,6 @@ class ReadyTxRocksDBStorage(
     )
     with ReadyTxStorage {
   override def clear(): IOResult[Unit] = {
-    iterateE((key, _) => delete(key))
+    iterateE((key, _) => remove(key))
   }
 }

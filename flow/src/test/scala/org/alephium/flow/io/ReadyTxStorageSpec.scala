@@ -40,7 +40,7 @@ class ReadyTxStorageSpec
       storage.put(txId, readyTxInfo) isE ()
       storage.exists(txId) isE true
       storage.get(txId) isE readyTxInfo
-      storage.delete(txId) isE ()
+      storage.remove(txId) isE ()
       storage.exists(txId) isE false
     }
   }
@@ -68,7 +68,7 @@ class ReadyTxStorageSpec
     var index    = 0
     storage.iterate { (hash, info) =>
       entries0(hash) is info
-      storage.delete(hash) isE ()
+      storage.remove(hash) isE ()
       val (newHash, newInfo) = entries1(index)
       storage.put(newHash, newInfo) isE ()
       index += 1

@@ -446,7 +446,7 @@ trait TxHandlerPersistence extends TxHandlerUtils {
   def persistMempoolTxs(): Unit = {
     log.info("Start to persist pending txs")
     escapeIOError(pendingTxStorage.iterateE { (txId, _) =>
-      pendingTxStorage.delete(txId)
+      pendingTxStorage.remove(txId)
     })
     escapeIOError(
       blockFlow.getGrandPool().getOutTxsWithTimestamp().foreachE { case (timestamp, tx) =>

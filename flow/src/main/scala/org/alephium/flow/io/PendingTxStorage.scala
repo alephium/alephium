@@ -59,7 +59,7 @@ class PendingTxRocksDBStorage(
   ): IOResult[Unit] = {
     assume(oldId.txId == newId.txId)
     IOUtils.tryExecute {
-      deleteUnsafe(oldId)
+      removeUnsafe(oldId)
       putUnsafe(newId, tx)
     }
   }
