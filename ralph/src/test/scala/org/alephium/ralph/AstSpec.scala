@@ -267,33 +267,133 @@ class AstSpec extends AlephiumSpec {
 
   it should "test check external caller for interface" in {
     {
-      info("All contracts that inherit from the interface should have check external caller")
+      info("No error for simple view functions")
       val code =
         s"""
-           |Interface Base {
-           |  pub fn base() -> ()
+           |Interface Foo {
+           |  pub fn foo() -> U256
            |}
-           |Contract Foo() implements Base {
-           |  pub fn base() -> () {
-           |    checkCaller!(true, 0)
+           |Contract Bar() implements Foo {
+           |  pub fn foo() -> U256 {
+           |    return 0
            |  }
-           |}
-           |Abstract Contract A() implements Base {
-           |  fn a() -> () {
-           |    checkCaller!(true, 0)
-           |  }
-           |}
-           |Contract Bar() extends A() {
-           |  pub fn base() -> () {
-           |    a()
-           |  }
-           |}
-           |Contract Baz() implements Base {
-           |  pub fn base() -> () {}
            |}
            |""".stripMargin
-      val error = Compiler.compileProject(code).leftValue
-      error.message is Warnings.noCheckExternalCallerMsg("Baz", "base")
+      Compiler.compileProject(code).isRight is true
+    }
+
+    {
+      info("No error if impl contract checks external caller")
+      val code =
+        s"""
+           |Interface Foo {
+           |  @using(updateFields = true)
+           |  pub fn foo() -> ()
+           |  pub fn bar() -> ()
+           |  @using(preapprovedAssets = true)
+           |  pub fn baz() -> ()
+           |  @using(assetsInContract = true)
+           |  pub fn qux(address: Address) -> ()
+           |}
+           |Contract Bar(mut a: U256) implements Foo {
+           |  @using(updateFields = true)
+           |  pub fn foo() -> () {
+           |    checkCaller!(true, 0)
+           |    a = 0
+           |  }
+           |
+           |  fn bar_() -> () {}
+           |  pub fn bar() -> () {
+           |    checkCaller!(true, 0)
+           |    bar_()
+           |  }
+           |
+           |  @using(preapprovedAssets = true)
+           |  pub fn baz() -> () {
+           |    checkCaller!(true, 0)
+           |  }
+           |
+           |  @using(assetsInContract = true)
+           |  pub fn qux(address: Address) -> () {
+           |    checkCaller!(true, 0)
+           |    transferTokenFromSelf!(address, selfTokenId!(), 1)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileProject(code).isRight is true
+    }
+
+    {
+      info("Error if impl contract does not check external caller")
+      def test(code: String, typeId: String, funcId: String) = {
+        val error = Compiler.compileProject(code).leftValue
+        error.message is Warnings.noCheckExternalCallerMsg(typeId, funcId)
+      }
+
+      test(
+        s"""
+           |Interface Foo {
+           |  @using(updateFields = true)
+           |  pub fn foo() -> ()
+           |}
+           |Contract Bar(mut a: U256) implements Foo {
+           |  @using(updateFields = true)
+           |  pub fn foo() -> () {
+           |    a = 0
+           |  }
+           |}
+           |""".stripMargin,
+        "Bar",
+        "foo"
+      )
+
+      test(
+        s"""
+           |Interface Foo {
+           |  @using(preapprovedAssets = true)
+           |  pub fn foo() -> ()
+           |}
+           |Contract Bar() implements Foo {
+           |  @using(preapprovedAssets = true)
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin,
+        "Bar",
+        "foo"
+      )
+
+      test(
+        s"""
+           |Interface Foo {
+           |  @using(assetsInContract = true)
+           |  pub fn foo(address: Address) -> ()
+           |}
+           |Contract Bar() implements Foo {
+           |  @using(assetsInContract = true)
+           |  pub fn foo(address: Address) -> () {
+           |    transferTokenFromSelf!(address, selfTokenId!(), 1)
+           |  }
+           |}
+           |""".stripMargin,
+        "Bar",
+        "foo"
+      )
+
+      test(
+        s"""
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |Contract Bar() implements Foo {
+           |  fn foo_() -> () {}
+           |  pub fn foo() -> () {
+           |    foo_()
+           |  }
+           |}
+           |""".stripMargin,
+        "Bar",
+        "foo"
+      )
     }
 
     {

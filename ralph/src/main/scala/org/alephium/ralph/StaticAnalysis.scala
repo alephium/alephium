@@ -155,6 +155,7 @@ object StaticAnalysis {
   }
 
   def checkInterfaceCheckExternalCaller(
+      allStates: AVector[Compiler.State[vm.StatefulContext]],
       multiContract: MultiContract,
       interfaceTypeId: TypeId,
       checkExternalCallerTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
@@ -167,9 +168,18 @@ object StaticAnalysis {
       .getOrElse(Seq.empty)
     val interface = multiContract.getInterface(interfaceTypeId)
     children.foreach { contractId =>
+      val childContractState = allStates
+        .find(_.typeId == contractId)
+        .getOrElse(
+          throw Compiler.Error(s"No state for contract $contractId") // this should never happen
+        )
       val table = checkExternalCallerTables(contractId)
       interface.funcs.foreach { func =>
-        if (func.useCheckExternalCaller && !table(func.id)) {
+        if (
+          func.useCheckExternalCaller &&
+          !table(func.id) &&
+          !isSimpleViewFunction(childContractState, func.id)
+        ) {
           throw Compiler.Error(Warnings.noCheckExternalCallerMsg(contractId.name, func.id.name))
         }
       }
@@ -196,7 +206,12 @@ object StaticAnalysis {
         val state = states(index)
         checkExternalCallPermissions(states, state, contract, checkExternalCallerTables)
       case (interface: ContractInterface, _) =>
-        checkInterfaceCheckExternalCaller(multiContract, interface.ident, checkExternalCallerTables)
+        checkInterfaceCheckExternalCaller(
+          states,
+          multiContract,
+          interface.ident,
+          checkExternalCallerTables
+        )
       case _ =>
     }
   }
