@@ -404,7 +404,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
       newContractCode: StatefulContract,
       newFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = {
-    val newFields = newFieldsOpt.getOrElse(AVector.from(obj.fields))
+    val newFields = newFieldsOpt.getOrElse(AVector.from(obj.mutFields))
     for {
       _ <-
         if (newFields.length == newContractCode.fieldLength) { okay }

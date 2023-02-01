@@ -631,7 +631,7 @@ trait FlowFixture
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     val contractState = worldState.getContractState(contractId).fold(throw _, identity)
 
-    contractState.fields is fields
+    contractState.mutFields is fields
     contractState.contractOutputRef is outputRef
 
     worldState

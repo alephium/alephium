@@ -963,7 +963,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     def checkContractStates(contractId: ContractId, value: U256, attoAlphAmount: U256) = {
       val worldState    = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       val contractState = worldState.getContractState(contractId).rightValue
-      contractState.fields is AVector[vm.Val](vm.Val.U256(value))
+      contractState.mutFields is AVector[vm.Val](vm.Val.U256(value))
       val contractOutput = worldState.getContractAsset(contractState.contractOutputRef).rightValue
       contractOutput.amount is attoAlphAmount
     }

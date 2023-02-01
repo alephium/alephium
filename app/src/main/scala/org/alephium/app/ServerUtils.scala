@@ -1088,7 +1088,7 @@ class ServerUtils(implicit
       contract,
       contract.hash,
       Some(state.initialStateHash),
-      state.fields.map(Val.from),
+      state.mutFields.map(Val.from),
       AssetState.from(contractOutput)
     )
     wrapResult(result)

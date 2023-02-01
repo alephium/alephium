@@ -2491,7 +2491,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       expectedContractId.foreach { _ is contractId }
 
       val contractState = frame.ctx.worldState.getContractState(contractId).rightValue
-      contractState.fields is fields
+      contractState.mutFields is fields
       val contractOutput =
         frame.ctx.worldState.getContractAsset(contractState.contractOutputRef).rightValue
       val tokenId = TokenId.from(contractId)

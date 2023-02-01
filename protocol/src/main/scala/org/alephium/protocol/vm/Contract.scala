@@ -410,7 +410,7 @@ object StatefulContract {
 sealed trait ContractObj[Ctx <: StatelessContext] {
   def contractIdOpt: Option[ContractId]
   def code: Contract[Ctx]
-  def fields: mutable.ArraySeq[Val]
+  def mutFields: mutable.ArraySeq[Val]
 
   def getContractId(): ExeResult[ContractId] = contractIdOpt.toRight(Right(ExpectAContract))
 
@@ -422,23 +422,23 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
   def getMethod(index: Int): ExeResult[Method[Ctx]] = code.getMethod(index)
 
   def getField(index: Int): ExeResult[Val] = {
-    if (fields.isDefinedAt(index)) Right(fields(index)) else failed(InvalidFieldIndex)
+    if (mutFields.isDefinedAt(index)) Right(mutFields(index)) else failed(InvalidFieldIndex)
   }
 
   def setField(index: Int, v: Val): ExeResult[Unit] = {
-    if (!fields.isDefinedAt(index)) {
+    if (!mutFields.isDefinedAt(index)) {
       failed(InvalidFieldIndex)
-    } else if (fields(index).tpe != v.tpe) {
+    } else if (mutFields(index).tpe != v.tpe) {
       failed(InvalidFieldType)
     } else {
-      Right(fields.update(index, v))
+      Right(mutFields.update(index, v))
     }
   }
 }
 
 sealed trait ScriptObj[Ctx <: StatelessContext] extends ContractObj[Ctx] {
   val contractIdOpt: Option[ContractId] = None
-  val fields: mutable.ArraySeq[Val]     = mutable.ArraySeq.empty
+  val mutFields: mutable.ArraySeq[Val]  = mutable.ArraySeq.empty
 }
 
 final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[StatelessContext]
@@ -448,9 +448,9 @@ final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[St
 final case class StatefulContractObject private (
     codeHash: Hash,
     code: StatefulContract.HalfDecoded,
-    initialStateHash: Hash,      // the state hash when the contract is created
-    initialFields: AVector[Val], // the initial field values when the contract is loaded
-    fields: mutable.ArraySeq[Val],
+    initialStateHash: Hash,         // the state hash when the contract is created
+    initialMutFields: AVector[Val], // the initial field values when the contract is loaded
+    mutFields: mutable.ArraySeq[Val],
     contractId: ContractId
 ) extends ContractObj[StatefulContext] {
   def contractIdOpt: Option[ContractId] = Some(contractId)
@@ -459,10 +459,11 @@ final case class StatefulContractObject private (
 
   def getCodeHash(): Val.ByteVec = Val.ByteVec(codeHash.bytes)
 
-  def isUpdated: Boolean = !fields.indices.forall(index => fields(index) == initialFields(index))
+  def isUpdated: Boolean =
+    !mutFields.indices.forall(index => mutFields(index) == initialMutFields(index))
 
   def estimateByteSize(): Int =
-    fields.foldLeft(0)(_ + _.estimateByteSize()) + code.methodsBytes.length
+    mutFields.foldLeft(0)(_ + _.estimateByteSize()) + code.methodsBytes.length
 }
 
 object StatefulContractObject {

@@ -24,15 +24,15 @@ import org.alephium.util.AVector
 final case class ContractState private (
     codeHash: Hash,
     initialStateHash: Hash,
-    fields: AVector[Val],
+    mutFields: AVector[Val],
     contractOutputRef: ContractOutputRef
 ) {
   def updateFieldsUnsafe(newFields: AVector[Val]): ContractState = {
-    this.copy(fields = newFields)
+    this.copy(mutFields = newFields)
   }
 
   def migrate(newCode: StatefulContract, newFields: AVector[Val]): ContractState = {
-    this.copy(codeHash = newCode.hash, fields = newFields)
+    this.copy(codeHash = newCode.hash, mutFields = newFields)
   }
 
   def updateOutputRef(ref: ContractOutputRef): ContractState = {
@@ -43,7 +43,7 @@ final case class ContractState private (
       contractId: ContractId,
       code: StatefulContract.HalfDecoded
   ): StatefulContractObject = {
-    StatefulContractObject.unsafe(codeHash, code, initialStateHash, fields, contractId)
+    StatefulContractObject.unsafe(codeHash, code, initialStateHash, mutFields, contractId)
   }
 }
 
@@ -52,7 +52,7 @@ object ContractState {
   implicit val serde: Serde[ContractState] =
     Serde.forProduct4(
       ContractState.apply,
-      t => (t.codeHash, t.initialStateHash, t.fields, t.contractOutputRef)
+      t => (t.codeHash, t.initialStateHash, t.mutFields, t.contractOutputRef)
     )
 
   val forMPt: ContractState =

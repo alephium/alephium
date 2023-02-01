@@ -1308,7 +1308,7 @@ class VMSpec extends AlephiumSpec {
       val obj         = worldState.getContractObj(contractKey).rightValue
       obj.contractId is contractKey
       obj.code is fooV2Code.toHalfDecoded()
-      obj.initialFields is AVector[Val](Val.True)
+      obj.initialMutFields is AVector[Val](Val.True)
     }
 
     {
@@ -1320,7 +1320,7 @@ class VMSpec extends AlephiumSpec {
       val obj         = worldState.getContractObj(contractKey).rightValue
       obj.contractId is contractKey
       obj.code is fooV2Code.toHalfDecoded()
-      obj.initialFields is AVector[Val](Val.False)
+      obj.initialMutFields is AVector[Val](Val.False)
     }
   }
 
@@ -1777,7 +1777,7 @@ class VMSpec extends AlephiumSpec {
     def checkState(expected: Long, contractId: ContractId) = {
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
       val contractState = worldState.getContractState(contractId).fold(throw _, identity)
-      contractState.fields is AVector[Val](Val.U256(U256.unsafe(expected)))
+      contractState.mutFields is AVector[Val](Val.U256(U256.unsafe(expected)))
     }
   }
 
@@ -1883,7 +1883,7 @@ class VMSpec extends AlephiumSpec {
     def checkContract(alphReserve: U256, x: Int) = {
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       val state      = worldState.getContractState(contractId).rightValue
-      state.fields is AVector[Val](Val.U256(x))
+      state.mutFields is AVector[Val](Val.U256(x))
       val output = worldState.getContractAsset(contractId).rightValue
       output.amount is alphReserve
     }
@@ -2335,7 +2335,7 @@ class VMSpec extends AlephiumSpec {
 
       val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractState = worldState.getContractState(contractId).rightValue
-      contractState.fields is AVector[Val](Val.U256(3))
+      contractState.mutFields is AVector[Val](Val.U256(3))
       getLogStates(blockFlow, contractId, 0).value is
         LogStates(
           block.hash,
@@ -2844,7 +2844,7 @@ class VMSpec extends AlephiumSpec {
     val subContractId = logStates.states(0).fields.head.asInstanceOf[Val.ByteVec].bytes
 
     val worldState = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
-    worldState.getContractState(contractId).rightValue.fields is AVector[Val](
+    worldState.getContractState(contractId).rightValue.mutFields is AVector[Val](
       Val.ByteVec(subContractId)
     )
   }
@@ -2905,7 +2905,7 @@ class VMSpec extends AlephiumSpec {
 
       val subContractId = contractId.subContractId(serialize(subContractPath), chainIndex.from)
       val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
-      worldState.getContractState(contractId).rightValue.fields is AVector[Val](
+      worldState.getContractState(contractId).rightValue.mutFields is AVector[Val](
         Val.ByteVec(subContractId.bytes)
       )
 

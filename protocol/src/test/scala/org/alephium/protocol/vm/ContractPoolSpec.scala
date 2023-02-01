@@ -141,11 +141,11 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     val gasRemaining    = pool.gasRemaining
     pool.updateContractStates().rightValue // no updates
     pool.gasRemaining is gasRemaining
-    pool.worldState.getContractState(contractId).rightValue.fields is fields(1)
+    pool.worldState.getContractState(contractId).rightValue.mutFields is fields(1)
     pool.gasRemaining is gasRemaining
     obj.setField(0, Val.False)
     pool.updateContractStates().rightValue
-    pool.worldState.getContractState(contractId).rightValue.fields is AVector[Val](Val.False)
+    pool.worldState.getContractState(contractId).rightValue.mutFields is AVector[Val](Val.False)
     pool.gasRemaining is gasRemaining
       .use(GasSchedule.contractStateUpdateBaseGas.addUnsafe(GasBox.unsafe(1)))
       .rightValue

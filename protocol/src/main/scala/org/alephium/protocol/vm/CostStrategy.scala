@@ -38,7 +38,7 @@ trait CostStrategy {
   }
 
   def chargeContractStateUpdate(obj: StatefulContractObject): ExeResult[Unit] = {
-    chargeContractStateUpdate(obj.fields)
+    chargeContractStateUpdate(obj.mutFields)
   }
 
   def chargeContractStateUpdate(fields: Iterable[Val]): ExeResult[Unit] = {
