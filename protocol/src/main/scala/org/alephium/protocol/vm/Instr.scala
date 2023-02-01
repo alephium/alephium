@@ -1764,7 +1764,8 @@ sealed trait MigrateBase
     with GasMigrate {
   def migrate[C <: StatefulContext](
       frame: Frame[C],
-      newFieldsOpt: Option[AVector[Val]]
+      newImmFieldsOpt: Option[AVector[Val]],
+      newMutFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = {
     for {
       contractCodeRaw <- frame.popOpStackByteVec()
@@ -1772,7 +1773,7 @@ sealed trait MigrateBase
       contractCode <- decode[StatefulContract](contractCodeRaw.bytes).left.map(e =>
         Right(SerdeErrorCreateContract(e))
       )
-      _ <- frame.migrateContract(contractCode, newFieldsOpt)
+      _ <- frame.migrateContract(contractCode, newImmFieldsOpt, newMutFieldsOpt)
     } yield ()
   }
 }
@@ -1781,7 +1782,7 @@ object MigrateSimple extends MigrateBase {
   def runWithLeman[C <: StatefulContext](
       frame: Frame[C]
   ): ExeResult[Unit] = {
-    migrate(frame, None)
+    migrate(frame, None, None)
   }
 }
 
@@ -1789,7 +1790,11 @@ object MigrateWithFields extends MigrateBase {
   def runWithLeman[C <: StatefulContext](
       frame: Frame[C]
   ): ExeResult[Unit] = {
-    frame.popFields().flatMap(newFields => migrate(frame, Some(newFields)))
+    for {
+      newMutFields <- frame.popFields()
+      newImmFields <- frame.popFields()
+      _            <- migrate(frame, Some(newImmFields), Some(newMutFields))
+    } yield ()
   }
 }
 

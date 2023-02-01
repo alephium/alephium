@@ -402,20 +402,23 @@ trait StatefulContext extends StatelessContext with ContractPool {
       contractId: ContractId,
       obj: ContractObj[StatefulContext],
       newContractCode: StatefulContract,
-      newFieldsOpt: Option[AVector[Val]]
+      newImmFieldsOpt: Option[AVector[Val]],
+      newMutFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = {
-    val newFields = newFieldsOpt.getOrElse(AVector.from(obj.mutFields))
+    val newImmFields = newImmFieldsOpt.getOrElse(AVector.from(obj.immFields))
+    val newMutFields = newMutFieldsOpt.getOrElse(AVector.from(obj.mutFields))
     for {
       _ <-
-        if (newFields.length == newContractCode.fieldLength) { okay }
+        if (newContractCode.validate(newImmFields, newMutFields)) { okay }
         else {
           failed(InvalidFieldLength)
         }
-      _ <- chargeFieldSize(newFields.toIterable)
-      _ <- worldState
-        .migrateContractUnsafe(contractId, newContractCode, newFields)
+      _ <- chargeFieldSize(newImmFields.toIterable ++ newMutFields.toIterable)
+      succeeded <- worldState
+        .migrateContractLemanUnsafe(contractId, newContractCode, newImmFields, newMutFields)
         .left
         .map(e => Left(IOErrorMigrateContract(e)))
+      _ <- if (succeeded) okay else failed(UnableToMigratePreLemanContract)
     } yield {
       blockContractLoad(contractId)
       removeContractFromCache(contractId)

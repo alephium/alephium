@@ -55,14 +55,19 @@ sealed trait ContractState {
       contractId: ContractId,
       code: StatefulContract.HalfDecoded
   ): StatefulContractObject = {
-    StatefulContractObject.unsafe(codeHash, code, initialStateHash, mutFields, contractId)
+    StatefulContractObject.unsafe(
+      codeHash,
+      code,
+      initialStateHash,
+      immFields,
+      mutFields,
+      contractId
+    )
   }
 
-  def updateMutFieldsUnsafe(newMutFields: AVector[Val]): ContractState
+  def updateMutFieldsUnsafe(newMutFields: AVector[Val]): ContractStorageState
 
-  def updateOutputRef(ref: ContractOutputRef): ContractState
-
-  def migrate(newCode: StatefulContract, newFields: AVector[Val]): ContractState
+  def updateOutputRef(ref: ContractOutputRef): ContractStorageState
 }
 
 object ContractState {}
@@ -76,16 +81,12 @@ final case class ContractLegacyState private (
     with ContractState {
   def immFields: AVector[Val] = ContractLegacyState.emptyImmFields
 
-  def updateMutFieldsUnsafe(newMutFields: AVector[Val]): ContractState = {
+  def updateMutFieldsUnsafe(newMutFields: AVector[Val]): ContractStorageState = {
     this.copy(mutFields = newMutFields)
   }
 
-  def updateOutputRef(ref: ContractOutputRef): ContractState = {
+  def updateOutputRef(ref: ContractOutputRef): ContractStorageState = {
     this.copy(contractOutputRef = ref)
-  }
-
-  def migrate(newCode: StatefulContract, newFields: AVector[Val]): ContractState = {
-    this.copy(codeHash = newCode.hash, mutFields = newFields)
   }
 }
 
@@ -95,37 +96,44 @@ final case class ContractNewState(
 ) extends ContractState {
   def codeHash: Hash                       = immutable.codeHash
   def initialStateHash: Hash               = immutable.initialStateHash
+  def immutableStateHash: Hash             = mutable.immutableStateHash
   def immFields: AVector[Val]              = immutable.immFields
   def mutFields: AVector[Val]              = mutable.mutFields
   def contractOutputRef: ContractOutputRef = mutable.contractOutputRef
 
-  def updateMutFieldsUnsafe(newMutFields: AVector[Val]): ContractState = {
-    val newMutable = mutable.copy(mutFields = newMutFields)
-    ContractNewState(immutable, newMutable)
+  def updateMutFieldsUnsafe(newMutFields: AVector[Val]): ContractStorageState = {
+    mutable.copy(mutFields = newMutFields)
   }
 
-  def updateOutputRef(ref: ContractOutputRef): ContractState = {
-    val newMutable = mutable.copy(contractOutputRef = ref)
-    ContractNewState(immutable, newMutable)
+  def updateOutputRef(ref: ContractOutputRef): ContractStorageState = {
+    mutable.copy(contractOutputRef = ref)
   }
 
-  def migrate(newCode: StatefulContract, newFields: AVector[Val]): ContractState = {
-    ???
+  def migrate(
+      newCode: StatefulContract,
+      newImmFields: AVector[Val],
+      newMutFields: AVector[Val]
+  ): ContractNewState = {
+    val newImmutable = immutable.copy(codeHash = newCode.hash, immFields = newImmFields)
+    val newMutable =
+      mutable.copy(mutFields = newMutFields, immutableStateHash = newImmutable.stateHash)
+    ContractNewState(newImmutable, newMutable)
   }
 }
 
 final case class ContractMutableState private[vm] (
     mutFields: AVector[Val],
-    contractOutputRef: ContractOutputRef
+    contractOutputRef: ContractOutputRef,
+    immutableStateHash: Hash
 ) extends ContractStorageState
 
 object ContractMutableState {
   import ContractStorageState.fieldsSerde
 
   private[vm] val serde: Serde[ContractMutableState] =
-    Serde.forProduct2(
+    Serde.forProduct3(
       ContractMutableState.apply,
-      t => (t.mutFields, t.contractOutputRef)
+      t => (t.mutFields, t.contractOutputRef, t.immutableStateHash)
     )
 }
 
@@ -133,7 +141,9 @@ final case class ContractImmutableState(
     codeHash: Hash,
     initialStateHash: Hash,
     immFields: AVector[Val]
-)
+) {
+  def stateHash: Hash = Hash.hash(ContractImmutableState.serde.serialize(this))
+}
 
 object ContractImmutableState {
   import ContractStorageState.fieldsSerde
@@ -168,7 +178,7 @@ object ContractLegacyState {
       contractOutputRef: ContractOutputRef
   ): ContractLegacyState = {
     assume(code.validate(fields))
-    val initialStateHash = code.initialStateHash(fields)
+    val initialStateHash = code.initialStateHash(emptyImmFields, fields)
     new ContractLegacyState(code.hash, initialStateHash, fields, contractOutputRef)
   }
 }

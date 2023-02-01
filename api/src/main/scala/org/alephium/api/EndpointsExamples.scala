@@ -682,7 +682,7 @@ trait EndpointsExamples extends ErrorExamples {
     address = Address.contract(anotherContractId),
     bytecode = code,
     codeHash = code.hash,
-    initialStateHash = Some(code.initialStateHash(AVector.empty)),
+    initialStateHash = Some(code.initialStateHash(AVector.empty, AVector.empty)),
     fields = AVector[Val](ValU256(ALPH.alph(2))),
     asset = asset(2)
   )

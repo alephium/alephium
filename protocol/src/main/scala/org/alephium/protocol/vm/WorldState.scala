@@ -141,7 +141,7 @@ trait WorldState[T, R1, R2, R3] {
       output: ContractOutput
   ): IOResult[T]
 
-  protected[vm] def updateContract(key: ContractId, state: ContractState): IOResult[T]
+  protected[vm] def updateContract(key: ContractId, state: ContractStorageState): IOResult[T]
 
   def removeAsset(outputRef: TxOutputRef): IOResult[T]
 
@@ -203,10 +203,10 @@ sealed abstract class MutableWorldState extends WorldState[Unit, Unit, Unit, Uni
     } yield (state.contractOutputRef, output)
   }
 
-  def updateContractUnsafe(key: ContractId, fields: AVector[Val]): IOResult[Unit] = {
+  def updateContractUnsafe(key: ContractId, mutFields: AVector[Val]): IOResult[Unit] = {
     for {
       oldState <- getContractState(key)
-      newState <- updateContract(key, oldState.updateMutFieldsUnsafe(fields))
+      newState <- updateContract(key, oldState.updateMutFieldsUnsafe(mutFields))
     } yield newState
   }
 
@@ -326,14 +326,11 @@ object WorldState {
       )
     }
 
-    private def _updateContract(key: ContractId, state: ContractState) = {
-      state match {
-        case s: ContractLegacyState => contractState.put(key, s)
-        case s: ContractNewState    => contractState.put(key, s.mutable)
-      }
+    @inline private def _updateContract(key: ContractId, state: ContractStorageState) = {
+      contractState.put(key, state)
     }
 
-    def updateContract(key: ContractId, state: ContractState): IOResult[Persisted] = {
+    def updateContract(key: ContractId, state: ContractStorageState): IOResult[Persisted] = {
       _updateContract(key, state)
         .map(Persisted(outputState, _, contractImmutableState, codeState, logStorage))
     }
@@ -426,11 +423,8 @@ object WorldState {
       } yield ()
     }
 
-    def updateContract(key: ContractId, state: ContractState): IOResult[Unit] = {
-      state match {
-        case s: ContractNewState    => contractState.put(key, s.mutable)
-        case s: ContractLegacyState => contractState.put(key, s)
-      }
+    def updateContract(key: ContractId, state: ContractStorageState): IOResult[Unit] = {
+      contractState.put(key, state)
     }
 
     def updateContract(
@@ -446,19 +440,36 @@ object WorldState {
     }
 
     // only available since Leman fork
-    def migrateContractUnsafe(
+    def migrateContractLemanUnsafe(
         contractId: ContractId,
         newCode: StatefulContract,
-        newFields: AVector[Val]
-    ): IOResult[Unit] = {
+        newImmFields: AVector[Val],
+        newMutFields: AVector[Val]
+    ): IOResult[Boolean] = {
+      getContractState(contractId).flatMap {
+        case s: ContractNewState =>
+          migrateContractLemanUnsafe(contractId, s, newCode, newImmFields, newMutFields)
+        case _: ContractLegacyState =>
+          Right(false)
+      }
+    }
+
+    @inline private def migrateContractLemanUnsafe(
+        contractId: ContractId,
+        state: ContractNewState,
+        newCode: StatefulContract,
+        newImmFields: AVector[Val],
+        newMutFields: AVector[Val]
+    ): IOResult[Boolean] = {
+      val migratedState = state.migrate(newCode, newImmFields, newMutFields)
       for {
-        state            <- getContractState(contractId)
-        _                <- updateContract(contractId, state.migrate(newCode, newFields))
+        _ <- updateContract(contractId, migratedState.mutable)
+        _ <- contractImmutableState.put(migratedState.immutableStateHash, migratedState.immutable)
         codeRecord       <- codeState.get(state.codeHash)
         _                <- removeContractCode(state, codeRecord)
         newCodeRecordOpt <- codeState.getOpt(newCode.hash)
         _ <- codeState.put(newCode.hash, CodeRecord.from(newCode.toHalfDecoded(), newCodeRecordOpt))
-      } yield ()
+      } yield true
     }
 
     def removeAsset(outputRef: TxOutputRef): IOResult[Unit] = {

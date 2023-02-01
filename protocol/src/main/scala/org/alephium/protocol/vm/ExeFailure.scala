@@ -110,6 +110,7 @@ case object InvalidSizeForZeros                                extends ExeFailur
 final case class SerdeErrorByteVecToAddress(error: SerdeError) extends ExeFailure
 case object FailedInRecoverEthAddress                          extends ExeFailure
 case object UnexpectedRecursiveCallInMigration                 extends ExeFailure
+case object UnableToMigratePreLemanContract                    extends ExeFailure
 case object InvalidAssetAddress                                extends ExeFailure
 final case class ContractAlreadyExists(contractId: ContractId) extends ExeFailure
 case object NoBlockHashAvailable                               extends ExeFailure

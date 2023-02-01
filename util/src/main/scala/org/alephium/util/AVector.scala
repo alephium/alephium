@@ -128,7 +128,9 @@ final class AVector[@sp A](
   }
 
   def ++[B <: A](that: AVector[B]): AVector[A] = {
-    if (that.isEmpty) {
+    if (this.isEmpty) {
+      that.as[A]
+    } else if (that.isEmpty) {
       this
     } else {
       val newLength = length + that.length
