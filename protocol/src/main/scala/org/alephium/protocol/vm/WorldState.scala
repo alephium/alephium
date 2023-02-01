@@ -172,7 +172,7 @@ trait WorldState[T, R1, R2, R3] {
 
   def removeAsset(outputRef: TxOutputRef): IOResult[T]
 
-  def removeContract(contractKey: ContractId): IOResult[T]
+  def removeContractForVM(contractKey: ContractId): IOResult[T]
 
   protected def removeContractCode(
       currentState: ContractState,
@@ -410,15 +410,15 @@ object WorldState {
         .map(Persisted(_, contractState, contractImmutableState, codeState, logStorage))
     }
 
-    def removeContract(contractKey: ContractId): IOResult[Persisted] = {
+    // Contract output is already removed by the VM
+    def removeContractForVM(contractKey: ContractId): IOResult[Persisted] = {
       for {
         state            <- getContractState(contractKey)
-        newOutputState   <- outputState.remove(state.contractOutputRef)
         newContractState <- contractState.remove(contractKey)
         codeRecord       <- codeState.get(state.codeHash)
         newCodeState     <- removeContractCode(state, codeRecord)
       } yield Persisted(
-        newOutputState,
+        outputState,
         newContractState,
         contractImmutableState,
         newCodeState,
@@ -545,18 +545,14 @@ object WorldState {
       outputState.remove(outputRef)
     }
 
-    def removeContract(contractKey: ContractId): IOResult[Unit] = {
+    // Contract output is already removed by the VM
+    def removeContractForVM(contractId: ContractId): IOResult[Unit] = {
       for {
-        state      <- getContractState(contractKey)
-        _          <- outputState.remove(state.contractOutputRef)
+        state      <- getContractState(contractId)
         codeRecord <- codeState.get(state.codeHash)
         _          <- removeContractCode(state, codeRecord)
-        _          <- contractState.remove(contractKey)
+        _          <- contractState.remove(contractId)
       } yield ()
-    }
-
-    def removeContractState(contractId: ContractId): IOResult[Unit] = {
-      contractState.remove(contractId)
     }
 
     // Not supported, use persisted worldstate instead

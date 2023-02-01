@@ -88,7 +88,7 @@ trait ContractPool extends CostStrategy {
   def removeContract(contractId: ContractId): ExeResult[Unit] = {
     for {
       _ <-
-        worldState.removeContractState(contractId).left.map(e => Left(IOErrorRemoveContract(e)))
+        worldState.removeContractForVM(contractId).left.map(e => Left(IOErrorRemoveContract(e)))
       _ <- markAssetFlushed(contractId)
     } yield {
       removeContractFromCache(contractId)
