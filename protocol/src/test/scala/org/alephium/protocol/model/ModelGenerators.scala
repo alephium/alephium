@@ -624,12 +624,11 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
       groupIndex <- groupIndexGen
       outputRef  <- contractOutputRefGen(groupIndex)
       output     <- contractOutputGen(scriptGen = p2cLockupGen(groupIndex))
-      immState   <- counterStateGen
       mutState   <- counterStateGen
     } yield (
       ContractId.random,
       counterContract.toHalfDecoded(),
-      immState,
+      AVector.empty,
       mutState,
       outputRef,
       output

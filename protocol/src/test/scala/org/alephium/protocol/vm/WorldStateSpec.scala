@@ -43,7 +43,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
   }
 
   // scalastyle:off method.length
-  def test[T, R1, R2, R3](initialWorldState: WorldState[T, R1, R2, R3]) = {
+  def test[T, R1, R2, R3](initialWorldState: WorldState[T, R1, R2, R3], isLemanFork: Boolean) = {
     val (assetOutputRef, assetOutput) = generateAsset.sample.get
     val (contractId, code, _, mutFields, contractOutputRef, contractOutput) =
       generateContract().sample.get
@@ -69,15 +69,17 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     update(worldState.addAsset(assetOutputRef, assetOutput))
     worldState.getOutput(assetOutputRef) isE assetOutput
 
-    update(
-      worldState.createContractLegacyUnsafe(
+    update {
+      worldState.createContractUnsafe(
         contractId,
         code,
+        AVector.empty,
         mutFields,
         contractOutputRef,
-        contractOutput
+        contractOutput,
+        isLemanFork
       )
-    )
+    }
     worldState.getContractObj(contractId) isE contractObj
     worldState.contractExists(contractId) isE true
     worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
@@ -89,16 +91,19 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     val newState = AVector[Val](Val.Bool(false))
     assume(newState != mutFields)
     update(
-      worldState.createContractLegacyUnsafe(
+      worldState.createContractUnsafe(
         contractId1,
         code,
+        AVector.empty,
         newState,
         contractOutputRef1,
-        contractOutput1
+        contractOutput1,
+        isLemanFork
       )
     )
     worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 2)
-    worldState.getContractObj(contractId1) isE code.toObjectUnsafe(contractId1, AVector.empty, newState)
+    worldState
+      .getContractObj(contractId1) isE code.toObjectUnsafe(contractId1, AVector.empty, newState)
 
     update(worldState.removeContract(contractId))
     worldState.getContractObj(contractId).isLeft is true
@@ -117,26 +122,30 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     worldState.removeContract(contractId1).isLeft is true
   }
 
-  it should "test mutable world state" in {
+  trait Fixture {
     val storage = newDBStorage()
-    test(
-      WorldState.emptyCached(
-        newDB(storage, RocksDBSource.ColumnFamily.All),
-        newDB(storage, RocksDBSource.ColumnFamily.All),
-        newLogStorage(storage)
-      )
+    val persisted = WorldState.emptyPersisted(
+      newDB(storage, RocksDBSource.ColumnFamily.All),
+      newDB(storage, RocksDBSource.ColumnFamily.All),
+      newLogStorage(storage)
     )
+    val cached = persisted.cached()
   }
 
-  it should "test immutable world state" in {
-    val storage = newDBStorage()
-    test(
-      WorldState.emptyPersisted(
-        newDB(storage, RocksDBSource.ColumnFamily.All),
-        newDB(storage, RocksDBSource.ColumnFamily.All),
-        newLogStorage(storage)
-      )
-    )
+  it should "test mutable world state for Genesis fork" in new Fixture {
+    test(cached, isLemanFork = false)
+  }
+
+  it should "test mutable world state for Leman fork" in new Fixture {
+    test(cached, isLemanFork = true)
+  }
+
+  it should "test immutable world state for Genesis fork" in new Fixture {
+    test(persisted, isLemanFork = false)
+  }
+
+  it should "test immutable world state for Leman fork" in new Fixture {
+    test(persisted, isLemanFork = true)
   }
 
   it should "test the event key of contract creation and destruction" in {
@@ -145,7 +154,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
   }
 
   trait StagingFixture {
-    val storage = newDBStorage()
+    val isLemanFork: Boolean = scala.util.Random.nextBoolean()
+    val storage              = newDBStorage()
     val worldState = WorldState.emptyCached(
       newDB(storage, RocksDBSource.ColumnFamily.All),
       newDB(storage, RocksDBSource.ColumnFamily.All),
@@ -153,14 +163,17 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     )
     val staging = worldState.staging()
 
-    val (contractId, code, _, mutFields, contractOutputRef, contractOutput) = generateContract().sample.get
+    val (contractId, code, _, mutFields, contractOutputRef, contractOutput) =
+      generateContract().sample.get
     val contractObj = code.toObjectUnsafe(contractId, AVector.empty, mutFields)
-    staging.createContractLegacyUnsafe(
+    staging.createContractUnsafe(
       contractId,
       code,
+      AVector.empty,
       mutFields,
       contractOutputRef,
-      contractOutput
+      contractOutput,
+      isLemanFork
     ) isE ()
     staging.getContractObj(contractId) isE contractObj
     worldState.getContractObj(contractId).isLeft is true

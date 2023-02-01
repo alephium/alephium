@@ -398,20 +398,16 @@ trait StatefulContext extends StatelessContext with ContractPool {
       outputRef: ContractOutputRef,
       contractOutput: ContractOutput
   ): ExeResult[Unit] = {
-    val result = if (getHardFork().isLemanEnabled()) {
-      worldState
-        .createContractLemanUnsafe(
-          contractId,
-          code,
-          initialImmFields,
-          initialMutFields,
-          outputRef,
-          contractOutput
-        )
-    } else {
-      worldState
-        .createContractLegacyUnsafe(contractId, code, initialMutFields, outputRef, contractOutput)
-    }
+    val result = worldState
+      .createContractUnsafe(
+        contractId,
+        code,
+        initialImmFields,
+        initialMutFields,
+        outputRef,
+        contractOutput,
+        getHardFork().isLemanEnabled()
+      )
 
     result match {
       case Right(_) => Right(discard(generatedOutputs.addOne(contractOutput)))

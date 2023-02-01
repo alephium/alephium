@@ -126,6 +126,23 @@ trait WorldState[T, R1, R2, R3] {
 
   def addAsset(outputRef: TxOutputRef, output: TxOutput): IOResult[T]
 
+  def createContractUnsafe(
+    contractId: ContractId,
+    code: StatefulContract.HalfDecoded,
+    immFields: AVector[Val],
+    mutFields: AVector[Val],
+    outputRef: ContractOutputRef,
+    output: ContractOutput,
+    isLemanActivated: Boolean
+  ): IOResult[T] = {
+    if (isLemanActivated) {
+      createContractLemanUnsafe(contractId, code, immFields, mutFields, outputRef, output)
+    } else {
+      assume(immFields.isEmpty)
+      createContractLegacyUnsafe(contractId, code, mutFields, outputRef, output)
+    }
+  }
+
   def createContractLegacyUnsafe(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
