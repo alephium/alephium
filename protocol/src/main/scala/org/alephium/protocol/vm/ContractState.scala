@@ -129,10 +129,9 @@ object ContractNewState {
       contractOutputRef: ContractOutputRef
   ): ContractNewState = {
     assume(code.validate(immFields, mutFields))
-    val initialStateHash   = code.initialStateHash(immFields, mutFields)
-    val immutableState     = ContractImmutableState(code.hash, initialStateHash, immFields)
-    val immutableStateHash = Hash.hash(ContractImmutableState.serde.serialize(immutableState))
-    val mutableState       = ContractMutableState(mutFields, contractOutputRef, immutableStateHash)
+    val initialStateHash = code.initialStateHash(immFields, mutFields)
+    val immutableState   = ContractImmutableState(code.hash, initialStateHash, immFields)
+    val mutableState = ContractMutableState(mutFields, contractOutputRef, immutableState.stateHash)
     new ContractNewState(immutableState, mutableState)
   }
 }

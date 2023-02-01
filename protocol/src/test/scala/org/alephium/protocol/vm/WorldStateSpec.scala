@@ -148,6 +148,93 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     test(persisted, isLemanFork = true)
   }
 
+  it should "not migrate contracts created before Leman fork" in new Fixture {
+    val (contractId, code, _, mutFields, contractOutputRef, contractOutput) =
+      generateContract().sample.get
+    cached.createContractLegacyUnsafe(
+      contractId,
+      code,
+      mutFields,
+      contractOutputRef,
+      contractOutput
+    ) isE ()
+    val newWorldState = cached.persist().rightValue
+    newWorldState.getContractObj(contractId).isRight is true
+
+    newWorldState
+      .cached()
+      .migrateContractLemanUnsafe(
+        contractId,
+        code.toContract().rightValue,
+        AVector.empty,
+        AVector.empty
+      ) isE false
+  }
+
+  trait MigrationFixture extends Fixture {
+    val (contractId, code, _, mutFields, contractOutputRef, contractOutput) =
+      generateContract().sample.get
+    cached.createContractLemanUnsafe(
+      contractId,
+      code,
+      AVector.empty,
+      mutFields,
+      contractOutputRef,
+      contractOutput
+    ) isE ()
+    val oldWorldState = cached.persist().rightValue
+    val oldContractState =
+      oldWorldState.getContractState(contractId).rightValue.asInstanceOf[ContractNewState]
+  }
+
+  it should "migrate contracts created after Leman fork" in new MigrationFixture {
+    val newCode   = code.copy(fieldLength = 2)
+    val newCached = oldWorldState.cached()
+    newCached.migrateContractLemanUnsafe(
+      contractId,
+      newCode.toContract().rightValue,
+      AVector(Val.True, Val.False),
+      AVector.empty
+    ) isE true
+
+    val migratedWorldState = newCached.persist().rightValue
+    migratedWorldState.codeState.exists(code.hash) isE false
+    migratedWorldState.codeState.exists(newCode.hash) isE true
+    migratedWorldState.getContractCode(newCode.hash) isE WorldState.CodeRecord(newCode, 1)
+    // The old immutable state is still kept as history, which can be pruned in the future
+    migratedWorldState.contractImmutableState.get(oldContractState.mutable.immutableStateHash) isE
+      oldContractState.immutable
+
+    val migratedContractState =
+      migratedWorldState.getContractState(contractId).rightValue.asInstanceOf[ContractNewState]
+    migratedWorldState.contractImmutableState.get(
+      migratedContractState.mutable.immutableStateHash
+    ) isE migratedContractState.immutable
+    migratedContractState.initialStateHash is oldContractState.initialStateHash
+    migratedContractState.mutFields is AVector.empty[Val]
+    migratedContractState.immFields is AVector[Val](Val.True, Val.False)
+  }
+
+  it should "migrate without any state change" in new MigrationFixture {
+    oldWorldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
+
+    val newCached = oldWorldState.cached()
+    newCached.migrateContractLemanUnsafe(
+      contractId,
+      code.toContract().rightValue,
+      AVector.empty,
+      mutFields
+    ) isE true
+
+    val migratedWorldState = newCached.persist().rightValue
+    migratedWorldState.codeState.exists(code.hash) isE true
+    migratedWorldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
+
+    val migratedContractState =
+      migratedWorldState.getContractState(contractId).rightValue.asInstanceOf[ContractNewState]
+    migratedContractState is oldContractState
+  }
+
   it should "test the event key of contract creation and destruction" in {
     createContractEventId.bytes is Hash.zero.bytes.init ++ ByteString(-1)
     destroyContractEventId.bytes is Hash.zero.bytes.init ++ ByteString(-2)
