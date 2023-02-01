@@ -3371,21 +3371,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "load both mutable and immutable fields" in {
     val code =
       s"""
-         |Contract Foo(mut x: U256, y: Bool) {
+         |Contract Foo(mut a: U256, mut x: [U256; 2], b: Bool, y: [Bool; 2]) {
          |  pub fn foo(z: I256) -> () {
-         |    assert!(x != 0, 0)
+         |    assert!(x[1] != 0, 0)
          |    assert!(z != 0i, 0)
          |  }
          |
          |  pub fn bar(z: ByteVec) -> () {
-         |    assert!(y, 0)
+         |    assert!(y[1], 0)
          |    assert!(z != #, 0)
          |  }
          |}
          |""".stripMargin
     val contract = Compiler.compileContract(code).rightValue
     contract is StatefulContract(
-      2,
+      6,
       methods = AVector(
         Method[StatefulContext](
           true,
@@ -3395,7 +3395,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           1,
           0,
           AVector[Instr[StatefulContext]](
-            LoadMutField(0.toByte),
+            LoadMutField(2.toByte),
             U256Const0,
             U256Neq,
             U256Const0,
@@ -3411,7 +3411,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           1,
           0,
           AVector[Instr[StatefulContext]](
-            LoadImmField(0.toByte),
+            LoadImmField(2.toByte),
             U256Const0,
             AssertWithErrorCode
           ) ++

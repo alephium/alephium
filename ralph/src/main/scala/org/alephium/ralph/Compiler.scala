@@ -727,7 +727,11 @@ object Compiler {
 
     def genLoadCode(ident: Ast.Ident): Seq[Instr[Ctx]]
 
-    def genLoadCode(offset: ArrayTransformer.ArrayVarOffset[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
+    def genLoadCode(
+        offset: ArrayTransformer.ArrayVarOffset[Ctx],
+        isLocal: Boolean,
+        isMutable: Boolean
+    ): Seq[Instr[Ctx]]
 
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[Ctx]]]
 
@@ -845,7 +849,8 @@ object Compiler {
 
     def genLoadCode(
         offset: ArrayTransformer.ArrayVarOffset[StatelessContext],
-        isLocal: Boolean
+        isLocal: Boolean,
+        isMutable: Boolean
     ): Seq[Instr[StatelessContext]] =
       genVarIndexCode(offset, isLocal, LoadLocal.apply, LoadLocalByIndex)
 
@@ -916,13 +921,14 @@ object Compiler {
 
     def genLoadCode(
         offset: ArrayTransformer.ArrayVarOffset[StatefulContext],
-        isLocal: Boolean
+        isLocal: Boolean,
+        isMutable: Boolean
     ): Seq[Instr[StatefulContext]] =
       genVarIndexCode(
         offset,
         isLocal,
         LoadLocal.apply,
-        LoadMutField.apply,
+        if (isMutable) LoadMutField.apply else LoadImmField.apply,
         LoadLocalByIndex,
         LoadFieldByIndex
       )
