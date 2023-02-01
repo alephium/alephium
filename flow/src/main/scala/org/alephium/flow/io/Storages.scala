@@ -17,21 +17,17 @@
 package org.alephium.flow.io
 
 import java.nio.file.Path
+
 import org.rocksdb.WriteOptions
+
 import org.alephium.crypto.Byte32
-import org.alephium.io.*
-import org.alephium.io.RocksDBSource.ColumnFamily.*
+import org.alephium.io._
+import org.alephium.io.RocksDBSource.ColumnFamily._
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ContractId
-import org.alephium.protocol.vm.{
-  ContractImmutableState,
-  LogStateRef,
-  LogStates,
-  LogStatesId,
-  WorldState
-}
+import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.util.AVector
 
