@@ -25,6 +25,7 @@ import org.alephium.protocol.vm.event.{CachedLog, LogStorage, MutableLog, Stagin
 import org.alephium.serde.{Serde, SerdeError}
 import org.alephium.util.AVector
 
+// scalastyle:off number.of.methods
 trait WorldState[T, R1, R2, R3] {
   def outputState: MutableKV[TxOutputRef, TxOutput, R1]
   def contractState: MutableKV[ContractId, ContractStorageState, R2]
@@ -72,7 +73,7 @@ trait WorldState[T, R1, R2, R3] {
   def getContractState(id: ContractId): IOResult[ContractState] = {
     contractState.get(id).flatMap {
       case mutable: ContractMutableState =>
-        contractImmutableState.get(id.value) map {
+        contractImmutableState.get(mutable.immutableStateHash) map {
           case immutable: ContractImmutableState =>
             ContractNewState(immutable, mutable)
           case _ => throw new RuntimeException("Invalid contract state")
@@ -129,6 +130,15 @@ trait WorldState[T, R1, R2, R3] {
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
       fields: AVector[Val],
+      outputRef: ContractOutputRef,
+      output: ContractOutput
+  ): IOResult[T]
+
+  def createContractLemanUnsafe(
+      contractId: ContractId,
+      code: StatefulContract.HalfDecoded,
+      immFields: AVector[Val],
+      mutFields: AVector[Val],
       outputRef: ContractOutputRef,
       output: ContractOutput
   ): IOResult[T]
@@ -326,6 +336,30 @@ object WorldState {
       )
     }
 
+    def createContractLemanUnsafe(
+        contractId: ContractId,
+        code: StatefulContract.HalfDecoded,
+        immFields: AVector[Val],
+        mutFields: AVector[Val],
+        outputRef: ContractOutputRef,
+        output: ContractOutput
+    ): IOResult[Persisted] = {
+      val state = ContractNewState.unsafe(code, immFields, mutFields, outputRef)
+      for {
+        newOutputState   <- outputState.put(outputRef, output)
+        newContractState <- contractState.put(contractId, state.mutable)
+        _         <- contractImmutableState.put(state.mutable.immutableStateHash, state.immutable)
+        recordOpt <- codeState.getOpt(code.hash)
+        newCodeState <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
+      } yield Persisted(
+        newOutputState,
+        newContractState,
+        contractImmutableState,
+        newCodeState,
+        logStorage
+      )
+    }
+
     @inline private def _updateContract(key: ContractId, state: ContractStorageState) = {
       contractState.put(key, state)
     }
@@ -410,14 +444,32 @@ object WorldState {
     def createContractLegacyUnsafe(
         contractId: ContractId,
         code: StatefulContract.HalfDecoded,
-        fields: AVector[Val],
+        mutFields: AVector[Val],
         outputRef: ContractOutputRef,
         output: ContractOutput
     ): IOResult[Unit] = {
-      val state = ContractLegacyState.unsafe(code, fields, outputRef)
+      val state = ContractLegacyState.unsafe(code, mutFields, outputRef)
       for {
         _         <- outputState.put(outputRef, output)
         _         <- contractState.put(contractId, state)
+        recordOpt <- codeState.getOpt(code.hash)
+        _         <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
+      } yield ()
+    }
+
+    def createContractLemanUnsafe(
+        contractId: ContractId,
+        code: StatefulContract.HalfDecoded,
+        immFields: AVector[Val],
+        mutFields: AVector[Val],
+        outputRef: ContractOutputRef,
+        output: ContractOutput
+    ): IOResult[Unit] = {
+      val state = ContractNewState.unsafe(code, immFields, mutFields, outputRef)
+      for {
+        _         <- outputState.put(outputRef, output)
+        _         <- contractState.put(contractId, state.mutable)
+        _         <- contractImmutableState.put(state.mutable.immutableStateHash, state.immutable)
         recordOpt <- codeState.getOpt(code.hash)
         _         <- codeState.put(code.hash, CodeRecord.from(code, recordOpt))
       } yield ()

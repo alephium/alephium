@@ -597,7 +597,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
 
     def test(vm: StatefulVM, contract: StatefulContract, succeeded: Boolean) = {
-      val obj = StatefulContractObject.from(contract, AVector.empty, ContractId.random)
+      val obj =
+        StatefulContractObject.from(contract, AVector.empty, AVector.empty, ContractId.random)
       if (succeeded) {
         vm.execute(obj, 0, AVector.empty) match {
           case Right(res)  => res is ()

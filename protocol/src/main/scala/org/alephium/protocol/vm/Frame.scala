@@ -148,7 +148,8 @@ abstract class Frame[Ctx <: StatelessContext] {
   def createContract(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
-      fields: AVector[Val],
+      immFields: AVector[Val],
+      mutFields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId]
 
@@ -221,7 +222,8 @@ final class StatelessFrame(
   def createContract(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
-      fields: AVector[Val],
+      immFields: AVector[Val],
+      mutFields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId] = StatelessFrame.notAllowed
   def destroyContract(refundAddress: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
@@ -367,14 +369,15 @@ final case class StatefulFrame(
   def createContract(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
-      fields: AVector[Val],
+      immFields: AVector[Val],
+      mutFields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId] = {
     for {
       _            <- checkContractId(contractId)
       balanceState <- getBalanceState()
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
-      _            <- ctx.createContract(contractId, code, balances, fields, tokenIssuanceInfo)
+      _ <- ctx.createContract(contractId, code, immFields, balances, mutFields, tokenIssuanceInfo)
       _ <- ctx.writeLog(
         Some(createContractEventId),
         AVector(

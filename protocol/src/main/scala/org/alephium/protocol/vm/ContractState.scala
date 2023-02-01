@@ -121,6 +121,22 @@ final case class ContractNewState(
   }
 }
 
+object ContractNewState {
+  def unsafe(
+      code: StatefulContract.HalfDecoded,
+      immFields: AVector[Val],
+      mutFields: AVector[Val],
+      contractOutputRef: ContractOutputRef
+  ): ContractNewState = {
+    assume(code.validate(immFields, mutFields))
+    val initialStateHash   = code.initialStateHash(immFields, mutFields)
+    val immutableState     = ContractImmutableState(code.hash, initialStateHash, immFields)
+    val immutableStateHash = Hash.hash(ContractImmutableState.serde.serialize(immutableState))
+    val mutableState       = ContractMutableState(mutFields, contractOutputRef, immutableStateHash)
+    new ContractNewState(immutableState, mutableState)
+  }
+}
+
 final case class ContractMutableState private[vm] (
     mutFields: AVector[Val],
     contractOutputRef: ContractOutputRef,
@@ -177,7 +193,7 @@ object ContractLegacyState {
       fields: AVector[Val],
       contractOutputRef: ContractOutputRef
   ): ContractLegacyState = {
-    assume(code.validate(fields))
+    assume(code.validate(emptyImmFields, fields))
     val initialStateHash = code.initialStateHash(emptyImmFields, fields)
     new ContractLegacyState(code.hash, initialStateHash, fields, contractOutputRef)
   }

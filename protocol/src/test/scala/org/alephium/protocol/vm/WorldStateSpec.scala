@@ -23,7 +23,7 @@ import org.alephium.io.{IOResult, RocksDBSource, StorageFixture}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.event.LogStorage
-import org.alephium.util.{AlephiumSpec, AVector, I256}
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with StorageFixture {
   def generateAsset: Gen[(TxOutputRef, TxOutput)] = {
@@ -44,11 +44,12 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
   // scalastyle:off method.length
   def test[T, R1, R2, R3](initialWorldState: WorldState[T, R1, R2, R3]) = {
-    val (assetOutputRef, assetOutput)                                = generateAsset.sample.get
-    val (contractId, code, state, contractOutputRef, contractOutput) = generateContract().sample.get
-    val (contractId1, _, _, contractOutputRef1, contractOutput1)     = generateContract().sample.get
+    val (assetOutputRef, assetOutput) = generateAsset.sample.get
+    val (contractId, code, _, mutFields, contractOutputRef, contractOutput) =
+      generateContract().sample.get
+    val (contractId1, _, _, _, contractOutputRef1, contractOutput1) = generateContract().sample.get
 
-    val contractObj = code.toObjectUnsafe(contractId, state)
+    val contractObj = code.toObjectUnsafe(contractId, AVector.empty, mutFields)
     var worldState  = initialWorldState
 
     def update(f: => IOResult[T]) = f.rightValue match {
@@ -72,7 +73,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       worldState.createContractLegacyUnsafe(
         contractId,
         code,
-        state,
+        mutFields,
         contractOutputRef,
         contractOutput
       )
@@ -86,7 +87,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     worldState.getOutput(assetOutputRef).isLeft is true
 
     val newState = AVector[Val](Val.Bool(false))
-    assume(newState != state)
+    assume(newState != mutFields)
     update(
       worldState.createContractLegacyUnsafe(
         contractId1,
@@ -97,7 +98,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       )
     )
     worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 2)
-    worldState.getContractObj(contractId1) isE code.toObjectUnsafe(contractId1, newState)
+    worldState.getContractObj(contractId1) isE code.toObjectUnsafe(contractId1, AVector.empty, newState)
 
     update(worldState.removeContract(contractId))
     worldState.getContractObj(contractId).isLeft is true
@@ -152,12 +153,12 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     )
     val staging = worldState.staging()
 
-    val (contractId, code, state, contractOutputRef, contractOutput) = generateContract().sample.get
-    val contractObj = code.toObjectUnsafe(contractId, state)
+    val (contractId, code, _, mutFields, contractOutputRef, contractOutput) = generateContract().sample.get
+    val contractObj = code.toObjectUnsafe(contractId, AVector.empty, mutFields)
     staging.createContractLegacyUnsafe(
       contractId,
       code,
-      state,
+      mutFields,
       contractOutputRef,
       contractOutput
     ) isE ()

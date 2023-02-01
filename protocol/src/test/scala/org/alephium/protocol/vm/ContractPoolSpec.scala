@@ -72,7 +72,9 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
           output
         ) isE ()
       pool.worldState.getContractObj(contractId) isE
-        contract.toHalfDecoded().toObjectUnsafe(contractId, fields(contract.fieldLength))
+        contract
+          .toHalfDecoded()
+          .toObjectUnsafe(contractId, AVector.empty, fields(contract.fieldLength))
     }
 
     def createContract(n: Long = 0, fieldLength: Int = 0): (ContractId, StatefulContract) = {
@@ -84,7 +86,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     def toObject(contract: StatefulContract, contractId: ContractId) = {
       contract
         .toHalfDecoded()
-        .toObjectUnsafe(contractId, fields(contract.fieldLength))
+        .toObjectUnsafe(contractId, AVector.empty, fields(contract.fieldLength))
     }
   }
 

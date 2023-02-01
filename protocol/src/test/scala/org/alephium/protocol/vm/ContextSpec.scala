@@ -48,6 +48,7 @@ class ContextSpec
         .createContract(
           contractId,
           StatefulContract.forSMT,
+          AVector.empty,
           balances,
           AVector.empty,
           None

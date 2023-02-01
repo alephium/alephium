@@ -609,19 +609,28 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
     chainIndexGen.flatMap(chainGenOf(_, length))
 
   type GeneratedContract =
-    (ContractId, StatefulContract.HalfDecoded, AVector[Val], ContractOutputRef, ContractOutput)
+    (
+        ContractId,
+        StatefulContract.HalfDecoded,
+        AVector[Val],
+        AVector[Val],
+        ContractOutputRef,
+        ContractOutput
+    )
   def generateContract(): Gen[GeneratedContract] = {
     lazy val counterStateGen: Gen[AVector[Val]] =
       Gen.choose(0L, Long.MaxValue / 1000).map(n => AVector(Val.U256(U256.unsafe(n))))
     for {
-      groupIndex    <- groupIndexGen
-      outputRef     <- contractOutputRefGen(groupIndex)
-      output        <- contractOutputGen(scriptGen = p2cLockupGen(groupIndex))
-      contractState <- counterStateGen
+      groupIndex <- groupIndexGen
+      outputRef  <- contractOutputRefGen(groupIndex)
+      output     <- contractOutputGen(scriptGen = p2cLockupGen(groupIndex))
+      immState   <- counterStateGen
+      mutState   <- counterStateGen
     } yield (
       ContractId.random,
       counterContract.toHalfDecoded(),
-      contractState,
+      immState,
+      mutState,
       outputRef,
       output
     )

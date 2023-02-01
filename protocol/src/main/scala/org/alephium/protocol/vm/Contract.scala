@@ -288,16 +288,16 @@ object StatefulContract {
   ) extends Contract[StatefulContext] {
     def methodsLength: Int = methodIndexes.length
 
-    def check(initialFields: AVector[Val]): ExeResult[Unit] = {
-      if (validate(initialFields)) {
+    def check(initialImmFields: AVector[Val], initialMutFields: AVector[Val]): ExeResult[Unit] = {
+      if (validate(initialImmFields, initialMutFields)) {
         okay
       } else {
         failed(InvalidFieldLength)
       }
     }
 
-    def validate(initialFields: AVector[Val]): Boolean = {
-      initialFields.length == fieldLength
+    def validate(initialImmFields: AVector[Val], initialMutFields: AVector[Val]): Boolean = {
+      (initialImmFields.length + initialMutFields.length) == fieldLength
     }
 
     private[vm] lazy val methods = Array.ofDim[Method[StatefulContext]](methodsLength)

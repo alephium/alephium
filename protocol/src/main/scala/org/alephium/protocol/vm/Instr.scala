@@ -1576,15 +1576,27 @@ sealed trait CreateContractAbstract extends ContractInstr {
   ): ExeResult[Unit] = {
     for {
       tokenIssuanceInfo <- getTokenIssuanceInfo(frame, tokenIssuance)
-      fields            <- frame.popFields()
-      _                 <- frame.ctx.chargeFieldSize(fields.toIterable)
-      contractCode      <- prepareContractCode(frame)
+      mutFields         <- frame.popFields()
+      immFields <-
+        if (frame.ctx.getHardFork().isLemanEnabled()) {
+          frame.popFields()
+        } else {
+          Right(CreateContractAbstract.emptyImmFields)
+        }
+      _            <- frame.ctx.chargeFieldSize(immFields.toIterable ++ mutFields.toIterable)
+      contractCode <- prepareContractCode(frame)
       newContractId <- CreateContractAbstract.getContractId(
         frame,
         subContract,
         frame.ctx.blockEnv.chainIndex.from
       )
-      _ <- frame.createContract(newContractId, contractCode, fields, tokenIssuanceInfo)
+      _ <- frame.createContract(
+        newContractId,
+        contractCode,
+        immFields,
+        mutFields,
+        tokenIssuanceInfo
+      )
       _ <-
         if (frame.ctx.getHardFork().isLemanEnabled()) {
           frame.pushOpStack(Val.ByteVec(newContractId.bytes))
@@ -1596,6 +1608,8 @@ sealed trait CreateContractAbstract extends ContractInstr {
 }
 
 object CreateContractAbstract {
+  val emptyImmFields: AVector[Val] = AVector.empty
+
   def getContractId[C <: StatefulContext](
       frame: Frame[C],
       subContract: Boolean,
