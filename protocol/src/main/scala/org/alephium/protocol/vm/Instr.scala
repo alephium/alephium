@@ -416,7 +416,7 @@ final case class LoadField(index: Byte) extends FieldInstr with GasVeryLow {
   def serialize(): ByteString = ByteString(code, index)
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      v <- frame.getField(Bytes.toPosInt(index))
+      v <- frame.getMutField(Bytes.toPosInt(index))
       _ <- frame.pushOpStack(v)
     } yield ()
   }
@@ -428,7 +428,7 @@ final case class StoreField(index: Byte) extends FieldInstr with GasVeryLow {
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       v <- frame.popOpStack()
-      _ <- frame.setField(Bytes.toPosInt(index), v)
+      _ <- frame.setMutField(Bytes.toPosInt(index), v)
     } yield ()
   }
 }
@@ -437,8 +437,8 @@ object StoreField extends StatefulInstrCompanion1[Byte]
 case object LoadFieldByIndex extends VarIndexInstr[StatefulContext] with StatefulInstrCompanion0 {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      index <- popIndex(frame, InvalidFieldIndex)
-      v     <- frame.getField(index)
+      index <- popIndex(frame, InvalidMutFieldIndex)
+      v     <- frame.getMutField(index)
       _     <- frame.pushOpStack(v)
     } yield ()
   }
@@ -447,9 +447,9 @@ case object LoadFieldByIndex extends VarIndexInstr[StatefulContext] with Statefu
 case object StoreFieldByIndex extends VarIndexInstr[StatefulContext] with StatefulInstrCompanion0 {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      index <- popIndex(frame, InvalidFieldIndex)
+      index <- popIndex(frame, InvalidMutFieldIndex)
       v     <- frame.popOpStack()
-      _     <- frame.setField(index, v)
+      _     <- frame.setMutField(index, v)
     } yield ()
   }
 }

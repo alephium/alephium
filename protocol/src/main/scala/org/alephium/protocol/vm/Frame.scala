@@ -131,12 +131,12 @@ abstract class Frame[Ctx <: StatelessContext] {
     locals.set(index, v)
   }
 
-  def getField(index: Int): ExeResult[Val] = {
-    obj.getField(index)
+  def getMutField(index: Int): ExeResult[Val] = {
+    obj.getMutField(index)
   }
 
-  def setField(index: Int, v: Val): ExeResult[Unit] = {
-    obj.setField(index, v)
+  def setMutField(index: Int, v: Val): ExeResult[Unit] = {
+    obj.setMutField(index, v)
   }
 
   protected def getMethod(index: Int): ExeResult[Method[Ctx]] = {

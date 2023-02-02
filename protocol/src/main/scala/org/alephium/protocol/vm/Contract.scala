@@ -332,17 +332,15 @@ object StatefulContract {
     }
 
     // For testing purpose
-    def toObjectUnsafe(
+    def toObjectUnsafeTestOnly(
         contractId: ContractId,
         immFields: AVector[Val],
         mutFields: AVector[Val]
     ): StatefulContractObject = {
-      val initialStateHash =
-        Hash.doubleHash(hash.bytes ++ ContractStorageState.fieldsSerde.serialize(mutFields))
       StatefulContractObject.unsafe(
         this.hash,
         this,
-        initialStateHash,
+        this.initialStateHash(immFields, mutFields),
         immFields,
         mutFields,
         contractId
@@ -428,15 +426,22 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
 
   def getMethod(index: Int): ExeResult[Method[Ctx]] = code.getMethod(index)
 
-  def getField(index: Int): ExeResult[Val] = {
-    if (mutFields.isDefinedAt(index)) Right(mutFields(index)) else failed(InvalidFieldIndex)
+  def getImmField(index: Int): ExeResult[Val] = {
+    immFields.get(index) match {
+      case Some(v) => Right(v)
+      case None    => failed(InvalidImmFieldIndex)
+    }
   }
 
-  def setField(index: Int, v: Val): ExeResult[Unit] = {
+  def getMutField(index: Int): ExeResult[Val] = {
+    if (mutFields.isDefinedAt(index)) Right(mutFields(index)) else failed(InvalidMutFieldIndex)
+  }
+
+  def setMutField(index: Int, v: Val): ExeResult[Unit] = {
     if (!mutFields.isDefinedAt(index)) {
-      failed(InvalidFieldIndex)
+      failed(InvalidMutFieldIndex)
     } else if (mutFields(index).tpe != v.tpe) {
-      failed(InvalidFieldType)
+      failed(InvalidMutFieldType)
     } else {
       Right(mutFields.update(index, v))
     }
@@ -475,8 +480,11 @@ final case class StatefulContractObject private (
   def isUpdated: Boolean =
     !mutFields.indices.forall(index => mutFields(index) == initialMutFields(index))
 
-  def estimateByteSize(): Int =
-    mutFields.foldLeft(0)(_ + _.estimateByteSize()) + code.methodsBytes.length
+  def estimateContractLoadByteSize(): Int = {
+    immFields.fold(0)(_ + _.estimateByteSize()) +
+      mutFields.foldLeft(0)(_ + _.estimateByteSize()) +
+      code.methodsBytes.length
+  }
 }
 
 object StatefulContractObject {

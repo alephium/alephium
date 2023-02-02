@@ -49,7 +49,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
       generateContract().sample.get
     val (contractId1, _, _, _, contractOutputRef1, contractOutput1) = generateContract().sample.get
 
-    val contractObj = code.toObjectUnsafe(contractId, AVector.empty, mutFields)
+    val contractObj = code.toObjectUnsafeTestOnly(contractId, AVector.empty, mutFields)
     var worldState  = initialWorldState
 
     def update(f: => IOResult[T]) = f.rightValue match {
@@ -103,7 +103,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     )
     worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 2)
     worldState
-      .getContractObj(contractId1) isE code.toObjectUnsafe(contractId1, AVector.empty, newState)
+      .getContractObj(contractId1) isE code.toObjectUnsafeTestOnly(contractId1, AVector.empty, newState)
 
     update(worldState.removeAsset(contractOutputRef))
     update(worldState.removeContractForVM(contractId))
@@ -254,7 +254,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
     val (contractId, code, _, mutFields, contractOutputRef, contractOutput) =
       generateContract().sample.get
-    val contractObj = code.toObjectUnsafe(contractId, AVector.empty, mutFields)
+    val contractObj = code.toObjectUnsafeTestOnly(contractId, AVector.empty, mutFields)
     staging.createContractUnsafe(
       contractId,
       code,

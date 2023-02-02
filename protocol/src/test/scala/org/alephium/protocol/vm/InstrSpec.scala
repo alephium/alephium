@@ -1875,20 +1875,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.size is 1
     stack.top.get is Val.True
 
-    LoadField(1.toByte).runWith(frame).leftValue isE InvalidFieldIndex
-    LoadField(-1.toByte).runWith(frame).leftValue isE InvalidFieldIndex
+    LoadField(1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex
+    LoadField(-1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex
   }
 
   it should "StoreField(byte)" in new StatefulInstrFixture {
     stack.push(Val.False)
     runAndCheckGas(StoreField(0.toByte))
     stack.size is 0
-    frame.obj.getField(0) isE Val.False
+    frame.obj.getMutField(0) isE Val.False
 
     stack.push(Val.True)
-    StoreField(1.toByte).runWith(frame).leftValue isE InvalidFieldIndex
+    StoreField(1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex
     stack.push(Val.True)
-    StoreField(-1.toByte).runWith(frame).leftValue isE InvalidFieldIndex
+    StoreField(-1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex
   }
 
   it should "LoadFieldByIndex" in new StatefulInstrFixture {
@@ -1898,11 +1898,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.top.get is Val.True
 
     stack.push(Val.U256(1))
-    LoadFieldByIndex.runWith(frame).leftValue isE InvalidFieldIndex
+    LoadFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex
     stack.push(Val.U256(0xff))
-    LoadFieldByIndex.popIndex(frame, InvalidFieldIndex) isE 0xff
+    LoadFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
     stack.push(Val.U256(0xff + 1))
-    LoadFieldByIndex.popIndex(frame, InvalidFieldIndex).leftValue isE InvalidFieldIndex
+    LoadFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex
   }
 
   it should "StoreFieldByIndex" in new StatefulInstrFixture {
@@ -1910,17 +1910,17 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.U256(0))
     runAndCheckGas(StoreFieldByIndex)
     stack.size is 0
-    frame.obj.getField(0) isE Val.False
+    frame.obj.getMutField(0) isE Val.False
 
     stack.push(Val.False)
     stack.push(Val.U256(1))
-    StoreFieldByIndex.runWith(frame).leftValue isE InvalidFieldIndex
+    StoreFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex
     stack.push(Val.False)
     stack.push(Val.U256(0xff))
-    StoreFieldByIndex.popIndex(frame, InvalidFieldIndex) isE 0xff
+    StoreFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
     stack.push(Val.False)
     stack.push(Val.U256(0xff + 1))
-    StoreFieldByIndex.popIndex(frame, InvalidFieldIndex).leftValue isE InvalidFieldIndex
+    StoreFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex
   }
 
   it should "CallExternal(byte)" in new StatefulInstrFixture {

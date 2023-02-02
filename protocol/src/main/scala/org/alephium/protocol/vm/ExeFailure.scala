@@ -50,10 +50,11 @@ case object RelativeLockTimeExpectPersistedUtxo                extends ExeFailur
 final case class ArithmeticError(message: String)              extends ExeFailure
 case object InvalidVarIndex                                    extends ExeFailure
 case object InvalidVarType                                     extends ExeFailure
-case object InvalidFieldIndex                                  extends ExeFailure
+case object InvalidMutFieldIndex                               extends ExeFailure
+case object InvalidImmFieldIndex                               extends ExeFailure
 case object InvalidFieldLength                                 extends ExeFailure
 case object TooManyFields                                      extends ExeFailure
-case object InvalidFieldType                                   extends ExeFailure
+case object InvalidMutFieldType                                extends ExeFailure
 case object EmptyMethods                                       extends ExeFailure
 final case class InvalidType(v: Val)                           extends ExeFailure
 case object InvalidMethod                                      extends ExeFailure

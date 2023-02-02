@@ -77,7 +77,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
       pool.worldState.getContractObj(contractId) isE
         contract
           .toHalfDecoded()
-          .toObjectUnsafe(contractId, fields(immFieldLength), fields(mutFieldLength))
+          .toObjectUnsafeTestOnly(contractId, fields(immFieldLength), fields(mutFieldLength))
     }
 
     def createContract(
@@ -94,7 +94,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     def toObject(contract: StatefulContract, contractId: ContractId) = {
       contract
         .toHalfDecoded()
-        .toObjectUnsafe(contractId, AVector.empty, fields(contract.fieldLength))
+        .toObjectUnsafeTestOnly(contractId, AVector.empty, fields(contract.fieldLength))
     }
   }
 
@@ -131,11 +131,11 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.loadContractObj(contractId0) isE
       contract0
         .toHalfDecoded()
-        .toObjectUnsafe(contractId0, fields(contract0.fieldLength), AVector.empty)
+        .toObjectUnsafeTestOnly(contractId0, fields(contract0.fieldLength), AVector.empty)
     pool.loadContractObj(contractId1) isE
       contract1
         .toHalfDecoded()
-        .toObjectUnsafe(contractId1, AVector.empty, fields(contract1.fieldLength))
+        .toObjectUnsafeTestOnly(contractId1, AVector.empty, fields(contract1.fieldLength))
     pool.loadContractObj(contractId2) is failed(ContractFieldOverflow)
   }
 
@@ -159,7 +159,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.gasRemaining is gasRemaining
     pool.worldState.getContractState(contractId).rightValue.mutFields is fields(1)
     pool.gasRemaining is gasRemaining
-    obj.setField(0, Val.False)
+    obj.setMutField(0, Val.False)
     pool.updateContractStates().rightValue
     pool.worldState.getContractState(contractId).rightValue.mutFields is AVector[Val](Val.False)
     pool.gasRemaining is gasRemaining
