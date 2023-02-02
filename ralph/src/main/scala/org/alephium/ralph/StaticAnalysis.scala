@@ -97,7 +97,7 @@ object StaticAnalysis {
       method: vm.Method[Ctx]
   ): Unit = {
     val updateFields = method.instrs.exists {
-      case _: vm.StoreField | _: vm.StoreFieldByIndex.type | _: vm.MigrateWithFields.type => true
+      case _: vm.StoreMutField | _: vm.StoreFieldByIndex.type | _: vm.MigrateWithFields.type => true
       case _                                                                              => false
     }
 

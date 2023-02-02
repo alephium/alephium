@@ -131,6 +131,10 @@ abstract class Frame[Ctx <: StatelessContext] {
     locals.set(index, v)
   }
 
+  def getImmField(index: Int): ExeResult[Val] = {
+    obj.getImmField(index)
+  }
+
   def getMutField(index: Int): ExeResult[Val] = {
     obj.getMutField(index)
   }

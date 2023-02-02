@@ -26,11 +26,7 @@ import org.alephium.macros.ByteCode
 import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput, ContractId, GroupIndex, TokenId}
-import org.alephium.protocol.vm.TokenIssuance.{
-  IssueTokenAndTransfer,
-  IssueTokenWithoutTransfer,
-  NoIssuance
-}
+import org.alephium.protocol.vm.TokenIssuance.{IssueTokenAndTransfer, IssueTokenWithoutTransfer, NoIssuance}
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
 import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
 import org.alephium.util
@@ -158,7 +154,7 @@ object Instr {
     BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
-    LoadField, StoreField, CallExternal,
+    LoadMutField, StoreMutField, CallExternal,
     ApproveAlph, ApproveToken, AlphRemaining, TokenRemaining, IsPaying,
     TransferAlph, TransferAlphFromSelf, TransferAlphToSelf, TransferToken, TransferTokenFromSelf, TransferTokenToSelf,
     CreateContract, CreateContractWithToken, CopyCreateContract, DestroySelf, SelfContractId, SelfAddress,
@@ -168,7 +164,8 @@ object Instr {
     CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
     LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
     CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
-    NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId
+    NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
+    LoadImmField
   )
   // format: on
 
@@ -410,9 +407,20 @@ case object StoreLocalByIndex
   }
 }
 
-sealed trait FieldInstr extends StatefulInstrSimpleGas with GasSimple {}
+sealed trait FieldInstr extends Instr[StatefulContext] with GasSimple {}
 @ByteCode
-final case class LoadField(index: Byte) extends FieldInstr with GasVeryLow {
+final case class LoadImmField(index: Byte) extends LemanInstrWithSimpleGas[StatefulContext] with FieldInstr with GasVeryLow {
+  def serialize(): ByteString = ByteString(code, index)
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      v <- frame.getImmField(Bytes.toPosInt(index))
+      _ <- frame.pushOpStack(v)
+    } yield ()
+  }
+}
+object LoadImmField extends StatefulInstrCompanion1[Byte]
+@ByteCode
+final case class LoadMutField(index: Byte) extends FieldInstr with StatefulInstrSimpleGas with GasVeryLow {
   def serialize(): ByteString = ByteString(code, index)
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -421,9 +429,9 @@ final case class LoadField(index: Byte) extends FieldInstr with GasVeryLow {
     } yield ()
   }
 }
-object LoadField extends StatefulInstrCompanion1[Byte]
+object LoadMutField extends StatefulInstrCompanion1[Byte]
 @ByteCode
-final case class StoreField(index: Byte) extends FieldInstr with GasVeryLow {
+final case class StoreMutField(index: Byte) extends FieldInstr with StatefulInstrSimpleGas with GasVeryLow {
   def serialize(): ByteString = ByteString(code, index)
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -432,7 +440,7 @@ final case class StoreField(index: Byte) extends FieldInstr with GasVeryLow {
     } yield ()
   }
 }
-object StoreField extends StatefulInstrCompanion1[Byte]
+object StoreMutField extends StatefulInstrCompanion1[Byte]
 
 case object LoadFieldByIndex extends VarIndexInstr[StatefulContext] with StatefulInstrCompanion0 {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {

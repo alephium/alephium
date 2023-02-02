@@ -889,7 +889,7 @@ object Compiler {
         offset,
         isLocal,
         LoadLocal.apply,
-        LoadField.apply,
+        LoadMutField.apply,
         LoadLocalByIndex,
         LoadFieldByIndex
       )
@@ -902,7 +902,7 @@ object Compiler {
         offset,
         isLocal,
         StoreLocal.apply,
-        StoreField.apply,
+        StoreMutField.apply,
         StoreLocalByIndex,
         StoreFieldByIndex
       )
@@ -912,7 +912,7 @@ object Compiler {
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
       val varInfo = getVariable(ident)
       getVariable(ident) match {
-        case v: VarInfo.Field    => Seq(LoadField(v.index))
+        case v: VarInfo.Field    => Seq(LoadMutField(v.index))
         case v: VarInfo.Local    => Seq(LoadLocal(v.index))
         case v: VarInfo.Template => Seq(TemplateVariable(ident.name, varInfo.tpe.toVal, v.index))
         case _: VarInfo.ArrayRef[StatefulContext @unchecked] => getArrayRef(ident).genLoadCode(this)
@@ -923,7 +923,7 @@ object Compiler {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[StatefulContext]]] = {
       getVariable(ident) match {
-        case v: VarInfo.Field    => Seq(Seq(StoreField(v.index)))
+        case v: VarInfo.Field    => Seq(Seq(StoreMutField(v.index)))
         case v: VarInfo.Local    => Seq(Seq(StoreLocal(v.index)))
         case _: VarInfo.Template => throw Error(s"Unexpected template variable: ${ident.name}")
         case ref: VarInfo.ArrayRef[StatefulContext @unchecked] => ref.ref.genStoreCode(this)
