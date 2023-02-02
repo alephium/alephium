@@ -233,8 +233,8 @@ sealed abstract class MutableWorldState extends WorldState[Unit, Unit, Unit, Uni
   def updateContractUnsafe(key: ContractId, mutFields: AVector[Val]): IOResult[Unit] = {
     for {
       oldState <- getContractState(key)
-      newState <- updateContract(key, oldState.updateMutFieldsUnsafe(mutFields))
-    } yield newState
+      _        <- updateContract(key, oldState.updateMutFieldsUnsafe(mutFields))
+    } yield ()
   }
 
   def updateContract(
@@ -254,9 +254,9 @@ sealed abstract class ImmutableWorldState
     ] {
   def updateContractUnsafe(key: ContractId, fields: AVector[Val]): IOResult[ImmutableWorldState] = {
     for {
-      oldState <- getContractState(key)
-      newState <- updateContract(key, oldState.updateMutFieldsUnsafe(fields))
-    } yield newState
+      oldState      <- getContractState(key)
+      newWorldState <- updateContract(key, oldState.updateMutFieldsUnsafe(fields))
+    } yield newWorldState
   }
 }
 // scalastyle:on
