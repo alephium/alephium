@@ -23,6 +23,7 @@ import org.alephium.util.U256
 object ArrayTransformer {
   @inline def arrayVarName(baseName: String, idx: Int): String = s"_$baseName-$idx"
 
+  // scalastyle:off parameter.number
   def init[Ctx <: StatelessContext](
       state: Compiler.State[Ctx],
       tpe: Type.FixedSizeArray,
@@ -31,10 +32,22 @@ object ArrayTransformer {
       isUnused: Boolean,
       isLocal: Boolean,
       isGenerated: Boolean,
-      varInfoBuilder: Compiler.VarInfoBuilder
+      varInfoBuilder: Compiler.VarInfoBuilder,
+      getIndex: () => Byte,
+      increaseIndex: () => Unit
   ): ArrayRef[Ctx] = {
     val offset = ConstantArrayVarOffset[Ctx](state.currentScopeState.varIndex)
-    initArrayVars(state, tpe, baseName, isMutable, isUnused, isLocal, varInfoBuilder)
+    initArrayVars(
+      state,
+      tpe,
+      baseName,
+      isMutable,
+      isUnused,
+      isLocal,
+      varInfoBuilder,
+      getIndex,
+      increaseIndex
+    )
     val ref = ArrayRef[Ctx](isLocal, tpe, offset)
     state.addArrayRef(Ident(baseName), isMutable, isUnused, isGenerated, ref)
     ref
@@ -48,13 +61,25 @@ object ArrayTransformer {
       isMutable: Boolean,
       isUnused: Boolean,
       isLocal: Boolean,
-      varInfoBuilder: Compiler.VarInfoBuilder
+      varInfoBuilder: Compiler.VarInfoBuilder,
+      getIndex: () => Byte,
+      increaseIndex: () => Unit
   ): Unit = {
     tpe.baseType match {
       case baseType: Type.FixedSizeArray =>
         (0 until tpe.size).foreach { idx =>
           val newBaseName = arrayVarName(baseName, idx)
-          initArrayVars(state, baseType, newBaseName, isMutable, isUnused, isLocal, varInfoBuilder)
+          initArrayVars(
+            state,
+            baseType,
+            newBaseName,
+            isMutable,
+            isUnused,
+            isLocal,
+            varInfoBuilder,
+            getIndex,
+            increaseIndex
+          )
         }
       case baseType =>
         (0 until tpe.size).foreach { idx =>
@@ -66,11 +91,14 @@ object ArrayTransformer {
             isUnused,
             isLocal,
             isGenerated = true,
-            varInfoBuilder
+            varInfoBuilder,
+            getIndex,
+            increaseIndex
           )
         }
     }
   }
+  // scalastyle:on parameter.number
 
   @inline def checkArrayIndex(index: Int, arraySize: Int): Unit = {
     if (index < 0 || index >= arraySize) {

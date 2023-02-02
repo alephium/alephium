@@ -986,7 +986,7 @@ class TxUtilsSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val (contractId, ref) =
-      createContract(code, AVector.empty, tokenIssuanceInfo = Some(TokenIssuance.Info(1)))
+      createContract(code, AVector.empty, AVector.empty, tokenIssuanceInfo = Some(TokenIssuance.Info(1)))
     val address = LockupScript.p2c(contractId)
   }
 

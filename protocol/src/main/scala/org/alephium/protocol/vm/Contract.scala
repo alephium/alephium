@@ -159,8 +159,15 @@ sealed trait Contract[Ctx <: StatelessContext] {
     }
   }
 
-  def validate(initialImmFields: AVector[Val], initialMutFields: AVector[Val]): Boolean = {
-    (initialImmFields.length + initialMutFields.length) == fieldLength
+  def validate(newImmFields: AVector[Val], newMutFields: AVector[Val]): Boolean = {
+    (newImmFields.length + newMutFields.length) == fieldLength
+  }
+
+  def check(newImmFields: AVector[Val], newMutFields: AVector[Val]): ExeResult[Unit] = {
+    if (validate(newImmFields, newMutFields)) { okay }
+    else {
+      failed(InvalidFieldLength)
+    }
   }
 }
 
@@ -287,14 +294,6 @@ object StatefulContract {
       methodsBytes: ByteString
   ) extends Contract[StatefulContext] {
     def methodsLength: Int = methodIndexes.length
-
-    def check(initialImmFields: AVector[Val], initialMutFields: AVector[Val]): ExeResult[Unit] = {
-      if (validate(initialImmFields, initialMutFields)) {
-        okay
-      } else {
-        failed(InvalidFieldLength)
-      }
-    }
 
     private[vm] lazy val methods = Array.ofDim[Method[StatefulContext]](methodsLength)
 

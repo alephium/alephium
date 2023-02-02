@@ -189,11 +189,11 @@ object ContractLegacyState {
 
   def unsafe(
       code: StatefulContract.HalfDecoded,
-      fields: AVector[Val],
+      mutFields: AVector[Val],
       contractOutputRef: ContractOutputRef
   ): ContractLegacyState = {
-    assume(code.validate(emptyImmFields, fields))
-    val initialStateHash = code.initialStateHash(emptyImmFields, fields)
-    new ContractLegacyState(code.hash, initialStateHash, fields, contractOutputRef)
+    assume(code.validate(emptyImmFields, mutFields))
+    val initialStateHash = code.initialStateHash(emptyImmFields, mutFields)
+    new ContractLegacyState(code.hash, initialStateHash, mutFields, contractOutputRef)
   }
 }

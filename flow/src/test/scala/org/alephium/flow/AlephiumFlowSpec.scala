@@ -623,7 +623,8 @@ trait FlowFixture
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
       contractId: ContractId,
-      fields: AVector[Val],
+      immFields: AVector[Val],
+      mutFields: AVector[Val],
       outputRef: ContractOutputRef,
       numAssets: Int = 2,
       numContracts: Int = 2
@@ -631,7 +632,8 @@ trait FlowFixture
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     val contractState = worldState.getContractState(contractId).fold(throw _, identity)
 
-    contractState.mutFields is fields
+    contractState.immFields is immFields
+    contractState.mutFields is mutFields
     contractState.contractOutputRef is outputRef
 
     worldState
@@ -681,23 +683,25 @@ trait FlowFixture
 
   def contractCreation(
       code: StatefulContract,
-      initialState: AVector[Val],
+      initialImmState: AVector[Val],
+      initialMutState: AVector[Val],
       lockupScript: LockupScript.Asset,
       attoAlphAmount: U256,
       tokenIssuanceInfo: Option[TokenIssuance.Info] = None
   ): StatefulScript = {
-    val address  = Address.Asset(lockupScript)
-    val codeRaw  = Hex.toHexString(serialize(code))
-    val stateRaw = Hex.toHexString(serialize(initialState))
+    val address     = Address.Asset(lockupScript)
+    val codeRaw     = Hex.toHexString(serialize(code))
+    val immStateRaw = Hex.toHexString(serialize(initialImmState))
+    val mutStateRaw = Hex.toHexString(serialize(initialMutState))
     val creation = tokenIssuanceInfo match {
       case Some(TokenIssuance.Info(amount, None)) =>
-        s"createContractWithToken!{@$address -> ALPH: ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw, ${amount.v})"
+        s"createContractWithToken!{@$address -> ALPH: ${attoAlphAmount.v}}(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${amount.v})"
       case Some(TokenIssuance.Info(amount, Some(transferTo))) => {
         val toAddress = Address.from(transferTo).toBase58
-        s"createContractWithToken!{@$address -> ALPH: ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw, ${amount.v}, @${toAddress})"
+        s"createContractWithToken!{@$address -> ALPH: ${attoAlphAmount.v}}(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${amount.v}, @${toAddress})"
       }
       case None =>
-        s"createContract!{@$address -> ALPH: ${attoAlphAmount.v}}(#$codeRaw, #$stateRaw)"
+        s"createContract!{@$address -> ALPH: ${attoAlphAmount.v}}(#$codeRaw, #$immStateRaw, #$mutStateRaw)"
     }
     val scriptRaw =
       s"""
@@ -720,7 +724,13 @@ trait FlowFixture
          |""".stripMargin
     val contract = Compiler.compileContract(input).rightValue
     val txScript =
-      contractCreation(contract, AVector.empty, getGenesisLockupScript(chainIndex), ALPH.alph(1))
+      contractCreation(
+        contract,
+        AVector.empty,
+        AVector.empty,
+        getGenesisLockupScript(chainIndex),
+        ALPH.alph(1)
+      )
     payableCallTxTemplate(
       blockFlow,
       chainIndex,
@@ -733,7 +743,8 @@ trait FlowFixture
 
   def createContract(
       input: String,
-      initialState: AVector[Val],
+      initialImmState: AVector[Val] = AVector.empty,
+      initialMutState: AVector[Val] = AVector.empty,
       tokenIssuanceInfo: Option[TokenIssuance.Info] = None,
       initialAttoAlphAmount: U256 = minimalAlphInContract,
       chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
@@ -743,7 +754,8 @@ trait FlowFixture
     val txScript =
       contractCreation(
         contract,
-        initialState,
+        initialImmState,
+        initialMutState,
         genesisLockup,
         initialAttoAlphAmount,
         tokenIssuanceInfo

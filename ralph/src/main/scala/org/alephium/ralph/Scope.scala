@@ -32,6 +32,8 @@ trait Scope { self: Compiler.State[_] =>
   val scopes                        = mutable.Map.empty[Ast.FuncId, ScopeState]
   var currentScope: Ast.FuncId      = Ast.FuncId.empty
   var currentScopeState: ScopeState = ScopeState.default()
+  var immFieldsIndex: Int           = 0
+  var mutFieldsIndex: Int           = 0
   val currentScopeUsedVars          = mutable.Set.empty[String]
 
   def setFuncScope(funcId: Ast.FuncId): Unit = {

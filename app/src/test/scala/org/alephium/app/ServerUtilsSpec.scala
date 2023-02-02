@@ -908,10 +908,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       block
     }
 
-    def createContract(code: String, fields: AVector[vm.Val]): (Block, ContractId) = {
+    def createContract(code: String, mutFields: AVector[vm.Val]): (Block, ContractId) = {
       val contract = Compiler.compileContract(code).rightValue
       val script =
-        contractCreation(contract, fields, lockupScript, minimalAlphInContract)
+        contractCreation(contract, AVector.empty, mutFields, lockupScript, minimalAlphInContract)
       val block      = executeScript(script)
       val contractId = ContractId.from(block.transactions.head.id, 0, chainIndex.from)
       (block, contractId)
