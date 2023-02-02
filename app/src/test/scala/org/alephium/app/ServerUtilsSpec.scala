@@ -1889,7 +1889,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
           fromAddress,
-          initialFields,
+          initialImmFields = initialFields,
+          initialMutFields = AVector.empty,
           U256.unsafe(10),
           AVector((token1, U256.unsafe(10)), (token2, U256.unsafe(20))),
           Some(U256.unsafe(50))
@@ -1913,7 +1914,8 @@ class ServerUtilsSpec extends AlephiumSpec {
         .buildDeployContractScriptRawWithParsedState(
           codeRaw,
           fromAddress,
-          initialFields,
+          initialImmFields = initialFields,
+          initialMutFields = AVector.empty,
           U256.unsafe(10),
           AVector.empty,
           Some(U256.unsafe(50))

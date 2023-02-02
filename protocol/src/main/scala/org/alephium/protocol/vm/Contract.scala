@@ -158,6 +158,10 @@ sealed trait Contract[Ctx <: StatelessContext] {
       }
     }
   }
+
+  def validate(initialImmFields: AVector[Val], initialMutFields: AVector[Val]): Boolean = {
+    (initialImmFields.length + initialMutFields.length) == fieldLength
+  }
 }
 
 sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
@@ -259,10 +263,6 @@ final case class StatefulContract(
     methods.get(index).toRight(Right(InvalidMethodIndex(index)))
   }
 
-  def validate(initialImmFields: AVector[Val], initialMutFields: AVector[Val]): Boolean = {
-    (initialImmFields.length + initialMutFields.length) == fieldLength
-  }
-
   def toHalfDecoded(): StatefulContract.HalfDecoded = {
     val methodsBytes = methods.map(Method.statefulSerde.serialize)
     var count        = 0
@@ -294,10 +294,6 @@ object StatefulContract {
       } else {
         failed(InvalidFieldLength)
       }
-    }
-
-    def validate(initialImmFields: AVector[Val], initialMutFields: AVector[Val]): Boolean = {
-      (initialImmFields.length + initialMutFields.length) == fieldLength
     }
 
     private[vm] lazy val methods = Array.ofDim[Method[StatefulContext]](methodsLength)

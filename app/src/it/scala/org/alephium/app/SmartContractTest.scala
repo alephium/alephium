@@ -96,7 +96,8 @@ class SmartContractTest extends AlephiumActorSpec {
 
     def estimateBuildContractGas(
         code: String,
-        state: Option[String],
+        immFields: Option[String],
+        mutFields: Option[String],
         issueTokenAmount: Option[U256]
     ): GasBox = {
       val unlockScript = UnlockScript.p2pkh(PublicKey.from(Hex.unsafe(publicKey)).value)
@@ -107,7 +108,8 @@ class SmartContractTest extends AlephiumActorSpec {
         .buildDeployContractTx(
           compileResult.bytecode,
           Address.fromBase58(address).value,
-          state,
+          immFields,
+          mutFields,
           minimalAlphInContract,
           AVector.empty,
           issueTokenAmount
@@ -220,7 +222,7 @@ class SmartContractTest extends AlephiumActorSpec {
     val rawUnsignedTx = Hex.from(tokenContractBuildResult.unsignedTx).value
     val unsignedTx    = deserialize[UnsignedTransaction](rawUnsignedTx).rightValue
 
-    val scriptGas = estimateBuildContractGas(SwapContracts.tokenContract, None, Some(1024))
+    val scriptGas = estimateBuildContractGas(SwapContracts.tokenContract, None, None, Some(1024))
     val gasWithoutScript = GasEstimation.estimateWithP2PKHInputs(
       unsignedTx.inputs.length,
       unsignedTx.fixedOutputs.length

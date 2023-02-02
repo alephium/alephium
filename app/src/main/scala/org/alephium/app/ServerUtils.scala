@@ -790,7 +790,8 @@ class ServerUtils(implicit
       script <- buildDeployContractTxWithParsedState(
         code.contract,
         address,
-        code.initialFields,
+        code.initialImmFields,
+        code.initialMutFields,
         initialAttoAlphAmount,
         amounts._2,
         query.issueTokenAmount.map(_.value)
@@ -1298,27 +1299,32 @@ object ServerUtils {
   def buildDeployContractTx(
       codeRaw: String,
       address: Address,
-      initialState: Option[String],
+      _immFields: Option[String],
+      _mutFields: Option[String],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
-    parseState(initialState).flatMap { state =>
-      buildDeployContractScriptWithParsedState(
+    for {
+      immFields <- parseState(_immFields)
+      mutFields <- parseState(_mutFields)
+      script <- buildDeployContractScriptWithParsedState(
         codeRaw,
         address,
-        state,
+        immFields,
+        mutFields,
         initialAttoAlphAmount,
         initialTokenAmounts,
         newTokenAmount
       )
-    }
+    } yield script
   }
 
   def buildDeployContractTxWithParsedState(
       contract: StatefulContract,
       address: Address,
-      initialFields: AVector[vm.Val],
+      initialImmFields: AVector[vm.Val],
+      initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
@@ -1326,7 +1332,8 @@ object ServerUtils {
     buildDeployContractScriptWithParsedState(
       Hex.toHexString(serialize(contract)),
       address,
-      initialFields,
+      initialImmFields,
+      initialMutFields,
       initialAttoAlphAmount,
       initialTokenAmounts,
       newTokenAmount
@@ -1336,16 +1343,18 @@ object ServerUtils {
   def buildDeployContractScriptRawWithParsedState(
       codeRaw: String,
       address: Address,
-      initialFields: AVector[vm.Val],
+      initialImmFields: AVector[vm.Val],
+      initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): String = {
-    val stateRaw = Hex.toHexString(serialize(initialFields))
+    val immStateRaw = Hex.toHexString(serialize(initialImmFields))
+    val mutStateRaw = Hex.toHexString(serialize(initialMutFields))
     def toCreate(approveAssets: String): String = newTokenAmount match {
       case Some(amount) =>
-        s"createContractWithToken!$approveAssets(#$codeRaw, #$stateRaw, ${amount.v})"
-      case None => s"createContract!$approveAssets(#$codeRaw, #$stateRaw)"
+        s"createContractWithToken!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${amount.v})"
+      case None => s"createContract!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw)"
     }
 
     val create = if (initialTokenAmounts.isEmpty) {
@@ -1370,7 +1379,8 @@ object ServerUtils {
   def buildDeployContractScriptWithParsedState(
       codeRaw: String,
       address: Address,
-      initialFields: AVector[vm.Val],
+      initialImmFields: AVector[vm.Val],
+      initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
@@ -1378,7 +1388,8 @@ object ServerUtils {
     val scriptRaw = buildDeployContractScriptRawWithParsedState(
       codeRaw,
       address,
-      initialFields,
+      initialImmFields,
+      initialMutFields,
       initialAttoAlphAmount,
       initialTokenAmounts,
       newTokenAmount

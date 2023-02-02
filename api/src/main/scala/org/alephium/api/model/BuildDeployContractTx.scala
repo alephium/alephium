@@ -38,13 +38,18 @@ final case class BuildDeployContractTx(
 ) extends BuildTxCommon
 
 object BuildDeployContractTx {
-  final case class Code(contract: StatefulContract, initialFields: AVector[vm.Val])
+  // initialFields are list of Vals with flag indicating whether the field is mutable
+  final case class Code(contract: StatefulContract, initialFields: AVector[(vm.Val, Boolean)]) {
+    val initialImmFields: AVector[vm.Val] = AVector.from(initialFields.view.filter(!_._2).map(_._1))
+    val initialMutFields: AVector[vm.Val] = AVector.from(initialFields.view.filter(_._2).map(_._1))
+  }
   object Code {
     implicit val serde: Serde[Code] = {
+      implicit val fieldSerde: Serde[(vm.Val, Boolean)] = Serde.tuple2[vm.Val, Boolean]
       val _serde: Serde[Code] = Serde.forProduct2(Code.apply, t => (t.contract, t.initialFields))
 
       _serde.validate(code =>
-        if (code.contract.validate(code.initialFields)) {
+        if (code.contract.validate(code.initialImmFields, code.initialMutFields)) {
           Right(())
         } else {
           Left(

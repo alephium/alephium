@@ -990,13 +990,14 @@ object BuiltIn {
   val createContract: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.contract(
       "createContract",
-      Seq[Type](Type.ByteVec, Type.ByteVec),
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
       CreateContract,
       usePreapprovedAssets = true,
       argsName = Seq(
-        "bytecode"      -> "the bytecode of the contract to be created",
-        "encodedFields" -> "the encoded fields as a ByteVec"
+        "bytecode"         -> "the bytecode of the contract to be created",
+        "encodedImmFields" -> "the encoded immutable fields as a ByteVec",
+        "encodedMutFields" -> "the encoded mutable fields as a ByteVec"
       ),
       retComment = "the id of the created contract",
       doc = docContractFunction(issueToken = false, copy = false, subContract = false)
@@ -1007,11 +1008,11 @@ object BuiltIn {
       "createContractWithToken",
       argsTypeWithInstrs = Seq(
         ArgsTypeWithInstrs(
-          Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
           Seq(CreateContractWithToken)
         ),
         ArgsTypeWithInstrs(
-          Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
           Seq(CreateContractAndTransferToken)
         )
       ),
@@ -1021,7 +1022,8 @@ object BuiltIn {
       category = Category.Contract,
       argsName = Seq(
         "bytecode"         -> "the bytecode of the contract to be created",
-        "encodedFields"    -> "the encoded fields as a ByteVec",
+        "encodedImmFields" -> "the encoded immutable fields as a ByteVec",
+        "encodedMutFields" -> "the encoded mutable fields as a ByteVec",
         "issueTokenAmount" -> "the amount of token to be issued"
       ),
       doc = docContractFunction(issueToken = true, copy = false, subContract = false)
@@ -1030,13 +1032,14 @@ object BuiltIn {
   val copyCreateContract: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.contract(
       "copyCreateContract",
-      Seq[Type](Type.ByteVec, Type.ByteVec),
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
       CopyCreateContract,
       usePreapprovedAssets = true,
       argsName = Seq(
-        "contractId"    -> "the id of the contract to be copied",
-        "encodedFields" -> "the encoded fields as a ByteVec"
+        "contractId"       -> "the id of the contract to be copied",
+        "encodedImmFields" -> "the encoded immutable fields as a ByteVec",
+        "encodedMutFields" -> "the encoded mutable fields as a ByteVec"
       ),
       retComment = "the id of the created contract",
       doc = docContractFunction(
@@ -1052,11 +1055,11 @@ object BuiltIn {
       "copyCreateContractWithToken",
       argsTypeWithInstrs = Seq(
         ArgsTypeWithInstrs(
-          Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256),
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
           Seq(CopyCreateContractWithToken)
         ),
         ArgsTypeWithInstrs(
-          Seq[Type](Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
           Seq(CopyCreateContractAndTransferToken)
         )
       ),
@@ -1066,7 +1069,8 @@ object BuiltIn {
       category = Category.Contract,
       argsName = Seq(
         "contractId"       -> "the id of the contract to be copied",
-        "encodedFields"    -> "the encoded fields as a ByteVec",
+        "encodedImmFields" -> "the encoded immutable fields as a ByteVec",
+        "encodedMutFields" -> "the encoded mutable fields as a ByteVec",
         "issueTokenAmount" -> "the amount of token to be issued"
       ),
       doc = docContractFunction(
@@ -1080,14 +1084,15 @@ object BuiltIn {
   val createSubContract: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.subContract(
       "createSubContract",
-      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
       CreateSubContract,
       usePreapprovedAssets = true,
       argsName = Seq(
-        "subContractPath" -> "the path of the sub-contract to be created",
-        "bytecode"        -> "the bytecode of the sub-contract to be created",
-        "encodedFields"   -> "the encoded fields as a ByteVec"
+        "subContractPath"  -> "the path of the sub-contract to be created",
+        "bytecode"         -> "the bytecode of the sub-contract to be created",
+        "encodedImmFields" -> "the encoded immutable fields as a ByteVec",
+        "encodedMutFields" -> "the encoded mutable fields as a ByteVec"
       ),
       retComment = "the id of the created contract",
       doc = docContractFunction(issueToken = false, copy = false, subContract = true)
@@ -1098,11 +1103,18 @@ object BuiltIn {
       "createSubContractWithToken",
       argsTypeWithInstrs = Seq(
         ArgsTypeWithInstrs(
-          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
           Seq(CreateSubContractWithToken)
         ),
         ArgsTypeWithInstrs(
-          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
+          Seq[Type](
+            Type.ByteVec,
+            Type.ByteVec,
+            Type.ByteVec,
+            Type.ByteVec,
+            Type.U256,
+            Type.Address
+          ),
           Seq(CreateSubContractAndTransferToken)
         )
       ),
@@ -1113,7 +1125,8 @@ object BuiltIn {
       argsName = Seq(
         "subContractPath"  -> "the path of the sub-contract to be created",
         "bytecode"         -> "the bytecode of the sub-contract to be created",
-        "encodedFields"    -> "the encoded fields as a ByteVec",
+        "encodedImmFields" -> "the encoded immutable fields as a ByteVec",
+        "encodedMutFields" -> "the encoded mutable fields as a ByteVec",
         "issueTokenAmount" -> "the amount of token to be issued"
       ),
       doc = docContractFunction(issueToken = true, copy = false, subContract = true)
@@ -1122,14 +1135,15 @@ object BuiltIn {
   val copyCreateSubContract: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.subContract(
       "copyCreateSubContract",
-      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.ByteVec),
       Seq[Type](Type.ByteVec),
       CopyCreateSubContract,
       usePreapprovedAssets = true,
       argsName = Seq(
-        "subContractPath" -> "the path of the sub-contract to be created",
-        "contractId"      -> "the id of the contract to be copied",
-        "encodedFields"   -> "the encoded fields as a ByteVec"
+        "subContractPath"  -> "the path of the sub-contract to be created",
+        "contractId"       -> "the id of the contract to be copied",
+        "encodedImmFields" -> "the encoded immutable fields as a ByteVec",
+        "encodedMutFields" -> "the encoded mutable fields as a ByteVec"
       ),
       retComment = "the id of the created contract",
       doc = docContractFunction(
@@ -1145,11 +1159,18 @@ object BuiltIn {
       "copyCreateSubContractWithToken",
       argsTypeWithInstrs = Seq(
         ArgsTypeWithInstrs(
-          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
+          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256),
           Seq(CopyCreateSubContractWithToken)
         ),
         ArgsTypeWithInstrs(
-          Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec, Type.U256, Type.Address),
+          Seq[Type](
+            Type.ByteVec,
+            Type.ByteVec,
+            Type.ByteVec,
+            Type.ByteVec,
+            Type.U256,
+            Type.Address
+          ),
           Seq(CopyCreateSubContractAndTransferToken)
         )
       ),
@@ -1160,7 +1181,8 @@ object BuiltIn {
       argsName = Seq(
         "subContractPath"  -> "the path of the sub-contract to be created",
         "contractId"       -> "the id of the contract to be copied",
-        "encodedFields"    -> "the encoded fields as a ByteVec",
+        "encodedImmFields" -> "the encoded immutable fields as a ByteVec",
+        "encodedMutFields" -> "the encoded mutable fields as a ByteVec",
         "issueTokenAmount" -> "the amount of token to be issued"
       ),
       doc = docContractFunction(
