@@ -306,7 +306,8 @@ trait TxGenerators
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,
-          instrs = AVector(vm.LoadMutField(0), vm.U256Const1, vm.U256Add, vm.StoreMutField(0), vm.Return)
+          instrs =
+            AVector(vm.LoadMutField(0), vm.U256Const1, vm.U256Add, vm.StoreMutField(0), vm.Return)
         )
       )
     )

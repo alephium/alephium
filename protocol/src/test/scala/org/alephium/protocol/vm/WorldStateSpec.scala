@@ -103,7 +103,11 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     )
     worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 2)
     worldState
-      .getContractObj(contractId1) isE code.toObjectUnsafeTestOnly(contractId1, AVector.empty, newState)
+      .getContractObj(contractId1) isE code.toObjectUnsafeTestOnly(
+      contractId1,
+      AVector.empty,
+      newState
+    )
 
     update(worldState.removeAsset(contractOutputRef))
     update(worldState.removeContractForVM(contractId))

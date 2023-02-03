@@ -26,7 +26,11 @@ import org.alephium.macros.ByteCode
 import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.model
 import org.alephium.protocol.model.{AssetOutput, ContractId, GroupIndex, TokenId}
-import org.alephium.protocol.vm.TokenIssuance.{IssueTokenAndTransfer, IssueTokenWithoutTransfer, NoIssuance}
+import org.alephium.protocol.vm.TokenIssuance.{
+  IssueTokenAndTransfer,
+  IssueTokenWithoutTransfer,
+  NoIssuance
+}
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
 import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
 import org.alephium.util
@@ -409,7 +413,10 @@ case object StoreLocalByIndex
 
 sealed trait FieldInstr extends Instr[StatefulContext] with GasSimple {}
 @ByteCode
-final case class LoadImmField(index: Byte) extends LemanInstrWithSimpleGas[StatefulContext] with FieldInstr with GasVeryLow {
+final case class LoadImmField(index: Byte)
+    extends LemanInstrWithSimpleGas[StatefulContext]
+    with FieldInstr
+    with GasVeryLow {
   def serialize(): ByteString = ByteString(code, index)
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -420,7 +427,10 @@ final case class LoadImmField(index: Byte) extends LemanInstrWithSimpleGas[State
 }
 object LoadImmField extends StatefulInstrCompanion1[Byte]
 @ByteCode
-final case class LoadMutField(index: Byte) extends FieldInstr with StatefulInstrSimpleGas with GasVeryLow {
+final case class LoadMutField(index: Byte)
+    extends FieldInstr
+    with StatefulInstrSimpleGas
+    with GasVeryLow {
   def serialize(): ByteString = ByteString(code, index)
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
@@ -431,7 +441,10 @@ final case class LoadMutField(index: Byte) extends FieldInstr with StatefulInstr
 }
 object LoadMutField extends StatefulInstrCompanion1[Byte]
 @ByteCode
-final case class StoreMutField(index: Byte) extends FieldInstr with StatefulInstrSimpleGas with GasVeryLow {
+final case class StoreMutField(index: Byte)
+    extends FieldInstr
+    with StatefulInstrSimpleGas
+    with GasVeryLow {
   def serialize(): ByteString = ByteString(code, index)
   def _runWith[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
