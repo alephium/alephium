@@ -240,14 +240,22 @@ trait VotingFixture extends WalletFixture {
         )
       )
     voters.map(wallet => s"@${wallet.activeAddress}").mkString(",")
-    val initialFields = AVector[vm.Val](
-      vm.Val.U256(U256.Zero),
-      vm.Val.U256(U256.Zero),
-      vm.Val.False,
-      vm.Val.False,
+    val initialImmFields = AVector[vm.Val](
       vm.Val.Address(Address.fromBase58(admin.activeAddress).get.lockupScript)
     ) ++ votersList
-    contract(admin, votingContract, Some(initialFields), Some(tokenAmount))
+    val initialMutFields = AVector[vm.Val](
+      vm.Val.U256(U256.Zero),
+      vm.Val.U256(U256.Zero),
+      vm.Val.False,
+      vm.Val.False
+    )
+    contract(
+      admin,
+      votingContract,
+      Some(initialImmFields),
+      Some(initialMutFields),
+      Some(tokenAmount)
+    )
   }
   // scalastyle:on method.length
 
@@ -322,7 +330,8 @@ trait WalletFixture extends CliqueFixture {
   def contract(
       wallet: Wallet,
       code: String,
-      initialFields: Option[AVector[vm.Val]],
+      initialImmFields: Option[AVector[vm.Val]],
+      initialMutFields: Option[AVector[vm.Val]],
       issueTokenAmount: Option[U256]
   ): ContractRef = {
     val compileResult = request[CompileContractResult](compileContract(code), restPort)
@@ -330,7 +339,8 @@ trait WalletFixture extends CliqueFixture {
       buildDeployContractTx(
         fromPublicKey = wallet.publicKey.toHexString,
         code = compileResult.bytecode,
-        initialFields = initialFields,
+        initialImmFields = initialImmFields,
+        initialMutFields = initialMutFields,
         issueTokenAmount = issueTokenAmount
       ),
       restPort
