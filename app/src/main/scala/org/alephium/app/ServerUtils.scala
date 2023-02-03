@@ -785,7 +785,7 @@ class ServerUtils(implicit
         .left
         .map(badRequest)
       initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1)
-      code                  <- BuildDeployContractTx.decode(query.bytecode)
+      code                  <- query.decodeBytecode()
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildDeployContractTxWithParsedState(
         code.contract,
