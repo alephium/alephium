@@ -132,12 +132,12 @@ class VotingTest extends AlephiumActorSpec {
           getContractState(contractAddress.toBase58, activeAddressesGroup),
           restPort
         )
-      contractState.fields.get(0).get is ValU256(U256.unsafe(nbYes))
-      contractState.fields.get(1).get is ValU256(U256.unsafe(nbNo))
-      contractState.fields.get(2).get is ValBool(isClosed)
-      contractState.fields.get(3).get is ValBool(isInitialized)
-      contractState.fields.get(4).get is ValAddress(Address.fromBase58(admin.activeAddress).get)
-      contractState.fields.drop(5) is AVector.from[Val](
+      contractState.mutFields.get(0).get is ValU256(U256.unsafe(nbYes))
+      contractState.mutFields.get(1).get is ValU256(U256.unsafe(nbNo))
+      contractState.mutFields.get(2).get is ValBool(isClosed)
+      contractState.mutFields.get(3).get is ValBool(isInitialized)
+      contractState.immFields.get(0).get is ValAddress(Address.fromBase58(admin.activeAddress).get)
+      contractState.immFields.drop(1) is AVector.from[Val](
         voters.map(v => ValAddress(Address.fromBase58(v.activeAddress).get))
       )
     }

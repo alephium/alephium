@@ -1089,6 +1089,7 @@ class ServerUtils(implicit
       contract,
       contract.hash,
       Some(state.initialStateHash),
+      state.immFields.map(Val.from),
       state.mutFields.map(Val.from),
       AssetState.from(contractOutput)
     )
@@ -1224,7 +1225,8 @@ class ServerUtils(implicit
       worldState,
       existingContract.id,
       existingContract.bytecode,
-      toVmVal(existingContract.fields),
+      toVmVal(existingContract.immFields),
+      toVmVal(existingContract.mutFields),
       existingContract.asset
     )
   }
@@ -1238,7 +1240,8 @@ class ServerUtils(implicit
       worldState,
       contractId,
       testContract.code,
-      toVmVal(testContract.initialFields),
+      toVmVal(testContract.initialImmFields),
+      toVmVal(testContract.initialMutFields),
       testContract.initialAsset
     )
   }
@@ -1247,16 +1250,18 @@ class ServerUtils(implicit
       worldState: WorldState.Staging,
       contractId: ContractId,
       code: StatefulContract,
-      initialState: AVector[vm.Val],
+      initialImmState: AVector[vm.Val],
+      initialMutState: AVector[vm.Val],
       asset: AssetState
   ): Try[Unit] = {
     val outputRef = contractId.inaccurateFirstOutputRef()
     val output    = asset.toContractOutput(contractId)
     wrapResult(
-      worldState.createContractLegacyUnsafe(
+      worldState.createContractLemanUnsafe(
         contractId,
         code.toHalfDecoded(),
-        initialState,
+        initialImmState,
+        initialMutState,
         outputRef,
         output
       )

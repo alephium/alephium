@@ -683,7 +683,8 @@ trait EndpointsExamples extends ErrorExamples {
     bytecode = code,
     codeHash = code.hash,
     initialStateHash = Some(code.initialStateHash(AVector.empty, AVector.empty)),
-    fields = AVector[Val](ValU256(ALPH.alph(2))),
+    immFields = AVector[Val](ValU256(ALPH.alph(1))),
+    mutFields = AVector[Val](ValU256(ALPH.alph(2))),
     asset = asset(2)
   )
   implicit val testContractExamples: List[Example[TestContract]] = {
@@ -692,7 +693,8 @@ trait EndpointsExamples extends ErrorExamples {
         group = Some(0),
         address = Some(Address.contract(ContractId.zero)),
         bytecode = code,
-        initialFields = Some(AVector[Val](ValU256(ALPH.oneAlph))),
+        initialImmFields = Some(AVector[Val](ValU256(ALPH.alph(1)))),
+        initialMutFields = Some(AVector[Val](ValU256(ALPH.alph(2)))),
         initialAsset = Some(asset(1)),
         methodIndex = Some(0),
         args = Some(AVector[Val](ValU256(ALPH.oneAlph))),
