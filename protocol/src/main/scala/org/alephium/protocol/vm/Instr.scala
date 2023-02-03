@@ -166,10 +166,10 @@ object Instr {
     /* Below are instructions for Leman hard fork */
     MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
     CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-    LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
+    LoadMutFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
     CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-    LoadImmField
+    LoadImmField, LoadImmFieldByIndex
   )
   // format: on
 
@@ -455,7 +455,21 @@ final case class StoreMutField(index: Byte)
 }
 object StoreMutField extends StatefulInstrCompanion1[Byte]
 
-case object LoadFieldByIndex extends VarIndexInstr[StatefulContext] with StatefulInstrCompanion0 {
+case object LoadImmFieldByIndex
+    extends VarIndexInstr[StatefulContext]
+    with StatefulInstrCompanion0 {
+  def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      index <- popIndex(frame, InvalidMutFieldIndex)
+      v     <- frame.getImmField(index)
+      _     <- frame.pushOpStack(v)
+    } yield ()
+  }
+}
+
+case object LoadMutFieldByIndex
+    extends VarIndexInstr[StatefulContext]
+    with StatefulInstrCompanion0 {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       index <- popIndex(frame, InvalidMutFieldIndex)

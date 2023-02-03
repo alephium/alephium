@@ -3426,4 +3426,81 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
     )
   }
+
+  it should "load both mutable and immutable fields by index" in {
+    val code =
+      s"""
+         |Contract Foo(mut a: U256, mut x: [U256; 2], b: Bool, y: [Bool; 2]) {
+         |  pub fn foo(z: I256, c: U256) -> () {
+         |    assert!(x[c + 1] != 0, 0)
+         |    assert!(z != 0i, 0)
+         |  }
+         |
+         |  pub fn bar(z: ByteVec, c: U256) -> () {
+         |    assert!(y[c + 1], 0)
+         |    assert!(z != #, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val contract = Compiler.compileContract(code).rightValue
+    contract is StatefulContract(
+      6,
+      methods = AVector(
+        Method[StatefulContext](
+          true,
+          false,
+          false,
+          2,
+          2,
+          0,
+          AVector[Instr[StatefulContext]](
+            LoadLocal(1.toByte),
+            U256Const1,
+            U256Add,
+            Dup,
+            U256Const2,
+            U256Lt,
+            Assert,
+            U256Const1,
+            U256Add,
+            LoadMutFieldByIndex,
+            U256Const0,
+            U256Neq,
+            U256Const0,
+            AssertWithErrorCode
+          ) ++
+            AVector(LoadLocal(0.toByte), I256Const0, I256Neq, U256Const0, AssertWithErrorCode)
+        ),
+        Method[StatefulContext](
+          true,
+          false,
+          false,
+          2,
+          2,
+          0,
+          AVector[Instr[StatefulContext]](
+            LoadLocal(1.toByte),
+            U256Const1,
+            U256Add,
+            Dup,
+            U256Const2,
+            U256Lt,
+            Assert,
+            U256Const1,
+            U256Add,
+            LoadImmFieldByIndex,
+            U256Const0,
+            AssertWithErrorCode
+          ) ++
+            AVector(
+              LoadLocal(0.toByte),
+              BytesConst(Val.ByteVec(ByteString.empty)),
+              ByteVecNeq,
+              U256Const0,
+              AssertWithErrorCode
+            )
+        )
+      )
+    )
+  }
 }

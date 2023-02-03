@@ -930,7 +930,7 @@ object Compiler {
         LoadLocal.apply,
         if (isMutable) LoadMutField.apply else LoadImmField.apply,
         LoadLocalByIndex,
-        LoadFieldByIndex
+        if (isMutable) LoadMutFieldByIndex else LoadImmFieldByIndex
       )
 
     def genStoreCode(

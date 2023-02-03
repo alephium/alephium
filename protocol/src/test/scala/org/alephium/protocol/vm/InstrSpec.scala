@@ -79,10 +79,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     val lemanStatefulInstrs = AVector[LemanInstr[StatefulContext]](
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-      LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
+      LoadMutFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
       NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-      LoadImmField(0.toByte)
+      LoadImmField(0.toByte), LoadImmFieldByIndex
     )
     // format: on
   }
@@ -1893,9 +1893,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "LoadImmField(byte)" in new StatefulInstrFixture {
-    runAndCheckGas(LoadMutField(0.toByte))
+    runAndCheckGas(LoadImmField(0.toByte))
     stack.size is 1
-    stack.top.get is Val.True
+    stack.top.get is Val.False
 
     LoadImmField(1.toByte).runWith(frame).leftValue isE InvalidImmFieldIndex
     LoadImmField(-1.toByte).runWith(frame).leftValue isE InvalidImmFieldIndex
@@ -1922,18 +1922,32 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     StoreMutField(-1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex
   }
 
-  it should "LoadFieldByIndex" in new StatefulInstrFixture {
+  it should "LoadImmFieldByIndex" in new StatefulInstrFixture {
     stack.push(Val.U256(0))
-    runAndCheckGas(LoadFieldByIndex)
+    runAndCheckGas(LoadImmFieldByIndex)
+    stack.size is 1
+    stack.top.get is Val.False
+
+    stack.push(Val.U256(1))
+    LoadImmFieldByIndex.runWith(frame).leftValue isE InvalidImmFieldIndex
+    stack.push(Val.U256(0xff))
+    LoadImmFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
+    stack.push(Val.U256(0xff + 1))
+    LoadImmFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex
+  }
+
+  it should "LoadMutFieldByIndex" in new StatefulInstrFixture {
+    stack.push(Val.U256(0))
+    runAndCheckGas(LoadMutFieldByIndex)
     stack.size is 1
     stack.top.get is Val.True
 
     stack.push(Val.U256(1))
-    LoadFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex
+    LoadMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex
     stack.push(Val.U256(0xff))
-    LoadFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
+    LoadMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
     stack.push(Val.U256(0xff + 1))
-    LoadFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex
+    LoadMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex
   }
 
   it should "StoreFieldByIndex" in new StatefulInstrFixture {
@@ -3510,10 +3524,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MigrateSimple -> 32000, MigrateWithFields -> 32000, CopyCreateContractWithToken -> 24000,
       BurnToken -> 30, LockApprovedAssets -> 30,
       CreateSubContract -> 32000, CreateSubContractWithToken -> 32000, CopyCreateSubContract -> 24000, CopyCreateSubContractWithToken -> 24000,
-      LoadFieldByIndex -> 5, StoreFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
+      LoadMutFieldByIndex -> 5, StoreFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
       CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
       NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199, ALPHTokenId -> 2,
-      LoadImmField(byte) -> 3
+      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -3638,10 +3652,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MigrateSimple -> 186, MigrateWithFields -> 187, CopyCreateContractWithToken -> 188,
       BurnToken -> 189, LockApprovedAssets -> 190,
       CreateSubContract -> 191, CreateSubContractWithToken -> 192, CopyCreateSubContract -> 193, CopyCreateSubContractWithToken -> 194,
-      LoadFieldByIndex -> 195, StoreFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
+      LoadMutFieldByIndex -> 195, StoreFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
       CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
       NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204, ALPHTokenId -> 205,
-      LoadImmField(byte) -> 206
+      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207
     )
     // format: on
 
@@ -3697,10 +3711,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Leman hard fork */
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-      LoadFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
+      LoadMutFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
       NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-      LoadImmField(0.toByte)
+      LoadImmField(0.toByte), LoadImmFieldByIndex
     )
     // format: on
   }
