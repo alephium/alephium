@@ -1220,12 +1220,13 @@ object BuiltIn {
   val migrateWithFields: SimpleBuiltIn[StatefulContext] =
     SimpleBuiltIn.contract(
       "migrateWithFields",
-      Seq[Type](Type.ByteVec, Type.ByteVec),
+      Seq[Type](Type.ByteVec, Type.ByteVec, Type.ByteVec),
       Seq.empty,
       MigrateWithFields,
       argsName = Seq(
-        "newBytecode"      -> "the bytecode for the contract to migrate to",
-        "newEncodedFields" -> "the new fields for the contract to migrate to"
+        "newBytecode"         -> "the bytecode for the contract to migrate to",
+        "newEncodedImmFields" -> "the encoded immutable fields for the contract to migrate to",
+        "newEncodedMutFields" -> "the encoded mutable fields for the contract to migrate to"
       ),
       retComment = "",
       doc = "Migrates both the code and the fields of the contract."

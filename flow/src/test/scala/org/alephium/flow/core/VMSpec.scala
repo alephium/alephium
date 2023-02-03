@@ -1315,14 +1315,14 @@ class VMSpec extends AlephiumSpec {
   it should "migrate contract" in new DestroyFixture {
     val fooV1 =
       s"""
-         |Contract Foo(x: Bool) {
+         |Contract Foo(mut x: Bool) {
          |  @using(updateFields = true)
          |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
          |    // in practice, we should check the permission for migration
          |    if (!changeState) {
          |      migrate!(code)
          |    } else {
-         |      migrateWithFields!(code, #010000)
+         |      migrateWithFields!(code, #00, #010000)
          |    }
          |  }
          |
@@ -1334,11 +1334,11 @@ class VMSpec extends AlephiumSpec {
     val (fooId, _) = prepareContract(fooV1, AVector[Val](Val.True))
     val fooV2 =
       s"""
-         |Contract Foo(x: Bool) {
+         |Contract Foo(mut x: Bool) {
          |  @using(updateFields = true)
          |  pub fn foo(code: ByteVec, changeState: Bool) -> () {
          |    if (changeState) {
-         |      migrateWithFields!(code, #010000)
+         |      migrateWithFields!(code, #00, #010000)
          |    } else {
          |      migrate!(code)
          |    }

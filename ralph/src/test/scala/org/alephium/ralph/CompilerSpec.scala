@@ -3150,7 +3150,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  pub fn foo(code: ByteVec, fields: ByteVec) -> () {
-           |    migrateWithFields!(code, fields)
+           |    migrateWithFields!(code, #00, fields)
            |  }
            |}
            |""".stripMargin
