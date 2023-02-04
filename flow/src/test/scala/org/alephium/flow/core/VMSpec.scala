@@ -288,13 +288,16 @@ class VMSpec extends AlephiumSpec {
 
     def checkContractState(
         contractId: String,
+        code: String,
         contractAssetRef: ContractOutputRef,
         existed: Boolean
     ): Assertion = {
+      val contract    = Compiler.compileContract(code).rightValue
       val worldState  = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       val contractKey = ContractId.from(Hex.from(contractId).get).get
       worldState.contractState.exists(contractKey) isE existed
       worldState.outputState.exists(contractAssetRef) isE existed
+      worldState.codeState.exists(contract.hash) isE existed
     }
 
     def getContractAsset(contractId: ContractId, chainIndex: ChainIndex): ContractOutput = {
@@ -1163,7 +1166,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val (fooId, fooAssetRef) = prepareContract(foo, AVector(Val.U256(0)))
-    checkContractState(fooId, fooAssetRef, true)
+    checkContractState(fooId, foo, fooAssetRef, true)
 
     lazy val fooCaller =
       s"""
@@ -1212,7 +1215,7 @@ class VMSpec extends AlephiumSpec {
       val address = Address.Contract(LockupScript.P2C(ContractId.generate))
       val script  = Compiler.compileTxScript(destroy(address.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, PayToContractAddressNotInCallerTrace)
-      checkContractState(fooId, fooAssetRef, true)
+      checkContractState(fooId, foo, fooAssetRef, true)
     }
 
     {
@@ -1220,7 +1223,7 @@ class VMSpec extends AlephiumSpec {
       val fooAddress = Address.contract(ContractId.unsafe(Hash.unsafe(Hex.unsafe(fooId))))
       val script     = Compiler.compileTxScript(destroy(fooAddress.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, ContractAssetAlreadyFlushed)
-      checkContractState(fooId, fooAssetRef, true)
+      checkContractState(fooId, foo, fooAssetRef, true)
     }
 
     {
@@ -1237,13 +1240,13 @@ class VMSpec extends AlephiumSpec {
       val script = Compiler.compileTxScript(main).rightValue
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
         .startsWith("Right(TxScriptExeFailed(NonExistContract") is true
-      checkContractState(fooId, fooAssetRef, true) // None of the two destruction will take place
+      checkContractState(fooId, foo, fooAssetRef, true) // None of the two destruction will take place
     }
 
     {
       info("Destroy a contract properly")
       callTxScript(destroy(genesisAddress.toBase58))
-      checkContractState(fooId, fooAssetRef, false)
+      checkContractState(fooId, foo, fooAssetRef, false)
     }
   }
 
@@ -1263,7 +1266,7 @@ class VMSpec extends AlephiumSpec {
     fooCallerAssetBefore.amount is ALPH.oneAlph
 
     callTxScript(destroy())
-    checkContractState(fooId, fooAssetRef, false)
+    checkContractState(fooId, foo, fooAssetRef, false)
 
     val fooCallerAssetAfter = getContractAsset(fooCallerContractId, chainIndex)
     fooCallerAssetAfter.amount is ALPH.alph(2)
@@ -1281,7 +1284,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     callTxScript(destroy())
-    checkContractState(fooId, fooAssetRef, false)
+    checkContractState(fooId, foo, fooAssetRef, false)
   }
 
   it should "not destroy a contract after approving assets" in new DestroyFixture {
@@ -1407,7 +1410,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val (fooId, fooAssetRef) = prepareContract(foo)
-    checkContractState(fooId, fooAssetRef, true)
+    checkContractState(fooId, foo, fooAssetRef, true)
 
     val bar =
       s"""
@@ -1431,7 +1434,7 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     callTxScript(main)
-    checkContractState(fooId, fooAssetRef, false)
+    checkContractState(fooId, foo, fooAssetRef, false)
   }
 
   it should "not call contract destroy function from the same contract" in new DestroyFixture {
@@ -1451,7 +1454,7 @@ class VMSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val (fooId, fooAssetRef) = prepareContract(foo)
-    checkContractState(fooId, fooAssetRef, true)
+    checkContractState(fooId, foo, fooAssetRef, true)
 
     val main =
       s"""
@@ -2400,7 +2403,7 @@ class VMSpec extends AlephiumSpec {
       val (contractId, contractOutputRef) =
         createContract(contract, AVector.empty, AVector(Val.U256(0)))
       val contractIdHex = contractId.toHexString
-      checkContractState(contractIdHex, contractOutputRef, true)
+      checkContractState(contractIdHex, contract, contractOutputRef, true)
 
       val script =
         s"""
