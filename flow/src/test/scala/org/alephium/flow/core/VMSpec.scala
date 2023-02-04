@@ -1240,7 +1240,12 @@ class VMSpec extends AlephiumSpec {
       val script = Compiler.compileTxScript(main).rightValue
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
         .startsWith("Right(TxScriptExeFailed(NonExistContract") is true
-      checkContractState(fooId, foo, fooAssetRef, true) // None of the two destruction will take place
+      checkContractState(
+        fooId,
+        foo,
+        fooAssetRef,
+        true
+      ) // None of the two destruction will take place
     }
 
     {
