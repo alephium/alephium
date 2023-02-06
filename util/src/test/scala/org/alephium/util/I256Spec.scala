@@ -191,24 +191,77 @@ class I256Spec extends AlephiumSpec {
   }
 
   it should "test pow" in {
-    I256.Zero.pow(0) is Some(I256.One)
-    I256.Zero.pow(1) is Some(I256.Zero)
-    I256.from(-1).pow(0) is Some(I256.One)
-    I256.Two.pow(255) is None
-    I256.Two.pow(254) is Some(I256.MaxValue.divUnsafe(I256.Two).addUnsafe(I256.One))
-    I256.from(-2).pow(256) is None
-    I256.from(-2).pow(255) is Some(I256.MinValue)
+    I256.Zero.v.bitLength() is 0
+    I256.Zero.pow(I256.Zero) is Some(I256.One)
+    I256.Zero.v.pow(I256.Zero.toInt.value) is (I256.One.v)
+    I256.Zero.pow(I256.One) is Some(I256.Zero)
+    I256.Zero.pow(I256.MaxValue) is Some(I256.Zero)
+    I256.Zero.pow(I256.NegOne) is None
+    I256.Zero.pow(I256.MinValue) is None
+
+    I256.NegOne.v.bitLength() is 0
+    I256.NegOne.pow(I256.Zero) is Some(I256.One)
+    I256.NegOne.pow(I256.One) is Some(I256.NegOne)
+    I256.NegOne.pow(I256.Two) is Some(I256.One)
+    I256.NegOne.pow(I256.MaxValue) is Some(I256.NegOne)
+
+    I256.One.v.bitLength() is 1
+    I256.One.pow(I256.Zero) is Some(I256.One)
+    I256.One.pow(I256.One) is Some(I256.One)
+    I256.One.pow(I256.Two) is Some(I256.One)
+    I256.One.pow(I256.MaxValue) is Some(I256.One)
+
+    I256.Two.v.bitLength() is 2
+    I256.Two.pow(I256.Zero) is Some(I256.One)
+    I256.Two.pow(I256.One) is Some(I256.Two)
+    I256.Two.pow(I256.NegOne) is None
+    I256.Two.pow(I256.unsafe(255)) is None
+    I256.Two.pow(I256.unsafe(254)) is Some(I256.MaxValue.divUnsafe(I256.Two).addUnsafe(I256.One))
+
+    I256.from(-2).pow(I256.NegOne) is None
+    I256.from(-2).pow(I256.unsafe(256)) is None
+    I256.from(-2).pow(I256.unsafe(255)) is Some(I256.MinValue)
+
+    I256.MaxValue.pow(I256.Zero) is Some(I256.One)
+    I256.MaxValue.v.pow(I256.Zero.toInt.value) is (I256.One.v)
+    I256.MaxValue.pow(I256.One) is Some(I256.MaxValue)
+    I256.MaxValue.v.pow(I256.One.toInt.value) is (I256.MaxValue.v)
+    I256.MaxValue.pow(I256.NegOne) is None
+    I256.MaxValue.pow(I256.Two) is None
+
+    I256.MinValue.pow(I256.Zero) is Some(I256.One)
+    I256.MinValue.pow(I256.One) is Some(I256.MinValue)
+    I256.MinValue.pow(I256.NegOne) is None
+    I256.MinValue.pow(I256.Two) is None
+
+    val number0 = I256.unsafe(BigInteger.ONE.shiftLeft(127))
+    number0.pow(I256.One) is Some(number0)
+    number0.pow(I256.Two) is Some(I256.unsafe(BigInteger.ONE.shiftLeft(254)))
+    number0.negateUnsafe().pow(I256.One) is Some(number0.negateUnsafe())
+    number0.negateUnsafe().pow(I256.Two) is Some(I256.unsafe(BigInteger.ONE.shiftLeft(254)))
+
+    val number1 = I256.unsafe(BigInteger.ONE.shiftLeft(128))
+    number1.pow(I256.One) is Some(number1)
+    number1.pow(I256.Two) is None
+    number1.negateUnsafe().pow(I256.One) is Some(number1.negateUnsafe())
+    number1.negateUnsafe().pow(I256.Two) is None
 
     forAll(Gen.choose(-10, 10), Gen.choose(0, 50)) { case (base, exp) =>
-      I256.from(base).pow(exp) is Some(I256.unsafe(BigInteger.valueOf(base.toLong).pow(exp)))
+      I256.from(base).pow(I256.unsafe(exp)) is Some(
+        I256.unsafe(BigInteger.valueOf(base.toLong).pow(exp))
+      )
+    }
+
+    forAll(Gen.choose(-10, 10), Gen.choose(Int.MinValue, -1)) { case (base, exp) =>
+      I256.from(base).pow(I256.unsafe(exp)) is None
     }
 
     forAll(Gen.choose(2, 10), Gen.choose(256, 500)) { case (base, exp) =>
-      I256.unsafe(base).pow(exp) is None
+      I256.unsafe(base).pow(I256.unsafe(exp)) is None
     }
 
     forAll(Gen.choose(-10, -2), Gen.choose(256, 500)) { case (base, exp) =>
-      I256.unsafe(base).pow(exp) is None
+      I256.unsafe(base).pow(I256.unsafe(exp)) is None
     }
   }
 }

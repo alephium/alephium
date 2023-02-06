@@ -25,7 +25,11 @@ class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
 
   @inline def isZero: Boolean = v.signum() == 0
 
-  def isPositive: Boolean = v.signum() >= 0
+  def isNonNegative: Boolean = v.signum() >= 0
+
+  def isNegative: Boolean = v.signum() < 0
+
+  def negateUnsafe(): I256 = I256.unsafe(v.negate())
 
   def addUnsafe(that: I256): I256 = {
     val underlying = this.v.add(that.v)
@@ -60,7 +64,33 @@ class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
     if (validate(underlying)) Some(I256.unsafe(underlying)) else None
   }
 
-  def pow(n: Int): Option[I256] = I256.from(this.v.pow(n))
+  def pow(that: I256): Option[I256] = {
+    if (that.isNegative) {
+      None
+    } else if (this == I256.Zero) {
+      if (that == I256.Zero) {
+        Some(I256.One)
+      } else {
+        Some(I256.Zero)
+      }
+    } else if (this == I256.One) {
+      Some(I256.One)
+    } else if (this == I256.NegOne) {
+      if (that.v.testBit(0)) {
+        Some(I256.NegOne)
+      } else {
+        Some(I256.One)
+      }
+    } else {
+      that.toInt.flatMap { n =>
+        if ((n < 0) || ((this.v.bitLength() - 1) * n > 256)) {
+          None
+        } else {
+          I256.from(this.v.pow(n))
+        }
+      }
+    }
+  }
 
   def divUnsafe(that: I256): I256 = {
     assume(!(that.isZero || (that == I256.NegOne && this == I256.MinValue)))
@@ -163,4 +193,6 @@ object I256 {
   val NegOne: I256   = unsafe(BigInteger.ONE.negate())
   val MaxValue: I256 = unsafe(upperBound.subtract(BigInteger.ONE))
   val MinValue: I256 = unsafe(lowerBound)
+
+  val HalfMaxValue: I256 = MaxValue.divUnsafe(Two)
 }
