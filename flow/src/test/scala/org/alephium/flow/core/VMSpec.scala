@@ -1516,9 +1516,9 @@ class VMSpec extends AlephiumSpec {
          |  assert!(txId!() != #${zeroId.toHexString}, 0)
          |  assert!(txInputAddress!($index) == @${genesisAddress.toBase58}, 0)
          |  assert!(txInputsSize!() == 1, 0)
-         |  assert!(txGasPrice!() == ${defaultGasPrice.value}, 0)
+         |  assert!(txGasPrice!() == ${nonCoinbaseMinGasPrice.value}, 0)
          |  assert!(txGasAmount!() == ${gasAmount.value}, 0)
-         |  assert!(txGasFee!() == ${defaultGasPrice * gasAmount}, 0)
+         |  assert!(txGasFee!() == ${nonCoinbaseMinGasPrice * gasAmount}, 0)
          |}
          |""".stripMargin
     testSimpleScript(main(0), gasAmount.value)

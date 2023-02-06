@@ -216,7 +216,7 @@ class MemPoolSpec
     val index = ChainIndex.unsafe(0)
     val txs = Seq.tabulate(10) { k =>
       val tx = transactionGen().sample.get
-      tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(defaultGasPrice.value + k)))
+      tx.copy(unsigned = tx.unsigned.copy(gasPrice = GasPrice(nonCoinbaseMinGasPrice.value + k)))
         .toTemplate
     }
     val timeStamp = TimeStamp.now()

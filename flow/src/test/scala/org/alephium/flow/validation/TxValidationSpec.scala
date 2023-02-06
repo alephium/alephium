@@ -95,7 +95,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           genesisPriKey.publicKey,
           outputs,
           None,
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           defaultUtxoLimit
         )
         .rightValue
@@ -112,7 +112,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           unlock,
           outputs.tail,
           None,
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           defaultUtxoLimit
         )
         .rightValue
@@ -412,8 +412,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.gasAmount(maximalGasPerTx.addUnsafe(1)).fail(InvalidStartGas)
 
     tx.gasPrice(GasPrice(0)).fail(InvalidGasPrice)
-    tx.gasPrice(minimalGasPrice).pass()
-    tx.gasPrice(GasPrice(minimalGasPrice.value - 1)).fail(InvalidGasPrice)
+    tx.gasPrice(coinbaseGasPrice).pass()
+    tx.gasPrice(GasPrice(coinbaseGasPrice.value - 1)).fail(InvalidGasPrice)
     tx.gasPrice(GasPrice(ALPH.MaxALPHValue - 1)).pass()
     tx.gasPrice(GasPrice(ALPH.MaxALPHValue)).fail(InvalidGasPrice)
   }

@@ -1609,7 +1609,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   trait GasInstrFixture extends StatelessInstrFixture {
     val gasPriceGen = Gen
-      .choose[BigInteger](minimalGasPrice.value.v, ALPH.oneAlph.v)
+      .choose[BigInteger](coinbaseGasPrice.value.v, ALPH.oneAlph.v)
       .map(v => GasPrice(U256.unsafe(v)))
     val gasAmountGen = Gen.choose[Int](minimalGas.value, maximalGasPerTx.value).map(GasBox.unsafe)
     val txEnv = TxEnv.mockup(

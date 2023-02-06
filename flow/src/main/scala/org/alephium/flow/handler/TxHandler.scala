@@ -82,7 +82,7 @@ object TxHandler {
   }
   @inline def checkHighGasPrice(currentTs: TimeStamp, tx: TransactionTemplate): Boolean = {
     if (currentTs <= highPriceUntil) {
-      tx.unsigned.gasPrice >= defaultGasPrice
+      tx.unsigned.gasPrice >= nonCoinbaseMinGasPrice
     } else {
       true
     }
@@ -274,7 +274,7 @@ trait TxCoreHandler extends TxHandlerUtils {
     assume(!brokerConfig.isIncomingChain(chainIndex))
     val mempool = blockFlow.getMemPool(chainIndex.from)
     if (!TxHandler.checkHighGasPrice(tx)) {
-      addFailed(tx, s"tx has lower gas price than ${defaultGasPrice}", acknowledge)
+      addFailed(tx, s"tx has lower gas price than ${nonCoinbaseMinGasPrice}", acknowledge)
     } else if (mempool.contains(tx)) {
       addFailed(tx, s"tx ${tx.id.toHexString} is already included", acknowledge)
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {

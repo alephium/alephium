@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.minimalGasPrice
+import org.alephium.protocol.model.coinbaseGasPrice
 import org.alephium.serde.Serde
 import org.alephium.util.U256
 
@@ -34,6 +34,6 @@ object GasPrice {
   implicit val serde: Serde[GasPrice] = Serde.forProduct1(GasPrice.apply, _.value)
 
   def validate(gasPrice: GasPrice): Boolean = {
-    gasPrice >= minimalGasPrice && gasPrice.value < ALPH.MaxALPHValue
+    gasPrice >= coinbaseGasPrice && gasPrice.value < ALPH.MaxALPHValue
   }
 }

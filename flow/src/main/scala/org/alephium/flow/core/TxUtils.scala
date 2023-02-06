@@ -557,8 +557,8 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   private def checkGasPrice(gasPrice: GasPrice): Either[String, Unit] = {
-    if (gasPrice < minimalGasPrice) {
-      Left(s"Gas price $gasPrice too small, minimal $minimalGasPrice")
+    if (gasPrice < coinbaseGasPrice) {
+      Left(s"Gas price $gasPrice too small, minimal $coinbaseGasPrice")
     } else if (gasPrice.value >= ALPH.MaxALPHValue) {
       val maximalGasPrice = GasPrice(ALPH.MaxALPHValue.subOneUnsafe())
       Left(s"Gas price $gasPrice too large, maximal $maximalGasPrice")

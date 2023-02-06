@@ -198,7 +198,7 @@ class ServerUtils(implicit
         query.utxos,
         query.destinations,
         query.gasAmount,
-        query.gasPrice.getOrElse(defaultGasPrice),
+        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
         query.targetBlockHash
       )
     } yield {
@@ -219,7 +219,7 @@ class ServerUtils(implicit
         unlockScript,
         query.destinations,
         query.gas,
-        query.gasPrice.getOrElse(defaultGasPrice),
+        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
         None
       )
     } yield {
@@ -268,7 +268,7 @@ class ServerUtils(implicit
         query.toAddress,
         query.lockTime,
         query.gasAmount,
-        query.gasPrice.getOrElse(defaultGasPrice),
+        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
         query.targetBlockHash
       )
     } yield {
@@ -751,7 +751,7 @@ class ServerUtils(implicit
       allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
       allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
       unsignedTx <- UtxoSelectionAlgo
-        .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(defaultGasPrice)))
+        .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
         .select(
           AssetAmounts(amount, tokens),
           unlockScript,
@@ -765,7 +765,7 @@ class ServerUtils(implicit
           val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, unlockScript))
           UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
             gasAmount = gas.getOrElse(selectedUtxos.gas),
-            gasPrice = gasPrice.getOrElse(defaultGasPrice)
+            gasPrice = gasPrice.getOrElse(nonCoinbaseMinGasPrice)
           )
         }
         .left
@@ -1115,13 +1115,13 @@ class ServerUtils(implicit
       consensusConfig.maxMiningTarget,
       Some(blockHash)
     )
-    val testGasFee = defaultGasPrice * maximalGasPerTx
+    val testGasFee = nonCoinbaseMinGasPrice * maximalGasPerTx
     val txEnv: TxEnv = TxEnv.mockup(
       txId = txId,
       signatures = Stack.popOnly(AVector.empty[Signature]),
       prevOutputs = inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
-      gasPrice = defaultGasPrice,
+      gasPrice = nonCoinbaseMinGasPrice,
       gasAmount = maximalGasPerTx,
       isEntryMethodPayable = true
     )

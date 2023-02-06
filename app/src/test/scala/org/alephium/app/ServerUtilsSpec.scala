@@ -382,7 +382,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       // Spend 10 UTXOs and generate 1 output
       sweepAddressTxTemplate.unsigned.fixedOutputs.length is 1
       sweepAddressTxTemplate.unsigned.gasAmount > minimalGas is true
-      sweepAddressTxTemplate.gasFeeUnsafe is defaultGasPrice * GasEstimation.sweepAddress(11, 1)
+      sweepAddressTxTemplate.gasFeeUnsafe is nonCoinbaseMinGasPrice * GasEstimation.sweepAddress(11, 1)
 
       checkAddressBalance(
         sweepAddressDestination,
@@ -430,7 +430,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           None,
           destinations,
           None,
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           targetBlockHash
         )
         .rightValue
@@ -446,7 +446,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           destinations.head.address,
           None,
           None,
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           targetBlockHash
         )
         .rightValue
@@ -471,7 +471,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         destinations,
         gasOpt = None,
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .rightValue
@@ -536,7 +536,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           outputRefsOpt = Some(outputRefs),
           destinations,
           gasOpt = Some(minimalGas),
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           targetBlockHashOpt = None
         )
         .rightValue
@@ -556,7 +556,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = None,
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .rightValue
@@ -566,7 +566,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val outputLockupScripts = fromLockupScript +: destinations.map(_.address.lockupScript)
       val defaultGas =
         GasEstimation.estimateWithP2PKHInputs(outputRefs.length, outputLockupScripts.length)
-      val defaultGasFee = defaultGasPrice * defaultGas
+      val defaultGasFee = nonCoinbaseMinGasPrice * defaultGas
       fromAddressBalance - ALPH.oneAlph.mulUnsafe(2) - defaultGasFee
     }
 
@@ -600,7 +600,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       NetworkId.AlephiumDevNet,
       None,
       minimalGas,
-      defaultGasPrice,
+      nonCoinbaseMinGasPrice,
       AVector.empty,
       AVector.empty
     )
@@ -627,7 +627,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .leftValue
@@ -649,7 +649,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .leftValue
@@ -664,7 +664,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(AVector.empty),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .leftValue
@@ -684,7 +684,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(GasBox.unsafe(100)),
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .leftValue
@@ -698,7 +698,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(GasBox.unsafe(625001)),
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .leftValue
@@ -718,7 +718,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        GasPrice(minimalGasPrice.value - 1),
+        GasPrice(coinbaseGasPrice.value - 1),
         targetBlockHashOpt = None
       )
       .leftValue
@@ -751,7 +751,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         attoAlphAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .leftValue
@@ -771,7 +771,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = None,
         tokenAmountOverflowDestinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .leftValue
@@ -790,7 +790,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         outputRefsOpt = Some(outputRefs),
         destinations,
         gasOpt = Some(minimalGas),
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         targetBlockHashOpt = None
       )
       .leftValue
@@ -1091,7 +1091,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts(1).address is Address.contract(barContractId)
     val assetOutput = result.txOutputs(1)
     assetOutput.address is assetAddress
-    assetOutput.attoAlphAmount is Amount(ALPH.alph(2).subUnsafe(defaultGasPrice * maximalGasPerTx))
+    assetOutput.attoAlphAmount is Amount(ALPH.alph(2).subUnsafe(nonCoinbaseMinGasPrice * maximalGasPerTx))
   }
 
   trait DestroyFixture extends Fixture {
@@ -1184,7 +1184,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts(1).address is Address.contract(barContractId)
     val assetOutput = result.txOutputs(1)
     assetOutput.address is assetAddress
-    val totalGas = defaultGasPrice * maximalGasPerTx
+    val totalGas = nonCoinbaseMinGasPrice * maximalGasPerTx
     assetOutput.attoAlphAmount is Amount(ALPH.oneAlph.subUnsafe(totalGas))
     val contractOutput = result.txOutputs(0)
     contractOutput.address is Address.contract(fooCallerContractId)

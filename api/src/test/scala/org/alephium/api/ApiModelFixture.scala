@@ -63,7 +63,7 @@ trait ApiModelFixture
   val unsignedTransaction = UnsignedTransaction(
     Some(script),
     defaultGas,
-    defaultGasPrice,
+    nonCoinbaseMinGasPrice,
     AVector(txInput),
     AVector(assetOutput)
   )

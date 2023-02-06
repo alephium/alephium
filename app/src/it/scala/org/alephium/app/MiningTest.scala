@@ -18,7 +18,7 @@ package org.alephium.app
 
 import org.alephium.api.model._
 import org.alephium.flow.mining.Miner
-import org.alephium.protocol.model.defaultGasFee
+import org.alephium.protocol.model.nonCoinbaseMinGasFee
 import org.alephium.util._
 
 class MiningTest extends AlephiumActorSpec {
@@ -40,7 +40,7 @@ class MiningTest extends AlephiumActorSpec {
     eventually {
       request[Balance](getBalance(address), restPort) is
         Balance.from(
-          Amount(initialBalance.balance.value - transferAmount - defaultGasFee),
+          Amount(initialBalance.balance.value - transferAmount - nonCoinbaseMinGasFee),
           Amount.Zero,
           None,
           None,
@@ -53,7 +53,7 @@ class MiningTest extends AlephiumActorSpec {
     eventually {
       request[Balance](getBalance(address), restPort) is
         Balance.from(
-          Amount(initialBalance.balance.value - (transferAmount + defaultGasFee) * 2),
+          Amount(initialBalance.balance.value - (transferAmount + nonCoinbaseMinGasFee) * 2),
           Amount.Zero,
           None,
           None,
@@ -101,7 +101,7 @@ class MiningTest extends AlephiumActorSpec {
     eventually {
       request[Balance](getBalance(address), restPort) is
         Balance.from(
-          Amount(initialBalance.balance.value - (transferAmount + defaultGasFee) * n),
+          Amount(initialBalance.balance.value - (transferAmount + nonCoinbaseMinGasFee) * n),
           Amount.Zero,
           None,
           None,

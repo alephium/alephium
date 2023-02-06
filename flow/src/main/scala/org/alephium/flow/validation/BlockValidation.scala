@@ -225,7 +225,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     for {
       _ <- checkCoinbaseEasy(block, outputNum)
       _ <- checkCoinbaseData(chainIndex, block)
-      _ <- checkCoinbaseAsTx(chainIndex, block, groupView, netReward.addUnsafe(minimalGasFee))
+      _ <- checkCoinbaseAsTx(chainIndex, block, groupView, netReward.addUnsafe(coinbaseGasFee))
       _ <- checkLockedReward(block, lockedReward)
     } yield ()
   }
@@ -261,7 +261,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     if (
       unsigned.scriptOpt.isEmpty &&
       unsigned.gasAmount == minimalGas &&
-      unsigned.gasPrice == minimalGasPrice &&
+      unsigned.gasPrice == coinbaseGasPrice &&
       unsigned.fixedOutputs.length == outputsNum &&
       unsigned.fixedOutputs(0).tokens.isEmpty &&
       coinbase.contractInputs.isEmpty &&
