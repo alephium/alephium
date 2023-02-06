@@ -237,21 +237,6 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
     (block.target < consensusConfig.maxMiningTarget) is true
   }
 
-  it should "trigger diff penalty based on timestamp for testnet" in new FlowFixture {
-    override val configValues = Map(
-      ("alephium.network.network-id", NetworkId.AlephiumTestNet.id)
-    )
-    config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is true
-    config.network.networkId is NetworkId.AlephiumTestNet
-
-    blockFlow.triggerDiffPenaltyLeman(TimeStamp.zero) is false
-    blockFlow.triggerDiffPenaltyLeman(TimeStamp.now()) is true
-    blockFlow.triggerDiffPenaltyLeman(blockFlow.testnetDiffPenaltyTriggerTs) is false
-    blockFlow.triggerDiffPenaltyLeman(
-      blockFlow.testnetDiffPenaltyTriggerTs.plusSecondsUnsafe(1)
-    ) is true
-  }
-
   trait PreLemanDifficultyFixture extends FlowFixture {
     override val configValues = Map(
       ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(1).millis)

@@ -44,7 +44,7 @@ trait FlowDifficultyAdjustment {
       nextTimeStamp: TimeStamp
   ): IOResult[Target] = {
     if (networkConfig.getHardFork(nextTimeStamp).isLemanEnabled()) {
-      getNextHashTargetLeman(chainIndex, deps, nextTimeStamp)
+      getNextHashTargetLeman(chainIndex, deps)
     } else {
       getNextHashTargetGenesis(chainIndex, deps, nextTimeStamp)
     }
@@ -70,32 +70,17 @@ trait FlowDifficultyAdjustment {
 
   def getNextHashTargetLeman(
       chainIndex: ChainIndex,
-      deps: BlockDeps,
-      nextTimeStamp: TimeStamp
+      deps: BlockDeps
   ): IOResult[Target] = IOUtils.tryExecute {
     val commonIntraGroupDeps             = calCommonIntraGroupDepsUnsafe(deps, chainIndex.from)
     val (diffSum, timeSpanSum, oldestTs) = getDiffAndTimeSpanUnsafe(commonIntraGroupDeps)
     val diffAverage                      = diffSum.divide(brokerConfig.chainNum)
     val timeSpanAverage                  = timeSpanSum.divUnsafe(brokerConfig.chainNum.toLong)
 
-    val chainDep  = deps.getOutDep(chainIndex.to)
-    val heightGap = calHeightDiffUnsafe(chainDep, oldestTs)
-    val targetDiff = if (triggerDiffPenaltyLeman(nextTimeStamp)) {
-      consensusConfig.penalizeDiffForHeightGapLeman(diffAverage, heightGap)
-    } else {
-      diffAverage
-    }
+    val chainDep   = deps.getOutDep(chainIndex.to)
+    val heightGap  = calHeightDiffUnsafe(chainDep, oldestTs)
+    val targetDiff = consensusConfig.penalizeDiffForHeightGapLeman(diffAverage, heightGap)
     ChainDifficultyAdjustment.calNextHashTargetRaw(targetDiff.getTarget(), timeSpanAverage)
-  }
-
-  // scalastyle:off magic.number
-  val testnetDiffPenaltyTriggerTs =
-    TimeStamp.unsafe(1674039600000L) // Jan 18 2023 12:00:00 GMT+0100
-  // scalastyle:on magic.number
-  // As testnet is running with Leman hardfork already, we add another activation timestamp to trigger the penalty.
-  @inline def triggerDiffPenaltyLeman(nextTimeStamp: TimeStamp): Boolean = {
-    networkConfig.networkId != NetworkId.AlephiumTestNet ||
-    nextTimeStamp > testnetDiffPenaltyTriggerTs
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
