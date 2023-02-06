@@ -111,13 +111,13 @@ class TxUtilsSpec extends AlephiumSpec {
 
     lazy val (genesisPriKey, genesisPubKey, _) = genesisKeys(chainIndex.from.value)
     lazy val genesisLockup                     = LockupScript.p2pkh(genesisPubKey)
-    lazy val genesisChange                     = genesisBalance - ALPH.alph(1) - nonCoinbaseMinGasFee
-    lazy val output1 = TxOutputInfo(genesisLockup, genesisChange, AVector.empty, None)
+    lazy val genesisChange = genesisBalance - ALPH.alph(1) - nonCoinbaseMinGasFee
+    lazy val output1       = TxOutputInfo(genesisLockup, genesisChange, AVector.empty, None)
     lazy val unsignedTx = blockFlow
       .transfer(
         genesisPriKey.publicKey,
         AVector(output0, output1),
-        Some(defaultGas),
+        Some(minimalGas),
         nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
@@ -454,7 +454,8 @@ class TxUtilsSpec extends AlephiumSpec {
       val tokenId2 = TokenId.hash("tokenId2")
 
       val inputs = {
-        val input1Amount = nonCoinbaseMinGasFee.addUnsafe(minimalAttoAlphAmountPerTxOutput(1)).subUnsafe(1)
+        val input1Amount =
+          nonCoinbaseMinGasFee.addUnsafe(minimalAttoAlphAmountPerTxOutput(1)).subUnsafe(1)
         val input1 = input("input1", input1Amount, fromLockupScript, (tokenId2, U256.unsafe(10)))
         val input2 = input("input2", ALPH.alph(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
         AVector(input1, input2)
@@ -487,9 +488,10 @@ class TxUtilsSpec extends AlephiumSpec {
     {
       info("without tokens")
       val inputs = {
-        val input1Amount = nonCoinbaseMinGasFee.addUnsafe(minimalAttoAlphAmountPerTxOutput(0)).subUnsafe(1)
-        val input1       = input("input1", input1Amount, fromLockupScript)
-        val input2       = input("input2", ALPH.alph(3), fromLockupScript)
+        val input1Amount =
+          nonCoinbaseMinGasFee.addUnsafe(minimalAttoAlphAmountPerTxOutput(0)).subUnsafe(1)
+        val input1 = input("input1", input1Amount, fromLockupScript)
+        val input2 = input("input2", ALPH.alph(3), fromLockupScript)
         AVector(input1, input2)
       }
 

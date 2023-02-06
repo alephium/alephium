@@ -136,7 +136,7 @@ trait EndpointsExamples extends ErrorExamples {
     1,
     1,
     None,
-    model.defaultGas.value,
+    model.minimalGas.value,
     model.nonCoinbaseMinGasPrice.value,
     AVector(inputAsset),
     AVector(outputAsset)
@@ -451,7 +451,12 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
     val sweepAddressTxs = AVector(
-      SweepAddressTransaction(txId, hexString, model.minimalGas, model.nonCoinbaseMinGasPrice)
+      SweepAddressTransaction(
+        txId,
+        hexString,
+        model.minimalGas,
+        model.nonCoinbaseMinGasPrice
+      )
     )
     simpleExample(BuildSweepAddressTransactionsResult(sweepAddressTxs, fromGroup = 2, toGroup = 1))
   }

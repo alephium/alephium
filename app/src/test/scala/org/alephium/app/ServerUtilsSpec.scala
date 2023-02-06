@@ -382,7 +382,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       // Spend 10 UTXOs and generate 1 output
       sweepAddressTxTemplate.unsigned.fixedOutputs.length is 1
       sweepAddressTxTemplate.unsigned.gasAmount > minimalGas is true
-      sweepAddressTxTemplate.gasFeeUnsafe is nonCoinbaseMinGasPrice * GasEstimation.sweepAddress(11, 1)
+      sweepAddressTxTemplate.gasFeeUnsafe is nonCoinbaseMinGasPrice *
+        GasEstimation.sweepAddress(11, 1)
 
       checkAddressBalance(
         sweepAddressDestination,
@@ -1091,7 +1092,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.contracts(1).address is Address.contract(barContractId)
     val assetOutput = result.txOutputs(1)
     assetOutput.address is assetAddress
-    assetOutput.attoAlphAmount is Amount(ALPH.alph(2).subUnsafe(nonCoinbaseMinGasPrice * maximalGasPerTx))
+    assetOutput.attoAlphAmount is Amount(
+      ALPH.alph(2).subUnsafe(nonCoinbaseMinGasPrice * maximalGasPerTx)
+    )
   }
 
   trait DestroyFixture extends Fixture {

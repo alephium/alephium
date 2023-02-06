@@ -384,7 +384,9 @@ class BlockFlowSpec extends AlephiumSpec {
       consensusConfig.emission.lowHashRateInitialRewardPerChain,
       consensusConfig.emission.stableMaxRewardPerChain
     ).min
-    (block.coinbase.attoAlphAmountInOutputs.get > minimalReward.subUnsafe(nonCoinbaseMinGasFee)) is true
+    (block.coinbase.attoAlphAmountInOutputs.get > minimalReward.subUnsafe(
+      nonCoinbaseMinGasFee
+    )) is true
   }
 
   it should "reduce target gradually and reach a stable target eventually" in new FlowFixture {
