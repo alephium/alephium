@@ -278,4 +278,42 @@ class U256Spec extends AlephiumSpec {
         .toFixedSizeBytes(size) is Some(ByteString(Array.fill[Byte](size)(-1)))
     }
   }
+
+  it should "test pow" in {
+    U256.Zero.pow(0) is Some(U256.One)
+    U256.Zero.pow(1) is Some(U256.Zero)
+    U256.Two.pow(256) is None
+    U256.Two.pow(255) is Some(U256.HalfMaxValue.addOneUnsafe())
+
+    forAll(Gen.choose(0, 10), Gen.choose(0, 50)) { case (base, exp) =>
+      U256.unsafe(base).pow(exp) is Some(U256.unsafe(BigInteger.valueOf(base.toLong).pow(exp)))
+    }
+
+    forAll(Gen.choose(2, 10), Gen.choose(256, 500)) { case (base, exp) =>
+      U256.unsafe(base).pow(exp) is None
+    }
+  }
+
+  it should "test byte length" in {
+    (0 until 256).foreach { n =>
+      U256.unsafe(BigInteger.TWO.pow(n)).byteLength() is (n / 8 + 1)
+    }
+    U256.Zero.byteLength() is 0
+    U256.MaxValue.byteLength() is 32
+  }
+
+  it should "test mod_pow" in {
+    U256.Two.modPow(0) is U256.One
+    U256.Two.modPow(1) is U256.Two
+    U256.Two.modPow(256) is U256.Zero
+    val number = U256.unsafe(BigInteger.ONE.shiftLeft(255)).addOneUnsafe()
+    number.modPow(3) is number
+
+    forAll(Gen.choose(0, 10), Gen.choose(0, 200)) { case (base, exp) =>
+      U256
+        .unsafe(base)
+        .modPow(exp)
+        .v is BigInteger.valueOf(base.toLong).pow(exp).mod(U256.upperBound)
+    }
+  }
 }

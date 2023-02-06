@@ -60,6 +60,8 @@ class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
     if (validate(underlying)) Some(I256.unsafe(underlying)) else None
   }
 
+  def pow(n: Int): Option[I256] = I256.from(this.v.pow(n))
+
   def divUnsafe(that: I256): I256 = {
     assume(!(that.isZero || (that == I256.NegOne && this == I256.MinValue)))
     I256.unsafe(this.v.divide(that.v))

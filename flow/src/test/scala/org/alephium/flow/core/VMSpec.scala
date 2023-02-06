@@ -840,6 +840,17 @@ class VMSpec extends AlephiumSpec {
          |
          |  fn test() -> () {
          |    assert!((33 + 2 - 3) * 5 / 7 % 11 == 0, 0)
+         |    assert!(3 ** 0 + 1 == 2, 0)
+         |    assert!(3 ** 3 - 1 == 26, 0)
+         |    assert!(3 * 3 ** 2 == 27, 0)
+         |    assert!(10 ** 18 == 1 alph, 0)
+         |    assert!(-3 ** 2 == 9i, 0)
+         |    assert!(-3 ** 3 == -27, 0)
+         |    assert!(8 / 2 ** 2 + 1 == 3, 0)
+         |    assert!(2 |**| 256 == 0, 0)
+         |    assert!(8 / 2 |**| 2 - 1 == 1, 0)
+         |    let a = 2 ** 255 + 1
+         |    assert!(a |**| 3 == a, 0)
          |
          |    let x = 0
          |    let y = 1

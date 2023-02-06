@@ -19,6 +19,7 @@ package org.alephium.util
 import java.math.BigInteger
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 
 class I256Spec extends AlephiumSpec {
   val numGen = (0L to 3L).flatMap { i =>
@@ -186,6 +187,28 @@ class I256Spec extends AlephiumSpec {
   it should "convert from Int" in {
     forAll { x: Int =>
       I256.from(x).v.longValue() is x.toLong
+    }
+  }
+
+  it should "test pow" in {
+    I256.Zero.pow(0) is Some(I256.One)
+    I256.Zero.pow(1) is Some(I256.Zero)
+    I256.from(-1).pow(0) is Some(I256.One)
+    I256.Two.pow(255) is None
+    I256.Two.pow(254) is Some(I256.MaxValue.divUnsafe(I256.Two).addUnsafe(I256.One))
+    I256.from(-2).pow(256) is None
+    I256.from(-2).pow(255) is Some(I256.MinValue)
+
+    forAll(Gen.choose(-10, 10), Gen.choose(0, 50)) { case (base, exp) =>
+      I256.from(base).pow(exp) is Some(I256.unsafe(BigInteger.valueOf(base.toLong).pow(exp)))
+    }
+
+    forAll(Gen.choose(2, 10), Gen.choose(256, 500)) { case (base, exp) =>
+      I256.unsafe(base).pow(exp) is None
+    }
+
+    forAll(Gen.choose(-10, -2), Gen.choose(256, 500)) { case (base, exp) =>
+      I256.unsafe(base).pow(exp) is None
     }
   }
 }

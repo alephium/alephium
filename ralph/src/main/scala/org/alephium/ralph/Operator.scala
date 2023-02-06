@@ -48,26 +48,47 @@ object ArithOperator {
     }
   }
 
-  private def u256Binary(name: String, instr: BinaryArithmeticInstr[Val.U256]): ArithOperator = {
+  private def u256Binary(name: String, instr: BinaryInstr[Val.U256]): ArithOperator = {
     new ArithOperator {
       override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
         argsType(0) match {
           case Type.U256 => Seq(instr)
-          case _         => throw new RuntimeException(s"$name accepts U256 only")
+          case _         => throw Compiler.Error(s"$name accepts U256 only")
         }
       }
     }
   }
 
+  private def exp(i256Instr: ExpInstr[Val.I256], u256Instr: ExpInstr[Val.U256]): ArithOperator =
+    new ArithOperator {
+      override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
+        if (argsType.length != 2 || !argsType(0).toVal.isNumeric || argsType(1) != Type.U256) {
+          throw Compiler.Error(s"Invalid param types $argsType for exp operator")
+        } else {
+          Seq(argsType(0))
+        }
+      }
+
+      override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
+        argsType(0) match {
+          case Type.I256 => Seq(i256Instr)
+          case Type.U256 => Seq(u256Instr)
+          case _         => throw new RuntimeException("Dead branch")
+        }
+      }
+    }
+
   val Add: ArithOperator = binary(I256Add, U256Add)
   val Sub: ArithOperator = binary(I256Sub, U256Sub)
   val Mul: ArithOperator = binary(I256Mul, U256Mul)
+  val Exp: ArithOperator = exp(I256Exp, U256Exp)
   val Div: ArithOperator = binary(I256Div, U256Div)
   val Mod: ArithOperator = binary(I256Mod, U256Mod)
 
   val ModAdd: ArithOperator = u256Binary("ModAdd", U256ModAdd)
   val ModSub: ArithOperator = u256Binary("ModSub", U256ModSub)
   val ModMul: ArithOperator = u256Binary("ModMul", U256ModMul)
+  val ModExp: ArithOperator = u256Binary("ModExp", U256ModExp)
   val SHL: ArithOperator    = u256Binary("SHL", U256SHL)
   val SHR: ArithOperator    = u256Binary("SHR", U256SHR)
   val BitAnd: ArithOperator = u256Binary("BitAnd", U256BitAnd)

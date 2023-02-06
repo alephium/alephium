@@ -74,6 +74,11 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     if (validate(underlying)) Some(U256.unsafe(underlying)) else None
   }
 
+  def pow(n: Int): Option[U256] = U256.from(this.v.pow(n))
+  def modPow(n: Int): U256      = U256.boundNonNegative(this.v.pow(n))
+
+  def byteLength(): Int = (this.v.bitLength() + 7) / 8
+
   def modMul(that: U256): U256 = {
     U256.boundNonNegative(this.v.multiply(that.v))
   }

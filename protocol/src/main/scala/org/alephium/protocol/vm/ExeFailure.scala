@@ -119,6 +119,7 @@ case object DebugIsNotSupportedForMainnet                      extends ExeFailur
 case object DebugMessageIsEmpty                                extends ExeFailure
 case object ZeroContractId                                     extends ExeFailure
 case object BurningAlphNotAllowed                              extends ExeFailure
+case object InvalidExponent                                    extends ExeFailure
 
 final case class UncaughtKeyNotFoundError(error: IOError.KeyNotFound) extends ExeFailure
 final case class UncaughtSerdeError(error: IOError.Serde)             extends ExeFailure
