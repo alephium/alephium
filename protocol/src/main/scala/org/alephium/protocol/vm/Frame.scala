@@ -384,10 +384,13 @@ final case class StatefulFrame(
       _ <- ctx.createContract(contractId, code, immFields, balances, mutFields, tokenIssuanceInfo)
       _ <- ctx.writeLog(
         Some(createContractEventId),
-        AVector(
+        (AVector(
           createContractEventIndex,
           Val.Address(LockupScript.p2c(contractId))
-        )
+        ): AVector[Val]) ++
+          obj.contractIdOpt
+            .map(cId => AVector(Val.Address(LockupScript.p2c(cId))))
+            .getOrElse(AVector.empty)
       )
     } yield contractId
   }
