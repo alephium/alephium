@@ -156,7 +156,7 @@ object Instr {
     ContractIdToAddress,
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
     BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
-    I256Exp, U256Exp, U256ModExp, VerifyBIP430Schnorr
+    I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -1294,7 +1294,7 @@ case object VerifyED25519
     crypto.ED25519.verify(data, signature, pubKey)
 }
 
-case object VerifyBIP430Schnorr
+case object VerifyBIP340Schnorr
     extends GenericVerifySignature[crypto.BIP340SchnorrPublicKey, crypto.BIP340SchnorrSignature]
     with LemanInstrWithSimpleGas[StatelessContext] {
   def buildPubKey(value: Val.ByteVec): Option[crypto.BIP340SchnorrPublicKey] =

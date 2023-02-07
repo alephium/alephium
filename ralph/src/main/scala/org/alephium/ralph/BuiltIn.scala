@@ -349,19 +349,19 @@ object BuiltIn {
       retComment = "true if the signature is valid, false otherwise",
       doc = s"Verifies the ED25519 signature of the input and public key."
     )
-  val verifyBIP430Schnorr: SimpleBuiltIn[StatelessContext] =
+  val verifyBIP340Schnorr: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
-      "verifyBIP430Schnorr",
+      "verifyBIP340Schnorr",
       Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec),
       Seq.empty,
-      VerifyBIP430Schnorr,
+      VerifyBIP340Schnorr,
       argsName = Seq(
         "data"      -> "the data (32 bytes) that was supposed to have been signed",
         "publicKey" -> "the public key (32 bytes) of the signer",
         "signature" -> "the signature value (64 bytes)"
       ),
       retComment = "true if the signature is valid, false otherwise",
-      doc = s"Verifies the BIP430 Schnorr signature of the input and public key."
+      doc = s"Verifies the BIP340 Schnorr signature of the input and public key."
     )
   val ethEcRecover: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
@@ -843,7 +843,7 @@ object BuiltIn {
     verifyTxSignature,
     verifySecP256K1,
     verifyED25519,
-    verifyBIP430Schnorr,
+    verifyBIP340Schnorr,
     networkId,
     blockHash,
     blockTimeStamp,

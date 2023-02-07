@@ -1572,7 +1572,7 @@ class VMSpec extends AlephiumSpec {
          |TxScript Main {
          |  verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig)
          |  verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
-         |  verifyBIP430Schnorr!(#$zero, #${bip430Pub.toHexString}, #$bip430Sig)
+         |  verifyBIP340Schnorr!(#$zero, #${bip430Pub.toHexString}, #$bip430Sig)
          |}
          |""".stripMargin
     testSimpleScript(main(p256Sig, ed25519Sig, bip430Sig))

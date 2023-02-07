@@ -833,10 +833,10 @@
     "returns": "@returns true if the signature is valid, false otherwise"
   },
   {
-    "name": "verifyBIP430Schnorr",
+    "name": "verifyBIP340Schnorr",
     "category": "Cryptography",
-    "signature": "fn verifyBIP430Schnorr!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
-    "doc": "Verifies the BIP430 Schnorr signature of the input and public key.",
+    "signature": "fn verifyBIP340Schnorr!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
+    "doc": "Verifies the BIP340 Schnorr signature of the input and public key.",
     "params": [
       "@param data the data (32 bytes) that was supposed to have been signed",
       "@param publicKey the public key (32 bytes) of the signer",
