@@ -75,7 +75,7 @@ class ContextSpec
 
   it should "generate asset output" in new Fixture {
     val assetOutput = assetOutputGen(GroupIndex.unsafe(0))(_tokensGen =
-      tokensGen(1, Gen.choose(1, maxTokenPerUtxo))
+      tokensGen(1, Gen.choose(1, maxTokenPerAssetUtxo))
     ).sample.get
     context.generateOutput(assetOutput) isE ()
     initialGas.use(GasSchedule.txOutputBaseGas) isE context.gasRemaining
@@ -291,7 +291,7 @@ class ContextSpec
   }
 
   it should "generate single output when token number <= maxTokenPerUTXO for Mainnet hardfork" in new MainnetAssetOutputFixture {
-    (0 to maxTokenPerUtxo).foreach { num =>
+    (0 to maxTokenPerAssetUtxo).foreach { num =>
       val output = prepareOutput(ALPH.oneAlph, num)
       context.generatedOutputs.clear()
       context.generateOutput(output) isE ()
@@ -300,7 +300,7 @@ class ContextSpec
   }
 
   it should "generate single output when token number > maxTokenPerUTXO for Mainnet hardfork" in new MainnetAssetOutputFixture {
-    (maxTokenPerUtxo + 1 to 5 * maxTokenPerUtxo).foreach { num =>
+    (maxTokenPerAssetUtxo + 1 to 5 * maxTokenPerAssetUtxo).foreach { num =>
       val output = prepareOutput(ALPH.oneAlph, num)
       context.generatedOutputs.clear()
       context.generateOutput(output) isE ()
@@ -309,7 +309,7 @@ class ContextSpec
   }
 
   it should "generate single output when token number <= maxTokenPerUTXO for Leman hardfork" in new LemanAssetOutputFixture {
-    (0 to maxTokenPerUtxo).foreach { num =>
+    (0 to maxTokenPerAssetUtxo).foreach { num =>
       val output = prepareOutput(ALPH.oneAlph, num)
       context.generatedOutputs.clear()
       context.generateOutput(output) isE ()
@@ -334,11 +334,11 @@ class ContextSpec
     }
 
     val k      = Random.nextInt(5) + 1
-    val output = prepareOutput(ALPH.alph(k.toLong), k * maxTokenPerUtxo)
-    test(output, Seq.fill(k)(ALPH.oneAlph), Seq.fill(k)(maxTokenPerUtxo))
-    (1 until maxTokenPerUtxo).foreach { r =>
-      val output = prepareOutput(ALPH.alph(k.toLong + 1), k * maxTokenPerUtxo + r)
-      test(output, Seq.fill(k + 1)(ALPH.oneAlph), Seq.fill(k)(maxTokenPerUtxo) :+ r)
+    val output = prepareOutput(ALPH.alph(k.toLong), k * maxTokenPerAssetUtxo)
+    test(output, Seq.fill(k)(ALPH.oneAlph), Seq.fill(k)(maxTokenPerAssetUtxo))
+    (1 until maxTokenPerAssetUtxo).foreach { r =>
+      val output = prepareOutput(ALPH.alph(k.toLong + 1), k * maxTokenPerAssetUtxo + r)
+      test(output, Seq.fill(k + 1)(ALPH.oneAlph), Seq.fill(k)(maxTokenPerAssetUtxo) :+ r)
     }
   }
 }

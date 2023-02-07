@@ -538,7 +538,7 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "fail when there are too many tokens in the transaction output" in new UnsignedTransactionFixture {
     val inputs = AVector(input("input", ALPH.alph(3), fromLockupScript))
     val outputs = {
-      val tokens = AVector.tabulate(maxTokenPerUtxo + 1) { i =>
+      val tokens = AVector.tabulate(maxTokenPerAssetUtxo + 1) { i =>
         val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
@@ -656,8 +656,8 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     def verifyExtraOutput(output: TxOutputInfo) = {
-      output.attoAlphAmount is minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo)
-      output.tokens.length is maxTokenPerUtxo
+      output.attoAlphAmount is minimalAttoAlphAmountPerTxOutput(maxTokenPerAssetUtxo)
+      output.tokens.length is maxTokenPerAssetUtxo
     }
 
     {
@@ -670,7 +670,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     {
       info("token amount not more than `maxTokenPerUtxo`")
-      val tokens = AVector.tabulate(maxTokenPerUtxo) { i =>
+      val tokens = AVector.tabulate(maxTokenPerAssetUtxo) { i =>
         val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
@@ -683,7 +683,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     {
       info("token amount more than `maxTokenPerUtxo`")
-      val tokens = AVector.tabulate(maxTokenPerUtxo + 1) { i =>
+      val tokens = AVector.tabulate(maxTokenPerAssetUtxo + 1) { i =>
         val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
@@ -693,7 +693,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
         outputs(0).attoAlphAmount is ALPH
           .alph(3)
-          .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo))
+          .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerAssetUtxo))
           .subUnsafe(nonCoinbaseMinGasPrice * gas)
         outputs(0).tokens.length is 1
 
@@ -705,7 +705,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     {
       info("token amount a bit more than two times of `maxTokenPerUtxo`")
-      val tokens = AVector.tabulate(2 * maxTokenPerUtxo + 1) { i =>
+      val tokens = AVector.tabulate(2 * maxTokenPerAssetUtxo + 1) { i =>
         val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
@@ -715,7 +715,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
         outputs(0).attoAlphAmount is ALPH
           .alph(3)
-          .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+          .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerAssetUtxo).mulUnsafe(2))
           .subUnsafe(nonCoinbaseMinGasPrice * gas)
         outputs(0).tokens.length is 1
 
@@ -728,7 +728,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     {
       info("token amount three times of `maxTokenPerUtxo`")
-      val tokens = AVector.tabulate(3 * maxTokenPerUtxo) { i =>
+      val tokens = AVector.tabulate(3 * maxTokenPerAssetUtxo) { i =>
         val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
@@ -738,9 +738,9 @@ class TxUtilsSpec extends AlephiumSpec {
 
         outputs(0).attoAlphAmount is ALPH
           .alph(3)
-          .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+          .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerAssetUtxo).mulUnsafe(2))
           .subUnsafe(nonCoinbaseMinGasPrice * gas)
-        outputs(0).tokens.length is maxTokenPerUtxo
+        outputs(0).tokens.length is maxTokenPerAssetUtxo
 
         verifyExtraOutput(outputs(1))
         verifyExtraOutput(outputs(2))
@@ -751,11 +751,11 @@ class TxUtilsSpec extends AlephiumSpec {
 
     {
       info("The amount in the first output is below minimalAttoAlphAmountPerTxOutput(tokens)")
-      val attoAlphAmount = minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
+      val attoAlphAmount = minimalAttoAlphAmountPerTxOutput(maxTokenPerAssetUtxo - 1)
         .addUnsafe(nonCoinbaseMinGasPrice * GasEstimation.sweepAddress(1, 3))
-        .addUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
+        .addUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerAssetUtxo).mulUnsafe(2))
 
-      val tokens = AVector.tabulate(3 * maxTokenPerUtxo - 1) { i =>
+      val tokens = AVector.tabulate(3 * maxTokenPerAssetUtxo - 1) { i =>
         val tokenId = TokenId.hash(s"tokenId$i")
         (tokenId, U256.unsafe(1))
       }
@@ -763,8 +763,8 @@ class TxUtilsSpec extends AlephiumSpec {
       Test(tokens, attoAlphAmount).success { case (outputs, gas) =>
         outputs.length is 3
 
-        outputs(0).attoAlphAmount is minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
-        outputs(0).tokens.length is maxTokenPerUtxo - 1
+        outputs(0).attoAlphAmount is minimalAttoAlphAmountPerTxOutput(maxTokenPerAssetUtxo - 1)
+        outputs(0).tokens.length is maxTokenPerAssetUtxo - 1
 
         verifyExtraOutput(outputs(1))
         verifyExtraOutput(outputs(2))
@@ -779,11 +779,11 @@ class TxUtilsSpec extends AlephiumSpec {
 
   "TxUtils.getFirstOutputTokensNum" should "return the number of tokens for the first output of the sweepAddress transaction" in {
     TxUtils.getFirstOutputTokensNum(0) is 0
-    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo) is maxTokenPerUtxo
-    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 1) is 1
-    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + 10) is 2
-    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo + maxTokenPerUtxo - 1) is maxTokenPerUtxo - 1
-    TxUtils.getFirstOutputTokensNum(maxTokenPerUtxo * 10) is maxTokenPerUtxo
+    TxUtils.getFirstOutputTokensNum(maxTokenPerAssetUtxo) is maxTokenPerAssetUtxo
+    TxUtils.getFirstOutputTokensNum(maxTokenPerAssetUtxo + 1) is 1
+    TxUtils.getFirstOutputTokensNum(maxTokenPerAssetUtxo + 10) is 2
+    TxUtils.getFirstOutputTokensNum(maxTokenPerAssetUtxo + maxTokenPerAssetUtxo - 1) is maxTokenPerAssetUtxo - 1
+    TxUtils.getFirstOutputTokensNum(maxTokenPerAssetUtxo * 10) is maxTokenPerAssetUtxo
   }
 
   trait LargeUtxos extends FlowFixture {

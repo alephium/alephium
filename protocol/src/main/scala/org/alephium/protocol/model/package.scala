@@ -47,7 +47,7 @@ package object model {
 
   val dustUtxoAmount: U256           = ALPH.nanoAlph(1000000)
   val deprecatedDustUtxoAmount: U256 = ALPH.nanoAlph(1000)
-  val maxTokenPerUtxo: Int           = 4
+  val maxTokenPerAssetUtxo: Int      = 4
   val deprecatedMaxTokenPerUtxo: Int = 64
 
   val minimalAlphInContract: U256 = ALPH.oneAlph

@@ -492,8 +492,8 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       info("Leman hardfork")
       implicit val validator = checkOutputStats(_, HardFork.Leman)
 
-      forAll(transactionGen(numTokensGen = maxTokenPerUtxo + 1))(_.fail(InvalidOutputStats))
-      forAll(transactionGen(numTokensGen = maxTokenPerUtxo))(_.pass())
+      forAll(transactionGen(numTokensGen = maxTokenPerAssetUtxo + 1))(_.fail(InvalidOutputStats))
+      forAll(transactionGen(numTokensGen = maxTokenPerAssetUtxo))(_.pass())
     }
 
     {

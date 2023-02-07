@@ -304,18 +304,19 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def generateAssetOutputLeman(assetOutput: AssetOutput): ExeResult[Unit] = {
-    if (assetOutput.tokens.length <= maxTokenPerUtxo) {
+    if (assetOutput.tokens.length <= maxTokenPerAssetUtxo) {
       generateAssetOutputSimple(assetOutput)
     } else {
       val tokenLength       = assetOutput.tokens.length
-      val outputNum         = (tokenLength - 1) / maxTokenPerUtxo + 1
+      val outputNum         = (tokenLength - 1) / maxTokenPerAssetUtxo + 1
       val alphAmountAverage = assetOutput.amount.divUnsafe(U256.unsafe(outputNum))
       EitherF.foreachTry(0 until outputNum) { k =>
-        val tokenIndexStart = maxTokenPerUtxo * k
+        val tokenIndexStart = maxTokenPerAssetUtxo * k
         val newOutput = if (k < outputNum - 1) {
           assetOutput.copy(
             amount = alphAmountAverage,
-            tokens = assetOutput.tokens.slice(tokenIndexStart, tokenIndexStart + maxTokenPerUtxo)
+            tokens =
+              assetOutput.tokens.slice(tokenIndexStart, tokenIndexStart + maxTokenPerAssetUtxo)
           )
         } else {
           assetOutput.copy(

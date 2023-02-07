@@ -619,13 +619,13 @@ object TxUtils {
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         utxos.flatMap(_.tokens)
       )
-      groupsOfTokens    = (totalAmountPerToken.length + maxTokenPerUtxo - 1) / maxTokenPerUtxo
+      groupsOfTokens    = (totalAmountPerToken.length + maxTokenPerAssetUtxo - 1) / maxTokenPerAssetUtxo
       extraNumOfOutputs = Math.max(0, groupsOfTokens - 1)
       gas = gasOpt.getOrElse(GasEstimation.sweepAddress(utxos.length, extraNumOfOutputs + 1))
       totalAmountWithoutGas <- totalAmount
         .sub(gasPrice * gas)
         .toRight("Not enough balance for gas fee in Sweeping")
-      amountRequiredForExtraOutputs <- minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo)
+      amountRequiredForExtraOutputs <- minimalAttoAlphAmountPerTxOutput(maxTokenPerAssetUtxo)
         .mul(U256.unsafe(extraNumOfOutputs))
         .toRight("Too many tokens")
       amountOfFirstOutput <- totalAmountWithoutGas
@@ -637,12 +637,12 @@ object TxUtils {
         .toRight("Not enough ALPH balance for transaction outputs")
     } yield {
       val firstTokens  = totalAmountPerToken.take(firstOutputTokensNum)
-      val restOfTokens = totalAmountPerToken.drop(firstOutputTokensNum).grouped(maxTokenPerUtxo)
+      val restOfTokens = totalAmountPerToken.drop(firstOutputTokensNum).grouped(maxTokenPerAssetUtxo)
       val firstOutput  = TxOutputInfo(toLockupScript, amountOfFirstOutput, firstTokens, lockTimeOpt)
       val restOfOutputs = restOfTokens.map { tokens =>
         TxOutputInfo(
           toLockupScript,
-          minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo),
+          minimalAttoAlphAmountPerTxOutput(maxTokenPerAssetUtxo),
           tokens,
           lockTimeOpt
         )
@@ -702,11 +702,11 @@ object TxUtils {
   }
 
   private[core] def getFirstOutputTokensNum(tokensNum: Int): Int = {
-    val remainder = tokensNum % maxTokenPerUtxo
+    val remainder = tokensNum % maxTokenPerAssetUtxo
     if (tokensNum == 0) {
       tokensNum
     } else if (remainder == 0) {
-      maxTokenPerUtxo
+      maxTokenPerAssetUtxo
     } else {
       remainder
     }

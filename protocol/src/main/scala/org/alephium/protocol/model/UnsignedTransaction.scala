@@ -250,8 +250,8 @@ object UnsignedTransaction {
   ): Either[String, Option[AssetOutput]] = {
     if (alphRemainder == U256.Zero && tokensRemainder.isEmpty) {
       Right(None)
-    } else if (tokensRemainder.length > maxTokenPerUtxo) {
-      Left(s"Too many tokens in the change output, maximal number $maxTokenPerUtxo")
+    } else if (tokensRemainder.length > maxTokenPerAssetUtxo) {
+      Left(s"Too many tokens in the change output, maximal number $maxTokenPerAssetUtxo")
     } else {
       if (alphRemainder > minimalAttoAlphAmountPerTxOutput(tokensRemainder.length)) {
         Right(Some(TxOutput.asset(alphRemainder, tokensRemainder, fromLockupScript)))
@@ -276,8 +276,8 @@ object UnsignedTransaction {
       outputs: AVector[TxOutputInfo]
   ): Either[String, Unit] = {
     check(
-      failCondition = outputs.exists(_.tokens.length > maxTokenPerUtxo),
-      s"Too many tokens in the transaction output, maximal number $maxTokenPerUtxo"
+      failCondition = outputs.exists(_.tokens.length > maxTokenPerAssetUtxo),
+      s"Too many tokens in the transaction output, maximal number $maxTokenPerAssetUtxo"
     )
   }
 

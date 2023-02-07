@@ -1973,7 +1973,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       caller,
       AssetState(
         ALPH.alph(3),
-        Some(AVector.fill(2 * maxTokenPerUtxo)(Token(TokenId.random, 1)))
+        Some(AVector.fill(2 * maxTokenPerAssetUtxo)(Token(TokenId.random, 1)))
       )
     )
     val testContract = TestContract(
@@ -1990,15 +1990,15 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testResult   = serverUtils.runTestContract(blockFlow, testContract).rightValue
     testResult.txOutputs.length is 4
     testResult.txOutputs(0).address is caller
-    testResult.txOutputs(0).tokens.length is maxTokenPerUtxo
-    testResult.txOutputs(0).tokens is tokensSorted.slice(0, maxTokenPerUtxo)
+    testResult.txOutputs(0).tokens.length is maxTokenPerAssetUtxo
+    testResult.txOutputs(0).tokens is tokensSorted.slice(0, maxTokenPerAssetUtxo)
     testResult.txOutputs(1).address is caller
-    testResult.txOutputs(1).tokens.length is maxTokenPerUtxo
+    testResult.txOutputs(1).tokens.length is maxTokenPerAssetUtxo
     testResult.txOutputs(1).tokens is tokensSorted
-      .slice(maxTokenPerUtxo, 2 * maxTokenPerUtxo)
+      .slice(maxTokenPerAssetUtxo, 2 * maxTokenPerAssetUtxo)
     testResult.txOutputs(2).address is caller
     testResult.txOutputs(2).tokens.length is 1
-    testResult.txOutputs(2).tokens is tokensSorted.slice(2 * maxTokenPerUtxo, tokensSorted.length)
+    testResult.txOutputs(2).tokens is tokensSorted.slice(2 * maxTokenPerAssetUtxo, tokensSorted.length)
     testResult.txOutputs(3).address is Address.contract(testContract.contractId)
   }
 

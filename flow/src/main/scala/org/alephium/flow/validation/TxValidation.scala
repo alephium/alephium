@@ -493,7 +493,7 @@ object TxValidation {
         hardFork: HardFork
     ): TxValidationResult[Unit] = {
       val (dustAmount, numTokenBound) = if (hardFork.isLemanEnabled()) {
-        (dustUtxoAmount, maxTokenPerUtxo)
+        (dustUtxoAmount, maxTokenPerAssetUtxo)
       } else {
         (deprecatedDustUtxoAmount, deprecatedMaxTokenPerUtxo)
       }
