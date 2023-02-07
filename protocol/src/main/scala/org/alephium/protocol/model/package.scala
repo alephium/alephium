@@ -53,10 +53,6 @@ package object model {
 
   val minimalAlphInContract: U256 = ALPH.oneAlph
 
-  def minimalAttoAlphAmountPerTxOutput(tokenNum: Int): U256 = {
-    dustUtxoAmount.mulUnsafe(U256.unsafe(1 + tokenNum))
-  }
-
   implicit val hashOrdering: Ordering[Hash] = Ordering.by(_.bytes)
   // scalastyle:on magic.number
 }

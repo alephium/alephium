@@ -517,7 +517,7 @@ class VMSpec extends AlephiumSpec {
       privateKey0,
       address1.lockupScript,
       tokens,
-      minimalAttoAlphAmountPerTxOutput(1)
+      dustUtxoAmount
     )
   }
 
