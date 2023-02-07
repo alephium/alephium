@@ -644,6 +644,17 @@ final class AVector[@sp A](
     (selected, apply(selected))
   }
 
+  def shuffle(): AVector[A] = {
+    val array = toArray
+    array.indices.reverse.foreach { index =>
+      val toSwapIndex = Random.nextInt(index + 1)
+      val tmp         = array(index)
+      array(index) = array(toSwapIndex)
+      array(toSwapIndex) = tmp
+    }
+    AVector.unsafe(array)
+  }
+
   def toArray: Array[A] = {
     val arr = new Array[A](length)
     System.arraycopy(elems, start, arr, 0, length)

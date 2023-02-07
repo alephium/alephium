@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.util.Sorting
+import scala.util.{Random, Sorting}
 
 import akka.util.ByteString
 import org.scalacheck.Arbitrary._
@@ -234,16 +234,23 @@ trait TokenGenerators extends Generators with NumericHelpers {
     AVector.tabulate(num)(i => pivots(i + 1) - pivots(i) + minAmount)
   }
   def split(balances: Balances, outputNum: Int): AVector[Balances] = {
-    val alphSplits = split(balances.attoAlphAmount, minAmount, outputNum)
+    val outputWithTokenNum = if (balances.tokens.isEmpty) 0 else Random.between(1, outputNum)
     val tokenSplits = balances.tokens.map { case (tokenId, amount) =>
-      tokenId -> split(amount, 0, outputNum)
+      tokenId -> split(amount, 0, outputWithTokenNum)
     }
-    AVector.tabulate(outputNum) { index =>
+    val tokenBalances = AVector.tabulate(outputWithTokenNum) { index =>
       val tokens = tokenSplits.map { case (tokenId, amounts) =>
         tokenId -> amounts(index)
       }
-      Balances(alphSplits(index), tokens)
+      Balances(dustUtxoAmount, tokens)
     }
+    val alphOutputNum = outputNum - outputWithTokenNum
+    val alphToSplit =
+      balances.attoAlphAmount.subUnsafe(dustUtxoAmount.mulUnsafe(outputWithTokenNum))
+    val alphBalances = split(alphToSplit, minAmount, alphOutputNum).map { alphAmount =>
+      Balances(alphAmount, Map.empty)
+    }
+    (tokenBalances ++ alphBalances).shuffle()
   }
 }
 
@@ -387,7 +394,7 @@ trait TxGenerators
     } yield Balances(attoAlphAmount, tokens)
 
   def assetsToSpendGen(
-      inputsNumGen: Gen[Int] = Gen.choose(1, 10),
+      inputsNumGen: Gen[Int] = Gen.choose(2, 10),
       tokensNumGen: Gen[Int] = Gen.choose(0, 10),
       scriptGen: Gen[ScriptPair],
       lockTimeGen: Gen[TimeStamp] = Gen.const(TimeStamp.zero)
@@ -403,7 +410,7 @@ trait TxGenerators
     } yield AVector.from(inputs)
 
   def transactionGenWithPreOutputs(
-      inputsNumGen: Gen[Int] = Gen.choose(1, 10),
+      inputsNumGen: Gen[Int] = Gen.choose(2, 10),
       tokensNumGen: Gen[Int] = Gen.choose(0, maxTokenPerAssetUtxo),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
@@ -428,7 +435,7 @@ trait TxGenerators
 
   def transactionGenWithCompressedUnlockScripts(
       unlockScriptsNumGen: Gen[Int] = Gen.choose(1, 4),
-      inputsNumGen: Gen[Int] = Gen.choose(1, 4),
+      inputsNumGen: Gen[Int] = Gen.choose(2, 4),
       tokensNumGen: Gen[Int] = Gen.const(0),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
@@ -466,7 +473,7 @@ trait TxGenerators
   }
 
   def transactionGen(
-      numInputsGen: Gen[Int] = Gen.choose(1, 10),
+      numInputsGen: Gen[Int] = Gen.choose(2, 10),
       numTokensGen: Gen[Int] = Gen.choose(0, maxTokenPerAssetUtxo),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,

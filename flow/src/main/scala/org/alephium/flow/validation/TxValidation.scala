@@ -492,13 +492,31 @@ object TxValidation {
         output: TxOutput,
         hardFork: HardFork
     ): TxValidationResult[Unit] = {
-      val (dustAmount, numTokenBound) = if (hardFork.isLemanEnabled()) {
-        (dustUtxoAmount, maxTokenPerAssetUtxo)
+      if (hardFork.isLemanEnabled()) {
+        checkOutputAmountLeman(output)
       } else {
-        (deprecatedDustUtxoAmount, deprecatedMaxTokenPerUtxo)
+        checkOutputAmountGenesis(output)
       }
-      val validated = output.amount >= dustAmount &&
+    }
+
+    @inline private def checkOutputAmountLeman(
+        output: TxOutput
+    ): TxValidationResult[Unit] = {
+      val numTokenBound =
+        if (output.isAsset) maxTokenPerAssetUtxo else maxTokenPerContractUtxo
+      val validated = output.amount >= dustUtxoAmount &&
         output.tokens.length <= numTokenBound &&
+        output.tokens.forall(_._2.nonZero) &&
+        // If the asset output contains token, it has to contains exact dust amount of ALPH
+        (output.isContract || output.tokens.isEmpty || output.amount == dustUtxoAmount)
+      if (validated) Right(()) else invalidTx(InvalidOutputStats)
+    }
+
+    @inline private def checkOutputAmountGenesis(
+        output: TxOutput
+    ): TxValidationResult[Unit] = {
+      val validated = output.amount >= deprecatedDustUtxoAmount &&
+        output.tokens.length <= deprecatedMaxTokenPerUtxo &&
         output.tokens.forall(_._2.nonZero)
       if (validated) Right(()) else invalidTx(InvalidOutputStats)
     }
