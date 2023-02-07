@@ -3516,14 +3516,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     Compiler.compileContract(code("I256", "I256", "**", "I256")).leftValue.message is
-      "Exp accepts U256 only"
+      "Invalid param types List(I256, I256) for exp operator"
     Compiler.compileContract(code("U256", "U256", "**", "U256")).isRight is true
     Compiler.compileContract(code("U256", "U256", "**", "I256")).leftValue.message is
       s"""Invalid return types: expected "List(I256)", got "List(U256)""""
-    Compiler.compileContract(code("I256", "U256", "**", "I256")).leftValue.message is
-      s"Invalid param types List(I256, U256) for ArithOperator"
+    Compiler.compileContract(code("I256", "U256", "**", "I256")).isRight is true
     Compiler.compileContract(code("I256", "U256", "**", "U256")).leftValue.message is
-      s"Invalid param types List(I256, U256) for ArithOperator"
+      s"""Invalid return types: expected "List(U256)", got "List(I256)""""
 
     Compiler.compileContract(code("I256", "I256", "|**|", "I256")).leftValue.message is
       "ModExp accepts U256 only"
