@@ -64,11 +64,9 @@ class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
     if (validate(underlying)) Some(I256.unsafe(underlying)) else None
   }
 
-  def pow(that: I256): Option[I256] = {
-    if (that.isNegative) {
-      None
-    } else if (this == I256.Zero) {
-      if (that == I256.Zero) {
+  def pow(that: U256): Option[I256] = {
+    if (this == I256.Zero) {
+      if (that == U256.Zero) {
         Some(I256.One)
       } else {
         Some(I256.Zero)
@@ -83,7 +81,7 @@ class I256(val v: BigInteger) extends AnyVal with Ordered[I256] {
       }
     } else {
       that.toInt.flatMap { n =>
-        if ((n < 0) || ((this.v.bitLength() - 1) * n > 256)) {
+        if ((this.v.bitLength() - 1) * n > 256) {
           None
         } else {
           I256.from(this.v.pow(n))
