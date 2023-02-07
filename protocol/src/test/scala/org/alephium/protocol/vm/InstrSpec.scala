@@ -850,8 +850,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait ExpArithmeticInstrFixture extends StatelessInstrFixture {
-    val expGen: Gen[U256]        = Gen.choose(0, 200).map(U256.unsafe)
-    val invalidExpGen: Gen[U256] = Gen.choose(Int.MaxValue.toLong, Long.MaxValue).map(U256.unsafe)
+    val expGen: Gen[U256] = Gen.choose(0, 200).map(U256.unsafe)
 
     def test[T <: Val](
         instr: ExpInstr[T],
@@ -895,7 +894,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           .toRight(ArithmeticError(s"Exp overflow: $base ** $exp"))
       }
     )
-    test(I256Exp, baseGen, invalidExpGen, (_: Val.I256, _: U256) => Left(InvalidExponent))
   }
 
   it should "U256Exp" in new ExpArithmeticInstrFixture {
@@ -912,7 +910,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
           .toRight(ArithmeticError(s"Exp overflow: $base ** $exp"))
       }
     )
-    test(U256Exp, baseGen, invalidExpGen, (_: Val.U256, _: U256) => Left(InvalidExponent))
   }
 
   it should "U256ModExp" in new ExpArithmeticInstrFixture {
@@ -923,7 +920,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       expGen,
       (base: Val.U256, e: U256) => Right(Val.U256(base.v.modPow(e.toIntUnsafe)))
     )
-    test(U256ModExp, baseGen, invalidExpGen, (_: Val.U256, _: U256) => Left(InvalidExponent))
   }
 
   it should "I256ToU256" in new StatelessInstrFixture {

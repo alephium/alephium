@@ -718,20 +718,19 @@ sealed trait ExpInstr[T <: Val]
     with StatelessInstrCompanion0
     with LemanInstr[StatelessContext]
     with GasExp {
-  def op[C <: StatelessContext](frame: Frame[C], exp: Int): ExeResult[T]
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[T]
 
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      expU256 <- frame.popOpStackU256()
-      exp     <- expU256.v.toInt.toRight(Right(InvalidExponent))
-      result  <- op(frame, exp)
-      _       <- frame.ctx.chargeGasWithSize(this, expU256.v.byteLength())
-      _       <- frame.pushOpStack(result)
+      exp    <- frame.popOpStackU256()
+      result <- op(frame, exp.v)
+      _      <- frame.ctx.chargeGasWithSize(this, exp.v.byteLength())
+      _      <- frame.pushOpStack(result)
     } yield ()
   }
 }
 object I256Exp extends ExpInstr[Val.I256] {
-  def op[C <: StatelessContext](frame: Frame[C], exp: Int): ExeResult[Val.I256] =
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[Val.I256] =
     frame
       .popOpStackI256()
       .flatMap(base =>
@@ -743,7 +742,7 @@ object I256Exp extends ExpInstr[Val.I256] {
 }
 
 object U256Exp extends ExpInstr[Val.U256] {
-  def op[C <: StatelessContext](frame: Frame[C], exp: Int): ExeResult[Val.U256] =
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[Val.U256] =
     frame
       .popOpStackU256()
       .flatMap(base =>
@@ -754,7 +753,7 @@ object U256Exp extends ExpInstr[Val.U256] {
       )
 }
 object U256ModExp extends ExpInstr[Val.U256] {
-  def op[C <: StatelessContext](frame: Frame[C], exp: Int): ExeResult[Val.U256] =
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[Val.U256] =
     frame.popOpStackU256().map(base => Val.U256(base.v.modPow(exp)))
 }
 
