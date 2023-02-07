@@ -303,10 +303,10 @@ object BuiltIn {
       Seq(Type.ByteVec),
       Seq(),
       VerifyTxSignature,
-      argsName = Seq("publicKey" -> "the public key of the signer"),
+      argsName = Seq("publicKey" -> "the public key (33 bytes) of the signer"),
       retComment = "true if the signature is valid, false otherwise",
       doc =
-        "Verifies the transaction signature of a public key. The signature is signed against the transaction id."
+        "Verifies the transaction SecP256K1 signature of a public key. The signature is signed against the transaction id."
     )
   val verifySecP256K1: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
@@ -315,9 +315,9 @@ object BuiltIn {
       Seq.empty,
       VerifySecP256K1,
       argsName = Seq(
-        "data"      -> "the data that was supposed to have been signed",
-        "publicKey" -> "the public key of the signer",
-        "signature" -> "the signature value"
+        "data"      -> "the data (32 bytes) that was supposed to have been signed",
+        "publicKey" -> "the public key (33 bytes) of the signer",
+        "signature" -> "the signature (64 bytes) value"
       ),
       retComment = "true if the signature is valid, false otherwise",
       doc = s"Verifies the SecP256K1 signature of the input and public key."
@@ -342,12 +342,26 @@ object BuiltIn {
       Seq.empty,
       VerifyED25519,
       argsName = Seq(
-        "data"      -> "the data that was supposed to have been signed",
-        "publicKey" -> "the public key of the signer",
-        "signature" -> "the signature value"
+        "data"      -> "the data (32 bytes) that was supposed to have been signed",
+        "publicKey" -> "the public key (32 bytes) of the signer",
+        "signature" -> "the signature value (64 bytes)"
       ),
       retComment = "true if the signature is valid, false otherwise",
       doc = s"Verifies the ED25519 signature of the input and public key."
+    )
+  val verifyBIP430Schnorr: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.cryptography(
+      "verifyBIP430Schnorr",
+      Seq(Type.ByteVec, Type.ByteVec, Type.ByteVec),
+      Seq.empty,
+      VerifyBIP430Schnorr,
+      argsName = Seq(
+        "data"      -> "the data (32 bytes) that was supposed to have been signed",
+        "publicKey" -> "the public key (32 bytes) of the signer",
+        "signature" -> "the signature value (64 bytes)"
+      ),
+      retComment = "true if the signature is valid, false otherwise",
+      doc = s"Verifies the BIP430 Schnorr signature of the input and public key."
     )
   val ethEcRecover: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
@@ -829,6 +843,7 @@ object BuiltIn {
     verifyTxSignature,
     verifySecP256K1,
     verifyED25519,
+    verifyBIP430Schnorr,
     networkId,
     blockHash,
     blockTimeStamp,

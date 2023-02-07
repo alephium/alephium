@@ -1564,17 +1564,30 @@ class VMSpec extends AlephiumSpec {
     val p256Sig                  = SecP256K1.sign(Hash.zero.bytes, p256Pri).toHexString
     val (ed25519Pri, ed25519Pub) = ED25519.generatePriPub()
     val ed25519Sig               = ED25519.sign(Hash.zero.bytes, ed25519Pri).toHexString
-    def main(p256Sig: String, ed25519Sig: String) =
+    val (bip430Pri, bip430Pub)   = BIP340Schnorr.generatePriPub()
+    val bip430Sig                = BIP340Schnorr.sign(Hash.zero.bytes, bip430Pri).toHexString
+    def main(p256Sig: String, ed25519Sig: String, bip430Sig: String) =
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
          |  verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig)
          |  verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
+         |  verifyBIP430Schnorr!(#$zero, #${bip430Pub.toHexString}, #$bip430Sig)
          |}
          |""".stripMargin
-    testSimpleScript(main(p256Sig, ed25519Sig))
-    failSimpleScript(main(SecP256K1Signature.zero.toHexString, ed25519Sig), InvalidSignature)
-    failSimpleScript(main(p256Sig, ED25519Signature.zero.toHexString), InvalidSignature)
+    testSimpleScript(main(p256Sig, ed25519Sig, bip430Sig))
+    failSimpleScript(
+      main(SecP256K1Signature.generate.toHexString, ed25519Sig, bip430Sig),
+      InvalidSignature
+    )
+    failSimpleScript(
+      main(p256Sig, ED25519Signature.generate.toHexString, bip430Sig),
+      InvalidSignature
+    )
+    failSimpleScript(
+      main(p256Sig, ed25519Sig, BIP340SchnorrSignature.generate.toHexString),
+      InvalidSignature
+    )
   }
 
   it should "test eth ecrecover" in new ContractFixture with EthEcRecoverFixture {

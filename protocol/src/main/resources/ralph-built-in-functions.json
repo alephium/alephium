@@ -802,9 +802,9 @@
     "name": "verifyTxSignature",
     "category": "Cryptography",
     "signature": "fn verifyTxSignature!(publicKey:ByteVec) -> ()",
-    "doc": "Verifies the transaction signature of a public key. The signature is signed against the transaction id.",
+    "doc": "Verifies the transaction SecP256K1 signature of a public key. The signature is signed against the transaction id.",
     "params": [
-      "@param publicKey the public key of the signer"
+      "@param publicKey the public key (33 bytes) of the signer"
     ],
     "returns": "@returns true if the signature is valid, false otherwise"
   },
@@ -814,9 +814,9 @@
     "signature": "fn verifySecP256K1!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
     "doc": "Verifies the SecP256K1 signature of the input and public key.",
     "params": [
-      "@param data the data that was supposed to have been signed",
-      "@param publicKey the public key of the signer",
-      "@param signature the signature value"
+      "@param data the data (32 bytes) that was supposed to have been signed",
+      "@param publicKey the public key (33 bytes) of the signer",
+      "@param signature the signature (64 bytes) value"
     ],
     "returns": "@returns true if the signature is valid, false otherwise"
   },
@@ -826,9 +826,21 @@
     "signature": "fn verifyED25519!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
     "doc": "Verifies the ED25519 signature of the input and public key.",
     "params": [
-      "@param data the data that was supposed to have been signed",
-      "@param publicKey the public key of the signer",
-      "@param signature the signature value"
+      "@param data the data (32 bytes) that was supposed to have been signed",
+      "@param publicKey the public key (32 bytes) of the signer",
+      "@param signature the signature value (64 bytes)"
+    ],
+    "returns": "@returns true if the signature is valid, false otherwise"
+  },
+  {
+    "name": "verifyBIP430Schnorr",
+    "category": "Cryptography",
+    "signature": "fn verifyBIP430Schnorr!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",
+    "doc": "Verifies the BIP430 Schnorr signature of the input and public key.",
+    "params": [
+      "@param data the data (32 bytes) that was supposed to have been signed",
+      "@param publicKey the public key (32 bytes) of the signer",
+      "@param signature the signature value (64 bytes)"
     ],
     "returns": "@returns true if the signature is valid, false otherwise"
   },
