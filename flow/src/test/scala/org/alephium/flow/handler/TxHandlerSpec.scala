@@ -323,12 +323,9 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     val lowGasPriceTx = tx.copy(unsigned = tx.unsigned.copy(gasPrice = coinbaseGasPrice))
 
     txHandler ! addTx(lowGasPriceTx)
-    expectMsg(
-      TxHandler.AddFailed(
-        lowGasPriceTx.id,
-        s"tx has lower gas price than ${nonCoinbaseMinGasPrice}"
-      )
-    )
+    val failure = expectMsgType[TxHandler.AddFailed]
+    failure.txId is lowGasPriceTx.id
+    failure.reason.contains("InvalidGasPrice") is true
   }
 
   it should "mine new block if auto-mine is enabled" in new Fixture {

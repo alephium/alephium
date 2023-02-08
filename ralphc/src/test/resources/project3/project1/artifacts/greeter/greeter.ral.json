@@ -1,8 +1,8 @@
 {
-  "version": "v1.6.4",
+  "version": "v1.7.0",
   "name": "Greeter",
-  "bytecode": "01010c010000000105030c7ba00002",
-  "codeHash": "23a48462286d2c2ffc6d3a19192060dd42c178e7d331819e75e059c5be3c042f",
+  "bytecode": "01010c010000000105030c7bce0002",
+  "codeHash": "d8a1c2190c6c54f720608a4b264d1c648a9865e0744e942e489c87e64d4e596a",
   "fieldsSig": {
     "names": [
       "btcPrice"
