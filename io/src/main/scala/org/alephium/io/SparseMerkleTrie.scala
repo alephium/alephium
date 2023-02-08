@@ -554,6 +554,8 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
 ) extends SparseMerkleTrieBase[K, V, SparseMerkleTrie[K, V]] {
   import SparseMerkleTrie._
 
+  def unit: SparseMerkleTrie[K, V] = this
+
   def getNode(hash: Hash): IOResult[Node] = storage.get(hash)
 
   def applyActions(result: TrieUpdateActions): IOResult[SparseMerkleTrie[K, V]] = {
@@ -600,6 +602,8 @@ final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
     cache: mutable.Map[Hash, SparseMerkleTrie.Node]
 ) extends SparseMerkleTrieBase[K, V, Unit] {
   import SparseMerkleTrie._
+
+  def unit: Unit = ()
 
   def getNode(hash: Hash): IOResult[Node] = {
     cache.get(hash) match {

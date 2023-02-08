@@ -1081,8 +1081,8 @@ class ServerUtils(implicit
   ): Try[ContractState] = {
     val result = for {
       state          <- worldState.getContractState(contractId)
-      codeRecord     <- worldState.getContractCode(state.codeHash)
-      contract       <- codeRecord.code.toContract().left.map(IOError.Serde)
+      code           <- worldState.getContractCode(state)
+      contract       <- code.toContract().left.map(IOError.Serde)
       contractOutput <- worldState.getContractAsset(state.contractOutputRef)
     } yield ContractState(
       Address.contract(contractId),

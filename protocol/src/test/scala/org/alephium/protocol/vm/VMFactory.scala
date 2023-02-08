@@ -28,7 +28,7 @@ trait VMFactory extends StorageFixture {
     val storage = newDBStorage()
     val trieDb  = newDB[Hash, SparseMerkleTrie.Node](storage, RocksDBSource.ColumnFamily.Trie)
     val trieImmutableStateStorage =
-      newDB[Hash, ContractImmutableState](storage, RocksDBSource.ColumnFamily.Trie)
+      newDB[Hash, ContractStorageImmutableState](storage, RocksDBSource.ColumnFamily.Trie)
     val logDb        = newDB[LogStatesId, LogStates](storage, RocksDBSource.ColumnFamily.Log)
     val logRefDb     = newDB[Byte32, AVector[LogStateRef]](storage, RocksDBSource.ColumnFamily.Log)
     val logCounterDb = newDB[ContractId, Int](storage, RocksDBSource.ColumnFamily.LogCounter)
