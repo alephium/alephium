@@ -20,27 +20,27 @@ import scala.collection.mutable
 
 final class CachedKVStorage[K, V](
     val underlying: KeyValueStorage[K, V],
-    val caches: mutable.LinkedHashMap[K, Cache[V]]
+    val caches: mutable.HashMap[K, Cache[V]]
 ) extends CachedKV[K, V, Cache[V]] {
   protected def getOptFromUnderlying(key: K): IOResult[Option[V]] = {
     CachedKV.getOptFromUnderlying(underlying, caches, key)
   }
 
-  def persist(): IOResult[Unit] = {
-    underlying.putBatch(CachedKVStorage.accumulateUpdates(_, caches))
+  def persist(): IOResult[KeyValueStorage[K, V]] = {
+    underlying.putBatch(CachedKVStorage.accumulateUpdates(_, caches)).map(_ => underlying)
   }
 
-  def staging(): StagingKVStorage[K, V] = new StagingKVStorage(this, mutable.LinkedHashMap.empty)
+  def staging(): StagingKVStorage[K, V] = new StagingKVStorage(this, mutable.HashMap.empty)
 }
 
 object CachedKVStorage {
   def from[K, V](storage: KeyValueStorage[K, V]): CachedKVStorage[K, V] = {
-    new CachedKVStorage[K, V](storage, mutable.LinkedHashMap.empty)
+    new CachedKVStorage[K, V](storage, mutable.HashMap.empty)
   }
 
   @inline private[io] def accumulateUpdates[K, V](
       putAccumulate: (K, V) => Unit,
-      caches: mutable.LinkedHashMap[K, Cache[V]]
+      caches: mutable.HashMap[K, Cache[V]]
   ): Unit = {
     caches.foreach {
       case (_, Cached(_))         => Right(())

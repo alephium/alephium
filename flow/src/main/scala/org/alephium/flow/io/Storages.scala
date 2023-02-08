@@ -27,7 +27,7 @@ import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.ContractId
-import org.alephium.protocol.vm.{LogStateRef, LogStates, LogStatesId, WorldState}
+import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.event.LogStorage
 import org.alephium.util.AVector
 
@@ -54,9 +54,19 @@ object Storages {
     val logRefStorage = RocksDBKeyValueStorage[Byte32, AVector[LogStateRef]](db, Log, writeOptions)
     val logCounterStorage = RocksDBKeyValueStorage[ContractId, Int](db, LogCounter, writeOptions)
     val logStorage        = LogStorage(logStateStorage, logRefStorage, logCounterStorage)
+    val trieImmutableStateStorage =
+      RocksDBKeyValueStorage[Hash, ContractStorageImmutableState](db, Trie, writeOptions)
     val worldStateStorage =
-      WorldStateRockDBStorage(trieStorage, logStorage, db, All, writeOptions)
-    val emptyWorldState  = WorldState.emptyPersisted(trieStorage, logStorage)
+      WorldStateRockDBStorage(
+        trieStorage,
+        trieImmutableStateStorage,
+        logStorage,
+        db,
+        All,
+        writeOptions
+      )
+    val emptyWorldState =
+      WorldState.emptyPersisted(trieStorage, trieImmutableStateStorage, logStorage)
     val pendingTxStorage = PendingTxRocksDBStorage(db, PendingTx, writeOptions)
     val readyTxStorage   = ReadyTxRocksDBStorage(db, ReadyTx, writeOptions)
     val brokerStorage    = BrokerRocksDBStorage(db, Broker, writeOptions)

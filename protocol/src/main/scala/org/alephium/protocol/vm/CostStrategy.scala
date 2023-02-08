@@ -30,7 +30,7 @@ trait CostStrategy {
   }
 
   def chargeContractLoad(obj: StatefulContractObject): ExeResult[Unit] = {
-    chargeContractLoad(obj.estimateByteSize())
+    chargeContractLoad(obj.estimateContractLoadByteSize())
   }
 
   def chargeContractLoad(size: Int): ExeResult[Unit] = {
@@ -38,7 +38,7 @@ trait CostStrategy {
   }
 
   def chargeContractStateUpdate(obj: StatefulContractObject): ExeResult[Unit] = {
-    chargeContractStateUpdate(obj.fields)
+    chargeContractStateUpdate(obj.mutFields)
   }
 
   def chargeContractStateUpdate(fields: Iterable[Val]): ExeResult[Unit] = {

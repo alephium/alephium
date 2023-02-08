@@ -132,7 +132,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         failure: ExeFailure
     ): Assertion = {
       val (obj, context) =
-        prepareContract(contract, AVector[Val](), gasLimit)
+        prepareContract(contract, AVector.empty, AVector.empty, gasLimit)
       StatefulVM.execute(context, obj, args).leftValue.rightValue is failure
     }
   }
@@ -209,11 +209,15 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         argsLength = 1,
         localsLength = 1,
         returnLength = 1,
-        instrs = AVector(LoadLocal(0), LoadField(1), U256Add, U256Const5, U256Add, Return)
+        instrs = AVector(LoadLocal(0), LoadImmField(1), U256Add, U256Const5, U256Add, Return)
       )
     val contract = StatefulContract(2, methods = AVector(method))
     val (obj, context) =
-      prepareContract(contract, AVector[Val](Val.U256(U256.Zero), Val.U256(U256.One)))
+      prepareContract(
+        contract,
+        AVector[Val](Val.U256(U256.Zero), Val.U256(U256.One)),
+        AVector.empty
+      )
     StatefulVM.executeWithOutputs(context, obj, AVector(Val.U256(U256.Two))) isE
       AVector[Val](Val.U256(U256.unsafe(8)))
   }
@@ -431,6 +435,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         ApproveAlph,
         BytesConst(Val.ByteVec(serialize(contract))),
         BytesConst(Val.ByteVec(serialize(AVector.empty[Val]))),
+        BytesConst(Val.ByteVec(serialize(AVector.empty[Val]))),
         CreateContract
       )
       val expected = result match {
@@ -477,7 +482,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
         argsLength = 1,
         localsLength = 1,
         returnLength = 0,
-        instrs = AVector(LoadLocal(0), LoadField(1), U256Add, U256Const1, U256Add, StoreField(1))
+        instrs =
+          AVector(LoadLocal(0), LoadMutField(1), U256Add, U256Const1, U256Add, StoreMutField(1))
       )
     val contract = StatefulContract(2, methods = AVector(method))
     serialize(contract)(StatefulContract.serde).nonEmpty is true
@@ -597,7 +603,8 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val contract3 = StatefulContract(0, AVector(Method(true, false, true, 0, 0, 0, AVector.empty)))
 
     def test(vm: StatefulVM, contract: StatefulContract, succeeded: Boolean) = {
-      val obj = StatefulContractObject.from(contract, AVector.empty, ContractId.random)
+      val obj =
+        StatefulContractObject.from(contract, AVector.empty, AVector.empty, ContractId.random)
       if (succeeded) {
         vm.execute(obj, 0, AVector.empty) match {
           case Right(res)  => res is ()

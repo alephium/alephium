@@ -131,12 +131,16 @@ abstract class Frame[Ctx <: StatelessContext] {
     locals.set(index, v)
   }
 
-  def getField(index: Int): ExeResult[Val] = {
-    obj.getField(index)
+  def getImmField(index: Int): ExeResult[Val] = {
+    obj.getImmField(index)
   }
 
-  def setField(index: Int, v: Val): ExeResult[Unit] = {
-    obj.setField(index, v)
+  def getMutField(index: Int): ExeResult[Val] = {
+    obj.getMutField(index)
+  }
+
+  def setMutField(index: Int, v: Val): ExeResult[Unit] = {
+    obj.setMutField(index, v)
   }
 
   protected def getMethod(index: Int): ExeResult[Method[Ctx]] = {
@@ -148,7 +152,8 @@ abstract class Frame[Ctx <: StatelessContext] {
   def createContract(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
-      fields: AVector[Val],
+      immFields: AVector[Val],
+      mutFields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId]
 
@@ -158,7 +163,8 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def migrateContract(
       newContractCode: StatefulContract,
-      newFieldsOpt: Option[AVector[Val]]
+      newImmFieldsOpt: Option[AVector[Val]],
+      newMutFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit]
 
   def callLocal(index: Byte): ExeResult[Option[Frame[Ctx]]] = {
@@ -220,7 +226,8 @@ final class StatelessFrame(
   def createContract(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
-      fields: AVector[Val],
+      immFields: AVector[Val],
+      mutFields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId] = StatelessFrame.notAllowed
   def destroyContract(refundAddress: LockupScript): ExeResult[Unit] = StatelessFrame.notAllowed
@@ -228,7 +235,8 @@ final class StatelessFrame(
     StatelessFrame.notAllowed
   def migrateContract(
       newContractCode: StatefulContract,
-      newFieldsOpt: Option[AVector[Val]]
+      newImmFieldsOpt: Option[AVector[Val]],
+      newMutFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = StatelessFrame.notAllowed
   def getCallerFrame(): ExeResult[Frame[StatelessContext]] = StatelessFrame.notAllowed
   def getCallerAddress(): ExeResult[Val.Address]           = StatelessFrame.notAllowed
@@ -365,14 +373,15 @@ final case class StatefulFrame(
   def createContract(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
-      fields: AVector[Val],
+      immFields: AVector[Val],
+      mutFields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId] = {
     for {
       _            <- checkContractId(contractId)
       balanceState <- getBalanceState()
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
-      _            <- ctx.createContract(contractId, code, balances, fields, tokenIssuanceInfo)
+      _ <- ctx.createContract(contractId, code, immFields, balances, mutFields, tokenIssuanceInfo)
       _ <- ctx.writeLog(
         Some(createContractEventId),
         AVector(
@@ -456,14 +465,15 @@ final case class StatefulFrame(
 
   def migrateContract(
       newContractCode: StatefulContract,
-      newFieldsOpt: Option[AVector[Val]]
+      newImmFieldsOpt: Option[AVector[Val]],
+      newMutFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = {
     for {
       contractId  <- obj.getContractId()
       callerFrame <- getCallerFrame()
       _           <- callerFrame.checkNonRecursive(contractId, UnexpectedRecursiveCallInMigration)
-      _           <- ctx.migrateContract(contractId, obj, newContractCode, newFieldsOpt)
-      _           <- runReturn() // return immediately as the code is upgraded
+      _ <- ctx.migrateContract(contractId, obj, newContractCode, newImmFieldsOpt, newMutFieldsOpt)
+      _ <- runReturn() // return immediately as the code is upgraded
     } yield {
       pc -= 1
     }

@@ -214,7 +214,7 @@ class MultisigTest extends AlephiumActorSpec {
     confirmTx(multisigTx, restPort)
 
     request[Balance](getBalance(multisigAddress), restPort) is
-      Balance.from(Amount(transferAmount / 2 - defaultGasFee), Amount.Zero, None, None, 1)
+      Balance.from(Amount(transferAmount / 2 - nonCoinbaseMinGasFee), Amount.Zero, None, None, 1)
 
     clique.stopMining()
     clique.stop()

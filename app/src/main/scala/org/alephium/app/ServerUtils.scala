@@ -198,7 +198,7 @@ class ServerUtils(implicit
         query.utxos,
         query.destinations,
         query.gasAmount,
-        query.gasPrice.getOrElse(defaultGasPrice),
+        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
         query.targetBlockHash
       )
     } yield {
@@ -219,7 +219,7 @@ class ServerUtils(implicit
         unlockScript,
         query.destinations,
         query.gas,
-        query.gasPrice.getOrElse(defaultGasPrice),
+        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
         None
       )
     } yield {
@@ -268,7 +268,7 @@ class ServerUtils(implicit
         query.toAddress,
         query.lockTime,
         query.gasAmount,
-        query.gasPrice.getOrElse(defaultGasPrice),
+        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
         query.targetBlockHash
       )
     } yield {
@@ -751,7 +751,7 @@ class ServerUtils(implicit
       allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
       allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
       unsignedTx <- UtxoSelectionAlgo
-        .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(defaultGasPrice)))
+        .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
         .select(
           AssetAmounts(amount, tokens),
           unlockScript,
@@ -765,7 +765,7 @@ class ServerUtils(implicit
           val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, unlockScript))
           UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
             gasAmount = gas.getOrElse(selectedUtxos.gas),
-            gasPrice = gasPrice.getOrElse(defaultGasPrice)
+            gasPrice = gasPrice.getOrElse(nonCoinbaseMinGasPrice)
           )
         }
         .left
@@ -785,12 +785,13 @@ class ServerUtils(implicit
         .left
         .map(badRequest)
       initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1)
-      code                  <- BuildDeployContractTx.decode(query.bytecode)
+      code                  <- query.decodeBytecode()
       address = Address.p2pkh(query.fromPublicKey)
       script <- buildDeployContractTxWithParsedState(
         code.contract,
         address,
-        code.initialFields,
+        code.initialImmFields,
+        code.initialMutFields,
         initialAttoAlphAmount,
         amounts._2,
         query.issueTokenAmount.map(_.value)
@@ -1080,15 +1081,16 @@ class ServerUtils(implicit
   ): Try[ContractState] = {
     val result = for {
       state          <- worldState.getContractState(contractId)
-      codeRecord     <- worldState.getContractCode(state.codeHash)
-      contract       <- codeRecord.code.toContract().left.map(IOError.Serde)
+      code           <- worldState.getContractCode(state)
+      contract       <- code.toContract().left.map(IOError.Serde)
       contractOutput <- worldState.getContractAsset(state.contractOutputRef)
     } yield ContractState(
       Address.contract(contractId),
       contract,
       contract.hash,
       Some(state.initialStateHash),
-      state.fields.map(Val.from),
+      state.immFields.map(Val.from),
+      state.mutFields.map(Val.from),
       AssetState.from(contractOutput)
     )
     wrapResult(result)
@@ -1113,13 +1115,13 @@ class ServerUtils(implicit
       consensusConfig.maxMiningTarget,
       Some(blockHash)
     )
-    val testGasFee = defaultGasPrice * maximalGasPerTx
+    val testGasFee = nonCoinbaseMinGasPrice * maximalGasPerTx
     val txEnv: TxEnv = TxEnv.mockup(
       txId = txId,
       signatures = Stack.popOnly(AVector.empty[Signature]),
       prevOutputs = inputAssets.map(_.toAssetOutput),
       fixedOutputs = AVector.empty[AssetOutput],
-      gasPrice = defaultGasPrice,
+      gasPrice = nonCoinbaseMinGasPrice,
       gasAmount = maximalGasPerTx,
       isEntryMethodPayable = true
     )
@@ -1223,7 +1225,8 @@ class ServerUtils(implicit
       worldState,
       existingContract.id,
       existingContract.bytecode,
-      toVmVal(existingContract.fields),
+      toVmVal(existingContract.immFields),
+      toVmVal(existingContract.mutFields),
       existingContract.asset
     )
   }
@@ -1237,7 +1240,8 @@ class ServerUtils(implicit
       worldState,
       contractId,
       testContract.code,
-      toVmVal(testContract.initialFields),
+      toVmVal(testContract.initialImmFields),
+      toVmVal(testContract.initialMutFields),
       testContract.initialAsset
     )
   }
@@ -1246,16 +1250,18 @@ class ServerUtils(implicit
       worldState: WorldState.Staging,
       contractId: ContractId,
       code: StatefulContract,
-      initialState: AVector[vm.Val],
+      initialImmState: AVector[vm.Val],
+      initialMutState: AVector[vm.Val],
       asset: AssetState
   ): Try[Unit] = {
     val outputRef = contractId.inaccurateFirstOutputRef()
     val output    = asset.toContractOutput(contractId)
     wrapResult(
-      worldState.createContractUnsafe(
+      worldState.createContractLemanUnsafe(
         contractId,
         code.toHalfDecoded(),
-        initialState,
+        initialImmState,
+        initialMutState,
         outputRef,
         output
       )
@@ -1298,27 +1304,32 @@ object ServerUtils {
   def buildDeployContractTx(
       codeRaw: String,
       address: Address,
-      initialState: Option[String],
+      _immFields: Option[String],
+      _mutFields: Option[String],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): Try[StatefulScript] = {
-    parseState(initialState).flatMap { state =>
-      buildDeployContractScriptWithParsedState(
+    for {
+      immFields <- parseState(_immFields)
+      mutFields <- parseState(_mutFields)
+      script <- buildDeployContractScriptWithParsedState(
         codeRaw,
         address,
-        state,
+        immFields,
+        mutFields,
         initialAttoAlphAmount,
         initialTokenAmounts,
         newTokenAmount
       )
-    }
+    } yield script
   }
 
   def buildDeployContractTxWithParsedState(
       contract: StatefulContract,
       address: Address,
-      initialFields: AVector[vm.Val],
+      initialImmFields: AVector[vm.Val],
+      initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
@@ -1326,7 +1337,8 @@ object ServerUtils {
     buildDeployContractScriptWithParsedState(
       Hex.toHexString(serialize(contract)),
       address,
-      initialFields,
+      initialImmFields,
+      initialMutFields,
       initialAttoAlphAmount,
       initialTokenAmounts,
       newTokenAmount
@@ -1336,16 +1348,18 @@ object ServerUtils {
   def buildDeployContractScriptRawWithParsedState(
       codeRaw: String,
       address: Address,
-      initialFields: AVector[vm.Val],
+      initialImmFields: AVector[vm.Val],
+      initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
   ): String = {
-    val stateRaw = Hex.toHexString(serialize(initialFields))
+    val immStateRaw = Hex.toHexString(serialize(initialImmFields))
+    val mutStateRaw = Hex.toHexString(serialize(initialMutFields))
     def toCreate(approveAssets: String): String = newTokenAmount match {
       case Some(amount) =>
-        s"createContractWithToken!$approveAssets(#$codeRaw, #$stateRaw, ${amount.v})"
-      case None => s"createContract!$approveAssets(#$codeRaw, #$stateRaw)"
+        s"createContractWithToken!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${amount.v})"
+      case None => s"createContract!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw)"
     }
 
     val create = if (initialTokenAmounts.isEmpty) {
@@ -1370,7 +1384,8 @@ object ServerUtils {
   def buildDeployContractScriptWithParsedState(
       codeRaw: String,
       address: Address,
-      initialFields: AVector[vm.Val],
+      initialImmFields: AVector[vm.Val],
+      initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
       newTokenAmount: Option[U256]
@@ -1378,7 +1393,8 @@ object ServerUtils {
     val scriptRaw = buildDeployContractScriptRawWithParsedState(
       codeRaw,
       address,
-      initialFields,
+      initialImmFields,
+      initialMutFields,
       initialAttoAlphAmount,
       initialTokenAmounts,
       newTokenAmount

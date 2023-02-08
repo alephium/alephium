@@ -144,8 +144,10 @@ sealed trait Contract[Ctx <: StatelessContext] {
   def getMethod(index: Int): ExeResult[Method[Ctx]]
   def hash: Hash
 
-  def initialStateHash(fields: AVector[Val]): Hash =
-    Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
+  def initialStateHash(immFields: AVector[Val], mutFields: AVector[Val]): Hash =
+    Hash.doubleHash(
+      hash.bytes ++ ContractStorageState.fieldsSerde.serialize(immFields ++ mutFields)
+    )
 
   def checkAssetsModifier(ctx: StatelessContext): ExeResult[Unit] = {
     if (ctx.getHardFork().isLemanEnabled()) {
@@ -154,6 +156,17 @@ sealed trait Contract[Ctx <: StatelessContext] {
       EitherF.foreachTry(0 until methodsLength) { methodIndex =>
         getMethod(methodIndex).flatMap(_.checkModifierPreLeman())
       }
+    }
+  }
+
+  def validate(newImmFields: AVector[Val], newMutFields: AVector[Val]): Boolean = {
+    (newImmFields.length + newMutFields.length) == fieldLength
+  }
+
+  def check(newImmFields: AVector[Val], newMutFields: AVector[Val]): ExeResult[Unit] = {
+    if (validate(newImmFields, newMutFields)) { okay }
+    else {
+      failed(InvalidFieldLength)
     }
   }
 }
@@ -257,10 +270,6 @@ final case class StatefulContract(
     methods.get(index).toRight(Right(InvalidMethodIndex(index)))
   }
 
-  def validate(initialFields: AVector[Val]): Boolean = {
-    initialFields.length == fieldLength
-  }
-
   def toHalfDecoded(): StatefulContract.HalfDecoded = {
     val methodsBytes = methods.map(Method.statefulSerde.serialize)
     var count        = 0
@@ -285,18 +294,6 @@ object StatefulContract {
       methodsBytes: ByteString
   ) extends Contract[StatefulContext] {
     def methodsLength: Int = methodIndexes.length
-
-    def check(initialFields: AVector[Val]): ExeResult[Unit] = {
-      if (validate(initialFields)) {
-        okay
-      } else {
-        failed(InvalidFieldLength)
-      }
-    }
-
-    def validate(initialFields: AVector[Val]): Boolean = {
-      initialFields.length == fieldLength
-    }
 
     private[vm] lazy val methods = Array.ofDim[Method[StatefulContext]](methodsLength)
 
@@ -334,13 +331,19 @@ object StatefulContract {
     }
 
     // For testing purpose
-    def toObjectUnsafe(
+    def toObjectUnsafeTestOnly(
         contractId: ContractId,
-        fields: AVector[Val]
+        immFields: AVector[Val],
+        mutFields: AVector[Val]
     ): StatefulContractObject = {
-      val initialStateHash =
-        Hash.doubleHash(hash.bytes ++ ContractState.fieldsSerde.serialize(fields))
-      StatefulContractObject.unsafe(this.hash, this, initialStateHash, fields, contractId)
+      StatefulContractObject.unsafe(
+        this.hash,
+        this,
+        this.initialStateHash(immFields, mutFields),
+        immFields,
+        mutFields,
+        contractId
+      )
     }
   }
 
@@ -410,7 +413,8 @@ object StatefulContract {
 sealed trait ContractObj[Ctx <: StatelessContext] {
   def contractIdOpt: Option[ContractId]
   def code: Contract[Ctx]
-  def fields: mutable.ArraySeq[Val]
+  def immFields: AVector[Val]
+  def mutFields: mutable.ArraySeq[Val]
 
   def getContractId(): ExeResult[ContractId] = contractIdOpt.toRight(Right(ExpectAContract))
 
@@ -421,24 +425,36 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
 
   def getMethod(index: Int): ExeResult[Method[Ctx]] = code.getMethod(index)
 
-  def getField(index: Int): ExeResult[Val] = {
-    if (fields.isDefinedAt(index)) Right(fields(index)) else failed(InvalidFieldIndex)
+  def getImmField(index: Int): ExeResult[Val] = {
+    immFields.get(index) match {
+      case Some(v) => Right(v)
+      case None    => failed(InvalidImmFieldIndex)
+    }
   }
 
-  def setField(index: Int, v: Val): ExeResult[Unit] = {
-    if (!fields.isDefinedAt(index)) {
-      failed(InvalidFieldIndex)
-    } else if (fields(index).tpe != v.tpe) {
-      failed(InvalidFieldType)
+  def getMutField(index: Int): ExeResult[Val] = {
+    if (mutFields.isDefinedAt(index)) Right(mutFields(index)) else failed(InvalidMutFieldIndex)
+  }
+
+  def setMutField(index: Int, v: Val): ExeResult[Unit] = {
+    if (!mutFields.isDefinedAt(index)) {
+      failed(InvalidMutFieldIndex)
+    } else if (mutFields(index).tpe != v.tpe) {
+      failed(InvalidMutFieldType)
     } else {
-      Right(fields.update(index, v))
+      Right(mutFields.update(index, v))
     }
   }
 }
 
 sealed trait ScriptObj[Ctx <: StatelessContext] extends ContractObj[Ctx] {
   val contractIdOpt: Option[ContractId] = None
-  val fields: mutable.ArraySeq[Val]     = mutable.ArraySeq.empty
+  val immFields: AVector[Val]           = ScriptObj.emptyImmFields
+  val mutFields: mutable.ArraySeq[Val]  = mutable.ArraySeq.empty
+}
+
+object ScriptObj {
+  val emptyImmFields: AVector[Val] = AVector.empty
 }
 
 final case class StatelessScriptObject(code: StatelessScript) extends ScriptObj[StatelessContext]
@@ -448,9 +464,10 @@ final case class StatefulScriptObject(code: StatefulScript) extends ScriptObj[St
 final case class StatefulContractObject private (
     codeHash: Hash,
     code: StatefulContract.HalfDecoded,
-    initialStateHash: Hash,      // the state hash when the contract is created
-    initialFields: AVector[Val], // the initial field values when the contract is loaded
-    fields: mutable.ArraySeq[Val],
+    initialStateHash: Hash,         // the state hash when the contract is created
+    initialMutFields: AVector[Val], // the initial mutable field values when the contract is loaded
+    immFields: AVector[Val],
+    mutFields: mutable.ArraySeq[Val],
     contractId: ContractId
 ) extends ContractObj[StatefulContext] {
   def contractIdOpt: Option[ContractId] = Some(contractId)
@@ -459,10 +476,14 @@ final case class StatefulContractObject private (
 
   def getCodeHash(): Val.ByteVec = Val.ByteVec(codeHash.bytes)
 
-  def isUpdated: Boolean = !fields.indices.forall(index => fields(index) == initialFields(index))
+  def isUpdated: Boolean =
+    !mutFields.indices.forall(index => mutFields(index) == initialMutFields(index))
 
-  def estimateByteSize(): Int =
-    fields.foldLeft(0)(_ + _.estimateByteSize()) + code.methodsBytes.length
+  def estimateContractLoadByteSize(): Int = {
+    immFields.fold(0)(_ + _.estimateByteSize()) +
+      mutFields.foldLeft(0)(_ + _.estimateByteSize()) +
+      code.methodsBytes.length
+  }
 }
 
 object StatefulContractObject {
@@ -470,7 +491,8 @@ object StatefulContractObject {
       codeHash: Hash,
       code: StatefulContract.HalfDecoded,
       initialStateHash: Hash,
-      initialFields: AVector[Val],
+      immFields: AVector[Val],
+      initialMutFields: AVector[Val],
       contractId: ContractId
   ): StatefulContractObject = {
     assume(code.hash == codeHash)
@@ -478,20 +500,22 @@ object StatefulContractObject {
       codeHash,
       code,
       initialStateHash,
-      initialFields,
-      initialFields.toArray,
+      initialMutFields,
+      immFields,
+      initialMutFields.toArray,
       contractId
     )
   }
 
   def from(
       contract: StatefulContract,
-      initialFields: AVector[Val],
+      immFields: AVector[Val],
+      initialMutFields: AVector[Val],
       contractId: ContractId
   ): StatefulContractObject = {
     val code             = contract.toHalfDecoded()
     val codeHash         = code.hash
-    val initialStateHash = code.initialStateHash(initialFields)
-    unsafe(codeHash, code, initialStateHash, initialFields, contractId)
+    val initialStateHash = code.initialStateHash(immFields, initialMutFields)
+    unsafe(codeHash, code, initialStateHash, immFields, initialMutFields, contractId)
   }
 }

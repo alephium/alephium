@@ -79,7 +79,7 @@ object GasBox {
 
   def unsafeTest(gas: Int): GasBox = new GasBox(gas)
 
-  def validate(box: GasBox): Boolean = {
+  @inline def validate(box: GasBox): Boolean = {
     box >= minimalGas && box <= maximalGasPerTx
   }
 }

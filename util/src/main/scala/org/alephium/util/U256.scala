@@ -74,6 +74,29 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     if (validate(underlying)) Some(U256.unsafe(underlying)) else None
   }
 
+  def pow(that: U256): Option[U256] = {
+    if (this == U256.Zero) {
+      if (that == U256.Zero) {
+        Some(U256.One)
+      } else {
+        Some(U256.Zero)
+      }
+    } else if (this == U256.One) {
+      Some(U256.One)
+    } else {
+      that.toInt.flatMap { n =>
+        if ((this.v.bitLength() - 1) * n > 256) {
+          None
+        } else {
+          U256.from(this.v.pow(n))
+        }
+      }
+    }
+  }
+  def modPow(that: U256): U256 = U256.unsafe(this.v.modPow(that.v, U256.upperBound))
+
+  def byteLength(): Int = (this.v.bitLength() + 7) / 8
+
   def modMul(that: U256): U256 = {
     U256.boundNonNegative(this.v.multiply(that.v))
   }
@@ -237,7 +260,7 @@ object U256 {
   }
 
   def fromI256(value: I256): Option[U256] = {
-    if (value.isPositive) Some(unsafe(value.v)) else None
+    if (value.isNonNegative) Some(unsafe(value.v)) else None
   }
 
   val Zero: U256     = unsafe(BigInteger.ZERO)

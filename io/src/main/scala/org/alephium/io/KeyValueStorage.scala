@@ -41,15 +41,16 @@ trait AbstractKeyValueStorage[K, V] {
 
   def existsUnsafe(key: K): Boolean
 
-  def delete(key: K): IOResult[Unit]
+  def remove(key: K): IOResult[Unit]
 
-  def deleteUnsafe(key: K): Unit
+  def removeUnsafe(key: K): Unit
 }
 
 trait KeyValueStorage[K, V]
     extends AbstractKeyValueStorage[K, V]
     with RawKeyValueStorage
-    with ReadableKV[K, V] {
+    with MutableKV[K, V, Unit] {
+  def unit: Unit = ()
 
   protected def storageKey(key: K): ByteString = serialize(key)
 
@@ -94,9 +95,9 @@ trait KeyValueStorage[K, V]
     existsRawUnsafe(storageKey(key))
   }
 
-  def delete(key: K): IOResult[Unit] = IOUtils.tryExecute(deleteUnsafe(key))
+  def remove(key: K): IOResult[Unit] = IOUtils.tryExecute(removeUnsafe(key))
 
-  def deleteUnsafe(key: K): Unit = {
+  def removeUnsafe(key: K): Unit = {
     deleteRawUnsafe(storageKey(key))
   }
 }

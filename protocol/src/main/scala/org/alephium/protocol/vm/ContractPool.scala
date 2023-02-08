@@ -74,7 +74,7 @@ trait ContractPool extends CostStrategy {
 
   private var contractFieldSize = 0
   private def add(contractId: ContractId, obj: StatefulContractObject): ExeResult[Unit] = {
-    contractFieldSize += obj.initialFields.length
+    contractFieldSize += (obj.immFields.length + obj.initialMutFields.length)
     if (contractPool.size >= contractPoolMaxSize) {
       failed(ContractPoolOverflow)
     } else if (contractFieldSize > contractFieldMaxSize) {
@@ -88,7 +88,7 @@ trait ContractPool extends CostStrategy {
   def removeContract(contractId: ContractId): ExeResult[Unit] = {
     for {
       _ <-
-        worldState.removeContractState(contractId).left.map(e => Left(IOErrorRemoveContract(e)))
+        worldState.removeContractFromVM(contractId).left.map(e => Left(IOErrorRemoveContract(e)))
       _ <- markAssetFlushed(contractId)
     } yield {
       removeContractFromCache(contractId)
@@ -104,7 +104,7 @@ trait ContractPool extends CostStrategy {
       if (contractObj.isUpdated) {
         for {
           _ <- chargeContractStateUpdate(contractObj)
-          _ <- updateState(contractId, AVector.from(contractObj.fields))
+          _ <- updateMutableFields(contractId, AVector.from(contractObj.mutFields))
         } yield ()
       } else {
         Right(())
@@ -118,8 +118,14 @@ trait ContractPool extends CostStrategy {
     }
   }
 
-  private def updateState(contractId: ContractId, state: AVector[Val]): ExeResult[Unit] = {
-    worldState.updateContractUnsafe(contractId, state).left.map(e => Left(IOErrorUpdateState(e)))
+  private def updateMutableFields(
+      contractId: ContractId,
+      newMutFields: AVector[Val]
+  ): ExeResult[Unit] = {
+    worldState
+      .updateContractUnsafe(contractId, newMutFields)
+      .left
+      .map(e => Left(IOErrorUpdateState(e)))
   }
 
   def useContractAssets(contractId: ContractId): ExeResult[MutBalancesPerLockup] = {

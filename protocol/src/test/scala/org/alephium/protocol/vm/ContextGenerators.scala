@@ -90,7 +90,8 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
 
   def prepareContract(
       contract: StatefulContract,
-      fields: AVector[Val],
+      immFields: AVector[Val],
+      mutFields: AVector[Val],
       gasLimit: GasBox = GasBox.unsafe(100000),
       contractOutputOpt: Option[(ContractId, ContractOutput, ContractOutputRef)] = None,
       txEnvOpt: Option[TxEnv] = None
@@ -107,12 +108,14 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
     cachedWorldState.createContractUnsafe(
       contractId,
       halfDecoded,
-      fields,
+      immFields,
+      mutFields,
       contractOutputRef,
-      contractOutput
+      contractOutput,
+      _networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled()
     ) isE ()
 
-    val obj = halfDecoded.toObjectUnsafe(contractId, fields)
+    val obj = halfDecoded.toObjectUnsafeTestOnly(contractId, immFields, mutFields)
     val context = new StatefulContext {
       val worldState: WorldState.Staging = cachedWorldState.staging()
       val networkConfig: NetworkConfig   = _networkConfig

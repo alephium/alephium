@@ -51,12 +51,4 @@ class CachedKVStorageSpec extends AlephiumSpec with StorageFixture {
 
     assertThrows[RuntimeException](cachedStorage.persist())
   }
-
-  it should "keep the order of inserted value" in new Fixture {
-    val cachedStorage = CachedKVStorage.from(storage)
-    (0 until 10).foreach { k =>
-      cachedStorage.put(Blake2b.random, k) isE ()
-    }
-    cachedStorage.caches.values.toSeq is (0 until 10).map(k => Inserted(k))
-  }
 }

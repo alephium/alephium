@@ -323,7 +323,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     }
 
     val txs = keys.zipWithIndex.map { case ((priKey, _), index) =>
-      val gasPrice = GasPrice(defaultGasPrice.value + index)
+      val gasPrice = GasPrice(nonCoinbaseMinGasPrice.value + index)
       transferWithGas(
         blockFlow,
         priKey,

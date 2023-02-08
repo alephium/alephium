@@ -320,23 +320,12 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     val tx            = transactionGen().sample.get
-    val lowGasPriceTx = tx.copy(unsigned = tx.unsigned.copy(gasPrice = minimalGasPrice))
+    val lowGasPriceTx = tx.copy(unsigned = tx.unsigned.copy(gasPrice = coinbaseGasPrice))
 
     txHandler ! addTx(lowGasPriceTx)
-    expectMsg(
-      TxHandler.AddFailed(lowGasPriceTx.id, s"tx has lower gas price than ${defaultGasPrice}")
-    )
-  }
-
-  it should "check gas price" in new Fixture {
-    val tx            = transactionGen().sample.get.toTemplate
-    val lowGasPriceTx = tx.copy(unsigned = tx.unsigned.copy(gasPrice = minimalGasPrice))
-    TxHandler.checkHighGasPrice(tx) is true
-    TxHandler.checkHighGasPrice(lowGasPriceTx) is false
-    TxHandler.checkHighGasPrice(
-      ALPH.LaunchTimestamp.plusUnsafe(Duration.ofDaysUnsafe(366 + 365 / 2)),
-      lowGasPriceTx
-    ) is true
+    val failure = expectMsgType[TxHandler.AddFailed]
+    failure.txId is lowGasPriceTx.id
+    failure.reason.contains("InvalidGasPrice") is true
   }
 
   it should "mine new block if auto-mine is enabled" in new Fixture {

@@ -17,14 +17,32 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.minimalGasPrice
-import org.alephium.util.{AlephiumSpec, NumericHelpers}
+import org.alephium.protocol.model.{coinbaseGasPrice, nonCoinbaseMinGasPrice, HardFork}
+import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers}
 
 class GasPriceSpec extends AlephiumSpec with NumericHelpers {
-  it should "validate gas price bounds" in {
-    GasPrice.validate(minimalGasPrice) is true
-    GasPrice.validate(GasPrice(minimalGasPrice.value - 1)) is false
-    GasPrice.validate(GasPrice(ALPH.MaxALPHValue)) is false
-    GasPrice.validate(GasPrice(ALPH.MaxALPHValue - 1)) is true
+  it should "validate gas price bounds deprecated" in {
+    val (isCoinbase, hardfork) =
+      AVector(true -> HardFork.Mainnet, true -> HardFork.Leman, false -> HardFork.Mainnet).sample()
+    GasPrice.validate(coinbaseGasPrice, isCoinbase, hardfork) is true
+    GasPrice.validate(
+      GasPrice(coinbaseGasPrice.value - 1),
+      isCoinbase,
+      hardfork
+    ) is false
+    GasPrice.validate(GasPrice(ALPH.MaxALPHValue), isCoinbase, hardfork) is false
+    GasPrice.validate(GasPrice(ALPH.MaxALPHValue - 1), isCoinbase, hardfork) is true
+  }
+
+  it should "validate gas price bounds for non-coinbase + Leman fork" in {
+    GasPrice.validate(coinbaseGasPrice, isCoinbase = false, HardFork.Leman) is false
+    GasPrice.validate(nonCoinbaseMinGasPrice, isCoinbase = false, HardFork.Leman) is true
+    GasPrice.validate(
+      GasPrice(nonCoinbaseMinGasPrice.value - 1),
+      isCoinbase = false,
+      HardFork.Leman
+    ) is false
+    GasPrice.validate(GasPrice(ALPH.MaxALPHValue), isCoinbase = false, HardFork.Leman) is false
+    GasPrice.validate(GasPrice(ALPH.MaxALPHValue - 1), isCoinbase = false, HardFork.Leman) is true
   }
 }

@@ -64,12 +64,12 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
 
   trait FrameBalanceFixture {
     def prepareContract() = {
-      val (contractId, code, state, contractOutputRef, contractOutput) =
+      val (contractId, code, _, mutFields, contractOutputRef, contractOutput) =
         generateContract().sample.get
-      cachedWorldState.createContractUnsafe(
+      cachedWorldState.createContractLegacyUnsafe(
         contractId,
         code,
-        state,
+        mutFields,
         contractOutputRef,
         contractOutput
       )
@@ -107,7 +107,7 @@ class FrameSpec extends AlephiumSpec with FrameFixture {
 
       val result = frame
         .getNewFrameBalancesState(
-          StatefulContractObject.from(contract, AVector.empty, contractId),
+          StatefulContractObject.from(contract, AVector.empty, AVector.empty, contractId),
           method
         )
 

@@ -463,7 +463,7 @@ object ServerFixture {
       ) {
         val contractId: ContractId = ContractId.zero
         storages.emptyWorldState
-          .createContractUnsafe(
+          .createContractLegacyUnsafe(
             contractId,
             dummyContract.toHalfDecoded(),
             AVector(vm.Val.U256(U256.Zero)),

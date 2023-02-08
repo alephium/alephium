@@ -46,10 +46,10 @@ class BlockStorageSpec
     forAll(blockGen) { block =>
       storage.put(block) isE ()
       assertThrows[NotImplementedError] {
-        storage.delete(block.hash)
+        storage.remove(block.hash)
       }
       assertThrows[NotImplementedError] {
-        storage.deleteUnsafe(block.hash)
+        storage.removeUnsafe(block.hash)
       }
     }
   }

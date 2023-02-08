@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "1.6.4"
+    "version": "1.7.0"
   },
   "servers": [
     {
@@ -7039,7 +7039,13 @@
                   "bytecode": "00010700000000000118",
                   "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                   "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
-                  "fields": [
+                  "immFields": [
+                    {
+                      "type": "U256",
+                      "value": "1000000000000000000"
+                    }
+                  ],
+                  "mutFields": [
                     {
                       "type": "U256",
                       "value": "2000000000000000000"
@@ -7144,10 +7150,16 @@
                 "group": 0,
                 "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
                 "bytecode": "00010700000000000118",
-                "initialFields": [
+                "initialImmFields": [
                   {
                     "type": "U256",
                     "value": "1000000000000000000"
+                  }
+                ],
+                "initialMutFields": [
+                  {
+                    "type": "U256",
+                    "value": "2000000000000000000"
                   }
                 ],
                 "initialAsset": {
@@ -7172,7 +7184,13 @@
                     "bytecode": "00010700000000000118",
                     "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                     "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
-                    "fields": [
+                    "immFields": [
+                      {
+                        "type": "U256",
+                        "value": "1000000000000000000"
+                      }
+                    ],
+                    "mutFields": [
                       {
                         "type": "U256",
                         "value": "2000000000000000000"
@@ -7231,7 +7249,13 @@
                       "bytecode": "00010700000000000118",
                       "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                       "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
-                      "fields": [
+                      "immFields": [
+                        {
+                          "type": "U256",
+                          "value": "1000000000000000000"
+                        }
+                      ],
+                      "mutFields": [
                         {
                           "type": "U256",
                           "value": "2000000000000000000"
@@ -7434,7 +7458,13 @@
                       "bytecode": "00010700000000000118",
                       "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
                       "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
-                      "fields": [
+                      "immFields": [
+                        {
+                          "type": "U256",
+                          "value": "1000000000000000000"
+                        }
+                      ],
+                      "mutFields": [
                         {
                           "type": "U256",
                           "value": "2000000000000000000"
@@ -10366,7 +10396,8 @@
           "address",
           "bytecode",
           "codeHash",
-          "fields",
+          "immFields",
+          "mutFields",
           "asset"
         ],
         "type": "object",
@@ -10387,7 +10418,13 @@
             "type": "string",
             "format": "32-byte-hash"
           },
-          "fields": {
+          "immFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "mutFields": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Val"
@@ -11246,7 +11283,13 @@
             "type": "string",
             "format": "contract"
           },
-          "initialFields": {
+          "initialImmFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "initialMutFields": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Val"

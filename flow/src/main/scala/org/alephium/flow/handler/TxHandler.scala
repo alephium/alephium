@@ -32,7 +32,6 @@ import org.alephium.flow.network.broker.BrokerHandler
 import org.alephium.flow.network.sync.FetchState
 import org.alephium.flow.setting.{MemPoolSetting, NetworkSetting}
 import org.alephium.flow.validation._
-import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.message.{Message, NewBlock}
 import org.alephium.protocol.model._
@@ -72,21 +71,6 @@ object TxHandler {
   // scalastyle:off magic.number
   val PersistenceDuration: Duration = Duration.ofSecondsUnsafe(30)
   // scalastyle:on magic.number
-
-  // scalastyle:off magic.number
-  private val highPriceUntil: TimeStamp =
-    ALPH.LaunchTimestamp.plusUnsafe(ALPH.OneAndHalfYear)
-  // scalastyle:off magic.number
-  def checkHighGasPrice(tx: TransactionTemplate): Boolean = {
-    checkHighGasPrice(TimeStamp.now(), tx)
-  }
-  @inline def checkHighGasPrice(currentTs: TimeStamp, tx: TransactionTemplate): Boolean = {
-    if (currentTs <= highPriceUntil) {
-      tx.unsigned.gasPrice >= defaultGasPrice
-    } else {
-      true
-    }
-  }
 
   def mineTxForDev(
       blockFlow: BlockFlow,
@@ -273,9 +257,7 @@ trait TxCoreHandler extends TxHandlerUtils {
     val chainIndex = tx.chainIndex
     assume(!brokerConfig.isIncomingChain(chainIndex))
     val mempool = blockFlow.getMemPool(chainIndex.from)
-    if (!TxHandler.checkHighGasPrice(tx)) {
-      addFailed(tx, s"tx has lower gas price than ${defaultGasPrice}", acknowledge)
-    } else if (mempool.contains(tx)) {
+    if (mempool.contains(tx)) {
       addFailed(tx, s"tx ${tx.id.toHexString} is already included", acknowledge)
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
       addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}", acknowledge)
@@ -446,7 +428,7 @@ trait TxHandlerPersistence extends TxHandlerUtils {
   def persistMempoolTxs(): Unit = {
     log.info("Start to persist pending txs")
     escapeIOError(pendingTxStorage.iterateE { (txId, _) =>
-      pendingTxStorage.delete(txId)
+      pendingTxStorage.remove(txId)
     })
     escapeIOError(
       blockFlow.getGrandPool().getOutTxsWithTimestamp().foreachE { case (timestamp, tx) =>

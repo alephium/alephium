@@ -56,7 +56,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       prepareWorldState(preOutputs)
       for {
         chainIndex <- getChainIndex(tx)
-        _          <- checkStateless(chainIndex, tx, checkDoubleSpending = true, HardFork.Leman)
+        _ <- checkStateless(
+          chainIndex,
+          tx,
+          checkDoubleSpending = true,
+          HardFork.Leman,
+          isCoinbase = false
+        )
         _ <- checkStateful(
           chainIndex,
           tx,
@@ -95,7 +101,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           genesisPriKey.publicKey,
           outputs,
           None,
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           defaultUtxoLimit
         )
         .rightValue
@@ -112,7 +118,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           unlock,
           outputs.tail,
           None,
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           defaultUtxoLimit
         )
         .rightValue
@@ -398,8 +404,11 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
   }
 
-  it should "check gas bounds" in new Fixture {
-    implicit val validator = checkGasBound(_)
+  it should "check gas bounds deprecated" in new Fixture {
+    val (isCoinbase, hardfork) =
+      AVector(true -> HardFork.Mainnet, true -> HardFork.Leman, false -> HardFork.Mainnet).sample()
+
+    implicit val validator = checkGasBound(_, isCoinbase, hardfork)
 
     val tx = transactionGen(1, 1).sample.value
     tx.pass()
@@ -412,8 +421,29 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.gasAmount(maximalGasPerTx.addUnsafe(1)).fail(InvalidStartGas)
 
     tx.gasPrice(GasPrice(0)).fail(InvalidGasPrice)
-    tx.gasPrice(minimalGasPrice).pass()
-    tx.gasPrice(GasPrice(minimalGasPrice.value - 1)).fail(InvalidGasPrice)
+    tx.gasPrice(coinbaseGasPrice).pass()
+    tx.gasPrice(GasPrice(coinbaseGasPrice.value - 1)).fail(InvalidGasPrice)
+    tx.gasPrice(GasPrice(ALPH.MaxALPHValue - 1)).pass()
+    tx.gasPrice(GasPrice(ALPH.MaxALPHValue)).fail(InvalidGasPrice)
+  }
+
+  it should "check gas bounds for non-coinbase" in new Fixture {
+    implicit val validator = checkGasBound(_, isCoinbase = false, HardFork.Leman)
+
+    val tx = transactionGen(1, 1).sample.value
+    tx.pass()
+
+    tx.gasAmount(GasBox.unsafeTest(-1)).fail(InvalidStartGas)
+    tx.gasAmount(GasBox.unsafeTest(0)).fail(InvalidStartGas)
+    tx.gasAmount(minimalGas).pass()
+    tx.gasAmount(minimalGas.use(1).rightValue).fail(InvalidStartGas)
+    tx.gasAmount(maximalGasPerTx).pass()
+    tx.gasAmount(maximalGasPerTx.addUnsafe(1)).fail(InvalidStartGas)
+
+    tx.gasPrice(GasPrice(0)).fail(InvalidGasPrice)
+    tx.gasPrice(coinbaseGasPrice).fail(InvalidGasPrice)
+    tx.gasPrice(nonCoinbaseMinGasPrice).pass()
+    tx.gasPrice(GasPrice(nonCoinbaseMinGasPrice.value - 1)).fail(InvalidGasPrice)
     tx.gasPrice(GasPrice(ALPH.MaxALPHValue - 1)).pass()
     tx.gasPrice(GasPrice(ALPH.MaxALPHValue)).fail(InvalidGasPrice)
   }

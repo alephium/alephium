@@ -63,7 +63,7 @@ class TxRocksDBStorage(
       readOptions
     )
     with TxStorage {
-  override def delete(key: TransactionId): IOResult[Unit] = ???
+  override def remove(key: TransactionId): IOResult[Unit] = ???
 
-  override def deleteUnsafe(key: TransactionId): Unit = ???
+  override def removeUnsafe(key: TransactionId): Unit = ???
 }

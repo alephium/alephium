@@ -62,7 +62,7 @@ class BlockHeaderStorageSpec
       storage.put(header) isE ()
       storage.get(hash) isE header
       storage.getOpt(hash) isE Some(header)
-      storage.delete(hash) isE ()
+      storage.remove(hash) isE ()
       storage.get(hash).leftValue is a[IOError.KeyNotFound]
       storage.getOpt(hash) isE None
     }

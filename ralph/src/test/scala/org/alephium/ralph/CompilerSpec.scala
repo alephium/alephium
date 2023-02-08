@@ -16,6 +16,7 @@
 
 package org.alephium.ralph
 
+import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{Hash, PublicKey, Signature, SignatureSchema}
@@ -446,7 +447,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         input: String,
         args: AVector[Val] = AVector.empty,
         output: AVector[Val] = AVector.empty,
-        fields: AVector[Val] = AVector.empty,
+        immFields: AVector[Val] = AVector.empty,
+        mutFields: AVector[Val] = AVector.empty,
         methodIndex: Int = 0
     ): Assertion = {
       val compiled = Compiler.compileContractFull(input).rightValue
@@ -454,7 +456,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val contract = compiled.code
 
       deserialize[StatefulContract](serialize(contract)) isE contract
-      val (obj, context) = prepareContract(contract, fields)
+      val (obj, context) = prepareContract(contract, immFields, mutFields)
       StatefulVM.executeWithOutputsWithDebug(context, obj, args, methodIndex) isE output
     }
 
@@ -462,12 +464,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         input: String,
         args: AVector[Val],
         check: ExeFailure => Assertion,
-        fields: AVector[Val] = AVector.empty
+        immFields: AVector[Val] = AVector.empty,
+        mutFields: AVector[Val] = AVector.empty
     ): Assertion = {
       val contract = Compiler.compileContract(input).toOption.get
 
       deserialize[StatefulContract](serialize(contract)) isE contract
-      val (obj, context) = prepareContract(contract, fields)
+      val (obj, context) = prepareContract(contract, immFields, mutFields)
       check(StatefulVM.executeWithOutputs(context, obj, args).leftValue.rightValue)
     }
   }
@@ -738,14 +741,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       contract,
       AVector(Val.U256(U256.unsafe(1000))),
       AVector(Val.U256(U256.unsafe(99))),
-      AVector(Val.U256(U256.unsafe(1000000)), Val.U256(U256.unsafe(100000)))
+      mutFields = AVector(Val.U256(U256.unsafe(1000000)), Val.U256(U256.unsafe(100000)))
     )
 
     test(
       contract,
       AVector(Val.U256(U256.unsafe(1000))),
       AVector(Val.U256(U256.unsafe(99))),
-      AVector(
+      mutFields = AVector(
         Val.U256(U256.unsafe(Long.MaxValue) divUnsafe U256.unsafe(10)),
         Val.U256(U256.unsafe(Long.MaxValue) divUnsafe U256.unsafe(100))
       )
@@ -1322,8 +1325,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
 
-    val contract       = Compiler.compileContract(code).rightValue
-    val (obj, context) = prepareContract(contract, AVector.fill(7)(Val.U256(0)))
+    val contract = Compiler.compileContract(code).rightValue
+    val (obj, context) =
+      prepareContract(contract, AVector(Val.U256(0)), AVector.fill(6)(Val.U256(0)))
 
     def test(methodIndex: Int, args: AVector[Val]) = {
       StatefulVM
@@ -1367,7 +1371,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       val args = AVector.from[Val]((0 until 8).map(Val.U256(_)))
-      test(code, fields = AVector.fill(8)(Val.U256(0)), args = args)
+      test(code, mutFields = AVector.fill(8)(Val.U256(0)), args = args)
     }
 
     {
@@ -1393,7 +1397,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      test(code, fields = AVector(Val.U256(0)))
+      test(code, mutFields = AVector(Val.U256(0)))
     }
 
     {
@@ -1427,7 +1431,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      test(code, fields = AVector.fill(8)(Val.U256(0)))
+      test(code, mutFields = AVector.fill(8)(Val.U256(0)))
     }
 
     {
@@ -1463,7 +1467,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      test(code, fields = AVector.fill(9)(Val.U256(0)))
+      test(code, mutFields = AVector.fill(9)(Val.U256(0)))
     }
   }
 
@@ -1650,7 +1654,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      test(code, fields = AVector.fill(3)(Val.U256(0)))
+      test(code, mutFields = AVector.fill(3)(Val.U256(0)))
     }
 
     {
@@ -1693,7 +1697,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    test(code, fields = AVector(Val.U256(0)), output = AVector(Val.U256(1)))
+    test(code, mutFields = AVector(Val.U256(0)), output = AVector(Val.U256(1)))
   }
 
   it should "generate efficient code for arrays" in {
@@ -3146,7 +3150,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Foo() {
            |  pub fn foo(code: ByteVec, fields: ByteVec) -> () {
-           |    migrateWithFields!(code, fields)
+           |    migrateWithFields!(code, #00, fields)
            |  }
            |}
            |""".stripMargin
@@ -3362,5 +3366,170 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     val method1 = Compiler.compileContract(code).rightValue.methods(1)
     tokenInstrs.foreach(instr => method1.instrs.contains(instr) is true)
     alphInstrs.foreach(instr => method1.instrs.contains(instr) is false)
+  }
+
+  it should "load both mutable and immutable fields" in {
+    val code =
+      s"""
+         |Contract Foo(mut a: U256, mut x: [U256; 2], b: Bool, y: [Bool; 2]) {
+         |  pub fn foo(z: I256) -> () {
+         |    assert!(x[1] != 0, 0)
+         |    assert!(z != 0i, 0)
+         |  }
+         |
+         |  pub fn bar(z: ByteVec) -> () {
+         |    assert!(y[1], 0)
+         |    assert!(z != #, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val contract = Compiler.compileContract(code).rightValue
+    contract is StatefulContract(
+      6,
+      methods = AVector(
+        Method[StatefulContext](
+          true,
+          false,
+          false,
+          1,
+          1,
+          0,
+          AVector[Instr[StatefulContext]](
+            LoadMutField(2.toByte),
+            U256Const0,
+            U256Neq,
+            U256Const0,
+            AssertWithErrorCode
+          ) ++
+            AVector(LoadLocal(0.toByte), I256Const0, I256Neq, U256Const0, AssertWithErrorCode)
+        ),
+        Method[StatefulContext](
+          true,
+          false,
+          false,
+          1,
+          1,
+          0,
+          AVector[Instr[StatefulContext]](
+            LoadImmField(2.toByte),
+            U256Const0,
+            AssertWithErrorCode
+          ) ++
+            AVector(
+              LoadLocal(0.toByte),
+              BytesConst(Val.ByteVec(ByteString.empty)),
+              ByteVecNeq,
+              U256Const0,
+              AssertWithErrorCode
+            )
+        )
+      )
+    )
+  }
+
+  it should "load both mutable and immutable fields by index" in {
+    val code =
+      s"""
+         |Contract Foo(mut a: U256, mut x: [U256; 2], b: Bool, y: [Bool; 2]) {
+         |  pub fn foo(z: I256, c: U256) -> () {
+         |    assert!(x[c + 1] != 0, 0)
+         |    assert!(z != 0i, 0)
+         |  }
+         |
+         |  pub fn bar(z: ByteVec, c: U256) -> () {
+         |    assert!(y[c + 1], 0)
+         |    assert!(z != #, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val contract = Compiler.compileContract(code).rightValue
+    contract is StatefulContract(
+      6,
+      methods = AVector(
+        Method[StatefulContext](
+          true,
+          false,
+          false,
+          2,
+          2,
+          0,
+          AVector[Instr[StatefulContext]](
+            LoadLocal(1.toByte),
+            U256Const1,
+            U256Add,
+            Dup,
+            U256Const2,
+            U256Lt,
+            Assert,
+            U256Const1,
+            U256Add,
+            LoadMutFieldByIndex,
+            U256Const0,
+            U256Neq,
+            U256Const0,
+            AssertWithErrorCode
+          ) ++
+            AVector(LoadLocal(0.toByte), I256Const0, I256Neq, U256Const0, AssertWithErrorCode)
+        ),
+        Method[StatefulContext](
+          true,
+          false,
+          false,
+          2,
+          2,
+          0,
+          AVector[Instr[StatefulContext]](
+            LoadLocal(1.toByte),
+            U256Const1,
+            U256Add,
+            Dup,
+            U256Const2,
+            U256Lt,
+            Assert,
+            U256Const1,
+            U256Add,
+            LoadImmFieldByIndex,
+            U256Const0,
+            AssertWithErrorCode
+          ) ++
+            AVector(
+              LoadLocal(0.toByte),
+              BytesConst(Val.ByteVec(ByteString.empty)),
+              ByteVecNeq,
+              U256Const0,
+              AssertWithErrorCode
+            )
+        )
+      )
+    )
+  }
+
+  it should "compile exp expressions" in {
+    def code(baseType: String, expType: String, op: String, retType: String): String = {
+      s"""
+         |Contract Foo() {
+         |  pub fn foo(base: $baseType, exp: $expType) -> $retType {
+         |    return base $op exp
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    Compiler.compileContract(code("I256", "I256", "**", "I256")).leftValue.message is
+      "Invalid param types List(I256, I256) for exp operator"
+    Compiler.compileContract(code("U256", "U256", "**", "U256")).isRight is true
+    Compiler.compileContract(code("U256", "U256", "**", "I256")).leftValue.message is
+      s"""Invalid return types: expected "List(I256)", got "List(U256)""""
+    Compiler.compileContract(code("I256", "U256", "**", "I256")).isRight is true
+    Compiler.compileContract(code("I256", "U256", "**", "U256")).leftValue.message is
+      s"""Invalid return types: expected "List(U256)", got "List(I256)""""
+
+    Compiler.compileContract(code("I256", "I256", "|**|", "I256")).leftValue.message is
+      "ModExp accepts U256 only"
+    Compiler.compileContract(code("U256", "U256", "|**|", "U256")).isRight is true
+    Compiler.compileContract(code("I256", "U256", "|**|", "U256")).leftValue.message is
+      "Invalid param types List(I256, U256) for ArithOperator"
+    Compiler.compileContract(code("U256", "U256", "|**|", "I256")).leftValue.message is
+      """Invalid return types: expected "List(I256)", got "List(U256)""""
   }
 }

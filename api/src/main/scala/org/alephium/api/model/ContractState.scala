@@ -27,7 +27,8 @@ final case class ContractState(
     bytecode: StatefulContract,
     codeHash: Hash,
     initialStateHash: Option[Hash] = None,
-    fields: AVector[Val],
+    immFields: AVector[Val],
+    mutFields: AVector[Val],
     asset: AssetState
 ) {
   def id: ContractId = address.lockupScript.contractId

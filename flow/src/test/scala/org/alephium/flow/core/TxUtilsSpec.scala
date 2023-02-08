@@ -50,7 +50,7 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         dustUtxoAmount,
         None,
-        minimalGasPrice,
+        coinbaseGasPrice,
         defaultUtxoLimit
       )
       .rightValue
@@ -63,8 +63,8 @@ class TxUtilsSpec extends AlephiumSpec {
     val (toPriKey, _)         = chainIndex.from.generateKey
     val block = transfer(blockFlow, genesisPriKey, toPriKey.publicKey, amount = dustUtxoAmount)
     val tx    = block.nonCoinbase.head
-    tx.gasFeeUnsafe is defaultGasFee
-    defaultGasFee is ALPH.nanoAlph(20000 * 100)
+    tx.gasFeeUnsafe is nonCoinbaseMinGasFee
+    nonCoinbaseMinGasFee is ALPH.nanoAlph(20000 * 100)
   }
 
   trait UnsignedTxFixture extends FlowFixture {
@@ -92,7 +92,7 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         ALPH.cent(50),
         None,
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
@@ -111,14 +111,14 @@ class TxUtilsSpec extends AlephiumSpec {
 
     lazy val (genesisPriKey, genesisPubKey, _) = genesisKeys(chainIndex.from.value)
     lazy val genesisLockup                     = LockupScript.p2pkh(genesisPubKey)
-    lazy val genesisChange                     = genesisBalance - ALPH.alph(1) - defaultGasFee
-    lazy val output1 = TxOutputInfo(genesisLockup, genesisChange, AVector.empty, None)
+    lazy val genesisChange = genesisBalance - ALPH.alph(1) - nonCoinbaseMinGasFee
+    lazy val output1       = TxOutputInfo(genesisLockup, genesisChange, AVector.empty, None)
     lazy val unsignedTx = blockFlow
       .transfer(
         genesisPriKey.publicKey,
         AVector(output0, output1),
-        Some(defaultGas),
-        defaultGasPrice,
+        Some(minimalGas),
+        nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
@@ -239,7 +239,7 @@ class TxUtilsSpec extends AlephiumSpec {
           inputs,
           outputs,
           minimalGas,
-          defaultGasPrice
+          nonCoinbaseMinGasPrice
         )
         .rightValue
     }
@@ -265,7 +265,7 @@ class TxUtilsSpec extends AlephiumSpec {
         inputs,
         outputs,
         minimalGas,
-        defaultGasPrice
+        nonCoinbaseMinGasPrice
       )
       .leftValue is "Not enough balance"
   }
@@ -288,7 +288,7 @@ class TxUtilsSpec extends AlephiumSpec {
         inputs,
         outputs,
         minimalGas,
-        defaultGasPrice
+        nonCoinbaseMinGasPrice
       )
       .leftValue is "Not enough balance for gas fee"
   }
@@ -321,14 +321,14 @@ class TxUtilsSpec extends AlephiumSpec {
         inputs,
         outputs,
         minimalGas,
-        defaultGasPrice
+        nonCoinbaseMinGasPrice
       )
       .rightValue
 
     unsignedTx.fixedOutputs.length is 3
 
     info("verify change output")
-    unsignedTx.fixedOutputs(2).amount is ALPH.oneAlph.subUnsafe(defaultGasFee)
+    unsignedTx.fixedOutputs(2).amount is ALPH.oneAlph.subUnsafe(nonCoinbaseMinGasFee)
     unsignedTx.fixedOutputs(2).tokens.length is 2
     unsignedTx.fixedOutputs(2).tokens.foreach { case (_, amount) =>
       amount is U256.unsafe(1)
@@ -357,7 +357,7 @@ class TxUtilsSpec extends AlephiumSpec {
         inputs,
         outputs,
         minimalGas,
-        defaultGasPrice
+        nonCoinbaseMinGasPrice
       )
       .leftValue is s"New tokens found in outputs: ${Set(tokenId1)}"
   }
@@ -384,7 +384,7 @@ class TxUtilsSpec extends AlephiumSpec {
         inputs,
         outputs,
         minimalGas,
-        defaultGasPrice
+        nonCoinbaseMinGasPrice
       )
       .leftValue is s"Not enough balance for token $tokenId2"
   }
@@ -415,7 +415,7 @@ class TxUtilsSpec extends AlephiumSpec {
           inputs,
           outputs,
           minimalGas,
-          defaultGasPrice
+          nonCoinbaseMinGasPrice
         )
         .leftValue is "Not enough ALPH for transaction output"
     }
@@ -441,7 +441,7 @@ class TxUtilsSpec extends AlephiumSpec {
           inputs,
           outputs,
           minimalGas,
-          defaultGasPrice
+          nonCoinbaseMinGasPrice
         )
         .leftValue is "Not enough ALPH for transaction output"
     }
@@ -454,7 +454,8 @@ class TxUtilsSpec extends AlephiumSpec {
       val tokenId2 = TokenId.hash("tokenId2")
 
       val inputs = {
-        val input1Amount = defaultGasFee.addUnsafe(minimalAttoAlphAmountPerTxOutput(1)).subUnsafe(1)
+        val input1Amount =
+          nonCoinbaseMinGasFee.addUnsafe(minimalAttoAlphAmountPerTxOutput(1)).subUnsafe(1)
         val input1 = input("input1", input1Amount, fromLockupScript, (tokenId2, U256.unsafe(10)))
         val input2 = input("input2", ALPH.alph(3), fromLockupScript, (tokenId1, U256.unsafe(50)))
         AVector(input1, input2)
@@ -479,7 +480,7 @@ class TxUtilsSpec extends AlephiumSpec {
           inputs,
           outputs,
           minimalGas,
-          defaultGasPrice
+          nonCoinbaseMinGasPrice
         )
         .leftValue is "Not enough ALPH for change output"
     }
@@ -487,9 +488,10 @@ class TxUtilsSpec extends AlephiumSpec {
     {
       info("without tokens")
       val inputs = {
-        val input1Amount = defaultGasFee.addUnsafe(minimalAttoAlphAmountPerTxOutput(0)).subUnsafe(1)
-        val input1       = input("input1", input1Amount, fromLockupScript)
-        val input2       = input("input2", ALPH.alph(3), fromLockupScript)
+        val input1Amount =
+          nonCoinbaseMinGasFee.addUnsafe(minimalAttoAlphAmountPerTxOutput(0)).subUnsafe(1)
+        val input1 = input("input1", input1Amount, fromLockupScript)
+        val input2 = input("input2", ALPH.alph(3), fromLockupScript)
         AVector(input1, input2)
       }
 
@@ -506,7 +508,7 @@ class TxUtilsSpec extends AlephiumSpec {
           inputs,
           outputs,
           minimalGas,
-          defaultGasPrice
+          nonCoinbaseMinGasPrice
         )
         .leftValue is "Not enough ALPH for change output"
     }
@@ -528,7 +530,7 @@ class TxUtilsSpec extends AlephiumSpec {
         inputs,
         outputs,
         minimalGas,
-        defaultGasPrice
+        nonCoinbaseMinGasPrice
       )
       .leftValue is "Inputs not unique"
   }
@@ -552,7 +554,7 @@ class TxUtilsSpec extends AlephiumSpec {
         inputs,
         outputs,
         minimalGas,
-        defaultGasPrice
+        nonCoinbaseMinGasPrice
       )
       .leftValue is "Too many tokens in the transaction output, maximal number 4"
   }
@@ -581,7 +583,7 @@ class TxUtilsSpec extends AlephiumSpec {
         inputs,
         outputs,
         minimalGas,
-        defaultGasPrice
+        nonCoinbaseMinGasPrice
       )
       .leftValue is "Value is Zero for one or many tokens in the transaction output"
   }
@@ -605,7 +607,7 @@ class TxUtilsSpec extends AlephiumSpec {
           output.lockupScript,
           None,
           None,
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           defaultUtxoLimit
         )
         .rightValue
@@ -641,7 +643,7 @@ class TxUtilsSpec extends AlephiumSpec {
           lockTimeOpt = None,
           AVector(output),
           gasOpt = None,
-          defaultGasPrice
+          nonCoinbaseMinGasPrice
         )
 
       def success(verify: ((AVector[TxOutputInfo], GasBox)) => Assertion) = {
@@ -692,7 +694,7 @@ class TxUtilsSpec extends AlephiumSpec {
         outputs(0).attoAlphAmount is ALPH
           .alph(3)
           .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo))
-          .subUnsafe(defaultGasPrice * gas)
+          .subUnsafe(nonCoinbaseMinGasPrice * gas)
         outputs(0).tokens.length is 1
 
         verifyExtraOutput(outputs(1))
@@ -714,7 +716,7 @@ class TxUtilsSpec extends AlephiumSpec {
         outputs(0).attoAlphAmount is ALPH
           .alph(3)
           .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
-          .subUnsafe(defaultGasPrice * gas)
+          .subUnsafe(nonCoinbaseMinGasPrice * gas)
         outputs(0).tokens.length is 1
 
         verifyExtraOutput(outputs(1))
@@ -737,7 +739,7 @@ class TxUtilsSpec extends AlephiumSpec {
         outputs(0).attoAlphAmount is ALPH
           .alph(3)
           .subUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
-          .subUnsafe(defaultGasPrice * gas)
+          .subUnsafe(nonCoinbaseMinGasPrice * gas)
         outputs(0).tokens.length is maxTokenPerUtxo
 
         verifyExtraOutput(outputs(1))
@@ -750,7 +752,7 @@ class TxUtilsSpec extends AlephiumSpec {
     {
       info("The amount in the first output is below minimalAttoAlphAmountPerTxOutput(tokens)")
       val attoAlphAmount = minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo - 1)
-        .addUnsafe(defaultGasPrice * GasEstimation.sweepAddress(1, 3))
+        .addUnsafe(nonCoinbaseMinGasPrice * GasEstimation.sweepAddress(1, 3))
         .addUnsafe(minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo).mulUnsafe(2))
 
       val tokens = AVector.tabulate(3 * maxTokenPerUtxo - 1) { i =>
@@ -818,7 +820,7 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         ALPH.alph((ALPH.MaxTxInputNum - 1).toLong),
         Some(GasBox.unsafe(600000)),
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
@@ -835,7 +837,7 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         ALPH.alph(ALPH.MaxTxInputNum.toLong),
         Some(GasBox.unsafe(600000)),
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
@@ -867,7 +869,7 @@ class TxUtilsSpec extends AlephiumSpec {
         availableInputs.take(maxP2PKHInputsAllowedByGas),
         outputInfo,
         None,
-        defaultGasPrice
+        nonCoinbaseMinGasPrice
       )
       .rightValue
       .rightValue
@@ -880,7 +882,7 @@ class TxUtilsSpec extends AlephiumSpec {
         availableInputs.take(maxP2PKHInputsAllowedByGas + 1),
         outputInfo,
         None,
-        defaultGasPrice
+        nonCoinbaseMinGasPrice
       )
       .rightValue
       .leftValue is "Estimated gas GasBox(627120) too large, maximal GasBox(625000). Consider consolidating UTXOs using the sweep endpoints"
@@ -894,7 +896,7 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         ALPH.alph(maxP2PKHInputsAllowedByGas.toLong - 1),
         None,
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
@@ -909,7 +911,7 @@ class TxUtilsSpec extends AlephiumSpec {
         None,
         ALPH.alph(maxP2PKHInputsAllowedByGas.toLong),
         None,
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
@@ -926,7 +928,7 @@ class TxUtilsSpec extends AlephiumSpec {
         output.lockupScript,
         None,
         None,
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         Int.MaxValue
       )
       .rightValue
@@ -986,7 +988,12 @@ class TxUtilsSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val (contractId, ref) =
-      createContract(code, AVector.empty, tokenIssuanceInfo = Some(TokenIssuance.Info(1)))
+      createContract(
+        code,
+        AVector.empty,
+        AVector.empty,
+        tokenIssuanceInfo = Some(TokenIssuance.Info(1))
+      )
     val address = LockupScript.p2c(contractId)
   }
 

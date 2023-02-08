@@ -61,30 +61,40 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
         contractId: ContractId,
         contract: StatefulContract,
         outputRef: ContractOutputRef,
-        output: ContractOutput
+        output: ContractOutput,
+        immFieldLength: Int,
+        mutFieldLength: Int
     ): Assertion = {
       pool.worldState
-        .createContractUnsafe(
+        .createContractLemanUnsafe(
           contractId,
           contract.toHalfDecoded(),
-          fields(contract.fieldLength),
+          fields(immFieldLength),
+          fields(mutFieldLength),
           outputRef,
           output
         ) isE ()
       pool.worldState.getContractObj(contractId) isE
-        contract.toHalfDecoded().toObjectUnsafe(contractId, fields(contract.fieldLength))
+        contract
+          .toHalfDecoded()
+          .toObjectUnsafeTestOnly(contractId, fields(immFieldLength), fields(mutFieldLength))
     }
 
-    def createContract(n: Long = 0, fieldLength: Int = 0): (ContractId, StatefulContract) = {
-      val (contractId, contract, outputRef, output) = genContract(n, fieldLength)
-      createContract(contractId, contract, outputRef, output)
+    def createContract(
+        n: Long = 0,
+        immFieldLength: Int = 0,
+        mutFieldLength: Int = 0
+    ): (ContractId, StatefulContract) = {
+      val (contractId, contract, outputRef, output) =
+        genContract(n, immFieldLength + mutFieldLength)
+      createContract(contractId, contract, outputRef, output, immFieldLength, mutFieldLength)
       contractId -> contract
     }
 
     def toObject(contract: StatefulContract, contractId: ContractId) = {
       contract
         .toHalfDecoded()
-        .toObjectUnsafe(contractId, fields(contract.fieldLength))
+        .toObjectUnsafeTestOnly(contractId, AVector.empty, fields(contract.fieldLength))
     }
   }
 
@@ -115,11 +125,17 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "load contracts with limited number of fields" in new Fixture {
-    val (contractId0, contract0) = createContract(0, contractFieldMaxSize / 2)
-    val (contractId1, contract1) = createContract(1, contractFieldMaxSize / 2)
+    val (contractId0, contract0) = createContract(0, immFieldLength = contractFieldMaxSize / 2)
+    val (contractId1, contract1) = createContract(1, mutFieldLength = contractFieldMaxSize / 2)
     val (contractId2, _)         = createContract(2, 1)
-    pool.loadContractObj(contractId0) isE toObject(contract0, contractId0)
-    pool.loadContractObj(contractId1) isE toObject(contract1, contractId1)
+    pool.loadContractObj(contractId0) isE
+      contract0
+        .toHalfDecoded()
+        .toObjectUnsafeTestOnly(contractId0, fields(contract0.fieldLength), AVector.empty)
+    pool.loadContractObj(contractId1) isE
+      contract1
+        .toHalfDecoded()
+        .toObjectUnsafeTestOnly(contractId1, AVector.empty, fields(contract1.fieldLength))
     pool.loadContractObj(contractId2) is failed(ContractFieldOverflow)
   }
 
@@ -136,16 +152,16 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "update contract only when the state of the contract is altered" in new Fixture {
-    val (contractId, _) = createContract(fieldLength = 1)
+    val (contractId, _) = createContract(mutFieldLength = 1)
     val obj             = pool.loadContractObj(contractId).rightValue
     val gasRemaining    = pool.gasRemaining
     pool.updateContractStates().rightValue // no updates
     pool.gasRemaining is gasRemaining
-    pool.worldState.getContractState(contractId).rightValue.fields is fields(1)
+    pool.worldState.getContractState(contractId).rightValue.mutFields is fields(1)
     pool.gasRemaining is gasRemaining
-    obj.setField(0, Val.False)
+    obj.setMutField(0, Val.False)
     pool.updateContractStates().rightValue
-    pool.worldState.getContractState(contractId).rightValue.fields is AVector[Val](Val.False)
+    pool.worldState.getContractState(contractId).rightValue.mutFields is AVector[Val](Val.False)
     pool.gasRemaining is gasRemaining
       .use(GasSchedule.contractStateUpdateBaseGas.addUnsafe(GasBox.unsafe(1)))
       .rightValue
@@ -175,7 +191,7 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
     val contractId = ContractId.random
     val output = contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(contractId))).sample.get
-    pool.worldState.createContractUnsafe(
+    pool.worldState.createContractLegacyUnsafe(
       contractId,
       StatefulContract.forSMT,
       AVector.empty,

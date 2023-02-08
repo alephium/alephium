@@ -306,7 +306,8 @@ trait TxGenerators
           argsLength = 0,
           localsLength = 0,
           returnLength = 0,
-          instrs = AVector(vm.LoadField(0), vm.U256Const1, vm.U256Add, vm.StoreField(0), vm.Return)
+          instrs =
+            AVector(vm.LoadMutField(0), vm.U256Const1, vm.U256Add, vm.StoreMutField(0), vm.Return)
         )
       )
     )
@@ -352,7 +353,7 @@ trait TxGenerators
       val inputs         = assets.map(_.txInput)
       val outputsToSpend = assets.map[TxOutput](_.referredOutput)
       val gas            = math.max(minimalGas.value, inputs.length * 20000)
-      val attoAlphAmount = outputsToSpend.map(_.amount).reduce(_ + _) - defaultGasPrice * gas
+      val attoAlphAmount = outputsToSpend.map(_.amount).reduce(_ + _) - nonCoinbaseMinGasPrice * gas
       val tokenTable = {
         val tokens = mutable.Map.empty[TokenId, U256]
         assets.foreach(_.referredOutput.tokens.foreach { case (tokenId, amount) =>
@@ -376,7 +377,7 @@ trait TxGenerators
           }
         balance.toOutput(lockupScript, lockTime, dataGen.sample.get)
       }
-      UnsignedTransaction(None, gas, defaultGasPrice, inputs, outputs)(networkConfig)
+      UnsignedTransaction(None, gas, nonCoinbaseMinGasPrice, inputs, outputs)(networkConfig)
     }
 
   def balancesGen(inputNum: Int, tokensNumGen: Gen[Int]): Gen[Balances] =
@@ -609,19 +610,27 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
     chainIndexGen.flatMap(chainGenOf(_, length))
 
   type GeneratedContract =
-    (ContractId, StatefulContract.HalfDecoded, AVector[Val], ContractOutputRef, ContractOutput)
+    (
+        ContractId,
+        StatefulContract.HalfDecoded,
+        AVector[Val],
+        AVector[Val],
+        ContractOutputRef,
+        ContractOutput
+    )
   def generateContract(): Gen[GeneratedContract] = {
     lazy val counterStateGen: Gen[AVector[Val]] =
       Gen.choose(0L, Long.MaxValue / 1000).map(n => AVector(Val.U256(U256.unsafe(n))))
     for {
-      groupIndex    <- groupIndexGen
-      outputRef     <- contractOutputRefGen(groupIndex)
-      output        <- contractOutputGen(scriptGen = p2cLockupGen(groupIndex))
-      contractState <- counterStateGen
+      groupIndex <- groupIndexGen
+      outputRef  <- contractOutputRefGen(groupIndex)
+      output     <- contractOutputGen(scriptGen = p2cLockupGen(groupIndex))
+      mutState   <- counterStateGen
     } yield (
       ContractId.random,
       counterContract.toHalfDecoded(),
-      contractState,
+      AVector.empty,
+      mutState,
       outputRef,
       output
     )

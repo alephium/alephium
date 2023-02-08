@@ -474,7 +474,9 @@ object Compiler {
               isUnused = false,
               isLocal = true,
               isGenerated = true,
-              VarInfo.Local
+              VarInfo.Local,
+              () => currentScopeState.varIndex.toByte,
+              () => currentScopeState.varIndex += 1
             )
           val codes = expr.genCode(this) ++ arrayRef.genStoreCode(this).reverse.flatten
           (arrayRef, codes)
@@ -527,7 +529,17 @@ object Compiler {
         isUnused: Boolean,
         isGenerated: Boolean
     ): Unit = {
-      addVariable(ident, tpe, isMutable, isUnused, isLocal = false, isGenerated, VarInfo.Field)
+      addVariable(
+        ident,
+        tpe,
+        isMutable,
+        isUnused,
+        isLocal = false,
+        isGenerated,
+        VarInfo.Field,
+        () => if (isMutable) this.mutFieldsIndex.toByte else this.immFieldsIndex.toByte,
+        () => if (isMutable) this.mutFieldsIndex += 1 else this.immFieldsIndex += 1
+      )
     }
     def addLocalVariable(
         ident: Ast.Ident,
@@ -536,8 +548,19 @@ object Compiler {
         isUnused: Boolean,
         isGenerated: Boolean
     ): Unit = {
-      addVariable(ident, tpe, isMutable, isUnused, isLocal = true, isGenerated, VarInfo.Local)
+      addVariable(
+        ident,
+        tpe,
+        isMutable,
+        isUnused,
+        isLocal = true,
+        isGenerated,
+        VarInfo.Local,
+        () => currentScopeState.varIndex.toByte,
+        () => currentScopeState.varIndex += 1
+      )
     }
+    // scalastyle:off parameter.number
     def addVariable(
         ident: Ast.Ident,
         tpe: Type,
@@ -545,7 +568,9 @@ object Compiler {
         isUnused: Boolean,
         isLocal: Boolean,
         isGenerated: Boolean,
-        varInfoBuilder: Compiler.VarInfoBuilder
+        varInfoBuilder: Compiler.VarInfoBuilder,
+        getIndex: () => Byte,
+        increaseIndex: () => Unit
     ): Unit = {
       val sname = checkNewVariable(ident)
       tpe match {
@@ -558,7 +583,9 @@ object Compiler {
             isUnused,
             isLocal,
             isGenerated,
-            varInfoBuilder
+            varInfoBuilder,
+            getIndex,
+            increaseIndex
           )
           ()
         case c: Type.Contract =>
@@ -567,18 +594,24 @@ object Compiler {
             varType,
             isMutable,
             isUnused,
-            currentScopeState.varIndex.toByte,
+            getIndex(),
             isGenerated
           )
           trackGenCodePhaseNewVars(sname)
-          currentScopeState.varIndex += 1
+          increaseIndex()
         case _ =>
-          varTable(sname) =
-            varInfoBuilder(tpe, isMutable, isUnused, currentScopeState.varIndex.toByte, isGenerated)
+          varTable(sname) = varInfoBuilder(
+            tpe,
+            isMutable,
+            isUnused,
+            getIndex(),
+            isGenerated
+          )
           trackGenCodePhaseNewVars(sname)
-          currentScopeState.varIndex += 1
+          increaseIndex()
       }
     }
+    // scalastyle:on parameter.number
     def addConstantVariable(ident: Ast.Ident, tpe: Type, instrs: Seq[Instr[Ctx]]): Unit = {
       val sname = checkNewVariable(ident)
       varTable(sname) = VarInfo.Constant(tpe, instrs)
@@ -694,7 +727,11 @@ object Compiler {
 
     def genLoadCode(ident: Ast.Ident): Seq[Instr[Ctx]]
 
-    def genLoadCode(offset: ArrayTransformer.ArrayVarOffset[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
+    def genLoadCode(
+        offset: ArrayTransformer.ArrayVarOffset[Ctx],
+        isLocal: Boolean,
+        isMutable: Boolean
+    ): Seq[Instr[Ctx]]
 
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[Ctx]]]
 
@@ -812,7 +849,8 @@ object Compiler {
 
     def genLoadCode(
         offset: ArrayTransformer.ArrayVarOffset[StatelessContext],
-        isLocal: Boolean
+        isLocal: Boolean,
+        isMutable: Boolean
     ): Seq[Instr[StatelessContext]] =
       genVarIndexCode(offset, isLocal, LoadLocal.apply, LoadLocalByIndex)
 
@@ -883,15 +921,16 @@ object Compiler {
 
     def genLoadCode(
         offset: ArrayTransformer.ArrayVarOffset[StatefulContext],
-        isLocal: Boolean
+        isLocal: Boolean,
+        isMutable: Boolean
     ): Seq[Instr[StatefulContext]] =
       genVarIndexCode(
         offset,
         isLocal,
         LoadLocal.apply,
-        LoadField.apply,
+        if (isMutable) LoadMutField.apply else LoadImmField.apply,
         LoadLocalByIndex,
-        LoadFieldByIndex
+        if (isMutable) LoadMutFieldByIndex else LoadImmFieldByIndex
       )
 
     def genStoreCode(
@@ -902,9 +941,9 @@ object Compiler {
         offset,
         isLocal,
         StoreLocal.apply,
-        StoreField.apply,
+        StoreMutField.apply,
         StoreLocalByIndex,
-        StoreFieldByIndex
+        StoreMutFieldByIndex
       )
     }
 
@@ -912,7 +951,8 @@ object Compiler {
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
       val varInfo = getVariable(ident)
       getVariable(ident) match {
-        case v: VarInfo.Field    => Seq(LoadField(v.index))
+        case v: VarInfo.Field =>
+          if (v.isMutable) Seq(LoadMutField(v.index)) else Seq(LoadImmField(v.index))
         case v: VarInfo.Local    => Seq(LoadLocal(v.index))
         case v: VarInfo.Template => Seq(TemplateVariable(ident.name, varInfo.tpe.toVal, v.index))
         case _: VarInfo.ArrayRef[StatefulContext @unchecked] => getArrayRef(ident).genLoadCode(this)
@@ -923,7 +963,7 @@ object Compiler {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[StatefulContext]]] = {
       getVariable(ident) match {
-        case v: VarInfo.Field    => Seq(Seq(StoreField(v.index)))
+        case v: VarInfo.Field    => Seq(Seq(StoreMutField(v.index)))
         case v: VarInfo.Local    => Seq(Seq(StoreLocal(v.index)))
         case _: VarInfo.Template => throw Error(s"Unexpected template variable: ${ident.name}")
         case ref: VarInfo.ArrayRef[StatefulContext @unchecked] => ref.ref.genStoreCode(this)

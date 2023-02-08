@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.minimalGasPrice
+import org.alephium.protocol.model.{coinbaseGasPrice, nonCoinbaseMinGasPrice, HardFork}
 import org.alephium.serde.Serde
 import org.alephium.util.U256
 
@@ -33,7 +33,9 @@ final case class GasPrice(value: U256) extends Ordered[GasPrice] {
 object GasPrice {
   implicit val serde: Serde[GasPrice] = Serde.forProduct1(GasPrice.apply, _.value)
 
-  def validate(gasPrice: GasPrice): Boolean = {
-    gasPrice >= minimalGasPrice && gasPrice.value < ALPH.MaxALPHValue
+  @inline def validate(gasPrice: GasPrice, isCoinbase: Boolean, hardFork: HardFork): Boolean = {
+    val minGasPrice =
+      if (isCoinbase || !hardFork.isLemanEnabled()) coinbaseGasPrice else nonCoinbaseMinGasPrice
+    gasPrice >= minGasPrice && gasPrice.value < ALPH.MaxALPHValue
   }
 }

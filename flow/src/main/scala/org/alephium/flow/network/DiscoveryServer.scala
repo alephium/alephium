@@ -158,7 +158,7 @@ class DiscoveryServer(
   override def addBrokerToStorage(peerInfo: BrokerInfo): Unit =
     escapeIOError(brokerStorage.addBroker(peerInfo))
   override def removeBrokerFromStorage(peerId: PeerId): Unit =
-    escapeIOError(brokerStorage.delete(peerId))
+    escapeIOError(brokerStorage.remove(peerId))
 
   def binding: Receive = {
     case UdpServer.Bound(address) =>

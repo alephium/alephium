@@ -344,8 +344,9 @@ trait StatefulContext extends StatelessContext with ContractPool {
   def createContract(
       contractId: ContractId,
       code: StatefulContract.HalfDecoded,
+      initialImmFields: AVector[Val],
       initialBalances: MutBalancesPerLockup,
-      initialFields: AVector[Val],
+      initialMutFields: AVector[Val],
       tokenIssuanceInfo: Option[TokenIssuance.Info]
   ): ExeResult[ContractId] = {
     tokenIssuanceInfo.foreach { info =>
@@ -374,16 +375,43 @@ trait StatefulContext extends StatelessContext with ContractPool {
           case Right(_) =>
             Left(Right(ContractAlreadyExists(contractId)))
         }
-      _ <- code.check(initialFields)
-      _ <-
-        worldState
-          .createContractUnsafe(contractId, code, initialFields, outputRef, contractOutput)
-          .map(_ => discard(generatedOutputs.addOne(contractOutput)))
-          .left
-          .map(e => Left(IOErrorUpdateState(e)))
+      _ <- code.check(initialImmFields, initialMutFields)
+      _ <- createContract(
+        contractId,
+        code,
+        initialImmFields,
+        initialMutFields,
+        outputRef,
+        contractOutput
+      )
     } yield {
       blockContractLoad(contractId)
       contractId
+    }
+  }
+
+  private def createContract(
+      contractId: ContractId,
+      code: StatefulContract.HalfDecoded,
+      initialImmFields: AVector[Val],
+      initialMutFields: AVector[Val],
+      outputRef: ContractOutputRef,
+      contractOutput: ContractOutput
+  ): ExeResult[Unit] = {
+    val result = worldState
+      .createContractUnsafe(
+        contractId,
+        code,
+        initialImmFields,
+        initialMutFields,
+        outputRef,
+        contractOutput,
+        getHardFork().isLemanEnabled()
+      )
+
+    result match {
+      case Right(_) => Right(discard(generatedOutputs.addOne(contractOutput)))
+      case Left(e)  => ioFailed(IOErrorUpdateState(e))
     }
   }
 
@@ -402,20 +430,19 @@ trait StatefulContext extends StatelessContext with ContractPool {
       contractId: ContractId,
       obj: ContractObj[StatefulContext],
       newContractCode: StatefulContract,
-      newFieldsOpt: Option[AVector[Val]]
+      newImmFieldsOpt: Option[AVector[Val]],
+      newMutFieldsOpt: Option[AVector[Val]]
   ): ExeResult[Unit] = {
-    val newFields = newFieldsOpt.getOrElse(AVector.from(obj.fields))
+    val newImmFields = newImmFieldsOpt.getOrElse(AVector.from(obj.immFields))
+    val newMutFields = newMutFieldsOpt.getOrElse(AVector.from(obj.mutFields))
     for {
-      _ <-
-        if (newFields.length == newContractCode.fieldLength) { okay }
-        else {
-          failed(InvalidFieldLength)
-        }
-      _ <- chargeFieldSize(newFields.toIterable)
-      _ <- worldState
-        .migrateContractUnsafe(contractId, newContractCode, newFields)
+      _ <- newContractCode.check(newImmFields, newMutFields)
+      _ <- chargeFieldSize(newImmFields.toIterable ++ newMutFields.toIterable)
+      succeeded <- worldState
+        .migrateContractLemanUnsafe(contractId, newContractCode, newImmFields, newMutFields)
         .left
         .map(e => Left(IOErrorMigrateContract(e)))
+      _ <- if (succeeded) okay else failed(UnableToMigratePreLemanContract)
     } yield {
       blockContractLoad(contractId)
       removeContractFromCache(contractId)

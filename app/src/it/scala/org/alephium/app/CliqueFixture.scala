@@ -671,10 +671,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       code: String,
       gas: Option[Int] = Some(100000),
       gasPrice: Option[GasPrice] = None,
-      initialFields: Option[AVector[vm.Val]] = None,
+      initialImmFields: Option[AVector[vm.Val]] = None,
+      initialMutFields: Option[AVector[vm.Val]] = None,
       issueTokenAmount: Option[U256] = None
   ) = {
-    val bytecode = code + Hex.toHexString(serialize(initialFields.getOrElse(AVector.empty)))
+    val bytecode = code + Hex.toHexString(serialize(initialImmFields.getOrElse(AVector.empty))) +
+      Hex.toHexString(serialize(initialMutFields.getOrElse(AVector.empty)))
     val query = {
       s"""
          |{

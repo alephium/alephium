@@ -31,9 +31,9 @@ trait BlockHeaderStorage extends KeyValueStorage[BlockHash, BlockHeader] {
 
   def existsUnsafe(blockHeader: BlockHeader): Boolean = existsUnsafe(blockHeader.hash)
 
-  def delete(blockHeader: BlockHeader): IOResult[Unit] = delete(blockHeader.hash)
+  def delete(blockHeader: BlockHeader): IOResult[Unit] = remove(blockHeader.hash)
 
-  def deleteUnsafe(blockHeader: BlockHeader): Unit = deleteUnsafe(blockHeader.hash)
+  def deleteUnsafe(blockHeader: BlockHeader): Unit = removeUnsafe(blockHeader.hash)
 }
 
 object BlockHeaderRockDBStorage extends RocksDBKeyValueCompanion[BlockHeaderRockDBStorage] {

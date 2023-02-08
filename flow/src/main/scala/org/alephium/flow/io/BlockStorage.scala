@@ -46,7 +46,7 @@ class BlockRockDBStorage(
     readOptions: ReadOptions
 ) extends RocksDBKeyValueStorage[BlockHash, Block](storage, cf, writeOptions, readOptions)
     with BlockStorage {
-  override def delete(key: BlockHash): IOResult[Unit] = ???
+  override def remove(key: BlockHash): IOResult[Unit] = ???
 
-  override def deleteUnsafe(key: BlockHash): Unit = ???
+  override def removeUnsafe(key: BlockHash): Unit = ???
 }
