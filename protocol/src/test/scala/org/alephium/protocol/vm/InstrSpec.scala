@@ -2629,8 +2629,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       }
       contractOutput.tokens.toSet is allTokens.toSet
       contractOutput.amount is attoAlphAmount
-      val contractRecord = frame.ctx.worldState.getContractCode(contractState.codeHash).rightValue
-      contractRecord.code.toContract() isE contract
+      val code = frame.ctx.worldState.getContractCode(contractState).rightValue
+      code.toContract() isE contract
     }
   }
 

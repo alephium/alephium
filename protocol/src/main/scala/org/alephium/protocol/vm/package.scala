@@ -50,4 +50,6 @@ package object vm {
   val destroyContractEventIndex: Val.I256 = Val.I256(I256.from(-2))
   val debugEventIndex: Val.I256           = Val.I256(I256.from(-3))
   // scalastyle:on magic.number
+
+  type ContractStorageImmutableState = Either[ContractImmutableState, StatefulContract.HalfDecoded]
 }

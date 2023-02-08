@@ -70,8 +70,6 @@ sealed trait ContractState {
   def updateOutputRef(ref: ContractOutputRef): ContractStorageState
 }
 
-object ContractState {}
-
 final case class ContractLegacyState private (
     codeHash: Hash,
     initialStateHash: Hash,

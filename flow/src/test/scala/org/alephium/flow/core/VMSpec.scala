@@ -297,7 +297,8 @@ class VMSpec extends AlephiumSpec {
       val contractKey = ContractId.from(Hex.from(contractId).get).get
       worldState.contractState.exists(contractKey) isE existed
       worldState.outputState.exists(contractAssetRef) isE existed
-      worldState.codeState.exists(contract.hash) isE existed
+      worldState.codeState.exists(contract.hash) isE false
+      worldState.contractImmutableState.exists(contract.hash) isE true // keep history state always
     }
 
     def getContractAsset(contractId: ContractId, chainIndex: ChainIndex): ContractOutput = {
