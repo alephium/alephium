@@ -42,9 +42,9 @@ class SecP256K1PrivateKey(val bytes: ByteString) extends PrivateKey {
   }
 
   def publicKey: SecP256K1PublicKey = {
-    val bigInt       = getBigInt()
-    val rawPublicKey = SecP256K1.params.getG.multiply(bigInt).getEncoded(true)
-    SecP256K1PublicKey.unsafe(ByteString.fromArrayUnsafe(rawPublicKey))
+    val bigInt    = getBigInt()
+    val publicKey = SecP256K1.params.getG.multiply(bigInt).getEncoded(true)
+    SecP256K1PublicKey.unsafe(ByteString.fromArrayUnsafe(publicKey))
   }
 
   def add(that: SecP256K1PrivateKey): SecP256K1PrivateKey = {
@@ -121,8 +121,7 @@ object SecP256K1Signature
   }
 }
 
-object SecP256K1
-    extends SignatureSchema[SecP256K1PrivateKey, SecP256K1PublicKey, SecP256K1Signature] {
+trait SecP256K1CurveCommon {
   val params: X9ECParameters = CustomNamedCurves.getByName("secp256k1")
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -132,6 +131,11 @@ object SecP256K1
     new ECDomainParameters(curve, params.getG, params.getN, params.getH)
 
   val halfCurveOrder: BigInteger = params.getN.shiftRight(1)
+}
+
+object SecP256K1
+    extends SecP256K1CurveCommon
+    with SignatureSchema[SecP256K1PrivateKey, SecP256K1PublicKey, SecP256K1Signature] {
 
   def point(bytes: ByteString): ECPoint = curve.decodePoint(bytes.toArray)
 

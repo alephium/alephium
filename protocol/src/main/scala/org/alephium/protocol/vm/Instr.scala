@@ -156,7 +156,7 @@ object Instr {
     ContractIdToAddress,
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
     BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
-    I256Exp, U256Exp, U256ModExp
+    I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -1294,6 +1294,30 @@ case object VerifyED25519
       pubKey: crypto.ED25519PublicKey
   ): Boolean =
     crypto.ED25519.verify(data, signature, pubKey)
+}
+
+case object VerifyBIP340Schnorr
+    extends GenericVerifySignature[crypto.BIP340SchnorrPublicKey, crypto.BIP340SchnorrSignature]
+    with LemanInstrWithSimpleGas[StatelessContext] {
+  def buildPubKey(value: Val.ByteVec): Option[crypto.BIP340SchnorrPublicKey] =
+    crypto.BIP340SchnorrPublicKey.from(value.bytes)
+  def buildSignature(value: Val.ByteVec): Option[crypto.BIP340SchnorrSignature] =
+    crypto.BIP340SchnorrSignature.from(value.bytes)
+  def verify(
+      data: ByteString,
+      signature: crypto.BIP340SchnorrSignature,
+      pubKey: crypto.BIP340SchnorrPublicKey
+  ): Boolean =
+    crypto.BIP340Schnorr.verify(data, signature, pubKey)
+
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[GenericVerifySignature]._runWith(frame)
+
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    _runWith(frame)
+
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstrWithSimpleGas].runWith(frame)
 }
 
 case object EthEcRecover

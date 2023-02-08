@@ -16,7 +16,7 @@
 
 package org.alephium.protocol.vm
 
-import org.alephium.protocol.model.{maximalGasPerTx, minimalGas}
+import org.alephium.protocol.model._
 import org.alephium.util.AlephiumSpec
 
 class GasBoxSpec extends AlephiumSpec {

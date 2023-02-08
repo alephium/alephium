@@ -140,7 +140,7 @@ trait FlowFixture
       to: PublicKey,
       amount: U256
   ): Block = {
-    transferWithGas(blockFlow, from, to, amount, defaultGasPrice)
+    transferWithGas(blockFlow, from, to, amount, nonCoinbaseMinGasPrice)
   }
 
   def transferWithGas(
@@ -167,7 +167,7 @@ trait FlowFixture
       tokens: AVector[(TokenId, U256)],
       amount: U256
   ): Block = {
-    transferWithGas(blockFlow, from, to, tokens, amount, defaultGasPrice)
+    transferWithGas(blockFlow, from, to, tokens, amount, nonCoinbaseMinGasPrice)
   }
 
   def transferWithGas(
@@ -214,7 +214,7 @@ trait FlowFixture
         }
       case Some(_) => GasBox.unsafe(scriptGas)
     }
-    val gasFee = defaultGasPrice * gasAmount
+    val gasFee = nonCoinbaseMinGasPrice * gasAmount
     val outputAmount =
       if (gasFeeInTheAmount) amount - gasFee.divUnsafe(numReceivers) else amount
     val outputInfos = AVector.fill(numReceivers) {
@@ -229,7 +229,7 @@ trait FlowFixture
           publicKey,
           outputInfos,
           Some(gasAmount),
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           defaultUtxoLimit
         )
         .rightValue
@@ -278,9 +278,9 @@ trait FlowFixture
         publicKey,
         lockupScript,
         None,
-        amount - defaultGasFee,
+        amount - nonCoinbaseMinGasFee,
         Some(gasAmount),
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
@@ -307,7 +307,7 @@ trait FlowFixture
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
 
     val inputs     = balances.map(_.ref).map(TxInput(_, unlockScript))
-    val output     = TxOutput.asset(amount - defaultGasFee, lockupScript)
+    val output     = TxOutput.asset(amount - nonCoinbaseMinGasFee, lockupScript)
     val remaining  = TxOutput.asset(total - amount, fromLockupScript)
     val unsignedTx = UnsignedTransaction(None, inputs, AVector(output, remaining))
     Transaction.from(unsignedTx, privateKey)

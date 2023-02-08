@@ -353,7 +353,7 @@ trait TxGenerators
       val inputs         = assets.map(_.txInput)
       val outputsToSpend = assets.map[TxOutput](_.referredOutput)
       val gas            = math.max(minimalGas.value, inputs.length * 20000)
-      val attoAlphAmount = outputsToSpend.map(_.amount).reduce(_ + _) - defaultGasPrice * gas
+      val attoAlphAmount = outputsToSpend.map(_.amount).reduce(_ + _) - nonCoinbaseMinGasPrice * gas
       val tokenTable = {
         val tokens = mutable.Map.empty[TokenId, U256]
         assets.foreach(_.referredOutput.tokens.foreach { case (tokenId, amount) =>
@@ -377,7 +377,7 @@ trait TxGenerators
           }
         balance.toOutput(lockupScript, lockTime, dataGen.sample.get)
       }
-      UnsignedTransaction(None, gas, defaultGasPrice, inputs, outputs)(networkConfig)
+      UnsignedTransaction(None, gas, nonCoinbaseMinGasPrice, inputs, outputs)(networkConfig)
     }
 
   def balancesGen(inputNum: Int, tokensNumGen: Gen[Int]): Gen[Balances] =

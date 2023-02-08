@@ -110,7 +110,7 @@ object UnsignedTransaction {
       networkConfig.networkId,
       txScriptOpt,
       minimalGas,
-      defaultGasPrice,
+      nonCoinbaseMinGasPrice,
       inputs,
       fixedOutputs
     )
@@ -124,7 +124,7 @@ object UnsignedTransaction {
       networkConfig.networkId,
       None,
       minimalGas,
-      defaultGasPrice,
+      nonCoinbaseMinGasPrice,
       inputs,
       fixedOutputs
     )
@@ -138,7 +138,7 @@ object UnsignedTransaction {
       networkConfig.networkId,
       None,
       minimalGas,
-      minimalGasPrice,
+      coinbaseGasPrice,
       inputs,
       fixedOutputs
     )

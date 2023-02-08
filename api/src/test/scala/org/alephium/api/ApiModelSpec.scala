@@ -1089,8 +1089,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "version": ${unsignedTransaction.version},
          |  "networkId": ${unsignedTransaction.networkId.id},
          |  "scriptOpt": ${write(unsignedTransaction.scriptOpt.map(Script.fromProtocol))},
-         |  "gasAmount": ${defaultGas.value},
-         |  "gasPrice": "${defaultGasPrice.value}",
+         |  "gasAmount": ${minimalGas.value},
+         |  "gasPrice": "${nonCoinbaseMinGasPrice.value}",
          |  "inputs": ${write(unsignedTx.inputs)},
          |  "fixedOutputs": ${write(unsignedTx.fixedOutputs)}
          |}""".stripMargin

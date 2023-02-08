@@ -349,7 +349,7 @@ class SmartContractTest extends AlephiumActorSpec {
         .subUnsafe(ALPH.alph(1000))
         .subUnsafe(ALPH.alph(10000))
         .subUnsafe(ALPH.alph(100000))
-        .subUnsafe(defaultGasPrice * GasEstimation.estimateWithP2PKHInputs(1, 5))
+        .subUnsafe(nonCoinbaseMinGasPrice * GasEstimation.estimateWithP2PKHInputs(1, 5))
 
       changeAmount is ALPH.nanoAlph(888899997244000L)
 
@@ -381,7 +381,7 @@ class SmartContractTest extends AlephiumActorSpec {
       val updatedAmount = ALPH
         .alph(100)
         .subUnsafe(minimalAlphInContract)
-        .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
+        .subUnsafe(nonCoinbaseMinGasPrice * GasBox.unsafe(100000))
 
       updatedAmount is ALPH.nanoAlph(98990000000L)
 
@@ -408,7 +408,7 @@ class SmartContractTest extends AlephiumActorSpec {
       //   - Gas fee: defaultGasPrice  * 100000    [ALPH.nanoAlph(10000000)]
       val updatedAmount = ALPH
         .nanoAlph(98990000000L)
-        .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
+        .subUnsafe(nonCoinbaseMinGasPrice * GasBox.unsafe(100000))
 
       updatedAmount is ALPH.nanoAlph(98980000000L)
 
@@ -437,7 +437,7 @@ class SmartContractTest extends AlephiumActorSpec {
       val updatedAmount = ALPH
         .nanoAlph(98980000000L)
         .subUnsafe(minimalAlphInContract)
-        .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
+        .subUnsafe(nonCoinbaseMinGasPrice * GasBox.unsafe(100000))
 
       updatedAmount is ALPH.nanoAlph(97970000000L)
 
@@ -475,7 +475,7 @@ class SmartContractTest extends AlephiumActorSpec {
           ALPH.alph(1000)
         ) // from UTXO: 0b1556276bbde60fb6b09e2b3e4c6b7274c37e26f2f38392be782acbb81bfced
         .subUnsafe(ALPH.alph(100))
-        .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
+        .subUnsafe(nonCoinbaseMinGasPrice * GasBox.unsafe(100000))
 
       updatedAmount is ALPH.nanoAlph(997960000000L)
 
@@ -500,7 +500,7 @@ class SmartContractTest extends AlephiumActorSpec {
       val updatedAmount = ALPH
         .nanoAlph(997960000000L)
         .subUnsafe(ALPH.alph(100))
-        .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
+        .subUnsafe(nonCoinbaseMinGasPrice * GasBox.unsafe(100000))
 
       updatedAmount is ALPH.nanoAlph(897950000000L)
 
@@ -530,7 +530,7 @@ class SmartContractTest extends AlephiumActorSpec {
       val updatedAmount = ALPH
         .nanoAlph(897950000000L)
         .addUnsafe(ALPH.alph(100))
-        .subUnsafe(defaultGasPrice * GasBox.unsafe(100000))
+        .subUnsafe(nonCoinbaseMinGasPrice * GasBox.unsafe(100000))
 
       updatedAmount is ALPH.nanoAlph(997940000000L)
 

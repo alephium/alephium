@@ -23,7 +23,7 @@ import org.alephium.api.model.Amount
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.PublicKey
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{defaultGasPrice, minimalGas, GroupIndex}
+import org.alephium.protocol.model.{minimalGas, nonCoinbaseMinGasPrice, GroupIndex}
 import org.alephium.util.{AVector, Hex}
 import org.alephium.wallet.api.model._
 
@@ -147,7 +147,7 @@ trait WalletExamples extends EndpointsExamples {
       Transfer(
         moreSettingsDestinations,
         Some(minimalGas),
-        Some(defaultGasPrice),
+        Some(nonCoinbaseMinGasPrice),
         Some(defaultUtxosLimit)
       )
     )
@@ -167,7 +167,7 @@ trait WalletExamples extends EndpointsExamples {
           address,
           Some(ts),
           Some(minimalGas),
-          Some(defaultGasPrice),
+          Some(nonCoinbaseMinGasPrice),
           Some(defaultUtxosLimit)
         )
       )

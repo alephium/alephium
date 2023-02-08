@@ -18,7 +18,7 @@ package org.alephium.app
 
 import org.alephium.api.model._
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.defaultGasFee
+import org.alephium.protocol.model.nonCoinbaseMinGasFee
 import org.alephium.util._
 import org.alephium.wallet.api.model._
 
@@ -99,7 +99,7 @@ abstract class SweepTest(isMiner: Boolean) extends AlephiumActorSpec {
       request[Balance](getBalance(address), restPort) is
         Balance.from(
           Amount(
-            initialBalance.balance.value - (transferAmount + defaultGasFee) * numberOfAddresses
+            initialBalance.balance.value - (transferAmount + nonCoinbaseMinGasFee) * numberOfAddresses
           ),
           Amount.Zero,
           None,
