@@ -110,22 +110,22 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     )
 
     update(worldState.removeAsset(contractOutputRef))
-    update(worldState.removeContractForVM(contractId))
+    update(worldState.removeContractFromVM(contractId))
     worldState.getContractObj(contractId).isLeft is true
     worldState.contractExists(contractId) isE false
     worldState.getOutput(contractOutputRef).isLeft is true
     worldState.getContractState(contractId).isLeft is true
     worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
-    worldState.removeContractForVM(contractId).isLeft is true
+    worldState.removeContractFromVM(contractId).isLeft is true
 
     update(worldState.removeAsset(contractOutputRef1))
-    update(worldState.removeContractForVM(contractId1))
+    update(worldState.removeContractFromVM(contractId1))
     worldState.getContractObj(contractId1).isLeft is true
     worldState.contractExists(contractId1) isE false
     worldState.getOutput(contractOutputRef1).isLeft is true
     worldState.getContractState(contractId).isLeft is true
     worldState.getContractCode(code.hash).isLeft is true
-    worldState.removeContractForVM(contractId1).isLeft is true
+    worldState.removeContractFromVM(contractId1).isLeft is true
   }
 
   trait Fixture {

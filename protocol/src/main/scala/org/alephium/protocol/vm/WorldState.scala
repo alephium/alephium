@@ -172,7 +172,7 @@ trait WorldState[T, R1, R2, R3] {
 
   def removeAsset(outputRef: TxOutputRef): IOResult[T]
 
-  def removeContractForVM(contractKey: ContractId): IOResult[T]
+  def removeContractFromVM(contractKey: ContractId): IOResult[T]
 
   protected def removeContractCode(
       currentState: ContractState,
@@ -411,7 +411,7 @@ object WorldState {
     }
 
     // Contract output is already removed by the VM
-    def removeContractForVM(contractKey: ContractId): IOResult[Persisted] = {
+    def removeContractFromVM(contractKey: ContractId): IOResult[Persisted] = {
       for {
         state            <- getContractState(contractKey)
         newContractState <- contractState.remove(contractKey)
@@ -546,7 +546,7 @@ object WorldState {
     }
 
     // Contract output is already removed by the VM
-    def removeContractForVM(contractId: ContractId): IOResult[Unit] = {
+    def removeContractFromVM(contractId: ContractId): IOResult[Unit] = {
       for {
         state      <- getContractState(contractId)
         codeRecord <- codeState.get(state.codeHash)
