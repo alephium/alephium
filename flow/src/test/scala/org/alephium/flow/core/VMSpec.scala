@@ -1564,24 +1564,24 @@ class VMSpec extends AlephiumSpec {
     val p256Sig                  = SecP256K1.sign(Hash.zero.bytes, p256Pri).toHexString
     val (ed25519Pri, ed25519Pub) = ED25519.generatePriPub()
     val ed25519Sig               = ED25519.sign(Hash.zero.bytes, ed25519Pri).toHexString
-    val (bip430Pri, bip430Pub)   = BIP340Schnorr.generatePriPub()
-    val bip430Sig                = BIP340Schnorr.sign(Hash.zero.bytes, bip430Pri).toHexString
-    def main(p256Sig: String, ed25519Sig: String, bip430Sig: String) =
+    val (bip340Pri, bip340Pub)   = BIP340Schnorr.generatePriPub()
+    val bip340Sig                = BIP340Schnorr.sign(Hash.zero.bytes, bip340Pri).toHexString
+    def main(p256Sig: String, ed25519Sig: String, bip340Sig: String) =
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
          |  verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig)
          |  verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
-         |  verifyBIP340Schnorr!(#$zero, #${bip430Pub.toHexString}, #$bip430Sig)
+         |  verifyBIP340Schnorr!(#$zero, #${bip340Pub.toHexString}, #$bip340Sig)
          |}
          |""".stripMargin
-    testSimpleScript(main(p256Sig, ed25519Sig, bip430Sig))
+    testSimpleScript(main(p256Sig, ed25519Sig, bip340Sig))
     failSimpleScript(
-      main(SecP256K1Signature.generate.toHexString, ed25519Sig, bip430Sig),
+      main(SecP256K1Signature.generate.toHexString, ed25519Sig, bip340Sig),
       InvalidSignature
     )
     failSimpleScript(
-      main(p256Sig, ED25519Signature.generate.toHexString, bip430Sig),
+      main(p256Sig, ED25519Signature.generate.toHexString, bip340Sig),
       InvalidSignature
     )
     failSimpleScript(
