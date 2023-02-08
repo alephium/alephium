@@ -278,4 +278,96 @@ class U256Spec extends AlephiumSpec {
         .toFixedSizeBytes(size) is Some(ByteString(Array.fill[Byte](size)(-1)))
     }
   }
+
+  it should "test pow" in {
+    U256.Zero.v.bitLength() is 0
+    U256.Zero.pow(U256.Zero) is Some(U256.One)
+    U256.Zero.pow(U256.One) is Some(U256.Zero)
+    U256.Zero.pow(U256.MaxValue) is Some(U256.Zero)
+
+    U256.One.v.bitLength() is 1
+    U256.One.pow(U256.Zero) is Some(U256.One)
+    U256.One.pow(U256.One) is Some(U256.One)
+    U256.One.pow(U256.MaxValue) is Some(U256.One)
+
+    U256.Two.v.bitLength() is 2
+    U256.Two.pow(U256.Zero) is Some(U256.One)
+    U256.Two.pow(U256.One) is Some(U256.Two)
+    U256.Two.pow(U256.unsafe(255)) is Some(U256.HalfMaxValue.addOneUnsafe())
+    U256.HalfMaxValue.addOneUnsafe().v is U256.upperBound.divide(2)
+    U256.Two.pow(U256.unsafe(256)) is None
+
+    U256.MaxValue.pow(U256.Zero) is Some(U256.One)
+    U256.MaxValue.pow(U256.One) is Some(U256.MaxValue)
+    U256.MaxValue.pow(U256.Two) is None
+    U256.MaxValue.pow(U256.MaxValue) is None
+
+    val number0 = U256.unsafe(BigInteger.ONE.shiftLeft(128))
+    number0.pow(U256.Zero) is Some(U256.One)
+    number0.pow(U256.One) is Some(number0)
+    number0.pow(U256.Two) is None
+
+    val number1 = U256.unsafe(BigInteger.ONE.shiftLeft(128).subtract(BigInteger.ONE))
+    number1.pow(U256.Zero) is Some(U256.One)
+    number1.pow(U256.One) is Some(number1)
+    number1.pow(U256.Two) is Some(
+      U256.unsafe(
+        U256.upperBound.add(BigInteger.ONE).subtract(BigInteger.ONE.shiftLeft(129))
+      )
+    )
+
+    forAll(Gen.choose(0, 10), Gen.choose(0, 50)) { case (base, exp) =>
+      U256.unsafe(base).pow(U256.unsafe(exp)) is Some(
+        U256.unsafe(BigInteger.valueOf(base.toLong).pow(exp))
+      )
+    }
+
+    forAll(Gen.choose(2, 10), Gen.choose(256, 500)) { case (base, exp) =>
+      U256.unsafe(base).pow(U256.unsafe(exp)) is None
+    }
+  }
+
+  it should "test byte length" in {
+    (0 until 256).foreach { n =>
+      U256.unsafe(BigInteger.TWO.pow(n)).byteLength() is (n / 8 + 1)
+    }
+    U256.Zero.byteLength() is 0
+    U256.MaxValue.byteLength() is 32
+  }
+
+  it should "test mod_pow" in {
+    U256.Zero.modPow(U256.Zero) is (U256.One)
+    U256.Zero.modPow(U256.One) is (U256.Zero)
+    U256.Zero.modPow(U256.MaxValue) is (U256.Zero)
+
+    U256.One.modPow(U256.Zero) is (U256.One)
+    U256.One.modPow(U256.One) is (U256.One)
+    U256.One.modPow(U256.MaxValue) is (U256.One)
+
+    U256.Two.modPow(U256.Zero) is U256.One
+    U256.Two.modPow(U256.One) is U256.Two
+    U256.Two.modPow(U256.unsafe(255)) is U256.HalfMaxValue.addOneUnsafe()
+    U256.Two.modPow(U256.unsafe(256)) is U256.Zero
+
+    U256.MaxValue.modPow(U256.Zero) is U256.One
+    U256.MaxValue.modPow(U256.One) is U256.MaxValue
+    U256.MaxValue.modPow(U256.Two) is U256.One
+    U256.MaxValue.modPow(U256.unsafe(3)) is U256.MaxValue
+    U256.MaxValue.modPow(U256.MaxValue) is U256.MaxValue
+    U256.MaxValue.modPow(U256.MaxValue).v is
+      U256.MaxValue.v.modPow(U256.MaxValue.v, U256.upperBound)
+
+    val number = U256.unsafe(BigInteger.ONE.shiftLeft(255)).addOneUnsafe()
+    number.modPow(U256.Two) is U256.One
+    number.v.modPow(BigInteger.TWO, U256.upperBound) is BigInteger.ONE
+    number.modPow(U256.unsafe(3)) is number
+    number.v.modPow(BigInteger.valueOf(3), U256.upperBound) is number.v
+
+    forAll(Gen.choose(0, 10), Gen.choose(0, 200)) { case (base, exp) =>
+      U256
+        .unsafe(base)
+        .modPow(U256.unsafe(exp))
+        .v is BigInteger.valueOf(base.toLong).pow(exp).mod(U256.upperBound)
+    }
+  }
 }

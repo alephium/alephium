@@ -155,7 +155,8 @@ object Instr {
     Log6, Log7, Log8, Log9,
     ContractIdToAddress,
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
-    BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee
+    BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
+    I256Exp, U256Exp, U256ModExp
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -536,8 +537,11 @@ trait AddressStackOps extends StackOps[Val.Address] {
   @inline def popOpStack(frame: Frame[_]): ExeResult[Val.Address] = frame.popOpStackAddress()
 }
 
+sealed trait BinaryInstr[T <: Val] extends StatelessInstr
+
 sealed trait BinaryArithmeticInstr[T <: Val]
-    extends ArithmeticInstr
+    extends BinaryInstr[T]
+    with ArithmeticInstr
     with StackOps[T]
     with GasSimple {
   protected def op(x: T, y: T): ExeResult[Val]
@@ -709,6 +713,50 @@ object U256Gt extends BinaryArithmeticInstr[Val.U256] with U256StackOps with Gas
 object U256Ge extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(_.>=(_))(x, y)
+}
+
+sealed trait ExpInstr[T <: Val]
+    extends BinaryInstr[T]
+    with StatelessInstrCompanion0
+    with LemanInstr[StatelessContext]
+    with GasExp {
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[T]
+
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      exp    <- frame.popOpStackU256()
+      result <- op(frame, exp.v)
+      _      <- frame.ctx.chargeGasWithSize(this, exp.v.byteLength())
+      _      <- frame.pushOpStack(result)
+    } yield ()
+  }
+}
+object I256Exp extends ExpInstr[Val.I256] {
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[Val.I256] =
+    frame
+      .popOpStackI256()
+      .flatMap(base =>
+        base.v
+          .pow(exp)
+          .map(v => Val.I256(v))
+          .toRight(Right(ArithmeticError(s"Exp overflow: $base ** $exp")))
+      )
+}
+
+object U256Exp extends ExpInstr[Val.U256] {
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[Val.U256] =
+    frame
+      .popOpStackU256()
+      .flatMap(base =>
+        base.v
+          .pow(exp)
+          .map(v => Val.U256(v))
+          .toRight(Right(ArithmeticError(s"Exp overflow: $base ** $exp")))
+      )
+}
+object U256ModExp extends ExpInstr[Val.U256] {
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[Val.U256] =
+    frame.popOpStackU256().map(base => Val.U256(base.v.modPow(exp)))
 }
 
 sealed trait LogicInstr
