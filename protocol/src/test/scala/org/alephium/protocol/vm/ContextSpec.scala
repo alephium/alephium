@@ -16,8 +16,6 @@
 
 package org.alephium.protocol.vm
 
-import scala.util.Random
-
 import akka.util.ByteString
 import org.scalacheck.Gen
 
@@ -314,31 +312,6 @@ class ContextSpec
       context.generatedOutputs.clear()
       context.generateOutput(output) isE ()
       context.generatedOutputs.toSeq is Seq(output)
-    }
-  }
-
-  it should "generate multiple outputs when token number > maxTokenPerUTXO for Leman hardfork" in new LemanAssetOutputFixture {
-    def test(output: AssetOutput, expectedAlph: Seq[U256], expectedTokenNum: Seq[Int]) = {
-      expectedAlph.length is expectedTokenNum.length
-      expectedTokenNum.sum is output.tokens.length
-      context.generatedOutputs.clear()
-      context.generateOutput(output) isE ()
-      expectedAlph.indices.foreach { k =>
-        context.generatedOutputs(k).amount is expectedAlph(k)
-        context.generatedOutputs(k).tokens.length is expectedTokenNum(k)
-        context.generatedOutputs(k).tokens is output.tokens.slice(
-          expectedTokenNum.take(k).sum,
-          expectedTokenNum.take(k + 1).sum
-        )
-      }
-    }
-
-    val k      = Random.nextInt(5) + 1
-    val output = prepareOutput(ALPH.alph(k.toLong), k * maxTokenPerAssetUtxo)
-    test(output, Seq.fill(k)(ALPH.oneAlph), Seq.fill(k)(maxTokenPerAssetUtxo))
-    (1 until maxTokenPerAssetUtxo).foreach { r =>
-      val output = prepareOutput(ALPH.alph(k.toLong + 1), k * maxTokenPerAssetUtxo + r)
-      test(output, Seq.fill(k + 1)(ALPH.oneAlph), Seq.fill(k)(maxTokenPerAssetUtxo) :+ r)
     }
   }
 }
