@@ -751,7 +751,7 @@ class ServerUtils(implicit
       allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
       allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
       unsignedTx <- UtxoSelectionAlgo
-        .Build(dustUtxoAmount, ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
+        .Build(ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
         .select(
           AssetAmounts(amount, tokens),
           unlockScript,
