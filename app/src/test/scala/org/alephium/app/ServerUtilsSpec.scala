@@ -1998,7 +1998,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       .slice(maxTokenPerAssetUtxo, 2 * maxTokenPerAssetUtxo)
     testResult.txOutputs(2).address is caller
     testResult.txOutputs(2).tokens.length is 1
-    testResult.txOutputs(2).tokens is tokensSorted.slice(2 * maxTokenPerAssetUtxo, tokensSorted.length)
+    testResult.txOutputs(2).tokens is tokensSorted.slice(
+      2 * maxTokenPerAssetUtxo,
+      tokensSorted.length
+    )
     testResult.txOutputs(3).address is Address.contract(testContract.contractId)
   }
 

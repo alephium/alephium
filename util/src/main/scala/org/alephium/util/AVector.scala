@@ -28,7 +28,7 @@ import org.alephium.macros.HPC
 /*
  * Immutable vector that is optimized for appending, not synchronized
  */
-// scalastyle:off number.of.methods return
+// scalastyle:off number.of.methods return file.size.limit
 @SuppressWarnings(Array("org.wartremover.warts.While", "org.wartremover.warts.AsInstanceOf"))
 final class AVector[@sp A](
     protected[util] var elems: Array[A],
