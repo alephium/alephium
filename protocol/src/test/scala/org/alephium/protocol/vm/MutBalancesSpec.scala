@@ -21,7 +21,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
-import org.alephium.protocol.model.{TokenId, TxGenerators, TxOutput}
+import org.alephium.protocol.model.{GroupIndex, TokenId, TxGenerators, TxOutput}
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 
 class MutBalancesSpec extends AlephiumSpec {
@@ -251,7 +251,7 @@ class MutBalancesSpec extends AlephiumSpec {
   }
 
   it should "toOutputs" in new Fixture {
-    val lockupScript2 = lockupScriptGen.sample.get
+    val lockupScript2 = p2pkhLockupGen(GroupIndex.unsafe(0)).sample.get
     val balances2     = MutBalances(ArrayBuffer((lockupScript2, balancesPerLockup)))
 
     balances.merge(balances2)
@@ -273,7 +273,7 @@ class MutBalancesSpec extends AlephiumSpec {
     val tokens     = mutable.Map(tokenId -> ALPH.oneAlph)
     val balancesPerLockup =
       MutBalancesPerLockup(ALPH.oneAlph, tokens, scopeDepth)
-    val lockupScript = lockupScriptGen.sample.get
+    val lockupScript = p2pkhLockupGen(GroupIndex.unsafe(0)).sample.get
 
     val balances = MutBalances(ArrayBuffer((lockupScript, balancesPerLockup)))
   }

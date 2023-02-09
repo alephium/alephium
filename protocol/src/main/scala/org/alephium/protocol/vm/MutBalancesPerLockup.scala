@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.util.Try
 
-import org.alephium.protocol.model.{HardFork, TokenId, TxOutput}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class MutBalancesPerLockup(
@@ -103,9 +103,20 @@ final case class MutBalancesPerLockup(
     if (attoAlphAmount.isZero) {
       if (tokens.isEmpty) Right(AVector.empty) else failed(InvalidOutputBalances)
     } else {
-      TxOutput
-        .from(attoAlphAmount, tokens, lockupScript, lockTime)
-        .toRight(Right(InvalidOutputBalances))
+      lockupScript match {
+        case l: LockupScript.Asset =>
+          TxOutput
+            .from(attoAlphAmount, tokens, l, lockTime)
+            .toRight(Right(InvalidOutputBalances))
+        case l: LockupScript.P2C =>
+          if (attoAlphAmount < minimalAlphInContract) {
+            failed(InvalidOutputBalances)
+          } else if (tokens.length > maxTokenPerContractUtxo) {
+            failed(InvalidTokenNumForContractOutput)
+          } else {
+            Right(AVector[TxOutput](ContractOutput(attoAlphAmount, l, tokens)))
+          }
+      }
     }
   }
 

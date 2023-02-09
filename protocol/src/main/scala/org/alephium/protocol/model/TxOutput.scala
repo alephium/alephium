@@ -52,7 +52,7 @@ object TxOutput {
   def from(
       amount: U256,
       tokens: AVector[(TokenId, U256)],
-      lockupScript: LockupScript
+      lockupScript: LockupScript.Asset
   ): Option[AVector[TxOutput]] = {
     from(amount, tokens, lockupScript, TimeStamp.zero)
   }
@@ -60,29 +60,21 @@ object TxOutput {
   def from(
       amount: U256,
       tokens: AVector[(TokenId, U256)],
-      lockupScript: LockupScript,
+      lockupScript: LockupScript.Asset,
       lockTime: TimeStamp
   ): Option[AVector[TxOutput]] = {
     val outputs = Array.ofDim[TxOutput](tokens.length + 1)
     tokens.foreachWithIndex { case (token, index) =>
-      val output: TxOutput = lockupScript match {
-        case e: LockupScript.P2C => ContractOutput(dustUtxoAmount, e, AVector(token))
-        case e: LockupScript.Asset =>
-          AssetOutput(dustUtxoAmount, e, lockTime, AVector(token), ByteString.empty)
-      }
-      outputs(index) = output
+      outputs(index) =
+        AssetOutput(dustUtxoAmount, lockupScript, lockTime, AVector(token), ByteString.empty)
     }
     val totalTokenDustAmount = dustUtxoAmount.mulUnsafe(U256.unsafe(tokens.length))
     if (amount == totalTokenDustAmount) {
       Some(AVector.unsafe(outputs, 0, tokens.length))
     } else if (amount >= totalTokenDustAmount.addUnsafe(dustUtxoAmount)) {
       val alphRemaining = amount.subUnsafe(totalTokenDustAmount)
-      val alphOutput: TxOutput = lockupScript match {
-        case e: LockupScript.P2C => ContractOutput(alphRemaining, e, AVector.empty)
-        case e: LockupScript.Asset =>
-          AssetOutput(alphRemaining, e, lockTime, AVector.empty, ByteString.empty)
-      }
-      outputs(tokens.length) = alphOutput
+      outputs(tokens.length) =
+        AssetOutput(alphRemaining, lockupScript, lockTime, AVector.empty, ByteString.empty)
       Some(AVector.unsafe(outputs))
     } else {
       None

@@ -22,7 +22,7 @@ import org.scalatest.Assertion
 
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
-import org.alephium.protocol.model.{dustUtxoAmount, HardFork, TokenId, TxGenerators, TxOutput}
+import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 import org.alephium.util.Bytes.byteStringOrdering
 
@@ -176,14 +176,9 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
     import org.alephium.protocol.model.TokenId.tokenIdOrder
 
     val lockupScript = lockupScriptGen.sample.get
-    val _tokenId0    = TokenId.generate
-    val _tokenId1    = TokenId.generate
-
-    val (tokenId0, tokenId1) = if (tokenIdOrder.compare(_tokenId0, _tokenId1) < 0) {
-      (_tokenId0, _tokenId1)
-    } else {
-      (_tokenId1, _tokenId0)
-    }
+    val tokens       = AVector.fill(maxTokenPerContractUtxo + 1)(TokenId.generate).sorted
+    val tokenId0     = tokens(0)
+    val tokenId1     = tokens(1)
 
     case class Test(alphAmount: U256, tokens: (TokenId, U256)*) {
       lazy val genesisOutputs = MutBalancesPerLockup(alphAmount, mutable.Map.from(tokens), 1)
@@ -208,8 +203,8 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
         }
       }
 
-      def failLeman(): Assertion = {
-        lemanOutputs is failed(InvalidOutputBalances)
+      def failLeman(error: ExeFailure = InvalidOutputBalances): Assertion = {
+        lemanOutputs is failed(error)
       }
     }
   }
@@ -226,7 +221,9 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
     Test(0, tokenId -> 1).failGenesis()
   }
 
-  it should "toTxOutput for Leman fork" in new ToTxOutputFixture {
+  it should "toTxOutput for Leman fork + asset lockup script" in new ToTxOutputFixture {
+    override val lockupScript = assetLockupGen(GroupIndex.unsafe(0)).sample.get
+
     Test(0).expectLeman()
     Test(dustUtxoAmount - 1).failLeman()
     Test(dustUtxoAmount).expectLeman(dustUtxoAmount -> Seq.empty)
@@ -264,6 +261,25 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
       dustUtxoAmount                             -> Seq(tokenId1 -> 2),
       ALPH.oneAlph.subUnsafe(dustUtxoAmount * 2) -> Seq.empty
     )
+  }
+
+  it should "toTxOutput for Leman fork + contract lockup script" in new ToTxOutputFixture {
+    override val lockupScript = LockupScript.p2c(ContractId.generate)
+
+    Test(0).expectLeman()
+    Test(ALPH.oneAlph - 1).failLeman()
+    Test(ALPH.oneAlph).expectLeman(ALPH.oneAlph -> Seq.empty)
+
+    Test(0, tokenId -> 1).failLeman()
+    Test(ALPH.oneAlph - 1, tokenId -> 1).failLeman()
+    Test(ALPH.oneAlph, tokenId -> 1).expectLeman(
+      ALPH.oneAlph -> Seq(tokenId -> 1)
+    )
+    Test(ALPH.oneAlph, tokens.init.map(_ -> U256.One).toSeq: _*).expectLeman(
+      ALPH.oneAlph -> tokens.init.map(_ -> U256.One).toSeq
+    )
+    Test(ALPH.oneAlph, tokens.map(_ -> U256.One).toSeq: _*)
+      .failLeman(InvalidTokenNumForContractOutput)
   }
 
   trait Fixture extends TxGenerators with NetworkConfigFixture.Default {

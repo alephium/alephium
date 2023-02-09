@@ -92,6 +92,7 @@ case object BalanceErrorWhenSwitchingBackFrame                 extends ExeFailur
 case object LowerThanContractMinimalBalance                    extends ExeFailure
 case object UnableToPayGasFee                                  extends ExeFailure
 case object InvalidOutputBalances                              extends ExeFailure
+case object InvalidTokenNumForContractOutput                   extends ExeFailure
 case object InvalidTokenId                                     extends ExeFailure
 case object InvalidContractId                                  extends ExeFailure
 case object ExpectAContract                                    extends ExeFailure
