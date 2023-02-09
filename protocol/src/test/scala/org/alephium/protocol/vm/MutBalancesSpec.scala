@@ -257,10 +257,8 @@ class MutBalancesSpec extends AlephiumSpec {
     balances.merge(balances2)
 
     balances.toOutputs() is Some(
-      AVector(
-        TxOutput.from(ALPH.oneAlph, AVector.from(tokens), lockupScript),
-        TxOutput.from(ALPH.oneAlph, AVector.from(tokens), lockupScript2)
-      )
+      TxOutput.from(ALPH.oneAlph, AVector.from(tokens), lockupScript).value ++
+        TxOutput.from(ALPH.oneAlph, AVector.from(tokens), lockupScript2).value
     )
   }
 

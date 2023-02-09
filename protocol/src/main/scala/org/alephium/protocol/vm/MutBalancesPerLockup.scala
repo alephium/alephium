@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.util.Try
 
-import org.alephium.protocol.model.{TokenId, TxOutput}
+import org.alephium.protocol.model.{HardFork, TokenId, TxOutput}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class MutBalancesPerLockup(
@@ -87,12 +87,29 @@ final case class MutBalancesPerLockup(
       }
     }.toOption
 
-  def toTxOutput(lockupScript: LockupScript): ExeResult[Option[TxOutput]] = {
+  def toTxOutput(lockupScript: LockupScript, hardFork: HardFork): ExeResult[AVector[TxOutput]] = {
+    if (hardFork.isLemanEnabled()) {
+      toTxOutputLeman(lockupScript)
+    } else {
+      toTxOutputDeprecated(lockupScript)
+    }
+  }
+
+  def toTxOutputLeman(lockupScript: LockupScript): ExeResult[AVector[TxOutput]] = {
     val tokens = tokenVector
     if (attoAlphAmount.isZero) {
-      if (tokens.isEmpty) Right(None) else failed(InvalidOutputBalances)
+      if (tokens.isEmpty) Right(AVector.empty) else failed(InvalidOutputBalances)
     } else {
-      Right(Some(TxOutput.from(attoAlphAmount, tokens, lockupScript)))
+      TxOutput.from(attoAlphAmount, tokens, lockupScript).toRight(Right(InvalidOutputBalances))
+    }
+  }
+
+  def toTxOutputDeprecated(lockupScript: LockupScript): ExeResult[AVector[TxOutput]] = {
+    val tokens = tokenVector
+    if (attoAlphAmount.isZero) {
+      if (tokens.isEmpty) Right(AVector.empty) else failed(InvalidOutputBalances)
+    } else {
+      Right(AVector(TxOutput.fromDeprecated(attoAlphAmount, tokens, lockupScript)))
     }
   }
 

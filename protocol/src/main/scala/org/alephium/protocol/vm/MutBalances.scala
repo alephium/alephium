@@ -19,8 +19,8 @@ package org.alephium.protocol.vm
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
-import org.alephium.protocol.model.{AssetOutput, TokenId, TxOutput}
-import org.alephium.util.{AVector, U256}
+import org.alephium.protocol.model.{AssetOutput, HardFork, TokenId, TxOutput}
+import org.alephium.util.{AVector, OptionF, U256}
 
 final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLockup)]) {
   def getBalances(lockupScript: LockupScript): Option[MutBalancesPerLockup] = {
@@ -120,24 +120,15 @@ final case class MutBalances(all: ArrayBuffer[(LockupScript, MutBalancesPerLocku
     iter(0)
   }
 
-  // scalastyle:off return
   final def toOutputs(): Option[AVector[TxOutput]] = {
-    @tailrec
-    def iter(acc: AVector[TxOutput], index: Int): Option[AVector[TxOutput]] = {
-      if (index == all.length) {
-        Some(acc)
-      } else {
-        val (lockupScript, balancesPerLockup) = all(index)
-        balancesPerLockup.toTxOutput(lockupScript) match {
-          case Right(Some(output)) => iter(acc :+ output, index + 1)
-          case Right(None)         => iter(acc, index + 1)
-          case Left(_)             => None
+    OptionF.fold(all, AVector.ofCapacity[TxOutput](all.size)) {
+      case (acc, (lockupScript, balancesPerLockup)) =>
+        balancesPerLockup.toTxOutput(lockupScript, HardFork.Leman) match {
+          case Right(outputs) => Some(acc ++ outputs)
+          case Left(_)        => None
         }
-      }
     }
-    iter(AVector.ofCapacity[TxOutput](all.size), 0)
   }
-  // scalastyle:on return
 }
 
 object MutBalances {
