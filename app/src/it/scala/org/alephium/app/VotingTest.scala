@@ -19,7 +19,14 @@ package org.alephium.app
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, PublicKey}
-import org.alephium.protocol.model.{dustUtxoAmount, Address, BlockHash, ContractId, TransactionId}
+import org.alephium.protocol.model.{
+  dustUtxoAmount,
+  Address,
+  BlockHash,
+  ContractId,
+  TokenId,
+  TransactionId
+}
 import org.alephium.protocol.vm
 import org.alephium.util._
 import org.alephium.wallet.api.model._
@@ -274,7 +281,12 @@ trait VotingFixture extends WalletFixture {
          |}
         $contractCode
       """.stripMargin
-    script(adminWallet.publicKey.toHexString, allocationScript, adminWallet.creation.walletName)
+    script(
+      adminWallet.publicKey.toHexString,
+      allocationScript,
+      adminWallet.creation.walletName,
+      attoAlphAmount = Some(Amount(dustUtxoAmount * votersWallets.size))
+    )
   }
 
   def vote(
@@ -292,7 +304,13 @@ trait VotingFixture extends WalletFixture {
          |}
       $contractCode
       """.stripMargin
-    script(voterWallet.publicKey.toHexString, votingScript, voterWallet.creation.walletName)
+    script(
+      voterWallet.publicKey.toHexString,
+      votingScript,
+      voterWallet.creation.walletName,
+      attoAlphAmount = Some(Amount(dustUtxoAmount)),
+      tokens = Some(TokenId.from(Hex.unsafe(contractId)).value -> 1)
+    )
   }
 
   def close(adminWallet: Wallet, contractId: String, contractCode: String): SubmitTxResult = {
@@ -359,12 +377,20 @@ trait WalletFixture extends CliqueFixture {
     ContractRef(buildResult.contractAddress.contractId, contractAddress, code)
   }
 
-  def script(publicKey: String, code: String, walletName: String) = {
+  def script(
+      publicKey: String,
+      code: String,
+      walletName: String,
+      attoAlphAmount: Option[Amount] = None,
+      tokens: Option[(TokenId, U256)] = None
+  ) = {
     val compileResult = request[CompileScriptResult](compileScript(code), restPort)
     val buildResult = request[BuildExecuteScriptTxResult](
       buildExecuteScriptTx(
         fromPublicKey = publicKey,
-        code = compileResult.bytecodeTemplate
+        code = compileResult.bytecodeTemplate,
+        attoAlphAmount = attoAlphAmount,
+        tokens = tokens
       ),
       restPort
     )

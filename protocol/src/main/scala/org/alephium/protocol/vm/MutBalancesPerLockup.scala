@@ -129,7 +129,10 @@ final case class MutBalancesPerLockup(
     }
   }
 
-  def toLockedTxOutput(lockupScript: LockupScript.Asset, lockTime: TimeStamp): ExeResult[AVector[TxOutput]] = {
+  def toLockedTxOutput(
+      lockupScript: LockupScript.Asset,
+      lockTime: TimeStamp
+  ): ExeResult[AVector[TxOutput]] = {
     toTxOutputLeman(lockupScript, lockTime)
   }
 }
