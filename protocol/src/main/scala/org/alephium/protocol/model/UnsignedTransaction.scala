@@ -161,7 +161,6 @@ object UnsignedTransaction {
       _ <- checkWithMaxTxInputNum(inputs)
       _ <- checkUniqueInputs(inputs)
       _ <- checkMinimalAlphPerOutput(outputInfos)
-      _ <- checkMaximumTokenNumPerOutput(outputInfos)
       _ <- checkTokenValuesNonZero(outputInfos)
       txOutputs = buildOutputs(outputInfos)
       alphRemainder   <- calculateAlphRemainder(inputs, txOutputs, gasFee)
@@ -289,15 +288,6 @@ object UnsignedTransaction {
         output.attoAlphAmount < dustUtxoAmount
       },
       "Not enough ALPH for transaction output"
-    )
-  }
-
-  private def checkMaximumTokenNumPerOutput(
-      outputs: AVector[TxOutputInfo]
-  ): Either[String, Unit] = {
-    check(
-      failCondition = outputs.exists(_.tokens.length > maxTokenPerAssetUtxo),
-      s"Too many tokens in the transaction output, maximal number $maxTokenPerAssetUtxo"
     )
   }
 
