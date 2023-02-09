@@ -29,6 +29,7 @@ import org.alephium.util._
  * We sort the Utxos based on the amount and type
  *   - the Utxos with higher persisted level are selected first (confirmed Utxos are of high priority)
  *   - the Utxos with smaller amounts are selected first
+ *   - alph selection non-token Utxos first
  *   - the above logic applies to both ALPH and tokens.
  */
 // scalastyle:off parameter.number
@@ -222,8 +223,8 @@ object UtxoSelectionAlgo extends StrictLogging {
         (utxosForTokens, remainingUtxos) = tokensFoundResult
         alphSelected = utxosForTokens.fold(U256.Zero)(_ addUnsafe _.output.amount)
         alphToSelect = amounts.alph.sub(alphSelected).getOrElse(U256.Zero)
-        alphFoundResult <- selectForAmount(alphToSelect, remainingUtxos.sorted(assetOrder.byAlph))(
-          asset => Some(asset.output.amount)
+        alphFoundResult <- selectForAmount(alphToSelect, sortAlph(remainingUtxos))(asset =>
+          Some(asset.output.amount)
         )
       } yield {
         val (utxosForAlph, restOfUtxos) = alphFoundResult
@@ -231,6 +232,13 @@ object UtxoSelectionAlgo extends StrictLogging {
         val attoAlphAmountWithoutGas    = foundUtxos.fold(U256.Zero)(_ addUnsafe _.output.amount)
         SelectedSoFar(attoAlphAmountWithoutGas, foundUtxos, restOfUtxos)
       }
+    }
+
+    def sortAlph(assets: AVector[Asset]): AVector[Asset] = {
+      val assetsWithoutTokens = assets.filter(_.output.tokens.isEmpty)
+      val assetsWithTokens    = assets.filter(_.output.tokens.nonEmpty)
+      assetsWithoutTokens.sorted(assetOrder.byAlph) ++
+        assetsWithTokens.sorted(assetOrder.byAlph)
     }
 
     private def selectForAmount(

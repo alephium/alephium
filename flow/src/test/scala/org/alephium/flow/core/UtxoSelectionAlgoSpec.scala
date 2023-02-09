@@ -59,22 +59,22 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       implicit val utxos = buildUtxosWithTokens(
         (20, AVector((tokenId1, 10))),
         (25, AVector((tokenId2, 20))),
-        (10, AVector.empty),
-        (30, AVector((tokenId3, 10))),
-        (31, AVector((tokenId1, 1)))
+        (30, AVector.empty),
+        (31, AVector((tokenId3, 10))),
+        (10, AVector((tokenId1, 1)))
       )
 
       UtxoSelection(10).verify(2)
-      UtxoSelection(20).verify(2, 0)
-      UtxoSelection(20, (tokenId1, 1)).verify(4)
+      UtxoSelection(20).verify(2)
+      UtxoSelection(20, (tokenId1, 1)).verify(4, 2)
       UtxoSelection(20, (tokenId1, 2)).verify(4, 0)
       UtxoSelection(20, (tokenId1, 11)).verify(4, 0)
       UtxoSelection(20, (tokenId1, 12)).leftValueWithoutGas
         .startsWith(s"Not enough balance") is true
 
-      UtxoSelection(30).verify(2, 0)
+      UtxoSelection(30).verify(2)
       UtxoSelection(30, (tokenId1, 10), (tokenId2, 15)).verify(4, 0, 1)
-      UtxoSelection(40).verify(2, 0, 1)
+      UtxoSelection(40).verify(2, 4)
       UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 10)).verify(4, 0, 1, 3)
       UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 11)).leftValueWithoutGas
         .startsWith(s"Not enough balance") is true
@@ -164,6 +164,20 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       UtxoSelection(7, (tokenId1, 10))(utxos0).verifyWithGas(0)
       UtxoSelection(7, (tokenId1, 10)).verifyWithGas(1)
     }
+  }
+
+  it should "prefer non-token utxos for ALPH selection" in new Fixture {
+    val tokenId = TokenId.generate
+    implicit val utxos = buildUtxosWithTokens(
+      (20, AVector((tokenId, 10))),
+      (10, AVector.empty),
+      (30, AVector.empty)
+    )
+
+    UtxoSelection(10).verify(1)
+    UtxoSelection(20).verify(1, 2)
+    UtxoSelection(40).verify(1, 2)
+    UtxoSelection(50).verify(1, 2, 0)
   }
 
   it should "return the correct utxos when gas is preset" in new Fixture {
