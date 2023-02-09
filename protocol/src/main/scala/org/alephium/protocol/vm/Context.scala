@@ -22,8 +22,7 @@ import org.alephium.io.IOError
 import org.alephium.protocol.Signature
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.TokenIssuance
-import org.alephium.util.{discard, AVector, EitherF, TimeStamp, U256}
+import org.alephium.util.{discard, AVector, TimeStamp, U256}
 
 final case class BlockEnv(
     chainIndex: ChainIndex,
@@ -304,30 +303,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
   }
 
   def generateAssetOutputLeman(assetOutput: AssetOutput): ExeResult[Unit] = {
-    if (assetOutput.tokens.length <= maxTokenPerAssetUtxo) {
-      generateAssetOutputSimple(assetOutput)
-    } else {
-      val tokenLength       = assetOutput.tokens.length
-      val outputNum         = (tokenLength - 1) / maxTokenPerAssetUtxo + 1
-      val alphAmountAverage = assetOutput.amount.divUnsafe(U256.unsafe(outputNum))
-      EitherF.foreachTry(0 until outputNum) { k =>
-        val tokenIndexStart = maxTokenPerAssetUtxo * k
-        val newOutput = if (k < outputNum - 1) {
-          assetOutput.copy(
-            amount = alphAmountAverage,
-            tokens =
-              assetOutput.tokens.slice(tokenIndexStart, tokenIndexStart + maxTokenPerAssetUtxo)
-          )
-        } else {
-          assetOutput.copy(
-            amount =
-              alphAmountAverage.addUnsafe(assetOutput.amount.modUnsafe(U256.unsafe(outputNum))),
-            tokens = assetOutput.tokens.slice(tokenIndexStart, tokenLength)
-          )
-        }
-        generateAssetOutputSimple(newOutput)
-      }
-    }
+    assume(assetOutput.tokens.length <= maxTokenPerAssetUtxo)
+    generateAssetOutputSimple(assetOutput)
   }
 
   def generateAssetOutputSimple(assetOutput: AssetOutput): ExeResult[Unit] = {
