@@ -44,6 +44,7 @@ case object NoTxInput                                          extends ExeFailur
 case object TxInputAddressesAreNotIdentical                    extends ExeFailure
 case object AccessTxInputAddressInContract                     extends ExeFailure
 case object LockTimeOverflow                                   extends ExeFailure
+case object InvalidLockTime                                    extends ExeFailure
 case object AbsoluteLockTimeVerificationFailed                 extends ExeFailure
 case object RelativeLockTimeVerificationFailed                 extends ExeFailure
 case object RelativeLockTimeExpectPersistedUtxo                extends ExeFailure

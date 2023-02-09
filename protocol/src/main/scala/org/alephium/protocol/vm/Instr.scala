@@ -1366,6 +1366,7 @@ sealed trait LockApprovedAssetsInstr extends LemanAssetInstr with StatefulInstrC
     for {
       timestampU256 <- frame.popOpStackU256()
       timestamp     <- timestampU256.v.toLong.map(TimeStamp.unsafe).toRight(Right(LockTimeOverflow))
+      _ <- if (timestamp > frame.ctx.blockEnv.timeStamp) okay else failed(InvalidLockTime)
     } yield timestamp
   }
 }
@@ -1377,7 +1378,8 @@ object LockApprovedAssets extends LockApprovedAssetsInstr {
       lockupScript <- frame.popAssetAddress()
       balanceState <- frame.getBalanceState()
       approved     <- balanceState.useAllApproved(lockupScript).toRight(Right(NoAssetsApproved))
-      _            <- frame.ctx.generateOutput(approved.toLockedTxOutput(lockupScript, lockTime))
+      outputs      <- approved.toLockedTxOutput(lockupScript, lockTime)
+      _            <- outputs.foreachE(frame.ctx.generateOutput)
     } yield ()
   }
 }
