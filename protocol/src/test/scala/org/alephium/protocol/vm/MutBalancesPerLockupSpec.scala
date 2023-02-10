@@ -26,7 +26,7 @@ import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 import org.alephium.util.Bytes.byteStringOrdering
 
-class MutMutBalancesPerLockupSpec extends AlephiumSpec {
+class MutBalancesPerLockupSpec extends AlephiumSpec {
 
   it should "tokenVector" in new Fixture {
     val tokens = mutable.Map(tokenId -> ALPH.oneAlph)
