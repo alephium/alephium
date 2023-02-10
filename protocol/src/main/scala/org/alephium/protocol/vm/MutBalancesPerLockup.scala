@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import scala.collection.mutable
 import scala.util.Try
 
-import org.alephium.protocol.model.{TokenId, TxOutput}
+import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class MutBalancesPerLockup(
@@ -87,18 +87,53 @@ final case class MutBalancesPerLockup(
       }
     }.toOption
 
-  def toTxOutput(lockupScript: LockupScript): ExeResult[Option[TxOutput]] = {
-    val tokens = tokenVector
-    if (attoAlphAmount.isZero) {
-      if (tokens.isEmpty) Right(None) else failed(InvalidOutputBalances)
+  def toTxOutput(lockupScript: LockupScript, hardFork: HardFork): ExeResult[AVector[TxOutput]] = {
+    if (hardFork.isLemanEnabled()) {
+      toTxOutputLeman(lockupScript, TimeStamp.zero)
     } else {
-      Right(Some(TxOutput.from(attoAlphAmount, tokens, lockupScript)))
+      toTxOutputDeprecated(lockupScript)
     }
   }
 
-  def toLockedTxOutput(lockupScript: LockupScript.Asset, lockTime: TimeStamp): TxOutput = {
+  def toTxOutputLeman(
+      lockupScript: LockupScript,
+      lockTime: TimeStamp
+  ): ExeResult[AVector[TxOutput]] = {
     val tokens = tokenVector
-    TxOutput.asset(attoAlphAmount, lockupScript, tokens, lockTime)
+    if (attoAlphAmount.isZero) {
+      if (tokens.isEmpty) Right(AVector.empty) else failed(InvalidOutputBalances)
+    } else {
+      lockupScript match {
+        case l: LockupScript.Asset =>
+          TxOutput
+            .from(attoAlphAmount, tokens, l, lockTime)
+            .toRight(Right(InvalidOutputBalances))
+        case l: LockupScript.P2C =>
+          if (attoAlphAmount < minimalAlphInContract) {
+            failed(InvalidOutputBalances)
+          } else if (tokens.length > maxTokenPerContractUtxo) {
+            failed(InvalidTokenNumForContractOutput)
+          } else {
+            Right(AVector[TxOutput](ContractOutput(attoAlphAmount, l, tokens)))
+          }
+      }
+    }
+  }
+
+  def toTxOutputDeprecated(lockupScript: LockupScript): ExeResult[AVector[TxOutput]] = {
+    val tokens = tokenVector
+    if (attoAlphAmount.isZero) {
+      if (tokens.isEmpty) Right(AVector.empty) else failed(InvalidOutputBalances)
+    } else {
+      Right(AVector(TxOutput.fromDeprecated(attoAlphAmount, tokens, lockupScript)))
+    }
+  }
+
+  def toLockedTxOutput(
+      lockupScript: LockupScript.Asset,
+      lockTime: TimeStamp
+  ): ExeResult[AVector[TxOutput]] = {
+    toTxOutputLeman(lockupScript, lockTime)
   }
 }
 

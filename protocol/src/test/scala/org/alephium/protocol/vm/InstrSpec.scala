@@ -2315,8 +2315,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(Val.U256(timestamp))
     }
 
-    prepareStack(ALPH.oneAlph, ALPH.cent(1), 10000)
-    runAndCheckGas(LockApprovedAssets, Some(GasSchedule.txOutputBaseGas))
+    val validTimestamp = TimeStamp.now().plusHoursUnsafe(1)
+
+    prepareStack(ALPH.oneAlph, ALPH.cent(1), validTimestamp.millis)
+    runAndCheckGas(LockApprovedAssets, Some(GasSchedule.txOutputBaseGas.mulUnsafe(2)))
     frame.balanceStateOpt is Some(
       MutBalanceState.from {
         val balance = tokenBalance(assetAddress, tokenId, ALPH.cent(199))
@@ -2327,21 +2329,31 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     frame.ctx.outputBalances.all.isEmpty is true
     frame.ctx.generatedOutputs.head is
       TxOutput.asset(
-        ALPH.oneAlph,
+        dustUtxoAmount,
         assetAddress,
         AVector(tokenId -> ALPH.cent(1)),
-        TimeStamp.unsafe(10000)
+        validTimestamp
+      )
+    frame.ctx.generatedOutputs(1) is
+      TxOutput.asset(
+        ALPH.oneAlph - dustUtxoAmount,
+        assetAddress,
+        AVector.empty,
+        validTimestamp
       )
 
     prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, U256.MaxValue)
     LockApprovedAssets.runWith(frame).leftValue isE LockTimeOverflow
 
     // use up remaining approved assets
-    prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, 10000)
+    prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, validTimestamp.millis)
     LockApprovedAssets.runWith(frame) isE ()
 
-    prepareStack(ALPH.oneAlph, ALPH.alph(2), 10000)
+    prepareStack(ALPH.oneAlph, ALPH.alph(2), validTimestamp.millis)
     LockApprovedAssets.runWith(frame).leftValue isE NoAssetsApproved
+
+    prepareStack(ALPH.oneAlph, ALPH.alph(2), 0)
+    LockApprovedAssets.runWith(frame).leftValue isE InvalidLockTime
   }
 
   it should "TransferAlph" in new StatefulInstrFixture {

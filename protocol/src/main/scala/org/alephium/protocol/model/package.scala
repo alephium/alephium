@@ -47,14 +47,11 @@ package object model {
 
   val dustUtxoAmount: U256           = ALPH.nanoAlph(1000000)
   val deprecatedDustUtxoAmount: U256 = ALPH.nanoAlph(1000)
-  val maxTokenPerUtxo: Int           = 4
+  val maxTokenPerContractUtxo: Int   = 8
+  val maxTokenPerAssetUtxo: Int      = 1
   val deprecatedMaxTokenPerUtxo: Int = 64
 
   val minimalAlphInContract: U256 = ALPH.oneAlph
-
-  def minimalAttoAlphAmountPerTxOutput(tokenNum: Int): U256 = {
-    ALPH.nanoAlph(100 * tokenNum.toLong).addUnsafe(dustUtxoAmount)
-  }
 
   implicit val hashOrdering: Ordering[Hash] = Ordering.by(_.bytes)
   // scalastyle:on magic.number

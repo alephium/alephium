@@ -44,6 +44,7 @@ case object NoTxInput                                          extends ExeFailur
 case object TxInputAddressesAreNotIdentical                    extends ExeFailure
 case object AccessTxInputAddressInContract                     extends ExeFailure
 case object LockTimeOverflow                                   extends ExeFailure
+case object InvalidLockTime                                    extends ExeFailure
 case object AbsoluteLockTimeVerificationFailed                 extends ExeFailure
 case object RelativeLockTimeVerificationFailed                 extends ExeFailure
 case object RelativeLockTimeExpectPersistedUtxo                extends ExeFailure
@@ -91,6 +92,7 @@ case object BalanceErrorWhenSwitchingBackFrame                 extends ExeFailur
 case object LowerThanContractMinimalBalance                    extends ExeFailure
 case object UnableToPayGasFee                                  extends ExeFailure
 case object InvalidOutputBalances                              extends ExeFailure
+case object InvalidTokenNumForContractOutput                   extends ExeFailure
 case object InvalidTokenId                                     extends ExeFailure
 case object InvalidContractId                                  extends ExeFailure
 case object ExpectAContract                                    extends ExeFailure

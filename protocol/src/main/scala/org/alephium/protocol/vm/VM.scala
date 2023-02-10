@@ -370,9 +370,8 @@ final class StatefulVM(
 
   private def outputGeneratedBalances(outputBalances: MutBalances): ExeResult[Unit] = {
     EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
-      balances.toTxOutput(lockupScript).flatMap {
-        case Some(output) => ctx.generateOutput(output)
-        case None         => Right(())
+      balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
+        outputs.foreachE(output => ctx.generateOutput(output))
       }
     }
   }

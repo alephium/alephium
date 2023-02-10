@@ -48,12 +48,6 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       UtxoSelection(50).verify(1, 0, 2)
       UtxoSelection(60).verify(1, 0, 2)
       UtxoSelection(70).leftValueWithoutGas.startsWith(s"Not enough balance") is true
-
-      UtxoSelection(29).withDust(1).verify(1, 0)
-      UtxoSelection(29).withDust(2).verify(1, 0, 2)
-      UtxoSelection(30).withDust(1).verify(1, 0)
-      UtxoSelection(59).withDust(2).leftValueWithoutGas.startsWith(s"Not enough balance") is true
-
     }
 
     {
@@ -63,36 +57,29 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       val tokenId3 = TokenId.hash("tokenId3")
 
       implicit val utxos = buildUtxosWithTokens(
-        (20, AVector((tokenId1, 10), (tokenId2, 20))),
-        (10, AVector.empty),
-        (30, AVector((tokenId1, 2), (tokenId3, 10))),
-        (31, AVector((tokenId1, 1)))
+        (20, AVector((tokenId1, 10))),
+        (25, AVector((tokenId2, 20))),
+        (30, AVector.empty),
+        (31, AVector((tokenId3, 10))),
+        (10, AVector((tokenId1, 1)))
       )
 
-      UtxoSelection(10).verify(1)
-      UtxoSelection(20).verify(1, 0)
-      UtxoSelection(20, (tokenId1, 1)).verify(1, 0)
-      UtxoSelection(20, (tokenId3, 5)).verify(1, 0, 2)
-      UtxoSelection(20, (tokenId1, 10)).verify(1, 0)
-      UtxoSelection(20, (tokenId1, 11)).verify(1, 0, 3)
-      UtxoSelection(20, (tokenId1, 14)).leftValueWithoutGas
+      UtxoSelection(10).verify(2)
+      UtxoSelection(20).verify(2)
+      UtxoSelection(20, (tokenId1, 1)).verify(4, 2)
+      UtxoSelection(20, (tokenId1, 2)).verify(4, 0)
+      UtxoSelection(20, (tokenId1, 11)).verify(4, 0)
+      UtxoSelection(20, (tokenId1, 12)).leftValueWithoutGas
         .startsWith(s"Not enough balance") is true
 
-      UtxoSelection(30).verify(1, 0)
-      UtxoSelection(30, (tokenId1, 10), (tokenId2, 15)).verify(1, 0)
-      UtxoSelection(40).verify(1, 0, 2)
-      UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 10)).verify(1, 0, 2)
+      UtxoSelection(30).verify(2)
+      UtxoSelection(30, (tokenId1, 10), (tokenId2, 15)).verify(4, 0, 1)
+      UtxoSelection(40).verify(2, 4)
+      UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 10)).verify(4, 0, 1, 3)
       UtxoSelection(40, (tokenId1, 10), (tokenId2, 20), (tokenId3, 11)).leftValueWithoutGas
         .startsWith(s"Not enough balance") is true
 
-      UtxoSelection(92, (tokenId1, 1)).leftValueWithoutGas.startsWith(s"Not enough balance") is true
-      UtxoSelection(29, (tokenId1, 10), (tokenId2, 15)).withDust(1).verify(1, 0)
-      UtxoSelection(29, (tokenId1, 10), (tokenId2, 1)).withDust(2).verify(1, 0, 2)
-      UtxoSelection(29, (tokenId1, 11), (tokenId2, 20)).withDust(1).verify(1, 0, 3)
-      UtxoSelection(29, (tokenId1, 13), (tokenId2, 20)).withDust(1).verify(1, 0, 3, 2)
-      UtxoSelection(90, (tokenId1, 10))
-        .withDust(2)
-        .leftValueWithoutGas
+      UtxoSelection(200, (tokenId1, 1)).leftValueWithoutGas
         .startsWith(s"Not enough balance") is true
     }
   }
@@ -102,6 +89,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
   // 2 inputs: 22620
   // 3 inputs: 26680
   // 4 inputs: 30740
+  // 5 inputs: 34800
   it should "return the correct utxos when gas is considered" in new Fixture {
     {
       info("without tokens")
@@ -115,12 +103,6 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       UtxoSelection(40381).verifyWithGas(1, 0, 2)
       UtxoSelection(91320).verifyWithGas(1, 0, 2)
       UtxoSelection(91321).leftValueWithGas.startsWith("Not enough balance for fee") is true
-
-      UtxoSelection(91318).withDust(2).verifyWithGas(1, 0, 2)
-      UtxoSelection(91318)
-        .withDust(3)
-        .leftValueWithGas
-        .startsWith("Not enough balance for fee") is true
     }
 
     {
@@ -130,39 +112,31 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       val tokenId3 = TokenId.hash("tokenId3")
 
       implicit val utxos = buildUtxosWithTokens(
-        (40000, AVector((tokenId1, 10), (tokenId2, 20))),
+        (40000, AVector((tokenId1, 10))),
+        (35000, AVector((tokenId2, 20))),
         (23000, AVector.empty),
-        (55000, AVector((tokenId1, 2), (tokenId3, 10))),
+        (55000, AVector((tokenId3, 10))),
         (55010, AVector((tokenId1, 1)))
       )
 
-      UtxoSelection(10).verifyWithGas(1)
-      UtxoSelection(10, (tokenId1, 1)).verifyWithGas(1, 3)
-      UtxoSelection(10, (tokenId1, 2)).verifyWithGas(1, 3, 2)
-      UtxoSelection(10, (tokenId1, 5)).verifyWithGas(1, 3, 2, 0)
+      UtxoSelection(10).verifyWithGas(2)
+      UtxoSelection(10, (tokenId1, 1)).verifyWithGas(4)
+      UtxoSelection(10, (tokenId1, 2)).verifyWithGas(4, 0)
+      UtxoSelection(10, (tokenId1, 11)).verifyWithGas(4, 0)
 
-      UtxoSelection(23100).verifyWithGas(1, 0)
-      UtxoSelection(23010, (tokenId1, 10)).verifyWithGas(1, 0)
-      UtxoSelection(23100, (tokenId1, 11)).verifyWithGas(1, 0, 3)
-      UtxoSelection(23100, (tokenId1, 12)).verifyWithGas(1, 0, 3, 2)
-      UtxoSelection(23100, (tokenId1, 14)).leftValueWithGas
+      UtxoSelection(23100).verifyWithGas(2, 1)
+      UtxoSelection(23100, (tokenId1, 11)).verifyWithGas(4, 0)
+      UtxoSelection(23100, (tokenId1, 12)).leftValueWithGas
         .startsWith(s"Not enough balance") is true
 
-      UtxoSelection(23100, (tokenId2, 10)).verifyWithGas(1, 0)
-      UtxoSelection(23100, (tokenId2, 15), (tokenId3, 5)).verifyWithGas(1, 0, 2)
-      UtxoSelection(23100, (tokenId2, 15), (tokenId1, 11)).verifyWithGas(1, 0, 3)
-      UtxoSelection(23100, (tokenId2, 15), (tokenId1, 13)).verifyWithGas(1, 0, 3, 2)
-      UtxoSelection(23100, (tokenId2, 15), (tokenId1, 13)).verifyWithGas(1, 0, 3, 2)
+      UtxoSelection(23100, (tokenId2, 10)).verifyWithGas(1, 2)
+      UtxoSelection(23100, (tokenId2, 15), (tokenId3, 5)).verifyWithGas(1, 3)
+      UtxoSelection(23100, (tokenId2, 15), (tokenId1, 11)).verifyWithGas(1, 4, 0)
       UtxoSelection(23100, (tokenId2, 21)).leftValueWithGas
         .startsWith(s"Not enough balance") is true
 
-      UtxoSelection(142270, (tokenId2, 15), (tokenId1, 13)).verifyWithGas(1, 0, 2, 3)
-      UtxoSelection(142271, (tokenId2, 15), (tokenId1, 13)).leftValueWithGas
-        .startsWith(s"Not enough balance") is true
-      UtxoSelection(142268, (tokenId2, 15), (tokenId1, 13)).withDust(2).verifyWithGas(1, 0, 2, 3)
-      UtxoSelection(142269, (tokenId2, 15), (tokenId1, 13))
-        .withDust(2)
-        .leftValueWithGas
+      UtxoSelection(173210, (tokenId2, 15), (tokenId1, 11)).verifyWithGas(1, 4, 0, 2, 3)
+      UtxoSelection(173211, (tokenId2, 15), (tokenId1, 11)).leftValueWithGas
         .startsWith(s"Not enough balance") is true
     }
   }
@@ -170,27 +144,40 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
   it should "prefer persisted utxos" in new Fixture {
     {
       info("without tokens")
-      val utxos0          = buildUtxos(40000, 23000)
-      implicit val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
+      val utxos0 = buildUtxos(40000, 23000)
+      val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
 
-      UtxoSelection(7).verifyWithGas(0)
+      UtxoSelection(7)(utxos0).verifyWithGas(1)
+      UtxoSelection(7)(utxos1).verifyWithGas(0)
     }
 
     {
       info("with tokens")
       val tokenId1 = TokenId.hash("tokenId1")
-      val tokenId2 = TokenId.hash("tokenId2")
 
       val utxos0 = buildUtxosWithTokens(
         (40000, AVector((tokenId1, 10))),
-        (23000, AVector((tokenId2, 20)))
+        (23000, AVector((tokenId1, 11)))
       )
-      implicit val utxos1 = AVector(utxos0(0), utxos0(1).copy(outputType = UnpersistedBlockOutput))
+      implicit val utxos1 = AVector(utxos0(0).copy(outputType = UnpersistedBlockOutput), utxos0(1))
 
-      UtxoSelection(7).verifyWithGas(0)
-      UtxoSelection(7, (tokenId1, 10)).verifyWithGas(0)
-      UtxoSelection(7, (tokenId2, 10)).verifyWithGas(0, 1)
+      UtxoSelection(7, (tokenId1, 10))(utxos0).verifyWithGas(0)
+      UtxoSelection(7, (tokenId1, 10)).verifyWithGas(1)
     }
+  }
+
+  it should "prefer non-token utxos for ALPH selection" in new Fixture {
+    val tokenId = TokenId.generate
+    implicit val utxos = buildUtxosWithTokens(
+      (20, AVector((tokenId, 10))),
+      (10, AVector.empty),
+      (30, AVector.empty)
+    )
+
+    UtxoSelection(10).verify(1)
+    UtxoSelection(20).verify(1, 2)
+    UtxoSelection(40).verify(1, 2)
+    UtxoSelection(50).verify(1, 2, 0)
   }
 
   it should "return the correct utxos when gas is preset" in new Fixture {
@@ -209,18 +196,24 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
       val tokenId3 = TokenId.hash("tokenId3")
 
       implicit val utxos = buildUtxosWithTokens(
-        (20, AVector((tokenId1, 10), (tokenId2, 20))),
+        (20, AVector((tokenId1, 10))),
+        (25, AVector((tokenId2, 20))),
         (10, AVector.empty),
-        (30, AVector((tokenId1, 2), (tokenId3, 10)))
+        (30, AVector((tokenId3, 10))),
+        (31, AVector((tokenId1, 1)))
       )
 
-      UtxoSelection(7).withGas(1).verifyWithGas(1)
-      UtxoSelection(10).withGas(1).verifyWithGas(1, 0)
-      UtxoSelection(10, (tokenId2, 15), (tokenId1, 12)).withGas(1).verifyWithGas(1, 0, 2)
-      UtxoSelection(40, (tokenId2, 15), (tokenId1, 12), (tokenId3, 10))
+      UtxoSelection(7).withGas(1).verifyWithGas(2)
+      UtxoSelection(10).withGas(1).verifyWithGas(2, 0)
+      UtxoSelection(10, (tokenId2, 15), (tokenId1, 11)).withGas(1).verifyWithGas(1, 4, 0)
+      UtxoSelection(115, (tokenId2, 15), (tokenId1, 11), (tokenId3, 10))
         .withGas(1)
-        .verifyWithGas(1, 0, 2)
-      UtxoSelection(10, (tokenId2, 15), (tokenId1, 13))
+        .verifyWithGas(1, 4, 0, 3, 2)
+      UtxoSelection(116, (tokenId2, 15), (tokenId1, 11), (tokenId3, 10))
+        .withGas(1)
+        .leftValueWithGas
+        .startsWith(s"Not enough balance") is true
+      UtxoSelection(10, (tokenId2, 15), (tokenId1, 12))
         .withGas(1)
         .leftValueWithGas
         .startsWith(s"Not enough balance") is true
@@ -321,7 +314,6 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
         utxos: AVector[Asset]
     ) {
       val utxosSorted            = utxos.sorted(AssetAscendingOrder.byAlph)
-      var dustAmount: U256       = U256.Zero
       var gasOpt: Option[GasBox] = None
       val outputs = {
         val lockupScript1 = p2pkhLockupGen(GroupIndex.unsafe(0)).sample.value
@@ -332,13 +324,13 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
 
       lazy val valueWithoutGas = {
         SelectionWithoutGasEstimation(AssetAscendingOrder)
-          .select(AssetAmounts(alph, AVector.from(tokens)), utxosSorted, dustAmount)
+          .select(AssetAmounts(alph, AVector.from(tokens)), utxosSorted)
           .map(_.selected)
       }
 
       lazy val valueWithGas = {
         UtxoSelectionAlgo
-          .Build(dustAmount, ProvidedGas(gasOpt, GasPrice(1)))
+          .Build(ProvidedGas(gasOpt, GasPrice(1)))
           .select(
             AssetAmounts(alph, AVector.from(tokens)),
             defaultUnlockScript,
@@ -361,11 +353,6 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
           GasEstimation.estimateWithP2PKHInputs(selectedUtxos.length, outputs.length)
         )
         valueWithGas isE Selected(selectedUtxos, gas)
-      }
-
-      def withDust(newDustAmount: U256): UtxoSelection = {
-        dustAmount = newDustAmount
-        this
       }
 
       def withGas(gas: Int): UtxoSelection = {

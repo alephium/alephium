@@ -1503,7 +1503,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
 
     result0.returns.isEmpty is true
-    result0.gasUsed is 17476
+    result0.gasUsed is 21976
     result0.contracts.length is 1
     val contractState = result0.contracts.head
     contractState.id is ContractId.zero
@@ -1511,7 +1511,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState.mutFields is AVector[Val](ValU256(ALPH.alph(20)), ValU256(50))
     contractState.asset is AssetState.from(ALPH.alph(20), AVector(Token(tokenId, 50)))
     result0.txInputs is AVector[Address](contractAddress)
-    result0.txOutputs.length is 2
+    result0.txOutputs.length is 3
     result0.txOutputs(0) is ContractOutput(
       result0.txOutputs(0).hint,
       emptyKey(0),
@@ -1522,9 +1522,18 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.txOutputs(1) is AssetOutput(
       result0.txOutputs(1).hint,
       emptyKey(1),
-      Amount(ALPH.nanoAlph(90937500000L)),
+      Amount(dustUtxoAmount),
       buyer,
       AVector(Token(tokenId, 150)),
+      TimeStamp.zero,
+      ByteString.empty
+    )
+    result0.txOutputs(2) is AssetOutput(
+      result0.txOutputs(2).hint,
+      emptyKey(2),
+      Amount(ALPH.nanoAlph(90937500000L) - dustUtxoAmount),
+      buyer,
+      AVector.empty,
       TimeStamp.zero,
       ByteString.empty
     )
@@ -1646,7 +1655,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       )
     )
     result1.returns.isEmpty is true
-    result1.gasUsed is 18507
+    result1.gasUsed is 23007
     result1.contracts.length is 2
     val contractState1 = result1.contracts.head
     contractState1.id is ContractId.zero
@@ -1654,7 +1663,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     contractState1.mutFields is AVector[Val](ValU256(ALPH.alph(10)), ValU256(100))
     contractState1.asset is AssetState.from(ALPH.alph(10), AVector(Token(tokenId, 100)))
     result1.txInputs is AVector[Address](contractAddress)
-    result1.txOutputs.length is 2
+    result1.txOutputs.length is 3
     result1.txOutputs(0) is ContractOutput(
       result1.txOutputs(0).hint,
       emptyKey(0),
@@ -1665,9 +1674,18 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.txOutputs(1) is AssetOutput(
       result1.txOutputs(1).hint,
       emptyKey(1),
-      Amount(ALPH.nanoAlph(95937500000L)),
+      Amount(dustUtxoAmount),
       lp,
       AVector(Token(tokenId, 100)),
+      TimeStamp.zero,
+      ByteString.empty
+    )
+    result1.txOutputs(2) is AssetOutput(
+      result1.txOutputs(2).hint,
+      emptyKey(2),
+      Amount(ALPH.nanoAlph(95937500000L) - dustUtxoAmount),
+      lp,
+      AVector.empty,
       TimeStamp.zero,
       ByteString.empty
     )
@@ -1973,7 +1991,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       caller,
       AssetState(
         ALPH.alph(3),
-        Some(AVector.fill(2 * maxTokenPerUtxo)(Token(TokenId.random, 1)))
+        Some(AVector.fill(2 * maxTokenPerAssetUtxo)(Token(TokenId.random, 1)))
       )
     )
     val testContract = TestContract(
@@ -1988,18 +2006,21 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils  = new ServerUtils()
     val tokensSorted = (inputAssets.asset.tokens.get :+ Token(tokenId, 1)).sortBy(_.id)
     val testResult   = serverUtils.runTestContract(blockFlow, testContract).rightValue
-    testResult.txOutputs.length is 4
+    testResult.txOutputs.length is 5
     testResult.txOutputs(0).address is caller
-    testResult.txOutputs(0).tokens.length is maxTokenPerUtxo
-    testResult.txOutputs(0).tokens is tokensSorted.slice(0, maxTokenPerUtxo)
+    testResult.txOutputs(0).tokens.length is maxTokenPerAssetUtxo
+    testResult.txOutputs(0).tokens is tokensSorted.slice(0, maxTokenPerAssetUtxo)
     testResult.txOutputs(1).address is caller
-    testResult.txOutputs(1).tokens.length is maxTokenPerUtxo
+    testResult.txOutputs(1).tokens.length is maxTokenPerAssetUtxo
     testResult.txOutputs(1).tokens is tokensSorted
-      .slice(maxTokenPerUtxo, 2 * maxTokenPerUtxo)
+      .slice(maxTokenPerAssetUtxo, 2 * maxTokenPerAssetUtxo)
     testResult.txOutputs(2).address is caller
     testResult.txOutputs(2).tokens.length is 1
-    testResult.txOutputs(2).tokens is tokensSorted.slice(2 * maxTokenPerUtxo, tokensSorted.length)
-    testResult.txOutputs(3).address is Address.contract(testContract.contractId)
+    testResult.txOutputs(2).tokens is tokensSorted.slice(
+      2 * maxTokenPerAssetUtxo,
+      tokensSorted.length
+    )
+    testResult.txOutputs(4).address is Address.contract(testContract.contractId)
   }
 
   private def generateDestination(
