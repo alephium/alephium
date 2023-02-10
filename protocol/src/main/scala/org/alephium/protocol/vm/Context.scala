@@ -173,7 +173,11 @@ trait StatelessContext extends CostStrategy {
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[MutBalances]
 
-  def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit]
+  def writeLog(
+      contractIdOpt: Option[ContractId],
+      fields: AVector[Val],
+      systemEvent: Boolean
+  ): ExeResult[Unit]
 
   def txId: TransactionId          = txEnv.txId
   def signatures: Stack[Signature] = txEnv.signatures
@@ -233,7 +237,11 @@ object StatelessContext {
       extends StatelessContext {
     def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
 
-    def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = okay
+    def writeLog(
+        contractIdOpt: Option[ContractId],
+        fields: AVector[Val],
+        systemEvent: Boolean
+    ): ExeResult[Unit] = okay
   }
 }
 
@@ -441,10 +449,14 @@ trait StatefulContext extends StatelessContext with ContractPool {
     } yield ()
   }
 
-  def writeLog(contractIdOpt: Option[ContractId], fields: AVector[Val]): ExeResult[Unit] = {
+  def writeLog(
+      contractIdOpt: Option[ContractId],
+      fields: AVector[Val],
+      systemEvent: Boolean
+  ): ExeResult[Unit] = {
     val result = (blockEnv.blockId, contractIdOpt) match {
       case (Some(blockId), Some(contractId))
-          if logConfig.logContractEnabled(Address.contract(contractId)) =>
+          if systemEvent || logConfig.logContractEnabled(Address.contract(contractId)) =>
         worldState.logState.putLog(
           blockId,
           txId,
