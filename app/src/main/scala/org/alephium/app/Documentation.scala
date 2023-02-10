@@ -52,7 +52,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getHashesAtHeight,
     getChainInfo,
     getBlockHeaderEntry,
-    listUnconfirmedTransactions,
+    listMempoolTransactions,
     buildTransaction,
     buildSweepAddressTransactions,
     submitTransaction,

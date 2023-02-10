@@ -18,8 +18,8 @@ package org.alephium.api.model
 
 import org.alephium.util.AVector
 
-final case class UnconfirmedTransactions(
+final case class MempoolTransactions(
     fromGroup: Int,
     toGroup: Int,
-    unconfirmedTransactions: AVector[TransactionTemplate]
+    mempoolTransactions: AVector[TransactionTemplate]
 )

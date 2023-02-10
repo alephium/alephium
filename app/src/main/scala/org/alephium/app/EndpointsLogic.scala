@@ -274,8 +274,8 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.getChainInfo(blockFlow, chainIndex))
   }
 
-  val listUnconfirmedTransactionsLogic = serverLogic(listUnconfirmedTransactions) { _ =>
-    Future.successful(serverUtils.listUnconfirmedTransactions(blockFlow))
+  val listMempoolTransactionsLogic = serverLogic(listMempoolTransactions) { _ =>
+    Future.successful(serverUtils.listMempoolTransactions(blockFlow))
   }
 
   type BaseServerEndpoint[A, B] = ServerEndpoint[Any, Future]

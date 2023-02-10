@@ -164,18 +164,18 @@ class ServerUtils(implicit
       .map(failed)
   }
 
-  def listUnconfirmedTransactions(
+  def listMempoolTransactions(
       blockFlow: BlockFlow
-  ): Try[AVector[UnconfirmedTransactions]] = {
+  ): Try[AVector[MempoolTransactions]] = {
     val result = brokerConfig.groupRange.foldLeft(
-      AVector.ofCapacity[UnconfirmedTransactions](brokerConfig.chainNum)
+      AVector.ofCapacity[MempoolTransactions](brokerConfig.chainNum)
     ) { case (acc, group) =>
       val groupIndex = GroupIndex.unsafe(group)
       val txs        = blockFlow.getMemPool(groupIndex).getAll()
       val groupedTxs = txs.filter(_.chainIndex.from == groupIndex).groupBy(_.chainIndex)
       acc ++ AVector.from(
         groupedTxs.map { case (chainIndex, txs) =>
-          UnconfirmedTransactions(
+          MempoolTransactions(
             chainIndex.from.value,
             chainIndex.to.value,
             txs.map(model.TransactionTemplate.fromProtocol)
