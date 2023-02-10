@@ -18,9 +18,9 @@ import sbt._
 
 object Version {
   lazy val akka       = "2.6.20"
-  lazy val tapir      = "1.2.2"
+  lazy val tapir      = "1.2.8"
   lazy val sttp       = "3.5.2"
-  lazy val apispec    = "0.3.1"
+  lazy val apispec    = "0.3.2"
   lazy val prometheus = "0.16.0"
 }
 
@@ -29,7 +29,7 @@ object Dependencies {
   lazy val `akka-slf4j` = "com.typesafe.akka" %% "akka-slf4j"   % Version.akka
   lazy val `akka-test`  = "com.typesafe.akka" %% "akka-testkit" % Version.akka % Test
 
-  lazy val vertx = "io.vertx" % "vertx-core" % "4.3.4"
+  lazy val vertx = "io.vertx" % "vertx-core" % "4.3.8"
 
   lazy val `upickle` = "com.lihaoyi" %% "upickle" % "2.0.0"
 
