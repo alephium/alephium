@@ -2227,7 +2227,7 @@ sealed trait LogInstr extends StatelessInstr with StatelessInstrCompanion0 with 
     for {
       _      <- frame.ctx.chargeGasWithSize(this, n)
       fields <- frame.opStack.pop(n)
-      _      <- frame.ctx.writeLog(frame.obj.contractIdOpt, fields)
+      _      <- frame.ctx.writeLog(frame.obj.contractIdOpt, fields, systemEvent = false)
     } yield ()
   }
 }
@@ -2303,7 +2303,8 @@ final case class DEBUG(stringParts: AVector[Val.ByteVec])
         interpolationParts <- frame.opStack.pop(stringParts.length - 1)
         _ <- frame.ctx.writeLog(
           Some(frame.obj.contractIdOpt.getOrElse(ContractId.zero)),
-          AVector(debugEventIndex, combineUnsafe(interpolationParts))
+          AVector(debugEventIndex, combineUnsafe(interpolationParts)),
+          systemEvent = false
         )
       } yield ()
     }

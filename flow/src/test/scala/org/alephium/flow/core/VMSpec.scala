@@ -2655,6 +2655,28 @@ class VMSpec extends AlephiumSpec {
       val logStatesOpt    = getLogStates(blockFlow, wrongContractId, 0)
       logStatesOpt is None
     }
+
+  }
+
+  it should "Log contract and subcontract ids when subcontract is created" in new SubContractFixture {
+    val subContract         = Compiler.compileContract(subContractRaw).rightValue
+    val subContractByteCode = Hex.toHexString(serialize(subContract))
+    val subContractPath1    = Hex.toHexString(serialize("nft-01"))
+    val (contractId, subContractId) = verify(
+      s"createSubContract!{callerAddress!() -> ALPH: 1 alph}(#$subContractPath1, #$subContractByteCode, #00, #00)",
+      subContractPath = "nft-01",
+      numOfAssets = 2,
+      numOfContracts = 2
+    )
+
+    val logStatesOpt = getLogStates(blockFlow, createContractEventId, 1)
+    val logStates    = logStatesOpt.value
+
+    val fields = logStates.states(0).fields
+
+    fields.length is 2
+    fields(0) is Val.Address(LockupScript.p2c(subContractId))
+    fields(1) is Val.Address(LockupScript.p2c(contractId))
   }
 
   it should "not write to the log storage when logging is disabled" in new EventFixtureWithContract {
@@ -2997,7 +3019,7 @@ class VMSpec extends AlephiumSpec {
         subContractPath: String,
         numOfAssets: Int,
         numOfContracts: Int
-    ): ContractId = {
+    ): (ContractId, ContractId) = {
       val contractRaw: String =
         s"""
            |Contract Foo(mut subContractId: ByteVec) {
@@ -3056,7 +3078,7 @@ class VMSpec extends AlephiumSpec {
 
       callTxScript(callSubContractRaw)
 
-      subContractId
+      (contractId, subContractId)
     }
 
     def verify(
@@ -3109,7 +3131,7 @@ class VMSpec extends AlephiumSpec {
     {
       info("create sub-contract with token")
       val subContractPath2 = Hex.toHexString(serialize("nft-02"))
-      val subContractId = verify(
+      val (_, subContractId) = verify(
         s"createSubContractWithToken!{callerAddress!() -> ALPH: 1 alph}(#$subContractPath2, #$subContractByteCode, #00, #00, 10)",
         subContractPath = "nft-02",
         numOfAssets = 5,
@@ -3123,7 +3145,7 @@ class VMSpec extends AlephiumSpec {
     {
       info("create sub-contract and transfer token to asset address")
       val subContractPath3 = Hex.toHexString(serialize("nft-03"))
-      val subContractId = verify(
+      val (_, subContractId) = verify(
         s"createSubContractWithToken!{callerAddress!() -> ALPH: 1 alph}(#$subContractPath3, #$subContractByteCode, #00, #00, 10, @${genesisAddress.toBase58})",
         subContractPath = "nft-03",
         numOfAssets = 8,
@@ -3167,7 +3189,7 @@ class VMSpec extends AlephiumSpec {
     {
       info("copy create sub-contract with token")
       val subContractPath2 = Hex.toHexString(serialize("nft-02"))
-      val contractId = verify(
+      val (_, contractId) = verify(
         s"copyCreateSubContractWithToken!{callerAddress!() -> ALPH: 1 alph}(#$subContractPath2, #${subContractId.toHexString}, #00, #00, 10)",
         subContractPath = "nft-02",
         numOfAssets = 6,
@@ -3182,7 +3204,7 @@ class VMSpec extends AlephiumSpec {
     {
       info("copy create sub-contract and transfer token to asset address")
       val subContractPath3 = Hex.toHexString(serialize("nft-03"))
-      val contractId = verify(
+      val (_, contractId) = verify(
         s"copyCreateSubContractWithToken!{callerAddress!() -> ALPH: 1 alph}(#$subContractPath3, #${subContractId.toHexString}, #00, #00, 10, @${genesisAddress.toBase58})",
         subContractPath = "nft-03",
         numOfAssets = 9,

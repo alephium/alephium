@@ -384,12 +384,26 @@ final case class StatefulFrame(
       _ <- ctx.createContract(contractId, code, immFields, balances, mutFields, tokenIssuanceInfo)
       _ <- ctx.writeLog(
         Some(createContractEventId),
-        AVector(
-          createContractEventIndex,
-          Val.Address(LockupScript.p2c(contractId))
-        )
+        contractCreationEventFields(contractId),
+        systemEvent = true
       )
     } yield contractId
+  }
+
+  def contractCreationEventFields(createdContract: ContractId): AVector[Val] = {
+    obj.contractIdOpt match {
+      case Some(contractId) =>
+        AVector(
+          createContractEventIndex,
+          Val.Address(LockupScript.p2c(createdContract)),
+          Val.Address(LockupScript.p2c(contractId))
+        )
+      case None =>
+        AVector(
+          createContractEventIndex,
+          Val.Address(LockupScript.p2c(createdContract))
+        )
+    }
   }
 
   def destroyContract(refundAddress: LockupScript): ExeResult[Unit] = {
@@ -405,7 +419,8 @@ final case class StatefulFrame(
       _ <- ctx.destroyContract(contractId, contractAssets, refundAddress)
       _ <- ctx.writeLog(
         Some(destroyContractEventId),
-        AVector(destroyContractEventIndex, Val.Address(LockupScript.p2c(contractId)))
+        AVector(destroyContractEventIndex, Val.Address(LockupScript.p2c(contractId))),
+        systemEvent = true
       )
       _ <- runReturn()
     } yield {
