@@ -348,8 +348,8 @@ object AlephiumConfig {
         val discoveryRefined = if (network.networkId == NetworkId.AlephiumTestNet) {
           discovery.copy(bootstrap =
             ArraySeq(
-              new InetSocketAddress("testnet-v17-bootstrap0.alephium.org", 9973),
-              new InetSocketAddress("testnet-v17-bootstrap1.alephium.org", 9973)
+              new InetSocketAddress("v17-bootstrap0.testnet.alephium.org", 9973),
+              new InetSocketAddress("v17-bootstrap1.testnet.alephium.org", 9973)
             )
           )
         } else {
