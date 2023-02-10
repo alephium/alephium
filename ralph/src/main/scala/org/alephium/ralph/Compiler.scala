@@ -943,7 +943,7 @@ object Compiler {
         StoreLocal.apply,
         StoreMutField.apply,
         StoreLocalByIndex,
-        StoreFieldByIndex
+        StoreMutFieldByIndex
       )
     }
 

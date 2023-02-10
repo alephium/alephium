@@ -165,25 +165,23 @@ trait TxUtils { Self: FlowUtils =>
       utxosLimit: Int
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val totalAmountsE = for {
-      _                   <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
-      _                   <- checkProvidedGas(gasOpt, gasPrice)
-      totalAttoAlphAmount <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
-      totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
-        outputInfos.flatMap(_.tokens)
-      )
-    } yield (totalAttoAlphAmount, totalAmountPerToken)
+      _               <- checkOutputInfos(fromLockupScript.groupIndex, outputInfos)
+      _               <- checkProvidedGas(gasOpt, gasPrice)
+      _               <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
+      calculateResult <- UnsignedTransaction.calculateTotalAmountNeeded(outputInfos)
+    } yield calculateResult
 
     totalAmountsE match {
-      case Right((totalAmount, totalAmountPerToken)) =>
+      case Right((totalAmount, totalAmountPerToken, txOutputLength)) =>
         getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit)
           .map { utxos =>
             UtxoSelectionAlgo
-              .Build(dustUtxoAmount, ProvidedGas(gasOpt, gasPrice))
+              .Build(ProvidedGas(gasOpt, gasPrice))
               .select(
                 AssetAmounts(totalAmount, totalAmountPerToken),
                 fromUnlockScript,
                 utxos,
-                outputInfos.length + 1,
+                txOutputLength,
                 txScriptOpt = None,
                 AssetScriptGasEstimator.Default(Self.blockFlow),
                 TxScriptGasEstimator.NotImplemented
@@ -557,8 +555,8 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   private def checkGasPrice(gasPrice: GasPrice): Either[String, Unit] = {
-    if (gasPrice < minimalGasPrice) {
-      Left(s"Gas price $gasPrice too small, minimal $minimalGasPrice")
+    if (gasPrice < coinbaseGasPrice) {
+      Left(s"Gas price $gasPrice too small, minimal $coinbaseGasPrice")
     } else if (gasPrice.value >= ALPH.MaxALPHValue) {
       val maximalGasPrice = GasPrice(ALPH.MaxALPHValue.subOneUnsafe())
       Left(s"Gas price $gasPrice too large, maximal $maximalGasPrice")
@@ -619,30 +617,29 @@ object TxUtils {
       totalAmountPerToken <- UnsignedTransaction.calculateTotalAmountPerToken(
         utxos.flatMap(_.tokens)
       )
-      groupsOfTokens    = (totalAmountPerToken.length + maxTokenPerUtxo - 1) / maxTokenPerUtxo
-      extraNumOfOutputs = Math.max(0, groupsOfTokens - 1)
+      extraNumOfOutputs =
+        (totalAmountPerToken.length + maxTokenPerAssetUtxo - 1) / maxTokenPerAssetUtxo
       gas = gasOpt.getOrElse(GasEstimation.sweepAddress(utxos.length, extraNumOfOutputs + 1))
       totalAmountWithoutGas <- totalAmount
         .sub(gasPrice * gas)
         .toRight("Not enough balance for gas fee in Sweeping")
-      amountRequiredForExtraOutputs <- minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo)
+      amountRequiredForExtraOutputs <- dustUtxoAmount
         .mul(U256.unsafe(extraNumOfOutputs))
         .toRight("Too many tokens")
       amountOfFirstOutput <- totalAmountWithoutGas
         .sub(amountRequiredForExtraOutputs)
         .toRight("Not enough ALPH balance for transaction outputs")
-      firstOutputTokensNum = getFirstOutputTokensNum(totalAmountPerToken.length)
       _ <- amountOfFirstOutput
-        .sub(minimalAttoAlphAmountPerTxOutput(firstOutputTokensNum))
+        .sub(dustUtxoAmount)
         .toRight("Not enough ALPH balance for transaction outputs")
     } yield {
-      val firstTokens  = totalAmountPerToken.take(firstOutputTokensNum)
-      val restOfTokens = totalAmountPerToken.drop(firstOutputTokensNum).grouped(maxTokenPerUtxo)
-      val firstOutput  = TxOutputInfo(toLockupScript, amountOfFirstOutput, firstTokens, lockTimeOpt)
+      val firstOutput =
+        TxOutputInfo(toLockupScript, amountOfFirstOutput, AVector.empty, lockTimeOpt)
+      val restOfTokens = totalAmountPerToken.grouped(maxTokenPerAssetUtxo)
       val restOfOutputs = restOfTokens.map { tokens =>
         TxOutputInfo(
           toLockupScript,
-          minimalAttoAlphAmountPerTxOutput(maxTokenPerUtxo),
+          dustUtxoAmount,
           tokens,
           lockTimeOpt
         )
@@ -699,17 +696,6 @@ object TxUtils {
       tokenBalances.getBalances(),
       tokenLockedBalances.getBalances()
     )
-  }
-
-  private[core] def getFirstOutputTokensNum(tokensNum: Int): Int = {
-    val remainder = tokensNum % maxTokenPerUtxo
-    if (tokensNum == 0) {
-      tokensNum
-    } else if (remainder == 0) {
-      maxTokenPerUtxo
-    } else {
-      remainder
-    }
   }
 
   private[core] def checkTotalAttoAlphAmount(

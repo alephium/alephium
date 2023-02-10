@@ -297,7 +297,8 @@ class VMSpec extends AlephiumSpec {
       val contractKey = ContractId.from(Hex.from(contractId).get).get
       worldState.contractState.exists(contractKey) isE existed
       worldState.outputState.exists(contractAssetRef) isE existed
-      worldState.codeState.exists(contract.hash) isE existed
+      worldState.codeState.exists(contract.hash) isE false
+      worldState.contractImmutableState.exists(contract.hash) isE true // keep history state always
     }
 
     def getContractAsset(contractId: ContractId, chainIndex: ChainIndex): ContractOutput = {
@@ -516,7 +517,7 @@ class VMSpec extends AlephiumSpec {
       privateKey0,
       address1.lockupScript,
       tokens,
-      minimalAttoAlphAmountPerTxOutput(1)
+      dustUtxoAmount
     )
   }
 
@@ -625,12 +626,15 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
     callTxScript(mint)
 
+    val timestamp0 = TimeStamp.now().plusHoursUnsafe(1)
+    val timestamp1 = TimeStamp.now().plusHoursUnsafe(2)
+    val timestamp2 = TimeStamp.now().plusHoursUnsafe(3)
     val lock =
       s"""
          |TxScript Main {
-         |  let timestamp0 = 1000
-         |  let timestamp1 = 2000
-         |  let timestamp2 = 3000
+         |  let timestamp0 = ${timestamp0.millis}
+         |  let timestamp1 = ${timestamp1.millis}
+         |  let timestamp2 = ${timestamp2.millis}
          |
          |  lockApprovedAssets!{ @$genesisAddress -> ALPH: 0.01 alph }(@$genesisAddress, timestamp0)
          |
@@ -647,27 +651,28 @@ class VMSpec extends AlephiumSpec {
          |""".stripMargin
 
     val tx = callTxScript(lock).nonCoinbase(0)
-    tx.generatedOutputs(0) is AssetOutput(
-      ALPH.cent(1),
-      genesisAddress.lockupScript,
-      TimeStamp.unsafe(1000),
-      AVector.empty,
-      ByteString.empty
-    )
-    tx.generatedOutputs(1) is AssetOutput(
-      ALPH.cent(2),
-      genesisAddress.lockupScript,
-      TimeStamp.unsafe(2000),
-      AVector(tokenId0 -> ALPH.cent(3)),
-      ByteString.empty
-    )
-    tx.generatedOutputs(2) is AssetOutput(
-      ALPH.cent(4),
-      genesisAddress.lockupScript,
-      TimeStamp.unsafe(3000),
-      AVector(tokenId0 -> ALPH.cent(5), tokenId1 -> ALPH.cent(6)),
-      ByteString.empty
-    )
+
+    def checkOutput(
+        index: Int,
+        timestamp: TimeStamp,
+        alphAmount: U256,
+        tokens: (TokenId, U256)*
+    ) = {
+      tx.generatedOutputs(index) is AssetOutput(
+        alphAmount,
+        genesisAddress.lockupScript,
+        timestamp,
+        AVector.from(tokens),
+        ByteString.empty
+      )
+    }
+
+    checkOutput(0, timestamp0, ALPH.cent(1))
+    checkOutput(1, timestamp1, dustUtxoAmount, tokenId0 -> ALPH.cent(3))
+    checkOutput(2, timestamp1, ALPH.cent(2) - dustUtxoAmount)
+    checkOutput(3, timestamp2, dustUtxoAmount, tokenId0 -> ALPH.cent(5))
+    checkOutput(4, timestamp2, dustUtxoAmount, tokenId1 -> ALPH.cent(6))
+    checkOutput(5, timestamp2, ALPH.cent(4) - (dustUtxoAmount * 2))
   }
 
   it should "not use up contract assets" in new ContractFixture {
@@ -840,6 +845,17 @@ class VMSpec extends AlephiumSpec {
          |
          |  fn test() -> () {
          |    assert!((33 + 2 - 3) * 5 / 7 % 11 == 0, 0)
+         |    assert!(3 ** 0 + 1 == 2, 0)
+         |    assert!(3 ** 3 - 1 == 26, 0)
+         |    assert!(3 * 3 ** 2 == 27, 0)
+         |    assert!(10 ** 18 == 1 alph, 0)
+         |    assert!(-3 ** 2 == 9i, 0)
+         |    assert!(-3 ** 3 == -27, 0)
+         |    assert!(8 / 2 ** 2 + 1 == 3, 0)
+         |    assert!(2 |**| 256 == 0, 0)
+         |    assert!(8 / 2 |**| 2 - 1 == 1, 0)
+         |    let a = 2 ** 255 + 1
+         |    assert!(a |**| 3 == a, 0)
          |
          |    let x = 0
          |    let y = 1
@@ -1505,9 +1521,9 @@ class VMSpec extends AlephiumSpec {
          |  assert!(txId!() != #${zeroId.toHexString}, 0)
          |  assert!(txInputAddress!($index) == @${genesisAddress.toBase58}, 0)
          |  assert!(txInputsSize!() == 1, 0)
-         |  assert!(txGasPrice!() == ${defaultGasPrice.value}, 0)
+         |  assert!(txGasPrice!() == ${nonCoinbaseMinGasPrice.value}, 0)
          |  assert!(txGasAmount!() == ${gasAmount.value}, 0)
-         |  assert!(txGasFee!() == ${defaultGasPrice * gasAmount}, 0)
+         |  assert!(txGasFee!() == ${nonCoinbaseMinGasPrice * gasAmount}, 0)
          |}
          |""".stripMargin
     testSimpleScript(main(0), gasAmount.value)
@@ -1553,17 +1569,30 @@ class VMSpec extends AlephiumSpec {
     val p256Sig                  = SecP256K1.sign(Hash.zero.bytes, p256Pri).toHexString
     val (ed25519Pri, ed25519Pub) = ED25519.generatePriPub()
     val ed25519Sig               = ED25519.sign(Hash.zero.bytes, ed25519Pri).toHexString
-    def main(p256Sig: String, ed25519Sig: String) =
+    val (bip340Pri, bip340Pub)   = BIP340Schnorr.generatePriPub()
+    val bip340Sig                = BIP340Schnorr.sign(Hash.zero.bytes, bip340Pri).toHexString
+    def main(p256Sig: String, ed25519Sig: String, bip340Sig: String) =
       s"""
          |@using(preapprovedAssets = false)
          |TxScript Main {
          |  verifySecP256K1!(#$zero, #${p256Pub.toHexString}, #$p256Sig)
          |  verifyED25519!(#$zero, #${ed25519Pub.toHexString}, #$ed25519Sig)
+         |  verifyBIP340Schnorr!(#$zero, #${bip340Pub.toHexString}, #$bip340Sig)
          |}
          |""".stripMargin
-    testSimpleScript(main(p256Sig, ed25519Sig))
-    failSimpleScript(main(SecP256K1Signature.zero.toHexString, ed25519Sig), InvalidSignature)
-    failSimpleScript(main(p256Sig, ED25519Signature.zero.toHexString), InvalidSignature)
+    testSimpleScript(main(p256Sig, ed25519Sig, bip340Sig))
+    failSimpleScript(
+      main(SecP256K1Signature.generate.toHexString, ed25519Sig, bip340Sig),
+      InvalidSignature
+    )
+    failSimpleScript(
+      main(p256Sig, ED25519Signature.generate.toHexString, bip340Sig),
+      InvalidSignature
+    )
+    failSimpleScript(
+      main(p256Sig, ed25519Sig, BIP340SchnorrSignature.generate.toHexString),
+      InvalidSignature
+    )
   }
 
   it should "test eth ecrecover" in new ContractFixture with EthEcRecoverFixture {
@@ -1793,7 +1822,7 @@ class VMSpec extends AlephiumSpec {
         .length is numContractOutput
     }
 
-    checkSwapBalance(minimalAlphInContract, 0, 4, 3)
+    checkSwapBalance(minimalAlphInContract, 0, 5, 3)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -1805,7 +1834,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |${AMMContract.swapContract}
                     |""".stripMargin)
-    checkSwapBalance(minimalAlphInContract + 10, 100, 5 /* 1 more coinbase output */, 3)
+    checkSwapBalance(minimalAlphInContract + 10, 100, 6 /* 1 more coinbase output */, 3)
 
     callTxScript(s"""
                     |TxScript Main {
@@ -1815,7 +1844,7 @@ class VMSpec extends AlephiumSpec {
                     |
                     |${AMMContract.swapContract}
                     |""".stripMargin)
-    checkSwapBalance(minimalAlphInContract + 20, 50, 6 /* 1 more coinbase output */, 3)
+    checkSwapBalance(minimalAlphInContract + 20, 50, 7 /* 1 more coinbase output */, 3)
 
     callTxScript(
       s"""
@@ -1827,7 +1856,7 @@ class VMSpec extends AlephiumSpec {
          |${AMMContract.swapContract}
          |""".stripMargin
     )
-    checkSwapBalance(minimalAlphInContract + 10, 100, 7 /* 1 more coinbase output */, 3)
+    checkSwapBalance(minimalAlphInContract + 10, 100, 8 /* 1 more coinbase output */, 3)
   }
 
   trait TxExecutionOrderFixture extends ContractFixture {

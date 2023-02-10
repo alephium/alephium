@@ -55,7 +55,7 @@ object Storages {
     val logCounterStorage = RocksDBKeyValueStorage[ContractId, Int](db, LogCounter, writeOptions)
     val logStorage        = LogStorage(logStateStorage, logRefStorage, logCounterStorage)
     val trieImmutableStateStorage =
-      RocksDBKeyValueStorage[Hash, ContractImmutableState](db, Trie, writeOptions)
+      RocksDBKeyValueStorage[Hash, ContractStorageImmutableState](db, Trie, writeOptions)
     val worldStateStorage =
       WorldStateRockDBStorage(
         trieStorage,

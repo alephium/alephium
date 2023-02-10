@@ -136,8 +136,8 @@ trait EndpointsExamples extends ErrorExamples {
     1,
     1,
     None,
-    model.defaultGas.value,
-    model.defaultGasPrice.value,
+    model.minimalGas.value,
+    model.nonCoinbaseMinGasPrice.value,
     AVector(inputAsset),
     AVector(outputAsset)
   )
@@ -412,7 +412,7 @@ trait EndpointsExamples extends ErrorExamples {
         moreSettingsDestinations,
         Some(AVector(outputRef)),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice)
+        Some(model.nonCoinbaseMinGasPrice)
       )
     )
   )
@@ -431,7 +431,7 @@ trait EndpointsExamples extends ErrorExamples {
           address,
           Some(ts),
           Some(model.minimalGas),
-          Some(model.defaultGasPrice)
+          Some(model.nonCoinbaseMinGasPrice)
         )
       )
     )
@@ -441,7 +441,7 @@ trait EndpointsExamples extends ErrorExamples {
       BuildTransactionResult(
         unsignedTx = hexString,
         model.minimalGas,
-        model.defaultGasPrice,
+        model.nonCoinbaseMinGasPrice,
         txId,
         fromGroup = 2,
         toGroup = 1
@@ -451,7 +451,12 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildSweepAddressTransactionsResultExamples
       : List[Example[BuildSweepAddressTransactionsResult]] = {
     val sweepAddressTxs = AVector(
-      SweepAddressTransaction(txId, hexString, model.minimalGas, model.defaultGasPrice)
+      SweepAddressTransaction(
+        txId,
+        hexString,
+        model.minimalGas,
+        model.nonCoinbaseMinGasPrice
+      )
     )
     simpleExample(BuildSweepAddressTransactionsResult(sweepAddressTxs, fromGroup = 2, toGroup = 1))
   }
@@ -490,7 +495,7 @@ trait EndpointsExamples extends ErrorExamples {
         AVector(publicKey),
         moreSettingsDestinations,
         Some(model.minimalGas),
-        Some(model.defaultGasPrice)
+        Some(model.nonCoinbaseMinGasPrice)
       )
     )
   )
@@ -625,7 +630,7 @@ trait EndpointsExamples extends ErrorExamples {
         Some(tokens),
         Some(bigAmount),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice)
+        Some(model.nonCoinbaseMinGasPrice)
       )
     )
   )
@@ -639,7 +644,7 @@ trait EndpointsExamples extends ErrorExamples {
         Some(Amount(model.dustUtxoAmount)),
         Some(tokens),
         Some(model.minimalGas),
-        Some(model.defaultGasPrice)
+        Some(model.nonCoinbaseMinGasPrice)
       )
     )
   )
@@ -651,7 +656,7 @@ trait EndpointsExamples extends ErrorExamples {
         toGroup = 2,
         unsignedTx = hexString,
         model.minimalGas,
-        model.defaultGasPrice,
+        model.nonCoinbaseMinGasPrice,
         txId = txId,
         contractAddress = Address.contract(contractId)
       )
@@ -664,7 +669,7 @@ trait EndpointsExamples extends ErrorExamples {
         toGroup = 2,
         unsignedTx = hexString,
         model.minimalGas,
-        model.defaultGasPrice,
+        model.nonCoinbaseMinGasPrice,
         txId = txId
       )
     )

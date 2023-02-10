@@ -74,12 +74,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
-      vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee
+      vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee,
+      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr
     )
     val lemanStatefulInstrs = AVector[LemanInstr[StatefulContext]](
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-      LoadMutFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
+      LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
       NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
       LoadImmField(0.toByte), LoadImmFieldByIndex
@@ -848,6 +849,79 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     testOp(U256SHR, _ shr _)
   }
 
+  trait ExpArithmeticInstrFixture extends StatelessInstrFixture {
+    val expGen: Gen[U256] = Gen.choose(0, 200).map(U256.unsafe)
+
+    def test[T <: Val](
+        instr: ExpInstr[T],
+        baseGen: Gen[T],
+        expGen: Gen[U256],
+        check: (T, U256) => Either[ExeFailure, T]
+    ) = {
+      forAll(baseGen, expGen) { case (base, exp) =>
+        stack.push(base)
+        stack.push(Val.U256(exp))
+
+        check(base, exp) match {
+          case Left(error) =>
+            instr.runWith(frame).leftValue is Right(error)
+            stack.pop(2)
+          case Right(result) =>
+            val initialGas = context.gasRemaining
+            instr.runWith(frame) isE ()
+
+            stack.size is 1
+            stack.top.get is result
+            initialGas.subUnsafe(context.gasRemaining) is instr.gas(exp.byteLength())
+
+            stack.pop()
+        }
+      }
+    }
+  }
+
+  it should "I256Exp" in new ExpArithmeticInstrFixture {
+    val baseGen: Gen[Val.I256] = Gen.choose(-200, 200).map(v => Val.I256(I256.from(v)))
+    test(
+      I256Exp,
+      baseGen,
+      expGen,
+      (base: Val.I256, e: U256) => {
+        val exp = e.toIntUnsafe
+        base.v
+          .pow(exp)
+          .map(v => Val.I256(v))
+          .toRight(ArithmeticError(s"Exp overflow: $base ** $exp"))
+      }
+    )
+  }
+
+  it should "U256Exp" in new ExpArithmeticInstrFixture {
+    val baseGen: Gen[Val.U256] = Gen.choose(0, 200).map(v => Val.U256(U256.unsafe(v)))
+    test(
+      U256Exp,
+      baseGen,
+      expGen,
+      (base: Val.U256, e: U256) => {
+        val exp = e.toIntUnsafe
+        base.v
+          .pow(exp)
+          .map(v => Val.U256(v))
+          .toRight(ArithmeticError(s"Exp overflow: $base ** $exp"))
+      }
+    )
+  }
+
+  it should "U256ModExp" in new ExpArithmeticInstrFixture {
+    val baseGen: Gen[Val.U256] = Gen.choose(0, 200).map(v => Val.U256(U256.unsafe(v)))
+    test(
+      U256ModExp,
+      baseGen,
+      expGen,
+      (base: Val.U256, e: U256) => Right(Val.U256(base.v.modPow(e.toIntUnsafe)))
+    )
+  }
+
   it should "I256ToU256" in new StatelessInstrFixture {
     val i256Gen: Gen[I256] = posLongGen.map(I256.from)
 
@@ -1435,7 +1509,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
       stack.push(Val.ByteVec(data))
       stack.push(Val.ByteVec(pubKey.bytes))
-      stack.push(Val.ByteVec(sign(dataGen.sample.get, priKey).bytes))
+      stack.push(Val.ByteVec(sign(data32Gen.sample.get, priKey).bytes))
       instr.runWith(frame).leftValue isE InvalidSignature
     }
   }
@@ -1446,6 +1520,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "VerifyED25519" in new GenericSignatureFixture {
     test(VerifyED25519, crypto.ED25519.generatePriPub(), crypto.ED25519.sign)
+  }
+
+  it should "VerifyBIP340Schnorr" in new GenericSignatureFixture {
+    test(VerifyBIP340Schnorr, crypto.BIP340Schnorr.generatePriPub(), crypto.BIP340Schnorr.sign)
   }
 
   it should "test EthEcRecover: succeed in execution" in new StatelessInstrFixture
@@ -1535,7 +1613,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   trait GasInstrFixture extends StatelessInstrFixture {
     val gasPriceGen = Gen
-      .choose[BigInteger](minimalGasPrice.value.v, ALPH.oneAlph.v)
+      .choose[BigInteger](coinbaseGasPrice.value.v, ALPH.oneAlph.v)
       .map(v => GasPrice(U256.unsafe(v)))
     val gasAmountGen = Gen.choose[Int](minimalGas.value, maximalGasPerTx.value).map(GasBox.unsafe)
     val txEnv = TxEnv.mockup(
@@ -1950,22 +2028,22 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     LoadMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex
   }
 
-  it should "StoreFieldByIndex" in new StatefulInstrFixture {
+  it should "StoreMutFieldByIndex" in new StatefulInstrFixture {
     stack.push(Val.False)
     stack.push(Val.U256(0))
-    runAndCheckGas(StoreFieldByIndex)
+    runAndCheckGas(StoreMutFieldByIndex)
     stack.size is 0
     frame.obj.getMutField(0) isE Val.False
 
     stack.push(Val.False)
     stack.push(Val.U256(1))
-    StoreFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex
+    StoreMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex
     stack.push(Val.False)
     stack.push(Val.U256(0xff))
-    StoreFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
+    StoreMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
     stack.push(Val.False)
     stack.push(Val.U256(0xff + 1))
-    StoreFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex
+    StoreMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex
   }
 
   it should "CallExternal(byte)" in new StatefulInstrFixture {
@@ -2237,8 +2315,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(Val.U256(timestamp))
     }
 
-    prepareStack(ALPH.oneAlph, ALPH.cent(1), 10000)
-    runAndCheckGas(LockApprovedAssets, Some(GasSchedule.txOutputBaseGas))
+    val validTimestamp = TimeStamp.now().plusHoursUnsafe(1)
+
+    prepareStack(ALPH.oneAlph, ALPH.cent(1), validTimestamp.millis)
+    runAndCheckGas(LockApprovedAssets, Some(GasSchedule.txOutputBaseGas.mulUnsafe(2)))
     frame.balanceStateOpt is Some(
       MutBalanceState.from {
         val balance = tokenBalance(assetAddress, tokenId, ALPH.cent(199))
@@ -2249,21 +2329,31 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     frame.ctx.outputBalances.all.isEmpty is true
     frame.ctx.generatedOutputs.head is
       TxOutput.asset(
-        ALPH.oneAlph,
+        dustUtxoAmount,
         assetAddress,
         AVector(tokenId -> ALPH.cent(1)),
-        TimeStamp.unsafe(10000)
+        validTimestamp
+      )
+    frame.ctx.generatedOutputs(1) is
+      TxOutput.asset(
+        ALPH.oneAlph - dustUtxoAmount,
+        assetAddress,
+        AVector.empty,
+        validTimestamp
       )
 
     prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, U256.MaxValue)
     LockApprovedAssets.runWith(frame).leftValue isE LockTimeOverflow
 
     // use up remaining approved assets
-    prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, 10000)
+    prepareStack(ALPH.oneAlph, ALPH.oneNanoAlph, validTimestamp.millis)
     LockApprovedAssets.runWith(frame) isE ()
 
-    prepareStack(ALPH.oneAlph, ALPH.alph(2), 10000)
+    prepareStack(ALPH.oneAlph, ALPH.alph(2), validTimestamp.millis)
     LockApprovedAssets.runWith(frame).leftValue isE NoAssetsApproved
+
+    prepareStack(ALPH.oneAlph, ALPH.alph(2), 0)
+    LockApprovedAssets.runWith(frame).leftValue isE InvalidLockTime
   }
 
   it should "TransferAlph" in new StatefulInstrFixture {
@@ -2551,8 +2641,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       }
       contractOutput.tokens.toSet is allTokens.toSet
       contractOutput.amount is attoAlphAmount
-      val contractRecord = frame.ctx.worldState.getContractCode(contractState.codeHash).rightValue
-      contractRecord.code.toContract() isE contract
+      val code = frame.ctx.worldState.getContractCode(contractState).rightValue
+      code.toContract() isE contract
     }
   }
 
@@ -3512,7 +3602,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6 -> 220, Log7 -> 240, Log8 -> 260, Log9 -> 280,
       ContractIdToAddress -> 5,
       LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2, AssertWithErrorCode -> 3, Swap -> 2,
-      vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0, TxGasPrice -> 2, TxGasAmount -> 2, TxGasFee -> 2
+      vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0, TxGasPrice -> 2, TxGasAmount -> 2, TxGasFee -> 2,
+      I256Exp -> 1610, U256Exp -> 1610, U256ModExp -> 1610, VerifyBIP340Schnorr -> 2000
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadMutField(byte) -> 3, StoreMutField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -3524,7 +3615,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MigrateSimple -> 32000, MigrateWithFields -> 32000, CopyCreateContractWithToken -> 24000,
       BurnToken -> 30, LockApprovedAssets -> 30,
       CreateSubContract -> 32000, CreateSubContractWithToken -> 32000, CopyCreateSubContract -> 24000, CopyCreateSubContractWithToken -> 24000,
-      LoadMutFieldByIndex -> 5, StoreFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
+      LoadMutFieldByIndex -> 5, StoreMutFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
       CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
       NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199, ALPHTokenId -> 2,
       LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5
@@ -3642,6 +3733,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress -> 119,
       LoadLocalByIndex -> 120, StoreLocalByIndex -> 121, Dup -> 122, AssertWithErrorCode -> 123, Swap -> 124,
       vm.BlockHash -> 125, DEBUG(AVector.empty) -> 126, TxGasPrice -> 127, TxGasAmount -> 128, TxGasFee -> 129,
+      I256Exp -> 130, U256Exp -> 131, U256ModExp -> 132, VerifyBIP340Schnorr -> 133,
       // stateful instructions
       LoadMutField(byte) -> 160, StoreMutField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -3652,7 +3744,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       MigrateSimple -> 186, MigrateWithFields -> 187, CopyCreateContractWithToken -> 188,
       BurnToken -> 189, LockApprovedAssets -> 190,
       CreateSubContract -> 191, CreateSubContractWithToken -> 192, CopyCreateSubContract -> 193, CopyCreateSubContractWithToken -> 194,
-      LoadMutFieldByIndex -> 195, StoreFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
+      LoadMutFieldByIndex -> 195, StoreMutFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
       CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
       NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204, ALPHTokenId -> 205,
       LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207
@@ -3700,7 +3792,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Log6, Log7, Log8, Log9,
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
-      vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee
+      vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee,
+      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadMutField(byte), StoreMutField(byte), CallExternal(byte),
@@ -3711,7 +3804,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       /* Below are instructions for Leman hard fork */
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
       CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-      LoadMutFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
+      LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
       NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
       LoadImmField(0.toByte), LoadImmFieldByIndex

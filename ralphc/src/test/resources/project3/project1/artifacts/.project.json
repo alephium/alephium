@@ -12,7 +12,7 @@
       "sourceFile": "add/add.ral",
       "sourceCodeHash": "6089a405f7c0596fb72ec2bd0cea578422be360371c4c5d3e5a72e1acb8d4751",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "a20cffb6f8f9416decd7aec0375b12e04475e8cf19ba80775f8f2d7633e2556d",
+      "codeHashDebug": "45e656eed4bb10a58632b9ee6b25f03cc729b33a32271040ddae258fa3759a63",
       "warnings": [
         "Function \"Add.addPrivate\" changes state, please use @using(updateFields = true) for the function"
       ]
@@ -21,7 +21,7 @@
       "sourceFile": "greeter/greeter.ral",
       "sourceCodeHash": "3cf9e5898ff728b03630bf457ef96cbd21d345e2256f30d2ce4f6a102de51b14",
       "bytecodeDebugPatch": "",
-      "codeHashDebug": "23a48462286d2c2ffc6d3a19192060dd42c178e7d331819e75e059c5be3c042f",
+      "codeHashDebug": "d8a1c2190c6c54f720608a4b264d1c648a9865e0744e942e489c87e64d4e596a",
       "warnings": [
         
       ]

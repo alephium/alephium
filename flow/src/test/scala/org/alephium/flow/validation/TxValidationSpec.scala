@@ -56,7 +56,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       prepareWorldState(preOutputs)
       for {
         chainIndex <- getChainIndex(tx)
-        _          <- checkStateless(chainIndex, tx, checkDoubleSpending = true, HardFork.Leman)
+        _ <- checkStateless(
+          chainIndex,
+          tx,
+          checkDoubleSpending = true,
+          HardFork.Leman,
+          isCoinbase = false
+        )
         _ <- checkStateful(
           chainIndex,
           tx,
@@ -95,7 +101,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           genesisPriKey.publicKey,
           outputs,
           None,
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           defaultUtxoLimit
         )
         .rightValue
@@ -112,7 +118,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           unlock,
           outputs.tail,
           None,
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           defaultUtxoLimit
         )
         .rightValue
@@ -162,7 +168,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       }
 
       def updateAttoAlphAmount(f: U256 => U256): Transaction = {
-        updateRandomFixedOutputs(output => output.copy(amount = f(output.amount)))
+        updateRandomFixedOutputsWithoutToken(output => output.copy(amount = f(output.amount)))
       }
 
       def zeroTokenAmount(): Transaction = {
@@ -187,7 +193,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
       def getTokenAmount(tokenId: TokenId): U256 = {
         tx.unsigned.fixedOutputs.fold(U256.Zero) { case (acc, output) =>
-          acc + output.tokens.filter(_._1 equals tokenId).map(_._2).reduce(_ + _)
+          output.tokens.view.filter(_._1 equals tokenId).map(_._2).fold(acc)(_ + _)
         }
       }
 
@@ -201,6 +207,14 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         tx.updateUnsigned(_.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew)))
       }
 
+      def updateRandomFixedOutputsWithoutToken(f: AssetOutput => AssetOutput): Transaction = {
+        val (output, index) = Random
+          .shuffle(tx.unsigned.fixedOutputs.view.zipWithIndex.filter(p => p._1.tokens.isEmpty))
+          .head
+        val outputNew = f(output)
+        tx.updateUnsigned(_.copy(fixedOutputs = tx.unsigned.fixedOutputs.replace(index, outputNew)))
+      }
+
       def updateRandomGeneratedOutputs(f: TxOutput => TxOutput): Transaction = {
         val (index, output) = tx.generatedOutputs.sampleWithIndex()
         val outputNew       = f(output)
@@ -208,8 +222,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
       }
 
       def updateRandomInputs(f: TxInput => TxInput): Transaction = {
-        val (index, input) = tx.unsigned.inputs.sampleWithIndex()
-        val inputNew       = f(input)
+        val (index, _) = tx.unsigned.inputs.sampleWithIndex()
+        updateInput(index, f)
+      }
+
+      def updateInput(index: Int, f: TxInput => TxInput): Transaction = {
+        val input    = tx.unsigned.inputs(index)
+        val inputNew = f(input)
         tx.updateUnsigned(_.copy(inputs = tx.unsigned.inputs.replace(index, inputNew)))
       }
 
@@ -337,7 +356,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "check empty outputs" in new Fixture {
-    forAll(transactionGenWithPreOutputs(1, 1)) { case (tx, preOutputs) =>
+    forAll(transactionGenWithPreOutputs(2, 1)) { case (tx, preOutputs) =>
       implicit val validator =
         nestedValidator(checkOutputNum(_, tx.chainIndex.isIntraGroup), preOutputs)
 
@@ -398,10 +417,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
   }
 
-  it should "check gas bounds" in new Fixture {
-    implicit val validator = checkGasBound(_)
+  it should "check gas bounds deprecated" in new Fixture {
+    val (isCoinbase, hardfork) =
+      AVector(true -> HardFork.Mainnet, true -> HardFork.Leman, false -> HardFork.Mainnet).sample()
 
-    val tx = transactionGen(1, 1).sample.value
+    implicit val validator = checkGasBound(_, isCoinbase, hardfork)
+
+    val tx = transactionGen(2, 1).sample.value
     tx.pass()
 
     tx.gasAmount(GasBox.unsafeTest(-1)).fail(InvalidStartGas)
@@ -412,8 +434,29 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     tx.gasAmount(maximalGasPerTx.addUnsafe(1)).fail(InvalidStartGas)
 
     tx.gasPrice(GasPrice(0)).fail(InvalidGasPrice)
-    tx.gasPrice(minimalGasPrice).pass()
-    tx.gasPrice(GasPrice(minimalGasPrice.value - 1)).fail(InvalidGasPrice)
+    tx.gasPrice(coinbaseGasPrice).pass()
+    tx.gasPrice(GasPrice(coinbaseGasPrice.value - 1)).fail(InvalidGasPrice)
+    tx.gasPrice(GasPrice(ALPH.MaxALPHValue - 1)).pass()
+    tx.gasPrice(GasPrice(ALPH.MaxALPHValue)).fail(InvalidGasPrice)
+  }
+
+  it should "check gas bounds for non-coinbase" in new Fixture {
+    implicit val validator = checkGasBound(_, isCoinbase = false, HardFork.Leman)
+
+    val tx = transactionGen(2, 1).sample.value
+    tx.pass()
+
+    tx.gasAmount(GasBox.unsafeTest(-1)).fail(InvalidStartGas)
+    tx.gasAmount(GasBox.unsafeTest(0)).fail(InvalidStartGas)
+    tx.gasAmount(minimalGas).pass()
+    tx.gasAmount(minimalGas.use(1).rightValue).fail(InvalidStartGas)
+    tx.gasAmount(maximalGasPerTx).pass()
+    tx.gasAmount(maximalGasPerTx.addUnsafe(1)).fail(InvalidStartGas)
+
+    tx.gasPrice(GasPrice(0)).fail(InvalidGasPrice)
+    tx.gasPrice(coinbaseGasPrice).fail(InvalidGasPrice)
+    tx.gasPrice(nonCoinbaseMinGasPrice).pass()
+    tx.gasPrice(GasPrice(nonCoinbaseMinGasPrice.value - 1)).fail(InvalidGasPrice)
     tx.gasPrice(GasPrice(ALPH.MaxALPHValue - 1)).pass()
     tx.gasPrice(GasPrice(ALPH.MaxALPHValue)).fail(InvalidGasPrice)
   }
@@ -457,13 +500,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     }
   }
 
-  it should "check the number of tokens for outputs" in new Fixture {
+  it should "check the number of tokens for asset outputs" in new Fixture {
     {
       info("Leman hardfork")
       implicit val validator = checkOutputStats(_, HardFork.Leman)
 
-      forAll(transactionGen(numTokensGen = maxTokenPerUtxo + 1))(_.fail(InvalidOutputStats))
-      forAll(transactionGen(numTokensGen = maxTokenPerUtxo))(_.pass())
+      forAll(transactionGen(numTokensGen = maxTokenPerAssetUtxo + 1))(_.fail(InvalidOutputStats))
+      forAll(transactionGen(numTokensGen = maxTokenPerAssetUtxo))(_.pass())
     }
 
     {
@@ -474,6 +517,36 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         _.fail(InvalidOutputStats)
       )
       forAll(transactionGen(numTokensGen = deprecatedMaxTokenPerUtxo))(_.pass())
+    }
+  }
+
+  it should "check the number of tokens for contract outputs" in new Fixture {
+    val tx = transactionGen().sample.get
+
+    def update(tokenPerContract: Int): Transaction = {
+      val contractOutput =
+        contractOutputGen(
+          _tokensGen = tokensGen(1, tokenPerContract),
+          scriptGen = LockupScript.P2C(ContractId.zero)
+        ).sample.get
+      tx.copy(generatedOutputs = AVector(contractOutput))
+    }
+
+    {
+      info("Leman hardfork")
+      implicit val validator = checkOutputStats(_, HardFork.Leman)
+
+      update(maxTokenPerContractUtxo + 1).fail(InvalidOutputStats)
+      update(maxTokenPerContractUtxo).pass()
+    }
+
+    {
+      info("Pre-Leman hardfork")
+      implicit val validator = checkOutputStats(_, HardFork.Mainnet)
+
+      update(deprecatedMaxTokenPerUtxo + 1).fail(InvalidOutputStats)
+      update(maxTokenPerContractUtxo + 1).pass()
+      update(deprecatedMaxTokenPerUtxo).pass()
     }
   }
 
@@ -649,10 +722,9 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           preOutputs
         )
 
-        whenever(tx.unsigned.fixedOutputs.length >= 2) { // only able to overflow 2 outputs
-          val tokenId     = tx.sampleToken()
-          val tokenAmount = tx.getTokenAmount(tokenId)
-
+        val tokenId     = tx.sampleToken()
+        val tokenAmount = tx.getTokenAmount(tokenId)
+        whenever(tx.unsigned.fixedOutputs.view.count(_.tokens.exists(_._1 == tokenId)) >= 2) { // only able to overflow 2 outputs
           tx.modifyTokenAmount(tokenId, U256.MaxValue - tokenAmount + 1 + _).fail(BalanceOverFlow)
         }
     }
@@ -720,13 +792,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
 
   it should "validate witnesses" in new Fixture {
     import ModelGenerators.ScriptPair
-    forAll(transactionGenWithPreOutputs(1, 1)) { case (tx, preOutputs) =>
+    forAll(transactionGenWithPreOutputs(2, 1)) { case (tx, preOutputs) =>
       val inputsState              = preOutputs.map(_.referredOutput).as[TxOutput]
       val ScriptPair(_, unlock, _) = p2pkScriptGen(GroupIndex.unsafe(1)).sample.get
 
       implicit val validator = nestedValidator(checkWitnesses(_, inputsState), preOutputs)
 
-      tx.updateRandomInputs(_.copy(unlockScript = unlock)).fail(InvalidPublicKeyHash)
+      tx.updateInput(0, _.copy(unlockScript = unlock)).fail(InvalidPublicKeyHash)
 
       val (sampleIndex, _) = tx.inputSignatures.sampleWithIndex()
       val signaturesNew    = tx.inputSignatures.replace(sampleIndex, Signature.generate)

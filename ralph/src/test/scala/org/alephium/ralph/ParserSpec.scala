@@ -43,6 +43,18 @@ class ParserSpec extends AlephiumSpec {
         ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y")))),
         ParenExpr(Binop(Add, Variable(Ident("x")), Variable(Ident("y"))))
       )
+    fastparse.parse("x * y ** z + u", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](
+        Add,
+        Binop(Mul, Variable(Ident("x")), Binop(Exp, Variable(Ident("y")), Variable(Ident("z")))),
+        Variable(Ident("u"))
+      )
+    fastparse.parse("x / y |**| z + u", StatelessParser.expr(_)).get.value is
+      Binop[StatelessContext](
+        Add,
+        Binop(Div, Variable(Ident("x")), Binop(ModExp, Variable(Ident("y")), Variable(Ident("z")))),
+        Variable(Ident("u"))
+      )
     fastparse.parse("x + y * z + u", StatelessParser.expr(_)).get.value is
       Binop[StatelessContext](
         Add,

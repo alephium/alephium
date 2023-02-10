@@ -384,7 +384,9 @@ class BlockFlowSpec extends AlephiumSpec {
       consensusConfig.emission.lowHashRateInitialRewardPerChain,
       consensusConfig.emission.stableMaxRewardPerChain
     ).min
-    (block.coinbase.attoAlphAmountInOutputs.get > minimalReward.subUnsafe(defaultGasFee)) is true
+    (block.coinbase.attoAlphAmountInOutputs.get > minimalReward.subUnsafe(
+      nonCoinbaseMinGasFee
+    )) is true
   }
 
   it should "reduce target gradually and reach a stable target eventually" in new FlowFixture {
@@ -428,7 +430,7 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block, 1)
 
     val pubScript = block.nonCoinbase.head.unsigned.fixedOutputs.head.lockupScript
-    checkBalance(blockFlow, pubScript, ALPH.alph(1) - defaultGasFee)
+    checkBalance(blockFlow, pubScript, ALPH.alph(1) - nonCoinbaseMinGasFee)
     checkBalance(blockFlow, testGroup, genesisBalance - ALPH.alph(1))
   }
 
@@ -467,12 +469,12 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow0, fromGroupBlock, 2)
     addAndCheck(blockFlow1, fromGroupBlock.header, 2)
     checkBalance(blockFlow0, fromGroup, genesisBalance - ALPH.alph(1))
-    checkBalance(blockFlow1, pubScript, ALPH.alph(1) - defaultGasFee)
+    checkBalance(blockFlow1, pubScript, ALPH.alph(1) - nonCoinbaseMinGasFee)
 
     val toGroupBlock = emptyBlock(blockFlow1, ChainIndex.unsafe(toGroup, toGroup))
     addAndCheck(blockFlow1, toGroupBlock, 3)
     addAndCheck(blockFlow0, toGroupBlock.header, 3)
-    checkBalance(blockFlow1, pubScript, ALPH.alph(1) - defaultGasFee)
+    checkBalance(blockFlow1, pubScript, ALPH.alph(1) - nonCoinbaseMinGasFee)
 
     fromGroup isnot toGroup
     val newBlock = emptyBlock(blockFlow0, ChainIndex.unsafe(fromGroup, toGroup))
@@ -567,7 +569,7 @@ class BlockFlowSpec extends AlephiumSpec {
             lockTimeOpt,
             ALPH.alph(1),
             None,
-            defaultGasPrice,
+            nonCoinbaseMinGasPrice,
             defaultUtxoLimit
           )
           .rightValue
@@ -589,7 +591,7 @@ class BlockFlowSpec extends AlephiumSpec {
     val toPrivateKey   = keyManager(toLockupScript)
 
     addAndCheck(blockFlow, block)
-    val lockedBalance = ALPH.alph(1) - defaultGasFee
+    val lockedBalance = ALPH.alph(1) - nonCoinbaseMinGasFee
     blockFlow.getBalance(toLockupScript, Int.MaxValue) is Right(
       (
         lockedBalance,
@@ -607,7 +609,7 @@ class BlockFlowSpec extends AlephiumSpec {
         None,
         dustUtxoAmount,
         None,
-        defaultGasPrice,
+        nonCoinbaseMinGasPrice,
         defaultUtxoLimit
       )
       .rightValue
@@ -621,7 +623,7 @@ class BlockFlowSpec extends AlephiumSpec {
           None,
           dustUtxoAmount,
           None,
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           defaultUtxoLimit
         )
         .rightValue
@@ -652,7 +654,7 @@ class BlockFlowSpec extends AlephiumSpec {
           None,
           ALPH.oneAlph,
           None,
-          defaultGasPrice,
+          nonCoinbaseMinGasPrice,
           defaultUtxoLimit
         )
         .rightValue
@@ -663,7 +665,7 @@ class BlockFlowSpec extends AlephiumSpec {
       theGrandPool.add(chainIndex, tx, TimeStamp.now())
       theMemPool.contains(tx.id) is true
 
-      val balance = initialAmount - (ALPH.oneAlph + defaultGasFee).mulUnsafe(txCount)
+      val balance = initialAmount - (ALPH.oneAlph + nonCoinbaseMinGasFee).mulUnsafe(txCount)
       blockFlow
         .getBalance(fromLockup, Int.MaxValue)
         .rightValue is ((

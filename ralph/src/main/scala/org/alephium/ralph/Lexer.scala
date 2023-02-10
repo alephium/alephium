@@ -166,6 +166,8 @@ object Lexer {
   def opAdd[Unknown: P]: P[Operator]        = P("+").map(_ => Add)
   def opSub[Unknown: P]: P[Operator]        = P("-").map(_ => Sub)
   def opMul[Unknown: P]: P[Operator]        = P("*").map(_ => Mul)
+  def opExp[Unknown: P]: P[Operator]        = P("**").map(_ => Exp)
+  def opModExp[Unknown: P]: P[Operator]     = P("|**|").map(_ => ModExp)
   def opDiv[Unknown: P]: P[Operator]        = P("/").map(_ => Div)
   def opMod[Unknown: P]: P[Operator]        = P("%").map(_ => Mod)
   def opModAdd[Unknown: P]: P[Operator]     = P("⊕" | "|+|").map(_ => ModAdd)

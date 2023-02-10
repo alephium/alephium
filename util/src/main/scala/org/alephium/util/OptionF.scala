@@ -14,16 +14,22 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm
+package org.alephium.util
 
-import org.alephium.protocol.model._
-import org.alephium.util.AlephiumSpec
-
-class GasBoxSpec extends AlephiumSpec {
-  it should "validate gas bound" in {
-    GasBox.validate(minimalGas) is true
-    GasBox.validate(GasBox.unsafe(minimalGas.value - 1)) is false
-    GasBox.validate(maximalGasPerTx) is true
-    GasBox.validate(GasBox.unsafe(maximalGasPerTx.value + 1)) is false
+object OptionF {
+  // scalastyle:off return
+  def fold[E, R](elems: IterableOnce[E], zero: R)(
+      op: (R, E) => Option[R]
+  ): Option[R] = {
+    var result   = zero
+    val iterator = elems.iterator
+    while (iterator.hasNext) {
+      op(result, iterator.next()) match {
+        case None    => return None
+        case Some(r) => result = r
+      }
+    }
+    Some(result)
   }
+  // scalastyle:on return
 }

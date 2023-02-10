@@ -136,7 +136,7 @@ class BlockValidationSpec extends AlephiumSpec {
     block.Coinbase.unsignedTx(_.copy(gasAmount = GasBox.from(0).value)).fail()
 
     info("gasPrice")
-    block.Coinbase.unsignedTx(_.copy(gasPrice = minimalGasPrice)).pass()
+    block.Coinbase.unsignedTx(_.copy(gasPrice = coinbaseGasPrice)).pass()
     block.Coinbase.unsignedTx(_.copy(gasPrice = GasPrice(U256.Zero))).fail()
 
     info("output length")
@@ -284,9 +284,9 @@ class BlockValidationSpec extends AlephiumSpec {
 
     val block = transfer(blockFlow, chainIndex)
     val low   = block.nonCoinbase.head
-    low.unsigned.gasPrice is defaultGasPrice
+    low.unsigned.gasPrice is nonCoinbaseMinGasPrice
 
-    val higherGas = GasPrice(defaultGasPrice.value + 1)
+    val higherGas = GasPrice(nonCoinbaseMinGasPrice.value + 1)
     val high      = low.copy(unsigned = low.unsigned.copy(gasPrice = higherGas))
 
     block.copy(transactions = AVector(high, low, low)).pass()

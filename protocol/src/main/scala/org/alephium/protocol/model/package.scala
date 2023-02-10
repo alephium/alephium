@@ -27,16 +27,15 @@ package object model {
   val cliqueIdLength: Int = PublicKey.length
 
   // scalastyle:off magic.number
-  val minimalGas: GasBox        = GasBox.unsafe(20000)
-  val minimalGasPrice: GasPrice = GasPrice(ALPH.nanoAlph(1))
-  val minimalGasFee: U256       = minimalGasPrice * minimalGas
+  val minimalGas: GasBox         = GasBox.unsafe(20000)
+  val coinbaseGasPrice: GasPrice = GasPrice(ALPH.nanoAlph(1))
+  val coinbaseGasFee: U256       = coinbaseGasPrice * minimalGas
 
   val defaultGasPerInput: GasBox  = GasBox.unsafe(2500)
   val defaultGasPerOutput: GasBox = GasBox.unsafe(6000)
 
-  val defaultGas: GasBox        = minimalGas
-  val defaultGasPrice: GasPrice = GasPrice(ALPH.nanoAlph(100))
-  val defaultGasFee: U256       = defaultGasPrice * defaultGas
+  val nonCoinbaseMinGasPrice: GasPrice = GasPrice(ALPH.nanoAlph(100))
+  val nonCoinbaseMinGasFee: U256       = nonCoinbaseMinGasPrice * minimalGas
 
   val maximalTxsInOneBlock: Int  = 2000
   val maximalGasPerBlock: GasBox = GasBox.unsafe(minimalGas.value * maximalTxsInOneBlock)
@@ -48,14 +47,11 @@ package object model {
 
   val dustUtxoAmount: U256           = ALPH.nanoAlph(1000000)
   val deprecatedDustUtxoAmount: U256 = ALPH.nanoAlph(1000)
-  val maxTokenPerUtxo: Int           = 4
+  val maxTokenPerContractUtxo: Int   = 8
+  val maxTokenPerAssetUtxo: Int      = 1
   val deprecatedMaxTokenPerUtxo: Int = 64
 
   val minimalAlphInContract: U256 = ALPH.oneAlph
-
-  def minimalAttoAlphAmountPerTxOutput(tokenNum: Int): U256 = {
-    ALPH.nanoAlph(100 * tokenNum.toLong).addUnsafe(dustUtxoAmount)
-  }
 
   implicit val hashOrdering: Ordering[Hash] = Ordering.by(_.bytes)
   // scalastyle:on magic.number

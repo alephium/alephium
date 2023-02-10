@@ -89,29 +89,30 @@ abstract class Parser[Ctx <: StatelessContext] {
   def expr[Unknown: P]: P[Ast.Expr[Ctx]]    = P(chain(andExpr, Lexer.opOr))
   def andExpr[Unknown: P]: P[Ast.Expr[Ctx]] = P(chain(relationExpr, Lexer.opAnd))
   def relationExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(arithExpr5 ~ comparison.?).flatMap {
-      case (lhs, Some(op)) => arithExpr5.map(rhs => Ast.Binop(op, lhs, rhs))
+    P(arithExpr6 ~ comparison.?).flatMap {
+      case (lhs, Some(op)) => arithExpr6.map(rhs => Ast.Binop(op, lhs, rhs))
       case (lhs, None)     => Pass(lhs)
     }
   def comparison[Unknown: P]: P[TestOperator] =
     P(Lexer.opEq | Lexer.opNe | Lexer.opLe | Lexer.opLt | Lexer.opGe | Lexer.opGt)
+  def arithExpr6[Unknown: P]: P[Ast.Expr[Ctx]] =
+    P(chain(arithExpr5, Lexer.opBitOr))
   def arithExpr5[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(chain(arithExpr4, Lexer.opBitOr))
+    P(chain(arithExpr4, Lexer.opXor))
   def arithExpr4[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(chain(arithExpr3, Lexer.opXor))
+    P(chain(arithExpr3, Lexer.opBitAnd))
   def arithExpr3[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(chain(arithExpr2, Lexer.opBitAnd))
+    P(chain(arithExpr2, Lexer.opSHL | Lexer.opSHR))
   def arithExpr2[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(chain(arithExpr1, Lexer.opSHL | Lexer.opSHR))
-  def arithExpr1[Unknown: P]: P[Ast.Expr[Ctx]] =
     P(
       chain(
-        arithExpr0,
+        arithExpr1,
         Lexer.opByteVecAdd | Lexer.opAdd | Lexer.opSub | Lexer.opModAdd | Lexer.opModSub
       )
     )
-  def arithExpr0[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(chain(unaryExpr, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
+  def arithExpr1[Unknown: P]: P[Ast.Expr[Ctx]] =
+    P(chain(arithExpr0, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
+  def arithExpr0[Unknown: P]: P[Ast.Expr[Ctx]] = P(chain(unaryExpr, Lexer.opExp | Lexer.opModExp))
   def unaryExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
     P(arrayElementOrAtom | (Lexer.opNot ~ arrayElementOrAtom).map { case (op, expr) =>
       Ast.UnaryOp.apply[Ctx](op, expr)

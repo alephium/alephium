@@ -465,7 +465,7 @@ final case class StatefulContractObject private (
     codeHash: Hash,
     code: StatefulContract.HalfDecoded,
     initialStateHash: Hash,         // the state hash when the contract is created
-    initialMutFields: AVector[Val], // the initial field values when the contract is loaded
+    initialMutFields: AVector[Val], // the initial mutable field values when the contract is loaded
     immFields: AVector[Val],
     mutFields: mutable.ArraySeq[Val],
     contractId: ContractId

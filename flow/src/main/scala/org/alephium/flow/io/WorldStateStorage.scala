@@ -23,12 +23,12 @@ import org.alephium.io._
 import org.alephium.io.RocksDBSource.{ColumnFamily, Settings}
 import org.alephium.protocol.Hash
 import org.alephium.protocol.model.BlockHash
-import org.alephium.protocol.vm.{ContractImmutableState, WorldState}
+import org.alephium.protocol.vm.{ContractStorageImmutableState, WorldState}
 import org.alephium.protocol.vm.event.LogStorage
 
 trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
   val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node]
-  val trieImmutableStateStorage: KeyValueStorage[Hash, ContractImmutableState]
+  val trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState]
   val logStorage: LogStorage
 
   override def storageKey(key: BlockHash): ByteString =
@@ -54,7 +54,7 @@ trait WorldStateStorage extends KeyValueStorage[BlockHash, WorldState.Hashes] {
 object WorldStateRockDBStorage {
   def apply(
       trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-      trieImmutableStateStorage: KeyValueStorage[Hash, ContractImmutableState],
+      trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
       logStorage: LogStorage,
       storage: RocksDBSource,
       cf: ColumnFamily,
@@ -74,7 +74,7 @@ object WorldStateRockDBStorage {
 
 class WorldStateRockDBStorage(
     val trieStorage: KeyValueStorage[Hash, SparseMerkleTrie.Node],
-    val trieImmutableStateStorage: KeyValueStorage[Hash, ContractImmutableState],
+    val trieImmutableStateStorage: KeyValueStorage[Hash, ContractStorageImmutableState],
     val logStorage: LogStorage,
     storage: RocksDBSource,
     cf: ColumnFamily,

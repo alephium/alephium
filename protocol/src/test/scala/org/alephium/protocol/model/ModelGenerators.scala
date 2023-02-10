@@ -18,7 +18,7 @@ package org.alephium.protocol.model
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.util.Sorting
+import scala.util.{Random, Sorting}
 
 import akka.util.ByteString
 import org.scalacheck.Arbitrary._
@@ -234,16 +234,23 @@ trait TokenGenerators extends Generators with NumericHelpers {
     AVector.tabulate(num)(i => pivots(i + 1) - pivots(i) + minAmount)
   }
   def split(balances: Balances, outputNum: Int): AVector[Balances] = {
-    val alphSplits = split(balances.attoAlphAmount, minAmount, outputNum)
+    val outputWithTokenNum = if (balances.tokens.isEmpty) 0 else Random.between(1, outputNum)
     val tokenSplits = balances.tokens.map { case (tokenId, amount) =>
-      tokenId -> split(amount, 0, outputNum)
+      tokenId -> split(amount, 0, outputWithTokenNum)
     }
-    AVector.tabulate(outputNum) { index =>
+    val tokenBalances = AVector.tabulate(outputWithTokenNum) { index =>
       val tokens = tokenSplits.map { case (tokenId, amounts) =>
         tokenId -> amounts(index)
       }
-      Balances(alphSplits(index), tokens)
+      Balances(dustUtxoAmount, tokens)
     }
+    val alphOutputNum = outputNum - outputWithTokenNum
+    val alphToSplit =
+      balances.attoAlphAmount.subUnsafe(dustUtxoAmount.mulUnsafe(outputWithTokenNum))
+    val alphBalances = split(alphToSplit, minAmount, alphOutputNum).map { alphAmount =>
+      Balances(alphAmount, Map.empty)
+    }
+    (tokenBalances ++ alphBalances).shuffle()
   }
 }
 
@@ -353,7 +360,7 @@ trait TxGenerators
       val inputs         = assets.map(_.txInput)
       val outputsToSpend = assets.map[TxOutput](_.referredOutput)
       val gas            = math.max(minimalGas.value, inputs.length * 20000)
-      val attoAlphAmount = outputsToSpend.map(_.amount).reduce(_ + _) - defaultGasPrice * gas
+      val attoAlphAmount = outputsToSpend.map(_.amount).reduce(_ + _) - nonCoinbaseMinGasPrice * gas
       val tokenTable = {
         val tokens = mutable.Map.empty[TokenId, U256]
         assets.foreach(_.referredOutput.tokens.foreach { case (tokenId, amount) =>
@@ -377,7 +384,7 @@ trait TxGenerators
           }
         balance.toOutput(lockupScript, lockTime, dataGen.sample.get)
       }
-      UnsignedTransaction(None, gas, defaultGasPrice, inputs, outputs)(networkConfig)
+      UnsignedTransaction(None, gas, nonCoinbaseMinGasPrice, inputs, outputs)(networkConfig)
     }
 
   def balancesGen(inputNum: Int, tokensNumGen: Gen[Int]): Gen[Balances] =
@@ -387,7 +394,7 @@ trait TxGenerators
     } yield Balances(attoAlphAmount, tokens)
 
   def assetsToSpendGen(
-      inputsNumGen: Gen[Int] = Gen.choose(1, 10),
+      inputsNumGen: Gen[Int] = Gen.choose(2, 10),
       tokensNumGen: Gen[Int] = Gen.choose(0, 10),
       scriptGen: Gen[ScriptPair],
       lockTimeGen: Gen[TimeStamp] = Gen.const(TimeStamp.zero)
@@ -403,8 +410,8 @@ trait TxGenerators
     } yield AVector.from(inputs)
 
   def transactionGenWithPreOutputs(
-      inputsNumGen: Gen[Int] = Gen.choose(1, 10),
-      tokensNumGen: Gen[Int] = Gen.choose(0, maxTokenPerUtxo),
+      inputsNumGen: Gen[Int] = Gen.choose(2, 10),
+      tokensNumGen: Gen[Int] = Gen.choose(0, maxTokenPerAssetUtxo),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
       lockupGen: IndexLockupScriptGen = assetLockupGen,
@@ -428,7 +435,7 @@ trait TxGenerators
 
   def transactionGenWithCompressedUnlockScripts(
       unlockScriptsNumGen: Gen[Int] = Gen.choose(1, 4),
-      inputsNumGen: Gen[Int] = Gen.choose(1, 4),
+      inputsNumGen: Gen[Int] = Gen.choose(2, 4),
       tokensNumGen: Gen[Int] = Gen.const(0),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
@@ -466,8 +473,8 @@ trait TxGenerators
   }
 
   def transactionGen(
-      numInputsGen: Gen[Int] = Gen.choose(1, 10),
-      numTokensGen: Gen[Int] = Gen.choose(0, maxTokenPerUtxo),
+      numInputsGen: Gen[Int] = Gen.choose(2, 10),
+      numTokensGen: Gen[Int] = Gen.choose(0, maxTokenPerAssetUtxo),
       chainIndexGen: Gen[ChainIndex] = chainIndexGen,
       scriptGen: IndexScriptPairGen = p2pkScriptGen,
       lockupGen: IndexLockupScriptGen = assetLockupGen

@@ -18,13 +18,15 @@ package org.alephium.protocol.vm
 
 import scala.collection.mutable
 
+import org.scalatest.Assertion
+
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{GroupConfig, NetworkConfigFixture}
-import org.alephium.protocol.model.{TokenId, TxGenerators, TxOutput}
+import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, U256}
 import org.alephium.util.Bytes.byteStringOrdering
 
-class MutMutBalancesPerLockupSpec extends AlephiumSpec {
+class MutBalancesPerLockupSpec extends AlephiumSpec {
 
   it should "tokenVector" in new Fixture {
     val tokens = mutable.Map(tokenId -> ALPH.oneAlph)
@@ -170,22 +172,114 @@ class MutMutBalancesPerLockupSpec extends AlephiumSpec {
     ) is None
   }
 
-  it should "toTxOutput" in new Fixture {
-    val tokens = mutable.Map(tokenId -> ALPH.oneAlph)
+  trait ToTxOutputFixture extends Fixture {
+    import org.alephium.protocol.model.TokenId.tokenIdOrder
 
     val lockupScript = lockupScriptGen.sample.get
+    val tokens       = AVector.fill(maxTokenPerContractUtxo + 1)(TokenId.generate).sorted
+    val tokenId0     = tokens(0)
+    val tokenId1     = tokens(1)
 
-    MutBalancesPerLockup(ALPH.oneAlph, tokens, 1).toTxOutput(lockupScript) is Right(
-      Some(TxOutput.from(ALPH.oneAlph, AVector.from(tokens), lockupScript))
+    case class Test(alphAmount: U256, tokens: (TokenId, U256)*) {
+      lazy val genesisOutputs = MutBalancesPerLockup(alphAmount, mutable.Map.from(tokens), 1)
+        .toTxOutput(lockupScript, HardFork.Mainnet)
+
+      lazy val lemanOutputs = MutBalancesPerLockup(alphAmount, mutable.Map.from(tokens), 1)
+        .toTxOutput(lockupScript, HardFork.Leman)
+
+      def expectGenesis(outputs: (U256, Seq[(TokenId, U256)])*): Assertion = {
+        genesisOutputs isE AVector.from(outputs).map { case (amount, tokens) =>
+          TxOutput.fromDeprecated(amount, AVector.from(tokens), lockupScript)
+        }
+      }
+
+      def failGenesis(): Assertion = {
+        genesisOutputs is failed(InvalidOutputBalances)
+      }
+
+      def expectLeman(outputs: (U256, Seq[(TokenId, U256)])*): Assertion = {
+        lemanOutputs isE AVector.from(outputs).map { case (amount, tokens) =>
+          TxOutput.fromDeprecated(amount, AVector.from(tokens), lockupScript)
+        }
+      }
+
+      def failLeman(error: ExeFailure = InvalidOutputBalances): Assertion = {
+        lemanOutputs is failed(error)
+      }
+    }
+  }
+
+  it should "toTxOutput for Genesis fork" in new ToTxOutputFixture {
+    Test(0).expectGenesis()
+    Test(ALPH.oneAlph, tokenId -> 1).expectGenesis(
+      ALPH.oneAlph -> Seq(tokenId -> 1)
     )
-    MutBalancesPerLockup(ALPH.oneAlph, mutable.Map.empty, 1).toTxOutput(lockupScript) is Right(
-      Some(TxOutput.from(ALPH.oneAlph, AVector.empty, lockupScript))
+    Test(ALPH.oneAlph, tokenId0 -> 1, tokenId1 -> 2).expectGenesis(
+      ALPH.oneAlph -> Seq(tokenId0 -> 1, tokenId1 -> 2)
     )
-    MutBalancesPerLockup(U256.Zero, mutable.Map.empty, 1).toTxOutput(lockupScript) is Right(None)
-    MutBalancesPerLockup(U256.Zero, tokens, 1).toTxOutput(lockupScript) is Left(
-      Right(InvalidOutputBalances)
+    Test(ALPH.oneAlph).expectGenesis(ALPH.oneAlph -> Seq.empty)
+    Test(0, tokenId -> 1).failGenesis()
+  }
+
+  it should "toTxOutput for Leman fork + asset lockup script" in new ToTxOutputFixture {
+    override val lockupScript = assetLockupGen(GroupIndex.unsafe(0)).sample.get
+
+    Test(0).expectLeman()
+    Test(dustUtxoAmount - 1).failLeman()
+    Test(dustUtxoAmount).expectLeman(dustUtxoAmount -> Seq.empty)
+    Test(ALPH.oneAlph).expectLeman(ALPH.oneAlph     -> Seq.empty)
+
+    Test(0, tokenId -> 1).failLeman()
+    Test(dustUtxoAmount - 1, tokenId -> 1).failLeman()
+    Test(dustUtxoAmount, tokenId -> 1).expectLeman(
+      dustUtxoAmount -> Seq(tokenId -> 1)
     )
-    MutBalancesPerLockup(U256.Zero, mutable.Map.empty, 1).toTxOutput(lockupScript) is Right(None)
+    Test(dustUtxoAmount * 2 - 1, tokenId -> 1).failLeman()
+    Test(dustUtxoAmount * 2, tokenId -> 1).expectLeman(
+      dustUtxoAmount -> Seq(tokenId -> 1),
+      dustUtxoAmount -> Seq.empty
+    )
+    Test(ALPH.oneAlph, tokenId -> 1).expectLeman(
+      dustUtxoAmount                         -> Seq(tokenId -> 1),
+      ALPH.oneAlph.subUnsafe(dustUtxoAmount) -> Seq.empty
+    )
+
+    Test(0, tokenId0 -> 1, tokenId1 -> 2).failLeman()
+    Test(dustUtxoAmount * 2 - 1, tokenId0 -> 1, tokenId1 -> 2).failLeman()
+    Test(dustUtxoAmount * 2, tokenId0 -> 1, tokenId1 -> 2).expectLeman(
+      dustUtxoAmount -> Seq(tokenId0 -> 1),
+      dustUtxoAmount -> Seq(tokenId1 -> 2)
+    )
+    Test(dustUtxoAmount * 3 - 1, tokenId0 -> 1, tokenId1 -> 2).failLeman()
+    Test(dustUtxoAmount * 3, tokenId0 -> 1, tokenId1 -> 2).expectLeman(
+      dustUtxoAmount -> Seq(tokenId0 -> 1),
+      dustUtxoAmount -> Seq(tokenId1 -> 2),
+      dustUtxoAmount -> Seq.empty
+    )
+    Test(ALPH.oneAlph, tokenId0 -> 1, tokenId1 -> 2).expectLeman(
+      dustUtxoAmount                             -> Seq(tokenId0 -> 1),
+      dustUtxoAmount                             -> Seq(tokenId1 -> 2),
+      ALPH.oneAlph.subUnsafe(dustUtxoAmount * 2) -> Seq.empty
+    )
+  }
+
+  it should "toTxOutput for Leman fork + contract lockup script" in new ToTxOutputFixture {
+    override val lockupScript = LockupScript.p2c(ContractId.generate)
+
+    Test(0).expectLeman()
+    Test(ALPH.oneAlph - 1).failLeman()
+    Test(ALPH.oneAlph).expectLeman(ALPH.oneAlph -> Seq.empty)
+
+    Test(0, tokenId -> 1).failLeman()
+    Test(ALPH.oneAlph - 1, tokenId -> 1).failLeman()
+    Test(ALPH.oneAlph, tokenId -> 1).expectLeman(
+      ALPH.oneAlph -> Seq(tokenId -> 1)
+    )
+    Test(ALPH.oneAlph, tokens.init.map(_ -> U256.One).toSeq: _*).expectLeman(
+      ALPH.oneAlph -> tokens.init.map(_ -> U256.One).toSeq
+    )
+    Test(ALPH.oneAlph, tokens.map(_ -> U256.One).toSeq: _*)
+      .failLeman(InvalidTokenNumForContractOutput)
   }
 
   trait Fixture extends TxGenerators with NetworkConfigFixture.Default {

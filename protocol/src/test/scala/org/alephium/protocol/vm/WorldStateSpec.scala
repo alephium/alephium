@@ -42,6 +42,25 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     )
   }
 
+  def checkCode[T, R1, R2, R3](
+      worldState: WorldState[T, R1, R2, R3],
+      isLemanFork: Boolean,
+      code: StatefulContract.HalfDecoded,
+      refCount: Int
+  ) = {
+    if (isLemanFork) {
+      worldState.contractImmutableState.exists(code.hash) isE true
+      worldState.codeState.exists(code.hash) isE false
+    } else {
+      worldState.contractImmutableState.exists(code.hash) isE false
+      if (refCount > 0) {
+        worldState.codeState.get(code.hash) isE WorldState.CodeRecord(code, refCount)
+      } else {
+        worldState.codeState.exists(code.hash) isE false
+      }
+    }
+  }
+
   // scalastyle:off method.length
   def test[T, R1, R2, R3](initialWorldState: WorldState[T, R1, R2, R3], isLemanFork: Boolean) = {
     val (assetOutputRef, assetOutput) = generateAsset.sample.get
@@ -82,7 +101,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     }
     worldState.getContractObj(contractId) isE contractObj
     worldState.contractExists(contractId) isE true
-    worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
+    checkCode(worldState, isLemanFork, code, 1)
     worldState.getOutput(contractOutputRef) isE contractOutput
 
     update(worldState.removeAsset(assetOutputRef))
@@ -101,7 +120,7 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
         isLemanFork
       )
     )
-    worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 2)
+    checkCode(worldState, isLemanFork, code, 2)
     worldState
       .getContractObj(contractId1) isE code.toObjectUnsafeTestOnly(
       contractId1,
@@ -110,22 +129,22 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     )
 
     update(worldState.removeAsset(contractOutputRef))
-    update(worldState.removeContractForVM(contractId))
+    update(worldState.removeContractFromVM(contractId))
     worldState.getContractObj(contractId).isLeft is true
     worldState.contractExists(contractId) isE false
     worldState.getOutput(contractOutputRef).isLeft is true
     worldState.getContractState(contractId).isLeft is true
-    worldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
-    worldState.removeContractForVM(contractId).isLeft is true
+    checkCode(worldState, isLemanFork, code, 1)
+    worldState.removeContractFromVM(contractId).isLeft is true
 
     update(worldState.removeAsset(contractOutputRef1))
-    update(worldState.removeContractForVM(contractId1))
+    update(worldState.removeContractFromVM(contractId1))
     worldState.getContractObj(contractId1).isLeft is true
     worldState.contractExists(contractId1) isE false
     worldState.getOutput(contractOutputRef1).isLeft is true
     worldState.getContractState(contractId).isLeft is true
-    worldState.getContractCode(code.hash).isLeft is true
-    worldState.removeContractForVM(contractId1).isLeft is true
+    checkCode(worldState, isLemanFork, code, 0)
+    worldState.removeContractFromVM(contractId1).isLeft is true
   }
 
   trait Fixture {
@@ -205,24 +224,26 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
 
     val migratedWorldState = newCached.persist().rightValue
     migratedWorldState.codeState.exists(code.hash) isE false
-    migratedWorldState.codeState.exists(newCode.hash) isE true
-    migratedWorldState.getContractCode(newCode.hash) isE WorldState.CodeRecord(newCode, 1)
+    checkCode(migratedWorldState, isLemanFork = true, newCode, 1)
     // The old immutable state is still kept as history, which can be pruned in the future
     migratedWorldState.contractImmutableState.get(oldContractState.mutable.immutableStateHash) isE
-      oldContractState.immutable
+      Left(oldContractState.immutable)
+    migratedWorldState.contractImmutableState.get(oldContractState.codeHash) isE
+      Right(code)
 
     val migratedContractState =
       migratedWorldState.getContractState(contractId).rightValue.asInstanceOf[ContractNewState]
     migratedWorldState.contractImmutableState.get(
       migratedContractState.mutable.immutableStateHash
-    ) isE migratedContractState.immutable
+    ) isE Left(migratedContractState.immutable)
+    migratedContractState.codeHash is newCode.hash
     migratedContractState.initialStateHash is oldContractState.initialStateHash
     migratedContractState.mutFields is AVector.empty[Val]
     migratedContractState.immFields is AVector[Val](Val.True, Val.False)
   }
 
   it should "migrate without any state change" in new MigrationFixture {
-    oldWorldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
+    checkCode(oldWorldState, isLemanFork = true, code, 1)
 
     val newCached = oldWorldState.cached()
     newCached.migrateContractLemanUnsafe(
@@ -233,8 +254,8 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     ) isE true
 
     val migratedWorldState = newCached.persist().rightValue
-    migratedWorldState.codeState.exists(code.hash) isE true
-    migratedWorldState.getContractCode(code.hash) isE WorldState.CodeRecord(code, 1)
+    migratedWorldState.codeState.exists(code.hash) isE false
+    oldWorldState.contractImmutableState.get(code.hash) isE Right(code)
 
     val migratedContractState =
       migratedWorldState.getContractState(contractId).rightValue.asInstanceOf[ContractNewState]
@@ -285,12 +306,14 @@ class WorldStateSpec extends AlephiumSpec with NoIndexModelGenerators with Stora
     staging.getContractObj(contractId).isLeft is true
     staging.getContractState(contractId).isLeft is true
     staging.contractExists(contractId) isE false
-    staging.getContractCode(code.hash).isLeft is true
+    staging.codeState.exists(code.hash) isE false
+    staging.contractImmutableState.exists(code.hash) isE false
     staging.getContractAsset(contractId).isLeft is true
     worldState.getContractObj(contractId).isLeft is true
     worldState.getContractState(contractId).isLeft is true
     worldState.contractExists(contractId) isE false
-    worldState.getContractCode(code.hash).isLeft is true
+    worldState.codeState.exists(code.hash) isE false
+    worldState.contractImmutableState.exists(code.hash) isE false
     worldState.getContractAsset(contractId).isLeft is true
   }
 }

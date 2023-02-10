@@ -20,6 +20,8 @@ trait MutableKV[K, V, T] extends ReadableKV[K, V] {
   def remove(key: K): IOResult[T]
 
   def put(key: K, value: V): IOResult[T]
+
+  def unit: T
 }
 
 object MutableKV {

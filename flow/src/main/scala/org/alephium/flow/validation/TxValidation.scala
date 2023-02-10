@@ -62,7 +62,13 @@ trait TxValidation {
       failedTx <- FlowUtils
         .convertFailedScriptTx(preOutputs, tx, script)
         .toRight(Right(InvalidRemainingBalancesForFailedScriptTx))
-      _ <- checkStateless(chainIndex, failedTx, checkDoubleSpending = true, blockEnv.getHardFork())
+      _ <- checkStateless(
+        chainIndex,
+        failedTx,
+        checkDoubleSpending = true,
+        blockEnv.getHardFork(),
+        isCoinbase = false
+      )
       _ <- checkStatefulExceptTxScript(failedTx, blockEnv, preOutputs.as[TxOutput], None)
       // the tx should succeed
       _ <- validateSuccessfulScriptTxTemplate(
@@ -105,7 +111,8 @@ trait TxValidation {
         chainIndex,
         successfulTx,
         checkDoubleSpending = false,
-        blockEnv.getHardFork()
+        blockEnv.getHardFork(),
+        isCoinbase = false
       ) // checked already
       gasRemaining1 <- checkStatefulExceptTxScript(
         successfulTx,
@@ -130,7 +137,13 @@ trait TxValidation {
     assume(tx.unsigned.scriptOpt.isEmpty)
     val fullTx = FlowUtils.convertNonScriptTx(tx)
     for {
-      _ <- checkStateless(chainIndex, fullTx, checkDoubleSpending = true, blockEnv.getHardFork())
+      _ <- checkStateless(
+        chainIndex,
+        fullTx,
+        checkDoubleSpending = true,
+        blockEnv.getHardFork(),
+        isCoinbase = false
+      )
       preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx.unsigned.inputs))
       _ <- checkStateful(
         chainIndex,
@@ -185,7 +198,13 @@ trait TxValidation {
       checkDoubleSpending: Boolean // for block txs, this has been checked in block validation
   ): TxValidationResult[Unit] = {
     for {
-      _          <- checkStateless(chainIndex, tx, checkDoubleSpending, blockEnv.getHardFork())
+      _ <- checkStateless(
+        chainIndex,
+        tx,
+        checkDoubleSpending,
+        blockEnv.getHardFork(),
+        isCoinbase = coinbaseNetReward.nonEmpty
+      )
       preOutputs <- fromGetPreOutputs(groupView.getPreOutputs(tx))
       _ <- checkStateful(
         chainIndex,
@@ -232,7 +251,8 @@ trait TxValidation {
       chainIndex: ChainIndex,
       tx: Transaction,
       checkDoubleSpending: Boolean,
-      hardFork: HardFork
+      hardFork: HardFork,
+      isCoinbase: Boolean
   ): TxValidationResult[Unit] = {
     for {
       _ <- checkVersion(tx)
@@ -240,7 +260,7 @@ trait TxValidation {
       _ <- checkInputNum(tx, chainIndex.isIntraGroup)
       _ <- checkOutputNum(tx, chainIndex.isIntraGroup)
       _ <- checkScriptSigNum(tx, chainIndex.isIntraGroup)
-      _ <- checkGasBound(tx)
+      _ <- checkGasBound(tx, isCoinbase, hardFork)
       _ <- checkOutputStats(tx, hardFork)
       _ <- checkChainIndex(tx, chainIndex)
       _ <- checkUniqueInputs(tx, checkDoubleSpending)
@@ -288,7 +308,7 @@ trait TxValidation {
   protected[validation] def checkInputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkOutputNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
   protected[validation] def checkScriptSigNum(tx: Transaction, isIntraGroup: Boolean): TxValidationResult[Unit]
-  protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit]
+  protected[validation] def checkGasBound(tx: TransactionAbstract, isCoinbase: Boolean, hardFork: HardFork): TxValidationResult[Unit]
   protected[validation] def checkOutputStats(tx: Transaction, hardFork: HardFork): TxValidationResult[U256]
   protected[validation] def getChainIndex(tx: TransactionAbstract): TxValidationResult[ChainIndex]
   protected[validation] def checkChainIndex(tx: Transaction, expected: ChainIndex): TxValidationResult[Unit]
@@ -423,10 +443,14 @@ object TxValidation {
       }
     }
 
-    protected[validation] def checkGasBound(tx: TransactionAbstract): TxValidationResult[Unit] = {
+    protected[validation] def checkGasBound(
+        tx: TransactionAbstract,
+        isCoinbase: Boolean,
+        hardFork: HardFork
+    ): TxValidationResult[Unit] = {
       if (!GasBox.validate(tx.unsigned.gasAmount)) {
         invalidTx(InvalidStartGas)
-      } else if (!GasPrice.validate(tx.unsigned.gasPrice)) {
+      } else if (!GasPrice.validate(tx.unsigned.gasPrice, isCoinbase, hardFork)) {
         invalidTx(InvalidGasPrice)
       } else {
         validTx(())
@@ -468,13 +492,31 @@ object TxValidation {
         output: TxOutput,
         hardFork: HardFork
     ): TxValidationResult[Unit] = {
-      val (dustAmount, numTokenBound) = if (hardFork.isLemanEnabled()) {
-        (dustUtxoAmount, maxTokenPerUtxo)
+      if (hardFork.isLemanEnabled()) {
+        checkOutputAmountLeman(output)
       } else {
-        (deprecatedDustUtxoAmount, deprecatedMaxTokenPerUtxo)
+        checkOutputAmountGenesis(output)
       }
-      val validated = output.amount >= dustAmount &&
+    }
+
+    @inline private def checkOutputAmountLeman(
+        output: TxOutput
+    ): TxValidationResult[Unit] = {
+      val numTokenBound =
+        if (output.isAsset) maxTokenPerAssetUtxo else maxTokenPerContractUtxo
+      val validated = output.amount >= dustUtxoAmount &&
         output.tokens.length <= numTokenBound &&
+        output.tokens.forall(_._2.nonZero) &&
+        // If the asset output contains token, it has to contains exact dust amount of ALPH
+        (output.isContract || output.tokens.isEmpty || output.amount == dustUtxoAmount)
+      if (validated) Right(()) else invalidTx(InvalidOutputStats)
+    }
+
+    @inline private def checkOutputAmountGenesis(
+        output: TxOutput
+    ): TxValidationResult[Unit] = {
+      val validated = output.amount >= deprecatedDustUtxoAmount &&
+        output.tokens.length <= deprecatedMaxTokenPerUtxo &&
         output.tokens.forall(_._2.nonZero)
       if (validated) Right(()) else invalidTx(InvalidOutputStats)
     }

@@ -155,7 +155,8 @@ object Instr {
     Log6, Log7, Log8, Log9,
     ContractIdToAddress,
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
-    BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee
+    BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
+    I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -166,7 +167,7 @@ object Instr {
     /* Below are instructions for Leman hard fork */
     MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
     CreateSubContract, CreateSubContractWithToken, CopyCreateSubContract, CopyCreateSubContractWithToken,
-    LoadMutFieldByIndex, StoreFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
+    LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
     CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
     LoadImmField, LoadImmFieldByIndex
@@ -479,7 +480,9 @@ case object LoadMutFieldByIndex
   }
 }
 
-case object StoreFieldByIndex extends VarIndexInstr[StatefulContext] with StatefulInstrCompanion0 {
+case object StoreMutFieldByIndex
+    extends VarIndexInstr[StatefulContext]
+    with StatefulInstrCompanion0 {
   def runWithLeman[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       index <- popIndex(frame, InvalidMutFieldIndex)
@@ -534,8 +537,11 @@ trait AddressStackOps extends StackOps[Val.Address] {
   @inline def popOpStack(frame: Frame[_]): ExeResult[Val.Address] = frame.popOpStackAddress()
 }
 
+sealed trait BinaryInstr[T <: Val] extends StatelessInstr
+
 sealed trait BinaryArithmeticInstr[T <: Val]
-    extends ArithmeticInstr
+    extends BinaryInstr[T]
+    with ArithmeticInstr
     with StackOps[T]
     with GasSimple {
   protected def op(x: T, y: T): ExeResult[Val]
@@ -707,6 +713,50 @@ object U256Gt extends BinaryArithmeticInstr[Val.U256] with U256StackOps with Gas
 object U256Ge extends BinaryArithmeticInstr[Val.U256] with U256StackOps with GasVeryLow {
   protected def op(x: Val.U256, y: Val.U256): ExeResult[Val] =
     BinaryArithmeticInstr.u256Comp(_.>=(_))(x, y)
+}
+
+sealed trait ExpInstr[T <: Val]
+    extends BinaryInstr[T]
+    with StatelessInstrCompanion0
+    with LemanInstr[StatelessContext]
+    with GasExp {
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[T]
+
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      exp    <- frame.popOpStackU256()
+      result <- op(frame, exp.v)
+      _      <- frame.ctx.chargeGasWithSize(this, exp.v.byteLength())
+      _      <- frame.pushOpStack(result)
+    } yield ()
+  }
+}
+object I256Exp extends ExpInstr[Val.I256] {
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[Val.I256] =
+    frame
+      .popOpStackI256()
+      .flatMap(base =>
+        base.v
+          .pow(exp)
+          .map(v => Val.I256(v))
+          .toRight(Right(ArithmeticError(s"Exp overflow: $base ** $exp")))
+      )
+}
+
+object U256Exp extends ExpInstr[Val.U256] {
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[Val.U256] =
+    frame
+      .popOpStackU256()
+      .flatMap(base =>
+        base.v
+          .pow(exp)
+          .map(v => Val.U256(v))
+          .toRight(Right(ArithmeticError(s"Exp overflow: $base ** $exp")))
+      )
+}
+object U256ModExp extends ExpInstr[Val.U256] {
+  def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[Val.U256] =
+    frame.popOpStackU256().map(base => Val.U256(base.v.modPow(exp)))
 }
 
 sealed trait LogicInstr
@@ -1246,6 +1296,30 @@ case object VerifyED25519
     crypto.ED25519.verify(data, signature, pubKey)
 }
 
+case object VerifyBIP340Schnorr
+    extends GenericVerifySignature[crypto.BIP340SchnorrPublicKey, crypto.BIP340SchnorrSignature]
+    with LemanInstrWithSimpleGas[StatelessContext] {
+  def buildPubKey(value: Val.ByteVec): Option[crypto.BIP340SchnorrPublicKey] =
+    crypto.BIP340SchnorrPublicKey.from(value.bytes)
+  def buildSignature(value: Val.ByteVec): Option[crypto.BIP340SchnorrSignature] =
+    crypto.BIP340SchnorrSignature.from(value.bytes)
+  def verify(
+      data: ByteString,
+      signature: crypto.BIP340SchnorrSignature,
+      pubKey: crypto.BIP340SchnorrPublicKey
+  ): Boolean =
+    crypto.BIP340Schnorr.verify(data, signature, pubKey)
+
+  override def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[GenericVerifySignature]._runWith(frame)
+
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    _runWith(frame)
+
+  override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
+    super[LemanInstrWithSimpleGas].runWith(frame)
+}
+
 case object EthEcRecover
     extends CryptoInstr
     with LemanInstrWithSimpleGas[StatelessContext]
@@ -1292,6 +1366,7 @@ sealed trait LockApprovedAssetsInstr extends LemanAssetInstr with StatefulInstrC
     for {
       timestampU256 <- frame.popOpStackU256()
       timestamp     <- timestampU256.v.toLong.map(TimeStamp.unsafe).toRight(Right(LockTimeOverflow))
+      _ <- if (timestamp > frame.ctx.blockEnv.timeStamp) okay else failed(InvalidLockTime)
     } yield timestamp
   }
 }
@@ -1303,7 +1378,8 @@ object LockApprovedAssets extends LockApprovedAssetsInstr {
       lockupScript <- frame.popAssetAddress()
       balanceState <- frame.getBalanceState()
       approved     <- balanceState.useAllApproved(lockupScript).toRight(Right(NoAssetsApproved))
-      _            <- frame.ctx.generateOutput(approved.toLockedTxOutput(lockupScript, lockTime))
+      outputs      <- approved.toLockedTxOutput(lockupScript, lockTime)
+      _            <- outputs.foreachE(frame.ctx.generateOutput)
     } yield ()
   }
 }

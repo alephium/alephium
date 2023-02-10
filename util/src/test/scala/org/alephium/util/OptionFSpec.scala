@@ -14,16 +14,27 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.protocol.vm
+package org.alephium.util
 
-import org.alephium.protocol.model._
-import org.alephium.util.AlephiumSpec
+import scala.util.Random
 
-class GasBoxSpec extends AlephiumSpec {
-  it should "validate gas bound" in {
-    GasBox.validate(minimalGas) is true
-    GasBox.validate(GasBox.unsafe(minimalGas.value - 1)) is false
-    GasBox.validate(maximalGasPerTx) is true
-    GasBox.validate(GasBox.unsafe(maximalGasPerTx.value + 1)) is false
+class OptionFSpec extends AlephiumSpec {
+  it should "fold for positive case" in {
+    forAll { ns: Seq[Int] =>
+      val result = OptionF.fold[Int, Int](ns, 0) { case (acc, n) => Some(acc + n) }
+      result.value is ns.sum
+    }
+  }
+
+  it should "fold for negative case" in {
+    forAll { ns: Seq[Int] =>
+      if (ns.nonEmpty) {
+        val r = ns(Random.nextInt(ns.length))
+        val result = OptionF.fold[Int, Unit](ns, ()) { case (_, n) =>
+          if (n.equals(r)) None else Some(())
+        }
+        result is None
+      }
+    }
   }
 }

@@ -84,6 +84,16 @@ object GasToByte {
     GasBox.unsafe(gasPerByte * GasFormula.wordLength(byteLength))
 }
 
+trait GasExp extends GasFormula {
+  def gas(byteLength: Int): GasBox = GasExp.gas(byteLength)
+}
+object GasExp {
+  val baseGas: Int    = 10
+  val gasPerByte: Int = 50
+
+  def gas(byteLength: Int): GasBox = GasBox.unsafe(baseGas + gasPerByte * byteLength)
+}
+
 trait GasHash extends GasFormula {
   def gas(byteLength: Int): GasBox = GasHash.gas(byteLength)
 }
