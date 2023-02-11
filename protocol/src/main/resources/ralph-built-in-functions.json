@@ -752,7 +752,7 @@
     "name": "encodeToByteVec",
     "category": "ByteVec",
     "signature": "fn encodeToByteVec!(...any) -> (ByteVec)",
-    "doc": "Encodes inputs as ByteVec.",
+    "doc": "Encodes inputs as big-endian ByteVec.",
     "params": [
       "@param any a sequence of input values"
     ],

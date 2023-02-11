@@ -619,7 +619,7 @@ object BuiltIn {
     def signature: String   = s"fn $name!(...any) -> (ByteVec)"
     def params: Seq[String] = Seq("@param any a sequence of input values")
     def returns: String     = "@returns a ByteVec encoding the inputs"
-    def doc: String         = "Encodes inputs as ByteVec."
+    def doc: String         = "Encodes inputs as big-endian ByteVec."
   }
 
   val zeros: SimpleBuiltIn[StatelessContext] =
