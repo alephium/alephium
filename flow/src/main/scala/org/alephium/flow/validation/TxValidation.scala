@@ -680,7 +680,7 @@ object TxValidation {
               }
             } else {
               outputBalances.forall { case (tokenId, balance) =>
-                inputBalances.contains(tokenId) && inputBalances(tokenId) == balance
+                inputBalances.get(tokenId) == Option(balance)
               }
             }
           }
