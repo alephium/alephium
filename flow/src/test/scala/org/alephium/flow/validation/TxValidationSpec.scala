@@ -262,6 +262,13 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         tx.updateUnsigned(_.copy(fixedOutputs = newOutputs))
       }
 
+      def addNewTokenOutput(): Transaction = {
+        val firstOutput = tx.unsigned.fixedOutputs.head
+        val newTokenOutput =
+          firstOutput.copy(amount = dustUtxoAmount, tokens = AVector(TokenId.generate -> 1))
+        tx.copy(generatedOutputs = tx.generatedOutputs :+ newTokenOutput)
+      }
+
       def replaceUnlock(unlock: UnlockScript, priKeys: PrivateKey*): Transaction = {
         val unsigned  = tx.unsigned
         val inputs    = unsigned.inputs
@@ -715,19 +722,143 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
   }
 
   it should "test token balance overflow" in new Fixture {
-    forAll(transactionGenWithPreOutputs(tokensNumGen = Gen.choose(1, 10))) {
-      case (tx, preOutputs) =>
+    forAll(transactionGenWithPreOutputs(tokensNumGen = 1)) { case (tx, preOutputs) =>
+      implicit val validator = nestedValidator(
+        checkTokenBalance(_, preOutputs.map(_.referredOutput)),
+        preOutputs
+      )
+
+      val tokenId     = tx.sampleToken()
+      val tokenAmount = tx.getTokenAmount(tokenId)
+      whenever(tx.unsigned.fixedOutputs.view.count(_.tokens.exists(_._1 == tokenId)) >= 2) { // only able to overflow 2 outputs
+        tx.modifyTokenAmount(tokenId, U256.MaxValue - tokenAmount + 1 + _).fail(BalanceOverFlow)
+      }
+    }
+  }
+
+  trait TokenBalanceFixture extends Fixture {
+    def updateTx(tx: Transaction): Transaction
+
+    def method(useAssets: Boolean) = Method[StatefulContext](
+      isPublic = true,
+      usePreapprovedAssets = useAssets,
+      useContractAssets = useAssets,
+      argsLength = 0,
+      localsLength = 0,
+      returnLength = 0,
+      instrs = AVector.empty
+    )
+    val payableScript    = StatefulScript.unsafe(AVector(method(true)))
+    val nonPayableScript = StatefulScript.unsafe(AVector(method(false)))
+
+    def test(pass: Boolean = false) = {
+      forAll(
+        transactionGenWithPreOutputs(
+          tokensNumGen = Gen.choose(1, 10),
+          chainIndexGen = ChainIndex.unsafe(0, 0)
+        )
+      ) { case ((tx, preOutputs)) =>
         implicit val validator = nestedValidator(
           checkTokenBalance(_, preOutputs.map(_.referredOutput)),
           preOutputs
         )
 
-        val tokenId     = tx.sampleToken()
-        val tokenAmount = tx.getTokenAmount(tokenId)
-        whenever(tx.unsigned.fixedOutputs.view.count(_.tokens.exists(_._1 == tokenId)) >= 2) { // only able to overflow 2 outputs
-          tx.modifyTokenAmount(tokenId, U256.MaxValue - tokenAmount + 1 + _).fail(BalanceOverFlow)
+        val newTx = updateTx(tx)
+        if (pass) {
+          val result = validator(newTx)
+          (result.isRight || result.leftValue.rightValue != InvalidTokenBalance) is true
+        } else {
+          newTx.fail(InvalidTokenBalance)
         }
+      }
     }
+  }
+
+  it should "validate token balances for normal tx with invalid token amount" in new TokenBalanceFixture {
+    def updateTx(tx: Transaction): Transaction = {
+      val tokenId = tx.sampleToken()
+      val result  = tx.modifyTokenAmount(tokenId, _ + 1)
+      result.unsigned.scriptOpt is None
+      result.scriptExecutionOk is true
+      result
+    }
+
+    test()
+  }
+
+  it should "validate token balances for non-payable script tx with invalid token amount" in new TokenBalanceFixture {
+    def updateTx(tx: Transaction): Transaction = {
+      val tokenId     = tx.sampleToken()
+      val executionOk = Random.nextBoolean()
+      val result = tx
+        .updateUnsigned(_.copy(scriptOpt = Some(nonPayableScript)))
+        .modifyTokenAmount(tokenId, _ + 1)
+        .copy(scriptExecutionOk = executionOk)
+      result.isEntryMethodPayable is false
+      result.scriptExecutionOk is executionOk
+      result
+    }
+
+    test()
+  }
+
+  it should "validate token balances for non-payable script tx with invalid new token" in new TokenBalanceFixture {
+    def updateTx(tx: Transaction): Transaction = {
+      val executionOk = Random.nextBoolean()
+      val result = tx
+        .updateUnsigned(_.copy(scriptOpt = Some(nonPayableScript)))
+        .addNewTokenOutput()
+        .copy(scriptExecutionOk = executionOk)
+      result.isEntryMethodPayable is false
+      result.scriptExecutionOk is executionOk
+      result
+    }
+
+    test()
+  }
+
+  it should "validate token balances for payable script tx with invalid token amount" in new TokenBalanceFixture {
+    def updateTx(tx: Transaction): Transaction = {
+      val tokenId     = tx.sampleToken()
+      val executionOk = Random.nextBoolean()
+      val result = tx
+        .updateUnsigned(_.copy(scriptOpt = Some(payableScript)))
+        .modifyTokenAmount(tokenId, _ + 1)
+        .copy(scriptExecutionOk = executionOk)
+      result.isEntryMethodPayable is true
+      result.scriptExecutionOk is executionOk
+      result
+    }
+
+    test()
+  }
+
+  it should "validate token balances for script tx with invalid new token: execution failed" in new TokenBalanceFixture {
+    def updateTx(tx: Transaction): Transaction = {
+      val result = tx
+        .updateUnsigned(_.copy(scriptOpt = Some(payableScript)))
+        .addNewTokenOutput()
+        .copy(scriptExecutionOk = false)
+      result.isEntryMethodPayable is true
+      result.scriptExecutionOk is false
+      result
+    }
+
+    test()
+  }
+
+  // This would pass `checkTokenBalance`, but VM execution would fail
+  it should "validate token balances for script tx with invalid new token: execution succeeded" in new TokenBalanceFixture {
+    def updateTx(tx: Transaction): Transaction = {
+      val result = tx
+        .updateUnsigned(_.copy(scriptOpt = Some(payableScript)))
+        .addNewTokenOutput()
+      result.isEntryMethodPayable is true
+      result.scriptExecutionOk is true
+      result
+    }
+
+    test(pass = true)
   }
 
   it should "validate token balances" in new Fixture {
@@ -757,9 +888,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
           invalidTx.updateUnsigned(_.copy(scriptOpt = Some(script)))
         }
 
-        if (!useAssets) {
-          invalidTxWithScript.fail(InvalidTokenBalance)
-        }
+        invalidTxWithScript.fail(InvalidTokenBalance)
     }
   }
 

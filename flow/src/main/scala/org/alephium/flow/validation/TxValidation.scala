@@ -672,7 +672,7 @@ object TxValidation {
         outputBalances <- computeTokenBalances(tx.allOutputs)
         _ <- {
           val ok = {
-            if (tx.isEntryMethodPayable) {
+            if (tx.isEntryMethodPayable && tx.scriptExecutionOk) {
               // Token balance is validated in VM execution, but let's double check here
               outputBalances.forall { case (tokenId, balance) =>
                 // either new token or no inflation
