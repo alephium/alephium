@@ -169,6 +169,7 @@ final case class MemPoolSetting(
     cleanMempoolFrequency: Duration,
     batchBroadcastTxsFrequency: Duration,
     batchDownloadTxsFrequency: Duration,
+    cleanMissingInputsTxFrequency: Duration,
     autoMineForDev: Boolean // for dev only
 )
 

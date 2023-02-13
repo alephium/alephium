@@ -74,7 +74,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     val txs = prepareRandomSequentialTxs(groupConfig.groups)
     txs.length is 4
-    txHandler.underlyingActor.txsBuffer.isEmpty is true
+    txHandler.underlyingActor.outgoingTxBuffer.isEmpty is true
 
     val txs0 = txs.take(2)
     checkInterCliqueBroadcast(txs0)
@@ -103,10 +103,10 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
   it should "broadcast valid transactions preserving the order" in new Fixture {
     val txs = prepareRandomSequentialTxs(3)
     txs.length is 3
-    txHandler.underlyingActor.txsBuffer.isEmpty is true
+    txHandler.underlyingActor.outgoingTxBuffer.isEmpty is true
     txs.foreach(txHandler ! addTx(_))
     txs.foreach(tx => expectMsg(TxHandler.AddSucceeded(tx.id)))
-    txHandler.underlyingActor.txsBuffer.keys().toSeq is txs.map(_.toTemplate).toSeq
+    txHandler.underlyingActor.outgoingTxBuffer.keys().toSeq is txs.map(_.toTemplate).toSeq
   }
 
   it should "not broadcast invalid tx" in new Fixture {
@@ -470,7 +470,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
         hashes.contains(txs.last.id) is true
       }
       // use eventually here to avoid test failure on windows
-      eventually(txHandler.underlyingActor.txsBuffer.isEmpty is true)
+      eventually(txHandler.underlyingActor.outgoingTxBuffer.isEmpty is true)
       txs.foreach { tx =>
         txHandler.underlyingActor.blockFlow.getTransactionStatus(tx.id, tx.chainIndex) isE
           Option(MemPooled)

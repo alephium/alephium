@@ -42,9 +42,8 @@ class MemPool private (
     timestamps: ValueSortedMap[TransactionId, TimeStamp],
     val sharedTxIndexes: TxIndexes,
     val capacity: Int
-)(implicit
-    groupConfig: GroupConfig
-) extends RWLock {
+)(implicit val groupConfig: GroupConfig)
+    extends RWLock {
   def size: Int = readOnly(timestamps.size)
 
   private def _isFull(): Boolean = size >= capacity
