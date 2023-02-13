@@ -258,7 +258,8 @@ trait TxCoreHandler extends TxHandlerUtils {
     assume(!brokerConfig.isIncomingChain(chainIndex))
     val mempool = blockFlow.getMemPool(chainIndex.from)
     if (mempool.contains(tx)) {
-      addFailed(tx, s"tx ${tx.id.toHexString} is already included", acknowledge)
+      log.debug(s"tx ${tx.id.toHexString} is already included")
+      addSucceeded(tx, acknowledge)
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
       addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}", acknowledge)
     } else {

@@ -100,6 +100,15 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     intraCliqueProbe.expectMsg(IntraCliqueManager.BroadCastTx(broadcastMsg))
   }
 
+  it should "broadcast valid transactions preserving the order" in new Fixture {
+    val txs = prepareRandomSequentialTxs(3)
+    txs.length is 3
+    txHandler.underlyingActor.txsBuffer.isEmpty is true
+    txs.foreach(txHandler ! addTx(_))
+    txs.foreach(tx => expectMsg(TxHandler.AddSucceeded(tx.id)))
+    txHandler.underlyingActor.txsBuffer.keys().toSeq is txs.map(_.toTemplate).toSeq
+  }
+
   it should "not broadcast invalid tx" in new Fixture {
     setSynced()
     val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
@@ -181,9 +190,7 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
 
     EventFilter.warning(pattern = ".*already existed.*").intercept {
       txHandler ! addTx(tx)
-      expectMsg(
-        TxHandler.AddFailed(tx.id, s"tx ${tx.id.toHexString} is already included")
-      )
+      expectMsg(TxHandler.AddSucceeded(tx.id))
       interCliqueProbe.expectNoMessage()
     }
   }
