@@ -19,6 +19,7 @@ package org.alephium.app
 import java.net.InetSocketAddress
 
 import org.alephium.api.model._
+import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{Address, BrokerInfo, GroupIndex}
 import org.alephium.util._
 
@@ -116,25 +117,56 @@ class BroadcastTxTest extends AlephiumActorSpec {
       }
     }
 
-    val tx0 =
-      transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
-    checkTx(tx0, restPort(masterPortClique1), MemPooled())
-    checkTx(tx0, restPort(masterPortClique2), MemPooled())
-
-    val tx1 =
-      transfer(publicKey, transferAddress, transferAmount, privateKey, restPort(masterPortClique1))
-    checkTx(tx1, restPort(masterPortClique1), MemPooled())
-    checkTx(tx1, restPort(masterPortClique2), MemPooled())
-
-    txNotFound(tx0.txId, restPort(masterPortClique1))
-    txNotFound(tx1.txId, restPort(masterPortClique1))
+    var amount = ALPH.alph(4096)
+    val transactions = AVector.tabulate(12) { k =>
+      amount = amount.divUnsafe(2)
+      val tx = (k % 4) match {
+        case 0 =>
+          transfer(
+            publicKey,
+            transferAddress,
+            amount,
+            privateKey,
+            restPort(masterPortClique1)
+          )
+        case 1 =>
+          transfer(
+            transferPubKey,
+            address,
+            amount,
+            transferPriKey,
+            restPort(masterPortClique1)
+          )
+        case 2 =>
+          transfer(
+            publicKey,
+            address,
+            amount,
+            privateKey,
+            restPort(masterPortClique1)
+          )
+        case 3 =>
+          transfer(
+            transferPubKey,
+            transferAddress,
+            amount,
+            transferPriKey,
+            restPort(masterPortClique1)
+          )
+      }
+      tx
+    }
+    transactions.foreach(checkTx(_, restPort(masterPortClique1), MemPooled()))
+    transactions.foreach(checkTx(_, restPort(masterPortClique2), MemPooled()))
+    transactions.foreach(tx => txNotInBlocks(tx.txId, restPort(masterPortClique1)))
+    transactions.foreach(tx => txNotInBlocks(tx.txId, restPort(masterPortClique2)))
 
     clique2.startFakeMining()
 
-    confirmTx(tx0, restPort(masterPortClique1))
-    confirmTx(tx1, restPort(masterPortClique1))
-    getTransaction(tx0.txId, restPort(masterPortClique1))
-    getTransaction(tx1.txId, restPort(masterPortClique1))
+    transactions.foreach { tx =>
+      confirmTx(tx, restPort(masterPortClique1))
+      getTransaction(tx.txId, restPort(masterPortClique1))
+    }
 
     clique2.stopFakeMining()
     clique1.stop()
