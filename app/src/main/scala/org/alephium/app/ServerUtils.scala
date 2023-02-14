@@ -530,7 +530,8 @@ class ServerUtils(implicit
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
   ): FutureTry[SubmitTxResult] = {
-    val message = TxHandler.AddToMemPool(AVector(tx), isIntraCliqueSyncing = false)
+    val message =
+      TxHandler.AddToMemPool(AVector(tx), isIntraCliqueSyncing = false, isLocalTx = true)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
         Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))

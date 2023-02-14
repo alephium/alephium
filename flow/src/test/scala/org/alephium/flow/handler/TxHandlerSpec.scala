@@ -441,8 +441,8 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
         TxHandler.props(blockFlow, storages.pendingTxStorage)
       )
 
-    def addTx(tx: Transaction, isIntraCliqueSyncing: Boolean = false) =
-      TxHandler.AddToMemPool(AVector(tx.toTemplate), isIntraCliqueSyncing)
+    def addTx(tx: Transaction, isIntraCliqueSyncing: Boolean = false, isLocalTx: Boolean = true) =
+      TxHandler.AddToMemPool(AVector(tx.toTemplate), isIntraCliqueSyncing, isLocalTx)
     def hex(tx: Transaction) = Hex.toHexString(serialize(tx.toTemplate))
     def setSynced() = {
       txHandler ! InterCliqueManager.SyncedResult(true)

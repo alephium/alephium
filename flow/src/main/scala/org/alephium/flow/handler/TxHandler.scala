@@ -48,8 +48,11 @@ object TxHandler {
   ): Props = Props(new TxHandler(blockFlow, txStorage))
 
   sealed trait Command
-  final case class AddToMemPool(txs: AVector[TransactionTemplate], isIntraCliqueSyncing: Boolean)
-      extends Command
+  final case class AddToMemPool(
+      txs: AVector[TransactionTemplate],
+      isIntraCliqueSyncing: Boolean,
+      isLocalTx: Boolean
+  ) extends Command
   final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
@@ -182,12 +185,12 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
 
   // scalastyle:off method.length
   def handleCommand: Receive = {
-    case TxHandler.AddToMemPool(txs, isIntraCliqueSyncing) =>
+    case TxHandler.AddToMemPool(txs, isIntraCliqueSyncing, isLocalTx) =>
       if (!memPoolSetting.autoMineForDev) {
         if (isIntraCliqueSyncing) {
           txs.foreach(handleIntraCliqueSyncingTx)
         } else {
-          txs.foreach(handleInterCliqueTx(_, acknowledge = true))
+          txs.foreach(handleInterCliqueTx(_, acknowledge = true, isLocalTx))
         }
       } else {
         mineTxsForDev(txs)
@@ -211,7 +214,7 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
   }
 
   override def onFirstTimeSynced(): Unit = {
-    clearStorageAndLoadTxs(handleInterCliqueTx(_, acknowledge = false))
+    clearStorageAndLoadTxs(handleInterCliqueTx(_, acknowledge = false, isLocalTx = false))
     schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
     schedule(self, TxHandler.CleanMissingInputsTx, memPoolSetting.cleanMissingInputsTxFrequency)
     scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
@@ -249,9 +252,11 @@ trait TxCoreHandler extends TxHandlerUtils {
 
   def nonCoinbaseValidation: TxValidation
 
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def handleInterCliqueTx(
       tx: TransactionTemplate,
-      acknowledge: Boolean
+      acknowledge: Boolean,
+      isLocalTx: Boolean
   ): Unit = {
     val chainIndex = tx.chainIndex
     assume(!brokerConfig.isIncomingChain(chainIndex))
@@ -263,14 +268,16 @@ trait TxCoreHandler extends TxHandlerUtils {
       addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}", acknowledge)
     } else {
       nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
-        case Left(Right(_: NonExistInput.type)) =>
-          missingInputsTxBuffer.add(tx, TimeStamp.now())
         case Left(Right(s: InvalidTxStatus)) =>
-          addFailed(
-            tx,
-            s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}",
-            acknowledge
-          )
+          if (s.isInstanceOf[NonExistInput.type] && !isLocalTx) {
+            missingInputsTxBuffer.add(tx, TimeStamp.now())
+          } else {
+            addFailed(
+              tx,
+              s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}",
+              acknowledge
+            )
+          }
         case Right(_) =>
           val grandPool = blockFlow.getGrandPool()
           handleValidTx(chainIndex, tx, grandPool, acknowledge)
