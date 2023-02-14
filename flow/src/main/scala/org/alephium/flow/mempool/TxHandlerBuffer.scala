@@ -16,7 +16,6 @@
 
 package org.alephium.flow.mempool
 
-import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionTemplate}
 import org.alephium.util.{AVector, TimeStamp}
@@ -44,8 +43,9 @@ class TxHandlerBuffer private (
     children.map(_.view.filter(_.isSource()).map(_.tx))
   }
 
-  def clean(blockFlow: BlockFlow, timeStampThreshold: TimeStamp): Unit = {
-    pool.clean(blockFlow, timeStampThreshold)
+  def clean(timeStampThreshold: TimeStamp): Int = {
+    val oldTxs = pool._takeOldTxs(timeStampThreshold)
+    pool.removeUnusedTxs(oldTxs)
   }
 }
 

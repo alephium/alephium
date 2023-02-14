@@ -293,10 +293,7 @@ trait TxCoreHandler extends TxHandlerUtils {
 
   def cleanMissingInputsBuffer(): Unit = {
     missingInputsTxBuffer.getRootTxs().foreach(validateMissingInputRootTx)
-    missingInputsTxBuffer.clean(
-      blockFlow,
-      TimeStamp.now().minusUnsafe(missingInputsTxExpiryDuration)
-    )
+    missingInputsTxBuffer.clean(TimeStamp.now().minusUnsafe(missingInputsTxExpiryDuration))
     scheduleOnce(self, TxHandler.CleanMissingInputsTx, cleanMissingInputsTxFrequency)
   }
 

@@ -247,7 +247,7 @@ class MemPool private (
     transactionsTotalLabeled.foreach(_.set(0.0))
   }
 
-  private def _takeOldTxs(
+  private[mempool] def _takeOldTxs(
       timeStampThreshold: TimeStamp
   ): AVector[TransactionTemplate] = {
     var buffer = AVector.empty[TransactionTemplate]
