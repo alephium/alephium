@@ -261,6 +261,7 @@ class MemPool private (
     buffer
   }
 
+  // TODO: Optimize this
   def clean(
       blockFlow: BlockFlow,
       timeStampThreshold: TimeStamp

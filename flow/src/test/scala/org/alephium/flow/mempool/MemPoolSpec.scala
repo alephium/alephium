@@ -226,4 +226,17 @@ class MemPoolSpec
       txs.sortBy(_.unsigned.gasPrice.value).reverse
     )
   }
+
+  it should "handle cross-group transactions" in {
+    val mainGroup = GroupIndex.unsafe(0)
+    val pool      = MemPool.empty(mainGroup)
+    val index     = ChainIndex.unsafe(1, 0)
+    val tx        = transactionGen().retryUntil(_.chainIndex == index).sample.get.toTemplate
+    pool.addXGroupTx(index, tx, TimeStamp.now())
+    pool.size is 1
+    pool.collectForBlock(ChainIndex(mainGroup, mainGroup), Int.MaxValue).isEmpty is true
+
+    pool.clean(blockFlow, TimeStamp.now().plusHoursUnsafe(1))
+    pool.size is 0
+  }
 }
