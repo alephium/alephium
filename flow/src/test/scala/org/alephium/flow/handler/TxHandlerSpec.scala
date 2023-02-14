@@ -122,6 +122,41 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     interCliqueProbe.expectNoMessage()
   }
 
+  it should "temporarily cache missing inputs tx" in new Fixture {
+    override val configValues = Map(
+      ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"),
+      ("alephium.mempool.clean-missing-inputs-tx-frequency", "500 ms")
+    )
+
+    val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
+    txHandler ! addTx(tx, isLocalTx = false)
+    txHandler.underlyingActor.missingInputsTxBuffer.getRootTxs() willBe AVector(tx.toTemplate)
+    interCliqueProbe.expectNoMessage()
+
+    setSynced()
+    txHandler.underlyingActor.missingInputsTxBuffer.getRootTxs().isEmpty willBe true
+  }
+
+  it should "broadcast ready txs from missing inputs tx buffer" in new Fixture {
+    override val configValues = Map(
+      ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms")
+    )
+
+    val tx     = transfer(blockFlow, chainIndex).nonCoinbase.head.toTemplate
+    val buffer = txHandler.underlyingActor.missingInputsTxBuffer
+    buffer.add(tx, TimeStamp.now())
+    buffer.getRootTxs() is AVector(tx)
+
+    txHandler ! TxHandler.CleanMissingInputsTx
+    txHandler.underlyingActor.outgoingTxBuffer.contains(tx) willBe true
+    buffer.getRootTxs().isEmpty willBe true
+
+    setSynced()
+    interCliqueProbe.expectMsg(
+      InterCliqueManager.BroadCastTx(AVector((chainIndex, AVector(tx.id))))
+    )
+  }
+
   it should "load persisted pending txs only once when node synced" in new FlowFixture {
     implicit lazy val system = createSystem(Some(AlephiumActorSpec.infoConfig))
     val txHandler = TestActorRef[TxHandler](

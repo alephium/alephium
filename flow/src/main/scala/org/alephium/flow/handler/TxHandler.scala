@@ -190,7 +190,7 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
         if (isIntraCliqueSyncing) {
           txs.foreach(handleIntraCliqueSyncingTx)
         } else {
-          txs.foreach(handleInterCliqueTx(_, acknowledge = true, isLocalTx))
+          txs.foreach(handleInterCliqueTx(_, acknowledge = true, cacheMissingInputsTx = !isLocalTx))
         }
       } else {
         mineTxsForDev(txs)
@@ -214,7 +214,9 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
   }
 
   override def onFirstTimeSynced(): Unit = {
-    clearStorageAndLoadTxs(handleInterCliqueTx(_, acknowledge = false, isLocalTx = false))
+    clearStorageAndLoadTxs(
+      handleInterCliqueTx(_, acknowledge = false, cacheMissingInputsTx = false)
+    )
     schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
     schedule(self, TxHandler.CleanMissingInputsTx, memPoolSetting.cleanMissingInputsTxFrequency)
     scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
@@ -256,7 +258,7 @@ trait TxCoreHandler extends TxHandlerUtils {
   def handleInterCliqueTx(
       tx: TransactionTemplate,
       acknowledge: Boolean,
-      isLocalTx: Boolean
+      cacheMissingInputsTx: Boolean
   ): Unit = {
     val chainIndex = tx.chainIndex
     assume(!brokerConfig.isIncomingChain(chainIndex))
@@ -269,7 +271,7 @@ trait TxCoreHandler extends TxHandlerUtils {
     } else {
       nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
         case Left(Right(s: InvalidTxStatus)) =>
-          if (s.isInstanceOf[NonExistInput.type] && !isLocalTx) {
+          if (s.isInstanceOf[NonExistInput.type] && cacheMissingInputsTx) {
             missingInputsTxBuffer.add(tx, TimeStamp.now())
           } else {
             addFailed(
@@ -305,9 +307,8 @@ trait TxCoreHandler extends TxHandlerUtils {
         missingInputsTxBuffer.removeInvalidTx(tx)
         log.debug(s"Remove invalid pending tx ${tx.id.toHexString}: ${hex(tx)}")
       case Right(_) =>
-        val children  = missingInputsTxBuffer.removeValidTx(tx)
-        val grandPool = blockFlow.getGrandPool()
-        handleValidTx(tx.chainIndex, tx, grandPool, false)
+        val children = missingInputsTxBuffer.removeValidTx(tx)
+        handleInterCliqueTx(tx, false, cacheMissingInputsTx = false)
         children.foreach(_.foreach(validateMissingInputRootTx))
     }
   }
