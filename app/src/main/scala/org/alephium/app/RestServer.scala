@@ -99,6 +99,8 @@ class RestServer(
       getTransactionStatusLocalLogic,
       decodeUnsignedTransactionLogic,
       getTransactionLogic,
+      listMempoolTransactionsLogic,
+      clearMempoolLogic,
       minerActionLogic,
       mineOneBlockLogic,
       minerListAddressesLogic,

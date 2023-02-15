@@ -64,6 +64,10 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
   ): Unit = {
     mempools.foreach(_.clean(blockFlow, timeStampThreshold))
   }
+
+  def clear(): Unit = {
+    mempools.foreach(_.clear())
+  }
 }
 
 object GrandPool {

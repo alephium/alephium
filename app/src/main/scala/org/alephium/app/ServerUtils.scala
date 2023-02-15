@@ -164,7 +164,7 @@ class ServerUtils(implicit
       .map(failed)
   }
 
-  def listUnconfirmedTransactions(
+  def listMempoolTransactions(
       blockFlow: BlockFlow
   ): Try[AVector[MempoolTransactions]] = {
     val result = brokerConfig.groupRange.foldLeft(
