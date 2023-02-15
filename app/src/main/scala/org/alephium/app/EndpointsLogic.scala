@@ -283,7 +283,16 @@ trait EndpointsLogic extends Endpoints {
   }
 
   val clearMempoolLogic = serverLogic(clearMempool) { _ =>
+    logger.info("Clearing mempool")
     Future.successful(Right(blockFlow.grandPool.clear()))
+  }
+
+  val validateMempoolTransactionsLogic = serverLogic(validateMempoolTransactions) { _ =>
+    val removed = blockFlow.grandPool.validateAllTxs(blockFlow)
+    logger.info(
+      s"Removed #${removed} invalid txs from Mempool. Note that cross-group txs might be counted twice."
+    )
+    Future.successful(Right(()))
   }
 
   type BaseServerEndpoint[A, B] = ServerEndpoint[Any, Future]

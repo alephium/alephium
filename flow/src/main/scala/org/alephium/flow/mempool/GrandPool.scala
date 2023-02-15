@@ -68,6 +68,11 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
   def clear(): Unit = {
     mempools.foreach(_.clear())
   }
+
+  def validateAllTxs(blockFlow: BlockFlow): Int = {
+    val now = TimeStamp.now()
+    mempools.fold(0)(_ + _.clean(blockFlow, now))
+  }
 }
 
 object GrandPool {

@@ -61,6 +61,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getTransactionStatus,
     listMempoolTransactions,
     clearMempool,
+    validateMempoolTransactions,
     compileScript,
     buildExecuteScriptTx,
     compileContract,

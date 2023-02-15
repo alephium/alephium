@@ -90,7 +90,7 @@ trait Endpoints
       .in("transactions")
       .tag("Transactions")
 
-  private val mempoolEndpoint: BaseEndpoint[Unit, Unit] =
+  private lazy val mempoolEndpoint: BaseEndpoint[Unit, Unit] =
     baseEndpoint
       .in("mempool")
       .tag("Mempool")
@@ -319,16 +319,21 @@ trait Endpoints
       .out(jsonBody[SubmitTxResult])
       .summary("Submit a signed transaction")
 
-  val listMempoolTransactions: BaseEndpoint[Unit, AVector[MempoolTransactions]] =
+  lazy val listMempoolTransactions: BaseEndpoint[Unit, AVector[MempoolTransactions]] =
     mempoolEndpoint.get
       .in("list-tx")
       .out(jsonBody[AVector[MempoolTransactions]])
       .summary("List mempool transactions")
 
-  val clearMempool: BaseEndpoint[Unit, Unit] =
-    mempoolEndpoint.get
+  lazy val clearMempool: BaseEndpoint[Unit, Unit] =
+    mempoolEndpoint.post
       .in("clear")
-      .summary("Clear mempool")
+      .summary("Remove all transactions from mempool")
+
+  lazy val validateMempoolTransactions: BaseEndpoint[Unit, Unit] =
+    mempoolEndpoint.post
+      .in("validate-txs")
+      .summary("Validate all mempool transactions and remove invalid ones")
 
   val buildMultisigAddress: BaseEndpoint[BuildMultisigAddress, BuildMultisigAddressResult] =
     multisigEndpoint.post

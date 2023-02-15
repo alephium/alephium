@@ -101,6 +101,7 @@ class RestServer(
       getTransactionLogic,
       listMempoolTransactionsLogic,
       clearMempoolLogic,
+      validateMempoolTransactionsLogic,
       minerActionLogic,
       mineOneBlockLogic,
       minerListAddressesLogic,

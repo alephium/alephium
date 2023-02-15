@@ -265,11 +265,13 @@ class MemPool private (
   def clean(
       blockFlow: BlockFlow,
       timeStampThreshold: TimeStamp
-  ): Unit = writeOnly {
-    val oldTxs = _takeOldTxs(timeStampThreshold)
+  ): Int = writeOnly {
+    val oldTxs  = _takeOldTxs(timeStampThreshold)
+    var removed = 0
     blockFlow.recheckInputs(group, oldTxs).foreach { invalidTxs =>
-      removeUnusedTxs(invalidTxs)
+      removed += removeUnusedTxs(invalidTxs)
     }
+    removed
   }
 
   private val transactionsTotalLabeled = {
