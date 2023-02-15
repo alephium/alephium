@@ -31,5 +31,16 @@ object OptionF {
     }
     Some(result)
   }
+
+  def getAny[E, R](elems: IterableOnce[E])(f: E => Option[R]): Option[R] = {
+    val iterator = elems.iterator
+    while (iterator.hasNext) {
+      f(iterator.next()) match {
+        case Some(r) => return Some(r)
+        case None    => ()
+      }
+    }
+    return None
+  }
   // scalastyle:on return
 }

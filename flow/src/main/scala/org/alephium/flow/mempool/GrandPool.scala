@@ -19,14 +19,18 @@ package org.alephium.flow.mempool
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.setting.MemPoolSetting
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionTemplate}
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.protocol.model.{ChainIndex, GroupIndex, TransactionId, TransactionTemplate}
+import org.alephium.util.{AVector, OptionF, TimeStamp}
 
 class GrandPool(val mempools: AVector[MemPool])(implicit
     val brokerConfig: BrokerConfig
 ) {
   @inline def getMemPool(mainGroup: GroupIndex): MemPool = {
     mempools(brokerConfig.groupIndexOfBroker(mainGroup))
+  }
+
+  def get(txId: TransactionId): Option[TransactionTemplate] = {
+    OptionF.getAny(mempools.toIterable)(_.get(txId))
   }
 
   def add(

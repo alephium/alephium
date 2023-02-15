@@ -60,6 +60,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getTransaction,
     getTransactionStatus,
     listMempoolTransactions,
+    rebroadcastMempoolTransaction,
     clearMempool,
     validateMempoolTransactions,
     compileScript,

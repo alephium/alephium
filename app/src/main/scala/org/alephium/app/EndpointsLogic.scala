@@ -28,7 +28,7 @@ import io.prometheus.client.exporter.common.TextFormat
 import sttp.model.{StatusCode, Uri}
 import sttp.tapir.server.ServerEndpoint
 
-import org.alephium.api.{ApiError, Endpoints, Try}
+import org.alephium.api.{notFound, ApiError, Endpoints, Try}
 import org.alephium.api.model.{TransactionTemplate => _, _}
 import org.alephium.app.FutureTry
 import org.alephium.flow.client.Node
@@ -293,6 +293,15 @@ trait EndpointsLogic extends Endpoints {
       s"Removed #${removed} invalid txs from Mempool. Note that cross-group txs might be counted twice."
     )
     Future.successful(Right(()))
+  }
+
+  val rebroadcastMempoolTransactionLogic = serverLogic(rebroadcastMempoolTransaction) { txId =>
+    blockFlow.grandPool.get(txId) match {
+      case Some(tx) =>
+        txHandler ! TxHandler.Rebroadcast(tx)
+      Future.successful(Right(()))
+      case None  => Future.successful(Left(notFound(s"TxId: ${txId.toHexString}")))
+    }
   }
 
   type BaseServerEndpoint[A, B] = ServerEndpoint[Any, Future]

@@ -325,6 +325,11 @@ trait Endpoints
       .out(jsonBody[AVector[MempoolTransactions]])
       .summary("List mempool transactions")
 
+  lazy val rebroadcastMempoolTransaction: BaseEndpoint[TransactionId, Unit] =
+    mempoolEndpoint.post
+      .in(query[TransactionId]("txId"))
+      .summary("Rebroadcase a mempool transaction to the network")
+
   lazy val clearMempool: BaseEndpoint[Unit, Unit] =
     mempoolEndpoint.post
       .in("clear")

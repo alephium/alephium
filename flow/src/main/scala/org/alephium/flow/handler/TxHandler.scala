@@ -53,6 +53,7 @@ object TxHandler {
       isIntraCliqueSyncing: Boolean,
       isLocalTx: Boolean
   ) extends Command
+  final case class Rebroadcast(tx: TransactionTemplate) extends Command
   final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
@@ -211,6 +212,8 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
         blockFlow,
         TimeStamp.now().minusUnsafe(memPoolSetting.cleanMempoolFrequency)
       )
+    case TxHandler.Rebroadcast(tx) =>
+      outgoingTxBuffer.put(tx, ())
   }
 
   override def onFirstTimeSynced(): Unit = {
