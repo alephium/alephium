@@ -863,7 +863,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     implicit val serverUtils = new ServerUtils()
 
-    val emptyMempool = serverUtils.listUnconfirmedTransactions(blockFlow).rightValue
+    val emptyMempool = serverUtils.listMempoolTransactions(blockFlow).rightValue
     emptyMempool is AVector.empty[MempoolTransactions]
 
     val chainIndex                         = chainIndexGen.sample.get
@@ -885,7 +885,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       fromPrivateKey
     )
 
-    val txs = serverUtils.listUnconfirmedTransactions(blockFlow).rightValue
+    val txs = serverUtils.listMempoolTransactions(blockFlow).rightValue
 
     txs is AVector(
       MempoolTransactions(

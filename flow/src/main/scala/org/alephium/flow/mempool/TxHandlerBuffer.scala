@@ -23,6 +23,8 @@ import org.alephium.util.{AVector, TimeStamp}
 class TxHandlerBuffer private (
     val pool: MemPool
 ) {
+  def size: Int = pool.size
+
   def add(transaction: TransactionTemplate, timeStamp: TimeStamp): Unit = {
     pool.add(TxHandlerBuffer.bufferChainIndex, transaction, timeStamp)
     ()
@@ -46,6 +48,10 @@ class TxHandlerBuffer private (
   def clean(timeStampThreshold: TimeStamp): Int = {
     val oldTxs = pool._takeOldTxs(timeStampThreshold)
     pool.removeUnusedTxs(oldTxs)
+  }
+
+  def clear(): Unit = {
+    pool.clear()
   }
 }
 

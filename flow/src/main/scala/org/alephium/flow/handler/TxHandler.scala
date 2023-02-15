@@ -53,6 +53,7 @@ object TxHandler {
       isIntraCliqueSyncing: Boolean,
       isLocalTx: Boolean
   ) extends Command
+  final case class Rebroadcast(tx: TransactionTemplate) extends Command
   final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
@@ -60,6 +61,7 @@ object TxHandler {
   case object CleanMissingInputsTx                      extends Command
   private[handler] case object BroadcastTxs             extends Command
   private[handler] case object DownloadTxs              extends Command
+  case object ClearMemPool                              extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: TransactionId)              extends Event
@@ -211,6 +213,13 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
         blockFlow,
         TimeStamp.now().minusUnsafe(memPoolSetting.cleanMempoolFrequency)
       )
+      ()
+    case TxHandler.Rebroadcast(tx) =>
+      outgoingTxBuffer.put(tx, ())
+    case TxHandler.ClearMemPool =>
+      blockFlow.grandPool.clear()
+      clearPersistedTxs()
+      missingInputsTxBuffer.clear()
   }
 
   override def onFirstTimeSynced(): Unit = {
@@ -432,13 +441,14 @@ trait TxHandlerPersistence extends TxHandlerUtils {
   def clearStorageAndLoadTxs(handlePendingTx: TransactionTemplate => Unit): Unit = {
     log.info("Start to load persisted pending txs")
     var (valid, invalid) = (0, 0)
+    val toRemove         = mutable.ArrayBuffer.empty[PersistedTxId]
     escapeIOError(for {
       groupViews <- AVector
         .tabulateE(brokerConfig.groupNumPerBroker) { index =>
           val groupIndex = GroupIndex.unsafe(brokerConfig.groupRange(index))
           blockFlow.getImmutableGroupViewIncludePool(groupIndex)
         }
-      _ <- pendingTxStorage.iterateE { (_, tx) =>
+      _ <- pendingTxStorage.iterateE { (key, tx) =>
         val chainIndex = tx.chainIndex
         val groupIndex = chainIndex.from
         val index      = brokerConfig.groupIndexOfBroker(groupIndex)
@@ -447,9 +457,11 @@ trait TxHandlerPersistence extends TxHandlerUtils {
             valid += 1
             handlePendingTx(tx)
           case None =>
+            toRemove += key
             invalid += 1
         }
       }
+      _ <- EitherF.foreachTry(toRemove)(pendingTxStorage.remove)
     } yield ())
     log.info(
       s"Load persisted pending txs completed, valid: #$valid, invalid: #$invalid (not precise though..)"
@@ -458,14 +470,18 @@ trait TxHandlerPersistence extends TxHandlerUtils {
 
   def persistMempoolTxs(): Unit = {
     log.info("Start to persist pending txs")
-    escapeIOError(pendingTxStorage.iterateE { (txId, _) =>
-      pendingTxStorage.remove(txId)
-    })
+    clearPersistedTxs()
     escapeIOError(
       blockFlow.getGrandPool().getOutTxsWithTimestamp().foreachE { case (timestamp, tx) =>
         pendingTxStorage.put(PersistedTxId(timestamp, tx.id), tx)
       }
     )
+  }
+
+  def clearPersistedTxs(): Unit = {
+    escapeIOError(pendingTxStorage.iterateE { (txId, _) =>
+      pendingTxStorage.remove(txId)
+    })
   }
 }
 

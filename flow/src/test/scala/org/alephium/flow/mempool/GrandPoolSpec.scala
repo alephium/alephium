@@ -112,6 +112,8 @@ class GrandPoolSpec extends AlephiumSpec {
       val block = transfer(blockFlow, chainIndex)
       val tx    = block.nonCoinbase.head.toTemplate
       pool.add(tx.chainIndex, tx, TimeStamp.now())
+      pool.size is 1
+      pool.get(tx.id).value is tx
       brokerConfig.groupRange.foreach { group =>
         val groupIndex = GroupIndex.unsafe(group)
         val memPool    = pool.getMemPool(groupIndex)
@@ -123,6 +125,8 @@ class GrandPoolSpec extends AlephiumSpec {
           memPool.size is 0
         }
       }
+      pool.clear()
+      pool.size is 0
     }
 
     def testXGroupTx(chainIndex: ChainIndex) = {
@@ -131,6 +135,8 @@ class GrandPoolSpec extends AlephiumSpec {
       val block = transfer(blockFlow, chainIndex)
       val tx    = block.nonCoinbase.head.toTemplate
       pool.add(tx.chainIndex, tx, TimeStamp.now())
+      pool.size is (if (brokerConfig.contains(tx.chainIndex.to)) 2 else 1)
+      pool.get(tx.id).value is tx
       brokerConfig.groupRange.foreach { group =>
         val groupIndex = GroupIndex.unsafe(group)
         val memPool    = pool.getMemPool(groupIndex)
@@ -164,6 +170,8 @@ class GrandPoolSpec extends AlephiumSpec {
           memPool.size is 0
         }
       }
+      pool.clear()
+      pool.size is 0
     }
   }
 }

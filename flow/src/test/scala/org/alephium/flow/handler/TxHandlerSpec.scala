@@ -122,6 +122,18 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     interCliqueProbe.expectNoMessage()
   }
 
+  it should "rebroadcast tx" in new Fixture {
+    override val configValues = Map(("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"))
+    setSynced()
+    val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get.toTemplate
+    txHandler ! TxHandler.Rebroadcast(tx)
+    interCliqueProbe.expectMsgPF() { case InterCliqueManager.BroadCastTx(indexedHashes) =>
+      val hashes = indexedHashes.flatMap(_._2)
+      hashes.length is 1
+      hashes.contains(tx.id) is true
+    }
+  }
+
   it should "temporarily cache missing inputs tx" in new Fixture {
     override val configValues = Map(
       ("alephium.mempool.batch-broadcast-txs-frequency", "500 ms"),
@@ -177,10 +189,11 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     }
   }
 
-  it should "load all of the pending txs once the node is synced" in new Fixture {
+  trait StorageFixture extends Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
-    val txs     = prepareRandomSequentialTxs(4)
+    val txNum   = 4
+    val txs     = prepareRandomSequentialTxs(txNum)
     val startTs = TimeStamp.now()
     txs.foreachWithIndex { case (tx, index) =>
       storages.pendingTxStorage.put(
@@ -188,6 +201,10 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
         tx.toTemplate
       ) isE ()
     }
+    storages.pendingTxStorage.size() is txNum
+  }
+
+  it should "load all of the pending txs once the node is synced" in new StorageFixture {
     blockFlow.getGrandPool().mempools.foreach(_.size is 0)
 
     setSynced()
@@ -195,6 +212,21 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
       blockFlow.getGrandPool().getOutTxsWithTimestamp().map(_._2.id).sorted is
         txs.map(_.id).sorted
     }
+  }
+
+  it should "clear mempool and persisted txs" in new StorageFixture {
+    blockFlow.getGrandPool().size is 0
+    txs.foreach(tx => blockFlow.getGrandPool().add(tx.chainIndex, tx.toTemplate, TimeStamp.now()))
+    (blockFlow
+      .getGrandPool()
+      .size >= txNum) is true // Inter-group txs are counted twice, this will be improved in the future.
+    txHandler.underlyingActor.missingInputsTxBuffer.add(txs.head.toTemplate, TimeStamp.now())
+    txHandler.underlyingActor.missingInputsTxBuffer.size is 1
+
+    txHandler ! TxHandler.ClearMemPool
+    storages.pendingTxStorage.size() willBe 0
+    blockFlow.getGrandPool().size is 0
+    txHandler.underlyingActor.missingInputsTxBuffer.size is 0
   }
 
   it should "persist all of the pending txs once the handler is stopped" in new Fixture {

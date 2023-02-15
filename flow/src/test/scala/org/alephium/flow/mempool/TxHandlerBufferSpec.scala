@@ -31,6 +31,7 @@ class TxHandlerBufferSpec
     val pool  = TxHandlerBuffer.default()
     txs.foreach(pool.add(_, TimeStamp.now()))
     pool.getRootTxs().toSet is txs.toSet
+    pool.size is txs.length
 
     val toRemove0 = txs.head
     pool.removeValidTx(toRemove0) is None
@@ -42,6 +43,9 @@ class TxHandlerBufferSpec
 
     pool.clean(TimeStamp.now().plusHoursUnsafe(1)) is (txs.length - 2)
     pool.getRootTxs().isEmpty is true
+
+    pool.clear()
+    pool.size is 0
   }
 
   trait SequentialFixture {
@@ -49,6 +53,7 @@ class TxHandlerBufferSpec
     val pool = TxHandlerBuffer.default()
     txs.foreach(pool.add(_, TimeStamp.now()))
     pool.getRootTxs().toSet is Set(txs.head)
+    pool.size is txs.length
 
     val toRemove = txs.head
   }
@@ -70,5 +75,8 @@ class TxHandlerBufferSpec
     pool.add(tx0, TimeStamp.now())
     pool.add(tx1, TimeStamp.now())
     pool.getRootTxs().length is 1
+
+    pool.clear()
+    pool.size is 0
   }
 }
