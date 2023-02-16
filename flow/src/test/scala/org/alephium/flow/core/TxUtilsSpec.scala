@@ -20,13 +20,14 @@ import akka.util.ByteString
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 
+import org.alephium.crypto.BIP340Schnorr
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.FlowUtils.AssetOutputInfo
-import org.alephium.flow.gasestimation._
+import org.alephium.flow.gasestimation.*
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.TxValidation
-import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey}
+import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, TokenIssuance, UnlockScript}
@@ -973,6 +974,58 @@ class TxUtilsSpec extends AlephiumSpec {
     utxo.output.lockupScript is address
     utxo.output.amount is ALPH.oneAlph
     utxo.output.tokens is AVector(TokenId.from(contractId) -> U256.unsafe(1))
+  }
+
+  it should "transfer to Schnorr addrss" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val chainIndex                        = ChainIndex.unsafe(0, 0)
+    val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
+
+    val (priKey, pubKey) = BIP340Schnorr.generatePriPub()
+    val schnorrAddress   = SchnorrAddress(pubKey)
+
+    val block0 = transfer(
+      blockFlow,
+      genesisPriKey,
+      schnorrAddress.lockupScript,
+      AVector.empty[(TokenId, U256)],
+      ALPH.alph(2)
+    )
+    addAndCheck(blockFlow, block0)
+
+    // In case, the first transfer is a cross-group transaction
+    val confirmBlock = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, confirmBlock)
+
+    val (balance, _, _, _, utxoNum) =
+      blockFlow.getBalance(schnorrAddress.lockupScript, Int.MaxValue).rightValue
+    balance is ALPH.alph(2)
+    utxoNum is 1
+
+    val unsignedTx = blockFlow
+      .transfer(
+        None,
+        schnorrAddress.lockupScript,
+        schnorrAddress.unlockScript,
+        AVector(TxOutputInfo(LockupScript.p2pkh(genesisPubKey), ALPH.oneAlph, AVector.empty, None)),
+        None,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue
+      )
+      .rightValue
+      .rightValue
+
+    val signature = BIP340Schnorr.sign(unsignedTx.id.bytes, priKey)
+    val tx = TransactionTemplate(
+      unsignedTx,
+      AVector(Signature.unsafe(signature.bytes)),
+      scriptSignatures = AVector.empty
+    )
+    TxValidation.build.validateMempoolTxTemplate(tx, blockFlow) isE ()
+    blockFlow
+      .getGrandPool()
+      .add(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToMemPool
   }
 
   private def input(
