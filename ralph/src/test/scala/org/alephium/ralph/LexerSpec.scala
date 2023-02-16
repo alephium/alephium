@@ -16,6 +16,8 @@
 
 package org.alephium.ralph
 
+import fastparse.Parsed
+
 import org.alephium.crypto.Byte32
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model.{Address, ContractId}
@@ -68,6 +70,74 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
     fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
     fastparse.parse("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)
+  }
+
+  it should "typedNum should report error messages with line number information" in {
+    {
+      info("when input is not a number type")
+
+      val failure = fastparse.parse("a", Lexer.typedNum(_)).asInstanceOf[Parsed.Failure].trace()
+      failure.index is 0
+      failure.longMsg should include(CompilerError.`an I256 or U256 value`.message)
+      failure.longMsg should include("a")
+    }
+
+    {
+      info("when input is an invalid U256")
+
+      val failure =
+        fastparse.parse("123456789" * 10, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+      failure.index is 0
+      failure.msg should include(CompilerError.`an I256 or U256 value`.message)
+      failure.msg should include("123456789")
+    }
+
+    {
+      info("when input is an invalid negative I256")
+
+      val failure =
+        fastparse.parse("-" + ("123456789" * 10), Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+      failure.index is 0
+      failure.msg should include(CompilerError.`an I256 value`.message)
+      failure.msg should include("-123456789")
+    }
+
+    {
+      info("when input is an invalid negative I256")
+
+      val failure =
+        fastparse.parse(("123456789" * 10) + "i", Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+      failure.index is 0
+      failure.msg should include(CompilerError.`an I256 value`.message)
+      failure.msg should include("123456789")
+    }
+
+    def errorAssetScript(errorTypedNum: String): String =
+      s"""
+         |// comment
+         |AssetScript Foo {
+         |  pub fn bar(a: U256, b: U256) -> (U256) {
+         |    let c = $errorTypedNum
+         |    return (a + b + c)
+         |  }
+         |}
+         |""".stripMargin
+
+    {
+      info("when the error is in a larger ralph program")
+
+      val invalidTypedNum = "123456789" * 10
+      val errorScript     = errorAssetScript(invalidTypedNum)
+      // error index should be 85
+      // or use `indexOf` to find the error index dynamically with `errorScript.replaceAll("\n", " ").indexOf(invalidTypedNum)`
+      val errorIndex = 85
+      val failure =
+        fastparse.parse(errorScript, StatelessParser.assetScript(_)).asInstanceOf[Parsed.Failure]
+      failure.msg should include(CompilerError.`an I256 or U256 value`.message)
+      failure.msg should include("123456789")
+      failure.index is errorIndex
+    }
+
   }
 
   it should "special operators" in {
