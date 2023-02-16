@@ -56,6 +56,7 @@ class TxHandlerBuffer private (
 }
 
 object TxHandlerBuffer {
+  // The buffer will be used to handle cross-group transactions, so the number of groups is set to 1
   private val bufferGroupConfig = new GroupConfig {
     override def groups: Int = 1
   }

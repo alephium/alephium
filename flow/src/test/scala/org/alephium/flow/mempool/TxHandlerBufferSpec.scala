@@ -26,7 +26,7 @@ class TxHandlerBufferSpec
     with NoIndexModelGeneratorsLike {
 
   it should "work for parallel transactions" in {
-    val block = blockGen.filter(_.nonCoinbase.nonEmpty).sample.get
+    val block = blockGen.sample.get
     val txs   = block.transactions.map(_.toTemplate)
     val pool  = TxHandlerBuffer.default()
     txs.foreach(pool.add(_, TimeStamp.now()))
