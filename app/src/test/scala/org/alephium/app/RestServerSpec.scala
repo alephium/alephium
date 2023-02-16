@@ -197,13 +197,6 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "call GET /transactions/unconfirmed" in {
-    Get(s"/transactions/unconfirmed?fromGroup=0&toGroup=0") check { response =>
-      response.code is StatusCode.Ok
-      response.as[AVector[MempoolTransactions]] is AVector.empty[MempoolTransactions]
-    }
-  }
-
   it should "call GET /mempool/transactions" in {
     Get(s"/mempool/transactions") check { response =>
       response.code is StatusCode.Ok

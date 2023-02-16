@@ -291,13 +291,6 @@ trait Endpoints
       .out(jsonBody[ChainInfo])
       .summary("Get infos about the chain from the given groups")
 
-  // have to be lazy to let `groupConfig` being initialized
-  lazy val listUnconfirmedTransactions: BaseEndpoint[Unit, AVector[MempoolTransactions]] =
-    transactionsEndpoint.get
-      .in("unconfirmed")
-      .out(jsonBody[AVector[MempoolTransactions]])
-      .summary("List unconfirmed transactions")
-
   val buildTransaction: BaseEndpoint[BuildTransaction, BuildTransactionResult] =
     transactionsEndpoint.post
       .in("build")
