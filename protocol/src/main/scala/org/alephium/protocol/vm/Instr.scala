@@ -156,7 +156,7 @@ object Instr {
     ContractIdToAddress,
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
     BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
-    I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr
+    I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -1318,6 +1318,18 @@ case object VerifyBIP340Schnorr
 
   override def runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] =
     super[LemanInstrWithSimpleGas].runWith(frame)
+}
+
+case object GetSegregatedSignature
+    extends SignatureInstr
+    with LemanInstrWithSimpleGas[StatelessContext]
+    with StatelessInstrCompanion0
+    with GasVeryLow {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.ctx.signatures.pop().flatMap { signature =>
+      frame.pushOpStack(Val.ByteVec(signature.bytes))
+    }
+  }
 }
 
 case object EthEcRecover

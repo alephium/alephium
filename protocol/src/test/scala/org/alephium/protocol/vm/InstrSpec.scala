@@ -75,7 +75,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
       vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee,
-      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr
+      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature
     )
     val lemanStatefulInstrs = AVector[LemanInstr[StatefulContext]](
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
@@ -1435,7 +1435,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(Sha3, crypto.Sha3)
   }
 
-  it should "VerifyTxSignature" in new StatelessInstrFixture {
+  trait SignatureFixture extends StatelessInstrFixture {
     val keysGen = for {
       group         <- groupIndexGen
       (_, pub, pri) <- addressGen(group)
@@ -1452,7 +1452,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       AVector.empty,
       txEnv = Some(TxEnv(tx, AVector.empty, signatureStack))
     )
+  }
 
+  it should "VerifyTxSignature" in new SignatureFixture {
     val initialGas = context.gasRemaining
     stack.push(Val.ByteVec(pubKey.bytes))
     VerifyTxSignature.runWith(frame) isE ()
@@ -1466,6 +1468,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(Val.ByteVec(dataGen.sample.get))
     VerifyTxSignature.runWith(frame).leftValue isE InvalidPublicKey
+  }
+
+  it should "GetSegregatedSignature" in new SignatureFixture {
+    GetSegregatedSignature.runWith(frame) isE ()
+    GetSegregatedSignature.runWith(frame).leftValue isE StackUnderflow
   }
 
   trait GenericSignatureFixture extends StatelessInstrFixture {
@@ -3603,7 +3610,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress -> 5,
       LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2, AssertWithErrorCode -> 3, Swap -> 2,
       vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0, TxGasPrice -> 2, TxGasAmount -> 2, TxGasFee -> 2,
-      I256Exp -> 1610, U256Exp -> 1610, U256ModExp -> 1610, VerifyBIP340Schnorr -> 2000
+      I256Exp -> 1610, U256Exp -> 1610, U256ModExp -> 1610, VerifyBIP340Schnorr -> 2000, GetSegregatedSignature -> 3
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadMutField(byte) -> 3, StoreMutField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -3733,7 +3740,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress -> 119,
       LoadLocalByIndex -> 120, StoreLocalByIndex -> 121, Dup -> 122, AssertWithErrorCode -> 123, Swap -> 124,
       vm.BlockHash -> 125, DEBUG(AVector.empty) -> 126, TxGasPrice -> 127, TxGasAmount -> 128, TxGasFee -> 129,
-      I256Exp -> 130, U256Exp -> 131, U256ModExp -> 132, VerifyBIP340Schnorr -> 133,
+      I256Exp -> 130, U256Exp -> 131, U256ModExp -> 132, VerifyBIP340Schnorr -> 133, GetSegregatedSignature -> 134,
       // stateful instructions
       LoadMutField(byte) -> 160, StoreMutField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -3793,7 +3800,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
       vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee,
-      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr
+      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadMutField(byte), StoreMutField(byte), CallExternal(byte),
