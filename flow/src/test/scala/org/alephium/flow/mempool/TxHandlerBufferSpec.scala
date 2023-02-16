@@ -24,6 +24,7 @@ class TxHandlerBufferSpec
     extends AlephiumFlowSpec
     with TxIndexesSpec.Fixture
     with NoIndexModelGeneratorsLike {
+  override val configValues = Map(("alephium.broker.broker-num", 1))
 
   it should "work for parallel transactions" in {
     val block = blockGen.sample.get
@@ -49,6 +50,8 @@ class TxHandlerBufferSpec
   }
 
   trait SequentialFixture {
+    brokerConfig.brokerNum is 1
+
     val txs  = prepareRandomSequentialTxs(4).map(_.toTemplate)
     val pool = TxHandlerBuffer.default()
     txs.foreach(pool.add(_, TimeStamp.now()))
