@@ -466,6 +466,7 @@ trait TxHandlerPersistence extends TxHandlerUtils {
     })
     escapeIOError(
       blockFlow.getGrandPool().getOutTxsWithTimestamp().foreachE { case (timestamp, tx) =>
+        println(s"==== persist ${tx.id.toHexString}")
         pendingTxStorage.put(PersistedTxId(timestamp, tx.id), tx)
       }
     )

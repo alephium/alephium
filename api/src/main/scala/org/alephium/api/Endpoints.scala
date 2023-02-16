@@ -327,6 +327,7 @@ trait Endpoints
 
   lazy val rebroadcastMempoolTransaction: BaseEndpoint[TransactionId, Unit] =
     mempoolEndpoint.post
+      .in("rebroadcast-tx")
       .in(query[TransactionId]("txId"))
       .summary("Rebroadcase a mempool transaction to the network")
 

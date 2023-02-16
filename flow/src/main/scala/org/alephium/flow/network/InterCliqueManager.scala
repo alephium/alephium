@@ -214,7 +214,7 @@ class InterCliqueManager(
             brokerState.info.contains(chainIndex.from) && txHashes.nonEmpty
           }
           if (needToSend.nonEmpty) {
-            log.debug(
+            log.info(
               s"Send tx announcements ${FlowUtils.showChainIndexedDigest(needToSend)} to broker $peerId"
             )
             brokerState.actor ! BrokerHandler.RelayTxs(needToSend)
