@@ -8151,7 +8151,7 @@
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/MinerAction"
             },
             "examples": {
               "Start mining": {
@@ -10775,6 +10775,13 @@
             "type": "string"
           }
         }
+      },
+      "MinerAction": {
+        "type": "string",
+        "enum": [
+          "start-mining",
+          "stop-mining"
+        ]
       },
       "MinerAddresses": {
         "required": [

@@ -19,7 +19,7 @@ package org.alephium.api
 import scala.util.{Failure, Success, Try}
 
 import sttp.tapir.{Codec, DecodeResult, Validator}
-import sttp.tapir.CodecFormat.TextPlain
+import sttp.tapir.Codec.PlainCodec
 
 import org.alephium.api.model._
 import org.alephium.json.Json._
@@ -31,37 +31,37 @@ import org.alephium.util.{TimeStamp, U256}
 
 trait TapirCodecs extends ApiModelCodec {
 
-  implicit val timestampTapirCodec: Codec[String, TimeStamp, TextPlain] =
+  implicit val timestampTapirCodec: PlainCodec[TimeStamp] =
     Codec.long.validate(Validator.min(0L)).map(TimeStamp.unsafe(_))(_.millis)
 
-  implicit val hashTapirCodec: Codec[String, Hash, TextPlain] =
+  implicit val hashTapirCodec: PlainCodec[Hash] =
     fromJson[Hash]
 
-  implicit val blockHashTapirCodec: Codec[String, BlockHash, TextPlain] =
+  implicit val blockHashTapirCodec: PlainCodec[BlockHash] =
     fromJson[BlockHash]
 
-  implicit val transactionIdCodec: Codec[String, TransactionId, TextPlain] =
+  implicit val transactionIdCodec: PlainCodec[TransactionId] =
     fromJson[TransactionId]
 
-  implicit val assetAddressTapirCodec: Codec[String, Address.Asset, TextPlain] =
+  implicit val assetAddressTapirCodec: PlainCodec[Address.Asset] =
     fromJson[Address.Asset]
 
-  implicit val contractAddressTapirCodec: Codec[String, Address.Contract, TextPlain] =
+  implicit val contractAddressTapirCodec: PlainCodec[Address.Contract] =
     fromJson[Address.Contract]
 
-  implicit val addressTapirCodec: Codec[String, Address, TextPlain] =
+  implicit val addressTapirCodec: PlainCodec[Address] =
     fromJson[Address]
 
-  implicit val apiKeyTapirCodec: Codec[String, ApiKey, TextPlain] =
+  implicit val apiKeyTapirCodec: PlainCodec[ApiKey] =
     fromJson[ApiKey]
 
-  implicit val publicKeyTapirCodec: Codec[String, PublicKey, TextPlain] =
+  implicit val publicKeyTapirCodec: PlainCodec[PublicKey] =
     fromJson[PublicKey]
 
-  implicit val u256TapirCodec: Codec[String, U256, TextPlain] =
+  implicit val u256TapirCodec: PlainCodec[U256] =
     fromJson[U256]
 
-  implicit val gasBoxCodec: Codec[String, GasBox, TextPlain] =
+  implicit val gasBoxCodec: PlainCodec[GasBox] =
     Codec.int.mapDecode(value =>
       GasBox.from(value) match {
         case Some(gas) => DecodeResult.Value(gas)
@@ -69,18 +69,28 @@ trait TapirCodecs extends ApiModelCodec {
       }
     )(_.value)
 
-  implicit val gasPriceCodec: Codec[String, GasPrice, TextPlain] =
+  implicit val gasPriceCodec: PlainCodec[GasPrice] =
     u256TapirCodec.map[GasPrice](GasPrice(_))(_.value)
 
-  implicit val minerActionTapirCodec: Codec[String, MinerAction, TextPlain] =
-    fromJson[MinerAction]
+  @SuppressWarnings(
+    Array(
+      "org.wartremover.warts.JavaSerializable",
+      "org.wartremover.warts.Product",
+      "org.wartremover.warts.Serializable"
+    )
+  ) // Wartremover is complaining, maybe because of tapir macros
+  implicit val minerActionTapirCodec: PlainCodec[MinerAction] =
+    Codec.derivedEnumeration[String, MinerAction](
+      MinerAction.validate,
+      MinerAction.write
+    )
 
-  implicit val timespanTapirCodec: Codec[String, TimeSpan, TextPlain] =
+  implicit val timespanTapirCodec: PlainCodec[TimeSpan] =
     Codec.long.validate(Validator.min(1)).map(TimeSpan(_))(_.millis)
 
   implicit def groupIndexCodec(implicit
       groupConfig: GroupConfig
-  ): Codec[String, GroupIndex, TextPlain] =
+  ): PlainCodec[GroupIndex] =
     Codec.int.mapDecode(int =>
       GroupIndex.from(int) match {
         case Some(groupIndex) => DecodeResult.Value(groupIndex)
@@ -89,7 +99,7 @@ trait TapirCodecs extends ApiModelCodec {
       }
     )(_.value)
 
-  def fromJson[A: ReadWriter]: Codec[String, A, TextPlain] =
+  def fromJson[A: ReadWriter]: PlainCodec[A] =
     Codec.string.mapDecode[A] { raw =>
       Try(read[A](ujson.Str(raw))) match {
         case Success(a) => DecodeResult.Value(a)

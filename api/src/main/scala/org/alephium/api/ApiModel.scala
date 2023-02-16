@@ -335,15 +335,12 @@ trait ApiModelCodec {
   implicit val getBlockRW: RW[GetBlock] = macroRW
 
   implicit val minerActionRW: RW[MinerAction] = readwriter[String].bimap(
-    {
-      case MinerAction.StartMining => "start-mining"
-      case MinerAction.StopMining  => "stop-mining"
-    },
-    {
-      case "start-mining" => MinerAction.StartMining
-      case "stop-mining"  => MinerAction.StopMining
-      case other          => throw Abort(s"Invalid miner action: $other")
-    }
+    MinerAction.write,
+    str =>
+      MinerAction.validate(str) match {
+        case Some(minerAction) => minerAction
+        case None              => throw Abort(s"Invalid miner action: $str")
+      }
   )
 
   implicit val misbehaviorActionUnBanRW: RW[MisbehaviorAction.Unban] = macroRW
