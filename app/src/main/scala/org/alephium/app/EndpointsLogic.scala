@@ -299,8 +299,8 @@ trait EndpointsLogic extends Endpoints {
     blockFlow.grandPool.get(txId) match {
       case Some(tx) =>
         txHandler ! TxHandler.Rebroadcast(tx)
-      Future.successful(Right(()))
-      case None  => Future.successful(Left(notFound(s"TxId: ${txId.toHexString}")))
+        Future.successful(Right(()))
+      case None => Future.successful(Left(notFound(s"TxId: ${txId.toHexString}")))
     }
   }
 

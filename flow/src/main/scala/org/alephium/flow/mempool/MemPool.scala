@@ -270,16 +270,9 @@ class MemPool private (
   ): Int = writeOnly {
     val oldTxs  = _takeOldTxs(timeStampThreshold)
     var removed = 0
-    println(
-      s"=== before ${group.value} ${flow.allTxs.keys().map(_.toHexString).toIndexedSeq} ${timestamps.keys().map(_.toHexString).toIndexedSeq}"
-    )
     blockFlow.recheckInputs(group, oldTxs).foreach { invalidTxs =>
-      println(s"=== invalid ${invalidTxs.map(_.id.toHexString)}")
       removed += removeUnusedTxs(invalidTxs)
     }
-    println(
-      s"=== after ${group.value} ${flow.allTxs.keys().map(_.toHexString).toIndexedSeq} ${timestamps.keys().map(_.toHexString).toIndexedSeq}"
-    )
     removed
   }
 
