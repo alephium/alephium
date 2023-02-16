@@ -17,6 +17,7 @@
 package org.alephium.flow.gasestimation
 
 import org.alephium.flow.core._
+import org.alephium.protocol.Signature
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
@@ -45,26 +46,24 @@ object TxScriptGasEstimator {
       ): Either[String, TxScriptExecution] = {
         val txTemplate = TransactionTemplate(
           UnsignedTransaction(Some(script), inputs, AVector.empty),
-          inputSignatures = AVector.empty,
-          scriptSignatures = AVector.empty
+          inputSignatures = AVector.fill(16)(Signature.generate),
+          scriptSignatures = AVector.fill(16)(Signature.generate)
         )
 
         val result =
           VM.checkCodeSize(maximalGasPerTx, script.bytes, blockEnv.getHardFork()).flatMap {
             remainingGas =>
-              StatefulVM.runTxScript(
+              StatefulVM.runTxScriptMockup(
                 groupView.worldState.staging(),
                 blockEnv,
                 txTemplate,
                 preOutputs,
-                script,
+                script.mockup(),
                 remainingGas
               )
           }
 
         result.left.map {
-          case Right(InvalidPublicKey) =>
-            "Please use binary search to set the gas manually as signature is required in tx script or contract"
           case Right(error) =>
             s"Execution error when estimating gas for tx script or contract: $error"
           case Left(error) =>

@@ -59,6 +59,8 @@ final case class Method[Ctx <: StatelessContext](
     )
     prefix ++ instrs.map(_.toTemplateString()).mkString("")
   }
+
+  def mockup(): Method[Ctx] = this.copy(instrs = instrs.map(_.mockup()))
 }
 
 object Method {
@@ -169,6 +171,8 @@ sealed trait Contract[Ctx <: StatelessContext] {
       failed(InvalidFieldLength)
     }
   }
+
+  def mockup(): Contract[Ctx]
 }
 
 sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
@@ -193,6 +197,8 @@ final case class StatelessScript private (methods: AVector[Method[StatelessConte
   override def toObject: ScriptObj[StatelessContext] = {
     StatelessScriptObject(this)
   }
+
+  def mockup(): StatelessScript = this.copy(methods = methods.map(_.mockup()))
 }
 
 object StatelessScript {
@@ -224,6 +230,8 @@ final case class StatefulScript private (methods: AVector[Method[StatefulContext
   override def toObject: ScriptObj[StatefulContext] = {
     StatefulScriptObject(this)
   }
+
+  def mockup(): StatefulScript = this.copy(methods = methods.map(_.mockup()))
 }
 
 object StatefulScript {
@@ -283,6 +291,8 @@ final case class StatefulContract(
       methodsBytes.fold(ByteString.empty)(_ ++ _)
     )
   }
+
+  def mockup(): StatefulContract = this.copy(methods = methods.map(_.mockup()))
 }
 
 object StatefulContract {
@@ -345,6 +355,8 @@ object StatefulContract {
         contractId
       )
     }
+
+    def mockup(): HalfDecoded = ???
   }
 
   object HalfDecoded {

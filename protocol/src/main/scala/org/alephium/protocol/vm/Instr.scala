@@ -45,6 +45,8 @@ sealed trait Instr[-Ctx <: StatelessContext] extends GasSchedule {
 
   // this function needs to charge gas manually
   def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+
+  def mockup(): Instr[Ctx] = this
 }
 
 sealed trait LemanInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
@@ -201,6 +203,8 @@ object Instr {
 
   val allLogInstrs: AVector[LogInstr] =
     AVector(Log1, Log2, Log3, Log4, Log5, Log6, Log7, Log8, Log9)
+
+  val mockupCode: Byte = 0xff.toByte
 }
 
 sealed trait StatefulInstr  extends Instr[StatefulContext] with GasSchedule                     {}
@@ -1245,6 +1249,26 @@ case object VerifyTxSignature
       }
     } yield ()
   }
+
+  override def mockup(): Instr[StatelessContext] = {
+    assume(this.gas() == VerifyTxSignatureMockup.gas())
+    VerifyTxSignatureMockup
+  }
+}
+
+case object VerifyTxSignatureMockup
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasSignature {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    val signatures = frame.ctx.signatures
+    for {
+      _ <- frame.popOpStackByteVec() // rawPublicKey
+      _ <- signatures.pop()          // signature
+    } yield ()
+  }
+
+  override lazy val code: Byte = Instr.mockupCode
 }
 
 sealed trait GenericVerifySignature[PubKey, Sig]
@@ -1266,6 +1290,29 @@ sealed trait GenericVerifySignature[PubKey, Sig]
       _ <- if (verify(rawData.bytes, signature, publicKey)) okay else failed(InvalidSignature)
     } yield ()
   }
+
+  override def mockup(): Instr[StatelessContext] = {
+    assume(this.gas() == VerifySignatureMockup.gas())
+    VerifySignatureMockup
+  }
+}
+
+sealed trait GenericVerifySignatureMockup[PubKey, Sig]
+    extends SignatureInstr
+    with StatelessInstrCompanion0
+    with GasSignature {
+  def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.popOpStackByteVec() // rawSignature
+      _ <- frame.popOpStackByteVec() // rawPublicKey
+      _ <- frame.popOpStackByteVec() // rawData
+    } yield ()
+  }
+}
+
+case object VerifySignatureMockup
+    extends GenericVerifySignatureMockup[crypto.SecP256K1PublicKey, crypto.SecP256K1Signature] {
+  override lazy val code: Byte = Instr.mockupCode
 }
 
 case object VerifySecP256K1

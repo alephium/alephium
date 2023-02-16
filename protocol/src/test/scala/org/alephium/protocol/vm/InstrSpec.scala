@@ -34,7 +34,7 @@ import org.alephium.protocol.model.NetworkId.AlephiumMainNet
 import org.alephium.serde.{serialize, RandomBytes}
 import org.alephium.util._
 
-// scalastyle:off file.size.limit no.equal number.of.methods
+// scalastyle:off file.size.limit no.equal number.of.methods number.of.types
 class InstrSpec extends AlephiumSpec with NumericHelpers {
   import Instr._
 
@@ -50,6 +50,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       case CallExternal => ()
       case instr        => toCode(instr) >= 160 is true
     }
+    toCode
   }
 
   it should "serde properly" in new AllInstrsFixture {
@@ -1466,6 +1467,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(wrongKey.bytes))
     VerifyTxSignature.runWith(frame).leftValue isE InvalidSignature
 
+    signatureStack.push(signature)
+    stack.push(Val.ByteVec(wrongKey.bytes))
+    VerifyTxSignature.mockup().runWith(frame) isE ()
+    stack.isEmpty is true
+
     stack.push(Val.ByteVec(dataGen.sample.get))
     VerifyTxSignature.runWith(frame).leftValue isE InvalidPublicKey
   }
@@ -1518,6 +1524,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(Val.ByteVec(pubKey.bytes))
       stack.push(Val.ByteVec(sign(data32Gen.sample.get, priKey).bytes))
       instr.runWith(frame).leftValue isE InvalidSignature
+      stack.isEmpty is true
+
+      stack.push(Val.ByteVec(data))
+      stack.push(Val.ByteVec(pubKey.bytes))
+      stack.push(Val.ByteVec(sign(data32Gen.sample.get, priKey).bytes))
+      instr.mockup().runWith(frame) isE ()
+      stack.isEmpty is true
     }
   }
 
