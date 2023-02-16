@@ -5403,7 +5403,7 @@
         "tags": [
           "Transactions"
         ],
-        "summary": "Build unsigned transactions to send all unlocked balanced of one address to another address",
+        "summary": "Build unsigned transactions to send all unlocked ALPH and token balances of one address to another address",
         "operationId": "postTransactionsSweep-addressBuild",
         "requestBody": {
           "content": {
