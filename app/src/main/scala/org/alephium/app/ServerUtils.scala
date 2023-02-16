@@ -191,10 +191,11 @@ class ServerUtils(implicit
       query: BuildTransaction
   ): Try[BuildTransactionResult] = {
     for {
-      _ <- checkGroup(query.fromPublicKey)
+      lockPair <- query.lockPair()
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
-        query.fromPublicKey,
+        lockPair._1,
+        lockPair._2,
         query.utxos,
         query.destinations,
         query.gasAmount,

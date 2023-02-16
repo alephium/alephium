@@ -16,19 +16,52 @@
 
 package org.alephium.api.model
 
+import akka.util.ByteString
+
+import org.alephium.api.{badRequest, Try}
+import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, BlockHash}
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.AVector
+import org.alephium.protocol.model.{BlockHash, SchnorrAddress}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.util.{AVector, Hex}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildTransaction(
-    fromPublicKey: PublicKey,
+    fromPublicKey: ByteString,
+    fromPublicKeyType: Option[BuildTransaction.PublicKeyType] = None,
     destinations: AVector[Destination],
     utxos: Option[AVector[OutputRef]] = None,
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
 ) extends BuildTxCommon {
-  def fromAddress(): Address.Asset = Address.p2pkh(fromPublicKey)
+  def lockPair(): Try[(LockupScript.Asset, UnlockScript)] = fromPublicKeyType match {
+    case Some(BuildTransaction.BIP340Schnorr) => BuildTransaction.schnorrLockPair(fromPublicKey)
+    case _                                    => BuildTransaction.p2pkhLockPair(fromPublicKey)
+  }
+}
+
+object BuildTransaction {
+  sealed trait PublicKeyType
+  object Default       extends PublicKeyType // SecP256K1
+  object BIP340Schnorr extends PublicKeyType
+
+  def p2pkhLockPair(fromPublicKey: ByteString): Try[(LockupScript.Asset, UnlockScript)] = {
+    PublicKey.from(fromPublicKey) match {
+      case Some(publicKey) =>
+        Right(LockupScript.p2pkh(publicKey) -> UnlockScript.p2pkh(publicKey))
+      case None =>
+        Left(badRequest(s"Invalid SecP256K1 public key: ${Hex.toHexString(fromPublicKey)}"))
+    }
+  }
+
+  def schnorrLockPair(fromPublicKey: ByteString): Try[(LockupScript.Asset, UnlockScript)] = {
+    BIP340SchnorrPublicKey.from(fromPublicKey) match {
+      case Some(publicKey) =>
+        val address = SchnorrAddress(publicKey)
+        Right(address.lockupScript -> address.unlockScript)
+      case None =>
+        Left(badRequest(s"Invalid SecP256K1 public key: ${Hex.toHexString(fromPublicKey)}"))
+    }
+  }
 }

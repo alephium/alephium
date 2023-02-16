@@ -370,7 +370,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bt => Right(Some(LockupScript.p2pkh(bt.fromPublicKey).groupIndex(brokerConfig)))
+    bt => bt.lockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
   )
 
   val buildMultisigLogic = serverLogicRedirect(buildMultisig)(

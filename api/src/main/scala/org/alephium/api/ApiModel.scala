@@ -247,6 +247,17 @@ trait ApiModelCodec {
 
   implicit val destinationRW: RW[Destination] = macroRW
 
+  implicit val fromPublicKeyTypeRW: RW[BuildTransaction.PublicKeyType] = readwriter[String].bimap(
+    {
+      case BuildTransaction.Default       => "default"
+      case BuildTransaction.BIP340Schnorr => "bip430-schnorr"
+    },
+    {
+      case "default"        => BuildTransaction.Default
+      case "bip430-schnorr" => BuildTransaction.BIP340Schnorr
+      case other            => throw Abort(s"Invalid public key type: $other")
+    }
+  )
   implicit val buildTransactionRW: RW[BuildTransaction] = macroRW
 
   implicit val buildSweepAddressTransactionsRW: RW[BuildSweepAddressTransactions] = macroRW

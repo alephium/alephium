@@ -402,13 +402,15 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildTransactionExamples: List[Example[BuildTransaction]] = List(
     defaultExample(
       BuildTransaction(
-        publicKey,
+        publicKey.bytes,
+        None,
         defaultDestinations
       )
     ),
     moreSettingsExample(
       BuildTransaction(
-        publicKey,
+        publicKey.bytes,
+        Some(BuildTransaction.BIP340Schnorr),
         moreSettingsDestinations,
         Some(AVector(outputRef)),
         Some(model.minimalGas),

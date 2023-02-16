@@ -355,7 +355,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     {
       val transfer =
-        BuildTransaction(fromPublicKey, AVector(Destination(toAddress, Amount(1))))
+        BuildTransaction(fromPublicKey.bytes, None, AVector(Destination(toAddress, Amount(1))))
       val jsonRaw = s"""
                        |{
                        |  "fromPublicKey": "${fromPublicKey.toHexString}",
@@ -372,7 +372,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
     {
       val transfer = BuildTransaction(
-        fromPublicKey,
+        fromPublicKey.bytes,
+        None,
         AVector(Destination(toAddress, Amount(1), None, Some(TimeStamp.unsafe(1234)))),
         None,
         Some(GasBox.unsafe(1)),
@@ -399,7 +400,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val tokenId1 = TokenId.hash("tokenId1")
 
       val transfer = BuildTransaction(
-        fromPublicKey,
+        fromPublicKey.bytes,
+        None,
         AVector(
           Destination(
             toAddress,
@@ -439,7 +441,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val tokenId1 = TokenId.hash("tokenId1")
 
       val transfer = BuildTransaction(
-        fromPublicKey,
+        fromPublicKey.bytes,
+        None,
         AVector(
           Destination(
             toAddress,
@@ -480,7 +483,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val utxoKey1 = Hash.hash("utxo1")
 
       val transfer = BuildTransaction(
-        fromPublicKey,
+        fromPublicKey.bytes,
+        Some(BuildTransaction.BIP340Schnorr),
         AVector(
           Destination(
             toAddress,
@@ -496,6 +500,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val jsonRaw = s"""
                        |{
                        |  "fromPublicKey": "${fromPublicKey.toHexString}",
+                       |  "fromPublicKeyType": "bip430-schnorr",
                        |  "destinations": [
                        |    {
                        |      "address": "${toAddress.toBase58}",

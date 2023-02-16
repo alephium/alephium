@@ -123,7 +123,8 @@ object BlockFlowClient {
         lockupScript.groupIndex,
         buildTransaction,
         BuildTransaction(
-          fromPublicKey,
+          fromPublicKey.bytes,
+          None,
           destinations,
           None,
           gas,
