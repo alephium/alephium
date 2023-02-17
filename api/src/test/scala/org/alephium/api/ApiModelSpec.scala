@@ -442,7 +442,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
       val transfer = BuildTransaction(
         fromPublicKey.bytes,
-        None,
+        Some(BuildTxCommon.Default),
         AVector(
           Destination(
             toAddress,
@@ -458,6 +458,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val jsonRaw = s"""
                        |{
                        |  "fromPublicKey": "${fromPublicKey.toHexString}",
+                       |  "fromPublicKeyType": "default",
                        |  "destinations": [
                        |    {
                        |      "address": "${toAddress.toBase58}",

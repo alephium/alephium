@@ -249,11 +249,11 @@ trait ApiModelCodec {
 
   implicit val fromPublicKeyTypeRW: RW[BuildTxCommon.PublicKeyType] = readwriter[String].bimap(
     {
-      case BuildTxCommon.Default       => "secp256k1"
+      case BuildTxCommon.Default       => "default"
       case BuildTxCommon.BIP340Schnorr => "bip340-schnorr"
     },
     {
-      case "secp256k1"      => BuildTxCommon.Default
+      case "default"        => BuildTxCommon.Default
       case "bip340-schnorr" => BuildTxCommon.BIP340Schnorr
       case other            => throw Abort(s"Invalid public key type: $other")
     }

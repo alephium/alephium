@@ -6558,7 +6558,7 @@
                   "summary": "More settings",
                   "value": {
                     "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                    "fromPublicKeyType": "secp256k1",
+                    "fromPublicKeyType": "default",
                     "bytecode": "35d1b2a520a0da34c5eb8d712aa9cc",
                     "attoAlphAmount": "1000000000000000",
                     "tokens": [

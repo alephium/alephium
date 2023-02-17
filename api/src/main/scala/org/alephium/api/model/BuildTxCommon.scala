@@ -53,7 +53,7 @@ object BuildTxCommon {
       case Some(publicKey) =>
         Right(LockupScript.p2pkh(publicKey) -> UnlockScript.p2pkh(publicKey))
       case None =>
-        Left(badRequest(s"Invalid BIP340Schnorr public key: ${Hex.toHexString(fromPublicKey)}"))
+        Left(badRequest(s"Invalid SecP256K1 public key: ${Hex.toHexString(fromPublicKey)}"))
     }
   }
 
@@ -63,7 +63,7 @@ object BuildTxCommon {
         val address = SchnorrAddress(publicKey)
         Right(address.lockupScript -> address.unlockScript)
       case None =>
-        Left(badRequest(s"Invalid SecP256K1 public key: ${Hex.toHexString(fromPublicKey)}"))
+        Left(badRequest(s"Invalid BIP340Schnorr public key: ${Hex.toHexString(fromPublicKey)}"))
     }
   }
 
