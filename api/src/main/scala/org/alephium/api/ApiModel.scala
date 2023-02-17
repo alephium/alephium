@@ -250,11 +250,11 @@ trait ApiModelCodec {
   implicit val fromPublicKeyTypeRW: RW[BuildTransaction.PublicKeyType] = readwriter[String].bimap(
     {
       case BuildTransaction.Default       => "default"
-      case BuildTransaction.BIP340Schnorr => "bip430-schnorr"
+      case BuildTransaction.BIP340Schnorr => "bip340-schnorr"
     },
     {
       case "default"        => BuildTransaction.Default
-      case "bip430-schnorr" => BuildTransaction.BIP340Schnorr
+      case "bip340-schnorr" => BuildTransaction.BIP340Schnorr
       case other            => throw Abort(s"Invalid public key type: $other")
     }
   )

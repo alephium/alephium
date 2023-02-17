@@ -51,7 +51,7 @@ object BuildTransaction {
       case Some(publicKey) =>
         Right(LockupScript.p2pkh(publicKey) -> UnlockScript.p2pkh(publicKey))
       case None =>
-        Left(badRequest(s"Invalid SecP256K1 public key: ${Hex.toHexString(fromPublicKey)}"))
+        Left(badRequest(s"Invalid BIP340Schnorr public key: ${Hex.toHexString(fromPublicKey)}"))
     }
   }
 

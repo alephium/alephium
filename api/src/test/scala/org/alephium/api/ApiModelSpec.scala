@@ -500,7 +500,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       val jsonRaw = s"""
                        |{
                        |  "fromPublicKey": "${fromPublicKey.toHexString}",
-                       |  "fromPublicKeyType": "bip430-schnorr",
+                       |  "fromPublicKeyType": "bip340-schnorr",
                        |  "destinations": [
                        |    {
                        |      "address": "${toAddress.toBase58}",
