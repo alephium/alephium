@@ -42,7 +42,7 @@ object BuildTxCommon {
     def fromPublicKey: ByteString
     def fromPublicKeyType: Option[PublicKeyType]
 
-    def lockPair(): Try[(LockupScript.Asset, UnlockScript)] = fromPublicKeyType match {
+    def getLockPair(): Try[(LockupScript.Asset, UnlockScript)] = fromPublicKeyType match {
       case Some(BuildTxCommon.BIP340Schnorr) => schnorrLockPair(fromPublicKey)
       case _                                 => p2pkhLockPair(fromPublicKey)
     }

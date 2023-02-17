@@ -370,7 +370,7 @@ trait EndpointsLogic extends Endpoints {
             )
         )
       },
-    bt => bt.lockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
+    bt => bt.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
   )
 
   val buildMultisigLogic = serverLogicRedirect(buildMultisig)(

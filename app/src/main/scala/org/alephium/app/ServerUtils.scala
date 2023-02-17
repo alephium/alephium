@@ -191,7 +191,7 @@ class ServerUtils(implicit
       query: BuildTransaction
   ): Try[BuildTransactionResult] = {
     for {
-      lockPair <- query.lockPair()
+      lockPair <- query.getLockPair()
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
         lockPair._1,
@@ -787,7 +787,7 @@ class ServerUtils(implicit
         .map(badRequest)
       initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1)
       code                  <- query.decodeBytecode()
-      lockPair              <- query.lockPair()
+      lockPair              <- query.getLockPair()
       script <- buildDeployContractTxWithParsedState(
         code.contract,
         Address.Asset(lockPair._1),
@@ -851,7 +851,7 @@ class ServerUtils(implicit
         .getAlphAndTokenAmounts(query.attoAlphAmount, query.tokens)
         .left
         .map(badRequest)
-      lockPair <- query.lockPair()
+      lockPair <- query.getLockPair()
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
