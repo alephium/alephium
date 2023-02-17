@@ -801,7 +801,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`",
+            "description": "\nFormat 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`\n\nField fromPublicKeyType can be `default` or `bip340-schnorr`\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -1022,7 +1022,7 @@
           }
         ],
         "requestBody": {
-          "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`",
+          "description": "\nFormat 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`\n\nField fromPublicKeyType can be `default` or `bip340-schnorr`\n",
           "content": {
             "application/json": {
               "schema": {
@@ -4386,7 +4386,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`",
+            "description": "\nFormat 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`\n\nField fromPublicKeyType can be `default` or `bip340-schnorr`\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -5115,7 +5115,7 @@
         "summary": "Build an unsigned transaction to a number of recipients",
         "operationId": "postTransactionsBuild",
         "requestBody": {
-          "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`",
+          "description": "\nFormat 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`\n\nField fromPublicKeyType can be `default` or `bip340-schnorr`\n",
           "content": {
             "application/json": {
               "schema": {
@@ -7852,7 +7852,7 @@
         "summary": "Create the multisig address and unlock script",
         "operationId": "postMultisigAddress",
         "requestBody": {
-          "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`",
+          "description": "\nFormat 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`\n\nField fromPublicKeyType can be `default` or `bip340-schnorr`\n",
           "content": {
             "application/json": {
               "schema": {

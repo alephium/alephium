@@ -572,7 +572,11 @@ object Endpoints {
     alphJsonBody[T]
       .examples(examples)
       .description(
-        s"""Format 1: `${ALPH.oneAlph}`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = ${ALPH.oneAlph}`"""
+        s"""
+           |Format 1: `${ALPH.oneAlph}`\n
+           |Format 2: `x.y ALPH`, where `1 ALPH = ${ALPH.oneAlph}`\n
+           |Field fromPublicKeyType can be `default` or `bip340-schnorr`
+           |""".stripMargin
       )
   }
 }
