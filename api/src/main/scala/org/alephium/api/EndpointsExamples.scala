@@ -410,7 +410,7 @@ trait EndpointsExamples extends ErrorExamples {
     moreSettingsExample(
       BuildTransaction(
         publicKey.bytes,
-        Some(BuildTransaction.BIP340Schnorr),
+        Some(BuildTxCommon.BIP340Schnorr),
         moreSettingsDestinations,
         Some(AVector(outputRef)),
         Some(model.minimalGas),
@@ -623,10 +623,11 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   implicit val buildDeployContractTxExamples: List[Example[BuildDeployContractTx]] = List(
-    defaultExample(BuildDeployContractTx(publicKey, bytecode = byteString)),
+    defaultExample(BuildDeployContractTx(publicKey.bytes, None, bytecode = byteString)),
     moreSettingsExample(
       BuildDeployContractTx(
-        publicKey,
+        publicKey.bytes,
+        Some(BuildTxCommon.BIP340Schnorr),
         byteString,
         Some(bigAmount),
         Some(tokens),
@@ -638,10 +639,11 @@ trait EndpointsExamples extends ErrorExamples {
   )
 
   implicit val buildExecuteScriptTxExamples: List[Example[BuildExecuteScriptTx]] = List(
-    defaultExample(BuildExecuteScriptTx(publicKey, bytecode = byteString)),
+    defaultExample(BuildExecuteScriptTx(publicKey.bytes, None, bytecode = byteString)),
     moreSettingsExample(
       BuildExecuteScriptTx(
-        publicKey,
+        publicKey.bytes,
+        Some(BuildTxCommon.Default),
         byteString,
         Some(Amount(model.dustUtxoAmount)),
         Some(tokens),

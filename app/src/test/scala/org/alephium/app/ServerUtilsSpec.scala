@@ -260,7 +260,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         blockFlow,
         BuildTransaction(
           fromPublicKey = pubKey.bytes,
-          fromPublicKeyType = Some(BuildTransaction.BIP340Schnorr),
+          fromPublicKeyType = Some(BuildTxCommon.BIP340Schnorr),
           AVector(destination)
         )
       )

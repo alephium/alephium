@@ -484,7 +484,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
 
       val transfer = BuildTransaction(
         fromPublicKey.bytes,
-        Some(BuildTransaction.BIP340Schnorr),
+        Some(BuildTxCommon.BIP340Schnorr),
         AVector(
           Destination(
             toAddress,
@@ -725,7 +725,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode BuildContract" in {
     val publicKey = PublicKey.generate
     val buildDeployContractTx = BuildDeployContractTx(
-      fromPublicKey = publicKey,
+      fromPublicKey = publicKey.bytes,
       bytecode = ByteString(0, 0),
       issueTokenAmount = Some(Amount(1)),
       gasAmount = Some(GasBox.unsafe(1)),
@@ -774,7 +774,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   it should "encode/decode BuildScriptTx" in {
     val publicKey = PublicKey.generate
     val buildExecuteScriptTx = BuildExecuteScriptTx(
-      fromPublicKey = publicKey,
+      fromPublicKey = publicKey.bytes,
       bytecode = ByteString(0, 0),
       gasAmount = Some(GasBox.unsafe(1)),
       gasPrice = Some(GasPrice(1))
