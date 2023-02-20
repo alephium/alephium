@@ -197,10 +197,30 @@ abstract class RestServerSpec(
     }
   }
 
-  it should "call GET /transactions/unconfirmed" in {
-    Get(s"/transactions/unconfirmed?fromGroup=0&toGroup=0") check { response =>
+  it should "call GET /mempool/transactions" in {
+    Get(s"/mempool/transactions") check { response =>
       response.code is StatusCode.Ok
-      response.as[AVector[UnconfirmedTransactions]] is AVector.empty[UnconfirmedTransactions]
+      response.as[AVector[MempoolTransactions]] is AVector.empty[MempoolTransactions]
+    }
+  }
+
+  it should "call DELETE /mempool/transactions" in {
+    Delete(s"/mempool/transactions") check { response =>
+      response.code is StatusCode.Ok
+    }
+  }
+
+  it should "call PUT /mempool/transactions/rebroadcast" in {
+    val txId = TransactionId.generate.toHexString
+    Put(s"/mempool/transactions/rebroadcast/${txId}") check { response =>
+      response.code is StatusCode.NotFound
+    }
+  }
+
+  it should "call PUT /mempool/transactions/validate" in {
+    Put(s"/mempool/transactions/validate") check { response =>
+      // TODO: the dummy blockflow does not work for multi-node clique
+      (response.code == StatusCode.Ok || response.code == StatusCode.InternalServerError) is true
     }
   }
 

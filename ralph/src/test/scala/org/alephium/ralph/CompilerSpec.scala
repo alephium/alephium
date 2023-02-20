@@ -3532,4 +3532,29 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     Compiler.compileContract(code("U256", "U256", "|**|", "I256")).leftValue.message is
       """Invalid return types: expected "List(I256)", got "List(U256)""""
   }
+
+  it should "compile Schnorr address lockup script" in {
+    val (script, warnings) =
+      Compiler.compileAssetScript(Address.schnorrAddressLockupScript).rightValue
+    warnings.isEmpty is true
+    script is StatelessScript.unsafe(
+      AVector(
+        Method[StatelessContext](
+          isPublic = true,
+          usePreapprovedAssets = false,
+          useContractAssets = false,
+          argsLength = 0,
+          localsLength = 0,
+          returnLength = 0,
+          instrs = AVector[Instr[StatelessContext]](
+            TxId,
+            TemplateVariable("publicKey", Val.ByteVec, 0),
+            GetSegregatedSignature,
+            VerifyBIP340Schnorr
+          )
+        )
+      )
+    )
+    script.toTemplateString() is "0101000000000458{0}8685"
+  }
 }

@@ -192,7 +192,7 @@ trait BrokerHandler extends FlowDataHandler {
     case TxHandler.AddSucceeded(hash) =>
       log.debug(s"Tx ${hash.shortHex} was added successfully")
     case TxHandler.AddFailed(hash, reason) =>
-      log.debug(s"Tx ${hash.shortHex} failed in adding. Reason: ${reason}")
+      log.debug(s"Failed in adding new TX ${hash.shortHex}. Reason: ${reason}")
   }
 
   def dataOrigin: DataOrigin

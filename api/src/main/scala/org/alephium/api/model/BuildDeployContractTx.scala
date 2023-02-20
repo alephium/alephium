@@ -19,15 +19,16 @@ package org.alephium.api.model
 import akka.util.ByteString
 
 import org.alephium.api.{badRequest, Try}
-import org.alephium.protocol.{vm, PublicKey}
 import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
 import org.alephium.serde._
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildDeployContractTx(
-    fromPublicKey: PublicKey,
+    fromPublicKey: ByteString,
+    fromPublicKeyType: Option[BuildTxCommon.PublicKeyType] = None,
     bytecode: ByteString,
     initialAttoAlphAmount: Option[Amount] = None,
     initialTokenAmounts: Option[AVector[Token]] = None,
@@ -35,7 +36,8 @@ final case class BuildDeployContractTx(
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
-) extends BuildTxCommon {
+) extends BuildTxCommon
+    with BuildTxCommon.FromPublicKey {
   def decodeBytecode(): Try[BuildDeployContractTx.Code] = {
     deserialize[BuildDeployContractTx.Code](bytecode).left.map(serdeError =>
       badRequest(serdeError.getMessage)

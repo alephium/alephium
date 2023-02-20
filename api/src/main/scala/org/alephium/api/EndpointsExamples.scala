@@ -343,8 +343,8 @@ trait EndpointsExamples extends ErrorExamples {
       : List[Example[BlocksAndEventsPerTimeStampRange]] =
     simpleExample(BlocksAndEventsPerTimeStampRange(AVector(AVector(blockAndEvents))))
 
-  implicit val unconfirmedTransactionsExamples: List[Example[AVector[UnconfirmedTransactions]]] =
-    simpleExample(AVector(UnconfirmedTransactions(0, 1, AVector(transactionTemplate))))
+  implicit val mempoolTransactionsExamples: List[Example[AVector[MempoolTransactions]]] =
+    simpleExample(AVector(MempoolTransactions(0, 1, AVector(transactionTemplate))))
 
   implicit val blockEntryExamples: List[Example[BlockEntry]] =
     simpleExample(blockEntry)
@@ -402,13 +402,15 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val buildTransactionExamples: List[Example[BuildTransaction]] = List(
     defaultExample(
       BuildTransaction(
-        publicKey,
+        publicKey.bytes,
+        None,
         defaultDestinations
       )
     ),
     moreSettingsExample(
       BuildTransaction(
-        publicKey,
+        publicKey.bytes,
+        Some(BuildTxCommon.BIP340Schnorr),
         moreSettingsDestinations,
         Some(AVector(outputRef)),
         Some(model.minimalGas),
@@ -621,10 +623,11 @@ trait EndpointsExamples extends ErrorExamples {
     )
 
   implicit val buildDeployContractTxExamples: List[Example[BuildDeployContractTx]] = List(
-    defaultExample(BuildDeployContractTx(publicKey, bytecode = byteString)),
+    defaultExample(BuildDeployContractTx(publicKey.bytes, None, bytecode = byteString)),
     moreSettingsExample(
       BuildDeployContractTx(
-        publicKey,
+        publicKey.bytes,
+        Some(BuildTxCommon.BIP340Schnorr),
         byteString,
         Some(bigAmount),
         Some(tokens),
@@ -636,10 +639,11 @@ trait EndpointsExamples extends ErrorExamples {
   )
 
   implicit val buildExecuteScriptTxExamples: List[Example[BuildExecuteScriptTx]] = List(
-    defaultExample(BuildExecuteScriptTx(publicKey, bytecode = byteString)),
+    defaultExample(BuildExecuteScriptTx(publicKey.bytes, None, bytecode = byteString)),
     moreSettingsExample(
       BuildExecuteScriptTx(
-        publicKey,
+        publicKey.bytes,
+        Some(BuildTxCommon.Default),
         byteString,
         Some(Amount(model.dustUtxoAmount)),
         Some(tokens),

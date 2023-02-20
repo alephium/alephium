@@ -308,6 +308,16 @@ object BuiltIn {
       doc =
         "Verifies the transaction SecP256K1 signature of a public key. The signature is signed against the transaction id."
     )
+  val getSegregatedSignature: SimpleBuiltIn[StatelessContext] =
+    SimpleBuiltIn.cryptography(
+      "getSegregatedSignature",
+      Seq.empty,
+      Seq(Type.ByteVec),
+      GetSegregatedSignature,
+      argsName = Seq.empty,
+      retComment = "the segregated signature of the transaction",
+      doc = "The segregated signature of the transaction"
+    )
   val verifySecP256K1: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.cryptography(
       "verifySecP256K1",
@@ -841,6 +851,7 @@ object BuiltIn {
     assert,
     checkCaller,
     verifyTxSignature,
+    getSegregatedSignature,
     verifySecP256K1,
     verifyED25519,
     verifyBIP340Schnorr,

@@ -23,7 +23,7 @@ import akka.util.ByteString
 import sttp.tapir.{FieldName, Schema}
 import sttp.tapir.SchemaType.{SArray, SInteger, SProduct, SProductField, SString}
 
-import org.alephium.api.model.{Amount, Script}
+import org.alephium.api.model.{Amount, BuildTxCommon, Script}
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.model.{Address, BlockHash, CliqueId, GroupIndex}
@@ -79,6 +79,9 @@ trait TapirSchemasLike {
 
   implicit val statefulContractSchema: Schema[StatefulContract] =
     Schema(SString()).format("contract")
+
+  implicit val publicKeyTypeSchema: Schema[BuildTxCommon.PublicKeyType] =
+    Schema(SString()).format("hex-string")
 }
 
 object TapirSchemas extends TapirSchemasLike

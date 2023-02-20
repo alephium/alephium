@@ -449,6 +449,36 @@ object StatefulVM {
     } yield result
   }
 
+  def runTxScriptMockup(
+      worldState: WorldState.Staging,
+      blockEnv: BlockEnv,
+      tx: TransactionAbstract,
+      preOutputs: AVector[AssetOutput],
+      script: StatefulScript,
+      gasRemaining: GasBox
+  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
+    val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
+    runTxScriptMockup(context, script)
+  }
+
+  def runTxScriptMockup(
+      context: StatefulContext,
+      script: StatefulScript
+  ): ExeResult[TxScriptExecution] = {
+    for {
+      _ <- execute(context, script.toObject, AVector.empty)
+    } yield prepareResultMockup(context)
+  }
+
+  private def prepareResultMockup(context: StatefulContext): TxScriptExecution = {
+    TxScriptExecution(
+      context.gasRemaining,
+      AVector.from(context.contractInputs.view.map(_._1)),
+      AVector.from(context.contractInputs.view.map(_._2)),
+      AVector.from(context.generatedOutputs)
+    )
+  }
+
   def runTxScriptWithOutputs(
       context: StatefulContext,
       script: StatefulScript

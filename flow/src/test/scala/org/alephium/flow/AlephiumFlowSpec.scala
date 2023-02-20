@@ -783,7 +783,7 @@ trait FlowFixture
     def createTx(): Transaction = {
       val (fromPriKey, _, lastAmount) = keys.last
       val (toPriKey, toPubKey)        = brokerConfig.randomGroupIndex().generateKey
-      val amount                      = lastAmount.divUnsafe(2)
+      val amount                      = lastAmount.subUnsafe(ALPH.oneAlph)
       val block                       = transfer(tmpBlockFlow, fromPriKey, toPubKey, amount)
       val chainIndex                  = block.chainIndex
       addAndCheck(tmpBlockFlow, block)

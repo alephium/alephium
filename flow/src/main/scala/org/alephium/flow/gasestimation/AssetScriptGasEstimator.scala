@@ -61,7 +61,7 @@ object AssetScriptGasEstimator {
         val txEnv = TxEnv(
           txTemplate,
           preOutputs.getOrElse(AVector.empty),
-          Stack.popOnly(AVector.empty[Signature])
+          Stack.popOnly(AVector.fill(16)(Signature.generate))
         )
 
         val result = for {
@@ -71,7 +71,7 @@ object AssetScriptGasEstimator {
             blockEnv,
             txEnv,
             remaining1,
-            p2sh.script,
+            p2sh.script.mockup(),
             p2sh.params
           )
         } yield exeResult

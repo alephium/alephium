@@ -16,11 +16,13 @@
 
 package org.alephium.protocol.model
 
-import org.alephium.protocol.PublicKey
+import org.alephium.crypto.BIP340SchnorrPublicKey
+import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.vm.LockupScript
-import org.alephium.serde.serialize
-import org.alephium.util.Base58
+import org.alephium.protocol.vm.{LockupScript, StatelessScript, UnlockScript}
+import org.alephium.serde.{deserialize, serialize}
+import org.alephium.util.{AVector, Base58}
+import org.alephium.util.Hex.HexStringSyntax
 
 sealed trait Address {
   def lockupScript: LockupScript
@@ -70,4 +72,31 @@ object Address {
 
   def p2pkh(publicKey: PublicKey): Address.Asset =
     Asset(LockupScript.p2pkh(publicKey))
+
+  lazy val schnorrAddressLockupScript: String =
+    s"""
+       |AssetScript Schnorr(publicKey: ByteVec) {
+       |  pub fn unlock() -> () {
+       |    verifyBIP340Schnorr!(txId!(), publicKey, getSegregatedSignature!())
+       |  }
+       |}
+       |""".stripMargin
+}
+
+final case class SchnorrAddress(publicKey: BIP340SchnorrPublicKey) {
+  // bytecode template generated from the script is 0101000000000458{0}8685
+  lazy val scriptByteCode = {
+    hex"0101000000000458144020" ++ publicKey.bytes ++ hex"8685"
+  }
+
+  lazy val lockupScript: LockupScript.Asset = {
+    LockupScript.p2sh(Hash.hash(scriptByteCode))
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  lazy val unlockScript: UnlockScript = {
+    UnlockScript.p2sh(deserialize[StatelessScript](scriptByteCode).toOption.get, AVector.empty)
+  }
+
+  lazy val address: Address.Asset = Address.Asset(lockupScript)
 }

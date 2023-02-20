@@ -178,9 +178,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
       transferFromP2sh(lockup, unlock)
 
       val estimator = assetScriptGasEstimator(lockup, unlock)
-      GasEstimation
-        .estimateInputGas(unlock, None, estimator)
-        .leftValue is "Please use binary search to set the gas manually as signature is required in P2SH script"
+      GasEstimation.estimateInputGas(unlock, None, estimator) isE GasBox.unsafe(4277)
     }
 
     info("P2SH, other execution error, e.g. ArithmeticError")
@@ -252,7 +250,7 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
            |  verifyTxSignature!(#${pubKey.toHexString})
            |}
            |""".stripMargin
-      ).leftValue is "Please use binary search to set the gas manually as signature is required in tx script or contract"
+      ) isE GasBox.unsafe(6745)
     }
 
     info("Other execution error, e.g. AssertionFailed")

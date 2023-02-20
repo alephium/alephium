@@ -25,6 +25,7 @@ import akka.util.ByteString
 import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
 import org.alephium.api.model.{Transaction => _, TransactionTemplate => _, _}
+import org.alephium.crypto.BIP340Schnorr
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow}
 import org.alephium.flow.gasestimation._
@@ -93,7 +94,10 @@ class ServerUtilsSpec extends AlephiumSpec {
     val message               = Hex.unsafe("FFFF")
     val destination           = generateDestination(ChainIndex.unsafe(0, 1), message)
     val buildTransaction = serverUtils
-      .buildTransaction(blockFlow, BuildTransaction(fromPublicKey, AVector(destination)))
+      .buildTransaction(
+        blockFlow,
+        BuildTransaction(fromPublicKey.bytes, None, AVector(destination))
+      )
       .rightValue
     val unsignedTransaction =
       serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
@@ -121,7 +125,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey, destinations)
+          BuildTransaction(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
@@ -181,7 +185,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey, destinations)
+          BuildTransaction(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
@@ -227,6 +231,57 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "support Schnorr address" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val chainIndex                        = ChainIndex.unsafe(0, 0)
+    val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
+
+    val (priKey, pubKey) = BIP340Schnorr.generatePriPub()
+    val schnorrAddress   = SchnorrAddress(pubKey)
+
+    val block0 = transfer(
+      blockFlow,
+      genesisPriKey,
+      schnorrAddress.lockupScript,
+      AVector.empty[(TokenId, U256)],
+      ALPH.alph(2)
+    )
+    addAndCheck(blockFlow, block0)
+
+    // In case, the first transfer is a cross-group transaction
+    val confirmBlock = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, confirmBlock)
+
+    implicit val serverUtils = new ServerUtils
+    val destination          = Destination(Address.p2pkh(genesisPubKey), Amount(ALPH.oneAlph))
+    val buildTransaction = serverUtils
+      .buildTransaction(
+        blockFlow,
+        BuildTransaction(
+          fromPublicKey = pubKey.bytes,
+          fromPublicKeyType = Some(BuildTxCommon.BIP340Schnorr),
+          AVector(destination)
+        )
+      )
+      .rightValue
+    val unsignedTransaction =
+      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+
+    val signature = BIP340Schnorr.sign(unsignedTransaction.id.bytes, priKey)
+    val txTemplate =
+      serverUtils
+        .createTxTemplate(
+          SubmitTransaction(buildTransaction.unsignedTx, Signature.unsafe(signature.bytes))
+        )
+        .rightValue
+    blockFlow.getGrandPool().add(txTemplate.chainIndex, AVector(txTemplate), TimeStamp.now())
+
+    val block1 = mineFromMemPool(blockFlow, txTemplate.chainIndex)
+    block1.nonCoinbase.map(_.id).contains(txTemplate.id) is true
+    addAndCheck(blockFlow, block1)
+  }
+
   it should "check sweep address tx status for intra group txs" in new Fixture with GetTxFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
@@ -246,7 +301,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey, destinations)
+          BuildTransaction(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
@@ -328,7 +383,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       val buildTransaction = serverUtils
         .buildTransaction(
           blockFlow,
-          BuildTransaction(fromPublicKey, destinations)
+          BuildTransaction(fromPublicKey.bytes, None, destinations)
         )
         .rightValue
 
@@ -480,7 +535,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransaction = serverUtils
       .buildTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey, destinations)
+        BuildTransaction(fromPublicKey.bytes, None, destinations)
       )
       .rightValue
 
@@ -504,7 +559,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransaction = serverUtils
       .buildTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey, selfDestinations)
+        BuildTransaction(fromPublicKey.bytes, None, selfDestinations)
       )
       .rightValue
     val txTemplate = signAndAddToMemPool(
@@ -809,7 +864,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils
       .buildTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey, emptyDestinations)
+        BuildTransaction(fromPublicKey.bytes, None, emptyDestinations)
       )
       .leftValue
       .detail is "Zero transaction outputs"
@@ -819,7 +874,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils
       .buildTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey, tooManyDestinations)
+        BuildTransaction(fromPublicKey.bytes, None, tooManyDestinations)
       )
       .leftValue
       .detail is "Too many transaction outputs, maximal value: 256"
@@ -850,7 +905,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransaction = serverUtils
       .buildTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey, destinations)
+        BuildTransaction(fromPublicKey.bytes, None, destinations)
       )
       .leftValue
 
@@ -863,8 +918,8 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     implicit val serverUtils = new ServerUtils()
 
-    val emptyMempool = serverUtils.listUnconfirmedTransactions(blockFlow).rightValue
-    emptyMempool is AVector.empty[UnconfirmedTransactions]
+    val emptyMempool = serverUtils.listMempoolTransactions(blockFlow).rightValue
+    emptyMempool is AVector.empty[MempoolTransactions]
 
     val chainIndex                         = chainIndexGen.sample.get
     val fromGroup                          = chainIndex.from
@@ -874,7 +929,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransaction = serverUtils
       .buildTransaction(
         blockFlow,
-        BuildTransaction(fromPublicKey, AVector(destination))
+        BuildTransaction(fromPublicKey.bytes, None, AVector(destination))
       )
       .rightValue
 
@@ -885,10 +940,10 @@ class ServerUtilsSpec extends AlephiumSpec {
       fromPrivateKey
     )
 
-    val txs = serverUtils.listUnconfirmedTransactions(blockFlow).rightValue
+    val txs = serverUtils.listMempoolTransactions(blockFlow).rightValue
 
     txs is AVector(
-      UnconfirmedTransactions(
+      MempoolTransactions(
         chainIndex.from.value,
         chainIndex.to.value,
         AVector(api.TransactionTemplate.fromProtocol(txTemplate))

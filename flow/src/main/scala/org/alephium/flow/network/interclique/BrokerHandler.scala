@@ -146,7 +146,7 @@ trait BrokerHandler extends BaseBrokerHandler {
   private def handleNewTxHashes(hashes: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
     log.debug(s"Received txs hashes ${Utils.showChainIndexedDigest(hashes)} from $remoteAddress")
     // ignore the tx announcements before synced
-    if (selfSynced && remoteSynced) {
+    if (selfSynced) {
       val result = hashes.mapE { case (chainIndex, txHashes) =>
         if (!brokerConfig.contains(chainIndex.from)) {
           Left(())
@@ -203,7 +203,11 @@ trait BrokerHandler extends BaseBrokerHandler {
       if (txs.exists(tx => !brokerConfig.contains(tx.chainIndex.from))) {
         handleMisbehavior(MisbehaviorManager.InvalidGroup(remoteAddress))
       } else {
-        allHandlers.txHandler ! TxHandler.AddToMemPool(txs, isIntraCliqueSyncing = false)
+        allHandlers.txHandler ! TxHandler.AddToMemPool(
+          txs,
+          isIntraCliqueSyncing = false,
+          isLocalTx = false
+        )
       }
     }
   }
