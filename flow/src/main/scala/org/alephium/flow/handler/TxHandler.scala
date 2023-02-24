@@ -279,25 +279,17 @@ trait TxCoreHandler extends TxHandlerUtils {
       addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}", acknowledge)
     } else {
       nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
-        case Left(Right(s: InvalidTxStatus)) =>
+        case failed @ Left(Right(s: InvalidTxStatus)) =>
           if (s.isInstanceOf[NonExistInput.type] && cacheMissingInputsTx) {
             missingInputsTxBuffer.add(tx, TimeStamp.now())
           } else {
-            addFailed(
-              tx,
-              s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}",
-              acknowledge
-            )
+            handleInvalidTx(tx, acknowledge, failed)
           }
         case Right(_) =>
           val grandPool = blockFlow.getGrandPool()
           handleValidTx(chainIndex, tx, grandPool, acknowledge)
-        case Left(Left(e)) =>
-          addFailed(
-            tx,
-            s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}",
-            acknowledge
-          )
+        case failed @ Left(Left(_)) =>
+          handleInvalidTx(tx, acknowledge, failed)
       }
     }
   }
@@ -344,8 +336,31 @@ trait TxCoreHandler extends TxHandlerUtils {
     addSucceeded(tx, acknowledge)
   }
 
-  private def hex(tx: TransactionTemplate): String = {
+  protected def hex(tx: TransactionTemplate): String = {
     Hex.toHexString(serialize(tx))
+  }
+
+  protected def handleInvalidTx(
+      tx: TransactionTemplate,
+      acknowledge: Boolean,
+      result: TxValidationResult[Unit]
+  ): Unit = {
+    result match {
+      case Right(_) =>
+        ()
+      case Left(Right(s: InvalidTxStatus)) =>
+        addFailed(
+          tx,
+          s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}",
+          acknowledge
+        )
+      case Left(Left(e)) =>
+        addFailed(
+          tx,
+          s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}",
+          acknowledge
+        )
+    }
   }
 }
 
@@ -412,16 +427,22 @@ trait BroadcastTxsHandler extends TxHandlerUtils {
   }
 }
 
-trait AutoMineHandler extends TxHandlerUtils {
+trait AutoMineHandler extends TxCoreHandler {
   def blockFlow: BlockFlow
   implicit def brokerConfig: BrokerConfig
   implicit def networkSetting: NetworkSetting
 
   def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
     txs.foreach { tx =>
-      TxHandler.mineTxForDev(blockFlow, tx, publishBlock) match {
-        case Left(error) => addFailed(tx, error, acknowledge = true)
-        case Right(_)    => addSucceeded(tx, acknowledge = true)
+      nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
+        case failed @ Left(Right(_: InvalidTxStatus) | Left(_)) =>
+          handleInvalidTx(tx, true, failed)
+
+        case Right(_) =>
+          TxHandler.mineTxForDev(blockFlow, tx, publishBlock) match {
+            case Left(error) => addFailed(tx, error, acknowledge = true)
+            case Right(_)    => addSucceeded(tx, acknowledge = true)
+          }
       }
     }
   }
