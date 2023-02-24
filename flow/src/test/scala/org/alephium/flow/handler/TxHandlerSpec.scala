@@ -422,6 +422,15 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     blockFlow.getBestDeps(chainIndex.from).deps.contains(blockHash) is true
   }
 
+  it should "report validation error when auto-mine is enabled" in new Fixture {
+    override val configValues = Map(("alephium.mempool.auto-mine-for-dev", true))
+    config.mempool.autoMineForDev is true
+    val tx = transactionGen(chainIndexGen = Gen.const(chainIndex)).sample.get
+    txHandler ! addTx(tx)
+    val failedMsg = expectMsgType[TxHandler.AddFailed]
+    failedMsg.txId is tx.id
+  }
+
   it should "auto mine new blocks if auto-mine is enabled" in new Fixture {
     override val configValues = Map(("alephium.mempool.auto-mine-for-dev", true))
     config.mempool.autoMineForDev is true
