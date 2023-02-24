@@ -16,9 +16,14 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.{BlockHash, TokenId}
-import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.{AVector, U256}
+import akka.util.ByteString
+
+import org.alephium.api.{badRequest, Try}
+import org.alephium.crypto.BIP340SchnorrPublicKey
+import org.alephium.protocol.PublicKey
+import org.alephium.protocol.model.{BlockHash, SchnorrAddress, TokenId}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.util.{AVector, Hex, U256}
 
 trait BuildTxCommon {
   def gasAmount: Option[GasBox]
@@ -29,6 +34,39 @@ trait BuildTxCommon {
 }
 
 object BuildTxCommon {
+  sealed trait PublicKeyType
+  object Default       extends PublicKeyType // SecP256K1
+  object BIP340Schnorr extends PublicKeyType
+
+  trait FromPublicKey {
+    def fromPublicKey: ByteString
+    def fromPublicKeyType: Option[PublicKeyType]
+
+    def getLockPair(): Try[(LockupScript.Asset, UnlockScript)] = fromPublicKeyType match {
+      case Some(BuildTxCommon.BIP340Schnorr) => schnorrLockPair(fromPublicKey)
+      case _                                 => p2pkhLockPair(fromPublicKey)
+    }
+  }
+
+  def p2pkhLockPair(fromPublicKey: ByteString): Try[(LockupScript.Asset, UnlockScript)] = {
+    PublicKey.from(fromPublicKey) match {
+      case Some(publicKey) =>
+        Right(LockupScript.p2pkh(publicKey) -> UnlockScript.p2pkh(publicKey))
+      case None =>
+        Left(badRequest(s"Invalid SecP256K1 public key: ${Hex.toHexString(fromPublicKey)}"))
+    }
+  }
+
+  def schnorrLockPair(fromPublicKey: ByteString): Try[(LockupScript.Asset, UnlockScript)] = {
+    BIP340SchnorrPublicKey.from(fromPublicKey) match {
+      case Some(publicKey) =>
+        val address = SchnorrAddress(publicKey)
+        Right(address.lockupScript -> address.unlockScript)
+      case None =>
+        Left(badRequest(s"Invalid BIP340Schnorr public key: ${Hex.toHexString(fromPublicKey)}"))
+    }
+  }
+
   def getAlphAndTokenAmounts(
       attoAlphAmount: Option[Amount],
       tokensAmount: Option[AVector[Token]]

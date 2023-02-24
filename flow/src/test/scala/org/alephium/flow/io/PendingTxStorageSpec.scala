@@ -77,6 +77,7 @@ class PendingTxStorageSpec
       index += 1
     }
     index is txsSize
+    storage.size() is txsSize
   }
 
   it should "works for remove/put when iterate" in new Fixture {

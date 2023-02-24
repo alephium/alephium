@@ -16,19 +16,20 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{Address, BlockHash}
+import akka.util.ByteString
+
+import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildTransaction(
-    fromPublicKey: PublicKey,
+    fromPublicKey: ByteString,
+    fromPublicKeyType: Option[BuildTxCommon.PublicKeyType] = None,
     destinations: AVector[Destination],
     utxos: Option[AVector[OutputRef]] = None,
     gasAmount: Option[GasBox] = None,
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
-) extends BuildTxCommon {
-  def fromAddress(): Address.Asset = Address.p2pkh(fromPublicKey)
-}
+) extends BuildTxCommon
+    with BuildTxCommon.FromPublicKey

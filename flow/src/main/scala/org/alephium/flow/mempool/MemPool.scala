@@ -42,9 +42,8 @@ class MemPool private (
     timestamps: ValueSortedMap[TransactionId, TimeStamp],
     val sharedTxIndexes: TxIndexes,
     val capacity: Int
-)(implicit
-    groupConfig: GroupConfig
-) extends RWLock {
+)(implicit val groupConfig: GroupConfig)
+    extends RWLock {
   def size: Int = readOnly(timestamps.size)
 
   private def _isFull(): Boolean = size >= capacity
@@ -56,6 +55,8 @@ class MemPool private (
   }
 
   def contains(txId: TransactionId): Boolean = readOnly(_contains(txId))
+
+  def get(txId: TransactionId): Option[TransactionTemplate] = readOnly(flow.get(txId).map(_.tx))
 
   private def _contains(txId: TransactionId): Boolean = {
     timestamps.contains(txId)
@@ -248,7 +249,7 @@ class MemPool private (
     transactionsTotalLabeled.foreach(_.set(0.0))
   }
 
-  private def _takeOldTxs(
+  private[mempool] def _takeOldTxs(
       timeStampThreshold: TimeStamp
   ): AVector[TransactionTemplate] = {
     var buffer = AVector.empty[TransactionTemplate]
@@ -262,14 +263,17 @@ class MemPool private (
     buffer
   }
 
+  // TODO: Optimize this
   def clean(
       blockFlow: BlockFlow,
       timeStampThreshold: TimeStamp
-  ): Unit = writeOnly {
-    val oldTxs = _takeOldTxs(timeStampThreshold)
+  ): Int = writeOnly {
+    val oldTxs  = _takeOldTxs(timeStampThreshold)
+    var removed = 0
     blockFlow.recheckInputs(group, oldTxs).foreach { invalidTxs =>
-      removeUnusedTxs(invalidTxs)
+      removed += removeUnusedTxs(invalidTxs)
     }
+    removed
   }
 
   private val transactionsTotalLabeled = {

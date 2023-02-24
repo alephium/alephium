@@ -19,10 +19,12 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 import org.scalatest.Assertion
 
+import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.config.GroupConfigFixture
 import org.alephium.protocol.model.ContractId
-import org.alephium.protocol.vm.LockupScript
+import org.alephium.protocol.vm._
+import org.alephium.serde._
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
 class AddressSpec extends AlephiumSpec {
@@ -124,6 +126,30 @@ class AddressSpec extends AlephiumSpec {
     AddressVerifyP2SH("rvpeCy7GhsGHq8n6TnB1LjQh4xn1FMHJVXnsdZAniKZA")
       .scriptHash(hex"e5d64f886664c58378d41fe3b8c29dd7975da59245a4a6bf92c3a47339a9a0a9")
       .success()
+  }
+
+  it should "test Schnorr address" in {
+    val address = SchnorrAddress(BIP340SchnorrPublicKey.zero)
+
+    val script1 = StatelessScript.unsafe(
+      AVector(
+        Method[StatelessContext](
+          isPublic = true,
+          usePreapprovedAssets = false,
+          useContractAssets = false,
+          argsLength = 0,
+          localsLength = 0,
+          returnLength = 0,
+          instrs = AVector[Instr[StatelessContext]](
+            TxId,
+            BytesConst(Val.ByteVec(BIP340SchnorrPublicKey.zero.bytes)),
+            GetSegregatedSignature,
+            VerifyBIP340Schnorr
+          )
+        )
+      )
+    )
+    serialize(script1) is address.scriptByteCode
   }
 
   "Address.asset" should "parse asset address only" in {

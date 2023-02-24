@@ -154,11 +154,11 @@ trait HttpRouteFixture extends HttpFixture with AlephiumFutureSpec {
   def Post(endpoint: String, body: String): Response[Either[String, String]] =
     Post(endpoint, Some(body))
 
-  def Put(endpoint: String, body: String, apiKey: Option[String] = maybeApiKey) = {
+  def Put(endpoint: String, body: String = "", apiKey: Option[String] = maybeApiKey) = {
     httpPut(endpoint, Some(body), apiKeyHeader(apiKey))(port).send(backend).futureValue
   }
 
-  def Delete(endpoint: String, body: String, apiKey: Option[String] = maybeApiKey) = {
+  def Delete(endpoint: String, body: String = "", apiKey: Option[String] = maybeApiKey) = {
     httpRequest(Method.DELETE, endpoint, Some(body), apiKeyHeader(apiKey))(port)
       .send(backend)
       .futureValue

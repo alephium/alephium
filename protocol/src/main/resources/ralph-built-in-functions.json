@@ -809,6 +809,16 @@
     "returns": "@returns true if the signature is valid, false otherwise"
   },
   {
+    "name": "getSegregatedSignature",
+    "category": "Cryptography",
+    "signature": "fn getSegregatedSignature!() -> (ByteVec)",
+    "doc": "The segregated signature of the transaction",
+    "params": [
+      
+    ],
+    "returns": "@returns the segregated signature of the transaction"
+  },
+  {
     "name": "verifySecP256K1",
     "category": "Cryptography",
     "signature": "fn verifySecP256K1!(data:ByteVec, publicKey:ByteVec, signature:ByteVec) -> ()",

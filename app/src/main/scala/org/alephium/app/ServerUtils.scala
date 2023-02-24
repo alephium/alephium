@@ -164,18 +164,18 @@ class ServerUtils(implicit
       .map(failed)
   }
 
-  def listUnconfirmedTransactions(
+  def listMempoolTransactions(
       blockFlow: BlockFlow
-  ): Try[AVector[UnconfirmedTransactions]] = {
+  ): Try[AVector[MempoolTransactions]] = {
     val result = brokerConfig.groupRange.foldLeft(
-      AVector.ofCapacity[UnconfirmedTransactions](brokerConfig.chainNum)
+      AVector.ofCapacity[MempoolTransactions](brokerConfig.chainNum)
     ) { case (acc, group) =>
       val groupIndex = GroupIndex.unsafe(group)
       val txs        = blockFlow.getMemPool(groupIndex).getAll()
       val groupedTxs = txs.filter(_.chainIndex.from == groupIndex).groupBy(_.chainIndex)
       acc ++ AVector.from(
         groupedTxs.map { case (chainIndex, txs) =>
-          UnconfirmedTransactions(
+          MempoolTransactions(
             chainIndex.from.value,
             chainIndex.to.value,
             txs.map(model.TransactionTemplate.fromProtocol)
@@ -191,10 +191,11 @@ class ServerUtils(implicit
       query: BuildTransaction
   ): Try[BuildTransactionResult] = {
     for {
-      _ <- checkGroup(query.fromPublicKey)
+      lockPair <- query.getLockPair()
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
-        query.fromPublicKey,
+        lockPair._1,
+        lockPair._2,
         query.utxos,
         query.destinations,
         query.gasAmount,
@@ -530,7 +531,8 @@ class ServerUtils(implicit
   private def publishTx(txHandler: ActorRefT[TxHandler.Command], tx: TransactionTemplate)(implicit
       askTimeout: Timeout
   ): FutureTry[SubmitTxResult] = {
-    val message = TxHandler.AddToMemPool(AVector(tx), isIntraCliqueSyncing = false)
+    val message =
+      TxHandler.AddToMemPool(AVector(tx), isIntraCliqueSyncing = false, isLocalTx = true)
     txHandler.ask(message).mapTo[TxHandler.Event].map {
       case _: TxHandler.AddSucceeded =>
         Right(SubmitTxResult(tx.id, tx.fromGroup.value, tx.toGroup.value))
@@ -740,21 +742,20 @@ class ServerUtils(implicit
       script: StatefulScript,
       amount: U256,
       tokens: AVector[(TokenId, U256)],
-      fromPublicKey: PublicKey,
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Try[UnsignedTransaction] = {
-    val lockupScript = LockupScript.p2pkh(fromPublicKey)
-    val unlockScript = UnlockScript.p2pkh(fromPublicKey)
-    val utxosLimit   = apiConfig.defaultUtxosLimit
+    val utxosLimit = apiConfig.defaultUtxosLimit
     for {
-      allUtxos <- blockFlow.getUsableUtxos(lockupScript, utxosLimit).left.map(failedInIO)
-      allInputs = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
+      allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
+      allInputs = allUtxos.map(_.ref).map(TxInput(_, fromUnlockScript))
       unsignedTx <- UtxoSelectionAlgo
         .Build(ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
         .select(
           AssetAmounts(amount, tokens),
-          unlockScript,
+          fromUnlockScript,
           allUtxos,
           txOutputsLength = 0,
           Some(script),
@@ -762,7 +763,7 @@ class ServerUtils(implicit
           TxScriptGasEstimator.Default(allInputs, blockFlow)
         )
         .map { selectedUtxos =>
-          val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, unlockScript))
+          val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, fromUnlockScript))
           UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
             gasAmount = gas.getOrElse(selectedUtxos.gas),
             gasPrice = gasPrice.getOrElse(nonCoinbaseMinGasPrice)
@@ -786,10 +787,10 @@ class ServerUtils(implicit
         .map(badRequest)
       initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1)
       code                  <- query.decodeBytecode()
-      address = Address.p2pkh(query.fromPublicKey)
+      lockPair              <- query.getLockPair()
       script <- buildDeployContractTxWithParsedState(
         code.contract,
-        address,
+        Address.Asset(lockPair._1),
         code.initialImmFields,
         code.initialMutFields,
         initialAttoAlphAmount,
@@ -801,7 +802,8 @@ class ServerUtils(implicit
         script,
         initialAttoAlphAmount,
         AVector.empty,
-        query.fromPublicKey,
+        lockPair._1,
+        lockPair._2,
         query.gasAmount,
         query.gasPrice
       )
@@ -849,6 +851,7 @@ class ServerUtils(implicit
         .getAlphAndTokenAmounts(query.attoAlphAmount, query.tokens)
         .left
         .map(badRequest)
+      lockPair <- query.getLockPair()
       script <- deserialize[StatefulScript](query.bytecode).left.map(serdeError =>
         badRequest(serdeError.getMessage)
       )
@@ -857,7 +860,8 @@ class ServerUtils(implicit
         script,
         amounts._1.getOrElse(U256.Zero),
         amounts._2,
-        query.fromPublicKey,
+        lockPair._1,
+        lockPair._2,
         query.gasAmount,
         query.gasPrice
       )

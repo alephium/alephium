@@ -24,7 +24,7 @@ import akka.actor.Props
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.PendingTxStorage
-import org.alephium.flow.mempool.{GrandPool, MemPool}
+import org.alephium.flow.mempool.{GrandPool, MemPool, TxHandlerBuffer}
 import org.alephium.flow.mining.Miner
 import org.alephium.flow.model.{DataOrigin, MiningBlob, PersistedTxId}
 import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
@@ -48,14 +48,20 @@ object TxHandler {
   ): Props = Props(new TxHandler(blockFlow, txStorage))
 
   sealed trait Command
-  final case class AddToMemPool(txs: AVector[TransactionTemplate], isIntraCliqueSyncing: Boolean)
-      extends Command
+  final case class AddToMemPool(
+      txs: AVector[TransactionTemplate],
+      isIntraCliqueSyncing: Boolean,
+      isLocalTx: Boolean
+  ) extends Command
+  final case class Rebroadcast(tx: TransactionTemplate) extends Command
   final case class TxAnnouncements(txs: AVector[(ChainIndex, AVector[TransactionId])])
       extends Command
   final case class MineOneBlock(chainIndex: ChainIndex) extends Command
   case object CleanMemPool                              extends Command
+  case object CleanMissingInputsTx                      extends Command
   private[handler] case object BroadcastTxs             extends Command
   private[handler] case object DownloadTxs              extends Command
+  case object ClearMemPool                              extends Command
 
   sealed trait Event
   final case class AddSucceeded(txId: TransactionId)              extends Event
@@ -164,10 +170,12 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
     with EventStream.Publisher
     with InterCliqueManager.NodeSyncStatus {
   val txBufferMaxCapacity: Int = (brokerConfig.groupNumPerBroker * brokerConfig.groups * 10) * 32
-  val batchBroadcastTxsFrequency: Duration = memPoolSetting.batchBroadcastTxsFrequency
-  val batchDownloadTxsFrequency: Duration  = memPoolSetting.batchDownloadTxsFrequency
+  val batchBroadcastTxsFrequency: Duration    = memPoolSetting.batchBroadcastTxsFrequency
+  val batchDownloadTxsFrequency: Duration     = memPoolSetting.batchDownloadTxsFrequency
+  val cleanMissingInputsTxFrequency: Duration = memPoolSetting.cleanMissingInputsTxFrequency
+  val missingInputsTxExpiryDuration: Duration = cleanMissingInputsTxFrequency.timesUnsafe(2)
 
-  private val nonCoinbaseValidation = TxValidation.build
+  val nonCoinbaseValidation = TxValidation.build
   val fetching: FetchState[TransactionId] =
     FetchState[TransactionId](
       txBufferMaxCapacity,
@@ -179,18 +187,12 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
 
   // scalastyle:off method.length
   def handleCommand: Receive = {
-    case TxHandler.AddToMemPool(txs, isIntraCliqueSyncing) =>
+    case TxHandler.AddToMemPool(txs, isIntraCliqueSyncing, isLocalTx) =>
       if (!memPoolSetting.autoMineForDev) {
         if (isIntraCliqueSyncing) {
           txs.foreach(handleIntraCliqueSyncingTx)
         } else {
-          txs.foreach(
-            handleInterCliqueTx(
-              _,
-              nonCoinbaseValidation.validateMempoolTxTemplate,
-              acknowledge = true
-            )
-          )
+          txs.foreach(handleInterCliqueTx(_, acknowledge = true, cacheMissingInputsTx = !isLocalTx))
         }
       } else {
         mineTxsForDev(txs)
@@ -203,23 +205,29 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
         .forceMineForDev(blockFlow, chainIndex, Env.currentEnv, publishBlock)
         .swap
         .foreach(log.error(_))
+    case TxHandler.CleanMissingInputsTx =>
+      cleanMissingInputsBuffer()
     case TxHandler.CleanMemPool =>
       log.debug("Start to clean mempools")
       blockFlow.grandPool.clean(
         blockFlow,
         TimeStamp.now().minusUnsafe(memPoolSetting.cleanMempoolFrequency)
       )
+      ()
+    case TxHandler.Rebroadcast(tx) =>
+      outgoingTxBuffer.put(tx, ())
+    case TxHandler.ClearMemPool =>
+      blockFlow.grandPool.clear()
+      clearPersistedTxs()
+      missingInputsTxBuffer.clear()
   }
 
   override def onFirstTimeSynced(): Unit = {
     clearStorageAndLoadTxs(
-      handleInterCliqueTx(
-        _,
-        nonCoinbaseValidation.validateMempoolTxTemplate,
-        acknowledge = false
-      )
+      handleInterCliqueTx(_, acknowledge = false, cacheMissingInputsTx = false)
     )
     schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
+    schedule(self, TxHandler.CleanMissingInputsTx, memPoolSetting.cleanMissingInputsTxFrequency)
     scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
     scheduleOnce(self, TxHandler.DownloadTxs, batchDownloadTxsFrequency)
   }
@@ -247,38 +255,62 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
 trait TxCoreHandler extends TxHandlerUtils {
   def blockFlow: BlockFlow
   implicit def brokerConfig: BrokerConfig
-  def txsBuffer: Cache[TransactionTemplate, Unit]
+  def outgoingTxBuffer: Cache[TransactionTemplate, Unit]
 
+  val missingInputsTxBuffer = TxHandlerBuffer.default()
+  def cleanMissingInputsTxFrequency: Duration
+  def missingInputsTxExpiryDuration: Duration
+
+  def nonCoinbaseValidation: TxValidation
+
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   def handleInterCliqueTx(
       tx: TransactionTemplate,
-      validate: (TransactionTemplate, BlockFlow) => TxValidationResult[Unit],
-      acknowledge: Boolean
+      acknowledge: Boolean,
+      cacheMissingInputsTx: Boolean
   ): Unit = {
     val chainIndex = tx.chainIndex
     assume(!brokerConfig.isIncomingChain(chainIndex))
     val mempool = blockFlow.getMemPool(chainIndex.from)
     if (mempool.contains(tx)) {
-      addFailed(tx, s"tx ${tx.id.toHexString} is already included", acknowledge)
+      log.debug(s"tx ${tx.id.toHexString} is already included")
+      addSucceeded(tx, acknowledge)
     } else if (mempool.isDoubleSpending(chainIndex, tx)) {
       addFailed(tx, s"tx ${tx.id.shortHex} is double spending: ${hex(tx)}", acknowledge)
     } else {
-      validate(tx, blockFlow) match {
-        case Left(Right(s: InvalidTxStatus)) =>
-          addFailed(
-            tx,
-            s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}",
-            acknowledge
-          )
+      nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
+        case failed @ Left(Right(s: InvalidTxStatus)) =>
+          if (s.isInstanceOf[NonExistInput.type] && cacheMissingInputsTx) {
+            missingInputsTxBuffer.add(tx, TimeStamp.now())
+          } else {
+            handleInvalidTx(tx, acknowledge, failed)
+          }
         case Right(_) =>
           val grandPool = blockFlow.getGrandPool()
           handleValidTx(chainIndex, tx, grandPool, acknowledge)
-        case Left(Left(e)) =>
-          addFailed(
-            tx,
-            s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}",
-            acknowledge
-          )
+        case failed @ Left(Left(_)) =>
+          handleInvalidTx(tx, acknowledge, failed)
       }
+    }
+  }
+
+  def cleanMissingInputsBuffer(): Unit = {
+    missingInputsTxBuffer.getRootTxs().foreach(validateMissingInputRootTx)
+    missingInputsTxBuffer.clean(TimeStamp.now().minusUnsafe(missingInputsTxExpiryDuration))
+    scheduleOnce(self, TxHandler.CleanMissingInputsTx, cleanMissingInputsTxFrequency)
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def validateMissingInputRootTx(tx: TransactionTemplate): Unit = {
+    nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
+      case Left(Right(_: NonExistInput.type)) => ()
+      case Left(Right(_: InvalidTxStatus)) | Left(Left(_)) =>
+        missingInputsTxBuffer.removeInvalidTx(tx)
+        log.debug(s"Remove invalid pending tx ${tx.id.toHexString}: ${hex(tx)}")
+      case Right(_) =>
+        val children = missingInputsTxBuffer.removeValidTx(tx)
+        handleInterCliqueTx(tx, false, cacheMissingInputsTx = false)
+        children.foreach(_.foreach(validateMissingInputRootTx))
     }
   }
 
@@ -298,14 +330,37 @@ trait TxCoreHandler extends TxHandlerUtils {
     val result    = grandPool.add(chainIndex, tx, currentTs)
     log.debug(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
-      case MemPool.AddedToMemPool => txsBuffer.put(tx, ())
+      case MemPool.AddedToMemPool => outgoingTxBuffer.put(tx, ())
       case _                      => ()
     }
     addSucceeded(tx, acknowledge)
   }
 
-  private def hex(tx: TransactionTemplate): String = {
+  protected def hex(tx: TransactionTemplate): String = {
     Hex.toHexString(serialize(tx))
+  }
+
+  protected def handleInvalidTx(
+      tx: TransactionTemplate,
+      acknowledge: Boolean,
+      result: TxValidationResult[Unit]
+  ): Unit = {
+    result match {
+      case Right(_) =>
+        ()
+      case Left(Right(s: InvalidTxStatus)) =>
+        addFailed(
+          tx,
+          s"Failed in validating tx ${tx.id.toHexString} due to $s: ${hex(tx)}",
+          acknowledge
+        )
+      case Left(Left(e)) =>
+        addFailed(
+          tx,
+          s"IO failed in validating tx ${tx.id.toHexString} due to $e: ${hex(tx)}",
+          acknowledge
+        )
+    }
   }
 }
 
@@ -347,18 +402,18 @@ trait BroadcastTxsHandler extends TxHandlerUtils {
   def txBufferMaxCapacity: Int
   def batchBroadcastTxsFrequency: Duration
 
-  lazy val txsBuffer: Cache[TransactionTemplate, Unit] = {
+  lazy val outgoingTxBuffer: Cache[TransactionTemplate, Unit] = {
     Cache.fifo[TransactionTemplate, Unit](txBufferMaxCapacity)
   }
 
   protected def broadcastTxs(): Unit = {
     log.debug("Start to broadcast txs")
     val broadcasts = mutable.Map.empty[ChainIndex, mutable.ArrayBuffer[TransactionTemplate]]
-    if (txsBuffer.nonEmpty) {
-      txsBuffer.keys().foreach { tx =>
+    if (outgoingTxBuffer.nonEmpty) {
+      outgoingTxBuffer.keys().foreach { tx =>
         updateChainIndexTxs(tx, tx.chainIndex, broadcasts)
       }
-      txsBuffer.clear()
+      outgoingTxBuffer.clear()
     }
 
     if (broadcasts.nonEmpty) {
@@ -372,16 +427,22 @@ trait BroadcastTxsHandler extends TxHandlerUtils {
   }
 }
 
-trait AutoMineHandler extends TxHandlerUtils {
+trait AutoMineHandler extends TxCoreHandler {
   def blockFlow: BlockFlow
   implicit def brokerConfig: BrokerConfig
   implicit def networkSetting: NetworkSetting
 
   def mineTxsForDev(txs: AVector[TransactionTemplate]): Unit = {
     txs.foreach { tx =>
-      TxHandler.mineTxForDev(blockFlow, tx, publishBlock) match {
-        case Left(error) => addFailed(tx, error, acknowledge = true)
-        case Right(_)    => addSucceeded(tx, acknowledge = true)
+      nonCoinbaseValidation.validateMempoolTxTemplate(tx, blockFlow) match {
+        case failed @ Left(Right(_: InvalidTxStatus) | Left(_)) =>
+          handleInvalidTx(tx, true, failed)
+
+        case Right(_) =>
+          TxHandler.mineTxForDev(blockFlow, tx, publishBlock) match {
+            case Left(error) => addFailed(tx, error, acknowledge = true)
+            case Right(_)    => addSucceeded(tx, acknowledge = true)
+          }
       }
     }
   }
@@ -401,13 +462,14 @@ trait TxHandlerPersistence extends TxHandlerUtils {
   def clearStorageAndLoadTxs(handlePendingTx: TransactionTemplate => Unit): Unit = {
     log.info("Start to load persisted pending txs")
     var (valid, invalid) = (0, 0)
+    val toRemove         = mutable.ArrayBuffer.empty[PersistedTxId]
     escapeIOError(for {
       groupViews <- AVector
         .tabulateE(brokerConfig.groupNumPerBroker) { index =>
           val groupIndex = GroupIndex.unsafe(brokerConfig.groupRange(index))
           blockFlow.getImmutableGroupViewIncludePool(groupIndex)
         }
-      _ <- pendingTxStorage.iterateE { (_, tx) =>
+      _ <- pendingTxStorage.iterateE { (key, tx) =>
         val chainIndex = tx.chainIndex
         val groupIndex = chainIndex.from
         val index      = brokerConfig.groupIndexOfBroker(groupIndex)
@@ -416,9 +478,11 @@ trait TxHandlerPersistence extends TxHandlerUtils {
             valid += 1
             handlePendingTx(tx)
           case None =>
+            toRemove += key
             invalid += 1
         }
       }
+      _ <- EitherF.foreachTry(toRemove)(pendingTxStorage.remove)
     } yield ())
     log.info(
       s"Load persisted pending txs completed, valid: #$valid, invalid: #$invalid (not precise though..)"
@@ -427,14 +491,18 @@ trait TxHandlerPersistence extends TxHandlerUtils {
 
   def persistMempoolTxs(): Unit = {
     log.info("Start to persist pending txs")
-    escapeIOError(pendingTxStorage.iterateE { (txId, _) =>
-      pendingTxStorage.remove(txId)
-    })
+    clearPersistedTxs()
     escapeIOError(
       blockFlow.getGrandPool().getOutTxsWithTimestamp().foreachE { case (timestamp, tx) =>
         pendingTxStorage.put(PersistedTxId(timestamp, tx.id), tx)
       }
     )
+  }
+
+  def clearPersistedTxs(): Unit = {
+    escapeIOError(pendingTxStorage.iterateE { (txId, _) =>
+      pendingTxStorage.remove(txId)
+    })
   }
 }
 
@@ -478,3 +546,5 @@ trait TxHandlerUtils extends IOBaseActor with EventStream.Publisher {
     }
   }
 }
+
+trait TxHandlerIncomingTxBuffer extends TxHandlerUtils {}

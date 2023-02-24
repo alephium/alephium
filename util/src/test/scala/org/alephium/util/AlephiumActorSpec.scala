@@ -39,7 +39,7 @@ trait AlephiumActorSpec extends AlephiumFutureSpec with BeforeAndAfterEach with 
   var testKit: TestKit                  = _
 
   // scalastyle:off no.should
-  implicit class WillBeOps[A: Equality](left: A)(implicit pos: Position) {
+  implicit class WillBeOps[A: Equality](left: => A)(implicit pos: Position) {
     def willBe(right: A): Assertion                          = eventually(left shouldEqual right)
     def willBe(right: ResultOfATypeInvocation[_]): Assertion = eventually(left shouldBe right)
 

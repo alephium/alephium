@@ -37,4 +37,12 @@ class OptionFSpec extends AlephiumSpec {
       }
     }
   }
+
+  it should "get any" in {
+    val ns = Seq(1, 2, 3)
+    OptionF.getAny(ns)(n => if (n == 1) Some(1) else None) is Some(1)
+    OptionF.getAny(ns)(n => if (n == 2) Some(2) else None) is Some(2)
+    OptionF.getAny(ns)(n => if (n == 3) Some(3) else None) is Some(3)
+    OptionF.getAny(ns)(_ => None) is None
+  }
 }

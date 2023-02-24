@@ -18,14 +18,14 @@ package org.alephium.api.model
 
 import akka.util.ByteString
 
-import org.alephium.protocol.PublicKey
 import org.alephium.protocol.model.BlockHash
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildExecuteScriptTx(
-    fromPublicKey: PublicKey,
+    fromPublicKey: ByteString,
+    fromPublicKeyType: Option[BuildTxCommon.PublicKeyType] = None,
     bytecode: ByteString,
     attoAlphAmount: Option[Amount] = None,
     tokens: Option[AVector[Token]] = None,
@@ -33,3 +33,4 @@ final case class BuildExecuteScriptTx(
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
 ) extends BuildTxCommon
+    with BuildTxCommon.FromPublicKey

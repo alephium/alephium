@@ -182,7 +182,7 @@ trait ApiModelCodec {
 
   implicit val blocksAndEventsPerTimeStampRangeRW: RW[BlocksAndEventsPerTimeStampRange] = macroRW
 
-  implicit val unconfirmedTransactionsRW: RW[UnconfirmedTransactions] = macroRW
+  implicit val mempoolTransactionsRW: RW[MempoolTransactions] = macroRW
 
   implicit val outputRefRW: RW[OutputRef] = macroRW
 
@@ -247,6 +247,17 @@ trait ApiModelCodec {
 
   implicit val destinationRW: RW[Destination] = macroRW
 
+  implicit val fromPublicKeyTypeRW: RW[BuildTxCommon.PublicKeyType] = readwriter[String].bimap(
+    {
+      case BuildTxCommon.Default       => "default"
+      case BuildTxCommon.BIP340Schnorr => "bip340-schnorr"
+    },
+    {
+      case "default"        => BuildTxCommon.Default
+      case "bip340-schnorr" => BuildTxCommon.BIP340Schnorr
+      case other            => throw Abort(s"Invalid public key type: $other")
+    }
+  )
   implicit val buildTransactionRW: RW[BuildTransaction] = macroRW
 
   implicit val buildSweepAddressTransactionsRW: RW[BuildSweepAddressTransactions] = macroRW

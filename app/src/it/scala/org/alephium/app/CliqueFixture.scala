@@ -89,7 +89,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   val privateKey = "d24967efb7f1b558ad40a4d71593ceb5b3cecf46d17f0e68ef53def6b391c33d"
   val mnemonic =
     "toward outdoor daughter deny mansion bench water alien crumble mother exchange screen salute antenna abuse key hair crisp debate goose great market core screen"
-  val (transferAddress, _, _) = generateAccount
+  val (transferAddress, transferPubKey, transferPriKey) = generateAccount
 
   val password = "password"
 
@@ -199,7 +199,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     tx.unsigned.txId is txId
   }
 
-  def txNotFound(txId: TransactionId, restPort: Int): Assertion = {
+  def txNotInBlocks(txId: TransactionId, restPort: Int): Assertion = {
     requestFailed(getTransaction(txId), restPort, StatusCode.NotFound)
   }
 

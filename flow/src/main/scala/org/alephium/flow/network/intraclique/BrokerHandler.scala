@@ -79,7 +79,11 @@ trait BrokerHandler extends BaseBrokerHandler {
     )
     if (txs.nonEmpty) {
       assume(txs.forall(tx => brokerConfig.isIncomingChain(tx.chainIndex)))
-      allHandlers.txHandler ! TxHandler.AddToMemPool(txs, isIntraCliqueSyncing = true)
+      allHandlers.txHandler ! TxHandler.AddToMemPool(
+        txs,
+        isIntraCliqueSyncing = true,
+        isLocalTx = false
+      )
     }
   }
 }
