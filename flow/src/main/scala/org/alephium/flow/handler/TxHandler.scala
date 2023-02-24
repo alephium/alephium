@@ -336,7 +336,7 @@ trait TxCoreHandler extends TxHandlerUtils {
     addSucceeded(tx, acknowledge)
   }
 
-  protected def hex(tx: TransactionTemplate): String = {
+  private def hex(tx: TransactionTemplate): String = {
     Hex.toHexString(serialize(tx))
   }
 
