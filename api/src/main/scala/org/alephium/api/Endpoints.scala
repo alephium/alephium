@@ -306,7 +306,7 @@ trait Endpoints
       .in(jsonBody[BuildSweepAddressTransactions])
       .out(jsonBody[BuildSweepAddressTransactionsResult])
       .summary(
-        "Build unsigned transactions to send all unlocked balanced of one address to another address"
+        "Build unsigned transactions to send all unlocked ALPH and token balances of one address to another address"
       )
 
   val submitTransaction: BaseEndpoint[SubmitTransaction, SubmitTxResult] =
