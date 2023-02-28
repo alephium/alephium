@@ -87,7 +87,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler
         .compileTxScript(script)
         .leftValue
-        .message is """Parser failed: Expected multiContract:1:1 / rawTxScript:2:1 / "}":3:3, found "event Add(""""
+        .message is
+        """-- error: Expected multiContract:1:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
+          |3 |  event Add(a: U256, b: U256)
+          |  |  ^^^^^^^^^^
+          |  |  Expected "}"
+          |""".stripMargin
     }
   }
 

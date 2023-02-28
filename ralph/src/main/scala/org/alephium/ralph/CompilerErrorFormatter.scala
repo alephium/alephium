@@ -154,7 +154,7 @@ object CompilerErrorFormatter {
           throw Compiler.Error(unsupportedLineNumberFormat(lineNum))
       }
     } else {
-      // TODO: is the preferred way of handling error like these other than
+      // TODO: is there a preferred way of handling error like these other than
       //       throwing exception?
       // There is no usage of other line number formats supported by FastParse.
       // So this is reported as unsupported.

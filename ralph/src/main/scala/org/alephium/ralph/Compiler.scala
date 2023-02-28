@@ -52,7 +52,7 @@ object Compiler {
           val state = State.buildFor(script)(compilerOptions)
           Right((script.genCodeFull(state), state.getWarnings))
         case failure: Parsed.Failure =>
-          Left(Error.parse(failure))
+          Left(Error.parse(failure, input))
       }
     } catch {
       case e: Error => Left(e)
@@ -114,7 +114,7 @@ object Compiler {
     try {
       fastparse.parse(input, StatefulParser.multiContract(_)) match {
         case Parsed.Success(multiContract, _) => Right(multiContract.extendedContracts())
-        case failure: Parsed.Failure          => Left(Error.parse(failure))
+        case failure: Parsed.Failure          => Left(Error.parse(failure, input))
       }
     } catch {
       case e: Error => Left(e)
@@ -125,7 +125,7 @@ object Compiler {
     try {
       fastparse.parse(stateRaw, StatefulParser.state(_)) match {
         case Parsed.Success(state, _) => Right(AVector.from(state.map(_.v)))
-        case failure: Parsed.Failure  => Left(Error.parse(failure))
+        case failure: Parsed.Failure  => Left(Error.parse(failure, stateRaw))
       }
     } catch {
       case e: Error => Left(e)
@@ -150,7 +150,10 @@ object Compiler {
 
   final case class Error(message: String) extends Exception(message)
   object Error {
-    def parse(failure: Parsed.Failure): Error = Error(s"Parser failed: ${failure.trace().longMsg}")
+    def parse(failure: Parsed.Failure, input: String): Error = {
+      val message = CompilerErrorFormatter(failure, input)
+      Error(message)
+    }
   }
 
   def expectOneType(ident: Ast.Ident, tpe: Seq[Type]): Type = {
