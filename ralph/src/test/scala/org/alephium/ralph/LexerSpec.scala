@@ -16,6 +16,8 @@
 
 package org.alephium.ralph
 
+import fastparse.Parsed
+
 import org.alephium.crypto.Byte32
 import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model.{Address, ContractId}
@@ -68,6 +70,76 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
     fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
     fastparse.parse("add!", Lexer.funcId(_)).get.value is Ast.FuncId("add", true)
+  }
+
+  it should "report CompilerError messages with line number information" in {
+    {
+      info("when input is not a number type")
+      val input   = "a"
+      val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure].trace()
+
+      failure.index is 0
+      failure.longMsg is s"""Expected ${CompilerError.`an I256 or U256 value`.message}:1:1 / num:1:1 / (hexNum | decNum):1:1, found "$input""""
+    }
+
+    {
+      info("when input is an invalid U256")
+      val input   = "123456789" * 10
+      val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+
+      failure.index is 0
+
+      val foundToken = input.take(10)
+      failure.msg is s"""Expected ${CompilerError.`an U256 value`.message}:1:1, found "$foundToken""""
+    }
+
+    {
+      info("when input is an invalid negative I256")
+      val input   = "-" + ("123456789" * 10)
+      val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+
+      failure.index is 0
+
+      val foundToken = input.take(10)
+      failure.msg is s"""Expected ${CompilerError.`an I256 value`.message}:1:1, found "$foundToken""""
+    }
+
+    {
+      info("when input is an invalid I256")
+      val input   = ("123456789" * 10) + "i"
+      val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+
+      failure.index is 0
+
+      val foundToken = input.take(10)
+      failure.msg is s"""Expected ${CompilerError.`an I256 value`.message}:1:1, found "$foundToken""""
+    }
+
+    {
+
+      def errorAssetScript(errorTypedNum: String): String =
+        s"""
+           |// comment
+           |AssetScript Foo {
+           |  pub fn bar(a: U256, b: U256) -> (U256) {
+           |    let c = $errorTypedNum
+           |    return (a + b + c)
+           |  }
+           |}
+           |""".stripMargin
+
+      {
+        info("when the error is in a larger ralph program")
+
+        val invalidTypedNum = "123456789" * 10
+        val errorScript     = errorAssetScript(invalidTypedNum)
+
+        val failure =
+          fastparse.parse(errorScript, StatelessParser.assetScript(_)).asInstanceOf[Parsed.Failure]
+        failure.msg is s"""Expected ${CompilerError.`an U256 value`}:5:13, found "1234567891""""
+      }
+
+    }
   }
 
   it should "special operators" in {
