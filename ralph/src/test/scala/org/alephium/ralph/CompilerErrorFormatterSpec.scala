@@ -46,7 +46,7 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
               errorColor = None
             )
 
-          val lines = errorMessage.split("\n")
+          val lines = errorMessage.linesIterator.toArray
 
           // first line contains the actual full error message
           lines(0) is s"-- error: $compilerErrorMessage"
