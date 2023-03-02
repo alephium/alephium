@@ -32,7 +32,7 @@ object CompilerError {
   /** Creates a failed parser result.
     *
     * @param error
-    *   the parser error or error cause.
+    *   the parser error or the error cause.
     * @param index
     *   location where this error occurred. `0` being the first character.
     * @param cut
@@ -50,7 +50,7 @@ object CompilerError {
     // Currently there is no obvious need to clear this stack.
     ctx.isSuccess = false
     // `verboseFailures = false` is equivalent to cut in this case.
-    // Actual cut syntax `~/` that gets used by macros in parsers to generate relevant code which does not work here.
+    // Actual cut syntax `~/` used in parsers gets applied by macros to emit relevant code which will not work here.
     // Setting `ctx.verboseFailures = false` tells FastParse to stop collecting stack
     // for previous successful parsers and that `verboseFailures` is valid only for this `CompilerError`.
     // To enable collecting stack information set `cut = false`.

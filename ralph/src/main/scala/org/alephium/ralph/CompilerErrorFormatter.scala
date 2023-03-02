@@ -26,7 +26,7 @@ object CompilerErrorFormatter {
     * @param failure
     *   FastParser's failure run result.
     * @param program
-    *   The program compiled.
+    *   The compiled program/source.
     * @return
     *   A formatted error message.
     */
@@ -34,7 +34,7 @@ object CompilerErrorFormatter {
     val traced = failure.trace()
 
     val sourcePos =
-      parseLineNumber(traced.input.prettyIndex(traced.index))
+      SourcePosition.parse(traced.input.prettyIndex(traced.index))
 
     val pointToCodeLine =
       getErroredLine(sourcePos.rowIndex, program)
@@ -50,8 +50,7 @@ object CompilerErrorFormatter {
       pointToCodeLine = pointToCodeLine,
       pointToCodeToken = pointToCodeToken,
       pointToErrorMessage = pointToErrorMessage,
-      programRowNum = sourcePos.rowNum,
-      programColIndex = sourcePos.colIndex
+      sourcePosition = sourcePos
     )
   }
 
@@ -65,10 +64,8 @@ object CompilerErrorFormatter {
     *   String token(s) that lead to this failure.
     * @param pointToErrorMessage
     *   Error message to display under the pointer.
-    * @param programRowNum
-    *   Line where this error occurred. Following FastParser, this Starts at `1`.
-    * @param programColIndex
-    *   Index in the line where this error occurred. Being an index this starts at `0`.
+    * @param sourcePosition
+    *   Location of where this error occurred.
     * @param errorColor
     *   Parts of the error message can be coloured. Use `Some(Console.RED)` as input for red colour.
     *   This parameter is optional so the output is easily comparable in test-cases.
@@ -81,12 +78,11 @@ object CompilerErrorFormatter {
       pointToCodeLine: String,
       pointToCodeToken: String,
       pointToErrorMessage: String,
-      programRowNum: Int,
-      programColIndex: Int,
+      sourcePosition: SourcePosition,
       errorColor: Option[String] = None // or use Some(Console.RED)
   ): String = {
-    val lineNumGutter    = s"$programRowNum |"
-    val lineNumGutterRed = highlight(lineNumGutter, errorColor)
+    val lineNumGutter   = s"${sourcePosition.rowNum} |"
+    val lineNumGutterHL = highlight(lineNumGutter, errorColor)
 
     val emptyLineNumGutterPaddingLeft = " " * (lineNumGutter.length - 1)
     val emptyLineNumGutter            = highlight(emptyLineNumGutterPaddingLeft + "|", errorColor)
@@ -94,7 +90,7 @@ object CompilerErrorFormatter {
     val errorTag         = highlight("-- error: ", errorColor)
     val mainErrorMessage = highlight(compilerErrorMessage, errorColor)
 
-    val paddingLeft   = " " * programColIndex
+    val paddingLeft   = " " * sourcePosition.colIndex
     val pointerMarker = this.pointer * pointToCodeToken.length
 
     // Add padding only if there is a message to append at the end.
@@ -102,7 +98,7 @@ object CompilerErrorFormatter {
     val paddingLeftPointToErrorMessage = if (pointToErrorMessage.isEmpty) "" else paddingLeft
 
     s"""$errorTag$mainErrorMessage
-       |$lineNumGutterRed$pointToCodeLine
+       |$lineNumGutterHL$pointToCodeLine
        |$emptyLineNumGutter$paddingLeft$pointerMarker
        |$emptyLineNumGutter$paddingLeftPointToErrorMessage$pointToErrorMessage
        |""".stripMargin
@@ -111,7 +107,7 @@ object CompilerErrorFormatter {
   /** Fetch the line where the error occurred.
     *
     * @param programRowIndex
-    *   Index of where the error occurred. Note: this is an index i.e. it starts at `0`.
+    *   Index of where the error occurred. Note: this is an index so it starts at `0`.
     * @param program
     *   The compiled program.
     * @return
@@ -125,40 +121,6 @@ object CompilerErrorFormatter {
       ""
     } else {
       lines(programRowIndex)
-    }
-  }
-
-  def unsupportedLineNumberFormat(string: String): String =
-    s"Unsupported line number format: $string"
-
-  /** Parse line number into `SourcePosition`.
-    *
-    * @param lineNum
-    *   a String of format `int:int`
-    * @return
-    *   A SourcePosition or throws if the input format is valid.
-    */
-  def parseLineNumber(lineNum: String): SourcePosition = {
-    val lineNumAndIndex = lineNum.split(":").filter(_.nonEmpty)
-
-    if (lineNumAndIndex.length == 2) {
-      try {
-        val lineNumber = lineNumAndIndex.head.toInt
-        val lineIndex  = lineNumAndIndex.last.toInt - 1
-        SourcePosition(lineNumber, lineIndex)
-      } catch {
-        case _: Throwable =>
-          // FIXME: Information within Throwable is lost, it should be included in the stack.
-          //        This need `Compiler.Error` to accept `cause` as parameter.
-          //        Let if there is a preferred way of doing this or if it's ok to change `Compiler.Error`.
-          throw Compiler.Error(unsupportedLineNumberFormat(lineNum))
-      }
-    } else {
-      // TODO: is there a preferred way of handling error like these other than
-      //       throwing exception?
-      // There is no usage of other line number formats supported by FastParse.
-      // So this is reported as unsupported.
-      throw Compiler.Error(unsupportedLineNumberFormat(lineNum))
     }
   }
 

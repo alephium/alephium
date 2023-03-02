@@ -16,11 +16,54 @@
 package org.alephium.ralph
 
 /** @param rowNum
-  *   Following FastParse, this starts at `1`.
-  * @param colIndex
-  *   Is the position within the line. Being an index, this start at `0`.
+  *   Line in the source/program. Following FastParse, this starts at `1`.
+  * @param colNum
+  *   Column in the source/program. Following FastParse, this starts at `1`.
   */
-final case class SourcePosition(rowNum: Int, colIndex: Int) {
+final case class SourcePosition(rowNum: Int, colNum: Int) {
   def rowIndex: Int =
     rowNum - 1
+
+  def colIndex: Int =
+    colNum - 1
+}
+
+object SourcePosition {
+
+  /** Parse line number into `SourcePosition`.
+    *
+    * @param lineNum
+    *   a String of format `int:int`
+    * @return
+    *   A `SourcePosition` or throws if the input format is valid.
+    */
+  def parse(lineNum: String): SourcePosition = {
+    val lineNumAndIndex = lineNum.split(":").filter(_.nonEmpty)
+
+    if (lineNumAndIndex.length == 2) {
+      try
+        SourcePosition(
+          rowNum = lineNumAndIndex.head.toInt,
+          colNum = lineNumAndIndex.last.toInt
+        )
+      catch {
+        case _: Throwable =>
+          // FIXME: Information within Throwable is lost, it should be included in the stack.
+          //        This need `Compiler.Error` to accept `cause` as parameter.
+          //        Let me know the preferred way of doing this
+          //        or if it's ok to change `Compiler.Error` to accept `cause` as parameter?
+          throw Compiler.Error(unsupportedLineNumberFormat(lineNum))
+      }
+    } else {
+      // TODO: is there a preferred way of handling error like these other than
+      //       throwing exception?
+      // There is no usage of other line number formats supported by FastParse.
+      // So this is reported as unsupported.
+      throw Compiler.Error(unsupportedLineNumberFormat(lineNum))
+    }
+  }
+
+  def unsupportedLineNumberFormat(string: String): String =
+    s"Unsupported line number format: $string"
+
 }

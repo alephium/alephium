@@ -31,9 +31,16 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
 
   it should "format error messages" in {
     forAll(Gen.alphaNumStr, Gen.alphaNumStr) { case (compilerErrorMessage, pointToCodeLine) =>
+      // for the error message run multiple tests at random positions and tokens
       forAll(randomChunk(pointToCodeLine), Gen.posNum[Int], Gen.alphaNumStr) {
         case ((fromErrorIndex, toErrorIndex), lineNumber, pointToErrorMessage) =>
           val pointToCodeToken = pointToCodeLine.slice(fromErrorIndex, toErrorIndex)
+
+          val sourcePosition =
+            SourcePosition(
+              rowNum = lineNumber,
+              colNum = fromErrorIndex + 1
+            )
 
           val errorMessage =
             CompilerErrorFormatter(
@@ -41,8 +48,7 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
               pointToCodeLine = pointToCodeLine,
               pointToCodeToken = pointToCodeToken,
               pointToErrorMessage = pointToErrorMessage,
-              programRowNum = lineNumber,
-              programColIndex = fromErrorIndex,
+              sourcePosition = sourcePosition,
               errorColor = None
             )
 
@@ -81,37 +87,11 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
     }
   }
 
-  it should "parse valid line number format" in {
-    forAll { (lineNumber: Int, lineIndex: Int) =>
-      CompilerErrorFormatter.parseLineNumber(s"$lineNumber:$lineIndex") is
-        SourcePosition(
-          rowNum = lineNumber,
-          colIndex = lineIndex - 1
-        )
-    }
-  }
-
-  it should "report invalid line number formats" in {
-    def runCheck(input: String) =
-      intercept[Compiler.Error](
-        CompilerErrorFormatter.parseLineNumber(input)
-      ) is Compiler.Error(CompilerErrorFormatter.unsupportedLineNumberFormat(input))
-
-    runCheck("")
-    runCheck("12345")
-    runCheck("12345:")
-    runCheck(":12345")
-
-    forAll(runCheck)
-    forAll { (left: String, right: String) =>
-      runCheck(s"""$left:$right""")
-    }
-  }
-
   it should "drop only the head and tail quotes" in {
     CompilerErrorFormatter.dropQuotes("\"test\"") is "test"
     CompilerErrorFormatter.dropQuotes("\"\"test\"\"") is "\"test\""
-    CompilerErrorFormatter.dropQuotes("\"test\"") is "test"
+    CompilerErrorFormatter.dropQuotes("\"\"test\"") is "\"test"
+    CompilerErrorFormatter.dropQuotes("\"test\"\"") is "test\""
     CompilerErrorFormatter.dropQuotes("\"\"test\"\"test\"\"") is "\"test\"\"test\""
   }
 
