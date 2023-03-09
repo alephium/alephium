@@ -3557,4 +3557,254 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     )
     script.toTemplateString() is "0101000000000458{0}8685"
   }
+
+  it should "check mutable field assignments" in {
+    def unassignedErrorMsg(contract: String, fields: Seq[String]): String = {
+      s"There are unassigned mutable fields in contract $contract: $fields"
+    }
+
+    {
+      info("Check assignment for mutable field")
+      val code =
+        s"""
+           |Contract Foo(mut a: U256) {
+           |  pub fn foo() -> U256 {
+           |    return a
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is unassignedErrorMsg("Foo", Seq("a"))
+    }
+
+    {
+      info("No error if field is assigned")
+      val code =
+        s"""
+           |Contract Foo(mut a: U256) {
+           |  pub fn foo() -> () {
+           |    a = 0
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("Check assignment for multiple mutable fields")
+      val code =
+        s"""
+           |Contract Foo(mut a: U256, mut b: U256) {
+           |  pub fn foo() -> (U256, U256) {
+           |    return a, b
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is unassignedErrorMsg("Foo", Seq("a", "b"))
+    }
+
+    {
+      info("Check assignment for mutable array field")
+      val code =
+        s"""
+           |Contract Foo(mut a: [U256; 2]) {
+           |  pub fn foo() -> [U256; 2] {
+           |    return a
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is unassignedErrorMsg("Foo", Seq("a"))
+    }
+
+    {
+      info("Check assignment for multiple mutable array fields")
+      val code =
+        s"""
+           |Contract Foo(mut a: [U256; 2], mut b: [U256; 2]) {
+           |  pub fn foo() -> [[U256; 2]; 2] {
+           |    return [a, b]
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is unassignedErrorMsg("Foo", Seq("a", "b"))
+    }
+
+    {
+      info("No error if array field is assigned")
+      val code =
+        s"""
+           |Contract Foo(mut a: [U256; 2]) {
+           |  @using(updateFields = true)
+           |  pub fn foo() -> () {
+           |    a = [0, 0]
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("No error if array element is assigned(case 0)")
+      val code =
+        s"""
+           |Contract Foo(mut a: [U256; 2]) {
+           |  @using(updateFields = true)
+           |  pub fn foo() -> () {
+           |    a[0] = 0
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("No error if array element is assigned(case 1)")
+      val code =
+        s"""
+           |Contract Foo(mut a: [U256; 2]) {
+           |  @using(updateFields = true)
+           |  pub fn foo(index: U256) -> () {
+           |    a[index] = 0
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+  }
+
+  it should "check mutable local vars assignment" in {
+    def unassignedErrorMsg(contract: String, func: String, fields: Seq[String]): String = {
+      s"There are unassigned mutable local vars in function $contract.$func: $fields"
+    }
+
+    {
+      info("Check assignment for mutable local vars")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let mut a = 0
+           |    return a
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is unassignedErrorMsg(
+        "Foo",
+        "foo",
+        Seq("foo.a")
+      )
+    }
+
+    {
+      info("No error if local vars is assigned")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> U256 {
+           |    let mut a = 0
+           |    a = 1
+           |    return a
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("Check assignment for multiple mutable local vars")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> (U256, U256) {
+           |    let mut a = 0
+           |    let mut b = 0
+           |    return a, b
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is unassignedErrorMsg(
+        "Foo",
+        "foo",
+        Seq("foo.a", "foo.b")
+      )
+    }
+
+    {
+      info("Check assignment for mutable local array var")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> [U256; 2] {
+           |    let mut a = [0, 0]
+           |    return a
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is unassignedErrorMsg(
+        "Foo",
+        "foo",
+        Seq("foo.a")
+      )
+    }
+
+    {
+      info("Check assignment for multiple mutable local array vars")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> [[U256; 2]; 2] {
+           |    let mut a = [0, 0]
+           |    let mut b = [0, 0]
+           |    return [a, b]
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).leftValue.message is unassignedErrorMsg(
+        "Foo",
+        "foo",
+        Seq("foo.a", "foo.b")
+      )
+    }
+
+    {
+      info("No error if local array var is assigned")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    let mut a = [0, 0]
+           |    a = [1, 1]
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("No error if array element is assigned(case 0)")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    let mut a = [0, 0]
+           |    a[0] = 1
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+
+    {
+      info("No error if array element is assigned(case 1)")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(index: U256) -> () {
+           |    let mut a = [0, 0]
+           |    a[index] = 1
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(code).isRight is true
+    }
+  }
 }
