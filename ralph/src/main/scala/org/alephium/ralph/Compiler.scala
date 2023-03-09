@@ -429,6 +429,9 @@ object Compiler {
     }
   }
 
+  sealed trait AccessVariable
+  final case class ReadVariable(name: String) extends AccessVariable
+
   // scalastyle:off number.of.methods
   sealed trait State[Ctx <: StatelessContext]
       extends CallGraph
@@ -441,7 +444,7 @@ object Compiler {
 
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
-    val usedVars: mutable.Set[String] = mutable.Set.empty[String]
+    val accessedVars: mutable.Set[AccessVariable] = mutable.Set.empty[AccessVariable]
     def eventsInfo: Seq[EventInfo]
 
     def getArrayIndexVar(): Ast.Ident = {
@@ -641,29 +644,32 @@ object Compiler {
             case None          => throw Error(s"Variable $sname does not exist")
           }
       }
-      currentScopeUsedVars.add(varName)
+      currentScopeAccessedVars.add(ReadVariable(varName))
       varInfo
     }
 
-    def addUsedVars(names: Set[String]): Unit = usedVars.addAll(names)
+    def addAccessedVars(vars: Set[AccessVariable]): Unit = accessedVars.addAll(vars)
 
     def checkUnusedLocalVars(funcId: Ast.FuncId): Unit = {
       val prefix = s"${funcId.name}."
       val unusedVars = varTable.filter { case (name, varInfo) =>
         name.startsWith(prefix) &&
-        !usedVars.contains(name) &&
+        !accessedVars.contains(ReadVariable(name)) &&
         !varInfo.isGenerated &&
         !varInfo.isUnused
       }
       if (unusedVars.nonEmpty) {
         warnUnusedVariables(typeId, unusedVars)
       }
-      usedVars.filterInPlace(name => !name.startsWith(prefix))
+      accessedVars.filterInPlace {
+        case ReadVariable(name) => !name.startsWith(prefix)
+        case _                  => true
+      }
     }
 
     def checkUnusedFields(): Unit = {
       val unusedVars = varTable.filter { case (name, varInfo) =>
-        !usedVars.contains(name) && !varInfo.isGenerated && !varInfo.isUnused
+        !accessedVars.contains(ReadVariable(name)) && !varInfo.isGenerated && !varInfo.isUnused
       }
       val unusedConstants = mutable.ArrayBuffer.empty[String]
       val unusedFields    = mutable.ArrayBuffer.empty[String]

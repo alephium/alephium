@@ -526,7 +526,7 @@ object Ast {
     def isPrivate: Boolean        = !isPublic
     val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
-    private var usedVars: Option[Set[String]] = None
+    private var funcAccessedVarsCache: Option[Set[Compiler.AccessVariable]] = None
 
     def signature: String = {
       val publicPrefix = if (isPublic) "pub " else ""
@@ -576,15 +576,15 @@ object Ast {
       args.foreach(arg =>
         state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, isGenerated = false)
       )
-      usedVars match {
+      funcAccessedVarsCache match {
         case Some(vars) => // the function has been compiled before
-          state.addUsedVars(vars)
+          state.addAccessedVars(vars)
           body.foreach(_.check(state))
         case None =>
           body.foreach(_.check(state))
-          val currentScopeUsedVars = Set.from(state.currentScopeUsedVars)
-          usedVars = Some(currentScopeUsedVars)
-          state.addUsedVars(currentScopeUsedVars)
+          val currentScopeUsedVars = Set.from(state.currentScopeAccessedVars)
+          funcAccessedVarsCache = Some(currentScopeUsedVars)
+          state.addAccessedVars(currentScopeUsedVars)
       }
       state.checkUnusedLocalVars(id)
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
