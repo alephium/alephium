@@ -1197,7 +1197,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract ArrayTest() {
            |  pub fn test() -> () {
-           |    let mut x = [0, 1, 2, 3]
+           |    let x = [0, 1, 2, 3]
            |    let num = 4
            |    assert!(x[foo()] == 3, 0)
            |    assert!(x[num / 2] == 2, 0)
@@ -1705,7 +1705,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |Contract Foo() {
          |  pub fn foo() -> () {
-         |    let mut x = [1, 2, 3, 4]
+         |    let x = [1, 2, 3, 4]
          |    let y = x[0]
          |    return
          |  }
@@ -1859,6 +1859,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         s"""
            |Contract Child(mut x: U256, y: U256) extends Parent(x) {
            |  pub fn bar() -> () {
+           |    x = 0
            |    foo()
            |  }
            |
@@ -3373,6 +3374,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |Contract Foo(mut a: U256, mut x: [U256; 2], b: Bool, y: [Bool; 2]) {
          |  pub fn foo(z: I256) -> () {
+         |    a = 0
+         |    x[0] = 0
          |    assert!(x[1] != 0, 0)
          |    assert!(z != 0i, 0)
          |  }
@@ -3395,6 +3398,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           1,
           0,
           AVector[Instr[StatefulContext]](
+            U256Const0,
+            StoreMutField(0.toByte),
+            U256Const0,
+            StoreMutField(1.toByte),
             LoadMutField(2.toByte),
             U256Const0,
             U256Neq,
@@ -3432,6 +3439,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |Contract Foo(mut a: U256, mut x: [U256; 2], b: Bool, y: [Bool; 2]) {
          |  pub fn foo(z: I256, c: U256) -> () {
+         |    a = 0
+         |    x[0] = 0
          |    assert!(x[c + 1] != 0, 0)
          |    assert!(z != 0i, 0)
          |  }
@@ -3454,6 +3463,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           2,
           0,
           AVector[Instr[StatefulContext]](
+            U256Const0,
+            StoreMutField(0.toByte),
+            U256Const0,
+            StoreMutField(1.toByte),
             LoadLocal(1.toByte),
             U256Const1,
             U256Add,

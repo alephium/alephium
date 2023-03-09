@@ -1353,6 +1353,10 @@ class VMSpec extends AlephiumSpec {
          |  pub fn checkX(expected: Bool) -> () {
          |    assert!(x == expected, 0)
          |  }
+         |
+         |  pub fn updateState() -> () {
+         |    x = false
+         |  }
          |}
          |""".stripMargin
     val (fooId, _) = prepareContract(fooV1, AVector[Val](Val.True))
@@ -1370,6 +1374,10 @@ class VMSpec extends AlephiumSpec {
          |
          |  pub fn checkX(expected: Bool) -> () {
          |    assert!(x == expected, 0)
+         |  }
+         |
+         |  pub fn updateState() -> () {
+         |    x = false
          |  }
          |}
          |""".stripMargin
@@ -2920,7 +2928,7 @@ class VMSpec extends AlephiumSpec {
   it should "not compile when emitting events with array field types" in new FlowFixture {
     def contractRaw: String =
       s"""
-         |Contract Foo(mut result: U256) {
+         |Contract Foo(result: U256) {
          |
          |  event TestEvent(f: [U256; 2])
          |
@@ -3929,6 +3937,10 @@ class VMSpec extends AlephiumSpec {
          |Contract Foo(mut name: ByteVec) {
          |  pub fn foo() -> () {
          |    emit Debug(`Hello, $${name}!`)
+         |  }
+         |
+         |  pub fn setName() -> () {
+         |    name = #
          |  }
          |}
          |""".stripMargin
