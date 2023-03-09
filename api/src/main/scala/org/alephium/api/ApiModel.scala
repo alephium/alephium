@@ -333,6 +333,9 @@ trait ApiModelCodec {
   implicit val callContractRW: ReadWriter[CallContract]             = macroRW
   implicit val callContractResultRW: ReadWriter[CallContractResult] = macroRW
 
+  implicit val multipleCallContractRW: ReadWriter[MultipleCallContract]             = macroRW
+  implicit val multipleCallContractResultRW: ReadWriter[MultipleCallContractResult] = macroRW
+
   implicit val txResultRW: RW[SubmitTxResult] = macroRW
 
   implicit val getHashesAtHeightRW: RW[GetHashesAtHeight] = macroRW

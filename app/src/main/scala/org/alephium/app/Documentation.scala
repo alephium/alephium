@@ -70,6 +70,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     contractState,
     testContract,
     callContract,
+    multipleCallContract,
     buildMultisigAddress,
     buildMultisig,
     submitMultisigTransaction,

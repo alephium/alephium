@@ -952,6 +952,13 @@ class ServerUtils(implicit
     }
   }
 
+  def multipleCallContract(
+      blockFlow: BlockFlow,
+      params: MultipleCallContract
+  ): Try[MultipleCallContractResult] = {
+    params.calls.mapE(call => callContract(blockFlow, call)).map(MultipleCallContractResult)
+  }
+
   def runTestContract(
       blockFlow: BlockFlow,
       testContract: TestContract.Complete

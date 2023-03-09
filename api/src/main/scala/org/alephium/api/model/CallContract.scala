@@ -50,3 +50,5 @@ final case class CallContract(
     } yield chainIndex.from
   }
 }
+
+final case class MultipleCallContract(calls: AVector[CallContract])

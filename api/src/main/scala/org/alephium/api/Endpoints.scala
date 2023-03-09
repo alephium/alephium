@@ -478,6 +478,13 @@ trait Endpoints
       .out(jsonBody[CallContractResult])
       .summary("Call contract")
 
+  lazy val multipleCallContract: BaseEndpoint[MultipleCallContract, MultipleCallContractResult] =
+    contractsEndpoint.post
+      .in("multiple-call-contract")
+      .in(jsonBody[MultipleCallContract])
+      .out(jsonBody[MultipleCallContractResult])
+      .summary("Multiple call contract")
+
   val exportBlocks: BaseEndpoint[ExportFile, Unit] =
     baseEndpoint.post
       .in("export-blocks")
