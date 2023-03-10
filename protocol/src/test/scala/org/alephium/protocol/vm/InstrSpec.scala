@@ -656,7 +656,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait I256BinaryArithmeticInstrFixture extends BinaryArithmeticInstrFixture {
-    val i256Gen: Gen[I256] = arbitrary[Long].map(I256.from)
+    override val i256Gen: Gen[I256] = arbitrary[Long].map(I256.from)
 
     def testOp(instr: BinaryArithmeticInstr[Val.I256], op: (I256, I256) => I256) = {
       binaryArithmeticGenTest(instr, Val.I256.apply, Val.I256.apply, op, i256Gen)
@@ -739,7 +739,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait U256BinaryArithmeticInstrFixture extends BinaryArithmeticInstrFixture {
-    val u256Gen: Gen[U256] = posLongGen.map(U256.unsafe)
+    override val u256Gen: Gen[U256] = posLongGen.map(U256.unsafe)
 
     def testOp(instr: BinaryArithmeticInstr[Val.U256], op: (U256, U256) => U256) = {
       binaryArithmeticGenTest(instr, Val.U256.apply, Val.U256.apply, op, u256Gen)
@@ -925,7 +925,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "I256ToU256" in new StatelessInstrFixture {
-    val i256Gen: Gen[I256] = posLongGen.map(I256.from)
+    override val i256Gen: Gen[I256] = posLongGen.map(I256.from)
 
     forAll(i256Gen) { i256 =>
       val value = Val.I256(i256)
@@ -952,8 +952,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "I256ToByteVec" in new StatelessInstrFixture {
-    val i256Gen: Gen[I256] = arbitrary[Long].map(I256.from)
-
     forAll(i256Gen) { i256 =>
       val value = Val.I256(i256)
       stack.push(value)
@@ -971,7 +969,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "U256ToI256" in new StatelessInstrFixture {
-    val u256Gen: Gen[U256] = posLongGen.map(U256.unsafe)
+    override val u256Gen: Gen[U256] = posLongGen.map(U256.unsafe)
 
     forAll(u256Gen) { u256 =>
       val value = Val.U256(u256)
@@ -992,8 +990,6 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   it should "U256ToByteVec" in new StatelessInstrFixture {
-    val u256Gen: Gen[U256] = posLongGen.map(U256.unsafe)
-
     forAll(u256Gen) { u256 =>
       val value = Val.U256(u256)
       stack.push(value)
@@ -3599,11 +3595,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.pop()
     }
 
-    val gen = Gen
-      .choose[BigInteger](U256.MinValue.v, U256.MaxValue.v)
-      .map(U256.unsafe)
-
-    forAll(gen) { value =>
+    forAll(u256Gen) { value =>
       val expected = ByteString(value.toString().getBytes(StandardCharsets.US_ASCII))
       check(value, expected)
     }

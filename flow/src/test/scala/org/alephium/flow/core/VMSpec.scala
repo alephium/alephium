@@ -19,8 +19,6 @@ package org.alephium.flow.core
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 
-import scala.language.implicitConversions
-
 import akka.util.ByteString
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
@@ -30,7 +28,7 @@ import org.alephium.crypto._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
-import org.alephium.protocol.{ALPH, Hash, PublicKey}
+import org.alephium.protocol.{ALPH, Generators, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
@@ -38,8 +36,7 @@ import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
 
 // scalastyle:off file.size.limit method.length number.of.methods
-class VMSpec extends AlephiumSpec {
-  implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
+class VMSpec extends AlephiumSpec with Generators {
 
   it should "not start with private function" in new ContractFixture {
     val input =
@@ -1664,11 +1661,7 @@ class VMSpec extends AlephiumSpec {
   }
 
   it should "test u256 to string" in new ContractFixture {
-    val gen = Gen
-      .choose[BigInteger](U256.MinValue.v, U256.MaxValue.v)
-      .map(U256.unsafe)
-
-    forAll(gen) { number =>
+    forAll(u256Gen) { number =>
       val hex = Hex.toHexString(ByteString(number.toString().getBytes(StandardCharsets.US_ASCII)))
       testSimpleScript(
         s"""

@@ -25,7 +25,7 @@ import org.scalacheck.Gen
 import org.alephium.protocol.config.{BrokerConfig, CliqueConfig, GroupConfig}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.GasBox
-import org.alephium.util.{AVector, NumericHelpers}
+import org.alephium.util.{AVector, I256, NumericHelpers, U256}
 
 trait Generators extends NumericHelpers {
   implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
@@ -159,6 +159,11 @@ trait Generators extends NumericHelpers {
       ReleaseVersion(major, minor, patch)
     )
   }
+
+  val i256Gen: Gen[I256] =
+    Gen.choose[java.math.BigInteger](I256.MinValue.v, I256.MaxValue.v).map(I256.unsafe)
+  val u256Gen: Gen[U256] =
+    Gen.choose[java.math.BigInteger](U256.MinValue.v, U256.MaxValue.v).map(U256.unsafe)
 }
 
 trait DefaultGenerators extends Generators {

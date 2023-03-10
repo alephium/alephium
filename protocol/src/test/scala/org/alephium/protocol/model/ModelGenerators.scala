@@ -127,11 +127,6 @@ trait LockupScriptGenerators extends Generators {
       )
     }
 
-  private val i256Gen: Gen[I256] =
-    Gen.choose[java.math.BigInteger](I256.MinValue.v, I256.MaxValue.v).map(I256.unsafe)
-  private val u256Gen: Gen[U256] =
-    Gen.choose[java.math.BigInteger](U256.MinValue.v, U256.MaxValue.v).map(U256.unsafe)
-
   lazy val valBoolGen: Gen[Val.Bool]       = arbitrary[Boolean].map(Val.Bool.apply)
   lazy val valI256Gen: Gen[Val.I256]       = i256Gen.map(Val.I256.apply)
   lazy val valU256Gen: Gen[Val.U256]       = u256Gen.map(Val.U256.apply)
