@@ -687,7 +687,8 @@ object Compiler {
         .toSeq
       if (unassignedMutableVars.nonEmpty) {
         throw new Compiler.Error(
-          s"There are unassigned mutable local vars in function ${typeId.name}.${funcId.name}: $unassignedMutableVars"
+          s"There are unassigned mutable local vars in function ${typeId.name}.${funcId.name}: ${unassignedMutableVars
+              .mkString(",")}"
         )
       }
       accessedVars.filterInPlace {
@@ -728,7 +729,8 @@ object Compiler {
         .toSeq
       if (unassignedMutableFields.nonEmpty) {
         throw new Compiler.Error(
-          s"There are unassigned mutable fields in contract ${typeId.name}: $unassignedMutableFields"
+          s"There are unassigned mutable fields in contract ${typeId.name}: ${unassignedMutableFields
+              .mkString(",")}"
         )
       }
     }

@@ -1438,7 +1438,7 @@ object BuiltIn {
 
   val tokenId: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] with DocUtils {
     val name: String       = "tokenId"
-    val category: Category = Category.Asset
+    val category: Category = Category.Contract
 
     def signature: String             = s"fn $name!(contract:<Contract>) -> (ByteVec)"
     def usePreapprovedAssets: Boolean = false
@@ -1484,6 +1484,7 @@ object BuiltIn {
       selfAddress,
       selfContractId,
       selfTokenId,
+      tokenId,
       callerContractId,
       callerAddress,
       contractInitialStateHash,
@@ -1497,8 +1498,7 @@ object BuiltIn {
       isCalledFromTxScript,
       subContractId,
       subContractIdOf,
-      nullContractAddress,
-      tokenId
+      nullContractAddress
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap

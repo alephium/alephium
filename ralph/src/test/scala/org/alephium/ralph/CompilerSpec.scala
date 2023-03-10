@@ -3573,7 +3573,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
   it should "check mutable field assignments" in {
     def unassignedErrorMsg(contract: String, fields: Seq[String]): String = {
-      s"There are unassigned mutable fields in contract $contract: $fields"
+      s"There are unassigned mutable fields in contract $contract: ${fields.mkString(",")}"
     }
 
     {
@@ -3686,7 +3686,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
   it should "check mutable local vars assignment" in {
     def unassignedErrorMsg(contract: String, func: String, fields: Seq[String]): String = {
-      s"There are unassigned mutable local vars in function $contract.$func: $fields"
+      s"There are unassigned mutable local vars in function $contract.$func: ${fields.mkString(",")}"
     }
 
     {
