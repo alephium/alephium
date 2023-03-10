@@ -1660,32 +1660,45 @@ class VMSpec extends AlephiumSpec with Generators {
     failSimpleScript(main("u256To32Byte!", 33), AssertionFailedWithErrorCode(None, 0))
   }
 
-  it should "test u256 to string" in new ContractFixture {
-    forAll(u256Gen) { number =>
-      val hex = Hex.toHexString(ByteString(number.toString().getBytes(StandardCharsets.US_ASCII)))
+  trait VerifyToStringFixture extends ContractFixture {
+    def toHex(string: String) = {
+      Hex.toHexString(ByteString(string.getBytes(StandardCharsets.US_ASCII)))
+    }
+
+    def assert(statement: String) = {
       testSimpleScript(
         s"""
            |@using(preapprovedAssets = false)
            |TxScript Main {
-           |  assert!(u256ToString!($number) == #$hex, 0)
+           |  $statement
            |}
            |""".stripMargin
       )
     }
   }
 
-  it should "test i256 to string" in new ContractFixture {
-    forAll(i256Gen) { number =>
-      val hex = Hex.toHexString(ByteString(number.toString().getBytes(StandardCharsets.US_ASCII)))
-      testSimpleScript(
-        s"""
-           |@using(preapprovedAssets = false)
-           |TxScript Main {
-           |  assert!(i256ToString!(${number}i) == #$hex, 0)
-           |}
-           |""".stripMargin
-      )
+  it should "test u256 to string" in new VerifyToStringFixture {
+    forAll(u256Gen) { number =>
+      val hex = toHex(number.toString())
+      assert(s"assert!(u256ToString!($number) == #$hex, 0)")
     }
+  }
+
+  it should "test i256 to string" in new VerifyToStringFixture {
+    forAll(i256Gen) { number =>
+      val hex = toHex(number.toString())
+      assert(s"assert!(i256ToString!(${number}i) == #$hex, 0)")
+    }
+  }
+
+  it should "test bool to string" in new VerifyToStringFixture {
+    def test(value: Boolean) = {
+      val hex = toHex(value.toString())
+      assert(s"assert!(boolToString!($value) == #$hex, 0)")
+    }
+
+    test(true)
+    test(false)
   }
 
   it should "test u256 from bytes" in new ContractFixture {

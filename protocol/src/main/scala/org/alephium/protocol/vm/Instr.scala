@@ -161,7 +161,7 @@ object Instr {
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
     BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
     I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, U256ToString,
-    I256ToString
+    I256ToString, BoolToString
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -830,30 +830,33 @@ sealed trait ToStringInstr
     with LemanInstr[StatelessContext]
     with GasToByte
     with StatelessInstrCompanion0 {
-  def toBytes[C <: StatelessContext](frame: Frame[C]): ExeResult[ByteString]
+  def toString[C <: StatelessContext](frame: Frame[C]): ExeResult[String]
 
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      bytes <- toBytes(frame)
-      _     <- frame.pushOpStack(Val.ByteVec(bytes))
-      _     <- frame.ctx.chargeGasWithSize(this, bytes.length)
+      string <- toString(frame)
+      bytes = ByteString(string.getBytes(StandardCharsets.US_ASCII))
+      _ <- frame.pushOpStack(Val.ByteVec(bytes))
+      _ <- frame.ctx.chargeGasWithSize(this, bytes.length)
     } yield ()
   }
 }
 
 object U256ToString extends ToStringInstr {
-  def toBytes[C <: StatelessContext](frame: Frame[C]): ExeResult[ByteString] = {
-    frame.popOpStackU256().map { value =>
-      ByteString(value.v.v.toString().getBytes(StandardCharsets.US_ASCII))
-    }
+  def toString[C <: StatelessContext](frame: Frame[C]): ExeResult[String] = {
+    frame.popOpStackU256().map(_.v.v.toString())
   }
 }
 
 object I256ToString extends ToStringInstr {
-  def toBytes[C <: StatelessContext](frame: Frame[C]): ExeResult[ByteString] = {
-    frame.popOpStackI256().map { value =>
-      ByteString(value.v.v.toString().getBytes(StandardCharsets.US_ASCII))
-    }
+  def toString[C <: StatelessContext](frame: Frame[C]): ExeResult[String] = {
+    frame.popOpStackI256().map(_.v.v.toString())
+  }
+}
+
+object BoolToString extends ToStringInstr {
+  def toString[C <: StatelessContext](frame: Frame[C]): ExeResult[String] = {
+    frame.popOpStackBool().map(_.v.toString())
   }
 }
 
