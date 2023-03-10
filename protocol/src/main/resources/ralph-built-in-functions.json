@@ -82,6 +82,16 @@
     "returns": "@returns the token id (ByteVec) of the contract"
   },
   {
+    "name": "tokenId",
+    "category": "Contract",
+    "signature": "fn tokenId!(contract:<Contract>) -> (ByteVec)",
+    "doc": "Returns the id of the contract",
+    "params": [
+      "@param contract the contract variable"
+    ],
+    "returns": "@returns the id of the contract"
+  },
+  {
     "name": "callerContractId",
     "category": "Contract",
     "signature": "fn callerContractId!() -> (ByteVec)",
@@ -354,16 +364,6 @@
     "returns": "@returns "
   },
   {
-    "name": "tokenId",
-    "category": "Asset",
-    "signature": "fn tokenId!(contract:<Contract>) -> (ByteVec)",
-    "doc": "Returns the id of the contract",
-    "params": [
-      "@param contract the contract variable"
-    ],
-    "returns": "@returns the id of the contract"
-  },
-  {
     "name": "assert",
     "category": "Utils",
     "signature": "fn assert!(condition:Bool, errorCode:U256) -> ()",
@@ -424,6 +424,60 @@
       "@param errorCode (optional) the error code to be thrown when the panic!(...) is called"
     ],
     "returns": "@returns "
+  },
+  {
+    "name": "mulModN",
+    "category": "Utils",
+    "signature": "fn mulModN!(x:U256, y:U256, n:U256) -> (U256)",
+    "doc": "Returns compute the x * y % n.",
+    "params": [
+      "@param x x",
+      "@param y y",
+      "@param n n"
+    ],
+    "returns": "@returns compute the x * y % n"
+  },
+  {
+    "name": "addModN",
+    "category": "Utils",
+    "signature": "fn addModN!(x:U256, y:U256, n:U256) -> (U256)",
+    "doc": "Returns compute the (x + y) % n.",
+    "params": [
+      "@param x x",
+      "@param y y",
+      "@param n n"
+    ],
+    "returns": "@returns compute the (x + y) % n"
+  },
+  {
+    "name": "u256Max",
+    "category": "Utils",
+    "signature": "fn u256Max!() -> (U256)",
+    "doc": "Returns the max value of U256.",
+    "params": [
+      
+    ],
+    "returns": "@returns the max value of U256"
+  },
+  {
+    "name": "i256Max",
+    "category": "Utils",
+    "signature": "fn i256Max!() -> (I256)",
+    "doc": "Returns the max value of I256.",
+    "params": [
+      
+    ],
+    "returns": "@returns the max value of I256"
+  },
+  {
+    "name": "i256Min",
+    "category": "Utils",
+    "signature": "fn i256Min!() -> (I256)",
+    "doc": "Returns the min value of I256.",
+    "params": [
+      
+    ],
+    "returns": "@returns the min value of I256"
   },
   {
     "name": "nullContractAddress",
