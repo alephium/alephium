@@ -94,6 +94,12 @@ object GasExp {
   def gas(byteLength: Int): GasBox = GasBox.unsafe(baseGas + gasPerByte * byteLength)
 }
 
+@Gas
+trait GasMulModN extends GasSimple
+object GasMulModN {
+  val gas: GasBox = GasBox.unsafe(13) // GasMid + GasLow
+}
+
 trait GasHash extends GasFormula {
   def gas(byteLength: Int): GasBox = GasHash.gas(byteLength)
 }

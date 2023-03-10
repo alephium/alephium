@@ -843,6 +843,16 @@ object BuiltIn {
       retComment = "the block hash of the current block"
     )
 
+  val mulModN: BuiltIn[StatelessContext] =
+    SimpleBuiltIn.utilsSimple(
+      "mulModN",
+      Seq(Type.U256, Type.U256, Type.U256),
+      Seq(Type.U256),
+      MulModN,
+      Seq("x" -> "x", "y" -> "y", "n" -> "n"),
+      retComment = "compute the x * y % n"
+    )
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -892,7 +902,8 @@ object BuiltIn {
     u256From32Byte,
     ethEcRecover,
     dustAmount,
-    panic
+    panic,
+    mulModN
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap

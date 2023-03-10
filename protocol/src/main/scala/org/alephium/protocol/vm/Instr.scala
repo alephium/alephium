@@ -158,7 +158,7 @@ object Instr {
     ContractIdToAddress,
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
     BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
-    I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature
+    I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -761,6 +761,19 @@ object U256Exp extends ExpInstr[Val.U256] {
 object U256ModExp extends ExpInstr[Val.U256] {
   def op[C <: StatelessContext](frame: Frame[C], exp: util.U256): ExeResult[Val.U256] =
     frame.popOpStackU256().map(base => Val.U256(base.v.modPow(exp)))
+}
+
+object MulModN extends StatelessInstrCompanion0 with LemanInstr[StatelessContext] with GasMulModN {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      n      <- frame.popOpStackU256()
+      y      <- frame.popOpStackU256()
+      x      <- frame.popOpStackU256()
+      result <- x.v.mulModN(y.v, n.v).toRight(Right(ArithmeticError(s"$x * $y % $n")))
+      _      <- frame.ctx.chargeGas(this)
+      _      <- frame.pushOpStack(Val.U256(result))
+    } yield ()
+  }
 }
 
 sealed trait LogicInstr
