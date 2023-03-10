@@ -17,6 +17,7 @@
 package org.alephium.protocol.vm
 
 import java.math.BigInteger
+import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -76,7 +77,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
       vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee,
-      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature
+      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, U256ToString
     )
     val lemanStatefulInstrs = AVector[LemanInstr[StatefulContext]](
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
@@ -3586,6 +3587,30 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     }
   }
 
+  it should "U256ToString" in new StatelessInstrFixture {
+    def check(value: U256, bytes: ByteString) = {
+      val instr = U256ToString
+      stack.push(Val.U256(value))
+      val initialGas = context.gasRemaining
+      instr.runWith(frame) isE ()
+      initialGas.subUnsafe(context.gasRemaining) is instr.gas(bytes.length)
+      stack.size is 1
+      stack.top.get is Val.ByteVec(bytes)
+      stack.pop()
+    }
+
+    val gen = Gen
+      .choose[BigInteger](U256.MinValue.v, U256.MaxValue.v)
+      .map(U256.unsafe)
+
+    forAll(gen) { value =>
+      val expected = ByteString(value.toString().getBytes(StandardCharsets.US_ASCII))
+      check(value, expected)
+    }
+
+    check(U256.Zero, ByteString("0".getBytes(StandardCharsets.US_ASCII)))
+  }
+
   it should "test gas amount" in new FrameFixture {
     val bytes      = AVector[Byte](0, 255.toByte, Byte.MaxValue, Byte.MinValue)
     val ints       = AVector[Int](0, 1 << 16, -(1 << 16))
@@ -3623,7 +3648,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress -> 5,
       LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2, AssertWithErrorCode -> 3, Swap -> 2,
       vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0, TxGasPrice -> 2, TxGasAmount -> 2, TxGasFee -> 2,
-      I256Exp -> 1610, U256Exp -> 1610, U256ModExp -> 1610, VerifyBIP340Schnorr -> 2000, GetSegregatedSignature -> 3
+      I256Exp -> 1610, U256Exp -> 1610, U256ModExp -> 1610, VerifyBIP340Schnorr -> 2000, GetSegregatedSignature -> 3, U256ToString -> 4
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadMutField(byte) -> 3, StoreMutField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -3753,7 +3778,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress -> 119,
       LoadLocalByIndex -> 120, StoreLocalByIndex -> 121, Dup -> 122, AssertWithErrorCode -> 123, Swap -> 124,
       vm.BlockHash -> 125, DEBUG(AVector.empty) -> 126, TxGasPrice -> 127, TxGasAmount -> 128, TxGasFee -> 129,
-      I256Exp -> 130, U256Exp -> 131, U256ModExp -> 132, VerifyBIP340Schnorr -> 133, GetSegregatedSignature -> 134,
+      I256Exp -> 130, U256Exp -> 131, U256ModExp -> 132, VerifyBIP340Schnorr -> 133, GetSegregatedSignature -> 134, U256ToString -> 135,
       // stateful instructions
       LoadMutField(byte) -> 160, StoreMutField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -3813,7 +3838,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
       vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee,
-      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature
+      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, U256ToString
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadMutField(byte), StoreMutField(byte), CallExternal(byte),

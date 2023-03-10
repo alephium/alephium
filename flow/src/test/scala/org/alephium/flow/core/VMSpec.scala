@@ -17,6 +17,7 @@
 package org.alephium.flow.core
 
 import java.math.BigInteger
+import java.nio.charset.StandardCharsets
 
 import scala.language.implicitConversions
 
@@ -1660,6 +1661,24 @@ class VMSpec extends AlephiumSpec {
     }
     testSimpleScript(main("u256To32Byte!", 32))
     failSimpleScript(main("u256To32Byte!", 33), AssertionFailedWithErrorCode(None, 0))
+  }
+
+  it should "test u256 to string" in new ContractFixture {
+    val gen = Gen
+      .choose[BigInteger](U256.MinValue.v, U256.MaxValue.v)
+      .map(U256.unsafe)
+
+    forAll(gen) { number =>
+      val hex = Hex.toHexString(ByteString(number.toString().getBytes(StandardCharsets.US_ASCII)))
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(u256ToString!($number) == #$hex, 0)
+           |}
+           |""".stripMargin
+      )
+    }
   }
 
   it should "test u256 from bytes" in new ContractFixture {

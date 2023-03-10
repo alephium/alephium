@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import java.nio.charset.StandardCharsets
+
 import scala.annotation.switch
 
 import akka.util.ByteString
@@ -158,7 +160,7 @@ object Instr {
     ContractIdToAddress,
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
     BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
-    I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature
+    I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, U256ToString
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -821,6 +823,21 @@ case object U256To4Byte  extends U256ToBytesInstr(4)
 case object U256To8Byte  extends U256ToBytesInstr(8)
 case object U256To16Byte extends U256ToBytesInstr(16)
 case object U256To32Byte extends U256ToBytesInstr(32)
+
+object U256ToString
+    extends StatelessInstr
+    with LemanInstr[StatelessContext]
+    with GasToByte
+    with StatelessInstrCompanion0 {
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      value <- frame.popOpStackU256()
+      bytes = ByteString(value.v.v.toString().getBytes(StandardCharsets.US_ASCII))
+      _ <- frame.pushOpStack(Val.ByteVec(bytes))
+      _ <- frame.ctx.chargeGasWithSize(this, bytes.length)
+    } yield ()
+  }
+}
 
 sealed abstract class U256FromBytesInstr(val size: Int)
     extends StatelessInstr
