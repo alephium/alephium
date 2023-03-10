@@ -354,6 +354,16 @@
     "returns": "@returns "
   },
   {
+    "name": "tokenId",
+    "category": "Asset",
+    "signature": "fn tokenId!(contract:<Contract>) -> (ByteVec)",
+    "doc": "Returns the id of the contract",
+    "params": [
+      "@param contract the contract variable"
+    ],
+    "returns": "@returns the id of the contract"
+  },
+  {
     "name": "assert",
     "category": "Utils",
     "signature": "fn assert!(condition:Bool, errorCode:U256) -> ()",
