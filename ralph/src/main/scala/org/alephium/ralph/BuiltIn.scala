@@ -853,6 +853,16 @@ object BuiltIn {
       retComment = "compute the x * y % n"
     )
 
+  val addModN: BuiltIn[StatelessContext] =
+    SimpleBuiltIn.utilsSimple(
+      "addModN",
+      Seq(Type.U256, Type.U256, Type.U256),
+      Seq(Type.U256),
+      AddModN,
+      Seq("x" -> "x", "y" -> "y", "n" -> "n"),
+      retComment = "compute the (x + y) % n"
+    )
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -903,7 +913,8 @@ object BuiltIn {
     ethEcRecover,
     dustAmount,
     panic,
-    mulModN
+    mulModN,
+    addModN
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap

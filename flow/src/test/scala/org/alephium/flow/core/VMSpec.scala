@@ -861,6 +861,11 @@ class VMSpec extends AlephiumSpec {
          |    assert!(mulModN!(1 << 128, 1 << 128, ${U256.MaxValue}) == 1, 0)
          |    assert!(mulModN!(${U256.MaxValue}, ${U256.MaxValue}, ${U256.MaxValue}) == 0, 0)
          |
+         |    assert!(addModN!(2, 3, 4) == 1, 0)
+         |    assert!(addModN!(1 << 128, 1 << 128, ${U256.MaxValue}) == 1 << 129, 0)
+         |    assert!(addModN!(1 << 255, 1 << 255, ${U256.MaxValue}) == 1, 0)
+         |    assert!(addModN!(${U256.MaxValue}, ${U256.MaxValue}, ${U256.MaxValue}) == 0, 0)
+         |
          |    let x = 0
          |    let y = 1
          |    assert!(x << 1 == 0, 0)
