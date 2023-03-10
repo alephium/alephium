@@ -30,20 +30,24 @@ object CompilerErrorFormatter {
     * @return
     *   A formatted error message.
     */
-  def apply(failure: Parsed.Failure, program: String): String = {
-    val traced = failure.trace()
+  def apply(failure: Parsed.Failure, program: String): String =
+    CompilerErrorFormatter(failure.trace(), program)
+
+  def apply(traced: Parsed.TracedFailure, program: String): String = {
+    val erroredIndex =
+      getErroredIndex(traced)
 
     val sourcePos =
-      SourcePosition.parse(traced.input.prettyIndex(traced.index))
+      SourcePosition.parse(traced.input.prettyIndex(erroredIndex))
 
     val pointToCodeLine =
       getErroredLine(sourcePos.rowIndex, program)
 
     val pointToErrorMessage =
-      getLatestErrorMessage(traced)
+      s"Expected ${getLatestErrorMessage(traced, erroredIndex)}"
 
     val pointToCodeToken =
-      dropQuotes(Parsed.Failure.formatTrailing(traced.input, traced.index))
+      dropQuotes(Parsed.Failure.formatTrailing(traced.input, erroredIndex))
 
     CompilerErrorFormatter(
       compilerErrorMessage = traced.longMsg,
@@ -128,17 +132,17 @@ object CompilerErrorFormatter {
   def dropQuotes(string: String): String =
     string.replaceFirst("""^"(.+)"$""", "$1")
 
-  /** Fetch the most recent error message. */
-  private def getLatestErrorMessage(traced: Parsed.TracedFailure): String = {
-    val lastStackMessage =
-      traced.stack
-        .filter(_._2 == traced.index) // all parsers for this index
-        .lastOption
-        .map(_._1)               // use the last errored
-        .getOrElse(traced.label) // if none found, use the label
+  /** Use index with maximum value i.e. the latest errored code */
+  private def getErroredIndex(traced: Parsed.TracedFailure): Int =
+    traced.index max traced.stack.foldLeft(0)(_ max _._2)
 
-    s"Expected $lastStackMessage"
-  }
+  /** Fetch the most recent error message. */
+  private def getLatestErrorMessage(traced: Parsed.TracedFailure, forIndex: Int): String =
+    traced.stack
+      .filter(_._2 == forIndex) // all parsers for this index
+      .lastOption
+      .map(_._1)               // use the last errored
+      .getOrElse(traced.label) // if none found, use the label
 
   /** Wraps the input String to be coloured */
   private def highlight(msg: String, color: Option[String]): String =
