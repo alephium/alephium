@@ -858,13 +858,17 @@ class VMSpec extends AlephiumSpec {
          |    assert!(a |**| 3 == a, 0)
          |
          |    assert!(mulModN!(2, 3, 4) == 2, 0)
-         |    assert!(mulModN!(1 << 128, 1 << 128, ${U256.MaxValue}) == 1, 0)
-         |    assert!(mulModN!(${U256.MaxValue}, ${U256.MaxValue}, ${U256.MaxValue}) == 0, 0)
+         |    assert!(mulModN!(1 << 128, 1 << 128, u256Max!()) == 1, 0)
+         |    assert!(mulModN!(u256Max!(), u256Max!(), u256Max!()) == 0, 0)
          |
          |    assert!(addModN!(2, 3, 4) == 1, 0)
-         |    assert!(addModN!(1 << 128, 1 << 128, ${U256.MaxValue}) == 1 << 129, 0)
-         |    assert!(addModN!(1 << 255, 1 << 255, ${U256.MaxValue}) == 1, 0)
-         |    assert!(addModN!(${U256.MaxValue}, ${U256.MaxValue}, ${U256.MaxValue}) == 0, 0)
+         |    assert!(addModN!(1 << 128, 1 << 128, u256Max!()) == 1 << 129, 0)
+         |    assert!(addModN!(1 << 255, 1 << 255, u256Max!()) == 1, 0)
+         |    assert!(addModN!(u256Max!(), u256Max!(), u256Max!()) == 0, 0)
+         |
+         |    assert!(u256Max!() == ${U256.MaxValue}, 0)
+         |    assert!(i256Max!() == ${I256.MaxValue}i, 0)
+         |    assert!(i256Min!() == ${I256.MinValue}i, 0)
          |
          |    let x = 0
          |    let y = 1

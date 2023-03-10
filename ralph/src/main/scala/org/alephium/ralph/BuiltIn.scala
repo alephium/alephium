@@ -21,7 +21,7 @@ import scala.language.reflectiveCalls
 import org.alephium.protocol.model.dustUtxoAmount
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler.{Error, FuncInfo}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, I256, U256}
 
 // scalastyle:off file.size.limit
 // scalastyle:off number.of.methods
@@ -863,6 +863,36 @@ object BuiltIn {
       retComment = "compute the (x + y) % n"
     )
 
+  val u256Max: BuiltIn[StatelessContext] =
+    SimpleBuiltIn.utilsSimple(
+      "u256Max",
+      Seq.empty,
+      Seq(Type.U256),
+      U256Const(Val.U256(U256.MaxValue)),
+      Seq.empty,
+      retComment = "the max value of U256"
+    )
+
+  val i256Max: BuiltIn[StatelessContext] =
+    SimpleBuiltIn.utilsSimple(
+      "i256Max",
+      Seq.empty,
+      Seq(Type.I256),
+      I256Const(Val.I256(I256.MaxValue)),
+      Seq.empty,
+      retComment = "the max value of I256"
+    )
+
+  val i256Min: BuiltIn[StatelessContext] =
+    SimpleBuiltIn.utilsSimple(
+      "i256Min",
+      Seq.empty,
+      Seq(Type.I256),
+      I256Const(Val.I256(I256.MinValue)),
+      Seq.empty,
+      retComment = "the min value of I256"
+    )
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -914,7 +944,10 @@ object BuiltIn {
     dustAmount,
     panic,
     mulModN,
-    addModN
+    addModN,
+    u256Max,
+    i256Max,
+    i256Min
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap
