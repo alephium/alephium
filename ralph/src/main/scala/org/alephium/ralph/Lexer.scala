@@ -66,6 +66,16 @@ object Lexer {
   def unused[Unknown: P]: P[Boolean] = token("@unused").?.!.map(_.nonEmpty)
   def mut[Unknown: P]: P[Boolean]    = P(keyword("mut").?.!).map(_.nonEmpty)
 
+  /** Allows `mut` declarations if `allowMutable = true`. */
+  def mutMaybe[Unknown: P](allowMutable: Boolean): P[Boolean] =
+    P(Index ~ mut) flatMap { case (index, mutable) =>
+      if (!allowMutable && mutable) {
+        CompilerError(CompilerError.AnImmutableVariable, index)
+      } else {
+        Pass(mutable)
+      }
+    }
+
   def lineComment[Unknown: P]: P[Unit] = P("//" ~ CharsWhile(_ != '\n', 0))
   def emptyChars[Unknown: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
 

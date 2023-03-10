@@ -67,4 +67,12 @@ object CompilerError {
   case object `an I256 value`         extends CompilerError
   case object `an U256 value`         extends CompilerError
 
+  // FIXME: Naming this object as `an immutable variable` reports the following error:
+  //        `object name does not match the regular expression '[A-Z][A-Za-z]*'.`
+  //        Which naming is preferred?
+  case object AnImmutableVariable extends CompilerError {
+    override def message: String =
+      "an immutable variable"
+  }
+
 }
