@@ -3963,6 +3963,65 @@ class VMSpec extends AlephiumSpec {
     event.fields is AVector[Val](Val.ByteVec(ByteString.fromString("Hello, Alephium!")))
   }
 
+  it should "test token id built-in function" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    val tokenIssuanceInfo = TokenIssuance.Info(Val.U256(U256.unsafe(1024)), Some(genesisLockup))
+    val (fooId, _)        = createContract(foo, tokenIssuanceInfo = Some(tokenIssuanceInfo))
+
+    def barCode(arguments: String): String = {
+      s"""
+         |Contract Bar() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn bar(foo: Foo, caller: Address) -> () {
+         |    assert!(tokenId!($arguments) == #${fooId.toHexString}, 1)
+         |    transferTokenToSelf!(caller, tokenId!(foo), 1)
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    }
+
+    {
+      info("Invalid argument type")
+      val code = barCode("caller")
+      intercept[Throwable](createContract(code)).getMessage is
+        "org.alephium.ralph.Compiler$Error: Invalid argument type for tokenId, (Contract) expected"
+    }
+
+    {
+      info("Invalid number of arguments")
+      val code = barCode("foo, caller")
+      intercept[Throwable](createContract(code)).getMessage is
+        "org.alephium.ralph.Compiler$Error: Invalid argument type for tokenId, (Contract) expected"
+    }
+
+    {
+      info("Transfer token by tokenId")
+      val bar        = barCode("foo")
+      val (barId, _) = createContract(bar)
+      val script =
+        s"""
+           |TxScript Main {
+           |  let foo = Foo(#${fooId.toHexString})
+           |  Bar(#${barId.toHexString}).bar{@$genesisAddress -> tokenId!(foo): 1}(foo, @$genesisAddress)
+           |}
+           |$bar
+           |""".stripMargin
+
+      callTxScript(script)
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val barState   = worldState.getContractState(barId).rightValue
+      val barContractOutput = worldState.getContractOutput(barState.contractOutputRef).rightValue
+      barContractOutput.tokens is AVector((TokenId.from(fooId), U256.One))
+    }
+  }
+
   it should "test contract asset only function" in new ContractFixture {
     val foo =
       s"""
