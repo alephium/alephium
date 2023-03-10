@@ -1674,6 +1674,20 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
+  it should "test i256 to string" in new ContractFixture {
+    forAll(i256Gen) { number =>
+      val hex = Hex.toHexString(ByteString(number.toString().getBytes(StandardCharsets.US_ASCII)))
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  assert!(i256ToString!(${number}i) == #$hex, 0)
+           |}
+           |""".stripMargin
+      )
+    }
+  }
+
   it should "test u256 from bytes" in new ContractFixture {
     def main(func: String, size: Int): String = {
       val number = BigInteger.ONE.shiftLeft(size * 8).subtract(BigInteger.ONE)

@@ -719,6 +719,17 @@ object BuiltIn {
       doc = "Converts U256 to string in ByteVec."
     )
 
+  val i256ToString: BuiltIn[StatelessContext] =
+    SimpleBuiltIn.conversion(
+      "i256ToString",
+      Seq[Type](Type.I256),
+      Seq[Type](Type.ByteVec),
+      I256ToString,
+      argsName = Seq("i256" -> "the input I256"),
+      retComment = "Converted string in ByteVec",
+      doc = "Converts I256 to string in ByteVec."
+    )
+
   val u256From1Byte: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.conversion(
       "u256From1Byte",
@@ -896,6 +907,7 @@ object BuiltIn {
     u256To16Byte,
     u256To32Byte,
     u256ToString,
+    i256ToString,
     u256From1Byte,
     u256From2Byte,
     u256From4Byte,
