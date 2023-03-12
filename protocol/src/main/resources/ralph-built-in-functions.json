@@ -667,6 +667,36 @@
     "returns": "@returns 32 bytes"
   },
   {
+    "name": "u256ToString",
+    "category": "Conversion",
+    "signature": "fn u256ToString!(u256:U256) -> (ByteVec)",
+    "doc": "Converts U256 to string in ByteVec.",
+    "params": [
+      "@param u256 the input U256"
+    ],
+    "returns": "@returns Converted string in ByteVec"
+  },
+  {
+    "name": "i256ToString",
+    "category": "Conversion",
+    "signature": "fn i256ToString!(i256:I256) -> (ByteVec)",
+    "doc": "Converts I256 to string in ByteVec.",
+    "params": [
+      "@param i256 the input I256"
+    ],
+    "returns": "@returns Converted string in ByteVec"
+  },
+  {
+    "name": "boolToString",
+    "category": "Conversion",
+    "signature": "fn boolToString!(bool:Bool) -> (ByteVec)",
+    "doc": "Converts Bool to string in ByteVec.",
+    "params": [
+      "@param bool the input Bool"
+    ],
+    "returns": "@returns Converted string in ByteVec"
+  },
+  {
     "name": "u256From1Byte",
     "category": "Conversion",
     "signature": "fn u256From1Byte!(bytes:ByteVec) -> (U256)",
