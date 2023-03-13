@@ -82,6 +82,16 @@
     "returns": "@returns the token id (ByteVec) of the contract"
   },
   {
+    "name": "tokenId",
+    "category": "Contract",
+    "signature": "fn tokenId!(contract:<Contract>) -> (ByteVec)",
+    "doc": "Returns the id of the contract",
+    "params": [
+      "@param contract the contract variable"
+    ],
+    "returns": "@returns the id of the contract"
+  },
+  {
     "name": "callerContractId",
     "category": "Contract",
     "signature": "fn callerContractId!() -> (ByteVec)",

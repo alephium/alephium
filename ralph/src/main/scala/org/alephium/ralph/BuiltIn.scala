@@ -1436,6 +1436,36 @@ object BuiltIn {
       retComment = "the null contract address with contract id being zeros"
     )
 
+  val tokenId: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] with DocUtils {
+    val name: String       = "tokenId"
+    val category: Category = Category.Contract
+
+    def signature: String             = s"fn $name!(contract:<Contract>) -> (ByteVec)"
+    def usePreapprovedAssets: Boolean = false
+    def useAssetsInContract: Boolean  = false
+
+    def returnType: Seq[Type] = Seq(Type.ByteVec)
+
+    @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+    def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+      if (inputType.length == 1 && inputType(0).isInstanceOf[Type.Contract]) {
+        Seq(Type.ByteVec)
+      } else {
+        throw Error(
+          s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(",")}"
+        )
+      }
+    }
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = Seq.empty
+
+    val argsCommentedName: Seq[(String, String)] =
+      Seq("contract" -> "the contract variable")
+
+    val retComment: String = "the id of the contract"
+    def doc: String        = s"Returns $retComment"
+  }
+
   val statefulFuncsSeq: Seq[(String, BuiltIn[StatefulContext])] =
     statelessFuncsSeq ++ Seq(
       approveToken,
@@ -1456,6 +1486,7 @@ object BuiltIn {
       selfAddress,
       selfContractId,
       selfTokenId,
+      tokenId,
       callerContractId,
       callerAddress,
       contractInitialStateHash,

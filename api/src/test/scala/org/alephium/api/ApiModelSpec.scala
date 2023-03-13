@@ -913,11 +913,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     CompileProjectResult.diffPatch("Hello", "Hello").value is ""
 
     val bytecode = Hex.toHexString(serialize(compiledContract.code))
-    bytecode is "0701402901010707061005ce00a000a001ce0261b413c40de0b6b3a7640000a916011602160316041605160602"
+    bytecode is "0701403701010707061805ce00a000a001ce0261b413c40de0b6b3a7640000a90c17010ca100140017031400a10116011602160316041605160602"
     val debugBytecode = Hex.toHexString(serialize(compiledContract.debugCode))
-    debugBytecode is "0701402e01010707061105ce00a000a001ce02617e01027878b413c40de0b6b3a7640000a916011602160316041605160602"
+    debugBytecode is "0701403c01010707061905ce00a000a001ce02617e01027878b413c40de0b6b3a7640000a90c17010ca100140017031400a10116011602160316041605160602"
     val diff = CompileProjectResult.diffPatch(bytecode, debugBytecode)
-    diff.value is "=7-1+e=11-1+1=20+7e01027878=50"
+    diff.value is "=7-1+c=11-1+9=20+7e01027878=78"
     val patchedCode = CompileProjectResult.applyPatchUnsafe(bytecode, diff)
     patchedCode is debugBytecode
   }
@@ -929,10 +929,10 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "version": "${ReleaseVersion.current}",
          |  "name": "Foo",
-         |  "bytecode": "0701402901010707061005ce00a000a001ce0261b413c40de0b6b3a7640000a916011602160316041605160602",
-         |  "bytecodeDebugPatch": "=7-1+e=11-1+1=20+7e01027878=50",
-         |  "codeHash": "9edd4014a3813b5c5d63874d8f83d70418d6531d26f214058ed3b53fba6f37b1",
-         |  "codeHashDebug":"bf8cda4711807ca5be9466990f3603f52fea7a2ee33f7c137e43c0c04c0faf24",
+         |  "bytecode": "0701403701010707061805ce00a000a001ce0261b413c40de0b6b3a7640000a90c17010ca100140017031400a10116011602160316041605160602",
+         |  "bytecodeDebugPatch": "=7-1+c=11-1+9=20+7e01027878=78",
+         |  "codeHash": "6ee50d3b19b5dcc42ca293ce86ba9b962c597e28eb931ccb2f92468db682b126",
+         |  "codeHashDebug":"a57454cfd739e83190ec0494fafddb1fada6d24c1540a885f4f9b3fea742db85",
          |  "fields": {
          |    "names": ["aa","bb","cc","dd","ee","ff"],
          |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
@@ -971,8 +971,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "version": "${ReleaseVersion.current}",
          |  "name": "Foo",
-         |  "bytecodeTemplate": "020103000000010201000707060716011602160316041605160602",
-         |  "bytecodeDebugPatch": "=27+8=1+e01027878=26",
+         |  "bytecodeTemplate": "020103000000010201000707060b0c17011400170316011602160316041605160602",
+         |  "bytecodeDebugPatch": "=27-1+c7e01027878=40",
          |  "fields": {
          |    "names": ["aa","bb","cc","dd","ee"],
          |    "types": ["Bool", "U256", "I256", "ByteVec", "Address"],

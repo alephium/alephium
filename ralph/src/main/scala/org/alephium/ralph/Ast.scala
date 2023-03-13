@@ -526,7 +526,7 @@ object Ast {
     def isPrivate: Boolean        = !isPublic
     val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
-    private var usedVars: Option[Set[String]] = None
+    private var funcAccessedVarsCache: Option[Set[Compiler.AccessVariable]] = None
 
     def signature: String = {
       val publicPrefix = if (isPublic) "pub " else ""
@@ -576,17 +576,18 @@ object Ast {
       args.foreach(arg =>
         state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, isGenerated = false)
       )
-      usedVars match {
+      funcAccessedVarsCache match {
         case Some(vars) => // the function has been compiled before
-          state.addUsedVars(vars)
+          state.addAccessedVars(vars)
           body.foreach(_.check(state))
         case None =>
           body.foreach(_.check(state))
-          val currentScopeUsedVars = Set.from(state.currentScopeUsedVars)
-          usedVars = Some(currentScopeUsedVars)
-          state.addUsedVars(currentScopeUsedVars)
+          val currentScopeUsedVars = Set.from(state.currentScopeAccessedVars)
+          funcAccessedVarsCache = Some(currentScopeUsedVars)
+          state.addAccessedVars(currentScopeUsedVars)
       }
       state.checkUnusedLocalVars(id)
+      state.checkUnassignedLocalMutableVars(id)
       if (rtypes.nonEmpty) checkRetTypes(body.lastOption)
     }
 
@@ -636,7 +637,7 @@ object Ast {
   }
   final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
       extends AssignmentTarget[Ctx] {
-    def _getType(state: Compiler.State[Ctx]): Type                 = state.getVariable(ident).tpe
+    def _getType(state: Compiler.State[Ctx]): Type = state.getVariable(ident, isWrite = true).tpe
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
   }
   final case class AssignmentArrayElementTarget[Ctx <: StatelessContext](
@@ -644,7 +645,7 @@ object Ast {
       indexes: Seq[Ast.Expr[Ctx]]
   ) extends AssignmentTarget[Ctx] {
     def _getType(state: Compiler.State[Ctx]): Type =
-      state.getArrayElementType(Seq(state.getVariable(ident).tpe), indexes)
+      state.getArrayElementType(Seq(state.getVariable(ident, isWrite = true).tpe), indexes)
 
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
       val arrayRef = state.getArrayRef(ident)
@@ -904,6 +905,7 @@ object Ast {
       )
       funcs.foreach(_.check(state))
       state.checkUnusedFields()
+      state.checkUnassignedMutableFields()
     }
 
     def genMethods(state: Compiler.State[Ctx]): AVector[Method[Ctx]] = {

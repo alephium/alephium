@@ -1353,6 +1353,10 @@ class VMSpec extends AlephiumSpec {
          |  pub fn checkX(expected: Bool) -> () {
          |    assert!(x == expected, 0)
          |  }
+         |
+         |  pub fn updateState() -> () {
+         |    x = false
+         |  }
          |}
          |""".stripMargin
     val (fooId, _) = prepareContract(fooV1, AVector[Val](Val.True))
@@ -1370,6 +1374,10 @@ class VMSpec extends AlephiumSpec {
          |
          |  pub fn checkX(expected: Bool) -> () {
          |    assert!(x == expected, 0)
+         |  }
+         |
+         |  pub fn updateState() -> () {
+         |    x = false
          |  }
          |}
          |""".stripMargin
@@ -2920,7 +2928,7 @@ class VMSpec extends AlephiumSpec {
   it should "not compile when emitting events with array field types" in new FlowFixture {
     def contractRaw: String =
       s"""
-         |Contract Foo(mut result: U256) {
+         |Contract Foo(result: U256) {
          |
          |  event TestEvent(f: [U256; 2])
          |
@@ -3930,6 +3938,10 @@ class VMSpec extends AlephiumSpec {
          |  pub fn foo() -> () {
          |    emit Debug(`Hello, $${name}!`)
          |  }
+         |
+         |  pub fn setName() -> () {
+         |    name = #
+         |  }
          |}
          |""".stripMargin
 
@@ -3949,6 +3961,65 @@ class VMSpec extends AlephiumSpec {
     val event = logStates.states.head
     event.index is debugEventIndex.v.v.toInt.toByte
     event.fields is AVector[Val](Val.ByteVec(ByteString.fromString("Hello, Alephium!")))
+  }
+
+  it should "test token id built-in function" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    val tokenIssuanceInfo = TokenIssuance.Info(Val.U256(U256.unsafe(1024)), Some(genesisLockup))
+    val (fooId, _)        = createContract(foo, tokenIssuanceInfo = Some(tokenIssuanceInfo))
+
+    def barCode(arguments: String): String = {
+      s"""
+         |Contract Bar() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn bar(foo: Foo, caller: Address) -> () {
+         |    assert!(tokenId!($arguments) == #${fooId.toHexString}, 1)
+         |    transferTokenToSelf!(caller, tokenId!(foo), 1)
+         |  }
+         |}
+         |$foo
+         |""".stripMargin
+    }
+
+    {
+      info("Invalid argument type")
+      val code = barCode("caller")
+      intercept[Throwable](createContract(code)).getMessage is
+        "org.alephium.ralph.Compiler$Error: Invalid argument type for tokenId, expected Contract, got Address"
+    }
+
+    {
+      info("Invalid number of arguments")
+      val code = barCode("1, caller")
+      intercept[Throwable](createContract(code)).getMessage is
+        "org.alephium.ralph.Compiler$Error: Invalid argument type for tokenId, expected Contract, got U256,Address"
+    }
+
+    {
+      info("Transfer token by tokenId")
+      val bar        = barCode("foo")
+      val (barId, _) = createContract(bar)
+      val script =
+        s"""
+           |TxScript Main {
+           |  let foo = Foo(#${fooId.toHexString})
+           |  Bar(#${barId.toHexString}).bar{@$genesisAddress -> tokenId!(foo): 1}(foo, @$genesisAddress)
+           |}
+           |$bar
+           |""".stripMargin
+
+      callTxScript(script)
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val barState   = worldState.getContractState(barId).rightValue
+      val barContractOutput = worldState.getContractOutput(barState.contractOutputRef).rightValue
+      barContractOutput.tokens is AVector((TokenId.from(fooId), U256.One))
+    }
   }
 
   it should "test contract asset only function" in new ContractFixture {
