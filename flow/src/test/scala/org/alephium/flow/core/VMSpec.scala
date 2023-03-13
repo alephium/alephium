@@ -17,8 +17,7 @@
 package org.alephium.flow.core
 
 import java.math.BigInteger
-
-import scala.language.implicitConversions
+import java.nio.charset.StandardCharsets
 
 import akka.util.ByteString
 import org.scalacheck.Arbitrary.arbitrary
@@ -29,7 +28,7 @@ import org.alephium.crypto._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
-import org.alephium.protocol.{ALPH, Hash, PublicKey}
+import org.alephium.protocol.{ALPH, Generators, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
@@ -37,8 +36,7 @@ import org.alephium.serde.{serialize, Serde}
 import org.alephium.util._
 
 // scalastyle:off file.size.limit method.length number.of.methods
-class VMSpec extends AlephiumSpec {
-  implicit def gasBox(n: Int): GasBox = GasBox.unsafe(n)
+class VMSpec extends AlephiumSpec with Generators {
 
   it should "not start with private function" in new ContractFixture {
     val input =
@@ -1684,6 +1682,55 @@ class VMSpec extends AlephiumSpec {
     }
     testSimpleScript(main("u256To32Byte!", 32))
     failSimpleScript(main("u256To32Byte!", 33), AssertionFailedWithErrorCode(None, 0))
+  }
+
+  trait VerifyToStringFixture extends ContractFixture {
+    def toHex(string: String) = {
+      Hex.toHexString(ByteString(string.getBytes(StandardCharsets.US_ASCII)))
+    }
+
+    def test(statements: Seq[String]) = {
+      testSimpleScript(
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  ${statements.mkString("\n")}
+           |}
+           |""".stripMargin
+      )
+    }
+  }
+
+  it should "test u256 to string" in new VerifyToStringFixture {
+    def check(input: U256, expected: String): String = {
+      s"assert!(u256ToString!($input) == #$expected, 0)"
+    }
+    val statements =
+      Gen.listOfN(10, u256Gen).sample.get.map(number => check(number, toHex(number.toString()))) ++
+        Seq(check(0, "30"), check(1, "31"))
+    test(statements)
+  }
+
+  it should "test i256 to string" in new VerifyToStringFixture {
+    def check(input: I256, expected: String): String = {
+      s"assert!(i256ToString!(${input}i) == #$expected, 0)"
+    }
+    val statements =
+      Gen.listOfN(10, i256Gen).sample.get.map(number => check(number, toHex(number.toString()))) ++
+        Seq(
+          check(I256.unsafe(0), "30"),
+          check(I256.unsafe(1), "31"),
+          check(I256.unsafe(-1), "2d31")
+        )
+    test(statements)
+  }
+
+  it should "test bool to string" in new VerifyToStringFixture {
+    val statements = Seq(
+      s"assert!(boolToString!(true) == #${toHex("true")}, 0)",
+      s"assert!(boolToString!(false) == #${toHex("false")}, 0)"
+    )
+    test(statements)
   }
 
   it should "test u256 from bytes" in new ContractFixture {

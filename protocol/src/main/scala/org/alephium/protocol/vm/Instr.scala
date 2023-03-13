@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import java.nio.charset.StandardCharsets
+
 import scala.annotation.switch
 
 import akka.util.ByteString
@@ -158,7 +160,8 @@ object Instr {
     ContractIdToAddress,
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
     BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
-    I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN
+    I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN,
+    U256ToString, I256ToString, BoolToString
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -851,6 +854,44 @@ case object U256To4Byte  extends U256ToBytesInstr(4)
 case object U256To8Byte  extends U256ToBytesInstr(8)
 case object U256To16Byte extends U256ToBytesInstr(16)
 case object U256To32Byte extends U256ToBytesInstr(32)
+
+sealed trait ToStringInstr
+    extends StatelessInstr
+    with LemanInstr[StatelessContext]
+    with GasToByte
+    with StatelessInstrCompanion0 {
+  def toString[C <: StatelessContext](frame: Frame[C]): ExeResult[String]
+
+  def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      string <- toString(frame)
+      bytes = ByteString.fromArrayUnsafe(string.getBytes(StandardCharsets.US_ASCII))
+      _ <- frame.pushOpStack(Val.ByteVec(bytes))
+      _ <- frame.ctx.chargeGasWithSize(this, bytes.length)
+    } yield ()
+  }
+}
+
+object U256ToString extends ToStringInstr {
+  def toString[C <: StatelessContext](frame: Frame[C]): ExeResult[String] = {
+    frame.popOpStackU256().map(_.v.v.toString())
+  }
+}
+
+object I256ToString extends ToStringInstr {
+  def toString[C <: StatelessContext](frame: Frame[C]): ExeResult[String] = {
+    frame.popOpStackI256().map(_.v.v.toString())
+  }
+}
+
+object BoolToString extends ToStringInstr {
+  private val trueString  = "true"
+  private val falseString = "false"
+
+  def toString[C <: StatelessContext](frame: Frame[C]): ExeResult[String] = {
+    frame.popOpStackBool().map(bool => if (bool.v) trueString else falseString)
+  }
+}
 
 sealed abstract class U256FromBytesInstr(val size: Int)
     extends StatelessInstr
