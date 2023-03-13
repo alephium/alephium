@@ -386,9 +386,9 @@ class U256Spec extends AlephiumSpec {
     U256.MaxValue.mulModN(U256.Two, U256.MaxValue) is Some(U256.Zero)
     U256.MaxValue.mulModN(U256.MaxValue, U256.MaxValue) is Some(U256.Zero)
     U256.MaxValue.mulModN(U256.MaxValue, U256.MaxValue.subUnsafe(U256.One)) is Some(U256.One)
+
     val oneShift128 = U256.unsafe(BigInteger.ONE.shiftLeft(128))
     oneShift128.mulModN(oneShift128, U256.MaxValue) is Some(U256.One)
-
     val u256Gen0 = Gen.choose(BigInteger.ONE, oneShift128.subOneUnsafe().v).map(U256.unsafe)
     forAll(u256Gen0, u256Gen0) { case (x, y) =>
       x.mulModN(y, U256.MaxValue) is Some(U256.unsafe(x.v.multiply(y.v)))
@@ -411,9 +411,9 @@ class U256Spec extends AlephiumSpec {
     U256.MaxValue.addModN(U256.Two, U256.MaxValue) is Some(U256.Two)
     U256.MaxValue.addModN(U256.MaxValue, U256.MaxValue) is Some(U256.Zero)
     U256.MaxValue.addModN(U256.MaxValue, U256.MaxValue.subUnsafe(U256.One)) is Some(U256.Two)
+
     val halfUpperBound = U256.unsafe(BigInteger.ONE.shiftLeft(255))
     halfUpperBound.addModN(halfUpperBound, U256.MaxValue) is Some(U256.One)
-
     val u256Gen0 = Gen.choose(BigInteger.ONE, halfUpperBound.subOneUnsafe().v).map(U256.unsafe)
     forAll(u256Gen0, u256Gen0) { case (x, y) =>
       x.addModN(y, U256.MaxValue) is Some(U256.unsafe(x.v.add(y.v)))

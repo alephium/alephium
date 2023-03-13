@@ -783,7 +783,7 @@ sealed trait ModNInstr
 
 object MulModN extends ModNInstr with GasMulModN {
   def op(x: Val.U256, y: Val.U256, n: Val.U256): ExeResult[Val.U256] = {
-    x.v.mulModN(y.v, n.v).map(Val.U256.apply).toRight(Right(ArithmeticError(s"$x * $y % $n")))
+    x.v.mulModN(y.v, n.v).map(Val.U256.apply).toRight(Right(ArithmeticError(s"($x * $y) % $n")))
   }
 }
 
