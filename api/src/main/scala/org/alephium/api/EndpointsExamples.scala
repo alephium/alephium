@@ -729,32 +729,38 @@ trait EndpointsExamples extends ErrorExamples {
       )
     )
 
+  val callContractExample = CallContract(
+    group = 0,
+    worldStateBlockHash = Some(blockHash),
+    txId = Some(txId),
+    address = Address.contract(ContractId.zero),
+    methodIndex = 0,
+    args = Some(AVector[Val](ValU256(U256.Zero))),
+    existingContracts = Some(AVector(contractAddress)),
+    inputAssets = Some(AVector(TestInputAsset(address, asset(3))))
+  )
   implicit val callContractExamples: List[Example[CallContract]] = {
-    simpleExample(
-      CallContract(
-        group = 0,
-        worldStateBlockHash = Some(blockHash),
-        txId = Some(txId),
-        address = Address.contract(ContractId.zero),
-        methodIndex = 0,
-        args = Some(AVector[Val](ValU256(U256.Zero))),
-        existingContracts = Some(AVector(contractAddress)),
-        inputAssets = Some(AVector(TestInputAsset(address, asset(3))))
-      )
-    )
+    simpleExample(callContractExample)
   }
 
+  val callContractResultExample = CallContractResult(
+    returns = AVector[Val](ValU256(U256.Zero)),
+    gasUsed = 20000,
+    contracts = AVector(existingContract),
+    txInputs = AVector(contractAddress),
+    txOutputs = AVector(ContractOutput(1, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
+    events = AVector(eventByTxId)
+  )
   implicit val callContractResultExamples: List[Example[CallContractResult]] = {
-    simpleExample(
-      CallContractResult(
-        returns = AVector[Val](ValU256(U256.Zero)),
-        gasUsed = 20000,
-        contracts = AVector(existingContract),
-        txInputs = AVector(contractAddress),
-        txOutputs = AVector(ContractOutput(1, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
-        events = AVector(eventByTxId)
-      )
-    )
+    simpleExample(callContractResultExample)
+  }
+
+  implicit val multipleCallContractExamples: List[Example[MultipleCallContract]] = {
+    simpleExample(MultipleCallContract(AVector(callContractExample)))
+  }
+
+  implicit val multipleCallContractResultExamples: List[Example[MultipleCallContractResult]] = {
+    simpleExample(MultipleCallContractResult(AVector(callContractResultExample)))
   }
 
   implicit val exportFileExamples: List[Example[ExportFile]] =

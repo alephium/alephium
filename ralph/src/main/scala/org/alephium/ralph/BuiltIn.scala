@@ -21,7 +21,7 @@ import scala.language.reflectiveCalls
 import org.alephium.protocol.model.dustUtxoAmount
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler.{Error, FuncInfo}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, U256}
 
 // scalastyle:off file.size.limit
 // scalastyle:off number.of.methods
@@ -166,6 +166,31 @@ object BuiltIn {
         )
     }
 
+    private def multipleInstrReturn[Ctx <: StatelessContext](category: Category) = new {
+      def apply(
+          name: String,
+          argsType: Seq[Type],
+          returnType: Seq[Type],
+          instrs: Seq[Instr[Ctx]],
+          argsName: Seq[(String, String)],
+          retComment: String,
+          usePreapprovedAssets: Boolean = false,
+          useAssetsInContract: Boolean = false
+      ): SimpleBuiltIn[Ctx] =
+        SimpleBuiltIn(
+          name,
+          argsType,
+          returnType,
+          instrs,
+          usePreapprovedAssets,
+          useAssetsInContract,
+          category,
+          argsName,
+          retComment,
+          doc = s"Returns $retComment."
+        )
+    }
+
     private[ralph] val cryptography = tag[StatelessContext](Category.Cryptography)
     private[ralph] val chain        = tag[StatelessContext](Category.Chain)
     private[ralph] val conversion   = tag[StatelessContext](Category.Conversion)
@@ -181,6 +206,8 @@ object BuiltIn {
 
     private[BuiltIn] def utils[Ctx <: StatelessContext]       = tag[Ctx](Category.Utils)
     private[BuiltIn] def utilsSimple[Ctx <: StatelessContext] = simpleReturn[Ctx](Category.Utils)
+    private[BuiltIn] def utilsMultipleInstr[Ctx <: StatelessContext] =
+      multipleInstrReturn[Ctx](Category.Utils)
 
     def hash(
         name: String,
@@ -843,6 +870,94 @@ object BuiltIn {
       retComment = "the block hash of the current block"
     )
 
+  val mulModN: BuiltIn[StatelessContext] =
+    SimpleBuiltIn.utilsSimple(
+      "mulModN",
+      Seq(Type.U256, Type.U256, Type.U256),
+      Seq(Type.U256),
+      MulModN,
+      Seq("x" -> "x", "y" -> "y", "n" -> "n"),
+      retComment = "compute the x * y % n"
+    )
+
+  val addModN: BuiltIn[StatelessContext] =
+    SimpleBuiltIn.utilsSimple(
+      "addModN",
+      Seq(Type.U256, Type.U256, Type.U256),
+      Seq(Type.U256),
+      AddModN,
+      Seq("x" -> "x", "y" -> "y", "n" -> "n"),
+      retComment = "compute the (x + y) % n"
+    )
+
+  val u256Max: BuiltIn[StatelessContext] = {
+    // scalastyle:off magic.number
+    val instrs = Seq[Instr[StatelessContext]](
+      U256Const1,
+      U256Const(Val.U256(U256.unsafe(255))),
+      U256SHL,
+      Dup,
+      U256Const1,
+      U256Sub,
+      U256BitOr
+    )
+    // scalastyle:on magic.number
+    SimpleBuiltIn.utilsMultipleInstr(
+      "u256Max",
+      Seq.empty,
+      Seq(Type.U256),
+      instrs,
+      Seq.empty,
+      retComment = "the max value of U256"
+    )
+  }
+
+  val i256Max: BuiltIn[StatelessContext] = {
+    // scalastyle:off magic.number
+    val instrs = Seq[Instr[StatelessContext]](
+      U256Const1,
+      U256Const(Val.U256(U256.unsafe(255))),
+      U256SHL,
+      U256Const1,
+      U256Sub,
+      U256ToI256
+    )
+    // scalastyle:on magic.number
+    SimpleBuiltIn.utilsMultipleInstr(
+      "i256Max",
+      Seq.empty,
+      Seq(Type.I256),
+      instrs,
+      Seq.empty,
+      retComment = "the max value of I256"
+    )
+  }
+
+  val i256Min: BuiltIn[StatelessContext] = {
+    // scalastyle:off magic.number
+    val instrs = Seq[Instr[StatelessContext]](
+      U256Const1,
+      U256Const(Val.U256(U256.unsafe(255))),
+      U256SHL,
+      U256Const1,
+      U256Sub,
+      U256ToI256,
+      I256ConstN1,
+      I256Mul,
+      I256ConstN1,
+      I256Add
+    )
+    // scalastyle:on magic.number
+    SimpleBuiltIn.utilsMultipleInstr(
+      "i256Min",
+      Seq.empty,
+      Seq(Type.I256),
+      instrs,
+      Seq.empty,
+      retComment = "the min value of I256"
+    )
+  }
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -892,7 +1007,12 @@ object BuiltIn {
     u256From32Byte,
     ethEcRecover,
     dustAmount,
-    panic
+    panic,
+    mulModN,
+    addModN,
+    u256Max,
+    i256Max,
+    i256Min
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap

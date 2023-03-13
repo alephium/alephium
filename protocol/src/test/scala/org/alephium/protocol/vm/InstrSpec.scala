@@ -76,7 +76,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
       vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee,
-      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature
+      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN
     )
     val lemanStatefulInstrs = AVector[LemanInstr[StatefulContext]](
       MigrateSimple, MigrateWithFields, CopyCreateContractWithToken, BurnToken, LockApprovedAssets,
@@ -921,6 +921,40 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       expGen,
       (base: Val.U256, e: U256) => Right(Val.U256(base.v.modPow(e.toIntUnsafe)))
     )
+  }
+
+  trait ModNInstrFixture extends StatelessInstrFixture {
+    def test(instr: ModNInstr, op: (Val.U256, Val.U256, Val.U256) => Val.U256) = {
+      val nonZeroU256 = valU256Gen.retryUntil(_.v.nonZero)
+      forAll(valU256Gen, valU256Gen, nonZeroU256) { case (x, y, n) =>
+        stack.push(x)
+        stack.push(y)
+        stack.push(n)
+
+        val initialGas = context.gasRemaining
+        instr.runWith(frame) isE ()
+
+        stack.size is 1
+        stack.top.get is op(x, y, n)
+        initialGas.subUnsafe(context.gasRemaining) is instr.gas()
+
+        stack.pop()
+      }
+
+      stack.push(Val.U256(U256.Two))
+      stack.push(Val.U256(U256.Two))
+      stack.push(Val.U256(U256.Zero))
+
+      instr.runWith(frame).leftValue isE a[ArithmeticError]
+    }
+  }
+
+  it should "MulModN" in new ModNInstrFixture {
+    test(MulModN, (x, y, n) => Val.U256(x.v.mulModN(y.v, n.v).get))
+  }
+
+  it should "AddModN" in new ModNInstrFixture {
+    test(AddModN, (x, y, n) => Val.U256(x.v.addModN(y.v, n.v).get))
   }
 
   it should "I256ToU256" in new StatelessInstrFixture {
@@ -3623,7 +3657,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress -> 5,
       LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2, AssertWithErrorCode -> 3, Swap -> 2,
       vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0, TxGasPrice -> 2, TxGasAmount -> 2, TxGasFee -> 2,
-      I256Exp -> 1610, U256Exp -> 1610, U256ModExp -> 1610, VerifyBIP340Schnorr -> 2000, GetSegregatedSignature -> 3
+      I256Exp -> 1610, U256Exp -> 1610, U256ModExp -> 1610, VerifyBIP340Schnorr -> 2000, GetSegregatedSignature -> 3, MulModN -> 13, AddModN -> 8
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadMutField(byte) -> 3, StoreMutField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -3753,7 +3787,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress -> 119,
       LoadLocalByIndex -> 120, StoreLocalByIndex -> 121, Dup -> 122, AssertWithErrorCode -> 123, Swap -> 124,
       vm.BlockHash -> 125, DEBUG(AVector.empty) -> 126, TxGasPrice -> 127, TxGasAmount -> 128, TxGasFee -> 129,
-      I256Exp -> 130, U256Exp -> 131, U256ModExp -> 132, VerifyBIP340Schnorr -> 133, GetSegregatedSignature -> 134,
+      I256Exp -> 130, U256Exp -> 131, U256ModExp -> 132, VerifyBIP340Schnorr -> 133, GetSegregatedSignature -> 134, MulModN -> 135, AddModN -> 136,
       // stateful instructions
       LoadMutField(byte) -> 160, StoreMutField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -3813,7 +3847,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ContractIdToAddress,
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
       vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee,
-      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature
+      I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadMutField(byte), StoreMutField(byte), CallExternal(byte),

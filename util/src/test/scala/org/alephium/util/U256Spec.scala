@@ -370,4 +370,58 @@ class U256Spec extends AlephiumSpec {
         .v is BigInteger.valueOf(base.toLong).pow(exp).mod(U256.upperBound)
     }
   }
+
+  it should "test mul_mod_n" in {
+    U256.Zero.mulModN(U256.Zero, U256.Zero) is None
+    U256.One.mulModN(U256.One, U256.Zero) is None
+    U256.Zero.mulModN(U256.One, U256.One) is Some(U256.Zero)
+    U256.One.mulModN(U256.Zero, U256.One) is Some(U256.Zero)
+
+    U256.One.mulModN(U256.One, U256.One) is Some(U256.Zero)
+    U256.One.mulModN(U256.Ten, U256.Two) is Some(U256.Zero)
+    U256.Ten.mulModN(U256.One, U256.unsafe(4)) is Some(U256.Two)
+
+    U256.Two.mulModN(U256.Two, U256.MaxValue) is Some(U256.unsafe(4))
+    U256.Two.mulModN(U256.MaxValue, U256.MaxValue) is Some(U256.Zero)
+    U256.MaxValue.mulModN(U256.Two, U256.MaxValue) is Some(U256.Zero)
+    U256.MaxValue.mulModN(U256.MaxValue, U256.MaxValue) is Some(U256.Zero)
+    U256.MaxValue.mulModN(U256.MaxValue, U256.MaxValue.subUnsafe(U256.One)) is Some(U256.One)
+
+    val oneShift128 = U256.unsafe(BigInteger.ONE.shiftLeft(128))
+    oneShift128.mulModN(oneShift128, U256.MaxValue) is Some(U256.One)
+    val u256Gen0 = Gen.choose(BigInteger.ONE, oneShift128.subOneUnsafe().v).map(U256.unsafe)
+    forAll(u256Gen0, u256Gen0) { case (x, y) =>
+      x.mulModN(y, U256.MaxValue) is Some(U256.unsafe(x.v.multiply(y.v)))
+    }
+
+    val u256Gen1 = Gen.choose(BigInteger.ONE, U256.MaxValue.v).map(U256.unsafe)
+    forAll(u256Gen1, u256Gen1, u256Gen1) { case (x, y, n) =>
+      x.mulModN(y, n) is Some(U256.unsafe(x.v.multiply(y.v).remainder(n.v)))
+    }
+  }
+
+  it should "test add_mod_n" in {
+    U256.Zero.addModN(U256.Zero, U256.Zero) is None
+    U256.One.addModN(U256.One, U256.Zero) is None
+    U256.Zero.addModN(U256.One, U256.One) is Some(U256.Zero)
+    U256.One.addModN(U256.Zero, U256.One) is Some(U256.Zero)
+
+    U256.Two.addModN(U256.Two, U256.MaxValue) is Some(U256.unsafe(4))
+    U256.Two.addModN(U256.MaxValue, U256.MaxValue) is Some(U256.Two)
+    U256.MaxValue.addModN(U256.Two, U256.MaxValue) is Some(U256.Two)
+    U256.MaxValue.addModN(U256.MaxValue, U256.MaxValue) is Some(U256.Zero)
+    U256.MaxValue.addModN(U256.MaxValue, U256.MaxValue.subUnsafe(U256.One)) is Some(U256.Two)
+
+    val halfUpperBound = U256.unsafe(BigInteger.ONE.shiftLeft(255))
+    halfUpperBound.addModN(halfUpperBound, U256.MaxValue) is Some(U256.One)
+    val u256Gen0 = Gen.choose(BigInteger.ONE, halfUpperBound.subOneUnsafe().v).map(U256.unsafe)
+    forAll(u256Gen0, u256Gen0) { case (x, y) =>
+      x.addModN(y, U256.MaxValue) is Some(U256.unsafe(x.v.add(y.v)))
+    }
+
+    val u256Gen1 = Gen.choose(BigInteger.ONE, U256.MaxValue.v).map(U256.unsafe)
+    forAll(u256Gen1, u256Gen1, u256Gen1) { case (x, y, n) =>
+      x.addModN(y, n) is Some(U256.unsafe(x.v.add(y.v).remainder(n.v)))
+    }
+  }
 }

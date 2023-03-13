@@ -980,6 +980,9 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  pub fn addOne() -> () {
          |    value = value + 1
          |  }
+         |  pub fn getContractId() -> ByteVec {
+         |    return selfContractId!()
+         |  }
          |}
          |""".stripMargin
 
@@ -995,6 +998,9 @@ class ServerUtilsSpec extends AlephiumSpec {
          |    let bar = Bar(#${barId.toHexString})
          |    bar.addOne()
          |    return value
+         |  }
+         |  pub fn getContractId() -> ByteVec {
+         |    return selfContractId!()
          |  }
          |}
          |
@@ -1040,7 +1046,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
     val callContractResult0 = serverUtils.callContract(blockFlow, params0).rightValue
     callContractResult0.returns is AVector[Val](ValU256(2))
-    callContractResult0.gasUsed is 23198
+    callContractResult0.gasUsed is 23200
     callContractResult0.txOutputs.length is 2
     val contractAttoAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
     callContractResult0.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount0
@@ -1061,7 +1067,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val params1             = params0.copy(worldStateBlockHash = Some(createContractBlock.hash))
     val callContractResult1 = serverUtils.callContract(blockFlow, params1).rightValue
     callContractResult1.returns is AVector[Val](ValU256(1))
-    callContractResult1.gasUsed is 23198
+    callContractResult1.gasUsed is 23200
     callContractResult1.txOutputs.length is 2
     val contractAttoAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
     callContractResult1.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount1
@@ -1077,6 +1083,26 @@ class ServerUtilsSpec extends AlephiumSpec {
     fooState1.mutFields is AVector[Val](ValU256(1))
     fooState1.address is fooAddress
     fooState1.asset is AssetState(contractAttoAlphAmount1, Some(AVector.empty))
+  }
+
+  it should "multiple call contract" in new CallContractFixture {
+    val groupIndex = chainIndex.from.value
+    val call0      = CallContract(group = groupIndex, address = barAddress, methodIndex = 1)
+    val call1      = CallContract(group = groupIndex, address = fooAddress, methodIndex = 1)
+    val multipleCallContract = MultipleCallContract(AVector(call0, call1))
+    val multipleCallContractResult =
+      serverUtils.multipleCallContract(blockFlow, multipleCallContract).rightValue
+    multipleCallContractResult.results.length is 2
+
+    val result0 = multipleCallContractResult.results(0)
+    result0.txOutputs.isEmpty is true
+    result0.events.isEmpty is true
+    result0.returns is AVector[Val](ValByteVec(barId.bytes))
+
+    val result1 = multipleCallContractResult.results(1)
+    result1.txOutputs.isEmpty is true
+    result1.events.isEmpty is true
+    result1.returns is AVector[Val](ValByteVec(fooId.bytes))
   }
 
   "the test contract endpoint" should "handle create and destroy contracts properly" in new Fixture {
@@ -1787,6 +1813,29 @@ class ServerUtilsSpec extends AlephiumSpec {
     compileResult.codeHash is code.hash
     result.codeHash is contractState.codeHash
     contractState.codeHash is compileResult.codeHash // We should return the original code hash even when the method is private
+  }
+
+  it should "test the contract by the specified block timestamp" in new Fixture {
+    val blockTimeStamp = TimeStamp.now().plusMinutesUnsafe(5)
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> U256 {
+         |    return blockTimeStamp!()
+         |  }
+         |}
+         |""".stripMargin
+
+    val code = Compiler.compileContract(contract).rightValue
+    val testContract0 =
+      TestContract(bytecode = code, blockTimeStamp = Some(blockTimeStamp)).toComplete().rightValue
+    val serverUtils = new ServerUtils()
+    val testResult0 = serverUtils.runTestContract(blockFlow, testContract0).rightValue
+    testResult0.returns is AVector[Val](ValU256(U256.unsafe(blockTimeStamp.millis)))
+
+    val testContract1 = TestContract(bytecode = code).toComplete().rightValue
+    val testResult1   = serverUtils.runTestContract(blockFlow, testContract1).rightValue
+    testResult1.returns isnot AVector[Val](ValU256(U256.unsafe(blockTimeStamp.millis)))
   }
 
   it should "test with preassigned block hash and tx id" in new Fixture {

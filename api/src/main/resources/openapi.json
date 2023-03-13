@@ -7844,6 +7844,217 @@
         }
       }
     },
+    "/contracts/multicall-contract": {
+      "post": {
+        "tags": [
+          "Contracts"
+        ],
+        "summary": "Multiple call contract",
+        "operationId": "postContractsMulticall-contract",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MultipleCallContract"
+              },
+              "example": {
+                "calls": [
+                  {
+                    "group": 0,
+                    "worldStateBlockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                    "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                    "address": "tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq",
+                    "methodIndex": 0,
+                    "args": [
+                      {
+                        "type": "U256",
+                        "value": "0"
+                      }
+                    ],
+                    "existingContracts": [
+                      "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
+                    ],
+                    "inputAssets": [
+                      {
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                        "asset": {
+                          "attoAlphAmount": "3000000000000000000",
+                          "tokens": [
+                            {
+                              "id": "20aa1fcc865087d7788302d087e4bc76691218ce5d5013dd1cedaabfac19cca4",
+                              "amount": "3000000000"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultipleCallContractResult"
+                },
+                "example": {
+                  "results": [
+                    {
+                      "returns": [
+                        {
+                          "type": "U256",
+                          "value": "0"
+                        }
+                      ],
+                      "gasUsed": 20000,
+                      "contracts": [
+                        {
+                          "address": "vYZdgzNHHp7Qh9U5Rrv5H65eSJCGQTXEC4yuQCZ7mosA",
+                          "bytecode": "00010700000000000118",
+                          "codeHash": "c49d951065f85d0c673d33930e8476240c010a52313f99889ae06d9f0d92d2f9",
+                          "initialStateHash": "e195a4e597e62a6802a456224008b896566b7c961023954fab808a0f83d8ad63",
+                          "immFields": [
+                            {
+                              "type": "U256",
+                              "value": "1000000000000000000"
+                            }
+                          ],
+                          "mutFields": [
+                            {
+                              "type": "U256",
+                              "value": "2000000000000000000"
+                            }
+                          ],
+                          "asset": {
+                            "attoAlphAmount": "2000000000000000000",
+                            "tokens": [
+                              {
+                                "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                                "amount": "2000000000"
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "txInputs": [
+                        "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S"
+                      ],
+                      "txOutputs": [
+                        {
+                          "type": "ContractOutput",
+                          "hint": 1,
+                          "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "attoAlphAmount": "1000000000000000000",
+                          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "tokens": [
+                            {
+                              "id": "2d11fd6c12435ffb07aaed4d190a505b621b927a5f6e51b61ce0ebe186397bdd",
+                              "amount": "42000000000000000000"
+                            },
+                            {
+                              "id": "bd165d20bd063c7a023d22232a1e75bf46e904067f92b49323fe89fa0fd586bf",
+                              "amount": "1000000000000000000000"
+                            }
+                          ]
+                        }
+                      ],
+                      "events": [
+                        {
+                          "blockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                          "contractAddress": "vSxdLL2kE3o6vJBdKkdgmS3W39G3ZEmFHpo2y1jnbzBq",
+                          "eventIndex": 1,
+                          "fields": [
+                            {
+                              "type": "Address",
+                              "value": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y"
+                            },
+                            {
+                              "type": "U256",
+                              "value": "10"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/multisig/address": {
       "post": {
         "tags": [
@@ -11109,6 +11320,34 @@
           }
         }
       },
+      "MultipleCallContract": {
+        "required": [
+          "calls"
+        ],
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CallContract"
+            }
+          }
+        }
+      },
+      "MultipleCallContractResult": {
+        "required": [
+          "results"
+        ],
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CallContractResult"
+            }
+          }
+        }
+      },
       "NodeInfo": {
         "required": [
           "buildInfo",
@@ -11557,6 +11796,10 @@
           "blockHash": {
             "type": "string",
             "format": "block-hash"
+          },
+          "blockTimeStamp": {
+            "type": "integer",
+            "format": "int64"
           },
           "txId": {
             "type": "string",

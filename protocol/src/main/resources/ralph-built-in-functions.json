@@ -426,6 +426,60 @@
     "returns": "@returns "
   },
   {
+    "name": "mulModN",
+    "category": "Utils",
+    "signature": "fn mulModN!(x:U256, y:U256, n:U256) -> (U256)",
+    "doc": "Returns compute the x * y % n.",
+    "params": [
+      "@param x x",
+      "@param y y",
+      "@param n n"
+    ],
+    "returns": "@returns compute the x * y % n"
+  },
+  {
+    "name": "addModN",
+    "category": "Utils",
+    "signature": "fn addModN!(x:U256, y:U256, n:U256) -> (U256)",
+    "doc": "Returns compute the (x + y) % n.",
+    "params": [
+      "@param x x",
+      "@param y y",
+      "@param n n"
+    ],
+    "returns": "@returns compute the (x + y) % n"
+  },
+  {
+    "name": "u256Max",
+    "category": "Utils",
+    "signature": "fn u256Max!() -> (U256)",
+    "doc": "Returns the max value of U256.",
+    "params": [
+      
+    ],
+    "returns": "@returns the max value of U256"
+  },
+  {
+    "name": "i256Max",
+    "category": "Utils",
+    "signature": "fn i256Max!() -> (I256)",
+    "doc": "Returns the max value of I256.",
+    "params": [
+      
+    ],
+    "returns": "@returns the max value of I256"
+  },
+  {
+    "name": "i256Min",
+    "category": "Utils",
+    "signature": "fn i256Min!() -> (I256)",
+    "doc": "Returns the min value of I256.",
+    "params": [
+      
+    ],
+    "returns": "@returns the min value of I256"
+  },
+  {
     "name": "nullContractAddress",
     "category": "Utils",
     "signature": "fn nullContractAddress!() -> (Address)",

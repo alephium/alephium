@@ -926,6 +926,7 @@ class ServerUtils(implicit
         contractId,
         txId,
         blockHash,
+        TimeStamp.now(),
         params.inputAssets.getOrElse(AVector.empty),
         params.methodIndex,
         params.args.getOrElse(AVector.empty),
@@ -952,6 +953,13 @@ class ServerUtils(implicit
     }
   }
 
+  def multipleCallContract(
+      blockFlow: BlockFlow,
+      params: MultipleCallContract
+  ): Try[MultipleCallContractResult] = {
+    params.calls.mapE(call => callContract(blockFlow, call)).map(MultipleCallContractResult)
+  }
+
   def runTestContract(
       blockFlow: BlockFlow,
       testContract: TestContract.Complete
@@ -969,6 +977,7 @@ class ServerUtils(implicit
         contractId,
         testContract.txId,
         testContract.blockHash,
+        testContract.blockTimeStamp,
         testContract.inputAssets,
         testContract.testMethodIndex,
         testContract.testArgs,
@@ -1107,6 +1116,7 @@ class ServerUtils(implicit
       contractId: ContractId,
       txId: TransactionId,
       blockHash: BlockHash,
+      blockTimeStamp: TimeStamp,
       inputAssets: AVector[TestInputAsset],
       methodIndex: Int,
       args: AVector[Val],
@@ -1115,7 +1125,7 @@ class ServerUtils(implicit
     val blockEnv = BlockEnv(
       ChainIndex(groupIndex, groupIndex),
       networkConfig.networkId,
-      TimeStamp.now(),
+      blockTimeStamp,
       consensusConfig.maxMiningTarget,
       Some(blockHash)
     )
