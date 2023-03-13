@@ -3991,14 +3991,14 @@ class VMSpec extends AlephiumSpec {
       info("Invalid argument type")
       val code = barCode("caller")
       intercept[Throwable](createContract(code)).getMessage is
-        "org.alephium.ralph.Compiler$Error: Invalid argument type for tokenId, (Contract) expected"
+        "org.alephium.ralph.Compiler$Error: Invalid argument type for tokenId, expected Contract, got Address"
     }
 
     {
       info("Invalid number of arguments")
-      val code = barCode("foo, caller")
+      val code = barCode("1, caller")
       intercept[Throwable](createContract(code)).getMessage is
-        "org.alephium.ralph.Compiler$Error: Invalid argument type for tokenId, (Contract) expected"
+        "org.alephium.ralph.Compiler$Error: Invalid argument type for tokenId, expected Contract, got U256,Address"
     }
 
     {
