@@ -101,6 +101,22 @@ class U256(val v: BigInteger) extends AnyVal with Ordered[U256] {
     U256.boundNonNegative(this.v.multiply(that.v))
   }
 
+  def mulModN(that: U256, n: U256): Option[U256] = {
+    if (n.isZero) {
+      None
+    } else {
+      U256.from(this.v.multiply(that.v).remainder(n.v))
+    }
+  }
+
+  def addModN(that: U256, n: U256): Option[U256] = {
+    if (n.isZero) {
+      None
+    } else {
+      U256.from(this.v.add(that.v).remainder(n.v))
+    }
+  }
+
   def divUnsafe(that: U256): U256 = {
     assume(!that.isZero)
     U256.unsafe(this.v.divide(that.v))

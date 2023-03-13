@@ -429,6 +429,10 @@ object Compiler {
     }
   }
 
+  sealed trait AccessVariable
+  final case class ReadVariable(name: String)  extends AccessVariable
+  final case class WriteVariable(name: String) extends AccessVariable
+
   // scalastyle:off number.of.methods
   sealed trait State[Ctx <: StatelessContext]
       extends CallGraph
@@ -441,7 +445,7 @@ object Compiler {
 
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
-    val usedVars: mutable.Set[String] = mutable.Set.empty[String]
+    val accessedVars: mutable.Set[AccessVariable] = mutable.Set.empty[AccessVariable]
     def eventsInfo: Seq[EventInfo]
 
     def getArrayIndexVar(): Ast.Ident = {
@@ -506,8 +510,9 @@ object Compiler {
       if (currentScope == Ast.FuncId.empty) name else scopedName(currentScope, name)
     }
 
+    @inline private def scopedNamePrefix(scopeId: Ast.FuncId): String = s"${scopeId.name}."
     protected def scopedName(scopeId: Ast.FuncId, name: String): String = {
-      s"${scopeId.name}.$name"
+      s"${scopedNamePrefix(scopeId)}$name"
     }
 
     def addTemplateVariable(ident: Ast.Ident, tpe: Type, index: Int): Unit = {
@@ -630,7 +635,7 @@ object Compiler {
       sname
     }
 
-    def getVariable(ident: Ast.Ident): VarInfo = {
+    def getVariable(ident: Ast.Ident, isWrite: Boolean = false): VarInfo = {
       val name  = ident.name
       val sname = scopedName(ident.name)
       val (varName, varInfo) = varTable.get(sname) match {
@@ -641,29 +646,60 @@ object Compiler {
             case None          => throw Error(s"Variable $sname does not exist")
           }
       }
-      currentScopeUsedVars.add(varName)
+      if (isWrite) {
+        currentScopeAccessedVars.add(WriteVariable(varName))
+      } else {
+        currentScopeAccessedVars.add(ReadVariable(varName))
+      }
       varInfo
     }
 
-    def addUsedVars(names: Set[String]): Unit = usedVars.addAll(names)
+    def addAccessedVars(vars: Set[AccessVariable]): Unit = accessedVars.addAll(vars)
 
     def checkUnusedLocalVars(funcId: Ast.FuncId): Unit = {
-      val prefix = s"${funcId.name}."
+      val prefix = scopedNamePrefix(funcId)
       val unusedVars = varTable.filter { case (name, varInfo) =>
         name.startsWith(prefix) &&
-        !usedVars.contains(name) &&
         !varInfo.isGenerated &&
-        !varInfo.isUnused
+        !varInfo.isUnused &&
+        !accessedVars.contains(ReadVariable(name))
       }
       if (unusedVars.nonEmpty) {
         warnUnusedVariables(typeId, unusedVars)
       }
-      usedVars.filterInPlace(name => !name.startsWith(prefix))
+      accessedVars.filterInPlace {
+        case ReadVariable(name) => !name.startsWith(prefix)
+        case _                  => true
+      }
+    }
+
+    def checkUnassignedLocalMutableVars(funcId: Ast.FuncId): Unit = {
+      val prefix = scopedNamePrefix(funcId)
+      val unassignedMutableVars = varTable.view
+        .filter { case (name, varInfo) =>
+          varInfo.isMutable &&
+          name.startsWith(prefix) &&
+          !varInfo.isGenerated &&
+          !varInfo.isUnused &&
+          !accessedVars.contains(WriteVariable(name))
+        }
+        .keys
+        .toSeq
+      if (unassignedMutableVars.nonEmpty) {
+        throw new Compiler.Error(
+          s"There are unassigned mutable local vars in function ${typeId.name}.${funcId.name}: ${unassignedMutableVars
+              .mkString(",")}"
+        )
+      }
+      accessedVars.filterInPlace {
+        case WriteVariable(name) => !name.startsWith(prefix)
+        case _                   => true
+      }
     }
 
     def checkUnusedFields(): Unit = {
       val unusedVars = varTable.filter { case (name, varInfo) =>
-        !usedVars.contains(name) && !varInfo.isGenerated && !varInfo.isUnused
+        !varInfo.isGenerated && !varInfo.isUnused && !accessedVars.contains(ReadVariable(name))
       }
       val unusedConstants = mutable.ArrayBuffer.empty[String]
       val unusedFields    = mutable.ArrayBuffer.empty[String]
@@ -677,6 +713,25 @@ object Compiler {
       }
       if (unusedFields.nonEmpty) {
         warnUnusedFields(typeId, unusedFields)
+      }
+    }
+
+    def checkUnassignedMutableFields(): Unit = {
+      val unassignedMutableFields = varTable.view
+        .filter { case (name, varInfo) =>
+          !varInfo.isLocal &&
+          varInfo.isMutable &&
+          !varInfo.isGenerated &&
+          !varInfo.isUnused &&
+          !accessedVars.contains(WriteVariable(name))
+        }
+        .keys
+        .toSeq
+      if (unassignedMutableFields.nonEmpty) {
+        throw new Compiler.Error(
+          s"There are unassigned mutable fields in contract ${typeId.name}: ${unassignedMutableFields
+              .mkString(",")}"
+        )
       }
     }
 

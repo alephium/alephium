@@ -27,3 +27,5 @@ final case class CallContractResult(
     txOutputs: AVector[Output],
     events: AVector[ContractEventByTxId]
 )
+
+final case class MultipleCallContractResult(results: AVector[CallContractResult])

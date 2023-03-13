@@ -22,12 +22,13 @@ import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, BlockHash, ContractId, GroupIndex, TransactionId}
 import org.alephium.protocol.vm.{ContractState => _, Val => _, _}
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, TimeStamp}
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class TestContract(
     group: Option[Int] = None,
     blockHash: Option[BlockHash] = None,
+    blockTimeStamp: Option[TimeStamp] = None,
     txId: Option[TransactionId] = None,
     address: Option[Address.Contract] = None,
     bytecode: StatefulContract,
@@ -55,6 +56,7 @@ final case class TestContract(
           Complete(
             group.getOrElse(groupDefault),
             blockHash.getOrElse(BlockHash.random),
+            blockTimeStamp.getOrElse(TimeStamp.now()),
             txId.getOrElse(TransactionId.random),
             address.getOrElse(addressDefault).contractId,
             code = testCode,
@@ -87,6 +89,7 @@ object TestContract {
   final case class Complete(
       group: Int = groupDefault,
       blockHash: BlockHash = BlockHash.random,
+      blockTimeStamp: TimeStamp = TimeStamp.now(),
       txId: TransactionId = TransactionId.random,
       contractId: ContractId = addressDefault.contractId,
       code: StatefulContract,
