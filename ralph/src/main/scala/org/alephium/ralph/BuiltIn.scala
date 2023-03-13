@@ -1571,7 +1571,9 @@ object BuiltIn {
       if (inputType.length == 1 && inputType(0).isInstanceOf[Type.Contract]) {
         Seq(Type.ByteVec)
       } else {
-        throw Error(s"Invalid argument type for ${name}, (Contract) expected")
+        throw Error(
+          s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(",")}"
+        )
       }
     }
 
