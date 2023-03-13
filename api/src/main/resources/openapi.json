@@ -7844,13 +7844,13 @@
         }
       }
     },
-    "/contracts/multiple-call-contract": {
+    "/contracts/multicall-contract": {
       "post": {
         "tags": [
           "Contracts"
         ],
         "summary": "Multiple call contract",
-        "operationId": "postContractsMultiple-call-contract",
+        "operationId": "postContractsMulticall-contract",
         "requestBody": {
           "content": {
             "application/json": {
