@@ -1665,12 +1665,12 @@ class VMSpec extends AlephiumSpec with Generators {
       Hex.toHexString(ByteString(string.getBytes(StandardCharsets.US_ASCII)))
     }
 
-    def assert(statement: String) = {
+    def test(statements: Seq[String]) = {
       testSimpleScript(
         s"""
            |@using(preapprovedAssets = false)
            |TxScript Main {
-           |  $statement
+           |  ${statements.mkString("\n")}
            |}
            |""".stripMargin
       )
@@ -1678,27 +1678,35 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "test u256 to string" in new VerifyToStringFixture {
-    forAll(u256Gen) { number =>
-      val hex = toHex(number.toString())
-      assert(s"assert!(u256ToString!($number) == #$hex, 0)")
+    def check(input: U256, expected: String): String = {
+      s"assert!(u256ToString!($input) == #$expected, 0)"
     }
+    val statements =
+      Gen.listOfN(10, u256Gen).sample.get.map(number => check(number, toHex(number.toString()))) ++
+        Seq(check(0, "30"), check(1, "31"))
+    test(statements)
   }
 
   it should "test i256 to string" in new VerifyToStringFixture {
-    forAll(i256Gen) { number =>
-      val hex = toHex(number.toString())
-      assert(s"assert!(i256ToString!(${number}i) == #$hex, 0)")
+    def check(input: I256, expected: String): String = {
+      s"assert!(i256ToString!(${input}i) == #$expected, 0)"
     }
+    val statements =
+      Gen.listOfN(10, i256Gen).sample.get.map(number => check(number, toHex(number.toString()))) ++
+        Seq(
+          check(I256.unsafe(0), "30"),
+          check(I256.unsafe(1), "31"),
+          check(I256.unsafe(-1), "2d31")
+        )
+    test(statements)
   }
 
   it should "test bool to string" in new VerifyToStringFixture {
-    def test(value: Boolean) = {
-      val hex = toHex(value.toString())
-      assert(s"assert!(boolToString!($value) == #$hex, 0)")
-    }
-
-    test(true)
-    test(false)
+    val statements = Seq(
+      s"assert!(boolToString!(true) == #${toHex("true")}, 0)",
+      s"assert!(boolToString!(false) == #${toHex("false")}, 0)"
+    )
+    test(statements)
   }
 
   it should "test u256 from bytes" in new ContractFixture {

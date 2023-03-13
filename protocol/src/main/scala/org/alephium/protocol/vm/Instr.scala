@@ -835,7 +835,7 @@ sealed trait ToStringInstr
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       string <- toString(frame)
-      bytes = ByteString(string.getBytes(StandardCharsets.US_ASCII))
+      bytes = ByteString.fromArrayUnsafe(string.getBytes(StandardCharsets.US_ASCII))
       _ <- frame.pushOpStack(Val.ByteVec(bytes))
       _ <- frame.ctx.chargeGasWithSize(this, bytes.length)
     } yield ()
@@ -855,8 +855,11 @@ object I256ToString extends ToStringInstr {
 }
 
 object BoolToString extends ToStringInstr {
+  private val trueString  = "true"
+  private val falseString = "false"
+
   def toString[C <: StatelessContext](frame: Frame[C]): ExeResult[String] = {
-    frame.popOpStackBool().map(_.v.toString())
+    frame.popOpStackBool().map(bool => if (bool.v) trueString else falseString)
   }
 }
 
