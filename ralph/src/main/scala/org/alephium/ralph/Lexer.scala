@@ -90,17 +90,21 @@ object Lexer {
       case (_, i)   => i
     }
   def typedNum[Unknown: P]: P[Val] =
-    P(num ~ ("i" | "u").?.!)
-      .map {
-        case (n, postfix) if Number.isNegative(n) || postfix == "i" =>
+    P(Index ~ num ~ ("i" | "u").?.!)(
+      sourcecode.Name(CompilerError.`an I256 or U256 value`.message),
+      implicitly[P[_]]
+    )
+      .flatMap {
+        case (index, n, postfix) if Number.isNegative(n) || postfix == "i" =>
           I256.from(n) match {
-            case Some(value) => Val.I256(value)
-            case None        => throw Compiler.Error(s"Invalid I256 value: $n")
+            case Some(value) => Pass(Val.I256(value))
+            case None        => CompilerError(CompilerError.`an I256 value`, index)
           }
-        case (n, _) =>
+
+        case (index, n, _) =>
           U256.from(n) match {
-            case Some(value) => Val.U256(value)
-            case None        => throw Compiler.Error(s"Invalid U256 value: $n")
+            case Some(value) => Pass(Val.U256(value))
+            case None        => CompilerError(CompilerError.`an U256 value`, index)
           }
       }
 
