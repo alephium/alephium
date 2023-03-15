@@ -150,7 +150,7 @@ object Compiler {
 
   final case class Error(message: String) extends Exception(message)
   object Error {
-    def parse(failure: Parsed.Failure): Error = Error(s"Parser failed: ${failure.trace().longMsg}")
+    def parse(failure: Parsed.Failure): Error = Error(CompilerErrorFormatter(failure).format())
   }
 
   def expectOneType(ident: Ast.Ident, tpe: Seq[Type]): Type = {
