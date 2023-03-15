@@ -68,7 +68,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler
         .compileTxScript(script)
         .leftValue
-        .message is "No main statements defined in TxScript Foo"
+        .message is
+        """-- error: Expected main statements for type `Foo`:2:15 / ([ \t\r\n] | lineComment):2:15, found "}\n"
+          |2 |TxScript Foo {}
+          |  |              ^^^
+          |  |              Expected main statements for type `Foo`
+          |""".stripMargin
     }
 
     {

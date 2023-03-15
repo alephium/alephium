@@ -76,4 +76,9 @@ object CompilerError {
       "an immutable variable"
   }
 
+  final case class NoMainStatementDefined(typeId: Ast.TypeId) extends CompilerError {
+    override def message: String =
+      s"""main statements for type `${typeId.name}`"""
+  }
+
 }

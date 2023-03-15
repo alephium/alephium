@@ -512,13 +512,13 @@ object StatefulParser extends Parser[StatefulContext] {
       annotation.rep ~
         Lexer.keyword(
           "TxScript"
-        ) ~/ Lexer.typeId ~ templateParams.? ~ "{" ~ statement
+        ) ~/ Lexer.typeId ~ templateParams.? ~ "{" ~ Index ~ statement
           .rep(0) ~ func
           .rep(0) ~ "}"
     )
-      .map { case (annotations, typeId, templateVars, mainStmts, funcs) =>
+      .flatMap { case (annotations, typeId, templateVars, mainStmtsIndex, mainStmts, funcs) =>
         if (mainStmts.isEmpty) {
-          throw Compiler.Error(s"No main statements defined in TxScript ${typeId.name}")
+          CompilerError(CompilerError.NoMainStatementDefined(typeId), mainStmtsIndex)
         } else {
           val (usePreapprovedAssets, useContractAssets, _, useUpdateFields) =
             Parser.extractFuncModifier(
@@ -528,12 +528,14 @@ object StatefulParser extends Parser[StatefulContext] {
               useCheckExternalCallerDefault = true,
               useUpdateFieldsDefault = false
             )
-          Ast.TxScript(
-            typeId,
-            templateVars.getOrElse(Seq.empty),
-            Ast.FuncDef
-              .main(mainStmts, usePreapprovedAssets, useContractAssets, useUpdateFields) +: funcs
-          )
+          val txScript =
+            Ast.TxScript(
+              typeId,
+              templateVars.getOrElse(Seq.empty),
+              Ast.FuncDef
+                .main(mainStmts, usePreapprovedAssets, useContractAssets, useUpdateFields) +: funcs
+            )
+          Pass(txScript)
         }
       }
   def txScript[Unknown: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
