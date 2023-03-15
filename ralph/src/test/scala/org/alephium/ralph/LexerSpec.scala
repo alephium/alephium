@@ -65,7 +65,10 @@ class LexerSpec extends AlephiumSpec {
       Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = true, isUnused = false)
     fastparse.parse("@unused mut x: U256", StatelessParser.funcArgument(_)).get.value is
       Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = true, isUnused = true)
-    fastparse.parse("@unused mut x: U256", StatelessParser.contractField(_)).get.value is
+    fastparse
+      .parse("@unused mut x: U256", StatelessParser.contractField(allowMutable = true)(_))
+      .get
+      .value is
       Ast.Argument(Ast.Ident("x"), Type.U256, isMutable = true, isUnused = true)
     fastparse.parse("// comment", Lexer.lineComment(_)).isSuccess is true
     fastparse.parse("add", Lexer.funcId(_)).get.value is Ast.FuncId("add", false)
@@ -175,5 +178,59 @@ class LexerSpec extends AlephiumSpec {
     fastparse.parse("a b c$x$$`", Lexer.stringPart(_)).get.value is "a b c"
     fastparse.parse("$", Lexer.stringPart(_)).get.value is ""
     fastparse.parse("`", Lexer.stringPart(_)).get.value is ""
+  }
+
+  it should "parse mut declarations" in {
+    {
+      info("fail mut declarations when mutability is disallowed")
+      forAll { right: String =>
+        val code = s"mut $right"
+
+        // when allowMutable is false, it should let `mut` declarations through.
+        val traced =
+          fastparse
+            .parse(code, Lexer.mutMaybe(allowMutable = false)(_))
+            .asInstanceOf[Parsed.Failure]
+            .trace()
+
+        // fastparse reports only the first 10 characters.
+        val reportedToken = code.take(10)
+
+        traced.longMsg is s"""Expected ${CompilerError.AnImmutableVariable.message}:1:1 / (letter | digit | "_"):1:1, found "$reportedToken""""
+      }
+
+      {
+        info("succeed mut declarations when mutability is allowed")
+        forAll { right: String =>
+          // when mut has an identifier.
+          fastparse
+            .parse(s"mut $right", Lexer.mutMaybe(allowMutable = true)(_))
+            .asInstanceOf[Parsed.Success[Boolean]]
+            .value is true
+        }
+
+        // when mut does not have an identifier.
+        fastparse
+          .parse(s"mut", Lexer.mutMaybe(allowMutable = true)(_))
+          .asInstanceOf[Parsed.Success[Boolean]]
+          .value is true
+      }
+
+      {
+        info("succeed for immutable declarations")
+        forAll { right: String =>
+          // immutable declarations should always be allowed.
+          fastparse
+            .parse(s"$right", Lexer.mutMaybe(allowMutable = true)(_))
+            .asInstanceOf[Parsed.Success[Boolean]]
+            .value is false
+
+          fastparse
+            .parse(s"$right", Lexer.mutMaybe(allowMutable = false)(_))
+            .asInstanceOf[Parsed.Success[Boolean]]
+            .value is false
+        }
+      }
+    }
   }
 }
