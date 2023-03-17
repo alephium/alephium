@@ -403,7 +403,7 @@ object AlephiumConfig {
   def sanityCheck(config: AlephiumConfig): AlephiumConfig = {
     if (
       config.network.networkId == NetworkId.AlephiumMainNet &&
-      config.network.lemanHardForkTimestamp != TimeStamp.unsafe(9000000000000000000L)
+      config.network.lemanHardForkTimestamp != TimeStamp.unsafe(1680170400000L)
     ) {
       throw new IllegalArgumentException("Invalid timestamp for leman hard fork")
     }
