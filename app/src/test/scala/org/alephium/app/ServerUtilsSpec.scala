@@ -34,7 +34,7 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.ralph.Compiler
-import org.alephium.serde.serialize
+import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
@@ -2160,6 +2160,14 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
 
     def deployContract() = {
+      val deployContractTx =
+        deserialize[UnsignedTransaction](Hex.unsafe(deployContractTxResult.unsignedTx)).rightValue
+      deployContractTx.fixedOutputs.length is 1
+      val output = deployContractTx.fixedOutputs.head
+      output.amount is ALPH.oneAlph.subUnsafe(
+        deployContractTx.gasPrice * deployContractTx.gasAmount
+      )
+
       signAndAddToMemPool(
         deployContractTxResult.txId,
         deployContractTxResult.unsignedTx,
@@ -2170,6 +2178,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
       val block = mineFromMemPool(blockFlow, chainIndex)
+      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
       addAndCheck(blockFlow, block)
     }
   }

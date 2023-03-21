@@ -747,30 +747,38 @@ class ServerUtils(implicit
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Try[UnsignedTransaction] = {
-    val utxosLimit = apiConfig.defaultUtxosLimit
+    val utxosLimit               = apiConfig.defaultUtxosLimit
+    val estimatedTxOutputsLength = tokens.length + (if (amount > U256.Zero) 1 else 0)
     for {
       allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
       allInputs = allUtxos.map(_.ref).map(TxInput(_, fromUnlockScript))
-      unsignedTx <- UtxoSelectionAlgo
-        .Build(ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
-        .select(
-          AssetAmounts(amount, tokens),
-          fromUnlockScript,
-          allUtxos,
-          txOutputsLength = 0,
-          Some(script),
-          AssetScriptGasEstimator.Default(blockFlow),
-          TxScriptGasEstimator.Default(allInputs, blockFlow)
-        )
-        .map { selectedUtxos =>
-          val inputs = selectedUtxos.assets.map(_.ref).map(TxInput(_, fromUnlockScript))
-          UnsignedTransaction(Some(script), inputs, AVector.empty).copy(
-            gasAmount = gas.getOrElse(selectedUtxos.gas),
-            gasPrice = gasPrice.getOrElse(nonCoinbaseMinGasPrice)
+      selectedUtxos <- wrapError(
+        UtxoSelectionAlgo
+          .Build(ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
+          .select(
+            AssetAmounts(amount, tokens),
+            fromUnlockScript,
+            allUtxos,
+            txOutputsLength = estimatedTxOutputsLength,
+            Some(script),
+            AssetScriptGasEstimator.Default(blockFlow),
+            TxScriptGasEstimator.Default(allInputs, blockFlow)
           )
-        }
-        .left
-        .map(badRequest)
+      )
+      unsignedTx <- wrapError {
+        val inputs     = selectedUtxos.assets.map(_.ref).map(TxInput(_, fromUnlockScript))
+        val inputUTXOs = selectedUtxos.assets.map(_.output)
+        UnsignedTransaction.approve(
+          script,
+          fromLockupScript,
+          inputs,
+          inputUTXOs,
+          amount,
+          tokens,
+          gas.getOrElse(selectedUtxos.gas),
+          gasPrice.getOrElse(nonCoinbaseMinGasPrice)
+        )
+      }
       validatedUnsignedTx <- validateUnsignedTransaction(unsignedTx)
     } yield validatedUnsignedTx
   }
