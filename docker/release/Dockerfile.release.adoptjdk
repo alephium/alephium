@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jre
+FROM adoptopenjdk:11-jre
 
 ARG RELEASE=0.0.0
 
@@ -28,6 +28,6 @@ USER nobody
 ENV JAVA_NET_OPTS="-Djava.net.preferIPv4Stack=true"
 ENV JAVA_MEM_OPTS=""
 ENV JAVA_GC_OPTS=""
-ENV JAVA_EXTRA_OPTS="-XX:+UseShenandoahGC -XX:ShenandoahGCHeuristics=compact -XX:+AlwaysPreTouch -Xms512m -XX:+UseNUMA -XX:-UseBiasedLocking -XX:+DisableExplicitGC"
+ENV JAVA_EXTRA_OPTS=""
 
 ENTRYPOINT /entrypoint.sh
