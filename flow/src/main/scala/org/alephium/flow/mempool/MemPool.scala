@@ -227,7 +227,10 @@ class MemPool private (
       lockupScript: LockupScript,
       utxosInBlock: AVector[AssetOutputInfo]
   ): AVector[AssetOutputInfo] = readOnly {
-    val newUtxos = sharedTxIndexes.getRelevantUtxos(lockupScript)
+    // TODO: optimize this once mempool is updated differently
+    val newUtxos = sharedTxIndexes
+      .getRelevantUtxos(lockupScript)
+      .filter(utxo => !utxosInBlock.exists(_.ref == utxo.ref))
 
     (utxosInBlock ++ newUtxos).filterNot(asset => _isSpent(asset.ref))
   }
