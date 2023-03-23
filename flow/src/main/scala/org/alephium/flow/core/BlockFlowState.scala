@@ -114,27 +114,16 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def sanityCheckUnsafe(): Unit = {
     inBlockChains.foreach(_.foreach { chain =>
-      chain.getAllTips.foreach { tip =>
-        require(chain.blockStorage.existsUnsafe(tip), "Tip should be stored in block storage")
-        require(chain.blockStateStorage.existsUnsafe(tip), "Tip should be stored in state storage")
-      }
+      chain.cleanTips()
     })
     outBlockChains.foreach(_.foreach { chain =>
-      chain.getAllTips.foreach { tip =>
-        require(chain.blockStorage.existsUnsafe(tip), "Tip should be stored in block storage")
-        require(chain.blockStateStorage.existsUnsafe(tip), "Tip should be stored in state storage")
-      }
+      chain.cleanTips()
     })
     intraGroupBlockChains.foreach { chain =>
-      chain.getAllTips.foreach { tip =>
-        require(chain.worldStateStorage.existsUnsafe(tip), "Tip should have its state trie stored")
-      }
+      chain.cleanTips()
     }
     blockHeaderChains.foreach(_.foreach { chain =>
-      chain.getAllTips.map { tip =>
-        require(chain.headerStorage.existsUnsafe(tip), "Tip should be stored in header storage")
-        require(chain.blockStateStorage.existsUnsafe(tip), "Tip should be stored in state storage")
-      }
+      chain.cleanTips()
     })
   }
 

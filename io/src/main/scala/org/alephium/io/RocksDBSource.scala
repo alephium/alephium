@@ -198,6 +198,7 @@ class RocksDBSource(val path: Path, val db: RocksDB, val cfHandles: AVector[Colu
     logger.info("Closing RocksDB")
     // fsync the WAL files, as suggested by the doc of RocksDB.close()
     db.write(new WriteOptions().setSync(true), new WriteBatch())
+    db.flushWal(true)
     cfHandles.foreach(_.close())
     db.close()
   }

@@ -63,6 +63,10 @@ trait BlockChainWithState extends BlockChain {
       _             <- add(block.header, weight)
     } yield ()
   }
+
+  override def checkCompletenessUnsafe(hash: BlockHash): Boolean = {
+    checkCompletenessHelper(hash, worldStateStorage.existsUnsafe, super.checkCompletenessUnsafe)
+  }
 }
 
 object BlockChainWithState {
