@@ -28,7 +28,7 @@ class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |// comment
          |AssetScript Foo($params) {
-         |  pub fn bar(: U256, b: U256) -> (U256) {
+         |  pub fn bar(a: U256, b: U256) -> (U256) {
          |    return (a + b)
          |  }
          |}

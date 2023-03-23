@@ -20,9 +20,7 @@ import fastparse.P
 
 /** Typed compiler errors.
   */
-sealed trait CompilerError {
-  def productPrefix: String
-
+sealed trait CompilerError extends Product {
   def message: String =
     productPrefix
 }

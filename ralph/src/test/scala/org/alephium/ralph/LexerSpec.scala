@@ -186,7 +186,7 @@ class LexerSpec extends AlephiumSpec {
       forAll { right: String =>
         val code = s"mut $right"
 
-        // when allowMutable is false, it should let `mut` declarations through.
+        // when allowMutable is false, it should not let `mut` declarations through.
         val traced =
           fastparse
             .parse(code, Lexer.mutMaybe(allowMutable = false)(_))
