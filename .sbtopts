@@ -1,0 +1,7 @@
+-J-Xms512M
+-J-Xmx3g
+-J-Xss2m
+-J-XX:+UseStringDeduplication
+-J-XX:+OptimizeStringConcat
+-J-XX:+UseNUMA
+-Dsbt.task.timings=false
