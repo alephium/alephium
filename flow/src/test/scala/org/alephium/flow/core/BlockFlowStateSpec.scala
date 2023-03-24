@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import org.alephium.flow.FlowFixture
 import org.alephium.io.IOError
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
+import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp}
 
 class BlockFlowStateSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
@@ -107,5 +107,39 @@ class BlockFlowStateSpec extends AlephiumSpec {
 
       checkUtxo(blockFlow0, chainIndex, block1, tx0)
     }
+  }
+
+  it should "check database completeness" in new Fixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val chain      = blockFlow.getBlockChain(chainIndex)
+    blockFlow.sanityCheckUnsafe()
+
+    val block00 = transfer(blockFlow, chainIndex)
+    val block01 = transfer(blockFlow, chainIndex)
+
+    val (block10, block11) =
+      if (Bytes.byteStringOrdering.compare(block00.hash.bytes, block01.hash.bytes) < 0) {
+        addAndCheck(blockFlow, block00)
+        val block10 = transfer(blockFlow, chainIndex)
+        addAndCheck(blockFlow, block01)
+        val block11 = transfer(blockFlow, chainIndex)
+        block10 -> block11
+      } else {
+        addAndCheck(blockFlow, block01)
+        val block11 = transfer(blockFlow, chainIndex)
+        addAndCheck(blockFlow, block00)
+        val block10 = transfer(blockFlow, chainIndex)
+        block10 -> block11
+      }
+    addAndCheck0(blockFlow, block10)
+    addAndCheck0(blockFlow, block11)
+    block10.parentHash is block00.hash
+    block11.parentHash is block01.hash
+
+    chain.heightIndexStorage.getUnsafe(1).toSet is Set(block00.hash, block01.hash)
+    chain.heightIndexStorage.put(1, AVector(block01.hash)) // remove block00 on purpose
+    chain.getAllTips.toSet is Set(block10.hash, block11.hash)
+    blockFlow.sanityCheckUnsafe()
+    chain.getAllTips.toSet is Set(block11.hash)
   }
 }
