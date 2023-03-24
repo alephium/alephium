@@ -57,7 +57,7 @@ object CompilerError {
     // set the error message
     ctx.setMsg(index, () => error.message)
     // add error message to stack
-    ctx.failureStack = ctx.failureStack :+ (error.message, index)
+    ctx.failureStack = ctx.failureStack.appended((error.message, index))
     // set the error index and return as failure.
     ctx.augmentFailure(index = index)
   }

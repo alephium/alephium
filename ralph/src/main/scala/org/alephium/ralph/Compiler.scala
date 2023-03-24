@@ -148,8 +148,12 @@ object Compiler {
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
   }
 
-  final case class Error(message: String) extends Exception(message)
+  final case class Error(message: String, cause: Throwable) extends Exception(message, cause)
   object Error {
+    // scalastyle:off null
+    def apply(message: String): Error = new Error(message, null)
+    // scalastyle:on null
+
     def parse(failure: Parsed.Failure): Error = Error(CompilerErrorFormatter(failure).format())
   }
 
@@ -686,7 +690,7 @@ object Compiler {
         .keys
         .toSeq
       if (unassignedMutableVars.nonEmpty) {
-        throw new Compiler.Error(
+        throw Compiler.Error(
           s"There are unassigned mutable local vars in function ${typeId.name}.${funcId.name}: ${unassignedMutableVars
               .mkString(",")}"
         )
@@ -728,7 +732,7 @@ object Compiler {
         .keys
         .toSeq
       if (unassignedMutableFields.nonEmpty) {
-        throw new Compiler.Error(
+        throw Compiler.Error(
           s"There are unassigned mutable fields in contract ${typeId.name}: ${unassignedMutableFields
               .mkString(",")}"
         )

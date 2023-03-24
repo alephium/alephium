@@ -566,7 +566,7 @@ object Ast {
           checkRetTypes(elseBranchOpt.flatMap(_.body.lastOption))
         case Some(call: FuncCall[_]) if call.id == FuncId("panic", isBuiltIn = true) => ()
         case _ =>
-          throw new Compiler.Error(s"Expected return statement for function ${quote(id.name)}")
+          throw Compiler.Error(s"Expected return statement for function ${quote(id.name)}")
       }
     }
 
@@ -968,7 +968,7 @@ object Ast {
     val inheritances: Seq[ContractInheritance] = Seq.empty
 
     def error(tpe: String): Compiler.Error =
-      new Compiler.Error(s"TxScript ${ident.name} should not contain any $tpe")
+      Compiler.Error(s"TxScript ${ident.name} should not contain any $tpe")
     def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
     def enums: Seq[EnumDef]               = throw error("enum")
     def getTemplateVarsSignature(): String =
@@ -1115,7 +1115,7 @@ object Ast {
       inheritances: Seq[InterfaceInheritance]
   ) extends ContractWithState {
     def error(tpe: String): Compiler.Error =
-      new Compiler.Error(s"Interface ${quote(ident.name)} should not contain any ${quote(tpe)}")
+      Compiler.Error(s"Interface ${quote(ident.name)} should not contain any ${quote(tpe)}")
 
     def templateVars: Seq[Argument]       = throw error("template variable")
     def fields: Seq[Argument]             = throw error("field")
@@ -1125,7 +1125,7 @@ object Ast {
     def enums: Seq[EnumDef]               = throw error("enum")
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
-      throw new Compiler.Error(s"Interface ${quote(ident.name)} should not generate code")
+      throw Compiler.Error(s"Interface ${quote(ident.name)} should not generate code")
     }
   }
 
@@ -1437,7 +1437,7 @@ object Ast {
         val funcName                = abstractFunc.id.name
         val implementedAbstractFunc = nonAbstractFuncSet(funcName)
         if (implementedAbstractFunc.copy(bodyOpt = None) != abstractFunc) {
-          throw new Compiler.Error(
+          throw Compiler.Error(
             s"Function ${quote(funcName)} is implemented with wrong signature"
           )
         }

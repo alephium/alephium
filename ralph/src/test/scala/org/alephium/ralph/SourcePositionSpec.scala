@@ -27,8 +27,8 @@ class SourcePositionSpec extends AlephiumSpec {
 
   it should "report invalid line number formats" in {
     def runCheck(input: String) =
-      intercept[Compiler.Error](SourcePosition.parse(input)) is
-        Compiler.Error(SourcePosition.unsupportedLineNumberFormat(input))
+      intercept[Compiler.Error](SourcePosition.parse(input)).message is
+        SourcePosition.unsupportedLineNumberFormat(input)
 
     runCheck("")
     runCheck("12345")

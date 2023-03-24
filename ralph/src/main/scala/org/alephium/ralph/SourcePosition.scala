@@ -47,12 +47,8 @@ object SourcePosition {
           colNum = lineNumAndIndex.last.toInt
         )
       catch {
-        case _: Throwable =>
-          // FIXME: Information within Throwable is lost, it should be included in the stack.
-          //        This need `Compiler.Error` to accept `cause` as parameter.
-          //        Let me know the preferred way of doing this
-          //        or if it's ok to change `Compiler.Error` to accept `cause` as parameter?
-          throw Compiler.Error(unsupportedLineNumberFormat(lineNum))
+        case throwable: Throwable =>
+          throw Compiler.Error(unsupportedLineNumberFormat(lineNum), throwable)
       }
     } else {
       // TODO: is there a preferred way of handling error like these other than
