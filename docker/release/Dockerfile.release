@@ -26,7 +26,7 @@ VOLUME /alephium-home/.alephium-wallets
 USER nobody
 
 ENV JAVA_NET_OPTS="-Djava.net.preferIPv4Stack=true"
-ENV JAVA_MEM_OPTS=" -XX:+UseStringDeduplication -XX:+OptimizeStringConcat -XX:+UseNUMA"
+ENV JAVA_MEM_OPTS="-XX:+UseStringDeduplication -XX:+OptimizeStringConcat -XX:+UseNUMA"
 ENV JAVA_GC_OPTS="-XX:+UseShenandoahGC -XX:ShenandoahGCHeuristics=static -XX:MaxGCPauseMillis=1 -XX:+ParallelRefProcEnabled -XX:-UseGCOverheadLimit -XX:+DisableExplicitGC"
 ENV JAVA_EXTRA_OPTS=""
 
