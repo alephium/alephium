@@ -137,7 +137,7 @@ class BlockFlowStateSpec extends AlephiumSpec {
     block11.parentHash is block01.hash
 
     chain.heightIndexStorage.getUnsafe(1).toSet is Set(block00.hash, block01.hash)
-    chain.heightIndexStorage.put(1, AVector(block01.hash)) // remove block01 on purpose
+    chain.heightIndexStorage.put(1, AVector(block01.hash)) // remove block00 on purpose
     chain.getAllTips.toSet is Set(block10.hash, block11.hash)
     blockFlow.sanityCheckUnsafe()
     chain.getAllTips.toSet is Set(block11.hash)
