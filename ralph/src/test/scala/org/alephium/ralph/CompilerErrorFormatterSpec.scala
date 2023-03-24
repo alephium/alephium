@@ -85,6 +85,24 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
     }
   }
 
+  it should "format a custom error message" in {
+    val errorMessage =
+      CompilerErrorFormatter(
+        errorMessage = "detailed compiler error message",
+        errorLine = "this is error line",
+        found = "error",
+        expected = "pass",
+        sourcePosition = SourcePosition(2, 9)
+      ).format()
+
+    errorMessage is
+      """-- error: detailed compiler error message
+        |2 |this is error line
+        |  |        ^^^^^
+        |  |        Expected pass
+        |""".stripMargin
+  }
+
   it should "drop only the head and tail quotes" in {
     CompilerErrorFormatter.dropQuotes("\"test\"") is "test"
     CompilerErrorFormatter.dropQuotes("\"\"test\"\"") is "\"test\""

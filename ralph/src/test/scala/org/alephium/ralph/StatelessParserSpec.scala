@@ -45,9 +45,7 @@ class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
           .trace()
 
       val expectedErrorMessage =
-        s"""Expected ${CompilerError.AnImmutableVariable.message}:3:17 / (letter | digit | "_"):3:16, found "(mut x: U2""""
-
-      failure.longMsg is expectedErrorMessage
+        s"""Expected an immutable variable:3:17 / (letter | digit | "_"):3:16, found "(mut x: U2""""
 
       val formatter = CompilerErrorFormatter(failure)
 
@@ -62,7 +60,7 @@ class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
 
       // formatter should point the exact mut declaration
       formatter.format() is
-        s"""-- error: $expectedErrorMessage
+        s"""-- error: Expected an immutable variable:3:17 / (letter | digit | "_"):3:16, found "(mut x: U2"
            |3 |AssetScript Foo(mut x: U256, y: U256, z: U256) {
            |  |                ^^^^^^^^^^
            |  |                Expected an immutable variable
@@ -85,9 +83,7 @@ class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
       //        - Either update call to `templateParams.?` in `StatelessParse` to work without option.
       //        - Or use custom formatted message instead of using `.longMsg` from FastParse.
       val expectedErrorMessage =
-        s"""Expected ${CompilerError.AnImmutableVariable.message}:3:26 / (letter | digit | "_"):3:16, found "(x: U256, """"
-
-      failure.longMsg is expectedErrorMessage
+        s"""Expected an immutable variable:3:26 / (letter | digit | "_"):3:16, found "(x: U256, """"
 
       val formatter = CompilerErrorFormatter(failure)
 

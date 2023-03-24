@@ -82,7 +82,7 @@ class LexerSpec extends AlephiumSpec {
       val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure].trace()
 
       failure.index is 0
-      failure.longMsg is s"""Expected ${CompilerError.`an I256 or U256 value`.message}:1:1 / num:1:1 / (hexNum | decNum):1:1, found "$input""""
+      failure.longMsg is s"""Expected an I256 or U256 value:1:1 / num:1:1 / (hexNum | decNum):1:1, found "$input""""
     }
 
     {
@@ -93,7 +93,7 @@ class LexerSpec extends AlephiumSpec {
       failure.index is 0
 
       val foundToken = input.take(10)
-      failure.msg is s"""Expected ${CompilerError.`an U256 value`.message}:1:1, found "$foundToken""""
+      failure.msg is s"""Expected an U256 value:1:1, found "$foundToken""""
     }
 
     {
@@ -104,7 +104,7 @@ class LexerSpec extends AlephiumSpec {
       failure.index is 0
 
       val foundToken = input.take(10)
-      failure.msg is s"""Expected ${CompilerError.`an I256 value`.message}:1:1, found "$foundToken""""
+      failure.msg is s"""Expected an I256 value:1:1, found "$foundToken""""
     }
 
     {
@@ -115,7 +115,7 @@ class LexerSpec extends AlephiumSpec {
       failure.index is 0
 
       val foundToken = input.take(10)
-      failure.msg is s"""Expected ${CompilerError.`an I256 value`.message}:1:1, found "$foundToken""""
+      failure.msg is s"""Expected an I256 value:1:1, found "$foundToken""""
     }
 
     {
@@ -139,7 +139,7 @@ class LexerSpec extends AlephiumSpec {
 
         val failure =
           fastparse.parse(errorScript, StatelessParser.assetScript(_)).asInstanceOf[Parsed.Failure]
-        failure.msg is s"""Expected ${CompilerError.`an U256 value`.message}:5:13, found "1234567891""""
+        failure.msg is s"""Expected an U256 value:5:13, found "1234567891""""
       }
 
     }
@@ -196,7 +196,7 @@ class LexerSpec extends AlephiumSpec {
         // fastparse reports only the first 10 characters.
         val reportedToken = code.take(10)
 
-        traced.longMsg is s"""Expected ${CompilerError.AnImmutableVariable.message}:1:1 / (letter | digit | "_"):1:1, found "$reportedToken""""
+        traced.longMsg is s"""Expected an immutable variable:1:1 / (letter | digit | "_"):1:1, found "$reportedToken""""
       }
 
       {
