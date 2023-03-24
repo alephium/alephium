@@ -12,9 +12,12 @@ jobs:
         with:
           fetch-depth: 0
           submodules: true
-      - uses: actions/setup-java@v1
+      - name: Setup JDK
+        uses: actions/setup-java@v3
         with:
+          distribution: temurin
           java-version: 11
+          cache: sbt
       - uses: olafurpg/setup-gpg@v3
       - name: Publish To Sonatype
         run: sbt ci-release
