@@ -712,6 +712,7 @@ class ParserSpec extends AlephiumSpec {
            |""".stripMargin
 
       fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
+        None,
         false,
         TypeId("Child"),
         Seq.empty,
@@ -828,6 +829,70 @@ class ParserSpec extends AlephiumSpec {
       barContract.enums.length is 2
       fooContract.enums.length is 1
     }
+
+    {
+      info("Contract inherit from std interface")
+      val code =
+        s"""
+           |@std(#0001)
+           |Interface Token {
+           |  pub fn name() -> ByteVec
+           |}
+           |
+           |Contract TokenImpl() implements Token {
+           |  pub fn name() -> ByteVec {
+           |    return #11
+           |  }
+           |}
+           |""".stripMargin
+      val extended =
+        fastparse.parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
+      val tokenInterface = extended.contracts(0).asInstanceOf[ContractInterface]
+      val tokenImpl      = extended.contracts(1).asInstanceOf[Contract]
+      tokenInterface.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
+      tokenImpl.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
+    }
+
+    {
+      info("Std interface inheritance")
+      def code(barAnnotation: String) =
+        s"""
+           |@std(#0001)
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |
+           |$barAnnotation
+           |Interface Bar extends Foo {
+           |  pub fn bar() -> ()
+           |}
+           |
+           |Contract Impl() implements Bar {
+           |  pub fn foo() -> () {}
+           |  pub fn bar() -> () {}
+           |}
+           |""".stripMargin
+      val extended0 =
+        fastparse.parse(code(""), StatefulParser.multiContract(_)).get.value.extendedContracts()
+      val fooInterface0 = extended0.contracts(0).asInstanceOf[ContractInterface]
+      val barInterface0 = extended0.contracts(1).asInstanceOf[ContractInterface]
+      val implContract0 = extended0.contracts(2).asInstanceOf[Contract]
+      fooInterface0.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
+      barInterface0.stdId is None
+      implContract0.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
+
+      val extended1 = fastparse
+        .parse(code("@std(#0002)"), StatefulParser.multiContract(_))
+        .get
+        .value
+        .extendedContracts()
+      val fooInterface1 = extended1.contracts(0).asInstanceOf[ContractInterface]
+      val barInterface1 = extended1.contracts(1).asInstanceOf[ContractInterface]
+      val implContract1 = extended1.contracts(2).asInstanceOf[Contract]
+      fooInterface1.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
+      barInterface1.stdId is Some(Val.ByteVec(Hex.unsafe("0002")))
+      implContract1.stdId is Some(Val.ByteVec(Hex.unsafe("0002")))
+    }
   }
 
   it should "test contract interface parser" in {
@@ -840,6 +905,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       fastparse.parse(code, StatefulParser.interface(_)).get.value is ContractInterface(
+        None,
         TypeId("Child"),
         Seq(
           FuncDef(
@@ -858,6 +924,19 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         Seq(InterfaceInheritance(TypeId("Parent")))
       )
+    }
+
+    {
+      info("Parse std interface")
+      val code =
+        s"""
+           |@std(#0001)
+           |Interface Token {
+           |  pub fn name() -> ByteVec
+           |}
+           |""".stripMargin
+      val interface = fastparse.parse(code, StatefulParser.interface(_)).get.value
+      interface.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
     }
 
     {
@@ -881,6 +960,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
+        None,
         false,
         TypeId("Child"),
         Seq.empty,
@@ -917,6 +997,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
+        None,
         false,
         TypeId("Child"),
         Seq.empty,
@@ -1002,6 +1083,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
+        None,
         true,
         TypeId("Foo"),
         Seq.empty,
@@ -1044,6 +1126,7 @@ class ParserSpec extends AlephiumSpec {
         )
       )
       fooContract is Contract(
+        None,
         true,
         TypeId("Foo"),
         Seq.empty,

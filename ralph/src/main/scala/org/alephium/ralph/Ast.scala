@@ -25,6 +25,8 @@ import org.alephium.util.{AVector, I256, U256}
 
 // scalastyle:off number.of.methods number.of.types file.size.limit
 object Ast {
+  type StdId = Val.ByteVec
+
   final case class Ident(name: String)
   final case class TypeId(name: String)
   final case class FuncId(name: String, isBuiltIn: Boolean)
@@ -1006,6 +1008,7 @@ object Ast {
   final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident]) extends Inheritance
   final case class InterfaceInheritance(parentId: TypeId)                    extends Inheritance
   final case class Contract(
+      stdId: Option[StdId],
       isAbstract: Boolean,
       ident: TypeId,
       templateVars: Seq[Argument],
@@ -1109,6 +1112,7 @@ object Ast {
   }
 
   final case class ContractInterface(
+      stdId: Option[StdId],
       ident: TypeId,
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
@@ -1226,8 +1230,10 @@ object Ast {
         case script: TxScript =>
           script
         case c: Contract =>
-          val (funcs, events, constantVars, enums) = MultiContract.extractDefs(parentsCache, c)
+          val (stdId, funcs, events, constantVars, enums) =
+            MultiContract.extractDefs(parentsCache, c)
           Contract(
+            stdId,
             c.isAbstract,
             c.ident,
             c.templateVars,
@@ -1239,8 +1245,8 @@ object Ast {
             c.inheritances
           )
         case i: ContractInterface =>
-          val (funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
-          ContractInterface(i.ident, funcs, events, i.inheritances)
+          val (_, funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
+          ContractInterface(i.stdId, i.ident, funcs, events, i.inheritances)
       }
       val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
       MultiContract(newContracts, Some(dependencies))
@@ -1362,16 +1368,30 @@ object Ast {
       }
     }
 
+    @inline private def getStdId(interfaces: Seq[ContractInterface]): Option[StdId] = {
+      interfaces.findLast(_.stdId.isDefined) match {
+        case Some(interface) => interface.stdId
+        case None            => None
+      }
+    }
+
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def extractDefs(
         parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
         contract: ContractWithState
-    ): (Seq[FuncDef[StatefulContext]], Seq[EventDef], Seq[ConstantVarDef], Seq[EnumDef]) = {
+    ): (
+        Option[StdId],
+        Seq[FuncDef[StatefulContext]],
+        Seq[EventDef],
+        Seq[ConstantVarDef],
+        Seq[EnumDef]
+    ) = {
       val parents = parentsCache(contract.ident)
       val (allContracts, _allInterfaces) =
         (parents :+ contract).partition(_.isInstanceOf[Contract])
       val allInterfaces =
         sortInterfaces(parentsCache, _allInterfaces.map(_.asInstanceOf[ContractInterface]))
+      val stdId = getStdId(allInterfaces)
 
       val allFuncs                             = (allInterfaces ++ allContracts).flatMap(_.funcs)
       val (abstractFuncs, nonAbstractFuncs)    = allFuncs.partition(_.bodyOpt.isEmpty)
@@ -1404,7 +1424,7 @@ object Ast {
           unimplementedFuncs
       }
 
-      (resultFuncs, events, constantVars, enums)
+      (stdId, resultFuncs, events, constantVars, enums)
     }
 
     private def sortInterfaces(
