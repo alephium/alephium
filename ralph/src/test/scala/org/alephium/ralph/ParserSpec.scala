@@ -878,11 +878,11 @@ class ParserSpec extends AlephiumSpec {
       val barInterface0 = extended0.contracts(1).asInstanceOf[ContractInterface]
       val implContract0 = extended0.contracts(2).asInstanceOf[Contract]
       fooInterface0.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
-      barInterface0.stdId is None
+      barInterface0.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
       implContract0.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
 
       val extended1 = fastparse
-        .parse(code("@std(#0002)"), StatefulParser.multiContract(_))
+        .parse(code("@std(#000101)"), StatefulParser.multiContract(_))
         .get
         .value
         .extendedContracts()
@@ -890,8 +890,8 @@ class ParserSpec extends AlephiumSpec {
       val barInterface1 = extended1.contracts(1).asInstanceOf[ContractInterface]
       val implContract1 = extended1.contracts(2).asInstanceOf[Contract]
       fooInterface1.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
-      barInterface1.stdId is Some(Val.ByteVec(Hex.unsafe("0002")))
-      implContract1.stdId is Some(Val.ByteVec(Hex.unsafe("0002")))
+      barInterface1.stdId is Some(Val.ByteVec(Hex.unsafe("000101")))
+      implContract1.stdId is Some(Val.ByteVec(Hex.unsafe("000101")))
     }
   }
 

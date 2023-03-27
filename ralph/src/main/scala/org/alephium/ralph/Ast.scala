@@ -21,7 +21,7 @@ import scala.collection.mutable
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{ALPHTokenId => ALPHTokenIdInstr, Contract => VmContract, _}
 import org.alephium.ralph.LogicalOperator.Not
-import org.alephium.util.{AVector, I256, U256}
+import org.alephium.util.{AVector, Hex, I256, U256}
 
 // scalastyle:off number.of.methods number.of.types file.size.limit
 object Ast {
@@ -1249,8 +1249,8 @@ object Ast {
             c.inheritances
           )
         case i: ContractInterface =>
-          val (_, funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
-          ContractInterface(i.stdId, i.ident, funcs, events, i.inheritances)
+          val (stdId, funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
+          ContractInterface(stdId, i.ident, funcs, events, i.inheritances)
       }
       val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
       MultiContract(newContracts, Some(dependencies))
@@ -1372,10 +1372,25 @@ object Ast {
       }
     }
 
-    @inline private def getStdId(interfaces: Seq[ContractInterface]): Option[StdId] = {
-      interfaces.findLast(_.stdId.isDefined) match {
-        case Some(interface) => interface.stdId
-        case None            => None
+    @inline private[ralph] def getStdId(interfaces: Seq[ContractInterface]): Option[StdId] = {
+      interfaces.foldLeft[Option[StdId]](None) { case (parentStdIdOpt, interface) =>
+        (parentStdIdOpt, interface.stdId) match {
+          case (Some(parentStdId), Some(stdId)) =>
+            if (stdId.bytes == parentStdId.bytes) {
+              throw Compiler.Error(
+                s"The std id of interface ${interface.ident.name} is the same as parent interface"
+              )
+            }
+            if (!stdId.bytes.startsWith(parentStdId.bytes)) {
+              throw Compiler.Error(
+                s"The std id of interface ${interface.ident.name} should starts with ${Hex
+                    .toHexString(parentStdId.bytes)}"
+              )
+            }
+            Some(stdId)
+          case (Some(parentStdId), None) => Some(parentStdId)
+          case (None, stdId)             => stdId
+        }
       }
     }
 
