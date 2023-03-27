@@ -1991,6 +1991,33 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "compile contract and return the std id field" in new Fixture {
+    def code(stdAnnotation: String) =
+      s"""
+         |Contract Bar(@unused a: U256) implements Foo {
+         |  pub fn foo() -> () {}
+         |}
+         |
+         |$stdAnnotation
+         |Interface Foo {
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+
+    val serverUtils = new ServerUtils()
+    val result0     = serverUtils.compileContract(Compile.Contract(code(""))).rightValue
+    result0.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
+    result0.stdId is None
+
+    val result1 = serverUtils.compileContract(Compile.Contract(code("@std(#0001)"))).rightValue
+    result1.fields is CompileResult.FieldsSig(
+      AVector("a", "__stdId"),
+      AVector("U256", "ByteVec"),
+      AVector(false, false)
+    )
+    result1.stdId is Some("0001")
+  }
+
   it should "create build deploy contract script" in new Fixture {
     val rawCode =
       s"""

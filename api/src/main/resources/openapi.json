@@ -6781,7 +6781,8 @@
                   ],
                   "warnings": [
                     "Found unused fields in Foo: a"
-                  ]
+                  ],
+                  "stdId": "0001"
                 }
               }
             }
@@ -6971,7 +6972,8 @@
                       ],
                       "warnings": [
                         "Found unused fields in Foo: a"
-                      ]
+                      ],
+                      "stdId": "0001"
                     }
                   ],
                   "scripts": [
@@ -10555,6 +10557,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "stdId": {
+            "type": "string"
           }
         }
       },

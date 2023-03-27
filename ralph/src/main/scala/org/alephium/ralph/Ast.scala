@@ -26,6 +26,8 @@ import org.alephium.util.{AVector, I256, U256}
 // scalastyle:off number.of.methods number.of.types file.size.limit
 object Ast {
   type StdId = Val.ByteVec
+  private val stdArg: Argument =
+    Argument(Ident("__stdId"), Type.ByteVec, isMutable = false, isUnused = true)
 
   final case class Ident(name: String)
   final case class TypeId(name: String)
@@ -1019,11 +1021,12 @@ object Ast {
       enums: Seq[EnumDef],
       inheritances: Seq[Inheritance]
   ) extends ContractWithState {
+    lazy val contractFields: Seq[Argument] = if (stdId.isEmpty) fields else fields :+ Ast.stdArg
     def getFieldsSignature(): String =
-      s"Contract ${name}(${fields.map(_.signature).mkString(",")})"
-    def getFieldNames(): AVector[String]       = AVector.from(fields.view.map(_.ident.name))
-    def getFieldTypes(): AVector[String]       = AVector.from(fields.view.map(_.tpe.signature))
-    def getFieldMutability(): AVector[Boolean] = AVector.from(fields.view.map(_.isMutable))
+      s"Contract ${name}(${contractFields.map(_.signature).mkString(",")})"
+    def getFieldNames(): AVector[String] = AVector.from(contractFields.view.map(_.ident.name))
+    def getFieldTypes(): AVector[String] = AVector.from(contractFields.view.map(_.tpe.signature))
+    def getFieldMutability(): AVector[Boolean] = AVector.from(contractFields.view.map(_.isMutable))
 
     private def checkFuncs(): Unit = {
       if (funcs.length < 1) {
