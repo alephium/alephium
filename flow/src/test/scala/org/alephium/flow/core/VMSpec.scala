@@ -4108,6 +4108,31 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(script)
   }
 
+  it should "create contract with std id" in new ContractFixture {
+    val code =
+      s"""
+         |Contract Bar(@unused a: U256) implements Foo {
+         |  pub fn foo() -> () {}
+         |}
+         |
+         |@std(#0001)
+         |Interface Foo {
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+
+    val fields = AVector[Val](Val.U256(0))
+    intercept[AssertionError](createContract(code, fields)).getMessage is
+      "Right(TxScriptExeFailed(InvalidFieldLength))"
+
+    val stdId      = Val.ByteVec(Hex.unsafe("0001"))
+    val contractId = createContract(code, fields :+ stdId)._1
+    val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+    val contractState = worldState.getContractState(contractId).rightValue
+    contractState.immFields is AVector[Val](Val.U256(0), stdId)
+    contractState.mutFields is AVector.empty[Val]
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

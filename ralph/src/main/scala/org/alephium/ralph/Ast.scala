@@ -1072,8 +1072,9 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
       state.setGenCodePhase()
-      val methods = genMethods(state)
-      StatefulContract(Type.flattenTypeLength(fields.map(_.tpe)), methods)
+      val methods      = genMethods(state)
+      val fieldsLength = Type.flattenTypeLength(fields.map(_.tpe)) + (if (stdId.isDefined) 1 else 0)
+      StatefulContract(fieldsLength, methods)
     }
 
     // the state must have been updated in the check pass
