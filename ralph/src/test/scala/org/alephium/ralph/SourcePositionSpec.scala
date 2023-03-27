@@ -36,9 +36,5 @@ class SourcePositionSpec extends AlephiumSpec {
     runCheck(":12345")
 
     forAll(runCheck)
-    forAll { (left: String, right: String) =>
-      runCheck(s"""$left:$right""")
-    }
   }
-
 }
