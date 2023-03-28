@@ -4115,7 +4115,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  pub fn foo() -> () {}
          |}
          |
-         |@std(#0001)
+         |@std(id = #0001)
          |Interface Foo {
          |  pub fn foo() -> ()
          |}

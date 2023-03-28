@@ -3845,6 +3845,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
 
     Compiler.compileContract(code("")).rightValue.fieldLength is 0
-    Compiler.compileContract(code("@std(#0001)")).rightValue.fieldLength is 1
+    Compiler.compileContract(code("@std(id = #0001)")).rightValue.fieldLength is 1
   }
 }

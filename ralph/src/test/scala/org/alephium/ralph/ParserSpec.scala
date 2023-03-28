@@ -834,7 +834,7 @@ class ParserSpec extends AlephiumSpec {
       info("Contract inherit from std interface")
       val code =
         s"""
-           |@std(#0001)
+           |@std(id = #0001)
            |Interface Token {
            |  pub fn name() -> ByteVec
            |}
@@ -857,7 +857,7 @@ class ParserSpec extends AlephiumSpec {
       info("Std interface inheritance")
       def code(barAnnotation: String) =
         s"""
-           |@std(#0001)
+           |@std(id = #0001)
            |Interface Foo {
            |  pub fn foo() -> ()
            |}
@@ -882,7 +882,7 @@ class ParserSpec extends AlephiumSpec {
       implContract0.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
 
       val extended1 = fastparse
-        .parse(code("@std(#000101)"), StatefulParser.multiContract(_))
+        .parse(code("@std(id = #000101)"), StatefulParser.multiContract(_))
         .get
         .value
         .extendedContracts()
@@ -928,15 +928,48 @@ class ParserSpec extends AlephiumSpec {
 
     {
       info("Parse std interface")
-      val code =
+      def interface(annotations: String*): String =
         s"""
-           |@std(#0001)
-           |Interface Token {
-           |  pub fn name() -> ByteVec
+           |${annotations.mkString("\n")}
+           |Interface Foo {
+           |  pub fn foo() -> ()
            |}
            |""".stripMargin
-      val interface = fastparse.parse(code, StatefulParser.interface(_)).get.value
-      interface.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
+
+      fastparse
+        .parse(interface(""), StatefulParser.interface(_))
+        .get
+        .value
+        .stdId is None
+      fastparse
+        .parse(interface("@std(id = #0001)"), StatefulParser.interface(_))
+        .get
+        .value
+        .stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
+      intercept[Compiler.Error](
+        fastparse.parse(interface("@using(updateFields = true)"), StatefulParser.interface(_))
+      ).message is "Interface only supports `std` annotation"
+      intercept[Compiler.Error](
+        fastparse.parse(
+          interface("@std(id = #0001)", "@using(updateFields = true)"),
+          StatefulParser.interface(_)
+        )
+      ).message is "Interface only supports `std` annotation"
+      intercept[Compiler.Error](
+        fastparse.parse(
+          interface("@std(id = #0001, updateFields = true)"),
+          StatefulParser.interface(_)
+        )
+      ).message is "Invalid std annotation fields, expected `@std(id = byteVecLiteral)`"
+      intercept[Compiler.Error](
+        fastparse.parse(interface("@std(id = #)"), StatefulParser.interface(_))
+      ).message is "The field id of the std annotation must be a non-empty ByteVec"
+      intercept[Compiler.Error](
+        fastparse.parse(interface("@std(id = 0)"), StatefulParser.interface(_))
+      ).message is "Invalid std annotation, expected `@std(id = byteVecLiteral)`"
+      intercept[Compiler.Error](
+        fastparse.parse(interface("@std(updateFields = 0)"), StatefulParser.interface(_))
+      ).message is "Invalid std annotation, expected `@std(id = byteVecLiteral)`"
     }
 
     {

@@ -2009,7 +2009,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result0.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
     result0.stdId is None
 
-    val result1 = serverUtils.compileContract(Compile.Contract(code("@std(#0001)"))).rightValue
+    val result1 = serverUtils.compileContract(Compile.Contract(code("@std(id = #0001)"))).rightValue
     result1.fields is CompileResult.FieldsSig(
       AVector("a", "__stdId"),
       AVector("U256", "ByteVec"),

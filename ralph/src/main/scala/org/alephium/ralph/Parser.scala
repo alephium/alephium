@@ -355,8 +355,6 @@ abstract class Parser[Ctx <: StatelessContext] {
     P("@" ~ Lexer.ident ~ annotationFields.?).map { case (id, fieldsOpt) =>
       Ast.Annotation(id, fieldsOpt.getOrElse(Seq.empty))
     }
-  def stdAnnotation[Unknown: P]: P[Ast.StdId] =
-    P("@" ~ Parser.stdAnnotationId ~ "(" ~ Lexer.bytes ~ ")")
 }
 
 final case class FuncDefTmp[Ctx <: StatelessContext](
@@ -374,6 +372,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
 
 object Parser {
   val stdAnnotationId           = "std"
+  val stdIdKey                  = "id"
   val usingAnnotationId         = "using"
   val usePreapprovedAssetsKey   = "preapprovedAssets"
   val useContractAssetsKey      = "assetsInContract"
@@ -449,6 +448,29 @@ object Parser {
       case Some(_) =>
         throw Compiler.Error(s"Expect boolean for ${name} in annotation ${annotation.id.name}")
       case None => default
+    }
+  }
+
+  def extractStdId(annotations: Seq[Annotation]): Option[Ast.StdId] = {
+    if (annotations.isEmpty) {
+      None
+    } else {
+      if (annotations.length != 1 || annotations(0).id.name != stdAnnotationId) {
+        throw Compiler.Error(s"Interface only supports `std` annotation")
+      }
+      val stdAnnotation = annotations(0)
+      if (stdAnnotation.fields.length != 1) {
+        throw Compiler.Error("Invalid std annotation fields, expected `@std(id = byteVecLiteral)`")
+      }
+      stdAnnotation.fields(0) match {
+        case Ast.AnnotationField(Ast.Ident(Parser.stdIdKey), id: Val.ByteVec) =>
+          if (id.bytes.isEmpty) {
+            throw Compiler.Error("The field id of the std annotation must be a non-empty ByteVec")
+          }
+          Some(id)
+        case _ =>
+          throw Compiler.Error("Invalid std annotation, expected `@std(id = byteVecLiteral)`")
+      }
     }
   }
 }
@@ -649,10 +671,10 @@ object StatefulParser extends Parser[StatefulContext] {
   }
   def rawInterface[Unknown: P]: P[Ast.ContractInterface] =
     P(
-      stdAnnotation.? ~ Lexer.keyword("Interface") ~/ Lexer.typeId ~
+      annotation.rep ~ Lexer.keyword("Interface") ~/ Lexer.typeId ~
         (Lexer.keyword("extends") ~/ interfaceInheritance.rep(1, ",")).? ~
         "{" ~ eventDef.rep ~ interfaceFunc.rep ~ "}"
-    ).map { case (stdIdOpt, typeId, inheritances, events, funcs) =>
+    ).map { case (annotations, typeId, inheritances, events, funcs) =>
       inheritances match {
         case Some(parents) if parents.length > 1 =>
           throw Compiler.Error(
@@ -664,7 +686,7 @@ object StatefulParser extends Parser[StatefulContext] {
         throw Compiler.Error(s"No function definition in Interface ${typeId.name}")
       } else {
         Ast.ContractInterface(
-          stdIdOpt,
+          Parser.extractStdId(annotations),
           typeId,
           funcs,
           events,
