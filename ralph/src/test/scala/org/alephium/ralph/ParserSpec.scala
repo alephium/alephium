@@ -849,8 +849,8 @@ class ParserSpec extends AlephiumSpec {
         fastparse.parse(code, StatefulParser.multiContract(_)).get.value.extendedContracts()
       val tokenInterface = extended.contracts(0).asInstanceOf[ContractInterface]
       val tokenImpl      = extended.contracts(1).asInstanceOf[Contract]
-      tokenInterface.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
-      tokenImpl.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
+      tokenInterface.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
+      tokenImpl.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
     }
 
     {
@@ -877,9 +877,9 @@ class ParserSpec extends AlephiumSpec {
       val fooInterface0 = extended0.contracts(0).asInstanceOf[ContractInterface]
       val barInterface0 = extended0.contracts(1).asInstanceOf[ContractInterface]
       val implContract0 = extended0.contracts(2).asInstanceOf[Contract]
-      fooInterface0.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
-      barInterface0.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
-      implContract0.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
+      fooInterface0.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
+      barInterface0.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
+      implContract0.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
 
       val extended1 = fastparse
         .parse(code("@std(id = #000101)"), StatefulParser.multiContract(_))
@@ -889,9 +889,9 @@ class ParserSpec extends AlephiumSpec {
       val fooInterface1 = extended1.contracts(0).asInstanceOf[ContractInterface]
       val barInterface1 = extended1.contracts(1).asInstanceOf[ContractInterface]
       val implContract1 = extended1.contracts(2).asInstanceOf[Contract]
-      fooInterface1.stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
-      barInterface1.stdId is Some(Val.ByteVec(Hex.unsafe("000101")))
-      implContract1.stdId is Some(Val.ByteVec(Hex.unsafe("000101")))
+      fooInterface1.stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
+      barInterface1.stdId is Some(Val.ByteVec(Hex.unsafe("414c5048000101")))
+      implContract1.stdId is Some(Val.ByteVec(Hex.unsafe("414c5048000101")))
     }
   }
 
@@ -945,7 +945,7 @@ class ParserSpec extends AlephiumSpec {
         .parse(interface("@std(id = #0001)"), StatefulParser.interface(_))
         .get
         .value
-        .stdId is Some(Val.ByteVec(Hex.unsafe("0001")))
+        .stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
       intercept[Compiler.Error](
         fastparse.parse(interface("@using(updateFields = true)"), StatefulParser.interface(_))
       ).message is "Interface only supports `std` annotation"

@@ -467,7 +467,7 @@ object Parser {
           if (id.bytes.isEmpty) {
             throw Compiler.Error("The field id of the std annotation must be a non-empty ByteVec")
           }
-          Some(id)
+          Some(Val.ByteVec(Ast.StdIdPrefix ++ id.bytes))
         case _ =>
           throw Compiler.Error("Invalid std annotation, expected `@std(id = byteVecLiteral)`")
       }
