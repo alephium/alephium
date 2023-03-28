@@ -106,4 +106,42 @@ class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
+  it should "report missing closing brace" in {
+    val program =
+      s"""
+         |// comment
+         |AssetScript Foo {
+         |  pub fn bar(a: U256, b: U256) -> (U256) {
+         |    return (a + b)
+         |  }
+         |""".stripMargin
+
+    val failure =
+      fastparse
+        .parse(program, StatelessParser.assetScript(_))
+        .asInstanceOf[Parsed.Failure]
+        .trace()
+
+    val expectedErrorMessage =
+      s"""Expected assetScript:1:1 / "}":7:1, found """""
+
+    val formatter = CompilerErrorFormatter(failure)
+
+    formatter is
+      CompilerErrorFormatter(
+        errorMessage = expectedErrorMessage,
+        errorLine = "",
+        found = "\"\"",
+        expected = "\"}\"",
+        sourcePosition = SourcePosition(7, 1)
+      )
+
+    formatter.format() is
+      s"""-- error: Expected assetScript:1:1 / "}":7:1, found ""
+         |7 |
+         |  |^^
+         |  |Expected "}"
+         |""".stripMargin
+  }
+
 }
