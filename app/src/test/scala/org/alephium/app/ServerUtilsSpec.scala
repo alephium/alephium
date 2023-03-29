@@ -2007,7 +2007,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val serverUtils = new ServerUtils()
     val result0     = serverUtils.compileContract(Compile.Contract(code(""))).rightValue
     result0.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
-    result0.stdId is None
+    result0.stdInterfaceId is None
 
     val result1 = serverUtils.compileContract(Compile.Contract(code("@std(id = #0001)"))).rightValue
     result1.fields is CompileResult.FieldsSig(
@@ -2015,7 +2015,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector("U256", "ByteVec"),
       AVector(false, false)
     )
-    result1.stdId is Some("414c50480001")
+    result1.stdInterfaceId is Some("0001")
   }
 
   it should "create build deploy contract script" in new Fixture {

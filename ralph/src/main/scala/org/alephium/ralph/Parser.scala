@@ -451,7 +451,7 @@ object Parser {
     }
   }
 
-  def extractStdId(annotations: Seq[Annotation]): Option[Ast.StdId] = {
+  def extractStdId(annotations: Seq[Annotation]): Option[Ast.StdInterfaceId] = {
     if (annotations.isEmpty) {
       None
     } else {
@@ -467,7 +467,7 @@ object Parser {
           if (id.bytes.isEmpty) {
             throw Compiler.Error("The field id of the std annotation must be a non-empty ByteVec")
           }
-          Some(Val.ByteVec(Ast.StdIdPrefix ++ id.bytes))
+          Some(Val.ByteVec(Ast.StdInterfaceIdPrefix ++ id.bytes))
         case _ =>
           throw Compiler.Error("Invalid std annotation, expected `@std(id = byteVecLiteral)`")
       }

@@ -6782,7 +6782,7 @@
                   "warnings": [
                     "Found unused fields in Foo: a"
                   ],
-                  "stdId": "0001"
+                  "stdInterfaceId": "0001"
                 }
               }
             }
@@ -6973,7 +6973,7 @@
                       "warnings": [
                         "Found unused fields in Foo: a"
                       ],
-                      "stdId": "0001"
+                      "stdInterfaceId": "0001"
                     }
                   ],
                   "scripts": [
@@ -10558,7 +10558,7 @@
               "type": "string"
             }
           },
-          "stdId": {
+          "stdInterfaceId": {
             "type": "string"
           }
         }

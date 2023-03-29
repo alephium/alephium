@@ -29,8 +29,8 @@ import org.alephium.util.{AVector, Hex, I256, U256}
 
 // scalastyle:off number.of.methods number.of.types file.size.limit
 object Ast {
-  type StdId = Val.ByteVec
-  private[ralph] val StdIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
+  type StdInterfaceId = Val.ByteVec
+  val StdInterfaceIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
   private val stdArg: Argument =
     Argument(Ident("__stdId"), Type.ByteVec, isMutable = false, isUnused = true)
 
@@ -1015,7 +1015,7 @@ object Ast {
   final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident]) extends Inheritance
   final case class InterfaceInheritance(parentId: TypeId)                    extends Inheritance
   final case class Contract(
-      stdId: Option[StdId],
+      stdInterfaceId: Option[StdInterfaceId],
       isAbstract: Boolean,
       ident: TypeId,
       templateVars: Seq[Argument],
@@ -1026,7 +1026,8 @@ object Ast {
       enums: Seq[EnumDef],
       inheritances: Seq[Inheritance]
   ) extends ContractWithState {
-    lazy val contractFields: Seq[Argument] = if (stdId.isEmpty) fields else fields :+ Ast.stdArg
+    lazy val contractFields: Seq[Argument] =
+      if (stdInterfaceId.isEmpty) fields else fields :+ Ast.stdArg
     def getFieldsSignature(): String =
       s"Contract ${name}(${contractFields.map(_.signature).mkString(",")})"
     def getFieldNames(): AVector[String] = AVector.from(contractFields.view.map(_.ident.name))
@@ -1080,8 +1081,9 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
       state.setGenCodePhase()
-      val methods      = genMethods(state)
-      val fieldsLength = Type.flattenTypeLength(fields.map(_.tpe)) + (if (stdId.isDefined) 1 else 0)
+      val methods = genMethods(state)
+      val fieldsLength =
+        Type.flattenTypeLength(fields.map(_.tpe)) + (if (stdInterfaceId.isDefined) 1 else 0)
       StatefulContract(fieldsLength, methods)
     }
 
@@ -1121,7 +1123,7 @@ object Ast {
   }
 
   final case class ContractInterface(
-      stdId: Option[StdId],
+      stdId: Option[StdInterfaceId],
       ident: TypeId,
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
@@ -1377,8 +1379,10 @@ object Ast {
       }
     }
 
-    @inline private[ralph] def getStdId(interfaces: Seq[ContractInterface]): Option[StdId] = {
-      interfaces.foldLeft[Option[StdId]](None) { case (parentStdIdOpt, interface) =>
+    @inline private[ralph] def getStdId(
+        interfaces: Seq[ContractInterface]
+    ): Option[StdInterfaceId] = {
+      interfaces.foldLeft[Option[StdInterfaceId]](None) { case (parentStdIdOpt, interface) =>
         (parentStdIdOpt, interface.stdId) match {
           case (Some(parentStdId), Some(stdId)) =>
             if (stdId.bytes == parentStdId.bytes) {
@@ -1404,7 +1408,7 @@ object Ast {
         parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
         contract: ContractWithState
     ): (
-        Option[StdId],
+        Option[StdInterfaceId],
         Seq[FuncDef[StatefulContext]],
         Seq[EventDef],
         Seq[ConstantVarDef],
