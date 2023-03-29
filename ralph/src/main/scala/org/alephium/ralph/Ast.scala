@@ -30,7 +30,7 @@ import org.alephium.util.{AVector, Hex, I256, U256}
 // scalastyle:off number.of.methods number.of.types file.size.limit
 object Ast {
   type StdId = Val.ByteVec
-  private[ralph] val StdIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
+  val StdIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
   private val stdArg: Argument =
     Argument(Ident("__stdId"), Type.ByteVec, isMutable = false, isUnused = true)
 

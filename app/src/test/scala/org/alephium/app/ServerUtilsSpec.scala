@@ -2015,7 +2015,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       AVector("U256", "ByteVec"),
       AVector(false, false)
     )
-    result1.stdId is Some("414c50480001")
+    result1.stdId is Some("0001")
   }
 
   it should "create build deploy contract script" in new Fixture {
