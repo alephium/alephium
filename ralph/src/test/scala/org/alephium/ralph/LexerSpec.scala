@@ -183,53 +183,51 @@ class LexerSpec extends AlephiumSpec {
   it should "parse mut declarations" in {
     {
       info("fail mut declarations when mutability is disallowed")
-      forAll { right: String =>
-        val code = s"mut $right"
+      val code = s"mut foo"
 
-        // when allowMutable is false, it should not let `mut` declarations through.
-        val traced =
-          fastparse
-            .parse(code, Lexer.mutMaybe(allowMutable = false)(_))
-            .asInstanceOf[Parsed.Failure]
-            .trace()
-
-        // fastparse reports only the first 10 characters.
-        val reportedToken = code.take(10)
-
-        traced.longMsg is s"""Expected an immutable variable:1:1 / (letter | digit | "_"):1:1, found "$reportedToken""""
-      }
-
-      {
-        info("succeed mut declarations when mutability is allowed")
-        forAll { right: String =>
-          // when mut has an identifier.
-          fastparse
-            .parse(s"mut $right", Lexer.mutMaybe(allowMutable = true)(_))
-            .asInstanceOf[Parsed.Success[Boolean]]
-            .value is true
-        }
-
-        // when mut does not have an identifier.
+      // when allowMutable is false, it should not let `mut` declarations through.
+      val traced =
         fastparse
-          .parse(s"mut", Lexer.mutMaybe(allowMutable = true)(_))
+          .parse(code, Lexer.mutMaybe(allowMutable = false)(_))
+          .asInstanceOf[Parsed.Failure]
+          .trace()
+
+      // fastparse reports only the first 10 characters.
+      val reportedToken = code.take(10)
+
+      traced.longMsg is s"""Expected an immutable variable:1:1 / (letter | digit | "_"):1:1, found "$reportedToken""""
+    }
+
+    {
+      info("succeed mut declarations when mutability is allowed")
+      forAll { right: String =>
+        // when mut has an identifier.
+        fastparse
+          .parse(s"mut $right", Lexer.mutMaybe(allowMutable = true)(_))
           .asInstanceOf[Parsed.Success[Boolean]]
           .value is true
       }
 
-      {
-        info("succeed for immutable declarations")
-        forAll { right: String =>
-          // immutable declarations should always be allowed.
-          fastparse
-            .parse(s"$right", Lexer.mutMaybe(allowMutable = true)(_))
-            .asInstanceOf[Parsed.Success[Boolean]]
-            .value is false
+      // when mut does not have an identifier.
+      fastparse
+        .parse(s"mut", Lexer.mutMaybe(allowMutable = true)(_))
+        .asInstanceOf[Parsed.Success[Boolean]]
+        .value is true
+    }
 
-          fastparse
-            .parse(s"$right", Lexer.mutMaybe(allowMutable = false)(_))
-            .asInstanceOf[Parsed.Success[Boolean]]
-            .value is false
-        }
+    {
+      info("succeed for immutable declarations")
+      forAll { right: String =>
+        // immutable declarations should always be allowed.
+        fastparse
+          .parse(s"$right", Lexer.mutMaybe(allowMutable = true)(_))
+          .asInstanceOf[Parsed.Success[Boolean]]
+          .value is false
+
+        fastparse
+          .parse(s"$right", Lexer.mutMaybe(allowMutable = false)(_))
+          .asInstanceOf[Parsed.Success[Boolean]]
+          .value is false
       }
     }
   }

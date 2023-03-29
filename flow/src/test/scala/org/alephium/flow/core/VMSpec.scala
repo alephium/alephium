@@ -2670,8 +2670,10 @@ class VMSpec extends AlephiumSpec with Generators {
       val createContractLogState = logStates.states(0)
       createContractLogState.txId is createContractBlock.nonCoinbase.head.id
       createContractLogState.index is -1.toByte
-      createContractLogState.fields.length is 1
+      createContractLogState.fields.length is 3
       createContractLogState.fields(0) is Val.Address(LockupScript.p2c(contractId))
+      createContractLogState.fields(1) is Val.ByteVec(ByteString.empty)
+      createContractLogState.fields(2) is Val.ByteVec(ByteString.empty)
     }
 
     {
@@ -2745,9 +2747,10 @@ class VMSpec extends AlephiumSpec with Generators {
 
     val fields = logStates.states(0).fields
 
-    fields.length is 2
+    fields.length is 3
     fields(0) is Val.Address(LockupScript.p2c(subContractId))
     fields(1) is Val.Address(LockupScript.p2c(contractId))
+    fields(2) is Val.ByteVec(ByteString.empty)
   }
 
   it should "not write to the log storage when logging is disabled" in new EventFixtureWithContract {
@@ -4125,12 +4128,22 @@ class VMSpec extends AlephiumSpec with Generators {
     intercept[AssertionError](createContract(code, fields)).getMessage is
       "Right(TxScriptExeFailed(InvalidFieldLength))"
 
-    val stdId      = Val.ByteVec(Hex.unsafe("0001"))
+    val stdId      = Val.ByteVec(Hex.unsafe("414c50480001"))
     val contractId = createContract(code, fields :+ stdId)._1
     val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
     val contractState = worldState.getContractState(contractId).rightValue
     contractState.immFields is AVector[Val](Val.U256(0), stdId)
     contractState.mutFields is AVector.empty[Val]
+
+    val logStatesOpt = getLogStates(blockFlow, createContractEventId, 0)
+    val logStates    = logStatesOpt.value
+
+    val eventFields = logStates.states(0).fields
+
+    eventFields.length is 3
+    eventFields(0) is Val.Address(LockupScript.p2c(contractId))
+    eventFields(1) is Val.ByteVec(ByteString.empty)
+    eventFields(2) is Val.ByteVec(ByteString(0, 1))
   }
 
   private def getEvents(

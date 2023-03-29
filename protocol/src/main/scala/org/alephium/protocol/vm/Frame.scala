@@ -18,6 +18,8 @@ package org.alephium.protocol.vm
 
 import scala.annotation.{switch, tailrec}
 
+import akka.util.ByteString
+
 import org.alephium.protocol.model.{ContractId, TokenId}
 import org.alephium.protocol.vm.{createContractEventIndex, destroyContractEventIndex}
 import org.alephium.protocol.vm.TokenIssuance
@@ -384,25 +386,32 @@ final case class StatefulFrame(
       _ <- ctx.createContract(contractId, code, immFields, balances, mutFields, tokenIssuanceInfo)
       _ <- ctx.writeLog(
         Some(createContractEventId),
-        contractCreationEventFields(contractId),
+        contractCreationEventFields(contractId, immFields),
         systemEvent = true
       )
     } yield contractId
   }
 
-  def contractCreationEventFields(createdContract: ContractId): AVector[Val] = {
-    obj.contractIdOpt match {
-      case Some(contractId) =>
-        AVector(
-          createContractEventIndex,
-          Val.Address(LockupScript.p2c(createdContract)),
-          Val.Address(LockupScript.p2c(contractId))
-        )
-      case None =>
-        AVector(
-          createContractEventIndex,
-          Val.Address(LockupScript.p2c(createdContract))
-        )
+  def contractCreationEventFields(
+      createdContract: ContractId,
+      immFields: AVector[Val]
+  ): AVector[Val] = {
+    AVector(
+      createContractEventIndex,
+      Val.Address(LockupScript.p2c(createdContract)),
+      obj.contractIdOpt match {
+        case Some(contractId) => Val.Address(LockupScript.p2c(contractId))
+        case None             => Val.ByteVec(ByteString.empty)
+      },
+      contractInterfaceIdGuessed(immFields)
+    )
+  }
+
+  def contractInterfaceIdGuessed(immFields: AVector[Val]): Val = {
+    immFields.lastOption match {
+      case Some(bytes: Val.ByteVec) if bytes.bytes.startsWith(createContractInterfaceIdPrefix) =>
+        Val.ByteVec(bytes.bytes.drop(createContractInterfaceIdPrefix.length))
+      case _ => Val.ByteVec(ByteString.empty)
     }
   }
 
