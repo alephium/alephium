@@ -207,13 +207,16 @@ abstract class Parser[Ctx <: StatelessContext] {
       Type.FixedSizeArray(tpe, size)
     }
   }
-  def argument[Unknown: P](contractTypeCtor: (Ast.TypeId, Ast.Ident) => Type): P[Ast.Argument] =
-    P(Lexer.unused ~ Lexer.mut ~ Lexer.ident ~ ":").flatMap { case (isUnused, isMutable, ident) =>
-      parseType(contractTypeCtor(_, ident)).map { tpe =>
-        Ast.Argument(ident, tpe, isMutable, isUnused)
-      }
+  def argument[Unknown: P](
+      allowMutable: Boolean
+  )(contractTypeCtor: (Ast.TypeId, Ast.Ident) => Type): P[Ast.Argument] =
+    P(Lexer.unused ~ Lexer.mutMaybe(allowMutable) ~ Lexer.ident ~ ":").flatMap {
+      case (isUnused, isMutable, ident) =>
+        parseType(contractTypeCtor(_, ident)).map { tpe =>
+          Ast.Argument(ident, tpe, isMutable, isUnused)
+        }
     }
-  def funcArgument[Unknown: P]: P[Ast.Argument]   = argument(Type.Contract.local)
+  def funcArgument[Unknown: P]: P[Ast.Argument] = argument(allowMutable = true)(Type.Contract.local)
   def funParams[Unknown: P]: P[Seq[Ast.Argument]] = P("(" ~ funcArgument.rep(0, ",") ~ ")")
   def returnType[Unknown: P]: P[Seq[Type]]        = P(simpleReturnType | bracketReturnType)
   def simpleReturnType[Unknown: P]: P[Seq[Type]] =
@@ -326,18 +329,11 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   def statement[Unknown: P]: P[Ast.Statement[Ctx]]
 
-  def contractField[Unknown: P]: P[Ast.Argument] = argument(Type.Contract.global)
+  def contractField[Unknown: P](allowMutable: Boolean): P[Ast.Argument] =
+    argument(allowMutable)(Type.Contract.global)
 
   def templateParams[Unknown: P]: P[Seq[Ast.Argument]] =
-    P("(" ~ contractField.rep(0, ",") ~ ")").map { params =>
-      val mutables = params.filter(_.isMutable)
-      if (mutables.nonEmpty) {
-        throw Compiler.Error(
-          s"Template variables should be immutable: ${mutables.map(_.ident.name).mkString}"
-        )
-      }
-      params
-    }
+    P("(" ~ contractField(allowMutable = false).rep(0, ",") ~ ")")
 
   def eventField[Unknown: P]: P[Ast.EventField] =
     P(Lexer.ident ~ ":").flatMap { case (ident) =>
@@ -506,20 +502,23 @@ object StatefulParser extends Parser[StatefulContext] {
       varDef | assign | debug | funcCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
 
-  def contractFields[Unknown: P]: P[Seq[Ast.Argument]] = P("(" ~ contractField.rep(0, ",") ~ ")")
+  def contractFields[Unknown: P]: P[Seq[Ast.Argument]] =
+    P(
+      "(" ~ contractField(allowMutable = true).rep(0, ",") ~ ")"
+    )
 
   def rawTxScript[Unknown: P]: P[Ast.TxScript] =
     P(
       annotation.rep ~
         Lexer.keyword(
           "TxScript"
-        ) ~/ Lexer.typeId ~ templateParams.? ~ "{" ~ statement
+        ) ~/ Lexer.typeId ~ templateParams.? ~ "{" ~ Index ~ statement
           .rep(0) ~ func
           .rep(0) ~ "}"
     )
-      .map { case (annotations, typeId, templateVars, mainStmts, funcs) =>
+      .flatMap { case (annotations, typeId, templateVars, mainStmtsIndex, mainStmts, funcs) =>
         if (mainStmts.isEmpty) {
-          throw Compiler.Error(s"No main statements defined in TxScript ${typeId.name}")
+          CompilerError(CompilerError.NoMainStatementDefined(typeId), mainStmtsIndex)
         } else {
           val (usePreapprovedAssets, useContractAssets, _, useUpdateFields) =
             Parser.extractFuncModifier(
@@ -529,12 +528,14 @@ object StatefulParser extends Parser[StatefulContext] {
               useCheckExternalCallerDefault = true,
               useUpdateFieldsDefault = false
             )
-          Ast.TxScript(
-            typeId,
-            templateVars.getOrElse(Seq.empty),
-            Ast.FuncDef
-              .main(mainStmts, usePreapprovedAssets, useContractAssets, useUpdateFields) +: funcs
-          )
+          val txScript =
+            Ast.TxScript(
+              typeId,
+              templateVars.getOrElse(Seq.empty),
+              Ast.FuncDef
+                .main(mainStmts, usePreapprovedAssets, useContractAssets, useUpdateFields) +: funcs
+            )
+          Pass(txScript)
         }
       }
   def txScript[Unknown: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)

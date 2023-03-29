@@ -61,14 +61,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     {
       info("fail without main statements")
 
-      val script =
-        s"""
-           |TxScript Foo {}
-           |""".stripMargin
+      val script = "TxScript Foo {}"
       Compiler
         .compileTxScript(script)
         .leftValue
-        .message is "No main statements defined in TxScript Foo"
+        .message is
+        """-- error: Expected main statements for type `Foo`:1:15 / ([ \t\r\n] | lineComment):1:15, found "}"
+          |1 |TxScript Foo {}
+          |  |              ^
+          |  |              Expected main statements for type `Foo`
+          |""".stripMargin
     }
 
     {
@@ -87,7 +89,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler
         .compileTxScript(script)
         .leftValue
-        .message is """Parser failed: Expected multiContract:1:1 / rawTxScript:2:1 / "}":3:3, found "event Add(""""
+        .message is
+        """-- error: Expected multiContract:1:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
+          |3 |  event Add(a: U256, b: U256)
+          |  |  ^^^^^^^^^^
+          |  |  Expected "}"
+          |""".stripMargin
     }
   }
 
