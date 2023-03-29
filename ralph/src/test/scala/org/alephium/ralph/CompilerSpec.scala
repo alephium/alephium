@@ -3827,4 +3827,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler.compileContract(code).isRight is true
     }
   }
+
+  it should "generate code for std id" in {
+    def code(stdAnnotation: String): String =
+      s"""
+         |Contract Bar() implements Foo {
+         |  pub fn foo() -> () {}
+         |}
+         |
+         |$stdAnnotation
+         |Interface Foo {
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+
+    Compiler.compileContract(code("")).rightValue.fieldLength is 0
+    Compiler.compileContract(code("@std(id = #0001)")).rightValue.fieldLength is 1
+  }
 }

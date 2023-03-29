@@ -18,7 +18,8 @@ package org.alephium.ralph
 
 import scala.collection.mutable
 
-import org.alephium.util.{AlephiumSpec, AVector}
+import org.alephium.protocol.vm.Val
+import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
 class AstSpec extends AlephiumSpec {
 
@@ -650,5 +651,56 @@ class AstSpec extends AlephiumSpec {
                   |""".stripMargin
     val error = Compiler.compileProject(code).leftValue
     error.message is "These TxScript/Contract/Interface are defined multiple times: Bar, Foo, Main"
+  }
+
+  it should "check interface std id" in {
+    val foo = Ast.ContractInterface(None, Ast.TypeId("Foo"), Seq.empty, Seq.empty, Seq.empty)
+    val bar = foo.copy(ident = Ast.TypeId("Bar"))
+    val baz = foo.copy(ident = Ast.TypeId("Baz"))
+
+    Ast.MultiContract.getStdId(Seq.empty) is None
+    Ast.MultiContract.getStdId(Seq(foo)) is None
+    Ast.MultiContract.getStdId(
+      Seq(foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))))
+    ) is Some(Val.ByteVec(Hex.unsafe("0001")))
+    Ast.MultiContract.getStdId(Seq(foo, bar, baz)) is None
+    Ast.MultiContract.getStdId(
+      Seq(foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))), bar, baz)
+    ) is Some(Val.ByteVec(Hex.unsafe("0001")))
+    Ast.MultiContract.getStdId(
+      Seq(foo, bar.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))), baz)
+    ) is Some(Val.ByteVec(Hex.unsafe("0001")))
+    Ast.MultiContract.getStdId(
+      Seq(
+        foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))),
+        bar,
+        baz.copy(stdId = Some(Val.ByteVec(Hex.unsafe("000101"))))
+      )
+    ) is Some(Val.ByteVec(Hex.unsafe("000101")))
+    Ast.MultiContract.getStdId(
+      Seq(
+        foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))),
+        bar.copy(stdId = Some(Val.ByteVec(Hex.unsafe("000101")))),
+        baz.copy(stdId = Some(Val.ByteVec(Hex.unsafe("00010101"))))
+      )
+    ) is Some(Val.ByteVec(Hex.unsafe("00010101")))
+    intercept[Compiler.Error](
+      Ast.MultiContract.getStdId(
+        Seq(
+          foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))),
+          bar,
+          baz.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001"))))
+        )
+      )
+    ).message is "The std id of interface Baz is the same as parent interface"
+    intercept[Compiler.Error](
+      Ast.MultiContract.getStdId(
+        Seq(
+          foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))),
+          bar,
+          baz.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0002"))))
+        )
+      )
+    ).message is "The std id of interface Baz should starts with 0001"
   }
 }

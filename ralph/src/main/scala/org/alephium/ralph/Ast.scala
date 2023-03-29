@@ -16,15 +16,24 @@
 
 package org.alephium.ralph
 
+import java.nio.charset.StandardCharsets
+
 import scala.collection.mutable
+
+import akka.util.ByteString
 
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{ALPHTokenId => ALPHTokenIdInstr, Contract => VmContract, _}
 import org.alephium.ralph.LogicalOperator.Not
-import org.alephium.util.{AVector, I256, U256}
+import org.alephium.util.{AVector, Hex, I256, U256}
 
 // scalastyle:off number.of.methods number.of.types file.size.limit
 object Ast {
+  type StdId = Val.ByteVec
+  private[ralph] val StdIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
+  private val stdArg: Argument =
+    Argument(Ident("__stdId"), Type.ByteVec, isMutable = false, isUnused = true)
+
   final case class Ident(name: String)
   final case class TypeId(name: String)
   final case class FuncId(name: String, isBuiltIn: Boolean)
@@ -1006,6 +1015,7 @@ object Ast {
   final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident]) extends Inheritance
   final case class InterfaceInheritance(parentId: TypeId)                    extends Inheritance
   final case class Contract(
+      stdId: Option[StdId],
       isAbstract: Boolean,
       ident: TypeId,
       templateVars: Seq[Argument],
@@ -1016,11 +1026,12 @@ object Ast {
       enums: Seq[EnumDef],
       inheritances: Seq[Inheritance]
   ) extends ContractWithState {
+    lazy val contractFields: Seq[Argument] = if (stdId.isEmpty) fields else fields :+ Ast.stdArg
     def getFieldsSignature(): String =
-      s"Contract ${name}(${fields.map(_.signature).mkString(",")})"
-    def getFieldNames(): AVector[String]       = AVector.from(fields.view.map(_.ident.name))
-    def getFieldTypes(): AVector[String]       = AVector.from(fields.view.map(_.tpe.signature))
-    def getFieldMutability(): AVector[Boolean] = AVector.from(fields.view.map(_.isMutable))
+      s"Contract ${name}(${contractFields.map(_.signature).mkString(",")})"
+    def getFieldNames(): AVector[String] = AVector.from(contractFields.view.map(_.ident.name))
+    def getFieldTypes(): AVector[String] = AVector.from(contractFields.view.map(_.tpe.signature))
+    def getFieldMutability(): AVector[Boolean] = AVector.from(contractFields.view.map(_.isMutable))
 
     private def checkFuncs(): Unit = {
       if (funcs.length < 1) {
@@ -1069,8 +1080,9 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
       state.setGenCodePhase()
-      val methods = genMethods(state)
-      StatefulContract(Type.flattenTypeLength(fields.map(_.tpe)), methods)
+      val methods      = genMethods(state)
+      val fieldsLength = Type.flattenTypeLength(fields.map(_.tpe)) + (if (stdId.isDefined) 1 else 0)
+      StatefulContract(fieldsLength, methods)
     }
 
     // the state must have been updated in the check pass
@@ -1109,6 +1121,7 @@ object Ast {
   }
 
   final case class ContractInterface(
+      stdId: Option[StdId],
       ident: TypeId,
       funcs: Seq[FuncDef[StatefulContext]],
       events: Seq[EventDef],
@@ -1226,8 +1239,10 @@ object Ast {
         case script: TxScript =>
           script
         case c: Contract =>
-          val (funcs, events, constantVars, enums) = MultiContract.extractDefs(parentsCache, c)
+          val (stdId, funcs, events, constantVars, enums) =
+            MultiContract.extractDefs(parentsCache, c)
           Contract(
+            stdId,
             c.isAbstract,
             c.ident,
             c.templateVars,
@@ -1239,8 +1254,8 @@ object Ast {
             c.inheritances
           )
         case i: ContractInterface =>
-          val (funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
-          ContractInterface(i.ident, funcs, events, i.inheritances)
+          val (stdId, funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
+          ContractInterface(stdId, i.ident, funcs, events, i.inheritances)
       }
       val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
       MultiContract(newContracts, Some(dependencies))
@@ -1362,16 +1377,45 @@ object Ast {
       }
     }
 
+    @inline private[ralph] def getStdId(interfaces: Seq[ContractInterface]): Option[StdId] = {
+      interfaces.foldLeft[Option[StdId]](None) { case (parentStdIdOpt, interface) =>
+        (parentStdIdOpt, interface.stdId) match {
+          case (Some(parentStdId), Some(stdId)) =>
+            if (stdId.bytes == parentStdId.bytes) {
+              throw Compiler.Error(
+                s"The std id of interface ${interface.ident.name} is the same as parent interface"
+              )
+            }
+            if (!stdId.bytes.startsWith(parentStdId.bytes)) {
+              throw Compiler.Error(
+                s"The std id of interface ${interface.ident.name} should starts with ${Hex
+                    .toHexString(parentStdId.bytes)}"
+              )
+            }
+            Some(stdId)
+          case (Some(parentStdId), None) => Some(parentStdId)
+          case (None, stdId)             => stdId
+        }
+      }
+    }
+
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def extractDefs(
         parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
         contract: ContractWithState
-    ): (Seq[FuncDef[StatefulContext]], Seq[EventDef], Seq[ConstantVarDef], Seq[EnumDef]) = {
+    ): (
+        Option[StdId],
+        Seq[FuncDef[StatefulContext]],
+        Seq[EventDef],
+        Seq[ConstantVarDef],
+        Seq[EnumDef]
+    ) = {
       val parents = parentsCache(contract.ident)
       val (allContracts, _allInterfaces) =
         (parents :+ contract).partition(_.isInstanceOf[Contract])
       val allInterfaces =
         sortInterfaces(parentsCache, _allInterfaces.map(_.asInstanceOf[ContractInterface]))
+      val stdId = getStdId(allInterfaces)
 
       val allFuncs                             = (allInterfaces ++ allContracts).flatMap(_.funcs)
       val (abstractFuncs, nonAbstractFuncs)    = allFuncs.partition(_.bodyOpt.isEmpty)
@@ -1404,7 +1448,7 @@ object Ast {
           unimplementedFuncs
       }
 
-      (resultFuncs, events, constantVars, enums)
+      (stdId, resultFuncs, events, constantVars, enums)
     }
 
     private def sortInterfaces(
