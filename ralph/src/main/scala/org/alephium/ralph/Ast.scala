@@ -32,7 +32,7 @@ object Ast {
   type StdInterfaceId = Val.ByteVec
   val StdInterfaceIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
   private val stdArg: Argument =
-    Argument(Ident("__stdId"), Type.ByteVec, isMutable = false, isUnused = true)
+    Argument(Ident("__stdInterfaceId"), Type.ByteVec, isMutable = false, isUnused = true)
 
   final case class Ident(name: String)
   final case class TypeId(name: String)
