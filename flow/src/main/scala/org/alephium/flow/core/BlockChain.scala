@@ -279,6 +279,10 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
       acc ++ Utils.unsafe(getHashes(height))
     }
   }
+
+  override def checkCompletenessUnsafe(hash: BlockHash): Boolean = {
+    checkCompletenessHelper(hash, blockStorage.existsUnsafe, super.checkCompletenessUnsafe)
+  }
 }
 
 object BlockChain {

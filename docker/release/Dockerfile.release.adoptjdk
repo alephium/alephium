@@ -1,0 +1,33 @@
+FROM adoptopenjdk:11-jre
+
+ARG RELEASE=0.0.0
+
+RUN curl -L https://github.com/alephium/alephium/releases/download/v${RELEASE}/alephium-${RELEASE}.jar -o /alephium.jar && \
+  mkdir -p /alephium-home && usermod -d /alephium-home nobody && chown nobody /alephium-home && \
+  mkdir -p ~nobody/.alephium && chown nobody ~nobody/.alephium && \
+  mkdir -p ~nobody/.alephium-wallets && chown nobody ~nobody/.alephium-wallets
+
+COPY user-mainnet-release.conf /alephium-home/.alephium/user.conf
+COPY entrypoint.sh /entrypoint.sh
+
+# http
+EXPOSE 12973
+# ws
+EXPOSE 11973
+# miner
+EXPOSE 10973
+# p2p
+EXPOSE 9973
+
+VOLUME /alephium-home/.alephium
+
+VOLUME /alephium-home/.alephium-wallets
+
+USER nobody
+
+ENV JAVA_NET_OPTS="-Djava.net.preferIPv4Stack=true"
+ENV JAVA_MEM_OPTS=""
+ENV JAVA_GC_OPTS=""
+ENV JAVA_EXTRA_OPTS=""
+
+ENTRYPOINT /entrypoint.sh

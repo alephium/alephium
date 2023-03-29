@@ -106,6 +106,43 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
     } yield ()
   }
 
+  override def checkCompletenessUnsafe(hash: BlockHash): Boolean = {
+    checkCompletenessHelper(
+      hash,
+      hash => headerStorage.existsUnsafe(hash) && super.checkCompletenessUnsafe(hash),
+      _ => true
+    )
+  }
+
+  def checkCompletenessHelper(
+      hash: BlockHash,
+      checkSelf: BlockHash => Boolean,
+      checkSuper: BlockHash => Boolean
+  ): Boolean = {
+    checkSelf(hash) && checkSuper(hash) && {
+      var toCheckHeader = getBlockHeaderUnsafe(hash)
+      (0 until 10).forall { _ =>
+        if (toCheckHeader.isGenesis) {
+          true
+        } else {
+          val toCheckHash = toCheckHeader.hash
+          toCheckHeader = getBlockHeaderUnsafe(toCheckHeader.parentHash)
+          checkSelf(toCheckHash)
+        }
+      }
+    }
+  }
+
+  def cleanTips(): Unit = {
+    val currentTips = getAllTips
+    val invalidTips = currentTips.filter(!checkCompletenessUnsafe(_))
+    if (currentTips.length > invalidTips.length) {
+      invalidTips.foreach(removeInvalidTip)
+    } else {
+      // TODO: recover valid tips
+    }
+  }
+
   // We use height for canonicality checking. This will converge to weight based checking eventually
   private def checkCanonicality(hash: BlockHash, height: Int): IOResult[Boolean] = {
     EitherF.forallTry(tips.keys()) { tip =>

@@ -34,7 +34,7 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.ralph.Compiler
-import org.alephium.serde.serialize
+import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
@@ -2125,6 +2125,97 @@ class ServerUtilsSpec extends AlephiumSpec {
       tokensSorted.length
     )
     testResult.txOutputs(4).address is Address.contract(testContract.contractId)
+  }
+
+  trait ScriptTxFixture extends Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils = new ServerUtils
+
+    val chainIndex                        = ChainIndex.unsafe(0, 0)
+    val (testPriKey, testPubKey)          = chainIndex.from.generateKey
+    val testAddress                       = Address.p2pkh(testPubKey)
+    val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
+    val genesisAddress                    = Address.p2pkh(genesisPubKey)
+
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).toOption.get
+
+    lazy val deployContractTxResult = serverUtils
+      .buildDeployContractTx(
+        blockFlow,
+        BuildDeployContractTx(
+          Hex.unsafe(testPubKey.toHexString),
+          bytecode = serialize(code) ++ ByteString(0, 0),
+          initialAttoAlphAmount = Some(Amount(ALPH.oneAlph))
+        )
+      )
+      .rightValue
+
+    def deployContract() = {
+      val deployContractTx =
+        deserialize[UnsignedTransaction](Hex.unsafe(deployContractTxResult.unsignedTx)).rightValue
+      deployContractTx.fixedOutputs.length is 1
+      val output = deployContractTx.fixedOutputs.head
+      output.amount is ALPH.oneAlph.subUnsafe(
+        deployContractTx.gasPrice * deployContractTx.gasAmount
+      )
+
+      signAndAddToMemPool(
+        deployContractTxResult.txId,
+        deployContractTxResult.unsignedTx,
+        chainIndex,
+        testPriKey
+      )
+    }
+
+    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
+      addAndCheck(blockFlow, block)
+    }
+  }
+
+  it should "execute scripts for cross-group confirmed inputs" in new ScriptTxFixture {
+    val block = transfer(blockFlow, genesisKeys(1)._1, testPubKey, ALPH.alph(2))
+    addAndCheck(blockFlow, block)
+    checkAddressBalance(testAddress, ALPH.alph(2))
+    deployContract()
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
+  }
+
+  it should "execute scripts for cross-group mempool inputs" in new ScriptTxFixture {
+    val block   = transfer(blockFlow, genesisKeys(1)._1, testPubKey, ALPH.alph(2))
+    val blockTx = block.nonCoinbase.head.toTemplate
+    block.chainIndex is ChainIndex.unsafe(1, 0)
+    blockFlow
+      .getGrandPool()
+      .add(block.chainIndex, blockTx, TimeStamp.now())
+    checkAddressBalance(testAddress, ALPH.alph(2))
+    deployContract()
+    blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 0))
+    blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
+    // TODO: improve the calculation of bestDeps to get rid of the following line
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
+    blockFlow.getGrandPool().get(blockTx.id).isEmpty is true
+
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
   }
 
   private def generateDestination(

@@ -27,4 +27,8 @@ package object app {
   def wrapCompilerResult[T](result: Either[Compiler.Error, T]): Try[T] = {
     result.left.map(error => badRequest(error.message))
   }
+
+  def wrapError[T](result: Either[String, T]): Try[T] = {
+    result.left.map(error => badRequest(error))
+  }
 }

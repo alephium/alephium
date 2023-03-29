@@ -18,8 +18,8 @@ package org.alephium.flow.core
 
 import org.alephium.flow.FlowFixture
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.model.{ChainIndex, GroupIndex}
-import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
+import org.alephium.protocol.model.{BlockHash, ChainIndex, GroupIndex}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, TimeStamp}
 
 class FlowTipsUtilSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
@@ -222,5 +222,27 @@ class FlowTipsUtilSpec extends AlephiumSpec {
 
     val block = emptyBlock(blockFlow, ChainIndex.unsafe(0, 1))
     blockFlow.getGroupTip(block.header, GroupIndex.unsafe(0)) is block.header.hash
+  }
+
+  it should "calculate incoming blocks for a target group" in new Fixture {
+    val chainIndex0      = ChainIndex.unsafe(0, 0)
+    val targetGroupIndex = GroupIndex.unsafe(1)
+
+    val block0 = transfer(blockFlow, chainIndex0)
+    addAndCheck(blockFlow, block0)
+    val bestDeps0 = blockFlow.getBestDeps(targetGroupIndex)
+    bestDeps0.deps.contains(block0.hash) is true
+    blockFlow.getIncomingBlockDeps(targetGroupIndex, bestDeps0).rightValue.isEmpty is true
+
+    var newBlocks = AVector.empty[BlockHash]
+    brokerConfig.cliqueGroupIndexes.filter(_ != targetGroupIndex).foreach { fromGroupIndex =>
+      val chainIndex = ChainIndex(fromGroupIndex, targetGroupIndex)
+      val block      = transfer(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      newBlocks = newBlocks :+ block.hash
+      val bestDeps = blockFlow.getBestDeps(targetGroupIndex)
+      bestDeps.deps.contains(block.hash) is false
+      blockFlow.getIncomingBlockDeps(targetGroupIndex, bestDeps0) isE newBlocks
+    }
   }
 }

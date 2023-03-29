@@ -926,13 +926,9 @@ object BuiltIn {
   val u256Max: BuiltIn[StatelessContext] = {
     // scalastyle:off magic.number
     val instrs = Seq[Instr[StatelessContext]](
+      U256Const0,
       U256Const1,
-      U256Const(Val.U256(U256.unsafe(255))),
-      U256SHL,
-      Dup,
-      U256Const1,
-      U256Sub,
-      U256BitOr
+      U256ModSub
     )
     // scalastyle:on magic.number
     SimpleBuiltIn.utilsMultipleInstr(

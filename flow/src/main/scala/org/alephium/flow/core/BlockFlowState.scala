@@ -114,27 +114,16 @@ trait BlockFlowState extends FlowTipsUtil {
 
   def sanityCheckUnsafe(): Unit = {
     inBlockChains.foreach(_.foreach { chain =>
-      chain.getAllTips.foreach { tip =>
-        require(chain.blockStorage.existsUnsafe(tip), "Tip should be stored in block storage")
-        require(chain.blockStateStorage.existsUnsafe(tip), "Tip should be stored in state storage")
-      }
+      chain.cleanTips()
     })
     outBlockChains.foreach(_.foreach { chain =>
-      chain.getAllTips.foreach { tip =>
-        require(chain.blockStorage.existsUnsafe(tip), "Tip should be stored in block storage")
-        require(chain.blockStateStorage.existsUnsafe(tip), "Tip should be stored in state storage")
-      }
+      chain.cleanTips()
     })
     intraGroupBlockChains.foreach { chain =>
-      chain.getAllTips.foreach { tip =>
-        require(chain.worldStateStorage.existsUnsafe(tip), "Tip should have its state trie stored")
-      }
+      chain.cleanTips()
     }
     blockHeaderChains.foreach(_.foreach { chain =>
-      chain.getAllTips.map { tip =>
-        require(chain.headerStorage.existsUnsafe(tip), "Tip should be stored in header storage")
-        require(chain.blockStateStorage.existsUnsafe(tip), "Tip should be stored in state storage")
-      }
+      chain.cleanTips()
     })
   }
 
@@ -306,7 +295,7 @@ trait BlockFlowState extends FlowTipsUtil {
         case None            => Right(getBestDeps(mainGroup))
       }
       worldState  <- getPersistedWorldState(blockDeps, mainGroup)
-      blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
+      blockCaches <- getBlockCachesForGroupViewIncludePool(mainGroup, blockDeps)
     } yield BlockFlowGroupView.includePool(worldState, blockCaches, getMemPool(mainGroup))
   }
 
@@ -316,7 +305,7 @@ trait BlockFlowState extends FlowTipsUtil {
     val blockDeps = getBestDeps(mainGroup)
     for {
       worldState  <- getCachedWorldState(blockDeps, mainGroup)
-      blockCaches <- getBlockCachesForUpdates(mainGroup, blockDeps)
+      blockCaches <- getBlockCachesForGroupViewIncludePool(mainGroup, blockDeps)
     } yield BlockFlowGroupView.includePool(worldState, blockCaches, getMemPool(mainGroup))
   }
 
@@ -382,6 +371,26 @@ trait BlockFlowState extends FlowTipsUtil {
       diff        <- getHashesForUpdates(groupIndex, deps)
       blockCaches <- diff.mapE(getBlockCache(groupIndex, _))
     } yield blockCaches
+  }
+
+  def getIncomingBlockCaches(
+      targetGroupIndex: GroupIndex,
+      deps: BlockDeps
+  ): IOResult[AVector[BlockCache]] = {
+    for {
+      deps   <- getIncomingBlockDeps(targetGroupIndex, deps)
+      caches <- deps.mapE(getBlockCache(targetGroupIndex, _))
+    } yield caches
+  }
+
+  def getBlockCachesForGroupViewIncludePool(
+      mainGroup: GroupIndex,
+      blockDeps: BlockDeps
+  ): IOResult[AVector[BlockCache]] = {
+    for {
+      groupBlockCaches    <- getBlockCachesForUpdates(mainGroup, blockDeps)
+      incomingBlockCaches <- getIncomingBlockCaches(mainGroup, blockDeps)
+    } yield groupBlockCaches ++ incomingBlockCaches
   }
 
   // Note: update state only for intra group blocks

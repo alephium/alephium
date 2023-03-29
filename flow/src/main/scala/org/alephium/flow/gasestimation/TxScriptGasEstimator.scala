@@ -74,7 +74,7 @@ object TxScriptGasEstimator {
       for {
         chainIndex    <- chainIndexOpt.toRight("No UTXO found.")
         blockEnv      <- flow.getDryrunBlockEnv(chainIndex).left.map(_.toString())
-        groupView     <- flow.getMutableGroupView(chainIndex.from).left.map(_.toString())
+        groupView     <- flow.getMutableGroupViewIncludePool(chainIndex.from).left.map(_.toString())
         preOutputsOpt <- groupView.getPreOutputs(inputs).left.map(_.toString())
         preOutputs    <- preOutputsOpt.toRight("Tx inputs do not exit")
         result        <- runScript(blockEnv, groupView, preOutputs)

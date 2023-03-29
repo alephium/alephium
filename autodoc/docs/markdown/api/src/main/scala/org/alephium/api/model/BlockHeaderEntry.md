@@ -1,0 +1,14 @@
+[View code on GitHub](https://github.com/alephium/alephium/blob/master/api/src/main/scala/org/alephium/api/model/BlockHeaderEntry.scala)
+
+The code defines a case class `BlockHeaderEntry` and an object `BlockHeaderEntry` in the `org.alephium.api.model` package. The `BlockHeaderEntry` case class has six fields: `hash`, `timestamp`, `chainFrom`, `chainTo`, `height`, and `deps`. The `hash` field is of type `BlockHash`, which is a type alias for `ByteVector32`, a 32-byte vector used to represent block hashes. The `timestamp` field is of type `TimeStamp`, which represents a Unix timestamp in milliseconds. The `chainFrom` and `chainTo` fields are of type `Int` and represent the indices of the chains that the block header belongs to. The `height` field is of type `Int` and represents the height of the block in the blockchain. The `deps` field is of type `AVector[BlockHash]`, which is an immutable vector of block hashes representing the dependencies of the block.
+
+The `BlockHeaderEntry` object has a single method `from` that takes a `BlockHeader` and an `Int` as arguments and returns a `BlockHeaderEntry`. The `from` method is used to convert a `BlockHeader` to a `BlockHeaderEntry`. The `BlockHeader` is a case class defined in the `org.alephium.protocol.model` package and represents the header of a block in the blockchain. The `height` argument is used to set the `height` field of the `BlockHeaderEntry`. The `hash`, `timestamp`, `chainFrom`, `chainTo`, and `deps` fields of the `BlockHeaderEntry` are set to the corresponding fields of the `BlockHeader`.
+
+This code is used to represent block headers in the Alephium blockchain. The `BlockHeaderEntry` case class is used to store the relevant information about a block header, such as its hash, timestamp, height, and dependencies. The `from` method is used to convert a `BlockHeader` to a `BlockHeaderEntry` when needed, such as when the block header needs to be stored in a database or sent over the network. Other parts of the Alephium project can use the `BlockHeaderEntry` class and `from` method to work with block headers. For example, the Alephium API may use `BlockHeaderEntry` to return information about block headers to clients.
+## Questions: 
+ 1. What is the purpose of the `BlockHeaderEntry` class?
+   - The `BlockHeaderEntry` class is a model that represents a block header with additional information such as its height, chain indices, and dependencies.
+2. What is the `from` method in the `BlockHeaderEntry` object used for?
+   - The `from` method is a factory method that creates a `BlockHeaderEntry` instance from a `BlockHeader` instance and a given height.
+3. What is the `AVector` type used for in the `BlockHeaderEntry` class?
+   - The `AVector` type is used to represent a vector (i.e., an ordered collection) of `BlockHash` instances that represent the dependencies of the block header.
