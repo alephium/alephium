@@ -63,8 +63,13 @@ abstract class Parser[Ctx <: StatelessContext] {
       case (funcId, approveAssets, arguments) =>
         (funcId, approveAssets.getOrElse(Seq.empty), arguments)
     }
-  def callExpr[Unknown: P]: P[Ast.CallExpr[Ctx]] =
-    callAbs.map { case (funcId, approveAssets, expr) => Ast.CallExpr(funcId, approveAssets, expr) }
+  def callExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
+    P((Lexer.typeId ~ ".").? ~ callAbs).map { case (contractIdOpt, (funcId, approveAssets, expr)) =>
+      contractIdOpt match {
+        case Some(contractId) => Ast.ContractStaticCallExpr(contractId, funcId, approveAssets, expr)
+        case None             => Ast.CallExpr(funcId, approveAssets, expr)
+      }
+    }
   def contractConv[Unknown: P]: P[Ast.ContractConv[Ctx]] =
     P(Lexer.typeId ~ "(" ~ expr ~ ")").map { case (typeId, expr) => Ast.ContractConv(typeId, expr) }
 

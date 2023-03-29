@@ -16,6 +16,8 @@
 
 package org.alephium.ralph
 
+import akka.util.ByteString
+
 import org.alephium.protocol.vm._
 import org.alephium.ralph.BuiltIn.{OverloadedSimpleBuiltIn, SimpleBuiltIn}
 import org.alephium.util.AlephiumSpec
@@ -52,5 +54,42 @@ class BuiltInSpec extends AlephiumSpec {
       .toSet is StaticAnalysis.contractAssetsInstrs.--(
       Set(SelfAddress, TransferAlphFromSelf, TransferAlphToSelf)
     )
+  }
+
+  it should "initialize built-in encoding functions for contracts" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val ast = Compiler.compileContractFull(code).rightValue.ast
+    ast.builtInContractFuncs().length is 2
+    ast.funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is Seq(Encode)
+    ast.funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is Seq(Encode)
+  }
+
+  it should "initialize built-in encoding functions for contracts using standard interfaces" in {
+    val code =
+      s"""
+         |Contract Foo() implements IFoo {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |@std(id = #ffff)
+         |Interface IFoo {
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+    val ast = Compiler.compileContractFull(code).rightValue.ast
+    ast.builtInContractFuncs().length is 2
+    ast.funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is Seq(
+      BytesConst(Val.ByteVec(ByteString("ALPH") ++ ByteString(0xff, 0xff))),
+      Encode
+    )
+    ast.funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is Seq(Encode)
   }
 }

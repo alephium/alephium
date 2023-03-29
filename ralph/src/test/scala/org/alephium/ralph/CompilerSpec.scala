@@ -3844,4 +3844,28 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     Compiler.compileContract(code("")).rightValue.fieldLength is 0
     Compiler.compileContract(code("@std(id = #0001)")).rightValue.fieldLength is 1
   }
+
+  it should "use built-in contract functions" in {
+    def code(stdAnnotation: String, input0: String, input1: String): String =
+      s"""
+         |Contract Bar(a: U256, @unused mut b: I256) implements Foo {
+         |  @using(checkExternalCaller = false)
+         |  pub fn foo() -> () {
+         |    let bs0 = Bar.encodeImmFields!(${input0})
+         |    let bs1 = Bar.encodeMutFields!(${input1})
+         |    assert!(bs0 == #, 0)
+         |    assert!(bs1 == #, 0)
+         |  }
+         |}
+         |
+         |$stdAnnotation
+         |Interface Foo {
+         |  @using(checkExternalCaller = false)
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+
+    Compiler.compileContract(code("", "1", "2i")).rightValue.fieldLength is 2
+    Compiler.compileContract(code("@std(id = #0001)", "1", "2i")).rightValue.fieldLength is 3
+  }
 }

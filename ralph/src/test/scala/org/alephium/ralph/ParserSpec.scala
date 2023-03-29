@@ -156,6 +156,27 @@ class ParserSpec extends AlephiumSpec {
     ).message is "Empty asset for address: Variable(Ident(z))"
   }
 
+  it should "call expression" in {
+    fastparse.parse("foo(a)", StatefulParser.callExpr(_)).get.value is
+      CallExpr(FuncId("foo", false), Seq.empty, Seq(Variable[StatefulContext](Ident("a"))))
+    fastparse.parse("Foo.foo(a)", StatefulParser.callExpr(_)).get.value is
+      ContractStaticCallExpr(
+        TypeId("Foo"),
+        FuncId("foo", false),
+        Seq.empty,
+        Seq(Variable[StatefulContext](Ident("a")))
+      )
+    fastparse.parse("foo!(a)", StatefulParser.callExpr(_)).get.value is
+      CallExpr(FuncId("foo", true), Seq.empty, Seq(Variable[StatefulContext](Ident("a"))))
+    fastparse.parse("Foo.foo!(a)", StatefulParser.callExpr(_)).get.value is
+      ContractStaticCallExpr(
+        TypeId("Foo"),
+        FuncId("foo", true),
+        Seq.empty,
+        Seq(Variable[StatefulContext](Ident("a")))
+      )
+  }
+
   it should "parse ByteVec" in {
     fastparse.parse("# ++ #00", StatefulParser.expr(_)).get.value is
       Binop[StatefulContext](
