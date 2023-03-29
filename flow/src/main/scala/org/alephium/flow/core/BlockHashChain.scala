@@ -75,6 +75,13 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
     loadStateFromStorage()
   }
 
+  def checkCompletenessUnsafe(hash: BlockHash): Boolean = {
+    blockStateStorage.existsUnsafe(hash) && {
+      val height = blockStateStorage.getUnsafe(hash).height
+      heightIndexStorage.getOptUnsafe(height).exists(_.contains(hash))
+    }
+  }
+
   @inline
   private def updateHeightIndex(
       hash: BlockHash,

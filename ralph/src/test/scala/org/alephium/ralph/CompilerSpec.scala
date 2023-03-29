@@ -61,17 +61,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     {
       info("fail without main statements")
 
-      val script =
-        s"""
-           |TxScript Foo {}
-           |""".stripMargin
+      val script = "TxScript Foo {}"
       Compiler
         .compileTxScript(script)
         .leftValue
         .message is
-        """-- error: Expected main statements for type `Foo`:2:15 / ([ \t\r\n] | lineComment):2:15, found "}\n"
-          |2 |TxScript Foo {}
-          |  |              ^^^
+        """-- error: Expected main statements for type `Foo`:1:15 / ([ \t\r\n] | lineComment):1:15, found "}"
+          |1 |TxScript Foo {}
+          |  |              ^
           |  |              Expected main statements for type `Foo`
           |""".stripMargin
     }

@@ -61,6 +61,11 @@ trait BlockHashChainState {
     updateDB()
   }
 
+  def removeInvalidTip(tip: BlockHash): Unit = {
+    tips.remove(tip)
+    ()
+  }
+
   @inline
   private def updateDB(): IOResult[Unit] = {
     val state = BlockHashChain.State(numHashes, AVector.from(tips.keys()))
