@@ -813,6 +813,30 @@ object Ast {
       _genCode(state)
     }
   }
+  final case class StaticContractFuncCall[Ctx <: StatelessContext](
+      contractId: TypeId,
+      id: FuncId,
+      approveAssets: Seq[ApproveAsset[Ctx]],
+      args: Seq[Expr[Ctx]]
+  ) extends Statement[Ctx]
+      with CallAst[Ctx] {
+    def ignoreReturn: Boolean = true
+
+    def getFunc(state: Compiler.State[Ctx]): Compiler.ContractFunc[Ctx] =
+      state.getFunc(contractId, id)
+
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      checkApproveAssets(state)
+      val funcInfo = getFunc(state)
+      checkStaticContractFunction(contractId, id, funcInfo)
+      funcInfo.getReturnType(args.flatMap(_.getType(state)))
+      ()
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      _genCode(state)
+    }
+  }
   final case class ContractCall(
       obj: Expr[StatefulContext],
       callId: FuncId,

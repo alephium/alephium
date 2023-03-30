@@ -3491,6 +3491,8 @@ class VMSpec extends AlephiumSpec with Generators {
                    |Contract Bar(a: U256, @unused mut b: I256) implements Foo {
                    |  @using(checkExternalCaller = false)
                    |  pub fn foo() -> () {
+                   |    Bar.encodeImmFields!(1)
+                   |    Bar.encodeMutFields!(2i)
                    |    let bs0 = Bar.encodeImmFields!(1)
                    |    let bs1 = Bar.encodeMutFields!(2i)
                    |    assert!(bs0 == #${expectedImmFields}, 0)

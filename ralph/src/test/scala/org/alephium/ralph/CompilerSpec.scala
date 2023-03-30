@@ -3888,7 +3888,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
     compile("let x = bar.encodeImmFields!()").leftValue.message is
       s"""Expected non-static function, got "Bar.encodeImmFields""""
+    compile("bar.encodeImmFields!()").leftValue.message is
+      s"""Expected non-static function, got "Bar.encodeImmFields""""
     compile("let x = Bar.bar()").leftValue.message is
+      s"""Expected static function, got "Bar.bar""""
+    compile("Bar.bar()").leftValue.message is
       s"""Expected static function, got "Bar.bar""""
   }
 }

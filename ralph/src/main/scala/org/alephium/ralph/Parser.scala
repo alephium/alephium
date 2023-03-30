@@ -290,9 +290,13 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.EventDef(typeId, fields)
       }
 
-  def funcCall[Unknown: P]: P[Ast.FuncCall[Ctx]] =
-    callAbs.map { case (funcId, approveAssets, exprs) =>
-      Ast.FuncCall(funcId, approveAssets, exprs)
+  def funcCall[Unknown: P]: P[Ast.Statement[Ctx]] =
+    ((Lexer.typeId ~ ".").? ~ callAbs).map { case (contractIdOpt, (funcId, approveAssets, exprs)) =>
+      contractIdOpt match {
+        case Some(contractId) =>
+          Ast.StaticContractFuncCall(contractId, funcId, approveAssets, exprs)
+        case None => Ast.FuncCall(funcId, approveAssets, exprs)
+      }
     }
 
   def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]]      = P("{" ~ statement.rep(1) ~ "}")
