@@ -281,6 +281,16 @@ object Ast {
           }
       }
     }
+
+    @inline final def checkStaticContractFunction(
+        typeId: TypeId,
+        funcId: FuncId,
+        func: Compiler.ContractFunc[Ctx]
+    ): Unit = {
+      if (!func.isStatic) {
+        throw Compiler.Error(s"Expected static function, got ${funcName(typeId, funcId)}")
+      }
+    }
   }
 
   final case class CallExpr[Ctx <: StatelessContext](
@@ -316,11 +326,13 @@ object Ast {
       with CallAst[Ctx] {
     def ignoreReturn: Boolean = false
 
-    def getFunc(state: Compiler.State[Ctx]): Compiler.FuncInfo[Ctx] = state.getFunc(contractId, id)
+    def getFunc(state: Compiler.State[Ctx]): Compiler.ContractFunc[Ctx] =
+      state.getFunc(contractId, id)
 
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
+      checkStaticContractFunction(contractId, id, funcInfo)
       funcInfo.getReturnType(args.flatMap(_.getType(state)))
     }
 
@@ -342,6 +354,7 @@ object Ast {
         objType(0) match {
           case contract: Type.Contract =>
             val funcInfo = state.getFunc(contract.id, callId)
+            checkNonStaticContractFunction(contract.id, callId, funcInfo)
             state.addExternalCall(contract.id, callId)
             funcInfo.getReturnType(args.flatMap(_.getType(state)))
           case _ =>
@@ -368,6 +381,17 @@ object Ast {
         obj.genCode(state) ++
         func.genExternalCallCode(contract.id) ++
         (if (popReturnValues) Seq.fill[Instr[StatefulContext]](retLength)(Pop) else Seq.empty)
+    }
+
+    @inline final def checkNonStaticContractFunction(
+        typeId: TypeId,
+        funcId: FuncId,
+        func: Compiler.ContractFunc[StatefulContext]
+    ): Unit = {
+      if (func.isStatic) {
+        // TODO: use `obj.funcId` instead of `typeId.funcId`
+        throw Compiler.Error(s"Expected non-static function, got ${funcName(typeId, funcId)}")
+      }
     }
   }
   final case class ContractCallExpr(

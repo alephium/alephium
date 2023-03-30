@@ -87,13 +87,21 @@ class BuiltInSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val ast = Compiler.compileContractFull(code).rightValue.ast
+    ast.funcTable.size is 3
     ast.builtInContractFuncs().length is 2
-    ast.funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is Seq(
+
+    val foo = ast.funcTable(Ast.FuncId("foo", false))
+    foo.isStatic is false
+    val encodeImmFields = ast.funcTable(Ast.FuncId("encodeImmFields", true))
+    encodeImmFields.isStatic is true
+    encodeImmFields.genCode(Seq.empty) is Seq(
       BytesConst(Val.ByteVec(ByteString("ALPH") ++ ByteString(0xff, 0xff))),
       U256Const(Val.U256(U256.One)),
       Encode
     )
-    ast.funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is
+    val encodeMutFields = ast.funcTable(Ast.FuncId("encodeMutFields", true))
+    encodeMutFields.isStatic is true
+    encodeMutFields.genCode(Seq.empty) is
       Seq(U256Const(Val.U256(U256.Zero)), Encode)
   }
 }

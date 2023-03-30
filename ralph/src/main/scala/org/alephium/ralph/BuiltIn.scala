@@ -1663,6 +1663,8 @@ object BuiltIn {
     val useAssetsInContract: Boolean  = false
     val useUpdateFields: Boolean      = false
 
+    override def isStatic: Boolean = true
+
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = ???
 
     def returnType: Seq[Type]

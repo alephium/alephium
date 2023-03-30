@@ -220,6 +220,7 @@ object Compiler {
   trait ContractFunc[Ctx <: StatelessContext] extends FuncInfo[Ctx] {
     def argsType: Seq[Type]
     def returnType: Seq[Type]
+    def isStatic: Boolean = false
   }
   final case class SimpleFunc[Ctx <: StatelessContext](
       id: Ast.FuncId,

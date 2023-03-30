@@ -44,6 +44,8 @@ abstract class Parser[Ctx <: StatelessContext] {
   def arrayExpr[Unknown: P]: P[Ast.Expr[Ctx]] = P(createArray1 | createArray2)
   def variable[Unknown: P]: P[Ast.Variable[Ctx]] =
     P(Lexer.ident | Lexer.constantIdent).map(Ast.Variable.apply[Ctx])
+  def variableIdOnly[Unknown: P]: P[Ast.Variable[Ctx]] =
+    P(Lexer.ident).map(Ast.Variable.apply[Ctx])
   def alphTokenId[Unknown: P]: P[Ast.Expr[Ctx]] = Lexer.keyword("ALPH").map(_ => Ast.ALPHTokenId())
 
   def alphAmount[Unknown: P]: P[Ast.Expr[Ctx]]                       = expr
@@ -522,7 +524,7 @@ object StatefulParser extends Parser[StatefulContext] {
     }
 
   def contractCall[Unknown: P]: P[Ast.ContractCall] =
-    P((contractConv | variable) ~ "." ~ callAbs)
+    P((contractConv | variableIdOnly) ~ "." ~ callAbs)
       .map { case (obj, (callId, approveAssets, exprs)) =>
         Ast.ContractCall(obj, callId, approveAssets, exprs)
       }
