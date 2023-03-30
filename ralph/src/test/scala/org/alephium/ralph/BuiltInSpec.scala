@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.vm._
 import org.alephium.ralph.BuiltIn.{OverloadedSimpleBuiltIn, SimpleBuiltIn}
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, U256}
 
 class BuiltInSpec extends AlephiumSpec {
   it should "check all functions that can use preapproved assets" in {
@@ -67,8 +67,10 @@ class BuiltInSpec extends AlephiumSpec {
          |""".stripMargin
     val ast = Compiler.compileContractFull(code).rightValue.ast
     ast.builtInContractFuncs().length is 2
-    ast.funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is Seq(Encode)
-    ast.funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is Seq(Encode)
+    ast.funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is
+      Seq(U256Const(Val.U256(U256.Zero)), Encode)
+    ast.funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is
+      Seq(U256Const(Val.U256(U256.Zero)), Encode)
   }
 
   it should "initialize built-in encoding functions for contracts using standard interfaces" in {
@@ -88,8 +90,10 @@ class BuiltInSpec extends AlephiumSpec {
     ast.builtInContractFuncs().length is 2
     ast.funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is Seq(
       BytesConst(Val.ByteVec(ByteString("ALPH") ++ ByteString(0xff, 0xff))),
+      U256Const(Val.U256(U256.One)),
       Encode
     )
-    ast.funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is Seq(Encode)
+    ast.funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is
+      Seq(U256Const(Val.U256(U256.Zero)), Encode)
   }
 }
