@@ -44,6 +44,8 @@ abstract class Parser[Ctx <: StatelessContext] {
   def arrayExpr[Unknown: P]: P[Ast.Expr[Ctx]] = P(createArray1 | createArray2)
   def variable[Unknown: P]: P[Ast.Variable[Ctx]] =
     P(Lexer.ident | Lexer.constantIdent).map(Ast.Variable.apply[Ctx])
+  def variableIdOnly[Unknown: P]: P[Ast.Variable[Ctx]] =
+    P(Lexer.ident).map(Ast.Variable.apply[Ctx])
   def alphTokenId[Unknown: P]: P[Ast.Expr[Ctx]] = Lexer.keyword("ALPH").map(_ => Ast.ALPHTokenId())
 
   def alphAmount[Unknown: P]: P[Ast.Expr[Ctx]]                       = expr
@@ -63,8 +65,13 @@ abstract class Parser[Ctx <: StatelessContext] {
       case (funcId, approveAssets, arguments) =>
         (funcId, approveAssets.getOrElse(Seq.empty), arguments)
     }
-  def callExpr[Unknown: P]: P[Ast.CallExpr[Ctx]] =
-    callAbs.map { case (funcId, approveAssets, expr) => Ast.CallExpr(funcId, approveAssets, expr) }
+  def callExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
+    P((Lexer.typeId ~ ".").? ~ callAbs).map { case (contractIdOpt, (funcId, approveAssets, expr)) =>
+      contractIdOpt match {
+        case Some(contractId) => Ast.ContractStaticCallExpr(contractId, funcId, approveAssets, expr)
+        case None             => Ast.CallExpr(funcId, approveAssets, expr)
+      }
+    }
   def contractConv[Unknown: P]: P[Ast.ContractConv[Ctx]] =
     P(Lexer.typeId ~ "(" ~ expr ~ ")").map { case (typeId, expr) => Ast.ContractConv(typeId, expr) }
 
@@ -283,9 +290,13 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.EventDef(typeId, fields)
       }
 
-  def funcCall[Unknown: P]: P[Ast.FuncCall[Ctx]] =
-    callAbs.map { case (funcId, approveAssets, exprs) =>
-      Ast.FuncCall(funcId, approveAssets, exprs)
+  def funcCall[Unknown: P]: P[Ast.Statement[Ctx]] =
+    ((Lexer.typeId ~ ".").? ~ callAbs).map { case (contractIdOpt, (funcId, approveAssets, exprs)) =>
+      contractIdOpt match {
+        case Some(contractId) =>
+          Ast.StaticContractFuncCall(contractId, funcId, approveAssets, exprs)
+        case None => Ast.FuncCall(funcId, approveAssets, exprs)
+      }
     }
 
   def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]]      = P("{" ~ statement.rep(1) ~ "}")
@@ -517,7 +528,7 @@ object StatefulParser extends Parser[StatefulContext] {
     }
 
   def contractCall[Unknown: P]: P[Ast.ContractCall] =
-    P((contractConv | variable) ~ "." ~ callAbs)
+    P((contractConv | variableIdOnly) ~ "." ~ callAbs)
       .map { case (obj, (callId, approveAssets, exprs)) =>
         Ast.ContractCall(obj, callId, approveAssets, exprs)
       }

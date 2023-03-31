@@ -32,7 +32,7 @@ object Ast {
   type StdInterfaceId = Val.ByteVec
   val StdInterfaceIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
   private val stdArg: Argument =
-    Argument(Ident("__stdId"), Type.ByteVec, isMutable = false, isUnused = true)
+    Argument(Ident("__stdInterfaceId"), Type.ByteVec, isMutable = false, isUnused = true)
 
   final case class Ident(name: String)
   final case class TypeId(name: String)
@@ -245,6 +245,8 @@ object Ast {
     def args: Seq[Expr[Ctx]]
     def ignoreReturn: Boolean
 
+    def getFunc(state: Compiler.State[Ctx]): Compiler.FuncInfo[Ctx]
+
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def _genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       (id, args) match {
@@ -260,7 +262,7 @@ object Ast {
         case (BuiltIn.transferTokenToSelf.funcId, Seq(from, ALPHTokenId(), amount)) =>
           Seq(from, amount).flatMap(_.genCode(state)) :+ TransferAlphToSelf.asInstanceOf[Instr[Ctx]]
         case _ =>
-          val func     = state.getFunc(id)
+          val func     = getFunc(state)
           val argsType = args.flatMap(_.getType(state))
           val variadicInstrs = if (func.isVariadic) {
             Seq(U256Const(Val.U256.unsafe(args.length)))
@@ -279,6 +281,16 @@ object Ast {
           }
       }
     }
+
+    @inline final def checkStaticContractFunction(
+        typeId: TypeId,
+        funcId: FuncId,
+        func: Compiler.ContractFunc[Ctx]
+    ): Unit = {
+      if (!func.isStatic) {
+        throw Compiler.Error(s"Expected static function, got ${funcName(typeId, funcId)}")
+      }
+    }
   }
 
   final case class CallExpr[Ctx <: StatelessContext](
@@ -288,6 +300,8 @@ object Ast {
   ) extends Expr[Ctx]
       with CallAst[Ctx] {
     def ignoreReturn: Boolean = false
+
+    def getFunc(state: Compiler.State[Ctx]): Compiler.FuncInfo[Ctx] = state.getFunc(id)
 
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       checkApproveAssets(state)
@@ -299,6 +313,30 @@ object Ast {
       state.addInternalCall(
         id
       ) // don't put this in _getType, otherwise the statement might get skipped
+      _genCode(state)
+    }
+  }
+
+  final case class ContractStaticCallExpr[Ctx <: StatelessContext](
+      contractId: TypeId,
+      id: FuncId,
+      approveAssets: Seq[ApproveAsset[Ctx]],
+      args: Seq[Expr[Ctx]]
+  ) extends Expr[Ctx]
+      with CallAst[Ctx] {
+    def ignoreReturn: Boolean = false
+
+    def getFunc(state: Compiler.State[Ctx]): Compiler.ContractFunc[Ctx] =
+      state.getFunc(contractId, id)
+
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      checkApproveAssets(state)
+      val funcInfo = getFunc(state)
+      checkStaticContractFunction(contractId, id, funcInfo)
+      funcInfo.getReturnType(args.flatMap(_.getType(state)))
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       _genCode(state)
     }
   }
@@ -316,6 +354,7 @@ object Ast {
         objType(0) match {
           case contract: Type.Contract =>
             val funcInfo = state.getFunc(contract.id, callId)
+            checkNonStaticContractFunction(contract.id, callId, funcInfo)
             state.addExternalCall(contract.id, callId)
             funcInfo.getReturnType(args.flatMap(_.getType(state)))
           case _ =>
@@ -342,6 +381,17 @@ object Ast {
         obj.genCode(state) ++
         func.genExternalCallCode(contract.id) ++
         (if (popReturnValues) Seq.fill[Instr[StatefulContext]](retLength)(Pop) else Seq.empty)
+    }
+
+    @inline final def checkNonStaticContractFunction(
+        typeId: TypeId,
+        funcId: FuncId,
+        func: Compiler.ContractFunc[StatefulContext]
+    ): Unit = {
+      if (func.isStatic) {
+        // TODO: use `obj.funcId` instead of `typeId.funcId`
+        throw Compiler.Error(s"Expected non-static function, got ${funcName(typeId, funcId)}")
+      }
     }
   }
   final case class ContractCallExpr(
@@ -747,9 +797,11 @@ object Ast {
       with CallAst[Ctx] {
     def ignoreReturn: Boolean = true
 
+    def getFunc(state: Compiler.State[Ctx]): Compiler.FuncInfo[Ctx] = state.getFunc(id)
+
     override def check(state: Compiler.State[Ctx]): Unit = {
       checkApproveAssets(state)
-      val funcInfo = state.getFunc(id)
+      val funcInfo = getFunc(state)
       funcInfo.getReturnType(args.flatMap(_.getType(state)))
       ()
     }
@@ -758,6 +810,30 @@ object Ast {
       state.addInternalCall(
         id
       ) // don't put this in _getType, otherwise the statement might get skipped
+      _genCode(state)
+    }
+  }
+  final case class StaticContractFuncCall[Ctx <: StatelessContext](
+      contractId: TypeId,
+      id: FuncId,
+      approveAssets: Seq[ApproveAsset[Ctx]],
+      args: Seq[Expr[Ctx]]
+  ) extends Statement[Ctx]
+      with CallAst[Ctx] {
+    def ignoreReturn: Boolean = true
+
+    def getFunc(state: Compiler.State[Ctx]): Compiler.ContractFunc[Ctx] =
+      state.getFunc(contractId, id)
+
+    override def check(state: Compiler.State[Ctx]): Unit = {
+      checkApproveAssets(state)
+      val funcInfo = getFunc(state)
+      checkStaticContractFunction(contractId, id, funcInfo)
+      funcInfo.getReturnType(args.flatMap(_.getType(state)))
+      ()
+    }
+
+    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       _genCode(state)
     }
   }
@@ -1033,6 +1109,9 @@ object Ast {
     def getFieldNames(): AVector[String] = AVector.from(contractFields.view.map(_.ident.name))
     def getFieldTypes(): AVector[String] = AVector.from(contractFields.view.map(_.tpe.signature))
     def getFieldMutability(): AVector[Boolean] = AVector.from(contractFields.view.map(_.isMutable))
+
+    override def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] =
+      Seq(BuiltIn.encodeImmFields(stdInterfaceId, fields), BuiltIn.encodeMutFields(fields))
 
     private def checkFuncs(): Unit = {
       if (funcs.length < 1) {

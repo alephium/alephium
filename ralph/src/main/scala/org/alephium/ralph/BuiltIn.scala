@@ -1656,4 +1656,63 @@ object BuiltIn {
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
+
+  trait ContractBuiltIn[Ctx <: StatelessContext] extends Compiler.ContractFunc[Ctx] {
+    val isPublic: Boolean             = true
+    val usePreapprovedAssets: Boolean = false
+    val useAssetsInContract: Boolean  = false
+    val useUpdateFields: Boolean      = false
+
+    override def isStatic: Boolean = true
+
+    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = ???
+
+    def returnType: Seq[Type]
+    def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+      if (inputType == argsType) {
+        returnType
+      } else {
+        throw Error(s"Invalid args type $inputType for function $name")
+      }
+    }
+  }
+
+  def encodeImmFields[Ctx <: StatelessContext](
+      stdInterfaceId: Option[Ast.StdInterfaceId],
+      fields: Seq[Ast.Argument]
+  ): Compiler.ContractFunc[Ctx] = {
+    val immFieldsTypes = fields.filter(!_.isMutable).map(_.tpe)
+
+    new ContractBuiltIn[Ctx] {
+      val name: String          = "encodeImmFields"
+      val argsType: Seq[Type]   = immFieldsTypes
+      val returnType: Seq[Type] = Seq(Type.ByteVec)
+
+      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = {
+        stdInterfaceId match {
+          case Some(id) =>
+            Seq[Instr[Ctx]](
+              BytesConst(Val.ByteVec(id.bytes)),
+              U256Const(Val.U256.unsafe(argsType.length + 1)),
+              Encode
+            )
+          case None => Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(argsType.length)), Encode)
+        }
+      }
+    }
+  }
+
+  def encodeMutFields[Ctx <: StatelessContext](
+      fields: Seq[Ast.Argument]
+  ): Compiler.ContractFunc[Ctx] = {
+    val mutFieldsTypes = fields.filter(_.isMutable).map(_.tpe)
+    new ContractBuiltIn[Ctx] {
+      val name: String          = "encodeMutFields"
+      val argsType: Seq[Type]   = mutFieldsTypes
+      val returnType: Seq[Type] = Seq(Type.ByteVec)
+
+      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
+        Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(argsType.length)), Encode)
+    }
+  }
 }
