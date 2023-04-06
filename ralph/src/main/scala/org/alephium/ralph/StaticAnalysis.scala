@@ -115,13 +115,17 @@ object StaticAnalysis {
       contractState: Compiler.State[vm.StatefulContext],
       funcId: FuncId
   ): Boolean = {
-    val func = contractState.getFunc(funcId)
-    !(
-      func.useUpdateFields ||
-        func.usePreapprovedAssets ||
-        func.useAssetsInContract ||
-        contractState.hasSubFunctionCall(funcId)
+    val func                = contractState.getFunc(funcId)
+    val useAssets           = func.usePreapprovedAssets || func.useAssetsInContract
+    val internalSubCallsOpt = contractState.internalCalls.get(funcId)
+    val hasInternalSubCall = internalSubCallsOpt.exists(
+      _.exists(funcId =>
+        !funcId.isBuiltIn || contractState.getBuiltInFunc(funcId).needToCheckExternalCaller
+      )
     )
+    val hasExternalSubCall = contractState.externalCalls.contains(funcId)
+    val hasSubCall         = hasInternalSubCall || hasExternalSubCall
+    !(func.useUpdateFields || useAssets || hasSubCall)
   }
 
   private[ralph] def checkExternalCallPermissions(

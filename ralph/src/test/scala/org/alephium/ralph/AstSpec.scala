@@ -576,6 +576,47 @@ class AstSpec extends AlephiumSpec {
       val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
+
+    {
+      info("No warning if the function call simple builtin functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    panic!()
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  pub fn bar() -> () {
+           |    foo.foo()
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContractFull(code, 1).rightValue.warnings.isEmpty is true
+    }
+
+    {
+      info("Warning if the function call builtin functions that need to check external caller")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    migrate!(#)
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  pub fn bar() -> () {
+           |    foo.foo()
+           |  }
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+    }
   }
 
   it should "display the right warning message for check external caller" in {
