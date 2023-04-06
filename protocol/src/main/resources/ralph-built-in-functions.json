@@ -320,7 +320,7 @@
     "name": "transferTokenFromSelf",
     "category": "Asset",
     "signature": "fn transferTokenFromSelf!(toAddress:Address, tokenId:ByteVec, amount:U256) -> ()",
-    "doc": "Transfers the contract's token from the input assets of the function.",
+    "doc": "Transfers the contract's token to a designated address.",
     "params": [
       "@param toAddress the address to transfer token to",
       "@param tokenId the token to be transferred",

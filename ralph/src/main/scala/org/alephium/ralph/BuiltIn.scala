@@ -1103,7 +1103,7 @@ object BuiltIn {
         "amount"    -> "the amount of token to be transferred"
       ),
       retComment = "",
-      doc = "Transfers the contract's token from the input assets of the function."
+      doc = "Transfers the contract's token to a designated address."
     )
 
   val transferTokenToSelf: SimpleBuiltIn[StatefulContext] =
