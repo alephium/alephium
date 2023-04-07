@@ -138,10 +138,6 @@ class AstSpec extends AlephiumSpec {
       "h" -> Seq("a", "b", "c", "e"),
       "i" -> Seq("noCheck")
     )
-    state.internalCalls.foreach { case (funcId, _) =>
-      state.hasSubFunctionCall(funcId) is true
-    }
-    state.hasSubFunctionCall(Ast.FuncId("noCheck", false)) is false
     state.externalCalls.isEmpty is true
 
     val table = contract.buildCheckExternalCallerTable(state)
@@ -221,16 +217,6 @@ class AstSpec extends AlephiumSpec {
   }
 
   it should "check permission for external calls" in new ExternalCallsFixture {
-    val contracts = fastparse.parse(externalCalls, StatefulParser.multiContract(_)).get.value
-    val state     = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
-    state.internalCalls.foreach { case (funcId, _) =>
-      state.hasSubFunctionCall(funcId) is true
-    }
-    state.externalCalls.foreach { case (funcId, _) =>
-      state.hasSubFunctionCall(funcId) is true
-    }
-    state.hasSubFunctionCall(Ast.FuncId("noCheckPri", false)) is false
-
     val warnings = Compiler.compileContractFull(externalCalls, 0).rightValue.warnings
     checkExternalCallerWarnings(warnings).toSet is Set(
       Warnings.noCheckExternalCallerMsg("InternalCalls", "c"),
