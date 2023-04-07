@@ -138,10 +138,6 @@ class AstSpec extends AlephiumSpec {
       "h" -> Seq("a", "b", "c", "e"),
       "i" -> Seq("noCheck")
     )
-    state.internalCalls.foreach { case (funcId, _) =>
-      state.hasSubFunctionCall(funcId) is true
-    }
-    state.hasSubFunctionCall(Ast.FuncId("noCheck", false)) is false
     state.externalCalls.isEmpty is true
 
     val table = contract.buildCheckExternalCallerTable(state)
@@ -221,16 +217,6 @@ class AstSpec extends AlephiumSpec {
   }
 
   it should "check permission for external calls" in new ExternalCallsFixture {
-    val contracts = fastparse.parse(externalCalls, StatefulParser.multiContract(_)).get.value
-    val state     = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
-    state.internalCalls.foreach { case (funcId, _) =>
-      state.hasSubFunctionCall(funcId) is true
-    }
-    state.externalCalls.foreach { case (funcId, _) =>
-      state.hasSubFunctionCall(funcId) is true
-    }
-    state.hasSubFunctionCall(Ast.FuncId("noCheckPri", false)) is false
-
     val warnings = Compiler.compileContractFull(externalCalls, 0).rightValue.warnings
     checkExternalCallerWarnings(warnings).toSet is Set(
       Warnings.noCheckExternalCallerMsg("InternalCalls", "c"),
@@ -575,6 +561,47 @@ class AstSpec extends AlephiumSpec {
            |""".stripMargin
       val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
+    }
+
+    {
+      info("No warning if the function call simple builtin functions")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    panic!()
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  pub fn bar() -> () {
+           |    foo.foo()
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContractFull(code, 1).rightValue.warnings.isEmpty is true
+    }
+
+    {
+      info("Warning if the function call builtin functions that need to check external caller")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    migrate!(#)
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  pub fn bar() -> () {
+           |    foo.foo()
+           |  }
+           |}
+           |""".stripMargin
+
+      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
     }
   }
 

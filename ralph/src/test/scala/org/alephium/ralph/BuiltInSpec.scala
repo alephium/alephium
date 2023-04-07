@@ -104,4 +104,29 @@ class BuiltInSpec extends AlephiumSpec {
     encodeMutFields.genCode(Seq.empty) is
       Seq(U256Const(Val.U256(U256.Zero)), Encode)
   }
+
+  it should "check all functions that need to check external caller" in {
+    BuiltIn.statelessFuncs.values.count(_.needToCheckExternalCaller) is 0
+    BuiltIn.statefulFuncs.values.filter(_.needToCheckExternalCaller).toSet is
+      Set[BuiltIn.BuiltIn[StatefulContext]](
+        BuiltIn.approveToken,
+        BuiltIn.tokenRemaining,
+        BuiltIn.transferToken,
+        BuiltIn.transferTokenFromSelf,
+        BuiltIn.transferTokenToSelf,
+        BuiltIn.burnToken,
+        BuiltIn.lockApprovedAssets,
+        BuiltIn.createContract,
+        BuiltIn.createContractWithToken,
+        BuiltIn.copyCreateContract,
+        BuiltIn.copyCreateContractWithToken,
+        BuiltIn.createSubContract,
+        BuiltIn.createSubContractWithToken,
+        BuiltIn.copyCreateSubContract,
+        BuiltIn.copyCreateSubContractWithToken,
+        BuiltIn.destroySelf,
+        BuiltIn.migrate,
+        BuiltIn.migrateWithFields
+      )
+  }
 }

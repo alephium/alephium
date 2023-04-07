@@ -428,10 +428,6 @@ object Compiler {
         case None          => externalCalls.update(currentScope, mutable.Set(funcRef))
       }
     }
-
-    def hasSubFunctionCall(funcId: Ast.FuncId): Boolean = {
-      internalCalls.contains(funcId) || externalCalls.contains(funcId)
-    }
   }
 
   sealed trait AccessVariable
@@ -834,7 +830,7 @@ object Compiler {
         )
     }
 
-    protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[Ctx]
+    def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[Ctx]
 
     private def getNewFunc(call: Ast.FuncId): FuncInfo[Ctx] = {
       funcIdents.getOrElse(call, throw Error(s"Function ${call.name} does not exist"))
@@ -883,7 +879,7 @@ object Compiler {
       extends State[StatelessContext] {
     override def eventsInfo: Seq[EventInfo] = Seq.empty
 
-    protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatelessContext] = {
+    def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatelessContext] = {
       BuiltIn.statelessFuncs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
@@ -955,7 +951,7 @@ object Compiler {
       contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatefulContext]]
   )(implicit val compilerOptions: CompilerOptions)
       extends State[StatefulContext] {
-    protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatefulContext] = {
+    def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatefulContext] = {
       BuiltIn.statefulFuncs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
