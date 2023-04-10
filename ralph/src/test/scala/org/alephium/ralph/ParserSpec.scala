@@ -969,28 +969,28 @@ class ParserSpec extends AlephiumSpec {
         .stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
       intercept[Compiler.Error](
         fastparse.parse(interface("@using(updateFields = true)"), StatefulParser.interface(_))
-      ).message is "Interface only supports `std` annotation"
+      ).message is "Invalid annotation, expect std annotation"
       intercept[Compiler.Error](
         fastparse.parse(
           interface("@std(id = #0001)", "@using(updateFields = true)"),
           StatefulParser.interface(_)
         )
-      ).message is "Interface only supports `std` annotation"
+      ).message is "Invalid annotation, expect std annotation"
       intercept[Compiler.Error](
         fastparse.parse(
           interface("@std(id = #0001, updateFields = true)"),
           StatefulParser.interface(_)
         )
-      ).message is "Invalid std annotation fields, expected `@std(id = byteVecLiteral)`"
+      ).message is "Invalid keys for std annotation: updateFields"
       intercept[Compiler.Error](
         fastparse.parse(interface("@std(id = #)"), StatefulParser.interface(_))
       ).message is "The field id of the std annotation must be a non-empty ByteVec"
       intercept[Compiler.Error](
         fastparse.parse(interface("@std(id = 0)"), StatefulParser.interface(_))
-      ).message is "Invalid std annotation, expected `@std(id = byteVecLiteral)`"
+      ).message is "Expect ByteVec for id in annotation std"
       intercept[Compiler.Error](
         fastparse.parse(interface("@std(updateFields = 0)"), StatefulParser.interface(_))
-      ).message is "Invalid std annotation, expected `@std(id = byteVecLiteral)`"
+      ).message is "Invalid keys for std annotation: updateFields"
     }
 
     {
@@ -1175,8 +1175,8 @@ class ParserSpec extends AlephiumSpec {
       val fooContract = extended.contracts(0)
       val annotations = Seq(
         Annotation(
-          Ident(Parser.usingAnnotationId),
-          Seq(AnnotationField(Ident(Parser.useCheckExternalCallerKey), Val.False))
+          Ident(Parser.UsingAnnotation.id),
+          Seq(AnnotationField(Ident(Parser.UsingAnnotation.useCheckExternalCallerKey), Val.False))
         )
       )
       fooContract is Contract(

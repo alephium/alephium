@@ -21,6 +21,7 @@ import fastparse._
 
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
+import org.alephium.util.AVector
 
 // scalastyle:off number.of.methods
 @SuppressWarnings(
@@ -240,22 +241,23 @@ abstract class Parser[Ctx <: StatelessContext] {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
       } else {
         val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
-        val (usePreapprovedAssets, useContractAssets, useCheckExternalCaller, useUpdateFields) =
-          Parser.extractFuncModifier(
-            annotations,
-            usePreapprovedAssetsDefault = false,
-            useContractAssetsDefault = false,
-            useCheckExternalCallerDefault = true,
-            useUpdateFieldsDefault = false
+        val usingAnnotation = Parser.UsingAnnotation.extractFields(
+          annotations,
+          Parser.UsingAnnotationFields(
+            preapprovedAssets = false,
+            assetsInContract = false,
+            checkExternalCaller = true,
+            updateFields = false
           )
+        )
         FuncDefTmp(
           annotations,
           funcId,
           isPublic,
-          usePreapprovedAssets,
-          useContractAssets,
-          useCheckExternalCaller,
-          useUpdateFields,
+          usingAnnotation.preapprovedAssets,
+          usingAnnotation.assetsInContract,
+          usingAnnotation.checkExternalCaller,
+          usingAnnotation.updateFields,
           params,
           returnType,
           statements
@@ -382,105 +384,100 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
 )
 
 object Parser {
-  val stdAnnotationId           = "std"
-  val stdIdKey                  = "id"
-  val usingAnnotationId         = "using"
-  val usePreapprovedAssetsKey   = "preapprovedAssets"
-  val useContractAssetsKey      = "assetsInContract"
-  val useCheckExternalCallerKey = "checkExternalCaller"
-  val useUpdateFieldsKey        = "updateFields"
-  val keys: Set[String] =
-    Set(
+  sealed trait RalphAnnotation[T] {
+    def id: String
+    def keys: AVector[String]
+    def validate(annotations: Seq[Ast.Annotation]): Unit = {
+      if (annotations.exists(_.id.name != id)) {
+        throw Compiler.Error(s"Invalid annotation, expect $id annotation")
+      }
+    }
+
+    final def extractField[V <: Val](
+        annotation: Ast.Annotation,
+        key: String,
+        tpe: Val.Type
+    ): Option[V] = {
+      annotation.fields.find(_.ident.name == key) match {
+        case Some(Ast.AnnotationField(_, value: V @unchecked)) if tpe == value.tpe => Some(value)
+        case Some(_) => throw Compiler.Error(s"Expect $tpe for $key in annotation $id")
+        case None    => None
+      }
+    }
+
+    final def extractField[V <: Val](annotation: Ast.Annotation, key: String, default: V): V = {
+      extractField[V](annotation, key, default.tpe).getOrElse(default)
+    }
+
+    final def extractFields(annotations: Seq[Ast.Annotation], default: T): T = {
+      validate(annotations)
+      annotations.headOption match {
+        case Some(annotation) =>
+          val invalidKeys = annotation.fields.filter(f => !keys.contains(f.ident.name))
+          if (invalidKeys.nonEmpty) {
+            throw Compiler.Error(
+              s"Invalid keys for $id annotation: ${invalidKeys.map(_.ident.name).mkString(",")}"
+            )
+          }
+          extractFields(annotation, default)
+        case None => default
+      }
+    }
+    def extractFields(annotation: Ast.Annotation, default: T): T
+  }
+
+  final case class UsingAnnotationFields(
+      preapprovedAssets: Boolean,
+      assetsInContract: Boolean,
+      checkExternalCaller: Boolean,
+      updateFields: Boolean
+  )
+
+  object UsingAnnotation extends RalphAnnotation[UsingAnnotationFields] {
+    val id: String                = "using"
+    val usePreapprovedAssetsKey   = "preapprovedAssets"
+    val useContractAssetsKey      = "assetsInContract"
+    val useCheckExternalCallerKey = "checkExternalCaller"
+    val useUpdateFieldsKey        = "updateFields"
+    val keys: AVector[String] = AVector(
       usePreapprovedAssetsKey,
       useContractAssetsKey,
       useCheckExternalCallerKey,
       useUpdateFieldsKey
     )
 
-  // scalastyle:off method.length
-  def extractFuncModifier(
-      annotations: Seq[Annotation],
-      usePreapprovedAssetsDefault: Boolean,
-      useContractAssetsDefault: Boolean,
-      useCheckExternalCallerDefault: Boolean,
-      useUpdateFieldsDefault: Boolean
-  ): (Boolean, Boolean, Boolean, Boolean) = {
-    if (annotations.exists(_.id.name != usingAnnotationId)) {
-      throw Compiler.Error(s"Generic annotation is not supported yet")
-    } else {
-      annotations.headOption match {
-        case Some(useAnnotation) =>
-          val invalidKeys = useAnnotation.fields.filter(f => !keys.contains(f.ident.name))
-          if (invalidKeys.nonEmpty) {
-            throw Compiler.Error(
-              s"Invalid keys for use annotation: ${invalidKeys.map(_.ident.name).mkString(",")}"
-            )
-          }
-
-          val usePreapprovedAssets = extractAnnotationBoolean(
-            useAnnotation,
-            usePreapprovedAssetsKey,
-            usePreapprovedAssetsDefault
-          )
-          val useContractAssets = extractAnnotationBoolean(
-            useAnnotation,
-            useContractAssetsKey,
-            useContractAssetsDefault
-          )
-          val useCheckExternalCaller = extractAnnotationBoolean(
-            useAnnotation,
-            useCheckExternalCallerKey,
-            useCheckExternalCallerDefault
-          )
-          val useUpdateFields = extractAnnotationBoolean(
-            useAnnotation,
-            useUpdateFieldsKey,
-            useUpdateFieldsDefault
-          )
-          (usePreapprovedAssets, useContractAssets, useCheckExternalCaller, useUpdateFields)
-        case None =>
-          (
-            usePreapprovedAssetsDefault,
-            useContractAssetsDefault,
-            useCheckExternalCallerDefault,
-            useUpdateFieldsDefault
-          )
-      }
+    def extractFields(
+        annotation: Ast.Annotation,
+        default: UsingAnnotationFields
+    ): UsingAnnotationFields = {
+      UsingAnnotationFields(
+        extractField(annotation, usePreapprovedAssetsKey, Val.Bool(default.preapprovedAssets)).v,
+        extractField(annotation, useContractAssetsKey, Val.Bool(default.assetsInContract)).v,
+        extractField(
+          annotation,
+          useCheckExternalCallerKey,
+          Val.Bool(default.checkExternalCaller)
+        ).v,
+        extractField(annotation, useUpdateFieldsKey, Val.Bool(default.updateFields)).v
+      )
     }
   }
 
-  def extractAnnotationBoolean(
-      annotation: Annotation,
-      name: String,
-      default: Boolean
-  ): Boolean = {
-    annotation.fields.find(_.ident.name == name).map(_.value) match {
-      case Some(value: Val.Bool) => value.v
-      case Some(_) =>
-        throw Compiler.Error(s"Expect boolean for ${name} in annotation ${annotation.id.name}")
-      case None => default
-    }
-  }
+  final case class InterfaceStdFields(id: ByteString)
 
-  def extractStdId(annotations: Seq[Annotation]): Option[Ast.StdInterfaceId] = {
-    if (annotations.isEmpty) {
-      None
-    } else {
-      if (annotations.length != 1 || annotations(0).id.name != stdAnnotationId) {
-        throw Compiler.Error(s"Interface only supports `std` annotation")
-      }
-      val stdAnnotation = annotations(0)
-      if (stdAnnotation.fields.length != 1) {
-        throw Compiler.Error("Invalid std annotation fields, expected `@std(id = byteVecLiteral)`")
-      }
-      stdAnnotation.fields(0) match {
-        case Ast.AnnotationField(Ast.Ident(Parser.stdIdKey), id: Val.ByteVec) =>
-          if (id.bytes.isEmpty) {
-            throw Compiler.Error("The field id of the std annotation must be a non-empty ByteVec")
-          }
-          Some(Val.ByteVec(Ast.StdInterfaceIdPrefix ++ id.bytes))
-        case _ =>
-          throw Compiler.Error("Invalid std annotation, expected `@std(id = byteVecLiteral)`")
+  object InterfaceStdAnnotation extends RalphAnnotation[Option[InterfaceStdFields]] {
+    val id: String            = "std"
+    val keys: AVector[String] = AVector("id")
+
+    def extractFields(
+        annotation: Annotation,
+        default: Option[InterfaceStdFields]
+    ): Option[InterfaceStdFields] = {
+      extractField[Val.ByteVec](annotation, keys(0), Val.ByteVec).map { stdId =>
+        if (stdId.bytes.isEmpty) {
+          throw Compiler.Error("The field id of the std annotation must be a non-empty ByteVec")
+        }
+        InterfaceStdFields(Ast.StdInterfaceIdPrefix ++ stdId.bytes)
       }
     }
   }
@@ -556,21 +553,22 @@ object StatefulParser extends Parser[StatefulContext] {
         if (mainStmts.isEmpty) {
           CompilerError(CompilerError.NoMainStatementDefined(typeId), mainStmtsIndex)
         } else {
-          val (usePreapprovedAssets, useContractAssets, _, useUpdateFields) =
-            Parser.extractFuncModifier(
-              annotations,
-              usePreapprovedAssetsDefault = true,
-              useContractAssetsDefault = false,
-              useCheckExternalCallerDefault = true,
-              useUpdateFieldsDefault = false
+          val usingAnnotation = Parser.UsingAnnotation.extractFields(
+            annotations,
+            Parser.UsingAnnotationFields(
+              preapprovedAssets = true,
+              assetsInContract = false,
+              checkExternalCaller = true,
+              updateFields = false
             )
-          val txScript =
-            Ast.TxScript(
-              typeId,
-              templateVars.getOrElse(Seq.empty),
-              Ast.FuncDef
-                .main(mainStmts, usePreapprovedAssets, useContractAssets, useUpdateFields) +: funcs
-            )
+          )
+          val mainFunc = Ast.FuncDef.main(
+            mainStmts,
+            usingAnnotation.preapprovedAssets,
+            usingAnnotation.assetsInContract,
+            usingAnnotation.updateFields
+          )
+          val txScript = Ast.TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
           Pass(txScript)
         }
       }
@@ -696,8 +694,9 @@ object StatefulParser extends Parser[StatefulContext] {
       if (funcs.length < 1) {
         throw Compiler.Error(s"No function definition in Interface ${typeId.name}")
       } else {
+        val stdIdOpt = Parser.InterfaceStdAnnotation.extractFields(annotations, None)
         Ast.ContractInterface(
-          Parser.extractStdId(annotations),
+          stdIdOpt.map(stdId => Val.ByteVec(stdId.id)),
           typeId,
           funcs,
           events,
