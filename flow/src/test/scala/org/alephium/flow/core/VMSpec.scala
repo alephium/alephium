@@ -4159,8 +4159,9 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "create contract with std id" in new ContractFixture {
-    val code =
+    def code(enabled: Boolean): String =
       s"""
+         |@std(enabled = $enabled)
          |Contract Bar(@unused a: U256) implements Foo {
          |  pub fn foo() -> () {}
          |}
@@ -4171,26 +4172,55 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
 
-    val fields = AVector[Val](Val.U256(0))
-    intercept[AssertionError](createContract(code, fields)).getMessage is
-      "Right(TxScriptExeFailed(InvalidFieldLength))"
+    {
+      info("The std id of the contract is enabled")
+      val contractCode = code(true)
+      val fields       = AVector[Val](Val.U256(0))
+      intercept[AssertionError](createContract(contractCode, fields)).getMessage is
+        "Right(TxScriptExeFailed(InvalidFieldLength))"
 
-    val stdId      = Val.ByteVec(Hex.unsafe("414c50480001"))
-    val contractId = createContract(code, fields :+ stdId)._1
-    val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
-    val contractState = worldState.getContractState(contractId).rightValue
-    contractState.immFields is AVector[Val](Val.U256(0), stdId)
-    contractState.mutFields is AVector.empty[Val]
+      val stdId      = Val.ByteVec(Hex.unsafe("414c50480001"))
+      val contractId = createContract(contractCode, fields :+ stdId)._1
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val contractState = worldState.getContractState(contractId).rightValue
+      contractState.immFields is AVector[Val](Val.U256(0), stdId)
+      contractState.mutFields is AVector.empty[Val]
 
-    val logStatesOpt = getLogStates(blockFlow, createContractEventId, 0)
-    val logStates    = logStatesOpt.value
+      val logStatesOpt = getLogStates(blockFlow, createContractEventId, 0)
+      val logStates    = logStatesOpt.value
 
-    val eventFields = logStates.states(0).fields
+      val eventFields = logStates.states(0).fields
 
-    eventFields.length is 3
-    eventFields(0) is Val.Address(LockupScript.p2c(contractId))
-    eventFields(1) is Val.ByteVec(ByteString.empty)
-    eventFields(2) is Val.ByteVec(ByteString(0, 1))
+      eventFields.length is 3
+      eventFields(0) is Val.Address(LockupScript.p2c(contractId))
+      eventFields(1) is Val.ByteVec(ByteString.empty)
+      eventFields(2) is Val.ByteVec(ByteString(0, 1))
+    }
+
+    {
+      info("The std id of the contract is disabled")
+      val contractCode = code(false)
+      val fields       = AVector[Val](Val.U256(0))
+      val stdId        = Val.ByteVec(Hex.unsafe("414c50480001"))
+      intercept[AssertionError](createContract(contractCode, fields :+ stdId)).getMessage is
+        "Right(TxScriptExeFailed(InvalidFieldLength))"
+
+      val contractId = createContract(contractCode, fields)._1
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val contractState = worldState.getContractState(contractId).rightValue
+      contractState.immFields is AVector[Val](Val.U256(0))
+      contractState.mutFields is AVector.empty[Val]
+
+      val logStatesOpt = getLogStates(blockFlow, createContractEventId, 1)
+      val logStates    = logStatesOpt.value
+
+      val eventFields = logStates.states(0).fields
+
+      eventFields.length is 3
+      eventFields(0) is Val.Address(LockupScript.p2c(contractId))
+      eventFields(1) is Val.ByteVec(ByteString.empty)
+      eventFields(2) is Val.ByteVec(ByteString.empty)
+    }
   }
 
   private def getEvents(

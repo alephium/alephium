@@ -1707,6 +1707,7 @@ object BuiltIn {
   }
 
   def encodeImmFields[Ctx <: StatelessContext](
+      stdIdEnabled: Option[Boolean],
       stdInterfaceId: Option[Ast.StdInterfaceId],
       fields: Seq[Ast.Argument]
   ): Compiler.ContractFunc[Ctx] = {
@@ -1719,13 +1720,13 @@ object BuiltIn {
 
       def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = {
         stdInterfaceId match {
-          case Some(id) =>
+          case Some(id) if stdIdEnabled.exists(identity) =>
             Seq[Instr[Ctx]](
               BytesConst(Val.ByteVec(id.bytes)),
               U256Const(Val.U256.unsafe(argsType.length + 1)),
               Encode
             )
-          case None => Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(argsType.length)), Encode)
+          case _ => Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(argsType.length)), Encode)
         }
       }
     }

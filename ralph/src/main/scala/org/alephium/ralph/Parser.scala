@@ -481,6 +481,20 @@ object Parser {
       }
     }
   }
+
+  final case class ContractStdFields(enabled: Boolean)
+
+  object ContractStdAnnotation extends RalphAnnotation[Option[ContractStdFields]] {
+    val id: String            = "std"
+    val keys: AVector[String] = AVector("enabled")
+
+    def extractFields(
+        annotation: Annotation,
+        default: Option[ContractStdFields]
+    ): Option[ContractStdFields] = {
+      extractField[Val.Bool](annotation, keys(0), Val.Bool).map(field => ContractStdFields(field.v))
+    }
+  }
 }
 
 @SuppressWarnings(
@@ -635,11 +649,25 @@ object StatefulParser extends Parser[StatefulContext] {
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawContract[Unknown: P]: P[Ast.Contract] =
     P(
-      Lexer.`abstract` ~ Lexer.keyword("Contract") ~/ Lexer.typeId ~ contractFields ~
+      annotation.rep ~ Lexer.`abstract` ~ Lexer.keyword(
+        "Contract"
+      ) ~/ Lexer.typeId ~ contractFields ~
         contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
     ).map {
-      case (isAbstract, typeId, fields, contractInheritances, events, constantVars, enums, funcs) =>
+      case (
+            annotations,
+            isAbstract,
+            typeId,
+            fields,
+            contractInheritances,
+            events,
+            constantVars,
+            enums,
+            funcs
+          ) =>
+        val contractStdAnnotation = Parser.ContractStdAnnotation.extractFields(annotations, None)
         Ast.Contract(
+          contractStdAnnotation.map(_.enabled),
           None,
           isAbstract,
           typeId,

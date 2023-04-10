@@ -74,8 +74,9 @@ class BuiltInSpec extends AlephiumSpec {
   }
 
   it should "initialize built-in encoding functions for contracts using standard interfaces" in {
-    val code =
+    def code(enabled: Boolean): String =
       s"""
+         |@std(enabled = $enabled)
          |Contract Foo() implements IFoo {
          |  pub fn foo() -> () {
          |    return
@@ -86,23 +87,33 @@ class BuiltInSpec extends AlephiumSpec {
          |  pub fn foo() -> ()
          |}
          |""".stripMargin
-    val ast = Compiler.compileContractFull(code).rightValue.ast
-    ast.funcTable.size is 3
-    ast.builtInContractFuncs().length is 2
 
-    val foo = ast.funcTable(Ast.FuncId("foo", false))
-    foo.isStatic is false
-    val encodeImmFields = ast.funcTable(Ast.FuncId("encodeImmFields", true))
-    encodeImmFields.isStatic is true
-    encodeImmFields.genCode(Seq.empty) is Seq(
-      BytesConst(Val.ByteVec(ByteString("ALPH") ++ ByteString(0xff, 0xff))),
-      U256Const(Val.U256(U256.One)),
-      Encode
+    def test(enabled: Boolean, encodeImmFieldsInstrs: Seq[Instr[StatelessContext]]) = {
+      val ast = Compiler.compileContractFull(code(enabled)).rightValue.ast
+      ast.funcTable.size is 3
+      ast.builtInContractFuncs().length is 2
+
+      val foo = ast.funcTable(Ast.FuncId("foo", false))
+      foo.isStatic is false
+      val encodeImmFields = ast.funcTable(Ast.FuncId("encodeImmFields", true))
+      encodeImmFields.isStatic is true
+      encodeImmFields.genCode(Seq.empty) is encodeImmFieldsInstrs
+      val encodeMutFields = ast.funcTable(Ast.FuncId("encodeMutFields", true))
+      encodeMutFields.isStatic is true
+      encodeMutFields.genCode(Seq.empty) is
+        Seq(U256Const(Val.U256(U256.Zero)), Encode)
+    }
+
+    test(
+      true,
+      Seq(
+        BytesConst(Val.ByteVec(ByteString("ALPH") ++ ByteString(0xff, 0xff))),
+        U256Const(Val.U256(U256.One)),
+        Encode
+      )
     )
-    val encodeMutFields = ast.funcTable(Ast.FuncId("encodeMutFields", true))
-    encodeMutFields.isStatic is true
-    encodeMutFields.genCode(Seq.empty) is
-      Seq(U256Const(Val.U256(U256.Zero)), Encode)
+
+    test(false, Seq(U256Const(Val.U256(U256.Zero)), Encode))
   }
 
   it should "check all functions that need to check external caller" in {

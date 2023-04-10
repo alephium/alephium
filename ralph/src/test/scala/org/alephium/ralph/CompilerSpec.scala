@@ -3829,25 +3829,40 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "generate code for std id" in {
-    def code(stdAnnotation: String): String =
+    def code(contractAnnotation: String, interfaceAnnotation: String): String =
       s"""
+         |$contractAnnotation
          |Contract Bar() implements Foo {
          |  pub fn foo() -> () {}
          |}
          |
-         |$stdAnnotation
+         |$interfaceAnnotation
          |Interface Foo {
          |  pub fn foo() -> ()
          |}
          |""".stripMargin
 
-    Compiler.compileContract(code("")).rightValue.fieldLength is 0
-    Compiler.compileContract(code("@std(id = #0001)")).rightValue.fieldLength is 1
+    Compiler.compileContract(code("", "")).rightValue.fieldLength is 0
+    Compiler.compileContract(code("", "@std(id = #0001)")).rightValue.fieldLength is 1
+    Compiler
+      .compileContract(code("@std(enabled = true)", "@std(id = #0001)"))
+      .rightValue
+      .fieldLength is 1
+    Compiler
+      .compileContract(code("@std(enabled = false)", "@std(id = #0001)"))
+      .rightValue
+      .fieldLength is 0
   }
 
   it should "use built-in contract functions" in {
-    def code(stdAnnotation: String, input0: String, input1: String): String =
+    def code(
+        contractAnnotation: String,
+        interfaceAnnotation: String,
+        input0: String,
+        input1: String
+    ): String =
       s"""
+         |$contractAnnotation
          |Contract Bar(a: U256, @unused mut b: I256) implements Foo {
          |  @using(checkExternalCaller = false)
          |  pub fn foo() -> () {
@@ -3858,15 +3873,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |
-         |$stdAnnotation
+         |$interfaceAnnotation
          |Interface Foo {
          |  @using(checkExternalCaller = false)
          |  pub fn foo() -> ()
          |}
          |""".stripMargin
 
-    Compiler.compileContract(code("", "1", "2i")).rightValue.fieldLength is 2
-    Compiler.compileContract(code("@std(id = #0001)", "1", "2i")).rightValue.fieldLength is 3
+    Compiler.compileContract(code("", "", "1", "2i")).rightValue.fieldLength is 2
+    Compiler.compileContract(code("", "@std(id = #0001)", "1", "2i")).rightValue.fieldLength is 3
+    Compiler
+      .compileContract(code("@std(enabled = true)", "@std(id = #0001)", "1", "2i"))
+      .rightValue
+      .fieldLength is 3
+    Compiler
+      .compileContract(code("@std(enabled = false)", "@std(id = #0001)", "1", "2i"))
+      .rightValue
+      .fieldLength is 2
   }
 
   it should "check whether a function is static or not" in {

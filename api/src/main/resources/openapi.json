@@ -10513,7 +10513,8 @@
           "fields",
           "functions",
           "events",
-          "warnings"
+          "warnings",
+          "stdIdEnabled"
         ],
         "type": "object",
         "properties": {
@@ -10560,6 +10561,9 @@
           },
           "stdInterfaceId": {
             "type": "string"
+          },
+          "stdIdEnabled": {
+            "type": "boolean"
           }
         }
       },

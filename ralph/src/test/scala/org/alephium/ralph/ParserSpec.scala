@@ -734,6 +734,7 @@ class ParserSpec extends AlephiumSpec {
 
       fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
         None,
+        None,
         false,
         TypeId("Child"),
         Seq.empty,
@@ -1015,6 +1016,7 @@ class ParserSpec extends AlephiumSpec {
            |""".stripMargin
       fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
         None,
+        None,
         false,
         TypeId("Child"),
         Seq.empty,
@@ -1051,6 +1053,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
+        None,
         None,
         false,
         TypeId("Child"),
@@ -1096,7 +1099,7 @@ class ParserSpec extends AlephiumSpec {
     }
   }
 
-  it should "test abstract contract parser" in {
+  it should "test contract parser" in {
     def fooFuncDef(isAbstract: Boolean, checkExternalCaller: Boolean = true) =
       FuncDef[StatefulContext](
         Seq.empty,
@@ -1126,6 +1129,93 @@ class ParserSpec extends AlephiumSpec {
       )
 
     {
+      info("Parse contract")
+      def contract(annotations: String*): String = {
+        s"""
+           |${annotations.mkString("\n")}
+           |Contract Foo() {
+           |  pub fn foo() -> () {}
+           |}
+           |""".stripMargin
+      }
+
+      fastparse
+        .parse(contract(""), StatefulParser.contract(_))
+        .get
+        .value
+        .stdIdEnabled is None
+      fastparse
+        .parse(contract("@std(enabled = true)"), StatefulParser.contract(_))
+        .get
+        .value
+        .stdIdEnabled is Some(true)
+      fastparse
+        .parse(contract("@std(enabled = false)"), StatefulParser.contract(_))
+        .get
+        .value
+        .stdIdEnabled is Some(false)
+      intercept[Compiler.Error](
+        fastparse.parse(contract("@using(updateFields = true)"), StatefulParser.contract(_))
+      ).message is "Invalid annotation, expect std annotation"
+      intercept[Compiler.Error](
+        fastparse.parse(
+          contract("@std(enabled = true, updateFields = true)"),
+          StatefulParser.contract(_)
+        )
+      ).message is "Invalid keys for std annotation: updateFields"
+      intercept[Compiler.Error](
+        fastparse.parse(contract("@std(enabled = 0)"), StatefulParser.contract(_))
+      ).message is "Expect Bool for enabled in annotation std"
+      intercept[Compiler.Error](
+        fastparse.parse(contract("@std(updateFields = 0)"), StatefulParser.contract(_))
+      ).message is "Invalid keys for std annotation: updateFields"
+    }
+
+    {
+      info("Parse contract which has std annotation")
+      def code(enabled: Boolean): String =
+        s"""|
+            |@std(id = #0001)
+            |Interface Foo {
+            |  pub fn foo() -> ()
+            |}
+            |
+            |@std(enabled = $enabled)
+            |Abstract Contract Bar() implements Foo {
+            |  pub fn foo() -> () {}
+            |}
+            |
+            |Contract Baz() extends Bar() {
+            |}
+            |""".stripMargin
+
+      def test(enabled: Boolean) = {
+        val extended =
+          fastparse
+            .parse(code(enabled), StatefulParser.multiContract(_))
+            .get
+            .value
+            .extendedContracts()
+        val bar = extended.contracts(1).asInstanceOf[Ast.Contract]
+        bar.ident is TypeId("Bar")
+        bar.isAbstract is true
+        bar.stdIdEnabled is Some(enabled)
+        bar.stdInterfaceId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
+        bar.hasStdIdField is enabled
+
+        val baz = extended.contracts(2).asInstanceOf[Ast.Contract]
+        baz.ident is TypeId("Baz")
+        baz.isAbstract is false
+        baz.stdIdEnabled is Some(enabled)
+        bar.stdInterfaceId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
+        bar.hasStdIdField is enabled
+      }
+
+      test(false)
+      test(true)
+    }
+
+    {
       info("Parse abstract contract")
       val code =
         s"""
@@ -1137,6 +1227,7 @@ class ParserSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
+        None,
         None,
         true,
         TypeId("Foo"),
@@ -1180,6 +1271,7 @@ class ParserSpec extends AlephiumSpec {
         )
       )
       fooContract is Contract(
+        Some(true),
         None,
         true,
         TypeId("Foo"),

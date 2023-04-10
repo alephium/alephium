@@ -730,4 +730,47 @@ class AstSpec extends AlephiumSpec {
       )
     ).message is "The std id of interface Baz should starts with 0001"
   }
+
+  it should "check if the contract std id enabled" in {
+    val foo = Ast.Contract(
+      None,
+      None,
+      false,
+      Ast.TypeId("Foo"),
+      Seq.empty,
+      Seq.empty,
+      Seq.empty,
+      Seq.empty,
+      Seq.empty,
+      Seq.empty,
+      Seq.empty
+    )
+
+    Ast.MultiContract.getStdIdEnabled(Seq.empty, foo.ident) is true
+    Ast.MultiContract.getStdIdEnabled(Seq(foo), foo.ident) is true
+    Ast.MultiContract.getStdIdEnabled(Seq(foo.copy(stdIdEnabled = Some(true))), foo.ident) is true
+    Ast.MultiContract.getStdIdEnabled(Seq(foo.copy(stdIdEnabled = Some(false))), foo.ident) is false
+    Ast.MultiContract.getStdIdEnabled(
+      Seq(foo, foo.copy(stdIdEnabled = Some(true))),
+      foo.ident
+    ) is true
+    Ast.MultiContract.getStdIdEnabled(
+      Seq(foo, foo.copy(stdIdEnabled = Some(false))),
+      foo.ident
+    ) is false
+    Ast.MultiContract.getStdIdEnabled(
+      Seq(foo, foo.copy(stdIdEnabled = Some(true)), foo.copy(stdIdEnabled = Some(true))),
+      foo.ident
+    ) is true
+    Ast.MultiContract.getStdIdEnabled(
+      Seq(foo, foo.copy(stdIdEnabled = Some(false)), foo.copy(stdIdEnabled = Some(false))),
+      foo.ident
+    ) is false
+    intercept[Compiler.Error](
+      Ast.MultiContract.getStdIdEnabled(
+        Seq(foo, foo.copy(stdIdEnabled = Some(false)), foo.copy(stdIdEnabled = Some(true))),
+        foo.ident
+      )
+    ).message is "There are different std id enabled options on the inheritance chain of contract Foo"
+  }
 }

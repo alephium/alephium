@@ -610,7 +610,8 @@ trait EndpointsExamples extends ErrorExamples {
       )
     ),
     warnings = AVector("Found unused fields in Foo: a"),
-    stdInterfaceId = Some("0001")
+    stdInterfaceId = Some("0001"),
+    stdIdEnabled = true
   )
   implicit val compileContractResultExamples: List[Example[CompileContractResult]] =
     simpleExample(compileContractResult)
