@@ -1992,30 +1992,60 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "compile contract and return the std id field" in new Fixture {
-    def code(stdAnnotation: String) =
+    def code(contractAnnotation: String, interfaceAnnotation: String) =
       s"""
+         |$contractAnnotation
          |Contract Bar(@unused a: U256) implements Foo {
          |  pub fn foo() -> () {}
          |}
          |
-         |$stdAnnotation
+         |$interfaceAnnotation
          |Interface Foo {
          |  pub fn foo() -> ()
          |}
          |""".stripMargin
 
     val serverUtils = new ServerUtils()
-    val result0     = serverUtils.compileContract(Compile.Contract(code(""))).rightValue
+    val result0     = serverUtils.compileContract(Compile.Contract(code("", ""))).rightValue
     result0.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
     result0.stdInterfaceId is None
 
-    val result1 = serverUtils.compileContract(Compile.Contract(code("@std(id = #0001)"))).rightValue
+    val result1 =
+      serverUtils.compileContract(Compile.Contract(code("", "@std(id = #0001)"))).rightValue
     result1.fields is CompileResult.FieldsSig(
       AVector("a", "__stdInterfaceId"),
       AVector("U256", "ByteVec"),
       AVector(false, false)
     )
     result1.stdInterfaceId is Some("0001")
+
+    val result2 = serverUtils
+      .compileContract(Compile.Contract(code("@std(enabled = true)", "@std(id = #0001)")))
+      .rightValue
+    result2.fields is CompileResult.FieldsSig(
+      AVector("a", "__stdInterfaceId"),
+      AVector("U256", "ByteVec"),
+      AVector(false, false)
+    )
+    result2.stdInterfaceId is Some("0001")
+
+    val result3 = serverUtils
+      .compileContract(Compile.Contract(code("@std(enabled = false)", "@std(id = #0001)")))
+      .rightValue
+    result3.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
+    result3.stdInterfaceId is None
+
+    val result4 = serverUtils
+      .compileContract(Compile.Contract(code("@std(enabled = true)", "")))
+      .rightValue
+    result4.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
+    result4.stdInterfaceId is None
+
+    val result5 = serverUtils
+      .compileContract(Compile.Contract(code("@std(enabled = false)", "")))
+      .rightValue
+    result5.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
+    result5.stdInterfaceId is None
   }
 
   it should "create build deploy contract script" in new Fixture {

@@ -94,9 +94,13 @@ object CompileContractResult {
       functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from)),
       warnings = compiled.warnings,
-      stdInterfaceId = contractAst.stdInterfaceId.map(id =>
-        Hex.toHexString(id.bytes.drop(Ast.StdInterfaceIdPrefix.length))
-      )
+      stdInterfaceId = if (contractAst.hasStdIdField) {
+        contractAst.stdInterfaceId.map(id =>
+          Hex.toHexString(id.bytes.drop(Ast.StdInterfaceIdPrefix.length))
+        )
+      } else {
+        None
+      }
     )
   }
 }

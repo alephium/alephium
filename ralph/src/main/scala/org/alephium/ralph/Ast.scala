@@ -1091,6 +1091,7 @@ object Ast {
   final case class ContractInheritance(parentId: TypeId, idents: Seq[Ident]) extends Inheritance
   final case class InterfaceInheritance(parentId: TypeId)                    extends Inheritance
   final case class Contract(
+      stdIdEnabled: Option[Boolean],
       stdInterfaceId: Option[StdInterfaceId],
       isAbstract: Boolean,
       ident: TypeId,
@@ -1102,8 +1103,8 @@ object Ast {
       enums: Seq[EnumDef],
       inheritances: Seq[Inheritance]
   ) extends ContractWithState {
-    lazy val contractFields: Seq[Argument] =
-      if (stdInterfaceId.isEmpty) fields else fields :+ Ast.stdArg
+    lazy val hasStdIdField: Boolean = stdIdEnabled.exists(identity) && stdInterfaceId.nonEmpty
+    lazy val contractFields: Seq[Argument] = if (hasStdIdField) fields :+ Ast.stdArg else fields
     def getFieldsSignature(): String =
       s"Contract ${name}(${contractFields.map(_.signature).mkString(",")})"
     def getFieldNames(): AVector[String] = AVector.from(contractFields.view.map(_.ident.name))
@@ -1111,7 +1112,10 @@ object Ast {
     def getFieldMutability(): AVector[Boolean] = AVector.from(contractFields.view.map(_.isMutable))
 
     override def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] =
-      Seq(BuiltIn.encodeImmFields(stdInterfaceId, fields), BuiltIn.encodeMutFields(fields))
+      Seq(
+        BuiltIn.encodeImmFields(stdIdEnabled, stdInterfaceId, fields),
+        BuiltIn.encodeMutFields(fields)
+      )
 
     private def checkFuncs(): Unit = {
       if (funcs.length < 1) {
@@ -1162,7 +1166,7 @@ object Ast {
       state.setGenCodePhase()
       val methods = genMethods(state)
       val fieldsLength =
-        Type.flattenTypeLength(fields.map(_.tpe)) + (if (stdInterfaceId.isDefined) 1 else 0)
+        Type.flattenTypeLength(fields.map(_.tpe)) + (if (hasStdIdField) 1 else 0)
       StatefulContract(fieldsLength, methods)
     }
 
@@ -1320,9 +1324,10 @@ object Ast {
         case script: TxScript =>
           script
         case c: Contract =>
-          val (stdId, funcs, events, constantVars, enums) =
+          val (stdIdEnabled, stdId, funcs, events, constantVars, enums) =
             MultiContract.extractDefs(parentsCache, c)
           Contract(
+            Some(stdIdEnabled),
             stdId,
             c.isAbstract,
             c.ident,
@@ -1335,7 +1340,7 @@ object Ast {
             c.inheritances
           )
         case i: ContractInterface =>
-          val (stdId, funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
+          val (_, stdId, funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
           ContractInterface(stdId, i.ident, funcs, events, i.inheritances)
       }
       val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
@@ -1482,11 +1487,31 @@ object Ast {
       }
     }
 
+    @inline private[ralph] def getStdIdEnabled(
+        contracts: Seq[Contract],
+        typeId: Ast.TypeId
+    ): Boolean = {
+      contracts
+        .foldLeft[Option[Boolean]](None) {
+          case (None, contract) => contract.stdIdEnabled
+          case (v, contract) =>
+            if (contract.stdIdEnabled.nonEmpty && contract.stdIdEnabled != v) {
+              throw Compiler.Error(
+                s"There are different std id enabled options on the inheritance chain of contract ${typeId.name}"
+              )
+            }
+            v
+        }
+        .getOrElse(true)
+    }
+
+    // scalastyle:off method.length
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def extractDefs(
         parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
         contract: ContractWithState
     ): (
+        Boolean,
         Option[StdInterfaceId],
         Seq[FuncDef[StatefulContext]],
         Seq[EventDef],
@@ -1498,7 +1523,8 @@ object Ast {
         (parents :+ contract).partition(_.isInstanceOf[Contract])
       val allInterfaces =
         sortInterfaces(parentsCache, _allInterfaces.map(_.asInstanceOf[ContractInterface]))
-      val stdId = getStdId(allInterfaces)
+      val stdId        = getStdId(allInterfaces)
+      val stdIdEnabled = getStdIdEnabled(allContracts.map(_.asInstanceOf[Contract]), contract.ident)
 
       val allFuncs                             = (allInterfaces ++ allContracts).flatMap(_.funcs)
       val (abstractFuncs, nonAbstractFuncs)    = allFuncs.partition(_.bodyOpt.isEmpty)
@@ -1531,8 +1557,9 @@ object Ast {
           unimplementedFuncs
       }
 
-      (stdId, resultFuncs, events, constantVars, enums)
+      (stdIdEnabled, stdId, resultFuncs, events, constantVars, enums)
     }
+    // scalastyle:on method.length
 
     private def sortInterfaces(
         parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],
