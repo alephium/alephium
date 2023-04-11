@@ -69,8 +69,7 @@ final case class CompileContractResult(
     functions: AVector[CompileResult.FunctionSig],
     events: AVector[CompileResult.EventSig],
     warnings: AVector[String],
-    stdInterfaceId: Option[String] = None,
-    stdIdEnabled: Boolean = true
+    stdInterfaceId: Option[String] = None
 ) extends CompileResult.Versioned
 
 object CompileContractResult {
@@ -95,10 +94,13 @@ object CompileContractResult {
       functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from)),
       warnings = compiled.warnings,
-      stdInterfaceId = contractAst.stdInterfaceId.map(id =>
-        Hex.toHexString(id.bytes.drop(Ast.StdInterfaceIdPrefix.length))
-      ),
-      stdIdEnabled = contractAst.stdIdEnabled.getOrElse(true)
+      stdInterfaceId = if (contractAst.hasStdIdField) {
+        contractAst.stdInterfaceId.map(id =>
+          Hex.toHexString(id.bytes.drop(Ast.StdInterfaceIdPrefix.length))
+        )
+      } else {
+        None
+      }
     )
   }
 }
