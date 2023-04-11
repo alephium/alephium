@@ -970,28 +970,28 @@ class ParserSpec extends AlephiumSpec {
         .stdId is Some(Val.ByteVec(Hex.unsafe("414c50480001")))
       intercept[Compiler.Error](
         fastparse.parse(interface("@using(updateFields = true)"), StatefulParser.interface(_))
-      ).message is "Invalid annotation, expect std annotation"
+      ).message is "Invalid annotation, expect @std annotation"
       intercept[Compiler.Error](
         fastparse.parse(
           interface("@std(id = #0001)", "@using(updateFields = true)"),
           StatefulParser.interface(_)
         )
-      ).message is "Invalid annotation, expect std annotation"
+      ).message is "Invalid annotation, expect @std annotation"
       intercept[Compiler.Error](
         fastparse.parse(
           interface("@std(id = #0001, updateFields = true)"),
           StatefulParser.interface(_)
         )
-      ).message is "Invalid keys for std annotation: updateFields"
+      ).message is "Invalid keys for @std annotation: updateFields"
       intercept[Compiler.Error](
         fastparse.parse(interface("@std(id = #)"), StatefulParser.interface(_))
-      ).message is "The field id of the std annotation must be a non-empty ByteVec"
+      ).message is "The field id of the @std annotation must be a non-empty ByteVec"
       intercept[Compiler.Error](
         fastparse.parse(interface("@std(id = 0)"), StatefulParser.interface(_))
-      ).message is "Expect ByteVec for id in annotation std"
+      ).message is "Expect ByteVec for id in annotation @std"
       intercept[Compiler.Error](
         fastparse.parse(interface("@std(updateFields = 0)"), StatefulParser.interface(_))
-      ).message is "Invalid keys for std annotation: updateFields"
+      ).message is "Invalid keys for @std annotation: updateFields"
     }
 
     {
@@ -1156,19 +1156,19 @@ class ParserSpec extends AlephiumSpec {
         .stdIdEnabled is Some(false)
       intercept[Compiler.Error](
         fastparse.parse(contract("@using(updateFields = true)"), StatefulParser.contract(_))
-      ).message is "Invalid annotation, expect std annotation"
+      ).message is "Invalid annotation, expect @std annotation"
       intercept[Compiler.Error](
         fastparse.parse(
           contract("@std(enabled = true, updateFields = true)"),
           StatefulParser.contract(_)
         )
-      ).message is "Invalid keys for std annotation: updateFields"
+      ).message is "Invalid keys for @std annotation: updateFields"
       intercept[Compiler.Error](
         fastparse.parse(contract("@std(enabled = 0)"), StatefulParser.contract(_))
-      ).message is "Expect Bool for enabled in annotation std"
+      ).message is "Expect Bool for enabled in annotation @std"
       intercept[Compiler.Error](
         fastparse.parse(contract("@std(updateFields = 0)"), StatefulParser.contract(_))
-      ).message is "Invalid keys for std annotation: updateFields"
+      ).message is "Invalid keys for @std annotation: updateFields"
     }
 
     {

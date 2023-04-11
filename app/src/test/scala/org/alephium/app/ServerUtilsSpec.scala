@@ -2034,6 +2034,18 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
     result3.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
     result3.stdInterfaceId is None
+
+    val result4 = serverUtils
+      .compileContract(Compile.Contract(code("@std(enabled = true)", "")))
+      .rightValue
+    result4.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
+    result4.stdInterfaceId is None
+
+    val result5 = serverUtils
+      .compileContract(Compile.Contract(code("@std(enabled = false)", "")))
+      .rightValue
+    result5.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
+    result5.stdInterfaceId is None
   }
 
   it should "create build deploy contract script" in new Fixture {

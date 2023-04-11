@@ -389,7 +389,7 @@ object Parser {
     def keys: AVector[String]
     def validate(annotations: Seq[Ast.Annotation]): Unit = {
       if (annotations.exists(_.id.name != id)) {
-        throw Compiler.Error(s"Invalid annotation, expect $id annotation")
+        throw Compiler.Error(s"Invalid annotation, expect @$id annotation")
       }
     }
 
@@ -400,7 +400,7 @@ object Parser {
     ): Option[V] = {
       annotation.fields.find(_.ident.name == key) match {
         case Some(Ast.AnnotationField(_, value: V @unchecked)) if tpe == value.tpe => Some(value)
-        case Some(_) => throw Compiler.Error(s"Expect $tpe for $key in annotation $id")
+        case Some(_) => throw Compiler.Error(s"Expect $tpe for $key in annotation @$id")
         case None    => None
       }
     }
@@ -416,7 +416,7 @@ object Parser {
           val invalidKeys = annotation.fields.filter(f => !keys.contains(f.ident.name))
           if (invalidKeys.nonEmpty) {
             throw Compiler.Error(
-              s"Invalid keys for $id annotation: ${invalidKeys.map(_.ident.name).mkString(",")}"
+              s"Invalid keys for @$id annotation: ${invalidKeys.map(_.ident.name).mkString(",")}"
             )
           }
           extractFields(annotation, default)
@@ -475,7 +475,7 @@ object Parser {
     ): Option[InterfaceStdFields] = {
       extractField[Val.ByteVec](annotation, keys(0), Val.ByteVec).map { stdId =>
         if (stdId.bytes.isEmpty) {
-          throw Compiler.Error("The field id of the std annotation must be a non-empty ByteVec")
+          throw Compiler.Error("The field id of the @std annotation must be a non-empty ByteVec")
         }
         InterfaceStdFields(Ast.StdInterfaceIdPrefix ++ stdId.bytes)
       }
