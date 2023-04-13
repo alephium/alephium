@@ -15,27 +15,33 @@
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 package org.alephium.ralph.error
 
+import fastparse._
+
 import org.alephium.ralph.SourcePosition
+import org.alephium.ralph.error.CompilerError.FormattableError
 
 /** Builds a formatted error message.
   *
-  * @param errorMessage
-  *   Original error message from compiler/FastParse run.
+  * @param errorTitle
+  *   Error header. This can be error-types: `Syntax error`, `Type mismatch error` etc.
   * @param errorLine
   *   Line where this error occurred.
-  * @param found
-  *   String token(s) that lead to this failure.
-  * @param expected
+  * @param foundLength
+  *   The length of string token(s) that lead to this failure.
+  * @param errorMessage
   *   Error message to display under the pointer.
+  * @param errorFooter
+  *   Optionally add more error details/hints/suggestions to the footer.
   * @param sourcePosition
   *   Location of where this error occurred.
   */
 
 final case class CompilerErrorFormatter(
-    errorMessage: String,
+    errorTitle: String,
     errorLine: String,
-    found: String,
-    expected: String,
+    foundLength: Int,
+    errorMessage: String,
+    errorFooter: Option[String],
     sourcePosition: SourcePosition
 ) {
 
@@ -49,40 +55,83 @@ final case class CompilerErrorFormatter(
     * @return
     *   A formatted error message.
     */
+  // scalastyle:off method.length
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  def format(errorColor: Option[String] = None): String = { // or use Some(Console.RED)
+  def format(errorColor: Option[String] = None): String = {
     val lineNumGutter   = s"${sourcePosition.rowNum} |"
     val lineNumGutterHL = highlight(lineNumGutter, errorColor)
 
     val emptyLineNumGutterPaddingLeft = " " * (lineNumGutter.length - 1)
     val emptyLineNumGutter            = highlight(emptyLineNumGutterPaddingLeft + "|", errorColor)
 
-    val errorTag         = highlight("-- error: ", errorColor)
-    val mainErrorMessage = highlight(errorMessage, errorColor)
+    val errorTag    = highlight(s"-- error ${sourcePosition.format}: ", errorColor)
+    val errorHeader = highlight(errorTitle, errorColor)
 
     val paddingLeft   = " " * sourcePosition.colIndex
-    val pointerMarker = CompilerErrorFormatter.pointer * found.length
+    val pointerMarker = CompilerErrorFormatter.pointer * foundLength
 
     // Add padding & expected only if there is a message to append at the end.
     val paddingLeftExpected =
-      if (expected.isEmpty) {
+      if (errorMessage.isEmpty) {
         ""
       } else {
-        s"${paddingLeft}Expected "
+        s"$paddingLeft$errorMessage"
       }
 
-    s"""$errorTag$mainErrorMessage
-       |$lineNumGutterHL$errorLine
-       |$emptyLineNumGutter$paddingLeft$pointerMarker
-       |$emptyLineNumGutter$paddingLeftExpected$expected
-       |""".stripMargin
+    // Build error body
+    val errorBody =
+      s"""$errorTag$errorHeader
+         |$lineNumGutterHL$errorLine
+         |$emptyLineNumGutter$paddingLeft$pointerMarker
+         |$emptyLineNumGutter$paddingLeftExpected"""
+
+    val errorBodyStripped =
+      errorBody.stripMargin
+
+    // Build error footer
+    errorFooter match {
+      case Some(footer) =>
+        val emptyLineNumberGutterLength =
+          emptyLineNumGutter.length
+
+        val marginLength = // max length of the footer margin.
+          errorBodyStripped.linesIterator.foldLeft(footer.length) { case (currentMax, nextLine) =>
+            currentMax max (nextLine.length - emptyLineNumberGutterLength)
+          }
+
+        val footerMargin = highlight("-" * marginLength, errorColor)
+
+        s"""$errorBody
+           |$emptyLineNumGutter$footerMargin
+           |$emptyLineNumGutter$footer
+           |""".stripMargin
+
+      case None =>
+        errorBodyStripped + '\n'
+    }
   }
+  // scalastyle:on method.length
 
 }
 
 object CompilerErrorFormatter {
 
   val pointer = "^"
+
+  def apply(error: FormattableError, program: String): CompilerErrorFormatter = {
+    val farParserLineNumber = IndexedParserInput(program).prettyIndex(error.position)
+    val sourcePosition      = SourcePosition.parse(farParserLineNumber)
+    val errorLine           = getErroredLine(sourcePosition.rowIndex, program)
+
+    CompilerErrorFormatter(
+      errorTitle = error.title,
+      errorLine = errorLine,
+      foundLength = error.foundLength,
+      errorMessage = error.message,
+      errorFooter = error.footer,
+      sourcePosition = sourcePosition
+    )
+  }
 
   /** Fetch the line where the error occurred.
     *

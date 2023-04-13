@@ -564,9 +564,9 @@ object StatefulParser extends Parser[StatefulContext] {
           .rep(0) ~ func
           .rep(0) ~ "}"
     )
-      .flatMap { case (annotations, typeId, templateVars, mainStmtsIndex, mainStmts, funcs) =>
+      .map { case (annotations, typeId, templateVars, mainStmtsIndex, mainStmts, funcs) =>
         if (mainStmts.isEmpty) {
-          CompilerError(CompilerError.NoMainStatementDefined(typeId), mainStmtsIndex)
+          throw CompilerError.`Expected main statements`(typeId, mainStmtsIndex)
         } else {
           val usingAnnotation = Parser.UsingAnnotation.extractFields(
             annotations,
@@ -583,8 +583,7 @@ object StatefulParser extends Parser[StatefulContext] {
             usingAnnotation.assetsInContract,
             usingAnnotation.updateFields
           )
-          val txScript = Ast.TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
-          Pass(txScript)
+          Ast.TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
         }
       }
   def txScript[Unknown: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)

@@ -22,7 +22,8 @@ import fastparse.Parsed
 
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Ast.MultiContract
-import org.alephium.ralph.error.FastParseErrorUtil
+import org.alephium.ralph.error.CompilerError
+import org.alephium.ralph.error.CompilerError.FastParseError
 import org.alephium.util.AVector
 
 final case class CompiledContract(
@@ -56,7 +57,8 @@ object Compiler {
           Left(Error.parse(failure))
       }
     } catch {
-      case e: Error => Left(e)
+      case e: CompilerError.FormattableError => Left(e.toError(input))
+      case e: Error                          => Left(e)
     }
 
   def compileTxScript(
@@ -91,7 +93,8 @@ object Compiler {
     try {
       compileMultiContract(input).map(genCode)
     } catch {
-      case e: Error => Left(e)
+      case e: CompilerError.FormattableError => Left(e.toError(input))
+      case e: Error                          => Left(e)
     }
   }
 
@@ -155,7 +158,7 @@ object Compiler {
     def apply(message: String): Error = new Error(message, null)
     // scalastyle:on null
 
-    def parse(failure: Parsed.Failure): Error = Error(FastParseErrorUtil(failure).format())
+    def parse(failure: Parsed.Failure): Error = FastParseError(failure).toError()
   }
 
   def expectOneType(ident: Ast.Ident, tpe: Seq[Type]): Type = {

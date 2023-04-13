@@ -23,6 +23,7 @@ import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.protocol.vm.Val
 import org.alephium.ralph.ArithOperator._
+import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
 
 class LexerSpec extends AlephiumSpec {
@@ -87,35 +88,44 @@ class LexerSpec extends AlephiumSpec {
 
     {
       info("when input is an invalid U256")
-      val input   = "123456789" * 10
-      val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+      val input = "123456789" * 10
+      val failure =
+        intercept[CompilerError.`Expected an U256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.index is 0
-
-      val foundToken = input.take(10)
-      failure.msg is s"""Expected an U256 value:1:1, found "$foundToken""""
+      failure.toError(input).message is
+        """-- error (1:1): Syntax error
+          |1 |123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
+          |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |  |Expected an U256 value
+          |""".stripMargin
     }
 
     {
       info("when input is an invalid negative I256")
-      val input   = "-" + ("123456789" * 10)
-      val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+      val input = "-" + ("123456789" * 10)
+      val failure =
+        intercept[CompilerError.`Expected an I256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.index is 0
-
-      val foundToken = input.take(10)
-      failure.msg is s"""Expected an I256 value:1:1, found "$foundToken""""
+      failure.toError(input).message is
+        """-- error (1:1): Syntax error
+          |1 |-123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
+          |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |  |Expected an I256 value
+          |""".stripMargin
     }
 
     {
       info("when input is an invalid I256")
-      val input   = ("123456789" * 10) + "i"
-      val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+      val input = ("123456789" * 10) + "i"
+      val failure =
+        intercept[CompilerError.`Expected an I256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.index is 0
-
-      val foundToken = input.take(10)
-      failure.msg is s"""Expected an I256 value:1:1, found "$foundToken""""
+      failure.toError(input).message is
+        """-- error (1:1): Syntax error
+          |1 |123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789i
+          |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |  |Expected an I256 value
+          |""".stripMargin
     }
 
     {
@@ -138,8 +148,16 @@ class LexerSpec extends AlephiumSpec {
         val errorScript     = errorAssetScript(invalidTypedNum)
 
         val failure =
-          fastparse.parse(errorScript, StatelessParser.assetScript(_)).asInstanceOf[Parsed.Failure]
-        failure.msg is s"""Expected an U256 value:5:13, found "1234567891""""
+          intercept[CompilerError.`Expected an U256 value`] {
+            fastparse.parse(errorScript, StatelessParser.assetScript(_))
+          }
+
+        failure.toError(errorScript).message is
+          """-- error (5:13): Syntax error
+            |5 |    let c = 123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
+            |  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |  |            Expected an U256 value
+            |""".stripMargin
       }
 
     }
@@ -186,16 +204,18 @@ class LexerSpec extends AlephiumSpec {
       val code = s"mut foo"
 
       // when allowMutable is false, it should not let `mut` declarations through.
-      val traced =
-        fastparse
-          .parse(code, Lexer.mutMaybe(allowMutable = false)(_))
-          .asInstanceOf[Parsed.Failure]
-          .trace()
+      val error =
+        intercept[CompilerError.`Expected an immutable variable`] {
+          fastparse
+            .parse(code, Lexer.mutMaybe(allowMutable = false)(_))
+        }
 
-      // fastparse reports only the first 10 characters.
-      val reportedToken = code.take(10)
-
-      traced.longMsg is s"""Expected an immutable variable:1:1 / (letter | digit | "_"):1:1, found "$reportedToken""""
+      error.toError(code).message is
+        """-- error (1:1): Syntax error
+          |1 |mut foo
+          |  |^^^
+          |  |Expected an immutable variable
+          |""".stripMargin
     }
 
     {

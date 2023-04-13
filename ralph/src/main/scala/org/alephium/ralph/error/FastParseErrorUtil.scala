@@ -18,34 +18,23 @@ package org.alephium.ralph.error
 
 import fastparse.Parsed
 
-import org.alephium.ralph.SourcePosition
-
 object FastParseErrorUtil {
 
-  /** Builds an error message from FastParser's `Parsed.Failure` result.
+  /** Builds a Ralph compiler error type [[CompilerError.FastParseError]] from FastParser's
+    * `Parsed.Failure` result.
     *
-    * @param failure
+    * @param traced
     *   FastParser's failure run result.
-    * @param program
-    *   The compiled program/source.
     * @return
-    *   A formatted error message.
+    *   Ralph error type.
     */
-  def apply(failure: Parsed.Failure): CompilerErrorFormatter =
-    FastParseErrorUtil(failure.trace())
 
-  def apply(traced: Parsed.TracedFailure): CompilerErrorFormatter = {
+  def apply(traced: Parsed.TracedFailure): CompilerError.FastParseError = {
     val program =
       traced.input.slice(0, traced.input.length)
 
     val erroredIndex =
       getErroredIndex(traced)
-
-    val sourcePosition =
-      SourcePosition.parse(traced.input.prettyIndex(erroredIndex))
-
-    val errorLine =
-      CompilerErrorFormatter.getErroredLine(sourcePosition.rowIndex, program)
 
     val expected =
       getLatestErrorMessage(traced, erroredIndex)
@@ -56,15 +45,18 @@ object FastParseErrorUtil {
     val foundNoQuotes =
       dropQuotes(foundQuoted)
 
-    val errorMessage =
-      traced.longMsg
+    val expectedMessage =
+      "Expected " + expected
 
-    CompilerErrorFormatter(
-      errorMessage = errorMessage,
-      errorLine = errorLine,
+    val traceMsg = // report trace in the error footer
+      "Trace log: " + traced.longMsg
+
+    CompilerError.FastParseError(
+      position = erroredIndex,
+      message = expectedMessage,
       found = foundNoQuotes,
-      expected = expected,
-      sourcePosition = sourcePosition
+      tracedMsg = traceMsg,
+      program = program
     )
   }
 
@@ -80,7 +72,7 @@ object FastParseErrorUtil {
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def getLatestErrorMessage(traced: Parsed.TracedFailure, forIndex: Int): String = {
     // label is added to the tail-end because in `Parsed.TracedFailure.msg` label gets preference.
-    val stack = traced.stack.appended(traced.label, traced.index)
+    val stack = traced.stack.appended((traced.label, traced.index))
 
     stack
       .filter(_._2 == forIndex) // all parsers for this index

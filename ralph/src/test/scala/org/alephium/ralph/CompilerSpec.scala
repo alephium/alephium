@@ -66,7 +66,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         .compileTxScript(script)
         .leftValue
         .message is
-        """-- error: Expected main statements for type `Foo`:1:15 / ([ \t\r\n] | lineComment):1:15, found "}"
+        """-- error (1:15): Syntax error
           |1 |TxScript Foo {}
           |  |              ^
           |  |              Expected main statements for type `Foo`
@@ -90,10 +90,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         .compileTxScript(script)
         .leftValue
         .message is
-        """-- error: Expected multiContract:1:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
+        """-- error (3:3): Syntax error
           |3 |  event Add(a: U256, b: U256)
           |  |  ^^^^^^^^^^
           |  |  Expected "}"
+          |  |-------------------------------------------------------------------------------------
+          |  |Trace log: Expected multiContract:1:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
           |""".stripMargin
     }
   }

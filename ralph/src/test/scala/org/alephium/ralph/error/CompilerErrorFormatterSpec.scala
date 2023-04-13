@@ -31,79 +31,119 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
     } yield (from, to)
 
   it should "format error messages" in {
-    forAll(Gen.alphaNumStr, Gen.alphaNumStr) { case (compilerErrorMessage, errorLine) =>
-      // for the error message run multiple tests at random positions and tokens
-      forAll(randomChunk(errorLine), Gen.posNum[Int], Gen.alphaNumStr) {
-        case ((fromErrorIndex, toErrorIndex), lineNumber, expected) =>
-          val found = errorLine.slice(fromErrorIndex, toErrorIndex)
+    forAll(Gen.alphaNumStr, Gen.alphaNumStr, Gen.alphaNumStr, Gen.option(Gen.alphaNumStr)) {
+      case (errorTitle, errorMessage, errorLine, explain) =>
+        // for the error message run multiple tests at random positions and tokens
+        forAll(randomChunk(errorLine), Gen.posNum[Int]) {
+          case ((fromErrorIndex, toErrorIndex), lineNumber) =>
+            val found = errorLine.slice(fromErrorIndex, toErrorIndex)
 
-          val sourcePosition =
-            SourcePosition(
-              rowNum = lineNumber,
-              colNum = fromErrorIndex + 1
-            )
+            val sourcePosition =
+              SourcePosition(
+                rowNum = lineNumber,
+                colNum = fromErrorIndex + 1
+              )
 
-          val errorMessage =
-            CompilerErrorFormatter(
-              errorMessage = compilerErrorMessage,
-              errorLine = errorLine,
-              found = found,
-              expected = expected,
-              sourcePosition = sourcePosition
-            ).format()
+            val formatterMessage =
+              CompilerErrorFormatter(
+                errorTitle = errorTitle,
+                errorLine = errorLine,
+                foundLength = found.length,
+                errorMessage = errorMessage,
+                errorFooter = explain,
+                sourcePosition = sourcePosition
+              ).format()
 
-          val lines = errorMessage.linesIterator.toArray
+            val lines = formatterMessage.linesIterator.toArray
 
-          // first line contains the actual full error message
-          lines(0) is s"-- error: $compilerErrorMessage"
+            // first line contains the actual full error message
+            lines(0) is s"-- error (${sourcePosition.rowNum}:${sourcePosition.colNum}): $errorTitle"
 
-          // line 2 is the code where the error occurred
-          lines(1) is s"$lineNumber |$errorLine"
+            // line 2 is the code where the error occurred
+            lines(1) is s"$lineNumber |$errorLine"
 
-          // fetch the actual index of the pointer marker
-          val indexOfPointer =
-            lines(2).indexOf(CompilerErrorFormatter.pointer * found.length)
+            // fetch the actual index of the pointer marker
+            val indexOfPointer =
+              lines(2).indexOf(CompilerErrorFormatter.pointer * found.length)
 
-          // the pointer index should be `[lineNumber][space][bar][spaces][errorToken]`
-          val expectedPointerIndex =
-            lineNumber.toString.length + 2 + fromErrorIndex
+            val gutterLength =
+              lineNumber.toString.length + 2
 
-          if (found.isEmpty) {
-            indexOfPointer is 0
-          } else {
-            indexOfPointer is expectedPointerIndex
-          }
+            // the pointer index should be `[lineNumber][space][bar][spaces][errorToken]`
+            val expectedPointerIndex =
+              gutterLength + fromErrorIndex
 
-          val tokenErrorIndex =
-            lines(3).indexOf(s"Expected $expected")
+            if (found.isEmpty) {
+              indexOfPointer is 0
+            } else {
+              indexOfPointer is expectedPointerIndex
+            }
 
-          if (expected.isEmpty) {
-            tokenErrorIndex is -1
-          } else {
-            tokenErrorIndex is expectedPointerIndex
-          }
-      }
+            val tokenErrorIndex =
+              lines(3).indexOf(errorMessage)
+
+            if (errorMessage.isEmpty) {
+              tokenErrorIndex is 0
+            } else {
+              tokenErrorIndex is expectedPointerIndex
+            }
+
+            // length of the bar should be maximum length of a line
+            explain match {
+              case Some(explain) =>
+                val maxLine = lines.foldLeft(0)(_ max _.length)
+                val bars    = "-" * (maxLine - gutterLength)
+
+                lines(4).indexOf(bars) is gutterLength
+                lines(5).lastIndexOf(explain) is gutterLength
+
+                lines.length is 6 // no more lines to process
+
+              case None =>
+                lines.length is 4 // No more lines to process
+            }
+
+        }
     }
   }
 
   it should "format a custom error message" in {
-    val errorMessage =
+    val formatter =
       CompilerErrorFormatter(
-        errorMessage = "detailed compiler error message",
+        errorTitle = "The title",
         errorLine = "this is error line",
-        found = "error",
-        expected = "pass",
+        foundLength = "error".length,
+        errorMessage = "actual error message",
+        errorFooter = None,
         sourcePosition = SourcePosition(2, 9)
-      ).format()
+      )
 
-    errorMessage is
-      """-- error: detailed compiler error message
-        |2 |this is error line
-        |  |        ^^^^^
-        |  |        Expected pass
-        |""".stripMargin
+    {
+      info("when footer exists")
+      val formatterWithExplain =
+        formatter.copy(errorFooter = Some("I have some explaining to do"))
+
+      formatterWithExplain.format() is
+        """-- error (2:9): The title
+          |2 |this is error line
+          |  |        ^^^^^
+          |  |        actual error message
+          |  |----------------------------
+          |  |I have some explaining to do
+          |""".stripMargin
+    }
+
+    {
+      info("when footer does not exist")
+
+      formatter.format() is
+        """-- error (2:9): The title
+          |2 |this is error line
+          |  |        ^^^^^
+          |  |        actual error message
+          |""".stripMargin
+    }
   }
-
 
   it should "get errored line" in {
     forAll(Gen.nonEmptyListOf(Gen.alphaNumStr)) { programLines =>
@@ -115,7 +155,7 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
     }
   }
 
-  it should "return empty for when there no actual code to point to" in {
+  it should "return empty when there is no actual code to point to" in {
     forAll(Gen.listOf(Gen.alphaNumStr)) { programLines =>
       // This errored line does not exist.
       // This can occurs when there is no closing brace.

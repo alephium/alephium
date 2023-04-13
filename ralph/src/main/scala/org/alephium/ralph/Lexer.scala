@@ -72,11 +72,11 @@ object Lexer {
     *   - Else a boolean value: `true` if mut` declaration found, else `false`.
     */
   def mutMaybe[Unknown: P](allowMutable: Boolean): P[Boolean] =
-    P(Index ~ mut) flatMap { case (index, mutable) =>
+    P(Index ~ mut) map { case (index, mutable) =>
       if (!allowMutable && mutable) {
-        CompilerError(CompilerError.AnImmutableVariable, index)
+        throw CompilerError.`Expected an immutable variable`(index)
       } else {
-        Pass(mutable)
+        mutable
       }
     }
 
@@ -108,17 +108,17 @@ object Lexer {
       sourcecode.Name(CompilerError.`an I256 or U256 value`.message),
       implicitly[P[_]]
     )
-      .flatMap {
+      .map {
         case (index, n, postfix) if Number.isNegative(n) || postfix == "i" =>
           I256.from(n) match {
-            case Some(value) => Pass(Val.I256(value))
-            case None        => CompilerError(CompilerError.`an I256 value`, index)
+            case Some(value) => Val.I256(value)
+            case None        => throw CompilerError.`Expected an I256 value`(index, n)
           }
 
         case (index, n, _) =>
           U256.from(n) match {
-            case Some(value) => Pass(Val.U256(value))
-            case None        => CompilerError(CompilerError.`an U256 value`, index)
+            case Some(value) => Val.U256(value)
+            case None        => throw CompilerError.`Expected an U256 value`(index, n)
           }
       }
 

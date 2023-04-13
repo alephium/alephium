@@ -16,12 +16,11 @@
 
 package org.alephium.ralph.error
 
-import fastparse.P
+import fastparse.Parsed
 
-import org.alephium.ralph.Ast
+import org.alephium.ralph.{Ast, Compiler}
 
-/** Typed compiler errors.
-  */
+/** Typed compiler errors. */
 sealed trait CompilerError extends Product {
   def message: String =
     productPrefix
@@ -29,56 +28,86 @@ sealed trait CompilerError extends Product {
 
 object CompilerError {
 
-  /** Creates a failed parser result.
-    *
-    * @param error
-    *   the parser error or the error cause.
-    * @param index
-    *   location where this error occurred. `0` being the first character.
-    * @param cut
-    *   if true, disables back-tracking.
-    * @param ctx
-    *   FastParser context.
-    *
-    * @return
-    *   A failed parser run.
-    */
-  @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  def apply(error: CompilerError, index: Int, cut: Boolean = true)(implicit
-      ctx: P[_]
-  ): P[Nothing] = {
-    // `ctx.freshFailure()` can be used here but it clears the stack when `verboseFailures = true`.
-    // Currently there is no obvious need to clear this stack.
-    ctx.isSuccess = false
-    // `verboseFailures = false` is equivalent to cut in this case.
-    // Actual cut syntax `~/` used in parsers gets applied by macros to emit relevant code which will not work here.
-    // Setting `ctx.verboseFailures = false` tells FastParse to stop collecting stack
-    // for previous successful parsers and that `verboseFailures` is valid only for this `CompilerError`.
-    // To enable collecting stack information set `cut = false`.
-    if (cut) ctx.verboseFailures = false
-    // set the error message
-    ctx.setMsg(index, () => error.message)
-    // add error message to stack
-    ctx.failureStack = ctx.failureStack.appended((error.message, index))
-    // set the error index and return as failure.
-    ctx.augmentFailure(index = index)
-  }
-
+  /** String only error message. */
   case object `an I256 or U256 value` extends CompilerError
-  case object `an I256 value`         extends CompilerError
-  case object `an U256 value`         extends CompilerError
 
-  // FIXME: Naming this object as `an immutable variable` reports the following error:
-  //        `object name does not match the regular expression '[A-Z][A-Za-z]*'.`
-  //        Which naming is preferred?
-  case object AnImmutableVariable extends CompilerError {
-    override def message: String =
-      "an immutable variable"
+  /** Formattable types can be converted to formatted error messages. */
+  sealed trait FormattableError extends Exception with CompilerError {
+    def title: String
+
+    def position: Int
+
+    def foundLength: Int
+
+    /** Implement footer to have this String added to the footer of the formatted error message.
+      *
+      * [[FastParseError]] uses this to display traced log. Other error messages can use this to
+      * display suggestions/hints for each error type.
+      */
+    def footer: Option[String] = None
+
+    def toFormatter(program: String): CompilerErrorFormatter =
+      CompilerErrorFormatter(this, program)
+
+    def toError(program: String): Compiler.Error =
+      Compiler.Error(toFormatter(program).format(None))
   }
 
-  final case class NoMainStatementDefined(typeId: Ast.TypeId) extends CompilerError {
+  /** ****** Section: Syntax Errors ******
+    */
+  sealed trait SyntaxError extends FormattableError {
+    def title: String =
+      "Syntax error"
+  }
+
+  object FastParseError {
+    def apply(failure: Parsed.Failure): CompilerError.FastParseError =
+      FastParseErrorUtil(failure.trace())
+  }
+
+  /** Errors produced by FastParse. */
+  final case class FastParseError(
+      position: Int,
+      override val message: String,
+      found: String,
+      tracedMsg: String,
+      program: String
+  ) extends SyntaxError {
+    override def foundLength: Int =
+      found.length
+
+    override def footer: Option[String] =
+      Some(tracedMsg)
+
+    def toError(): Compiler.Error =
+      super.toError(program)
+
+    def toFormatter(): CompilerErrorFormatter =
+      super.toFormatter(program)
+  }
+
+  final case class `Expected an I256 value`(position: Int, found: BigInt) extends SyntaxError {
+    override def foundLength: Int =
+      found.toString().length
+  }
+
+  final case class `Expected an U256 value`(position: Int, found: BigInt) extends SyntaxError {
+    override def foundLength: Int =
+      found.toString().length
+  }
+
+  final case class `Expected an immutable variable`(position: Int) extends SyntaxError {
+    override def foundLength: Int =
+      3 // "mut".length
+  }
+
+  final case class `Expected main statements`(typeId: Ast.TypeId, position: Int)
+      extends SyntaxError {
     override def message: String =
-      s"""main statements for type `${typeId.name}`"""
+      s"""Expected main statements for type `${typeId.name}`"""
+
+    override def foundLength: Int =
+      1
   }
 
 }
