@@ -85,16 +85,16 @@ object Lexer {
 
   def hexNum[Unknown: P]: P[BigInteger] = P("0x") ~ hex.!.map(new BigInteger(_, 16))
   def decNum[Unknown: P]: P[BigInteger] = P(
-    (CharsWhileIn("0-9_") ~ ("." ~ CharsWhileIn("0-9_")).? ~
+    Index ~ (CharsWhileIn("0-9_") ~ ("." ~ CharsWhileIn("0-9_")).? ~
       ("e" ~ "-".? ~ CharsWhileIn("0-9")).?).! ~
       CharsWhileIn(" ", 0) ~ keyword("alph").?.!
-  ).map { case (input, unit) =>
+  ).map { case (index, input, unit) =>
     try {
       var num = new BigDecimal(input.replaceAll("_", ""))
       if (unit == "alph") num = num.multiply(new BigDecimal(ALPH.oneAlph.toBigInt))
       num.toBigIntegerExact()
     } catch {
-      case NonFatal(_) => throw Compiler.Error(s"Invalid number ${input}")
+      case NonFatal(_) => throw CompilerError.`Invalid number`(input, index)
     }
   }
   def num[Unknown: P]: P[BigInteger] = negatable(P(hexNum | decNum))

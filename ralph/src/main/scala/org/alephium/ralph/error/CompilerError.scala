@@ -122,4 +122,9 @@ object CompilerError {
       byteVec.length
   }
 
+  final case class `Invalid number`(number: String, position: Int) extends TypeError {
+    override def foundLength: Int =
+      number.length
+  }
+
 }

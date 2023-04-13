@@ -266,4 +266,24 @@ class LexerSpec extends AlephiumSpec {
       }
     }
   }
+
+  it should "report invalid decimal number" in {
+    // FIXME: 0.1 is valid decimal number but this fails the test which is the goal here.
+    //        Regardless, is this a bug? Shouldn't 0.1 be a valid decimal number?
+    val number = "0.1"
+
+    val error =
+      intercept[CompilerError.`Invalid number`](fastparse.parse(number, Lexer.decNum(_)))
+
+    error is CompilerError.`Invalid number`(number, 0)
+
+    error
+      .toError(number)
+      .message is
+      """-- error (1:1): Type error
+        |1 |0.1
+        |  |^^^
+        |  |Invalid number
+        |""".stripMargin
+  }
 }
