@@ -18,6 +18,7 @@ package org.alephium.ralph
 import fastparse.Parsed
 
 import org.alephium.protocol.vm._
+import org.alephium.ralph.error.{CompilerError, CompilerErrorFormatter}
 import org.alephium.util._
 
 // scalastyle:off no.equal file.size.limit

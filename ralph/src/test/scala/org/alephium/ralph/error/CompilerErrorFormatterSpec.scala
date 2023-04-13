@@ -13,10 +13,11 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
-package org.alephium.ralph
+package org.alephium.ralph.error
 
 import org.scalacheck._
 
+import org.alephium.ralph.SourcePosition
 import org.alephium.util.AlephiumSpec
 
 class CompilerErrorFormatterSpec extends AlephiumSpec {

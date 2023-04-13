@@ -21,6 +21,7 @@ import fastparse._
 
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
+import org.alephium.ralph.error.CompilerError
 import org.alephium.util.AVector
 
 // scalastyle:off number.of.methods

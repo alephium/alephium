@@ -30,6 +30,7 @@ import org.alephium.protocol.vm.Val.ByteVec
 import org.alephium.ralph.ArithOperator._
 import org.alephium.ralph.LogicalOperator._
 import org.alephium.ralph.TestOperator._
+import org.alephium.ralph.error.CompilerError
 import org.alephium.util._
 
 // scalastyle:off number.of.methods

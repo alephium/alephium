@@ -22,6 +22,7 @@ import fastparse.Parsed
 
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Ast.MultiContract
+import org.alephium.ralph.error.CompilerErrorFormatter
 import org.alephium.util.AVector
 
 final case class CompiledContract(
