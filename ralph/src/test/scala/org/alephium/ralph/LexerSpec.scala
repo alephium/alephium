@@ -181,10 +181,25 @@ class LexerSpec extends AlephiumSpec {
       Val.ByteVec(hash.bytes)
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is
       Val.Address(address.lockupScript)
-    intercept[Compiler.Error](fastparse.parse(s"#${address.toBase58}", Lexer.bytes(_))) is Compiler
-      .Error(s"Invalid byteVec: ${address.toBase58}")
+    intercept[CompilerError.`Invalid byteVec`](
+      fastparse.parse(s"#${address.toBase58}", Lexer.bytes(_))
+    ) is CompilerError.`Invalid byteVec`(address.toBase58, 1)
     fastparse.parse(s"#${contract.toBase58}", Lexer.bytes(_)).get.value is
       Val.ByteVec(contract.contractId.bytes)
+
+    {
+      info("format invalid byteVec")
+
+      val invalidByteVec = "#12DRq8VCM7kTs7eDjGyvKWuqJVbYS6DysC3ttguLabGD2"
+      intercept[CompilerError.`Invalid byteVec`](fastparse.parse(invalidByteVec, Lexer.bytes(_)))
+        .toError(invalidByteVec)
+        .message is
+        """-- error (1:2): Type error
+          |1 |#12DRq8VCM7kTs7eDjGyvKWuqJVbYS6DysC3ttguLabGD2
+          |  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |  | Invalid byteVec
+          |""".stripMargin
+    }
   }
 
   it should "parse string" in {

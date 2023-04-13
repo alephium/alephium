@@ -110,4 +110,16 @@ object CompilerError {
       1
   }
 
+  /** ****** Section: Type Errors ******
+    */
+  sealed trait TypeError extends FormattableError {
+    def title: String =
+      "Type error"
+  }
+
+  final case class `Invalid byteVec`(byteVec: String, position: Int) extends TypeError {
+    override def foundLength: Int =
+      byteVec.length
+  }
+
 }

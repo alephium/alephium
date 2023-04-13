@@ -123,13 +123,13 @@ object Lexer {
       }
 
   def bytesInternal[Unknown: P]: P[Val.ByteVec] =
-    P(CharsWhileIn("0-9a-zA-Z", 0)).!.map { string =>
+    P(Index ~ CharsWhileIn("0-9a-zA-Z", 0).!).map { case (index, string) =>
       Hex.from(string) match {
         case Some(bytes) => ByteVec(bytes)
         case None =>
           Address.extractLockupScript(string) match {
             case Some(LockupScript.P2C(contractId)) => ByteVec(contractId.bytes)
-            case _ => throw Compiler.Error(s"Invalid byteVec: $string")
+            case _ => throw CompilerError.`Invalid byteVec`(string, index)
           }
       }
     }
