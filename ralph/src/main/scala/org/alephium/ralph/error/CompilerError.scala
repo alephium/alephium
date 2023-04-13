@@ -127,4 +127,14 @@ object CompilerError {
       number.length
   }
 
+  final case class `Invalid contract address`(address: String, position: Int) extends TypeError {
+    override def foundLength: Int =
+      address.length
+  }
+
+  final case class `Invalid address`(address: String, position: Int) extends TypeError {
+    override def foundLength: Int =
+      address.length
+  }
+
 }

@@ -136,19 +136,20 @@ object Lexer {
   def bytes[Unknown: P]: P[Val.ByteVec] = P("#" ~ bytesInternal)
   def contractAddress[Unknown: P]: P[Val.ByteVec] =
     addressInternal.map {
-      case Val.Address(LockupScript.P2C(contractId)) => Val.ByteVec(contractId.bytes)
-      case addr => throw Compiler.Error(s"Invalid contract address: #@${addr.toBase58}")
+      case (Val.Address(LockupScript.P2C(contractId)), _) => Val.ByteVec(contractId.bytes)
+      case (addr, index) =>
+        throw CompilerError.`Invalid contract address`(s"#@${addr.toBase58}", index)
     }
 
-  def addressInternal[Unknown: P]: P[Val.Address] =
-    P(CharsWhileIn("0-9a-zA-Z")).!.map { input =>
+  def addressInternal[Unknown: P]: P[(Val.Address, Int)] =
+    P(Index ~ CharsWhileIn("0-9a-zA-Z").!).map { case (index, input) =>
       val lockupScriptOpt = Address.extractLockupScript(input)
       lockupScriptOpt match {
-        case Some(lockupScript) => Val.Address(lockupScript)
-        case None               => throw Compiler.Error(s"Invalid address: $input")
+        case Some(lockupScript) => (Val.Address(lockupScript), index)
+        case None               => throw CompilerError.`Invalid address`(input, index)
       }
     }
-  def address[Unknown: P]: P[Val.Address] = P("@" ~ addressInternal)
+  def address[Unknown: P]: P[Val.Address] = P("@" ~ addressInternal.map(_._1))
 
   def bool[Unknown: P]: P[Val.Bool] =
     P(keyword("true") | keyword("false")).!.map {

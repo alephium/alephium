@@ -286,4 +286,22 @@ class LexerSpec extends AlephiumSpec {
         |  |Invalid number
         |""".stripMargin
   }
+
+  it should "report invalid address" in {
+    val contractAddress = "abcefgh"
+
+    val error =
+      intercept[CompilerError.`Invalid address`] {
+        fastparse.parse(contractAddress, Lexer.contractAddress(_))
+      }
+
+    error is CompilerError.`Invalid address`(contractAddress, 0)
+
+    error.toError(contractAddress).message is
+      """-- error (1:1): Type error
+        |1 |abcefgh
+        |  |^^^^^^^
+        |  |Invalid address
+        |""".stripMargin
+  }
 }
