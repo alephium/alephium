@@ -18,7 +18,7 @@ package org.alephium.ralph
 import fastparse.Parsed
 
 import org.alephium.protocol.vm._
-import org.alephium.ralph.error.{CompilerError, CompilerErrorFormatter}
+import org.alephium.ralph.error.{CompilerError, CompilerErrorFormatter, FastParseErrorUtil}
 import org.alephium.util._
 
 // scalastyle:off no.equal file.size.limit
@@ -48,7 +48,7 @@ class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
       val expectedErrorMessage =
         s"""Expected an immutable variable:3:17 / (letter | digit | "_"):3:16, found "(mut x: U2""""
 
-      val formatter = CompilerErrorFormatter(failure)
+      val formatter = FastParseErrorUtil(failure)
 
       formatter is
         CompilerErrorFormatter(
@@ -86,7 +86,7 @@ class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
       val expectedErrorMessage =
         s"""Expected an immutable variable:3:26 / (letter | digit | "_"):3:16, found "(x: U256, """"
 
-      val formatter = CompilerErrorFormatter(failure)
+      val formatter = FastParseErrorUtil(failure)
 
       formatter is
         CompilerErrorFormatter(
@@ -126,7 +126,7 @@ class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
     val expectedErrorMessage =
       s"""Expected assetScript:1:1 / "}":7:1, found """""
 
-    val formatter = CompilerErrorFormatter(failure)
+    val formatter = FastParseErrorUtil(failure)
 
     formatter is
       CompilerErrorFormatter(

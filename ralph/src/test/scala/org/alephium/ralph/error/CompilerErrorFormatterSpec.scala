@@ -104,19 +104,6 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
         |""".stripMargin
   }
 
-  it should "drop only the head and tail quotes" in {
-    CompilerErrorFormatter.dropQuotes("\"test\"") is "test"
-    CompilerErrorFormatter.dropQuotes("\"\"test\"\"") is "\"test\""
-    CompilerErrorFormatter.dropQuotes("\"\"test\"") is "\"test"
-    CompilerErrorFormatter.dropQuotes("\"test\"\"") is "test\""
-    CompilerErrorFormatter.dropQuotes("\"\"test\"\"test\"\"") is "\"test\"\"test\""
-  }
-
-  it should "not drop quotes if both or either head or tail quote is missing" in {
-    CompilerErrorFormatter.dropQuotes("\"test") is "\"test"
-    CompilerErrorFormatter.dropQuotes("test\"") is "test\""
-    CompilerErrorFormatter.dropQuotes("test") is "test"
-  }
 
   it should "get errored line" in {
     forAll(Gen.nonEmptyListOf(Gen.alphaNumStr)) { programLines =>

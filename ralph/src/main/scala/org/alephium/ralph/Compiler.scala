@@ -22,7 +22,7 @@ import fastparse.Parsed
 
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Ast.MultiContract
-import org.alephium.ralph.error.CompilerErrorFormatter
+import org.alephium.ralph.error.FastParseErrorUtil
 import org.alephium.util.AVector
 
 final case class CompiledContract(
@@ -155,7 +155,7 @@ object Compiler {
     def apply(message: String): Error = new Error(message, null)
     // scalastyle:on null
 
-    def parse(failure: Parsed.Failure): Error = Error(CompilerErrorFormatter(failure).format())
+    def parse(failure: Parsed.Failure): Error = Error(FastParseErrorUtil(failure).format())
   }
 
   def expectOneType(ident: Ast.Ident, tpe: Seq[Type]): Type = {

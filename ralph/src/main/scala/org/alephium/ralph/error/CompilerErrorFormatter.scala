@@ -15,8 +15,6 @@
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 package org.alephium.ralph.error
 
-import fastparse._
-
 import org.alephium.ralph.SourcePosition
 
 /** Builds a formatted error message.
@@ -86,52 +84,6 @@ object CompilerErrorFormatter {
 
   val pointer = "^"
 
-  /** Builds an error message from FastParser's `Parsed.Failure` result.
-    *
-    * @param failure
-    *   FastParser's failure run result.
-    * @param program
-    *   The compiled program/source.
-    * @return
-    *   A formatted error message.
-    */
-  def apply(failure: Parsed.Failure): CompilerErrorFormatter =
-    CompilerErrorFormatter(failure.trace())
-
-  def apply(traced: Parsed.TracedFailure): CompilerErrorFormatter = {
-    val program =
-      traced.input.slice(0, traced.input.length)
-
-    val erroredIndex =
-      getErroredIndex(traced)
-
-    val sourcePosition =
-      SourcePosition.parse(traced.input.prettyIndex(erroredIndex))
-
-    val errorLine =
-      getErroredLine(sourcePosition.rowIndex, program)
-
-    val expected =
-      getLatestErrorMessage(traced, erroredIndex)
-
-    val foundQuoted =
-      Parsed.Failure.formatTrailing(traced.input, erroredIndex)
-
-    val foundNoQuotes =
-      dropQuotes(foundQuoted)
-
-    val errorMessage =
-      traced.longMsg
-
-    CompilerErrorFormatter(
-      errorMessage = errorMessage,
-      errorLine = errorLine,
-      found = foundNoQuotes,
-      expected = expected,
-      sourcePosition = sourcePosition
-    )
-  }
-
   /** Fetch the line where the error occurred.
     *
     * @param programRowIndex
@@ -151,22 +103,6 @@ object CompilerErrorFormatter {
       lines(programRowIndex)
     }
   }
-
-  /** Removes wrapper quotes from the output by `Parsed.Failure.formatTrailing`. */
-  def dropQuotes(string: String): String =
-    string.replaceFirst("""^"(.+)"$""", "$1")
-
-  /** Use index with maximum value i.e. the latest errored code */
-  private def getErroredIndex(traced: Parsed.TracedFailure): Int =
-    traced.index max traced.stack.foldLeft(0)(_ max _._2)
-
-  /** Fetch the most recent error message. */
-  private def getLatestErrorMessage(traced: Parsed.TracedFailure, forIndex: Int): String =
-    traced.stack
-      .filter(_._2 == forIndex) // all parsers for this index
-      .lastOption
-      .map(_._1)               // use the last errored
-      .getOrElse(traced.label) // if none found, use the label
 
   /** Wraps the input String to be coloured */
   private def highlight(msg: String, color: Option[String]): String =
