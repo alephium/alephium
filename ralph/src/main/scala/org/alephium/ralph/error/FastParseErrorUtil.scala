@@ -74,7 +74,7 @@ object FastParseErrorUtil {
 
   /** Use index with maximum value i.e. the latest errored code */
   private def getErroredIndex(traced: Parsed.TracedFailure): Int =
-    traced.index max traced.stack.foldLeft(0)(_ max _._2)
+    traced.stack.foldLeft(traced.index)(_ max _._2)
 
   /** Fetch the most recent error message. */
   private def getLatestErrorMessage(traced: Parsed.TracedFailure, forIndex: Int): String =
