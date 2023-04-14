@@ -17,12 +17,11 @@ package org.alephium.ralph
 
 import fastparse.Parsed
 
-import org.alephium.protocol.vm._
 import org.alephium.ralph.error.{CompilerError, CompilerErrorFormatter, FastParseErrorUtil}
 import org.alephium.util._
 
 // scalastyle:off no.equal file.size.limit
-class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
+class StatelessParserSpec extends AlephiumSpec {
 
   it should "disallow mutable template params" in {
     def createProgram(params: String) =
