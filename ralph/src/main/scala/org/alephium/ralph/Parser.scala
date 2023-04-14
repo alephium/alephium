@@ -22,6 +22,7 @@ import fastparse._
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
 import org.alephium.ralph.error.CompilerError
+import org.alephium.ralph.error.FastParseExtension._
 import org.alephium.util.AVector
 
 // scalastyle:off number.of.methods
@@ -54,9 +55,9 @@ abstract class Parser[Ctx <: StatelessContext] {
   def tokenAmount[Unknown: P]: P[(Ast.Expr[Ctx], Ast.Expr[Ctx])]     = P(expr ~ ":" ~ expr)
   def amountList[Unknown: P]: P[Seq[(Ast.Expr[Ctx], Ast.Expr[Ctx])]] = P(tokenAmount.rep(0, ","))
   def approveAssetPerAddress[Unknown: P]: P[Ast.ApproveAsset[Ctx]] =
-    P(expr ~ "->" ~ amountList).map { case (address, amounts) =>
+    P(expr ~ LastIndex("->") ~ amountList).map { case (address, index, amounts) =>
       if (amounts.isEmpty) {
-        throw Compiler.Error(s"Empty asset for address: $address")
+        throw CompilerError.`Expected non-empty asset(s) for address`(index)
       }
       Ast.ApproveAsset(address, amounts)
     }

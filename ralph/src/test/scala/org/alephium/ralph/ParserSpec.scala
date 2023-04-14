@@ -24,6 +24,7 @@ import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.ArithOperator._
 import org.alephium.ralph.LogicalOperator._
 import org.alephium.ralph.TestOperator._
+import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AlephiumSpec, AVector, Hex, I256, U256}
 
 // scalastyle:off file.size.limit
@@ -151,9 +152,16 @@ class ParserSpec extends AlephiumSpec {
         ),
         List(Variable(Ident("x")))
       )
-    intercept[Compiler.Error](
-      fastparse.parse("Foo(x).bar{ z -> }(x)", StatefulParser.contractCallExpr(_))
-    ).message is "Empty asset for address: Variable(Ident(z))"
+
+    val emptyAssetsCode = "Foo(x).bar{ z -> }(x)"
+    intercept[CompilerError.`Expected non-empty asset(s) for address`](
+      fastparse.parse(emptyAssetsCode, StatefulParser.contractCallExpr(_))
+    ).toError(emptyAssetsCode).message is
+      """-- error (1:17): Syntax error
+        |1 |Foo(x).bar{ z -> }(x)
+        |  |                ^
+        |  |                Expected non-empty asset(s) for address
+        |""".stripMargin
   }
 
   it should "call expression" in {

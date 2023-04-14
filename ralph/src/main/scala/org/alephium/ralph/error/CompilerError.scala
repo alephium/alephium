@@ -110,6 +110,11 @@ object CompilerError {
       1
   }
 
+  final case class `Expected non-empty asset(s) for address`(position: Int) extends SyntaxError {
+    override def foundLength: Int =
+      1
+  }
+
   /** ****** Section: Type Errors ******
     */
   sealed trait TypeError extends FormattableError {
