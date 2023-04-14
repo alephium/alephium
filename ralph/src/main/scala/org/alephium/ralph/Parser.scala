@@ -144,11 +144,11 @@ abstract class Parser[Ctx <: StatelessContext] {
   def elseBranchExpr[Unknown: P]: P[Ast.ElseBranchExpr[Ctx]] =
     P(Lexer.keyword("else") ~ expr).map(Ast.ElseBranchExpr(_))
   def ifelseExpr[Unknown: P]: P[Ast.IfElseExpr[Ctx]] =
-    P(ifBranchExpr ~ elseIfBranchExpr.rep(0) ~ elseBranchExpr.?).map {
-      case (ifBranch, elseIfBranches, Some(elseBranch)) =>
+    P(ifBranchExpr ~ elseIfBranchExpr.rep(0) ~ Index ~ elseBranchExpr.?).map {
+      case (ifBranch, elseIfBranches, _, Some(elseBranch)) =>
         Ast.IfElseExpr(ifBranch +: elseIfBranches, elseBranch)
-      case (_, _, None) =>
-        throw Compiler.Error("If else expressions should be terminated with an else branch")
+      case (_, _, index, None) =>
+        throw CompilerError.`Expected else statement`(index)
     }
 
   def ret[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =

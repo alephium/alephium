@@ -312,8 +312,18 @@ class ParserSpec extends AlephiumSpec {
         Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.Two)))
       )
 
-    val error = intercept[Compiler.Error](fastparse.parse("if (cond0) 0", StatelessParser.expr(_)))
-    error.message is "If else expressions should be terminated with an else branch"
+    val missingElseCode = "if (cond0) 0"
+    val error = intercept[CompilerError.`Expected else statement`](
+      fastparse.parse(missingElseCode, StatelessParser.expr(_))
+    )
+    error.toError(missingElseCode).message is
+      """-- error (1:13): Syntax error
+        |1 |if (cond0) 0
+        |  |            ^
+        |  |            Expected `else` statement
+        |  |------------------------------------------------------------------------------------------
+        |  |Description: `if/else` expressions require both `if` and `else` statements to be complete.
+        |""".stripMargin
   }
 
   it should "parse annotations" in {

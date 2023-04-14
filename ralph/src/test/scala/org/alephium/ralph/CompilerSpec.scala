@@ -2567,7 +2567,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(code).leftValue.message is
-        "If else expressions should be terminated with an else branch"
+        """-- error (5:3): Syntax error
+          |5 |  }
+          |  |  ^
+          |  |  Expected `else` statement
+          |  |------------------------------------------------------------------------------------------
+          |  |Description: `if/else` expressions require both `if` and `else` statements to be complete.
+          |""".stripMargin
     }
 
     {

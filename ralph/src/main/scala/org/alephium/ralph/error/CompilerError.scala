@@ -115,6 +115,17 @@ object CompilerError {
       1
   }
 
+  final case class `Expected else statement`(position: Int) extends SyntaxError {
+    override def foundLength: Int =
+      1
+
+    override def message: String =
+      "Expected `else` statement"
+
+    override def footer: Option[String] =
+      Some("Description: `if/else` expressions require both `if` and `else` statements to be complete.")
+  }
+
   /** ****** Section: Type Errors ******
     */
   sealed trait TypeError extends FormattableError {
