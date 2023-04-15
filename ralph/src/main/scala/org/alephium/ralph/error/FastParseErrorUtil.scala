@@ -69,15 +69,15 @@ object FastParseErrorUtil {
     traced.stack.foldLeft(traced.index)(_ max _._2)
 
   /** Fetch the most recent error message. */
-  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def getLatestErrorMessage(traced: Parsed.TracedFailure, forIndex: Int): String = {
     // label is added to the tail-end because in `Parsed.TracedFailure.msg` label gets preference.
     val stack = traced.stack.appended((traced.label, traced.index))
 
     stack
       .filter(_._2 == forIndex) // all parsers for this index
-      .last                     // ok because the stack is non-empty
-      ._1
+      .lastOption
+      .map(_._1)
+      .getOrElse(traced.label) // if index not found, use label
   }
 
 }
