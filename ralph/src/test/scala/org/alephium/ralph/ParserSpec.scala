@@ -348,7 +348,7 @@ class ParserSpec extends AlephiumSpec {
     val parsed1 = fastparse
       .parse(
         """@using(preapprovedAssets = true, updateFields = false)
-          |pub fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }
+          |pub fn add(x: U256, mut y: U256) -> (U256, U256) { return x + y, x - y }
           |""".stripMargin,
         StatelessParser.func(_)
       )
@@ -362,6 +362,14 @@ class ParserSpec extends AlephiumSpec {
     parsed1.useUpdateFields is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
+    parsed1.signature is FuncSignature(
+      FuncId("add", false),
+      true,
+      true,
+      false,
+      Seq((Type.U256, false), (Type.U256, true)),
+      Seq(Type.U256, Type.U256)
+    )
 
     info("Simple return type")
     val parsed2 = fastparse
@@ -380,6 +388,14 @@ class ParserSpec extends AlephiumSpec {
     parsed2.useUpdateFields is false
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
+    parsed2.signature is FuncSignature(
+      FuncId("add", false),
+      true,
+      true,
+      true,
+      Seq((Type.U256, false), (Type.U256, false)),
+      Seq(Type.U256)
+    )
 
     info("More use annotation")
     val parsed3 = fastparse
@@ -394,6 +410,14 @@ class ParserSpec extends AlephiumSpec {
     parsed3.useAssetsInContract is true
     parsed3.useCheckExternalCaller is true
     parsed3.useUpdateFields is true
+    parsed3.signature is FuncSignature(
+      FuncId("add", false),
+      true,
+      false,
+      true,
+      Seq((Type.U256, false), (Type.U256, false)),
+      Seq(Type.U256)
+    )
   }
 
   it should "parser contract initial states" in {

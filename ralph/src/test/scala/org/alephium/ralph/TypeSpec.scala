@@ -28,7 +28,7 @@ class TypeSpec extends AlephiumSpec {
       AVector("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]")
     contractAst.getFieldMutability() is
       AVector(false, true, false, true, false, false)
-    contractAst.funcs.map(_.signature) is Seq(
+    contractAst.funcs.map(_.signature.toString) is Seq(
       "@using(preapprovedAssets=true,assetsInContract=true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
     )
     contractAst.funcs.map(_.getArgNames()) is
@@ -55,7 +55,7 @@ class TypeSpec extends AlephiumSpec {
       AVector("Bool", "U256", "I256", "ByteVec", "Address")
     scriptAst.getTemplateVarsMutability() is
       AVector(false, false, false, false, false)
-    scriptAst.funcs.map(_.signature) is Seq(
+    scriptAst.funcs.map(_.signature.toString) is Seq(
       "@using(preapprovedAssets=true) pub main()->()",
       "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
     )
