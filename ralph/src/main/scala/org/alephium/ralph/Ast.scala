@@ -576,25 +576,7 @@ object Ast {
       useAssetsInContract: Boolean,
       args: Seq[(Type, Boolean)],
       rtypes: Seq[Type]
-  ) {
-    override def toString: String = {
-      val publicPrefix = if (isPublic) "pub " else ""
-      val assetModifier = {
-        (usePreapprovedAssets, useAssetsInContract) match {
-          case (true, true) =>
-            s"@using(preapprovedAssets=true,assetsInContract=true) "
-          case (true, false) =>
-            s"@using(preapprovedAssets=true) "
-          case (false, true) =>
-            s"@using(assetsInContract=true) "
-          case (false, false) =>
-            ""
-        }
-      }
-      s"${assetModifier}${publicPrefix}${id.name}(${args
-          .mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
-    }
-  }
+  )
 
   final case class FuncDef[Ctx <: StatelessContext](
       annotations: Seq[Annotation],
