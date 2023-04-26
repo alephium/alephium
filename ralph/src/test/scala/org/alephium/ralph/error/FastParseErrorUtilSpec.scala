@@ -16,6 +16,9 @@
 
 package org.alephium.ralph.error
 
+import fastparse._
+
+import org.alephium.ralph.Lexer
 import org.alephium.util.AlephiumSpec
 
 class FastParseErrorUtilSpec extends AlephiumSpec {
@@ -32,5 +35,24 @@ class FastParseErrorUtilSpec extends AlephiumSpec {
     FastParseErrorUtil.dropQuotes("\"test") is "\"test"
     FastParseErrorUtil.dropQuotes("test\"") is "test\""
     FastParseErrorUtil.dropQuotes("test") is "test"
+  }
+
+  it should "return label when input index does not exist" in {
+    val input  = "a"
+    val traced = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure].trace()
+
+    // stack does not contain index `1`
+    traced.stack is
+      List(
+        (CompilerError.`an I256 or U256 value`.message, 0),
+        ("num", 0)
+      )
+
+    // index `1` will return the label
+    FastParseErrorUtil
+      .getLatestErrorMessage(
+        traced = traced,
+        forIndex = 1
+      ) is traced.label
   }
 }
