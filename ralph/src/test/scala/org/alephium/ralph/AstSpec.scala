@@ -169,7 +169,6 @@ class AstSpec extends AlephiumSpec {
          |    checkCaller!(true, 0)
          |  }
          |
-         |  // no need to check external call since it does not call external functions
          |  pub fn noCheck() -> () {
          |    noCheckPri()
          |  }
@@ -207,6 +206,7 @@ class AstSpec extends AlephiumSpec {
          |    callee.c()
          |  }
          |
+         |  @using(checkExternalCaller = false)
          |  pub fn f() -> () {
          |    proxy()
          |  }
@@ -217,8 +217,18 @@ class AstSpec extends AlephiumSpec {
   }
 
   it should "check permission for external calls" in new ExternalCallsFixture {
-    val warnings = Compiler.compileContractFull(externalCalls, 0).rightValue.warnings
-    checkExternalCallerWarnings(warnings).toSet is Set(
+    val warnings0 = Compiler.compileContractFull(externalCalls, 0).rightValue.warnings
+    checkExternalCallerWarnings(warnings0).toSet is Set(
+      Warnings.noCheckExternalCallerMsg("ExternalCalls", "noCheck"),
+      Warnings.noCheckExternalCallerMsg("ExternalCalls", "a"),
+      Warnings.noCheckExternalCallerMsg("ExternalCalls", "b"),
+      Warnings.noCheckExternalCallerMsg("ExternalCalls", "c"),
+      Warnings.noCheckExternalCallerMsg("ExternalCalls", "d"),
+      Warnings.noCheckExternalCallerMsg("ExternalCalls", "e")
+    )
+
+    val warnings1 = Compiler.compileContractFull(internalCalls, 0).rightValue.warnings
+    checkExternalCallerWarnings(warnings1).toSet is Set(
       Warnings.noCheckExternalCallerMsg("InternalCalls", "c"),
       Warnings.noCheckExternalCallerMsg("InternalCalls", "f"),
       Warnings.noCheckExternalCallerMsg("InternalCalls", "g")
@@ -246,7 +256,7 @@ class AstSpec extends AlephiumSpec {
   }
 
   it should "not check permission for mutual recursive calls" in new MutualRecursionFixture {
-    val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+    val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
     checkExternalCallerWarnings(warnings).toSet is Set(
       Warnings.noCheckExternalCallerMsg("Bar", "a")
     )
@@ -436,14 +446,8 @@ class AstSpec extends AlephiumSpec {
            |    return state
            |  }
            |}
-           |
-           |Contract Bar(foo: Foo) {
-           |  pub fn getState() -> U256 {
-           |    return foo.getState()
-           |  }
-           |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings.isEmpty is true
     }
 
@@ -461,14 +465,8 @@ class AstSpec extends AlephiumSpec {
            |    return
            |  }
            |}
-           |
-           |Contract Bar(foo: Foo) {
-           |  pub fn getState() -> U256 {
-           |    return foo.getState()
-           |  }
-           |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
 
@@ -484,16 +482,12 @@ class AstSpec extends AlephiumSpec {
            |}
            |
            |Contract Bar(foo: Foo) {
-           |  pub fn getState() -> U256 {
-           |    return foo.getState()
-           |  }
-           |
            |  pub fn doNothing() -> () {
            |    return
            |  }
            |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
 
@@ -508,14 +502,8 @@ class AstSpec extends AlephiumSpec {
            |    return state
            |  }
            |}
-           |
-           |Contract Bar(foo: Foo) {
-           |  pub fn getState() -> U256 {
-           |    return foo.getState()
-           |  }
-           |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
 
@@ -529,15 +517,8 @@ class AstSpec extends AlephiumSpec {
            |    return state
            |  }
            |}
-           |
-           |Contract Bar(foo: Foo) {
-           |  @using(preapprovedAssets = true)
-           |  pub fn getState() -> U256 {
-           |    return foo.getState{callerAddress!() -> ALPH: 1 alph}()
-           |  }
-           |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
 
@@ -552,14 +533,8 @@ class AstSpec extends AlephiumSpec {
            |    return state
            |  }
            |}
-           |
-           |Contract Bar(foo: Foo) {
-           |  pub fn getState() -> U256 {
-           |    return foo.getState(callerAddress!())
-           |  }
-           |}
            |""".stripMargin
-      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
 
@@ -572,15 +547,9 @@ class AstSpec extends AlephiumSpec {
            |    panic!()
            |  }
            |}
-           |
-           |Contract Bar(foo: Foo) {
-           |  pub fn bar() -> () {
-           |    foo.foo()
-           |  }
-           |}
            |""".stripMargin
 
-      Compiler.compileContractFull(code, 1).rightValue.warnings.isEmpty is true
+      Compiler.compileContractFull(code, 0).rightValue.warnings.isEmpty is true
     }
 
     {
@@ -592,15 +561,9 @@ class AstSpec extends AlephiumSpec {
            |    migrate!(#)
            |  }
            |}
-           |
-           |Contract Bar(foo: Foo) {
-           |  pub fn bar() -> () {
-           |    foo.foo()
-           |  }
-           |}
            |""".stripMargin
 
-      val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
     }
   }
@@ -618,6 +581,8 @@ class AstSpec extends AlephiumSpec {
          |Contract Foo() {
          |  fn private0() -> () {}
          |  fn private1() -> () {}
+         |
+         |  @using(checkExternalCaller = false)
          |  pub fn public() -> () {
          |    private0()
          |  }
@@ -637,9 +602,11 @@ class AstSpec extends AlephiumSpec {
          |  }
          |}
          |Contract Bar() extends Foo() {
+         |  @using(checkExternalCaller = false)
          |  pub fn bar() -> () { foo1() }
          |}
          |Contract Baz() extends Foo() {
+         |  @using(checkExternalCaller = false)
          |  pub fn baz() -> () { foo1() }
          |}
          |""".stripMargin
