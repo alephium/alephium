@@ -31,39 +31,37 @@ object Keyword {
   sealed trait Used   extends Keyword
   sealed trait Unused extends Keyword
 
-  // FIXME: Temporarily using scalastyle:off.
-  //        Need to know the preferred alternative to backtick class names to avoid the following error.
-  //        > Object name does not match the regular expression '[A-Z][A-Za-z]*'.
-  // scalastyle:off
   case object Contract    extends Used
   case object AssetScript extends Used
   case object TxScript    extends Used
   case object Interface   extends Used
-  case object let         extends Used
-  case object mut         extends Used
-  case object fn          extends Used
-  case object `return`    extends Used
-  case object `true`      extends Used
-  case object `false`     extends Used
-  case object `if`        extends Used
-  case object `else`      extends Used
-  case object `while`     extends Used
-  case object `for`       extends Used
-  case object pub         extends Used
-  case object event       extends Used
-  case object emit        extends Used
-  case object `extends`   extends Used
-  case object implements  extends Used
-  case object alph        extends Used
-  case object const       extends Used
-  case object `enum`      extends Used
-  case object Abstract    extends Used
+  // scalastyle:off object.name
+  case object let        extends Used
+  case object mut        extends Used
+  case object fn         extends Used
+  case object `return`   extends Used
+  case object `true`     extends Used
+  case object `false`    extends Used
+  case object `if`       extends Used
+  case object `else`     extends Used
+  case object `while`    extends Used
+  case object `for`      extends Used
+  case object pub        extends Used
+  case object event      extends Used
+  case object emit       extends Used
+  case object `extends`  extends Used
+  case object implements extends Used
+  case object alph       extends Used
+  case object const      extends Used
+  case object `enum`     extends Used
+  case object Abstract   extends Used
   case object ALPH_CAPS extends Used {
     override def name: String =
       "ALPH"
   }
 
   case object `@unused` extends Unused
+  // scalastyle:on object.name
 
   object Used {
     val all: Array[Keyword.Used] =
