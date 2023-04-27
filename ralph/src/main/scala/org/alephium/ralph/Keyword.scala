@@ -16,9 +16,11 @@
 
 package org.alephium.ralph
 
-sealed trait Keyword {
-  // protected to disable direct access from outside
-  protected def productPrefix: String
+import scala.collection.immutable.TreeSet
+
+import org.alephium.macros.EnumerationMacros
+
+sealed trait Keyword extends Product {
 
   def name: String =
     productPrefix
@@ -27,6 +29,8 @@ sealed trait Keyword {
     name
 }
 object Keyword {
+
+  implicit val ordering: Ordering[Used] = Ordering.by(_.name)
 
   sealed trait Used   extends Keyword
   sealed trait Unused extends Keyword
@@ -64,33 +68,8 @@ object Keyword {
   // scalastyle:on object.name
 
   object Used {
-    val all: Array[Keyword.Used] =
-      Array(
-        Contract,
-        AssetScript,
-        TxScript,
-        Interface,
-        let,
-        mut,
-        fn,
-        `return`,
-        `true`,
-        `false`,
-        `if`,
-        `else`,
-        `while`,
-        `for`,
-        pub,
-        event,
-        emit,
-        `extends`,
-        implements,
-        alph,
-        const,
-        `enum`,
-        Abstract,
-        ALPH_CAPS
-      )
+    val all: TreeSet[Used] =
+      EnumerationMacros.sealedInstancesOf[Keyword.Used]
 
     def exists(keyword: String): Boolean =
       all.exists(_.name == keyword)

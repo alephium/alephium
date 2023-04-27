@@ -16,12 +16,14 @@
 
 package org.alephium.ralph
 
+import scala.collection.immutable.TreeSet
+
 import org.alephium.util.AlephiumSpec
 
 class KeywordSpec extends AlephiumSpec {
 
   val keywordStrings =
-    Array(
+    TreeSet(
       "Contract",
       "AssetScript",
       "TxScript",
