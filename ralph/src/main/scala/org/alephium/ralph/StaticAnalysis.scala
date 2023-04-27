@@ -111,24 +111,53 @@ object StaticAnalysis {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def isSimpleViewFunction(
+      isSimpleViewFuncCache: mutable.Map[(TypeId, FuncId), Boolean],
+      allStates: AVector[Compiler.State[vm.StatefulContext]],
       contractState: Compiler.State[vm.StatefulContext],
       funcId: FuncId
   ): Boolean = {
-    val func                = contractState.getFunc(funcId)
-    val useAssets           = func.usePreapprovedAssets || func.useAssetsInContract
-    val internalSubCallsOpt = contractState.internalCalls.get(funcId)
-    val hasInternalSubCall = internalSubCallsOpt.exists(
-      _.exists(funcId =>
-        !funcId.isBuiltIn || contractState.getBuiltInFunc(funcId).needToCheckExternalCaller
-      )
-    )
-    val hasExternalSubCall = contractState.externalCalls.contains(funcId)
-    val hasSubCall         = hasInternalSubCall || hasExternalSubCall
-    !(func.useUpdateFields || useAssets || hasSubCall)
+    val key = contractState.typeId -> funcId
+    isSimpleViewFuncCache.get(key) match {
+      case Some(result) => result
+      case None =>
+        isSimpleViewFuncCache(key) = false // this is to handle recursive calls
+        val func                = contractState.getFunc(funcId)
+        val useAssets           = func.usePreapprovedAssets || func.useAssetsInContract
+        val internalSubCallsOpt = contractState.internalCalls.get(funcId)
+        val isInternalSubCallsPure = internalSubCallsOpt.forall(_.forall { calleeFuncId =>
+          if (calleeFuncId.isBuiltIn) {
+            !contractState.getBuiltInFunc(calleeFuncId).needToCheckExternalCaller
+          } else {
+            isSimpleViewFunction(isSimpleViewFuncCache, allStates, contractState, calleeFuncId)
+          }
+        })
+        val externalCallsOpt = contractState.externalCalls.get(funcId)
+        val isExternalCallsPure =
+          externalCallsOpt.forall(_.forall { case (calleeTypeId, calleeFuncId) =>
+            val calleeContractState = allStates
+              .find(_.typeId == calleeTypeId)
+              .getOrElse(
+                throw Compiler.Error(s"No state for contract $calleeTypeId")
+              ) // this should never happen
+            isSimpleViewFunction(
+              isSimpleViewFuncCache,
+              allStates,
+              calleeContractState,
+              calleeFuncId
+            )
+          })
+        val isViewFunction =
+          !func.useUpdateFields && !useAssets && isInternalSubCallsPure && isExternalCallsPure
+        isSimpleViewFuncCache(key) = isViewFunction
+        isViewFunction
+    }
   }
 
   private[ralph] def checkExternalCallPermissions(
+      isSimpleViewFuncCache: mutable.Map[(TypeId, FuncId), Boolean],
+      allStates: AVector[Compiler.State[vm.StatefulContext]],
       contractState: Compiler.State[vm.StatefulContext],
       contract: Contract,
       checkExternalCallerTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
@@ -136,7 +165,11 @@ object StaticAnalysis {
     val allNoCheckExternalCallers: mutable.Set[(TypeId, FuncId)] = mutable.Set.empty
     val table = checkExternalCallerTables(contract.ident)
     contract.funcs.foreach { func =>
-      if (func.isPublic && !table(func.id) && !isSimpleViewFunction(contractState, func.id)) {
+      if (
+        func.isPublic &&
+        !table(func.id) &&
+        !isSimpleViewFunction(isSimpleViewFuncCache, allStates, contractState, func.id)
+      ) {
         allNoCheckExternalCallers.addOne(contract.ident -> func.id)
       }
     }
@@ -160,10 +193,17 @@ object StaticAnalysis {
         checkExternalCallerTables.update(interface.ident, table)
       case _ => ()
     }
+    val isSimpleViewFuncCache = mutable.Map.empty[(TypeId, FuncId), Boolean]
     multiContract.contracts.zipWithIndex.foreach {
       case (contract: Contract, index) if !contract.isAbstract =>
         val state = states(index)
-        checkExternalCallPermissions(state, contract, checkExternalCallerTables)
+        checkExternalCallPermissions(
+          isSimpleViewFuncCache,
+          states,
+          state,
+          contract,
+          checkExternalCallerTables
+        )
       case _ =>
     }
   }

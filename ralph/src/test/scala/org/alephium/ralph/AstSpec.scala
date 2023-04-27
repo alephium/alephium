@@ -218,48 +218,139 @@ class AstSpec extends AlephiumSpec {
 
   it should "check permission for external calls" in new ExternalCallsFixture {
     val warnings0 = Compiler.compileContractFull(externalCalls, 0).rightValue.warnings
-    checkExternalCallerWarnings(warnings0).toSet is Set(
-      Warnings.noCheckExternalCallerMsg("ExternalCalls", "noCheck"),
-      Warnings.noCheckExternalCallerMsg("ExternalCalls", "a"),
-      Warnings.noCheckExternalCallerMsg("ExternalCalls", "b"),
-      Warnings.noCheckExternalCallerMsg("ExternalCalls", "c"),
-      Warnings.noCheckExternalCallerMsg("ExternalCalls", "d"),
-      Warnings.noCheckExternalCallerMsg("ExternalCalls", "e")
-    )
+    checkExternalCallerWarnings(warnings0).isEmpty is true
 
     val warnings1 = Compiler.compileContractFull(internalCalls, 0).rightValue.warnings
-    checkExternalCallerWarnings(warnings1).toSet is Set(
-      Warnings.noCheckExternalCallerMsg("InternalCalls", "c"),
-      Warnings.noCheckExternalCallerMsg("InternalCalls", "f"),
-      Warnings.noCheckExternalCallerMsg("InternalCalls", "g")
-    )
+    checkExternalCallerWarnings(warnings1).isEmpty is true
   }
 
-  trait MutualRecursionFixture {
-    val code =
-      s"""
-         |Contract Foo(bar: Bar) {
-         |  pub fn a() -> () {
-         |    bar.a()
-         |  }
-         |  pub fn b() -> () {
-         |    checkCaller!(true, 0)
-         |  }
-         |}
-         |
-         |Contract Bar(foo: Foo) {
-         |  pub fn a() -> () {
-         |    foo.b()
-         |  }
-         |}
-         |""".stripMargin
-  }
+  it should "check permission for mutual recursive calls" in {
+    {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn a() -> () {
+           |    b()
+           |  }
+           |
+           |  pub fn b() -> () {
+           |    a()
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      checkExternalCallerWarnings(warnings).toSet is Set(
+        Warnings.noCheckExternalCallerMsg("Foo", "a"),
+        Warnings.noCheckExternalCallerMsg("Foo", "b")
+      )
+    }
 
-  it should "not check permission for mutual recursive calls" in new MutualRecursionFixture {
-    val warnings = Compiler.compileContractFull(code, 1).rightValue.warnings
-    checkExternalCallerWarnings(warnings).toSet is Set(
-      Warnings.noCheckExternalCallerMsg("Bar", "a")
-    )
+    {
+      val code =
+        s"""
+           |Contract Foo() {
+           |  @using(checkExternalCaller = false)
+           |  pub fn a() -> () {
+           |    b()
+           |  }
+           |
+           |  @using(checkExternalCaller = false)
+           |  pub fn b() -> () {
+           |    a()
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      checkExternalCallerWarnings(warnings).isEmpty is true
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo(mut v: U256) {
+           |  @using(updateFields = true)
+           |  pub fn a() -> () {
+           |    b()
+           |    v = 0
+           |  }
+           |
+           |  pub fn b() -> () {
+           |    a()
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      checkExternalCallerWarnings(warnings).toSet is Set(
+        Warnings.noCheckExternalCallerMsg("Foo", "a"),
+        Warnings.noCheckExternalCallerMsg("Foo", "b")
+      )
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo(bar: Bar) {
+           |  pub fn a() -> () {
+           |    bar.a()
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  pub fn a() -> () {
+           |    foo.a()
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileProject(code).rightValue._1.flatMap(_.warnings)
+      checkExternalCallerWarnings(warnings).toSet is Set(
+        Warnings.noCheckExternalCallerMsg("Foo", "a"),
+        Warnings.noCheckExternalCallerMsg("Bar", "a")
+      )
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo(bar: Bar) {
+           |  @using(checkExternalCaller = false)
+           |  pub fn a() -> () {
+           |    bar.a()
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  @using(checkExternalCaller = false)
+           |  pub fn a() -> () {
+           |    foo.a()
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileProject(code).rightValue._1.flatMap(_.warnings)
+      checkExternalCallerWarnings(warnings).isEmpty is true
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Foo(bar: Bar, mut v: U256) {
+           |  pub fn a() -> () {
+           |    bar.a()
+           |    v = 0
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo) {
+           |  pub fn a() -> () {
+           |    foo.a()
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileProject(code).rightValue._1.flatMap(_.warnings)
+      checkExternalCallerWarnings(warnings).toSet is Set(
+        Warnings.noCheckExternalCallerMsg("Foo", "a"),
+        Warnings.noCheckExternalCallerMsg("Bar", "a")
+      )
+    }
   }
 
   it should "skip check external caller for simple view functions" in {
@@ -278,7 +369,7 @@ class AstSpec extends AlephiumSpec {
     }
 
     {
-      info("Warning if the function has internal calls")
+      info("No warnings if internal calls are pure")
       val code =
         s"""
            |Contract Foo(state: U256) {
@@ -293,11 +384,31 @@ class AstSpec extends AlephiumSpec {
            |}
            |""".stripMargin
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      warnings.isEmpty is true
+    }
+
+    {
+      info("Warning if internal calls changes state")
+      val code =
+        s"""
+           |Contract Foo(mut state: U256) {
+           |  pub fn getState() -> U256 {
+           |    update()
+           |    return state
+           |  }
+           |
+           |  @using(updateFields = true)
+           |  fn update() -> () {
+           |    state = 0
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "getState"))
     }
 
     {
-      info("Warning if the function has external calls")
+      info("No warnings if external calls are pure")
       val code =
         s"""
            |Contract Foo(state: U256, bar: Bar) {
@@ -310,6 +421,28 @@ class AstSpec extends AlephiumSpec {
            |Contract Bar(foo: Foo) {
            |  pub fn doNothing() -> () {
            |    return
+           |  }
+           |}
+           |""".stripMargin
+      val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
+      warnings.isEmpty is true
+    }
+
+    {
+      info("Warning if external calls changes state")
+      val code =
+        s"""
+           |Contract Foo(state: U256, bar: Bar) {
+           |  pub fn getState() -> U256 {
+           |    bar.update()
+           |    return state
+           |  }
+           |}
+           |
+           |Contract Bar(foo: Foo, mut v: U256) {
+           |  @using(updateFields = true)
+           |  pub fn update() -> () {
+           |    v = 0
            |  }
            |}
            |""".stripMargin
