@@ -154,6 +154,7 @@ object StaticAnalysis {
   }
 
   // Optimize: we will need to introduce `MultiState` later
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def updateNonSimpleViewFuncSet(
       nonSimpleViewFuncSet: mutable.Set[(TypeId, FuncId)],
       multiContract: MultiContract,
