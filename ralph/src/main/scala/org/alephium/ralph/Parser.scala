@@ -49,7 +49,8 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.ident | Lexer.constantIdent).map(Ast.Variable.apply[Ctx])
   def variableIdOnly[Unknown: P]: P[Ast.Variable[Ctx]] =
     P(Lexer.ident).map(Ast.Variable.apply[Ctx])
-  def alphTokenId[Unknown: P]: P[Ast.Expr[Ctx]] = Lexer.keyword("ALPH").map(_ => Ast.ALPHTokenId())
+  def alphTokenId[Unknown: P]: P[Ast.Expr[Ctx]] =
+    Lexer.token(Keyword.ALPH_CAPS).map(_ => Ast.ALPHTokenId())
 
   def alphAmount[Unknown: P]: P[Ast.Expr[Ctx]]                       = expr
   def tokenAmount[Unknown: P]: P[(Ast.Expr[Ctx], Ast.Expr[Ctx])]     = P(expr ~ ":" ~ expr)
@@ -136,13 +137,13 @@ abstract class Parser[Ctx <: StatelessContext] {
     P("(" ~ expr ~ ")").map(Ast.ParenExpr.apply[Ctx])
 
   def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
-    P(Lexer.keyword("if") ~/ "(" ~ expr ~ ")" ~ expr).map { case (condition, expr) =>
+    P(Lexer.token(Keyword.`if`) ~/ "(" ~ expr ~ ")" ~ expr).map { case (condition, expr) =>
       Ast.IfBranchExpr(condition, expr)
     }
   def elseIfBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
-    P(Lexer.keyword("else") ~ ifBranchExpr)
+    P(Lexer.token(Keyword.`else`) ~ ifBranchExpr)
   def elseBranchExpr[Unknown: P]: P[Ast.ElseBranchExpr[Ctx]] =
-    P(Lexer.keyword("else") ~ expr).map(Ast.ElseBranchExpr(_))
+    P(Lexer.token(Keyword.`else`) ~ expr).map(Ast.ElseBranchExpr(_))
   def ifelseExpr[Unknown: P]: P[Ast.IfElseExpr[Ctx]] =
     P(ifBranchExpr ~ elseIfBranchExpr.rep(0) ~ Index ~ elseBranchExpr.?).map {
       case (ifBranch, elseIfBranches, _, Some(elseBranch)) =>
@@ -161,7 +162,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
 
   def normalRet[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
-    P(Lexer.keyword("return") ~/ expr.rep(0, ",")).map(Ast.ReturnStmt.apply[Ctx])
+    P(Lexer.token(Keyword.`return`) ~/ expr.rep(0, ",")).map(Ast.ReturnStmt.apply[Ctx])
 
   def stringInterpolator[Unknown: P]: P[Ast.Expr[Ctx]] =
     P("${" ~ expr ~ "}")
@@ -184,7 +185,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     varDeclaration.map(Seq(_)) | "(" ~ varDeclaration.rep(1, ",") ~ ")"
   )
   def varDef[Unknown: P]: P[Ast.VarDef[Ctx]] =
-    P(Lexer.keyword("let") ~/ varDeclarations ~ "=" ~ expr).map { case (vars, expr) =>
+    P(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr).map { case (vars, expr) =>
       Ast.VarDef(vars, expr)
     }
   def assignmentSimpleTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = P(
@@ -237,7 +238,9 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(
       annotation.rep(0) ~
         Lexer.FuncModifier.modifiers.rep(0) ~ Lexer
-          .keyword("fn") ~/ Lexer.funcId ~ funParams ~ returnType ~ ("{" ~ statement.rep ~ "}").?
+          .token(
+            Keyword.fn
+          ) ~/ Lexer.funcId ~ funParams ~ returnType ~ ("{" ~ statement.rep ~ "}").?
     ).map { case (annotations, modifiers, funcId, params, returnType, statements) =>
       if (modifiers.toSet.size != modifiers.length) {
         throw Compiler.Error(s"Duplicated function modifiers: $modifiers")
@@ -283,7 +286,7 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   def eventFields[Unknown: P]: P[Seq[Ast.EventField]] = P("(" ~ eventField.rep(0, ",") ~ ")")
   def eventDef[Unknown: P]: P[Ast.EventDef] =
-    P(Lexer.keyword("event") ~/ Lexer.typeId ~ eventFields)
+    P(Lexer.token(Keyword.event) ~/ Lexer.typeId ~ eventFields)
       .map { case (typeId, fields) =>
         if (fields.length >= Instr.allLogInstrs.length) {
           throw Compiler.Error("Max 8 fields allowed for contract events")
@@ -306,13 +309,13 @@ abstract class Parser[Ctx <: StatelessContext] {
   def block[Unknown: P]: P[Seq[Ast.Statement[Ctx]]]      = P("{" ~ statement.rep(1) ~ "}")
   def emptyBlock[Unknown: P]: P[Seq[Ast.Statement[Ctx]]] = P("{" ~ "}").map(_ => Seq.empty)
   def ifBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
-    P(Lexer.keyword("if") ~/ "(" ~ expr ~ ")" ~ block).map { case (condition, body) =>
+    P(Lexer.token(Keyword.`if`) ~/ "(" ~ expr ~ ")" ~ block).map { case (condition, body) =>
       Ast.IfBranchStatement(condition, body)
     }
   def elseIfBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
-    P(Lexer.keyword("else") ~ ifBranchStmt)
+    P(Lexer.token(Keyword.`else`) ~ ifBranchStmt)
   def elseBranchStmt[Unknown: P]: P[Ast.ElseBranchStatement[Ctx]] =
-    P(Lexer.keyword("else") ~ (block | emptyBlock)).map(Ast.ElseBranchStatement(_))
+    P(Lexer.token(Keyword.`else`) ~ (block | emptyBlock)).map(Ast.ElseBranchStatement(_))
   def ifelseStmt[Unknown: P]: P[Ast.IfElseStatement[Ctx]] =
     P(ifBranchStmt ~ elseIfBranchStmt.rep(0) ~ elseBranchStmt.?)
       .map { case (ifBranch, elseIfBranches, elseBranchOpt) =>
@@ -325,13 +328,15 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
 
   def whileStmt[Unknown: P]: P[Ast.While[Ctx]] =
-    P(Lexer.keyword("while") ~/ "(" ~ expr ~ ")" ~ block).map { case (expr, block) =>
+    P(Lexer.token(Keyword.`while`) ~/ "(" ~ expr ~ ")" ~ block).map { case (expr, block) =>
       Ast.While(expr, block)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def forLoopStmt[Unknown: P]: P[Ast.ForLoop[Ctx]] =
-    P(Lexer.keyword("for") ~/ "(" ~ statement.? ~ ";" ~ expr ~ ";" ~ statement.? ~ ")" ~ block)
+    P(
+      Lexer.token(Keyword.`for`) ~/ "(" ~ statement.? ~ ";" ~ expr ~ ";" ~ statement.? ~ ")" ~ block
+    )
       .map { case (initializeOpt, condition, updateOpt, body) =>
         if (initializeOpt.isEmpty) {
           throw Compiler.Error("No initialize statement in for loop")
@@ -515,7 +520,7 @@ object StatelessParser extends Parser[StatelessContext] {
 
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
-      Start ~ Lexer.keyword("AssetScript") ~/ Lexer.typeId ~ templateParams.? ~
+      Start ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~ templateParams.? ~
         "{" ~ func.rep(1) ~ "}"
     ).map { case (typeId, templateVars, funcs) =>
       Ast.AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
@@ -559,8 +564,8 @@ object StatefulParser extends Parser[StatefulContext] {
   def rawTxScript[Unknown: P]: P[Ast.TxScript] =
     P(
       annotation.rep ~
-        Lexer.keyword(
-          "TxScript"
+        Lexer.token(
+          Keyword.TxScript
         ) ~/ Lexer.typeId ~ templateParams.? ~ "{" ~ Index ~ statement
           .rep(0) ~ func
           .rep(0) ~ "}"
@@ -599,10 +604,10 @@ object StatefulParser extends Parser[StatefulContext] {
     }
 
   def interfaceImplementing[Unknown: P]: P[Seq[Ast.Inheritance]] =
-    P(Lexer.keyword("implements") ~ (interfaceInheritance.rep(1, ",")))
+    P(Lexer.token(Keyword.implements) ~ (interfaceInheritance.rep(1, ",")))
 
   def contractExtending[Unknown: P]: P[Seq[Ast.Inheritance]] =
-    P(Lexer.keyword("extends") ~ (contractInheritance.rep(1, ",")))
+    P(Lexer.token(Keyword.`extends`) ~ (contractInheritance.rep(1, ",")))
 
   def contractInheritances[Unknown: P]: P[Seq[Ast.Inheritance]] = {
     P(contractExtending.? ~ interfaceImplementing.?).map {
@@ -621,7 +626,7 @@ object StatefulParser extends Parser[StatefulContext] {
   }
 
   def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef] =
-    P(Lexer.keyword("const") ~/ Lexer.constantIdent ~ "=" ~ value).map { case (ident, v) =>
+    P(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ value).map { case (ident, v) =>
       Ast.ConstantVarDef(ident, v)
     }
 
@@ -632,26 +637,27 @@ object StatefulParser extends Parser[StatefulContext] {
   def enumField[Unknown: P]: P[Ast.EnumField] =
     P(Lexer.constantIdent ~ "=" ~ value).map(Ast.EnumField.tupled)
   def rawEnumDef[Unknown: P]: P[Ast.EnumDef] =
-    P(Lexer.keyword("enum") ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}").map { case (id, fields) =>
-      if (fields.length == 0) {
-        throw Compiler.Error(s"No field definition in Enum ${id.name}")
-      }
-      Ast.UniqueDef.checkDuplicates(fields, "enum fields")
-      if (fields.distinctBy(_.value.tpe).size != 1) {
-        throw Compiler.Error(s"Fields have different types in Enum ${id.name}")
-      }
-      if (fields.distinctBy(_.value).size != fields.length) {
-        throw Compiler.Error(s"Fields have the same value in Enum ${id.name}")
-      }
-      Ast.EnumDef(id, fields)
+    P(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}").map {
+      case (id, fields) =>
+        if (fields.length == 0) {
+          throw Compiler.Error(s"No field definition in Enum ${id.name}")
+        }
+        Ast.UniqueDef.checkDuplicates(fields, "enum fields")
+        if (fields.distinctBy(_.value.tpe).size != 1) {
+          throw Compiler.Error(s"Fields have different types in Enum ${id.name}")
+        }
+        if (fields.distinctBy(_.value).size != fields.length) {
+          throw Compiler.Error(s"Fields have the same value in Enum ${id.name}")
+        }
+        Ast.EnumDef(id, fields)
     }
   def enumDef[Unknown: P]: P[Ast.EnumDef] = P(Start ~ rawEnumDef ~ End)
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawContract[Unknown: P]: P[Ast.Contract] =
     P(
-      annotation.rep ~ Lexer.`abstract` ~ Lexer.keyword(
-        "Contract"
+      annotation.rep ~ Lexer.`abstract` ~ Lexer.token(
+        Keyword.Contract
       ) ~/ Lexer.typeId ~ contractFields ~
         contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
     ).map {
@@ -709,8 +715,8 @@ object StatefulParser extends Parser[StatefulContext] {
   }
   def rawInterface[Unknown: P]: P[Ast.ContractInterface] =
     P(
-      annotation.rep ~ Lexer.keyword("Interface") ~/ Lexer.typeId ~
-        (Lexer.keyword("extends") ~/ interfaceInheritance.rep(1, ",")).? ~
+      annotation.rep ~ Lexer.token(Keyword.Interface) ~/ Lexer.typeId ~
+        (Lexer.token(Keyword.`extends`) ~/ interfaceInheritance.rep(1, ",")).? ~
         "{" ~ eventDef.rep ~ interfaceFunc.rep ~ "}"
     ).map { case (annotations, typeId, inheritances, events, funcs) =>
       inheritances match {
