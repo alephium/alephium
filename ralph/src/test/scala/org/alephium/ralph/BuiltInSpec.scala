@@ -16,9 +16,11 @@
 
 package org.alephium.ralph
 
+import akka.util.ByteString
+
 import org.alephium.protocol.vm._
 import org.alephium.ralph.BuiltIn.{OverloadedSimpleBuiltIn, SimpleBuiltIn}
-import org.alephium.util.AlephiumSpec
+import org.alephium.util.{AlephiumSpec, U256}
 
 class BuiltInSpec extends AlephiumSpec {
   it should "check all functions that can use preapproved assets" in {
@@ -52,5 +54,90 @@ class BuiltInSpec extends AlephiumSpec {
       .toSet is StaticAnalysis.contractAssetsInstrs.--(
       Set(SelfAddress, TransferAlphFromSelf, TransferAlphToSelf)
     )
+  }
+
+  it should "initialize built-in encoding functions for contracts" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val ast = Compiler.compileContractFull(code).rightValue.ast
+    ast.builtInContractFuncs().length is 2
+    ast.funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is
+      Seq(U256Const(Val.U256(U256.Zero)), Encode)
+    ast.funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is
+      Seq(U256Const(Val.U256(U256.Zero)), Encode)
+  }
+
+  it should "initialize built-in encoding functions for contracts using standard interfaces" in {
+    def code(enabled: Boolean): String =
+      s"""
+         |@std(enabled = $enabled)
+         |Contract Foo() implements IFoo {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |@std(id = #ffff)
+         |Interface IFoo {
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+
+    def test(enabled: Boolean, encodeImmFieldsInstrs: Seq[Instr[StatelessContext]]) = {
+      val ast = Compiler.compileContractFull(code(enabled)).rightValue.ast
+      ast.funcTable.size is 3
+      ast.builtInContractFuncs().length is 2
+
+      val foo = ast.funcTable(Ast.FuncId("foo", false))
+      foo.isStatic is false
+      val encodeImmFields = ast.funcTable(Ast.FuncId("encodeImmFields", true))
+      encodeImmFields.isStatic is true
+      encodeImmFields.genCode(Seq.empty) is encodeImmFieldsInstrs
+      val encodeMutFields = ast.funcTable(Ast.FuncId("encodeMutFields", true))
+      encodeMutFields.isStatic is true
+      encodeMutFields.genCode(Seq.empty) is
+        Seq(U256Const(Val.U256(U256.Zero)), Encode)
+    }
+
+    test(
+      true,
+      Seq(
+        BytesConst(Val.ByteVec(ByteString("ALPH") ++ ByteString(0xff, 0xff))),
+        U256Const(Val.U256(U256.One)),
+        Encode
+      )
+    )
+
+    test(false, Seq(U256Const(Val.U256(U256.Zero)), Encode))
+  }
+
+  it should "check all functions that need to check external caller" in {
+    BuiltIn.statelessFuncs.values.count(_.needToCheckExternalCaller) is 0
+    BuiltIn.statefulFuncs.values.filter(_.needToCheckExternalCaller).toSet is
+      Set[BuiltIn.BuiltIn[StatefulContext]](
+        BuiltIn.approveToken,
+        BuiltIn.tokenRemaining,
+        BuiltIn.transferToken,
+        BuiltIn.transferTokenFromSelf,
+        BuiltIn.transferTokenToSelf,
+        BuiltIn.burnToken,
+        BuiltIn.lockApprovedAssets,
+        BuiltIn.createContract,
+        BuiltIn.createContractWithToken,
+        BuiltIn.copyCreateContract,
+        BuiltIn.copyCreateContractWithToken,
+        BuiltIn.createSubContract,
+        BuiltIn.createSubContractWithToken,
+        BuiltIn.copyCreateSubContract,
+        BuiltIn.copyCreateSubContractWithToken,
+        BuiltIn.destroySelf,
+        BuiltIn.migrate,
+        BuiltIn.migrateWithFields
+      )
   }
 }

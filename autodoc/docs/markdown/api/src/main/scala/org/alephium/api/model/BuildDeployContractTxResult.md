@@ -1,0 +1,16 @@
+[View code on GitHub](https://github.com/alephium/alephium/blob/master/api/src/main/scala/org/alephium/api/model/BuildDeployContractTxResult.scala)
+
+The code defines a case class called `BuildDeployContractTxResult` which represents the result of building and deploying a smart contract transaction on the Alephium blockchain. The class contains several fields including the `fromGroup` and `toGroup` which represent the source and destination groups of the transaction, `unsignedTx` which is the serialized unsigned transaction, `gasAmount` and `gasPrice` which represent the amount of gas used and the price of gas respectively, `txId` which is the transaction ID, and `contractAddress` which is the address of the deployed contract.
+
+The `BuildDeployContractTxResult` object also defines a companion object with a `from` method that takes an `UnsignedTransaction` object and a `GroupConfig` object as input and returns a `BuildDeployContractTxResult` object. The `from` method uses the input `UnsignedTransaction` object to extract the necessary information to populate the fields of the `BuildDeployContractTxResult` object. Specifically, it extracts the `fromGroup`, `toGroup`, `unsignedTx`, `gasAmount`, `gasPrice`, `txId`, and `contractAddress` fields from the `UnsignedTransaction` object.
+
+This code is likely used in the larger Alephium project to facilitate the building and deployment of smart contracts on the Alephium blockchain. The `BuildDeployContractTxResult` object provides a convenient way to represent the result of such transactions, while the `from` method provides a way to easily convert an `UnsignedTransaction` object into a `BuildDeployContractTxResult` object. This can be useful for developers who are building applications on top of the Alephium blockchain and need to interact with smart contracts. For example, a developer might use this code to build and deploy a smart contract transaction, and then use the resulting `BuildDeployContractTxResult` object to retrieve the contract address and other relevant information about the deployed contract.
+## Questions: 
+ 1. What is the purpose of the `BuildDeployContractTxResult` class?
+- The `BuildDeployContractTxResult` class represents the result of building and deploying a contract transaction, including information such as the unsigned transaction, gas amount, gas price, transaction ID, and contract address.
+
+2. What is the `from` method in the `BuildDeployContractTxResult` object used for?
+- The `from` method is used to create a `BuildDeployContractTxResult` instance from an `UnsignedTransaction` object, using the provided `GroupConfig` to determine the contract ID and other information.
+
+3. What is the purpose of the `GasInfo` and `ChainIndexInfo` traits that `BuildDeployContractTxResult` extends?
+- The `GasInfo` and `ChainIndexInfo` traits provide additional information about the gas used in the transaction and the chain index, respectively, which can be useful for analyzing and tracking transactions in the Alephium network.

@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.model
 
+import scala.collection.IndexedSeqView
 import scala.collection.immutable.ListMap
 
 import akka.util.ByteString
@@ -24,7 +25,7 @@ import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.vm._
 import org.alephium.serde._
-import org.alephium.util.{AVector, Math, TimeStamp, U256}
+import org.alephium.util.{AVector, EitherF, Math, TimeStamp, U256}
 
 /** Up to one new token might be issued in each transaction exception for the coinbase transaction
   * The id of the new token will be hash of the first input
@@ -132,6 +133,28 @@ object UnsignedTransaction {
     )
   }
 
+  // scalastyle:off parameter.number
+  def approve(
+      script: StatefulScript,
+      owner: LockupScript.Asset,
+      inputs: AVector[TxInput],
+      inputUTXOs: AVector[AssetOutput],
+      approvedAttoAlphAmount: U256,
+      approvedTokens: AVector[(TokenId, U256)],
+      gasAmount: GasBox,
+      gasPrice: GasPrice
+  )(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
+    val approved         = TxOutputInfo(owner, approvedAttoAlphAmount, approvedTokens, None, None)
+    val approvedAsOutput = buildOutputs(approved)
+    val gasFee           = gasPrice * gasAmount
+    for {
+      alphRemainder  <- calculateAlphRemainder(inputUTXOs.view, approvedAsOutput, gasFee)
+      tokenRemainder <- calculateTokensRemainder(inputUTXOs.view, approvedAsOutput)
+      fixedOutputs   <- calculateChangeOutputs(alphRemainder, tokenRemainder, owner)
+    } yield UnsignedTransaction(Some(script), gasAmount, gasPrice, inputs, fixedOutputs)
+  }
+  // scalastyle:on parameter.number
+
   def coinbase(inputs: AVector[TxInput], fixedOutputs: AVector[AssetOutput])(implicit
       networkConfig: NetworkConfig
   ): UnsignedTransaction = {
@@ -156,15 +179,16 @@ object UnsignedTransaction {
   )(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
     assume(gas >= minimalGas)
     assume(gasPrice.value <= ALPH.MaxALPHValue)
-    val gasFee = gasPrice * gas
+    val gasFee        = gasPrice * gas
+    val inputUTXOView = inputs.view.map(_._2)
     for {
       _ <- checkWithMaxTxInputNum(inputs)
       _ <- checkUniqueInputs(inputs)
       _ <- checkMinimalAlphPerOutput(outputInfos)
       _ <- checkTokenValuesNonZero(outputInfos)
       txOutputs = buildOutputs(outputInfos)
-      alphRemainder   <- calculateAlphRemainder(inputs, txOutputs, gasFee)
-      tokensRemainder <- calculateTokensRemainder(inputs, txOutputs)
+      alphRemainder   <- calculateAlphRemainder(inputUTXOView, txOutputs, gasFee)
+      tokensRemainder <- calculateTokensRemainder(inputUTXOView, txOutputs)
       changeOutputs   <- calculateChangeOutputs(alphRemainder, tokensRemainder, fromLockupScript)
     } yield {
       UnsignedTransaction(
@@ -233,12 +257,12 @@ object UnsignedTransaction {
   }
 
   def calculateAlphRemainder(
-      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      inputs: IndexedSeqView[AssetOutput],
       outputs: AVector[AssetOutput],
       gasFee: U256
   ): Either[String, U256] = {
     for {
-      inputSum <- inputs.foldE(U256.Zero)(_ add _._2.amount toRight "Input amount overflow")
+      inputSum <- EitherF.foldTry(inputs, U256.Zero)(_ add _.amount toRight "Input amount overflow")
       outputAmount <- outputs.foldE(U256.Zero)(
         _ add _.amount toRight "Output amount overflow"
       )
@@ -248,11 +272,13 @@ object UnsignedTransaction {
   }
 
   def calculateTokensRemainder(
-      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      inputs: IndexedSeqView[AssetOutput],
       outputs: AVector[AssetOutput]
   ): Either[String, AVector[(TokenId, U256)]] = {
     for {
-      inputs    <- calculateTotalAmountPerToken(inputs.flatMap(_._2.tokens))
+      inputs <- calculateTotalAmountPerToken(
+        inputs.foldLeft(AVector.empty[(TokenId, U256)])(_ ++ _.tokens)
+      )
       outputs   <- calculateTotalAmountPerToken(outputs.flatMap(_.tokens))
       _         <- checkNoNewTokensInOutputs(inputs, outputs)
       remainder <- calculateRemainingTokens(inputs, outputs)

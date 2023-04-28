@@ -34,6 +34,7 @@ object BuiltIn {
     def params: Seq[String]
     def returns: String
     def doc: String
+    def needToCheckExternalCaller: Boolean
 
     def isPublic: Boolean        = true
     def useUpdateFields: Boolean = false
@@ -100,6 +101,7 @@ object BuiltIn {
       instrs: Seq[Instr[Ctx]],
       usePreapprovedAssets: Boolean,
       useAssetsInContract: Boolean,
+      needToCheckExternalCaller: Boolean,
       category: Category,
       argsCommentedName: Seq[(String, String)],
       retComment: String,
@@ -125,7 +127,8 @@ object BuiltIn {
           retComment: String,
           doc: String,
           usePreapprovedAssets: Boolean = false,
-          useAssetsInContract: Boolean = false
+          useAssetsInContract: Boolean = false,
+          needToCheckExternalCaller: Boolean = false
       ): SimpleBuiltIn[Ctx] =
         SimpleBuiltIn(
           name,
@@ -134,6 +137,7 @@ object BuiltIn {
           Seq(instr),
           usePreapprovedAssets,
           useAssetsInContract,
+          needToCheckExternalCaller,
           category,
           argsName,
           retComment,
@@ -150,7 +154,8 @@ object BuiltIn {
           argsName: Seq[(String, String)],
           retComment: String,
           usePreapprovedAssets: Boolean = false,
-          useAssetsInContract: Boolean = false
+          useAssetsInContract: Boolean = false,
+          needToCheckExternalCaller: Boolean = false
       ): SimpleBuiltIn[Ctx] =
         SimpleBuiltIn(
           name,
@@ -159,6 +164,7 @@ object BuiltIn {
           Seq(instr),
           usePreapprovedAssets,
           useAssetsInContract,
+          needToCheckExternalCaller,
           category,
           argsName,
           retComment,
@@ -175,7 +181,8 @@ object BuiltIn {
           argsName: Seq[(String, String)],
           retComment: String,
           usePreapprovedAssets: Boolean = false,
-          useAssetsInContract: Boolean = false
+          useAssetsInContract: Boolean = false,
+          needToCheckExternalCaller: Boolean = false
       ): SimpleBuiltIn[Ctx] =
         SimpleBuiltIn(
           name,
@@ -184,6 +191,7 @@ object BuiltIn {
           instrs,
           usePreapprovedAssets,
           useAssetsInContract,
+          needToCheckExternalCaller,
           category,
           argsName,
           retComment,
@@ -244,6 +252,8 @@ object BuiltIn {
       useAssetsInContract: Boolean
   ) extends BuiltIn[Ctx]
       with DocUtils {
+    def needToCheckExternalCaller: Boolean = true
+
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       assume(argsTypeWithInstrs.distinctBy(_.argsTypes).length == argsTypeWithInstrs.length)
 
@@ -299,8 +309,9 @@ object BuiltIn {
 
   sealed abstract class GenericStatelessBuiltIn(val name: String)
       extends BuiltIn[StatelessContext] {
-    def usePreapprovedAssets: Boolean = false
-    def useAssetsInContract: Boolean  = false
+    def usePreapprovedAssets: Boolean      = false
+    def useAssetsInContract: Boolean       = false
+    def needToCheckExternalCaller: Boolean = false
   }
 
   val blake2b: SimpleBuiltIn[StatelessContext] =
@@ -644,10 +655,11 @@ object BuiltIn {
   val encodeToByteVec: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
     val name: String = "encodeToByteVec"
 
-    def category: Category            = Category.ByteVec
-    override def isVariadic: Boolean  = true
-    def usePreapprovedAssets: Boolean = false
-    def useAssetsInContract: Boolean  = false
+    def category: Category                 = Category.ByteVec
+    override def isVariadic: Boolean       = true
+    def usePreapprovedAssets: Boolean      = false
+    def useAssetsInContract: Boolean       = false
+    def needToCheckExternalCaller: Boolean = false
 
     def getReturnType(inputType: Seq[Type]): Seq[Type] = Seq(Type.ByteVec)
 
@@ -867,10 +879,11 @@ object BuiltIn {
     )
 
   val panic: BuiltIn[StatelessContext] = new BuiltIn[StatelessContext] {
-    val name: String                  = "panic"
-    def category: Category            = Category.Utils
-    def usePreapprovedAssets: Boolean = false
-    def useAssetsInContract: Boolean  = false
+    val name: String                       = "panic"
+    def category: Category                 = Category.Utils
+    def usePreapprovedAssets: Boolean      = false
+    def useAssetsInContract: Boolean       = false
+    def needToCheckExternalCaller: Boolean = false
     override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
       if (inputType.nonEmpty && inputType != Seq(Type.U256)) {
         throw Compiler.Error(s"Invalid argument type for $name, optional U256 expected")
@@ -926,13 +939,9 @@ object BuiltIn {
   val u256Max: BuiltIn[StatelessContext] = {
     // scalastyle:off magic.number
     val instrs = Seq[Instr[StatelessContext]](
+      U256Const0,
       U256Const1,
-      U256Const(Val.U256(U256.unsafe(255))),
-      U256SHL,
-      Dup,
-      U256Const1,
-      U256Sub,
-      U256BitOr
+      U256ModSub
     )
     // scalastyle:on magic.number
     SimpleBuiltIn.utilsMultipleInstr(
@@ -1065,7 +1074,8 @@ object BuiltIn {
         "amount"      -> "the amount of the token to be approved"
       ),
       retComment = "",
-      doc = "Approves the usage of certain amount of token from the given address"
+      doc = "Approves the usage of certain amount of token from the given address",
+      needToCheckExternalCaller = true
     )
 
   val tokenRemaining: SimpleBuiltIn[StatefulContext] =
@@ -1075,7 +1085,8 @@ object BuiltIn {
       Seq(Type.U256),
       TokenRemaining,
       argsName = Seq("address" -> "the input address", "tokenId" -> "the token id"),
-      retComment = "the amount of the remaining token amount in the input assets of the function"
+      retComment = "the amount of the remaining token amount in the input assets of the function",
+      needToCheckExternalCaller = true
     )
 
   val transferToken: SimpleBuiltIn[StatefulContext] =
@@ -1091,7 +1102,8 @@ object BuiltIn {
         "amount"      -> "the amount of token to be transferred"
       ),
       retComment = "",
-      doc = "Transfers token from the input assets of the function."
+      doc = "Transfers token from the input assets of the function.",
+      needToCheckExternalCaller = true
     )
 
   val transferTokenFromSelf: SimpleBuiltIn[StatefulContext] =
@@ -1107,7 +1119,8 @@ object BuiltIn {
         "amount"    -> "the amount of token to be transferred"
       ),
       retComment = "",
-      doc = "Transfers the contract's token from the input assets of the function."
+      doc = "Transfers the contract's token from the input assets of the function.",
+      needToCheckExternalCaller = true
     )
 
   val transferTokenToSelf: SimpleBuiltIn[StatefulContext] =
@@ -1123,7 +1136,8 @@ object BuiltIn {
         "amount"      -> "the amount of token to be transferred"
       ),
       retComment = "",
-      doc = "Transfers token to the contract from the input assets of the function."
+      doc = "Transfers token to the contract from the input assets of the function.",
+      needToCheckExternalCaller = true
     )
 
   val burnToken: SimpleBuiltIn[StatefulContext] =
@@ -1138,7 +1152,8 @@ object BuiltIn {
         "amount"  -> "the amount of token to be burnt"
       ),
       retComment = "",
-      doc = "Burns token from the input assets of the function."
+      doc = "Burns token from the input assets of the function.",
+      needToCheckExternalCaller = true
     )
 
   val lockApprovedAssets: SimpleBuiltIn[StatefulContext] =
@@ -1153,7 +1168,8 @@ object BuiltIn {
         "timestamp" -> "the timestamp that the assets will be locked until"
       ),
       retComment = "",
-      doc = "Locks the current approved assets."
+      doc = "Locks the current approved assets.",
+      needToCheckExternalCaller = true
     )
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
@@ -1182,7 +1198,8 @@ object BuiltIn {
         "encodedMutFields" -> "the encoded mutable fields as a ByteVec"
       ),
       retComment = "the id of the created contract",
-      doc = docContractFunction(issueToken = false, copy = false, subContract = false)
+      doc = docContractFunction(issueToken = false, copy = false, subContract = false),
+      needToCheckExternalCaller = true
     )
 
   val createContractWithToken: BuiltIn[StatefulContext] =
@@ -1229,7 +1246,8 @@ object BuiltIn {
         copy = true,
         subContract = false,
         costLessThan = "createContract"
-      )
+      ),
+      needToCheckExternalCaller = true
     )
 
   val copyCreateContractWithToken: BuiltIn[StatefulContext] =
@@ -1277,7 +1295,8 @@ object BuiltIn {
         "encodedMutFields" -> "the encoded mutable fields as a ByteVec"
       ),
       retComment = "the id of the created contract",
-      doc = docContractFunction(issueToken = false, copy = false, subContract = true)
+      doc = docContractFunction(issueToken = false, copy = false, subContract = true),
+      needToCheckExternalCaller = true
     )
 
   val createSubContractWithToken: BuiltIn[StatefulContext] =
@@ -1333,7 +1352,8 @@ object BuiltIn {
         copy = true,
         subContract = true,
         costLessThan = "createSubContract"
-      )
+      ),
+      needToCheckExternalCaller = true
     )
 
   val copyCreateSubContractWithToken: BuiltIn[StatefulContext] =
@@ -1385,7 +1405,8 @@ object BuiltIn {
       argsName =
         Seq("refundAddress" -> "the address to receive the remaining assets in the contract"),
       retComment = "",
-      doc = "Destroys the contract and transfer the remaining assets to a designated address."
+      doc = "Destroys the contract and transfer the remaining assets to a designated address.",
+      needToCheckExternalCaller = true
     )
 
   val migrate: SimpleBuiltIn[StatefulContext] =
@@ -1396,7 +1417,8 @@ object BuiltIn {
       MigrateSimple,
       argsName = Seq("newBytecode" -> "the new bytecode for the contract to migrate to"),
       retComment = "",
-      doc = "Migrates the code of the contract."
+      doc = "Migrates the code of the contract.",
+      needToCheckExternalCaller = true
     )
 
   val migrateWithFields: SimpleBuiltIn[StatefulContext] =
@@ -1411,7 +1433,8 @@ object BuiltIn {
         "newEncodedMutFields" -> "the encoded mutable fields for the contract to migrate to"
       ),
       retComment = "",
-      doc = "Migrates both the code and the fields of the contract."
+      doc = "Migrates both the code and the fields of the contract.",
+      needToCheckExternalCaller = true
     )
 
   val contractExists: SimpleBuiltIn[StatefulContext] =
@@ -1529,9 +1552,10 @@ object BuiltIn {
 
   sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] with DocUtils {
     def name: String
-    def category: Category            = Category.SubContract
-    def usePreapprovedAssets: Boolean = false
-    def useAssetsInContract: Boolean  = false
+    def category: Category                 = Category.SubContract
+    def usePreapprovedAssets: Boolean      = false
+    def useAssetsInContract: Boolean       = false
+    def needToCheckExternalCaller: Boolean = false
 
     def returnType: Seq[Type] = Seq(Type.ByteVec)
 
@@ -1596,9 +1620,10 @@ object BuiltIn {
     val name: String       = "tokenId"
     val category: Category = Category.Contract
 
-    def signature: String             = s"fn $name!(contract:<Contract>) -> (ByteVec)"
-    def usePreapprovedAssets: Boolean = false
-    def useAssetsInContract: Boolean  = false
+    def signature: String                  = s"fn $name!(contract:<Contract>) -> (ByteVec)"
+    def usePreapprovedAssets: Boolean      = false
+    def useAssetsInContract: Boolean       = false
+    def needToCheckExternalCaller: Boolean = false
 
     def returnType: Seq[Type] = Seq(Type.ByteVec)
 
@@ -1660,4 +1685,64 @@ object BuiltIn {
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
+
+  trait ContractBuiltIn[Ctx <: StatelessContext] extends Compiler.ContractFunc[Ctx] {
+    val isPublic: Boolean             = true
+    val usePreapprovedAssets: Boolean = false
+    val useAssetsInContract: Boolean  = false
+    val useUpdateFields: Boolean      = false
+
+    override def isStatic: Boolean = true
+
+    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = ???
+
+    def returnType: Seq[Type]
+    def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+      if (inputType == argsType) {
+        returnType
+      } else {
+        throw Error(s"Invalid args type $inputType for function $name")
+      }
+    }
+  }
+
+  def encodeImmFields[Ctx <: StatelessContext](
+      stdIdEnabled: Option[Boolean],
+      stdInterfaceId: Option[Ast.StdInterfaceId],
+      fields: Seq[Ast.Argument]
+  ): Compiler.ContractFunc[Ctx] = {
+    val immFieldsTypes = fields.filter(!_.isMutable).map(_.tpe)
+
+    new ContractBuiltIn[Ctx] {
+      val name: String          = "encodeImmFields"
+      val argsType: Seq[Type]   = immFieldsTypes
+      val returnType: Seq[Type] = Seq(Type.ByteVec)
+
+      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = {
+        stdInterfaceId match {
+          case Some(id) if stdIdEnabled.exists(identity) =>
+            Seq[Instr[Ctx]](
+              BytesConst(Val.ByteVec(id.bytes)),
+              U256Const(Val.U256.unsafe(argsType.length + 1)),
+              Encode
+            )
+          case _ => Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(argsType.length)), Encode)
+        }
+      }
+    }
+  }
+
+  def encodeMutFields[Ctx <: StatelessContext](
+      fields: Seq[Ast.Argument]
+  ): Compiler.ContractFunc[Ctx] = {
+    val mutFieldsTypes = fields.filter(_.isMutable).map(_.tpe)
+    new ContractBuiltIn[Ctx] {
+      val name: String          = "encodeMutFields"
+      val argsType: Seq[Type]   = mutFieldsTypes
+      val returnType: Seq[Type] = Seq(Type.ByteVec)
+
+      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
+        Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(argsType.length)), Encode)
+    }
+  }
 }

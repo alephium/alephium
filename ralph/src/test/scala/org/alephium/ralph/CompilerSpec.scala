@@ -61,14 +61,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     {
       info("fail without main statements")
 
-      val script =
-        s"""
-           |TxScript Foo {}
-           |""".stripMargin
+      val script = "TxScript Foo {}"
       Compiler
         .compileTxScript(script)
         .leftValue
-        .message is "No main statements defined in TxScript Foo"
+        .message is
+        """-- error: Expected main statements for type `Foo`:1:15 / ([ \t\r\n] | lineComment):1:15, found "}"
+          |1 |TxScript Foo {}
+          |  |              ^
+          |  |              Expected main statements for type `Foo`
+          |""".stripMargin
     }
 
     {
@@ -87,7 +89,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler
         .compileTxScript(script)
         .leftValue
-        .message is """Parser failed: Expected multiContract:1:1 / rawTxScript:2:1 / "}":3:3, found "event Add(""""
+        .message is
+        """-- error: Expected multiContract:1:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
+          |3 |  event Add(a: U256, b: U256)
+          |  |  ^^^^^^^^^^
+          |  |  Expected "}"
+          |""".stripMargin
     }
   }
 
@@ -3819,5 +3826,96 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContract(code).isRight is true
     }
+  }
+
+  it should "generate code for std id" in {
+    def code(contractAnnotation: String, interfaceAnnotation: String): String =
+      s"""
+         |$contractAnnotation
+         |Contract Bar() implements Foo {
+         |  pub fn foo() -> () {}
+         |}
+         |
+         |$interfaceAnnotation
+         |Interface Foo {
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+
+    Compiler.compileContract(code("", "")).rightValue.fieldLength is 0
+    Compiler.compileContract(code("", "@std(id = #0001)")).rightValue.fieldLength is 1
+    Compiler
+      .compileContract(code("@std(enabled = true)", "@std(id = #0001)"))
+      .rightValue
+      .fieldLength is 1
+    Compiler
+      .compileContract(code("@std(enabled = false)", "@std(id = #0001)"))
+      .rightValue
+      .fieldLength is 0
+  }
+
+  it should "use built-in contract functions" in {
+    def code(
+        contractAnnotation: String,
+        interfaceAnnotation: String,
+        input0: String,
+        input1: String
+    ): String =
+      s"""
+         |$contractAnnotation
+         |Contract Bar(a: U256, @unused mut b: I256) implements Foo {
+         |  @using(checkExternalCaller = false)
+         |  pub fn foo() -> () {
+         |    let bs0 = Bar.encodeImmFields!(${input0})
+         |    let bs1 = Bar.encodeMutFields!(${input1})
+         |    assert!(bs0 == #, 0)
+         |    assert!(bs1 == #, 0)
+         |  }
+         |}
+         |
+         |$interfaceAnnotation
+         |Interface Foo {
+         |  @using(checkExternalCaller = false)
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+
+    Compiler.compileContract(code("", "", "1", "2i")).rightValue.fieldLength is 2
+    Compiler.compileContract(code("", "@std(id = #0001)", "1", "2i")).rightValue.fieldLength is 3
+    Compiler
+      .compileContract(code("@std(enabled = true)", "@std(id = #0001)", "1", "2i"))
+      .rightValue
+      .fieldLength is 3
+    Compiler
+      .compileContract(code("@std(enabled = false)", "@std(id = #0001)", "1", "2i"))
+      .rightValue
+      .fieldLength is 2
+  }
+
+  it should "check whether a function is static or not" in {
+    def compile(testCode: String) = {
+      val code = s"""
+                    |Contract Foo() {
+                    |  pub fn foo(bar: Bar) -> () {
+                    |    ${testCode}
+                    |    return
+                    |  }
+                    |}
+                    |Contract Bar() {
+                    |  pub fn bar() -> () {
+                    |    return
+                    |  }
+                    |}
+                    |""".stripMargin
+      Compiler.compileContractFull(code)
+    }
+    compile("let x = bar.encodeImmFields!()").leftValue.message is
+      s"""Expected non-static function, got "Bar.encodeImmFields""""
+    compile("bar.encodeImmFields!()").leftValue.message is
+      s"""Expected non-static function, got "Bar.encodeImmFields""""
+    compile("let x = Bar.bar()").leftValue.message is
+      s"""Expected static function, got "Bar.bar""""
+    compile("Bar.bar()").leftValue.message is
+      s"""Expected static function, got "Bar.bar""""
   }
 }

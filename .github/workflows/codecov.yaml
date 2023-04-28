@@ -12,9 +12,12 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - uses: olafurpg/setup-java@v10
+      - name: Setup JDK
+        uses: actions/setup-java@v3
         with:
+          distribution: temurin
           java-version: 11
+          cache: sbt
       - run: sbt clean coverage test coverageReport && sbt coverageAggregate
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2

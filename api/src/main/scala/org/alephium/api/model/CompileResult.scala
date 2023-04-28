@@ -57,6 +57,7 @@ object CompileScriptResult {
   }
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class CompileContractResult(
     version: String,
     name: String,
@@ -67,7 +68,8 @@ final case class CompileContractResult(
     fields: CompileResult.FieldsSig,
     functions: AVector[CompileResult.FunctionSig],
     events: AVector[CompileResult.EventSig],
-    warnings: AVector[String]
+    warnings: AVector[String],
+    stdInterfaceId: Option[String] = None
 ) extends CompileResult.Versioned
 
 object CompileContractResult {
@@ -91,7 +93,14 @@ object CompileContractResult {
       fields,
       functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from)),
-      warnings = compiled.warnings
+      warnings = compiled.warnings,
+      stdInterfaceId = if (contractAst.hasStdIdField) {
+        contractAst.stdInterfaceId.map(id =>
+          Hex.toHexString(id.bytes.drop(Ast.StdInterfaceIdPrefix.length))
+        )
+      } else {
+        None
+      }
     )
   }
 }

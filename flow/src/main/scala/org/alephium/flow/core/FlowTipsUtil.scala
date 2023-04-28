@@ -31,6 +31,7 @@ trait FlowTipsUtil {
   def groups: Int
   def initialGenesisHashes: AVector[BlockHash]
   def genesisHashes: AVector[AVector[BlockHash]]
+  def getBestDeps(groupIndex: GroupIndex): BlockDeps
 
   def getHeightUnsafe(hash: BlockHash): Int
   def getBlockUnsafe(hash: BlockHash): Block
@@ -214,6 +215,24 @@ trait FlowTipsUtil {
         genesisHashes(targetGroup.value)
       } else {
         getOutTipsUnsafe(header.getGroupTip(targetGroup))
+      }
+    }
+  }
+
+  def getIncomingBlockDeps(
+      targetGroupIndex: GroupIndex,
+      deps: BlockDeps
+  ): IOResult[AVector[BlockHash]] = {
+    deps.inDeps.foldE(AVector.empty[BlockHash]) { case (acc, inDep) =>
+      val chainIndex = ChainIndex.from(inDep)
+      assume(ChainIndex.from(inDep).isIntraGroup)
+      if (brokerConfig.contains(chainIndex.from)) {
+        val bestInDep = getBestDeps(chainIndex.from).getOutDep(targetGroupIndex)
+        getInTip(inDep, targetGroupIndex).flatMap { bestTargetDep =>
+          getTipsDiff(bestInDep, bestTargetDep).map(acc ++ _)
+        }
+      } else {
+        Right(acc)
       }
     }
   }

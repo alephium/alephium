@@ -14,8 +14,11 @@ jobs:
         java: [ '11' ]
     steps:
       - uses: actions/checkout@v2
-      - uses: olafurpg/setup-scala@v10
+      - name: Setup JDK
+        uses: actions/setup-java@v3
         with:
+          distribution: temurin
           java-version: ${{ matrix.java }}
+          cache: sbt
       - run: sbt it:test
         shell: bash

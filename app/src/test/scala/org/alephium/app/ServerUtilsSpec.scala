@@ -34,7 +34,7 @@ import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.ralph.Compiler
-import org.alephium.serde.serialize
+import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
 // scalastyle:off file.size.limit
@@ -1991,6 +1991,63 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "compile contract and return the std id field" in new Fixture {
+    def code(contractAnnotation: String, interfaceAnnotation: String) =
+      s"""
+         |$contractAnnotation
+         |Contract Bar(@unused a: U256) implements Foo {
+         |  pub fn foo() -> () {}
+         |}
+         |
+         |$interfaceAnnotation
+         |Interface Foo {
+         |  pub fn foo() -> ()
+         |}
+         |""".stripMargin
+
+    val serverUtils = new ServerUtils()
+    val result0     = serverUtils.compileContract(Compile.Contract(code("", ""))).rightValue
+    result0.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
+    result0.stdInterfaceId is None
+
+    val result1 =
+      serverUtils.compileContract(Compile.Contract(code("", "@std(id = #0001)"))).rightValue
+    result1.fields is CompileResult.FieldsSig(
+      AVector("a", "__stdInterfaceId"),
+      AVector("U256", "ByteVec"),
+      AVector(false, false)
+    )
+    result1.stdInterfaceId is Some("0001")
+
+    val result2 = serverUtils
+      .compileContract(Compile.Contract(code("@std(enabled = true)", "@std(id = #0001)")))
+      .rightValue
+    result2.fields is CompileResult.FieldsSig(
+      AVector("a", "__stdInterfaceId"),
+      AVector("U256", "ByteVec"),
+      AVector(false, false)
+    )
+    result2.stdInterfaceId is Some("0001")
+
+    val result3 = serverUtils
+      .compileContract(Compile.Contract(code("@std(enabled = false)", "@std(id = #0001)")))
+      .rightValue
+    result3.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
+    result3.stdInterfaceId is None
+
+    val result4 = serverUtils
+      .compileContract(Compile.Contract(code("@std(enabled = true)", "")))
+      .rightValue
+    result4.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
+    result4.stdInterfaceId is None
+
+    val result5 = serverUtils
+      .compileContract(Compile.Contract(code("@std(enabled = false)", "")))
+      .rightValue
+    result5.fields is CompileResult.FieldsSig(AVector("a"), AVector("U256"), AVector(false))
+    result5.stdInterfaceId is None
+  }
+
   it should "create build deploy contract script" in new Fixture {
     val rawCode =
       s"""
@@ -2125,6 +2182,97 @@ class ServerUtilsSpec extends AlephiumSpec {
       tokensSorted.length
     )
     testResult.txOutputs(4).address is Address.contract(testContract.contractId)
+  }
+
+  trait ScriptTxFixture extends Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils = new ServerUtils
+
+    val chainIndex                        = ChainIndex.unsafe(0, 0)
+    val (testPriKey, testPubKey)          = chainIndex.from.generateKey
+    val testAddress                       = Address.p2pkh(testPubKey)
+    val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
+    val genesisAddress                    = Address.p2pkh(genesisPubKey)
+
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val code = Compiler.compileContract(contract).toOption.get
+
+    lazy val deployContractTxResult = serverUtils
+      .buildDeployContractTx(
+        blockFlow,
+        BuildDeployContractTx(
+          Hex.unsafe(testPubKey.toHexString),
+          bytecode = serialize(code) ++ ByteString(0, 0),
+          initialAttoAlphAmount = Some(Amount(ALPH.oneAlph))
+        )
+      )
+      .rightValue
+
+    def deployContract() = {
+      val deployContractTx =
+        deserialize[UnsignedTransaction](Hex.unsafe(deployContractTxResult.unsignedTx)).rightValue
+      deployContractTx.fixedOutputs.length is 1
+      val output = deployContractTx.fixedOutputs.head
+      output.amount is ALPH.oneAlph.subUnsafe(
+        deployContractTx.gasPrice * deployContractTx.gasAmount
+      )
+
+      signAndAddToMemPool(
+        deployContractTxResult.txId,
+        deployContractTxResult.unsignedTx,
+        chainIndex,
+        testPriKey
+      )
+    }
+
+    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
+      addAndCheck(blockFlow, block)
+    }
+  }
+
+  it should "execute scripts for cross-group confirmed inputs" in new ScriptTxFixture {
+    val block = transfer(blockFlow, genesisKeys(1)._1, testPubKey, ALPH.alph(2))
+    addAndCheck(blockFlow, block)
+    checkAddressBalance(testAddress, ALPH.alph(2))
+    deployContract()
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
+  }
+
+  it should "execute scripts for cross-group mempool inputs" in new ScriptTxFixture {
+    val block   = transfer(blockFlow, genesisKeys(1)._1, testPubKey, ALPH.alph(2))
+    val blockTx = block.nonCoinbase.head.toTemplate
+    block.chainIndex is ChainIndex.unsafe(1, 0)
+    blockFlow
+      .getGrandPool()
+      .add(block.chainIndex, blockTx, TimeStamp.now())
+    checkAddressBalance(testAddress, ALPH.alph(2))
+    deployContract()
+    blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 0))
+    blockFlow.getGrandPool().get(blockTx.id).isEmpty is false
+    // TODO: improve the calculation of bestDeps to get rid of the following line
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
+    blockFlow.getGrandPool().get(blockTx.id).isEmpty is true
+
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
+    confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+    blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
   }
 
   private def generateDestination(

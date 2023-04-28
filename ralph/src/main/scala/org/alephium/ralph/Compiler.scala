@@ -148,9 +148,13 @@ object Compiler {
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
   }
 
-  final case class Error(message: String) extends Exception(message)
+  final case class Error(message: String, cause: Throwable) extends Exception(message, cause)
   object Error {
-    def parse(failure: Parsed.Failure): Error = Error(s"Parser failed: ${failure.trace().longMsg}")
+    // scalastyle:off null
+    def apply(message: String): Error = new Error(message, null)
+    // scalastyle:on null
+
+    def parse(failure: Parsed.Failure): Error = Error(CompilerErrorFormatter(failure).format())
   }
 
   def expectOneType(ident: Ast.Ident, tpe: Seq[Type]): Type = {
@@ -216,6 +220,7 @@ object Compiler {
   trait ContractFunc[Ctx <: StatelessContext] extends FuncInfo[Ctx] {
     def argsType: Seq[Type]
     def returnType: Seq[Type]
+    def isStatic: Boolean = false
   }
   final case class SimpleFunc[Ctx <: StatelessContext](
       id: Ast.FuncId,
@@ -422,10 +427,6 @@ object Compiler {
         case Some(callees) => callees += funcRef
         case None          => externalCalls.update(currentScope, mutable.Set(funcRef))
       }
-    }
-
-    def hasSubFunctionCall(funcId: Ast.FuncId): Boolean = {
-      internalCalls.contains(funcId) || externalCalls.contains(funcId)
     }
   }
 
@@ -686,7 +687,7 @@ object Compiler {
         .keys
         .toSeq
       if (unassignedMutableVars.nonEmpty) {
-        throw new Compiler.Error(
+        throw Compiler.Error(
           s"There are unassigned mutable local vars in function ${typeId.name}.${funcId.name}: ${unassignedMutableVars
               .mkString(",")}"
         )
@@ -728,7 +729,7 @@ object Compiler {
         .keys
         .toSeq
       if (unassignedMutableFields.nonEmpty) {
-        throw new Compiler.Error(
+        throw Compiler.Error(
           s"There are unassigned mutable fields in contract ${typeId.name}: ${unassignedMutableFields
               .mkString(",")}"
         )
@@ -829,7 +830,7 @@ object Compiler {
         )
     }
 
-    protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[Ctx]
+    def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[Ctx]
 
     private def getNewFunc(call: Ast.FuncId): FuncInfo[Ctx] = {
       funcIdents.getOrElse(call, throw Error(s"Function ${call.name} does not exist"))
@@ -878,7 +879,7 @@ object Compiler {
       extends State[StatelessContext] {
     override def eventsInfo: Seq[EventInfo] = Seq.empty
 
-    protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatelessContext] = {
+    def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatelessContext] = {
       BuiltIn.statelessFuncs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }
@@ -950,7 +951,7 @@ object Compiler {
       contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatefulContext]]
   )(implicit val compilerOptions: CompilerOptions)
       extends State[StatefulContext] {
-    protected def getBuiltInFunc(call: Ast.FuncId): FuncInfo[StatefulContext] = {
+    def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatefulContext] = {
       BuiltIn.statefulFuncs
         .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
     }

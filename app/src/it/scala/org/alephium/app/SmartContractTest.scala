@@ -286,7 +286,10 @@ class SmartContractTest extends AlephiumActorSpec {
     val tokenId         = TokenId.from(tokenContractId)
 
     info("Transfer 1024 token back to self")
-    script(SwapContracts.tokenWithdrawTxScript(address, tokenContractId, U256.unsafe(1024)))
+    script(
+      SwapContracts.tokenWithdrawTxScript(address, tokenContractId, U256.unsafe(1024)),
+      attoAlphAmount = Some(Amount(dustUtxoAmount))
+    )
 
     info("Create the ALPH/token swap contract")
     val swapContractBuildResult = contract(
@@ -407,7 +410,8 @@ class SmartContractTest extends AlephiumActorSpec {
 
     info("Transfer 1024 token back to self")
     script(
-      SwapContracts.tokenWithdrawTxScript(address, tokenContractId, U256.unsafe(1024))
+      SwapContracts.tokenWithdrawTxScript(address, tokenContractId, U256.unsafe(1024)),
+      attoAlphAmount = Some(Amount(dustUtxoAmount))
     )
 
     checkUTXOs { currentUTXOs =>
@@ -493,7 +497,8 @@ class SmartContractTest extends AlephiumActorSpec {
 
       currentUTXOs is Set(
         (dustUtxoAmount, token(24)),
-        (ALPH.nanoAlph(997960000000L) - dustUtxoAmount, noTokens),
+        (ALPH.nanoAlph(997960000000L) - dustUtxoAmount * 2, noTokens),
+        (dustUtxoAmount, noTokens),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
         (ALPH.nanoAlph(888899997244000L), noTokens)
@@ -553,7 +558,8 @@ class SmartContractTest extends AlephiumActorSpec {
 
       currentUTXOs is Set(
         (dustUtxoAmount, token(24)),
-        (updatedAmount - dustUtxoAmount, noTokens),
+        (updatedAmount - dustUtxoAmount * 2 - ALPH.alph(100), noTokens),
+        (ALPH.alph(100) + dustUtxoAmount, noTokens),
         (ALPH.alph(10000), noTokens),
         (ALPH.alph(100000), noTokens),
         (ALPH.nanoAlph(888899997244000L), noTokens)
