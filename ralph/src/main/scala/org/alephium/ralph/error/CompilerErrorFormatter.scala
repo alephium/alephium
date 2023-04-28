@@ -119,8 +119,8 @@ object CompilerErrorFormatter {
   val pointer = "^"
 
   def apply(error: FormattableError, program: String): CompilerErrorFormatter = {
-    val farParserLineNumber = IndexedParserInput(program).prettyIndex(error.position)
-    val sourcePosition      = SourcePosition.parse(farParserLineNumber)
+    val fastParseLineNumber = IndexedParserInput(program).prettyIndex(error.position)
+    val sourcePosition      = SourcePosition.parse(fastParseLineNumber)
     val errorLine           = getErroredLine(sourcePosition.rowIndex, program)
 
     CompilerErrorFormatter(

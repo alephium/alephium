@@ -83,7 +83,7 @@ class LexerSpec extends AlephiumSpec {
       val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure].trace()
 
       failure.index is 0
-      failure.longMsg is s"""Expected an I256 or U256 value:1:1 / num:1:1 / (hexNum | decNum):1:1, found "$input""""
+      failure.longMsg is s"""Expected an I256 or U256 value:1:1 / num:1:1 / (hexNum | integer):1:1, found "$input""""
     }
 
     {
@@ -268,12 +268,10 @@ class LexerSpec extends AlephiumSpec {
   }
 
   it should "report invalid decimal number" in {
-    // FIXME: 0.1 is valid decimal number but this fails the test which is the goal here.
-    //        Regardless, is this a bug? Shouldn't 0.1 be a valid decimal number?
     val number = "0.1"
 
     val error =
-      intercept[CompilerError.`Invalid number`](fastparse.parse(number, Lexer.decNum(_)))
+      intercept[CompilerError.`Invalid number`](fastparse.parse(number, Lexer.integer(_)))
 
     error is CompilerError.`Invalid number`(number, 0)
 

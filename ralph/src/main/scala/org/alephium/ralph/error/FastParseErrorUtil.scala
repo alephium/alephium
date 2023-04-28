@@ -69,8 +69,8 @@ object FastParseErrorUtil {
     traced.stack.foldLeft(traced.index)(_ max _._2)
 
   /** Fetch the most recent error message. */
-  private def getLatestErrorMessage(traced: Parsed.TracedFailure, forIndex: Int): String = {
-    // label is added to the tail-end because in `Parsed.TracedFailure.msg` label gets preference.
+  def getLatestErrorMessage(traced: Parsed.TracedFailure, forIndex: Int): String = {
+    // label is added to the tail-end because in `Parsed.TracedFailure.longMsg` label gets preference.
     val stack = traced.stack.appended((traced.label, traced.index))
 
     stack
