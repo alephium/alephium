@@ -260,6 +260,10 @@ class AstSpec extends AlephiumSpec {
       val code =
         s"""
            |Contract Foo(mut v: U256) {
+           |  pub fn x() -> () {
+           |    b()
+           |  }
+           |
            |  @using(updateFields = true)
            |  pub fn a() -> () {
            |    b()
@@ -273,6 +277,7 @@ class AstSpec extends AlephiumSpec {
            |""".stripMargin
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       checkExternalCallerWarnings(warnings).toSet is Set(
+        Warnings.noCheckExternalCallerMsg("Foo", "x"),
         Warnings.noCheckExternalCallerMsg("Foo", "a"),
         Warnings.noCheckExternalCallerMsg("Foo", "b")
       )
