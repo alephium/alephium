@@ -2919,6 +2919,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |Contract Foo(v: U256) extends Base(v) {
+           |  @using(checkExternalCaller = false)
            |  pub fn foo() -> () {
            |    base()
            |  }
@@ -2996,9 +2997,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |Contract Bar() extends Foo() {
+           |  @using(checkExternalCaller = false)
            |  pub fn bar() -> () { foo(0) }
            |}
            |Contract Baz() extends Foo() {
+           |  @using(checkExternalCaller = false)
            |  pub fn baz() -> () { foo(0) }
            |}
            |""".stripMargin
@@ -3219,6 +3222,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
+           |  @using(checkExternalCaller = false)
            |  pub fn foo(code: ByteVec, fields: ByteVec) -> () {
            |    migrateWithFields!(code, #00, fields)
            |  }

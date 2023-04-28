@@ -448,6 +448,11 @@ object Compiler {
     def varTable: mutable.HashMap[String, VarInfo]
     var allowDebug: Boolean = false
 
+    val hasInterfaceFuncCallSet: mutable.Set[Ast.FuncId] = mutable.Set.empty
+    def addInterfaceFuncCall(funcId: Ast.FuncId): Unit = {
+      hasInterfaceFuncCallSet.addOne(funcId)
+    }
+
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
     val accessedVars: mutable.Set[AccessVariable] = mutable.Set.empty[AccessVariable]

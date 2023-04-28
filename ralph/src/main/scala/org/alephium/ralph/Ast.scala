@@ -229,8 +229,12 @@ object Ast {
         throw Compiler.Error(s"Invalid expr $address for contract address")
       }
 
-      if (!state.getContractInfo(contractType).kind.instantiable) {
+      val contractInfo = state.getContractInfo(contractType)
+      if (!contractInfo.kind.instantiable) {
         throw Compiler.Error(s"${contractType.name} is not instantiable")
+      }
+      if (contractInfo.kind == Compiler.ContractKind.Interface) {
+        state.addInterfaceFuncCall(state.currentScope)
       }
 
       Seq(Type.Contract.stack(contractType))
@@ -595,6 +599,15 @@ object Ast {
     val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
     private var funcAccessedVarsCache: Option[Set[Compiler.AccessVariable]] = None
+
+    def isSimpleViewFunc(state: Compiler.State[Ctx]): Boolean = {
+      val hasInterfaceFuncCall = state.hasInterfaceFuncCallSet.contains(id)
+      val hasMigrateSimple = body.exists {
+        case FuncCall(id, _, _) => id.isBuiltIn && id.name == "migrate"
+        case _                  => false
+      }
+      !(useUpdateFields || usePreapprovedAssets || useAssetsInContract || hasInterfaceFuncCall || hasMigrateSimple)
+    }
 
     def signature: FuncSignature = FuncSignature(
       id,
