@@ -42,6 +42,8 @@ class CliSpec extends AlephiumSpec {
       isRecode: Boolean = false
   ) = {
     val cli = Cli()
+//    val updatePaths = sourcePath.split(",").map(_ ++ "/../artifacts").mkString(",")
+//    assert(cli.call(Array("-c", sourcePath, "-a", updatePaths)) == 0)
     assert(cli.call(Array("-c", sourcePath, "-a", artifactsPath)) == 0)
 
     cli.configs

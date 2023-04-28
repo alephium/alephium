@@ -14,8 +14,8 @@
       "bytecodeDebugPatch": "",
       "codeHashDebug": "45e656eed4bb10a58632b9ee6b25f03cc729b33a32271040ddae258fa3759a63",
       "warnings": [
-        "No check external caller for function: Add.add, please use checkCaller!(...) for the function or its private callees.",
-        "Function \"Add.addPrivate\" changes state, please use @using(updateFields = true) for the function"
+        "No external caller check for function \"Add.add\". Please use \"checkCaller!(...)\" in the function or its callees, or disable it with \"@using(checkExternalCaller = false)\".",
+        "Function \"Add.addPrivate\" updates fields. Please use \"@using(updateFields = true)\" for the function."
       ]
     },
     "Greeter": {
