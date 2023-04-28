@@ -3185,7 +3185,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue.warnings is
         AVector(
-          "Function \"Foo.foo\" changes state, please use @using(updateFields = true) for the function"
+          s"""Function "Foo.foo" updates fields. Please use "@using(updateFields = true)" for the function."""
         )
     }
 
@@ -3230,7 +3230,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       Compiler.compileContractFull(code).rightValue.warnings is
         AVector(
-          "Function \"Foo.foo\" changes state, please use @using(updateFields = true) for the function"
+          s"""Function "Foo.foo" updates fields. Please use "@using(updateFields = true)" for the function."""
         )
     }
 
@@ -3353,7 +3353,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
       warnings is AVector(
-        "Function Foo.foo does not update fields, please remove @using(updateFields = true) for the function"
+        s"""Function "Foo.foo" does not update fields. Please remove "@using(updateFields = true)" for the function."""
       )
     }
   }

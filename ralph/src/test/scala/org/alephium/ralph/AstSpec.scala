@@ -26,7 +26,7 @@ class AstSpec extends AlephiumSpec {
   behavior of "Check external caller"
 
   def checkExternalCallerWarnings(warnings: AVector[String]): AVector[String] = {
-    warnings.filter(_.startsWith("No check external caller"))
+    warnings.filter(_.startsWith("No external caller check"))
   }
 
   it should "detect direct check external caller" in {
@@ -522,7 +522,7 @@ class AstSpec extends AlephiumSpec {
 
   it should "display the right warning message for check external caller" in {
     Warnings.noCheckExternalCallerMsg("Foo", "bar") is
-      "No check external caller for function: Foo.bar, please use checkCaller!(...) for the function or its private callees."
+      s"""No external caller check for function "Foo.bar". Please use "checkCaller!(...)" in the function or its callees, or disable it with "@using(checkExternalCaller = false)"."""
   }
 
   behavior of "Private function usage"
@@ -541,7 +541,7 @@ class AstSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val warnings0 = Compiler.compileContractFull(code0, 0).rightValue.warnings
-    warnings0 is AVector("Private function Foo.private1 is not used")
+    warnings0 is AVector(s"""Private function "Foo.private1" is not used""")
 
     val code1 =
       s"""
