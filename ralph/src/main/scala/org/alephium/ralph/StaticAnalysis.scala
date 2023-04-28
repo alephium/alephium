@@ -111,53 +111,8 @@ object StaticAnalysis {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def isSimpleViewFunction(
-      isSimpleViewFuncCache: mutable.Map[(TypeId, FuncId), Boolean],
-      allStates: AVector[Compiler.State[vm.StatefulContext]],
-      contractState: Compiler.State[vm.StatefulContext],
-      funcId: FuncId
-  ): Boolean = {
-    val key = contractState.typeId -> funcId
-    isSimpleViewFuncCache.get(key) match {
-      case Some(result) => result
-      case None =>
-        isSimpleViewFuncCache(key) = false // this is to handle recursive calls
-        val func                = contractState.getFunc(funcId)
-        val useAssets           = func.usePreapprovedAssets || func.useAssetsInContract
-        val internalSubCallsOpt = contractState.internalCalls.get(funcId)
-        val isInternalSubCallsPure = internalSubCallsOpt.forall(_.forall { calleeFuncId =>
-          if (calleeFuncId.isBuiltIn) {
-            !contractState.getBuiltInFunc(calleeFuncId).needToCheckExternalCaller
-          } else {
-            isSimpleViewFunction(isSimpleViewFuncCache, allStates, contractState, calleeFuncId)
-          }
-        })
-        val externalCallsOpt = contractState.externalCalls.get(funcId)
-        val isExternalCallsPure =
-          externalCallsOpt.forall(_.forall { case (calleeTypeId, calleeFuncId) =>
-            val calleeContractState = allStates
-              .find(_.typeId == calleeTypeId)
-              .getOrElse(
-                throw Compiler.Error(s"No state for contract $calleeTypeId")
-              ) // this should never happen
-            isSimpleViewFunction(
-              isSimpleViewFuncCache,
-              allStates,
-              calleeContractState,
-              calleeFuncId
-            )
-          })
-        val isViewFunction =
-          !func.useUpdateFields && !useAssets && isInternalSubCallsPure && isExternalCallsPure
-        isSimpleViewFuncCache(key) = isViewFunction
-        isViewFunction
-    }
-  }
-
   private[ralph] def checkExternalCallPermissions(
-      isSimpleViewFuncCache: mutable.Map[(TypeId, FuncId), Boolean],
-      allStates: AVector[Compiler.State[vm.StatefulContext]],
+      nonSimpleViewFuncSet: mutable.Set[(TypeId, FuncId)],
       contractState: Compiler.State[vm.StatefulContext],
       contract: Contract,
       checkExternalCallerTables: mutable.Map[TypeId, mutable.Map[FuncId, Boolean]]
@@ -168,7 +123,7 @@ object StaticAnalysis {
       if (
         func.isPublic &&
         !table(func.id) &&
-        !isSimpleViewFunction(isSimpleViewFuncCache, allStates, contractState, func.id)
+        nonSimpleViewFuncSet.contains(contract.ident -> func.id)
       ) {
         allNoCheckExternalCallers.addOne(contract.ident -> func.id)
       }
@@ -178,28 +133,72 @@ object StaticAnalysis {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def updateExternalCallers(
+      nonSimpleViewFuncSet: mutable.Set[(TypeId, FuncId)],
+      states: AVector[Compiler.State[vm.StatefulContext]],
+      callee: (TypeId, FuncId)
+  ): Unit = {
+    states.foreach { state =>
+      if (state.typeId != callee._1) {
+        state.externalCalls.foreach { case (funcId, callees) =>
+          val key = state.typeId -> funcId
+          if (!nonSimpleViewFuncSet.contains(key) && callees.contains(callee)) {
+            nonSimpleViewFuncSet.addOne(key)
+            state.internalCallsReversed
+              .get(funcId)
+              .foreach(_.foreach(caller => nonSimpleViewFuncSet.addOne(state.typeId -> caller)))
+            if (state.getFunc(funcId).isPublic) {
+              updateExternalCallers(nonSimpleViewFuncSet, states, key)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  def checkNonSimpleViewFunctions(
+      nonSimpleViewFuncSet: mutable.Set[(TypeId, FuncId)],
+      allStates: AVector[Compiler.State[vm.StatefulContext]],
+      contract: Contract,
+      state: Compiler.State[vm.StatefulContext]
+  ): Unit = {
+    contract.funcs.foreach { func =>
+      val key = contract.ident -> func.id
+      if (!nonSimpleViewFuncSet.contains(key) && !func.isSimpleViewFunc(state)) {
+        nonSimpleViewFuncSet.addOne(key)
+        state.internalCallsReversed
+          .get(func.id)
+          .foreach(_.foreach(caller => nonSimpleViewFuncSet.addOne(contract.ident -> caller)))
+        if (func.isPublic) {
+          updateExternalCallers(nonSimpleViewFuncSet, allStates, key)
+        }
+      }
+    }
+  }
+
   def checkExternalCalls(
       multiContract: MultiContract,
       states: AVector[Compiler.State[vm.StatefulContext]]
   ): Unit = {
     val checkExternalCallerTables = mutable.Map.empty[TypeId, mutable.Map[FuncId, Boolean]]
+    val nonSimpleViewFuncSet      = mutable.Set.empty[(TypeId, FuncId)]
     multiContract.contracts.zipWithIndex.foreach {
       case (contract: Contract, index) if !contract.isAbstract =>
         val state = states(index)
         val table = contract.buildCheckExternalCallerTable(state)
         checkExternalCallerTables.update(contract.ident, table)
+        checkNonSimpleViewFunctions(nonSimpleViewFuncSet, states, contract, state)
       case (interface: ContractInterface, _) =>
         val table = mutable.Map.from(interface.funcs.map(_.id -> true))
         checkExternalCallerTables.update(interface.ident, table)
       case _ => ()
     }
-    val isSimpleViewFuncCache = mutable.Map.empty[(TypeId, FuncId), Boolean]
     multiContract.contracts.zipWithIndex.foreach {
       case (contract: Contract, index) if !contract.isAbstract =>
         val state = states(index)
         checkExternalCallPermissions(
-          isSimpleViewFuncCache,
-          states,
+          nonSimpleViewFuncSet,
           state,
           contract,
           checkExternalCallerTables
