@@ -229,8 +229,12 @@ object Ast {
         throw Compiler.Error(s"Invalid expr $address for contract address")
       }
 
-      if (!state.getContractInfo(contractType).kind.instantiable) {
+      val contractInfo = state.getContractInfo(contractType)
+      if (!contractInfo.kind.instantiable) {
         throw Compiler.Error(s"${contractType.name} is not instantiable")
+      }
+      if (contractInfo.kind == Compiler.ContractKind.Interface) {
+        state.addInterfaceFuncCall(state.currentScope)
       }
 
       Seq(Type.Contract.stack(contractType))
@@ -569,6 +573,15 @@ object Ast {
     }
   }
 
+  final case class FuncSignature(
+      id: FuncId,
+      isPublic: Boolean,
+      usePreapprovedAssets: Boolean,
+      useAssetsInContract: Boolean,
+      args: Seq[(Type, Boolean)],
+      rtypes: Seq[Type]
+  )
+
   final case class FuncDef[Ctx <: StatelessContext](
       annotations: Seq[Annotation],
       id: FuncId,
@@ -587,22 +600,23 @@ object Ast {
 
     private var funcAccessedVarsCache: Option[Set[Compiler.AccessVariable]] = None
 
-    def signature: String = {
-      val publicPrefix = if (isPublic) "pub " else ""
-      val assetModifier = {
-        (usePreapprovedAssets, useAssetsInContract) match {
-          case (true, true) =>
-            s"@using(preapprovedAssets=true,assetsInContract=true) "
-          case (true, false) =>
-            s"@using(preapprovedAssets=true) "
-          case (false, true) =>
-            s"@using(assetsInContract=true) "
-          case (false, false) =>
-            ""
-        }
+    def isSimpleViewFunc(state: Compiler.State[Ctx]): Boolean = {
+      val hasInterfaceFuncCall = state.hasInterfaceFuncCallSet.contains(id)
+      val hasMigrateSimple = body.exists {
+        case FuncCall(id, _, _) => id.isBuiltIn && id.name == "migrate"
+        case _                  => false
       }
-      s"${assetModifier}${publicPrefix}${name}(${args.map(_.signature).mkString(",")})->(${rtypes.map(_.signature).mkString(",")})"
+      !(useUpdateFields || usePreapprovedAssets || useAssetsInContract || hasInterfaceFuncCall || hasMigrateSimple)
     }
+
+    def signature: FuncSignature = FuncSignature(
+      id,
+      isPublic,
+      usePreapprovedAssets,
+      useAssetsInContract,
+      args.map(arg => (arg.tpe, arg.isMutable)),
+      rtypes
+    )
     def getArgNames(): AVector[String]          = AVector.from(args.view.map(_.ident.name))
     def getArgTypeSignatures(): AVector[String] = AVector.from(args.view.map(_.tpe.signature))
     def getArgMutability(): AVector[Boolean]    = AVector.from(args.view.map(_.isMutable))
@@ -1590,7 +1604,7 @@ object Ast {
       implementedFuncs.foreach { abstractFunc =>
         val funcName                = abstractFunc.id.name
         val implementedAbstractFunc = nonAbstractFuncSet(funcName)
-        if (implementedAbstractFunc.copy(bodyOpt = None) != abstractFunc) {
+        if (implementedAbstractFunc.signature != abstractFunc.signature) {
           throw Compiler.Error(
             s"Function ${quote(funcName)} is implemented with wrong signature"
           )

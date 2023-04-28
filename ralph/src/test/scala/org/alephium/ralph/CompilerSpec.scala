@@ -2036,27 +2036,81 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       contract.methods.map(_.argsLength) is AVector(2, 1, 3, 0)
     }
 
-    {
-      info("Follow the same function annotation")
+    def wrongSignature(code: String, funcName: String) = {
+      Compiler
+        .compileContract(code)
+        .leftValue
+        .message is s"""Function "$funcName" is implemented with wrong signature"""
+    }
 
-      def code(flag: Boolean) =
+    {
+      info("Check the function annotations")
+
+      def code(interfaceAnnotations: String, implAnnotations: String) =
         s"""
-           |Contract Foo() implements Bar {
-           |  @using(checkExternalCaller = $flag)
+           |Contract Foo(addr: Address) implements Bar {
+           |  $implAnnotations
            |  fn bar() -> () {
+           |    transferTokenToSelf!(addr, ALPH, 1)
+           |    checkCaller!(true, 0)
            |    return
            |  }
            |}
            |Interface Bar {
-           |  @using(checkExternalCaller = false)
+           |  $interfaceAnnotations
            |  fn bar() -> ()
            |}
            |""".stripMargin
-      Compiler.compileContract(code(false)).isRight is true
-      Compiler
-        .compileContract(code(true))
-        .leftValue
-        .message is "Function \"bar\" is implemented with wrong signature"
+
+      def test(annotation: String, mustBeEqual: Boolean): Assertion = {
+        Compiler.compileContract(code("", "")).isRight is true
+        Compiler
+          .compileContract(code(s"@using($annotation = true)", s"@using($annotation = true)"))
+          .isRight is true
+        Compiler
+          .compileContract(code(s"@using($annotation = false)", s"@using($annotation = false)"))
+          .isRight is true
+        if (mustBeEqual) {
+          Compiler.compileContract(code(s"@using($annotation = false)", "")).isRight is true
+          wrongSignature(code(s"@using($annotation = true)", ""), "bar")
+          wrongSignature(code(s"@using($annotation = true)", s"@using($annotation = false)"), "bar")
+          wrongSignature(code(s"@using($annotation = false)", s"@using($annotation = true)"), "bar")
+        } else {
+          Compiler.compileContract(code(s"@using($annotation = true)", "")).isRight is true
+          Compiler.compileContract(code(s"@using($annotation = false)", "")).isRight is true
+          Compiler.compileContract(code("", s"@using($annotation = true)")).isRight is true
+          Compiler.compileContract(code("", s"@using($annotation = false)")).isRight is true
+        }
+      }
+
+      test(Parser.UsingAnnotation.usePreapprovedAssetsKey, true)
+      test(Parser.UsingAnnotation.useContractAssetsKey, true)
+      test(Parser.UsingAnnotation.useCheckExternalCallerKey, false)
+      test(Parser.UsingAnnotation.useUpdateFieldsKey, false)
+    }
+
+    {
+      info("Check the function signature")
+      def code(modifier: String, args: String, rets: String): String =
+        s"""
+           |Contract Foo(c: U256) implements Bar {
+           |  $modifier fn bar($args) -> ($rets) {
+           |    return c
+           |  }
+           |}
+           |
+           |Interface Bar {
+           |  pub fn bar(a: U256) -> U256
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code("pub", "a: U256", "U256")).isRight is true
+      Compiler.compileContract(code("pub", "@unused a: U256", "U256")).isRight is true
+      Compiler.compileContract(code("pub", "b: U256", "U256")).isRight is true
+      wrongSignature(code("", "a: U256", "U256"), "bar")
+      wrongSignature(code("pub", "mut a: U256", "U256"), "bar")
+      wrongSignature(code("pub", "a: ByteVec", "U256"), "bar")
+      wrongSignature(code("", "a: U256", "ByteVec"), "bar")
     }
   }
 
@@ -2865,6 +2919,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |Contract Foo(v: U256) extends Base(v) {
+           |  @using(checkExternalCaller = false)
            |  pub fn foo() -> () {
            |    base()
            |  }
@@ -2942,9 +2997,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |Contract Bar() extends Foo() {
+           |  @using(checkExternalCaller = false)
            |  pub fn bar() -> () { foo(0) }
            |}
            |Contract Baz() extends Foo() {
+           |  @using(checkExternalCaller = false)
            |  pub fn baz() -> () { foo(0) }
            |}
            |""".stripMargin
@@ -3165,6 +3222,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |Contract Foo() {
+           |  @using(checkExternalCaller = false)
            |  pub fn foo(code: ByteVec, fields: ByteVec) -> () {
            |    migrateWithFields!(code, #00, fields)
            |  }

@@ -123,7 +123,9 @@ object CompilerError {
       "Expected `else` statement"
 
     override def footer: Option[String] =
-      Some("Description: `if/else` expressions require both `if` and `else` statements to be complete.")
+      Some(
+        "Description: `if/else` expressions require both `if` and `else` statements to be complete."
+      )
   }
 
   /** ****** Section: Type Errors ******
