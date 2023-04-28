@@ -17,11 +17,11 @@ package org.alephium.ralph
 
 import fastparse.Parsed
 
-import org.alephium.protocol.vm._
+import org.alephium.ralph.error.{CompilerError, CompilerErrorFormatter, FastParseErrorUtil}
 import org.alephium.util._
 
 // scalastyle:off no.equal file.size.limit
-class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
+class StatelessParserSpec extends AlephiumSpec {
 
   it should "disallow mutable template params" in {
     def createProgram(params: String) =
@@ -39,30 +39,27 @@ class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
       val program = createProgram("mut x: U256, y: U256, z: U256")
 
       val failure =
-        fastparse
-          .parse(program, StatelessParser.assetScript(_))
-          .asInstanceOf[Parsed.Failure]
-          .trace()
+        intercept[CompilerError.`Expected an immutable variable`] {
+          fastparse.parse(program, StatelessParser.assetScript(_))
+        }
 
-      val expectedErrorMessage =
-        s"""Expected an immutable variable:3:17 / (letter | digit | "_"):3:16, found "(mut x: U2""""
-
-      val formatter = CompilerErrorFormatter(failure)
+      val formatter = failure.toFormatter(program)
 
       formatter is
         CompilerErrorFormatter(
-          errorMessage = expectedErrorMessage,
+          errorTitle = "Syntax error",
           errorLine = program.linesIterator.toList(2),
-          found = "mut x: U25",
-          expected = CompilerError.AnImmutableVariable.message,
+          foundLength = 3,
+          errorMessage = "Expected an immutable variable",
+          errorFooter = None,
           sourcePosition = SourcePosition(3, 17)
         )
 
       // formatter should point the exact mut declaration
       formatter.format() is
-        s"""-- error: Expected an immutable variable:3:17 / (letter | digit | "_"):3:16, found "(mut x: U2"
+        s"""-- error (3:17): Syntax error
            |3 |AssetScript Foo(mut x: U256, y: U256, z: U256) {
-           |  |                ^^^^^^^^^^
+           |  |                ^^^
            |  |                Expected an immutable variable
            |""".stripMargin
     }
@@ -72,35 +69,27 @@ class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
       val program = createProgram("x: U256, mut y: U256, z: U256")
 
       val failure =
-        fastparse
-          .parse(program, StatelessParser.assetScript(_))
-          .asInstanceOf[Parsed.Failure]
-          .trace()
+        intercept[CompilerError.`Expected an immutable variable`] {
+          fastparse.parse(program, StatelessParser.assetScript(_))
+        }
 
-      // TODO: The found "(x: U256, " reported in FastParse `longMsg` is not showing the actual
-      //       `mut` variable but is showing the start of the token.
-      //       Possible Fixes:
-      //        - Either update call to `templateParams.?` in `StatelessParse` to work without option.
-      //        - Or use custom formatted message instead of using `.longMsg` from FastParse.
-      val expectedErrorMessage =
-        s"""Expected an immutable variable:3:26 / (letter | digit | "_"):3:16, found "(x: U256, """"
-
-      val formatter = CompilerErrorFormatter(failure)
+      val formatter = failure.toFormatter(program)
 
       formatter is
         CompilerErrorFormatter(
-          errorMessage = expectedErrorMessage,
+          errorTitle = "Syntax error",
           errorLine = program.linesIterator.toList(2),
-          found = "mut y: U25",
-          expected = CompilerError.AnImmutableVariable.message,
+          foundLength = 3,
+          errorMessage = "Expected an immutable variable",
+          errorFooter = None,
           sourcePosition = SourcePosition(3, 26)
         )
 
       // formatter should point the exact mut declaration
       formatter.format() is
-        s"""-- error: $expectedErrorMessage
+        s"""-- error (3:26): Syntax error
            |3 |AssetScript Foo(x: U256, mut y: U256, z: U256) {
-           |  |                         ^^^^^^^^^^
+           |  |                         ^^^
            |  |                         Expected an immutable variable
            |""".stripMargin
     }
@@ -122,26 +111,25 @@ class StatelessParserSpec extends AlephiumSpec with ContextGenerators {
         .asInstanceOf[Parsed.Failure]
         .trace()
 
-    val expectedErrorMessage =
-      s"""Expected assetScript:1:1 / "}":7:1, found """""
-
-    val formatter = CompilerErrorFormatter(failure)
+    val formatter = FastParseErrorUtil(failure).toFormatter()
 
     formatter is
       CompilerErrorFormatter(
-        errorMessage = expectedErrorMessage,
+        errorTitle = "Syntax error",
+        errorMessage = """Expected "}"""",
         errorLine = "",
-        found = "\"\"",
-        expected = "\"}\"",
+        foundLength = 2,
+        errorFooter = Some("""Trace log: Expected assetScript:1:1 / "}":7:1, found """""),
         sourcePosition = SourcePosition(7, 1)
       )
 
     formatter.format() is
-      s"""-- error: Expected assetScript:1:1 / "}":7:1, found ""
+      s"""-- error (7:1): Syntax error
          |7 |
          |  |^^
          |  |Expected "}"
+         |  |-------------------------------------------------------
+         |  |Trace log: Expected assetScript:1:1 / "}":7:1, found ""
          |""".stripMargin
   }
-
 }

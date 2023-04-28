@@ -21,6 +21,8 @@ import fastparse._
 
 import org.alephium.protocol.vm.{Instr, StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.Ast.{Annotation, Argument, FuncId, Statement}
+import org.alephium.ralph.error.CompilerError
+import org.alephium.ralph.error.FastParseExtension._
 import org.alephium.util.AVector
 
 // scalastyle:off number.of.methods
@@ -54,9 +56,9 @@ abstract class Parser[Ctx <: StatelessContext] {
   def tokenAmount[Unknown: P]: P[(Ast.Expr[Ctx], Ast.Expr[Ctx])]     = P(expr ~ ":" ~ expr)
   def amountList[Unknown: P]: P[Seq[(Ast.Expr[Ctx], Ast.Expr[Ctx])]] = P(tokenAmount.rep(0, ","))
   def approveAssetPerAddress[Unknown: P]: P[Ast.ApproveAsset[Ctx]] =
-    P(expr ~ "->" ~ amountList).map { case (address, amounts) =>
+    P(expr ~ LastIndex("->") ~ amountList).map { case (address, index, amounts) =>
       if (amounts.isEmpty) {
-        throw Compiler.Error(s"Empty asset for address: $address")
+        throw CompilerError.`Expected non-empty asset(s) for address`(index)
       }
       Ast.ApproveAsset(address, amounts)
     }
@@ -143,11 +145,11 @@ abstract class Parser[Ctx <: StatelessContext] {
   def elseBranchExpr[Unknown: P]: P[Ast.ElseBranchExpr[Ctx]] =
     P(Lexer.token(Keyword.`else`) ~ expr).map(Ast.ElseBranchExpr(_))
   def ifelseExpr[Unknown: P]: P[Ast.IfElseExpr[Ctx]] =
-    P(ifBranchExpr ~ elseIfBranchExpr.rep(0) ~ elseBranchExpr.?).map {
-      case (ifBranch, elseIfBranches, Some(elseBranch)) =>
+    P(ifBranchExpr ~ elseIfBranchExpr.rep(0) ~ Index ~ elseBranchExpr.?).map {
+      case (ifBranch, elseIfBranches, _, Some(elseBranch)) =>
         Ast.IfElseExpr(ifBranch +: elseIfBranches, elseBranch)
-      case (_, _, None) =>
-        throw Compiler.Error("If else expressions should be terminated with an else branch")
+      case (_, _, index, None) =>
+        throw CompilerError.`Expected else statement`(index)
     }
 
   def ret[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
@@ -568,9 +570,9 @@ object StatefulParser extends Parser[StatefulContext] {
           .rep(0) ~ func
           .rep(0) ~ "}"
     )
-      .flatMap { case (annotations, typeId, templateVars, mainStmtsIndex, mainStmts, funcs) =>
+      .map { case (annotations, typeId, templateVars, mainStmtsIndex, mainStmts, funcs) =>
         if (mainStmts.isEmpty) {
-          CompilerError(CompilerError.NoMainStatementDefined(typeId), mainStmtsIndex)
+          throw CompilerError.`Expected main statements`(typeId, mainStmtsIndex)
         } else {
           val usingAnnotation = Parser.UsingAnnotation.extractFields(
             annotations,
@@ -587,8 +589,7 @@ object StatefulParser extends Parser[StatefulContext] {
             usingAnnotation.assetsInContract,
             usingAnnotation.updateFields
           )
-          val txScript = Ast.TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
-          Pass(txScript)
+          Ast.TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
         }
       }
   def txScript[Unknown: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)

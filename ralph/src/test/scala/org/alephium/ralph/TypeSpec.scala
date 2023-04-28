@@ -28,9 +28,6 @@ class TypeSpec extends AlephiumSpec {
       AVector("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]")
     contractAst.getFieldMutability() is
       AVector(false, true, false, true, false, false)
-    contractAst.funcs.map(_.signature) is Seq(
-      "@using(preapprovedAssets=true,assetsInContract=true) pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
-    )
     contractAst.funcs.map(_.getArgNames()) is
       Seq(AVector("a", "b", "c", "d", "e", "f"))
     contractAst.funcs.map(_.getArgTypeSignatures()) is
@@ -55,10 +52,6 @@ class TypeSpec extends AlephiumSpec {
       AVector("Bool", "U256", "I256", "ByteVec", "Address")
     scriptAst.getTemplateVarsMutability() is
       AVector(false, false, false, false, false)
-    scriptAst.funcs.map(_.signature) is Seq(
-      "@using(preapprovedAssets=true) pub main()->()",
-      "pub bar(a:Bool,mut b:U256,c:I256,mut d:ByteVec,e:Address,f:[[Bool;1];2])->(U256,I256,ByteVec,Address,[[Bool;1];2])"
-    )
     scriptAst.events.map(_.signature) is Seq.empty
   }
 }
@@ -69,7 +62,7 @@ trait TypeSignatureFixture extends AlephiumFixture {
        |Contract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2]) {
        |  event Bar(a: Bool, b: U256, d: ByteVec, e: Address)
        |
-       |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
+       |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true, checkExternalCaller = false)
        |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
        |    emit Bar(aa, bb, dd, ee)
        |    emit Debug(`xx`)

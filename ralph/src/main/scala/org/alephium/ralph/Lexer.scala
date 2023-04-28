@@ -30,6 +30,7 @@ import org.alephium.protocol.vm.Val.ByteVec
 import org.alephium.ralph.ArithOperator._
 import org.alephium.ralph.LogicalOperator._
 import org.alephium.ralph.TestOperator._
+import org.alephium.ralph.error.CompilerError
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
@@ -68,11 +69,11 @@ object Lexer {
     *   - Else a boolean value: `true` if mut` declaration found, else `false`.
     */
   def mutMaybe[Unknown: P](allowMutable: Boolean): P[Boolean] =
-    P(Index ~ mut) flatMap { case (index, mutable) =>
+    P(Index ~ mut) map { case (index, mutable) =>
       if (!allowMutable && mutable) {
-        CompilerError(CompilerError.AnImmutableVariable, index)
+        throw CompilerError.`Expected an immutable variable`(index)
       } else {
-        Pass(mutable)
+        mutable
       }
     }
 
@@ -80,20 +81,20 @@ object Lexer {
   def emptyChars[Unknown: P]: P[Unit]  = P((CharsWhileIn(" \t\r\n") | lineComment).rep)
 
   def hexNum[Unknown: P]: P[BigInteger] = P("0x") ~ hex.!.map(new BigInteger(_, 16))
-  def decNum[Unknown: P]: P[BigInteger] = P(
-    (CharsWhileIn("0-9_") ~ ("." ~ CharsWhileIn("0-9_")).? ~
+  def integer[Unknown: P]: P[BigInteger] = P(
+    Index ~ (CharsWhileIn("0-9_") ~ ("." ~ CharsWhileIn("0-9_")).? ~
       ("e" ~ "-".? ~ CharsWhileIn("0-9")).?).! ~
       CharsWhileIn(" ", 0) ~ token(Keyword.alph).?.!
-  ).map { case (input, unit) =>
+  ).map { case (index, input, unit) =>
     try {
       var num = new BigDecimal(input.replaceAll("_", ""))
       if (unit == "alph") num = num.multiply(new BigDecimal(ALPH.oneAlph.toBigInt))
       num.toBigIntegerExact()
     } catch {
-      case NonFatal(_) => throw Compiler.Error(s"Invalid number ${input}")
+      case NonFatal(_) => throw CompilerError.`Invalid number`(input, index)
     }
   }
-  def num[Unknown: P]: P[BigInteger] = negatable(P(hexNum | decNum))
+  def num[Unknown: P]: P[BigInteger] = negatable(P(hexNum | integer))
   def negatable[Unknown: P](p: => P[BigInteger]): P[BigInteger] =
     ("-".?.! ~ p).map {
       case ("-", i) => i.negate()
@@ -104,47 +105,48 @@ object Lexer {
       sourcecode.Name(CompilerError.`an I256 or U256 value`.message),
       implicitly[P[_]]
     )
-      .flatMap {
+      .map {
         case (index, n, postfix) if Number.isNegative(n) || postfix == "i" =>
           I256.from(n) match {
-            case Some(value) => Pass(Val.I256(value))
-            case None        => CompilerError(CompilerError.`an I256 value`, index)
+            case Some(value) => Val.I256(value)
+            case None        => throw CompilerError.`Expected an I256 value`(index, n)
           }
 
         case (index, n, _) =>
           U256.from(n) match {
-            case Some(value) => Pass(Val.U256(value))
-            case None        => CompilerError(CompilerError.`an U256 value`, index)
+            case Some(value) => Val.U256(value)
+            case None        => throw CompilerError.`Expected an U256 value`(index, n)
           }
       }
 
   def bytesInternal[Unknown: P]: P[Val.ByteVec] =
-    P(CharsWhileIn("0-9a-zA-Z", 0)).!.map { string =>
+    P(Index ~ CharsWhileIn("0-9a-zA-Z", 0).!).map { case (index, string) =>
       Hex.from(string) match {
         case Some(bytes) => ByteVec(bytes)
         case None =>
           Address.extractLockupScript(string) match {
             case Some(LockupScript.P2C(contractId)) => ByteVec(contractId.bytes)
-            case _ => throw Compiler.Error(s"Invalid byteVec: $string")
+            case _ => throw CompilerError.`Invalid byteVec`(string, index)
           }
       }
     }
   def bytes[Unknown: P]: P[Val.ByteVec] = P("#" ~ bytesInternal)
   def contractAddress[Unknown: P]: P[Val.ByteVec] =
     addressInternal.map {
-      case Val.Address(LockupScript.P2C(contractId)) => Val.ByteVec(contractId.bytes)
-      case addr => throw Compiler.Error(s"Invalid contract address: #@${addr.toBase58}")
+      case (Val.Address(LockupScript.P2C(contractId)), _) => Val.ByteVec(contractId.bytes)
+      case (addr, index) =>
+        throw CompilerError.`Invalid contract address`(s"#@${addr.toBase58}", index)
     }
 
-  def addressInternal[Unknown: P]: P[Val.Address] =
-    P(CharsWhileIn("0-9a-zA-Z")).!.map { input =>
+  def addressInternal[Unknown: P]: P[(Val.Address, Int)] =
+    P(Index ~ CharsWhileIn("0-9a-zA-Z").!).map { case (index, input) =>
       val lockupScriptOpt = Address.extractLockupScript(input)
       lockupScriptOpt match {
-        case Some(lockupScript) => Val.Address(lockupScript)
-        case None               => throw Compiler.Error(s"Invalid address: $input")
+        case Some(lockupScript) => (Val.Address(lockupScript), index)
+        case None               => throw CompilerError.`Invalid address`(input, index)
       }
     }
-  def address[Unknown: P]: P[Val.Address] = P("@" ~ addressInternal)
+  def address[Unknown: P]: P[Val.Address] = P("@" ~ addressInternal.map(_._1))
 
   def bool[Unknown: P]: P[Val.Bool] =
     P(token(Keyword.`true`) | token(Keyword.`false`)).!.map {

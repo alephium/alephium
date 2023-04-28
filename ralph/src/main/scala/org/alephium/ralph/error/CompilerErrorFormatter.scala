@@ -13,29 +13,35 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
-package org.alephium.ralph
+package org.alephium.ralph.error
 
 import fastparse._
 
+import org.alephium.ralph.SourcePosition
+import org.alephium.ralph.error.CompilerError.FormattableError
+
 /** Builds a formatted error message.
   *
-  * @param errorMessage
-  *   Original error message from compiler/FastParse run.
+  * @param errorTitle
+  *   Error header. This can be error-types: `Syntax error`, `Type mismatch error` etc.
   * @param errorLine
   *   Line where this error occurred.
-  * @param found
-  *   String token(s) that lead to this failure.
-  * @param expected
+  * @param foundLength
+  *   The length of string token(s) that lead to this failure.
+  * @param errorMessage
   *   Error message to display under the pointer.
+  * @param errorFooter
+  *   Optionally add more error details/hints/suggestions to the footer.
   * @param sourcePosition
   *   Location of where this error occurred.
   */
 
 final case class CompilerErrorFormatter(
-    errorMessage: String,
+    errorTitle: String,
     errorLine: String,
-    found: String,
-    expected: String,
+    foundLength: Int,
+    errorMessage: String,
+    errorFooter: Option[String],
     sourcePosition: SourcePosition
 ) {
 
@@ -49,34 +55,62 @@ final case class CompilerErrorFormatter(
     * @return
     *   A formatted error message.
     */
+  // scalastyle:off method.length
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-  def format(errorColor: Option[String] = None): String = { // or use Some(Console.RED)
+  def format(errorColor: Option[String] = None): String = {
     val lineNumGutter   = s"${sourcePosition.rowNum} |"
     val lineNumGutterHL = highlight(lineNumGutter, errorColor)
 
     val emptyLineNumGutterPaddingLeft = " " * (lineNumGutter.length - 1)
     val emptyLineNumGutter            = highlight(emptyLineNumGutterPaddingLeft + "|", errorColor)
 
-    val errorTag         = highlight("-- error: ", errorColor)
-    val mainErrorMessage = highlight(errorMessage, errorColor)
+    val errorTag    = highlight(s"-- error ${sourcePosition.format}: ", errorColor)
+    val errorHeader = highlight(errorTitle, errorColor)
 
     val paddingLeft   = " " * sourcePosition.colIndex
-    val pointerMarker = CompilerErrorFormatter.pointer * found.length
+    val pointerMarker = CompilerErrorFormatter.pointer * foundLength
 
     // Add padding & expected only if there is a message to append at the end.
     val paddingLeftExpected =
-      if (expected.isEmpty) {
+      if (errorMessage.isEmpty) {
         ""
       } else {
-        s"${paddingLeft}Expected "
+        s"$paddingLeft$errorMessage"
       }
 
-    s"""$errorTag$mainErrorMessage
-       |$lineNumGutterHL$errorLine
-       |$emptyLineNumGutter$paddingLeft$pointerMarker
-       |$emptyLineNumGutter$paddingLeftExpected$expected
-       |""".stripMargin
+    // Build error body
+    val errorBody =
+      s"""$errorTag$errorHeader
+         |$lineNumGutterHL$errorLine
+         |$emptyLineNumGutter$paddingLeft$pointerMarker
+         |$emptyLineNumGutter$paddingLeftExpected"""
+
+    val errorBodyStripped =
+      errorBody.stripMargin
+
+    // Build error footer
+    errorFooter match {
+      case Some(footer) =>
+        val emptyLineNumberGutterLength =
+          emptyLineNumGutter.length
+
+        val marginLength = // max length of the footer margin.
+          errorBodyStripped.linesIterator.foldLeft(footer.length) { case (currentMax, nextLine) =>
+            currentMax max (nextLine.length - emptyLineNumberGutterLength)
+          }
+
+        val footerMargin = highlight("-" * marginLength, errorColor)
+
+        s"""$errorBody
+           |$emptyLineNumGutter$footerMargin
+           |$emptyLineNumGutter$footer
+           |""".stripMargin
+
+      case None =>
+        errorBodyStripped + System.lineSeparator()
+    }
   }
+  // scalastyle:on method.length
 
 }
 
@@ -84,48 +118,17 @@ object CompilerErrorFormatter {
 
   val pointer = "^"
 
-  /** Builds an error message from FastParser's `Parsed.Failure` result.
-    *
-    * @param failure
-    *   FastParser's failure run result.
-    * @param program
-    *   The compiled program/source.
-    * @return
-    *   A formatted error message.
-    */
-  def apply(failure: Parsed.Failure): CompilerErrorFormatter =
-    CompilerErrorFormatter(failure.trace())
-
-  def apply(traced: Parsed.TracedFailure): CompilerErrorFormatter = {
-    val program =
-      traced.input.slice(0, traced.input.length)
-
-    val erroredIndex =
-      getErroredIndex(traced)
-
-    val sourcePosition =
-      SourcePosition.parse(traced.input.prettyIndex(erroredIndex))
-
-    val errorLine =
-      getErroredLine(sourcePosition.rowIndex, program)
-
-    val expected =
-      getLatestErrorMessage(traced, erroredIndex)
-
-    val foundQuoted =
-      Parsed.Failure.formatTrailing(traced.input, erroredIndex)
-
-    val foundNoQuotes =
-      dropQuotes(foundQuoted)
-
-    val errorMessage =
-      traced.longMsg
+  def apply(error: FormattableError, program: String): CompilerErrorFormatter = {
+    val fastParseLineNumber = IndexedParserInput(program).prettyIndex(error.position)
+    val sourcePosition      = SourcePosition.parse(fastParseLineNumber)
+    val errorLine           = getErroredLine(sourcePosition.rowIndex, program)
 
     CompilerErrorFormatter(
-      errorMessage = errorMessage,
+      errorTitle = error.title,
       errorLine = errorLine,
-      found = foundNoQuotes,
-      expected = expected,
+      foundLength = error.foundLength,
+      errorMessage = error.message,
+      errorFooter = error.footer,
       sourcePosition = sourcePosition
     )
   }
@@ -149,22 +152,6 @@ object CompilerErrorFormatter {
       lines(programRowIndex)
     }
   }
-
-  /** Removes wrapper quotes from the output by `Parsed.Failure.formatTrailing`. */
-  def dropQuotes(string: String): String =
-    string.replaceFirst("""^"(.+)"$""", "$1")
-
-  /** Use index with maximum value i.e. the latest errored code */
-  private def getErroredIndex(traced: Parsed.TracedFailure): Int =
-    traced.index max traced.stack.foldLeft(0)(_ max _._2)
-
-  /** Fetch the most recent error message. */
-  private def getLatestErrorMessage(traced: Parsed.TracedFailure, forIndex: Int): String =
-    traced.stack
-      .filter(_._2 == forIndex) // all parsers for this index
-      .lastOption
-      .map(_._1)               // use the last errored
-      .getOrElse(traced.label) // if none found, use the label
 
   /** Wraps the input String to be coloured */
   private def highlight(msg: String, color: Option[String]): String =

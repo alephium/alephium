@@ -26,6 +26,9 @@ final case class SourcePosition(rowNum: Int, colNum: Int) {
 
   def colIndex: Int =
     colNum - 1
+
+  def format: String =
+    s"($rowNum:$colNum)"
 }
 
 object SourcePosition {

@@ -23,6 +23,7 @@ import org.alephium.protocol.{ALPH, Hash, PublicKey}
 import org.alephium.protocol.model.{Address, ContractId}
 import org.alephium.protocol.vm.Val
 import org.alephium.ralph.ArithOperator._
+import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AlephiumSpec, Hex, I256, U256}
 
 class LexerSpec extends AlephiumSpec {
@@ -82,40 +83,49 @@ class LexerSpec extends AlephiumSpec {
       val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure].trace()
 
       failure.index is 0
-      failure.longMsg is s"""Expected an I256 or U256 value:1:1 / num:1:1 / (hexNum | decNum):1:1, found "$input""""
+      failure.longMsg is s"""Expected an I256 or U256 value:1:1 / num:1:1 / (hexNum | integer):1:1, found "$input""""
     }
 
     {
       info("when input is an invalid U256")
-      val input   = "123456789" * 10
-      val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+      val input = "123456789" * 10
+      val failure =
+        intercept[CompilerError.`Expected an U256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.index is 0
-
-      val foundToken = input.take(10)
-      failure.msg is s"""Expected an U256 value:1:1, found "$foundToken""""
+      failure.toError(input).message is
+        """-- error (1:1): Syntax error
+          |1 |123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
+          |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |  |Expected an U256 value
+          |""".stripMargin
     }
 
     {
       info("when input is an invalid negative I256")
-      val input   = "-" + ("123456789" * 10)
-      val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+      val input = "-" + ("123456789" * 10)
+      val failure =
+        intercept[CompilerError.`Expected an I256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.index is 0
-
-      val foundToken = input.take(10)
-      failure.msg is s"""Expected an I256 value:1:1, found "$foundToken""""
+      failure.toError(input).message is
+        """-- error (1:1): Syntax error
+          |1 |-123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
+          |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |  |Expected an I256 value
+          |""".stripMargin
     }
 
     {
       info("when input is an invalid I256")
-      val input   = ("123456789" * 10) + "i"
-      val failure = fastparse.parse(input, Lexer.typedNum(_)).asInstanceOf[Parsed.Failure]
+      val input = ("123456789" * 10) + "i"
+      val failure =
+        intercept[CompilerError.`Expected an I256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.index is 0
-
-      val foundToken = input.take(10)
-      failure.msg is s"""Expected an I256 value:1:1, found "$foundToken""""
+      failure.toError(input).message is
+        """-- error (1:1): Syntax error
+          |1 |123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789i
+          |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |  |Expected an I256 value
+          |""".stripMargin
     }
 
     {
@@ -138,8 +148,16 @@ class LexerSpec extends AlephiumSpec {
         val errorScript     = errorAssetScript(invalidTypedNum)
 
         val failure =
-          fastparse.parse(errorScript, StatelessParser.assetScript(_)).asInstanceOf[Parsed.Failure]
-        failure.msg is s"""Expected an U256 value:5:13, found "1234567891""""
+          intercept[CompilerError.`Expected an U256 value`] {
+            fastparse.parse(errorScript, StatelessParser.assetScript(_))
+          }
+
+        failure.toError(errorScript).message is
+          """-- error (5:13): Syntax error
+            |5 |    let c = 123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
+            |  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            |  |            Expected an U256 value
+            |""".stripMargin
       }
 
     }
@@ -163,10 +181,25 @@ class LexerSpec extends AlephiumSpec {
       Val.ByteVec(hash.bytes)
     fastparse.parse(s"@${address.toBase58}", Lexer.address(_)).get.value is
       Val.Address(address.lockupScript)
-    intercept[Compiler.Error](fastparse.parse(s"#${address.toBase58}", Lexer.bytes(_))) is Compiler
-      .Error(s"Invalid byteVec: ${address.toBase58}")
+    intercept[CompilerError.`Invalid byteVec`](
+      fastparse.parse(s"#${address.toBase58}", Lexer.bytes(_))
+    ) is CompilerError.`Invalid byteVec`(address.toBase58, 1)
     fastparse.parse(s"#${contract.toBase58}", Lexer.bytes(_)).get.value is
       Val.ByteVec(contract.contractId.bytes)
+
+    {
+      info("format invalid byteVec")
+
+      val invalidByteVec = "#12DRq8VCM7kTs7eDjGyvKWuqJVbYS6DysC3ttguLabGD2"
+      intercept[CompilerError.`Invalid byteVec`](fastparse.parse(invalidByteVec, Lexer.bytes(_)))
+        .toError(invalidByteVec)
+        .message is
+        """-- error (1:2): Type error
+          |1 |#12DRq8VCM7kTs7eDjGyvKWuqJVbYS6DysC3ttguLabGD2
+          |  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |  | Invalid byteVec
+          |""".stripMargin
+    }
   }
 
   it should "parse string" in {
@@ -186,16 +219,18 @@ class LexerSpec extends AlephiumSpec {
       val code = s"mut foo"
 
       // when allowMutable is false, it should not let `mut` declarations through.
-      val traced =
-        fastparse
-          .parse(code, Lexer.mutMaybe(allowMutable = false)(_))
-          .asInstanceOf[Parsed.Failure]
-          .trace()
+      val error =
+        intercept[CompilerError.`Expected an immutable variable`] {
+          fastparse
+            .parse(code, Lexer.mutMaybe(allowMutable = false)(_))
+        }
 
-      // fastparse reports only the first 10 characters.
-      val reportedToken = code.take(10)
-
-      traced.longMsg is s"""Expected an immutable variable:1:1 / (letter | digit | "_"):1:1, found "$reportedToken""""
+      error.toError(code).message is
+        """-- error (1:1): Syntax error
+          |1 |mut foo
+          |  |^^^
+          |  |Expected an immutable variable
+          |""".stripMargin
     }
 
     {
@@ -230,5 +265,41 @@ class LexerSpec extends AlephiumSpec {
           .value is false
       }
     }
+  }
+
+  it should "report invalid decimal number" in {
+    val number = "0.1"
+
+    val error =
+      intercept[CompilerError.`Invalid number`](fastparse.parse(number, Lexer.integer(_)))
+
+    error is CompilerError.`Invalid number`(number, 0)
+
+    error
+      .toError(number)
+      .message is
+      """-- error (1:1): Type error
+        |1 |0.1
+        |  |^^^
+        |  |Invalid number
+        |""".stripMargin
+  }
+
+  it should "report invalid address" in {
+    val contractAddress = "abcefgh"
+
+    val error =
+      intercept[CompilerError.`Invalid address`] {
+        fastparse.parse(contractAddress, Lexer.contractAddress(_))
+      }
+
+    error is CompilerError.`Invalid address`(contractAddress, 0)
+
+    error.toError(contractAddress).message is
+      """-- error (1:1): Type error
+        |1 |abcefgh
+        |  |^^^^^^^
+        |  |Invalid address
+        |""".stripMargin
   }
 }

@@ -24,6 +24,7 @@ import org.alephium.protocol.vm.{StatefulContext, StatelessContext, Val}
 import org.alephium.ralph.ArithOperator._
 import org.alephium.ralph.LogicalOperator._
 import org.alephium.ralph.TestOperator._
+import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AlephiumSpec, AVector, Hex, I256, U256}
 
 // scalastyle:off file.size.limit
@@ -151,9 +152,16 @@ class ParserSpec extends AlephiumSpec {
         ),
         List(Variable(Ident("x")))
       )
-    intercept[Compiler.Error](
-      fastparse.parse("Foo(x).bar{ z -> }(x)", StatefulParser.contractCallExpr(_))
-    ).message is "Empty asset for address: Variable(Ident(z))"
+
+    val emptyAssetsCode = "Foo(x).bar{ z -> }(x)"
+    intercept[CompilerError.`Expected non-empty asset(s) for address`](
+      fastparse.parse(emptyAssetsCode, StatefulParser.contractCallExpr(_))
+    ).toError(emptyAssetsCode).message is
+      """-- error (1:17): Syntax error
+        |1 |Foo(x).bar{ z -> }(x)
+        |  |                ^
+        |  |                Expected non-empty asset(s) for address
+        |""".stripMargin
   }
 
   it should "call expression" in {
@@ -304,8 +312,18 @@ class ParserSpec extends AlephiumSpec {
         Ast.ElseBranchExpr(Ast.Const(Val.U256(U256.Two)))
       )
 
-    val error = intercept[Compiler.Error](fastparse.parse("if (cond0) 0", StatelessParser.expr(_)))
-    error.message is "If else expressions should be terminated with an else branch"
+    val missingElseCode = "if (cond0) 0"
+    val error = intercept[CompilerError.`Expected else statement`](
+      fastparse.parse(missingElseCode, StatelessParser.expr(_))
+    )
+    error.toError(missingElseCode).message is
+      """-- error (1:13): Syntax error
+        |1 |if (cond0) 0
+        |  |            ^
+        |  |            Expected `else` statement
+        |  |------------------------------------------------------------------------------------------
+        |  |Description: `if/else` expressions require both `if` and `else` statements to be complete.
+        |""".stripMargin
   }
 
   it should "parse annotations" in {
@@ -330,7 +348,7 @@ class ParserSpec extends AlephiumSpec {
     val parsed1 = fastparse
       .parse(
         """@using(preapprovedAssets = true, updateFields = false)
-          |pub fn add(x: U256, y: U256) -> (U256, U256) { return x + y, x - y }
+          |pub fn add(x: U256, mut y: U256) -> (U256, U256) { return x + y, x - y }
           |""".stripMargin,
         StatelessParser.func(_)
       )
@@ -344,6 +362,14 @@ class ParserSpec extends AlephiumSpec {
     parsed1.useUpdateFields is false
     parsed1.args.size is 2
     parsed1.rtypes is Seq(Type.U256, Type.U256)
+    parsed1.signature is FuncSignature(
+      FuncId("add", false),
+      true,
+      true,
+      false,
+      Seq((Type.U256, false), (Type.U256, true)),
+      Seq(Type.U256, Type.U256)
+    )
 
     info("Simple return type")
     val parsed2 = fastparse
@@ -362,6 +388,14 @@ class ParserSpec extends AlephiumSpec {
     parsed2.useUpdateFields is false
     parsed2.args.size is 2
     parsed2.rtypes is Seq(Type.U256)
+    parsed2.signature is FuncSignature(
+      FuncId("add", false),
+      true,
+      true,
+      true,
+      Seq((Type.U256, false), (Type.U256, false)),
+      Seq(Type.U256)
+    )
 
     info("More use annotation")
     val parsed3 = fastparse
@@ -376,6 +410,14 @@ class ParserSpec extends AlephiumSpec {
     parsed3.useAssetsInContract is true
     parsed3.useCheckExternalCaller is true
     parsed3.useUpdateFields is true
+    parsed3.signature is FuncSignature(
+      FuncId("add", false),
+      true,
+      false,
+      true,
+      Seq((Type.U256, false), (Type.U256, false)),
+      Seq(Type.U256)
+    )
   }
 
   it should "parser contract initial states" in {
