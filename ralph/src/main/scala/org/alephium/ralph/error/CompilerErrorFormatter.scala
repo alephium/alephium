@@ -107,7 +107,7 @@ final case class CompilerErrorFormatter(
            |""".stripMargin
 
       case None =>
-        errorBodyStripped + '\n'
+        errorBodyStripped + System.lineSeparator()
     }
   }
   // scalastyle:on method.length
