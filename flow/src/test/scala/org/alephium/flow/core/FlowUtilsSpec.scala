@@ -340,4 +340,9 @@ class FlowUtilsSpec extends AlephiumSpec {
     val block = blockFlow.prepareBlockFlowUnsafe(chainIndex, LockupScript.p2pkh(fromPubKey))
     block.transactions.init.map(_.toTemplate) is AVector.from(txs.reverse)
   }
+
+  it should "calculate difficulty" in new FlowFixture {
+    blockFlow.getDifficultyMetric().rightValue is
+      blockFlow.genesisBlocks.head.head.target.getDifficulty()
+  }
 }
