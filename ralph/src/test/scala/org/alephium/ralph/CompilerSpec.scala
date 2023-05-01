@@ -3934,8 +3934,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  pub fn foo() -> () {
          |    let bs0 = Bar.encodeImmFields!(${input0})
          |    let bs1 = Bar.encodeMutFields!(${input1})
+         |    let (bs2, bs3) = Bar.encodeFields!($input0, $input1)
          |    assert!(bs0 == #, 0)
          |    assert!(bs1 == #, 0)
+         |    assert!(bs2 == #, 0)
+         |    assert!(bs3 == #, 0)
          |  }
          |}
          |
