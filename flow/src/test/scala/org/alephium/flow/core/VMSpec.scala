@@ -3485,7 +3485,7 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(main)
   }
 
-  it should "encode fields" in new ContractFixture {
+  it should "test Contract.encodeImmFields and Contract.encodeMutFields" in new ContractFixture {
     def test(stdAnnotation: String, expectedImmFields: String, expectedMutFields: String) = {
       val foo = s"""
                    |Contract Bar(a: U256, @unused mut b: I256) implements Foo {
@@ -3530,6 +3530,51 @@ class VMSpec extends AlephiumSpec with Generators {
 
     test("", "010201", "010102")
     test("@std(id = #0001)", "0202010306414c50480001", "010102")
+  }
+
+  it should "test Contract.encodeFields" in new ContractFixture {
+    def test(stdAnnotation: String, fields: String, immFields: String, mutFields: String) = {
+      val foo = s"""
+                   |Contract Bar(a: U256, @unused mut b: I256, @unused c: ByteVec) implements Foo {
+                   |  @using(checkExternalCaller = false)
+                   |  pub fn foo() -> () {
+                   |    let (immFields, mutFields) = Bar.encodeFields!($fields)
+                   |    assert!(immFields == #$immFields, 0)
+                   |    assert!(mutFields == #$mutFields, 0)
+                   |  }
+                   |}
+                   |
+                   |$stdAnnotation
+                   |Interface Foo {
+                   |  pub fn foo() -> ()
+                   |}
+                   |""".stripMargin
+      val initialImmFields = AVector[Val](Val.U256(0), Val.ByteVec(Hex.unsafe("00")))
+      val fooId = createContract(
+        foo,
+        initialImmState = if (stdAnnotation == "") {
+          initialImmFields
+        } else {
+          initialImmFields :+ Val.ByteVec(Hex.unsafe("414c50480001"))
+        },
+        initialMutState = AVector(Val.I256(I256.unsafe(-2)))
+      )._1
+      val main: String =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  Foo(#${fooId.toHexString}).foo()
+           |}
+           |
+           |$foo
+           |""".stripMargin
+      testSimpleScript(main)
+    }
+
+    intercept[Throwable](test("", "1, #11, 2i", "", "")).getMessage is
+      "org.alephium.ralph.Compiler$Error: Invalid args type List(U256, ByteVec, I256) for function encodeFields"
+    test("", "1, 2i, #11", "020201030111", "010102")
+    test("@std(id = #0001)", "1, 2i, #11", "0302010301110306414c50480001", "010102")
   }
 
   it should "not pay to unloaded contract" in new ContractFixture {

@@ -274,7 +274,7 @@ object Ast {
             Seq.empty
           }
           val instrs = genApproveCode(state, func) ++
-            args.flatMap(_.genCode(state)) ++
+            func.genCodeForArgs(args, state) ++
             variadicInstrs ++
             func.genCode(argsType)
           if (ignoreReturn) {
@@ -1125,11 +1125,14 @@ object Ast {
     def getFieldTypes(): AVector[String] = AVector.from(contractFields.view.map(_.tpe.signature))
     def getFieldMutability(): AVector[Boolean] = AVector.from(contractFields.view.map(_.isMutable))
 
-    override def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] =
+    override def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = {
+      val stdInterfaceIdOpt = if (hasStdIdField) stdInterfaceId else None
       Seq(
-        BuiltIn.encodeImmFields(stdIdEnabled, stdInterfaceId, fields),
-        BuiltIn.encodeMutFields(fields)
+        BuiltIn.encodeImmFields(stdInterfaceIdOpt, fields),
+        BuiltIn.encodeMutFields(fields),
+        BuiltIn.encodeFields(stdInterfaceIdOpt, fields)
       )
+    }
 
     private def checkFuncs(): Unit = {
       if (funcs.length < 1) {

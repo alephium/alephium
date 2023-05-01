@@ -148,6 +148,8 @@ object Compiler {
       val retTypes = getReturnType(inputType)
       Type.flattenTypeLength(retTypes)
     }
+    def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
+      args.flatMap(_.genCode(state))
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
   }
