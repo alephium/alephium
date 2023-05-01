@@ -215,7 +215,7 @@ trait Endpoints
     infosEndpoint.get
       .in("current-difficulty")
       .out(jsonBody[CurrentDifficulty])
-      .summary("Get current difficulty")
+      .summary("Get the average difficulty of the latest blocks from all shards")
 
   val getBlocks: BaseEndpoint[TimeInterval, BlocksPerTimeStampRange] =
     blockflowEndpoint.get
