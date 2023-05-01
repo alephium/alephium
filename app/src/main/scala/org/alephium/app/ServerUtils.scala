@@ -16,9 +16,9 @@
 
 package org.alephium.app
 
-import scala.concurrent._
-
 import java.math.BigInteger
+
+import scala.concurrent._
 
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
@@ -107,7 +107,7 @@ class ServerUtils(implicit
 
   def getCurrentDifficulty(
       blockFlow: BlockFlow
-  )(implicit groupConfig: GroupConfig): Try[BigInteger] = {
+  ): Try[BigInteger] = {
     wrapResult(blockFlow.getDifficultyMetric().map(_.value))
   }
 

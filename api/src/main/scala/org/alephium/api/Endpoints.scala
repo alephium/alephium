@@ -211,6 +211,12 @@ trait Endpoints
       .out(jsonBody[HashRateResponse])
       .summary("Get average hashrate from `now - timespan(millis)` to `now`")
 
+  val getCurrentDifficulty: BaseEndpoint[Unit, CurrentDifficulty] =
+    infosEndpoint.get
+      .in("current-difficulty")
+      .out(jsonBody[CurrentDifficulty])
+      .summary("Get current difficulty")
+
   val getBlocks: BaseEndpoint[TimeInterval, BlocksPerTimeStampRange] =
     blockflowEndpoint.get
       .in("blocks")

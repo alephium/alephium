@@ -41,6 +41,7 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     discoveryAction,
     getHistoryHashRate,
     getCurrentHashRate,
+    getCurrentDifficulty,
     getBlocks,
     getBlocksAndEvents,
     getBlock,

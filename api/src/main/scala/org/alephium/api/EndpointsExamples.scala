@@ -336,6 +336,9 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val hashrateResponseExamples: List[Example[HashRateResponse]] =
     simpleExample(HashRateResponse("100 MH/s"))
 
+  implicit val currentDifficultyExamples: List[Example[CurrentDifficulty]] =
+    simpleExample(CurrentDifficulty(new BigInteger("224000000000000")))
+
   implicit val blocksPerTimeStampRangeExamples: List[Example[BlocksPerTimeStampRange]] =
     simpleExample(BlocksPerTimeStampRange(AVector(AVector(blockEntry))))
 

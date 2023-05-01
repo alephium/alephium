@@ -16,6 +16,7 @@
 
 package org.alephium.app
 
+import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
 import scala.concurrent._
@@ -785,6 +786,15 @@ abstract class RestServerSpec(
     val body = """{"type":"Unban","peers":["123.123.123.123"]}"""
     Post(s"/infos/misbehaviors", body) check { response =>
       response.code is StatusCode.Ok
+    }
+  }
+
+  it should "call GET /infos/current-difficulty" in {
+    Get(s"/infos/current-difficulty") check { response =>
+      response.code is StatusCode.Ok
+      response.as[CurrentDifficulty] is CurrentDifficulty(
+        BigInteger.ONE
+      )
     }
   }
 
