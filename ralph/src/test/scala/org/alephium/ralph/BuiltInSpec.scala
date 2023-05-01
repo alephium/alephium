@@ -66,11 +66,12 @@ class BuiltInSpec extends AlephiumSpec {
          |}
          |""".stripMargin
     val ast = Compiler.compileContractFull(code).rightValue.ast
-    ast.builtInContractFuncs().length is 2
+    ast.builtInContractFuncs().length is 3
     ast.funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is
       Seq(U256Const(Val.U256(U256.Zero)), Encode)
     ast.funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is
       Seq(U256Const(Val.U256(U256.Zero)), Encode)
+    ast.funcTable(Ast.FuncId("encodeFields", true)).genCode(Seq.empty) is Seq.empty
   }
 
   it should "initialize built-in encoding functions for contracts using standard interfaces" in {
@@ -90,8 +91,8 @@ class BuiltInSpec extends AlephiumSpec {
 
     def test(enabled: Boolean, encodeImmFieldsInstrs: Seq[Instr[StatelessContext]]) = {
       val ast = Compiler.compileContractFull(code(enabled)).rightValue.ast
-      ast.funcTable.size is 3
-      ast.builtInContractFuncs().length is 2
+      ast.funcTable.size is 4
+      ast.builtInContractFuncs().length is 3
 
       val foo = ast.funcTable(Ast.FuncId("foo", false))
       foo.isStatic is false
@@ -102,6 +103,9 @@ class BuiltInSpec extends AlephiumSpec {
       encodeMutFields.isStatic is true
       encodeMutFields.genCode(Seq.empty) is
         Seq(U256Const(Val.U256(U256.Zero)), Encode)
+      val encodeFields = ast.funcTable(Ast.FuncId("encodeFields", true))
+      encodeFields.isStatic is true
+      encodeFields.genCode(Seq.empty) is Seq.empty
     }
 
     test(

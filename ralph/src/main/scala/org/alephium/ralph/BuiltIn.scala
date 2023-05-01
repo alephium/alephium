@@ -1677,9 +1677,25 @@ object BuiltIn {
     }
   }
 
+  object ContractBuiltIn {
+    @inline def genCodeForStdId[Ctx <: StatelessContext](
+        stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
+        fieldLength: Int
+    ): Seq[Instr[Ctx]] = {
+      stdInterfaceIdOpt match {
+        case Some(id) =>
+          Seq[Instr[Ctx]](
+            BytesConst(Val.ByteVec(id.bytes)),
+            U256Const(Val.U256.unsafe(fieldLength + 1)),
+            Encode
+          )
+        case _ => Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(fieldLength)), Encode)
+      }
+    }
+  }
+
   def encodeImmFields[Ctx <: StatelessContext](
-      stdIdEnabled: Option[Boolean],
-      stdInterfaceId: Option[Ast.StdInterfaceId],
+      stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
       fields: Seq[Ast.Argument]
   ): Compiler.ContractFunc[Ctx] = {
     val immFieldsTypes = fields.filter(!_.isMutable).map(_.tpe)
@@ -1689,17 +1705,8 @@ object BuiltIn {
       val argsType: Seq[Type]   = immFieldsTypes
       val returnType: Seq[Type] = Seq(Type.ByteVec)
 
-      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = {
-        stdInterfaceId match {
-          case Some(id) if stdIdEnabled.exists(identity) =>
-            Seq[Instr[Ctx]](
-              BytesConst(Val.ByteVec(id.bytes)),
-              U256Const(Val.U256.unsafe(argsType.length + 1)),
-              Encode
-            )
-          case _ => Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(argsType.length)), Encode)
-        }
-      }
+      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
+        ContractBuiltIn.genCodeForStdId(stdInterfaceIdOpt, argsType.length)
     }
   }
 
@@ -1714,6 +1721,44 @@ object BuiltIn {
 
       def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
         Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(argsType.length)), Encode)
+    }
+  }
+
+  def encodeFields[Ctx <: StatelessContext](
+      stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
+      fields: Seq[Ast.Argument]
+  ): Compiler.ContractFunc[Ctx] = {
+    val fieldTypes = fields.map(_.tpe)
+    new ContractBuiltIn[Ctx] {
+      val name: String          = "encodeFields"
+      val argsType: Seq[Type]   = fieldTypes
+      val returnType: Seq[Type] = Seq(Type.ByteVec, Type.ByteVec)
+
+      override def genCodeForArgs[C <: Ctx](
+          args: Seq[Ast.Expr[C]],
+          state: Compiler.State[C]
+      ): Seq[Instr[C]] = {
+        val (immFields, mutFields) = args.view.zipWithIndex
+          .foldLeft[(Seq[Ast.Expr[C]], Seq[Ast.Expr[C]])]((Seq.empty, Seq.empty)) {
+            case ((immFields, mutFields), (expr, index)) =>
+              if (fields(index).isMutable) {
+                (immFields, mutFields :+ expr)
+              } else {
+                (immFields :+ expr, mutFields)
+              }
+          }
+        val immFieldInstrs = immFields.flatMap(_.genCode(state)) ++ ContractBuiltIn.genCodeForStdId(
+          stdInterfaceIdOpt,
+          immFields.length
+        )
+        val mutFieldInstrs = mutFields.flatMap(_.genCode(state)) ++ Seq[Instr[Ctx]](
+          U256Const(Val.U256.unsafe(mutFields.length)),
+          Encode
+        )
+        immFieldInstrs ++ mutFieldInstrs
+      }
+
+      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq.empty
     }
   }
 }
