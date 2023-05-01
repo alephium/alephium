@@ -370,6 +370,18 @@ trait FlowUtils
       logger.warn("Hash indexing checking is on-going")
     }
   }
+
+  def getDifficultyMetric(): IOResult[Difficulty] = {
+    brokerConfig.cliqueChainIndexes
+      .foldE(Difficulty.zero) { case (acc, chainIndex) =>
+        val headerChain = blockFlow.getHeaderChain(chainIndex)
+        for {
+          bestHeaderHash <- headerChain.getBestTip()
+          bestHeader     <- headerChain.getBlockHeader(bestHeaderHash)
+        } yield acc.add(bestHeader.target.getDifficulty())
+      }
+      .map(_.divide(brokerConfig.chainNum))
+  }
 }
 
 object FlowUtils {

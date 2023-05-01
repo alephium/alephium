@@ -178,6 +178,8 @@ trait ApiModelCodec {
 
   implicit val hashrateResponseRW: RW[HashRateResponse] = macroRW
 
+  implicit val currentDifficultyRW: RW[CurrentDifficulty] = macroRW
+
   implicit val blocksPerTimeStampRangeRW: RW[BlocksPerTimeStampRange] = macroRW
 
   implicit val blocksAndEventsPerTimeStampRangeRW: RW[BlocksAndEventsPerTimeStampRange] = macroRW

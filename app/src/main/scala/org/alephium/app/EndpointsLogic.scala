@@ -157,6 +157,10 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(result)
   }
 
+  val getCurrentDifficultyLogic = serverLogic(getCurrentDifficulty) { _ =>
+    Future.successful(serverUtils.getCurrentDifficulty(blockFlow).map(CurrentDifficulty.apply))
+  }
+
   val getBlocksLogic = serverLogic(getBlocks) { timeInterval =>
     Future.successful(serverUtils.getBlocks(blockFlow, timeInterval))
   }

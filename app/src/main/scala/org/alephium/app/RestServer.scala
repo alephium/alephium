@@ -76,6 +76,7 @@ class RestServer(
       discoveryActionLogic,
       getHistoryHashRateLogic,
       getCurrentHashRateLogic,
+      getCurrentDifficultyLogic,
       getBlocksLogic,
       getBlocksAndEventsLogic,
       getBlockLogic,

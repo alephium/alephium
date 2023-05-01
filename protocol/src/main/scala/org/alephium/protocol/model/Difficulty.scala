@@ -32,6 +32,8 @@ final case class Difficulty private (value: BigInteger) extends AnyVal {
   def times(n: Int): Difficulty = Difficulty.unsafe(value.multiply(BigInteger.valueOf(n.toLong)))
 
   def divide(n: Int): Difficulty = new Difficulty(value.divide(BigInteger.valueOf(n.toLong)))
+
+  def add(another: Difficulty): Difficulty = Difficulty.unsafe(value.add(another.value))
 }
 
 object Difficulty {

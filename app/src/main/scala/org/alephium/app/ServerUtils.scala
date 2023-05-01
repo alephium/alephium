@@ -16,6 +16,8 @@
 
 package org.alephium.app
 
+import java.math.BigInteger
+
 import scala.concurrent._
 
 import akka.util.Timeout
@@ -101,6 +103,12 @@ class ServerUtils(implicit
         (hashCount * 1000 * groupConfig.chainNum) / timeInterval.durationUnsafe().millis
       HashRateResponse(s"${hashrate / 1000000} MH/s")
     }
+  }
+
+  def getCurrentDifficulty(
+      blockFlow: BlockFlow
+  ): Try[BigInteger] = {
+    wrapResult(blockFlow.getDifficultyMetric().map(_.value))
   }
 
   def getBalance(blockFlow: BlockFlow, address: Address): Try[Balance] = {
