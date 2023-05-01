@@ -3389,7 +3389,7 @@
         "tags": [
           "Infos"
         ],
-        "summary": "Get current difficulty",
+        "summary": "Get the average difficulty of the latest blocks from all shards",
         "operationId": "getInfosCurrent-difficulty",
         "responses": {
           "200": {
