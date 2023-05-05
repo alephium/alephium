@@ -148,6 +148,7 @@ object BlockFlowClient {
         BuildSweepAddressTransactions(
           fromPublicKey,
           address,
+          None,
           lockTime,
           gas,
           gasPrice

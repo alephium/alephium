@@ -434,6 +434,7 @@ trait EndpointsExamples extends ErrorExamples {
         BuildSweepAddressTransactions(
           publicKey,
           address,
+          Some(Amount(ALPH.oneAlph)),
           Some(ts),
           Some(model.minimalGas),
           Some(model.nonCoinbaseMinGasPrice)
