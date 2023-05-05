@@ -586,6 +586,7 @@ class TxUtilsSpec extends AlephiumSpec {
           None,
           None,
           nonCoinbaseMinGasPrice,
+          None,
           defaultUtxoLimit
         )
         .rightValue
@@ -880,24 +881,46 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "sweep as much as we can" in new LargeUtxos {
     val txValidation = TxValidation.build
 
-    val unsignedTxs = blockFlow
-      .sweepAddress(
-        None,
-        keyManager(output.lockupScript).publicKey,
-        output.lockupScript,
-        None,
-        None,
-        nonCoinbaseMinGasPrice,
-        Int.MaxValue
-      )
-      .rightValue
-      .rightValue
+    {
+      info("Sweep all UTXOs")
+      val unsignedTxs = blockFlow
+        .sweepAddress(
+          None,
+          keyManager(output.lockupScript).publicKey,
+          output.lockupScript,
+          None,
+          None,
+          nonCoinbaseMinGasPrice,
+          None,
+          Int.MaxValue
+        )
+        .rightValue
+        .rightValue
 
-    unsignedTxs.length is 6
+      unsignedTxs.length is 6
 
-    unsignedTxs.foreach { unsignedTx =>
-      val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
-      txValidation.validateTxOnlyForTest(sweepTx, blockFlow, None) isE ()
+      unsignedTxs.foreach { unsignedTx =>
+        val sweepTx = Transaction.from(unsignedTx, keyManager(output.lockupScript))
+        txValidation.validateTxOnlyForTest(sweepTx, blockFlow, None) isE ()
+      }
+    }
+
+    {
+      info("Sweep all UTXOs with less than 1 ALPH")
+      val unsignedTxs = blockFlow
+        .sweepAddress(
+          None,
+          keyManager(output.lockupScript).publicKey,
+          output.lockupScript,
+          None,
+          None,
+          nonCoinbaseMinGasPrice,
+          Some(ALPH.oneAlph),
+          Int.MaxValue
+        )
+        .rightValue
+        .rightValue
+      unsignedTxs.length is 0
     }
   }
 

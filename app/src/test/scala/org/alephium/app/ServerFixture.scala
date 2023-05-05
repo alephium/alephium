@@ -307,6 +307,7 @@ object ServerFixture {
         lockTimeOpt: Option[TimeStamp],
         gasOpt: Option[GasBox],
         gasPrice: GasPrice,
+        maxAttoAlphPerUTXOOpt: Option[U256],
         utxosLimit: Int
     ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
       Right(Right(AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))

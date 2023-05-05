@@ -275,6 +275,7 @@ class ServerUtils(implicit
         blockFlow,
         query.fromPublicKey,
         query.toAddress,
+        query.maxAttoAlphPerUTXO,
         query.lockTime,
         query.gasAmount,
         query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
@@ -646,6 +647,7 @@ class ServerUtils(implicit
       blockFlow: BlockFlow,
       fromPublicKey: PublicKey,
       toAddress: Address.Asset,
+      maxAttoAlphPerUTXO: Option[Amount],
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
@@ -658,6 +660,7 @@ class ServerUtils(implicit
       lockTimeOpt,
       gasOpt,
       gasPrice,
+      maxAttoAlphPerUTXO.map(_.value),
       Int.MaxValue
     ) match {
       case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)

@@ -284,7 +284,6 @@ trait TxUtils { Self: FlowUtils =>
       }
     }
   }
-  // scalastyle:on method.length
 
   def sweepAddress(
       targetBlockHashOpt: Option[BlockHash],
@@ -293,6 +292,7 @@ trait TxUtils { Self: FlowUtils =>
       lockTimeOpt: Option[TimeStamp],
       gasOpt: Option[GasBox],
       gasPrice: GasPrice,
+      maxAttoAlphPerUTXOOpt: Option[U256],
       utxosLimit: Int
   ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
@@ -302,9 +302,14 @@ trait TxUtils { Self: FlowUtils =>
 
     checkResult match {
       case Right(()) =>
-        getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit).map { allUtxos =>
+        getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit).map { allUtxosUnfiltered =>
           // Sweep as much as we can, taking maximalGasPerTx into consideration
           // Gas for ALPH.MaxTxInputNum P2PKH inputs exceeds maximalGasPerTx
+          val allUtxos = maxAttoAlphPerUTXOOpt match {
+            case Some(maxAttoAlphPerUTXO) =>
+              allUtxosUnfiltered.filter(_.output.amount < maxAttoAlphPerUTXO)
+            case None => allUtxosUnfiltered
+          }
           val groupedUtxos = allUtxos.groupedWithRemainder(ALPH.MaxTxInputNum / 2)
           groupedUtxos.mapE { utxos =>
             for {
@@ -332,6 +337,7 @@ trait TxUtils { Self: FlowUtils =>
         Right(Left(e))
     }
   }
+  // scalastyle:on method.length
 
   def isTxConfirmed(txId: TransactionId, chainIndex: ChainIndex): IOResult[Boolean] = {
     assume(brokerConfig.contains(chainIndex.from))

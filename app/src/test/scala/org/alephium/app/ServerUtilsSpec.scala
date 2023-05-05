@@ -455,6 +455,34 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "sweep only small UTXOs" in new FlowFixtureWithApi with GetTxFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils = new ServerUtils
+
+    val (_, fromPublicKey, _) = genesisKeys(0)
+
+    val result0 = serverUtils
+      .buildSweepAddressTransactions(
+        blockFlow,
+        BuildSweepAddressTransactions(fromPublicKey, Address.p2pkh(fromPublicKey), None)
+      )
+      .rightValue
+    result0.unsignedTxs.length is 1
+
+    val result1 = serverUtils
+      .buildSweepAddressTransactions(
+        blockFlow,
+        BuildSweepAddressTransactions(
+          fromPublicKey,
+          Address.p2pkh(fromPublicKey),
+          Some(Amount(U256.One))
+        )
+      )
+      .rightValue
+    result1.unsignedTxs.length is 0
+  }
+
   trait PrepareTxWithTargetBlockHash extends FlowFixtureWithApi {
     val serverUtils           = new ServerUtils
     val chainIndex            = ChainIndex.unsafe(0, 0)
@@ -500,6 +528,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           blockFlow,
           fromPublicKey,
           destinations.head.address,
+          None,
           None,
           None,
           nonCoinbaseMinGasPrice,

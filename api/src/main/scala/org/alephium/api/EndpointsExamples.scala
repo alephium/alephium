@@ -38,7 +38,7 @@ import org.alephium.serde._
 import org.alephium.util._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-// scalastyle:off magic.number
+// scalastyle:off magic.number file.size.limit
 trait EndpointsExamples extends ErrorExamples {
 
   private val networkId = NetworkId.AlephiumMainNet
@@ -434,6 +434,7 @@ trait EndpointsExamples extends ErrorExamples {
         BuildSweepAddressTransactions(
           publicKey,
           address,
+          Some(Amount(ALPH.oneAlph)),
           Some(ts),
           Some(model.minimalGas),
           Some(model.nonCoinbaseMinGasPrice)
