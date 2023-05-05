@@ -284,7 +284,6 @@ trait TxUtils { Self: FlowUtils =>
       }
     }
   }
-  // scalastyle:on method.length
 
   def sweepAddress(
       targetBlockHashOpt: Option[BlockHash],
@@ -338,6 +337,7 @@ trait TxUtils { Self: FlowUtils =>
         Right(Left(e))
     }
   }
+  // scalastyle:on method.length
 
   def isTxConfirmed(txId: TransactionId, chainIndex: ChainIndex): IOResult[Boolean] = {
     assume(brokerConfig.contains(chainIndex.from))

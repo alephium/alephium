@@ -38,7 +38,7 @@ import org.alephium.serde._
 import org.alephium.util._
 
 @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-// scalastyle:off magic.number
+// scalastyle:off magic.number file.size.limit
 trait EndpointsExamples extends ErrorExamples {
 
   private val networkId = NetworkId.AlephiumMainNet
