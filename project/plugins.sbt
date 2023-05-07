@@ -3,7 +3,7 @@ ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-xml" 
 
 addSbtPlugin("com.eed3si9n"       % "sbt-assembly"          % "2.0.0")
 addSbtPlugin("org.scalameta"      % "sbt-scalafmt"          % "2.5.0")
-addSbtPlugin("com.github.sbt"     % "sbt-ci-release"        % "1.5.11")
+addSbtPlugin("com.github.sbt"     % "sbt-ci-release"        % "1.5.12")
 addSbtPlugin("org.scalastyle"    %% "scalastyle-sbt-plugin" % "1.0.0")
 addSbtPlugin("org.scoverage"      % "sbt-scoverage"         % "2.0.6")
 addSbtPlugin("com.typesafe.sbt"   % "sbt-native-packager"   % "1.8.1")
