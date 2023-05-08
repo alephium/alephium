@@ -33,6 +33,7 @@ object Ast {
   val StdInterfaceIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
   private val stdArg: Argument =
     Argument(Ident("__stdInterfaceId"), Type.ByteVec, isMutable = false, isUnused = true)
+  val selfContractTypeId: TypeId = TypeId("__selfContract")
 
   final case class Ident(name: String)
   final case class TypeId(name: String)
@@ -220,9 +221,15 @@ object Ast {
       )
     }
   }
-  final case class ContractConv[Ctx <: StatelessContext](contractType: TypeId, address: Expr[Ctx])
+  final case class ContractConv[Ctx <: StatelessContext](contractType0: TypeId, address: Expr[Ctx])
       extends Expr[Ctx] {
     override protected def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      val contractType: TypeId = if (contractType0 == selfContractTypeId) {
+        state.typeId
+      } else {
+        contractType0
+      }
+
       state.checkContractType(contractType)
 
       if (address.getType(state) != Seq(Type.ByteVec)) {

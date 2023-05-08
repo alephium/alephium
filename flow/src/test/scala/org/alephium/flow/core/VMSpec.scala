@@ -3104,7 +3104,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |
            |  pub fn callSubContract(path: ByteVec) -> () {
            |    let subContractIdCalculated = subContractId!(path)
-           |    let subContractIdCalculatedTest = subContractIdOf!(Foo(selfContractId!()), path)
+           |    let subContractIdCalculatedTest = subContractIdOf!(selfContract!(), path)
            |    assert!(subContractIdCalculated == subContractIdCalculatedTest, 0)
            |    assert!(subContractIdCalculated == subContractId, 0)
            |    SubContract(subContractIdCalculated).call()
