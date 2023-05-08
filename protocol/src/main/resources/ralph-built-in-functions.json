@@ -204,6 +204,16 @@
     "returns": "@returns true if the function is called by a TxScript, false otherwise"
   },
   {
+    "name": "selfContract",
+    "category": "Contract",
+    "signature": "fn selfContract!() -> (<Contract>)",
+    "doc": "Returns self contract",
+    "params": [
+      
+    ],
+    "returns": "@returns self contract"
+  },
+  {
     "name": "createSubContract",
     "category": "SubContract",
     "signature": "fn createSubContract!(subContractPath:ByteVec, bytecode:ByteVec, encodedImmFields:ByteVec, encodedMutFields:ByteVec) -> (ByteVec)",
