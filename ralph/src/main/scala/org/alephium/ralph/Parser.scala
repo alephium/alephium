@@ -80,18 +80,6 @@ abstract class Parser[Ctx <: StatelessContext] {
   def contractConv[Unknown: P]: P[Ast.ContractConv[Ctx]] =
     P(Lexer.typeId ~ "(" ~ expr ~ ")").map { case (typeId, expr) => Ast.ContractConv(typeId, expr) }
 
-  def selfContractContractConv[Unknown: P]: P[Ast.ContractConv[Ctx]] =
-    P("selfContract!()").map { _ =>
-      Ast.ContractConv(
-        Ast.selfContractTypeId,
-        Ast.CallExpr(
-          id = Ast.FuncId("selfContractId", isBuiltIn = true),
-          approveAssets = Seq.empty,
-          args = Seq.empty
-        )
-      )
-    }
-
   def chain[Unknown: P](p: => P[Ast.Expr[Ctx]], op: => P[Operator]): P[Ast.Expr[Ctx]] =
     P(p ~ (op ~ p).rep).map { case (lhs, rhs) =>
       rhs.foldLeft(lhs) { case (acc, (op, right)) =>
@@ -527,7 +515,7 @@ object Parser {
 object StatelessParser extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
-      const | alphTokenId | selfContractContractConv | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr
+      const | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
@@ -552,7 +540,7 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | alphTokenId | selfContractContractConv | callExpr | contractCallExpr | contractConv
+      const | alphTokenId | callExpr | contractCallExpr | contractConv
         | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
     )
 

@@ -1618,6 +1618,26 @@ object BuiltIn {
     def doc: String        = s"Returns $retComment"
   }
 
+  val selfContract: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] with DocUtils {
+    val name: String       = "selfContract"
+    val category: Category = Category.Contract
+
+    def signature: String             = s"fn $name!() -> (<Contract>)"
+    def usePreapprovedAssets: Boolean = false
+    def useAssetsInContract: Boolean  = false
+
+    def returnType: Seq[Type] = Seq(Type.Contract.stack(Ast.selfContractTypeId))
+    def getReturnType(inputType: Seq[Type]): Seq[Type] = Seq(
+      Type.Contract.stack(Ast.selfContractTypeId)
+    )
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = Seq(SelfContractId)
+
+    val argsCommentedName: Seq[(String, String)] = Seq.empty
+    val retComment: String                       = "self contract"
+    def doc: String                              = s"Returns $retComment"
+  }
+
   val statefulFuncsSeq: Seq[(String, BuiltIn[StatefulContext])] =
     statelessFuncsSeq ++ Seq(
       approveToken,
@@ -1652,7 +1672,8 @@ object BuiltIn {
       isCalledFromTxScript,
       subContractId,
       subContractIdOf,
-      nullContractAddress
+      nullContractAddress,
+      selfContract
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap

@@ -221,15 +221,9 @@ object Ast {
       )
     }
   }
-  final case class ContractConv[Ctx <: StatelessContext](contractType0: TypeId, address: Expr[Ctx])
+  final case class ContractConv[Ctx <: StatelessContext](contractType: TypeId, address: Expr[Ctx])
       extends Expr[Ctx] {
     override protected def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      val contractType: TypeId = if (contractType0 == selfContractTypeId) {
-        state.typeId
-      } else {
-        contractType0
-      }
-
       state.checkContractType(contractType)
 
       if (address.getType(state) != Seq(Type.ByteVec)) {
@@ -364,10 +358,15 @@ object Ast {
       } else {
         objType(0) match {
           case contract: Type.Contract =>
-            val funcInfo = state.getFunc(contract.id, callId)
-            checkNonStaticContractFunction(contract.id, callId, funcInfo)
-            state.addExternalCall(contract.id, callId)
-            funcInfo.getReturnType(args.flatMap(_.getType(state)))
+            if (contract.id == Ast.selfContractTypeId) {
+              Seq(Type.Contract.stack(state.typeId))
+            } else {
+              val funcInfo = state.getFunc(contract.id, callId)
+              checkNonStaticContractFunction(contract.id, callId, funcInfo)
+              state.addExternalCall(contract.id, callId)
+              funcInfo.getReturnType(args.flatMap(_.getType(state)))
+            }
+
           case _ =>
             throw Compiler.Error(s"Expected a contract for ${quote(callId)}, got ${quote(obj)}")
         }
