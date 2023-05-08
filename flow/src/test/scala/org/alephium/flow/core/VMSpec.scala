@@ -3577,7 +3577,6 @@ class VMSpec extends AlephiumSpec with Generators {
     test("@std(id = #0001)", "1, 2i, #11", "0302010301110306414c50480001", "010102")
   }
 
-
   trait SelfContractFixture extends ContractFixture {
     def foo(selfContractStr: String): String
 
@@ -3603,40 +3602,43 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "test selfContract for contract" in new SelfContractFixture {
-    override def foo(selfContractStr: String) = s"""
-      |Contract Foo() {
-      |  pub fn hello() -> () {
-      |    emit Debug(`Hello`)
-      |  }
-      |
-      |  pub fn selfHello() -> () {
-      |    let foo = $selfContractStr
-      |    foo.hello()
-      |  }
-      |}
-      |""".stripMargin
+    override def foo(selfContractStr: String) = {
+      s"""
+         |Contract Foo() {
+         |  pub fn hello() -> () {
+         |    emit Debug(`Hello`)
+         |  }
+         |
+         |  pub fn selfHello() -> () {
+         |    let foo = $selfContractStr
+         |    foo.hello()
+         |  }
+         |}
+         |""".stripMargin
+    }
 
     test("Foo(selfContractId!())")
     test("selfContract!()")
   }
 
   it should "test selfContract for abstract contract" in new SelfContractFixture {
-    override def foo(selfContractStr: String) = s"""
-      |Contract Foo() extends AbstractFoo() {
-      |  pub fn hello() -> () {
-      |    emit Debug(`Hello`)
-      |  }
-      |}
-      |Abstract Contract AbstractFoo() {
-      |  pub fn hello() ->()
-      |
-      |  pub fn selfHello() -> () {
-      |    let foo = $selfContractStr
-      |    foo.hello()
-      |  }
-      |}
-      |""".stripMargin
-
+    override def foo(selfContractStr: String) = {
+      s"""
+         |Contract Foo() extends AbstractFoo() {
+         |  pub fn hello() -> () {
+         |    emit Debug(`Hello`)
+         |  }
+         |}
+         |Abstract Contract AbstractFoo() {
+         |  pub fn hello() ->()
+         |
+         |  pub fn selfHello() -> () {
+         |    let foo = $selfContractStr
+         |    foo.hello()
+         |  }
+         |}
+         |""".stripMargin
+    }
     intercept[Throwable](test("AbstractFoo(selfContractId!())")).getMessage is
       "org.alephium.ralph.Compiler$Error: AbstractFoo is not instantiable"
     test("Foo(selfContractId!())")

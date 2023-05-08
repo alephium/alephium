@@ -358,14 +358,10 @@ object Ast {
       } else {
         objType(0) match {
           case contract: Type.Contract =>
-            if (contract.id == Ast.selfContractTypeId) {
-              Seq(Type.Contract.stack(state.typeId))
-            } else {
-              val funcInfo = state.getFunc(contract.id, callId)
-              checkNonStaticContractFunction(contract.id, callId, funcInfo)
-              state.addExternalCall(contract.id, callId)
-              funcInfo.getReturnType(args.flatMap(_.getType(state)))
-            }
+            val funcInfo = state.getFunc(contract.id, callId)
+            checkNonStaticContractFunction(contract.id, callId, funcInfo)
+            state.addExternalCall(contract.id, callId)
+            funcInfo.getReturnType(args.flatMap(_.getType(state)))
 
           case _ =>
             throw Compiler.Error(s"Expected a contract for ${quote(callId)}, got ${quote(obj)}")
