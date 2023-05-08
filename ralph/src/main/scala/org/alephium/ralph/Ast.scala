@@ -362,7 +362,6 @@ object Ast {
             checkNonStaticContractFunction(contract.id, callId, funcInfo)
             state.addExternalCall(contract.id, callId)
             funcInfo.getReturnType(args.flatMap(_.getType(state)))
-
           case _ =>
             throw Compiler.Error(s"Expected a contract for ${quote(callId)}, got ${quote(obj)}")
         }
