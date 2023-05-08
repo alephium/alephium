@@ -33,6 +33,7 @@ object Ast {
   val StdInterfaceIdPrefix: ByteString = ByteString("ALPH", StandardCharsets.UTF_8)
   private val stdArg: Argument =
     Argument(Ident("__stdInterfaceId"), Type.ByteVec, isMutable = false, isUnused = true)
+  val selfContractTypeId: TypeId = TypeId("__selfContract")
 
   final case class Ident(name: String)
   final case class TypeId(name: String)
@@ -357,10 +358,15 @@ object Ast {
       } else {
         objType(0) match {
           case contract: Type.Contract =>
-            val funcInfo = state.getFunc(contract.id, callId)
-            checkNonStaticContractFunction(contract.id, callId, funcInfo)
-            state.addExternalCall(contract.id, callId)
-            funcInfo.getReturnType(args.flatMap(_.getType(state)))
+            if (contract.id == Ast.selfContractTypeId) {
+              Seq(Type.Contract.stack(state.typeId))
+            } else {
+              val funcInfo = state.getFunc(contract.id, callId)
+              checkNonStaticContractFunction(contract.id, callId, funcInfo)
+              state.addExternalCall(contract.id, callId)
+              funcInfo.getReturnType(args.flatMap(_.getType(state)))
+            }
+
           case _ =>
             throw Compiler.Error(s"Expected a contract for ${quote(callId)}, got ${quote(obj)}")
         }

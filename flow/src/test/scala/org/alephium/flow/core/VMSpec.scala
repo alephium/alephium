@@ -3104,7 +3104,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |
            |  pub fn callSubContract(path: ByteVec) -> () {
            |    let subContractIdCalculated = subContractId!(path)
-           |    let subContractIdCalculatedTest = subContractIdOf!(Foo(selfContractId!()), path)
+           |    let subContractIdCalculatedTest = subContractIdOf!(selfContract!(), path)
            |    assert!(subContractIdCalculated == subContractIdCalculatedTest, 0)
            |    assert!(subContractIdCalculated == subContractId, 0)
            |    SubContract(subContractIdCalculated).call()
@@ -3575,6 +3575,42 @@ class VMSpec extends AlephiumSpec with Generators {
       "org.alephium.ralph.Compiler$Error: Invalid args type List(U256, ByteVec, I256) for function encodeFields"
     test("", "1, 2i, #11", "020201030111", "010102")
     test("@std(id = #0001)", "1, 2i, #11", "0302010301110306414c50480001", "010102")
+  }
+
+  it should "test selfContract" in new ContractFixture {
+    def test(selfContractStr: String) = {
+      val foo = s"""
+                   |Contract Foo() {
+                   |  pub fn hello() -> () {
+                   |    emit Debug(`Hello`)
+                   |  }
+                   |
+                   |  pub fn selfHello() -> () {
+                   |    let foo = $selfContractStr
+                   |    foo.hello()
+                   |  }
+                   |}
+                   |""".stripMargin
+      val fooId = createContract(
+        foo,
+        initialImmState = AVector.empty,
+        initialMutState = AVector.empty
+      )._1
+
+      val main: String =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  Foo(#${fooId.toHexString}).selfHello()
+           |}
+           |
+           |$foo
+           |""".stripMargin
+      testSimpleScript(main)
+    }
+
+    test("Foo(selfContractId!())")
+    test("selfContract!()")
   }
 
   it should "not pay to unloaded contract" in new ContractFixture {

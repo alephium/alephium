@@ -829,7 +829,8 @@ object Compiler {
         .getOrElse(callId, throw Error(s"Function ${typeId}.${callId.name} does not exist"))
     }
 
-    def getContractInfo(typeId: Ast.TypeId): ContractInfo[Ctx] = {
+    def getContractInfo(typeId0: Ast.TypeId): ContractInfo[Ctx] = {
+      val typeId = if (typeId0 == Ast.selfContractTypeId) this.typeId else typeId0
       contractTable.getOrElse(typeId, throw Error(s"Contract ${typeId.name} does not exist"))
     }
 

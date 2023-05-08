@@ -76,6 +76,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         case None             => Ast.CallExpr(funcId, approveAssets, expr)
       }
     }
+
   def contractConv[Unknown: P]: P[Ast.ContractConv[Ctx]] =
     P(Lexer.typeId ~ "(" ~ expr ~ ")").map { case (typeId, expr) => Ast.ContractConv(typeId, expr) }
 
@@ -513,7 +514,9 @@ object Parser {
 )
 object StatelessParser extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
-    P(const | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr)
+    P(
+      const | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr
+    )
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
     P(varDef | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret)
@@ -537,7 +540,8 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | alphTokenId | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
+      const | alphTokenId | callExpr | contractCallExpr | contractConv
+        | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.ContractCallExpr] =
