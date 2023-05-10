@@ -16,7 +16,7 @@
 
 package org.alephium.ralph.error
 
-import fastparse.P
+import fastparse.{P, Pass}
 
 object FastParseExtension {
 
@@ -32,4 +32,17 @@ object FastParseExtension {
   def LastIndex(parser: P[Unit])(implicit ctx: P[_]): P[Int] =
     parser.map(_ => ctx.index)
 
+  /** Throws [[CompilerError.ExpectedEndOfInput]] if the last character is not the end-of-input.
+    *
+    * FastParse's default equivalent is `fastparse.End`.
+    */
+  def EndOfInput(implicit ctx: P[_]): P[Unit] = {
+    val index = ctx.index
+    if (ctx.input.isReachable(index)) {
+      val character = ctx.input.slice(index, index + 1).head
+      throw CompilerError.ExpectedEndOfInput(character, index)
+    } else {
+      Pass(())
+    }
+  }
 }
