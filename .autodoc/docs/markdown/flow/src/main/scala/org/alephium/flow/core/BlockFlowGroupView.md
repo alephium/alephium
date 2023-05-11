@@ -1,0 +1,29 @@
+[View code on GitHub](https://github.com/alephium/alephium/flow/src/main/scala/org/alephium/flow/core/BlockFlowGroupView.scala)
+
+This code defines a trait called `BlockFlowGroupView` which provides a set of methods to retrieve information about transaction outputs and relevant unspent transaction outputs (UTXOs) for a given lockup script. The trait is generic over a type `WS` which is a subtype of `WorldState[_, _, _, _]`. 
+
+The `BlockFlowGroupView` trait provides the following methods:
+- `worldState`: returns the world state of type `WS`.
+- `getPreOutput(outputRef: TxOutputRef): IOResult[Option[TxOutput]]`: returns the transaction output corresponding to the given `TxOutputRef`. The output can be either in the world state or in the block cache. If the output is not found, `None` is returned. The result is wrapped in an `IOResult` which can either be `Right(output)` or `Left(error)`.
+- `getAsset(outputRef: TxOutputRef): IOResult[Option[AssetOutput]]`: returns the asset output corresponding to the given `TxOutputRef`. If the output is not an asset output, an error is returned. This method is optimized using `asInstanceOf`.
+- `getPreOutputs(inputs: AVector[TxInput]): IOResult[Option[AVector[AssetOutput]]]`: returns the asset outputs corresponding to the given inputs. The result is wrapped in an `IOResult` which can either be `Right(outputs)` or `Left(error)`.
+- `getPreOutputs(tx: Transaction): IOResult[Option[AVector[TxOutput]]]`: returns the transaction outputs corresponding to the inputs of the given transaction. The result is wrapped in an `IOResult` which can either be `Right(outputs)` or `Left(error)`.
+- `getPrevAssetOutputs(inputs: AVector[AssetOutputRef]): IOResult[Option[AVector[(AssetOutputRef, AssetOutput)]]]`: returns the asset outputs corresponding to the given `AssetOutputRef`s. The result is wrapped in an `IOResult` which can either be `Right(outputs)` or `Left(error)`.
+- `getPreContractOutputs(inputs: AVector[ContractOutputRef]): IOResult[Option[AVector[TxOutput]]]`: returns the contract outputs corresponding to the given `ContractOutputRef`s. The result is wrapped in an `IOResult` which can either be `Right(outputs)` or `Left(error)`.
+- `getRelevantUtxos(lockupScript: LockupScript.Asset, maxUtxosToRead: Int): IOResult[AVector[AssetOutputInfo]]`: returns the relevant UTXOs for the given lockup script. The relevant UTXOs are the ones that match the lockup script and have not been spent. The method first looks for the UTXOs in the world state and then in the block cache. If the UTXOs are not found, it returns an empty vector. The result is wrapped in an `IOResult` which can either be `Right(utxos)` or `Left(error)`.
+- `getContractUtxos(lockupScript: LockupScript.P2C): IOResult[ContractOutput]`: returns the contract output corresponding to the given `LockupScript.P2C`. The result is wrapped in an `IOResult` which can either be `Right(output)` or `Left(error)`.
+
+The `BlockFlowGroupView` trait is implemented by two classes: `Impl0` and `Impl1`. `Impl0` provides the basic functionality of the trait, while `Impl1` extends `Impl0` by adding support for the mempool. 
+
+`Impl0` provides the implementation for the `getPreOutput` and `getRelevantUtxos` methods. The `getPreOutput` method first checks if the output has been spent in the mempool. If it has, it returns `None`. Otherwise, it calls the `getOutputOpt` method of the world state to retrieve the output. If the output is not found in the world state, it looks for it in the block cache. If the output is not found in the block cache, it returns `None`. The `getRelevantUtxos` method first retrieves the UTXOs from the world state using the `getAssetOutputs` method. It then looks for UTXOs in the block cache that match the lockup script. Finally, it merges the UTXOs from the world state and the block cache and returns the result.
+
+`Impl1` extends `Impl0` by overriding the `getPreOutput` and `getRelevantUtxos` methods. The `getPreOutput` method first checks if the output has been spent in the mempool. If it has, it returns `None`. Otherwise, it calls the `getOutput` method of the mempool to retrieve the output. If the output is not found in the mempool, it calls the `getPreOutput` method of `Impl0`. The `getRelevantUtxos` method first calls the `getRelevantUtxos` method of `Impl0` to retrieve the UTXOs from the world state and the block cache. It then calls the `getRelevantUtxos` method of the mempool to retrieve the UTXOs from the mempool. Finally, it merges the UTXOs from the world state, the block cache, and the mempool and returns the result.
+## Questions: 
+ 1. What is the purpose of the `BlockFlowGroupView` trait and its implementations?
+- The `BlockFlowGroupView` trait provides methods for retrieving information about transaction outputs and relevant UTXOs for a given lockup script. Its implementations (`Impl0` and `Impl1`) provide different ways of accessing this information, with `Impl1` including information from a mempool in addition to the world state and block caches.
+
+2. What is the purpose of the `getPreOutput` method?
+- The `getPreOutput` method retrieves the output of a transaction given its reference. It first checks if the output has been spent in the mempool, and if not, it looks for the output in the world state and block caches.
+
+3. What is the purpose of the `getRelevantUtxos` method?
+- The `getRelevantUtxos` method retrieves all relevant UTXOs for a given lockup script, which are UTXOs that can be spent by the lockup script. It first retrieves relevant UTXOs from the world state, and then checks the block caches for any additional relevant UTXOs. In `Impl1`, it also includes relevant UTXOs from the mempool.
