@@ -11487,7 +11487,8 @@
         "type": "object",
         "properties": {
           "version": {
-            "$ref": "#/components/schemas/ReleaseVersion"
+            "type": "string",
+            "format": "semver"
           }
         }
       },
@@ -11646,28 +11647,6 @@
           },
           "type": {
             "type": "string"
-          }
-        }
-      },
-      "ReleaseVersion": {
-        "required": [
-          "major",
-          "minor",
-          "patch"
-        ],
-        "type": "object",
-        "properties": {
-          "major": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "minor": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "patch": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },
