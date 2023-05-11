@@ -1,0 +1,26 @@
+[View code on GitHub](https://github.com/alephium/alephium/protocol/src/main/scala/org/alephium/protocol/vm/MutBalances.scala)
+
+The code defines a class called `MutBalances` that represents a mutable collection of balances for a given lockup script. The balances are stored as an `ArrayBuffer` of tuples, where each tuple contains a lockup script and a `MutBalancesPerLockup` object that represents the balances for that lockup script. 
+
+The `MutBalances` class provides methods to add and subtract balances for a given lockup script, as well as methods to retrieve the balances for a given lockup script or token ID. The class also provides methods to merge two `MutBalances` objects and to convert the balances to a collection of transaction outputs.
+
+The `MutBalances` class is used in the larger Alephium project to keep track of the balances of assets (such as Alphium tokens and other tokens) for a given lockup script. The balances are updated when assets are added or removed from the lockup script, such as when a transaction is processed. The balances can then be used to determine whether a transaction is valid or not.
+
+For example, the following code adds 100 Alphium tokens to the balances for a given lockup script:
+
+```
+val balances = MutBalances.empty
+val lockupScript = LockupScript(...)
+balances.addAlph(lockupScript, U256.from(100))
+```
+
+Overall, the `MutBalances` class provides a convenient way to manage balances for a given lockup script in the Alephium project.
+## Questions: 
+ 1. What is the purpose of the `MutBalances` class?
+- The `MutBalances` class represents a mutable collection of balances for different lockup scripts, which can hold both ALPH and token amounts.
+
+2. What methods are available for modifying the balances in `MutBalances`?
+- The `MutBalances` class provides methods for adding and subtracting ALPH and token amounts for specific lockup scripts, as well as merging balances with another `MutBalances` instance.
+
+3. How are `MutBalances` used to create transaction outputs?
+- The `toOutputs` method of `MutBalances` can be used to convert the balances into a vector of transaction outputs, which can be used to create a transaction.
