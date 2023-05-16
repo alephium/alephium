@@ -42,6 +42,7 @@ class KeywordSpec extends AlephiumSpec {
       "event",
       "emit",
       "extends",
+      "embeds",
       "implements",
       "alph",
       "const",

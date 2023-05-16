@@ -766,15 +766,15 @@ class ParserSpec extends AlephiumSpec {
   it should "parse contract inheritance" in {
     {
       info("Simple contract inheritance")
-      val code =
+      def code(keyword: String): String =
         s"""
-           |Contract Child(x: U256, y: U256) extends Parent0(x), Parent1(x) {
+           |Contract Child(x: U256, y: U256) $keyword Parent0(x), Parent1(x) {
            |  fn foo() -> () {
            |  }
            |}
            |""".stripMargin
 
-      fastparse.parse(code, StatefulParser.contract(_)).get.value is Contract(
+      val contract = Contract(
         None,
         None,
         false,
@@ -806,6 +806,11 @@ class ParserSpec extends AlephiumSpec {
           ContractInheritance(TypeId("Parent1"), Seq(Ident("x")))
         )
       )
+      fastparse
+        .parse(code(Keyword.`extends`.name), StatefulParser.contract(_))
+        .get
+        .value is contract
+      fastparse.parse(code(Keyword.`embeds`.name), StatefulParser.contract(_)).get.value is contract
     }
 
     {
