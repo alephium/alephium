@@ -2799,6 +2799,112 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       test(bar, methodIndex = 0)
     }
+
+    {
+      info("Fail if the enum field is missing in child contract")
+      val bar =
+        s"""
+           |Contract Bar() extends Foo() {
+           |  enum Color {
+           |    Red = 0
+           |  }
+           |}
+           |
+           |Abstract Contract Foo() {
+           |  enum Color {
+           |    Blue = 0
+           |  }
+           |
+           |  pub fn foo() -> () {
+           |    assert!(Color.Blue == 0, 0)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler.compileContract(bar).leftValue.message is
+        "Variable foo.Color.Blue does not exist"
+    }
+
+    {
+      info("Override enums from parents")
+      val bar =
+        s"""
+           |Contract Bar() extends Foo() {
+           |  enum Color {
+           |    Blue = 2
+           |  }
+           |}
+           |
+           |Abstract Contract Foo() {
+           |  enum Color {
+           |    Red = 0
+           |    Blue = 1
+           |  }
+           |
+           |  pub fn foo() -> () {
+           |    assert!(Color.Blue == 2, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      test(bar)
+    }
+
+    {
+      info("Select the first one from the inheritance hierarchy")
+      val abstractContracts =
+        s"""
+           |Abstract Contract A() {
+           |  enum Color {
+           |    Red = 0
+           |  }
+           |}
+           |
+           |Abstract Contract B() extends A() {
+           |  enum Color {
+           |    Red = 1
+           |  }
+           |}
+           |
+           |Abstract Contract C() {
+           |  enum Color {
+           |    Red = 2
+           |  }
+           |}
+           |""".stripMargin
+
+      val foo =
+        s"""
+           |Contract Foo() extends B(), C() {
+           |  pub fn foo() -> () {
+           |    assert!(Color.Red == 1, 0)
+           |  }
+           |}
+           |$abstractContracts
+           |""".stripMargin
+      test(foo)
+
+      val bar =
+        s"""
+           |Contract Bar() extends C(), B() {
+           |  pub fn foo() -> () {
+           |    assert!(Color.Red == 2, 0)
+           |  }
+           |}
+           |$abstractContracts
+           |""".stripMargin
+      test(bar)
+
+      val baz =
+        s"""
+           |Contract Baz() extends A(), B(), C() {
+           |  pub fn foo() -> () {
+           |    assert!(Color.Red == 0, 0)
+           |  }
+           |}
+           |$abstractContracts
+           |""".stripMargin
+      test(baz)
+    }
   }
 
   it should "check unused variables" in {

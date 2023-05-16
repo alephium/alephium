@@ -1547,7 +1547,7 @@ object Ast {
       val (abstractFuncs, nonAbstractFuncs)    = allFuncs.partition(_.bodyOpt.isEmpty)
       val (unimplementedFuncs, allUniqueFuncs) = checkFuncs(abstractFuncs, nonAbstractFuncs)
       val constantVars                         = allContracts.flatMap(_.constantVars)
-      val enums                                = allContracts.flatMap(_.enums)
+      val enums                                = extractEnums(contract, parents)
 
       val contractEvents = allContracts.flatMap(_.events)
       val events         = allInterfaces.flatMap(_.events) ++ contractEvents
@@ -1583,6 +1583,18 @@ object Ast {
         allInterfaces: Seq[ContractInterface]
     ): Seq[ContractInterface] = {
       allInterfaces.sortBy(interface => parentsCache(interface.ident).length)
+    }
+
+    def extractEnums(contract: ContractWithState, parents: Seq[ContractWithState]): Seq[EnumDef] = {
+      contract match {
+        case c: Contract =>
+          parents.foldLeft(c.enums) {
+            case (acc, parent: Contract) =>
+              acc ++ parent.enums.filterNot(e => acc.exists(_.id == e.id))
+            case (acc, _) => acc
+          }
+        case _ => Seq.empty
+      }
     }
 
     def checkFuncs(
