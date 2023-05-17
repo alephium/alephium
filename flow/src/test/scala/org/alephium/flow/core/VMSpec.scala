@@ -1142,6 +1142,33 @@ class VMSpec extends AlephiumSpec with Generators {
     failSimpleScript(failure(33), InvalidContractId)
   }
 
+  it should "test addressToContractId builtin" in new ContractFixture with LockupScriptGenerators {
+    def success(lockupScript: LockupScript.P2C) =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  let address = @${Address.from(lockupScript).toBase58}
+         |  assert!(addressToContractId!(address) == #${lockupScript.contractId.toHexString}, 0)
+         |}
+         |""".stripMargin
+
+    forAll(p2cLockupGen(GroupIndex.unsafe(0))) { lockupScript =>
+      testSimpleScript(success(lockupScript))
+    }
+
+    def failure(lockupScript: LockupScript.Asset) =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  addressToContractId!(@${Address.from(lockupScript).toBase58})
+         |}
+         |""".stripMargin
+
+    forAll(assetLockupGen(GroupIndex.unsafe(0))) { lockupScript =>
+      failSimpleScript(failure(lockupScript), AssertionFailed)
+    }
+  }
+
   it should "test contract exists" in new ContractFixture {
     val foo =
       s"""

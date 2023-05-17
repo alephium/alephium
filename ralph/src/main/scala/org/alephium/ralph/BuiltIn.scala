@@ -856,6 +856,29 @@ object BuiltIn {
       doc = "Converts contract id (ByteVec) to contract address (Address)."
     )
 
+  val addressToContractId: SimpleBuiltIn[StatelessContext] = SimpleBuiltIn[StatelessContext](
+    name = "addressToContractId",
+    argsType = Seq[Type](Type.Address),
+    returnType = Seq[Type](Type.ByteVec),
+    Seq(
+      Dup,
+      IsContractAddress,
+      Assert,
+      AddressToByteVec,
+      U256Const1,
+      // scalastyle:off magic.number
+      U256Const(Val.U256(U256.unsafe(33))),
+      // scalastyle:on magic.number
+      ByteVecSlice
+    ),
+    usePreapprovedAssets = false,
+    useAssetsInContract = false,
+    category = Category.Conversion,
+    argsCommentedName = Seq("contractAddress" -> "the input contract address"),
+    retComment = "a contract id",
+    doc = "Converts contract address (Address) to contract id (ByteVec)"
+  )
+
   val dustAmount: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chainSimple(
       "dustAmount",
@@ -1021,6 +1044,7 @@ object BuiltIn {
     encodeToByteVec,
     zeros,
     contractIdToAddress,
+    addressToContractId,
     byteVecToAddress,
     u256To1Byte,
     u256To2Byte,
