@@ -1601,7 +1601,7 @@ object Ast {
             val conflictFields = enumDef.fields.filter(f => fields.exists(_.name == f.name))
             if (conflictFields.nonEmpty) {
               throw Compiler.Error(
-                s"There are conflict fields in enum ${enumDef.id.name}: ${conflictFields.map(_.name).mkString(",")}"
+                s"There are conflict fields in the enum ${enumDef.id.name}: ${conflictFields.map(_.name).mkString(",")}"
               )
             }
             fields.appendAll(enumDef.fields)

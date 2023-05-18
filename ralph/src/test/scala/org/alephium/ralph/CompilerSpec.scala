@@ -2825,7 +2825,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(code).leftValue.message is
-        "There are conflict fields in enum Color: Red"
+        "There are conflict fields in the enum Color: Red"
     }
 
     {
