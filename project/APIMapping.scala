@@ -41,12 +41,12 @@ object APIMapping {
 
     val scalaMajorMinor = getScalaMajorMinor(scalaVersion)
 
-    val slickDocsURL =
+    val fastParseDocsURL =
       url(
         s"https://www.javadoc.io/doc/com.lihaoyi/fastparse_$scalaMajorMinor/${fastparse.revision}/index.html"
       )
 
-    fastParseJar -> slickDocsURL
+    fastParseJar -> fastParseDocsURL
   }
 
   private def getScalaMajorMinor(scalaVersion: String): String =
