@@ -369,7 +369,7 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
     }
   }
 
-  it should "format when footer length is the smallest" in {
+  it should "format when the length of the footer line is the smallest among the other lines" in {
     val formatter =
       CompilerErrorFormatter(
         errorTitle = "error title",
@@ -390,7 +390,7 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
         |""".stripMargin
   }
 
-  it should "format when footer length is the largest" in {
+  it should "format when the length of the footer line is the largest among the other lines" in {
     val formatter =
       CompilerErrorFormatter(
         errorTitle = "error title",
