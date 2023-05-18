@@ -2719,24 +2719,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
   it should "compile contract enum failed" in {
     {
-      info("Duplicated enum definitions")
-      val code =
-        s"""
-           |Contract Foo() {
-           |  enum ErrorCodes {
-           |    Error0 = 0
-           |  }
-           |  enum ErrorCodes {
-           |    Error1 = 1
-           |  }
-           |  pub fn foo() -> () {}
-           |}
-           |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "These enums are defined multiple times: ErrorCodes"
-    }
-
-    {
       info("Enum field does not exist")
       val code =
         s"""
@@ -2801,109 +2783,98 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Fail if the enum field is missing in child contract")
-      val bar =
+      info("Fail if there are different field types")
+      val code =
         s"""
-           |Contract Bar() extends Foo() {
-           |  enum Color {
-           |    Red = 0
-           |  }
-           |}
+           |Contract C() extends A(), B() {}
            |
-           |Abstract Contract Foo() {
-           |  enum Color {
-           |    Blue = 0
-           |  }
-           |
-           |  pub fn foo() -> () {
-           |    assert!(Color.Blue == 0, 0)
-           |  }
-           |}
-           |""".stripMargin
-      Compiler.compileContract(bar).leftValue.message is
-        "Variable foo.Color.Blue does not exist"
-    }
-
-    {
-      info("Override enums from parents")
-      val bar =
-        s"""
-           |Contract Bar() extends Foo() {
-           |  enum Color {
-           |    Blue = 2
-           |  }
-           |}
-           |
-           |Abstract Contract Foo() {
-           |  enum Color {
-           |    Red = 0
-           |    Blue = 1
-           |  }
-           |
-           |  pub fn foo() -> () {
-           |    assert!(Color.Blue == 2, 0)
-           |  }
-           |}
-           |""".stripMargin
-
-      test(bar)
-    }
-
-    {
-      info("Select the first one from the inheritance hierarchy")
-      val abstractContracts =
-        s"""
            |Abstract Contract A() {
            |  enum Color {
            |    Red = 0
            |  }
            |}
            |
-           |Abstract Contract B() extends A() {
+           |Abstract Contract B() {
+           |  enum Color {
+           |    Blue = #0011
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code).leftValue.message is
+        "There are different field types in the enum Color: ByteVec,U256"
+    }
+
+    {
+      info("Fail if there are conflict enum fields")
+      val code =
+        s"""
+           |Contract C() extends A(), B() {}
+           |
+           |Abstract Contract A() {
+           |  enum Color {
+           |    Red = 0
+           |  }
+           |}
+           |
+           |Abstract Contract B() {
            |  enum Color {
            |    Red = 1
            |  }
            |}
-           |
-           |Abstract Contract C() {
-           |  enum Color {
-           |    Red = 2
-           |  }
-           |}
            |""".stripMargin
 
-      val foo =
+      Compiler.compileContract(code).leftValue.message is
+        "There are conflict fields in enum Color: Red"
+    }
+
+    {
+      info("Merge enums")
+      val code =
         s"""
            |Contract Foo() extends B(), C() {
            |  pub fn foo() -> () {
-           |    assert!(Color.Red == 1, 0)
-           |  }
-           |}
-           |$abstractContracts
-           |""".stripMargin
-      test(foo)
-
-      val bar =
-        s"""
-           |Contract Bar() extends C(), B() {
-           |  pub fn foo() -> () {
-           |    assert!(Color.Red == 2, 0)
-           |  }
-           |}
-           |$abstractContracts
-           |""".stripMargin
-      test(bar)
-
-      val baz =
-        s"""
-           |Contract Baz() extends A(), B(), C() {
-           |  pub fn foo() -> () {
            |    assert!(Color.Red == 0, 0)
+           |    assert!(Color.Green == 1, 0)
+           |    assert!(Color.Blue == 2, 0)
+           |    assert!(EA.A == 0, 0)
+           |    assert!(EB.B == 0, 0)
+           |    assert!(EC.C == 0, 0)
            |  }
            |}
-           |$abstractContracts
+           |
+           |Abstract Contract A() {
+           |  enum EA {
+           |    A = 0
+           |  }
+           |
+           |  enum Color {
+           |    Red = 0
+           |  }
+           |}
+           |
+           |Abstract Contract B() extends A() {
+           |  enum EB {
+           |    B = 0
+           |  }
+           |
+           |  enum Color {
+           |    Green = 1
+           |  }
+           |}
+           |
+           |Abstract Contract C() {
+           |  enum EC {
+           |    C = 0
+           |  }
+           |
+           |  enum Color {
+           |    Blue = 2
+           |  }
+           |}
            |""".stripMargin
-      test(baz)
+
+      test(code)
     }
   }
 

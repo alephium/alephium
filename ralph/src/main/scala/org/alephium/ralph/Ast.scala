@@ -1547,7 +1547,7 @@ object Ast {
       val (abstractFuncs, nonAbstractFuncs)    = allFuncs.partition(_.bodyOpt.isEmpty)
       val (unimplementedFuncs, allUniqueFuncs) = checkFuncs(abstractFuncs, nonAbstractFuncs)
       val constantVars                         = allContracts.flatMap(_.constantVars)
-      val enums                                = extractEnums(contract, parents)
+      val enums                                = mergeEnums(allContracts.flatMap(_.enums))
 
       val contractEvents = allContracts.flatMap(_.events)
       val events         = allInterfaces.flatMap(_.events) ++ contractEvents
@@ -1585,16 +1585,30 @@ object Ast {
       allInterfaces.sortBy(interface => parentsCache(interface.ident).length)
     }
 
-    def extractEnums(contract: ContractWithState, parents: Seq[ContractWithState]): Seq[EnumDef] = {
-      contract match {
-        case c: Contract =>
-          parents.foldLeft(c.enums) {
-            case (acc, parent: Contract) =>
-              acc ++ parent.enums.filterNot(e => acc.exists(_.id == e.id))
-            case (acc, _) => acc
-          }
-        case _ => Seq.empty
+    def mergeEnums(enums: Seq[EnumDef]): Seq[EnumDef] = {
+      val mergedEnums = mutable.Map.empty[TypeId, mutable.ArrayBuffer[EnumField]]
+      enums.foreach { enumDef =>
+        mergedEnums.get(enumDef.id) match {
+          case Some(fields) =>
+            // enum fields will never be empty
+            val expectedType = enumDef.fields(0).value.tpe
+            val haveType     = fields(0).value.tpe
+            if (expectedType != haveType) {
+              throw Compiler.Error(
+                s"There are different field types in the enum ${enumDef.id.name}: $expectedType,$haveType"
+              )
+            }
+            val conflictFields = enumDef.fields.filter(f => fields.exists(_.name == f.name))
+            if (conflictFields.nonEmpty) {
+              throw Compiler.Error(
+                s"There are conflict fields in enum ${enumDef.id.name}: ${conflictFields.map(_.name).mkString(",")}"
+              )
+            }
+            fields.appendAll(enumDef.fields)
+          case None => mergedEnums(enumDef.id) = mutable.ArrayBuffer.from(enumDef.fields)
+        }
       }
+      mergedEnums.view.map(pair => EnumDef(pair._1, pair._2.toSeq)).toSeq
     }
 
     def checkFuncs(
