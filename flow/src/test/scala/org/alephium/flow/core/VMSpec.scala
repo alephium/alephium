@@ -4148,7 +4148,7 @@ class VMSpec extends AlephiumSpec with Generators {
     event.fields is AVector[Val](Val.ByteVec(ByteString.fromString("Hello, Alephium!")))
   }
 
-  it should "test token id built-in function" in new ContractFixture {
+  it should "test tokenId/contractId built-in function" in new ContractFixture {
     val foo =
       s"""
          |Contract Foo() {
@@ -4165,6 +4165,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn bar(foo: Foo, caller: Address) -> () {
          |    assert!(tokenId!($arguments) == #${fooId.toHexString}, 1)
+         |    assert!(contractId!($arguments) == #${fooId.toHexString}, 1)
          |    transferTokenToSelf!(caller, tokenId!(foo), 1)
          |  }
          |}
