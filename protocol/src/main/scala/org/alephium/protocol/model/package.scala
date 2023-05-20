@@ -19,6 +19,7 @@ package org.alephium.protocol
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.Bytes.byteStringOrdering
 import org.alephium.util.U256
+import org.alephium.protocol.vm.GasSchedule
 
 package object model {
   val DefaultBlockVersion: Byte = 0.toByte
@@ -52,6 +53,7 @@ package object model {
   val deprecatedMaxTokenPerUtxo: Int = 64
 
   val minimalAlphInContract: U256 = ALPH.oneAlph
+  val maxInputsForGasEstimation: Int = maximalGasPerTx.value / GasSchedule.txOutputBaseGas.value
 
   implicit val hashOrdering: Ordering[Hash] = Ordering.by(_.bytes)
   // scalastyle:on magic.number

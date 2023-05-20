@@ -25,17 +25,17 @@ import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.util._
 
 trait TxScriptGasEstimator {
-  def estimate(script: StatefulScript): Either[String, GasBox]
+  def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox]
 }
 
 object TxScriptGasEstimator {
 
+  // Is it because of not all inputs are picked for gas estimation?
   final case class Default(
-      inputs: AVector[TxInput],
       flow: BlockFlow
   )(implicit networkConfig: NetworkConfig, config: GroupConfig, logConfig: LogConfig)
       extends TxScriptGasEstimator {
-    def estimate(script: StatefulScript): Either[String, GasBox] = {
+    def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox] = {
       val chainIndexOpt =
         inputs.headOption.map(input => ChainIndex(input.fromGroup, input.fromGroup))
 
@@ -85,13 +85,13 @@ object TxScriptGasEstimator {
   }
 
   object Mock extends TxScriptGasEstimator {
-    def estimate(script: StatefulScript): Either[String, GasBox] = {
+    def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox] = {
       Right(defaultGasPerInput)
     }
   }
 
   object NotImplemented extends TxScriptGasEstimator {
-    def estimate(script: StatefulScript): Either[String, GasBox] = {
+    def estimate(inputs: AVector[TxInput], script: StatefulScript): Either[String, GasBox] = {
       throw new NotImplementedError("TxScriptGasEstimator not implemented")
     }
   }
