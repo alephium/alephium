@@ -607,7 +607,10 @@ object StatefulParser extends Parser[StatefulContext] {
     P(Lexer.token(Keyword.implements) ~ (interfaceInheritance.rep(1, ",")))
 
   def contractExtending[Unknown: P]: P[Seq[Ast.Inheritance]] =
-    P(Lexer.token(Keyword.`extends`) ~ (contractInheritance.rep(1, ",")))
+    P(
+      (Lexer.token(Keyword.`extends`) | Lexer.token(Keyword.`embeds`)) ~
+        contractInheritance.rep(1, ",")
+    )
 
   def contractInheritances[Unknown: P]: P[Seq[Ast.Inheritance]] = {
     P(contractExtending.? ~ interfaceImplementing.?).map {

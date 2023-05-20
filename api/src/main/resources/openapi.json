@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "2.3.0"
+    "version": "2.3.1"
   },
   "servers": [
     {
@@ -6853,6 +6853,36 @@
                       ]
                     }
                   ],
+                  "constants": [
+                    {
+                      "name": "A",
+                      "value": {
+                        "type": "Bool",
+                        "value": true
+                      }
+                    }
+                  ],
+                  "enums": [
+                    {
+                      "name": "Color",
+                      "fields": [
+                        {
+                          "name": "Red",
+                          "value": {
+                            "type": "U256",
+                            "value": "0"
+                          }
+                        },
+                        {
+                          "name": "Blue",
+                          "value": {
+                            "type": "U256",
+                            "value": "1"
+                          }
+                        }
+                      ]
+                    }
+                  ],
                   "events": [
                     {
                       "name": "Bar",
@@ -7041,6 +7071,36 @@
                             "I256",
                             "ByteVec",
                             "Address"
+                          ]
+                        }
+                      ],
+                      "constants": [
+                        {
+                          "name": "A",
+                          "value": {
+                            "type": "Bool",
+                            "value": true
+                          }
+                        }
+                      ],
+                      "enums": [
+                        {
+                          "name": "Color",
+                          "fields": [
+                            {
+                              "name": "Red",
+                              "value": {
+                                "type": "U256",
+                                "value": "0"
+                              }
+                            },
+                            {
+                              "name": "Blue",
+                              "value": {
+                                "type": "U256",
+                                "value": "1"
+                              }
+                            }
                           ]
                         }
                       ],
@@ -10607,6 +10667,8 @@
           "codeHashDebug",
           "fields",
           "functions",
+          "constants",
+          "enums",
           "events",
           "warnings"
         ],
@@ -10639,6 +10701,18 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FunctionSig"
+            }
+          },
+          "constants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Constant"
+            }
+          },
+          "enums": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Enum"
             }
           },
           "events": {
@@ -10776,6 +10850,21 @@
           },
           "type": {
             "type": "string"
+          }
+        }
+      },
+      "Constant": {
+        "required": [
+          "name",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Val"
           }
         }
       },
@@ -11102,6 +11191,39 @@
           "mapping": {
             "Reachable": "#/components/schemas/Reachable",
             "Unreachable": "#/components/schemas/Unreachable"
+          }
+        }
+      },
+      "Enum": {
+        "required": [
+          "name",
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnumField"
+            }
+          }
+        }
+      },
+      "EnumField": {
+        "required": [
+          "name",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Val"
           }
         }
       },
@@ -11487,7 +11609,8 @@
         "type": "object",
         "properties": {
           "version": {
-            "$ref": "#/components/schemas/ReleaseVersion"
+            "type": "string",
+            "format": "semver"
           }
         }
       },
@@ -11646,28 +11769,6 @@
           },
           "type": {
             "type": "string"
-          }
-        }
-      },
-      "ReleaseVersion": {
-        "required": [
-          "major",
-          "minor",
-          "patch"
-        ],
-        "type": "object",
-        "properties": {
-          "major": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "minor": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "patch": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },

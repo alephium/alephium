@@ -2719,24 +2719,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
   it should "compile contract enum failed" in {
     {
-      info("Duplicated enum definitions")
-      val code =
-        s"""
-           |Contract Foo() {
-           |  enum ErrorCodes {
-           |    Error0 = 0
-           |  }
-           |  enum ErrorCodes {
-           |    Error1 = 1
-           |  }
-           |  pub fn foo() -> () {}
-           |}
-           |""".stripMargin
-      Compiler.compileContract(code).leftValue.message is
-        "These enums are defined multiple times: ErrorCodes"
-    }
-
-    {
       info("Enum field does not exist")
       val code =
         s"""
@@ -2798,6 +2780,101 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       test(bar, methodIndex = 0)
+    }
+
+    {
+      info("Fail if there are different field types")
+      val code =
+        s"""
+           |Contract C() extends A(), B() {}
+           |
+           |Abstract Contract A() {
+           |  enum Color {
+           |    Red = 0
+           |  }
+           |}
+           |
+           |Abstract Contract B() {
+           |  enum Color {
+           |    Blue = #0011
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code).leftValue.message is
+        "There are different field types in the enum Color: ByteVec,U256"
+    }
+
+    {
+      info("Fail if there are conflict enum fields")
+      val code =
+        s"""
+           |Contract C() extends A(), B() {}
+           |
+           |Abstract Contract A() {
+           |  enum Color {
+           |    Red = 0
+           |  }
+           |}
+           |
+           |Abstract Contract B() {
+           |  enum Color {
+           |    Red = 1
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code).leftValue.message is
+        "There are conflict fields in the enum Color: Red"
+    }
+
+    {
+      info("Merge enums")
+      val code =
+        s"""
+           |Contract Foo() extends B(), C() {
+           |  pub fn foo() -> () {
+           |    assert!(Color.Red == 0, 0)
+           |    assert!(Color.Green == 1, 0)
+           |    assert!(Color.Blue == 2, 0)
+           |    assert!(EA.A == 0, 0)
+           |    assert!(EB.B == 0, 0)
+           |    assert!(EC.C == 0, 0)
+           |  }
+           |}
+           |
+           |Abstract Contract A() {
+           |  enum EA {
+           |    A = 0
+           |  }
+           |
+           |  enum Color {
+           |    Red = 0
+           |  }
+           |}
+           |
+           |Abstract Contract B() extends A() {
+           |  enum EB {
+           |    B = 0
+           |  }
+           |
+           |  enum Color {
+           |    Green = 1
+           |  }
+           |}
+           |
+           |Abstract Contract C() {
+           |  enum EC {
+           |    C = 0
+           |  }
+           |
+           |  enum Color {
+           |    Blue = 2
+           |  }
+           |}
+           |""".stripMargin
+
+      test(code)
     }
   }
 

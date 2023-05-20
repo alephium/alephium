@@ -606,6 +606,16 @@ trait EndpointsExamples extends ErrorExamples {
         returnTypes = AVector("U256", "I256", "ByteVec", "Address")
       )
     ),
+    constants = AVector(CompileResult.Constant("A", Val.True)),
+    enums = AVector(
+      CompileResult.Enum(
+        name = "Color",
+        fields = AVector(
+          CompileResult.EnumField("Red", ValU256(U256.Zero)),
+          CompileResult.EnumField("Blue", ValU256(U256.One))
+        )
+      )
+    ),
     events = AVector(
       CompileResult.EventSig(
         name = "Bar",
