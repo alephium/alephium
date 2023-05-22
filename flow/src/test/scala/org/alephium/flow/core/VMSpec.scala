@@ -3672,6 +3672,59 @@ class VMSpec extends AlephiumSpec with Generators {
     test("selfContract!()")
   }
 
+  it should "test selfContract for interface" in new SelfContractFixture {
+    override def foo(selfContractStr: String) = {
+      s"""
+         |Contract Foo() implements InterfaceFoo {
+         |  pub fn hello() -> () {
+         |    emit Debug(`Hello`)
+         |  }
+         |
+         |  pub fn selfHello() -> () {
+         |    let foo = $selfContractStr
+         |    foo.hello()
+         |  }
+         |}
+         |
+         |Interface InterfaceFoo {
+         |  pub fn hello() ->()
+         |  pub fn selfHello() -> ()
+         |}
+         |""".stripMargin
+    }
+    test("InterfaceFoo(selfContractId!())")
+    test("Foo(selfContractId!())")
+    test("selfContract!()")
+  }
+
+  it should "test selfContract for multi-level inheritance" in new SelfContractFixture {
+    override def foo(selfContractStr: String) = {
+      s"""
+         |Contract Foo() extends AbstractFooParent() {
+         |  pub fn hello() -> () {
+         |    emit Debug(`Hello`)
+         |  }
+         |}
+         |
+         |Abstract Contract AbstractFooParent() extends AbstractFooGrandParent() {
+         |}
+         |
+         |Abstract Contract AbstractFooGrandParent() {
+         |  pub fn hello() ->()
+         |
+         |  pub fn selfHello() -> () {
+         |    let foo = $selfContractStr
+         |    foo.hello()
+         |  }
+         |}
+         |""".stripMargin
+    }
+    intercept[Throwable](test("AbstractFooGrandParent(selfContractId!())")).getMessage is
+      "org.alephium.ralph.Compiler$Error: AbstractFooGrandParent is not instantiable"
+    test("Foo(selfContractId!())")
+    test("selfContract!()")
+  }
+
   it should "not pay to unloaded contract" in new ContractFixture {
     val foo: String =
       s"""
