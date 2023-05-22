@@ -143,9 +143,9 @@ object Compiler {
     def usePreapprovedAssets: Boolean
     def useAssetsInContract: Boolean
     def useUpdateFields: Boolean
-    def getReturnType(inputType: Seq[Type]): Seq[Type]
-    def getReturnLength(inputType: Seq[Type]): Int = {
-      val retTypes = getReturnType(inputType)
+    def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type]
+    def getReturnLength(inputType: Seq[Type], selfContractType: Type): Int = {
+      val retTypes = getReturnType(inputType, selfContractType)
       Type.flattenTypeLength(retTypes)
     }
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
@@ -240,7 +240,7 @@ object Compiler {
   ) extends ContractFunc[Ctx] {
     def name: String = id.name
 
-    override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+    override def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
       if (inputType == argsType) {
         returnType
       } else {
@@ -829,8 +829,7 @@ object Compiler {
         .getOrElse(callId, throw Error(s"Function ${typeId}.${callId.name} does not exist"))
     }
 
-    def getContractInfo(typeId0: Ast.TypeId): ContractInfo[Ctx] = {
-      val typeId = if (typeId0 == Ast.selfContractTypeId) this.typeId else typeId0
+    def getContractInfo(typeId: Ast.TypeId): ContractInfo[Ctx] = {
       contractTable.getOrElse(typeId, throw Error(s"Contract ${typeId.name} does not exist"))
     }
 
