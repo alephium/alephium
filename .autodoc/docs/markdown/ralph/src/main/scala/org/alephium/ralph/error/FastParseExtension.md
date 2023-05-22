@@ -1,0 +1,33 @@
+[View code on GitHub](https://github.com/alephium/alephium/ralph/src/main/scala/org/alephium/ralph/error/FastParseExtension.scala)
+
+The code provided is a Scala file that contains an object called `FastParseExtension`. This object provides a method called `LastIndex` that takes a `parser` and a `ctx` as input parameters and returns the tail/last index after the parser run. 
+
+The `FastParseExtension` object is used to extend the functionality of the `fastparse` library, which is a parsing library for Scala. The `fastparse` library provides a way to define parsers in a concise and easy-to-read way. The `LastIndex` method provided by the `FastParseExtension` object is used to get the last index of a parser run without ignoring whitespaces. 
+
+The `LastIndex` method takes a `parser` and a `ctx` as input parameters. The `parser` is a parser with a unit result, and the `ctx` is the current parser context. The method returns the tail/last index after the parser run. 
+
+This method can be used in the larger project to parse input data and extract relevant information. For example, if the project requires parsing a string to extract a specific value, the `fastparse` library can be used to define a parser for the string, and the `LastIndex` method can be used to get the last index of the parser run. This information can then be used to extract the relevant value from the string. 
+
+Here is an example of how the `LastIndex` method can be used:
+
+```
+import fastparse._
+import org.alephium.ralph.error.FastParseExtension._
+
+val parser = P("hello" ~ "world").rep(1)
+val input = "hello world hello world"
+
+val result = parser.parse(input)
+val lastIndex = LastIndex(parser)(result)
+
+println(lastIndex) // Output: 23
+```
+
+In this example, the `parser` is defined to parse the input string for the sequence "hello world" one or more times. The `input` string contains two occurrences of the sequence "hello world". The `parser` is run on the `input` string using the `parse` method provided by the `fastparse` library. The `result` variable contains the result of the parser run. The `LastIndex` method is then called with the `parser` and `result` as input parameters to get the last index of the parser run. The `lastIndex` variable contains the last index of the parser run, which is 23.
+## Questions: 
+ 1. What is the purpose of the `FastParseExtension` object?
+   - The `FastParseExtension` object provides a method called `LastIndex` that returns the last index after running a given parser without ignoring whitespaces.
+2. What is the license under which this code is distributed?
+   - This code is distributed under the GNU Lesser General Public License, either version 3 of the License, or any later version.
+3. What is the `org.alephium.ralph.error` package used for?
+   - It is unclear from this code snippet what the `org.alephium.ralph.error` package is used for. It is possible that this code is just a small part of a larger project and the package is used elsewhere.

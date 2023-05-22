@@ -856,6 +856,29 @@ object BuiltIn {
       doc = "Converts contract id (ByteVec) to contract address (Address)."
     )
 
+  val addressToContractId: SimpleBuiltIn[StatelessContext] = SimpleBuiltIn[StatelessContext](
+    name = "addressToContractId",
+    argsType = Seq[Type](Type.Address),
+    returnType = Seq[Type](Type.ByteVec),
+    Seq(
+      Dup,
+      IsContractAddress,
+      Assert,
+      AddressToByteVec,
+      U256Const1,
+      // scalastyle:off magic.number
+      U256Const(Val.U256(U256.unsafe(33))),
+      // scalastyle:on magic.number
+      ByteVecSlice
+    ),
+    usePreapprovedAssets = false,
+    useAssetsInContract = false,
+    category = Category.Conversion,
+    argsCommentedName = Seq("contractAddress" -> "the input contract address"),
+    retComment = "a contract id",
+    doc = "Converts contract address (Address) to contract id (ByteVec)"
+  )
+
   val dustAmount: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chainSimple(
       "dustAmount",
@@ -1021,6 +1044,7 @@ object BuiltIn {
     encodeToByteVec,
     zeros,
     contractIdToAddress,
+    addressToContractId,
     byteVecToAddress,
     u256To1Byte,
     u256To2Byte,
@@ -1588,34 +1612,36 @@ object BuiltIn {
       retComment = "the null contract address with contract id being zeros"
     )
 
-  val tokenId: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] with DocUtils {
-    val name: String       = "tokenId"
-    val category: Category = Category.Contract
+  private def contractIdBuiltIn(funcName: String) = {
+    new BuiltIn[StatefulContext] with DocUtils {
+      val name: String       = funcName
+      val category: Category = Category.Contract
 
-    def signature: String             = s"fn $name!(contract:<Contract>) -> (ByteVec)"
-    def usePreapprovedAssets: Boolean = false
-    def useAssetsInContract: Boolean  = false
+      def signature: String             = s"fn $name!(contract:<Contract>) -> (ByteVec)"
+      def usePreapprovedAssets: Boolean = false
+      def useAssetsInContract: Boolean  = false
 
-    def returnType: Seq[Type] = Seq(Type.ByteVec)
+      def returnType: Seq[Type] = Seq(Type.ByteVec)
 
-    @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
-    def getReturnType(inputType: Seq[Type]): Seq[Type] = {
-      if (inputType.length == 1 && inputType(0).isInstanceOf[Type.Contract]) {
-        Seq(Type.ByteVec)
-      } else {
-        throw Error(
-          s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(",")}"
-        )
+      @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+      def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+        if (inputType.length == 1 && inputType(0).isInstanceOf[Type.Contract]) {
+          Seq(Type.ByteVec)
+        } else {
+          throw Error(
+            s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(",")}"
+          )
+        }
       }
+
+      def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = Seq.empty
+
+      val argsCommentedName: Seq[(String, String)] =
+        Seq("contract" -> "the contract variable")
+
+      val retComment: String = "the id of the contract"
+      def doc: String        = s"Returns $retComment"
     }
-
-    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = Seq.empty
-
-    val argsCommentedName: Seq[(String, String)] =
-      Seq("contract" -> "the contract variable")
-
-    val retComment: String = "the id of the contract"
-    def doc: String        = s"Returns $retComment"
   }
 
   val selfContract: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] with DocUtils {
@@ -1638,6 +1664,9 @@ object BuiltIn {
     def doc: String                              = s"Returns $retComment"
   }
 
+  val tokenId: BuiltIn[StatefulContext]    = contractIdBuiltIn("tokenId")
+  val contractId: BuiltIn[StatefulContext] = contractIdBuiltIn("contractId")
+
   val statefulFuncsSeq: Seq[(String, BuiltIn[StatefulContext])] =
     statelessFuncsSeq ++ Seq(
       approveToken,
@@ -1659,6 +1688,7 @@ object BuiltIn {
       selfContractId,
       selfTokenId,
       tokenId,
+      contractId,
       callerContractId,
       callerAddress,
       contractInitialStateHash,

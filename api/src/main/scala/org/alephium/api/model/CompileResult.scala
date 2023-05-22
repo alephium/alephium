@@ -67,6 +67,8 @@ final case class CompileContractResult(
     codeHashDebug: Hash,
     fields: CompileResult.FieldsSig,
     functions: AVector[CompileResult.FunctionSig],
+    constants: AVector[CompileResult.Constant],
+    enums: AVector[CompileResult.Enum],
     events: AVector[CompileResult.EventSig],
     warnings: AVector[String],
     stdInterfaceId: Option[String] = None
@@ -93,6 +95,8 @@ object CompileContractResult {
       fields,
       functions = AVector.from(contractAst.funcs.view.map(CompileResult.FunctionSig.from)),
       events = AVector.from(contractAst.events.map(CompileResult.EventSig.from)),
+      constants = AVector.from(contractAst.constantVars.map(CompileResult.Constant.from)),
+      enums = AVector.from(contractAst.enums.map(CompileResult.Enum.from)),
       warnings = compiled.warnings,
       stdInterfaceId = if (contractAst.hasStdIdField) {
         contractAst.stdInterfaceId.map(id =>
@@ -192,6 +196,27 @@ object CompileResult {
         func.getArgMutability(),
         func.getReturnSignatures()
       )
+    }
+  }
+
+  final case class Constant(name: String, value: Val)
+  object Constant {
+    def from(constantDef: Ast.ConstantVarDef): Constant = {
+      Constant(constantDef.name, Val.from(constantDef.value))
+    }
+  }
+
+  final case class EnumField(name: String, value: Val)
+  object EnumField {
+    def from(enumFieldDef: Ast.EnumField): EnumField = {
+      EnumField(enumFieldDef.name, Val.from(enumFieldDef.value))
+    }
+  }
+
+  final case class Enum(name: String, fields: AVector[EnumField])
+  object Enum {
+    def from(enumDef: Ast.EnumDef): Enum = {
+      Enum(enumDef.name, AVector.from(enumDef.fields.map(EnumField.from)))
     }
   }
 

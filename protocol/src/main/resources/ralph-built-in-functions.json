@@ -92,6 +92,16 @@
     "returns": "@returns the id of the contract"
   },
   {
+    "name": "contractId",
+    "category": "Contract",
+    "signature": "fn contractId!(contract:<Contract>) -> (ByteVec)",
+    "doc": "Returns the id of the contract",
+    "params": [
+      "@param contract the contract variable"
+    ],
+    "returns": "@returns the id of the contract"
+  },
+  {
     "name": "callerContractId",
     "category": "Contract",
     "signature": "fn callerContractId!() -> (ByteVec)",
@@ -659,6 +669,16 @@
       "@param contractId the input contract id"
     ],
     "returns": "@returns a contract Address"
+  },
+  {
+    "name": "addressToContractId",
+    "category": "Conversion",
+    "signature": "fn addressToContractId!(contractAddress:Address) -> (ByteVec)",
+    "doc": "Converts contract address (Address) to contract id (ByteVec)",
+    "params": [
+      "@param contractAddress the input contract address"
+    ],
+    "returns": "@returns a contract id"
   },
   {
     "name": "byteVecToAddress",

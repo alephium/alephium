@@ -54,6 +54,7 @@ object Keyword {
   case object event      extends Used
   case object emit       extends Used
   case object `extends`  extends Used
+  case object `embeds`   extends Used
   case object implements extends Used
   case object alph       extends Used
   case object const      extends Used

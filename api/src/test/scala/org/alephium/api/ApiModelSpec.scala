@@ -950,6 +950,27 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
          |    }
          |  ],
+         |  "constants": [
+         |    {
+         |      "name": "A",
+         |      "value": {"type": "Bool", "value": true}
+         |    }
+         |  ],
+         |  "enums": [
+         |    {
+         |      "name": "Color",
+         |      "fields": [
+         |        {
+         |          "name": "Red",
+         |          "value": {"type": "U256", "value": "0"}
+         |        },
+         |        {
+         |          "name": "Blue",
+         |          "value": {"type": "U256", "value": "1"}
+         |        }
+         |      ]
+         |    }
+         |  ],
          |  "events": [
          |    {
          |      "name": "Bar",
@@ -959,6 +980,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  ],
          |  "warnings": [
          |    "Found unused variables in Foo: bar.a",
+         |    "Found unused constants in Foo: A,Color.Blue,Color.Red",
          |    "Found unused fields in Foo: cc, ff"
          |  ]
          |}
