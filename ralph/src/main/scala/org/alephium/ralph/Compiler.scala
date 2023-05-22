@@ -447,6 +447,7 @@ object Compiler {
       with Scope
       with PhaseLike {
     def typeId: Ast.TypeId
+    def selfContractType: Type = Type.Contract.stack(typeId)
     def varTable: mutable.HashMap[String, VarInfo]
     var allowDebug: Boolean = false
 
