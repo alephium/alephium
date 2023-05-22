@@ -3131,7 +3131,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |
            |  pub fn callSubContract(path: ByteVec) -> () {
            |    let subContractIdCalculated = subContractId!(path)
-           |    let subContractIdCalculatedTest = subContractIdOf!(Foo(selfContractId!()), path)
+           |    let subContractIdCalculatedTest = subContractIdOf!(selfContract!(), path)
            |    assert!(subContractIdCalculated == subContractIdCalculatedTest, 0)
            |    assert!(subContractIdCalculated == subContractId, 0)
            |    SubContract(subContractIdCalculated).call()
@@ -3602,6 +3602,160 @@ class VMSpec extends AlephiumSpec with Generators {
       "org.alephium.ralph.Compiler$Error: Invalid args type List(U256, ByteVec, I256) for function encodeFields"
     test("", "1, 2i, #11", "020201030111", "010102")
     test("@std(id = #0001)", "1, 2i, #11", "0302010301110306414c50480001", "010102")
+  }
+
+  trait SelfContractFixture extends ContractFixture {
+    def foo(selfContractStr: String): String
+
+    def test(selfContractStr: String) = {
+      val fooStr = foo(selfContractStr)
+      val fooId = createContract(
+        fooStr,
+        initialImmState = AVector.empty,
+        initialMutState = AVector.empty
+      )._1
+
+      val main: String =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main {
+           |  Foo(#${fooId.toHexString}).selfHello()
+           |}
+           |
+           |$fooStr
+           |""".stripMargin
+      testSimpleScript(main)
+    }
+  }
+
+  it should "test selfContract for contract" in new SelfContractFixture {
+    override def foo(selfContractStr: String) = {
+      s"""
+         |Contract Foo() {
+         |  pub fn hello() -> () {
+         |    emit Debug(`Hello`)
+         |  }
+         |
+         |  pub fn selfHello() -> () {
+         |    let foo = $selfContractStr
+         |    foo.hello()
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    test("Foo(selfContractId!())")
+    test("selfContract!()")
+  }
+
+  it should "test selfContract for abstract contract" in new SelfContractFixture {
+    override def foo(selfContractStr: String) = {
+      s"""
+         |Contract Foo() extends AbstractFoo() {
+         |  pub fn hello() -> () {
+         |    emit Debug(`Hello`)
+         |  }
+         |}
+         |Abstract Contract AbstractFoo() {
+         |  pub fn hello() ->()
+         |
+         |  pub fn selfHello() -> () {
+         |    let foo = $selfContractStr
+         |    foo.hello()
+         |  }
+         |}
+         |""".stripMargin
+    }
+    intercept[Throwable](test("AbstractFoo(selfContractId!())")).getMessage is
+      "org.alephium.ralph.Compiler$Error: AbstractFoo is not instantiable"
+    test("Foo(selfContractId!())")
+    test("selfContract!()")
+  }
+
+  it should "test selfContract for interface" in new SelfContractFixture {
+    override def foo(selfContractStr: String) = {
+      s"""
+         |Contract Foo() implements InterfaceFoo {
+         |  pub fn hello() -> () {
+         |    emit Debug(`Hello`)
+         |  }
+         |
+         |  pub fn selfHello() -> () {
+         |    let foo = $selfContractStr
+         |    foo.hello()
+         |  }
+         |}
+         |
+         |Interface InterfaceFoo {
+         |  pub fn hello() ->()
+         |  pub fn selfHello() -> ()
+         |}
+         |""".stripMargin
+    }
+    test("InterfaceFoo(selfContractId!())")
+    test("Foo(selfContractId!())")
+    test("selfContract!()")
+  }
+
+  it should "test selfContract for multi-level inheritance" in new SelfContractFixture {
+    override def foo(selfContractStr: String) = {
+      s"""
+         |Contract Foo() extends AbstractFooParent() {
+         |  pub fn hello() -> () {
+         |    emit Debug(`Hello`)
+         |  }
+         |}
+         |
+         |Abstract Contract AbstractFooParent() extends AbstractFooGrandParent() {
+         |}
+         |
+         |Abstract Contract AbstractFooGrandParent() {
+         |  pub fn hello() ->()
+         |
+         |  pub fn selfHello() -> () {
+         |    let foo = $selfContractStr
+         |    foo.hello()
+         |  }
+         |}
+         |""".stripMargin
+    }
+    intercept[Throwable](test("AbstractFooGrandParent(selfContractId!())")).getMessage is
+      "org.alephium.ralph.Compiler$Error: AbstractFooGrandParent is not instantiable"
+    test("Foo(selfContractId!())")
+    test("selfContract!()")
+  }
+
+  it should "test selfContract for multiple parents" in new SelfContractFixture {
+    override def foo(selfContractStr: String) = {
+      s"""
+         |Contract Foo() extends FooParent1(), FooParent2() {
+         |  pub fn hello() -> () {
+         |    emit Debug(`Hello 1`)
+         |  }
+         |
+         |  pub fn hello2() -> () {
+         |    emit Debug(`Hello 2`)
+         |  }
+         |}
+         |
+         |Abstract Contract FooParent1() {
+         |  pub fn hello2() ->()
+         |}
+         |
+         |Abstract Contract FooParent2() {
+         |  pub fn hello() ->()
+         |
+         |  pub fn selfHello() -> () {
+         |    let foo = $selfContractStr
+         |    foo.hello()
+         |  }
+         |}
+         |""".stripMargin
+    }
+    intercept[Throwable](test("FooParent2(selfContractId!())")).getMessage is
+      "org.alephium.ralph.Compiler$Error: FooParent2 is not instantiable"
+    test("Foo(selfContractId!())")
+    test("selfContract!()")
   }
 
   it should "not pay to unloaded contract" in new ContractFixture {

@@ -59,7 +59,7 @@ object BuiltIn {
 
   trait DocUtils {
     def name: String
-    def returnType: Seq[Type]
+    def returnType(selfContractType: Type): Seq[Type]
 
     def argsCommentedName: Seq[(String, String)]
     def retComment: String
@@ -73,23 +73,18 @@ object BuiltIn {
     def returns: String = s"@returns $retComment"
   }
 
-  trait NoOverloadingUtils {
+  sealed trait NoOverloadingUtils {
     def name: String
     def argsType: Seq[Type]
     def argsCommentedName: Seq[(String, String)]
-    def returnType: Seq[Type]
+    def returnType(selfContractType: Type): Seq[Type]
 
-    def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+    def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
       if (inputType == argsType) {
-        returnType
+        returnType(selfContractType)
       } else {
         throw Error(s"Invalid args type $inputType for builtin func $name, expected $argsType")
       }
-    }
-
-    def signature: String = {
-      val args = argsCommentedName.zip(argsType).map { case ((name, _), tpe) => s"$name:$tpe" }
-      s"fn $name!(${args.mkString(", ")}) -> (${returnType.mkString(", ")})"
     }
   }
 
@@ -109,7 +104,14 @@ object BuiltIn {
       with NoOverloadingUtils {
     require(argsCommentedName.length == argsType.length)
 
+    override def returnType(selfContractType: Type): Seq[Type] = returnType
+
     override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = instrs
+
+    def signature: String = {
+      val args = argsCommentedName.zip(argsType).map { case ((name, _), tpe) => s"$name:$tpe" }
+      s"fn $name!(${args.mkString(", ")}) -> (${returnType.mkString(", ")})"
+    }
   }
 
   // scalastyle:off parameter.number
@@ -244,7 +246,7 @@ object BuiltIn {
       useAssetsInContract: Boolean
   ) extends BuiltIn[Ctx]
       with DocUtils {
-    override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+    override def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
       assume(argsTypeWithInstrs.distinctBy(_.argsTypes).length == argsTypeWithInstrs.length)
 
       if (argsTypeWithInstrs.exists(_.argsTypes == inputType)) {
@@ -253,6 +255,8 @@ object BuiltIn {
         throw Error(s"Invalid args type $inputType for builtin func $name")
       }
     }
+
+    override def returnType(selfContractType: Type): Seq[Type] = returnType
 
     override def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = {
       argsTypeWithInstrs.find(_.argsTypes == inputType) match {
@@ -528,7 +532,7 @@ object BuiltIn {
 
     def validate(tpe: Type): Boolean = validTypes.contains(tpe) && (tpe != toType)
 
-    override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+    override def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
       if (inputType.length != 1 || !validate(inputType(0))) {
         throw Error(s"Invalid args type $inputType for builtin func $name")
       } else {
@@ -649,7 +653,7 @@ object BuiltIn {
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
 
-    def getReturnType(inputType: Seq[Type]): Seq[Type] = Seq(Type.ByteVec)
+    def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = Seq(Type.ByteVec)
 
     def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(Encode)
 
@@ -894,7 +898,7 @@ object BuiltIn {
     def category: Category            = Category.Utils
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
-    override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+    override def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
       if (inputType.nonEmpty && inputType != Seq(Type.U256)) {
         throw Compiler.Error(s"Invalid argument type for $name, optional U256 expected")
       }
@@ -1553,7 +1557,7 @@ object BuiltIn {
     def usePreapprovedAssets: Boolean = false
     def useAssetsInContract: Boolean  = false
 
-    def returnType: Seq[Type] = Seq(Type.ByteVec)
+    def returnType(selfContractType: Type): Seq[Type] = Seq(Type.ByteVec)
 
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]]
 
@@ -1572,12 +1576,14 @@ object BuiltIn {
     def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
       Seq(SubContractId)
     }
+
+    override def signature: String = s"fn $name!(subContractPath:ByteVec) -> (ByteVec)"
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   val subContractIdOf: BuiltIn[StatefulContext] = new SubContractBuiltIn {
     val name: String = "subContractIdOf"
-    override def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+    override def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
       if (
         inputType.length == 2 &&
         inputType(0).isInstanceOf[Type.Contract] &&
@@ -1621,10 +1627,10 @@ object BuiltIn {
       def usePreapprovedAssets: Boolean = false
       def useAssetsInContract: Boolean  = false
 
-      def returnType: Seq[Type] = Seq(Type.ByteVec)
+      def returnType(selfContractType: Type): Seq[Type] = Seq(Type.ByteVec)
 
       @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
-      def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+      def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
         if (inputType.length == 1 && inputType(0).isInstanceOf[Type.Contract]) {
           Seq(Type.ByteVec)
         } else {
@@ -1642,6 +1648,26 @@ object BuiltIn {
       val retComment: String = "the id of the contract"
       def doc: String        = s"Returns $retComment"
     }
+  }
+
+  val selfContract: BuiltIn[StatefulContext] = new BuiltIn[StatefulContext] with DocUtils {
+    val name: String       = "selfContract"
+    val category: Category = Category.Contract
+
+    def signature: String             = s"fn $name!() -> (<Contract>)"
+    def usePreapprovedAssets: Boolean = false
+    def useAssetsInContract: Boolean  = false
+
+    def returnType(selfContractType: Type): Seq[Type] = Seq(selfContractType)
+    def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = Seq(
+      selfContractType
+    )
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = Seq(SelfContractId)
+
+    val argsCommentedName: Seq[(String, String)] = Seq.empty
+    val retComment: String                       = "self contract"
+    def doc: String                              = s"Returns $retComment"
   }
 
   val tokenId: BuiltIn[StatefulContext]    = contractIdBuiltIn("tokenId")
@@ -1682,7 +1708,8 @@ object BuiltIn {
       isCalledFromTxScript,
       subContractId,
       subContractIdOf,
-      nullContractAddress
+      nullContractAddress,
+      selfContract
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
@@ -1698,7 +1725,7 @@ object BuiltIn {
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = ???
 
     def returnType: Seq[Type]
-    def getReturnType(inputType: Seq[Type]): Seq[Type] = {
+    def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
       if (inputType == argsType) {
         returnType
       } else {

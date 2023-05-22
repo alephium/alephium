@@ -278,7 +278,7 @@ object Ast {
             variadicInstrs ++
             func.genCode(argsType)
           if (ignoreReturn) {
-            val returnType = func.getReturnType(argsType)
+            val returnType = func.getReturnType(argsType, state.selfContractType)
             instrs ++ Seq.fill(Type.flattenTypeLength(returnType))(Pop)
           } else {
             instrs
@@ -310,7 +310,7 @@ object Ast {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
-      funcInfo.getReturnType(args.flatMap(_.getType(state)))
+      funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -337,7 +337,7 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      funcInfo.getReturnType(args.flatMap(_.getType(state)))
+      funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -360,7 +360,10 @@ object Ast {
             val funcInfo = state.getFunc(contract.id, callId)
             checkNonStaticContractFunction(contract.id, callId, funcInfo)
             state.addExternalCall(contract.id, callId)
-            funcInfo.getReturnType(args.flatMap(_.getType(state)))
+            funcInfo.getReturnType(
+              args.flatMap(_.getType(state)),
+              state.selfContractType
+            )
           case _ =>
             throw Compiler.Error(s"Expected a contract for ${quote(callId)}, got ${quote(obj)}")
         }
@@ -375,7 +378,8 @@ object Ast {
       val contract  = obj.getType(state)(0).asInstanceOf[Type.Contract]
       val func      = state.getFunc(contract.id, callId)
       val argLength = Type.flattenTypeLength(func.argsType)
-      val retLength = func.getReturnLength(args.flatMap(_.getType(state)))
+      val retLength =
+        func.getReturnLength(args.flatMap(_.getType(state)), state.selfContractType)
       genApproveCode(state, func) ++
         args.flatMap(_.genCode(state)) ++
         Seq(
@@ -816,7 +820,7 @@ object Ast {
     override def check(state: Compiler.State[Ctx]): Unit = {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
-      funcInfo.getReturnType(args.flatMap(_.getType(state)))
+      funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
       ()
     }
 
@@ -843,7 +847,7 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      funcInfo.getReturnType(args.flatMap(_.getType(state)))
+      funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
       ()
     }
 
