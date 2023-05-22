@@ -3725,6 +3725,39 @@ class VMSpec extends AlephiumSpec with Generators {
     test("selfContract!()")
   }
 
+  it should "test selfContract for multiple parents" in new SelfContractFixture {
+    override def foo(selfContractStr: String) = {
+      s"""
+         |Contract Foo() extends FooParent1(), FooParent2() {
+         |  pub fn hello() -> () {
+         |    emit Debug(`Hello 1`)
+         |  }
+         |
+         |  pub fn hello2() -> () {
+         |    emit Debug(`Hello 2`)
+         |  }
+         |}
+         |
+         |Abstract Contract FooParent1() {
+         |  pub fn hello2() ->()
+         |}
+         |
+         |Abstract Contract FooParent2() {
+         |  pub fn hello() ->()
+         |
+         |  pub fn selfHello() -> () {
+         |    let foo = $selfContractStr
+         |    foo.hello()
+         |  }
+         |}
+         |""".stripMargin
+    }
+    intercept[Throwable](test("FooParent2(selfContractId!())")).getMessage is
+      "org.alephium.ralph.Compiler$Error: FooParent2 is not instantiable"
+    test("Foo(selfContractId!())")
+    test("selfContract!()")
+  }
+
   it should "not pay to unloaded contract" in new ContractFixture {
     val foo: String =
       s"""
