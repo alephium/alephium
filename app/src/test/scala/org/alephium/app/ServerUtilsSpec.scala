@@ -32,7 +32,7 @@ import org.alephium.flow.gasestimation._
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, TokenIssuance, UnlockScript}
 import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
@@ -2302,6 +2302,57 @@ class ServerUtilsSpec extends AlephiumSpec {
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is false
     confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
+  }
+
+  it should "deploy contract with preapproved assets" in new Fixture {
+    val chainIndex                 = ChainIndex.unsafe(0, 0)
+    val lockupScript               = getGenesisLockupScript(chainIndex)
+    val (privateKey, publicKey, _) = genesisKeys(chainIndex.from.value)
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val contract = Compiler.compileContract(code).rightValue
+
+    def createToken(amount: U256): ContractId = {
+      val issuanceInfo = Some(TokenIssuance.Info(vm.Val.U256(amount), Some(lockupScript)))
+      val script =
+        contractCreation(
+          contract,
+          AVector.empty,
+          AVector.empty,
+          lockupScript,
+          minimalAlphInContract,
+          issuanceInfo
+        )
+      val block = payableCall(blockFlow, chainIndex, script)
+      addAndCheck(blockFlow, block)
+      ContractId.from(block.transactions.head.id, 0, chainIndex.from)
+    }
+
+    val tokenId               = TokenId.from(createToken(10))
+    val (_, _, tokens0, _, _) = blockFlow.getBalance(lockupScript, defaultUtxoLimit).rightValue
+    tokens0.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(10))
+
+    val query = BuildDeployContractTx(
+      fromPublicKey = publicKey.bytes,
+      bytecode = serialize(contract) ++ ByteString(0, 0),
+      initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
+      initialTokenAmounts = Some(AVector(Token(tokenId, U256.unsafe(4))))
+    )
+    implicit val serverUtils = new ServerUtils()
+    val result               = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
+    signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
+    val block = mineFromMemPool(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+
+    val (alphAmount, _, tokens1, _, _) = blockFlow
+      .getBalance(LockupScript.P2C(result.contractAddress.contractId), defaultUtxoLimit)
+      .rightValue
+    alphAmount is ALPH.alph(2)
+    tokens1.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(4))
   }
 
   private def generateDestination(
