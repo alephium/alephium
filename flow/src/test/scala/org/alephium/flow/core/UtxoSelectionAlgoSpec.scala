@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import scala.util.Random
+
 import akka.util.ByteString
 import org.scalatest.compatible.Assertion
 
@@ -279,6 +281,46 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
     UtxoSelection(68341).verifyWithGas(2, 0)
   }
 
+  it should "work when tx has more potential outputs than max gas allows" in new Fixture {
+    // Potentially 1000 outputs
+    val tokenIds     = new Array[TokenId](1000)
+    val tokenAmounts = new Array[U256](1000)
+    val amounts = (0 until 200).map { i =>
+      tokenIds(i) = TokenId.hash(s"tokenId$i")
+      val alphAmount = Random.between(1, 1000000)
+      tokenAmounts(i) = U256.unsafe(Random.between(1, 1000000))
+      (alphAmount, AVector((tokenIds(i), tokenAmounts(i))))
+    }.toSeq
+
+    implicit val utxos = buildUtxosWithTokens(amounts: _*)
+
+    UtxoSelection(0).verifyCanSelect()
+
+    val firstAlphAmount = amounts.head._1
+    UtxoSelection(firstAlphAmount).verifyCanSelect()
+    UtxoSelection(firstAlphAmount, (tokenIds(100), tokenAmounts(100))).verifyCanSelect()
+    UtxoSelection(
+      firstAlphAmount,
+      (tokenIds(1), tokenAmounts(1)),
+      (tokenIds(51), tokenAmounts(51)),
+      (tokenIds(151), tokenAmounts(151))
+    ).verifyCanSelect()
+
+    val firstTenAlphAmount = amounts.take(10).map(_._1).sum
+    UtxoSelection(firstTenAlphAmount).verifyCanSelect()
+    UtxoSelection(firstTenAlphAmount, (tokenIds(100), tokenAmounts(100))).verifyCanSelect()
+    UtxoSelection(
+      firstTenAlphAmount,
+      (tokenIds(1), tokenAmounts(1)),
+      (tokenIds(51), tokenAmounts(51)),
+      (tokenIds(151), tokenAmounts(151))
+    ).verifyCanSelect()
+
+    val allAlphAmount = amounts.map(_._1).sum
+    UtxoSelection(allAlphAmount).verifyCanNotSelect()
+    UtxoSelection(allAlphAmount, (tokenIds(101), tokenAmounts(101))).verifyCanNotSelect()
+  }
+
   trait Fixture extends AlephiumConfigFixture {
 
     def buildOutput(
@@ -353,6 +395,15 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
           GasEstimation.estimateWithP2PKHInputs(selectedUtxos.length, outputs.length)
         )
         valueWithGas isE Selected(selectedUtxos, gas)
+      }
+
+      def verifyCanSelect(): Assertion = {
+        valueWithGas.rightValue.assets.length should be < utxos.length
+      }
+
+      def verifyCanNotSelect(): Assertion = {
+        intercept[AssertionError](valueWithGas.rightValue)
+          .getMessage() is "Not enough balance for fee, maybe transfer a smaller amount"
       }
 
       def withGas(gas: Int): UtxoSelection = {
