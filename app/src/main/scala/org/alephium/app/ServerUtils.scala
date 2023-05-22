@@ -820,7 +820,7 @@ class ServerUtils(implicit
         blockFlow,
         script,
         initialAttoAlphAmount,
-        AVector.empty,
+        amounts._2,
         lockPair._1,
         lockPair._2,
         query.gasAmount,
