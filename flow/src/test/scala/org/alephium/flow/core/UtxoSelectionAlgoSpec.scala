@@ -285,7 +285,7 @@ class UtxoSelectionAlgoSpec extends AlephiumSpec with LockupScriptGenerators {
     // Potentially 1000 outputs
     val tokenIds     = new Array[TokenId](1000)
     val tokenAmounts = new Array[U256](1000)
-    val amounts = (0 until 200).map { i =>
+    val amounts = (0 until 1000).map { i =>
       tokenIds(i) = TokenId.hash(s"tokenId$i")
       val alphAmount = Random.between(1, 1000000)
       tokenAmounts(i) = U256.unsafe(Random.between(1, 1000000))

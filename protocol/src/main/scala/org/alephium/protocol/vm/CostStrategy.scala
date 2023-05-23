@@ -50,13 +50,9 @@ trait CostStrategy {
     } yield ()
   }
 
-  def chargeContractInput(): ExeResult[Unit] = {
-    chargeGas(GasSchedule.txInputBaseGas)
-  }
+  def chargeContractInput(): ExeResult[Unit] = chargeGas(GasSchedule.txInputBaseGas)
 
-  def chargeGeneratedOutput(): ExeResult[Unit] = {
-    chargeGas(GasSchedule.txOutputBaseGas)
-  }
+  def chargeGeneratedOutput(): ExeResult[Unit] = chargeGas(GasSchedule.txOutputBaseGas)
 
   def chargeGas(gas: GasBox): ExeResult[Unit] = {
     updateGas(gasRemaining.use(gas))
