@@ -23,9 +23,7 @@ import org.alephium.protocol.model.HardFork
 trait CostStrategy {
   var gasRemaining: GasBox
 
-  def chargeGas(instr: GasSimple): ExeResult[Unit] = {
-    chargeGas(instr.gas())
-  }
+  def chargeGas(instr: GasSimple): ExeResult[Unit] = chargeGas(instr.gas())
 
   def chargeGasWithSize(instr: GasFormula, size: Int): ExeResult[Unit] = {
     chargeGas(instr.gas(size))

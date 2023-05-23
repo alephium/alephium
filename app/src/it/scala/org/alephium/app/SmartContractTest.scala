@@ -123,9 +123,9 @@ class SmartContractTest extends AlephiumActorSpec {
       val blockFlow    = clique.servers(group.group % 2).node.blockFlow
       val allUtxos     = blockFlow.getUsableUtxos(lockupScript, 100).rightValue
       val allInputs    = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
-      val gasEstimator = TxScriptGasEstimator.Default(allInputs, blockFlow)
+      val gasEstimator = TxScriptGasEstimator.Default(blockFlow)
 
-      GasEstimation.estimate(script, gasEstimator).rightValue
+      GasEstimation.estimate(allInputs, script, gasEstimator).rightValue
     }
 
     def estimateTxScriptGas(
@@ -142,9 +142,9 @@ class SmartContractTest extends AlephiumActorSpec {
       val blockFlow    = clique.servers(group.group % 2).node.blockFlow
       val allUtxos     = blockFlow.getUsableUtxos(lockupScript, 10000).rightValue
       val allInputs    = allUtxos.map(_.ref).map(TxInput(_, unlockScript))
-      val gasEstimator = TxScriptGasEstimator.Default(allInputs, blockFlow)
+      val gasEstimator = TxScriptGasEstimator.Default(blockFlow)
 
-      GasEstimation.estimate(script, gasEstimator).rightValue
+      GasEstimation.estimate(allInputs, script, gasEstimator).rightValue
     }
 
     def decodeTx(str: String): UnsignedTx = {
