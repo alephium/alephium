@@ -68,10 +68,11 @@ object GasEstimation extends StrictLogging {
   }
 
   def estimate(
+      inputs: AVector[TxInput],
       script: StatefulScript,
       txScriptGasEstimator: TxScriptGasEstimator
   ): Either[String, GasBox] = {
-    txScriptGasEstimator.estimate(script)
+    txScriptGasEstimator.estimate(inputs, script)
   }
 
   private[gasestimation] def estimateInputGas(

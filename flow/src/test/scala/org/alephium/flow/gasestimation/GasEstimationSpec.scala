@@ -367,9 +367,9 @@ class GasEstimationSpec extends AlephiumFlowSpec with TxInputGenerators {
     val unlock            = UnlockScript.p2pkh(publicKey)
     val utxos             = blockFlow.getUsableUtxos(lockup, 100).rightValue
     val inputs            = utxos.map(_.ref).map(TxInput(_, unlock))
-    val estimator         = TxScriptGasEstimator.Default(inputs, blockFlow)
+    val estimator         = TxScriptGasEstimator.Default(blockFlow)
 
-    GasEstimation.estimate(script, estimator)
+    GasEstimation.estimate(inputs, script, estimator)
   }
 
   private def assetScriptGasEstimator(

@@ -760,9 +760,9 @@ class ServerUtils(implicit
   ): Try[UnsignedTransaction] = {
     val utxosLimit               = apiConfig.defaultUtxosLimit
     val estimatedTxOutputsLength = tokens.length + (if (amount > U256.Zero) 1 else 0)
+
     for {
       allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
-      allInputs = allUtxos.map(_.ref).map(TxInput(_, fromUnlockScript))
       selectedUtxos <- wrapError(
         UtxoSelectionAlgo
           .Build(ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
@@ -773,7 +773,7 @@ class ServerUtils(implicit
             txOutputsLength = estimatedTxOutputsLength,
             Some(script),
             AssetScriptGasEstimator.Default(blockFlow),
-            TxScriptGasEstimator.Default(allInputs, blockFlow)
+            TxScriptGasEstimator.Default(blockFlow)
           )
       )
       unsignedTx <- wrapError {

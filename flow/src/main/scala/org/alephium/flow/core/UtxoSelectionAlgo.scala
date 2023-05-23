@@ -143,7 +143,6 @@ object UtxoSelectionAlgo extends StrictLogging {
         txScriptGasEstimator: TxScriptGasEstimator
     ): Either[String, Selected] = {
       val gasPrice = providedGas.gasPrice
-
       providedGas.gasOpt match {
         case Some(gas) =>
           val amountsWithGas = amounts.copy(alph = amounts.alph.addUnsafe(gasPrice * gas))
@@ -155,12 +154,14 @@ object UtxoSelectionAlgo extends StrictLogging {
 
         case None =>
           for {
+            allInputs <- selectTxInputsForGasEstimation(amounts, unlockScript, utxos)
             scriptGas <- txScriptOpt match {
               case None =>
                 Right(GasBox.zero)
               case Some(txScript) =>
-                GasEstimation.estimate(txScript, txScriptGasEstimator)
+                GasEstimation.estimate(allInputs, txScript, txScriptGasEstimator)
             }
+
             scriptGasFee = gasPrice * scriptGas
             totalAttoAlphAmount <- scriptGasFee
               .add(amounts.alph)
@@ -209,6 +210,23 @@ object UtxoSelectionAlgo extends StrictLogging {
           assetScriptGasEstimator
         )
       } yield resultWithoutGas.selected ++ resultForGas.selected
+    }
+
+    private def selectTxInputsForGasEstimation(
+        amounts: AssetAmounts,
+        unlockScript: UnlockScript,
+        utxos: AVector[Asset]
+    ): Either[String, AVector[TxInput]] = {
+      val gasPrice = providedGas.gasPrice
+      SelectionWithoutGasEstimation(assetOrder)
+        .select(
+          amounts.copy(alph = amounts.alph.addUnsafe(gasPrice * maximalGasPerTx)),
+          utxos
+        )
+        .map { selectedSoFar =>
+          selectedSoFar.selected.map(_.ref).map(TxInput(_, unlockScript))
+        }
+        .orElse(Right(utxos.map(_.ref).map(TxInput(_, unlockScript))))
     }
   }
 
