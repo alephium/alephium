@@ -20,18 +20,6 @@ import fastparse.{P, Pass}
 
 object FastParseExtension {
 
-  /** Returns the last index, straight after the input parser run without ignoring whitespaces.
-    *
-    * @param parser
-    *   a parser with unit result
-    * @param ctx
-    *   current parser context
-    * @return
-    *   tail/last index after the parser run.
-    */
-  def LastIndex(parser: P[Unit])(implicit ctx: P[_]): P[Int] =
-    parser.map(_ => ctx.index)
-
   /** Throws [[CompilerError.ExpectedEndOfInput]] if the last character is not the end-of-input.
     *
     * FastParse's default equivalent is `fastparse.End`.
