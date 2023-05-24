@@ -24,7 +24,7 @@ object FastParseExtension {
     *
     * FastParse's default equivalent is `fastparse.End`.
     */
-  def EndOfInput(implicit ctx: P[_]): P[Unit] = {
+  def endOfInput(implicit ctx: P[_]): P[Unit] = {
     val index = ctx.index
     if (ctx.input.isReachable(index)) {
       val character = ctx.input.slice(index, index + 1).head

@@ -521,7 +521,7 @@ object StatelessParser extends Parser[StatelessContext] {
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
       Start ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~ templateParams.? ~
-        "{" ~ func.rep(1) ~ "}" ~ EndOfInput
+        "{" ~ func.rep(1) ~ "}" ~ endOfInput
     ).map { case (typeId, templateVars, funcs) =>
       Ast.AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
     }
