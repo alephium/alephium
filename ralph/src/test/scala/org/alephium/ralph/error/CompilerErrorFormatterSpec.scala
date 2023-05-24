@@ -22,393 +22,127 @@ import org.alephium.util.AlephiumSpec
 
 class CompilerErrorFormatterSpec extends AlephiumSpec {
 
-  it should "format when error title is empty" in {
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "",
-        errorLine = "this is the error line",
-        foundLength = "error".length,
-        errorMessage = "actual error message",
-        errorFooter = None,
-        sourcePosition = SourcePosition(2, 13)
-      )
+  // randomly select a slice from the input string.
+  // this can also be empty
+  private def randomChunk(string: String): Gen[(Int, Int)] =
+    for {
+      from <- Gen.choose[Int](0, (string.length - 1) max 0)
+      to   <- Gen.choose[Int](from, (string.length - 1) max 0)
+    } yield (from, to)
 
-    // scalastyle:off whitespace.end.of.line
-    formatter.format(None) is
-      """-- error (2:13): 
-        |2 |this is the error line
-        |  |            ^^^^^
-        |  |            actual error message
-        |""".stripMargin
-    // scalastyle:on whitespace.end.of.line
+  it should "format error messages" in {
+    forAll(Gen.alphaNumStr, Gen.alphaNumStr, Gen.alphaNumStr, Gen.option(Gen.alphaNumStr)) {
+      case (errorTitle, errorMessage, errorLine, explain) =>
+        // for the error message run multiple tests at random positions and tokens
+        forAll(randomChunk(errorLine), Gen.posNum[Int]) {
+          case ((fromErrorIndex, toErrorIndex), lineNumber) =>
+            val found = errorLine.slice(fromErrorIndex, toErrorIndex)
 
-    {
-      info("when footer is non-empty")
-      val footerFormatted = formatter.copy(errorFooter = Some("Something in the footer"))
+            val sourcePosition =
+              SourcePosition(
+                rowNum = lineNumber,
+                colNum = fromErrorIndex + 1
+              )
 
-      // scalastyle:off whitespace.end.of.line
-      footerFormatted.format(None) is
-        """-- error (2:13): 
-          |2 |this is the error line
-          |  |            ^^^^^
-          |  |            actual error message
-          |  |--------------------------------
-          |  |Something in the footer
-          |""".stripMargin
-      // scalastyle:on whitespace.end.of.line
-    }
+            val formatterMessage =
+              CompilerErrorFormatter(
+                errorTitle = errorTitle,
+                errorLine = errorLine,
+                foundLength = found.length,
+                errorMessage = errorMessage,
+                errorFooter = explain,
+                sourcePosition = sourcePosition
+              ).format()
 
-  }
+            val lines = formatterMessage.linesIterator.toArray
 
-  it should "format when error line is empty" in {
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "error title",
-        errorLine = "",
-        foundLength = "error".length,
-        errorMessage = "actual error message",
-        errorFooter = None,
-        sourcePosition = SourcePosition(2, 13)
-      )
+            // first line contains the actual full error message
+            lines(0) is s"-- error (${sourcePosition.rowNum}:${sourcePosition.colNum}): $errorTitle"
 
-    formatter.format(None) is
-      """-- error (2:13): error title
-        |2 |
-        |  |            ^^^^^
-        |  |            actual error message
-        |""".stripMargin
+            // line 2 is the code where the error occurred
+            lines(1) is s"$lineNumber |$errorLine"
 
-    {
-      info("when found length is empty")
+            // fetch the actual index of the pointer marker
+            val indexOfPointer =
+              lines(2).indexOf(CompilerErrorFormatter.pointer * found.length)
 
-      val emptyFoundLength = formatter.copy(foundLength = 0)
+            val gutterLength =
+              lineNumber.toString.length + 2
 
-      // scalastyle:off whitespace.end.of.line
-      emptyFoundLength.format(None) is
-        """-- error (2:13): error title
-          |2 |
-          |  |            
-          |  |            actual error message
-          |""".stripMargin
-      // scalastyle:on whitespace.end.of.line
-    }
-  }
+            // the pointer index should be `[lineNumber][space][bar][spaces][errorToken]`
+            val expectedPointerIndex =
+              gutterLength + fromErrorIndex
 
-  it should "format when foundLength (the errored token) is empty" in {
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "error title",
-        errorLine = "this is the error line",
-        foundLength = "".length,
-        errorMessage = "actual error message",
-        errorFooter = None,
-        sourcePosition = SourcePosition(2, 13)
-      )
+            if (found.isEmpty) {
+              indexOfPointer is 0
+            } else {
+              indexOfPointer is expectedPointerIndex
+            }
 
-    // scalastyle:off whitespace.end.of.line
-    formatter.format(None) is
-      """-- error (2:13): error title
-        |2 |this is the error line
-        |  |            
-        |  |            actual error message
-        |""".stripMargin
-    // scalastyle:on whitespace.end.of.line
-  }
+            val tokenErrorIndex =
+              lines(3).indexOf(errorMessage)
 
-  it should "format when error message is empty" in {
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "error title",
-        errorLine = "this is the error line",
-        foundLength = "error".length,
-        errorMessage = "",
-        errorFooter = None,
-        sourcePosition = SourcePosition(2, 13)
-      )
+            if (errorMessage.isEmpty) {
+              tokenErrorIndex is 0
+            } else {
+              tokenErrorIndex is expectedPointerIndex
+            }
 
-    formatter.format(None) is
-      """-- error (2:13): error title
-        |2 |this is the error line
-        |  |            ^^^^^
-        |  |
-        |""".stripMargin
+            // length of the bar should be maximum length of a line
+            explain match {
+              case Some(explain) =>
+                val maxLine = lines.foldLeft(0)(_ max _.length)
+                val bars    = "-" * (maxLine - gutterLength)
 
-    {
-      info("when found length is 1")
+                lines(4).indexOf(bars) is gutterLength
+                lines(5).lastIndexOf(explain) is gutterLength
 
-      val emptyFoundLength = formatter.copy(foundLength = 1)
+                lines.length is 6 // no more lines to process
 
-      emptyFoundLength.format(None) is
-        """-- error (2:13): error title
-          |2 |this is the error line
-          |  |            ^
-          |  |
-          |""".stripMargin
+              case None =>
+                lines.length is 4 // No more lines to process
+            }
+
+        }
     }
   }
 
-  it should "format when all fields are empty (not throw exceptions)" in {
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "",
-        errorLine = "",
-        foundLength = "".length,
-        errorMessage = "",
-        errorFooter = None,
-        sourcePosition = SourcePosition(0, 0)
-      )
-
-    // scalastyle:off whitespace.end.of.line
-    formatter.format(None) is
-      """-- error (0:0): 
-        |0 |
-        |  |
-        |  |
-        |""".stripMargin
-    // scalastyle:on whitespace.end.of.line
-
-    {
-      info("when footer is non-empty")
-      val footerFormatted = formatter.copy(errorFooter = Some("Something in the footer"))
-
-      // scalastyle:off whitespace.end.of.line
-      footerFormatted.format(None) is
-        """-- error (0:0): 
-          |0 |
-          |  |
-          |  |
-          |  |-----------------------
-          |  |Something in the footer
-          |""".stripMargin
-      // scalastyle:on whitespace.end.of.line
-    }
-
-    {
-      info("when footer is Some(empty), it should not fail abruptly (not throw an exception)")
-      val footerFormatted = formatter.copy(errorFooter = Some(""))
-
-      // scalastyle:off whitespace.end.of.line
-      footerFormatted.format(None) is
-        """-- error (0:0): 
-          |0 |
-          |  |
-          |  |
-          |  |-------------
-          |  |
-          |""".stripMargin
-      // scalastyle:on whitespace.end.of.line
-    }
-  }
-
-  it should "format when all fields are empty, except the actual error message" in {
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "",
-        errorLine = "",
-        foundLength = 0,
-        errorMessage = "the actual error message",
-        errorFooter = None,
-        sourcePosition = SourcePosition(2, 1)
-      )
-
-    // scalastyle:off whitespace.end.of.line
-    formatter.format(None) is
-      """-- error (2:1): 
-        |2 |
-        |  |
-        |  |the actual error message
-        |""".stripMargin
-    // scalastyle:on whitespace.end.of.line
-
-    {
-      info("when footer is non-empty")
-      val footerFormatted = formatter.copy(errorFooter = Some("Something in the footer"))
-
-      // scalastyle:off whitespace.end.of.line
-      footerFormatted.format(None) is
-        """-- error (2:1): 
-          |2 |
-          |  |
-          |  |the actual error message
-          |  |------------------------
-          |  |Something in the footer
-          |""".stripMargin
-      // scalastyle:on whitespace.end.of.line
-    }
-  }
-
-  it should "format when SourcePosition.column is the first character" in {
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "error title",
-        errorLine = "this is the error line",
-        foundLength = 1,
-        errorMessage = "failed here",
-        errorFooter = None,
-        sourcePosition = SourcePosition(1, 1)
-      )
-
-    formatter.format(None) is
-      """-- error (1:1): error title
-        |1 |this is the error line
-        |  |^
-        |  |failed here
-        |""".stripMargin
-
-    {
-      info("when found length is extended")
-
-      formatter.copy(foundLength = 4).format(None) is
-        """-- error (1:1): error title
-          |1 |this is the error line
-          |  |^^^^
-          |  |failed here
-          |""".stripMargin
-    }
-  }
-
-  it should "format when SourcePosition.column is the last character" in {
-    val errorLine = "this is the error line"
-
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "error title",
-        errorLine = errorLine,
-        foundLength = 1,
-        errorMessage = "failed here",
-        errorFooter = None,
-        sourcePosition = SourcePosition(1, errorLine.length)
-      )
-
-    formatter.format(None) is
-      """-- error (1:22): error title
-        |1 |this is the error line
-        |  |                     ^
-        |  |                     failed here
-        |""".stripMargin
-
-    {
-      info("when found length is extended")
-
-      formatter.copy(foundLength = 6).format(None) is
-        """-- error (1:22): error title
-          |1 |this is the error line
-          |  |                     ^^^^^^
-          |  |                     failed here
-          |""".stripMargin
-    }
-  }
-
-  it should "apply padding when SourcePosition.row is multi-digit Integer" in {
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "error title",
-        errorLine = "this is the error line",
-        foundLength = 1,
-        errorMessage = "failed here",
-        errorFooter = None,
-        sourcePosition = SourcePosition(100, 1)
-      )
-
-    formatter.format(None) is
-      """-- error (100:1): error title
-        |100 |this is the error line
-        |    |^
-        |    |failed here
-        |""".stripMargin
-  }
-
-  it should "format when source position is invalid (should not throw Exceptions)" in {
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "error title",
-        errorLine = "this is the error line",
-        foundLength = 4,
-        errorMessage = "something went wrong",
-        errorFooter = None,
-        sourcePosition = SourcePosition(-1, -1)
-      )
-
-    formatter.format(None) is
-      """-- error (-1:-1): error title
-        |-1 |this is the error line
-        |   |^^^^
-        |   |something went wrong
-        |""".stripMargin
-  }
-
-  it should "format when all field are non-empty & valid" in {
+  it should "format a custom error message" in {
     val formatter =
       CompilerErrorFormatter(
         errorTitle = "The title",
         errorLine = "this is error line",
         foundLength = "error".length,
         errorMessage = "actual error message",
-        errorFooter = Some("I have some explaining to do"),
+        errorFooter = None,
         sourcePosition = SourcePosition(2, 9)
       )
 
-    formatter.format() is
-      """-- error (2:9): The title
-        |2 |this is error line
-        |  |        ^^^^^
-        |  |        actual error message
-        |  |----------------------------
-        |  |I have some explaining to do
-        |""".stripMargin
+    {
+      info("when footer exists")
+      val formatterWithExplain =
+        formatter.copy(errorFooter = Some("I have some explaining to do"))
+
+      formatterWithExplain.format() is
+        """-- error (2:9): The title
+          |2 |this is error line
+          |  |        ^^^^^
+          |  |        actual error message
+          |  |----------------------------
+          |  |I have some explaining to do
+          |""".stripMargin
+    }
 
     {
       info("when footer does not exist")
 
-      formatter.copy(errorFooter = None).format() is
+      formatter.format() is
         """-- error (2:9): The title
           |2 |this is error line
           |  |        ^^^^^
           |  |        actual error message
           |""".stripMargin
     }
-  }
-
-  it should "format when the length of the footer line is the smallest among the other lines" in {
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "error title",
-        errorLine = "this is the error line",
-        foundLength = "line".length,
-        errorMessage = "failed here",
-        errorFooter = Some("Footer"),
-        sourcePosition = SourcePosition(1, 19)
-      )
-
-    formatter.format(None) is
-      """-- error (1:19): error title
-        |1 |this is the error line
-        |  |                  ^^^^
-        |  |                  failed here
-        |  |-----------------------------
-        |  |Footer
-        |""".stripMargin
-  }
-
-  it should "format when the length of the footer line is the largest among the other lines" in {
-    val formatter =
-      CompilerErrorFormatter(
-        errorTitle = "error title",
-        errorLine = "this is the error line",
-        foundLength = "line".length,
-        errorMessage = "failed here",
-        errorFooter = Some("This is some chunky footer message to impart wisdom."),
-        sourcePosition = SourcePosition(1, 19)
-      )
-
-    formatter.format(None) is
-      """-- error (1:19): error title
-        |1 |this is the error line
-        |  |                  ^^^^
-        |  |                  failed here
-        |  |----------------------------------------------------
-        |  |This is some chunky footer message to impart wisdom.
-        |""".stripMargin
   }
 
   it should "get errored line" in {
