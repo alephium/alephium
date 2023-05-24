@@ -16,20 +16,21 @@
 
 package org.alephium.ralph.error
 
-import fastparse.P
+import fastparse.{P, Pass}
 
 object FastParseExtension {
 
-  /** Returns the last index, straight after the input parser run without ignoring whitespaces.
+  /** Throws [[CompilerError.ExpectedEndOfInput]] if the last character is not the end-of-input.
     *
-    * @param parser
-    *   a parser with unit result
-    * @param ctx
-    *   current parser context
-    * @return
-    *   tail/last index after the parser run.
+    * FastParse's default equivalent is `fastparse.End`.
     */
-  def LastIndex(parser: P[Unit])(implicit ctx: P[_]): P[Int] =
-    parser.map(_ => ctx.index)
-
+  def EndOfInput(implicit ctx: P[_]): P[Unit] = {
+    val index = ctx.index
+    if (ctx.input.isReachable(index)) {
+      val character = ctx.input.slice(index, index + 1).head
+      throw CompilerError.ExpectedEndOfInput(character, index)
+    } else {
+      Pass(())
+    }
+  }
 }
