@@ -1,5 +1,6 @@
 import sbt._
 import sbt.Keys._
+import APIMapping._
 import Dependencies._
 
 Global / cancelable := true // Allow cancellation of forked task without killing SBT
@@ -58,7 +59,12 @@ def project(path: String): Project = {
       inConfig(IntegrationTest)(ScalastylePlugin.rawScalastyleSettings()),
       IntegrationTest / scalastyleConfig  := root.base / scalastyleTestCfgFile,
       IntegrationTest / scalastyleTarget  := target.value / "scalastyle-it-results.xml",
-      IntegrationTest / scalastyleSources := (IntegrationTest / unmanagedSourceDirectories).value
+      IntegrationTest / scalastyleSources := (IntegrationTest / unmanagedSourceDirectories).value,
+      apiMappings +=
+        APIMapping.scalaDocs(
+          classPath = (Compile / fullClasspath).value,
+          scalaVersion = scalaVersion.value
+        )
     )
 }
 
@@ -301,6 +307,13 @@ lazy val protocol = project("protocol")
 
 lazy val ralph = project("ralph")
   .dependsOn(protocol % "test->test;compile->compile")
+  .settings(
+    apiMappings +=
+      APIMapping.fastParseDocs(
+        classPath = (Compile / fullClasspath).value,
+        scalaVersion = scalaVersion.value
+      )
+  )
 
 lazy val wallet = project("wallet")
   .dependsOn(
