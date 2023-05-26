@@ -128,6 +128,19 @@ object CompilerError {
       )
   }
 
+  final case class ExpectedEndOfInput(found: Char, position: Int) extends SyntaxError {
+    override def foundLength: Int =
+      1
+
+    override def message: String =
+      s"Expected end of input but found unexpected character '$found'"
+
+    override def footer: Option[String] =
+      Some(
+        "Help: Ralph programs should end with a closing brace `}` to indicate the end of code block."
+      )
+  }
+
   /** ****** Section: Type Errors ******
     */
   sealed trait TypeError extends FormattableError {

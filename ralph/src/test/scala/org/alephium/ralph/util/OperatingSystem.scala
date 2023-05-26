@@ -13,24 +13,11 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
+package org.alephium.ralph.util
 
-package org.alephium.ralph.error
+object OperatingSystem {
 
-import fastparse.{P, Pass}
+  def isWindows: Boolean =
+    System.getProperty("os.name").contains("Windows")
 
-object FastParseExtension {
-
-  /** Throws [[CompilerError.ExpectedEndOfInput]] if the last character is not the end-of-input.
-    *
-    * FastParse's default equivalent is `fastparse.End`.
-    */
-  def endOfInput(implicit ctx: P[_]): P[Unit] = {
-    val index = ctx.index
-    if (ctx.input.isReachable(index)) {
-      val character = ctx.input.slice(index, index + 1).head
-      throw CompilerError.ExpectedEndOfInput(character, index)
-    } else {
-      Pass(())
-    }
-  }
 }

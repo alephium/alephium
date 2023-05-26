@@ -18,6 +18,7 @@ package org.alephium.ralph
 import fastparse.Parsed
 
 import org.alephium.ralph.error.{CompilerError, CompilerErrorFormatter, FastParseErrorUtil}
+import org.alephium.ralph.util.OperatingSystem
 import org.alephium.util._
 
 // scalastyle:off no.equal file.size.limit
@@ -131,5 +132,37 @@ class StatelessParserSpec extends AlephiumSpec {
          |  |-------------------------------------------------------
          |  |Trace log: Expected assetScript:1:1 / "}":7:1, found ""
          |""".stripMargin
+  }
+
+  it should "not allow definitions after end of program" in {
+    val program =
+      s"""
+         |AssetScript Foo {
+         |  pub fn bar() -> U256 {
+         |    return 1
+         |  }
+         |}
+         |
+         |Blah
+         |""".stripMargin
+
+    val error =
+      intercept[CompilerError.ExpectedEndOfInput](
+        fastparse.parse(program, StatelessParser.assetScript(_))
+      )
+
+    val indexOfB = program.indexOf("Blah")
+    error is CompilerError.ExpectedEndOfInput('B', indexOfB)
+
+    if (!OperatingSystem.isWindows) {
+      error.toError(program).message is
+        """-- error (8:1): Syntax error
+          |8 |Blah
+          |  |^
+          |  |Expected end of input but found unexpected character 'B'
+          |  |-------------------------------------------------------------------------------------------
+          |  |Help: Ralph programs should end with a closing brace `}` to indicate the end of code block.
+          |""".stripMargin
+    }
   }
 }

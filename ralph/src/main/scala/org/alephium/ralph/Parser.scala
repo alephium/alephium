@@ -56,7 +56,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def tokenAmount[Unknown: P]: P[(Ast.Expr[Ctx], Ast.Expr[Ctx])]     = P(expr ~ ":" ~ expr)
   def amountList[Unknown: P]: P[Seq[(Ast.Expr[Ctx], Ast.Expr[Ctx])]] = P(tokenAmount.rep(0, ","))
   def approveAssetPerAddress[Unknown: P]: P[Ast.ApproveAsset[Ctx]] =
-    P(expr ~ LastIndex("->") ~ amountList).map { case (address, index, amounts) =>
+    P(expr ~ "->" ~~ Index ~ amountList).map { case (address, index, amounts) =>
       if (amounts.isEmpty) {
         throw CompilerError.`Expected non-empty asset(s) for address`(index)
       }
@@ -521,7 +521,7 @@ object StatelessParser extends Parser[StatelessContext] {
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
       Start ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~ templateParams.? ~
-        "{" ~ func.rep(1) ~ "}"
+        "{" ~ func.rep(1) ~ "}" ~ endOfInput
     ).map { case (typeId, templateVars, funcs) =>
       Ast.AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
     }
