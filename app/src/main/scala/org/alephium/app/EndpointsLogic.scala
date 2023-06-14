@@ -185,8 +185,8 @@ trait EndpointsLogic extends Endpoints {
     Future.successful(serverUtils.getBlockHeader(blockFlow, hash))
   }
 
-  val getBalanceLogic = serverLogic(getBalance) { address =>
-    Future.successful(serverUtils.getBalance(blockFlow, address))
+  val getBalanceLogic = serverLogic(getBalance) { case (address, getMempoolUtxos) =>
+    Future.successful(serverUtils.getBalance(blockFlow, address, getMempoolUtxos.getOrElse(true)))
   }
 
   val getUTXOsLogic = serverLogic(getUTXOs) { address =>

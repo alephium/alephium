@@ -129,7 +129,7 @@ class TxUtilsSpec extends AlephiumSpec {
       unsignedTx.fixedOutputs(0).amount is ALPH.oneAlph
       unsignedTx.fixedOutputs(1).amount is genesisChange
       blockFlow
-        .getBalance(genesisLockup, defaultUtxoLimit)
+        .getBalance(genesisLockup, defaultUtxoLimit, true)
         .rightValue
         ._1 is genesisBalance
       testUnsignedTx(unsignedTx, genesisPriKey)
@@ -760,7 +760,7 @@ class TxUtilsSpec extends AlephiumSpec {
     addAndUpdateView(blockFlow, newBlock)
 
     val (balance, lockedBalance, _, _, numOfUtxos) =
-      blockFlow.getBalance(output.lockupScript, Int.MaxValue).rightValue
+      blockFlow.getBalance(output.lockupScript, Int.MaxValue, true).rightValue
     balance is U256.unsafe(outputs.sumBy(_.amount.toBigInt))
     lockedBalance is 0
     numOfUtxos is n
@@ -810,7 +810,7 @@ class TxUtilsSpec extends AlephiumSpec {
     info("With provided Utxos")
 
     val availableUtxos = blockFlow
-      .getUTXOsIncludePool(output.lockupScript, Int.MaxValue)
+      .getUTXOs(output.lockupScript, Int.MaxValue, true)
       .rightValue
       .asUnsafe[AssetOutputInfo]
     val availableInputs = availableUtxos.map(_.ref)
@@ -960,6 +960,38 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "get utxos for asset address" in new FlowFixture {
+    val chainIndex   = ChainIndex.unsafe(0, 0)
+    val block        = transfer(blockFlow, chainIndex)
+    val transferTx   = block.nonCoinbase.head.toTemplate
+    val grandPool    = blockFlow.getGrandPool()
+    val mempool      = blockFlow.getMemPool(chainIndex)
+    val lockupScript = getGenesisLockupScript(chainIndex)
+
+    grandPool.add(chainIndex, transferTx, TimeStamp.now())
+    mempool.contains(transferTx) is true
+
+    blockFlow
+      .getUTXOs(lockupScript, Int.MaxValue, true)
+      .rightValue
+      .map(_.output.asInstanceOf[AssetOutput]) is transferTx.unsigned.fixedOutputs.tail
+    blockFlow
+      .getUTXOs(lockupScript, Int.MaxValue, false)
+      .rightValue
+      .map(_.ref.asInstanceOf[AssetOutputRef]) is transferTx.unsigned.inputs.map(_.outputRef)
+
+    addAndCheck(blockFlow, block)
+    val utxos = transferTx.unsigned.fixedOutputs.tail.map(_.copy(lockTime = block.timestamp))
+    blockFlow
+      .getUTXOs(lockupScript, Int.MaxValue, true)
+      .rightValue
+      .map(_.output.asInstanceOf[AssetOutput]) is utxos
+    blockFlow
+      .getUTXOs(lockupScript, Int.MaxValue, false)
+      .rightValue
+      .map(_.output.asInstanceOf[AssetOutput]) is utxos
+  }
+
   trait ContractFixture extends FlowFixture {
     val code =
       s"""
@@ -981,7 +1013,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "get balance for contract address" in new ContractFixture {
     val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances, utxosNum) =
-      blockFlow.getBalance(address, Int.MaxValue).rightValue
+      blockFlow.getBalance(address, Int.MaxValue, true).rightValue
     attoAlphBalance is ALPH.oneAlph
     attoAlphLockedBalance is U256.Zero
     tokenBalances is AVector(TokenId.from(contractId) -> U256.unsafe(1))
@@ -990,7 +1022,7 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "get UTXOs for contract address" in new ContractFixture {
-    val utxos = blockFlow.getUTXOsIncludePool(address, Int.MaxValue).rightValue
+    val utxos = blockFlow.getUTXOs(address, Int.MaxValue, true).rightValue
     val utxo  = utxos.head.asInstanceOf[FlowUtils.ContractOutputInfo]
     utxos.length is 1
     utxo.ref is ref
@@ -1022,7 +1054,7 @@ class TxUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, confirmBlock)
 
     val (balance, _, _, _, utxoNum) =
-      blockFlow.getBalance(schnorrAddress.lockupScript, Int.MaxValue).rightValue
+      blockFlow.getBalance(schnorrAddress.lockupScript, Int.MaxValue, true).rightValue
     balance is ALPH.alph(2)
     utxoNum is 1
 

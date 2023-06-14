@@ -111,14 +111,15 @@ class ServerUtils(implicit
     wrapResult(blockFlow.getDifficultyMetric().map(_.value))
   }
 
-  def getBalance(blockFlow: BlockFlow, address: Address): Try[Balance] = {
+  def getBalance(blockFlow: BlockFlow, address: Address, getMempoolUtxos: Boolean): Try[Balance] = {
     val utxosLimit = apiConfig.defaultUtxosLimit
     for {
       _ <- checkGroup(address.lockupScript)
       balance <- blockFlow
         .getBalance(
           address.lockupScript,
-          utxosLimit
+          utxosLimit,
+          getMempoolUtxos
         )
         .map(Balance.from(_, utxosLimit))
         .left
@@ -131,7 +132,7 @@ class ServerUtils(implicit
     for {
       _ <- checkGroup(address.lockupScript)
       utxos <- blockFlow
-        .getUTXOsIncludePool(address.lockupScript, utxosLimit)
+        .getUTXOs(address.lockupScript, utxosLimit, getMempoolUtxos = true)
         .map(_.map(outputInfo => UTXO.from(outputInfo.ref, outputInfo.output)))
         .left
         .flatMap(failed)

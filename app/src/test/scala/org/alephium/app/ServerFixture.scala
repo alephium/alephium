@@ -251,16 +251,18 @@ object ServerFixture {
 
     override def getBalance(
         lockupScript: LockupScript,
-        utxosLimit: Int
+        utxosLimit: Int,
+        getMempoolUtxos: Boolean
     ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
       val tokens       = AVector((TokenId.hash("token1"), U256.One))
       val lockedTokens = AVector((TokenId.hash("token2"), U256.Two))
       Right((U256.Zero, U256.Zero, tokens, lockedTokens, 0))
     }
 
-    override def getUTXOsIncludePool(
+    override def getUTXOs(
         lockupScript: LockupScript,
-        utxosLimit: Int
+        utxosLimit: Int,
+        getMempoolUtxos: Boolean
     ): IOResult[AVector[OutputInfo]] = {
       val assetOutputInfos = AVector(U256.One, U256.Two).map { amount =>
         val tokens = AVector((TokenId.hash("token1"), U256.One))
