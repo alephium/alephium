@@ -325,7 +325,7 @@ object BuiltIn {
         "condition" -> "the condition to be checked",
         "errorCode" -> "the error code to throw if the check fails"
       ),
-      retComment = "true if the condition is satisfied, false otherwise",
+      retComment = "",
       doc = "Tests the condition or checks invariants."
     )
   val verifyTxSignature: SimpleBuiltIn[StatelessContext] =
@@ -335,7 +335,7 @@ object BuiltIn {
       Seq(),
       VerifyTxSignature,
       argsName = Seq("publicKey" -> "the public key (33 bytes) of the signer"),
-      retComment = "true if the signature is valid, false otherwise",
+      retComment = "",
       doc =
         "Verifies the transaction SecP256K1 signature of a public key. The signature is signed against the transaction id."
     )
@@ -360,7 +360,7 @@ object BuiltIn {
         "publicKey" -> "the public key (33 bytes) of the signer",
         "signature" -> "the signature (64 bytes) value"
       ),
-      retComment = "true if the signature is valid, false otherwise",
+      retComment = "",
       doc = s"Verifies the SecP256K1 signature of the input and public key."
     )
   val checkCaller: SimpleBuiltIn[StatelessContext] =
@@ -387,7 +387,7 @@ object BuiltIn {
         "publicKey" -> "the public key (32 bytes) of the signer",
         "signature" -> "the signature value (64 bytes)"
       ),
-      retComment = "true if the signature is valid, false otherwise",
+      retComment = "",
       doc = s"Verifies the ED25519 signature of the input and public key."
     )
   val verifyBIP340Schnorr: SimpleBuiltIn[StatelessContext] =
@@ -401,7 +401,7 @@ object BuiltIn {
         "publicKey" -> "the public key (32 bytes) of the signer",
         "signature" -> "the signature value (64 bytes)"
       ),
-      retComment = "true if the signature is valid, false otherwise",
+      retComment = "",
       doc = s"Verifies the BIP340 Schnorr signature of the input and public key."
     )
   val ethEcRecover: SimpleBuiltIn[StatelessContext] =
