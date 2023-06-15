@@ -504,9 +504,93 @@ class AstSpec extends AlephiumSpec {
       info("Warning if the function has sub interface function call")
       val code =
         s"""
+           |Interface Bar {
+           |  pub fn bar() -> ()
+           |}
+           |
+           |Contract BarImpl() implements Bar {
+           |  pub fn bar() -> () {}
+           |}
+           |""".stripMargin
+
+      val foo0 =
+        s"""
            |Contract Foo() {
-           |  pub fn foo(barId: ByteVec) -> () {
-           |    Bar(barId).bar()
+           |  pub fn foo(contractId: ByteVec) -> () {
+           |    Bar(contractId).bar()
+           |  }
+           |}
+           |$code
+           |""".stripMargin
+
+      val warnings0 = Compiler.compileContractFull(foo0, 0).rightValue.warnings
+      warnings0 is AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+
+      val foo1 =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(contractId: ByteVec) -> () {
+           |    BarImpl(contractId).bar()
+           |  }
+           |}
+           |$code
+           |""".stripMargin
+
+      val warnings1 = Compiler.compileContractFull(foo1, 0).rightValue.warnings
+      warnings1.isEmpty is true
+
+      val foo2 =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(bar: Bar) -> () {
+           |    bar.bar()
+           |  }
+           |}
+           |$code
+           |""".stripMargin
+
+      val warnings2 = Compiler.compileContractFull(foo2, 0).rightValue.warnings
+      warnings2 is AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+
+      val foo3 =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(barImpl: BarImpl) -> () {
+           |    barImpl.bar()
+           |  }
+           |}
+           |$code
+           |""".stripMargin
+
+      val warnings3 = Compiler.compileContractFull(foo3, 0).rightValue.warnings
+      warnings3.isEmpty is true
+
+      val foo4 =
+        s"""
+           |Contract Foo() {
+           |  fn inner(bar: Bar) -> () {
+           |    bar.bar()
+           |  }
+           |
+           |  pub fn foo(contractId: ByteVec) -> () {
+           |    let bar = Bar(contractId)
+           |    inner(bar)
+           |  }
+           |}
+           |$code
+           |""".stripMargin
+
+      val warnings4 = Compiler.compileContractFull(foo4, 0).rightValue.warnings
+      warnings4 is AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+    }
+
+    {
+      info("No warning if create contract instance through interface")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo(barId: ByteVec) -> Bar {
+           |    return Bar(barId)
            |  }
            |}
            |
@@ -516,7 +600,7 @@ class AstSpec extends AlephiumSpec {
            |""".stripMargin
 
       val warnings = Compiler.compileContractFull(code, 0).rightValue.warnings
-      warnings is AVector(Warnings.noCheckExternalCallerMsg("Foo", "foo"))
+      warnings.isEmpty is true
     }
   }
 

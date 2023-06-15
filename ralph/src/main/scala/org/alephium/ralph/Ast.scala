@@ -233,9 +233,6 @@ object Ast {
       if (!contractInfo.kind.instantiable) {
         throw Compiler.Error(s"${contractType.name} is not instantiable")
       }
-      if (contractInfo.kind == Compiler.ContractKind.Interface) {
-        state.addInterfaceFuncCall(state.currentScope)
-      }
 
       Seq(Type.Contract.stack(contractType))
     }
@@ -350,24 +347,29 @@ object Ast {
     def callId: FuncId
     def args: Seq[Expr[StatefulContext]]
 
-    def _getTypeBase(state: Compiler.State[StatefulContext]): Seq[Type] = {
+    @inline def getContractType(state: Compiler.State[StatefulContext]): Type.Contract = {
       val objType = obj.getType(state)
       if (objType.length != 1) {
         throw Compiler.Error(s"Expected a single parameter for contract object, got ${quote(obj)}")
       } else {
         objType(0) match {
-          case contract: Type.Contract =>
-            val funcInfo = state.getFunc(contract.id, callId)
-            checkNonStaticContractFunction(contract.id, callId, funcInfo)
-            state.addExternalCall(contract.id, callId)
-            funcInfo.getReturnType(
-              args.flatMap(_.getType(state)),
-              state.selfContractType
-            )
+          case contract: Type.Contract => contract
           case _ =>
             throw Compiler.Error(s"Expected a contract for ${quote(callId)}, got ${quote(obj)}")
         }
       }
+    }
+
+    def _getTypeBase(state: Compiler.State[StatefulContext]): Seq[Type] = {
+      val contractType = getContractType(state)
+      val contractInfo = state.getContractInfo(contractType.id)
+      if (contractInfo.kind == Compiler.ContractKind.Interface) {
+        state.addInterfaceFuncCall(state.currentScope)
+      }
+      val funcInfo = state.getFunc(contractType.id, callId)
+      checkNonStaticContractFunction(contractType.id, callId, funcInfo)
+      state.addExternalCall(contractType.id, callId)
+      funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
