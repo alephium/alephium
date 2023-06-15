@@ -256,7 +256,7 @@ trait Endpoints
     addressesEndpoint.get
       .in(path[Address]("address"))
       .in("balance")
-      .in(query[Option[Boolean]]("getMempoolUtxos"))
+      .in(query[Option[Boolean]]("mempool"))
       .out(jsonBodyWithAlph[Balance])
       .summary("Get the balance of an address")
 

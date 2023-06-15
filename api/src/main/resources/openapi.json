@@ -4474,7 +4474,7 @@
             }
           },
           {
-            "name": "getMempoolUtxos",
+            "name": "mempool",
             "in": "query",
             "required": false,
             "schema": {
