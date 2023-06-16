@@ -81,12 +81,13 @@ trait TxUtils { Self: FlowUtils =>
   // return the total balance, the locked balance, and the number of all utxos
   def getBalance(
       lockupScript: LockupScript,
-      utxosLimit: Int
+      utxosLimit: Int,
+      getMempoolUtxos: Boolean
   ): IOResult[(U256, U256, AVector[(TokenId, U256)], AVector[(TokenId, U256)], Int)] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
-    getUTXOsIncludePool(lockupScript, utxosLimit).map { utxos =>
+    getUTXOs(lockupScript, utxosLimit, getMempoolUtxos).map { utxos =>
       val utxosNum = utxos.length
 
       val (attoAlphBalance, attoAlphLockedBalance, tokenBalances, tokenLockedBalances) =
@@ -95,16 +96,22 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
-  def getUTXOsIncludePool(
+  def getUTXOs(
       lockupScript: LockupScript,
-      utxosLimit: Int
+      utxosLimit: Int,
+      getMempoolUtxos: Boolean
   ): IOResult[AVector[OutputInfo]] = {
     val groupIndex = lockupScript.groupIndex
     assume(brokerConfig.contains(groupIndex))
 
     lockupScript match {
       case ls: LockupScript.Asset =>
-        getImmutableGroupViewIncludePool(groupIndex).flatMap(
+        val blockFlowGroupView = if (getMempoolUtxos) {
+          getImmutableGroupViewIncludePool(groupIndex)
+        } else {
+          getImmutableGroupView(groupIndex)
+        }
+        blockFlowGroupView.flatMap(
           _.getRelevantUtxos(ls, utxosLimit).map(_.as[OutputInfo])
         )
       case ls: LockupScript.P2C =>

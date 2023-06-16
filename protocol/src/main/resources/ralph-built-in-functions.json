@@ -392,7 +392,7 @@
       "@param condition the condition to be checked",
       "@param errorCode the error code to throw if the check fails"
     ],
-    "returns": "@returns true if the condition is satisfied, false otherwise"
+    "returns": "@returns "
   },
   {
     "name": "checkCaller",
@@ -930,7 +930,7 @@
     "params": [
       "@param publicKey the public key (33 bytes) of the signer"
     ],
-    "returns": "@returns true if the signature is valid, false otherwise"
+    "returns": "@returns "
   },
   {
     "name": "getSegregatedSignature",
@@ -952,7 +952,7 @@
       "@param publicKey the public key (33 bytes) of the signer",
       "@param signature the signature (64 bytes) value"
     ],
-    "returns": "@returns true if the signature is valid, false otherwise"
+    "returns": "@returns "
   },
   {
     "name": "verifyED25519",
@@ -964,7 +964,7 @@
       "@param publicKey the public key (32 bytes) of the signer",
       "@param signature the signature value (64 bytes)"
     ],
-    "returns": "@returns true if the signature is valid, false otherwise"
+    "returns": "@returns "
   },
   {
     "name": "verifyBIP340Schnorr",
@@ -976,7 +976,7 @@
       "@param publicKey the public key (32 bytes) of the signer",
       "@param signature the signature value (64 bytes)"
     ],
-    "returns": "@returns true if the signature is valid, false otherwise"
+    "returns": "@returns "
   },
   {
     "name": "ethEcRecover",

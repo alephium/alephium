@@ -2332,8 +2332,9 @@ class ServerUtilsSpec extends AlephiumSpec {
       ContractId.from(block.transactions.head.id, 0, chainIndex.from)
     }
 
-    val tokenId               = TokenId.from(createToken(10))
-    val (_, _, tokens0, _, _) = blockFlow.getBalance(lockupScript, defaultUtxoLimit).rightValue
+    val tokenId = TokenId.from(createToken(10))
+    val (_, _, tokens0, _, _) =
+      blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
     tokens0.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(10))
 
     val query = BuildDeployContractTx(
@@ -2349,7 +2350,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block)
 
     val (alphAmount, _, tokens1, _, _) = blockFlow
-      .getBalance(LockupScript.P2C(result.contractAddress.contractId), defaultUtxoLimit)
+      .getBalance(LockupScript.P2C(result.contractAddress.contractId), defaultUtxoLimit, true)
       .rightValue
     alphAmount is ALPH.alph(2)
     tokens1.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(4))
@@ -2400,7 +2401,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
-    serverUtils.getBalance(blockFlow, address) isE Balance.from(
+    serverUtils.getBalance(blockFlow, address, true) isE Balance.from(
       Amount(amount),
       Amount.Zero,
       None,
