@@ -7857,6 +7857,7 @@
                   "$ref": "#/components/schemas/CallContractResult"
                 },
                 "example": {
+                  "type": "CallContractSucceeded",
                   "returns": [
                     {
                       "type": "U256",
@@ -8066,6 +8067,7 @@
                 "example": {
                   "results": [
                     {
+                      "type": "CallContractSucceeded",
                       "returns": [
                         {
                           "type": "U256",
@@ -10567,14 +10569,47 @@
           }
         }
       },
+      "CallContractFailed": {
+        "required": [
+          "error",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
       "CallContractResult": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/CallContractFailed"
+          },
+          {
+            "$ref": "#/components/schemas/CallContractSucceeded"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "CallContractFailed": "#/components/schemas/CallContractFailed",
+            "CallContractSucceeded": "#/components/schemas/CallContractSucceeded"
+          }
+        }
+      },
+      "CallContractSucceeded": {
         "required": [
           "returns",
           "gasUsed",
           "contracts",
           "txInputs",
           "txOutputs",
-          "events"
+          "events",
+          "type"
         ],
         "type": "object",
         "properties": {
@@ -10612,6 +10647,9 @@
             "items": {
               "$ref": "#/components/schemas/ContractEventByTxId"
             }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },

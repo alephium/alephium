@@ -624,11 +624,11 @@ trait EndpointsLogic extends Endpoints {
   }
 
   val callContractLogic = serverLogic(callContract) { params: CallContract =>
-    Future.successful(serverUtils.callContract(blockFlow, params))
+    Future.successful(Right(serverUtils.callContract(blockFlow, params)))
   }
 
   val multipleCallContractLogic = serverLogic(multiCallContract) { params: MultipleCallContract =>
-    Future.successful(serverUtils.multipleCallContract(blockFlow, params))
+    Future.successful(Right(serverUtils.multipleCallContract(blockFlow, params)))
   }
 
   val exportBlocksLogic = serverLogic(exportBlocks) { exportFile =>
