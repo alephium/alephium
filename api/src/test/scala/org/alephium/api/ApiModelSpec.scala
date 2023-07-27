@@ -1189,6 +1189,65 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
   }
 
+  it should "encode/decode MultipleCallContractResult" in {
+    val contractState = ContractState(
+      generateContractAddress(),
+      StatefulContract.forSMT.toContract().rightValue,
+      codeHash = Hash.zero,
+      initialStateHash = Some(Hash.zero),
+      immFields = AVector.empty,
+      mutFields = AVector.empty,
+      AssetState.from(ALPH.alph(1), AVector.empty)
+    )
+
+    val callResults = MultipleCallContractResult(
+      AVector(
+        CallContractSucceeded(
+          AVector(ValU256(1)),
+          100000,
+          AVector(contractState),
+          AVector.empty,
+          AVector.empty,
+          AVector.empty
+        ),
+        CallContractFailed("InvalidContractMethodIndex")
+      )
+    )
+
+    val jsonRaw =
+      s"""
+         |{
+         |  "results": [
+         |    {
+         |      "type": "CallContractSucceeded",
+         |      "returns": [{"type": "U256","value": "1"}],
+         |      "gasUsed": 100000,
+         |      "contracts": [
+         |        {
+         |          "address": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+         |          "bytecode": "00010700000000000118",
+         |          "codeHash": "0000000000000000000000000000000000000000000000000000000000000000",
+         |          "initialStateHash": "0000000000000000000000000000000000000000000000000000000000000000",
+         |          "immFields": [],
+         |          "mutFields": [],
+         |          "asset": {"attoAlphAmount": "1000000000000000000","tokens": []}
+         |        }
+         |      ],
+         |      "txInputs": [],
+         |      "txOutputs": [],
+         |      "events": []
+         |    },
+         |    {
+         |      "type": "CallContractFailed",
+         |      "error": "InvalidContractMethodIndex"
+         |    }
+         |  ]
+         |}
+         |""".stripMargin
+
+    checkData(callResults, jsonRaw)
+  }
+
   it should "get alph and token amounts" in {
     BuildTxCommon
       .getAlphAndTokenAmounts(None, None) isE (None, AVector.empty[(TokenId, U256)])
