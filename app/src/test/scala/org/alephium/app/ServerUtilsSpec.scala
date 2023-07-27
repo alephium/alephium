@@ -1073,7 +1073,8 @@ class ServerUtilsSpec extends AlephiumSpec {
       inputAssets = Some(AVector(inputAsset)),
       existingContracts = Some(AVector(barAddress))
     )
-    val callContractResult0 = serverUtils.callContract(blockFlow, params0).rightValue
+    val callContractResult0 =
+      serverUtils.callContract(blockFlow, params0).asInstanceOf[CallContractSucceeded]
     callContractResult0.returns is AVector[Val](ValU256(2))
     callContractResult0.gasUsed is 23200
     callContractResult0.txOutputs.length is 2
@@ -1093,8 +1094,9 @@ class ServerUtilsSpec extends AlephiumSpec {
     fooState0.asset is AssetState(contractAttoAlphAmount0, Some(AVector.empty))
 
     info("call contract against the old world state")
-    val params1             = params0.copy(worldStateBlockHash = Some(createContractBlock.hash))
-    val callContractResult1 = serverUtils.callContract(blockFlow, params1).rightValue
+    val params1 = params0.copy(worldStateBlockHash = Some(createContractBlock.hash))
+    val callContractResult1 =
+      serverUtils.callContract(blockFlow, params1).asInstanceOf[CallContractSucceeded]
     callContractResult1.returns is AVector[Val](ValU256(1))
     callContractResult1.gasUsed is 23200
     callContractResult1.txOutputs.length is 2
@@ -1115,23 +1117,29 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "multiple call contract" in new CallContractFixture {
-    val groupIndex = chainIndex.from.value
-    val call0      = CallContract(group = groupIndex, address = barAddress, methodIndex = 1)
-    val call1      = CallContract(group = groupIndex, address = fooAddress, methodIndex = 1)
-    val multipleCallContract = MultipleCallContract(AVector(call0, call1))
+    val groupIndex         = chainIndex.from.value
+    val call0              = CallContract(group = groupIndex, address = barAddress, methodIndex = 1)
+    val call1              = CallContract(group = groupIndex, address = fooAddress, methodIndex = 1)
+    val invalidMethodIndex = 10
+    val call2 =
+      CallContract(group = groupIndex, address = fooAddress, methodIndex = invalidMethodIndex)
+    val multipleCallContract = MultipleCallContract(AVector(call0, call1, call2))
     val multipleCallContractResult =
-      serverUtils.multipleCallContract(blockFlow, multipleCallContract).rightValue
-    multipleCallContractResult.results.length is 2
+      serverUtils.multipleCallContract(blockFlow, multipleCallContract)
+    multipleCallContractResult.results.length is 3
 
-    val result0 = multipleCallContractResult.results(0)
+    val result0 = multipleCallContractResult.results(0).asInstanceOf[CallContractSucceeded]
     result0.txOutputs.isEmpty is true
     result0.events.isEmpty is true
     result0.returns is AVector[Val](ValByteVec(barId.bytes))
 
-    val result1 = multipleCallContractResult.results(1)
+    val result1 = multipleCallContractResult.results(1).asInstanceOf[CallContractSucceeded]
     result1.txOutputs.isEmpty is true
     result1.events.isEmpty is true
     result1.returns is AVector[Val](ValByteVec(fooId.bytes))
+
+    val result2 = multipleCallContractResult.results(2).asInstanceOf[CallContractFailed]
+    result2.error is s"VM execution error: InvalidMethodIndex($invalidMethodIndex)"
   }
 
   "the test contract endpoint" should "handle create and destroy contracts properly" in new Fixture {

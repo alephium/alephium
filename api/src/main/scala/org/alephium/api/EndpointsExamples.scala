@@ -758,7 +758,7 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(callContractExample)
   }
 
-  val callContractResultExample = CallContractResult(
+  val callContractResultExample: CallContractResult = CallContractSucceeded(
     returns = AVector[Val](ValU256(U256.Zero)),
     gasUsed = 20000,
     contracts = AVector(existingContract),

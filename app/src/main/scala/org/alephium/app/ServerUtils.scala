@@ -926,8 +926,8 @@ class ServerUtils(implicit
     } yield state
   }
 
-  def callContract(blockFlow: BlockFlow, params: CallContract): Try[CallContractResult] = {
-    for {
+  def callContract(blockFlow: BlockFlow, params: CallContract): CallContractResult = {
+    val result = for {
       groupIndex <- params.validate()
       _          <- checkGroup(groupIndex)
       blockHash = params.worldStateBlockHash.getOrElse(
@@ -960,7 +960,7 @@ class ServerUtils(implicit
         fetchContractState(worldState, address.contractId)
       )
     } yield {
-      CallContractResult(
+      CallContractSucceeded(
         returns.map(Val.from),
         maximalGasPerTx.subUnsafe(result.gasBox).value,
         contractsState,
@@ -971,13 +971,17 @@ class ServerUtils(implicit
         fetchContractEvents(worldState)
       )
     }
+    result match {
+      case Right(result) => result
+      case Left(error)   => CallContractFailed(error.detail)
+    }
   }
 
   def multipleCallContract(
       blockFlow: BlockFlow,
       params: MultipleCallContract
-  ): Try[MultipleCallContractResult] = {
-    params.calls.mapE(call => callContract(blockFlow, call)).map(MultipleCallContractResult)
+  ): MultipleCallContractResult = {
+    MultipleCallContractResult(params.calls.map(call => callContract(blockFlow, call)))
   }
 
   def runTestContract(
