@@ -227,7 +227,7 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
       handleInterCliqueTx(_, acknowledge = false, cacheMissingInputsTx = false)
     )
     schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
-    schedule(self, TxHandler.CleanMissingInputsTx, memPoolSetting.cleanMissingInputsTxFrequency)
+    scheduleOnce(self, TxHandler.CleanMissingInputsTx, memPoolSetting.cleanMissingInputsTxFrequency)
     scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
     scheduleOnce(self, TxHandler.DownloadTxs, batchDownloadTxsFrequency)
   }
@@ -330,8 +330,12 @@ trait TxCoreHandler extends TxHandlerUtils {
     val result    = grandPool.add(chainIndex, tx, currentTs)
     log.debug(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
-      case MemPool.AddedToMemPool => outgoingTxBuffer.put(tx, ())
-      case _                      => ()
+      case MemPool.AddedToMemPool =>
+        outgoingTxBuffer.put(tx, ())
+        if (missingInputsTxBuffer.pool.contains(tx.id)) {
+          missingInputsTxBuffer.removeValidTx(tx).foreach(_.foreach(validateMissingInputRootTx))
+        }
+      case _ => ()
     }
     addSucceeded(tx, acknowledge)
   }
