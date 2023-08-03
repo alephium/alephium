@@ -33,14 +33,16 @@ import org.alephium.protocol.model.{
   TransactionId,
   TransactionTemplate
 }
-import org.alephium.util.{ActorRefT, AVector, Cache}
+import org.alephium.util.{ActorRefT, AVector, Cache, Duration, TimeStamp}
 
 trait BrokerHandler extends BaseBrokerHandler {
   val maxBlockCapacity: Int              = brokerConfig.groupNumPerBroker * brokerConfig.groups * 10
   val maxTxsCapacity: Int                = maxBlockCapacity * 32
   val seenBlocks: Cache[BlockHash, Unit] = Cache.fifo[BlockHash, Unit](maxBlockCapacity)
-  val seenTxs: Cache[TransactionId, Unit] = Cache.fifo[TransactionId, Unit](maxTxsCapacity)
-  val maxForkDepth: Int                   = systemMaxForkDepth
+  val seenTxExpiryDuration: Duration     = BrokerHandler.seenTxExpiryDuration
+  val seenTxs: Cache[TransactionId, TimeStamp] =
+    Cache.fifo[TransactionId, TimeStamp](maxTxsCapacity, identity[TimeStamp], seenTxExpiryDuration)
+  val maxForkDepth: Int = systemMaxForkDepth
 
   def cliqueManager: ActorRefT[CliqueManager.Command]
 
@@ -121,6 +123,7 @@ trait BrokerHandler extends BaseBrokerHandler {
   }
 
   private def handleRelayTxs(txs: AVector[(ChainIndex, AVector[TransactionId])]): Unit = {
+    val now = TimeStamp.now()
     val invs = txs.fold(AVector.empty[(ChainIndex, AVector[TransactionId])]) {
       case (acc, (chainIndex, txIds)) =>
         val selected = txIds.filter { txId =>
@@ -128,7 +131,7 @@ trait BrokerHandler extends BaseBrokerHandler {
           if (peerHaveTx) {
             log.debug(s"Remote broker already have the tx ${txId.shortHex}")
           } else {
-            seenTxs.put(txId, ())
+            seenTxs.put(txId, now)
           }
           !peerHaveTx
         }
@@ -147,6 +150,7 @@ trait BrokerHandler extends BaseBrokerHandler {
     log.debug(s"Received txs hashes ${Utils.showChainIndexedDigest(hashes)} from $remoteAddress")
     // ignore the tx announcements before synced
     if (selfSynced) {
+      val now = TimeStamp.now()
       val result = hashes.mapE { case (chainIndex, txHashes) =>
         if (!brokerConfig.contains(chainIndex.from)) {
           Left(())
@@ -154,7 +158,7 @@ trait BrokerHandler extends BaseBrokerHandler {
           val invs = txHashes.filter { hash =>
             val duplicated = seenTxs.contains(hash)
             if (!duplicated) {
-              seenTxs.put(hash, ())
+              seenTxs.put(hash, now)
             }
             !duplicated
           }
@@ -272,4 +276,8 @@ trait BrokerHandler extends BaseBrokerHandler {
       }
     }
   }
+}
+
+object BrokerHandler {
+  val seenTxExpiryDuration: Duration = Duration.ofMinutesUnsafe(5)
 }
