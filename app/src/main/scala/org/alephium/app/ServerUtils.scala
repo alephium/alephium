@@ -1317,7 +1317,7 @@ class ServerUtils(implicit
 
 object ServerUtils {
 
-  val maxCallsInMultipleCall: Int = 50
+  val maxCallsInMultipleCall: Int = 20
 
   private def validateUtxInputs(
       unsignedTx: UnsignedTransaction

@@ -337,7 +337,8 @@ trait TxCoreHandler extends TxHandlerUtils {
       case MemPool.AddedToMemPool =>
         outgoingTxBuffer.put(tx, ())
         if (missingInputsTxBuffer.pool.contains(tx.id)) {
-          missingInputsTxBuffer.removeValidTx(tx).foreach(_.foreach(validateMissingInputRootTx))
+          val newRoots = missingInputsTxBuffer.removeValidTx(tx)
+          newRoots.foreach(_.foreach(validateMissingInputRootTx))
         }
       case _ => ()
     }
