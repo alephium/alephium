@@ -203,6 +203,25 @@ class MemPoolSpec
     pool.contains(tx2) is true
   }
 
+  it should "remove unconfirmed txs from mempool" in {
+    val pool       = MemPool.empty(mainGroup)
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val txs0       = AVector.fill(3)(transactionGen().sample.get.toTemplate)
+    val ts0        = TimeStamp.now()
+    val txs1       = AVector.fill(3)(transactionGen().sample.get.toTemplate)
+    val ts1        = TimeStamp.now().plusSecondsUnsafe(1)
+
+    pool.add(chainIndex, txs0, ts0)
+    pool.add(chainIndex, txs1, ts1)
+
+    txs0.foreach(tx => pool.contains(tx.id) is true)
+    txs1.foreach(tx => pool.contains(tx.id) is true)
+
+    pool.cleanUnconfirmedTxs(ts0)
+    txs0.foreach(tx => pool.contains(tx.id) is false)
+    txs1.foreach(tx => pool.contains(tx.id) is true)
+  }
+
   it should "clear mempool" in new Fixture {
     tx0.unsigned.inputs.foreach(input => pool.isSpent(input.outputRef) is true)
     pool.clear()

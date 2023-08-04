@@ -167,6 +167,7 @@ final case class MemPoolSetting(
     mempoolCapacityPerChain: Int,
     txMaxNumberPerBlock: Int,
     cleanMempoolFrequency: Duration,
+    unconfirmedTxExpiryDuration: Duration,
     batchBroadcastTxsFrequency: Duration,
     batchDownloadTxsFrequency: Duration,
     cleanMissingInputsTxFrequency: Duration,

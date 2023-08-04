@@ -279,6 +279,10 @@ class MemPool private (
     removed
   }
 
+  def cleanUnconfirmedTxs(timeStampThreshold: TimeStamp): Int = writeOnly {
+    removeUnusedTxs(_takeOldTxs(timeStampThreshold))
+  }
+
   private val transactionsTotalLabeled = {
     groupConfig.cliqueChainIndexes.map(chainIndex =>
       MemPool.sharedPoolTransactionsTotal

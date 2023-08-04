@@ -71,6 +71,10 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
     mempools.fold(0)(_ + _.clean(blockFlow, timeStampThreshold))
   }
 
+  def cleanUnconfirmedTxs(timeStampThreshold: TimeStamp): Int = {
+    mempools.fold(0)(_ + _.cleanUnconfirmedTxs(timeStampThreshold))
+  }
+
   def clear(): Unit = {
     mempools.foreach(_.clear())
   }

@@ -565,6 +565,30 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     sequentialTxs.foreach(tx => eventually(missingInputsTxBuffer.contains(tx.id) is false))
   }
 
+  it should "remove unconfirmed txs based on expiry duration" in new Fixture {
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.broker.groups", 1),
+      ("alephium.mempool.unconfirmed-tx-expiry-duration", "500 ms")
+    )
+
+    val txs                = prepareRandomSequentialTxs(3).toSeq
+    val Seq(tx1, tx2, tx3) = txs
+    val grandPool          = blockFlow.getGrandPool()
+    val now                = TimeStamp.now()
+    grandPool.add(chainIndex, tx1.toTemplate, now)
+    grandPool.add(chainIndex, tx2.toTemplate, now.minusUnsafe(Duration.ofSecondsUnsafe(2)))
+    grandPool.add(chainIndex, tx3.toTemplate, now.plusSecondsUnsafe(2))
+
+    val mempool = blockFlow.getMemPool(chainIndex)
+    txs.foreach(tx => mempool.contains(tx.id) is true)
+
+    Thread.sleep(1000)
+
+    txHandler ! TxHandler.CleanMemPool
+    txs.foreach(tx => eventually(mempool.contains(tx.id) is false))
+  }
+
   trait Fixture extends FlowFixture with TxGenerators {
     implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
 

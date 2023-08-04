@@ -209,10 +209,11 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
       cleanMissingInputsBuffer()
     case TxHandler.CleanMemPool =>
       log.debug("Start to clean mempools")
-      blockFlow.grandPool.clean(
-        blockFlow,
-        TimeStamp.now().minusUnsafe(memPoolSetting.cleanMempoolFrequency)
+      val now = TimeStamp.now()
+      blockFlow.grandPool.cleanUnconfirmedTxs(
+        now.minusUnsafe(memPoolSetting.unconfirmedTxExpiryDuration)
       )
+      blockFlow.grandPool.clean(blockFlow, now.minusUnsafe(memPoolSetting.cleanMempoolFrequency))
       ()
     case TxHandler.Rebroadcast(tx) =>
       outgoingTxBuffer.put(tx, ())
