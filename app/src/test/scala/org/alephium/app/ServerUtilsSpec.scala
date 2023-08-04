@@ -1125,7 +1125,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       CallContract(group = groupIndex, address = fooAddress, methodIndex = invalidMethodIndex)
     val multipleCallContract = MultipleCallContract(AVector(call0, call1, call2))
     val multipleCallContractResult =
-      serverUtils.multipleCallContract(blockFlow, multipleCallContract)
+      serverUtils.multipleCallContract(blockFlow, multipleCallContract).rightValue
     multipleCallContractResult.results.length is 3
 
     val result0 = multipleCallContractResult.results(0).asInstanceOf[CallContractSucceeded]
@@ -1140,6 +1140,19 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val result2 = multipleCallContractResult.results(2).asInstanceOf[CallContractFailed]
     result2.error is s"VM execution error: InvalidMethodIndex($invalidMethodIndex)"
+  }
+
+  it should "returns error if the number of contract calls exceeds the maximum limit" in new CallContractFixture {
+    override val serverUtils = new ServerUtils() {
+      override val maxCallsInMultipleCall = 3
+    }
+    val groupIndex = chainIndex.from.value
+    val call       = CallContract(group = groupIndex, address = barAddress, methodIndex = 1)
+    val multipleCallContract = MultipleCallContract(AVector.fill(4)(call))
+    serverUtils
+      .multipleCallContract(blockFlow, multipleCallContract)
+      .leftValue
+      .detail is "The number of contract calls exceeds the maximum limit(3)"
   }
 
   "the test contract endpoint" should "handle create and destroy contracts properly" in new Fixture {

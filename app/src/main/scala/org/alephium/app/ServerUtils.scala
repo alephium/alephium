@@ -977,11 +977,19 @@ class ServerUtils(implicit
     }
   }
 
+  val maxCallsInMultipleCall: Int = ServerUtils.maxCallsInMultipleCall
+
   def multipleCallContract(
       blockFlow: BlockFlow,
       params: MultipleCallContract
-  ): MultipleCallContractResult = {
-    MultipleCallContractResult(params.calls.map(call => callContract(blockFlow, call)))
+  ): Try[MultipleCallContractResult] = {
+    if (params.calls.length > maxCallsInMultipleCall) {
+      Left(
+        failed(s"The number of contract calls exceeds the maximum limit($maxCallsInMultipleCall)")
+      )
+    } else {
+      Right(MultipleCallContractResult(params.calls.map(call => callContract(blockFlow, call))))
+    }
   }
 
   def runTestContract(
@@ -1308,6 +1316,8 @@ class ServerUtils(implicit
 }
 
 object ServerUtils {
+
+  val maxCallsInMultipleCall: Int = 50
 
   private def validateUtxInputs(
       unsignedTx: UnsignedTransaction
