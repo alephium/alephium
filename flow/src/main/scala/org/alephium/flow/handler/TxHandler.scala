@@ -209,9 +209,13 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
       cleanMissingInputsBuffer()
     case TxHandler.CleanMemPool =>
       log.debug("Start to clean mempools")
-      blockFlow.grandPool.clean(
+      val now = TimeStamp.now()
+      blockFlow.grandPool.cleanUnconfirmedTxs(
+        now.minusUnsafe(memPoolSetting.unconfirmedTxExpiryDuration)
+      )
+      blockFlow.grandPool.cleanInvalidTxs(
         blockFlow,
-        TimeStamp.now().minusUnsafe(memPoolSetting.cleanMempoolFrequency)
+        now.minusUnsafe(memPoolSetting.cleanMempoolFrequency)
       )
       ()
     case TxHandler.Rebroadcast(tx) =>
@@ -227,7 +231,7 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
       handleInterCliqueTx(_, acknowledge = false, cacheMissingInputsTx = false)
     )
     schedule(self, TxHandler.CleanMemPool, memPoolSetting.cleanMempoolFrequency)
-    schedule(self, TxHandler.CleanMissingInputsTx, memPoolSetting.cleanMissingInputsTxFrequency)
+    scheduleOnce(self, TxHandler.CleanMissingInputsTx, memPoolSetting.cleanMissingInputsTxFrequency)
     scheduleOnce(self, TxHandler.BroadcastTxs, batchBroadcastTxsFrequency)
     scheduleOnce(self, TxHandler.DownloadTxs, batchDownloadTxsFrequency)
   }
@@ -330,8 +334,13 @@ trait TxCoreHandler extends TxHandlerUtils {
     val result    = grandPool.add(chainIndex, tx, currentTs)
     log.debug(s"Add tx ${tx.id.shortHex} for $chainIndex, type: $result")
     result match {
-      case MemPool.AddedToMemPool => outgoingTxBuffer.put(tx, ())
-      case _                      => ()
+      case MemPool.AddedToMemPool =>
+        outgoingTxBuffer.put(tx, ())
+        if (missingInputsTxBuffer.pool.contains(tx.id)) {
+          val newRoots = missingInputsTxBuffer.removeValidTx(tx)
+          newRoots.foreach(_.foreach(validateMissingInputRootTx))
+        }
+      case _ => ()
     }
     addSucceeded(tx, acknowledge)
   }

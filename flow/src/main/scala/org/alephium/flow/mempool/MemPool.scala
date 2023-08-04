@@ -267,7 +267,7 @@ class MemPool private (
   }
 
   // TODO: Optimize this
-  def clean(
+  def cleanInvalidTxs(
       blockFlow: BlockFlow,
       timeStampThreshold: TimeStamp
   ): Int = writeOnly {
@@ -277,6 +277,10 @@ class MemPool private (
       removed += removeUnusedTxs(invalidTxs)
     }
     removed
+  }
+
+  def cleanUnconfirmedTxs(timeStampThreshold: TimeStamp): Int = writeOnly {
+    removeUnusedTxs(_takeOldTxs(timeStampThreshold))
   }
 
   private val transactionsTotalLabeled = {

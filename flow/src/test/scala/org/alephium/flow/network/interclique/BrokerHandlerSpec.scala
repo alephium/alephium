@@ -44,7 +44,7 @@ import org.alephium.protocol.model.{
   NoIndexModelGeneratorsLike,
   TransactionId
 }
-import org.alephium.util.{ActorRefT, AVector, TimeStamp, UnsecureRandom}
+import org.alephium.util.{ActorRefT, AVector, Duration, TimeStamp, UnsecureRandom}
 
 class BrokerHandlerSpec extends AlephiumFlowActorSpec {
   it should "set remote synced" in new Fixture {
@@ -285,7 +285,7 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     val txHash1 = TransactionId.generate
     val txHash2 = TransactionId.generate
 
-    brokerHandlerActor.seenTxs.put(txHash1, ())
+    brokerHandlerActor.seenTxs.put(txHash1, TimeStamp.now())
     brokerHandler ! BaseBrokerHandler.RelayTxs(AVector((chainIndex, AVector(txHash1))))
     connectionHandler.expectNoMessage()
     brokerHandlerActor.seenTxs.keys().toSet is Set(txHash1)
@@ -387,11 +387,33 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
     listener.expectMsg(MisbehaviorManager.InvalidFlowChainIndex(brokerHandlerActor.remoteAddress))
   }
 
+  it should "remove seen txs based on expiry duration" in new Fixture {
+    setSynced()
+
+    val Seq(txHash0, txHash1, txHash2, txHash3) = Seq.fill(4)(TransactionId.generate)
+    brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, AVector(txHash0)))))
+    brokerHandler ! BaseBrokerHandler.RelayTxs(AVector((chainIndex, AVector(txHash2))))
+    eventually(brokerHandler.underlyingActor.seenTxs.contains(txHash0) is true)
+    eventually(brokerHandler.underlyingActor.seenTxs.contains(txHash1) is false)
+    eventually(brokerHandler.underlyingActor.seenTxs.contains(txHash2) is true)
+    eventually(brokerHandler.underlyingActor.seenTxs.contains(txHash3) is false)
+
+    Thread.sleep((seenTxExpiryDuration + Duration.ofSecondsUnsafe(1)).millis)
+
+    brokerHandler ! BaseBrokerHandler.Received(NewTxHashes(AVector((chainIndex, AVector(txHash1)))))
+    brokerHandler ! BaseBrokerHandler.RelayTxs(AVector((chainIndex, AVector(txHash3))))
+    eventually(brokerHandler.underlyingActor.seenTxs.contains(txHash0) is false)
+    eventually(brokerHandler.underlyingActor.seenTxs.contains(txHash1) is true)
+    eventually(brokerHandler.underlyingActor.seenTxs.contains(txHash2) is false)
+    eventually(brokerHandler.underlyingActor.seenTxs.contains(txHash3) is true)
+  }
+
   trait Fixture extends FlowFixture {
     val cliqueManager         = TestProbe()
     val connectionHandler     = TestProbe()
     val blockFlowSynchronizer = TestProbe()
     val maxForkDepth          = 5
+    val seenTxExpiryDuration  = Duration.ofSecondsUnsafe(3)
 
     lazy val (allHandler, allHandlerProbes) = TestUtils.createAllHandlersProbe
     lazy val brokerHandler = TestActorRef[TestBrokerHandler](
@@ -404,7 +426,8 @@ class BrokerHandlerSpec extends AlephiumFlowActorSpec {
         ActorRefT(cliqueManager.ref),
         ActorRefT(blockFlowSynchronizer.ref),
         ActorRefT(connectionHandler.ref),
-        maxForkDepth
+        maxForkDepth,
+        seenTxExpiryDuration
       )
     )
     lazy val brokerHandlerActor = brokerHandler.underlyingActor
@@ -443,7 +466,8 @@ object TestBrokerHandler {
       cliqueManager: ActorRefT[CliqueManager.Command],
       blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
       brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
-      maxForkDepth: Int
+      maxForkDepth: Int,
+      seenTxExpiryDuration: Duration
   )(implicit brokerConfig: BrokerConfig, networkSetting: NetworkSetting): Props =
     Props(
       new TestBrokerHandler(
@@ -455,7 +479,8 @@ object TestBrokerHandler {
         cliqueManager,
         blockFlowSynchronizer,
         brokerConnectionHandler,
-        maxForkDepth
+        maxForkDepth,
+        seenTxExpiryDuration
       )
     )
 }
@@ -469,7 +494,8 @@ class TestBrokerHandler(
     val cliqueManager: ActorRefT[CliqueManager.Command],
     val blockFlowSynchronizer: ActorRefT[BlockFlowSynchronizer.Command],
     override val brokerConnectionHandler: ActorRefT[ConnectionHandler.Command],
-    override val maxForkDepth: Int
+    override val maxForkDepth: Int,
+    override val seenTxExpiryDuration: Duration
 )(implicit val brokerConfig: BrokerConfig, val networkSetting: NetworkSetting)
     extends BaseInboundBrokerHandler
     with BrokerHandler {

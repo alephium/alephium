@@ -163,7 +163,7 @@ class BlockFlowSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block11, 1)
       addAndCheck(blockFlow, block12, 1)
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, IndexedSeq(block11, block12))
-      blockFlow.grandPool.clean(
+      blockFlow.grandPool.cleanInvalidTxs(
         blockFlow,
         TimeStamp.now()
       ) // remove double spending tx

@@ -507,6 +507,88 @@ class TxHandlerSpec extends AlephiumFlowActorSpec {
     balance12 is balance11.subUnsafe(ALPH.oneAlph)
   }
 
+  it should "remove tx from missingInputTxBuffer after tx is added to mempool" in new Fixture {
+    override val configValues =
+      Map(("alephium.broker.broker-num", 1), ("alephium.broker.groups", 1))
+    val missingInputsTxBuffer   = txHandler.underlyingActor.missingInputsTxBuffer.pool
+    val Seq(tx1, tx2, tx3, tx4) = prepareRandomSequentialTxs(4).toSeq
+    txHandler ! addTx(tx2, isLocalTx = false)
+    txHandler ! addTx(tx3, isLocalTx = false)
+    txHandler ! addTx(tx4, isLocalTx = false)
+
+    eventually(missingInputsTxBuffer.contains(tx1.id) is false)
+    eventually(missingInputsTxBuffer.contains(tx2.id) is true)
+    eventually(missingInputsTxBuffer.contains(tx3.id) is true)
+    eventually(missingInputsTxBuffer.contains(tx4.id) is true)
+
+    val mempool = blockFlow.getMemPool(chainIndex)
+    txHandler ! addTx(tx1, isLocalTx = false)
+    txHandler ! addTx(tx2, isLocalTx = false)
+
+    eventually(mempool.contains(tx1.id) is true)
+    eventually(mempool.contains(tx2.id) is true)
+    eventually(mempool.contains(tx3.id) is true)
+    eventually(mempool.contains(tx4.id) is true)
+    eventually(missingInputsTxBuffer.contains(tx2.id) is false)
+    eventually(missingInputsTxBuffer.contains(tx3.id) is false)
+    eventually(missingInputsTxBuffer.contains(tx4.id) is false)
+  }
+
+  it should "handle missing inputs txs properly" in new Fixture {
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.broker.groups", 1),
+      ("alephium.mempool.clean-missing-inputs-tx-frequency", "500 ms")
+    )
+    val missingInputsTxBuffer             = txHandler.underlyingActor.missingInputsTxBuffer.pool
+    val sequentialTxs                     = prepareRandomSequentialTxs(6)
+    val Seq(tx1, tx2, tx3, tx4, tx5, tx6) = sequentialTxs.toSeq
+
+    val missingInputTxs = AVector(tx2, tx3, tx5, tx6).sortBy(_.id)
+    missingInputTxs.foreach(tx => txHandler ! addTx(tx, isLocalTx = false))
+    missingInputTxs.foreach(tx => eventually(missingInputsTxBuffer.contains(tx.id) is true))
+
+    setSynced()
+
+    val mempool = blockFlow.getMemPool(chainIndex)
+    txHandler ! addTx(tx1)
+    eventually(mempool.contains(tx1.id) is true)
+    eventually(mempool.contains(tx2.id) is true)
+    eventually(mempool.contains(tx3.id) is true)
+    eventually(missingInputsTxBuffer.contains(tx2.id) is false)
+    eventually(missingInputsTxBuffer.contains(tx3.id) is false)
+    eventually(missingInputsTxBuffer.contains(tx5.id) is true)
+    eventually(missingInputsTxBuffer.contains(tx6.id) is true)
+
+    txHandler ! addTx(tx4)
+    sequentialTxs.foreach(tx => eventually(mempool.contains(tx.id) is true))
+    sequentialTxs.foreach(tx => eventually(missingInputsTxBuffer.contains(tx.id) is false))
+  }
+
+  it should "remove unconfirmed txs based on expiry duration" in new Fixture {
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.broker.groups", 1),
+      ("alephium.mempool.unconfirmed-tx-expiry-duration", "500 ms")
+    )
+
+    val txs                = prepareRandomSequentialTxs(3).toSeq
+    val Seq(tx1, tx2, tx3) = txs
+    val grandPool          = blockFlow.getGrandPool()
+    val now                = TimeStamp.now()
+    grandPool.add(chainIndex, tx1.toTemplate, now)
+    grandPool.add(chainIndex, tx2.toTemplate, now.minusUnsafe(Duration.ofSecondsUnsafe(2)))
+    grandPool.add(chainIndex, tx3.toTemplate, now.plusSecondsUnsafe(2))
+
+    val mempool = blockFlow.getMemPool(chainIndex)
+    txs.foreach(tx => mempool.contains(tx.id) is true)
+
+    Thread.sleep(1000)
+
+    txHandler ! TxHandler.CleanMemPool
+    txs.foreach(tx => eventually(mempool.contains(tx.id) is false))
+  }
+
   trait Fixture extends FlowFixture with TxGenerators {
     implicit val timeout: Timeout = Timeout(Duration.ofSecondsUnsafe(2).asScala)
 

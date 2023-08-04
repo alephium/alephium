@@ -64,7 +64,7 @@ object TxHandlerBuffer {
   private val bufferGroupIndex = GroupIndex.unsafe(0)(bufferGroupConfig)
 
   // scalastyle:off magic.number
-  def default(): TxHandlerBuffer = ofCapacity(100)
+  def default(): TxHandlerBuffer = ofCapacity(500)
   // scalastyle:on magic.number
 
   def ofCapacity(capacity: Int): TxHandlerBuffer = {
