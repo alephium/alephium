@@ -213,7 +213,10 @@ final class TxHandler(val blockFlow: BlockFlow, val pendingTxStorage: PendingTxS
       blockFlow.grandPool.cleanUnconfirmedTxs(
         now.minusUnsafe(memPoolSetting.unconfirmedTxExpiryDuration)
       )
-      blockFlow.grandPool.clean(blockFlow, now.minusUnsafe(memPoolSetting.cleanMempoolFrequency))
+      blockFlow.grandPool.cleanInvalidTxs(
+        blockFlow,
+        now.minusUnsafe(memPoolSetting.cleanMempoolFrequency)
+      )
       ()
     case TxHandler.Rebroadcast(tx) =>
       outgoingTxBuffer.put(tx, ())

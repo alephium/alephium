@@ -64,11 +64,11 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
     mempools.flatMap(_.getOutTxsWithTimestamp())
   }
 
-  def clean(
+  def cleanInvalidTxs(
       blockFlow: BlockFlow,
       timeStampThreshold: TimeStamp
   ): Int = {
-    mempools.fold(0)(_ + _.clean(blockFlow, timeStampThreshold))
+    mempools.fold(0)(_ + _.cleanInvalidTxs(blockFlow, timeStampThreshold))
   }
 
   def cleanUnconfirmedTxs(timeStampThreshold: TimeStamp): Int = {
@@ -80,7 +80,7 @@ class GrandPool(val mempools: AVector[MemPool])(implicit
   }
 
   def validateAllTxs(blockFlow: BlockFlow): Int = {
-    clean(blockFlow, TimeStamp.now())
+    cleanInvalidTxs(blockFlow, TimeStamp.now())
   }
 }
 

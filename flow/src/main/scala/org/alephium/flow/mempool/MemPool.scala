@@ -267,7 +267,7 @@ class MemPool private (
   }
 
   // TODO: Optimize this
-  def clean(
+  def cleanInvalidTxs(
       blockFlow: BlockFlow,
       timeStampThreshold: TimeStamp
   ): Int = writeOnly {

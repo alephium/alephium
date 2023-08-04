@@ -198,7 +198,7 @@ class MemPoolSpec
     pool.size is 3
     pool.add(index2, tx3, currentTs) is MemPool.DoubleSpending
     pool.size is 3
-    pool.clean(blockFlow, TimeStamp.now().plusMinutesUnsafe(1)) is 2
+    pool.cleanInvalidTxs(blockFlow, TimeStamp.now().plusMinutesUnsafe(1)) is 2
     pool.size is 1
     pool.contains(tx2) is true
   }
@@ -255,7 +255,7 @@ class MemPoolSpec
     pool.size is 1
     pool.collectForBlock(ChainIndex(mainGroup, mainGroup), Int.MaxValue).isEmpty is true
 
-    pool.clean(blockFlow, TimeStamp.now().plusHoursUnsafe(1)) is 1
+    pool.cleanInvalidTxs(blockFlow, TimeStamp.now().plusHoursUnsafe(1)) is 1
     pool.size is 0
   }
 }
