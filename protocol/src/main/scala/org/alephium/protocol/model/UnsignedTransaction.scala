@@ -134,24 +134,38 @@ object UnsignedTransaction {
   }
 
   // scalastyle:off parameter.number
-  def approve(
+  def buildScriptTx(
       script: StatefulScript,
-      owner: LockupScript.Asset,
-      inputs: AVector[TxInput],
-      inputUTXOs: AVector[AssetOutput],
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
       approvedAttoAlphAmount: U256,
       approvedTokens: AVector[(TokenId, U256)],
       gasAmount: GasBox,
       gasPrice: GasPrice
   )(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
-    val approved         = TxOutputInfo(owner, approvedAttoAlphAmount, approvedTokens, None, None)
+    val approved =
+      TxOutputInfo(fromLockupScript, approvedAttoAlphAmount, approvedTokens, None, None)
     val approvedAsOutput = buildOutputs(approved)
-    val gasFee           = gasPrice * gasAmount
     for {
-      alphRemainder  <- calculateAlphRemainder(inputUTXOs.view, approvedAsOutput, gasFee)
-      tokenRemainder <- calculateTokensRemainder(inputUTXOs.view, approvedAsOutput)
-      fixedOutputs   <- calculateChangeOutputs(alphRemainder, tokenRemainder, owner)
-    } yield UnsignedTransaction(Some(script), gasAmount, gasPrice, inputs, fixedOutputs)
+      gasFee <- preCheckBuildTx(inputs, gasAmount, gasPrice)
+      fixedOutputs <- calculateChangeOutputs(
+        fromLockupScript,
+        inputs,
+        approvedAsOutput,
+        gasFee
+      )
+    } yield {
+      UnsignedTransaction(
+        Some(script),
+        gasAmount,
+        gasPrice,
+        inputs.map { case (ref, _) =>
+          TxInput(ref, fromUnlockScript)
+        },
+        fixedOutputs
+      )
+    }
   }
   // scalastyle:on parameter.number
 
@@ -169,7 +183,34 @@ object UnsignedTransaction {
     )
   }
 
-  def build(
+  @inline private def calculateChangeOutputs(
+      fromLockupScript: LockupScript.Asset,
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      txOutputs: AVector[AssetOutput],
+      gasFee: U256
+  ): Either[String, AVector[AssetOutput]] = {
+    val inputUTXOView = inputs.view.map(_._2)
+    for {
+      alphRemainder   <- calculateAlphRemainder(inputUTXOView, txOutputs, gasFee)
+      tokensRemainder <- calculateTokensRemainder(inputUTXOView, txOutputs)
+      changeOutputs   <- calculateChangeOutputs(alphRemainder, tokensRemainder, fromLockupScript)
+    } yield changeOutputs
+  }
+
+  @inline private def preCheckBuildTx(
+      inputs: AVector[(AssetOutputRef, AssetOutput)],
+      gas: GasBox,
+      gasPrice: GasPrice
+  ): Either[String, U256] = {
+    assume(gas >= minimalGas)
+    assume(gasPrice.value <= ALPH.MaxALPHValue)
+    for {
+      _ <- checkWithMaxTxInputNum(inputs)
+      _ <- checkUniqueInputs(inputs)
+    } yield gasPrice * gas
+  }
+
+  def buildTransferTx(
       fromLockupScript: LockupScript.Asset,
       fromUnlockScript: UnlockScript,
       inputs: AVector[(AssetOutputRef, AssetOutput)],
@@ -177,24 +218,15 @@ object UnsignedTransaction {
       gas: GasBox,
       gasPrice: GasPrice
   )(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
-    assume(gas >= minimalGas)
-    assume(gasPrice.value <= ALPH.MaxALPHValue)
-    val gasFee        = gasPrice * gas
-    val inputUTXOView = inputs.view.map(_._2)
     for {
-      _ <- checkWithMaxTxInputNum(inputs)
-      _ <- checkUniqueInputs(inputs)
-      _ <- checkMinimalAlphPerOutput(outputInfos)
-      _ <- checkTokenValuesNonZero(outputInfos)
+      gasFee <- preCheckBuildTx(inputs, gas, gasPrice)
+      _      <- checkMinimalAlphPerOutput(outputInfos)
+      _      <- checkTokenValuesNonZero(outputInfos)
       txOutputs = buildOutputs(outputInfos)
-      alphRemainder   <- calculateAlphRemainder(inputUTXOView, txOutputs, gasFee)
-      tokensRemainder <- calculateTokensRemainder(inputUTXOView, txOutputs)
-      changeOutputs   <- calculateChangeOutputs(alphRemainder, tokensRemainder, fromLockupScript)
+      changeOutputs <- calculateChangeOutputs(fromLockupScript, inputs, txOutputs, gasFee)
     } yield {
       UnsignedTransaction(
-        DefaultTxVersion,
-        networkConfig.networkId,
-        scriptOpt = None,
+        None,
         gas,
         gasPrice,
         inputs.map { case (ref, _) =>

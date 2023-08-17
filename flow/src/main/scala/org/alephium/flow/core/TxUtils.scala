@@ -199,7 +199,7 @@ trait TxUtils { Self: FlowUtils =>
               selected <- utxoSelectionResult
               _        <- checkEstimatedGasAmount(selected.gas)
               unsignedTx <- UnsignedTransaction
-                .build(
+                .buildTransferTx(
                   fromLockupScript,
                   fromUnlockScript,
                   selected.assets.map(asset => (asset.ref, asset.output)),
@@ -283,7 +283,14 @@ trait TxUtils { Self: FlowUtils =>
                 }
                 utxos <- utxosOpt.toRight("Can not find all selected UTXOs")
                 unsignedTx <- UnsignedTransaction
-                  .build(fromLockupScript, fromUnlockScript, utxos, outputInfos, gas, gasPrice)
+                  .buildTransferTx(
+                    fromLockupScript,
+                    fromUnlockScript,
+                    utxos,
+                    outputInfos,
+                    gas,
+                    gasPrice
+                  )
               } yield unsignedTx
             }
         case Left(e) =>
@@ -328,7 +335,7 @@ trait TxUtils { Self: FlowUtils =>
                 gasPrice
               )
               unsignedTx <- UnsignedTransaction
-                .build(
+                .buildTransferTx(
                   fromLockupScript,
                   fromUnlockScript,
                   utxos.map(asset => (asset.ref, asset.output)),
