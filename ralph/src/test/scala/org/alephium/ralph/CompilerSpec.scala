@@ -4064,4 +4064,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     compile("Bar.bar()").leftValue.message is
       s"""Expected static function, got "Bar.bar""""
   }
+
+  it should "should print correct error message when std is not prefixed correctly" in {
+    val code = s"""
+                  |@std(id = #0005)
+                  |Interface Foo {
+                  |    pub fn foo() -> ()
+                  |}
+                  |
+                  |@std(id = #000401)
+                  |Interface Bar extends Foo {
+                  |    pub fn foo() -> ()
+                  |}
+                  |""".stripMargin
+
+    Compiler
+      .compileContractFull(code)
+      .leftValue
+      .message is "The std id of interface Bar should start with 0005"
+  }
 }
