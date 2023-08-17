@@ -1499,8 +1499,8 @@ object Ast {
             }
             if (!stdId.bytes.startsWith(parentStdId.bytes)) {
               throw Compiler.Error(
-                s"The std id of interface ${interface.ident.name} should starts with ${Hex
-                    .toHexString(parentStdId.bytes)}"
+                s"The std id of interface ${interface.ident.name} should start with ${Hex
+                    .toHexString(parentStdId.bytes.drop(Ast.StdInterfaceIdPrefix.length))}"
               )
             }
             Some(stdId)
