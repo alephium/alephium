@@ -30,7 +30,7 @@ import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{GasBox, LockupScript, TokenIssuance, UnlockScript}
+import org.alephium.protocol.vm.{GasBox, LockupScript, StatefulScript, TokenIssuance, UnlockScript}
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
@@ -220,7 +220,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val fromUnlockScript = UnlockScript.p2pkh(fromPubKey)
   }
 
-  "UnsignedTransaction.build" should "build transaction successfully" in new UnsignedTransactionFixture {
+  "UnsignedTransaction.buildTransferTx" should "build transaction successfully" in new UnsignedTransactionFixture {
     val inputs = {
       val input1 = input("input1", ALPH.oneAlph, fromLockupScript)
       val input2 = input("input2", ALPH.cent(50), fromLockupScript)
@@ -235,7 +235,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
     noException should be thrownBy {
       UnsignedTransaction
-        .build(
+        .buildTransferTx(
           fromLockupScript,
           fromUnlockScript,
           inputs,
@@ -261,7 +261,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     UnsignedTransaction
-      .build(
+      .buildTransferTx(
         fromLockupScript,
         fromUnlockScript,
         inputs,
@@ -284,7 +284,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     UnsignedTransaction
-      .build(
+      .buildTransferTx(
         fromLockupScript,
         fromUnlockScript,
         inputs,
@@ -317,7 +317,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     val unsignedTx = UnsignedTransaction
-      .build(
+      .buildTransferTx(
         fromLockupScript,
         fromUnlockScript,
         inputs,
@@ -356,7 +356,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     UnsignedTransaction
-      .build(
+      .buildTransferTx(
         fromLockupScript,
         fromUnlockScript,
         inputs,
@@ -383,7 +383,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     UnsignedTransaction
-      .build(
+      .buildTransferTx(
         fromLockupScript,
         fromUnlockScript,
         inputs,
@@ -413,7 +413,7 @@ class TxUtilsSpec extends AlephiumSpec {
       }
 
       UnsignedTransaction
-        .build(
+        .buildTransferTx(
           fromLockupScript,
           fromUnlockScript,
           inputs,
@@ -438,7 +438,7 @@ class TxUtilsSpec extends AlephiumSpec {
       }
 
       UnsignedTransaction
-        .build(
+        .buildTransferTx(
           fromLockupScript,
           fromUnlockScript,
           inputs,
@@ -476,7 +476,7 @@ class TxUtilsSpec extends AlephiumSpec {
       }
 
       UnsignedTransaction
-        .build(
+        .buildTransferTx(
           fromLockupScript,
           fromUnlockScript,
           inputs,
@@ -504,7 +504,7 @@ class TxUtilsSpec extends AlephiumSpec {
       }
 
       UnsignedTransaction
-        .build(
+        .buildTransferTx(
           fromLockupScript,
           fromUnlockScript,
           inputs,
@@ -526,7 +526,7 @@ class TxUtilsSpec extends AlephiumSpec {
     val outputs = AVector(output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph))
 
     UnsignedTransaction
-      .build(
+      .buildTransferTx(
         fromLockupScript,
         fromUnlockScript,
         inputs,
@@ -555,7 +555,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
 
     UnsignedTransaction
-      .build(
+      .buildTransferTx(
         fromLockupScript,
         fromUnlockScript,
         inputs,
@@ -1081,6 +1081,124 @@ class TxUtilsSpec extends AlephiumSpec {
     blockFlow
       .getGrandPool()
       .add(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToMemPool
+  }
+
+  trait BuildScriptTxFixture extends UnsignedTransactionFixture {
+    val script        = StatefulScript.unsafe(AVector.empty)
+    val defaultGasFee = nonCoinbaseMinGasPrice * minimalGas
+    val tokenId       = TokenId.generate
+
+    protected def buildScriptTx(
+        inputs: AVector[(AssetOutputRef, AssetOutput)],
+        approvedAlph: U256,
+        approvedTokens: (TokenId, U256)*
+    ) = {
+      UnsignedTransaction
+        .buildScriptTx(
+          script,
+          fromLockupScript,
+          fromUnlockScript,
+          inputs,
+          approvedAlph,
+          AVector.from(approvedTokens),
+          minimalGas,
+          nonCoinbaseMinGasPrice
+        )
+    }
+  }
+
+  "UnsignedTransaction.buildScriptTx" should "fail because of not enough assets" in new BuildScriptTxFixture {
+    {
+      info("not enough ALPH")
+      val inputs = AVector(input("input1", ALPH.oneAlph, fromLockupScript))
+      buildScriptTx(inputs, ALPH.oneAlph.subUnsafe(defaultGasFee)).isRight is true
+      buildScriptTx(inputs, ALPH.oneAlph.addOneUnsafe()).leftValue is "Not enough balance"
+    }
+
+    {
+      info("not enough token")
+      val inputs = AVector(
+        input("input1", ALPH.oneAlph, fromLockupScript),
+        input("input2", dustUtxoAmount, fromLockupScript, (tokenId, ALPH.oneAlph))
+      )
+
+      buildScriptTx(inputs, ALPH.cent(10), (tokenId, ALPH.oneAlph)).isRight is true
+      buildScriptTx(
+        inputs,
+        ALPH.cent(10),
+        (tokenId, ALPH.oneAlph.addOneUnsafe())
+      ).leftValue is s"Not enough balance for token $tokenId"
+    }
+
+    {
+      info("not enough gas fee")
+      val inputs = AVector(
+        input("input1", ALPH.oneAlph.addUnsafe(defaultGasFee).subOneUnsafe(), fromLockupScript)
+      )
+
+      buildScriptTx(inputs, ALPH.oneAlph.subOneUnsafe()).isRight is true
+      buildScriptTx(inputs, ALPH.oneAlph).leftValue is "Not enough balance for gas fee"
+    }
+  }
+
+  "UnsignedTransaction.buildScriptTx" should "fail because of not enough ALPH for change output" in new BuildScriptTxFixture {
+    {
+      info("not enough ALPH for ALPH change output")
+      val inputs       = AVector(input("input1", ALPH.oneAlph, fromLockupScript))
+      val approvedAlph = ALPH.oneAlph.subUnsafe(defaultGasFee)
+
+      buildScriptTx(inputs, approvedAlph).isRight is true
+      buildScriptTx(inputs, approvedAlph.subUnsafe(dustUtxoAmount)).isRight is true
+      buildScriptTx(
+        inputs,
+        approvedAlph.subOneUnsafe()
+      ).leftValue is "Not enough ALPH for change output"
+    }
+
+    {
+      info("not enough ALPH for token change output")
+      val inputs = AVector(
+        input("input1", ALPH.oneAlph, fromLockupScript),
+        input("input2", dustUtxoAmount, fromLockupScript, (tokenId, ALPH.oneAlph))
+      )
+      val availableAlph = ALPH.oneAlph.subUnsafe(defaultGasFee)
+
+      buildScriptTx(inputs, availableAlph, (tokenId, ALPH.oneAlph)).isRight is true
+      buildScriptTx(
+        inputs,
+        availableAlph.subUnsafe(dustUtxoAmount),
+        (tokenId, ALPH.oneAlph.subOneUnsafe())
+      ).isRight is true
+      buildScriptTx(
+        inputs,
+        availableAlph.subOneUnsafe(),
+        (tokenId, ALPH.oneAlph.subOneUnsafe())
+      ).leftValue is "Not enough ALPH for change output"
+    }
+  }
+
+  "UnsignedTransaction.buildScriptTx" should "fail because of inputs not unique" in new BuildScriptTxFixture {
+    val inputs = AVector(
+      input("input1", ALPH.alph(1), fromLockupScript),
+      input("input1", ALPH.alph(2), fromLockupScript)
+    )
+
+    buildScriptTx(inputs, ALPH.oneAlph).leftValue is "Inputs not unique"
+  }
+
+  "UnsignedTransaction.buildScriptTx" should "fail because of the number of inputs exceeds MaxTxInputNum" in new BuildScriptTxFixture {
+    val inputs0 = AVector
+      .from(0 until ALPH.MaxTxInputNum)
+      .map(idx => input(s"input${idx}", ALPH.alph(1), fromLockupScript))
+    val inputs1 = AVector
+      .from(0 to ALPH.MaxTxInputNum)
+      .map(idx => input(s"input${idx}", ALPH.alph(1), fromLockupScript))
+
+    buildScriptTx(inputs0, ALPH.oneAlph).isRight is true
+    buildScriptTx(
+      inputs1,
+      ALPH.oneAlph
+    ).leftValue is "Too many inputs for the transfer, consider to reduce the amount to send, or use the `sweep-address` endpoint to consolidate the inputs first"
   }
 
   private def input(
