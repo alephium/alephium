@@ -248,7 +248,11 @@ object WalletService {
     private val path: AVector[Int] = Constants.path
 
     protected def startSelfOnce(): Future[Unit] = {
-      Future.fromTry(Try(discard(Files.createDirectories(secretDir))))
+      if (Files.exists(secretDir)) {
+        Future.unit
+      } else {
+        Future.fromTry(Try(discard(Files.createDirectories(secretDir))))
+      }
     }
 
     protected def stopSelfOnce(): Future[Unit] = {
