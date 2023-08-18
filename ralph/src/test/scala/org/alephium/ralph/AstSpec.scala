@@ -688,50 +688,54 @@ class AstSpec extends AlephiumSpec {
     val bar = foo.copy(ident = Ast.TypeId("Bar"))
     val baz = foo.copy(ident = Ast.TypeId("Baz"))
 
+    def stdId(raw: String) = {
+      Val.ByteVec(Ast.StdInterfaceIdPrefix ++ Hex.unsafe(raw))
+    }
+
     Ast.MultiContract.getStdId(Seq.empty) is None
     Ast.MultiContract.getStdId(Seq(foo)) is None
     Ast.MultiContract.getStdId(
-      Seq(foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))))
-    ) is Some(Val.ByteVec(Hex.unsafe("0001")))
+      Seq(foo.copy(stdId = Some(stdId("0001"))))
+    ) is Some(stdId("0001"))
     Ast.MultiContract.getStdId(Seq(foo, bar, baz)) is None
     Ast.MultiContract.getStdId(
-      Seq(foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))), bar, baz)
-    ) is Some(Val.ByteVec(Hex.unsafe("0001")))
+      Seq(foo.copy(stdId = Some(stdId("0001"))), bar, baz)
+    ) is Some(stdId("0001"))
     Ast.MultiContract.getStdId(
-      Seq(foo, bar.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))), baz)
-    ) is Some(Val.ByteVec(Hex.unsafe("0001")))
+      Seq(foo, bar.copy(stdId = Some(stdId("0001"))), baz)
+    ) is Some(stdId("0001"))
     Ast.MultiContract.getStdId(
       Seq(
-        foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))),
+        foo.copy(stdId = Some(stdId("0001"))),
         bar,
-        baz.copy(stdId = Some(Val.ByteVec(Hex.unsafe("000101"))))
+        baz.copy(stdId = Some(stdId("000101")))
       )
-    ) is Some(Val.ByteVec(Hex.unsafe("000101")))
+    ) is Some(stdId("000101"))
     Ast.MultiContract.getStdId(
       Seq(
-        foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))),
-        bar.copy(stdId = Some(Val.ByteVec(Hex.unsafe("000101")))),
-        baz.copy(stdId = Some(Val.ByteVec(Hex.unsafe("00010101"))))
+        foo.copy(stdId = Some(stdId("0001"))),
+        bar.copy(stdId = Some(stdId("000101"))),
+        baz.copy(stdId = Some(stdId("00010101")))
       )
-    ) is Some(Val.ByteVec(Hex.unsafe("00010101")))
+    ) is Some(stdId("00010101"))
     intercept[Compiler.Error](
       Ast.MultiContract.getStdId(
         Seq(
-          foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))),
+          foo.copy(stdId = Some(stdId("0001"))),
           bar,
-          baz.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001"))))
+          baz.copy(stdId = Some(stdId("0001")))
         )
       )
     ).message is "The std id of interface Baz is the same as parent interface"
     intercept[Compiler.Error](
       Ast.MultiContract.getStdId(
         Seq(
-          foo.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0001")))),
+          foo.copy(stdId = Some(stdId("0001"))),
           bar,
-          baz.copy(stdId = Some(Val.ByteVec(Hex.unsafe("0002"))))
+          baz.copy(stdId = Some(stdId("0002")))
         )
       )
-    ).message is "The std id of interface Baz should starts with 0001"
+    ).message is "The std id of interface Baz should start with 0001"
   }
 
   it should "check if the contract std id enabled" in {
