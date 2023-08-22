@@ -4451,36 +4451,41 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "return ContractAssetUnloaded when transferring to contract without loaded asset, no matter the amount" in new ContractFixture {
-
-    def testScript(amount: U256) = {
-      def code: String =
+    def test(amount: U256, useContractAsset: Boolean) = {
+      val code: String =
         s"""
            |Contract Foo() {
-           |  @using(preapprovedAssets = true)
+           |  @using(assetsInContract=${useContractAsset}, preapprovedAssets = true)
            |  pub fn payMe(amount: U256) -> () {
            |    transferTokenToSelf!(callerAddress!(), ALPH, amount)
            |  }
            |}
            |""".stripMargin
 
-      val fooContractId = createContract(code)._1.toHexString
+      val contractId = createContract(code)._1.toHexString
 
       val script: String =
-         s"""|
-             |@using(preapprovedAssets = true)
-             |TxScript Bar {
-             |  let foo = Foo(#${fooContractId})
-             |  foo.payMe{callerAddress!() -> ALPH: $amount}($amount)
-             |}
-             |
-             |${code}
-             |""".stripMargin
+        s"""|
+            |@using(preapprovedAssets = true)
+            |TxScript Bar {
+            |  let foo = Foo(#${contractId})
+            |  foo.payMe{callerAddress!() -> ALPH: $amount}($amount)
+            |}
+            |
+            |${code}
+            |""".stripMargin
 
-      failCallTxScript(script, ContractAssetUnloaded)
+      if (useContractAsset) {
+        callTxScript(script)
+      } else {
+        failCallTxScript(script, ContractAssetUnloaded)
+      }
     }
 
-    testScript(ALPH.oneNanoAlph)
-    testScript(ALPH.oneAlph)
+    test(ALPH.oneNanoAlph, true)
+    test(ALPH.oneNanoAlph, false)
+    test(ALPH.oneAlph, true)
+    test(ALPH.oneAlph, false)
   }
 
   private def getEvents(
