@@ -4450,6 +4450,39 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
+  it should "return ContractAssetUnloaded when transferring to contract without loaded asset, no matter the amount" in new ContractFixture {
+
+    def testScript(amount: U256) = {
+      def code: String =
+        s"""
+           |Contract Foo() {
+           |  @using(preapprovedAssets = true)
+           |  pub fn payMe(amount: U256) -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, amount)
+           |  }
+           |}
+           |""".stripMargin
+
+      val fooContractId = createContract(code)._1.toHexString
+
+      val script: String =
+         s"""|
+             |@using(preapprovedAssets = true)
+             |TxScript Bar {
+             |  let foo = Foo(#${fooContractId})
+             |  foo.payMe{callerAddress!() -> ALPH: $amount}($amount)
+             |}
+             |
+             |${code}
+             |""".stripMargin
+
+      failCallTxScript(script, ContractAssetUnloaded)
+    }
+
+    testScript(ALPH.oneNanoAlph)
+    testScript(ALPH.oneAlph)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

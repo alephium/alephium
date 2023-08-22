@@ -370,8 +370,13 @@ final class StatefulVM(
 
   private def outputGeneratedBalances(outputBalances: MutBalances): ExeResult[Unit] = {
     EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
-      balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
-        outputs.foreachE(output => ctx.generateOutput(output))
+      lockupScript match {
+        case l: LockupScript.P2C if ctx.assetStatus.get(l.contractId).isEmpty =>
+          failed(ContractAssetUnloaded)
+        case _ =>
+          balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
+            outputs.foreachE(output => ctx.generateOutput(output))
+          }
       }
     }
   }
