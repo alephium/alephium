@@ -217,7 +217,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     val expected = SignatureSchema.sign(unsignedTx.id, privateKey)
 
     walletService
-      .sign(walletName, unsignedTx.id.toHexString)
+      .sign(walletName, unsignedTx.id.value)
       .rightValue is expected
   }
 
@@ -226,7 +226,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     val expected = SignatureSchema.sign(data.bytes, privateKey)
 
     walletService
-      .sign(walletName, data.toHexString)
+      .sign(walletName, data)
       .rightValue is expected
   }
 
@@ -235,7 +235,7 @@ class WalletServiceSpec extends AlephiumFutureSpec {
     val expected = SignatureSchema.sign(data.bytes, privateKey)
 
     walletService
-      .sign(walletName, data.toHexString)
+      .sign(walletName, data)
       .rightValue is expected
   }
 
