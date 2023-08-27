@@ -2084,7 +2084,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       }
 
       test(Parser.UsingAnnotation.usePreapprovedAssetsKey, true)
-      test(Parser.UsingAnnotation.useContractAssetsKey, true)
+      test(Parser.UsingAnnotation.useContractAssetsKey, false)
       test(Parser.UsingAnnotation.useCheckExternalCallerKey, false)
       test(Parser.UsingAnnotation.useUpdateFieldsKey, false)
     }

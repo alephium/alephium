@@ -366,7 +366,6 @@ class ParserSpec extends AlephiumSpec {
       FuncId("add", false),
       true,
       true,
-      false,
       Seq((Type.U256, false), (Type.U256, true)),
       Seq(Type.U256, Type.U256)
     )
@@ -392,7 +391,6 @@ class ParserSpec extends AlephiumSpec {
       FuncId("add", false),
       true,
       true,
-      true,
       Seq((Type.U256, false), (Type.U256, false)),
       Seq(Type.U256)
     )
@@ -414,7 +412,6 @@ class ParserSpec extends AlephiumSpec {
       FuncId("add", false),
       true,
       false,
-      true,
       Seq((Type.U256, false), (Type.U256, false)),
       Seq(Type.U256)
     )
