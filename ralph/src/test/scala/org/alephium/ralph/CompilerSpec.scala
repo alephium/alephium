@@ -2046,7 +2046,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     {
       info("Check the function annotations")
 
-      def code(interfaceAnnotations: String, implAnnotations: String) =
+      def interface(interfaceAnnotations: String, implAnnotations: String): String =
         s"""
            |Contract Foo(addr: Address) implements Bar {
            |  $implAnnotations
@@ -2056,13 +2056,35 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    return
            |  }
            |}
+           |
            |Interface Bar {
            |  $interfaceAnnotations
            |  fn bar() -> ()
            |}
            |""".stripMargin
 
-      def test(annotation: String, mustBeEqual: Boolean): Assertion = {
+      def abstractContract(interfaceAnnotations: String, implAnnotations: String): String =
+        s"""
+           |Contract Foo(addr: Address) extends Bar() {
+           |  $implAnnotations
+           |  fn bar() -> () {
+           |    transferTokenToSelf!(addr, ALPH, 1)
+           |    checkCaller!(true, 0)
+           |    return
+           |  }
+           |}
+           |
+           |Abstract Contract Bar() {
+           |  $interfaceAnnotations
+           |  fn bar() -> ()
+           |}
+           |""".stripMargin
+
+      def test(
+          annotation: String,
+          mustBeEqual: Boolean,
+          code: (String, String) => String
+      ): Assertion = {
         Compiler.compileContract(code("", "")).isRight is true
         Compiler
           .compileContract(code(s"@using($annotation = true)", s"@using($annotation = true)"))
@@ -2083,10 +2105,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         }
       }
 
-      test(Parser.UsingAnnotation.usePreapprovedAssetsKey, true)
-      test(Parser.UsingAnnotation.useContractAssetsKey, true)
-      test(Parser.UsingAnnotation.useCheckExternalCallerKey, false)
-      test(Parser.UsingAnnotation.useUpdateFieldsKey, false)
+      Seq(interface, abstractContract).foreach(code => {
+        test(Parser.UsingAnnotation.usePreapprovedAssetsKey, true, code)
+        test(Parser.UsingAnnotation.useContractAssetsKey, false, code)
+        test(Parser.UsingAnnotation.useCheckExternalCallerKey, false, code)
+        test(Parser.UsingAnnotation.useUpdateFieldsKey, false, code)
+      })
     }
 
     {

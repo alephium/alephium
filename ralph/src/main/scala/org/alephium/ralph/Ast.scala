@@ -583,7 +583,6 @@ object Ast {
       id: FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
-      useAssetsInContract: Boolean,
       args: Seq[(Type, Boolean)],
       rtypes: Seq[Type]
   )
@@ -619,7 +618,6 @@ object Ast {
       id,
       isPublic,
       usePreapprovedAssets,
-      useAssetsInContract,
       args.map(arg => (arg.tpe, arg.isMutable)),
       rtypes
     )
