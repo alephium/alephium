@@ -110,7 +110,7 @@ final case class MutBalancesPerLockup(
             .toRight(Right(InvalidOutputBalances))
         case l: LockupScript.P2C =>
           if (attoAlphAmount < minimalAlphInContract) {
-            failed(InvalidOutputBalances)
+            failed(LowerThanContractMinimalBalance)
           } else if (tokens.length > maxTokenPerContractUtxo) {
             failed(InvalidTokenNumForContractOutput)
           } else {

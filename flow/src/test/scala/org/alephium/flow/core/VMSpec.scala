@@ -4450,6 +4450,82 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
+  it should "always return ContractAssetUnloaded when transferring assetes to a contract without assetsInContract set to true" in new ContractFixture {
+    def test(amount: U256, useContractAsset: Boolean) = {
+      val code: String =
+        s"""
+           |Contract Foo() {
+           |  @using(assetsInContract=${useContractAsset}, preapprovedAssets = true)
+           |  pub fn payMe(amount: U256) -> () {
+           |    transferTokenToSelf!(callerAddress!(), ALPH, amount)
+           |  }
+           |}
+           |""".stripMargin
+
+      val contractId = createContract(code)._1.toHexString
+
+      val script: String =
+        s"""|
+            |@using(preapprovedAssets = true)
+            |TxScript Bar {
+            |  let foo = Foo(#${contractId})
+            |  foo.payMe{callerAddress!() -> ALPH: $amount}($amount)
+            |}
+            |
+            |${code}
+            |""".stripMargin
+
+      if (useContractAsset) {
+        callTxScript(script)
+      } else {
+        failCallTxScript(script, ContractAssetUnloaded)
+      }
+    }
+
+    test(ALPH.oneNanoAlph, true)
+    test(ALPH.oneNanoAlph, false)
+    test(ALPH.oneAlph, true)
+    test(ALPH.oneAlph, false)
+  }
+
+  it should "return LowerThanContractMinimalBalance if contract balance falls below the minimal deposit" in new ContractFixture {
+    def test(amount: U256) = {
+      val code: String =
+        s"""
+           |Contract Foo() {
+           |  @using(assetsInContract=true, preapprovedAssets = true)
+           |  pub fn payMe(amount: U256) -> () {
+           |    transferTokenFromSelf!(callerAddress!(), ALPH, amount)
+           |  }
+           |}
+           |""".stripMargin
+
+      val contractId = createContract(code, initialAttoAlphAmount = ALPH.oneAlph * 2)._1.toHexString
+
+      val script: String =
+        s"""|
+            |@using(preapprovedAssets = true)
+            |TxScript Bar {
+            |  let foo = Foo(#${contractId})
+            |  foo.payMe{callerAddress!() -> ALPH: $amount}($amount)
+            |}
+            |
+            |${code}
+            |""".stripMargin
+
+      if (amount > ALPH.oneAlph) {
+        failCallTxScript(script, LowerThanContractMinimalBalance)
+      } else {
+        callTxScript(script)
+      }
+    }
+
+    test(ALPH.oneNanoAlph)
+    test(ALPH.oneAlph - 1)
+    test(ALPH.oneAlph)
+    test(ALPH.oneAlph + 1)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,

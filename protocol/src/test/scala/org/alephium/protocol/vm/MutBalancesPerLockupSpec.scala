@@ -267,11 +267,11 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
     override val lockupScript = LockupScript.p2c(ContractId.generate)
 
     Test(0).expectLeman()
-    Test(ALPH.oneAlph - 1).failLeman()
+    Test(ALPH.oneAlph - 1).failLeman(LowerThanContractMinimalBalance)
     Test(ALPH.oneAlph).expectLeman(ALPH.oneAlph -> Seq.empty)
 
     Test(0, tokenId -> 1).failLeman()
-    Test(ALPH.oneAlph - 1, tokenId -> 1).failLeman()
+    Test(ALPH.oneAlph - 1, tokenId -> 1).failLeman(LowerThanContractMinimalBalance)
     Test(ALPH.oneAlph, tokenId -> 1).expectLeman(
       ALPH.oneAlph -> Seq(tokenId -> 1)
     )
