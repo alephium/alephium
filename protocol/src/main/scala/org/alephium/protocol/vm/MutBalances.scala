@@ -139,7 +139,6 @@ object MutBalances {
         balances.add(input.lockupScript, MutBalancesPerLockup.from(input)).map(_ => balances)
       case (None, _) => None
     }
-
     val finalBalances = outputs.fold(inputBalances) {
       case (Some(balances), output) =>
         balances.sub(output.lockupScript, MutBalancesPerLockup.from(output)).map(_ => balances)
