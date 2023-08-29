@@ -529,6 +529,45 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
   }
 
+  it should "encode/decode BuildSweepMultisig" in {
+    val fromAddress        = generateAddress()
+    val fromPublicKeys     = AVector(PublicKey.generate, PublicKey.generate)
+    val toAddress          = generateAddress()
+    val maxAttoAlphPerUTXO = Amount(ALPH.oneAlph)
+    val lockTime           = TimeStamp.now()
+    val gasAmount          = GasBox.unsafe(1)
+    val gasPrice           = GasPrice(1)
+    val utxosLimit         = 3
+    val targetBlockHash    = BlockHash.generate
+
+    val buildSweep = BuildSweepMultisig(
+      fromAddress,
+      fromPublicKeys,
+      toAddress,
+      Some(maxAttoAlphPerUTXO),
+      Some(lockTime),
+      Some(gasAmount),
+      Some(gasPrice),
+      Some(utxosLimit),
+      Some(targetBlockHash)
+    )
+
+    val jsonRaw = s"""
+                     |{
+                     |  "fromAddress": "${fromAddress.toBase58}",
+                     |  "fromPublicKeys": ${write(fromPublicKeys.map(_.toHexString))},
+                     |  "toAddress": "${toAddress.toBase58}",
+                     |  "maxAttoAlphPerUTXO": "1000000000000000000",
+                     |  "lockTime": ${lockTime.millis},
+                     |  "gasAmount": 1,
+                     |  "gasPrice": "1",
+                     |  "utxosLimit": 3,
+                     |  "targetBlockHash": "${targetBlockHash.toHexString}"
+                     |}
+        """.stripMargin
+    checkData(buildSweep, jsonRaw)
+  }
+
   it should "encode/decode BuildTransactionResult" in {
     val txId     = TransactionId.generate
     val gas      = GasBox.unsafe(1)

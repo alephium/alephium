@@ -357,6 +357,15 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult])
       .summary("Build a multisig unsigned transaction")
 
+  val buildSweepMultisig: BaseEndpoint[BuildSweepMultisig, BuildSweepAddressTransactionsResult] =
+    multisigEndpoint.post
+      .in("sweep")
+      .in(jsonBody[BuildSweepMultisig])
+      .out(jsonBody[BuildSweepAddressTransactionsResult])
+      .summary(
+        "Sweep all unlocked ALPH and token balances of a multisig address to another address"
+      )
+
   val submitMultisigTransaction: BaseEndpoint[SubmitMultisig, SubmitTxResult] =
     multisigEndpoint.post
       .in("submit")

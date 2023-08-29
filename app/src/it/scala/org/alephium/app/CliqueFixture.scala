@@ -453,6 +453,25 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
+  def buildSweepMultisigTransaction(
+      fromAddress: String,
+      fromPublicKeys: AVector[String],
+      toAddress: String
+  ) = {
+    val body = s"""
+                  |{
+                  |  "fromAddress": "$fromAddress",
+                  |  "fromPublicKeys": ${write(fromPublicKeys)},
+                  |  "toAddress": "$toAddress"
+                  |}
+        """.stripMargin
+
+    httpPost(
+      "/multisig/sweep",
+      Some(body)
+    )
+  }
+
   def createWallet(password: String, walletName: String, isMiner: Boolean = false) =
     httpPost(
       s"/wallets",
