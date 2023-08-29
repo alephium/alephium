@@ -568,6 +568,34 @@ abstract class RestServerSpec(
     }
   }
 
+  it should "call POST /multisig/sweep" in {
+    lazy val (_, dummyKey2, _) = addressStringGen(
+      GroupIndex.unsafe(1)
+    ).sample.get
+
+    lazy val dummyKeyHex2 = dummyKey2.toHexString
+
+    val address = ServerFixture.p2mpkhAddress(AVector(dummyKeyHex, dummyKeyHex2), 1)
+
+    Post(
+      s"/multisig/sweep",
+      body = s"""
+                |{
+                |  "fromAddress": "${address.toBase58}",
+                |  "fromPublicKeys": ["$dummyKeyHex"],
+                |  "toAddress": "$dummyToAddress"
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.Ok
+      response.as[BuildSweepAddressTransactionsResult] is dummySweepAddressBuildTransactionsResult(
+        ServerFixture.dummySweepAddressTx(dummyTx, dummyToLockupScript, None),
+        Address.asset(dummyKeyAddress).value.groupIndex,
+        Address.asset(dummyToAddress).value.groupIndex
+      )
+    }
+  }
+
   it should "call POST /miners" in {
     val address      = Address.asset(dummyKeyAddress).get
     val lockupScript = address.lockupScript

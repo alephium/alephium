@@ -315,6 +315,21 @@ object ServerFixture {
       Right(Right(AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
     }
 
+    // scalastyle:off parameter.number
+    override def sweepAddressFromScripts(
+        targetBlockHashOpt: Option[BlockHash],
+        fromLockupScript: LockupScript.Asset,
+        fromUnlockScript: UnlockScript,
+        toLockupScript: LockupScript.Asset,
+        lockTimeOpt: Option[TimeStamp],
+        gasOpt: Option[GasBox],
+        gasPrice: GasPrice,
+        maxAttoAlphPerUTXOOpt: Option[U256],
+        utxosLimit: Int
+    ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
+      Right(Right(AVector(dummySweepAddressTx(dummyTx, toLockupScript, lockTimeOpt).unsigned)))
+    }
+
     // scalastyle:off no.equal
     val blockChainIndex = ChainIndex.from(block.hash, config.broker.groups)
     override def getTxConfirmedStatus(
