@@ -237,6 +237,34 @@ class ServerUtils(implicit
     }
   }
 
+  def buildSweepMultisig(
+      blockFlow: BlockFlow,
+      query: BuildSweepMultisig
+  ): Try[BuildSweepAddressTransactionsResult] = {
+    val lockupScript = query.fromAddress.lockupScript
+    for {
+      _            <- checkGroup(lockupScript)
+      unlockScript <- buildUnlockScript(lockupScript, query.fromPublicKeys)
+      unsignedTxs <- prepareSweepAddressTransactionFromScripts(
+        blockFlow,
+        lockupScript,
+        unlockScript,
+        query.toAddress,
+        query.maxAttoAlphPerUTXO,
+        query.lockTime,
+        query.gasAmount,
+        query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
+        query.targetBlockHash
+      )
+    } yield {
+      BuildSweepAddressTransactionsResult.from(
+        unsignedTxs,
+        lockupScript.groupIndex,
+        query.toAddress.groupIndex
+      )
+    }
+  }
+
   private def buildUnlockScript(
       lockupScript: LockupScript,
       pubKeys: AVector[PublicKey]
@@ -657,6 +685,35 @@ class ServerUtils(implicit
     blockFlow.sweepAddress(
       targetBlockHashOpt,
       fromPublicKey,
+      toAddress.lockupScript,
+      lockTimeOpt,
+      gasOpt,
+      gasPrice,
+      maxAttoAlphPerUTXO.map(_.value),
+      Int.MaxValue
+    ) match {
+      case Right(Right(unsignedTxs)) => unsignedTxs.mapE(validateUnsignedTransaction)
+      case Right(Left(error))        => Left(failed(error))
+      case Left(error)               => failed(error)
+    }
+  }
+
+  // scalastyle:off parameter.number
+  def prepareSweepAddressTransactionFromScripts(
+      blockFlow: BlockFlow,
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockupScript: UnlockScript,
+      toAddress: Address.Asset,
+      maxAttoAlphPerUTXO: Option[Amount],
+      lockTimeOpt: Option[TimeStamp],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice,
+      targetBlockHashOpt: Option[BlockHash]
+  ): Try[AVector[UnsignedTransaction]] = {
+    blockFlow.sweepAddressFromScripts(
+      targetBlockHashOpt,
+      fromLockupScript,
+      fromUnlockupScript,
       toAddress.lockupScript,
       lockTimeOpt,
       gasOpt,

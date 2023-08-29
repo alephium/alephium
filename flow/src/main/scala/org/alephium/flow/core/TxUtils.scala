@@ -311,7 +311,31 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
     val fromLockupScript = LockupScript.p2pkh(fromPublicKey)
     val fromUnlockScript = UnlockScript.p2pkh(fromPublicKey)
+    sweepAddressFromScripts(
+      targetBlockHashOpt,
+      fromLockupScript,
+      fromUnlockScript,
+      toLockupScript,
+      lockTimeOpt,
+      gasOpt,
+      gasPrice,
+      maxAttoAlphPerUTXOOpt,
+      utxosLimit
+    )
+  }
 
+  // scalastyle:off parameter.number
+  def sweepAddressFromScripts(
+      targetBlockHashOpt: Option[BlockHash],
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      toLockupScript: LockupScript.Asset,
+      lockTimeOpt: Option[TimeStamp],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice,
+      maxAttoAlphPerUTXOOpt: Option[U256],
+      utxosLimit: Int
+  ): IOResult[Either[String, AVector[UnsignedTransaction]]] = {
     val checkResult = checkProvidedGas(gasOpt, gasPrice)
 
     checkResult match {

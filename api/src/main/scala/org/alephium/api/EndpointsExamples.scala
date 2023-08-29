@@ -506,6 +506,35 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
+  implicit val buildSweepMultisigTransactionExamples: List[Example[BuildSweepMultisig]] = List(
+    defaultExample(
+      BuildSweepMultisig(
+        address,
+        AVector(publicKey),
+        address,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None
+      )
+    ),
+    moreSettingsExample(
+      BuildSweepMultisig(
+        address,
+        AVector(publicKey),
+        address,
+        Some(Amount(ALPH.oneAlph)),
+        Some(ts),
+        Some(model.minimalGas),
+        Some(model.nonCoinbaseMinGasPrice),
+        Some(10),
+        Some(blockHash)
+      )
+    )
+  )
+
   implicit val submitMultisigTransactionExamples: List[Example[SubmitMultisig]] =
     simpleExample(SubmitMultisig(unsignedTx = hexString, AVector(signature)))
 
