@@ -220,6 +220,32 @@ class MultisigTest extends AlephiumActorSpec {
     clique.stop()
   }
 
+  it should "sweep all multisig address" in new MultisigFixture {
+    val (_, publicKey2, _)           = generateAccount
+    val (_, publicKey3, privateKey3) = generateAccount
+    val (_, publicKey4, privateKey4) = generateAccount
+
+    val (multisigAddress, buildResult) = createSweepTransaction(
+      AVector(publicKey, publicKey2, publicKey3, publicKey4),
+      AVector(publicKey, publicKey3, publicKey4)
+    )
+
+    (request[Balance](getBalance(multisigAddress), restPort).balance.value > U256.Zero) is true
+
+    buildResult.unsignedTxs.foreach { sweep =>
+      submitSuccessfulMultisigTransaction(
+        sweepToBuildTransactionResult(sweep, buildResult.fromGroup, buildResult.toGroup),
+        AVector(privateKey, privateKey3, privateKey4)
+      )
+    }
+
+    request[Balance](getBalance(multisigAddress), restPort) is
+      Balance.from(Amount.Zero, Amount.Zero, None, None, 0)
+
+    clique.stopMining()
+    clique.stop()
+  }
+
   class MultisigFixture extends CliqueFixture {
     val clique = bootClique(nbOfNodes = 1)
     clique.start()
@@ -229,10 +255,10 @@ class MultisigTest extends AlephiumActorSpec {
 
     request[Balance](getBalance(address), restPort) is initialBalance
 
-    def createMultisigTransaction(
+    def buildAddressAndSendFunds(
         allPubKeys: AVector[String],
         unlockPubKeys: AVector[String]
-    ): BuildTransactionResult = {
+    ): String = {
       val multisigAddress =
         request[BuildMultisigAddressResult](
           multisig(allPubKeys, unlockPubKeys.length),
@@ -250,6 +276,15 @@ class MultisigTest extends AlephiumActorSpec {
       val tx2 = transfer(publicKey, multisigAddress, transferAmount, privateKey, restPort)
       confirmTx(tx2, restPort)
 
+      multisigAddress
+    }
+
+    def createMultisigTransaction(
+        allPubKeys: AVector[String],
+        unlockPubKeys: AVector[String]
+    ): BuildTransactionResult = {
+      val multisigAddress = buildAddressAndSendFunds(allPubKeys, unlockPubKeys)
+
       val amount = transferAmount + (transferAmount / 2) // To force 2 inputs
 
       val buildTx = buildMultisigTransaction(
@@ -260,6 +295,21 @@ class MultisigTest extends AlephiumActorSpec {
       )
 
       request[BuildTransactionResult](buildTx, restPort)
+    }
+
+    def createSweepTransaction(
+        allPubKeys: AVector[String],
+        unlockPubKeys: AVector[String]
+    ): (String, BuildSweepAddressTransactionsResult) = {
+      val multisigAddress = buildAddressAndSendFunds(allPubKeys, unlockPubKeys)
+
+      val buildTx = buildSweepMultisigTransaction(
+        multisigAddress,
+        unlockPubKeys,
+        address
+      )
+
+      (multisigAddress, request[BuildSweepAddressTransactionsResult](buildTx, restPort))
     }
 
     def submitSuccessfulMultisigTransaction(
@@ -312,5 +362,14 @@ class MultisigTest extends AlephiumActorSpec {
       unsignedTx.gasAmount is estimatedGas
     }
 
+    def sweepToBuildTransactionResult(sweep: SweepAddressTransaction, from: Int, to: Int) =
+      BuildTransactionResult(
+        sweep.unsignedTx,
+        sweep.gasAmount,
+        sweep.gasPrice,
+        sweep.txId,
+        from,
+        to
+      )
   }
 }
