@@ -221,8 +221,11 @@ class ServerUtils(implicit
       query: BuildMultisig
   ): Try[BuildTransactionResult] = {
     for {
-      _            <- checkGroup(query.fromAddress.lockupScript)
-      unlockScript <- buildUnlockScript(query.fromAddress.lockupScript, query.fromPublicKeys)
+      _ <- checkGroup(query.fromAddress.lockupScript)
+      unlockScript <- buildMultisigUnlockScript(
+        query.fromAddress.lockupScript,
+        query.fromPublicKeys
+      )
       unsignedTx <- prepareUnsignedTransaction(
         blockFlow,
         query.fromAddress.lockupScript,
@@ -244,7 +247,7 @@ class ServerUtils(implicit
     val lockupScript = query.fromAddress.lockupScript
     for {
       _            <- checkGroup(lockupScript)
-      unlockScript <- buildUnlockScript(lockupScript, query.fromPublicKeys)
+      unlockScript <- buildMultisigUnlockScript(lockupScript, query.fromPublicKeys)
       unsignedTxs <- prepareSweepAddressTransactionFromScripts(
         blockFlow,
         lockupScript,
@@ -265,7 +268,7 @@ class ServerUtils(implicit
     }
   }
 
-  private def buildUnlockScript(
+  private def buildMultisigUnlockScript(
       lockupScript: LockupScript,
       pubKeys: AVector[PublicKey]
   ): Try[UnlockScript.P2MPKH] = {
