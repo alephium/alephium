@@ -4526,6 +4526,52 @@ class VMSpec extends AlephiumSpec with Generators {
     test(ALPH.oneAlph + 1)
   }
 
+  it should "show something wrong with interface" in new ContractFixture {
+    val code: String =
+      s"""
+         |Contract FooBarBazContract() extends FooBarContract() implements FooBaz {
+         |  pub fn baz() -> (U256, U256) {
+         |     return 1, 2
+         |  }
+         |}
+         |
+         |Interface Foo {
+         |  pub fn foo() -> ()
+         |}
+         |
+         |Interface FooBar extends Foo {
+         |  pub fn bar() -> U256
+         |}
+         |
+         |Interface FooBaz extends Foo {
+         |  pub fn baz() -> (U256, U256)
+         |}
+         |
+         |Abstract Contract FooBarContract() implements FooBar {
+         |   pub fn foo() -> () {
+         |      return
+         |   }
+         |   pub fn bar() -> U256 {
+         |      return 1
+         |   }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(code, initialAttoAlphAmount = ALPH.oneAlph * 2)._1.toHexString
+
+    val script: String =
+      s"""|
+          |TxScript Main {
+          |  let fooBaz = FooBaz(#${contractId})
+          |  fooBaz.baz()
+          |}
+          |
+          |${code}
+          |""".stripMargin
+
+    failCallTxScript(script, InvalidExternalMethodReturnLength)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
