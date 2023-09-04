@@ -1546,7 +1546,7 @@ object Ast {
       val sortedInterfaces =
         sortInterfaces(parentsCache, allInterfaces.map(_.asInstanceOf[ContractInterface]))
 
-      checkLinearInheritance(sortedInterfaces)
+      ensureChainedInterfaces(sortedInterfaces)
 
       val stdId        = getStdId(sortedInterfaces)
       val stdIdEnabled = getStdIdEnabled(allContracts.map(_.asInstanceOf[Contract]), contract.ident)
@@ -1587,7 +1587,7 @@ object Ast {
     // scalastyle:on method.length
 
     @tailrec
-    def checkLinearInheritance(sortedInterfaces: Seq[ContractInterface]): Unit = {
+    def ensureChainedInterfaces(sortedInterfaces: Seq[ContractInterface]): Unit = {
       if (sortedInterfaces.length >= 2) {
         val parent = sortedInterfaces(0)
         val child  = sortedInterfaces(1)
@@ -1597,7 +1597,7 @@ object Ast {
           )
         }
 
-        checkLinearInheritance(sortedInterfaces.drop(1))
+        ensureChainedInterfaces(sortedInterfaces.drop(1))
       }
     }
 
