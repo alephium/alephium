@@ -18,6 +18,7 @@ package org.alephium.ralph
 
 import java.nio.charset.StandardCharsets
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 import akka.util.ByteString
@@ -967,7 +968,7 @@ object Ast {
     }
   }
 
-  trait ContractT[Ctx <: StatelessContext] extends UniqueDef {
+  sealed trait ContractT[Ctx <: StatelessContext] extends UniqueDef {
     def ident: TypeId
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]
@@ -1539,22 +1540,25 @@ object Ast {
         Seq[ConstantVarDef],
         Seq[EnumDef]
     ) = {
-      val parents = parentsCache(contract.ident)
-      val (allContracts, _allInterfaces) =
-        (parents :+ contract).partition(_.isInstanceOf[Contract])
-      val allInterfaces =
-        sortInterfaces(parentsCache, _allInterfaces.map(_.asInstanceOf[ContractInterface]))
-      val stdId        = getStdId(allInterfaces)
+      val parents                       = parentsCache(contract.ident)
+      val (allContracts, allInterfaces) = (parents :+ contract).partition(_.isInstanceOf[Contract])
+
+      val sortedInterfaces =
+        sortInterfaces(parentsCache, allInterfaces.map(_.asInstanceOf[ContractInterface]))
+
+      checkLinearInheritance(sortedInterfaces)
+
+      val stdId        = getStdId(sortedInterfaces)
       val stdIdEnabled = getStdIdEnabled(allContracts.map(_.asInstanceOf[Contract]), contract.ident)
 
-      val allFuncs                             = (allInterfaces ++ allContracts).flatMap(_.funcs)
+      val allFuncs                             = (sortedInterfaces ++ allContracts).flatMap(_.funcs)
       val (abstractFuncs, nonAbstractFuncs)    = allFuncs.partition(_.bodyOpt.isEmpty)
       val (unimplementedFuncs, allUniqueFuncs) = checkFuncs(abstractFuncs, nonAbstractFuncs)
       val constantVars                         = allContracts.flatMap(_.constantVars)
       val enums                                = mergeEnums(allContracts.flatMap(_.enums))
 
       val contractEvents = allContracts.flatMap(_.events)
-      val events         = allInterfaces.flatMap(_.events) ++ contractEvents
+      val events         = sortedInterfaces.flatMap(_.events) ++ contractEvents
 
       val resultFuncs = contract match {
         case _: TxScript =>
@@ -1581,6 +1585,21 @@ object Ast {
       (stdIdEnabled, stdId, resultFuncs, events, constantVars, enums)
     }
     // scalastyle:on method.length
+
+    @tailrec
+    def checkLinearInheritance(sortedInterfaces: Seq[ContractInterface]): Unit = {
+      if (sortedInterfaces.length >= 2) {
+        val parent = sortedInterfaces(0)
+        val child  = sortedInterfaces(1)
+        if (!child.inheritances.exists(_.parentId == parent.ident)) {
+          throw Compiler.Error(
+            s"Interface ${child.ident.name} does not inherit from ${parent.ident.name}"
+          )
+        }
+
+        checkLinearInheritance(sortedInterfaces.drop(1))
+      }
+    }
 
     private def sortInterfaces(
         parentsCache: mutable.Map[TypeId, Seq[ContractWithState]],

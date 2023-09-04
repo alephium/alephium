@@ -2251,6 +2251,72 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Check that compilation fails if interfaces are not chained")
+
+      val diamondShapedParentInterfaces: String =
+        s"""
+           |Contract FooBarBazContract() extends FooBarContract() implements FooBaz {
+           |  pub fn baz() -> (U256, U256) {
+           |     return 1, 2
+           |  }
+           |}
+           |
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |
+           |Interface FooBar extends Foo {
+           |  pub fn bar() -> U256
+           |}
+           |
+           |Interface FooBaz extends Foo {
+           |  pub fn baz() -> (U256, U256)
+           |}
+           |
+           |Abstract Contract FooBarContract() implements FooBar {
+           |   pub fn foo() -> () {
+           |      return
+           |   }
+           |   pub fn bar() -> U256 {
+           |      return 1
+           |   }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(diamondShapedParentInterfaces).leftValue.message is
+        "Interface FooBaz does not inherit from FooBar"
+
+      val unrelatedParentInterfaces: String =
+        s"""
+           |Contract FooBarBazContract() extends FooBarContract() implements Foo {
+           |  pub fn baz() -> (U256, U256) {
+           |     return 1, 2
+           |  }
+           |}
+           |
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |
+           |Interface Bar {
+           |  pub fn bar() -> U256
+           |}
+           |
+           |Abstract Contract FooBarContract() implements Bar {
+           |   pub fn foo() -> () {
+           |      return
+           |   }
+           |   pub fn bar() -> U256 {
+           |      return 1
+           |   }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(unrelatedParentInterfaces).leftValue.message is
+        "Interface Foo does not inherit from Bar"
+    }
+
+    {
       info("Contract inherits both interface and contract")
       val foo1: String =
         s"""
