@@ -193,6 +193,7 @@ trait FlowFixture
     mineWithTxs(blockFlow, chainIndex)((_, _) => AVector(tx))
   }
 
+  // scalastyle:off parameter.number
   def transferTxs(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
@@ -201,7 +202,8 @@ trait FlowFixture
       txScriptOpt: Option[StatefulScript],
       gasFeeInTheAmount: Boolean,
       lockTimeOpt: Option[TimeStamp] = None,
-      scriptGas: Int = 100000
+      scriptGas: Int = 100000,
+      validation: Boolean = true
   ): AVector[Transaction] = {
     val mainGroup                  = chainIndex.from
     val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
@@ -237,8 +239,10 @@ trait FlowFixture
     val newUnsignedTx = unsignedTx.copy(scriptOpt = txScriptOpt)
     val tx            = Transaction.from(newUnsignedTx, privateKey)
 
-    val txValidation = TxValidation.build
-    txValidation.validateMempoolTxTemplate(tx.toTemplate, blockFlow) isE ()
+    if (validation) {
+      val txValidation = TxValidation.build
+      txValidation.validateMempoolTxTemplate(tx.toTemplate, blockFlow) isE ()
+    }
 
     AVector(tx)
   }

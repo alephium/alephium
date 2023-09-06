@@ -4583,21 +4583,17 @@ class VMSpec extends AlephiumSpec with Generators {
     test(ALPH.oneAlph + 1)
   }
 
-  behavior of "Mempool"
-
-  ignore should "remove invalid transaction" in new ContractFixture {
+  "Mempool" should "remove invalid transaction" in new ContractFixture {
     val code =
       s"""
-         |Contract Foo(mut currentBlockHash: ByteVec) {
+         |Contract Foo() {
          |  pub fn foo() -> () {
-         |    currentBlockHash = blockHash!()
+         |    assert!(false, 0)
          |  }
          |}
          |""".stripMargin
 
-    val contractId =
-      createContract(code, initialMutState = AVector(Val.ByteVec(ByteString.empty)))._1
-    println(contractId)
+    val contractId = createContract(code)._1
 
     val scriptStr: String =
       s"""|
@@ -4610,16 +4606,27 @@ class VMSpec extends AlephiumSpec with Generators {
           |${code}
           |""".stripMargin
     val script = Compiler.compileTxScript(scriptStr).rightValue
-    val tx     = transferTxs(blockFlow, chainIndex, ALPH.alph(1), 1, Some(script), true).head
-    blockFlow.getGrandPool().add(chainIndex, tx.toTemplate, TimeStamp.now())
-    blockFlow.getGrandPool().size is 1
+    val tx = transferTxs(
+      blockFlow,
+      chainIndex,
+      ALPH.alph(1),
+      1,
+      Some(script),
+      true,
+      validation = false
+    ).head
+
     val (_, minerPubKey) = chainIndex.to.generateKey
     val miner            = LockupScript.p2pkh(minerPubKey)
-    val template         = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    val emptyTemplate    = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
 
-    // There is only coinbase tx mined, the invalid tx is removed
-    template.transactions.length is 1
-    template.transactions.head.unsigned.inputs.isEmpty is true
+    blockFlow.getGrandPool().add(chainIndex, tx.toTemplate, TimeStamp.now())
+    blockFlow.getGrandPool().size is 1
+    val newTemplate =
+      emptyTemplate.copy(transactions = AVector(tx, emptyTemplate.transactions.last))
+
+    // The invalid tx is removed
+    blockFlow.validateTemplate(chainIndex, newTemplate)
     blockFlow.getGrandPool().size is 0
   }
 

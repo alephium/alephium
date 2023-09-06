@@ -267,7 +267,7 @@ trait FlowUtils
 
   lazy val templateValidator =
     BlockValidation.build(brokerConfig, networkConfig, consensusConfig, logConfig)
-  private def validateTemplate(
+  def validateTemplate(
       chainIndex: ChainIndex,
       template: BlockFlowTemplate
   ): IOResult[Boolean] = {
