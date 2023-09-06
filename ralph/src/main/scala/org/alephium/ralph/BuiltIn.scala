@@ -920,16 +920,6 @@ object BuiltIn {
     def doc: String     = "Terminates the application immediately."
   }
 
-  val blockHash: BuiltIn[StatelessContext] =
-    SimpleBuiltIn.chainSimple(
-      "blockHash",
-      Seq.empty,
-      Seq(Type.ByteVec),
-      BlockHash,
-      Seq(),
-      retComment = "the block hash of the current block"
-    )
-
   val mulModN: BuiltIn[StatelessContext] =
     SimpleBuiltIn.utilsSimple(
       "mulModN",
@@ -1027,7 +1017,6 @@ object BuiltIn {
     verifyED25519,
     verifyBIP340Schnorr,
     networkId,
-    blockHash,
     blockTimeStamp,
     blockTarget,
     txId,

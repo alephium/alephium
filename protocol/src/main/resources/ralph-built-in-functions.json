@@ -520,16 +520,6 @@
     "returns": "@returns the network id (a single byte)"
   },
   {
-    "name": "blockHash",
-    "category": "Chain",
-    "signature": "fn blockHash!() -> (ByteVec)",
-    "doc": "Returns the block hash of the current block.",
-    "params": [
-      
-    ],
-    "returns": "@returns the block hash of the current block"
-  },
-  {
     "name": "blockTimeStamp",
     "category": "Chain",
     "signature": "fn blockTimeStamp!() -> (U256)",

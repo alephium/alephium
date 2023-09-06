@@ -17,7 +17,7 @@
 package org.alephium.flow.validation
 
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.model.{BlockHash, Transaction}
 import org.alephium.protocol.vm._
 import org.alephium.util.AVector
 
@@ -32,42 +32,42 @@ sealed trait InvalidBlockStatus extends InvalidStatus
 sealed trait InvalidHeaderStatus extends InvalidBlockStatus
 
 // TBD: final case object InvalidBlockSize               extends InvalidBlockStatus
-final case object InvalidGroup                           extends InvalidBlockStatus
-final case object InvalidGenesisVersion                  extends InvalidHeaderStatus
-final case object InvalidGenesisTimeStamp                extends InvalidHeaderStatus
-final case object InvalidGenesisDeps                     extends InvalidHeaderStatus
-final case object InvalidGenesisDepStateHash             extends InvalidHeaderStatus
-final case object InvalidGenesisWorkAmount               extends InvalidHeaderStatus
-final case object InvalidGenesisWorkTarget               extends InvalidHeaderStatus
-final case object InvalidBlockVersion                    extends InvalidHeaderStatus
-final case object NoIncreasingTimeStamp                  extends InvalidHeaderStatus
-final case object EarlierThanLaunchTimeStamp             extends InvalidHeaderStatus
-final case object TooAdvancedTimeStamp                   extends InvalidHeaderStatus
-final case object InvalidWorkAmount                      extends InvalidHeaderStatus
-final case object InvalidPoLWWorkAmount                  extends InvalidHeaderStatus
-final case object InvalidWorkTarget                      extends InvalidHeaderStatus
-final case object CannotEnablePoLW                       extends InvalidHeaderStatus
-final case object InvalidUncleTimeStamp                  extends InvalidHeaderStatus
-final case object InvalidHeaderFlow                      extends InvalidHeaderStatus
-final case object InvalidDepsNum                         extends InvalidHeaderStatus
-final case object InvalidDepsIndex                       extends InvalidHeaderStatus
-final case class MissingDeps(hashes: AVector[BlockHash]) extends InvalidHeaderStatus
-final case object InvalidDepStateHash                    extends InvalidHeaderStatus
-final case class HeaderIOError(e: IOError)               extends InvalidHeaderStatus
-final case object EmptyTransactionList                   extends InvalidBlockStatus
-final case object TooManyTransactions                    extends InvalidBlockStatus
-final case object TxGasPriceNonDecreasing                extends InvalidBlockStatus
-final case object TooMuchGasUsed                         extends InvalidBlockStatus
-final case object InvalidCoinbaseFormat                  extends InvalidBlockStatus
-final case object InvalidCoinbaseData                    extends InvalidBlockStatus
-final case object InvalidCoinbaseReward                  extends InvalidBlockStatus
-final case object InvalidCoinbaseLockedAmount            extends InvalidBlockStatus
-final case object InvalidCoinbaseLockupPeriod            extends InvalidBlockStatus
-final case object InvalidTxsMerkleRoot                   extends InvalidBlockStatus
-final case object BlockDoubleSpending                    extends InvalidBlockStatus
-final case class ExistInvalidTx(e: InvalidTxStatus)      extends InvalidBlockStatus
-final case object InvalidFlowDeps                        extends InvalidBlockStatus
-final case object InvalidFlowTxs                         extends InvalidBlockStatus
+final case object InvalidGroup                                      extends InvalidBlockStatus
+final case object InvalidGenesisVersion                             extends InvalidHeaderStatus
+final case object InvalidGenesisTimeStamp                           extends InvalidHeaderStatus
+final case object InvalidGenesisDeps                                extends InvalidHeaderStatus
+final case object InvalidGenesisDepStateHash                        extends InvalidHeaderStatus
+final case object InvalidGenesisWorkAmount                          extends InvalidHeaderStatus
+final case object InvalidGenesisWorkTarget                          extends InvalidHeaderStatus
+final case object InvalidBlockVersion                               extends InvalidHeaderStatus
+final case object NoIncreasingTimeStamp                             extends InvalidHeaderStatus
+final case object EarlierThanLaunchTimeStamp                        extends InvalidHeaderStatus
+final case object TooAdvancedTimeStamp                              extends InvalidHeaderStatus
+final case object InvalidWorkAmount                                 extends InvalidHeaderStatus
+final case object InvalidPoLWWorkAmount                             extends InvalidHeaderStatus
+final case object InvalidWorkTarget                                 extends InvalidHeaderStatus
+final case object CannotEnablePoLW                                  extends InvalidHeaderStatus
+final case object InvalidUncleTimeStamp                             extends InvalidHeaderStatus
+final case object InvalidHeaderFlow                                 extends InvalidHeaderStatus
+final case object InvalidDepsNum                                    extends InvalidHeaderStatus
+final case object InvalidDepsIndex                                  extends InvalidHeaderStatus
+final case class MissingDeps(hashes: AVector[BlockHash])            extends InvalidHeaderStatus
+final case object InvalidDepStateHash                               extends InvalidHeaderStatus
+final case class HeaderIOError(e: IOError)                          extends InvalidHeaderStatus
+final case object EmptyTransactionList                              extends InvalidBlockStatus
+final case object TooManyTransactions                               extends InvalidBlockStatus
+final case object TxGasPriceNonDecreasing                           extends InvalidBlockStatus
+final case object TooMuchGasUsed                                    extends InvalidBlockStatus
+final case object InvalidCoinbaseFormat                             extends InvalidBlockStatus
+final case object InvalidCoinbaseData                               extends InvalidBlockStatus
+final case object InvalidCoinbaseReward                             extends InvalidBlockStatus
+final case object InvalidCoinbaseLockedAmount                       extends InvalidBlockStatus
+final case object InvalidCoinbaseLockupPeriod                       extends InvalidBlockStatus
+final case object InvalidTxsMerkleRoot                              extends InvalidBlockStatus
+final case object BlockDoubleSpending                               extends InvalidBlockStatus
+final case class ExistInvalidTx(t: Transaction, e: InvalidTxStatus) extends InvalidBlockStatus
+final case object InvalidFlowDeps                                   extends InvalidBlockStatus
+final case object InvalidFlowTxs                                    extends InvalidBlockStatus
 
 object ValidationStatus {
   private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =
@@ -119,10 +119,13 @@ object ValidationStatus {
       case Right(())         => Right(default)
     }
 
-  private[validation] def convert[T](x: TxValidationResult[T]): BlockValidationResult[T] =
+  private[validation] def convert[T](
+      t: Transaction,
+      x: TxValidationResult[T]
+  ): BlockValidationResult[T] =
     x match {
       case Left(Left(error)) => Left(Left(error))
-      case Left(Right(t))    => Left(Right(ExistInvalidTx(t)))
+      case Left(Right(e))    => Left(Right(ExistInvalidTx(t, e)))
       case Right(t)          => Right(t)
     }
 }
