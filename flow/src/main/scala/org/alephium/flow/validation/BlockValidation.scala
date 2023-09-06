@@ -209,8 +209,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
 
     result match {
-      case Left(Right(ExistInvalidTx(InvalidAlphBalance))) => Left(Right(InvalidCoinbaseReward))
-      case result                                          => result
+      case Left(Right(ExistInvalidTx(_, InvalidAlphBalance))) => Left(Right(InvalidCoinbaseReward))
+      case result                                             => result
     }
   }
 
@@ -239,6 +239,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     if (brokerConfig.contains(chainIndex.from)) {
       val blockEnv = BlockEnv.from(chainIndex, block.header)
       convert(
+        block.coinbase,
         nonCoinbaseValidation.checkBlockTx(
           chainIndex,
           block.coinbase,
@@ -329,7 +330,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     if (brokerConfig.contains(chainIndex.from)) {
       for {
         _ <- checkBlockDoubleSpending(block)
-        _ <- convert(checkNonCoinbasesEach(chainIndex, block, groupView, hardFork))
+        _ <- checkNonCoinbasesEach(chainIndex, block, groupView, hardFork)
       } yield ()
     } else {
       validBlock(())
@@ -341,7 +342,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
       hardFork: HardFork
-  ): TxValidationResult[Unit] = {
+  ): BlockValidationResult[Unit] = {
     val blockEnv       = BlockEnv.from(chainIndex, block.header)
     val parentHash     = block.blockDeps.uncleHash(chainIndex.to)
     val executionOrder = Block.getNonCoinbaseExecutionOrder(parentHash, block.nonCoinbase, hardFork)
@@ -349,7 +350,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       val tx = block.transactions(index)
       val txValidationResult = nonCoinbaseValidation.checkBlockTx(
         chainIndex,
-        block.transactions(index),
+        tx,
         groupView,
         blockEnv,
         None
@@ -360,9 +361,10 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           if (tx.contractInputs.isEmpty) {
             Right(())
           } else {
-            invalidTx(ContractInputsShouldBeEmptyForFailedTxScripts)
+            convert(tx, invalidTx(ContractInputsShouldBeEmptyForFailedTxScripts))
           }
-        case result => result
+        case Left(Right(e)) => convert(tx, invalidTx(e))
+        case Left(Left(e))  => Left(Left(e))
       }
     }
   }

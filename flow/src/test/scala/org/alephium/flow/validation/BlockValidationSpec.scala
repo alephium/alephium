@@ -480,6 +480,7 @@ class BlockValidationSpec extends AlephiumSpec {
     val validatorGenesis = BlockValidation.build(blockflowGenesis)
     val validatorLeman   = BlockValidation.build(blockflowLeman)
     validatorGenesis.validate(block, blockflowGenesis).leftValue isE ExistInvalidTx(
+      block.nonCoinbase.head,
       UsingBreakingInstrs
     )
     validatorLeman.validate(block, blockflowLeman).isRight is true

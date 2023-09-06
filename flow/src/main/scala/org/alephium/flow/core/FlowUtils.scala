@@ -25,13 +25,14 @@ import org.alephium.flow.Utils
 import org.alephium.flow.mempool._
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.flow.setting.{ConsensusSetting, MemPoolSetting}
-import org.alephium.flow.validation.{BlockValidation, TxScriptExeFailed, TxValidation}
+import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
-import org.alephium.util.{AVector, TimeStamp}
+import org.alephium.serde.serialize
+import org.alephium.util.{AVector, Hex, TimeStamp}
 
 trait FlowUtils
     extends MultiChain
@@ -272,8 +273,17 @@ trait FlowUtils
   ): IOResult[Boolean] = {
     templateValidator.validateTemplate(chainIndex, template, this) match {
       case Left(Left(error)) => Left(error)
-      case Left(Right(_))    => Right(false)
-      case Right(_)          => Right(true)
+      case Left(Right(error)) =>
+        error match {
+          case ExistInvalidTx(t, _) =>
+            logger.warn(
+              s"Remove invalid mempool tx: ${t.id.toHexString} - ${Hex.toHexString(serialize(t))}"
+            )
+            this.getMemPool(chainIndex).removeUnusedTxs(AVector(t.toTemplate))
+          case _ => ()
+        }
+        Right(false)
+      case Right(_) => Right(true)
     }
   }
 
