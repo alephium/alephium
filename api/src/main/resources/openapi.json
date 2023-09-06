@@ -1660,7 +1660,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "address"
             }
           }
         ],
@@ -3948,7 +3949,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "block-hash"
             }
           }
         ],
@@ -4151,7 +4153,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "block-hash"
             }
           }
         ],
@@ -4373,7 +4376,8 @@
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "block-hash"
             }
           }
         ],
@@ -4470,7 +4474,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "address"
             }
           },
           {
@@ -4630,7 +4635,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "address"
             }
           }
         ],
@@ -4781,7 +4787,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "address"
             }
           }
         ],
@@ -5111,7 +5118,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "block-hash"
             }
           }
         ],
@@ -5741,7 +5749,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "32-byte-hash"
             }
           },
           {
@@ -5949,7 +5958,8 @@
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "32-byte-hash"
             }
           },
           {
@@ -6306,7 +6316,8 @@
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "32-byte-hash"
             }
           }
         ],
@@ -7426,7 +7437,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "address"
             }
           },
           {
@@ -9308,7 +9320,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "address"
             }
           },
           {
@@ -9451,7 +9464,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "address"
             }
           }
         ],
@@ -9549,7 +9563,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "32-byte-hash"
             }
           },
           {
@@ -9673,7 +9688,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "block-hash"
             }
           },
           {
