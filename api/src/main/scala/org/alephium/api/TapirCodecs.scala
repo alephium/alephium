@@ -18,7 +18,7 @@ package org.alephium.api
 
 import scala.util.{Failure, Success, Try}
 
-import sttp.tapir.{Codec, DecodeResult, Validator}
+import sttp.tapir.{Codec, DecodeResult, Schema, Validator}
 import sttp.tapir.CodecFormat.TextPlain
 
 import org.alephium.api.model._
@@ -29,7 +29,7 @@ import org.alephium.protocol.model.{Address, BlockHash, GroupIndex, TransactionI
 import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.{TimeStamp, U256}
 
-trait TapirCodecs extends ApiModelCodec {
+trait TapirCodecs extends ApiModelCodec with TapirSchemasLike {
 
   implicit val timestampTapirCodec: Codec[String, TimeStamp, TextPlain] =
     Codec.long.validate(Validator.min(0L)).map(TimeStamp.unsafe(_))(_.millis)
@@ -89,17 +89,19 @@ trait TapirCodecs extends ApiModelCodec {
       }
     )(_.value)
 
-  def fromJson[A: ReadWriter]: Codec[String, A, TextPlain] =
-    Codec.string.mapDecode[A] { raw =>
-      Try(read[A](ujson.Str(raw))) match {
-        case Success(a) => DecodeResult.Value(a)
-        case Failure(error) =>
-          DecodeResult.Error(raw, new IllegalArgumentException(error.getMessage))
+  def fromJson[A: ReadWriter](implicit schema: Schema[A]): Codec[String, A, TextPlain] =
+    Codec.string
+      .mapDecode[A] { raw =>
+        Try(read[A](ujson.Str(raw))) match {
+          case Success(a) => DecodeResult.Value(a)
+          case Failure(error) =>
+            DecodeResult.Error(raw, new IllegalArgumentException(error.getMessage))
+        }
+      } { a =>
+        writeJs(a) match {
+          case ujson.Str(str) => str
+          case other          => write(other)
+        }
       }
-    } { a =>
-      writeJs(a) match {
-        case ujson.Str(str) => str
-        case other          => write(other)
-      }
-    }
+      .schema(schema)
 }
