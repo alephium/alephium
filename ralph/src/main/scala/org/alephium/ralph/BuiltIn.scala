@@ -1027,7 +1027,7 @@ object BuiltIn {
     verifyED25519,
     verifyBIP340Schnorr,
     networkId,
-//    blockHash, // Remove this for now as it can cause invalid txs
+    blockHash,
     blockTimeStamp,
     blockTarget,
     txId,
