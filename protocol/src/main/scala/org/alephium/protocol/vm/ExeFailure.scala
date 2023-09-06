@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import java.math.BigInteger
 
 import org.alephium.io.IOError
-import org.alephium.protocol.model.{Address, ContractId}
+import org.alephium.protocol.model.{Address, ContractId, TokenId}
 import org.alephium.serde.SerdeError
 import org.alephium.util.U256
 
@@ -82,7 +82,17 @@ case object InvalidAddressTypeInContractDestroy                extends ExeFailur
 case object ExpectNonPayableMethod                             extends ExeFailure
 case object ExpectStatefulContractObj                          extends ExeFailure
 case object NoBalanceAvailable                                 extends ExeFailure
-case object NotEnoughBalance                                   extends ExeFailure
+final case class NotEnoughApprovedBalance(
+    lockupScript: LockupScript,
+    tokenId: TokenId,
+    expected: U256,
+    got: U256
+) extends ExeFailure {
+  override def toString: String = {
+    val token = if (tokenId == TokenId.alph) "ALPH" else tokenId.toHexString
+    s"NotEnoughApprovedBalance(address: ${Address.from(lockupScript)},tokenId: $token,expected: $expected,got: $got)"
+  }
+}
 case object NoAssetsApproved                                   extends ExeFailure
 case object BalanceOverflow                                    extends ExeFailure
 case object NoAlphBalanceForTheAddress                         extends ExeFailure
