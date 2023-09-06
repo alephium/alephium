@@ -2123,7 +2123,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.Address(lockupScript))
     stack.push(Val.U256(ALPH.alph(2)))
 
-    ApproveAlph.runWith(frame).leftValue isE NotEnoughBalance(
+    ApproveAlph.runWith(frame).leftValue isE NotEnoughApprovedBalance(
       lockupScript,
       TokenId.alph,
       ALPH.alph(2),
@@ -2167,7 +2167,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ALPH.alph(2),
       MutBalanceState.from(MutBalances.empty),
       Option(
-        NotEnoughBalance(
+        NotEnoughApprovedBalance(
           lockupScript,
           tokenId,
           ALPH.alph(2),
@@ -2221,7 +2221,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       ALPH.alph(2),
       MutBalanceState.from(MutBalances.empty),
       Option(
-        NotEnoughBalance(
+        NotEnoughApprovedBalance(
           lockupScript,
           TokenId.alph,
           ALPH.alph(2),
@@ -2387,7 +2387,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(tokenId.bytes))
     stack.push(Val.U256(ALPH.alph(2)))
 
-    BurnToken.runWith(frame).leftValue isE NotEnoughBalance(
+    BurnToken.runWith(frame).leftValue isE NotEnoughApprovedBalance(
       from,
       tokenId,
       ALPH.alph(2),
@@ -2478,7 +2478,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.Address(from))
     stack.push(Val.Address(to))
     stack.push(Val.U256(ALPH.alph(10)))
-    TransferAlph.runWith(frame).leftValue isE NotEnoughBalance(
+    TransferAlph.runWith(frame).leftValue isE NotEnoughApprovedBalance(
       from,
       TokenId.alph,
       ALPH.alph(10),
@@ -2625,7 +2625,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.Address(to))
     stack.push(Val.ByteVec(tokenId.bytes))
     stack.push(Val.U256(ALPH.alph(2)))
-    TransferToken.runWith(frame).leftValue isE NotEnoughBalance(
+    TransferToken.runWith(frame).leftValue isE NotEnoughApprovedBalance(
       from,
       tokenId,
       ALPH.alph(2),

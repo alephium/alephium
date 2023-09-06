@@ -1487,7 +1487,7 @@ object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
             .useToken(fromAddress.lockupScript, tokenId, tokenAmount.v)
             .toRight(
               Right(
-                NotEnoughBalance(
+                NotEnoughApprovedBalance(
                   fromAddress.lockupScript,
                   tokenId,
                   tokenAmount.v,
@@ -1540,7 +1540,7 @@ object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 {
         .approveALPH(address.lockupScript, amount.v)
         .toRight(
           Right(
-            NotEnoughBalance(
+            NotEnoughApprovedBalance(
               address.lockupScript,
               TokenId.alph,
               amount.v,
@@ -1573,7 +1573,7 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
             .approveALPH(address.lockupScript, amount.v)
             .toRight(
               Right(
-                NotEnoughBalance(
+                NotEnoughApprovedBalance(
                   address.lockupScript,
                   tokenId,
                   amount.v,
@@ -1586,7 +1586,7 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
             .approveToken(address.lockupScript, tokenId, amount.v)
             .toRight(
               Right(
-                NotEnoughBalance(
+                NotEnoughApprovedBalance(
                   address.lockupScript,
                   tokenId,
                   amount.v,
@@ -1674,7 +1674,12 @@ sealed trait Transfer extends AssetInstr {
         .useAlph(from, amount.v)
         .toRight(
           Right(
-            NotEnoughBalance(from, TokenId.alph, amount.v, balanceState.alphRemainingUnsafe(from))
+            NotEnoughApprovedBalance(
+              from,
+              TokenId.alph,
+              amount.v,
+              balanceState.alphRemainingUnsafe(from)
+            )
           )
         )
       _ <- frame.ctx.outputBalances
@@ -1709,7 +1714,7 @@ sealed trait Transfer extends AssetInstr {
         .useToken(from, tokenId, amount.v)
         .toRight(
           Right(
-            NotEnoughBalance(
+            NotEnoughApprovedBalance(
               from,
               tokenId,
               amount.v,

@@ -18,17 +18,20 @@ package org.alephium.protocol.vm
 
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.model.{Address, TokenId}
-import org.alephium.protocol.vm.NotEnoughBalance
+import org.alephium.protocol.vm.NotEnoughApprovedBalance
 import org.alephium.util.{AlephiumSpec, Hex, U256}
 
 class ExeFailureSpec extends AlephiumSpec {
-  it should "test NotEnoughBalance" in {
-    val lockupScript = Address.fromBase58("1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6").get.lockupScript
-    val tokenId = TokenId.from(Hex.unsafe("cee16cdfad98e8943fd9a5b45e1765e0a6895608efe3eeeb41a60db55f605b46")).get
+  it should "test NotEnoughApprovedBalance" in {
+    val lockupScript =
+      Address.fromBase58("1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6").get.lockupScript
+    val tokenId = TokenId
+      .from(Hex.unsafe("cee16cdfad98e8943fd9a5b45e1765e0a6895608efe3eeeb41a60db55f605b46"))
+      .get
 
-    NotEnoughBalance(lockupScript, tokenId, ALPH.alph(1), U256.Zero).toString is
-      "NotEnoughBalance(address: 1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6,tokenId: cee16cdfad98e8943fd9a5b45e1765e0a6895608efe3eeeb41a60db55f605b46,expected: 1000000000000000000,got: 0)"
-    NotEnoughBalance(lockupScript, TokenId.alph, ALPH.alph(2), ALPH.oneAlph).toString is
-      "NotEnoughBalance(address: 1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6,tokenId: ALPH,expected: 2000000000000000000,got: 1000000000000000000)"
+    NotEnoughApprovedBalance(lockupScript, tokenId, ALPH.alph(1), U256.Zero).toString is
+      "NotEnoughApprovedBalance(address: 1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6,tokenId: cee16cdfad98e8943fd9a5b45e1765e0a6895608efe3eeeb41a60db55f605b46,expected: 1000000000000000000,got: 0)"
+    NotEnoughApprovedBalance(lockupScript, TokenId.alph, ALPH.alph(2), ALPH.oneAlph).toString is
+      "NotEnoughApprovedBalance(address: 1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6,tokenId: ALPH,expected: 2000000000000000000,got: 1000000000000000000)"
   }
 }

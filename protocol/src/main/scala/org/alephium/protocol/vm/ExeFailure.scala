@@ -82,7 +82,7 @@ case object InvalidAddressTypeInContractDestroy                extends ExeFailur
 case object ExpectNonPayableMethod                             extends ExeFailure
 case object ExpectStatefulContractObj                          extends ExeFailure
 case object NoBalanceAvailable                                 extends ExeFailure
-final case class NotEnoughBalance(
+final case class NotEnoughApprovedBalance(
     lockupScript: LockupScript,
     tokenId: TokenId,
     expected: U256,
@@ -90,7 +90,7 @@ final case class NotEnoughBalance(
 ) extends ExeFailure {
   override def toString: String = {
     val token = if (tokenId == TokenId.alph) "ALPH" else tokenId.toHexString
-    s"NotEnoughBalance(address: ${Address.from(lockupScript)},tokenId: $token,expected: $expected,got: $got)"
+    s"NotEnoughApprovedBalance(address: ${Address.from(lockupScript)},tokenId: $token,expected: $expected,got: $got)"
   }
 }
 case object NoAssetsApproved                                   extends ExeFailure
