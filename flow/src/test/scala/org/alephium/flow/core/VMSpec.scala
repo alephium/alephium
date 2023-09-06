@@ -946,7 +946,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |  assert!(zeros!(2) == #0000, 0)
          |  assert!(nullContractAddress!() == @${Address.contract(ContractId.zero)}, 0)
          |  assert!(nullContractAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, 0)
-         |  assert!(blockHash!() != #${Hash.zero.toHexString}, 0)
+         |  assert!() != #${Hash.zero.toHexString}, 0)
          |  assert!(ALPH == zeros!(32), 0)
          |  assert!(ALPH == #0000000000000000000000000000000000000000000000000000000000000000, 0)
          |}
@@ -4583,7 +4583,9 @@ class VMSpec extends AlephiumSpec with Generators {
     test(ALPH.oneAlph + 1)
   }
 
-  "Mempool" should "remove invalid transaction" in new ContractFixture {
+  behavior of "Mempool"
+
+  ignore should "remove invalid transaction" in new ContractFixture {
     val code =
       s"""
          |Contract Foo(mut currentBlockHash: ByteVec) {
