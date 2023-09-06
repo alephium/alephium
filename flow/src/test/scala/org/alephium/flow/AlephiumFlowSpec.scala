@@ -193,7 +193,7 @@ trait FlowFixture
     mineWithTxs(blockFlow, chainIndex)((_, _) => AVector(tx))
   }
 
-  // scalastyle:off parameter.number
+  // scalastyle:off parameter.number method.length
   def transferTxs(
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,

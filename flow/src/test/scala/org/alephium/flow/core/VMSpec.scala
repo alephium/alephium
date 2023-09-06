@@ -946,7 +946,6 @@ class VMSpec extends AlephiumSpec with Generators {
          |  assert!(zeros!(2) == #0000, 0)
          |  assert!(nullContractAddress!() == @${Address.contract(ContractId.zero)}, 0)
          |  assert!(nullContractAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, 0)
-         |  assert!() != #${Hash.zero.toHexString}, 0)
          |  assert!(ALPH == zeros!(32), 0)
          |  assert!(ALPH == #0000000000000000000000000000000000000000000000000000000000000000, 0)
          |}
