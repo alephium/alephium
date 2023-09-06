@@ -397,7 +397,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       U256Const(Val.U256(10)),
       ApproveToken
     )
-    fail(instrs, NotEnoughBalance)
+    fail(instrs, NotEnoughBalance(address0.lockupScript, tokenId, U256.unsafe(10), U256.Zero))
   }
 
   it should "transfer asset to output" in new BalancesFixture {
