@@ -3604,6 +3604,63 @@ class VMSpec extends AlephiumSpec with Generators {
     test("@std(id = #0001)", "1, 2i, #11", "0302010301110306414c50480001", "010102")
   }
 
+  it should "encode array type contract fields" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo(@unused a: U256, @unused mut b: [U256; 2], @unused mut c: U256, @unused d: [U256; 2]) {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    val fooContract = Compiler.compileContract(foo).rightValue
+    val fooBytecode = Hex.toHexString(serialize(fooContract))
+
+    private def deployAndCheckContractState(
+        script: String,
+        immFields: AVector[Val],
+        mutFields: AVector[Val]
+    ) = {
+      val block      = callTxScript(script)
+      val tx         = block.nonCoinbase.head
+      val contractId = ContractId.from(tx.id, tx.unsigned.fixedOutputs.length, tx.fromGroup)
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val contractState = worldState.getContractState(contractId).rightValue
+      contractState.immFields is immFields
+      contractState.mutFields is mutFields
+    }
+
+    val script0 =
+      s"""
+         |TxScript Deploy() {
+         |  let (encodedImmFields, encodedMutFields) = Foo.encodeFields!(0, [1, 2], 3, [4, 5])
+         |  createContract!{@$genesisAddress -> ALPH: $minimalAlphInContract}(#$fooBytecode, encodedImmFields, encodedMutFields)
+         |}
+         |$foo
+         |""".stripMargin
+
+    deployAndCheckContractState(
+      script0,
+      AVector.from(Seq(0, 4, 5)).map(v => Val.U256(U256.unsafe(v))),
+      AVector.from(Seq(1, 2, 3)).map(v => Val.U256(U256.unsafe(v)))
+    )
+
+    val script1 =
+      s"""
+         |TxScript Deploy() {
+         |  let encodedImmFields = Foo.encodeImmFields!(0, [1, 2])
+         |  let encodedMutFields = Foo.encodeMutFields!([3, 4], 5)
+         |  createContract!{@$genesisAddress -> ALPH: $minimalAlphInContract}(#$fooBytecode, encodedImmFields, encodedMutFields)
+         |}
+         |$foo
+         |""".stripMargin
+
+    deployAndCheckContractState(
+      script1,
+      AVector.from(Seq(0, 1, 2)).map(v => Val.U256(U256.unsafe(v))),
+      AVector.from(Seq(3, 4, 5)).map(v => Val.U256(U256.unsafe(v)))
+    )
+  }
+
   trait SelfContractFixture extends ContractFixture {
     def foo(selfContractStr: String): String
 
