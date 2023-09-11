@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import java.math.BigInteger
 
 import org.alephium.io.IOError
-import org.alephium.protocol.model.{Address, ContractId, TokenId}
+import org.alephium.protocol.model.{dustUtxoAmount, Address, ContractId, TokenId}
 import org.alephium.serde.SerdeError
 import org.alephium.util.U256
 
@@ -93,15 +93,37 @@ final case class NotEnoughApprovedBalance(
     s"NotEnoughApprovedBalance(address: ${Address.from(lockupScript)},tokenId: $token,expected: $expected,got: $got)"
   }
 }
-case object NoAssetsApproved                                   extends ExeFailure
-case object BalanceOverflow                                    extends ExeFailure
-case object NoAlphBalanceForTheAddress                         extends ExeFailure
-case object NoTokenBalanceForTheAddress                        extends ExeFailure
-case object InvalidBalances                                    extends ExeFailure
-case object BalanceErrorWhenSwitchingBackFrame                 extends ExeFailure
-case object LowerThanContractMinimalBalance                    extends ExeFailure
-case object UnableToPayGasFee                                  extends ExeFailure
-case object InvalidOutputBalances                              extends ExeFailure
+case object NoAssetsApproved                            extends ExeFailure
+case object BalanceOverflow                             extends ExeFailure
+case object NoAlphBalanceForTheAddress                  extends ExeFailure
+case object NoTokenBalanceForTheAddress                 extends ExeFailure
+case object InvalidBalances                             extends ExeFailure
+case object BalanceErrorWhenSwitchingBackFrame          extends ExeFailure
+case object LowerThanContractMinimalBalance             extends ExeFailure
+case object UnableToPayGasFee                           extends ExeFailure
+final case class InvalidOutputBalances(details: String) extends ExeFailure
+object InvalidOutputBalances {
+  def from(
+      lockupScript: LockupScript,
+      tokenSize: Int,
+      attoAlphAmount: U256
+  ): InvalidOutputBalances = {
+    val address         = Address.from(lockupScript)
+    val tokenDustAmount = dustUtxoAmount.mulUnsafe(U256.unsafe(tokenSize))
+    val totalDustAmount = if (attoAlphAmount == U256.Zero) {
+      tokenDustAmount
+    } else {
+      if (attoAlphAmount < tokenDustAmount) {
+        tokenDustAmount
+      } else {
+        tokenDustAmount.addUnsafe(dustUtxoAmount)
+      }
+    }
+    InvalidOutputBalances(
+      s"Invalid ALPH balance for address $address, expected $totalDustAmount, got $attoAlphAmount, you need to transfer more ALPH to this address"
+    )
+  }
+}
 case object InvalidTokenNumForContractOutput                   extends ExeFailure
 case object InvalidTokenId                                     extends ExeFailure
 case object InvalidContractId                                  extends ExeFailure
