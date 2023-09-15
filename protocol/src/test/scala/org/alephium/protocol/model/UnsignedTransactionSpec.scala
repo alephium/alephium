@@ -91,7 +91,7 @@ class UnsignedTransactionSpec extends AlephiumSpec with NumericHelpers {
   it should "calculate change outputs for ALPH" in new ChangeOutputFixture {
     calculateChangeOutputs(0, AVector.empty) isE AVector.empty[AssetOutput]
     calculateChangeOutputs(dustUtxoAmount - 1, AVector.empty).leftValue is
-      "Not enough ALPH for change output"
+      s"Not enough ALPH for ALPH change output, expected $dustUtxoAmount, got ${dustUtxoAmount - 1}"
     calculateChangeOutputs(dustUtxoAmount, AVector.empty) isE
       AVector(output(dustUtxoAmount))
     calculateChangeOutputs(dustUtxoAmount + 1, AVector.empty) isE
@@ -100,34 +100,34 @@ class UnsignedTransactionSpec extends AlephiumSpec with NumericHelpers {
 
   it should "calculate change outputs for token" in new ChangeOutputFixture {
     calculateChangeOutputs(0, AVector(tokenId0 -> 1)).leftValue is
-      "Not enough ALPH for change output"
+      s"Not enough ALPH for token change output, expected $dustUtxoAmount, got 0"
     calculateChangeOutputs(dustUtxoAmount - 1, AVector(tokenId0 -> 1)).leftValue is
-      "Not enough ALPH for change output"
+      s"Not enough ALPH for token change output, expected $dustUtxoAmount, got ${dustUtxoAmount - 1}"
     calculateChangeOutputs(dustUtxoAmount, AVector(tokenId0 -> 1)) isE
       AVector(output(dustUtxoAmount, tokenId0, 1))
     calculateChangeOutputs(dustUtxoAmount + 1, AVector(tokenId0 -> 1)).leftValue is
-      "Not enough ALPH for change output"
+      s"Not enough ALPH for ALPH and token change output, expected ${dustUtxoAmount * 2}, got ${dustUtxoAmount + 1}"
     calculateChangeOutputs(dustUtxoAmount * 2 - 1, AVector(tokenId0 -> 1)).leftValue is
-      "Not enough ALPH for change output"
+      s"Not enough ALPH for ALPH and token change output, expected ${dustUtxoAmount * 2}, got ${dustUtxoAmount * 2 - 1}"
     calculateChangeOutputs(dustUtxoAmount * 2, AVector(tokenId0 -> 1)) isE
       AVector(output(dustUtxoAmount, tokenId0, 1), output(dustUtxoAmount))
 
     calculateChangeOutputs(0, AVector(tokenId0 -> 1, tokenId1 -> 1)).leftValue is
-      "Not enough ALPH for change output"
+      s"Not enough ALPH for token change output, expected ${dustUtxoAmount * 2}, got 0"
     calculateChangeOutputs(
       dustUtxoAmount * 2 - 1,
       AVector(tokenId0 -> 1, tokenId1 -> 1)
-    ).leftValue is "Not enough ALPH for change output"
+    ).leftValue is s"Not enough ALPH for token change output, expected ${dustUtxoAmount * 2}, got ${dustUtxoAmount * 2 - 1}"
     calculateChangeOutputs(dustUtxoAmount * 2, AVector(tokenId0 -> 1, tokenId1 -> 1)) isE
       AVector(output(dustUtxoAmount, tokenId0, 1), output(dustUtxoAmount, tokenId1, 1))
     calculateChangeOutputs(
       dustUtxoAmount * 2 + 1,
       AVector(tokenId0 -> 1, tokenId1 -> 1)
-    ).leftValue is "Not enough ALPH for change output"
+    ).leftValue is s"Not enough ALPH for ALPH and token change output, expected ${dustUtxoAmount * 3}, got ${dustUtxoAmount * 2 + 1}"
     calculateChangeOutputs(
       dustUtxoAmount * 3 - 1,
       AVector(tokenId0 -> 1, tokenId1 -> 1)
-    ).leftValue is "Not enough ALPH for change output"
+    ).leftValue is s"Not enough ALPH for ALPH and token change output, expected ${dustUtxoAmount * 3}, got ${dustUtxoAmount * 3 - 1}"
     calculateChangeOutputs(dustUtxoAmount * 3, AVector(tokenId0 -> 1, tokenId1 -> 1)) isE
       AVector(
         output(dustUtxoAmount, tokenId0, 1),
