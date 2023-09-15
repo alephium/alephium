@@ -819,23 +819,16 @@ class ServerUtils(implicit
       gas: Option[GasBox],
       gasPrice: Option[GasPrice]
   ): Try[UnsignedTransaction] = {
-    val utxosLimit               = apiConfig.defaultUtxosLimit
-    val estimatedTxOutputsLength = tokens.length + (if (amount > U256.Zero) 1 else 0)
-
     for {
-      allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
-      selectedUtxos <- wrapError(
-        UtxoSelectionAlgo
-          .Build(ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
-          .select(
-            AssetAmounts(amount, tokens),
-            fromUnlockScript,
-            allUtxos,
-            txOutputsLength = estimatedTxOutputsLength,
-            Some(script),
-            AssetScriptGasEstimator.Default(blockFlow),
-            TxScriptGasEstimator.Default(blockFlow)
-          )
+      selectedUtxos <- buildSelectedUtxos(
+        blockFlow,
+        script,
+        amount,
+        tokens,
+        fromLockupScript,
+        fromUnlockScript,
+        gas,
+        gasPrice
       )
       unsignedTx <- wrapError {
         val inputs = selectedUtxos.assets.map(asset => (asset.ref, asset.output))
@@ -852,6 +845,81 @@ class ServerUtils(implicit
       }
       validatedUnsignedTx <- validateUnsignedTransaction(unsignedTx)
     } yield validatedUnsignedTx
+  }
+
+  final def buildSelectedUtxos(
+      blockFlow: BlockFlow,
+      script: StatefulScript,
+      amount: U256,
+      tokens: AVector[(TokenId, U256)],
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      gas: Option[GasBox],
+      gasPrice: Option[GasPrice]
+  ): Try[Selected] = {
+    val result = tryBuildSelectedUtxos(
+      blockFlow,
+      script,
+      amount,
+      tokens,
+      fromLockupScript,
+      fromUnlockScript,
+      gas,
+      gasPrice
+    )
+
+    result match {
+      case Right(res) =>
+        val alphAmount = res.assets.fold(U256.Zero)(_ addUnsafe _.output.amount)
+        val gasFee     = gasPrice.getOrElse(nonCoinbaseMinGasPrice) * res.gas
+
+        val remainingAmount = alphAmount.subUnsafe(gasFee)
+        if (dustUtxoAmount.sub(remainingAmount).nonEmpty) {
+          tryBuildSelectedUtxos(
+            blockFlow,
+            script,
+            amount.addUnsafe(dustUtxoAmount),
+            tokens,
+            fromLockupScript,
+            fromUnlockScript,
+            Some(res.gas),
+            gasPrice
+          )
+        } else {
+          Right(res)
+        }
+      case err @ _ => err
+    }
+  }
+
+  private def tryBuildSelectedUtxos(
+      blockFlow: BlockFlow,
+      script: StatefulScript,
+      amount: U256,
+      tokens: AVector[(TokenId, U256)],
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      gas: Option[GasBox],
+      gasPrice: Option[GasPrice]
+  ): Try[Selected] = {
+    val utxosLimit               = apiConfig.defaultUtxosLimit
+    val estimatedTxOutputsLength = tokens.length + (if (amount > U256.Zero) 1 else 0)
+    for {
+      allUtxos <- blockFlow.getUsableUtxos(fromLockupScript, utxosLimit).left.map(failedInIO)
+      selectedUtxos <- wrapError(
+        UtxoSelectionAlgo
+          .Build(ProvidedGas(gas, gasPrice.getOrElse(nonCoinbaseMinGasPrice)))
+          .select(
+            AssetAmounts(amount, tokens),
+            fromUnlockScript,
+            allUtxos,
+            txOutputsLength = estimatedTxOutputsLength,
+            Some(script),
+            AssetScriptGasEstimator.Default(blockFlow),
+            TxScriptGasEstimator.Default(blockFlow)
+          )
+      )
+    } yield selectedUtxos
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))

@@ -2290,7 +2290,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "show that UTXO selection algorithm doesn't consider change output should have more than dustAmount" in new Fixture {
+  it should "show that UTXO selection algorithm considers change output should have more than dustAmount" in new Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
     implicit val serverUtils  = new ServerUtils
 
@@ -2326,8 +2326,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           gasPrice = Some(nonCoinbaseMinGasPrice)
         )
       )
-      .leftValue
-      .detail is "Not enough ALPH for change output"
+      .rightValue
   }
 
   it should "execute scripts for cross-group confirmed inputs" in new ScriptTxFixture {
