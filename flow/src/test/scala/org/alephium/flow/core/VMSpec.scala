@@ -226,7 +226,7 @@ class VMSpec extends AlephiumSpec with Generators {
       (contractId, contractOutputRef)
     }
 
-    def callTxScript(input: String): Block = {
+    def callTxScript(input: String, chainIndex: ChainIndex = chainIndex): Block = {
       val script = Compiler.compileTxScript(input).rightValue
       script.toTemplateString() is Hex.toHexString(serialize(script))
       val block =
@@ -2758,9 +2758,7 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "Log contract and subcontract ids when subcontract is created" in new SubContractFixture {
-    val subContract         = Compiler.compileContract(subContractRaw).rightValue
-    val subContractByteCode = Hex.toHexString(serialize(subContract))
-    val subContractPath1    = Hex.toHexString(serialize("nft-01"))
+    val subContractPath1 = Hex.toHexString(serialize("nft-01"))
     val (contractId, subContractId) = verify(
       s"createSubContract!{callerAddress!() -> ALPH: 1 alph}(#$subContractPath1, #$subContractByteCode, #00, #00)",
       subContractPath = "nft-01",
@@ -3112,6 +3110,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
     val subContractInitialState = Hex.toHexString(serialize(AVector.empty[Val]))
+    val subContract             = Compiler.compileContract(subContractRaw).rightValue
+    val subContractByteCode     = Hex.toHexString(serialize(subContract))
 
     // scalastyle:off method.length
     def verify(
@@ -3214,9 +3214,6 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "check createSubContract and createSubContractWithToken" in new SubContractFixture {
-    val subContract         = Compiler.compileContract(subContractRaw).rightValue
-    val subContractByteCode = Hex.toHexString(serialize(subContract))
-
     {
       info("create sub-contract without token")
       val subContractPath1 = Hex.toHexString(serialize("nft-01"))
@@ -3327,6 +3324,45 @@ class VMSpec extends AlephiumSpec with Generators {
         InvalidAssetAddress
       )
     }
+  }
+
+  it should "check crossGroupSubContractIdOf" in new SubContractFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    val subContractPath = "00"
+    val parentContract =
+      s"""
+         |Contract Parent() {
+         |  @using(preapprovedAssets = true)
+         |  pub fn createSubContract() -> () {
+         |    createSubContract!{callerAddress!() -> ALPH: 1 alph}(#$subContractPath, #$subContractByteCode, #00, #00)
+         |  }
+         |}
+         |""".stripMargin
+    val contractId    = createContract(parentContract, chainIndex = ChainIndex.unsafe(0, 0))._1
+    val contractIdHex = contractId.toHexString
+
+    val createSubContractScript =
+      s"""
+         |TxScript Main() {
+         |  Parent(#$contractIdHex).createSubContract{callerAddress!() -> ALPH: 1 alph}()
+         |}
+         |$parentContract
+         |""".stripMargin
+    callTxScript(createSubContractScript, chainIndex = ChainIndex.unsafe(0, 0))
+    val subContractId = contractId.subContractId(Hex.unsafe(subContractPath), contractId.groupIndex)
+    val subContractIdHex = subContractId.toHexString
+
+    val script =
+      s"""
+         |TxScript Main() {
+         |  let parent = Parent(#$contractIdHex)
+         |  assert!(subContractIdOf!(parent, #$subContractPath) != #$subContractIdHex, 0)
+         |  assert!(crossGroupSubContractIdOf!(parent, #$subContractPath) == #$subContractIdHex, 1)
+         |}
+         |$parentContract
+         |""".stripMargin
+    callTxScript(script, chainIndex = ChainIndex.unsafe(1, 1))
   }
 
   trait CheckArgAndReturnLengthFixture extends ContractFixture {
