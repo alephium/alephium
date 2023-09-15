@@ -2290,6 +2290,46 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  it should "show that UTXO selection algorithm doesn't consider change output should have more than dustAmount" in new Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+    implicit val serverUtils  = new ServerUtils
+
+    val chainIndex      = ChainIndex.unsafe(0, 0)
+    val (_, testPubKey) = chainIndex.from.generateKey
+    val testAddress     = Address.p2pkh(testPubKey)
+
+    val script =
+      s"""
+         |TxScript Foo {
+         |  emit Debug(`Hey, I am Foo`)
+         |}
+         |""".stripMargin
+    val code = Compiler.compileTxScript(script).toOption.get
+
+    val gasFee = nonCoinbaseMinGasPrice * GasBox.unsafe(30000)
+
+    val block1 = transfer(blockFlow, genesisKeys(1)._1, testPubKey, dustUtxoAmount + gasFee - 1)
+    addAndCheck(blockFlow, block1)
+    checkAddressBalance(testAddress, dustUtxoAmount + gasFee - 1, utxoNum = 1)
+
+    val block2 = transfer(blockFlow, genesisKeys(1)._1, testPubKey, dustUtxoAmount + gasFee - 1)
+    addAndCheck(blockFlow, block2)
+    checkAddressBalance(testAddress, (dustUtxoAmount + gasFee - 1) * 2, utxoNum = 2)
+
+    serverUtils
+      .buildExecuteScriptTx(
+        blockFlow,
+        BuildExecuteScriptTx(
+          fromPublicKey = Hex.unsafe(testPubKey.toHexString),
+          bytecode = serialize(code),
+          gasAmount = Some(GasBox.unsafe(30000)),
+          gasPrice = Some(nonCoinbaseMinGasPrice)
+        )
+      )
+      .leftValue
+      .detail is "Not enough ALPH for change output"
+  }
+
   it should "execute scripts for cross-group confirmed inputs" in new ScriptTxFixture {
     val block = transfer(blockFlow, genesisKeys(1)._1, testPubKey, ALPH.alph(2))
     addAndCheck(blockFlow, block)
