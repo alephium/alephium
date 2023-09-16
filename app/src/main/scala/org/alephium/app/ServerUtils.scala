@@ -873,8 +873,8 @@ class ServerUtils(implicit
         val alphAmount = res.assets.fold(U256.Zero)(_ addUnsafe _.output.amount)
         val gasFee     = gasPrice.getOrElse(nonCoinbaseMinGasPrice) * res.gas
 
-        val remainingAmount = alphAmount.subUnsafe(gasFee)
-        if (dustUtxoAmount.sub(remainingAmount).nonEmpty) {
+        val remainingAmount = alphAmount.subUnsafe(gasFee).subUnsafe(amount)
+        if (remainingAmount < dustUtxoAmount) {
           tryBuildSelectedUtxos(
             blockFlow,
             script,

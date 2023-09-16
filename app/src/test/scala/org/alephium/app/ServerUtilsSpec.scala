@@ -2290,7 +2290,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "show that UTXO selection algorithm considers change output should have more than dustAmount" in new Fixture {
+  trait DustAmountFixture extends Fixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
     implicit val serverUtils  = new ServerUtils
 
@@ -2306,27 +2306,45 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
     val code = Compiler.compileTxScript(script).toOption.get
 
-    val gasFee = nonCoinbaseMinGasPrice * GasBox.unsafe(30000)
+    val gasAmount = GasBox.unsafe(30000)
+    val gasPrice  = nonCoinbaseMinGasPrice
+    val gasFee    = gasPrice * gasAmount
 
-    val block1 = transfer(blockFlow, genesisKeys(1)._1, testPubKey, dustUtxoAmount + gasFee - 1)
+    def attoAlphAmount: Option[Amount]
+
+    val alphPerUTXO = dustUtxoAmount + gasFee + attoAlphAmount.getOrElse(Amount.Zero).value - 1
+    val block1      = transfer(blockFlow, genesisKeys(1)._1, testPubKey, alphPerUTXO)
     addAndCheck(blockFlow, block1)
-    checkAddressBalance(testAddress, dustUtxoAmount + gasFee - 1, utxoNum = 1)
+    checkAddressBalance(testAddress, alphPerUTXO, utxoNum = 1)
 
-    val block2 = transfer(blockFlow, genesisKeys(1)._1, testPubKey, dustUtxoAmount + gasFee - 1)
+    val block2 = transfer(blockFlow, genesisKeys(1)._1, testPubKey, alphPerUTXO)
     addAndCheck(blockFlow, block2)
-    checkAddressBalance(testAddress, (dustUtxoAmount + gasFee - 1) * 2, utxoNum = 2)
+    checkAddressBalance(testAddress, alphPerUTXO * 2, utxoNum = 2)
 
-    serverUtils
-      .buildExecuteScriptTx(
-        blockFlow,
-        BuildExecuteScriptTx(
-          fromPublicKey = Hex.unsafe(testPubKey.toHexString),
-          bytecode = serialize(code),
-          gasAmount = Some(GasBox.unsafe(30000)),
-          gasPrice = Some(nonCoinbaseMinGasPrice)
+    def executeTxScript() = {
+      serverUtils
+        .buildExecuteScriptTx(
+          blockFlow,
+          BuildExecuteScriptTx(
+            fromPublicKey = Hex.unsafe(testPubKey.toHexString),
+            bytecode = serialize(code),
+            gasAmount = Some(gasAmount),
+            gasPrice = Some(gasPrice),
+            attoAlphAmount = attoAlphAmount
+          )
         )
-      )
-      .rightValue
+        .rightValue
+    }
+  }
+
+  it should "considers dustAmount for change output when selecting UTXOs, without amounts" in new DustAmountFixture {
+    override def attoAlphAmount: Option[Amount] = None
+    executeTxScript()
+  }
+
+  it should "considers dustAmount for change output when selecting UTXOs, with amounts" in new DustAmountFixture {
+    override def attoAlphAmount: Option[Amount] = Some(Amount(U256.unsafe(10)))
+    executeTxScript()
   }
 
   it should "execute scripts for cross-group confirmed inputs" in new ScriptTxFixture {
