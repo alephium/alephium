@@ -301,9 +301,9 @@
     "returns": "@returns the id of the sub contract"
   },
   {
-    "name": "crossGroupSubContractIdOf",
+    "name": "subContractIdInParentGroup",
     "category": "SubContract",
-    "signature": "fn crossGroupSubContractIdOf!(contract:<Contract>, subContractPath:ByteVec) -> (ByteVec)",
+    "signature": "fn subContractIdInParentGroup!(contract:<Contract>, subContractPath:ByteVec) -> (ByteVec)",
     "doc": "Returns the id of the sub contract.",
     "params": [
       "@param contract the parent contract of the sub-contract",

@@ -3326,7 +3326,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
-  it should "check crossGroupSubContractIdOf" in new SubContractFixture {
+  it should "check subContractIdInParentGroup" in new SubContractFixture {
     override val configValues = Map(("alephium.broker.broker-num", 1))
 
     val subContractPath = "00"
@@ -3358,7 +3358,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |TxScript Main() {
          |  let parent = Parent(#$contractIdHex)
          |  assert!(subContractIdOf!(parent, #$subContractPath) != #$subContractIdHex, 0)
-         |  assert!(crossGroupSubContractIdOf!(parent, #$subContractPath) == #$subContractIdHex, 1)
+         |  assert!(subContractIdInParentGroup!(parent, #$subContractPath) == #$subContractIdHex, 1)
          |}
          |$parentContract
          |""".stripMargin

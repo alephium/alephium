@@ -1601,8 +1601,8 @@ object BuiltIn {
     }
   }
 
-  val crossGroupSubContractIdOf: BuiltIn[StatefulContext] = new SubContractIdOfBuiltIn {
-    val name: String = "crossGroupSubContractIdOf"
+  val subContractIdInParentGroup: BuiltIn[StatefulContext] = new SubContractIdOfBuiltIn {
+    val name: String = "subContractIdInParentGroup"
 
     override def genCodeForArgs[C <: StatefulContext](
         args: Seq[Ast.Expr[C]],
@@ -1729,7 +1729,7 @@ object BuiltIn {
       isCalledFromTxScript,
       subContractId,
       subContractIdOf,
-      crossGroupSubContractIdOf,
+      subContractIdInParentGroup,
       nullContractAddress,
       selfContract
     ).map(f => f.name -> f)
