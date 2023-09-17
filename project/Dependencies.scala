@@ -31,7 +31,7 @@ object Dependencies {
 
   lazy val vertx = "io.vertx" % "vertx-core" % "4.3.8"
 
-  lazy val `upickle` = "com.lihaoyi" %% "upickle" % "2.0.0"
+  lazy val `upickle` = "com.lihaoyi" %% "upickle" % "3.1.3"
 
   lazy val ficus           = "com.iheart"                 %% "ficus"           % "1.5.2"
   lazy val bcprov          = "org.bouncycastle"            % "bcprov-jdk18on"  % "1.71.1"
