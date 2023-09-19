@@ -2323,7 +2323,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(diamondShapedParentInterfaces).leftValue.message is
-        "Interface FooBaz does not inherit from FooBar"
+        "Only single inheritance is allowed. Interface FooBaz does not inherit from FooBar"
 
       val unrelatedParentInterfaces: String =
         s"""
@@ -2352,7 +2352,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       Compiler.compileContract(unrelatedParentInterfaces).leftValue.message is
-        "Interface Foo does not inherit from Bar"
+        "Only single inheritance is allowed. Interface Foo does not inherit from Bar"
     }
 
     {

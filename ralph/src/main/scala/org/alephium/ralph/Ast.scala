@@ -1593,7 +1593,7 @@ object Ast {
         val child  = sortedInterfaces(1)
         if (!child.inheritances.exists(_.parentId == parent.ident)) {
           throw Compiler.Error(
-            s"Interface ${child.ident.name} does not inherit from ${parent.ident.name}"
+            s"Only single inheritance is allowed. Interface ${child.ident.name} does not inherit from ${parent.ident.name}"
           )
         }
 
