@@ -2198,6 +2198,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     {
       info("Interface inheritance can be chained")
+
       val a =
         s"""
            |Interface A {
@@ -2227,27 +2228,131 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         Compiler.compileMultiContract(c).rightValue.contracts(0).asInstanceOf[Ast.ContractInterface]
       interface.funcs.map(_.args.length) is Seq(0, 1, 2)
 
-      val code =
+      {
+        info("Contract that only inherits from interface")
+        val code =
+          s"""
+             |Contract Foo() implements C {
+             |  @using(checkExternalCaller = false)
+             |  pub fn c(x: Bool, y: Bool) -> () {}
+             |  @using(checkExternalCaller = false)
+             |  pub fn a() -> () {}
+             |  @using(checkExternalCaller = false)
+             |  pub fn b(x: Bool) -> () {}
+             |  pub fn d(x: Bool, y: Bool, z: Bool) -> () {
+             |    a()
+             |    b(x)
+             |    c(x, y)
+             |  }
+             |}
+             |
+             |$c
+             |""".stripMargin
+        val contract =
+          Compiler.compileMultiContract(code).rightValue.contracts(0).asInstanceOf[Ast.Contract]
+        contract.funcs.map(_.args.length) is Seq(0, 1, 2, 3)
+      }
+
+      {
+        info("Contract that inherits from both interface and abstract contract")
+        val e =
+          s"""
+             |Abstract Contract E() implements B {
+             |  @using(checkExternalCaller = false)
+             |  pub fn e(x: Bool, y: Bool, z: Bool) -> ()
+             |}
+             |""".stripMargin
+
+        val code =
+          s"""
+             |Contract Foo() extends E() implements C {
+             |  @using(checkExternalCaller = false)
+             |  pub fn c(x: Bool, y: Bool) -> () {}
+             |  @using(checkExternalCaller = false)
+             |  pub fn a() -> () {}
+             |  @using(checkExternalCaller = false)
+             |  pub fn b(x: Bool) -> () {}
+             |  pub fn e(x: Bool, y: Bool, z: Bool) -> () {
+             |    a()
+             |    b(x)
+             |    c(x, y)
+             |  }
+             |}
+             |
+             |$c
+             |$e
+             |""".stripMargin
+
+        val contract =
+          Compiler.compileMultiContract(code).rightValue.contracts(0).asInstanceOf[Ast.Contract]
+        contract.funcs.map(_.args.length) is Seq(0, 1, 2, 3)
+      }
+    }
+
+    {
+      info("Check that compilation fails if interfaces are not chained")
+
+      val diamondShapedParentInterfaces: String =
         s"""
-           |Contract Foo() implements C {
-           |  @using(checkExternalCaller = false)
-           |  pub fn c(x: Bool, y: Bool) -> () {}
-           |  @using(checkExternalCaller = false)
-           |  pub fn a() -> () {}
-           |  @using(checkExternalCaller = false)
-           |  pub fn b(x: Bool) -> () {}
-           |  pub fn d(x: Bool, y: Bool, z: Bool) -> () {
-           |    a()
-           |    b(x)
-           |    c(x, y)
+           |Contract FooBarBazContract() extends FooBarContract() implements FooBaz {
+           |  pub fn baz() -> (U256, U256) {
+           |     return 1, 2
            |  }
            |}
            |
-           |$c
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |
+           |Interface FooBar extends Foo {
+           |  pub fn bar() -> U256
+           |}
+           |
+           |Interface FooBaz extends Foo {
+           |  pub fn baz() -> (U256, U256)
+           |}
+           |
+           |Abstract Contract FooBarContract() implements FooBar {
+           |   pub fn foo() -> () {
+           |      return
+           |   }
+           |   pub fn bar() -> U256 {
+           |      return 1
+           |   }
+           |}
            |""".stripMargin
-      val contract =
-        Compiler.compileMultiContract(code).rightValue.contracts(0).asInstanceOf[Ast.Contract]
-      contract.funcs.map(_.args.length) is Seq(0, 1, 2, 3)
+
+      Compiler.compileContract(diamondShapedParentInterfaces).leftValue.message is
+        "Only single inheritance is allowed. Interface FooBaz does not inherit from FooBar"
+
+      val unrelatedParentInterfaces: String =
+        s"""
+           |Contract FooBarBazContract() extends FooBarContract() implements Foo {
+           |  pub fn baz() -> (U256, U256) {
+           |     return 1, 2
+           |  }
+           |}
+           |
+           |Interface Foo {
+           |  pub fn foo() -> ()
+           |}
+           |
+           |Interface Bar {
+           |  pub fn bar() -> U256
+           |}
+           |
+           |Abstract Contract FooBarContract() implements Bar {
+           |   pub fn foo() -> () {
+           |      return
+           |   }
+           |   pub fn bar() -> U256 {
+           |      return 1
+           |   }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(unrelatedParentInterfaces).leftValue.message is
+        "Only single inheritance is allowed. Interface Foo does not inherit from Bar"
     }
 
     {

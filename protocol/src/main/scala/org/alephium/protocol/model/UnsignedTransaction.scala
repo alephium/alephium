@@ -326,15 +326,27 @@ object UnsignedTransaction {
   ): Either[String, AVector[AssetOutput]] = {
     if (alphRemainder == U256.Zero && tokensRemainder.isEmpty) {
       Right(AVector.empty)
-    } else if (
-      (alphRemainder != dustUtxoAmount.mulUnsafe(U256.unsafe(tokensRemainder.length))) &&
-      (alphRemainder < dustUtxoAmount.mulUnsafe(U256.unsafe(tokensRemainder.length + 1)))
-    ) {
-      Left("Not enough ALPH for change output")
     } else {
-      Right(
-        buildOutputs(TxOutputInfo(fromLockupScript, alphRemainder, tokensRemainder, None, None))
-      )
+      val tokenDustAmount = dustUtxoAmount.mulUnsafe(U256.unsafe(tokensRemainder.length))
+      val totalDustAmount = tokenDustAmount.addUnsafe(dustUtxoAmount)
+
+      if ((alphRemainder == tokenDustAmount) || (alphRemainder >= totalDustAmount)) {
+        Right(
+          buildOutputs(TxOutputInfo(fromLockupScript, alphRemainder, tokensRemainder, None, None))
+        )
+      } else if (tokensRemainder.isEmpty) {
+        Left(
+          s"Not enough ALPH for ALPH change output, expected $dustUtxoAmount, got $alphRemainder"
+        )
+      } else if (alphRemainder < tokenDustAmount) {
+        Left(
+          s"Not enough ALPH for token change output, expected $tokenDustAmount, got $alphRemainder"
+        )
+      } else {
+        Left(
+          s"Not enough ALPH for ALPH and token change output, expected $totalDustAmount, got $alphRemainder"
+        )
+      }
     }
   }
 
