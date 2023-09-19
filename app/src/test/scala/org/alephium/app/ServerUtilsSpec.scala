@@ -2290,6 +2290,63 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  trait DustAmountFixture extends Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+    implicit val serverUtils  = new ServerUtils
+
+    val chainIndex      = ChainIndex.unsafe(0, 0)
+    val (_, testPubKey) = chainIndex.from.generateKey
+    val testAddress     = Address.p2pkh(testPubKey)
+
+    val script =
+      s"""
+         |TxScript Foo {
+         |  emit Debug(`Hey, I am Foo`)
+         |}
+         |""".stripMargin
+    val code = Compiler.compileTxScript(script).toOption.get
+
+    val gasAmount = GasBox.unsafe(30000)
+    val gasPrice  = nonCoinbaseMinGasPrice
+    val gasFee    = gasPrice * gasAmount
+
+    def attoAlphAmount: Option[Amount]
+
+    val alphPerUTXO = dustUtxoAmount + gasFee + attoAlphAmount.getOrElse(Amount.Zero).value - 1
+    val block1      = transfer(blockFlow, genesisKeys(1)._1, testPubKey, alphPerUTXO)
+    addAndCheck(blockFlow, block1)
+    checkAddressBalance(testAddress, alphPerUTXO, utxoNum = 1)
+
+    val block2 = transfer(blockFlow, genesisKeys(1)._1, testPubKey, alphPerUTXO)
+    addAndCheck(blockFlow, block2)
+    checkAddressBalance(testAddress, alphPerUTXO * 2, utxoNum = 2)
+
+    def executeTxScript() = {
+      serverUtils
+        .buildExecuteScriptTx(
+          blockFlow,
+          BuildExecuteScriptTx(
+            fromPublicKey = Hex.unsafe(testPubKey.toHexString),
+            bytecode = serialize(code),
+            gasAmount = Some(gasAmount),
+            gasPrice = Some(gasPrice),
+            attoAlphAmount = attoAlphAmount
+          )
+        )
+        .rightValue
+    }
+  }
+
+  it should "considers dustAmount for change output when selecting UTXOs, without amounts" in new DustAmountFixture {
+    override def attoAlphAmount: Option[Amount] = None
+    executeTxScript()
+  }
+
+  it should "considers dustAmount for change output when selecting UTXOs, with amounts" in new DustAmountFixture {
+    override def attoAlphAmount: Option[Amount] = Some(Amount(U256.unsafe(10)))
+    executeTxScript()
+  }
+
   it should "execute scripts for cross-group confirmed inputs" in new ScriptTxFixture {
     val block = transfer(blockFlow, genesisKeys(1)._1, testPubKey, ALPH.alph(2))
     addAndCheck(blockFlow, block)
