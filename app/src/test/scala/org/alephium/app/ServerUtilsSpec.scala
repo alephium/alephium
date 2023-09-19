@@ -1367,7 +1367,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       "VM execution error: AssertionFailedWithErrorCode(tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq,0)"
   }
 
-  it should "test blockHash function for Ralph" in new TestContractFixture {
+  ignore should "test blockHash function for Ralph" in new TestContractFixture {
     val blockHash = BlockHash.random
     val contract =
       s"""

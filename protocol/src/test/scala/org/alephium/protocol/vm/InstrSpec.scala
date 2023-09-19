@@ -2119,6 +2119,16 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       alphBalance(lockupScript, ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)),
       alphBalance(lockupScript, ALPH.oneNanoAlph)
     )
+
+    stack.push(Val.Address(lockupScript))
+    stack.push(Val.U256(ALPH.alph(2)))
+
+    ApproveAlph.runWith(frame).leftValue isE NotEnoughApprovedBalance(
+      lockupScript,
+      TokenId.alph,
+      ALPH.alph(2),
+      ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)
+    )
   }
 
   it should "ApproveToken" in new StatefulInstrFixture {
@@ -2129,16 +2139,20 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         initBalanceState: MutBalanceState,
         tokenId: TokenId,
         amount: U256,
-        remainBalanceState: MutBalanceState
+        remainBalanceState: MutBalanceState,
+        error: Option[ExeFailure] = None
     ) = {
       frame.opStack.push(Val.Address(lockupScript))
       frame.opStack.push(Val.ByteVec(tokenId.bytes))
       frame.opStack.push(Val.U256(amount))
       frame.balanceStateOpt.get is initBalanceState
 
-      runAndCheckGas(ApproveToken, None, frame)
-
-      frame.balanceStateOpt.get is remainBalanceState
+      if (error.isEmpty) {
+        runAndCheckGas(ApproveToken, None, frame)
+        frame.balanceStateOpt.get is remainBalanceState
+      } else {
+        ApproveToken.runWith(frame).leftValue isE error.get
+      }
     }
 
     val initBalanceState0 =
@@ -2146,6 +2160,21 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         balances(lockupScript, None, Map(tokenId -> ALPH.oneAlph, TokenId.alph -> ALPH.oneAlph))
       )
     val genesisFrame = preparePreLemanFrame(Some(initBalanceState0))
+    test(
+      genesisFrame,
+      initBalanceState0,
+      tokenId,
+      ALPH.alph(2),
+      MutBalanceState.from(MutBalances.empty),
+      Option(
+        NotEnoughApprovedBalance(
+          lockupScript,
+          tokenId,
+          ALPH.alph(2),
+          ALPH.oneAlph
+        )
+      )
+    )
     test(
       genesisFrame,
       initBalanceState0,
@@ -2188,6 +2217,21 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     test(
       lemanFrame,
       initBalanceState1,
+      TokenId.alph,
+      ALPH.alph(2),
+      MutBalanceState.from(MutBalances.empty),
+      Option(
+        NotEnoughApprovedBalance(
+          lockupScript,
+          TokenId.alph,
+          ALPH.alph(2),
+          ALPH.oneAlph
+        )
+      )
+    )
+    test(
+      lemanFrame,
+      initBalanceState1,
       tokenId,
       ALPH.oneNanoAlph,
       MutBalanceState(
@@ -2213,6 +2257,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         balances(lockupScript, Some(ALPH.oneNanoAlph), Map(tokenId -> ALPH.oneNanoAlph))
       )
     )
+
   }
 
   it should "AlphRemaining" in new StatefulInstrFixture {
@@ -2342,7 +2387,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(tokenId.bytes))
     stack.push(Val.U256(ALPH.alph(2)))
 
-    BurnToken.runWith(frame).leftValue isE NotEnoughBalance
+    BurnToken.runWith(frame).leftValue isE NotEnoughApprovedBalance(
+      from,
+      tokenId,
+      ALPH.alph(2),
+      ALPH.oneAlph
+    )
 
     stack.push(Val.Address(from))
     stack.push(Val.ByteVec(TokenId.alph.bytes))
@@ -2428,7 +2478,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.Address(from))
     stack.push(Val.Address(to))
     stack.push(Val.U256(ALPH.alph(10)))
-    TransferAlph.runWith(frame).leftValue isE NotEnoughBalance
+    TransferAlph.runWith(frame).leftValue isE NotEnoughApprovedBalance(
+      from,
+      TokenId.alph,
+      ALPH.alph(10),
+      ALPH.oneAlph.subUnsafe(ALPH.oneNanoAlph)
+    )
 
     stack.push(Val.Address(from))
     stack.push(Val.Address(contractAddress))
@@ -2565,6 +2620,17 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.ByteVec(tokenId.bytes))
     stack.push(Val.U256(ALPH.oneNanoAlph))
     TransferToken.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
+
+    stack.push(Val.Address(from))
+    stack.push(Val.Address(to))
+    stack.push(Val.ByteVec(tokenId.bytes))
+    stack.push(Val.U256(ALPH.alph(2)))
+    TransferToken.runWith(frame).leftValue isE NotEnoughApprovedBalance(
+      from,
+      tokenId,
+      ALPH.alph(2),
+      ALPH.oneAlph
+    )
   }
 
   it should "TransferTokenFromSelf" in new TransferTokenFixture {

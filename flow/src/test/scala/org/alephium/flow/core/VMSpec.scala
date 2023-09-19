@@ -946,7 +946,6 @@ class VMSpec extends AlephiumSpec with Generators {
          |  assert!(zeros!(2) == #0000, 0)
          |  assert!(nullContractAddress!() == @${Address.contract(ContractId.zero)}, 0)
          |  assert!(nullContractAddress!() == @tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, 0)
-         |  assert!(blockHash!() != #${Hash.zero.toHexString}, 0)
          |  assert!(ALPH == zeros!(32), 0)
          |  assert!(ALPH == #0000000000000000000000000000000000000000000000000000000000000000, 0)
          |}
@@ -3604,6 +3603,63 @@ class VMSpec extends AlephiumSpec with Generators {
     test("@std(id = #0001)", "1, 2i, #11", "0302010301110306414c50480001", "010102")
   }
 
+  it should "encode array type contract fields" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo(@unused a: U256, @unused mut b: [U256; 2], @unused mut c: U256, @unused d: [U256; 2]) {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    val fooContract = Compiler.compileContract(foo).rightValue
+    val fooBytecode = Hex.toHexString(serialize(fooContract))
+
+    private def deployAndCheckContractState(
+        script: String,
+        immFields: AVector[Val],
+        mutFields: AVector[Val]
+    ) = {
+      val block      = callTxScript(script)
+      val tx         = block.nonCoinbase.head
+      val contractId = ContractId.from(tx.id, tx.unsigned.fixedOutputs.length, tx.fromGroup)
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val contractState = worldState.getContractState(contractId).rightValue
+      contractState.immFields is immFields
+      contractState.mutFields is mutFields
+    }
+
+    val script0 =
+      s"""
+         |TxScript Deploy() {
+         |  let (encodedImmFields, encodedMutFields) = Foo.encodeFields!(0, [1, 2], 3, [4, 5])
+         |  createContract!{@$genesisAddress -> ALPH: $minimalAlphInContract}(#$fooBytecode, encodedImmFields, encodedMutFields)
+         |}
+         |$foo
+         |""".stripMargin
+
+    deployAndCheckContractState(
+      script0,
+      AVector.from(Seq(0, 4, 5)).map(v => Val.U256(U256.unsafe(v))),
+      AVector.from(Seq(1, 2, 3)).map(v => Val.U256(U256.unsafe(v)))
+    )
+
+    val script1 =
+      s"""
+         |TxScript Deploy() {
+         |  let encodedImmFields = Foo.encodeImmFields!(0, [1, 2])
+         |  let encodedMutFields = Foo.encodeMutFields!([3, 4], 5)
+         |  createContract!{@$genesisAddress -> ALPH: $minimalAlphInContract}(#$fooBytecode, encodedImmFields, encodedMutFields)
+         |}
+         |$foo
+         |""".stripMargin
+
+    deployAndCheckContractState(
+      script1,
+      AVector.from(Seq(0, 1, 2)).map(v => Val.U256(U256.unsafe(v))),
+      AVector.from(Seq(3, 4, 5)).map(v => Val.U256(U256.unsafe(v)))
+    )
+  }
+
   trait SelfContractFixture extends ContractFixture {
     def foo(selfContractStr: String): String
 
@@ -4524,6 +4580,53 @@ class VMSpec extends AlephiumSpec with Generators {
     test(ALPH.oneAlph - 1)
     test(ALPH.oneAlph)
     test(ALPH.oneAlph + 1)
+  }
+
+  "Mempool" should "remove invalid transaction" in new ContractFixture {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    assert!(false, 0)
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractId = createContract(code)._1
+
+    val scriptStr: String =
+      s"""|
+          |@using(preapprovedAssets = false)
+          |TxScript Bar {
+          |  let foo = Foo(#${contractId.toHexString})
+          |  foo.foo()
+          |}
+          |
+          |${code}
+          |""".stripMargin
+    val script = Compiler.compileTxScript(scriptStr).rightValue
+    val tx = transferTxs(
+      blockFlow,
+      chainIndex,
+      ALPH.alph(1),
+      1,
+      Some(script),
+      true,
+      validation = false
+    ).head
+
+    val (_, minerPubKey) = chainIndex.to.generateKey
+    val miner            = LockupScript.p2pkh(minerPubKey)
+    val emptyTemplate    = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+
+    blockFlow.getGrandPool().add(chainIndex, tx.toTemplate, TimeStamp.now())
+    blockFlow.getGrandPool().size is 1
+    val newTemplate =
+      emptyTemplate.copy(transactions = AVector(tx, emptyTemplate.transactions.last))
+
+    // The invalid tx is removed
+    blockFlow.validateTemplate(chainIndex, newTemplate)
+    blockFlow.getGrandPool().size is 0
   }
 
   private def getEvents(

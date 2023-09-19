@@ -19,7 +19,7 @@ package org.alephium.protocol.vm
 import java.math.BigInteger
 
 import org.alephium.io.IOError
-import org.alephium.protocol.model.{Address, ContractId}
+import org.alephium.protocol.model.{dustUtxoAmount, Address, ContractId, TokenId}
 import org.alephium.serde.SerdeError
 import org.alephium.util.U256
 
@@ -82,16 +82,46 @@ case object InvalidAddressTypeInContractDestroy                extends ExeFailur
 case object ExpectNonPayableMethod                             extends ExeFailure
 case object ExpectStatefulContractObj                          extends ExeFailure
 case object NoBalanceAvailable                                 extends ExeFailure
-case object NotEnoughBalance                                   extends ExeFailure
-case object NoAssetsApproved                                   extends ExeFailure
-case object BalanceOverflow                                    extends ExeFailure
-case object NoAlphBalanceForTheAddress                         extends ExeFailure
-case object NoTokenBalanceForTheAddress                        extends ExeFailure
-case object InvalidBalances                                    extends ExeFailure
-case object BalanceErrorWhenSwitchingBackFrame                 extends ExeFailure
-case object LowerThanContractMinimalBalance                    extends ExeFailure
-case object UnableToPayGasFee                                  extends ExeFailure
-case object InvalidOutputBalances                              extends ExeFailure
+final case class NotEnoughApprovedBalance(
+    lockupScript: LockupScript,
+    tokenId: TokenId,
+    expected: U256,
+    got: U256
+) extends ExeFailure {
+  override def toString: String = {
+    val token = if (tokenId == TokenId.alph) "ALPH" else tokenId.toHexString
+    s"NotEnoughApprovedBalance(address: ${Address.from(lockupScript)},tokenId: $token,expected: $expected,got: $got)"
+  }
+}
+case object NoAssetsApproved                   extends ExeFailure
+case object BalanceOverflow                    extends ExeFailure
+case object NoAlphBalanceForTheAddress         extends ExeFailure
+case object NoTokenBalanceForTheAddress        extends ExeFailure
+case object InvalidBalances                    extends ExeFailure
+case object BalanceErrorWhenSwitchingBackFrame extends ExeFailure
+case object LowerThanContractMinimalBalance    extends ExeFailure
+case object UnableToPayGasFee                  extends ExeFailure
+final case class InvalidOutputBalances(
+    lockupScript: LockupScript,
+    tokenSize: Int,
+    attoAlphAmount: U256
+) extends ExeFailure {
+  override def toString: String = {
+    val address         = Address.from(lockupScript)
+    val tokenDustAmount = dustUtxoAmount.mulUnsafe(U256.unsafe(tokenSize))
+    val totalDustAmount = if (attoAlphAmount == U256.Zero) {
+      tokenDustAmount
+    } else {
+      if (attoAlphAmount < tokenDustAmount) {
+        tokenDustAmount
+      } else {
+        tokenDustAmount.addUnsafe(dustUtxoAmount)
+      }
+    }
+    s"InvalidOutputBalances(Invalid ALPH balance for address $address, expected $totalDustAmount, " +
+      s"got $attoAlphAmount, you need to transfer more ALPH to this address)"
+  }
+}
 case object InvalidTokenNumForContractOutput                   extends ExeFailure
 case object InvalidTokenId                                     extends ExeFailure
 case object InvalidContractId                                  extends ExeFailure

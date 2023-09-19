@@ -101,13 +101,17 @@ final case class MutBalancesPerLockup(
   ): ExeResult[AVector[TxOutput]] = {
     val tokens = tokenVector
     if (attoAlphAmount.isZero) {
-      if (tokens.isEmpty) Right(AVector.empty) else failed(InvalidOutputBalances)
+      if (tokens.isEmpty) {
+        Right(AVector.empty)
+      } else {
+        failed(InvalidOutputBalances(lockupScript, tokens.length, attoAlphAmount))
+      }
     } else {
       lockupScript match {
         case l: LockupScript.Asset =>
           TxOutput
             .from(attoAlphAmount, tokens, l, lockTime)
-            .toRight(Right(InvalidOutputBalances))
+            .toRight(Right(InvalidOutputBalances(lockupScript, tokens.length, attoAlphAmount)))
         case l: LockupScript.P2C =>
           if (attoAlphAmount < minimalAlphInContract) {
             failed(LowerThanContractMinimalBalance)
@@ -123,7 +127,11 @@ final case class MutBalancesPerLockup(
   def toTxOutputDeprecated(lockupScript: LockupScript): ExeResult[AVector[TxOutput]] = {
     val tokens = tokenVector
     if (attoAlphAmount.isZero) {
-      if (tokens.isEmpty) Right(AVector.empty) else failed(InvalidOutputBalances)
+      if (tokens.isEmpty) {
+        Right(AVector.empty)
+      } else {
+        failed(InvalidOutputBalances(lockupScript, tokens.length, attoAlphAmount))
+      }
     } else {
       Right(AVector(TxOutput.fromDeprecated(attoAlphAmount, tokens, lockupScript)))
     }

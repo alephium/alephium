@@ -920,16 +920,6 @@ object BuiltIn {
     def doc: String     = "Terminates the application immediately."
   }
 
-  val blockHash: BuiltIn[StatelessContext] =
-    SimpleBuiltIn.chainSimple(
-      "blockHash",
-      Seq.empty,
-      Seq(Type.ByteVec),
-      BlockHash,
-      Seq(),
-      retComment = "the block hash of the current block"
-    )
-
   val mulModN: BuiltIn[StatelessContext] =
     SimpleBuiltIn.utilsSimple(
       "mulModN",
@@ -1027,7 +1017,6 @@ object BuiltIn {
     verifyED25519,
     verifyBIP340Schnorr,
     networkId,
-    blockHash,
     blockTimeStamp,
     blockTarget,
     txId,
@@ -1763,7 +1752,7 @@ object BuiltIn {
       val returnType: Seq[Type] = Seq(Type.ByteVec)
 
       def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
-        ContractBuiltIn.genCodeForStdId(stdInterfaceIdOpt, argsType.length)
+        ContractBuiltIn.genCodeForStdId(stdInterfaceIdOpt, Type.flattenTypeLength(argsType))
     }
   }
 
@@ -1777,7 +1766,7 @@ object BuiltIn {
       val returnType: Seq[Type] = Seq(Type.ByteVec)
 
       def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
-        Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(argsType.length)), Encode)
+        Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(Type.flattenTypeLength(argsType))), Encode)
     }
   }
 
@@ -1785,7 +1774,10 @@ object BuiltIn {
       stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
       fields: Seq[Ast.Argument]
   ): Compiler.ContractFunc[Ctx] = {
-    val fieldTypes = fields.map(_.tpe)
+    val fieldTypes             = fields.map(_.tpe)
+    val (mutFields, immFields) = fields.view.partition(_.isMutable)
+    val immFieldsLength        = Type.flattenTypeLength(immFields.map(_.tpe).toSeq)
+    val mutFieldsLength        = Type.flattenTypeLength(mutFields.map(_.tpe).toSeq)
     new ContractBuiltIn[Ctx] {
       val name: String          = "encodeFields"
       val argsType: Seq[Type]   = fieldTypes
@@ -1806,10 +1798,10 @@ object BuiltIn {
           }
         val immFieldInstrs = immFields.flatMap(_.genCode(state)) ++ ContractBuiltIn.genCodeForStdId(
           stdInterfaceIdOpt,
-          immFields.length
+          immFieldsLength
         )
         val mutFieldInstrs = mutFields.flatMap(_.genCode(state)) ++ Seq[Instr[Ctx]](
-          U256Const(Val.U256.unsafe(mutFields.length)),
+          U256Const(Val.U256.unsafe(mutFieldsLength)),
           Encode
         )
         immFieldInstrs ++ mutFieldInstrs

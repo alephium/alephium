@@ -484,7 +484,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           nonCoinbaseMinGasPrice
         )
-        .leftValue is "Not enough ALPH for change output"
+        .leftValue is "Not enough ALPH for token change output, expected 2000000000000000, got 999999999999999"
     }
 
     {
@@ -512,7 +512,7 @@ class TxUtilsSpec extends AlephiumSpec {
           minimalGas,
           nonCoinbaseMinGasPrice
         )
-        .leftValue is "Not enough ALPH for change output"
+        .leftValue is "Not enough ALPH for ALPH change output, expected 1000000000000000, got 999999999999999"
     }
   }
 
@@ -1152,7 +1152,7 @@ class TxUtilsSpec extends AlephiumSpec {
       buildScriptTx(
         inputs,
         approvedAlph.subOneUnsafe()
-      ).leftValue is "Not enough ALPH for change output"
+      ).leftValue is "Not enough ALPH for ALPH change output, expected 1000000000000000, got 1"
     }
 
     {
@@ -1173,7 +1173,7 @@ class TxUtilsSpec extends AlephiumSpec {
         inputs,
         availableAlph.subOneUnsafe(),
         (tokenId, ALPH.oneAlph.subOneUnsafe())
-      ).leftValue is "Not enough ALPH for change output"
+      ).leftValue is "Not enough ALPH for ALPH and token change output, expected 2000000000000000, got 1000000000000001"
     }
   }
 

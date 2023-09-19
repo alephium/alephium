@@ -194,7 +194,9 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
       }
 
       def failGenesis(): Assertion = {
-        genesisOutputs is failed(InvalidOutputBalances)
+        genesisOutputs is failed(
+          InvalidOutputBalances(lockupScript, tokens.length, alphAmount)
+        )
       }
 
       def expectLeman(outputs: (U256, Seq[(TokenId, U256)])*): Assertion = {
@@ -203,7 +205,9 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
         }
       }
 
-      def failLeman(error: ExeFailure = InvalidOutputBalances): Assertion = {
+      def failLeman(
+          error: ExeFailure = InvalidOutputBalances(lockupScript, tokens.length, alphAmount)
+      ): Assertion = {
         lemanOutputs is failed(error)
       }
     }

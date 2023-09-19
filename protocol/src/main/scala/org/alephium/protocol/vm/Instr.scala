@@ -1485,7 +1485,16 @@ object BurnToken extends LemanAssetInstr with StatefulInstrCompanion0 {
         } else {
           balanceState
             .useToken(fromAddress.lockupScript, tokenId, tokenAmount.v)
-            .toRight(Right(NotEnoughBalance))
+            .toRight(
+              Right(
+                NotEnoughApprovedBalance(
+                  fromAddress.lockupScript,
+                  tokenId,
+                  tokenAmount.v,
+                  balanceState.tokenRemainingUnsafe(fromAddress.lockupScript, tokenId)
+                )
+              )
+            )
         }
     } yield ()
   }
@@ -1529,7 +1538,16 @@ object ApproveAlph extends AssetInstr with StatefulInstrCompanion0 {
       balanceState <- frame.getBalanceState()
       _ <- balanceState
         .approveALPH(address.lockupScript, amount.v)
-        .toRight(Right(NotEnoughBalance))
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              address.lockupScript,
+              TokenId.alph,
+              amount.v,
+              balanceState.alphRemainingUnsafe(address.lockupScript)
+            )
+          )
+        )
     } yield ()
   }
 }
@@ -1551,11 +1569,31 @@ object ApproveToken extends AssetInstr with StatefulInstrCompanion0 {
       balanceState <- frame.getBalanceState()
       _ <-
         if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
-          balanceState.approveALPH(address.lockupScript, amount.v).toRight(Right(NotEnoughBalance))
+          balanceState
+            .approveALPH(address.lockupScript, amount.v)
+            .toRight(
+              Right(
+                NotEnoughApprovedBalance(
+                  address.lockupScript,
+                  tokenId,
+                  amount.v,
+                  balanceState.alphRemainingUnsafe(address.lockupScript)
+                )
+              )
+            )
         } else {
           balanceState
             .approveToken(address.lockupScript, tokenId, amount.v)
-            .toRight(Right(NotEnoughBalance))
+            .toRight(
+              Right(
+                NotEnoughApprovedBalance(
+                  address.lockupScript,
+                  tokenId,
+                  amount.v,
+                  balanceState.tokenRemainingUnsafe(address.lockupScript, tokenId)
+                )
+              )
+            )
         }
     } yield ()
   }
@@ -1632,7 +1670,18 @@ sealed trait Transfer extends AssetInstr {
   ): ExeResult[Unit] = {
     for {
       balanceState <- frame.getBalanceState()
-      _            <- balanceState.useAlph(from, amount.v).toRight(Right(NotEnoughBalance))
+      _ <- balanceState
+        .useAlph(from, amount.v)
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              from,
+              TokenId.alph,
+              amount.v,
+              balanceState.alphRemainingUnsafe(from)
+            )
+          )
+        )
       _ <- frame.ctx.outputBalances
         .addAlph(to, amount.v)
         .toRight(Right(BalanceOverflow))
@@ -1663,7 +1712,16 @@ sealed trait Transfer extends AssetInstr {
       balanceState <- frame.getBalanceState()
       _ <- balanceState
         .useToken(from, tokenId, amount.v)
-        .toRight(Right(NotEnoughBalance))
+        .toRight(
+          Right(
+            NotEnoughApprovedBalance(
+              from,
+              tokenId,
+              amount.v,
+              balanceState.tokenRemainingUnsafe(from, tokenId)
+            )
+          )
+        )
       _ <- frame.ctx.outputBalances
         .addToken(to, tokenId, amount.v)
         .toRight(Right(BalanceOverflow))
