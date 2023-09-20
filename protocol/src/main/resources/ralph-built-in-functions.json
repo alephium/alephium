@@ -301,6 +301,17 @@
     "returns": "@returns the id of the sub contract"
   },
   {
+    "name": "subContractIdInParentGroup",
+    "category": "SubContract",
+    "signature": "fn subContractIdInParentGroup!(contract:<Contract>, subContractPath:ByteVec) -> (ByteVec)",
+    "doc": "Returns the id of the sub contract.",
+    "params": [
+      "@param contract the parent contract of the sub-contract",
+      "@param subContractPath the path of the sub-contract"
+    ],
+    "returns": "@returns the id of the sub contract"
+  },
+  {
     "name": "approveToken",
     "category": "Asset",
     "signature": "fn approveToken!(fromAddress:Address, tokenId:ByteVec, amount:U256) -> ()",

@@ -1570,8 +1570,7 @@ object BuiltIn {
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
-  val subContractIdOf: BuiltIn[StatefulContext] = new SubContractBuiltIn {
-    val name: String = "subContractIdOf"
+  sealed abstract private class SubContractIdOfBuiltIn extends SubContractBuiltIn {
     override def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
       if (
         inputType.length == 2 &&
@@ -1583,9 +1582,6 @@ object BuiltIn {
         throw Error(s"Invalid argument type for $name, (Contract, ByteVec) expected")
       }
     }
-    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
-      Seq[Instr[StatefulContext]](SubContractIdOf)
-    }
 
     val argsCommentedName: Seq[(String, String)] =
       Seq(
@@ -1595,6 +1591,42 @@ object BuiltIn {
 
     override def signature: String =
       s"fn $name!(contract:<Contract>, subContractPath:ByteVec) -> (ByteVec)"
+  }
+
+  val subContractIdOf: BuiltIn[StatefulContext] = new SubContractIdOfBuiltIn {
+    val name: String = "subContractIdOf"
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
+      Seq[Instr[StatefulContext]](SubContractIdOf)
+    }
+  }
+
+  val subContractIdInParentGroup: BuiltIn[StatefulContext] = new SubContractIdOfBuiltIn {
+    val name: String = "subContractIdInParentGroup"
+
+    override def genCodeForArgs[C <: StatefulContext](
+        args: Seq[Ast.Expr[C]],
+        state: Compiler.State[C]
+    ): Seq[Instr[C]] = {
+      assume(args.length == 2)
+      (args(0).genCode(state) :+ Dup) ++ args(1).genCode(state)
+    }
+
+    def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = {
+      Seq[Instr[StatefulContext]](
+        SubContractIdOf,
+        U256Const0,
+        // scalastyle:off magic.number
+        U256Const(Val.U256(U256.unsafe(31))),
+        ByteVecSlice,
+        Swap,
+        U256Const(Val.U256(U256.unsafe(31))),
+        U256Const(Val.U256(U256.unsafe(32))),
+        // scalastyle:on magic.number
+        ByteVecSlice,
+        ByteVecConcat
+      )
+    }
   }
 
   val nullContractAddress: SimpleBuiltIn[StatefulContext] =
@@ -1697,6 +1729,7 @@ object BuiltIn {
       isCalledFromTxScript,
       subContractId,
       subContractIdOf,
+      subContractIdInParentGroup,
       nullContractAddress,
       selfContract
     ).map(f => f.name -> f)
