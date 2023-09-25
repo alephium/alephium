@@ -203,6 +203,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       override def noPreMineProof: ByteString = ByteString.empty
       override def lemanHardForkTimestamp: TimeStamp =
         ALPH.DifficultyBombPatchEnabledTimeStamp.plusHoursUnsafe(100)
+      def ghostHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
     }
 
     final def calIceAgeTarget(

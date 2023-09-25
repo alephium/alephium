@@ -99,6 +99,7 @@ final case class MiningSetting(
 final case class NetworkSetting(
     networkId: NetworkId,
     lemanHardForkTimestamp: TimeStamp,
+    ghostHardForkTimestamp: TimeStamp,
     noPreMineProof: ByteString,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
@@ -245,6 +246,7 @@ object AlephiumConfig {
   final private case class TempNetworkSetting(
       networkId: NetworkId,
       lemanHardForkTimestamp: TimeStamp,
+      ghostHardForkTimestamp: TimeStamp,
       noPreMineProof: Seq[String],
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
@@ -280,6 +282,7 @@ object AlephiumConfig {
       NetworkSetting(
         networkId,
         lemanHardForkTimestamp,
+        ghostHardForkTimestamp,
         proofInOne,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,

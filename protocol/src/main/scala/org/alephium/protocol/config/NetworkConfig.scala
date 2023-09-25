@@ -38,9 +38,12 @@ trait NetworkConfig {
   // scalastyle:on magic.number
 
   def lemanHardForkTimestamp: TimeStamp
+  def ghostHardForkTimestamp: TimeStamp // TODO: rename
 
   def getHardFork(timeStamp: TimeStamp): HardFork = {
-    if (timeStamp >= lemanHardForkTimestamp) {
+    if (timeStamp >= ghostHardForkTimestamp) {
+      HardFork.Ghost
+    } else if (timeStamp >= lemanHardForkTimestamp) {
       HardFork.Leman
     } else {
       HardFork.Mainnet

@@ -24,12 +24,14 @@ import org.alephium.util.TimeStamp
 trait NetworkConfigFixture { self =>
   def networkId: NetworkId
   def lemanHardForkTimestamp: TimeStamp = TimeStamp.zero
+  def ghostHardForkTimestamp: TimeStamp = TimeStamp.zero
 
   implicit lazy val networkConfig: NetworkConfig = new NetworkConfig {
     val networkId: NetworkId       = self.networkId
     val noPreMineProof: ByteString = ByteString.empty
     val lemanHardForkTimestamp: TimeStamp =
       self.lemanHardForkTimestamp // enabled by default for all tests
+    val ghostHardForkTimestamp: TimeStamp = self.ghostHardForkTimestamp
   }
 }
 
@@ -42,11 +44,13 @@ object NetworkConfigFixture {
     override def networkId: NetworkId              = NetworkId.AlephiumMainNet
     override def noPreMineProof: ByteString        = ByteString.empty
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.unsafe(Long.MaxValue)
+    def ghostHardForkTimestamp: TimeStamp          = TimeStamp.unsafe(Long.MaxValue)
   }
 
   val Leman = new NetworkConfig {
     override def networkId: NetworkId              = NetworkId.AlephiumMainNet
     override def noPreMineProof: ByteString        = ByteString.empty
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
+    def ghostHardForkTimestamp: TimeStamp          = TimeStamp.unsafe(Long.MaxValue)
   }
 }

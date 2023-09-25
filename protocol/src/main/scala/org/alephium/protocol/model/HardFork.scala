@@ -22,10 +22,12 @@ sealed class HardFork(val version: Int) extends Ordered[HardFork] {
   def compare(that: HardFork): Int = this.version.compareTo(that.version)
 
   def isLemanEnabled(): Boolean = this >= HardFork.Leman
+  def isGhostEnabled(): Boolean = this >= HardFork.Ghost
 }
 object HardFork {
   object Mainnet extends HardFork(0)
   object Leman   extends HardFork(1)
+  object Ghost   extends HardFork(2)
 
   val All: ArraySeq[HardFork] = ArraySeq(Mainnet, Leman)
 }
