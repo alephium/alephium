@@ -21,14 +21,20 @@ import scala.collection.IndexedSeqView
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable.ArrayBuffer
 
+import akka.util.ByteString
+
 import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.model.BlockHash
-import org.alephium.serde.Serde
+import org.alephium.serde.{_deserialize => _decode, serialize => encode, _}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
-final case class Block(header: BlockHeader, transactions: AVector[Transaction]) extends FlowData {
+final case class Block(
+    header: BlockHeader,
+    uncles: AVector[BlockHeader],
+    transactions: AVector[Transaction]
+) extends FlowData {
   def hash: BlockHash = header.hash
 
   def chainIndex: ChainIndex = header.chainIndex
@@ -77,7 +83,31 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
 }
 
 object Block {
-  implicit val serde: Serde[Block] = Serde.forProduct2(apply, b => (b.header, b.transactions))
+  implicit val serde: Serde[Block] = new Serde[Block] {
+    def serialize(block: Block): ByteString = {
+      val bytes = encode(block.header) ++ encode(block.transactions)
+      if (block.header.version == GhostBlockVersion) bytes ++ encode(block.uncles) else bytes
+    }
+    def _deserialize(rest: ByteString): SerdeResult[Staging[Block]] = {
+      for {
+        headerResult <- _decode[BlockHeader](rest)
+        result <-
+          if (headerResult.value.version == GhostBlockVersion) {
+            for {
+              txsResult    <- _decode[AVector[Transaction]](headerResult.rest)
+              unclesResult <- _decode[AVector[BlockHeader]](txsResult.rest)
+            } yield Staging(
+              Block(headerResult.value, unclesResult.value, txsResult.value),
+              unclesResult.rest
+            )
+          } else {
+            _decode[AVector[Transaction]](headerResult.rest).map(txsResult =>
+              Staging(Block(headerResult.value, AVector.empty, txsResult.value), txsResult.rest)
+            )
+          }
+      } yield result
+    }
+  }
 
   def calTxsHash(transactions: AVector[Transaction]): Hash =
     MerkleHashable.rootHash(Hash, transactions)
@@ -85,6 +115,7 @@ object Block {
   def from(
       deps: AVector[BlockHash],
       depStateHash: Hash,
+      uncles: AVector[BlockHeader],
       transactions: AVector[Transaction],
       target: Target,
       timeStamp: TimeStamp,
@@ -93,7 +124,7 @@ object Block {
     val txsHash     = calTxsHash(transactions)
     val blockDeps   = BlockDeps.build(deps)
     val blockHeader = BlockHeader.unsafe(blockDeps, depStateHash, txsHash, timeStamp, target, nonce)
-    Block(blockHeader, transactions)
+    Block(blockHeader, uncles, transactions)
   }
 
   def genesis(chainIndex: ChainIndex, transactions: AVector[Transaction])(implicit
@@ -101,7 +132,7 @@ object Block {
       consensusConfig: ConsensusConfig
   ): Block = {
     val txsHash = calTxsHash(transactions)
-    Block(BlockHeader.genesis(chainIndex, txsHash), transactions)
+    Block(BlockHeader.genesis(chainIndex, txsHash), AVector.empty, transactions)
   }
 
   def scriptIndexes[T <: TransactionAbstract](nonCoinbase: AVector[T]): ArrayBuffer[Int] = {

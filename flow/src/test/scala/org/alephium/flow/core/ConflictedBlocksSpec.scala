@@ -42,6 +42,7 @@ class ConflictedBlocksSpec
       Block.from(
         AVector.fill(groupConfig.depsNum)(BlockHash.zero),
         Hash.zero,
+        AVector.empty,
         AVector(transaction),
         Target.Max,
         TimeStamp.now(),
@@ -56,6 +57,7 @@ class ConflictedBlocksSpec
       Block.from(
         AVector.fill(groupConfig.depsNum)(BlockHash.zero),
         Hash.zero,
+        AVector.empty,
         AVector.from(transactions),
         Target.Max,
         TimeStamp.now(),

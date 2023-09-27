@@ -124,7 +124,7 @@ class BlockHeaderSpec
 
     val header1Blob = header1.verify("header1")
 
-    val block     = Block(header1, AVector.empty)
+    val block     = Block(header1, AVector.empty, AVector.empty)
     val blockBlob = header1Blob ++ hex"00"
     serialize(block) is blockBlob
 

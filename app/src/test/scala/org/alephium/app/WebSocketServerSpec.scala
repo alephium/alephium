@@ -59,7 +59,7 @@ class WebSocketServerSpec
         Nonce.zero
       )
 
-    val block       = Block(header, AVector.empty)
+    val block       = Block(header, AVector.empty, AVector.empty)
     val blockNotify = BlockNotify(block, 1)
     val result      = WebSocketServer.blockNotifyEncode(blockNotify)
 

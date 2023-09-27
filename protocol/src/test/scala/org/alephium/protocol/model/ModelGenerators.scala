@@ -541,6 +541,7 @@ trait BlockGenerators extends TxGenerators {
       val block = Block.from(
         deps,
         depStateHash,
+        AVector.empty,
         txsWithCoinbase,
         consensusConfig.maxMiningTarget,
         blockTs,

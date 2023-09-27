@@ -27,7 +27,7 @@ import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.{InvalidBlockVersion, InvalidTxsMerkleRoot}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{Block, BlockHeader, ChainIndex}
-import org.alephium.util.ActorRefT
+import org.alephium.util.{ActorRefT, AVector}
 
 class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   trait Fixture extends FlowFixture {
@@ -152,7 +152,7 @@ class BlockChainHandlerSpec extends AlephiumFlowActorSpec {
   it should "broadcast block if the block header is valid" in new Fixture {
     // block header is valid, but block is invalid
     val block        = transfer(blockFlow, chainIndex)
-    val invalidBlock = Block(block.header, block.nonCoinbase ++ block.transactions)
+    val invalidBlock = Block(block.header, AVector.empty, block.nonCoinbase ++ block.transactions)
 
     blockChainHandler ! InterCliqueManager.SyncedResult(true)
     validateBlock(invalidBlock)

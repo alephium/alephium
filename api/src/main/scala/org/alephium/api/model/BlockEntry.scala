@@ -45,6 +45,7 @@ final case class BlockEntry(
     } yield {
       Block(
         header,
+        AVector.empty,
         transactions
       )
     }

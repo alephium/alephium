@@ -22,6 +22,7 @@ import org.alephium.util.U256
 
 package object model {
   val DefaultBlockVersion: Byte = 0.toByte
+  val GhostBlockVersion: Byte   = 1.toByte
   val DefaultTxVersion: Byte    = 0.toByte
 
   val cliqueIdLength: Int = PublicKey.length

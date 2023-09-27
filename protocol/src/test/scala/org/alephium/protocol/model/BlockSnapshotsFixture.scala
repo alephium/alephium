@@ -21,12 +21,12 @@ import org.alephium.protocol.model.BlockHash
 import org.alephium.util.{AVector, Hex, TimeStamp}
 
 trait BlockSnapshotsFixture extends TransactionSnapshotsFixture {
-  def blockHeader(txsHash: Hash) = {
+  def blockHeader(txsHash: Hash, version: Byte = DefaultBlockVersion) = {
     import Hex._
 
     BlockHeader(
       nonce = Nonce.unsafe(hex"bb557f744763ca4f5ef8079b4b76c2dbb26a4cd845fbc84d"),
-      version = DefaultBlockVersion,
+      version = version,
       blockDeps = BlockDeps.build(
         deps = AVector(
           BlockHash.unsafe(hex"f4e21b0811b4d1a56d016d4980cdcb34708de0d96050e077ac6a28bc3831be97"),
@@ -45,11 +45,11 @@ trait BlockSnapshotsFixture extends TransactionSnapshotsFixture {
     )
   }
 
-  def block(transactions: Transaction*): Block = {
+  def block(version: Byte, uncles: AVector[BlockHeader], transactions: Transaction*): Block = {
     val coinbaseTx = coinbaseTransaction(transactions: _*)
     val allTxs     = AVector.from(transactions) :+ coinbaseTx
 
-    val header = blockHeader(Block.calTxsHash(allTxs))
-    Block(header, allTxs)
+    val header = blockHeader(Block.calTxsHash(allTxs), version)
+    Block(header, uncles, allTxs)
   }
 }
