@@ -367,7 +367,7 @@ lazy val ralphc = project("ralphc")
       upickle,
       scopt
     ),
-    publish / skip             := true,
+    publish / skip             := false,
     assembly / mainClass       := Some("org.alephium.ralphc.Main"),
     assembly / assemblyJarName := s"alephium-ralphc-${version.value}.jar",
     assembly / test            := {},
