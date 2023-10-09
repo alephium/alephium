@@ -252,7 +252,8 @@ abstract class Parser[Ctx <: StatelessContext] {
             preapprovedAssets = false,
             assetsInContract = false,
             checkExternalCaller = true,
-            updateFields = false
+            updateFields = false,
+            methodIndex = None
           )
         )
         FuncDefTmp(
@@ -263,6 +264,7 @@ abstract class Parser[Ctx <: StatelessContext] {
           usingAnnotation.assetsInContract,
           usingAnnotation.checkExternalCaller,
           usingAnnotation.updateFields,
+          usingAnnotation.methodIndex,
           params,
           returnType,
           statements
@@ -270,6 +272,9 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
   def func[Unknown: P]: P[Ast.FuncDef[Ctx]] = funcTmp.map { f =>
+    if (f.useMethodIndex.nonEmpty) {
+      throw Compiler.Error("The `methodIndex` annotation can only be used for interface functions")
+    }
     Ast.FuncDef(
       f.annotations,
       f.id,
@@ -278,6 +283,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       f.useContractAssets,
       f.useCheckExternalCaller,
       f.useUpdateFields,
+      None,
       f.args,
       f.rtypes,
       f.body
@@ -385,6 +391,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     useContractAssets: Boolean,
     useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
+    useMethodIndex: Option[Int],
     args: Seq[Argument],
     rtypes: Seq[Type],
     body: Option[Seq[Statement[Ctx]]]
@@ -437,7 +444,8 @@ object Parser {
       preapprovedAssets: Boolean,
       assetsInContract: Boolean,
       checkExternalCaller: Boolean,
-      updateFields: Boolean
+      updateFields: Boolean,
+      methodIndex: Option[Int]
   )
 
   object UsingAnnotation extends RalphAnnotation[UsingAnnotationFields] {
@@ -446,11 +454,13 @@ object Parser {
     val useContractAssetsKey      = "assetsInContract"
     val useCheckExternalCallerKey = "checkExternalCaller"
     val useUpdateFieldsKey        = "updateFields"
+    val useMethodIndexKey         = "methodIndex"
     val keys: AVector[String] = AVector(
       usePreapprovedAssetsKey,
       useContractAssetsKey,
       useCheckExternalCallerKey,
-      useUpdateFieldsKey
+      useUpdateFieldsKey,
+      useMethodIndexKey
     )
 
     def extractFields(
@@ -465,7 +475,8 @@ object Parser {
           useCheckExternalCallerKey,
           Val.Bool(default.checkExternalCaller)
         ).v,
-        extractField(annotation, useUpdateFieldsKey, Val.Bool(default.updateFields)).v
+        extractField(annotation, useUpdateFieldsKey, Val.Bool(default.updateFields)).v,
+        extractField[Val.U256](annotation, useMethodIndexKey, Val.U256).flatMap(_.v.toInt)
       )
     }
   }
@@ -580,7 +591,8 @@ object StatefulParser extends Parser[StatefulContext] {
               preapprovedAssets = true,
               assetsInContract = false,
               checkExternalCaller = true,
-              updateFields = false
+              updateFields = false,
+              methodIndex = None
             )
           )
           val mainFunc = Ast.FuncDef.main(
@@ -707,6 +719,7 @@ object StatefulParser extends Parser[StatefulContext] {
             f.useContractAssets,
             f.useCheckExternalCaller,
             f.useUpdateFields,
+            f.useMethodIndex,
             f.args,
             f.rtypes,
             None
@@ -731,16 +744,19 @@ object StatefulParser extends Parser[StatefulContext] {
       }
       if (funcs.length < 1) {
         throw Compiler.Error(s"No function definition in Interface ${typeId.name}")
-      } else {
-        val stdIdOpt = Parser.InterfaceStdAnnotation.extractFields(annotations, None)
-        Ast.ContractInterface(
-          stdIdOpt.map(stdId => Val.ByteVec(stdId.id)),
-          typeId,
-          funcs,
-          events,
-          inheritances.getOrElse(Seq.empty)
-        )
       }
+      val preDefinedIndexFuncs = funcs.filter(_.useMethodIndex.isDefined)
+      if (preDefinedIndexFuncs.distinctBy(_.useMethodIndex).size != preDefinedIndexFuncs.size) {
+        throw Compiler.Error(s"There are duplicate method indexes in interface ${typeId.name}")
+      }
+      val stdIdOpt = Parser.InterfaceStdAnnotation.extractFields(annotations, None)
+      Ast.ContractInterface(
+        stdIdOpt.map(stdId => Val.ByteVec(stdId.id)),
+        typeId,
+        funcs,
+        events,
+        inheritances.getOrElse(Seq.empty)
+      )
     }
   def interface[Unknown: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
 

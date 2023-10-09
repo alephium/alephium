@@ -596,6 +596,7 @@ object Ast {
       useAssetsInContract: Boolean,
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
+      useMethodIndex: Option[Int],
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -701,6 +702,7 @@ object Ast {
         useAssetsInContract = useAssetsInContract,
         useCheckExternalCaller = true,
         useUpdateFields = useUpdateFields,
+        useMethodIndex = None,
         args = Seq.empty,
         rtypes = Seq.empty,
         bodyOpt = Some(stmts)

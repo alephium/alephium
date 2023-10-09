@@ -790,6 +790,7 @@ class ParserSpec extends AlephiumSpec {
             useAssetsInContract = false,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -982,6 +983,7 @@ class ParserSpec extends AlephiumSpec {
             useAssetsInContract = false,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             None
@@ -1074,6 +1076,7 @@ class ParserSpec extends AlephiumSpec {
             useAssetsInContract = false,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             Some(Seq.empty)
@@ -1112,6 +1115,7 @@ class ParserSpec extends AlephiumSpec {
             useAssetsInContract = false,
             useCheckExternalCaller = true,
             useUpdateFields = false,
+            useMethodIndex = None,
             Seq.empty,
             Seq.empty,
             Some(Seq(ReturnStmt(Seq.empty)))
@@ -1153,6 +1157,7 @@ class ParserSpec extends AlephiumSpec {
         useAssetsInContract = false,
         checkExternalCaller,
         useUpdateFields = false,
+        useMethodIndex = None,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1167,6 +1172,7 @@ class ParserSpec extends AlephiumSpec {
         useAssetsInContract = false,
         checkExternalCaller,
         useUpdateFields = false,
+        useMethodIndex = None,
         Seq.empty,
         Seq.empty,
         if (isAbstract) None else Some(Seq(Ast.ReturnStmt(List())))
@@ -1348,6 +1354,7 @@ class ParserSpec extends AlephiumSpec {
         useAssetsInContract = false,
         useCheckExternalCaller = true,
         useUpdateFields = false,
+        useMethodIndex = None,
         Seq.empty,
         Seq.empty,
         Some(Seq(Ast.ReturnStmt(List())))
@@ -1419,5 +1426,43 @@ class ParserSpec extends AlephiumSpec {
          |""".stripMargin
     intercept[Compiler.Error](fastparse.parse(code, StatefulParser.contract(_))).message is
       "Debug is a built-in event name"
+  }
+
+  it should "parse method index annotation" in {
+    def interface(index: String) =
+      s"""
+         |Interface Foo {
+         |  @using(methodIndex = $index, preapprovedAssets = true)
+         |  pub fn f1() -> ()
+         |
+         |  @using(methodIndex = 2)
+         |  pub fn f2() -> ()
+         |}
+         |""".stripMargin
+
+    val funcs = fastparse.parse(interface("1"), StatefulParser.interface(_)).get.value.funcs
+    funcs(0).useMethodIndex is Some(1)
+    funcs(0).usePreapprovedAssets is true
+    funcs(1).useMethodIndex is Some(2)
+
+    intercept[Compiler.Error](
+      fastparse.parse(interface("2"), StatefulParser.interface(_))
+    ).message is
+      "There are duplicate method indexes in interface Foo"
+    intercept[Compiler.Error](
+      fastparse.parse(interface("false"), StatefulParser.interface(_))
+    ).message is
+      "Expect U256 for methodIndex in annotation @using"
+
+    val contract =
+      s"""
+         |Contract Foo() {
+         |  @using(methodIndex = 1, preapprovedAssets = true)
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+
+    intercept[Compiler.Error](fastparse.parse(contract, StatefulParser.contract(_))).message is
+      "The `methodIndex` annotation can only be used for interface functions"
   }
 }
