@@ -1572,8 +1572,12 @@ object Ast {
               s"Contract ${txContract.name} has unimplemented methods: $methodNames"
             )
           }
+          if (txContract.isAbstract) {
+            allUniqueFuncs
+          } else {
+            rearrangeFuncs(sortedInterfaces, allUniqueFuncs)
+          }
 
-          allUniqueFuncs
         case interface: ContractInterface =>
           if (nonAbstractFuncs.nonEmpty) {
             val methodNames = nonAbstractFuncs.map(_.name).mkString(",")
@@ -1587,6 +1591,30 @@ object Ast {
       (stdIdEnabled, stdId, resultFuncs, events, constantVars, enums)
     }
     // scalastyle:on method.length
+
+    private def rearrangeFuncs(
+        interfaces: Seq[ContractInterface],
+        funcs: Seq[FuncDef[StatefulContext]]
+    ): Seq[FuncDef[StatefulContext]] = {
+      val interfaceFuncs = interfaces.flatMap(_.funcs)
+      val (remains, preDefinedIndexFuncs) = funcs.partitionMap { func =>
+        val methodIndex = interfaceFuncs.find(_.id == func.id).flatMap(_.useMethodIndex)
+        if (methodIndex.isDefined) Right(func.copy(useMethodIndex = methodIndex)) else Left(func)
+      }
+      val invalidFuncs = preDefinedIndexFuncs.filter(_.useMethodIndex.exists(_ >= funcs.length))
+      if (invalidFuncs.nonEmpty) {
+        throw Compiler.Error(
+          s"These inherited functions have invalid predefined method indexes: ${invalidFuncs.map(_.name).mkString(",")}"
+        )
+      }
+      val remainFuncsIterator = remains.iterator
+      funcs.indices.map { index =>
+        preDefinedIndexFuncs.find(_.useMethodIndex.contains(index)) match {
+          case Some(func) => func
+          case None       => remainFuncsIterator.next()
+        }
+      }
+    }
 
     @tailrec
     def ensureChainedInterfaces(sortedInterfaces: Seq[ContractInterface]): Unit = {

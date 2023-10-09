@@ -4212,4 +4212,103 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       .leftValue
       .message is "The std id of interface Bar should start with 0005"
   }
+
+  it should "rearrange funcs based on predefined method index" in {
+    def checkContractFuncs(code: String, funcs: Seq[String]) = {
+      val result   = Compiler.compileMultiContract(code).rightValue
+      val contract = result.contracts.head
+      contract.funcs.map(_.name) is funcs
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |}
+           |Interface Foo {
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |""".stripMargin
+      checkContractFuncs(code, Seq("f0", "f1"))
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = 1)
+           |  pub fn f0() -> ()
+           |  @using(methodIndex = 0)
+           |  pub fn f1() -> ()
+           |}
+           |""".stripMargin
+      checkContractFuncs(code, Seq("f1", "f0"))
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |}
+           |Interface Foo {
+           |  @using(methodIndex = 2)
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |}
+           |""".stripMargin
+      checkContractFuncs(code, Seq("f1", "f2", "f0"))
+    }
+
+    {
+      val code =
+        s"""
+           |Contract Bar() implements Foo {
+           |  pub fn f4() -> () {}
+           |  pub fn f0() -> () {}
+           |  pub fn f1() -> () {}
+           |  pub fn f2() -> () {}
+           |  pub fn f3() -> () {}
+           |}
+           |Interface Foo {
+           |  pub fn f0() -> ()
+           |  pub fn f1() -> ()
+           |  @using(methodIndex = 4)
+           |  pub fn f2() -> ()
+           |  @using(methodIndex = 0)
+           |  pub fn f3() -> ()
+           |}
+           |""".stripMargin
+      checkContractFuncs(code, Seq("f3", "f0", "f1", "f4", "f2"))
+    }
+  }
+
+  it should "throw an error if the predefined method index is invalid" in {
+    def code(index: Int) =
+      s"""
+         |Contract Bar() implements Foo {
+         |  pub fn f0() -> () {}
+         |  pub fn f1() -> () {}
+         |}
+         |Interface Foo {
+         |  @using(methodIndex = $index)
+         |  pub fn f0() -> ()
+         |  pub fn f1() -> ()
+         |}
+         |""".stripMargin
+    Compiler.compileContract(code(2)).leftValue.message is
+      "These inherited functions have invalid predefined method indexes: f0"
+    Compiler.compileContract(code(3)).leftValue.message is
+      "These inherited functions have invalid predefined method indexes: f0"
+    Compiler.compileContract(code(1)).isRight is true
+  }
 }
