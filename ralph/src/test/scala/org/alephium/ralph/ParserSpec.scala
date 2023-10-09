@@ -185,6 +185,60 @@ class ParserSpec extends AlephiumSpec {
       )
   }
 
+  it should "parse contract call" in {
+    fastparse.parse("a.b().c().d()", StatefulParser.contractCallExpr(_)).get.value is
+      ContractCallExpr(
+        ContractCallExpr(
+          ContractCallExpr(Variable(Ident("a")), FuncId("b", false), List(), List()),
+          FuncId("c", false),
+          List(),
+          List()
+        ),
+        FuncId("d", false),
+        List(),
+        List()
+      )
+
+    fastparse.parse("a().b().c()", StatefulParser.contractCallExpr(_)).get.value is
+      ContractCallExpr(
+        ContractCallExpr(
+          CallExpr(FuncId("a", false), List(), List()),
+          FuncId("b", false),
+          List(),
+          List()
+        ),
+        FuncId("c", false),
+        List(),
+        List()
+      )
+
+    fastparse.parse("a.b().c().d()", StatefulParser.contractCall(_)).get.value is
+      ContractCall(
+        ContractCallExpr(
+          ContractCallExpr(Variable(Ident("a")), FuncId("b", false), List(), List()),
+          FuncId("c", false),
+          List(),
+          List()
+        ),
+        FuncId("d", false),
+        List(),
+        List()
+      )
+
+    fastparse.parse("a().b().c()", StatefulParser.contractCall(_)).get.value is
+      ContractCall(
+        ContractCallExpr(
+          CallExpr(FuncId("a", false), List(), List()),
+          FuncId("b", false),
+          List(),
+          List()
+        ),
+        FuncId("c", false),
+        List(),
+        List()
+      )
+  }
+
   it should "parse ByteVec" in {
     fastparse.parse("# ++ #00", StatefulParser.expr(_)).get.value is
       Binop[StatefulContext](

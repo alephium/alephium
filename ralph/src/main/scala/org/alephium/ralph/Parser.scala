@@ -540,16 +540,26 @@ object StatefulParser extends Parser[StatefulContext] {
       const | alphTokenId | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
-  def contractCallExpr[Unknown: P]: P[Ast.ContractCallExpr] =
-    P((contractConv | variable) ~ "." ~ callAbs).map { case (obj, (callId, approveAssets, exprs)) =>
-      Ast.ContractCallExpr(obj, callId, approveAssets, exprs)
+  def contractCallExpr[Unknown: P]: P[Ast.Expr[StatefulContext]] =
+    P((callExpr | contractConv | variableIdOnly) ~ ("." ~ callAbs).rep(1)).map {
+      case (obj, callAbss) =>
+        callAbss.foldLeft(obj)((acc, callAbs) => {
+          val (funcId, approveAssets, arguments) = callAbs
+          Ast.ContractCallExpr(acc, funcId, approveAssets, arguments)
+        })
     }
 
-  def contractCall[Unknown: P]: P[Ast.ContractCall] =
-    P((contractConv | variableIdOnly) ~ "." ~ callAbs)
-      .map { case (obj, (callId, approveAssets, exprs)) =>
-        Ast.ContractCall(obj, callId, approveAssets, exprs)
-      }
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  def contractCall[Unknown: P]: P[Ast.Statement[StatefulContext]] =
+    P((callExpr | contractConv | variableIdOnly) ~ ("." ~ callAbs).rep(1)).map {
+      case (obj, callAbss) =>
+        val base = callAbss.init.foldLeft(obj)((acc, callAbs) => {
+          val (funcId, approveAssets, arguments) = callAbs
+          Ast.ContractCallExpr(acc, funcId, approveAssets, arguments)
+        })
+        val (funcId, approveAssets, arguments) = callAbss.last
+        Ast.ContractCall(base, funcId, approveAssets, arguments)
+    }
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
