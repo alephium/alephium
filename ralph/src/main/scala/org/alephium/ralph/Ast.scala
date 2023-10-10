@@ -90,6 +90,8 @@ object Ast {
     }
   }
 
+  final case class UseContractAssets(enforced: Boolean) extends AnyVal
+
   trait ApproveAssets[Ctx <: StatelessContext] {
     def approveAssets: Seq[ApproveAsset[Ctx]]
 
@@ -593,7 +595,7 @@ object Ast {
       id: FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
-      useAssetsInContract: Boolean,
+      useAssetsInContract: Option[UseContractAssets],
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
       useMethodIndex: Option[Byte],
@@ -613,7 +615,7 @@ object Ast {
         case FuncCall(id, _, _) => id.isBuiltIn && id.name == "migrate"
         case _                  => false
       }
-      !(useUpdateFields || usePreapprovedAssets || useAssetsInContract || hasInterfaceFuncCall || hasMigrateSimple)
+      !(useUpdateFields || usePreapprovedAssets || useAssetsInContract.isDefined || hasInterfaceFuncCall || hasMigrateSimple)
     }
 
     def signature: FuncSignature = FuncSignature(
@@ -678,7 +680,7 @@ object Ast {
       Method[Ctx](
         isPublic,
         usePreapprovedAssets,
-        useAssetsInContract,
+        useAssetsInContract.isDefined,
         argsLength = Type.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
         returnLength = Type.flattenTypeLength(rtypes),
@@ -691,7 +693,7 @@ object Ast {
     def main(
         stmts: Seq[Ast.Statement[StatefulContext]],
         usePreapprovedAssets: Boolean,
-        useAssetsInContract: Boolean,
+        useAssetsInContract: Option[Ast.UseContractAssets],
         useUpdateFields: Boolean
     ): FuncDef[StatefulContext] = {
       FuncDef[StatefulContext](

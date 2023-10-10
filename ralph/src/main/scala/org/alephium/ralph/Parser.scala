@@ -25,7 +25,7 @@ import org.alephium.ralph.error.CompilerError
 import org.alephium.ralph.error.FastParseExtension._
 import org.alephium.util.AVector
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods file.size.limit
 @SuppressWarnings(
   Array(
     "org.wartremover.warts.JavaSerializable",
@@ -250,7 +250,7 @@ abstract class Parser[Ctx <: StatelessContext] {
           annotations,
           Parser.UsingAnnotationFields(
             preapprovedAssets = false,
-            assetsInContract = false,
+            assetsInContract = None,
             checkExternalCaller = true,
             updateFields = false,
             methodIndex = None
@@ -368,6 +368,10 @@ abstract class Parser[Ctx <: StatelessContext] {
       }
     }
 
+  def enforceUsingContractAssets[Unknown: P]: P[Ast.AnnotationField] =
+    P(Parser.UsingAnnotation.useContractAssetsKey ~ "=" ~ "enforced").map(_ =>
+      Ast.AnnotationField(Ast.Ident(Parser.UsingAnnotation.useContractAssetsKey), Val.Enforced)
+    )
   def annotationField[Unknown: P]: P[Ast.AnnotationField] =
     P(Lexer.ident ~ "=" ~ expr).map {
       case (ident, expr: Ast.Const[_]) =>
@@ -376,7 +380,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         throw Compiler.Error(s"Expect const value for annotation field, got ${expr}")
     }
   def annotationFields[Unknown: P]: P[Seq[Ast.AnnotationField]] =
-    P("(" ~ annotationField.rep(1, ",") ~ ")")
+    P("(" ~ (enforceUsingContractAssets | annotationField).rep(1, ",") ~ ")")
   def annotation[Unknown: P]: P[Ast.Annotation] =
     P("@" ~ Lexer.ident ~ annotationFields.?).map { case (id, fieldsOpt) =>
       Ast.Annotation(id, fieldsOpt.getOrElse(Seq.empty))
@@ -388,7 +392,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     id: FuncId,
     isPublic: Boolean,
     usePreapprovedAssets: Boolean,
-    useContractAssets: Boolean,
+    useContractAssets: Option[Ast.UseContractAssets],
     useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
     useMethodIndex: Option[Byte],
@@ -442,7 +446,7 @@ object Parser {
 
   final case class UsingAnnotationFields(
       preapprovedAssets: Boolean,
-      assetsInContract: Boolean,
+      assetsInContract: Option[Ast.UseContractAssets],
       checkExternalCaller: Boolean,
       updateFields: Boolean,
       methodIndex: Option[Byte]
@@ -463,13 +467,29 @@ object Parser {
       useMethodIndexKey
     )
 
+    private def extractUseContractAsset(annotation: Annotation) = {
+      annotation.fields.find(_.ident.name == useContractAssetsKey) match {
+        case Some(Ast.AnnotationField(_, value)) =>
+          value match {
+            case Val.False    => None
+            case Val.True     => Some(Ast.UseContractAssets(false))
+            case Val.Enforced => Some(Ast.UseContractAssets(true))
+            case _ =>
+              throw Compiler.Error(
+                "Invalid assetsInContract annotation, expected true/false/enforced"
+              )
+          }
+        case None => None
+      }
+    }
+
     def extractFields(
         annotation: Ast.Annotation,
         default: UsingAnnotationFields
     ): UsingAnnotationFields = {
       UsingAnnotationFields(
         extractField(annotation, usePreapprovedAssetsKey, Val.Bool(default.preapprovedAssets)).v,
-        extractField(annotation, useContractAssetsKey, Val.Bool(default.assetsInContract)).v,
+        extractUseContractAsset(annotation),
         extractField(
           annotation,
           useCheckExternalCallerKey,
@@ -589,7 +609,7 @@ object StatefulParser extends Parser[StatefulContext] {
             annotations,
             Parser.UsingAnnotationFields(
               preapprovedAssets = true,
-              assetsInContract = false,
+              assetsInContract = None,
               checkExternalCaller = true,
               updateFields = false,
               methodIndex = None

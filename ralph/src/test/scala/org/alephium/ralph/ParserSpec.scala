@@ -341,7 +341,7 @@ class ParserSpec extends AlephiumSpec {
     parsed0.id is Ast.FuncId("add", false)
     parsed0.isPublic is false
     parsed0.usePreapprovedAssets is false
-    parsed0.useAssetsInContract is false
+    parsed0.useAssetsInContract is None
     parsed0.args.size is 2
     parsed0.rtypes is Seq(Type.U256, Type.U256)
 
@@ -357,7 +357,7 @@ class ParserSpec extends AlephiumSpec {
     parsed1.id is Ast.FuncId("add", false)
     parsed1.isPublic is true
     parsed1.usePreapprovedAssets is true
-    parsed1.useAssetsInContract is false
+    parsed1.useAssetsInContract is None
     parsed1.useCheckExternalCaller is true
     parsed1.useUpdateFields is false
     parsed1.args.size is 2
@@ -382,7 +382,7 @@ class ParserSpec extends AlephiumSpec {
     parsed2.id is Ast.FuncId("add", false)
     parsed2.isPublic is true
     parsed2.usePreapprovedAssets is true
-    parsed2.useAssetsInContract is true
+    parsed2.useAssetsInContract is Some(Ast.UseContractAssets(false))
     parsed2.useCheckExternalCaller is true
     parsed2.useUpdateFields is false
     parsed2.args.size is 2
@@ -405,10 +405,26 @@ class ParserSpec extends AlephiumSpec {
       .get
       .value
     parsed3.usePreapprovedAssets is false
-    parsed3.useAssetsInContract is true
+    parsed3.useAssetsInContract is Some(Ast.UseContractAssets(false))
     parsed3.useCheckExternalCaller is true
     parsed3.useUpdateFields is true
     parsed3.signature is FuncSignature(
+      FuncId("add", false),
+      true,
+      false,
+      Seq((Type.U256, false), (Type.U256, false)),
+      Seq(Type.U256)
+    )
+
+    info("Enforce using contract assets")
+    val code = """@using(assetsInContract = enforced)
+                 |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    val parsed4 = fastparse.parse(code, StatelessParser.func(_)).get.value
+    parsed4.usePreapprovedAssets is false
+    parsed4.useAssetsInContract is Some(Ast.UseContractAssets(true))
+    parsed4.useCheckExternalCaller is true
+    parsed4.useUpdateFields is false
+    parsed4.signature is FuncSignature(
       FuncId("add", false),
       true,
       false,
@@ -787,7 +803,7 @@ class ParserSpec extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = None,
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
@@ -980,7 +996,7 @@ class ParserSpec extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = None,
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
@@ -1073,7 +1089,7 @@ class ParserSpec extends AlephiumSpec {
             FuncId("bar", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = None,
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
@@ -1112,7 +1128,7 @@ class ParserSpec extends AlephiumSpec {
             FuncId("foo", false),
             isPublic = false,
             usePreapprovedAssets = false,
-            useAssetsInContract = false,
+            useAssetsInContract = None,
             useCheckExternalCaller = true,
             useUpdateFields = false,
             useMethodIndex = None,
@@ -1154,7 +1170,7 @@ class ParserSpec extends AlephiumSpec {
         FuncId("foo", false),
         isPublic = false,
         usePreapprovedAssets = false,
-        useAssetsInContract = false,
+        useAssetsInContract = None,
         checkExternalCaller,
         useUpdateFields = false,
         useMethodIndex = None,
@@ -1169,7 +1185,7 @@ class ParserSpec extends AlephiumSpec {
         FuncId("bar", false),
         isPublic = false,
         usePreapprovedAssets = false,
-        useAssetsInContract = false,
+        useAssetsInContract = None,
         checkExternalCaller,
         useUpdateFields = false,
         useMethodIndex = None,
@@ -1351,7 +1367,7 @@ class ParserSpec extends AlephiumSpec {
         FuncId("main", false),
         isPublic = true,
         usePreapprovedAssets,
-        useAssetsInContract = false,
+        useAssetsInContract = None,
         useCheckExternalCaller = true,
         useUpdateFields = false,
         useMethodIndex = None,

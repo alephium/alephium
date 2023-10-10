@@ -299,7 +299,10 @@ class VMSpec extends AlephiumSpec with Generators {
       worldState.contractImmutableState.exists(contract.hash) isE true // keep history state always
     }
 
-    def getContractAsset(contractId: ContractId, chainIndex: ChainIndex): ContractOutput = {
+    def getContractAsset(
+        contractId: ContractId,
+        chainIndex: ChainIndex = chainIndex
+    ): ContractOutput = {
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       worldState.getContractAsset(contractId).rightValue
     }
@@ -517,6 +520,44 @@ class VMSpec extends AlephiumSpec with Generators {
       tokens,
       dustUtxoAmount
     )
+  }
+
+  it should "enforce using contract assets" in new ContractFixture {
+    val bar =
+      s"""
+         |Contract Bar() {
+         |  @using(assetsInContract = true)
+         |  pub fn bar() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+    val (barContractId, _) = createContract(bar, initialAttoAlphAmount = ALPH.alph(2))
+    getContractAsset(barContractId).amount is ALPH.alph(2)
+
+    val foo =
+      s"""
+         |Contract Foo(bar: Bar) {
+         |  @using(assetsInContract = enforced)
+         |  pub fn foo() -> () {
+         |    bar.bar()
+         |  }
+         |}
+         |$bar
+         |""".stripMargin
+    val (fooContractId, _) = createContract(foo, AVector(Val.ByteVec(barContractId.bytes)))
+    getContractAsset(fooContractId).amount is ALPH.oneAlph
+
+    val script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooContractId.toHexString}).foo()
+         |}
+         |$foo
+         |""".stripMargin
+    callTxScript(script, chainIndex)
+    getContractAsset(barContractId).amount is ALPH.oneAlph
+    getContractAsset(fooContractId).amount is ALPH.alph(2)
   }
 
   it should "burn token" in new ContractFixture {

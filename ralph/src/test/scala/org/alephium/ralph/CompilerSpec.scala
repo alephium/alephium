@@ -2460,7 +2460,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "check if contract assets is used in the function" in {
-    def code(useAssetsInContract: Boolean = false, instr: String = "return"): String =
+    def code(useAssetsInContract: String = "false", instr: String = "return"): String =
       s"""
          |Contract Foo() {
          |  @using(assetsInContract = $useAssetsInContract)
@@ -2471,15 +2471,18 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     Compiler.compileContract(code()).isRight is true
     Compiler
-      .compileContract(code(true, "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
+      .compileContract(code("true", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
       .isRight is true
     Compiler
-      .compileContract(code(false, "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
+      .compileContract(code("false", "transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)"))
       .isRight is true
     Compiler
-      .compileContract(code(true))
+      .compileContract(code("true"))
       .leftValue
-      .message is "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on"
+      .message is
+      "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on." +
+      "Please remove the `assetsInContract` annotation or set it to `assetsInContract = enforced`"
+    Compiler.compileContract(code("enforced")).isRight is true
   }
 
   it should "check types for braces syntax" in {

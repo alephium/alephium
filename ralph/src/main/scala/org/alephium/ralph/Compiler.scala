@@ -141,7 +141,7 @@ object Compiler {
     def isPublic: Boolean
     def isVariadic: Boolean = false
     def usePreapprovedAssets: Boolean
-    def useAssetsInContract: Boolean
+    def useAssetsInContract: Option[Ast.UseContractAssets]
     def useUpdateFields: Boolean
     def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type]
     def getReturnLength(inputType: Seq[Type], selfContractType: Type): Int = {
@@ -232,7 +232,7 @@ object Compiler {
       id: Ast.FuncId,
       isPublic: Boolean,
       usePreapprovedAssets: Boolean,
-      useAssetsInContract: Boolean,
+      useAssetsInContract: Option[Ast.UseContractAssets],
       useUpdateFields: Boolean,
       argsType: Seq[Type],
       returnType: Seq[Type],
