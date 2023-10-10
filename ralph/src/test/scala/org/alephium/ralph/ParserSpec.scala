@@ -431,6 +431,11 @@ class ParserSpec extends AlephiumSpec {
       Seq((Type.U256, false), (Type.U256, false)),
       Seq(Type.U256)
     )
+
+    val invalidCode = """@using(assetsInContract = enforced, assetsInContract = false)
+                        |pub fn add(x: U256, y: U256) -> U256 { return x + y }""".stripMargin
+    intercept[Compiler.Error](fastparse.parse(invalidCode, StatelessParser.func(_))).message is
+      "These keys are defined multiple times: assetsInContract"
   }
 
   it should "parser contract initial states" in {

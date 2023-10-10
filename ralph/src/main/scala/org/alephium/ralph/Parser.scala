@@ -405,9 +405,26 @@ object Parser {
   sealed trait RalphAnnotation[T] {
     def id: String
     def keys: AVector[String]
-    def validate(annotations: Seq[Ast.Annotation]): Unit = {
+    def validate(annotations: Seq[Ast.Annotation]): Option[Annotation] = {
       if (annotations.exists(_.id.name != id)) {
         throw Compiler.Error(s"Invalid annotation, expect @$id annotation")
+      }
+      annotations.headOption match {
+        case result @ Some(annotation) =>
+          val duplicateKeys = keys.filter(key => annotation.fields.count(_.ident.name == key) > 1)
+          if (duplicateKeys.nonEmpty) {
+            throw Compiler.Error(
+              s"These keys are defined multiple times: ${duplicateKeys.mkString(",")}"
+            )
+          }
+          val invalidKeys = annotation.fields.filter(f => !keys.contains(f.ident.name))
+          if (invalidKeys.nonEmpty) {
+            throw Compiler.Error(
+              s"Invalid keys for @$id annotation: ${invalidKeys.map(_.ident.name).mkString(",")}"
+            )
+          }
+          result
+        case None => None
       }
     }
 
@@ -428,18 +445,7 @@ object Parser {
     }
 
     final def extractFields(annotations: Seq[Ast.Annotation], default: T): T = {
-      validate(annotations)
-      annotations.headOption match {
-        case Some(annotation) =>
-          val invalidKeys = annotation.fields.filter(f => !keys.contains(f.ident.name))
-          if (invalidKeys.nonEmpty) {
-            throw Compiler.Error(
-              s"Invalid keys for @$id annotation: ${invalidKeys.map(_.ident.name).mkString(",")}"
-            )
-          }
-          extractFields(annotation, default)
-        case None => default
-      }
+      validate(annotations).map(extractFields(_, default)).getOrElse(default)
     }
     def extractFields(annotation: Ast.Annotation, default: T): T
   }
