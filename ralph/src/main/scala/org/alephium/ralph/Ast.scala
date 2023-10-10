@@ -1555,6 +1555,7 @@ object Ast {
         sortInterfaces(parentsCache, allInterfaces.map(_.asInstanceOf[ContractInterface]))
 
       ensureChainedInterfaces(sortedInterfaces)
+      checkInterfaceMethodIndex(sortedInterfaces)
 
       val stdId        = getStdId(sortedInterfaces)
       val stdIdEnabled = getStdIdEnabled(allContracts.map(_.asInstanceOf[Contract]), contract.ident)
@@ -1610,7 +1611,7 @@ object Ast {
       val invalidFuncs = preDefinedIndexFuncs.filter(_.useMethodIndex.exists(_ >= funcs.length))
       if (invalidFuncs.nonEmpty) {
         throw Compiler.Error(
-          s"These inherited functions have invalid predefined method indexes: ${invalidFuncs.map(_.name).mkString(",")}"
+          s"These functions have invalid predefined method indexes: ${invalidFuncs.map(_.name).mkString(",")}"
         )
       }
       val remainFuncsIterator = remains.iterator
@@ -1634,6 +1635,19 @@ object Ast {
         }
 
         ensureChainedInterfaces(sortedInterfaces.drop(1))
+      }
+    }
+
+    def checkInterfaceMethodIndex(sortedInterfaces: Seq[ContractInterface]): Unit = {
+      var methodIndex = 0
+      sortedInterfaces.foreach { interface =>
+        val invalidFuncs = interface.funcs.filter(_.useMethodIndex.exists(_ < methodIndex))
+        if (invalidFuncs.nonEmpty) {
+          throw Compiler.Error(
+            s"These functions have invalid predefined method indexes in interface ${interface.name}: ${invalidFuncs.map(_.name).mkString(",")}"
+          )
+        }
+        methodIndex += interface.funcs.length
       }
     }
 
