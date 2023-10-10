@@ -1441,9 +1441,9 @@ class ParserSpec extends AlephiumSpec {
          |""".stripMargin
 
     val funcs = fastparse.parse(interface("1"), StatefulParser.interface(_)).get.value.funcs
-    funcs(0).useMethodIndex is Some(1)
+    funcs(0).useMethodIndex is Some(1.toByte)
     funcs(0).usePreapprovedAssets is true
-    funcs(1).useMethodIndex is Some(2)
+    funcs(1).useMethodIndex is Some(2.toByte)
 
     intercept[Compiler.Error](
       fastparse.parse(interface("2"), StatefulParser.interface(_))

@@ -596,7 +596,7 @@ object Ast {
       useAssetsInContract: Boolean,
       useCheckExternalCaller: Boolean,
       useUpdateFields: Boolean,
-      useMethodIndex: Option[Int],
+      useMethodIndex: Option[Byte],
       args: Seq[Argument],
       rtypes: Seq[Type],
       bodyOpt: Option[Seq[Statement[Ctx]]]
@@ -982,8 +982,12 @@ object Ast {
 
     lazy val funcTable: Map[FuncId, Compiler.ContractFunc[Ctx]] = {
       val builtInFuncs = builtInContractFuncs()
+      val isInterface = this match {
+        case _: ContractInterface => true
+        case _                    => false
+      }
       var table = Compiler.SimpleFunc
-        .from(funcs)
+        .from(funcs, isInterface)
         .map(f => f.id -> f)
         .toMap[FuncId, Compiler.ContractFunc[Ctx]]
       builtInFuncs.foreach(func => table = table + (FuncId(func.name, isBuiltIn = true) -> func))
@@ -1609,7 +1613,7 @@ object Ast {
       }
       val remainFuncsIterator = remains.iterator
       funcs.indices.map { index =>
-        preDefinedIndexFuncs.find(_.useMethodIndex.contains(index)) match {
+        preDefinedIndexFuncs.find(_.useMethodIndex.contains(index.toByte)) match {
           case Some(func) => func
           case None       => remainFuncsIterator.next()
         }

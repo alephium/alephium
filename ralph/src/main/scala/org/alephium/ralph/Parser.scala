@@ -391,7 +391,7 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
     useContractAssets: Boolean,
     useCheckExternalCaller: Boolean,
     useUpdateFields: Boolean,
-    useMethodIndex: Option[Int],
+    useMethodIndex: Option[Byte],
     args: Seq[Argument],
     rtypes: Seq[Type],
     body: Option[Seq[Statement[Ctx]]]
@@ -445,7 +445,7 @@ object Parser {
       assetsInContract: Boolean,
       checkExternalCaller: Boolean,
       updateFields: Boolean,
-      methodIndex: Option[Int]
+      methodIndex: Option[Byte]
   )
 
   object UsingAnnotation extends RalphAnnotation[UsingAnnotationFields] {
@@ -476,7 +476,7 @@ object Parser {
           Val.Bool(default.checkExternalCaller)
         ).v,
         extractField(annotation, useUpdateFieldsKey, Val.Bool(default.updateFields)).v,
-        extractField[Val.U256](annotation, useMethodIndexKey, Val.U256).flatMap(_.v.toInt)
+        extractField[Val.U256](annotation, useMethodIndexKey, Val.U256).flatMap(_.v.toByte)
       )
     }
   }

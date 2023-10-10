@@ -261,19 +261,52 @@ object Compiler {
     }
   }
   object SimpleFunc {
-    def from[Ctx <: StatelessContext](funcs: Seq[Ast.FuncDef[Ctx]]): Seq[SimpleFunc[Ctx]] = {
-      funcs.view.zipWithIndex.map { case (func, index) =>
-        new SimpleFunc[Ctx](
-          func.id,
-          func.isPublic,
-          func.usePreapprovedAssets,
-          func.useAssetsInContract,
-          func.useUpdateFields,
-          func.args.map(_.tpe),
-          func.rtypes,
-          index.toByte
-        )
-      }.toSeq
+    private def from[Ctx <: StatelessContext](
+        func: Ast.FuncDef[Ctx],
+        index: Byte
+    ): SimpleFunc[Ctx] = {
+      new SimpleFunc[Ctx](
+        func.id,
+        func.isPublic,
+        func.usePreapprovedAssets,
+        func.useAssetsInContract,
+        func.useUpdateFields,
+        func.args.map(_.tpe),
+        func.rtypes,
+        index
+      )
+    }
+
+    @scala.annotation.tailrec
+    private def getNextIndex(fromIndex: Byte, preDefinedIndexes: Seq[Byte]): Byte = {
+      if (preDefinedIndexes.contains(fromIndex)) {
+        getNextIndex((fromIndex + 1).toByte, preDefinedIndexes)
+      } else {
+        fromIndex
+      }
+    }
+
+    def from[Ctx <: StatelessContext](
+        funcs: Seq[Ast.FuncDef[Ctx]],
+        isInterface: Boolean
+    ): Seq[SimpleFunc[Ctx]] = {
+      if (isInterface) {
+        val preDefinedIndexes = funcs.collect {
+          case Ast.FuncDef(_, _, _, _, _, _, _, Some(index), _, _, _) => index
+        }
+        var fromIndex: Byte = 0
+        funcs.map { func =>
+          func.useMethodIndex match {
+            case Some(index) => from(func, index)
+            case None =>
+              val funcIndex = getNextIndex(fromIndex, preDefinedIndexes)
+              fromIndex = (funcIndex + 1).toByte
+              from(func, funcIndex)
+          }
+        }
+      } else {
+        funcs.view.zipWithIndex.map { case (func, index) => from(func, index.toByte) }.toSeq
+      }
     }
   }
 

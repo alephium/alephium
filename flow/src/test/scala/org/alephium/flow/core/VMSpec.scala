@@ -4618,6 +4618,65 @@ class VMSpec extends AlephiumSpec with Generators {
     test(ALPH.oneAlph + 1)
   }
 
+  it should "call the correct contract method based on the interface method index" in new ContractFixture {
+    val fooV0 =
+      s"""
+         |Interface FooV0 {
+         |  pub fn f0() -> U256
+         |  pub fn f1() -> U256
+         |}
+         |""".stripMargin
+    val foo0 =
+      s"""
+         |Contract Foo0() implements FooV0 {
+         |  pub fn f0() -> U256 { return 0 }
+         |  pub fn f1() -> U256 { return 1 }
+         |}
+         |$fooV0
+         |""".stripMargin
+    val (foo0ContractId, _) = createContract(foo0)
+
+    val foo =
+      s"""
+         |Interface Foo {
+         |  @using(methodIndex = 1)
+         |  pub fn f1() -> U256
+         |}
+         |""".stripMargin
+    val fooV1 =
+      s"""
+         |Interface FooV1 extends Foo {
+         |  pub fn f2() -> U256
+         |}
+         |$foo
+         |""".stripMargin
+    val foo1 =
+      s"""
+         |Contract Foo1() implements FooV1 {
+         |  pub fn f1() -> U256 { return 1 }
+         |  pub fn f2() -> U256 { return 2 }
+         |}
+         |$fooV1
+         |""".stripMargin
+    val (foo1ContractId, _) = createContract(foo1)
+    val script =
+      s"""
+         |TxScript Main {
+         |  assert!(Foo(#${foo0ContractId.toHexString}).f1() == 1, 0)
+         |  assert!(Foo(#${foo1ContractId.toHexString}).f1() == 1, 0)
+         |
+         |  assert!(FooV0(#${foo0ContractId.toHexString}).f0() == 0, 0)
+         |  assert!(FooV0(#${foo0ContractId.toHexString}).f1() == 1, 0)
+         |
+         |  assert!(FooV1(#${foo1ContractId.toHexString}).f1() == 1, 0)
+         |  assert!(FooV1(#${foo1ContractId.toHexString}).f2() == 2, 0)
+         |}
+         |$fooV0
+         |$fooV1
+         |""".stripMargin
+    callTxScript(script)
+  }
+
   "Mempool" should "remove invalid transaction" in new ContractFixture {
     val code =
       s"""

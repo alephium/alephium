@@ -4311,4 +4311,66 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       "These inherited functions have invalid predefined method indexes: f0"
     Compiler.compileContract(code(1)).isRight is true
   }
+
+  it should "assign correct method index to interface functions" in {
+    def createFunc(name: String, methodIndex: Option[Byte] = None): Ast.FuncDef[StatefulContext] =
+      Ast.FuncDef(
+        Seq.empty,
+        Ast.FuncId(name, false),
+        false,
+        false,
+        false,
+        false,
+        false,
+        methodIndex,
+        Seq.empty,
+        Seq.empty,
+        None
+      )
+
+    def checkFuncIndexes(funcs: Seq[Ast.FuncDef[StatefulContext]], indexes: Map[String, Byte]) = {
+      val result = Compiler.SimpleFunc.from(funcs, true)
+      result.foreach { func => func.index is indexes(func.name) }
+    }
+
+    val funcs0 = Seq(
+      createFunc("f0"),
+      createFunc("f1"),
+      createFunc("f2")
+    )
+    checkFuncIndexes(funcs0, Map("f0" -> 0.toByte, "f1" -> 1.toByte, "f2" -> 2.toByte))
+
+    val funcs1 = Seq(
+      createFunc("f0"),
+      createFunc("f1", Some(0.toByte)),
+      createFunc("f2"),
+      createFunc("f3", Some(1.toByte))
+    )
+    checkFuncIndexes(
+      funcs1,
+      Map("f1" -> 0.toByte, "f3" -> 1.toByte, "f0" -> 2.toByte, "f2" -> 3.toByte)
+    )
+
+    val funcs2 = Seq(
+      createFunc("f0", Some(3.toByte)),
+      createFunc("f1"),
+      createFunc("f2", Some(1.toByte)),
+      createFunc("f3")
+    )
+    checkFuncIndexes(
+      funcs2,
+      Map("f1" -> 0.toByte, "f2" -> 1.toByte, "f3" -> 2.toByte, "f0" -> 3.toByte)
+    )
+
+    val funcs3 = Seq(
+      createFunc("f0", Some(1.toByte)),
+      createFunc("f1"),
+      createFunc("f2"),
+      createFunc("f3", Some(5.toByte))
+    )
+    checkFuncIndexes(
+      funcs3,
+      Map("f1" -> 0.toByte, "f0" -> 1.toByte, "f2" -> 2.toByte, "f3" -> 5.toByte)
+    )
+  }
 }
