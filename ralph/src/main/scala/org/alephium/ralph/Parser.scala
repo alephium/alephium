@@ -771,10 +771,6 @@ object StatefulParser extends Parser[StatefulContext] {
       if (funcs.length < 1) {
         throw Compiler.Error(s"No function definition in Interface ${typeId.name}")
       }
-      val preDefinedIndexFuncs = funcs.filter(_.useMethodIndex.isDefined)
-      if (preDefinedIndexFuncs.distinctBy(_.useMethodIndex).size != preDefinedIndexFuncs.size) {
-        throw Compiler.Error(s"There are duplicate method indexes in interface ${typeId.name}")
-      }
       val stdIdOpt = Parser.InterfaceStdAnnotation.extractFields(annotations, None)
       Ast.ContractInterface(
         stdIdOpt.map(stdId => Val.ByteVec(stdId.id)),

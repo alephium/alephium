@@ -1467,10 +1467,6 @@ class ParserSpec extends AlephiumSpec {
     funcs(1).useMethodIndex is Some(2.toByte)
 
     intercept[Compiler.Error](
-      fastparse.parse(interface("2"), StatefulParser.interface(_))
-    ).message is
-      "There are duplicate method indexes in interface Foo"
-    intercept[Compiler.Error](
       fastparse.parse(interface("false"), StatefulParser.interface(_))
     ).message is
       "Expect U256 for methodIndex in annotation @using"

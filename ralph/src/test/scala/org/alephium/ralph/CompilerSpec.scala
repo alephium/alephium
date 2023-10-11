@@ -2481,7 +2481,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       .leftValue
       .message is
       "Function \"Foo.foo\" does not use contract assets, but its annotation of contract assets is turn on." +
-      "Please remove the `assetsInContract` annotation or set it to `assetsInContract = enforced`"
+      "Please remove the `assetsInContract` annotation or set it to `enforced`"
     Compiler.compileContract(code("enforced")).isRight is true
   }
 
@@ -4336,9 +4336,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     Compiler.compileContract(code0(2)).leftValue.message is
-      "These functions have invalid predefined method indexes: f0"
+      "The method index of these functions is out of bound: f0, total number of methods: 2"
     Compiler.compileContract(code0(3)).leftValue.message is
-      "These functions have invalid predefined method indexes: f0"
+      "The method index of these functions is out of bound: f0, total number of methods: 2"
     Compiler.compileContract(code0(1)).isRight is true
     Compiler.compileContract(code0(0)).isRight is true
 
@@ -4365,6 +4365,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       "These functions have invalid predefined method indexes in interface Bar: f2"
     Compiler.compileContract(code1(2)).isRight is true
     Compiler.compileContract(code1(3)).isRight is true
+  }
+
+  it should "throw an error if there are duplicate method indexes" in {
+    val code =
+      s"""
+         |Contract FooBar() implements Bar {
+         |  pub fn foo() -> () {}
+         |  pub fn bar() -> () {}
+         |}
+         |Interface Foo {
+         |  @using(methodIndex = 1)
+         |  pub fn foo() -> ()
+         |}
+         |Interface Bar extends Foo {
+         |  @using(methodIndex = 1)
+         |  pub fn bar() -> ()
+         |}
+         |""".stripMargin
+    Compiler.compileContract(code).leftValue.message is
+      s"There are duplicate method indexes in contract FooBar: 1"
   }
 
   it should "assign correct method index to interface functions" in {

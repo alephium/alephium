@@ -1582,7 +1582,7 @@ object Ast {
           if (txContract.isAbstract) {
             allUniqueFuncs
           } else {
-            rearrangeFuncs(sortedInterfaces, allUniqueFuncs)
+            rearrangeFuncs(sortedInterfaces, allUniqueFuncs, txContract.ident)
           }
 
         case interface: ContractInterface =>
@@ -1601,19 +1601,34 @@ object Ast {
 
     private def rearrangeFuncs(
         interfaces: Seq[ContractInterface],
-        funcs: Seq[FuncDef[StatefulContext]]
+        funcs: Seq[FuncDef[StatefulContext]],
+        contractId: TypeId
     ): Seq[FuncDef[StatefulContext]] = {
       val interfaceFuncs = interfaces.flatMap(_.funcs)
       val (remains, preDefinedIndexFuncs) = funcs.partitionMap { func =>
         val methodIndex = interfaceFuncs.find(_.id == func.id).flatMap(_.useMethodIndex)
         if (methodIndex.isDefined) Right(func.copy(useMethodIndex = methodIndex)) else Left(func)
       }
+
+      if (preDefinedIndexFuncs.distinctBy(_.useMethodIndex).size != preDefinedIndexFuncs.size) {
+        val duplicateIndexes = preDefinedIndexFuncs.view
+          .groupBy(_.useMethodIndex)
+          .filter(_._2.size > 1)
+          .keys
+          .collect { case Some(index) => index }
+          .mkString(",")
+        throw Compiler.Error(
+          s"There are duplicate method indexes in contract ${contractId.name}: $duplicateIndexes"
+        )
+      }
+
       val invalidFuncs = preDefinedIndexFuncs.filter(_.useMethodIndex.exists(_ >= funcs.length))
       if (invalidFuncs.nonEmpty) {
         throw Compiler.Error(
-          s"These functions have invalid predefined method indexes: ${invalidFuncs.map(_.name).mkString(",")}"
+          s"The method index of these functions is out of bound: ${invalidFuncs.map(_.name).mkString(",")}, total number of methods: ${funcs.length}"
         )
       }
+
       val remainFuncsIterator = remains.iterator
       funcs.indices.map { index =>
         preDefinedIndexFuncs.find(_.useMethodIndex.contains(index.toByte)) match {
