@@ -21,6 +21,7 @@ import java.math.BigInteger
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp}
@@ -32,7 +33,7 @@ final case class MiningBlob(
 )
 
 object MiningBlob {
-  def from(template: BlockFlowTemplate): MiningBlob = {
+  def from(template: BlockFlowTemplate)(implicit networkConfig: NetworkConfig): MiningBlob = {
     from(
       template.deps,
       template.depStateHash,
@@ -43,7 +44,7 @@ object MiningBlob {
     )
   }
 
-  def from(block: Block): MiningBlob = {
+  def from(block: Block)(implicit networkConfig: NetworkConfig): MiningBlob = {
     val header = block.header
     from(
       header.blockDeps.deps,
@@ -62,7 +63,7 @@ object MiningBlob {
       target: Target,
       blockTs: TimeStamp,
       transactions: AVector[Transaction]
-  ): MiningBlob = {
+  )(implicit networkConfig: NetworkConfig): MiningBlob = {
     val dummyHeader =
       BlockHeader.unsafe(BlockDeps.unsafe(deps), depStateHash, txsHash, blockTs, target, Nonce.zero)
 

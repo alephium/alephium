@@ -382,6 +382,7 @@ class BlockValidationSpec extends AlephiumSpec {
         blockFlow,
         index,
         newDeps,
+        block.uncles,
         block.transactions,
         block.header.timestamp
       )

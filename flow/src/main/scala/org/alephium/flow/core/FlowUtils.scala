@@ -203,6 +203,18 @@ trait FlowUtils
     }
   }
 
+  @inline private def getUncles(
+      hardFork: HardFork,
+      deps: BlockDeps,
+      parentHeader: BlockHeader
+  ): IOResult[AVector[BlockHeader]] = {
+    if (hardFork.isGhostEnabled()) {
+      getUncles(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
+    } else {
+      Right(AVector.empty)
+    }
+  }
+
   def prepareBlockFlow(
       chainIndex: ChainIndex,
       miner: LockupScript.Asset
@@ -212,14 +224,17 @@ trait FlowUtils
     for {
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
-      loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs)
-      target       <- getNextHashTarget(chainIndex, loosenDeps, templateTs)
-      groupView    <- getMutableGroupView(chainIndex.from, loosenDeps)
+      loosenDeps <- looseUncleDependencies(bestDeps, chainIndex, templateTs)
+      target     <- getNextHashTarget(chainIndex, loosenDeps, templateTs)
+      groupView  <- getMutableGroupView(chainIndex.from, loosenDeps)
+      hardFork = networkConfig.getHardFork(templateTs)
+      uncles       <- getUncles(hardFork, loosenDeps, parentHeader)
       txCandidates <- collectTransactions(chainIndex, groupView, bestDeps)
       template <- prepareBlockFlow(
         chainIndex,
         loosenDeps,
         groupView,
+        uncles,
         txCandidates,
         target,
         templateTs,
@@ -242,6 +257,7 @@ trait FlowUtils
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
       groupView: BlockFlowGroupView[WorldState.Cached],
+      uncles: AVector[BlockHeader],
       candidates: AVector[TransactionTemplate],
       target: Target,
       templateTs: TimeStamp,
@@ -260,6 +276,7 @@ trait FlowUtils
         depStateHash,
         target,
         templateTs,
+        uncles,
         fullTxs :+ coinbaseTx
       )
     }

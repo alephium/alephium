@@ -30,6 +30,8 @@ import org.alephium.protocol.vm.WorldState
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}
 
+// scalastyle:off number.of.methods
+
 trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def blockStorage: BlockStorage
   def txStorage: TxStorage
@@ -50,6 +52,74 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
   def getBlockUnsafe(hash: BlockHash): Block = {
     blockStorage.getUnsafe(hash)
+  }
+
+  def getUsedUnclesAndAncestors(
+      header: BlockHeader
+  ): IOResult[(AVector[BlockHash], AVector[BlockHash])] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def iter(
+        fromHash: BlockHash,
+        num: Int,
+        unclesAcc: AVector[BlockHash],
+        ancestorsAcc: AVector[BlockHash]
+    ): IOResult[(AVector[BlockHash], AVector[BlockHash])] = {
+      for {
+        block <- getBlock(fromHash)
+        result <-
+          if (block.isGenesis || num == 0) {
+            Right((unclesAcc, ancestorsAcc))
+          } else {
+            val uncles     = block.uncles.map(_.hash)
+            val parentHash = block.parentHash
+            iter(parentHash, num - 1, unclesAcc ++ uncles, ancestorsAcc :+ parentHash)
+          }
+      } yield result
+    }
+    iter(header.hash, ALPH.MaxUncleAge, AVector.empty, AVector.empty)
+  }
+
+  def selectUncles(
+      header: BlockHeader,
+      validator: BlockHeader => Boolean
+  ): IOResult[AVector[BlockHeader]] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def iter(
+        fromHeader: BlockHeader,
+        num: Int,
+        usedUncles: AVector[BlockHash],
+        ancestors: AVector[BlockHash],
+        unclesAcc: AVector[BlockHeader]
+    ): IOResult[AVector[BlockHeader]] = {
+      if (fromHeader.isGenesis || num == 0 || unclesAcc.length >= ALPH.MaxUncleSize) {
+        Right(unclesAcc)
+      } else {
+        for {
+          height       <- getHeight(fromHeader.hash)
+          uncleHashes  <- getHashes(height).map(_.filter(_ != fromHeader.hash))
+          uncleHeaders <- uncleHashes.mapE(uncleHash => getBlockHeader(uncleHash))
+          selected = uncleHeaders.filter(uncle =>
+            !usedUncles.contains(uncle.hash) &&
+              ancestors.exists(_ == uncle.parentHash) &&
+              validator(uncle)
+          )
+          parentHeader <- getBlockHeader(fromHeader.parentHash)
+          result       <- iter(parentHeader, num - 1, usedUncles, ancestors, unclesAcc ++ selected)
+        } yield result
+      }
+    }
+
+    for {
+      usedUnclesAndAncestors <- getUsedUnclesAndAncestors(header)
+      (usedUncles, ancestors) = usedUnclesAndAncestors
+      availableUncles <- iter(header, ALPH.MaxUncleAge, usedUncles, ancestors, AVector.empty)
+    } yield {
+      if (availableUncles.length <= ALPH.MaxUncleSize) {
+        availableUncles
+      } else {
+        availableUncles.take(ALPH.MaxUncleSize)
+      }
+    }
   }
 
   def getMainChainBlockByHeight(height: Int): IOResult[Option[Block]] = {

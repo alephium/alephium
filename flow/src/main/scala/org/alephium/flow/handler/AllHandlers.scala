@@ -175,7 +175,8 @@ object AllHandlers {
       namePostfix: String
   )(implicit
       brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig
+      consensusConfig: ConsensusConfig,
+      networkSetting: NetworkSetting
   ): Map[ChainIndex, ActorRefT[HeaderChainHandler.Command]] = {
     val headerHandlers = for {
       from <- 0 until brokerConfig.groups

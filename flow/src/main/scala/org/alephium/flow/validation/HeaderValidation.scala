@@ -18,12 +18,14 @@ package org.alephium.flow.validation
 
 import org.alephium.flow.core.BlockFlow
 import org.alephium.protocol.{ALPH, Hash}
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.util.TimeStamp
 
 trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus, Unit] {
+  implicit def networkConfig: NetworkConfig
+
   def validate(header: BlockHeader, flow: BlockFlow): HeaderValidationResult[Unit] = {
     checkHeader(header, flow)
   }
@@ -109,7 +111,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus, Unit
   protected[validation] def checkGenesisWorkAmount(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisWorkTarget(header: BlockHeader): HeaderValidationResult[Unit]
 
-  protected[validation] def checkVersion(header: BlockHeader): HeaderValidationResult[Unit]
+  protected[validation] def checkVersion(header: BlockHeader)(implicit networkConfig: NetworkConfig): HeaderValidationResult[Unit]
   protected[validation] def checkTimeStampIncreasing(header: BlockHeader, parent: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkTimeStampDrift(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkWorkAmount(header: BlockHeader): HeaderValidationResult[Unit]
@@ -128,11 +130,15 @@ object HeaderValidation {
 
   def build(implicit
       brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig
+      consensusConfig: ConsensusConfig,
+      networkConfig: NetworkConfig
   ): HeaderValidation = new Impl()
 
-  final class Impl(implicit val brokerConfig: BrokerConfig, val consensusConfig: ConsensusConfig)
-      extends HeaderValidation {
+  final class Impl(implicit
+      val brokerConfig: BrokerConfig,
+      val consensusConfig: ConsensusConfig,
+      val networkConfig: NetworkConfig
+  ) extends HeaderValidation {
     protected[validation] def checkGenesisVersion(
         header: BlockHeader
     ): HeaderValidationResult[Unit] = {
@@ -185,8 +191,10 @@ object HeaderValidation {
       }
     }
 
-    protected[validation] def checkVersion(header: BlockHeader): HeaderValidationResult[Unit] = {
-      if (header.version == DefaultBlockVersion) {
+    protected[validation] def checkVersion(
+        header: BlockHeader
+    )(implicit networkConfig: NetworkConfig): HeaderValidationResult[Unit] = {
+      if (header.version == BlockHeader.getBlockVersion(header.timestamp)) {
         validHeader(())
       } else {
         invalidHeader(InvalidBlockVersion)

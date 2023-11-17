@@ -346,4 +346,88 @@ class FlowUtilsSpec extends AlephiumSpec {
     blockFlow.getDifficultyMetric().rightValue is
       blockFlow.genesisBlocks.head.head.target.getDifficulty()
   }
+
+  trait PrepareBlockFlowFixture extends FlowFixture {
+    def ghostHardForkTimestamp: TimeStamp
+
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.network.ghost-hard-fork-timestamp", ghostHardForkTimestamp.millis)
+    )
+
+    lazy val chainIndex = ChainIndex.unsafe(1, 2)
+    def prepare(): BlockHash = {
+      val block0 = emptyBlock(blockFlow, chainIndex)
+      val block1 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block0, block1)
+
+      blockFlow.getMaxHeight(chainIndex).rightValue is 1
+      val blockHashes = blockFlow.getHashes(chainIndex, 1).rightValue
+      blockHashes.length is 2
+      blockHashes.toSet is Set(block0.hash, block1.hash)
+      blockHashes.last
+    }
+  }
+
+  it should "prepare block without uncles before ghost hardfork" in new PrepareBlockFlowFixture {
+    def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
+
+    prepare()
+    val blockTemplate =
+      blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
+    networkConfig.getHardFork(blockTemplate.templateTs) is HardFork.Leman
+    blockTemplate.uncles.isEmpty is true
+
+    val block = mine(blockFlow, blockTemplate)
+    block.header.version is DefaultBlockVersion
+    addAndCheck(blockFlow, block)
+  }
+
+  it should "prepare block with uncles after ghost hardfork" in new PrepareBlockFlowFixture {
+    def ghostHardForkTimestamp: TimeStamp = TimeStamp.now()
+
+    val uncleHash = prepare()
+    val blockTemplate =
+      blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
+    networkConfig.getHardFork(blockTemplate.templateTs) is HardFork.Ghost
+    blockTemplate.uncles.length is 1
+    blockTemplate.uncles.head.hash is uncleHash
+
+    val block = mine(blockFlow, blockTemplate)
+    block.header.version is GhostBlockVersion
+    addAndCheck(blockFlow, block)
+  }
+
+  it should "select uncles that deps are from mainchain" in new PrepareBlockFlowFixture {
+    def ghostHardForkTimestamp: TimeStamp = TimeStamp.now()
+
+    val chain00 = ChainIndex.unsafe(0, 0)
+    chainIndex isnot chain00
+
+    val depBlock0 = emptyBlock(blockFlow, chain00)
+    val depBlock1 = emptyBlock(blockFlow, chain00)
+    addAndCheck(blockFlow, depBlock0, depBlock1)
+
+    val depHashes = blockFlow.getHashes(chain00, 1).rightValue
+    depHashes.toSet is Set(depBlock0.hash, depBlock1.hash)
+
+    val uncle0Template =
+      blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
+    val uncle1Template =
+      blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
+    val block0 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0)
+    val block1 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block1)
+
+    val uncleDepHash = depHashes.filter(_ != block1.blockDeps.inDeps(0)).head
+    val uncle0 =
+      mine(blockFlow, uncle0Template.copy(deps = uncle0Template.deps.replace(0, uncleDepHash)))
+    val uncle1 = mine(blockFlow, uncle1Template)
+    addAndCheck(blockFlow, uncle0, uncle1)
+
+    val block2 = mineBlockTemplate(blockFlow, chainIndex)
+    block2.uncles.length is 1
+    block2.uncles.head.hash is uncle1.hash
+  }
 }

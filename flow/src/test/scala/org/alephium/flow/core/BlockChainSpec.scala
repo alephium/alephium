@@ -16,6 +16,8 @@
 
 package org.alephium.flow.core
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.scalatest.BeforeAndAfter
 import org.scalatest.EitherValues._
 
@@ -628,5 +630,112 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
     chain.checkHashIndexingUnsafe(3)
     chain.getHashes(2) isE AVector(longHash, shortHash)
+  }
+
+  trait GhostFixture extends Fixture {
+    lazy val chainIndex = genesis.chainIndex
+
+    def createBlockChain(length: Int): BlockChain = {
+      val chain  = buildBlockChain()
+      val blocks = chainGenOf(chainIndex, length, genesis.hash, TimeStamp.now()).sample.get
+      addBlocks(chain, blocks.tail)
+      chain
+    }
+
+    def createBlockChainWithUncles(length: Int): (BlockChain, Set[BlockHeader]) = {
+      val chain = buildBlockChain()
+      // generate `length + 1` blocks to make sure this is the canonical chain
+      val blocks    = chainGenOf(chainIndex, length + 1, genesis.hash, TimeStamp.now()).sample.get
+      val allUncles = ArrayBuffer.empty[BlockHeader]
+      addBlocks(chain, blocks)
+      blocks.init.foreach { block =>
+        val uncleGen = blockGen(block.chainIndex, block.timestamp, block.parentHash)
+        val uncles   = AVector.fill(ALPH.MaxUncleSize)(uncleGen.sample.get)
+        allUncles ++= uncles.map(_.header)
+        addBlocks(chain, uncles)
+      }
+      (chain, Set.from(allUncles))
+    }
+
+    def createBlockWithInvalidUncles(length: Int): BlockChain = {
+      val chain = buildBlockChain()
+      val now   = TimeStamp.now()
+      // generate `length + 1` blocks to make sure this is the canonical chain
+      val blocks     = chainGenOf(chainIndex, length + 1, genesis.hash, now).sample.get
+      val forkChain0 = chainGenOf(chainIndex, length, genesis.hash, now).sample.get
+      val forkChain1 = chainGenOf(chainIndex, length, genesis.hash, now).sample.get
+      addBlocks(chain, blocks)
+      addBlocks(chain, forkChain0)
+      addBlocks(chain, forkChain1)
+      chain
+    }
+  }
+
+  it should "select recent available uncles" in new GhostFixture {
+    private def test(chainLength: Int) = {
+      val (chain, _) = createBlockChainWithUncles(chainLength)
+      (1 to chainLength).reverse.foreach(height => {
+        val currentBlock = chain.getMainChainBlockByHeight(height).rightValue.get
+        val (usedUncleHashes, ancestors) =
+          chain.getUsedUnclesAndAncestors(currentBlock.header).rightValue
+        usedUncleHashes.isEmpty is true
+        val fromHeight = if (height > ALPH.MaxUncleAge) height - ALPH.MaxUncleAge else 0
+        ancestors is AVector.from(
+          (fromHeight until height).view
+            .map(chain.getMainChainBlockByHeight(_).rightValue.get.header.hash)
+            .reverse
+        )
+
+        val selectedUncles = chain.selectUncles(currentBlock.header, _ => true).rightValue
+        selectedUncles.length is ALPH.MaxUncleSize
+        selectedUncles.foreach(header => chain.getHeightUnsafe(header.hash) is height)
+      })
+    }
+
+    test(ALPH.MaxUncleAge - 2)
+    test(ALPH.MaxUncleAge)
+    test(ALPH.MaxUncleAge + 2)
+  }
+
+  it should "select uncles from unused uncles set" in new GhostFixture {
+    val (chain, _)    = createBlockChainWithUncles(ALPH.MaxUncleAge)
+    val currentHeight = ALPH.MaxUncleAge
+    var currentBlock  = chain.getMainChainBlockByHeight(ALPH.MaxUncleAge).rightValue.get
+    (1 to ALPH.MaxUncleAge).foreach(index => {
+      val uncles = chain.selectUncles(currentBlock.header, _ => true).rightValue
+      val block =
+        blockGen(
+          currentBlock.chainIndex,
+          currentBlock.timestamp,
+          currentBlock.hash,
+          uncles
+        ).sample.get
+      addBlock(chain, block)
+      chain.getHeight(block.hash).isE(currentHeight + index)
+
+      val (usedUncles, _) = chain.getUsedUnclesAndAncestors(block.header).rightValue
+      uncles.foreach(uncle => usedUncles.exists(_ == uncle.hash) is true)
+      currentBlock = block
+    })
+
+    (1 to ALPH.MaxUncleSize).foreach(_ => {
+      chain.selectUncles(currentBlock.header, _ => true).rightValue.isEmpty is true
+      val block =
+        blockGen(currentBlock.chainIndex, currentBlock.timestamp, currentBlock.hash).sample.get
+      addBlock(chain, block)
+      currentBlock = block
+    })
+  }
+
+  it should "select empty uncles if uncles is invalid" in new GhostFixture {
+    val chain      = createBlockWithInvalidUncles(ALPH.MaxUncleAge)
+    val fromHeight = ALPH.MaxUncleAge + 1
+    (fromHeight to ALPH.MaxUncleAge * 2).foreach(height => {
+      val header = chain.getMainChainBlockByHeight(height).rightValue.get.header
+      chain.selectUncles(header, _ => true).rightValue.isEmpty is true
+      val block = blockGen(header.chainIndex, header.timestamp, header.hash).sample.get
+      addBlock(chain, block)
+      chain.getHeight(block.hash).isE(height + 1)
+    })
   }
 }

@@ -18,10 +18,14 @@ package org.alephium.protocol.model
 
 import org.alephium.crypto.Blake3
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{ConsensusConfigFixture, GroupConfigFixture}
+import org.alephium.protocol.config.{
+  ConsensusConfigFixture,
+  GroupConfigFixture,
+  NetworkConfigFixture
+}
 import org.alephium.protocol.model.BlockHash
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex, TimeStamp, U256}
 
 class BlockHeaderSpec
     extends AlephiumSpec
@@ -99,6 +103,16 @@ class BlockHeaderSpec
 
     val header = genesis.copy(version = DefaultBlockVersion)
     header.version is 0.toByte
+  }
+
+  it should "get block version" in {
+    val now = TimeStamp.now()
+    val config = new NetworkConfigFixture.Default {
+      override val ghostHardForkTimestamp = now
+    }.networkConfig
+    BlockHeader.getBlockVersion(now.minusUnsafe(Duration.unsafe(1)))(config) is DefaultBlockVersion
+    BlockHeader.getBlockVersion(now)(config) is GhostBlockVersion
+    BlockHeader.getBlockVersion(now.plusMillisUnsafe(1))(config) is GhostBlockVersion
   }
 
   it should "serde the snapshots properly" in new ModelSnapshots {
