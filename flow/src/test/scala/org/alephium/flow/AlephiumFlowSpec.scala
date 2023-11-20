@@ -416,8 +416,9 @@ trait FlowFixture
     val parentTs         = blockFlow.getBlockHeaderUnsafe(deps.parentHash(chainIndex)).timestamp
     val blockTs          = FlowUtils.nextTimeStamp(parentTs)
 
-    val target     = blockFlow.getNextHashTarget(chainIndex, deps, blockTs).rightValue
-    val coinbaseTx = Transaction.coinbase(chainIndex, txs, lockupScript, target, blockTs)
+    val target = blockFlow.getNextHashTarget(chainIndex, deps, blockTs).rightValue
+    val coinbaseTx =
+      Transaction.coinbase(chainIndex, txs, lockupScript, target, blockTs, AVector.empty)
     mine0(blockFlow, chainIndex, deps, AVector.empty, txs :+ coinbaseTx, blockTs, target)
   }
 
@@ -425,15 +426,23 @@ trait FlowFixture
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
       txs: AVector[Transaction],
-      blockTs: TimeStamp
+      blockTs: TimeStamp,
+      uncles: AVector[(BlockHeader, LockupScript.Asset)] = AVector.empty
   ): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
     val coinbaseTx =
-      Transaction.coinbase(chainIndex, txs, lockupScript, consensusConfig.maxMiningTarget, blockTs)
+      Transaction.coinbase(
+        chainIndex,
+        txs,
+        lockupScript,
+        consensusConfig.maxMiningTarget,
+        blockTs,
+        uncles
+      )
 
-    mine0(blockFlow, chainIndex, deps, AVector.empty, txs :+ coinbaseTx, blockTs)
+    mine0(blockFlow, chainIndex, deps, uncles.map(_._1), txs :+ coinbaseTx, blockTs)
   }
 
   def mineBlockTemplate(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {

@@ -494,7 +494,7 @@ trait BlockGenerators extends TxGenerators {
       chainIndex: ChainIndex,
       blockTs: TimeStamp,
       parentHash: BlockHash,
-      uncles: AVector[BlockHeader] = AVector.empty
+      uncles: AVector[(BlockHeader, LockupScript.Asset)] = AVector.empty
   ): Gen[Block] = {
     val parentIndex = (groupConfig.groups * 2 - 1) / 2 + chainIndex.to.value
     for {
@@ -551,14 +551,15 @@ trait BlockGenerators extends TxGenerators {
       depStateHash: Hash,
       blockTs: TimeStamp,
       txs: AVector[Transaction],
-      uncles: AVector[BlockHeader]
+      uncles: AVector[(BlockHeader, LockupScript.Asset)]
   ): Block = {
     val coinbase = Transaction.coinbase(
       chainIndex,
       txs,
       p2pkhLockupGen(chainIndex.to).sample.get,
       consensusConfig.maxMiningTarget,
-      blockTs
+      blockTs,
+      uncles
     )
     val txsWithCoinbase = txs :+ coinbase
     @tailrec
@@ -566,7 +567,7 @@ trait BlockGenerators extends TxGenerators {
       val block = Block.from(
         deps,
         depStateHash,
-        uncles,
+        uncles.map(_._1),
         txsWithCoinbase,
         consensusConfig.maxMiningTarget,
         blockTs,
@@ -584,7 +585,7 @@ trait BlockGenerators extends TxGenerators {
       depStateHash: Hash,
       blockTs: TimeStamp,
       txNumGen: Gen[Int],
-      uncles: AVector[BlockHeader]
+      uncles: AVector[(BlockHeader, LockupScript.Asset)]
   ): Gen[Block] =
     for {
       txNum <- txNumGen

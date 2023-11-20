@@ -53,4 +53,11 @@ object NetworkConfigFixture {
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
     def ghostHardForkTimestamp: TimeStamp          = TimeStamp.unsafe(Long.MaxValue)
   }
+
+  val Ghost = new NetworkConfig {
+    def networkId: NetworkId              = NetworkId.AlephiumMainNet
+    def noPreMineProof: ByteString        = ByteString.empty
+    def lemanHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
+    def ghostHardForkTimestamp: TimeStamp = TimeStamp.unsafe(0)
+  }
 }

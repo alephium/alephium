@@ -26,7 +26,7 @@ import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALPH}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.WorldState
+import org.alephium.protocol.vm.{LockupScript, WorldState}
 import org.alephium.serde.Serde
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -82,27 +82,29 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def selectUncles(
       header: BlockHeader,
       validator: BlockHeader => Boolean
-  ): IOResult[AVector[BlockHeader]] = {
+  ): IOResult[AVector[(BlockHeader, LockupScript.Asset)]] = {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def iter(
         fromHeader: BlockHeader,
         num: Int,
         usedUncles: AVector[BlockHash],
         ancestors: AVector[BlockHash],
-        unclesAcc: AVector[BlockHeader]
-    ): IOResult[AVector[BlockHeader]] = {
+        unclesAcc: AVector[(BlockHeader, LockupScript.Asset)]
+    ): IOResult[AVector[(BlockHeader, LockupScript.Asset)]] = {
       if (fromHeader.isGenesis || num == 0 || unclesAcc.length >= ALPH.MaxUncleSize) {
         Right(unclesAcc)
       } else {
         for {
-          height       <- getHeight(fromHeader.hash)
-          uncleHashes  <- getHashes(height).map(_.filter(_ != fromHeader.hash))
-          uncleHeaders <- uncleHashes.mapE(uncleHash => getBlockHeader(uncleHash))
-          selected = uncleHeaders.filter(uncle =>
-            !usedUncles.contains(uncle.hash) &&
-              ancestors.exists(_ == uncle.parentHash) &&
-              validator(uncle)
-          )
+          height      <- getHeight(fromHeader.hash)
+          uncleHashes <- getHashes(height).map(_.filter(_ != fromHeader.hash))
+          uncleBlocks <- uncleHashes.mapE(uncleHash => getBlock(uncleHash))
+          selected = uncleBlocks
+            .filter(uncle =>
+              !usedUncles.contains(uncle.hash) &&
+                ancestors.exists(_ == uncle.parentHash) &&
+                validator(uncle.header)
+            )
+            .map(block => (block.header, block.coinbase.unsigned.fixedOutputs(0).lockupScript))
           parentHeader <- getBlockHeader(fromHeader.parentHash)
           result       <- iter(parentHeader, num - 1, usedUncles, ancestors, unclesAcc ++ selected)
         } yield result

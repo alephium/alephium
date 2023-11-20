@@ -22,7 +22,7 @@ import org.alephium.flow.model.BlockState
 import org.alephium.io.IOResult
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{BlockEnv, WorldState}
+import org.alephium.protocol.vm.{BlockEnv, LockupScript, WorldState}
 import org.alephium.util.{AVector, Cache, RWLock, TimeStamp}
 
 // scalastyle:off number.of.methods
@@ -137,7 +137,7 @@ trait MultiChain extends BlockPool with BlockHeaderPool with FlowDifficultyAdjus
   def getUncles(
       header: BlockHeader,
       validator: BlockHeader => Boolean
-  ): IOResult[AVector[BlockHeader]] =
+  ): IOResult[AVector[(BlockHeader, LockupScript.Asset)]] =
     getBlockChain(header.chainIndex).selectUncles(header, validator)
 
   def add(header: BlockHeader): IOResult[Unit]

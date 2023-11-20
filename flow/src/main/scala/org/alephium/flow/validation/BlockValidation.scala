@@ -282,12 +282,18 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   ): BlockValidationResult[Unit] = {
     val coinbase = block.coinbase
     val data     = coinbase.unsigned.fixedOutputs.head.additionalData
-    _deserialize[CoinbaseFixedData](data) match {
-      case Right(Staging(coinbaseFixedData, _)) =>
+    deserialize[CoinbaseData](data) match {
+      case Right(CoinbaseDataV1(prefix, _)) =>
+        if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
+          validBlock(())
+        } else {
+          invalidBlock(InvalidCoinbaseData)
+        }
+      case Right(CoinbaseDataV2(prefix, version, uncleHashes, _)) =>
         if (
-          coinbaseFixedData.fromGroup == chainIndex.from.value.toByte &&
-          coinbaseFixedData.toGroup == chainIndex.to.value.toByte &&
-          coinbaseFixedData.blockTs == block.header.timestamp
+          prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp) &&
+          version == CoinbaseData.GhostVersion &&
+          uncleHashes == block.uncles.map(_.hash)
         ) {
           validBlock(())
         } else {

@@ -19,6 +19,7 @@ package org.alephium.protocol.model
 import akka.util.ByteString
 
 import org.alephium.protocol._
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulScript, UnlockScript}
 import org.alephium.util.{AVector, Hex, TimeStamp, U256}
 
@@ -63,7 +64,10 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
     )
   }
 
-  def coinbaseTransaction(transactions: Transaction*) = {
+  def coinbaseTransaction(
+      uncles: AVector[(BlockHeader, LockupScript.Asset)],
+      transactions: Transaction*
+  )(implicit networkConfig: NetworkConfig) = {
     Transaction.coinbase(
       ChainIndex.unsafe(0),
       AVector.from(transactions),
@@ -71,7 +75,8 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
         Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")
       ),
       consensusConfig.maxMiningTarget,
-      TimeStamp.unsafe(1640879601000L)
+      TimeStamp.unsafe(1640879601000L),
+      uncles
     )
   }
 

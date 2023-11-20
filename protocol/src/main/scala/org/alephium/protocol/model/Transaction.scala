@@ -21,7 +21,6 @@ import akka.util.ByteString
 import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol._
 import org.alephium.protocol.config.{EmissionConfig, GroupConfig, NetworkConfig}
-import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Transaction.MerkelTx
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
@@ -251,21 +250,24 @@ object Transaction {
       txs: AVector[Transaction],
       lockupScript: LockupScript.Asset,
       target: Target,
-      blockTs: TimeStamp
+      blockTs: TimeStamp,
+      uncles: AVector[(BlockHeader, LockupScript.Asset)]
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    coinbase(chainIndex, txs, lockupScript, ByteString.empty, target, blockTs)
+    coinbase(chainIndex, txs, lockupScript, ByteString.empty, target, blockTs, uncles)
   }
 
+  // scalastyle:off parameter.number
   def coinbase(
       chainIndex: ChainIndex,
       txs: AVector[Transaction],
       lockupScript: LockupScript.Asset,
       minerData: ByteString,
       target: Target,
-      blockTs: TimeStamp
+      blockTs: TimeStamp,
+      uncles: AVector[(BlockHeader, LockupScript.Asset)]
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
     val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
-    coinbase(chainIndex, gasFee, lockupScript, minerData, target, blockTs)
+    coinbase(chainIndex, gasFee, lockupScript, minerData, target, blockTs, uncles)
   }
 
   def coinbase(
@@ -273,9 +275,10 @@ object Transaction {
       gasFee: U256,
       lockupScript: LockupScript.Asset,
       target: Target,
-      blockTs: TimeStamp
+      blockTs: TimeStamp,
+      uncles: AVector[(BlockHeader, LockupScript.Asset)]
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    coinbase(chainIndex, gasFee, lockupScript, ByteString.empty, target, blockTs)
+    coinbase(chainIndex, gasFee, lockupScript, ByteString.empty, target, blockTs, uncles)
   }
 
   def coinbase(
@@ -284,35 +287,10 @@ object Transaction {
       lockupScript: LockupScript.Asset,
       minerData: ByteString,
       target: Target,
-      blockTs: TimeStamp
+      blockTs: TimeStamp,
+      uncles: AVector[(BlockHeader, LockupScript.Asset)]
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    val coinbaseData = CoinbaseFixedData.from(chainIndex, blockTs)
-    val outputData   = serialize(coinbaseData) ++ minerData
-    val lockTime     = blockTs + networkConfig.coinbaseLockupPeriod
-    val miningReward = emissionConfig.emission.reward(target, blockTs, ALPH.LaunchTimestamp)
-    val hardFork     = networkConfig.getHardFork(blockTs)
-    val netReward = miningReward match {
-      case Emission.PoW(miningReward) => totalReward(gasFee, miningReward, hardFork)
-      case _: Emission.PoLW           => ??? // TODO: when hashrate is high enough
-    }
-
-    val txOutput =
-      AssetOutput(
-        netReward,
-        lockupScript,
-        lockTime,
-        tokens = AVector.empty,
-        outputData
-      )
-    val unsigned = UnsignedTransaction.coinbase(AVector.empty, AVector(txOutput))
-    Transaction(
-      unsigned,
-      scriptExecutionOk = true,
-      contractInputs = AVector.empty,
-      generatedOutputs = AVector.empty,
-      inputSignatures = AVector.empty,
-      scriptSignatures = AVector.empty
-    )
+    Coinbase.build(chainIndex, gasFee, lockupScript, minerData, target, blockTs, uncles)
   }
 
   def genesis(

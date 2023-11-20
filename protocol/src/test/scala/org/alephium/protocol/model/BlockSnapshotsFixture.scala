@@ -17,7 +17,9 @@
 package org.alephium.protocol.model
 
 import org.alephium.protocol._
+import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, Hex, TimeStamp}
 
 trait BlockSnapshotsFixture extends TransactionSnapshotsFixture {
@@ -45,11 +47,15 @@ trait BlockSnapshotsFixture extends TransactionSnapshotsFixture {
     )
   }
 
-  def block(version: Byte, uncles: AVector[BlockHeader], transactions: Transaction*): Block = {
-    val coinbaseTx = coinbaseTransaction(transactions: _*)
+  def block(
+      version: Byte,
+      uncles: AVector[(BlockHeader, LockupScript.Asset)],
+      transactions: Transaction*
+  )(implicit networkConfig: NetworkConfig): Block = {
+    val coinbaseTx = coinbaseTransaction(uncles, transactions: _*)
     val allTxs     = AVector.from(transactions) :+ coinbaseTx
 
     val header = blockHeader(Block.calTxsHash(allTxs), version)
-    Block(header, uncles, allTxs)
+    Block(header, uncles.map(_._1), allTxs)
   }
 }

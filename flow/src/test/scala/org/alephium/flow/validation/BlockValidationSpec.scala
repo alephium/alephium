@@ -89,7 +89,8 @@ class BlockValidationSpec extends AlephiumSpec {
 
   trait GenesisForkFixture extends Fixture {
     override val configValues = Map(
-      ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(1).millis)
+      ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis)
     )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
   }
@@ -166,25 +167,104 @@ class BlockValidationSpec extends AlephiumSpec {
     block.Coinbase.tx(_.copy(scriptSignatures = testSignatures)).fail()
   }
 
-  it should "check coinbase data" in new Fixture {
-    val block        = emptyBlock(blockFlow, chainIndex)
-    val coinbaseData = block.coinbase.unsigned.fixedOutputs.head.additionalData
-    val expected     = serialize(CoinbaseFixedData.from(chainIndex, block.header.timestamp))
-    coinbaseData.startsWith(expected) is true
+  trait PreGhostForkFixture extends Fixture {
+    override val configValues = Map(
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis)
+    )
+  }
+
+  trait CoinbaseDataFixture extends Fixture {
+    def block: Block
+    lazy val coinbaseData: CoinbaseData =
+      CoinbaseData.from(chainIndex, block.timestamp, block.uncles.map(_.hash), ByteString.empty)
+
+    def wrongTimeStamp(ts: TimeStamp): ByteString = {
+      serialize(CoinbaseData.from(chainIndex, ts, block.uncles.map(_.hash), ByteString.empty))
+    }
+
+    def wrongChainIndex(chainIndex: ChainIndex): ByteString = {
+      serialize(
+        CoinbaseData.from(
+          chainIndex,
+          block.header.timestamp,
+          block.uncles.map(_.hash),
+          ByteString.empty
+        )
+      )
+    }
+
+    def wrongVersion(version: Byte): ByteString = {
+      val coinbaseDataV2 = coinbaseData.asInstanceOf[CoinbaseDataV2]
+      serialize[CoinbaseData](coinbaseDataV2.copy(version = version))
+    }
+
+    def wrongUncleHashes(uncleHashes: AVector[BlockHash]): ByteString = {
+      val coinbaseDataV2 = coinbaseData.asInstanceOf[CoinbaseDataV2]
+      serialize[CoinbaseData](coinbaseDataV2.copy(uncleHashes = uncleHashes))
+    }
+  }
+
+  it should "check coinbase data for pre-ghost hardfork" in new CoinbaseDataFixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+    networkConfig.getHardFork(TimeStamp.now()) isnot HardFork.Ghost
 
     implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk)
 
+    val block = emptyBlock(blockFlow, chainIndex)
+    block.coinbase.unsigned.fixedOutputs.head.additionalData is serialize(coinbaseData)
+    block.pass()
+
     info("wrong block timestamp")
-    val wrongTimestamp =
-      serialize(CoinbaseFixedData.from(chainIndex, TimeStamp.now().plusSecondsUnsafe(5)))
-    block.Coinbase.output(_.copy(additionalData = wrongTimestamp)).fail(InvalidCoinbaseData)
+    val data0 = wrongTimeStamp(block.timestamp.plusSecondsUnsafe(5))
+    block.Coinbase.output(_.copy(additionalData = data0)).fail(InvalidCoinbaseData)
 
     info("wrong chain index")
-    val wrongChainIndex = {
-      val index = chainIndexGen.retryUntil(_ != chainIndex).sample.get
-      serialize(CoinbaseFixedData.from(index, block.header.timestamp))
-    }
-    block.Coinbase.output(_.copy(additionalData = wrongChainIndex)).fail(InvalidCoinbaseData)
+    val data1 = wrongChainIndex(chainIndexGen.retryUntil(_ != chainIndex).sample.get)
+    block.Coinbase.output(_.copy(additionalData = data1)).fail(InvalidCoinbaseData)
+
+    info("wrong format")
+    val wrongFormat = ByteString("wrong-coinbase-data-format")
+    block.Coinbase.output(_.copy(additionalData = wrongFormat)).fail(InvalidCoinbaseData)
+  }
+
+  it should "check coinbase data for ghost hardfork" in new CoinbaseDataFixture {
+    override val configValues = Map(("alephium.network.ghost-hard-fork-timestamp", 0))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+
+    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk)
+
+    val uncleBlock = blockGen(chainIndex).sample.get
+    val uncles     = AVector((uncleBlock.header, p2pkScriptGen(chainIndex.to).sample.get.lockup))
+    val block = mineWithoutCoinbase(blockFlow, chainIndex, AVector.empty, TimeStamp.now(), uncles)
+    block.coinbase.unsigned.fixedOutputs.head.additionalData is serialize(coinbaseData)
+    block.pass()
+
+    info("wrong block timestamp")
+    val data0 = wrongTimeStamp(block.timestamp.plusSecondsUnsafe(5))
+    block.Coinbase.output(_.copy(additionalData = data0)).fail(InvalidCoinbaseData)
+
+    info("wrong chain index")
+    val data1 = wrongChainIndex(chainIndexGen.retryUntil(_ != chainIndex).sample.get)
+    block.Coinbase.output(_.copy(additionalData = data1)).fail(InvalidCoinbaseData)
+
+    info("wrong version")
+    val data2 = wrongVersion((CoinbaseData.GhostVersion + 1).toByte)
+    block.Coinbase.output(_.copy(additionalData = data2)).fail(InvalidCoinbaseData)
+
+    info("wrong uncleHashes")
+    val invalidHashes = AVector.fill(2)(BlockHash.random)
+    block.Coinbase
+      .output(_.copy(additionalData = wrongUncleHashes(AVector.empty)))
+      .fail(InvalidCoinbaseData)
+    block.Coinbase
+      .output(_.copy(additionalData = wrongUncleHashes(invalidHashes)))
+      .fail(InvalidCoinbaseData)
+    block.Coinbase
+      .output(
+        _.copy(additionalData = wrongUncleHashes(AVector(uncleBlock.hash, invalidHashes.head)))
+      )
+      .fail(InvalidCoinbaseData)
 
     info("wrong format")
     val wrongFormat = ByteString("wrong-coinbase-data-format")
@@ -448,13 +528,18 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "invalidate blocks with breaking instrs" in new Fixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     override lazy val chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
     val newStorages =
       StoragesFixture.buildStorages(rootPath.resolveSibling(Hash.generate.toHexString))
     val genesisNetworkConfig = new NetworkConfigFixture.Default {
       override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+      override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     }.networkConfig
-    val lemanNetworkConfig = (new NetworkConfigFixture.Default {}).networkConfig
+    val lemanNetworkConfig = new NetworkConfigFixture.Default {
+      override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
+    }.networkConfig
 
     genesisNetworkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
     lemanNetworkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman

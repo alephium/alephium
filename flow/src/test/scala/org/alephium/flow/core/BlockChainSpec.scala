@@ -688,7 +688,10 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
         val selectedUncles = chain.selectUncles(currentBlock.header, _ => true).rightValue
         selectedUncles.length is ALPH.MaxUncleSize
-        selectedUncles.foreach(header => chain.getHeightUnsafe(header.hash) is height)
+        selectedUncles.foreach { case (header, miner) =>
+          miner is chain.getBlockUnsafe(header.hash).coinbase.unsigned.fixedOutputs(0).lockupScript
+          chain.getHeightUnsafe(header.hash) is height
+        }
       })
     }
 
@@ -714,7 +717,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.getHeight(block.hash).isE(currentHeight + index)
 
       val (usedUncles, _) = chain.getUsedUnclesAndAncestors(block.header).rightValue
-      uncles.foreach(uncle => usedUncles.exists(_ == uncle.hash) is true)
+      uncles.foreach(uncle => usedUncles.exists(_ == uncle._1.hash) is true)
       currentBlock = block
     })
 

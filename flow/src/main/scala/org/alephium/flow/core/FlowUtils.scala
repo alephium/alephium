@@ -207,7 +207,7 @@ trait FlowUtils
       hardFork: HardFork,
       deps: BlockDeps,
       parentHeader: BlockHeader
-  ): IOResult[AVector[BlockHeader]] = {
+  ): IOResult[AVector[(BlockHeader, LockupScript.Asset)]] = {
     if (hardFork.isGhostEnabled()) {
       getUncles(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
     } else {
@@ -247,7 +247,14 @@ trait FlowUtils
       } else {
         logger.warn("Assemble empty block due to invalid txs")
         val coinbaseTx =
-          Transaction.coinbase(chainIndex, AVector.empty[Transaction], miner, target, templateTs)
+          Transaction.coinbase(
+            chainIndex,
+            AVector.empty[Transaction],
+            miner,
+            target,
+            templateTs,
+            uncles
+          )
         template.copy(transactions = AVector(coinbaseTx)) // fall back to empty block
       }
     }
@@ -257,7 +264,7 @@ trait FlowUtils
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      uncles: AVector[BlockHeader],
+      uncles: AVector[(BlockHeader, LockupScript.Asset)],
       candidates: AVector[TransactionTemplate],
       target: Target,
       templateTs: TimeStamp,
@@ -269,14 +276,14 @@ trait FlowUtils
       depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)
     } yield {
       val coinbaseTx =
-        Transaction.coinbase(chainIndex, fullTxs, miner, target, templateTs)
+        Transaction.coinbase(chainIndex, fullTxs, miner, target, templateTs, uncles)
       BlockFlowTemplate(
         chainIndex,
         loosenDeps.deps,
         depStateHash,
         target,
         templateTs,
-        uncles,
+        uncles.map(_._1),
         fullTxs :+ coinbaseTx
       )
     }

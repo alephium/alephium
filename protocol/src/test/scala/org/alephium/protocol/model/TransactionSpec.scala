@@ -59,7 +59,8 @@ class TransactionSpec
           script,
           Hash.generate.bytes,
           Target.Max,
-          ALPH.LaunchTimestamp
+          ALPH.LaunchTimestamp,
+          AVector.empty
         )
     )
 
@@ -81,21 +82,24 @@ class TransactionSpec
       gasFee = U256.Zero,
       script,
       target = Target.Max,
-      blockTs = ALPH.LaunchTimestamp
+      blockTs = ALPH.LaunchTimestamp,
+      AVector.empty
     )
     val coinbase1 = Transaction.coinbase(
       ChainIndex.unsafe(0, 1),
       gasFee = U256.Zero,
       script,
       target = Target.Max,
-      blockTs = ALPH.LaunchTimestamp
+      blockTs = ALPH.LaunchTimestamp,
+      AVector.empty
     )
     val coinbase2 = Transaction.coinbase(
       ChainIndex.unsafe(0, 0),
       gasFee = U256.Zero,
       script,
       target = Target.Max,
-      blockTs = TimeStamp.now()
+      blockTs = TimeStamp.now(),
+      AVector.empty
     )
     (coinbase0.id equals coinbase1.id) is false
     (coinbase0.id equals coinbase2.id) is false
@@ -162,10 +166,19 @@ class TransactionSpec
     }
 
     {
-      info("coinbase transaction")
+      info("pre-ghost coinbase transaction")
 
-      val tx = coinbaseTransaction()
+      implicit val networkConfig = new NetworkConfigFixture.Default {
+        override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
+      }.networkConfig
+      val tx = coinbaseTransaction(AVector.empty)
       tx.verify("coinbase")
+    }
+
+    {
+      info("ghost coinbase transaction")
+      val tx = coinbaseTransaction(AVector.empty)
+      tx.verify("ghost-coinbase")
     }
 
     {

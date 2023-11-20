@@ -1,0 +1,116 @@
+// Copyright 2018 The Alephium Authors
+// This file is part of the alephium project.
+//
+// The library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the library. If not, see <http://www.gnu.org/licenses/>.
+
+package org.alephium.protocol.model
+
+import akka.util.ByteString
+
+import org.alephium.protocol.config.NetworkConfig
+import org.alephium.serde.{_deserialize => _decode, serialize => encode, _}
+import org.alephium.util.{AVector, TimeStamp}
+
+final case class CoinbaseDataPrefix private (fromGroup: Byte, toGroup: Byte, blockTs: TimeStamp)
+
+object CoinbaseDataPrefix {
+  implicit val prefixSerde: Serde[CoinbaseDataPrefix] =
+    Serde.forProduct3(
+      CoinbaseDataPrefix.apply,
+      prefix => (prefix.fromGroup, prefix.toGroup, prefix.blockTs)
+    )
+
+  def from(chainIndex: ChainIndex, blockTs: TimeStamp): CoinbaseDataPrefix = {
+    CoinbaseDataPrefix(chainIndex.from.value.toByte, chainIndex.to.value.toByte, blockTs)
+  }
+}
+
+sealed trait CoinbaseData {
+  def prefix: CoinbaseDataPrefix
+}
+
+final case class CoinbaseDataV1(
+    prefix: CoinbaseDataPrefix,
+    minerData: ByteString
+) extends CoinbaseData
+
+final case class CoinbaseDataV2(
+    prefix: CoinbaseDataPrefix,
+    version: Byte,
+    uncleHashes: AVector[BlockHash],
+    minerData: ByteString
+) extends CoinbaseData
+
+object CoinbaseData {
+  val GhostVersion: Byte = 1
+
+  implicit def serde(implicit networkConfig: NetworkConfig): Serde[CoinbaseData] =
+    new Serde[CoinbaseData] {
+      def _deserialize(input: ByteString): SerdeResult[Staging[CoinbaseData]] = {
+        for {
+          prefixResult <- _decode[CoinbaseDataPrefix](input)
+          hardFork = networkConfig.getHardFork(prefixResult.value.blockTs)
+          coinbaseData <-
+            if (hardFork.isGhostEnabled()) {
+              for {
+                versionResult     <- _decode[Byte](prefixResult.rest)
+                uncleHashesResult <- _decode[AVector[BlockHash]](versionResult.rest)
+              } yield Staging[CoinbaseData](
+                CoinbaseDataV2(
+                  prefixResult.value,
+                  versionResult.value,
+                  uncleHashesResult.value,
+                  uncleHashesResult.rest
+                ),
+                ByteString.empty
+              )
+            } else {
+              Right(
+                Staging[CoinbaseData](
+                  CoinbaseDataV1(prefixResult.value, prefixResult.rest),
+                  ByteString.empty
+                )
+              )
+            }
+        } yield coinbaseData
+      }
+
+      def serialize(d: CoinbaseData): ByteString = {
+        d match {
+          case data: CoinbaseDataV1 => encode(data.prefix) ++ data.minerData
+          case data: CoinbaseDataV2 =>
+            encode(data.prefix) ++ encode(data.version) ++ encode(
+              data.uncleHashes
+            ) ++ data.minerData
+        }
+      }
+    }
+
+  def from(
+      chainIndex: ChainIndex,
+      blockTs: TimeStamp,
+      uncleHashes: AVector[BlockHash],
+      minerData: ByteString
+  )(implicit
+      networkConfig: NetworkConfig
+  ): CoinbaseData = {
+    val prefix   = CoinbaseDataPrefix.from(chainIndex, blockTs)
+    val hardFork = networkConfig.getHardFork(blockTs)
+    if (hardFork.isGhostEnabled()) {
+      CoinbaseDataV2(prefix, GhostVersion, uncleHashes, minerData)
+    } else {
+      CoinbaseDataV1(prefix, minerData)
+    }
+  }
+}
