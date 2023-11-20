@@ -26,6 +26,8 @@ import org.alephium.protocol.vm.{BlockEnv, GasPrice, LogConfig, WorldState}
 import org.alephium.serde._
 import org.alephium.util.{AVector, EitherF, U256}
 
+// scalastyle:off number.of.methods
+
 trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[WorldState.Cached]] {
   import ValidationStatus._
 
@@ -129,8 +131,51 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       _          <- checkTotalGas(block)
       _          <- checkMerkleRoot(block)
       _          <- checkFlow(block, flow)
+      _          <- checkUncles(block, flow)
       sideResult <- checkTxs(block.chainIndex, block, flow)
     } yield sideResult
+  }
+
+  private def checkUncles(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
+    if (brokerConfig.contains(block.chainIndex.from)) {
+      val hardFork = networkConfig.getHardFork(block.timestamp)
+      if (hardFork.isGhostEnabled() && block.uncles.nonEmpty) {
+        for {
+          _       <- checkUncleSize(block)
+          _       <- checkDuplicateUncles(block)
+          isValid <- from(flow.getBlockChain(block.chainIndex).validateUncles(block))
+          _       <- if (isValid) validBlock(()) else invalidBlock(InvalidUncles)
+          _ <- if (isUncleDepsValid(block, flow)) validBlock(()) else invalidBlock(InvalidUncles)
+          _ <- block.uncles.foreachE(header => headerValidation.validate(header, flow))
+        } yield ()
+      } else if (block.uncles.nonEmpty) {
+        invalidBlock(InvalidUnclesBeforeGhostHardFork)
+      } else {
+        validBlock(())
+      }
+    } else {
+      validBlock(())
+    }
+  }
+
+  @inline private def checkUncleSize(block: Block): BlockValidationResult[Unit] = {
+    if (block.uncles.length > ALPH.MaxUncleSize) {
+      invalidBlock(InvalidUncleSize)
+    } else {
+      validBlock(())
+    }
+  }
+
+  @inline private def checkDuplicateUncles(block: Block): BlockValidationResult[Unit] = {
+    if (block.uncles.toSeq.distinctBy(_.hash).length != block.uncles.length) {
+      invalidBlock(DuplicatedUncles)
+    } else {
+      validBlock(())
+    }
+  }
+
+  @inline private def isUncleDepsValid(block: Block, flow: BlockFlow): Boolean = {
+    block.uncles.forall(uncle => flow.isExtendingUnsafe(block.blockDeps, uncle.blockDeps))
   }
 
   private def checkTxs(
@@ -201,7 +246,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     val result = consensusConfig.emission.reward(block.header) match {
       case Emission.PoW(miningReward) =>
         val netReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
-        checkCoinbase(chainIndex, block, groupView, 1, netReward, netReward)
+        checkCoinbase(chainIndex, block, groupView, 1 + block.uncles.length, netReward, netReward)
       case Emission.PoLW(miningReward, burntAmount) =>
         val lockedReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
         val netReward    = lockedReward.subUnsafe(burntAmount)
@@ -222,10 +267,12 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       netReward: U256,
       lockedReward: U256
   ): BlockValidationResult[Unit] = {
+    // FIXME
+    val rewards = netReward.mulUnsafe(U256.unsafe(outputNum))
     for {
       _ <- checkCoinbaseEasy(block, outputNum)
       _ <- checkCoinbaseData(chainIndex, block)
-      _ <- checkCoinbaseAsTx(chainIndex, block, groupView, netReward.addUnsafe(coinbaseGasFee))
+      _ <- checkCoinbaseAsTx(chainIndex, block, groupView, rewards.addUnsafe(coinbaseGasFee))
       _ <- checkLockedReward(block, lockedReward)
     } yield ()
   }

@@ -450,6 +450,22 @@ trait FlowFixture
     mine(blockFlow, blockFlow.prepareBlockFlowUnsafe(chainIndex, miner))
   }
 
+  implicit class RichBlockFlowTemplate(template: BlockFlowTemplate) {
+    def setUncles(uncles: AVector[(BlockHeader, LockupScript.Asset)]): BlockFlowTemplate = {
+      val txs   = template.transactions.init
+      val miner = template.transactions.last.unsigned.fixedOutputs.head.lockupScript
+      val coinbaseTx = Transaction.coinbase(
+        template.index,
+        txs,
+        miner,
+        template.target,
+        template.templateTs,
+        uncles
+      )
+      template.copy(transactions = txs :+ coinbaseTx, uncles = uncles.map(_._1))
+    }
+  }
+
   def mine(blockFlow: BlockFlow, template: BlockFlowTemplate): Block = {
     mine(
       blockFlow,

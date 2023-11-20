@@ -571,4 +571,199 @@ class BlockValidationSpec extends AlephiumSpec {
     )
     validatorLeman.validate(block, blockflowLeman).isRight is true
   }
+
+  it should "invalidate blocks with uncles before ghost hardfork" in new Fixture { F =>
+    override val configValues = Map(("alephium.network.ghost-hard-fork-timestamp", Long.MaxValue))
+
+    val block00 = emptyBlock(blockFlow, chainIndex)
+    val block01 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block00, block01)
+    val uncleHeaders =
+      blockFlow.getHashes(chainIndex, 1).rightValue.tail.map(blockFlow.getBlockHeaderUnsafe)
+
+    val template =
+      blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
+    val block = mine(blockFlow, template.copy(uncles = uncleHeaders))
+    block.uncles.nonEmpty is true
+    checkBlockAfterHeader(block, blockFlow).left.value isE InvalidUnclesBeforeGhostHardFork
+  }
+
+  trait GhostFixture extends Fixture {
+    override val configValues = Map(
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.now().millis)
+    )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    lazy val miner = getGenesisLockupScript(chainIndex.to)
+
+    def mineBlocks(size: Int): AVector[BlockHash] = {
+      val blocks = (0 to size).map(_ => emptyBlock(blockFlow, chainIndex))
+      addAndCheck(blockFlow, blocks: _*)
+      val hashes = blockFlow.getHashes(chainIndex, 1).rightValue
+      hashes.length is size + 1
+      hashes
+    }
+
+    def mineChain(size: Int): AVector[Block] = {
+      val blockFlow = isolatedBlockFlow()
+      val blocks = (0 until size).map(_ => {
+        val block = emptyBlock(blockFlow, chainIndex)
+        addAndCheck(blockFlow, block)
+        block
+      })
+      AVector.from(blocks)
+    }
+  }
+
+  it should "invalidate block with invalid uncles size" in new GhostFixture {
+    val hashes        = mineBlocks(ALPH.MaxUncleSize + 1)
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate.uncles.length is ALPH.MaxUncleSize
+    val uncleHeaders = hashes.tail.map(blockFlow.getBlockHeaderUnsafe)
+    uncleHeaders.length is ALPH.MaxUncleSize + 1
+    val block = mine(blockFlow, blockTemplate.setUncles(uncleHeaders.map((_, miner))))
+    checkBlock(block, blockFlow).left.value isE InvalidUncleSize
+  }
+
+  it should "invalidate block with duplicate uncles" in new GhostFixture {
+    mineBlocks(ALPH.MaxUncleSize)
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    val block =
+      mine(blockFlow, blockTemplate.setUncles(AVector.fill(2)((blockTemplate.uncles.head, miner))))
+    checkBlock(block, blockFlow).left.value isE DuplicatedUncles
+  }
+
+  it should "invalidate block with used uncles" in new GhostFixture {
+    mineBlocks(ALPH.MaxUncleSize)
+    val block0 = mineBlockTemplate(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0)
+
+    val block1Template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    block1Template.uncles.isEmpty is true
+    val block1 = mine(blockFlow, block1Template.setUncles(AVector((block0.uncles.head, miner))))
+    checkBlock(block1, blockFlow).left.value isE InvalidUncles
+  }
+
+  it should "invalidate block if uncle is sibling" in new GhostFixture {
+    val block0 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0)
+    val block10 = emptyBlock(blockFlow, chainIndex)
+    block10.parentHash is block0.hash
+
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    val block11       = mine(blockFlow, blockTemplate.setUncles(AVector((block10.header, miner))))
+    block11.parentHash is block0.hash
+    checkBlock(block11, blockFlow).left.value isE InvalidUncles
+  }
+
+  it should "invalidate block if uncle is ancestor" in new GhostFixture {
+    val block0 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0)
+
+    var parentBlock = block0
+    (0 until ALPH.MaxUncleAge).foreach { _ =>
+      val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+      val invalidBlock  = mine(blockFlow, blockTemplate.setUncles(AVector((block0.header, miner))))
+      invalidBlock.parentHash is parentBlock.hash
+      checkBlock(invalidBlock, blockFlow).left.value isE InvalidUncles
+
+      parentBlock = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, parentBlock)
+    }
+  }
+
+  it should "invalidate block if uncles' parent is not from mainchain" in new GhostFixture {
+    val (blocks0, blocks1) = (mineChain(4), mineChain(4))
+    addAndCheck(blockFlow, blocks0.toSeq: _*)
+    addAndCheck(blockFlow, blocks1.toSeq: _*)
+    val hashes = blockFlow.getHashes(chainIndex, 3).rightValue
+    hashes.length is 2
+    val uncleHeaders = hashes.tail.map(blockFlow.getBlockHeaderUnsafe)
+
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate.uncles.length is 1
+    val block = mine(
+      blockFlow,
+      blockTemplate.setUncles((blockTemplate.uncles ++ uncleHeaders).map((_, miner)))
+    )
+    checkBlock(block, blockFlow).left.value isE InvalidUncles
+  }
+
+  it should "invalidate block with invalid uncle intra deps" in new Fixture {
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.now().millis)
+    )
+    override lazy val chainIndex: ChainIndex = ChainIndex.unsafe(1, 2)
+    val chain00                              = ChainIndex.unsafe(0, 0)
+    val depBlock0                            = emptyBlock(blockFlow, chain00)
+    val depBlock1                            = emptyBlock(blockFlow, chain00)
+    addAndCheck(blockFlow, depBlock0, depBlock1)
+
+    val miner              = getGenesisLockupScript(chainIndex.to)
+    val uncleBlockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    val parent = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, parent)
+
+    val uncle0 = mine(
+      blockFlow,
+      uncleBlockTemplate.copy(deps = uncleBlockTemplate.deps.replace(0, depBlock0.hash))
+    )
+    val uncle1 = mine(
+      blockFlow,
+      uncleBlockTemplate.copy(deps = uncleBlockTemplate.deps.replace(0, depBlock1.hash))
+    )
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    val (validUncle, invalidUncle) =
+      if (parent.blockDeps.inDeps(0) == depBlock0.hash) {
+        (uncle0, uncle1)
+      } else {
+        (uncle1, uncle0)
+      }
+    val block0 =
+      mine(
+        blockFlow,
+        blockTemplate.setUncles(AVector((validUncle.header, miner), (invalidUncle.header, miner)))
+      )
+    checkBlock(block0, blockFlow).leftValue is Right(InvalidUncles)
+
+    val block1 = mine(blockFlow, blockTemplate.setUncles(AVector((validUncle.header, miner))))
+    checkBlock(block1, blockFlow).isRight is true
+
+    val block2 = mine(blockFlow, blockTemplate.setUncles(AVector((invalidUncle.header, miner))))
+    checkBlock(block2, blockFlow).leftValue is Right(InvalidUncles)
+  }
+
+  it should "validate block with valid uncles" in new GhostFixture {
+    mineBlocks(ALPH.MaxUncleSize)
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate.uncles.length is ALPH.MaxUncleSize
+    (0 until blockTemplate.uncles.length).foreach { size =>
+      val block =
+        mine(blockFlow, blockTemplate.setUncles(blockTemplate.uncles.take(size).map((_, miner))))
+      checkBlock(block, blockFlow).isRight is true
+    }
+  }
+
+  it should "validate block if uncle header used by another uncle block" in new GhostFixture {
+    val block10 = emptyBlock(blockFlow, chainIndex)
+    val block11 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block10, block11)
+    val hashesAtHeight1 = blockFlow.getHashes(chainIndex, 1).rightValue
+    hashesAtHeight1.length is 2
+
+    val block20 = emptyBlock(blockFlow, chainIndex)
+    block20.parentHash is hashesAtHeight1.head
+    val block21Template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    block21Template.uncles.map(_.hash) is hashesAtHeight1.tail
+    val block21 = mine(blockFlow, block21Template)
+
+    addAndCheck(blockFlow, block20)
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    addAndCheck(blockFlow, block21)
+
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate.uncles.map(_.hash) is block21.hash +: hashesAtHeight1.tail
+    addAndCheck(blockFlow, mine(blockFlow, blockTemplate))
+  }
 }

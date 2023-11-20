@@ -124,6 +124,22 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
+  def validateUncles(block: Block): IOResult[Boolean] = {
+    assume(block.uncles.nonEmpty)
+    for {
+      parentHeader           <- getBlockHeader(block.parentHash)
+      usedUnclesAndAncestors <- getUsedUnclesAndAncestors(parentHeader)
+    } yield {
+      val (usedUncles, ancestors) = usedUnclesAndAncestors
+      block.uncles.forall { uncle =>
+        uncle.hash != parentHeader.hash &&
+        !ancestors.exists(_ == uncle.hash) &&
+        ancestors.exists(_ == uncle.parentHash) &&
+        !usedUncles.contains(uncle.hash)
+      }
+    }
+  }
+
   def getMainChainBlockByHeight(height: Int): IOResult[Option[Block]] = {
     getHashes(height).flatMap { hashes =>
       hashes.headOption match {
