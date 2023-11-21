@@ -66,8 +66,9 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
 
   it should "pass explicit hex string serialization examples" in {
     {
-      val message: ServerMessage = Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ONE)))
-      val serializedJobs         = ServerMessage.serialize(message)
+      val message: ServerMessage =
+        Jobs(AVector(Job(0, 1, hex"aa", hex"bb", BigInteger.ONE)))
+      val serializedJobs = ServerMessage.serialize(message)
       serializedJobs is
         // message.length (4 bytes)
         hex"0000001c" ++
@@ -81,7 +82,7 @@ class MessageSpec extends AlephiumSpec with GroupConfigFixture.Default {
         hex"00000001" ++
         // headerBlob.length (4 bytes) ++ blob bytes
         hex"00000001" ++ hex"aa" ++
-        // txsBlob.length (4 bytes) ++ blob bytes
+        // bodyBlob.length (4 bytes) ++ blob bytes
         hex"00000001" ++ hex"bb" ++
         // target.length (4 bytes) ++ target bytes
         hex"00000001" ++ hex"01"

@@ -1991,7 +1991,8 @@ class VMSpec extends AlephiumSpec with Generators {
 
   it should "execute tx in random order" in new TxExecutionOrderFixture {
     override val configValues = Map(
-      ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis)
+      ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis)
     )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
 
@@ -2070,6 +2071,8 @@ class VMSpec extends AlephiumSpec with Generators {
   }
 
   it should "execute tx in sequential order" in new TxExecutionOrderFixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     val contractId = createContractAndCheckState(testContract, 2, 2)._1
     val block      = callScript(contractId, identity)
     networkConfig.getHardFork(block.timestamp) is HardFork.Leman

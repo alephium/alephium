@@ -153,6 +153,7 @@ class ContextSpec
 
   it should "charge gas based on mainnet hardfork" in new Fixture {
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Mainnet
 
     context.chargeGasWithSizeLeman(ByteVecEq, 7)
@@ -165,6 +166,7 @@ class ContextSpec
   }
 
   it should "charge gas based on leman hardfork" in new Fixture {
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Leman
 
     context.chargeGasWithSizeLeman(ByteVecEq, 7)
@@ -177,10 +179,11 @@ class ContextSpec
   }
 
   trait ContractOutputFixture extends NetworkConfigFixture.Default {
-    val contractId = ContractId.random
-    val tokenId0   = TokenId.random
-    val tokenId1   = TokenId.random
-    val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
+    val contractId                                 = ContractId.random
+    val tokenId0                                   = TokenId.random
+    val tokenId1                                   = TokenId.random
+    val outputRef = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
     val output =
       ContractOutput(100, LockupScript.p2c(contractId), AVector(tokenId0 -> 200, tokenId1 -> 300))
     val modifiedOutputs = Seq(
@@ -223,10 +226,12 @@ class ContextSpec
 
   trait MainnetContractOutputFixture extends ContractOutputFixture {
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Mainnet
   }
 
   trait LemanContractOutputFixture extends ContractOutputFixture {
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Leman
   }
 
@@ -281,10 +286,12 @@ class ContextSpec
 
   trait MainnetAssetOutputFixture extends AssetOutputFixture {
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Mainnet
   }
 
   trait LemanAssetOutputFixture extends AssetOutputFixture {
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Leman
   }
 

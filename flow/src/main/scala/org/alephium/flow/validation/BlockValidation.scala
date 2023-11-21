@@ -24,7 +24,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, GasPrice, LogConfig, WorldState}
 import org.alephium.serde._
-import org.alephium.util.{AVector, EitherF, U256}
+import org.alephium.util.{EitherF, U256}
 
 // scalastyle:off number.of.methods
 
@@ -56,7 +56,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       template.target,
       Nonce.zero
     )
-    val dummyBlock = Block(dummyHeader, AVector.empty, template.transactions)
+    val dummyBlock = Block(dummyHeader, template.uncles, template.transactions)
     checkTemplate(chainIndex, dummyBlock, blockFlow)
   }
 

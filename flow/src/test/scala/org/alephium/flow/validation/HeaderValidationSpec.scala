@@ -209,7 +209,12 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
     val modified0 = updateNonce(header.copy(timestamp = header0.timestamp))
     failValidation(modified0, NoIncreasingTimeStamp)
 
-    val modified1 = updateNonce(header.copy(timestamp = ALPH.LaunchTimestamp.plusMillisUnsafe(-1)))
+    val modified1 = updateNonce(
+      header.copy(
+        version = DefaultBlockVersion,
+        timestamp = ALPH.LaunchTimestamp.plusMillisUnsafe(-1)
+      )
+    )
     failValidation(modified1, EarlierThanLaunchTimeStamp)
   }
 

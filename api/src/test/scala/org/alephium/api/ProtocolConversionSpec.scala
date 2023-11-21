@@ -114,7 +114,7 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
       checkData[BlockEntry, protocol.Block](
         block,
         BlockEntry.from(_, 0), // height not needed for protocol
-        _.toProtocol().rightValue
+        _.toProtocol().rightValue.copy(uncles = block.uncles)
       )
     }
   }

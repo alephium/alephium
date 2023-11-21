@@ -29,8 +29,12 @@ import org.alephium.util.{AVector, TimeStamp}
 final case class MiningBlob(
     headerBlob: ByteString,
     target: BigInteger,
-    txsBlob: ByteString
-)
+    bodyBlob: ByteString
+) {
+  def toBlockBlob(nonce: Nonce): ByteString = {
+    nonce.value ++ headerBlob ++ bodyBlob
+  }
+}
 
 object MiningBlob {
   def from(template: BlockFlowTemplate)(implicit networkConfig: NetworkConfig): MiningBlob = {
@@ -40,7 +44,8 @@ object MiningBlob {
       template.txsHash,
       template.target,
       template.templateTs,
-      template.transactions
+      template.transactions,
+      template.uncles
     )
   }
 
@@ -52,7 +57,8 @@ object MiningBlob {
       header.txsHash,
       header.target,
       header.timestamp,
-      block.transactions
+      block.transactions,
+      block.uncles
     )
   }
 
@@ -62,13 +68,16 @@ object MiningBlob {
       txsHash: Hash,
       target: Target,
       blockTs: TimeStamp,
-      transactions: AVector[Transaction]
+      transactions: AVector[Transaction],
+      uncles: AVector[BlockHeader]
   )(implicit networkConfig: NetworkConfig): MiningBlob = {
     val dummyHeader =
       BlockHeader.unsafe(BlockDeps.unsafe(deps), depStateHash, txsHash, blockTs, target, Nonce.zero)
 
     val headerBlob = serialize(dummyHeader)
     val txsBlob    = serialize(transactions)
-    MiningBlob(headerBlob.drop(Nonce.byteLength), target.value, txsBlob)
+    val hardFork   = networkConfig.getHardFork(blockTs)
+    val bodyBlob   = if (hardFork.isGhostEnabled()) txsBlob ++ serialize(uncles) else txsBlob
+    MiningBlob(headerBlob.drop(Nonce.byteLength), target.value, bodyBlob)
   }
 }

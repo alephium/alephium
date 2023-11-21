@@ -90,10 +90,10 @@ final case class Job(
     fromGroup: Int,
     toGroup: Int,
     headerBlob: ByteString,
-    txsBlob: ByteString,
+    bodyBlob: ByteString,
     target: BigInteger
 ) {
-  def toMiningBlob: MiningBlob = MiningBlob(headerBlob, target, txsBlob)
+  def toMiningBlob: MiningBlob = MiningBlob(headerBlob, target, bodyBlob)
 }
 object Job {
   implicit val serde: Serde[Job] = {
@@ -114,7 +114,7 @@ object Job {
     }
     Serde.forProduct5(
       Job.apply,
-      t => (t.fromGroup, t.toGroup, t.headerBlob, t.txsBlob, t.target)
+      t => (t.fromGroup, t.toGroup, t.headerBlob, t.bodyBlob, t.target)
     )
   }
 
@@ -124,7 +124,7 @@ object Job {
       template.index.from.value,
       template.index.to.value,
       blobs.headerBlob,
-      blobs.txsBlob,
+      blobs.bodyBlob,
       blobs.target
     )
   }

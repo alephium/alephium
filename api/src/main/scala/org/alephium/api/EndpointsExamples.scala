@@ -194,7 +194,7 @@ trait EndpointsExamples extends ErrorExamples {
     toGroup = 0,
     headerBlob = Hex.unsafe("aaaa"),
     target = BigInteger.ONE.shiftLeft(18),
-    txsBlob = Hex.unsafe("bbbbbbbbbb")
+    bodyBlob = Hex.unsafe("bbbbbbbbbb")
   )
 
   private val blockSolution = BlockSolution(

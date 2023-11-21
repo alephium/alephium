@@ -239,7 +239,8 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
 
   trait PreLemanDifficultyFixture extends FlowFixture {
     override val configValues = Map(
-      ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(1).millis)
+      ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(1).millis),
+      ("alephium.network.ghost-hard-fork-timestamp ", TimeStamp.Max.millis)
     )
     config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is false
 
@@ -267,7 +268,10 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
   }
 
   trait LemanDifficultyFixture extends FlowFixture {
-    override val configValues = Map(("alephium.broker.broker-num", 1))
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.network.ghost-hard-fork-timestamp ", TimeStamp.Max.millis)
+    )
 
     config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is true
 

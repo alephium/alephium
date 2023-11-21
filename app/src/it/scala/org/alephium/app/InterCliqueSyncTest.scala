@@ -190,6 +190,7 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
         val networkId: NetworkId              = NetworkId.AlephiumMainNet
         val noPreMineProof: ByteString        = ByteString.empty
         val lemanHardForkTimestamp: TimeStamp = TimeStamp.now()
+        val ghostHardForkTimestamp: TimeStamp = TimeStamp.now()
       })
     }
     val server1 =
