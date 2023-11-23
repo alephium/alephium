@@ -74,7 +74,7 @@ trait TransactionSnapshotsFixture extends ModelSnapshots with NoIndexModelGenera
       LockupScript.P2PKH(
         Hash.unsafe(hex"0478042acbc0e37b410e5d2c7aebe367d47f39aa78a65277b7f8bb7ce3c5e036")
       ),
-      consensusConfig.maxMiningTarget,
+      consensusConfigs.maxMiningTarget,
       TimeStamp.unsafe(1640879601000L),
       uncles
     )

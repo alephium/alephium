@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import java.math.BigInteger
 
-import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.flow.setting.{ConsensusSetting, ConsensusSettings}
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.NetworkConfig
@@ -26,7 +26,7 @@ import org.alephium.protocol.model.{BlockHash, Target}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait ChainDifficultyAdjustment {
-  implicit def consensusConfig: ConsensusSetting
+  def consensusConfigs: ConsensusSettings
   implicit def networkConfig: NetworkConfig
 
   val difficultyBombPatchConfig =
@@ -48,7 +48,7 @@ trait ChainDifficultyAdjustment {
       hash: BlockHash,
       height: Int,
       nextTimeStamp: TimeStamp
-  ): IOResult[Option[Duration]] = {
+  )(implicit consensusConfig: ConsensusSetting): IOResult[Option[Duration]] = {
     val earlyHeight = height - consensusConfig.powAveragingWindow - 1
     assume(earlyHeight >= ALPH.GenesisHeight)
     calTimeSpan(hash, height).map { case (timestampLast, timestampNow) =>
@@ -66,7 +66,7 @@ trait ChainDifficultyAdjustment {
   final protected[core] def calTimeSpan(
       hash: BlockHash,
       height: Int
-  ): IOResult[(TimeStamp, TimeStamp)] = {
+  )(implicit consensusConfig: ConsensusSetting): IOResult[(TimeStamp, TimeStamp)] = {
     val earlyHeight = height - consensusConfig.powAveragingWindow - 1
     assume(earlyHeight >= ALPH.GenesisHeight)
     for {
@@ -110,14 +110,15 @@ trait ChainDifficultyAdjustment {
       currentTarget: Target,
       currentTimeStamp: TimeStamp,
       nextTimeStamp: TimeStamp
-  ): IOResult[Target] = {
+  )(implicit consensusConfig: ConsensusSetting): IOResult[Target] = {
     getHeight(hash).flatMap {
       case height if ChainDifficultyAdjustment.enoughHeight(height) =>
         calTimeSpan(hash, height, nextTimeStamp).flatMap {
           case Some(timeSpan) =>
             val target = ChainDifficultyAdjustment.calNextHashTargetRaw(
               currentTarget,
-              timeSpan
+              timeSpan,
+              consensusConfigs.maxMiningTarget
             )
             Right(calIceAgeTarget(target, currentTimeStamp, nextTimeStamp))
           case None =>
@@ -140,7 +141,8 @@ object ChainDifficultyAdjustment {
 
   def calNextHashTargetRaw(
       currentTarget: Target,
-      lastWindowTimeSpan: Duration
+      lastWindowTimeSpan: Duration,
+      maxMiningTarget: Target
   )(implicit consensusConfig: ConsensusSetting): Target = {
     var clippedTimeSpan =
       consensusConfig.expectedWindowTimeSpan.millis + (lastWindowTimeSpan.millis - consensusConfig.expectedWindowTimeSpan.millis) / 4
@@ -149,19 +151,19 @@ object ChainDifficultyAdjustment {
     } else if (clippedTimeSpan > consensusConfig.windowTimeSpanMax.millis) {
       clippedTimeSpan = consensusConfig.windowTimeSpanMax.millis
     }
-    reTarget(currentTarget, clippedTimeSpan)
+    reTarget(currentTarget, clippedTimeSpan, maxMiningTarget)
   }
 
-  @inline def reTarget(currentTarget: Target, timeSpanMs: Long)(implicit
+  @inline def reTarget(currentTarget: Target, timeSpanMs: Long, maxMiningTarget: Target)(implicit
       consensusConfig: ConsensusSetting
   ): Target = {
     val nextTarget = currentTarget.value
       .multiply(BigInteger.valueOf(timeSpanMs))
       .divide(BigInteger.valueOf(consensusConfig.expectedWindowTimeSpan.millis))
-    if (nextTarget.compareTo(consensusConfig.maxMiningTarget.value) <= 0) {
+    if (nextTarget.compareTo(maxMiningTarget.value) <= 0) {
       Target.unsafe(nextTarget)
     } else {
-      consensusConfig.maxMiningTarget
+      maxMiningTarget
     }
   }
 }

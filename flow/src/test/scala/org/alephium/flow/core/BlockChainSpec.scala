@@ -438,11 +438,11 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val chain  = createBlockChain(blocks.init)
     blocks.init.foreach(block => chain.contains(block) isE true)
     chain.maxHeight isE 3
-    chain.maxWeight isE consensusConfig.minBlockWeight * 3
+    chain.maxWeight isE consensusConfigs.minBlockWeight * 3
     addBlock(chain, blocks.last)
     chain.contains(blocks.last) isE true
     chain.maxHeight isE 4
-    chain.maxWeight isE consensusConfig.minBlockWeight * 4
+    chain.maxWeight isE consensusConfigs.minBlockWeight * 4
   }
 
   it should "compute correct weights for two chains with same root" in new Fixture {
@@ -454,7 +454,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     blocks1.foreach(block => chain.contains(block) isE true)
     blocks2.foreach(block => chain.contains(block) isE true)
     chain.maxHeight isE 4
-    chain.maxWeight isE consensusConfig.minBlockWeight * 4
+    chain.maxWeight isE consensusConfigs.minBlockWeight * 4
     chain.getHashesAfter(blocks1.head.hash) isE {
       val branch1 = blocks1.tail
       AVector(branch1.head.hash) ++ blocks2.map(_.hash) ++ branch1.tail.map(_.hash)

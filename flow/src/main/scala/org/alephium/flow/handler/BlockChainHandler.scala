@@ -27,7 +27,7 @@ import org.alephium.flow.network.{InterCliqueManager, IntraCliqueManager}
 import org.alephium.flow.setting.NetworkSetting
 import org.alephium.flow.validation._
 import org.alephium.io.IOResult
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
 import org.alephium.protocol.message.{Message, NewBlock, NewHeader}
 import org.alephium.protocol.model.{Block, BlockHash, ChainIndex}
 import org.alephium.protocol.vm.{LogConfig, WorldState}
@@ -40,7 +40,7 @@ object BlockChainHandler {
       eventBus: ActorRefT[EventBus.Message]
   )(implicit
       brokerConfig: BrokerConfig,
-      consensusConfig: ConsensusConfig,
+      consensusConfigs: ConsensusConfigs,
       networkSetting: NetworkSetting,
       logConfig: LogConfig
   ): Props =
@@ -86,8 +86,8 @@ class BlockChainHandler(
     eventBus: ActorRefT[EventBus.Message]
 )(implicit
     brokerConfig: BrokerConfig,
-    val consensusConfig: ConsensusConfig,
-    networkSetting: NetworkSetting,
+    val consensusConfigs: ConsensusConfigs,
+    val networkConfig: NetworkSetting,
     logConfig: LogConfig
 ) extends ChainHandler[Block, InvalidBlockStatus, Option[WorldState.Cached], BlockValidation](
       blockFlow,

@@ -273,6 +273,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
   it should "check coinbase locked amount" in new Fixture {
     val block              = emptyBlock(blockFlow, chainIndex)
+    val consensusConfig    = consensusConfigs.getConsensusConfig(block.timestamp)
     val miningReward       = consensusConfig.emission.reward(block.header).miningReward
     val lockedAmount       = miningReward
     implicit val validator = (blk: Block) => checkLockedReward(blk, lockedAmount)
@@ -288,13 +289,16 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check coinbase reward" in new Fixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     val block = emptyBlock(blockFlow, chainIndex)
     implicit val validator = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
       checkCoinbase(blk.chainIndex, blk, groupView, HardFork.Leman)
     }
 
-    val miningReward = consensusConfig.emission.reward(block.header).miningReward
+    val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
+    val miningReward    = consensusConfig.emission.reward(block.header).miningReward
     block.Coinbase.output(_.copy(amount = miningReward)).pass()
 
     val invalidMiningReward = miningReward.subUnsafe(1)
@@ -312,8 +316,9 @@ class BlockValidationSpec extends AlephiumSpec {
     block0.pass()
 
     info("gas reward is set to 1/2 of miningReward, miningReward not enough")
-    val miningReward = consensusConfig.emission.reward(block0.header).miningReward
-    val block1       = block0.replaceTxGas(miningReward)
+    val consensusConfig = consensusConfigs.getConsensusConfig(block0.timestamp)
+    val miningReward    = consensusConfig.emission.reward(block0.header).miningReward
+    val block1          = block0.replaceTxGas(miningReward)
     block1.fail(InvalidCoinbaseReward)
 
     info("adjust the miningReward to account for the adjusted gas reward")
@@ -328,6 +333,8 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check gas reward for Leman fork" in new Fixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled() is true
 
     implicit val validator = (blk: Block) => {
@@ -338,7 +345,8 @@ class BlockValidationSpec extends AlephiumSpec {
     val block = transfer(blockFlow, chainIndex)
     block.pass()
 
-    val miningReward = consensusConfig.emission.reward(block.header).miningReward
+    val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
+    val miningReward    = consensusConfig.emission.reward(block.header).miningReward
     block.coinbase.unsigned.fixedOutputs.head.amount is miningReward
   }
 
@@ -546,14 +554,14 @@ class BlockValidationSpec extends AlephiumSpec {
     val blockflowGenesis = BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)(
       implicitly,
       genesisNetworkConfig,
-      blockFlow.consensusConfig,
+      blockFlow.consensusConfigs,
       implicitly,
       implicitly
     )
     val blockflowLeman = BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)(
       implicitly,
       lemanNetworkConfig,
-      blockFlow.consensusConfig,
+      blockFlow.consensusConfigs,
       implicitly,
       implicitly
     )

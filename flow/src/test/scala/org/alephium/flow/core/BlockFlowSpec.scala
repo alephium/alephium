@@ -127,7 +127,7 @@ class BlockFlowSpec extends AlephiumSpec {
       } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks1.foreach { block =>
         addAndCheck(blockFlow, block, 1)
-        blockFlow.getWeight(block) isE consensusConfig.minBlockWeight * 1
+        blockFlow.getWeight(block) isE consensusConfigs.minBlockWeight * 1
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks1)
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(1))
@@ -380,6 +380,7 @@ class BlockFlowSpec extends AlephiumSpec {
   it should "sanity check rewards" in new FlowFixture {
     val block = transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(0, 0))
     block.nonCoinbase.nonEmpty is true
+    val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
     val minimalReward = Seq(
       consensusConfig.emission.lowHashRateInitialRewardPerChain,
       consensusConfig.emission.stableMaxRewardPerChain
@@ -400,7 +401,7 @@ class BlockFlowSpec extends AlephiumSpec {
       targets.head
     }
 
-    var lastTarget = consensusConfig.maxMiningTarget
+    var lastTarget = consensusConfigs.maxMiningTarget
     while ({
       val newTarget = step()
       if (lastTarget != Target.Max) {
@@ -532,17 +533,17 @@ class BlockFlowSpec extends AlephiumSpec {
       chain.stateCache.size is 1
     })
 
-    (0 until consensusConfig.blockCacheCapacityPerChain).foreach { _ =>
+    (0 until consensusConfigs.blockCacheCapacityPerChain).foreach { _ =>
       addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 1)))
     }
 
     val blockFlow2 = storageBlockFlow()
     blockFlow2.getGroupCache(GroupIndex.unsafe(0)).size is
-      consensusConfig.blockCacheCapacityPerChain + 5
+      consensusConfigs.blockCacheCapacityPerChain + 5
     blockFlow2.getHeaderChain(ChainIndex.unsafe(0, 1)).headerCache.size is
-      consensusConfig.blockCacheCapacityPerChain + 1
+      consensusConfigs.blockCacheCapacityPerChain + 1
     blockFlow2.getHeaderChain(ChainIndex.unsafe(0, 1)).stateCache.size is
-      consensusConfig.blockCacheCapacityPerChain + 1
+      consensusConfigs.blockCacheCapacityPerChain + 1
   }
 
   it should "generate random group orders" in new GroupConfigFixture {
@@ -852,33 +853,50 @@ class BlockFlowSpec extends AlephiumSpec {
     }
   }
 
-  it should "not include new block as dependency when dependency gap time is large" in new FlowFixture {
+  trait DependencyGapTimeFixture extends FlowFixture {
+    def test() = {
+      val blocks0 = for {
+        from <- 0 until groups0
+        to   <- 0 until groups0
+      } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+      blocks0.foreach(addAndCheck(blockFlow, _, 1))
+
+      val blocks1 = for {
+        from <- 0 until groups0
+        to   <- 0 until groups0
+      } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
+      blocks1.foreach(addAndCheck(blockFlow, _, 2))
+      blocks0.zip(blocks1).foreach { case (block0, block1) =>
+        val chainIndex = block0.chainIndex
+        block1.blockDeps.inDeps is block0.blockDeps.inDeps
+        block1.blockDeps.outDeps(chainIndex.to.value) is block0.hash
+        block1.blockDeps.outDeps.take(chainIndex.to.value) is
+          block0.blockDeps.outDeps.take(chainIndex.to.value)
+        block1.blockDeps.outDeps.drop(chainIndex.to.value + 1) is
+          block0.blockDeps.outDeps.drop(chainIndex.to.value + 1)
+      }
+    }
+  }
+
+  it should "not include new block as dependency when dependency gap time is large for pre-ghost hardfork" in new DependencyGapTimeFixture {
     override val configValues =
       Map(
-        ("alephium.consensus.uncle-dependency-gap-time", "5 seconds"),
+        ("alephium.consensus.mainnet.uncle-dependency-gap-time", "5 seconds"),
+        ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis),
         ("alephium.broker.broker-num", 1)
       )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    test()
+  }
 
-    val blocks0 = for {
-      from <- 0 until groups0
-      to   <- 0 until groups0
-    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
-    blocks0.foreach(addAndCheck(blockFlow, _, 1))
-
-    val blocks1 = for {
-      from <- 0 until groups0
-      to   <- 0 until groups0
-    } yield emptyBlock(blockFlow, ChainIndex.unsafe(from, to))
-    blocks1.foreach(addAndCheck(blockFlow, _, 2))
-    blocks0.zip(blocks1).foreach { case (block0, block1) =>
-      val chainIndex = block0.chainIndex
-      block1.blockDeps.inDeps is block0.blockDeps.inDeps
-      block1.blockDeps.outDeps(chainIndex.to.value) is block0.hash
-      block1.blockDeps.outDeps.take(chainIndex.to.value) is
-        block0.blockDeps.outDeps.take(chainIndex.to.value)
-      block1.blockDeps.outDeps.drop(chainIndex.to.value + 1) is
-        block0.blockDeps.outDeps.drop(chainIndex.to.value + 1)
-    }
+  it should "not include new block as dependency when dependency gap time is large for ghost hardfork" in new DependencyGapTimeFixture {
+    override val configValues =
+      Map(
+        ("alephium.consensus.ghost.uncle-dependency-gap-time", "5 seconds"),
+        ("alephium.broker.broker-num", 1)
+      )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    test()
   }
 
   it should "include new block as dependency when gap time is past" in new FlowFixture {

@@ -20,7 +20,7 @@ import akka.util.ByteString
 
 import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol._
-import org.alephium.protocol.config.{EmissionConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.Transaction.MerkelTx
 import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde._
@@ -252,7 +252,7 @@ object Transaction {
       target: Target,
       blockTs: TimeStamp,
       uncles: AVector[(BlockHeader, LockupScript.Asset)]
-  )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
+  )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
     coinbase(chainIndex, txs, lockupScript, ByteString.empty, target, blockTs, uncles)
   }
 
@@ -265,7 +265,7 @@ object Transaction {
       target: Target,
       blockTs: TimeStamp,
       uncles: AVector[(BlockHeader, LockupScript.Asset)]
-  )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
+  )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
     val gasFee = txs.fold(U256.Zero)(_ addUnsafe _.gasFeeUnsafe)
     coinbase(chainIndex, gasFee, lockupScript, minerData, target, blockTs, uncles)
   }
@@ -277,7 +277,7 @@ object Transaction {
       target: Target,
       blockTs: TimeStamp,
       uncles: AVector[(BlockHeader, LockupScript.Asset)]
-  )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
+  )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
     coinbase(chainIndex, gasFee, lockupScript, ByteString.empty, target, blockTs, uncles)
   }
 
@@ -289,8 +289,12 @@ object Transaction {
       target: Target,
       blockTs: TimeStamp,
       uncles: AVector[(BlockHeader, LockupScript.Asset)]
-  )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    Coinbase.build(chainIndex, gasFee, lockupScript, minerData, target, blockTs, uncles)
+  )(implicit consensusConfigs: ConsensusConfigs, networkConfig: NetworkConfig): Transaction = {
+    val emissionConfig = consensusConfigs.getConsensusConfig(blockTs)
+    Coinbase.build(chainIndex, gasFee, lockupScript, minerData, target, blockTs, uncles)(
+      emissionConfig,
+      networkConfig
+    )
   }
 
   def genesis(

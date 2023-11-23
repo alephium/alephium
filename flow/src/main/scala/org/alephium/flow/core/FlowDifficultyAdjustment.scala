@@ -19,7 +19,7 @@ package org.alephium.flow.core
 import java.math.BigInteger
 
 import org.alephium.flow.Utils
-import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.flow.setting.{ConsensusSetting, ConsensusSettings}
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
@@ -28,7 +28,7 @@ import org.alephium.util.{AVector, Cache, Duration, Math, TimeStamp}
 
 trait FlowDifficultyAdjustment {
   implicit def brokerConfig: BrokerConfig
-  implicit def consensusConfig: ConsensusSetting
+  def consensusConfigs: ConsensusSettings
   implicit def networkConfig: NetworkConfig
 
   def genesisHashes: AVector[AVector[BlockHash]]
@@ -43,7 +43,10 @@ trait FlowDifficultyAdjustment {
       deps: BlockDeps,
       nextTimeStamp: TimeStamp
   ): IOResult[Target] = {
-    if (networkConfig.getHardFork(nextTimeStamp).isLemanEnabled()) {
+    val hardFork = networkConfig.getHardFork(nextTimeStamp)
+    if (hardFork.isGhostEnabled()) {
+      getNextHashTargetGhost(chainIndex, deps)
+    } else if (hardFork.isLemanEnabled()) {
       getNextHashTargetLeman(chainIndex, deps)
     } else {
       getNextHashTargetGenesis(chainIndex, deps, nextTimeStamp)
@@ -68,10 +71,10 @@ trait FlowDifficultyAdjustment {
     }
   }
 
-  def getNextHashTargetLeman(
+  private def getNextHashTarget(
       chainIndex: ChainIndex,
       deps: BlockDeps
-  ): IOResult[Target] = IOUtils.tryExecute {
+  )(implicit consensusConfig: ConsensusSetting): IOResult[Target] = IOUtils.tryExecute {
     val commonIntraGroupDeps             = calCommonIntraGroupDepsUnsafe(deps, chainIndex.from)
     val (diffSum, timeSpanSum, oldestTs) = getDiffAndTimeSpanUnsafe(commonIntraGroupDeps)
     val diffAverage                      = diffSum.divide(brokerConfig.chainNum)
@@ -80,8 +83,24 @@ trait FlowDifficultyAdjustment {
     val chainDep   = deps.getOutDep(chainIndex.to)
     val heightGap  = calHeightDiffUnsafe(chainDep, oldestTs)
     val targetDiff = consensusConfig.penalizeDiffForHeightGapLeman(diffAverage, heightGap)
-    ChainDifficultyAdjustment.calNextHashTargetRaw(targetDiff.getTarget(), timeSpanAverage)
+    ChainDifficultyAdjustment.calNextHashTargetRaw(
+      targetDiff.getTarget(),
+      timeSpanAverage,
+      consensusConfigs.maxMiningTarget
+    )
   }
+
+  def getNextHashTargetLeman(
+      chainIndex: ChainIndex,
+      deps: BlockDeps
+  ): IOResult[Target] =
+    getNextHashTarget(chainIndex, deps)(consensusConfigs.mainnet)
+
+  def getNextHashTargetGhost(
+      chainIndex: ChainIndex,
+      deps: BlockDeps
+  ): IOResult[Target] =
+    getNextHashTarget(chainIndex, deps)(consensusConfigs.ghost)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def calHeightDiffUnsafe(chainDep: BlockHash, oldTimeStamp: TimeStamp): Int = {
@@ -119,13 +138,15 @@ trait FlowDifficultyAdjustment {
   def getOutTips(header: BlockHeader): AVector[BlockHash]
 
   private[core] val diffAndTimeSpanCache = Cache.fifoSafe[BlockHash, (Difficulty, Duration)](
-    consensusConfig.blockCacheCapacityPerChain * brokerConfig.chainNum * 8
+    consensusConfigs.blockCacheCapacityPerChain * brokerConfig.chainNum * 8
   )
-  def getDiffAndTimeSpanUnsafe(hash: BlockHash): (Difficulty, Duration) = {
+  def getDiffAndTimeSpanUnsafe(
+      hash: BlockHash
+  )(implicit consensusConfig: ConsensusSetting): (Difficulty, Duration) = {
     diffAndTimeSpanCache.get(hash).getOrElse {
       if (hash == BlockHash.zero) {
         (
-          consensusConfig.maxMiningTarget.getDifficulty(),
+          consensusConfigs.maxMiningTarget.getDifficulty(),
           consensusConfig.expectedWindowTimeSpan
         )
       } else {
@@ -144,15 +165,15 @@ trait FlowDifficultyAdjustment {
 
   private[core] val diffAndTimeSpanForIntraDepCache =
     Cache.fifoSafe[BlockHash, (Difficulty, Duration, TimeStamp)](
-      consensusConfig.blockCacheCapacityPerChain * brokerConfig.chainNum * 8
+      consensusConfigs.blockCacheCapacityPerChain * brokerConfig.chainNum * 8
     )
   def getDiffAndTimeSpanForIntraDepUnsafe(
       intraDep: BlockHash
-  ): (Difficulty, Duration, TimeStamp) = {
+  )(implicit consensusConfig: ConsensusSetting): (Difficulty, Duration, TimeStamp) = {
     diffAndTimeSpanForIntraDepCache.get(intraDep).getOrElse {
       if (intraDep == BlockHash.zero) {
         (
-          consensusConfig.maxMiningTarget.getDifficulty().times(brokerConfig.groups),
+          consensusConfigs.maxMiningTarget.getDifficulty().times(brokerConfig.groups),
           consensusConfig.expectedWindowTimeSpan.timesUnsafe(brokerConfig.groups.toLong),
           ALPH.GenesisTimestamp
         )
@@ -175,18 +196,20 @@ trait FlowDifficultyAdjustment {
   }
 
   def cacheDiffAndTimeSpan(header: BlockHeader): Unit = {
-    diffAndTimeSpanCache.put(header.hash, getDiffAndTimeSpanUnsafe(header.hash))
+    val hardFork        = networkConfig.getHardFork(header.timestamp)
+    val consensusConfig = consensusConfigs.getConsensusConfig(hardFork)
+    diffAndTimeSpanCache.put(header.hash, getDiffAndTimeSpanUnsafe(header.hash)(consensusConfig))
     if (header.chainIndex.isIntraGroup) {
       diffAndTimeSpanForIntraDepCache.put(
         header.hash,
-        getDiffAndTimeSpanForIntraDepUnsafe(header.hash)
+        getDiffAndTimeSpanForIntraDepUnsafe(header.hash)(consensusConfig)
       )
     }
   }
 
   def getDiffAndTimeSpanUnsafe(
       intraGroupDeps: AVector[BlockHash]
-  ): (Difficulty, Duration, TimeStamp) = {
+  )(implicit consensusConfig: ConsensusSetting): (Difficulty, Duration, TimeStamp) = {
     var diffSum     = BigInteger.valueOf(0)
     var timeSpanSum = Duration.zero
     var oldestTs    = TimeStamp.Max

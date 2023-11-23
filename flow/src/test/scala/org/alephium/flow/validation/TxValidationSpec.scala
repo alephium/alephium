@@ -1150,7 +1150,7 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
         tx.chainIndex,
         NetworkId.AlephiumMainNet,
         TimeStamp.now(),
-        consensusConfig.maxMiningTarget,
+        consensusConfigs.maxMiningTarget,
         None
       )
     lazy val prevOutputs = blockFlow

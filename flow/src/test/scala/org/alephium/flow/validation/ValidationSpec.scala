@@ -17,10 +17,9 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.protocol.config.ConsensusConfig
-import org.alephium.protocol.mining.Emission
+import org.alephium.protocol.config.{ConsensusConfig, ConsensusConfigs}
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, Duration}
+import org.alephium.util.AVector
 
 class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   override val configValues = Map(("alephium.consensus.num-zeros-at-least-in-hash", 1))
@@ -33,16 +32,15 @@ class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
     Validation.preValidate(AVector(block)) is true
 
     val newTarget = Target.unsafe(block.target.value.divide(4))
-    val newConsensusConfig = new ConsensusConfig {
-      override def blockTargetTime: Duration        = ???
-      override def uncleDependencyGapTime: Duration = ???
-      override def maxMiningTarget: Target          = newTarget
-      override def emission: Emission               = ???
+    val newConsensusConfigs = new ConsensusConfigs {
+      override def mainnet: ConsensusConfig = ???
+      override def ghost: ConsensusConfig   = ???
+      override def maxMiningTarget: Target  = newTarget
     }
-    Validation.preValidate(AVector(block))(newConsensusConfig) is false
+    Validation.preValidate(AVector(block))(newConsensusConfigs) is false
 
     val invalidBlock = invalidNonceBlock(blockFlow, ChainIndex.unsafe(0, 0))
-    invalidBlock.target is consensusConfig.maxMiningTarget
+    invalidBlock.target is consensusConfigs.maxMiningTarget
     Validation.preValidate(AVector(invalidBlock)) is false
   }
 }

@@ -136,7 +136,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   protected[core] lazy val stateCache =
-    FlowCache.states(consensusConfig.blockCacheCapacityPerChain * 4)
+    FlowCache.states(consensusConfigs.blockCacheCapacityPerChain * 4)
 
   def cacheState(hash: BlockHash, state: BlockState): Unit = stateCache.put(hash, state)
   def contains(hash: BlockHash): IOResult[Boolean] =
@@ -345,7 +345,7 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   }
 
   def isRecentHeight(height: Int): IOResult[Boolean] = {
-    maxHeight.map(height >= _ - consensusConfig.recentBlockHeightDiff)
+    maxHeight.map(height >= _ - consensusConfigs.recentBlockHeightDiff)
   }
 }
 // scalastyle:on number.of.methods

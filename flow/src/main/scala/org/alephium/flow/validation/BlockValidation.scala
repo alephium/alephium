@@ -19,7 +19,7 @@ package org.alephium.flow.validation
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
 import org.alephium.flow.model.BlockFlowTemplate
 import org.alephium.protocol.{ALPH, Hash}
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig, NetworkConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs, NetworkConfig}
 import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, GasPrice, LogConfig, WorldState}
@@ -243,6 +243,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       groupView: BlockFlowGroupView[WorldState.Cached],
       hardFork: HardFork
   ): BlockValidationResult[Unit] = {
+    val consensusConfig = consensusConfigs.getConsensusConfig(hardFork)
     val result = consensusConfig.emission.reward(block.header) match {
       case Emission.PoW(miningReward) =>
         val netReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
@@ -454,21 +455,21 @@ object BlockValidation {
     build(
       blockFlow.brokerConfig,
       blockFlow.networkConfig,
-      blockFlow.consensusConfig,
+      blockFlow.consensusConfigs,
       blockFlow.logConfig
     )
 
   def build(implicit
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig,
-      consensusConfig: ConsensusConfig,
+      consensusConfigs: ConsensusConfigs,
       logConfig: LogConfig
   ): BlockValidation = new Impl()
 
   class Impl(implicit
       val brokerConfig: BrokerConfig,
       val networkConfig: NetworkConfig,
-      val consensusConfig: ConsensusConfig,
+      val consensusConfigs: ConsensusConfigs,
       val logConfig: LogConfig
   ) extends BlockValidation {
     override def headerValidation: HeaderValidation  = HeaderValidation.build

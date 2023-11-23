@@ -19,7 +19,7 @@ package org.alephium.protocol.model
 import org.alephium.crypto.Blake3
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{
-  ConsensusConfigFixture,
+  ConsensusConfigsFixture,
   GroupConfigFixture,
   NetworkConfigFixture
 }
@@ -30,7 +30,7 @@ import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex, TimeStamp, U256}
 class BlockHeaderSpec
     extends AlephiumSpec
     with GroupConfigFixture.Default
-    with ConsensusConfigFixture.Default {
+    with ConsensusConfigsFixture.Default {
 
   it should "have correct data" in {
     for {
@@ -132,7 +132,7 @@ class BlockHeaderSpec
         Hash.unsafe(hex"e5d64f886664c58378d41fe3b8c29dd7975da59245a4a6bf92c3a47339a9a0a9"),
       txsHash = Hash.unsafe(hex"c78682d23662320d6f59d6612f26e2bcb08caff68b589523064924328f6d0d59"),
       timestamp = TimeStamp.unsafe(1),
-      target = consensusConfig.maxMiningTarget,
+      target = consensusConfigs.maxMiningTarget,
       nonce = nonce1
     )
 
@@ -160,7 +160,7 @@ class BlockHeaderSpec
         Hash.unsafe(hex"798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"),
       txsHash = Hash.unsafe(hex"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"),
       timestamp = TimeStamp.unsafe(102348),
-      target = consensusConfig.maxMiningTarget,
+      target = consensusConfigs.maxMiningTarget,
       nonce = nonce2
     )
 

@@ -24,11 +24,15 @@ import scala.util.Random
 import akka.util.ByteString
 
 import org.alephium.flow.AlephiumFlowSpec
-import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.flow.setting.{ConsensusSetting, ConsensusSettings}
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
-import org.alephium.protocol.mining.Emission
+import org.alephium.protocol.config.{
+  ConsensusConfig,
+  ConsensusConfigsFixture,
+  NetworkConfig,
+  NetworkConfigFixture
+}
 import org.alephium.protocol.model.{BlockHash, HardFork, NetworkId, Target}
 import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
 
@@ -36,12 +40,17 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   import ChainDifficultyAdjustment._
 
   trait MockFixture extends ChainDifficultyAdjustment with NumericHelpers {
-    implicit val consensusConfig: ConsensusSetting = {
-      val blockTargetTime = Duration.ofSecondsUnsafe(64)
-      val emission        = Emission(Test.groupConfig, blockTargetTime)
-      ConsensusSetting(blockTargetTime, blockTargetTime, 18, 25, emission)
+    def toConsensusSetting(config: ConsensusConfig): ConsensusSetting =
+      ConsensusSetting(config.blockTargetTime, config.uncleDependencyGapTime, config.emission)
+    val consensusConfigs: ConsensusSettings = {
+      val configFixture = (new ConsensusConfigsFixture.Default {}).consensusConfigs
+      val mainnet       = toConsensusSetting(configFixture.mainnet)
+      val ghost         = toConsensusSetting(configFixture.ghost)
+      ConsensusSettings(mainnet, ghost, 18, 25)
     }
     implicit override def networkConfig: NetworkConfig = NetworkConfigFixture.Leman
+    implicit val consensusConfig =
+      if (Random.nextBoolean()) consensusConfigs.ghost else consensusConfigs.mainnet
 
     val enabledDurationAfterNow = Duration.ofDaysUnsafe(10)
     override val difficultyBombPatchConfig =
@@ -94,11 +103,23 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   }
 
   it should "calculate target correctly" in new MockFixture {
-    val currentTarget = Target.unsafe((consensusConfig.maxMiningTarget / 4).underlying())
-    reTarget(currentTarget, consensusConfig.expectedWindowTimeSpan.millis) is currentTarget
-    reTarget(currentTarget, (consensusConfig.expectedWindowTimeSpan timesUnsafe 2).millis).value is
+    val currentTarget = Target.unsafe((consensusConfigs.maxMiningTarget / 4).underlying())
+    reTarget(
+      currentTarget,
+      consensusConfig.expectedWindowTimeSpan.millis,
+      consensusConfigs.maxMiningTarget
+    ) is currentTarget
+    reTarget(
+      currentTarget,
+      (consensusConfig.expectedWindowTimeSpan timesUnsafe 2).millis,
+      consensusConfigs.maxMiningTarget
+    ).value is
       (currentTarget * 2).underlying()
-    reTarget(currentTarget, (consensusConfig.expectedWindowTimeSpan divUnsafe 2).millis) is
+    reTarget(
+      currentTarget,
+      (consensusConfig.expectedWindowTimeSpan divUnsafe 2).millis,
+      consensusConfigs.maxMiningTarget
+    ) is
       Target.unsafe((currentTarget.value / 2).underlying())
   }
 
@@ -115,7 +136,8 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   }
 
   it should "return initial target when few blocks" in {
-    val maxHeight = ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1
+    implicit val consensusConfig = consensusConfigs.mainnet
+    val maxHeight                = ALPH.GenesisHeight + consensusConfig.powAveragingWindow + 1
     (1 until maxHeight).foreach { n =>
       val data       = AVector.fill(n)(BlockHash.random -> TimeStamp.zero)
       val fixture    = new MockFixture { setup(data) }
@@ -171,7 +193,11 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         data(height)._2 deltaUnsafe data(height - 17)._2
       )
       calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp, TimeStamp.now()) isE
-        reTarget(currentTarget, consensusConfig.windowTimeSpanMax.millis)
+        reTarget(
+          currentTarget,
+          consensusConfig.windowTimeSpanMax.millis,
+          consensusConfigs.maxMiningTarget
+        )
     }
   }
 
@@ -193,7 +219,11 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         data(height)._2 deltaUnsafe data(height - 17)._2
       )
       calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp, TimeStamp.now()) isE
-        reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
+        reTarget(
+          currentTarget,
+          consensusConfig.windowTimeSpanMin.millis,
+          consensusConfigs.maxMiningTarget
+        )
     }
   }
 
@@ -217,7 +247,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       )
     }
 
-    val currentTarget           = consensusConfig.maxMiningTarget
+    val currentTarget           = consensusConfigs.maxMiningTarget
     val diffBombEnabledTs       = ALPH.PreLemanDifficultyBombEnabledTimestamp
     val diffBombFirstAdjustment = diffBombEnabledTs.plusUnsafe(ALPH.ExpDiffPeriod)
 
@@ -290,7 +320,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     }
 
     val initialTarget =
-      Target.unsafe(consensusConfig.maxMiningTarget.value.divide(BigInteger.valueOf(128)))
+      Target.unsafe(consensusConfigs.maxMiningTarget.value.divide(BigInteger.valueOf(128)))
     var currentTarget =
       calNextHashTargetRaw(
         getHash(currentHeight),
@@ -365,7 +395,11 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         ALPH.LaunchTimestamp,
         getTimestamp(hash).rightValue
       ) isE
-        reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
+        reTarget(
+          currentTarget,
+          consensusConfig.windowTimeSpanMin.millis,
+          consensusConfigs.maxMiningTarget
+        )
     }
 
     (threshold * 2 until threshold * 3 - 1).foreach { height =>
@@ -390,7 +424,11 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         ALPH.LaunchTimestamp,
         getTimestamp(hash).rightValue
       ) isE
-        reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
+        reTarget(
+          currentTarget,
+          consensusConfig.windowTimeSpanMin.millis,
+          consensusConfigs.maxMiningTarget
+        )
     }
   }
 }

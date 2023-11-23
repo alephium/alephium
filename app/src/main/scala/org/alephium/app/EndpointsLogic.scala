@@ -40,7 +40,7 @@ import org.alephium.flow.network.{Bootstrapper, CliqueManager, DiscoveryServer, 
 import org.alephium.flow.network.bootstrap.IntraCliqueInfo
 import org.alephium.flow.network.broker.MisbehaviorManager
 import org.alephium.flow.network.broker.MisbehaviorManager.Peers
-import org.alephium.flow.setting.{ConsensusSetting, NetworkSetting}
+import org.alephium.flow.setting.{ConsensusSettings, NetworkSetting}
 import org.alephium.http.EndpointSender
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.{Transaction => _, _}
@@ -64,11 +64,11 @@ trait EndpointsLogic extends Endpoints {
   implicit def apiConfig: ApiConfig
   implicit def brokerConfig: BrokerConfig
 
-  implicit lazy val groupConfig: GroupConfig         = brokerConfig
-  implicit lazy val networkConfig: NetworkSetting    = node.config.network
-  implicit lazy val consenseConfig: ConsensusSetting = node.config.consensus
-  implicit lazy val logConfig: LogConfig             = node.config.node.eventLogConfig
-  implicit lazy val askTimeout: Timeout              = Timeout(apiConfig.askTimeout.asScala)
+  implicit lazy val groupConfig: GroupConfig           = brokerConfig
+  implicit lazy val networkConfig: NetworkSetting      = node.config.network
+  implicit lazy val consenseConfigs: ConsensusSettings = node.config.consensus
+  implicit lazy val logConfig: LogConfig               = node.config.node.eventLogConfig
+  implicit lazy val askTimeout: Timeout                = Timeout(apiConfig.askTimeout.asScala)
 
   private lazy val serverUtils: ServerUtils = new ServerUtils
 
@@ -737,7 +737,7 @@ trait EndpointsLogic extends Endpoints {
       Right(
         ChainParams(
           networkConfig.networkId,
-          consenseConfig.numZerosAtLeastInHash,
+          consenseConfigs.numZerosAtLeastInHash,
           brokerConfig.groupNumPerBroker,
           brokerConfig.groups
         )

@@ -25,7 +25,7 @@ import org.alephium.util._
 
 trait ApiModelFixture
     extends ModelGenerators
-    with ConsensusConfigFixture.Default
+    with ConsensusConfigsFixture.Default
     with NetworkConfigFixture.Default
     with ApiModelCodec {
 

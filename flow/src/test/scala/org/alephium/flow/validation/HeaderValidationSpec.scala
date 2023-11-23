@@ -126,7 +126,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check genesis PoW target" in new GenesisFixture {
-    genesis.target is consensusConfig.maxMiningTarget
+    genesis.target is consensusConfigs.maxMiningTarget
 
     val modified = genesis.copy(target = Target.unsafe(BigInteger.ZERO))
     failValidation(headerValidator.validateGenesisHeader(modified), InvalidGenesisWorkTarget)
@@ -219,7 +219,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check timestamp drift" in new HeaderFixture {
-    val newTs = header.timestamp + consensusConfig.maxHeaderTimeStampDrift +
+    val newTs = header.timestamp + consensusConfigs.maxHeaderTimeStampDrift +
       Duration.ofSecondsUnsafe(2)
     val modified = updateNonce(header.copy(timestamp = newTs))
     failValidation(modified, TooAdvancedTimeStamp)

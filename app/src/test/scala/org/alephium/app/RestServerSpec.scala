@@ -780,7 +780,7 @@ abstract class RestServerSpec(
       response.code is StatusCode.Ok
       response.as[ChainParams] is ChainParams(
         networkConfig.networkId,
-        consensusConfig.numZerosAtLeastInHash,
+        consensusConfigs.numZerosAtLeastInHash,
         brokerConfig.groupNumPerBroker,
         brokerConfig.groups
       )

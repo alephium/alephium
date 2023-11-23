@@ -486,7 +486,7 @@ trait TxGenerators
 
 trait BlockGenerators extends TxGenerators {
   implicit def groupConfig: GroupConfig
-  implicit def consensusConfig: ConsensusConfig
+  implicit def consensusConfigs: ConsensusConfigs
 
   lazy val nonceGen = Gen.const(()).map(_ => Nonce.unsecureRandom())
 
@@ -557,7 +557,7 @@ trait BlockGenerators extends TxGenerators {
       chainIndex,
       txs,
       p2pkhLockupGen(chainIndex.to).sample.get,
-      consensusConfig.maxMiningTarget,
+      consensusConfigs.maxMiningTarget,
       blockTs,
       uncles
     )
@@ -569,7 +569,7 @@ trait BlockGenerators extends TxGenerators {
         depStateHash,
         uncles.map(_._1),
         txsWithCoinbase,
-        consensusConfig.maxMiningTarget,
+        consensusConfigs.maxMiningTarget,
         blockTs,
         Nonce.unsecureRandom()
       )
@@ -670,7 +670,7 @@ trait NoIndexModelGeneratorsLike extends ModelGenerators {
 trait NoIndexModelGenerators
     extends NoIndexModelGeneratorsLike
     with GroupConfigFixture.Default
-    with ConsensusConfigFixture.Default
+    with ConsensusConfigsFixture.Default
     with NetworkConfigFixture.Default
 
 object ModelGenerators {

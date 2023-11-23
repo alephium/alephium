@@ -6,7 +6,12 @@ alephium {
   }
 
   consensus {
-    block-target-time = 64 seconds
+    mainnet {
+      block-target-time = 64 seconds
+    }
+    ghost {
+      block-target-time = 16 seconds
+    }
     num-zeros-at-least-in-hash = 37
   }
 

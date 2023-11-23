@@ -22,7 +22,7 @@ import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
-import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.flow.setting.ConsensusSettings
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
@@ -35,7 +35,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
 
   def headerStorage: BlockHeaderStorage
 
-  lazy val headerCache = FlowCache.headers(consensusConfig.blockCacheCapacityPerChain * 4)
+  lazy val headerCache = FlowCache.headers(consensusConfigs.blockCacheCapacityPerChain * 4)
 
   def cacheHeader(header: BlockHeader): Unit = {
     headerCache.put(header.hash, header)
@@ -191,16 +191,20 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
 
   def getNextHashTargetRaw(hash: BlockHash, nextTimeStamp: TimeStamp): IOResult[Target] = {
     for {
-      header    <- getBlockHeader(hash)
-      newTarget <- calNextHashTargetRaw(hash, header.target, header.timestamp, nextTimeStamp)
+      header <- getBlockHeader(hash)
+      consensusConfig = consensusConfigs.getConsensusConfig(nextTimeStamp)
+      newTarget <- calNextHashTargetRaw(hash, header.target, header.timestamp, nextTimeStamp)(
+        consensusConfig
+      )
     } yield newTarget
   }
 
   def getDryrunBlockEnv(): IOResult[BlockEnv] = {
+    val now = TimeStamp.now()
     for {
       tip    <- getBestTip()
-      target <- getNextHashTargetRaw(tip, TimeStamp.now())
-    } yield BlockEnv(chainIndex, networkConfig.networkId, TimeStamp.now(), target, Some(tip))
+      target <- getNextHashTargetRaw(tip, now)
+    } yield BlockEnv(chainIndex, networkConfig.networkId, now, target, Some(tip))
   }
 
   def getSyncDataUnsafe(locators: AVector[BlockHash]): AVector[BlockHash] = {
@@ -295,7 +299,7 @@ object BlockHeaderChain {
   )(implicit
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig,
-      consensusSetting: ConsensusSetting
+      consensusSettings: ConsensusSettings
   ): BlockHeaderChain = {
     val initialize = initializeGenesis(genesisHeader)(_)
     createUnsafe(genesisHeader, storages, initialize)
@@ -306,7 +310,7 @@ object BlockHeaderChain {
   )(implicit
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig,
-      consensusSetting: ConsensusSetting
+      consensusSettings: ConsensusSettings
   ): BlockHeaderChain = {
     createUnsafe(genesisHeader, storages, initializeFromStorage)
   }
@@ -318,12 +322,12 @@ object BlockHeaderChain {
   )(implicit
       _brokerConfig: BrokerConfig,
       _networkConfig: NetworkConfig,
-      _consensusSetting: ConsensusSetting
+      _consensusSettings: ConsensusSettings
   ): BlockHeaderChain = {
     val headerchain = new BlockHeaderChain {
       override val brokerConfig      = _brokerConfig
       override val networkConfig     = _networkConfig
-      override val consensusConfig   = _consensusSetting
+      override val consensusConfigs  = _consensusSettings
       override val headerStorage     = storages.headerStorage
       override val blockStateStorage = storages.blockStateStorage
       override val heightIndexStorage =

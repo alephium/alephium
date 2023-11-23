@@ -23,7 +23,7 @@ import scala.util.Random
 import org.openjdk.jmh.annotations._
 
 import org.alephium.flow.setting.{AlephiumConfig, Platform}
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.AVector
@@ -36,7 +36,7 @@ class MiningBench {
 
   val config: AlephiumConfig            = AlephiumConfig.load(Platform.getRootPath(), "alephium")
   implicit val groupConfig: GroupConfig = config.broker
-  implicit val consensusConfig: ConsensusConfig = config.consensus
+  implicit val consensusConfigs: ConsensusConfigs = config.consensus
 
   @Benchmark
   def mineGenesis(): Boolean = {

@@ -20,22 +20,27 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model.Target
 import org.alephium.util.Duration
 
-trait ConsensusConfigFixture {
+trait ConsensusConfigsFixture {
   def groupConfig: GroupConfig
 
-  def consensusConfig: ConsensusConfig
+  def consensusConfigs: ConsensusConfigs
 }
 
-object ConsensusConfigFixture {
-  trait Default extends ConsensusConfigFixture with GroupConfigFixture.Default {
-    implicit lazy val consensusConfig: ConsensusConfig = new ConsensusConfig {
-      override val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
-
-      def uncleDependencyGapTime: Duration = blockTargetTime
-
-      override val maxMiningTarget: Target = Target.Max
-
-      override val emission: Emission = Emission(groupConfig, blockTargetTime)
+object ConsensusConfigsFixture {
+  trait Default extends ConsensusConfigsFixture with GroupConfigFixture.Default {
+    implicit lazy val consensusConfigs: ConsensusConfigs = new ConsensusConfigs {
+      val mainnet: ConsensusConfig = new ConsensusConfig {
+        val blockTargetTime: Duration        = Duration.ofSecondsUnsafe(64)
+        val uncleDependencyGapTime: Duration = blockTargetTime
+        val emission: Emission               = Emission.mainnet(groupConfig, blockTargetTime)
+      }
+      val ghost: ConsensusConfig = new ConsensusConfig {
+        val blockTargetTime: Duration        = Duration.ofSecondsUnsafe(16)
+        val uncleDependencyGapTime: Duration = blockTargetTime
+        val emission: Emission =
+          Emission.ghost(groupConfig, mainnet.blockTargetTime, blockTargetTime)
+      }
+      val maxMiningTarget: Target = Target.Max
     }
   }
 }

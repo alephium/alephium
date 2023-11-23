@@ -42,14 +42,16 @@ class AlephiumConfigSpec extends AlephiumSpec {
   it should "load alephium config" in new AlephiumConfigFixture {
     override val configValues: Map[String, Any] = Map(
       ("alephium.broker.groups", "12"),
-      ("alephium.consensus.block-target-time", "11 seconds")
+      ("alephium.consensus.mainnet.block-target-time", "11 seconds"),
+      ("alephium.consensus.ghost.block-target-time", "4 seconds")
     )
 
     config.broker.groups is 12
     config.broker.brokerNum is 3
     config.broker.groupNumPerBroker is 4
     config.network.networkId is NetworkId(2)
-    config.consensus.blockTargetTime is Duration.ofSecondsUnsafe(11)
+    config.consensus.mainnet.blockTargetTime is Duration.ofSecondsUnsafe(11)
+    config.consensus.ghost.blockTargetTime is Duration.ofSecondsUnsafe(4)
     config.network.connectionBufferCapacityInByte is 100000000L
   }
 
@@ -60,7 +62,7 @@ class AlephiumConfigSpec extends AlephiumSpec {
     config.broker.groups is 4
     config.consensus.numZerosAtLeastInHash is 37
     val initialHashRate =
-      HashRate.from(config.consensus.maxMiningTarget, config.consensus.blockTargetTime)(
+      HashRate.from(config.consensus.maxMiningTarget, config.consensus.mainnet.blockTargetTime)(
         config.broker
       )
     initialHashRate is HashRate.unsafe(new BigInteger("549756862464"))
@@ -270,8 +272,9 @@ class AlephiumConfigSpec extends AlephiumSpec {
   }
 
   it should "adjust diff for height gaps across chains" in new AlephiumConfigFixture {
-    val N    = 123456
-    val diff = Difficulty.unsafe(N)
+    val N               = 123456
+    val diff            = Difficulty.unsafe(N)
+    val consensusConfig = consensusConfigs.mainnet
     consensusConfig.penalizeDiffForHeightGapLeman(diff, -1) is diff
     consensusConfig.penalizeDiffForHeightGapLeman(diff, 0) is diff
     consensusConfig.penalizeDiffForHeightGapLeman(diff, 1) is diff

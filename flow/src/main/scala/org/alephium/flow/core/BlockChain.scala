@@ -21,7 +21,7 @@ import scala.annotation.tailrec
 import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
-import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.flow.setting.ConsensusSettings
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALPH}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
@@ -379,7 +379,7 @@ object BlockChain {
   )(implicit
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig,
-      consensusSetting: ConsensusSetting
+      consensusSettings: ConsensusSettings
   ): BlockChain = {
     val initialize = initializeGenesis(genesisBlock)(_)
     createUnsafe(genesisBlock, storages, initialize)
@@ -390,7 +390,7 @@ object BlockChain {
   )(implicit
       brokerConfig: BrokerConfig,
       networkConfig: NetworkConfig,
-      consensusSetting: ConsensusSetting
+      consensusSettings: ConsensusSettings
   ): BlockChain = {
     createUnsafe(genesisBlock, storages, initializeFromStorage)
   }
@@ -402,12 +402,12 @@ object BlockChain {
   )(implicit
       _brokerConfig: BrokerConfig,
       _networkConfig: NetworkConfig,
-      _consensusSetting: ConsensusSetting
+      _consensusSettings: ConsensusSettings
   ): BlockChain = {
     val blockchain: BlockChain = new BlockChain {
       override val brokerConfig      = _brokerConfig
       override val networkConfig     = _networkConfig
-      override val consensusConfig   = _consensusSetting
+      override val consensusConfigs  = _consensusSettings
       override val blockStorage      = storages.blockStorage
       override val txStorage         = storages.txStorage
       override val headerStorage     = storages.headerStorage

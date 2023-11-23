@@ -25,7 +25,7 @@ import akka.util.ByteString
 
 import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.BlockHash
 import org.alephium.serde.{_deserialize => _decode, serialize => encode, _}
 import org.alephium.util.{AVector, TimeStamp, U256}
@@ -130,7 +130,7 @@ object Block {
 
   def genesis(chainIndex: ChainIndex, transactions: AVector[Transaction])(implicit
       groupConfig: GroupConfig,
-      consensusConfig: ConsensusConfig
+      consensusConfigs: ConsensusConfigs
   ): Block = {
     val txsHash = calTxsHash(transactions)
     Block(BlockHeader.genesis(chainIndex, txsHash), AVector.empty, transactions)

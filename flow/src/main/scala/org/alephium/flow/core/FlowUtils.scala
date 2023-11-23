@@ -24,7 +24,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.alephium.flow.Utils
 import org.alephium.flow.mempool._
 import org.alephium.flow.model.BlockFlowTemplate
-import org.alephium.flow.setting.{ConsensusSetting, MemPoolSetting}
+import org.alephium.flow.setting.{ConsensusSettings, MemPoolSetting}
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.config.NetworkConfig
@@ -44,7 +44,7 @@ trait FlowUtils
     with ConflictedBlocks
     with LazyLogging { Self: BlockFlow =>
   implicit def mempoolSetting: MemPoolSetting
-  implicit def consensusConfig: ConsensusSetting
+  implicit def consensusConfigs: ConsensusSettings
   implicit def networkConfig: NetworkConfig
   implicit def logConfig: LogConfig
 
@@ -224,10 +224,10 @@ trait FlowUtils
     for {
       parentHeader <- getBlockHeader(bestDeps.parentHash(chainIndex))
       templateTs = FlowUtils.nextTimeStamp(parentHeader.timestamp)
-      loosenDeps <- looseUncleDependencies(bestDeps, chainIndex, templateTs)
-      target     <- getNextHashTarget(chainIndex, loosenDeps, templateTs)
-      groupView  <- getMutableGroupView(chainIndex.from, loosenDeps)
-      hardFork = networkConfig.getHardFork(templateTs)
+      hardFork   = networkConfig.getHardFork(templateTs)
+      loosenDeps   <- looseUncleDependencies(bestDeps, chainIndex, templateTs, hardFork)
+      target       <- getNextHashTarget(chainIndex, loosenDeps, templateTs)
+      groupView    <- getMutableGroupView(chainIndex.from, loosenDeps)
       uncles       <- getUncles(hardFork, loosenDeps, parentHeader)
       txCandidates <- collectTransactions(chainIndex, groupView, bestDeps)
       template <- prepareBlockFlow(
@@ -275,8 +275,7 @@ trait FlowUtils
       fullTxs      <- executeTxTemplates(chainIndex, blockEnv, loosenDeps, groupView, candidates)
       depStateHash <- getDepStateHash(loosenDeps, chainIndex.from)
     } yield {
-      val coinbaseTx =
-        Transaction.coinbase(chainIndex, fullTxs, miner, target, templateTs, uncles)
+      val coinbaseTx = Transaction.coinbase(chainIndex, fullTxs, miner, target, templateTs, uncles)
       BlockFlowTemplate(
         chainIndex,
         loosenDeps.deps,
@@ -290,7 +289,7 @@ trait FlowUtils
   }
 
   lazy val templateValidator =
-    BlockValidation.build(brokerConfig, networkConfig, consensusConfig, logConfig)
+    BlockValidation.build(brokerConfig, networkConfig, consensusConfigs, logConfig)
   def validateTemplate(
       chainIndex: ChainIndex,
       template: BlockFlowTemplate
@@ -314,9 +313,11 @@ trait FlowUtils
   def looseUncleDependencies(
       bestDeps: BlockDeps,
       chainIndex: ChainIndex,
-      currentTs: TimeStamp
+      currentTs: TimeStamp,
+      hardFork: HardFork
   ): IOResult[BlockDeps] = {
-    val thresholdTs = currentTs.minusUnsafe(consensusConfig.uncleDependencyGapTime)
+    val consensusConfig = consensusConfigs.getConsensusConfig(hardFork)
+    val thresholdTs     = currentTs.minusUnsafe(consensusConfig.uncleDependencyGapTime)
     bestDeps.deps
       .mapWithIndexE {
         case (hash, k) if k != (groups - 1 + chainIndex.to.value) =>

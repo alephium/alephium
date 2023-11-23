@@ -46,7 +46,7 @@ import org.alephium.util._
 // scalastyle:off file.size.limit number.of.types
 class ServerUtils(implicit
     brokerConfig: BrokerConfig,
-    consensusConfig: ConsensusConfig,
+    consensusConfigs: ConsensusConfigs,
     networkConfig: NetworkConfig,
     apiConfig: ApiConfig,
     logConfig: LogConfig,
@@ -1285,7 +1285,7 @@ class ServerUtils(implicit
       ChainIndex(groupIndex, groupIndex),
       networkConfig.networkId,
       blockTimeStamp,
-      consensusConfig.maxMiningTarget,
+      consensusConfigs.maxMiningTarget,
       Some(blockHash)
     )
     val testGasFee = nonCoinbaseMinGasPrice * maximalGasPerTx

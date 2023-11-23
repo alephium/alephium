@@ -81,7 +81,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
     newBlocks.foreach { block =>
       addAndCheck(blockFlow, block, 1)
-      blockFlow.getWeight(block) isE consensusConfig.minBlockWeight * 1
+      blockFlow.getWeight(block) isE consensusConfigs.minBlockWeight * 1
     }
 
     newBlocks.map(_.hash).sorted(blockFlow.blockHashOrdering).map(_.bytes) is
@@ -107,30 +107,47 @@ class FlowUtilsSpec extends AlephiumSpec {
     FlowUtils.filterDoubleSpending(AVector(tx0, tx2, tx2)) is AVector(tx0, tx2)
   }
 
-  it should "detect tx conflicts using bestDeps" in new FlowFixture {
+  trait TxConflictsFixture extends FlowFixture {
+    def test() = {
+      val fromGroup      = Random.nextInt(groups0)
+      val chainIndex0    = ChainIndex.unsafe(fromGroup, Random.nextInt(groups0))
+      val anotherToGroup = (chainIndex0.to.value + 1 + Random.nextInt(groups0 - 1)) % groups0
+      val chainIndex1    = ChainIndex.unsafe(fromGroup, anotherToGroup)
+      val block0         = transfer(blockFlow, chainIndex0)
+      val block1         = transfer(blockFlow, chainIndex1)
+
+      addAndCheck(blockFlow, block0)
+      val groupIndex = GroupIndex.unsafe(fromGroup)
+      val tx1        = block1.nonCoinbase.head.toTemplate
+      blockFlow.isTxConflicted(groupIndex, tx1) is true
+      blockFlow.getGrandPool().add(chainIndex1, tx1, TimeStamp.now())
+
+      val miner    = getGenesisLockupScript(chainIndex1.to)
+      val template = blockFlow.prepareBlockFlowUnsafe(chainIndex1, miner)
+      template.deps.contains(block0.hash) is false
+      template.transactions.init.isEmpty is true
+    }
+  }
+
+  it should "detect tx conflicts using bestDeps for pre-ghost hardfork" in new TxConflictsFixture {
     override val configValues =
       Map(
-        ("alephium.consensus.uncle-dependency-gap-time", "10 seconds"),
+        ("alephium.consensus.mainnet.uncle-dependency-gap-time", "10 seconds"),
+        ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis),
         ("alephium.broker.broker-num", 1)
       )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
+    test()
+  }
 
-    val fromGroup      = Random.nextInt(groups0)
-    val chainIndex0    = ChainIndex.unsafe(fromGroup, Random.nextInt(groups0))
-    val anotherToGroup = (chainIndex0.to.value + 1 + Random.nextInt(groups0 - 1)) % groups0
-    val chainIndex1    = ChainIndex.unsafe(fromGroup, anotherToGroup)
-    val block0         = transfer(blockFlow, chainIndex0)
-    val block1         = transfer(blockFlow, chainIndex1)
-
-    addAndCheck(blockFlow, block0)
-    val groupIndex = GroupIndex.unsafe(fromGroup)
-    val tx1        = block1.nonCoinbase.head.toTemplate
-    blockFlow.isTxConflicted(groupIndex, tx1) is true
-    blockFlow.getGrandPool().add(chainIndex1, tx1, TimeStamp.now())
-
-    val miner    = getGenesisLockupScript(chainIndex1)
-    val template = blockFlow.prepareBlockFlowUnsafe(chainIndex1, miner)
-    template.deps.contains(block0.hash) is false
-    template.transactions.init.isEmpty is true
+  it should "detect tx conflicts using bestDeps for ghost hardfork" in new TxConflictsFixture {
+    override val configValues =
+      Map(
+        ("alephium.consensus.ghost.uncle-dependency-gap-time", "10 seconds"),
+        ("alephium.broker.broker-num", 1)
+      )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    test()
   }
 
   it should "truncate txs w.r.t. tx number and gas" in new FlowFixture {
@@ -148,13 +165,64 @@ class FlowUtilsSpec extends AlephiumSpec {
     FlowUtils.truncateTxs(txs, 3, GasBox.unsafe(gas * 2 - 1)) is txs.take(1)
   }
 
-  it should "prepare block with correct coinbase reward" in new FlowFixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
+  trait CoinbaseRewardFixture extends FlowFixture {
+    lazy val chainIndex = ChainIndex.unsafe(0, 0)
+
+    def newTransferBlock() = {
+      // generate the block using mineFromMemPool as it uses FlowUtils.prepareBlockFlow
+      val tmpBlock = transfer(blockFlow, chainIndex)
+      blockFlow
+        .getGrandPool()
+        .add(chainIndex, tmpBlock.nonCoinbase.head.toTemplate, TimeStamp.now())
+      mineFromMemPool(blockFlow, chainIndex)
+    }
+  }
+
+  it should "prepare block with correct coinbase reward for pre-ghost hardfork" in new CoinbaseRewardFixture {
+    override val configValues = Map(
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis)
+    )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
     val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
-    emptyBlock.coinbaseReward is consensusConfig.emission
+    emptyBlock.coinbaseReward is consensusConfigs.mainnet.emission
       .reward(emptyBlock.header)
       .miningReward
     emptyBlock.coinbaseReward is ALPH.alph(30) / 9
+    addAndCheck(blockFlow, emptyBlock)
+
+    val transferBlock = newTransferBlock()
+    transferBlock.coinbaseReward is consensusConfigs.mainnet.emission
+      .reward(transferBlock.header)
+      .miningReward
+    addAndCheck(blockFlow, transferBlock)
+  }
+
+  it should "prepare block with correct coinbase reward for ghost hardfork" in new CoinbaseRewardFixture {
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
+    emptyBlock.coinbaseReward is consensusConfigs.ghost.emission
+      .reward(emptyBlock.header)
+      .miningReward
+    emptyBlock.coinbaseReward is (ALPH.alph(30) / 9 / 4)
+    addAndCheck(blockFlow, emptyBlock)
+
+    val transferBlock = newTransferBlock()
+    transferBlock.coinbaseReward is consensusConfigs.ghost.emission
+      .reward(transferBlock.header)
+      .miningReward
+    addAndCheck(blockFlow, transferBlock)
+
+    // TODO: add more tests for uncle miner rewards
+  }
+
+  it should "prepare block with correct coinbase reward" in new FlowFixture {
+    val chainIndex      = ChainIndex.unsafe(0, 0)
+    val emptyBlock      = mineFromMemPool(blockFlow, chainIndex)
+    val consensusConfig = consensusConfigs.getConsensusConfig(emptyBlock.timestamp)
+    emptyBlock.coinbaseReward is consensusConfig.emission
+      .reward(emptyBlock.header)
+      .miningReward
+    emptyBlock.coinbaseReward is (ALPH.alph(30) / 9 / 4)
     addAndCheck(blockFlow, emptyBlock)
 
     // generate the block using mineFromMemPool as it uses FlowUtils.prepareBlockFlow

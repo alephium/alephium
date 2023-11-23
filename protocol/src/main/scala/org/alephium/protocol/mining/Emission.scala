@@ -23,10 +23,21 @@ import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHeader, Target}
 import org.alephium.util.{Duration, Math, TimeStamp, U256}
 
-class Emission(blockTargetTime: Duration)(implicit groupConfig: GroupConfig) {
+final class Emission private (blockTargetTime: Duration, fraction: Emission.Fraction)(implicit
+    groupConfig: GroupConfig
+) {
   import Emission.{yearsUntilNoReward, yearsUntilStable}
 
   // scalastyle:off magic.number
+  val initialMaxReward: U256 = ALPH
+    .alph(60)
+    .mulUnsafe(U256.unsafe(fraction.numerator))
+    .divUnsafe(U256.unsafe(fraction.denominator))
+  val stableMaxReward: U256 = ALPH
+    .alph(20)
+    .mulUnsafe(U256.unsafe(fraction.numerator))
+    .divUnsafe(U256.unsafe(fraction.denominator))
+  val lowHashRateInitialReward: U256 = initialMaxReward.divUnsafe(U256.unsafe(2))
   val blocksInAboutOneYearPerChain: Long =
     Duration.ofDaysUnsafe(365L).millis / blockTargetTime.millis
   val blocksToStableMaxReward: Long       = blocksInAboutOneYearPerChain * yearsUntilStable
@@ -35,9 +46,9 @@ class Emission(blockTargetTime: Duration)(implicit groupConfig: GroupConfig) {
   val durationToNoReward: Duration        = blockTargetTime.timesUnsafe(blocksToNoReward)
   // scalastyle:on magic.number
 
-  val initialMaxRewardPerChain: U256         = shareReward(Emission.initialMaxReward)
-  val stableMaxRewardPerChain: U256          = shareReward(Emission.stableMaxReward)
-  val lowHashRateInitialRewardPerChain: U256 = shareReward(Emission.lowHashRateInitialReward)
+  val initialMaxRewardPerChain: U256         = shareReward(initialMaxReward)
+  val stableMaxRewardPerChain: U256          = shareReward(stableMaxReward)
+  val lowHashRateInitialRewardPerChain: U256 = shareReward(lowHashRateInitialReward)
 
   val onePhPerSecondTarget: Target  = Target.from(HashRate.onePhPerSecond, blockTargetTime)
   val oneEhPerSecondTarget: Target  = Target.from(HashRate.oneEhPerSecond, blockTargetTime)
@@ -201,14 +212,22 @@ class Emission(blockTargetTime: Duration)(implicit groupConfig: GroupConfig) {
 }
 
 object Emission {
-  def apply(groupConfig: GroupConfig, blockTargetTime: Duration): Emission =
-    new Emission(blockTargetTime)(groupConfig)
+  final private[mining] case class Fraction(numerator: Long, denominator: Long)
+
+  def mainnet(groupConfig: GroupConfig, mainnetBlockTargetTime: Duration): Emission =
+    new Emission(mainnetBlockTargetTime, Fraction(1, 1))(groupConfig)
+
+  def ghost(
+      groupConfig: GroupConfig,
+      mainnetBlockTargetTime: Duration,
+      ghostBlockTargetTime: Duration
+  ): Emission = {
+    assume(ghostBlockTargetTime.millis < mainnetBlockTargetTime.millis)
+    val fraction = Fraction(ghostBlockTargetTime.millis, mainnetBlockTargetTime.millis)
+    new Emission(ghostBlockTargetTime, fraction)(groupConfig)
+  }
 
   // scalastyle:off magic.number
-  private[mining] val initialMaxReward: U256         = ALPH.alph(60)
-  private[mining] val stableMaxReward: U256          = ALPH.alph(20)
-  private[mining] val lowHashRateInitialReward: U256 = initialMaxReward.divUnsafe(U256.unsafe(2))
-
   val yearsUntilStable: Int   = 4
   val yearsUntilNoReward: Int = 82
   // scalastyle:on magic.number
