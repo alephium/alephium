@@ -65,7 +65,7 @@ class WebSocketServerSpec
 
     show(
       result
-    ) is write(BlockEntry.from(block, 1))
+    ) is write(BlockEntry.from(block, 1, AVector.empty))
   }
 
   behavior of "ws"

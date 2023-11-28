@@ -3515,15 +3515,22 @@
                   "blocks": [
                     [
                       {
-                        "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                        "timestamp": 1611041396892,
-                        "chainFrom": 1,
-                        "chainTo": 2,
-                        "height": 42,
-                        "deps": [
-                          "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                          "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
-                        ],
+                        "header": {
+                          "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "version": 1,
+                          "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                          "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                          "timestamp": 1611041396892,
+                          "chainFrom": 1,
+                          "chainTo": 2,
+                          "height": 42,
+                          "deps": [
+                            "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                            "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                          ]
+                        },
                         "transactions": [
                           {
                             "unsigned": {
@@ -3615,11 +3622,24 @@
                             ]
                           }
                         ],
-                        "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                        "version": 1,
-                        "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                        "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                        "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                        "uncles": [
+                          {
+                            "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                            "version": 1,
+                            "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                            "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                            "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                            "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                            "timestamp": 1611041396892,
+                            "chainFrom": 1,
+                            "chainTo": 2,
+                            "height": 42,
+                            "deps": [
+                              "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                              "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                            ]
+                          }
+                        ]
                       }
                     ]
                   ]
@@ -3737,15 +3757,22 @@
                     [
                       {
                         "block": {
-                          "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                          "timestamp": 1611041396892,
-                          "chainFrom": 1,
-                          "chainTo": 2,
-                          "height": 42,
-                          "deps": [
-                            "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                            "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
-                          ],
+                          "header": {
+                            "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                            "version": 1,
+                            "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                            "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                            "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                            "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                            "timestamp": 1611041396892,
+                            "chainFrom": 1,
+                            "chainTo": 2,
+                            "height": 42,
+                            "deps": [
+                              "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                              "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                            ]
+                          },
                           "transactions": [
                             {
                               "unsigned": {
@@ -3837,11 +3864,24 @@
                               ]
                             }
                           ],
-                          "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                          "version": 1,
-                          "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                          "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                          "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                          "uncles": [
+                            {
+                              "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                              "version": 1,
+                              "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                              "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                              "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                              "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                              "timestamp": 1611041396892,
+                              "chainFrom": 1,
+                              "chainTo": 2,
+                              "height": 42,
+                              "deps": [
+                                "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                                "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                              ]
+                            }
+                          ]
                         },
                         "events": [
                           {
@@ -3962,15 +4002,22 @@
                   "$ref": "#/components/schemas/BlockEntry"
                 },
                 "example": {
-                  "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                  "timestamp": 1611041396892,
-                  "chainFrom": 1,
-                  "chainTo": 2,
-                  "height": 42,
-                  "deps": [
-                    "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                    "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
-                  ],
+                  "header": {
+                    "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                    "version": 1,
+                    "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                    "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                    "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                    "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                    "timestamp": 1611041396892,
+                    "chainFrom": 1,
+                    "chainTo": 2,
+                    "height": 42,
+                    "deps": [
+                      "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                    ]
+                  },
                   "transactions": [
                     {
                       "unsigned": {
@@ -4062,11 +4109,24 @@
                       ]
                     }
                   ],
-                  "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "version": 1,
-                  "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                  "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                  "uncles": [
+                    {
+                      "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "version": 1,
+                      "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "timestamp": 1611041396892,
+                      "chainFrom": 1,
+                      "chainTo": 2,
+                      "height": 42,
+                      "deps": [
+                        "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                        "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -4167,15 +4227,22 @@
                 },
                 "example": {
                   "block": {
-                    "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                    "timestamp": 1611041396892,
-                    "chainFrom": 1,
-                    "chainTo": 2,
-                    "height": 42,
-                    "deps": [
-                      "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
-                      "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
-                    ],
+                    "header": {
+                      "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "version": 1,
+                      "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                      "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                      "timestamp": 1611041396892,
+                      "chainFrom": 1,
+                      "chainTo": 2,
+                      "height": 42,
+                      "deps": [
+                        "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                        "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                      ]
+                    },
                     "transactions": [
                       {
                         "unsigned": {
@@ -4267,11 +4334,24 @@
                         ]
                       }
                     ],
-                    "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                    "version": 1,
-                    "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                    "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
-                    "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                    "uncles": [
+                      {
+                        "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "version": 1,
+                        "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                        "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                        "timestamp": 1611041396892,
+                        "chainFrom": 1,
+                        "chainTo": 2,
+                        "height": 42,
+                        "deps": [
+                          "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
+                          "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                        ]
+                      }
+                    ]
                   },
                   "events": [
                     {
@@ -5131,6 +5211,11 @@
                   "$ref": "#/components/schemas/BlockHeaderEntry"
                 },
                 "example": {
+                  "nonce": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "version": 1,
+                  "depStateHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "txsHash": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
+                  "target": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef",
                   "hash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5",
                   "timestamp": 1611041396892,
                   "chainFrom": 1,
@@ -10102,47 +10187,14 @@
       },
       "BlockEntry": {
         "required": [
-          "hash",
-          "timestamp",
-          "chainFrom",
-          "chainTo",
-          "height",
-          "deps",
+          "header",
           "transactions",
-          "nonce",
-          "version",
-          "depStateHash",
-          "txsHash",
-          "target"
+          "uncles"
         ],
         "type": "object",
         "properties": {
-          "hash": {
-            "type": "string",
-            "format": "block-hash"
-          },
-          "timestamp": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "chainFrom": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "chainTo": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "height": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "deps": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "block-hash"
-            }
+          "header": {
+            "$ref": "#/components/schemas/BlockHeaderEntry"
           },
           "transactions": {
             "type": "array",
@@ -10150,6 +10202,30 @@
               "$ref": "#/components/schemas/Transaction"
             }
           },
+          "uncles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockHeaderEntry"
+            }
+          }
+        }
+      },
+      "BlockHeaderEntry": {
+        "required": [
+          "nonce",
+          "version",
+          "depStateHash",
+          "txsHash",
+          "target",
+          "hash",
+          "timestamp",
+          "chainFrom",
+          "chainTo",
+          "height",
+          "deps"
+        ],
+        "type": "object",
+        "properties": {
           "nonce": {
             "type": "string",
             "format": "hex-string"
@@ -10168,20 +10244,7 @@
           "target": {
             "type": "string",
             "format": "hex-string"
-          }
-        }
-      },
-      "BlockHeaderEntry": {
-        "required": [
-          "hash",
-          "timestamp",
-          "chainFrom",
-          "chainTo",
-          "height",
-          "deps"
-        ],
-        "type": "object",
-        "properties": {
+          },
           "hash": {
             "type": "string",
             "format": "block-hash"

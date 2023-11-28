@@ -39,21 +39,21 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   val defaultUtxosLimit: Int = 1024
 
   val zeroHash: String = BlockHash.zero.toHexString
+  def blockHeaderEntry(i: Int) = BlockHeaderEntry(
+    ByteString.empty,
+    1.toByte,
+    Hash.zero,
+    Hash.zero,
+    ByteString.empty,
+    BlockHash.zero,
+    TimeStamp.unsafe(i.toLong),
+    i,
+    i,
+    i,
+    AVector(BlockHash.zero)
+  )
   def entryDummy(i: Int): BlockEntry =
-    BlockEntry(
-      BlockHash.zero,
-      TimeStamp.unsafe(i.toLong),
-      i,
-      i,
-      i,
-      AVector(BlockHash.zero),
-      AVector.empty,
-      ByteString.empty,
-      1.toByte,
-      Hash.zero,
-      Hash.zero,
-      ByteString.empty
-    )
+    BlockEntry(blockHeaderEntry(i), AVector.empty, AVector.empty)
   val dummyAddress = new InetSocketAddress("127.0.0.1", 9000)
   val dummyCliqueInfo =
     CliqueInfo.unsafe(
@@ -78,18 +78,21 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
   def blockEntryJson(blockEntry: BlockEntry): String = {
     s"""
        |{
-       |  "hash":"${blockEntry.hash.toHexString}",
-       |  "timestamp":${blockEntry.timestamp.millis},
-       |  "chainFrom":${blockEntry.chainFrom},
-       |  "chainTo":${blockEntry.chainTo},
-       |  "height":${blockEntry.height},
-       |  "deps":${write(blockEntry.deps.map(_.toHexString))},
+       |  "header": {
+       |    "nonce":"${Hex.toHexString(blockEntry.header.nonce)}",
+       |    "version":${blockEntry.header.version},
+       |    "depStateHash":"${blockEntry.header.depStateHash.toHexString}",
+       |    "txsHash":"${blockEntry.header.txsHash.toHexString}",
+       |    "target":"${Hex.toHexString(blockEntry.header.target)}",
+       |    "hash":"${blockEntry.header.hash.toHexString}",
+       |    "timestamp":${blockEntry.header.timestamp.millis},
+       |    "chainFrom":${blockEntry.header.chainFrom},
+       |    "chainTo":${blockEntry.header.chainTo},
+       |    "height":${blockEntry.header.height},
+       |    "deps":${write(blockEntry.header.deps.map(_.toHexString))}
+       |  },
        |  "transactions":${write(blockEntry.transactions)},
-       |  "nonce":"${Hex.toHexString(blockEntry.nonce)}",
-       |  "version":${blockEntry.version},
-       |  "depStateHash":"${blockEntry.depStateHash.toHexString}",
-       |  "txsHash":"${blockEntry.txsHash.toHexString}",
-       |  "target":"${Hex.toHexString(blockEntry.target)}"
+       |  "uncles":${write(blockEntry.uncles)}
        |}""".stripMargin
   }
   def parseFail[A: Reader](jsonRaw: String): String = {

@@ -165,19 +165,24 @@ trait EndpointsExamples extends ErrorExamples {
     hash.bytes
   )
 
-  private val blockEntry = BlockEntry(
-    blockHash,
+  private val blockHeaderEntry = BlockHeaderEntry(
+    nonce = hash.bytes,
+    version = 1.toByte,
+    depStateHash = hash,
+    txsHash = hash,
+    target = hash.bytes,
+    hash = blockHash,
     timestamp = ts,
     chainFrom = 1,
     chainTo = 2,
-    height,
-    deps = AVector(blockHash, blockHash),
+    height = height,
+    deps = AVector(blockHash, blockHash)
+  )
+
+  private val blockEntry = BlockEntry(
+    header = blockHeaderEntry,
     transactions = AVector(transaction),
-    hash.bytes,
-    1.toByte,
-    hash,
-    hash,
-    hash.bytes
+    uncles = AVector(blockHeaderEntry)
   )
 
   private val eventByBlockHash = ContractEventByBlockHash(
@@ -200,15 +205,6 @@ trait EndpointsExamples extends ErrorExamples {
   private val blockSolution = BlockSolution(
     blockBlob = Hex.unsafe("bbbbbbbb"),
     miningCount = U256.unsafe(1000)
-  )
-
-  private val blockHeaderEntry = BlockHeaderEntry(
-    hash = blockHash,
-    timestamp = ts,
-    chainFrom = 1,
-    chainTo = 2,
-    height = height,
-    deps = AVector(blockHash, blockHash)
   )
 
   private val event = ContractEvent(

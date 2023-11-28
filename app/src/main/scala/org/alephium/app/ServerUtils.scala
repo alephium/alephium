@@ -64,11 +64,25 @@ class ServerUtils(implicit
     } yield blocks
   }
 
+  def getBlockEntry(blockFlow: BlockFlow, block: Block, height: Int): Try[BlockEntry] = {
+    wrapResult(
+      block.uncles
+        .mapE(uncle =>
+          blockFlow
+            .getHeight(uncle)
+            .map(uncleHeight => BlockHeaderEntry.from(uncle, uncleHeight))
+        )
+        .map(BlockEntry.from(block, height, _))
+    )
+  }
+
   def getBlocks(blockFlow: BlockFlow, timeInterval: TimeInterval): Try[BlocksPerTimeStampRange] = {
-    getHeightedBlocks(blockFlow, timeInterval).map { heightedBlocks =>
-      BlocksPerTimeStampRange(heightedBlocks.map(_._2.map { case (block, height) =>
-        BlockEntry.from(block, height)
-      }))
+    getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
+      heightedBlocks
+        .mapE(_._2.mapE { case (block, height) =>
+          getBlockEntry(blockFlow, block, height)
+        })
+        .map(BlocksPerTimeStampRange)
     }
   }
 
@@ -79,10 +93,11 @@ class ServerUtils(implicit
     getHeightedBlocks(blockFlow, timeInterval).flatMap { heightedBlocks =>
       heightedBlocks
         .mapE(_._2.mapE { case (block, height) =>
-          val blockEntry = BlockEntry.from(block, height)
-          getEventsByBlockHash(blockFlow, blockEntry.hash).map(events =>
-            BlockAndEvents(blockEntry, events.events)
-          )
+          getBlockEntry(blockFlow, block, height).flatMap { blockEntry =>
+            getEventsByBlockHash(blockFlow, blockEntry.header.hash).map(events =>
+              BlockAndEvents(blockEntry, events.events)
+            )
+          }
         })
         .map(BlocksAndEventsPerTimeStampRange)
     }
@@ -430,7 +445,8 @@ class ServerUtils(implicit
         .getHeight(block.header)
         .left
         .map(failedInIO)
-    } yield BlockEntry.from(block, height)
+      entry <- getBlockEntry(blockFlow, block, height)
+    } yield entry
 
   def getBlockAndEvents(blockFlow: BlockFlow, hash: BlockHash): Try[BlockAndEvents] =
     for {
