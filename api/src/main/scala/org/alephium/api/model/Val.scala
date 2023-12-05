@@ -43,6 +43,14 @@ object Val {
 
   val True: ValBool  = ValBool(true)
   val False: ValBool = ValBool(false)
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def toVmVal(values: util.AVector[Val]): util.AVector[vm.Val] = {
+    values.fold(util.AVector.ofCapacity[vm.Val](values.length)) {
+      case (acc, value: Val.Primitive) => acc :+ value.toVmVal
+      case (acc, value: ValArray)      => acc ++ toVmVal(value.value)
+    }
+  }
 }
 
 @upickle.implicits.key("Bool")

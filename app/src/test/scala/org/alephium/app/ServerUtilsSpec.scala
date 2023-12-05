@@ -2434,14 +2434,78 @@ class ServerUtilsSpec extends AlephiumSpec {
     tokens1.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(4))
   }
 
+  trait GenericBuildFixture extends Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils = new ServerUtils
+
+    val chainIndex                         = ChainIndex.unsafe(0, 0)
+    val (fromPrivateKey, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val fromAddress                        = Address.p2pkh(fromPublicKey)
+    val utxos       = serverUtils.getUTXOsIncludePool(blockFlow, fromAddress).rightValue.utxos
+    val outputRefs  = utxos.map(_.ref)
+    val totalAmount = utxos.map(_.amount.value).fold(U256.Zero)(_ addUnsafe _)
+  }
+
+  "ServerUtils.genericBuildTransaction" should "build a simple p2pkh transaction" in new GenericBuildFixture {
+    val inputs: AVector[BuildInputs] = AVector(P2PKHInputs(fromPublicKey, outputRefs))
+    val destination = generateDestination(
+      chainIndex,
+      amountValue = totalAmount.subUnsafe(nonCoinbaseMinGasPrice * minimalGas)
+    )
+
+    val genericBuild = serverUtils
+      .genericBuildTransaction(
+        blockFlow,
+        GenericBuildTransaction(inputs, AVector(destination), minimalGas, nonCoinbaseMinGasPrice)
+      )
+      .rightValue
+
+    val txTemplate = signAndAddToMemPool(
+      genericBuild.txId,
+      genericBuild.unsignedTx,
+      chainIndex,
+      fromPrivateKey
+    )
+
+    val senderBalance = genesisBalance - destination.attoAlphAmount.value
+
+    checkAddressBalance(fromAddress, senderBalance - txTemplate.gasFeeUnsafe, 0)
+    checkDestinationBalance(destination)
+  }
+
+  it should "fail if one input is in another group" in new GenericBuildFixture {
+    val chainIndex2            = ChainIndex.unsafe(1, 0)
+    val (_, fromPublicKey2, _) = genesisKeys(chainIndex2.from.value)
+    val fromAddress2           = Address.p2pkh(fromPublicKey2)
+    val utxos2      = serverUtils.getUTXOsIncludePool(blockFlow, fromAddress2).rightValue.utxos
+    val outputRefs2 = utxos2.map(_.ref)
+
+    val inputs: AVector[BuildInputs] = AVector(
+      P2PKHInputs(fromPublicKey, outputRefs),
+      P2PKHInputs(fromPublicKey2, outputRefs2)
+    )
+
+    val destination = generateDestination(chainIndex)
+
+    serverUtils
+      .genericBuildTransaction(
+        blockFlow,
+        GenericBuildTransaction(inputs, AVector(destination), minimalGas, nonCoinbaseMinGasPrice)
+      )
+      .leftValue
+      .detail is s"Selected UTXOs are not from the same group"
+  }
+
   private def generateDestination(
       chainIndex: ChainIndex,
-      message: ByteString = ByteString.empty
+      message: ByteString = ByteString.empty,
+      amountValue: U256 = ALPH.oneAlph
   )(implicit
       groupConfig: GroupConfig
   ): Destination = {
     val address = generateAddress(chainIndex)
-    val amount  = Amount(ALPH.oneAlph)
+    val amount  = Amount(amountValue)
     Destination(address, amount, None, None, Some(message))
   }
 

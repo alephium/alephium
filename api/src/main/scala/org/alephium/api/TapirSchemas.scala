@@ -27,7 +27,7 @@ import org.alephium.api.model.{Amount, ApiKey, BuildTxCommon, MinerAction, Scrip
 import org.alephium.crypto.wallet.Mnemonic
 import org.alephium.protocol.{Hash, PublicKey, Signature}
 import org.alephium.protocol.model._
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, StatefulContract, StatelessScript}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 trait TapirSchemasLike {
@@ -89,6 +89,9 @@ trait TapirSchemasLike {
 
   implicit val transactionIdSchema: Schema[TransactionId] = Schema(SString()).format("32-byte-hash")
   implicit val minerActionSchema: Schema[MinerAction]     = Schema(SString())
+
+  implicit val statelessScriptSchema: Schema[StatelessScript] =
+    Schema(SString()).format("script")
 }
 
 object TapirSchemas extends TapirSchemasLike

@@ -305,6 +305,13 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction to a number of recipients")
 
+  val genericBuildTransaction: BaseEndpoint[GenericBuildTransaction, BuildTransactionResult] =
+    transactionsEndpoint.post
+      .in("generic-build")
+      .in(jsonBodyWithAlph[GenericBuildTransaction])
+      .out(jsonBody[BuildTransactionResult])
+      .summary("Build a generic unsigned transaction to a number of recipients")
+
   val buildSweepAddressTransactions
       : BaseEndpoint[BuildSweepAddressTransactions, BuildSweepAddressTransactionsResult] =
     transactionsEndpoint.post

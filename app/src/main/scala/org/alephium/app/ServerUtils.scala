@@ -216,13 +216,28 @@ class ServerUtils(implicit
     }
   }
 
+  def genericBuildTransaction(
+      blockFlow: BlockFlow,
+      query: GenericBuildTransaction
+  ): Try[BuildTransactionResult] = {
+    for {
+      _ <- query.inputs.foreachE(in => checkGroup(in.lockupScript))
+      unsignedTx <- prepareGenericUnsignedTransactionFromQuery(
+        blockFlow,
+        query
+      )
+    } yield {
+      BuildTransactionResult.from(unsignedTx)
+    }
+  }
+
   def buildMultisig(
       blockFlow: BlockFlow,
       query: BuildMultisig
   ): Try[BuildTransactionResult] = {
     for {
       _ <- checkGroup(query.fromAddress.lockupScript)
-      unlockScript <- buildMultisigUnlockScript(
+      unlockScript <- ApiUtils.buildUnlockScript(
         query.fromAddress.lockupScript,
         query.fromPublicKeys
       )
@@ -604,6 +619,27 @@ class ServerUtils(implicit
     }
   }
 
+  def prepareGenericUnsignedTransactionFromQuery(
+      blockFlow: BlockFlow,
+      query: GenericBuildTransaction
+  ): Try[UnsignedTransaction] = {
+    for {
+      inputs <- query.inputs.mapE { in =>
+        in.unlockScriptTry.map { unlock =>
+          (unlock, in.utxos)
+        }
+      }
+      unsignedTx <- prepareGenericUnsignedTransaction(
+        blockFlow,
+        inputs,
+        query.destinations,
+        query.gasAmount,
+        query.gasPrice,
+        query.targetBlockHash
+      )
+    } yield unsignedTx
+  }
+
   def prepareUnsignedTransaction(
       blockFlow: BlockFlow,
       fromPublicKey: PublicKey,
@@ -668,6 +704,38 @@ class ServerUtils(implicit
         )
     }
 
+    transferResult match {
+      case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
+      case Right(Left(error))                => Left(failed(error))
+      case Left(error)                       => failed(error)
+    }
+  }
+
+  def prepareGenericUnsignedTransaction(
+      blockFlow: BlockFlow,
+      inputs: AVector[(UnlockScript, AVector[OutputRef])],
+      destinations: AVector[Destination],
+      gasOpt: GasBox,
+      gasPrice: GasPrice,
+      targetBlockHashOpt: Option[BlockHash]
+  ): Try[UnsignedTransaction] = {
+    val outputInfos = prepareOutputInfos(destinations)
+
+    val allAssetType = inputs.forall { case (_, outputRefs) =>
+      outputRefs.forall(outputRef => Hint.unsafe(outputRef.hint).isAssetType)
+    }
+
+    val transferResult = if (allAssetType) {
+      blockFlow.transferGeneric(
+        targetBlockHashOpt,
+        inputs.map { case (u, outs) => (u, outs.map(_.unsafeToAssetOutputRef())) },
+        outputInfos,
+        gasOpt,
+        gasPrice
+      )
+    } else {
+      Right(Left("Selected UTXOs must be of asset type"))
+    }
     transferResult match {
       case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
       case Right(Left(error))                => Left(failed(error))
@@ -972,16 +1040,8 @@ class ServerUtils(implicit
 
   def toVmVal(values: Option[AVector[Val]]): AVector[vm.Val] = {
     values match {
-      case Some(vs) => toVmVal(vs)
+      case Some(vs) => model.Val.toVmVal(vs)
       case None     => AVector.empty
-    }
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def toVmVal(values: AVector[Val]): AVector[vm.Val] = {
-    values.fold(AVector.ofCapacity[vm.Val](values.length)) {
-      case (acc, value: Val.Primitive) => acc :+ value.toVmVal
-      case (acc, value: ValArray)      => acc ++ toVmVal(value.value)
     }
   }
 
@@ -1381,7 +1441,7 @@ class ServerUtils(implicit
       returnLength: Int,
       contractId: ContractId
   ): AVector[Instr[StatefulContext]] = {
-    toVmVal(args).map(_.toConstInstr: Instr[StatefulContext]) ++
+    model.Val.toVmVal(args).map(_.toConstInstr: Instr[StatefulContext]) ++
       AVector[Instr[StatefulContext]](
         ConstInstr.u256(vm.Val.U256(U256.unsafe(argLength))),
         ConstInstr.u256(vm.Val.U256(U256.unsafe(returnLength))),
@@ -1398,8 +1458,8 @@ class ServerUtils(implicit
       worldState,
       existingContract.id,
       existingContract.bytecode,
-      toVmVal(existingContract.immFields),
-      toVmVal(existingContract.mutFields),
+      model.Val.toVmVal(existingContract.immFields),
+      model.Val.toVmVal(existingContract.mutFields),
       existingContract.asset
     )
   }
@@ -1413,8 +1473,8 @@ class ServerUtils(implicit
       worldState,
       contractId,
       testContract.code,
-      toVmVal(testContract.initialImmFields),
-      toVmVal(testContract.initialMutFields),
+      model.Val.toVmVal(testContract.initialImmFields),
+      model.Val.toVmVal(testContract.initialMutFields),
       testContract.initialAsset
     )
   }

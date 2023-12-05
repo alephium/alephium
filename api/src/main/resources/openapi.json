@@ -5364,6 +5364,168 @@
         }
       }
     },
+    "/transactions/generic-build": {
+      "post": {
+        "tags": [
+          "Transactions"
+        ],
+        "summary": "Build a generic unsigned transaction to a number of recipients",
+        "operationId": "postTransactionsGeneric-build",
+        "requestBody": {
+          "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000`",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenericBuildTransaction"
+              },
+              "examples": {
+                "Example": {
+                  "summary": "Default",
+                  "value": {
+                    "inputs": [
+                      {
+                        "type": "P2PKHInputs",
+                        "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
+                        "utxos": [
+                          {
+                            "hint": 1234,
+                            "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "P2MPKHInputs",
+                        "fromAddress": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                        "fromPublicKeys": [
+                          "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28"
+                        ],
+                        "utxos": [
+                          {
+                            "hint": 1234,
+                            "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "P2SHInputs",
+                        "script": "0101000102030103",
+                        "params": [
+                          {
+                            "type": "Bool",
+                            "value": true
+                          }
+                        ],
+                        "utxos": [
+                          {
+                            "hint": 1234,
+                            "key": "798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"
+                          }
+                        ]
+                      }
+                    ],
+                    "destinations": [
+                      {
+                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                        "attoAlphAmount": "2000000000000000000"
+                      }
+                    ],
+                    "gasAmount": 20000,
+                    "gasPrice": "100000000000",
+                    "targetBlockHash": "bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildTransactionResult"
+                },
+                "example": {
+                  "unsignedTx": "35d1b2a520a0da34c5eb8d712aa9cc",
+                  "gasAmount": 20000,
+                  "gasPrice": "100000000000",
+                  "txId": "503bfb16230888af4924aa8f8250d7d348b862e267d75d3147f1998050b6da69",
+                  "fromGroup": 2,
+                  "toGroup": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/transactions/sweep-address/build": {
       "post": {
         "tags": [
@@ -10467,6 +10629,27 @@
           }
         }
       },
+      "BuildInputs": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/P2MPKHInputs"
+          },
+          {
+            "$ref": "#/components/schemas/P2PKHInputs"
+          },
+          {
+            "$ref": "#/components/schemas/P2SHInputs"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "P2MPKHInputs": "#/components/schemas/P2MPKHInputs",
+            "P2PKHInputs": "#/components/schemas/P2PKHInputs",
+            "P2SHInputs": "#/components/schemas/P2SHInputs"
+          }
+        }
+      },
       "BuildMultisig": {
         "required": [
           "fromAddress",
@@ -11622,6 +11805,41 @@
           }
         }
       },
+      "GenericBuildTransaction": {
+        "required": [
+          "inputs",
+          "destinations",
+          "gasAmount",
+          "gasPrice"
+        ],
+        "type": "object",
+        "properties": {
+          "inputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BuildInputs"
+            }
+          },
+          "destinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Destination"
+            }
+          },
+          "gasAmount": {
+            "type": "integer",
+            "format": "gas"
+          },
+          "gasPrice": {
+            "type": "string",
+            "format": "uint256"
+          },
+          "targetBlockHash": {
+            "type": "string",
+            "format": "block-hash"
+          }
+        }
+      },
       "Group": {
         "required": [
           "group"
@@ -11907,6 +12125,90 @@
           "key": {
             "type": "string",
             "format": "32-byte-hash"
+          }
+        }
+      },
+      "P2MPKHInputs": {
+        "required": [
+          "fromAddress",
+          "fromPublicKeys",
+          "utxos",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "fromAddress": {
+            "type": "string",
+            "format": "address"
+          },
+          "fromPublicKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "public-key"
+            }
+          },
+          "utxos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputRef"
+            }
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "P2PKHInputs": {
+        "required": [
+          "fromPublicKey",
+          "utxos",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "fromPublicKey": {
+            "type": "string",
+            "format": "public-key"
+          },
+          "utxos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputRef"
+            }
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "P2SHInputs": {
+        "required": [
+          "script",
+          "params",
+          "utxos",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "format": "script"
+          },
+          "params": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Val"
+            }
+          },
+          "utxos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputRef"
+            }
+          },
+          "type": {
+            "type": "string"
           }
         }
       },

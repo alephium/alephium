@@ -746,6 +746,76 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
+  "UnsignedTransaction.buildGeneric" should "build generic transaction successfully" in new UnsignedTransactionFixture {
+    val inputs: AVector[(UnlockScript, AVector[(AssetOutputRef, AssetOutput)])] = {
+      val input1 = input("input1", ALPH.oneAlph, fromLockupScript)
+      val input2 = input("input2", ALPH.oneAlph, fromLockupScript)
+      AVector((fromUnlockScript, AVector(input1, input2)))
+    }
+
+    val gasFee = nonCoinbaseMinGasPrice * minimalGas
+
+    val outputs = {
+      val output1 =
+        output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph.mulUnsafe(2).subUnsafe(gasFee))
+      AVector(output1)
+    }
+
+    noException should be thrownBy {
+      UnsignedTransaction
+        .buildGeneric(
+          inputs,
+          outputs,
+          minimalGas,
+          nonCoinbaseMinGasPrice
+        )
+        .rightValue
+    }
+  }
+
+  it should "fail if there are alph remaining" in new UnsignedTransactionFixture {
+    val inputs: AVector[(UnlockScript, AVector[(AssetOutputRef, AssetOutput)])] = {
+      val input1 = input("input1", ALPH.oneAlph, fromLockupScript)
+      AVector((fromUnlockScript, AVector(input1)))
+    }
+
+    val outputs = {
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph.divUnsafe(U256.Two))
+      AVector(output1)
+    }
+
+    UnsignedTransaction
+      .buildGeneric(
+        inputs,
+        outputs,
+        minimalGas,
+        nonCoinbaseMinGasPrice
+      )
+      .leftValue is "Inputs' Alph don't sum up to outputs and gas fee"
+  }
+
+  it should "fail if not enough alph for gas fee" in new UnsignedTransactionFixture {
+
+    val inputs: AVector[(UnlockScript, AVector[(AssetOutputRef, AssetOutput)])] = {
+      val input1 = input("input1", ALPH.oneAlph, fromLockupScript)
+      AVector((fromUnlockScript, AVector(input1)))
+    }
+
+    val outputs = {
+      val output1 = output(LockupScript.p2pkh(toPubKey), ALPH.oneAlph)
+      AVector(output1)
+    }
+
+    UnsignedTransaction
+      .buildGeneric(
+        inputs,
+        outputs,
+        minimalGas,
+        nonCoinbaseMinGasPrice
+      )
+      .leftValue is "Not enough balance for gas fee"
+  }
+
   trait LargeUtxos extends FlowFixture {
     val chainIndex = ChainIndex.unsafe(0, 0)
     val block      = transfer(blockFlow, chainIndex)

@@ -225,6 +225,14 @@ trait EndpointsExamples extends ErrorExamples {
     fields = AVector(ValAddress(address), ValU256(U256.unsafe(10)))
   )
 
+  private val outputRefs = AVector(OutputRef(1234, hash))
+  private val statelessScript = vm.StatelessScript.unsafe(
+    AVector(vm.Method[vm.StatelessContext](true, false, false, 1, 2, 3, AVector(vm.ConstTrue)))
+  )
+  private val p2pkhInputs  = P2PKHInputs(publicKey, outputRefs)
+  private val p2mpkhInputs = P2MPKHInputs(address, AVector(publicKey), outputRefs)
+  private val p2shInputs   = P2SHInputs(statelessScript, AVector(ValBool(true)), outputRefs)
+
   implicit val minerActionExamples: List[Example[MinerAction]] = List(
     Example[MinerAction](MinerAction.StartMining, Some("Start mining"), None),
     Example[MinerAction](MinerAction.StopMining, Some("Stop mining"), None)
@@ -418,6 +426,17 @@ trait EndpointsExamples extends ErrorExamples {
         Some(AVector(outputRef)),
         Some(model.minimalGas),
         Some(model.nonCoinbaseMinGasPrice)
+      )
+    )
+  )
+  implicit val genericBuildTransactionExamples: List[Example[GenericBuildTransaction]] = List(
+    defaultExample(
+      GenericBuildTransaction(
+        AVector(p2pkhInputs, p2mpkhInputs, p2shInputs),
+        defaultDestinations,
+        model.minimalGas,
+        model.nonCoinbaseMinGasPrice,
+        Some(blockHash)
       )
     )
   )

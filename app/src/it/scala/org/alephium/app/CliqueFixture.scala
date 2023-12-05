@@ -48,7 +48,7 @@ import org.alephium.flow.validation.BlockValidation
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, PrivateKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, Block, ChainIndex, TokenId, TransactionId}
+import org.alephium.protocol.model.{Address, Block, ChainIndex, GroupIndex, TokenId, TransactionId}
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{GasPrice, LockupScript}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -83,13 +83,21 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     (Address.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
+  def generateAccount(groupIndex: GroupIndex): (String, String, String) = {
+    val (priKey, pubKey) = groupIndex.generateKey
+    (Address.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
+  }
+
   // This address is allocated 1 ALPH in the genensis block
   val address    = "14PqtYSSbwpUi2RJKUvv9yUwGafd6yHbEcke7ionuiE7w"
   val publicKey  = "03e75902fa24caff042b2b4c350e8f2ffeb3cb95f4263f0e109a2c2d7aa3dcae5c"
   val privateKey = "d24967efb7f1b558ad40a4d71593ceb5b3cecf46d17f0e68ef53def6b391c33d"
   val mnemonic =
     "toward outdoor daughter deny mansion bench water alien crumble mother exchange screen salute antenna abuse key hair crisp debate goose great market core screen"
+
   val (transferAddress, transferPubKey, transferPriKey) = generateAccount
+
+  val addressGroupIndex = GroupIndex.unsafe(2)
 
   val password = "password"
 
@@ -149,6 +157,21 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
     val submitTx   = submitTransaction(unsignedTx, privateKey)
     val res        = request[SubmitTxResult](submitTx, restPort)
+    res
+  }
+
+  def transferGeneric(
+      inputs: AVector[BuildInputs],
+      destinations: AVector[Destination],
+      gas: Int,
+      gasPrice: GasPrice,
+      privateKey: AVector[String],
+      restPort: Int
+  ): SubmitTxResult = eventually {
+    val buildTx          = buildGenericTransaction(inputs, destinations, gas, gasPrice)
+    val unsignedTx       = request[BuildTransactionResult](buildTx, restPort)
+    val submitMultisigTx = signAndSubmitMultisigTransaction(unsignedTx, privateKey)
+    val res              = request[SubmitTxResult](submitMultisigTx, restPort)
     res
   }
 
@@ -425,6 +448,49 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
               |  "destinations": ${write(destinations)}
               |}
         """.stripMargin)
+    )
+  }
+
+  def buildGenericTransaction(
+      inputs: AVector[BuildInputs],
+      destinations: AVector[Destination],
+      gas: Int,
+      gasPrice: GasPrice
+  ): Int => HttpRequest = {
+    val inputsStr = inputs
+      .map {
+        case P2PKHInputs(pubKey, outputRefs) =>
+          s"""
+             |{
+             |  "type": "P2PKHInputs",
+             |  "fromPublicKey": ${write(pubKey)},
+             |  "utxos": ${write(outputRefs)}
+             |}
+        """.stripMargin
+        case P2MPKHInputs(fromAddress, pubKeys, outputRefs) =>
+          s"""
+             |{
+             |  "type": "P2MPKHInputs",
+             |  "fromAddress": "$fromAddress",
+             |  "fromPublicKeys": ${write(pubKeys)},
+             |  "utxos": ${write(outputRefs)}
+             |}
+        """.stripMargin
+        case P2SHInputs(_, _, _) => ""
+      }
+      .mkString("[", ",", "]")
+
+    val p = s"""
+               |{
+               |  "inputs": $inputsStr,
+               |  "destinations": ${write(destinations)},
+               |  "gasAmount": $gas,
+               |  "gasPrice": "${gasPrice.value}"
+               |}
+        """.stripMargin
+    httpPost(
+      "/transactions/generic-build",
+      Some(p)
     )
   }
 

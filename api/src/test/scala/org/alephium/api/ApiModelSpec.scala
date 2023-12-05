@@ -348,6 +348,73 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(result, jsonRaw)
   }
 
+  it should "encode/decode BuildInputs" in {
+    val publicKey            = PublicKey.generate
+    val address              = Address.p2pkh(publicKey)
+    val publicKeys           = AVector(publicKey)
+    val key                  = Hash.generate
+    val outputRefs           = AVector(OutputRef(1234, key))
+    val params: AVector[Val] = AVector(ValBool(true))
+
+    checkData(
+      P2PKHInputs(publicKey, outputRefs),
+      s"""{"type":"P2PKHInputs","fromPublicKey":"${publicKey.toHexString}","utxos":${write(
+          outputRefs
+        )}}"""
+    )
+    checkData(
+      P2MPKHInputs(address, publicKeys, outputRefs),
+      s"""{"type":"P2MPKHInputs","fromAddress":"${address.toBase58}","fromPublicKeys":${write(
+          publicKeys
+        )},"utxos":${write(outputRefs)}}"""
+    )
+    checkData(
+      P2SHInputs(statelessScript, params, outputRefs),
+      s"""{"type":"P2SHInputs","script":${write(statelessScript)},"params":${write(
+          params
+        )},"utxos":${write(outputRefs)}}"""
+    )
+  }
+
+  it should "encode/decode GeneriBuildTransaction" in {
+    val publicKey  = PublicKey.generate
+    val address    = Address.p2pkh(publicKey)
+    val key        = Hash.generate
+    val outputRefs = AVector(OutputRef(1234, key))
+
+    val inputs: AVector[BuildInputs] = AVector(P2PKHInputs(publicKey, outputRefs))
+    val destination                  = AVector(Destination(address, Amount(1)))
+
+    val genericBuild = GenericBuildTransaction(
+      inputs,
+      destination,
+      minimalGas,
+      nonCoinbaseMinGasPrice
+    )
+
+    val jsonRaw = s"""
+                     |{
+                     |  "inputs": [
+                     |    {
+                     |      "type":"P2PKHInputs",
+                     |      "fromPublicKey":"${publicKey.toHexString}",
+                     |      "utxos":${write(outputRefs)}
+                     |    }
+                     |  ],
+                     |  "destinations": [
+                     |    {
+                     |      "address": "${address.toBase58}",
+                     |      "attoAlphAmount": "1"
+                     |    }
+                     | ],
+                     |  "gasAmount": ${minimalGas.value},
+                     |  "gasPrice": "${nonCoinbaseMinGasPrice.value}"
+                     |}
+    """.stripMargin
+
+    checkData(genericBuild, jsonRaw)
+  }
+
   it should "encode/decode BuildTransaction" in {
     val fromPublicKey = PublicKey.generate
     val toKey         = PublicKey.generate

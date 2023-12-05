@@ -34,6 +34,12 @@ trait ApiModelFixture
   val method  = vm.Method[vm.StatefulContext](true, true, true, 1, 2, 3, instrs)
   val methods = AVector(method, method)
   val script  = vm.StatefulScript.unsafe(methods)
+
+  val statelessScript = vm.StatelessScript.unsafe(
+    AVector(
+      vm.Method[vm.StatelessContext](true, false, false, 1, 2, 3, AVector(vm.ConstTrue))
+    )
+  )
   val assetTxOutputRef = AssetOutputRef.unsafe(
     Hint.unsafe(0),
     TxOutputRef.unsafeKey(hashGen.sample.get)

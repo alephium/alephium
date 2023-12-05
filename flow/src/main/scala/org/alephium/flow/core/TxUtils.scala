@@ -299,6 +299,51 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  def transferGeneric(
+      targetBlockHashOpt: Option[BlockHash],
+      inputs: AVector[(UnlockScript, AVector[AssetOutputRef])],
+      outputInfos: AVector[TxOutputInfo],
+      gas: GasBox,
+      gasPrice: GasPrice
+  ): IOResult[Either[String, UnsignedTransaction]] = {
+    if (inputs.exists { case (_, refs) => refs.isEmpty }) {
+      Right(Left("Empty UTXOs"))
+    } else {
+      val groupIndex = inputs.head._2.head.hint.groupIndex
+      assume(brokerConfig.contains(groupIndex))
+
+      val checkResult = for {
+        _ <- checkUTXOsInSameGroup(inputs.flatMap { case (_, utxoRefs) => utxoRefs })
+        _ <- checkOutputInfos(groupIndex, outputInfos)
+        _ <- checkProvidedGas(Some(gas), gasPrice)
+        _ <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
+        _ <- UnsignedTransaction.calculateTotalAmountPerToken(
+          outputInfos.flatMap(_.tokens)
+        )
+      } yield ()
+
+      checkResult match {
+        case Right(()) =>
+          getImmutableGroupViewIncludePool(groupIndex, targetBlockHashOpt)
+            .flatMap { gv =>
+              inputs.mapE { case (unlock, refs) =>
+                gv.getPrevAssetOutputs(refs).map(_.map(res => (unlock, res)))
+              }
+            }
+            .map { utxosOpt =>
+              for {
+                utxos <- utxosOpt.mapE(_.toRight("Can not find all selected UTXOs"))
+                unsignedTx <- UnsignedTransaction
+                  .buildGeneric(utxos, outputInfos, gas, gasPrice)
+              } yield unsignedTx
+            }
+        case Left(e) =>
+          Right(Left(e))
+      }
+    }
+  }
+  // scalastyle:on method.length
+
   def sweepAddress(
       targetBlockHashOpt: Option[BlockHash],
       fromPublicKey: PublicKey,

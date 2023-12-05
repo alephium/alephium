@@ -377,6 +377,20 @@ trait EndpointsLogic extends Endpoints {
     bt => bt.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply)
   )
 
+  val buildGenericTransactionLogic = serverLogicRedirect(genericBuildTransaction)(
+    genericBuildTransaction =>
+      withSyncedClique {
+        Future.successful(
+          serverUtils
+            .genericBuildTransaction(
+              blockFlow,
+              genericBuildTransaction
+            )
+        )
+      },
+    bt => Right(bt.inputs.headOption.map(_.lockupScript.groupIndex(brokerConfig)))
+  )
+
   val buildMultisigLogic = serverLogicRedirect(buildMultisig)(
     buildMultisig =>
       withSyncedClique {

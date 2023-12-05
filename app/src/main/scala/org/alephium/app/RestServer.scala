@@ -90,6 +90,7 @@ class RestServer(
       getChainInfoLogic,
       getBlockHeaderEntryLogic,
       buildTransactionLogic,
+      buildGenericTransactionLogic,
       buildSweepAddressTransactionsLogic,
       submitTransactionLogic,
       buildMultisigAddressLogic,

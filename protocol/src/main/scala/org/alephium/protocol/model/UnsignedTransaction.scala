@@ -270,6 +270,61 @@ object UnsignedTransaction {
     }
   }
 
+  def buildGeneric(
+      from: AVector[(UnlockScript, AVector[(AssetOutputRef, AssetOutput)])],
+      outputInfos: AVector[TxOutputInfo],
+      gas: GasBox,
+      gasPrice: GasPrice
+  )(implicit networkConfig: NetworkConfig): Either[String, UnsignedTransaction] = {
+    assume(gas >= minimalGas)
+    assume(gasPrice.value <= ALPH.MaxALPHValue)
+    val gasFee    = gasPrice * gas
+    val inputs    = from.flatMap { case (_, refs) => refs }
+    val inputRefs = from.flatMap { case (_, refs) => refs.map { case (_, o) => o } }.view
+
+    for {
+      _ <- checkWithMaxTxInputNum(inputs)
+      _ <- checkUniqueInputs(inputs)
+      outputs = buildOutputs(outputInfos)
+      _               <- checkMinimalAlphPerOutput(outputInfos)
+      _               <- checkTokenValuesNonZero(outputInfos)
+      alphRemainder   <- calculateAlphRemainder(inputRefs, outputs, gasFee)
+      _               <- checkNoAlphRemainder(alphRemainder)
+      tokensRemainder <- calculateTokensRemainder(inputRefs, outputs)
+      _               <- checkNoTokensRemainder(tokensRemainder)
+    } yield {
+      UnsignedTransaction(
+        DefaultTxVersion,
+        networkConfig.networkId,
+        scriptOpt = None,
+        gas,
+        gasPrice,
+        from.flatMap { case (fromUnlockScript, ins) =>
+          ins.map { case (ref, _) =>
+            TxInput(ref, fromUnlockScript)
+          }
+        },
+        outputs
+      )
+    }
+  }
+
+  def checkNoAlphRemainder(alphRemainder: U256): Either[String, Unit] = {
+    if (alphRemainder != U256.Zero) {
+      Left("Inputs' Alph don't sum up to outputs and gas fee")
+    } else {
+      Right(())
+    }
+  }
+
+  def checkNoTokensRemainder(tokensRemainder: AVector[(TokenId, U256)]): Either[String, Unit] = {
+    if (tokensRemainder.exists { case (_, value) => value != U256.Zero }) {
+      Left("Inputs' tokens don't sum up to outputs' tokens  ")
+    } else {
+      Right(())
+    }
+  }
+
   def checkUniqueInputs(
       assets: AVector[(AssetOutputRef, AssetOutput)]
   ): Either[String, Unit] = {

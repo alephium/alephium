@@ -42,7 +42,7 @@ import org.alephium.protocol.model.{
   TokenId,
   TransactionId
 }
-import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract}
+import org.alephium.protocol.vm.{GasBox, GasPrice, StatefulContract, StatelessScript}
 import org.alephium.serde.{deserialize, serialize, RandomBytes}
 import org.alephium.util._
 
@@ -260,6 +260,15 @@ trait ApiModelCodec {
       case other            => throw Abort(s"Invalid public key type: $other")
     }
   )
+
+  implicit val p2pkhInputsRW: RW[P2PKHInputs]   = macroRW
+  implicit val p2mpkhInputsRW: RW[P2MPKHInputs] = macroRW
+  implicit val p2shInputsRW: RW[P2SHInputs]     = macroRW
+  implicit val buildInputsRW: RW[BuildInputs] =
+    RW.merge(p2pkhInputsRW, p2mpkhInputsRW, p2shInputsRW)
+
+  implicit val genericBuildTransactionRW: RW[GenericBuildTransaction] = macroRW
+
   implicit val buildTransactionRW: RW[BuildTransaction] = macroRW
 
   implicit val buildSweepAddressTransactionsRW: RW[BuildSweepAddressTransactions] = macroRW
@@ -329,6 +338,17 @@ trait ApiModelCodec {
   }
   implicit val statefulContractWriter: Writer[StatefulContract] =
     StringWriter.comap(contract => Hex.toHexString(serialize(contract)))
+
+  implicit val statelessScriptReader: Reader[StatelessScript] = StringReader.map { input =>
+    val bs =
+      Hex.from(input).getOrElse(throw Abort(s"Invalid hex string for stateless script $input"))
+    deserialize[StatelessScript](bs) match {
+      case Right(script) => script
+      case Left(error)   => throw Abort(s"Invalid stateless script $input: $error")
+    }
+  }
+  implicit val statelessScriptWriter: Writer[StatelessScript] =
+    StringWriter.comap(script => Hex.toHexString(serialize(script)))
 
   implicit val assetRW: ReadWriter[AssetState]                      = macroRW
   implicit val existingContractRW: ReadWriter[ContractState]        = macroRW
