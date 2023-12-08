@@ -223,7 +223,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         case text: String =>
           val notification = read[NotificationUnsafe](text).asNotification.rightValue
           val blockEntry   = read[BlockEntry](notification.params)
-          buffer(blockEntry.chainFrom)(blockEntry.chainTo) += 1
+          buffer(blockEntry.header.chainFrom)(blockEntry.header.chainTo) += 1
           if (buffer.forall(_.forall(_ >= number))) () else iter()
       }
     }
