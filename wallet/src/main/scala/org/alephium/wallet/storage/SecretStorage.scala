@@ -171,6 +171,7 @@ object SecretStorage {
         )
         state <- stateFromFile(file, password, path, mnemonicPassphrase)
       } yield {
+        SecretStorage.setPermission600(file)
         new Impl(file, Some(state), path)
       }
     }
@@ -403,5 +404,12 @@ object SecretStorage {
       .toEither
       .left
       .map(_ => SecretFileError)
+  }
+
+  def setPermission600(file: File): Unit = {
+    file.setReadable(false, false) // This returns false on Windows CI
+    require(file.setReadable(true, true))
+    require(file.setWritable(false, false))
+    require(file.setWritable(true, true))
   }
 }
