@@ -38,7 +38,7 @@ import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
-// scalastyle:off file.size.limit
+// scalastyle:off file.size.limit number.of.methods
 class ServerUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
   val defaultUtxosLimit: Int                         = ALPH.MaxTxInputNum * 2
@@ -2474,6 +2474,259 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     checkAddressBalance(scriptCaller, ALPH.alph(1000000))
     checkAddressBalance(contractAddress, ALPH.alph(3).subUnsafe(scriptTxGasFee))
+  }
+
+  it should "not charge caller gas fee when contract is paying gas conditionally" in new GasFeeFixture {
+    def contract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo(contractPay: Bool) -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |    if (contractPay) {
+         |      payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractAddress = deployContract(contract)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo(true)
+         |}
+         |
+         |$contract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000).addUnsafe(ALPH.oneAlph))
+    checkAddressBalance(contractAddress, ALPH.alph(2).subUnsafe(scriptTxGasFee))
+  }
+
+  it should "charge caller gas fee when contract is not paying gas conditionally" in new GasFeeFixture {
+    def contract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo(contractPay: Bool) -> () {
+         |    if (contractPay) {
+         |      payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractAddress = deployContract(contract)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo(false)
+         |}
+         |
+         |$contract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000).subUnsafe(scriptTxGasFee))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+  }
+
+  it should "charge caller gas fee when contract doen't have enough to pay gas fee" in new GasFeeFixture {
+    def contract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo(contractPay: Bool) -> () {
+         |    if (contractPay) {
+         |      payGasFee!{selfAddress!() -> ALPH: 0}()
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractAddress = deployContract(contract, Amount(ALPH.alph(1)))
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo(true)
+         |}
+         |
+         |$contract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(1))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000) subUnsafe scriptTxGasFee
+    )
+    checkAddressBalance(contractAddress, ALPH.alph(1))
+  }
+
+  it should "charge caller partial gas fee when contract can also pay partial gas fee" in new GasFeeFixture {
+    val partialGasFee = nonCoinbaseMinGasFee.divUnsafe(2)
+
+    def contract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo(contractPay: Bool) -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |    if (contractPay) {
+         |      payGasFee!{selfAddress!() -> ALPH: 2}()
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractAddress = deployContract(contract, Amount(ALPH.alph(2).addUnsafe(partialGasFee)))
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  payGasFee!{callerAddress!() -> ALPH: 100}()
+         |  Foo(#${contractAddress.toBase58}).foo(true)
+         |}
+         |
+         |$contract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(2).addUnsafe(partialGasFee))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).addUnsafe(ALPH.oneAlph).subUnsafe(scriptTxGasFee.subUnsafe(U256.Two))
+    )
+    checkAddressBalance(contractAddress, ALPH.alph(1).addUnsafe(partialGasFee).subUnsafe(2))
+  }
+
+  it should "charge the contract that has enough balance for gas" in new GasFeeFixture {
+    val partialGasFee = nonCoinbaseMinGasFee.divUnsafe(2)
+
+    def barContract: String =
+      s"""
+         |Contract Bar() {
+         |  @using(assetsInContract = true)
+         |  pub fn bar() -> () {
+         |    payGasFee!{selfAddress!() -> ALPH: ${partialGasFee}}()
+         |  }
+         |}
+         |""".stripMargin
+
+    val barContractAddress =
+      deployContract(barContract, Amount(ALPH.alph(1).addUnsafe(partialGasFee)))
+
+    def fooContract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |    payGasFee!{selfAddress!() -> ALPH: 0}()
+         |    Bar(#${barContractAddress.toBase58}).bar()
+         |  }
+         |}
+         |
+         |$barContract
+         |""".stripMargin
+
+    val fooContractAddress = deployContract(fooContract, Amount(ALPH.alph(2)))
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooContractAddress.toBase58}).foo()
+         |}
+         |
+         |$fooContract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(fooContractAddress, ALPH.alph(2))
+    checkAddressBalance(barContractAddress, ALPH.alph(1).addUnsafe(partialGasFee))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).addUnsafe(ALPH.alph(1)).subUnsafe(scriptTxGasFee.subUnsafe(partialGasFee))
+    )
+    checkAddressBalance(fooContractAddress, ALPH.alph(1))
+    checkAddressBalance(barContractAddress, ALPH.alph(1))
+  }
+
+  it should "charge the contract that pays the for gas the first" in new GasFeeFixture {
+    def barContract: String =
+      s"""
+         |Contract Bar() {
+         |  @using(assetsInContract = true)
+         |  pub fn bar() -> () {
+         |    payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |  }
+         |}
+         |""".stripMargin
+
+    val barContractAddress = deployContract(barContract, Amount(ALPH.alph(10)))
+
+    def fooContract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    Bar(#${barContractAddress.toBase58}).bar()
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |    payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |  }
+         |}
+         |
+         |$barContract
+         |""".stripMargin
+
+    val fooContractAddress = deployContract(fooContract, Amount(ALPH.alph(10)))
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooContractAddress.toBase58}).foo()
+         |}
+         |
+         |$fooContract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(fooContractAddress, ALPH.alph(10))
+    checkAddressBalance(barContractAddress, ALPH.alph(10))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000).addUnsafe(ALPH.alph(1)))
+    checkAddressBalance(fooContractAddress, ALPH.alph(9))
+    checkAddressBalance(barContractAddress, ALPH.alph(10).subUnsafe(scriptTxGasFee))
   }
 
   it should "considers dustAmount for change output when selecting UTXOs, without amounts" in new DustAmountFixture {
