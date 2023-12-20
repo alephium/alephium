@@ -2553,6 +2553,44 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
+  trait PayGasFeeFixture extends ContractOutputFixture {
+    def contractBalance: U256
+    def gasFeePaid: U256
+
+    val from  = LockupScript.P2C(contractId)
+    val txEnv = genTxEnv(None, AVector.empty)
+    val balanceState =
+      MutBalanceState(remaining = MutBalances.empty, approved = alphBalance(from, contractBalance))
+
+    override lazy val frame =
+      prepareFrame(
+        Some(balanceState),
+        Some((contractId, contractOutput, contractOutputRef)),
+        Some(txEnv)
+      )
+    runAndCheckGas(PayGasFee)
+
+    frame.ctx.gasFeePaid is gasFeePaid
+    stack.size is 0
+  }
+
+  it should "not pay when contract has no available fund [PayGasFee]" in new PayGasFeeFixture {
+    override def contractBalance: U256 = U256.Zero
+    override def gasFeePaid: U256      = U256.Zero
+  }
+
+  it should "pay partial gas that contract has available fund for [PayGasFee]" in new PayGasFeeFixture {
+    lazy val halfGas                   = txEnv.gasFeeUnsafe.div(2).get
+    override def contractBalance: U256 = halfGas
+    override def gasFeePaid: U256      = halfGas
+  }
+
+  it should "pay all gas if contract has enough fund [PayGasFee]" in new PayGasFeeFixture {
+    lazy val twiceGas                  = txEnv.gasFeeUnsafe.mul(2).get
+    override def contractBalance: U256 = minimalAlphInContract.addUnsafe(twiceGas)
+    override def gasFeePaid: U256      = txEnv.gasFeeUnsafe
+  }
+
   trait TransferTokenFixture extends ContractOutputFixture {
     def instr: Instr[StatefulContext] with GasSimple
     def from: LockupScript
