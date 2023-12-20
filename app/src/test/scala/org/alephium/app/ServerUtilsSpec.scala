@@ -29,6 +29,7 @@ import org.alephium.crypto.BIP340Schnorr
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow}
 import org.alephium.flow.gasestimation._
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
@@ -2337,6 +2338,144 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  trait GasFeeFixture extends Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils = new ServerUtils
+
+    val chainIndex                        = ChainIndex.unsafe(0, 0)
+    val (testPriKey, testPubKey)          = chainIndex.from.generateKey
+    val testAddress                       = Address.p2pkh(testPubKey)
+    val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
+    val genesisAddress                    = Address.p2pkh(genesisPubKey)
+
+    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
+      addAndCheck(blockFlow, block)
+    }
+
+    def executeScript(
+        rawScript: String,
+        keyPairOpt: Option[(PrivateKey, PublicKey)] = None
+    ) = {
+      val script = Compiler.compileTxScript(rawScript).toOption.get
+      val block  = payableCall(blockFlow, chainIndex, script, keyPairOpt = keyPairOpt)
+      addAndCheck(blockFlow, block)
+      block
+    }
+
+    def deployContract(
+        contract: String,
+        initialAttoAlphAmount: Amount = Amount(ALPH.alph(3))
+    ): Address.Contract = {
+      val code = Compiler.compileContract(contract).toOption.get
+
+      val deployContractTxResult = serverUtils
+        .buildDeployContractTx(
+          blockFlow,
+          BuildDeployContractTx(
+            Hex.unsafe(testPubKey.toHexString),
+            bytecode = serialize(code) ++ ByteString(0, 0),
+            initialAttoAlphAmount = Some(initialAttoAlphAmount)
+          )
+        )
+        .rightValue
+
+      val deployContractTx =
+        deserialize[UnsignedTransaction](Hex.unsafe(deployContractTxResult.unsignedTx)).rightValue
+      deployContractTx.fixedOutputs.length is 1
+
+      val testAddressAlphBalance = getAlphBalance(blockFlow, LockupScript.p2pkh(testPubKey))
+      signAndAddToMemPool(
+        deployContractTxResult.txId,
+        deployContractTxResult.unsignedTx,
+        chainIndex,
+        testPriKey
+      )
+
+      confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
+      confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+      serverUtils.getTransaction(blockFlow, deployContractTxResult.txId, None, None).rightValue
+
+      // Check that gas is paid correctly
+      getAlphBalance(blockFlow, LockupScript.p2pkh(testPubKey)) is testAddressAlphBalance.subUnsafe(
+        deployContractTx.gasPrice * deployContractTx.gasAmount + initialAttoAlphAmount.value
+      )
+      deployContractTxResult.contractAddress
+
+    }
+
+    val testAddressBalance = ALPH.alph(1000)
+    val block              = transfer(blockFlow, genesisKeys(1)._1, testPubKey, testAddressBalance)
+    addAndCheck(blockFlow, block)
+    checkAddressBalance(testAddress, testAddressBalance)
+
+    def scriptCaller = genesisAddress
+  }
+
+  it should "should throw exception for payGasFee instr before Ghost hardfork" in new GasFeeFixture {
+    implicit override lazy val networkConfig: NetworkSetting = config.network.copy(
+      ghostHardForkTimestamp = TimeStamp.unsafe(Long.MaxValue)
+    )
+
+    def contract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractAddress = deployContract(contract)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+
+    val exception = intercept[AssertionError](executeScript(script))
+    exception.getMessage() is "Right(TxScriptExeFailed(InactiveInstr(PayGasFee)))"
+  }
+
+  it should "not charge caller gas fee when contract is paying gas" in new GasFeeFixture {
+    def contract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractAddress = deployContract(contract)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3).subUnsafe(scriptTxGasFee))
+  }
+
   it should "considers dustAmount for change output when selecting UTXOs, without amounts" in new DustAmountFixture {
     override def attoAlphAmount: Option[Amount] = None
     executeTxScript()
@@ -2475,7 +2614,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     txTemplate
   }
 
-  private def checkAddressBalance(address: Address.Asset, amount: U256, utxoNum: Int = 1)(implicit
+  private def checkAddressBalance(address: Address, amount: U256, utxoNum: Int = 1)(implicit
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {
