@@ -19,6 +19,7 @@ package org.alephium.protocol.vm
 import java.nio.charset.StandardCharsets
 
 import scala.annotation.switch
+import scala.annotation.tailrec
 
 import akka.util.ByteString
 
@@ -34,7 +35,7 @@ import org.alephium.protocol.vm.TokenIssuance.{
   NoIssuance
 }
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
-import org.alephium.util.{AVector, Bytes, Duration, TimeStamp}
+import org.alephium.util.{AVector, Bytes, Duration, TimeStamp, U256}
 import org.alephium.util
 
 // scalastyle:off file.size.limit number.of.types
@@ -60,6 +61,17 @@ sealed trait LemanInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
   }
 
   def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+}
+
+sealed trait GhostInstr[-Ctx <: StatelessContext] extends Instr[Ctx] {
+  def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkGhostHardFork(this)
+      _ <- runWithGhost(frame)
+    } yield ()
+  }
+
+  def runWithGhost[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
 }
 
 sealed trait InstrWithSimpleGas[-Ctx <: StatelessContext] extends Instr[Ctx] with GasSimple {
@@ -88,6 +100,20 @@ sealed trait LemanInstrWithSimpleGas[-Ctx <: StatelessContext]
   }
 
   def runWithLeman[C <: Ctx](frame: Frame[C]): ExeResult[Unit]
+}
+
+sealed trait GhostInstrWithSimpleGas[-Ctx <: StatelessContext]
+    extends GhostInstr[Ctx]
+    with GasSimple {
+  def _runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = ???
+
+  override def runWith[C <: Ctx](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      _ <- frame.ctx.checkGhostHardFork(this)
+      _ <- frame.ctx.chargeGas(this)
+      _ <- runWithGhost(frame)
+    } yield ()
+  }
 }
 
 object Instr {
@@ -175,7 +201,9 @@ object Instr {
     LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
     CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-    LoadImmField, LoadImmFieldByIndex
+    LoadImmField, LoadImmFieldByIndex,
+    /* Below are instructions for Ghost hard fork */
+    PayGasFee
   )
   // format: on
 
@@ -495,6 +523,65 @@ case object StoreMutFieldByIndex
       index <- popIndex(frame, InvalidMutFieldIndex)
       v     <- frame.popOpStack()
       _     <- frame.setMutField(index, v)
+    } yield ()
+  }
+}
+
+case object PayGasFee
+    extends GhostInstrWithSimpleGas[StatefulContext]
+    with GasBalance
+    with StatefulInstrCompanion0 {
+  def gasFeeToBePaid[C <: StatefulContext](
+      frame: Frame[C],
+      approved: MutBalances
+  ): AVector[(LockupScript, U256)] = {
+    val numOfGasPayers                                = approved.all.length
+    var gasFeeToBePaid: AVector[(LockupScript, U256)] = AVector.empty
+    val gasRemainingOpt = frame.ctx.txEnv.gasFeeUnsafe.sub(frame.ctx.gasFeePaid)
+
+    gasRemainingOpt match {
+      case None =>
+        gasFeeToBePaid
+      case Some(gasRemaining) =>
+        var remaining = gasRemaining
+        @tailrec
+        def iter(index: Int): Unit = {
+          if (index == numOfGasPayers || remaining.isZero) {
+            ()
+          } else {
+            val (lockupScript, balance) = approved.all(index)
+            val toBePaid                = U256.min(remaining, balance.attoAlphAmount)
+            gasFeeToBePaid = gasFeeToBePaid :+ (lockupScript, toBePaid)
+            remaining = remaining.subUnsafe(toBePaid)
+            iter(index + 1)
+          }
+        }
+
+        iter(0)
+        gasFeeToBePaid
+    }
+  }
+
+  def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      balanceState <- frame.getBalanceState()
+      _ <- gasFeeToBePaid(frame, balanceState.approved).foreachE { case (lockupScript, gasFee) =>
+        for {
+          _ <- balanceState.approved
+            .subAlph(lockupScript, gasFee)
+            .toRight(
+              Right(
+                NotEnoughApprovedBalance(
+                  lockupScript,
+                  TokenId.alph,
+                  gasFee,
+                  balanceState.approved.getAttoAlphAmount(lockupScript).getOrElse(U256.Zero)
+                )
+              )
+            )
+          _ <- frame.ctx.payGasFee(gasFee)
+        } yield ()
+      }
     } yield ()
   }
 }

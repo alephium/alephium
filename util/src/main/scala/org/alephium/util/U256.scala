@@ -279,6 +279,10 @@ object U256 {
     if (value.isNonNegative) Some(unsafe(value.v)) else None
   }
 
+  def min(a: U256, b: U256): U256 = {
+    if (a.compare(b) <= 0) a else b
+  }
+
   val Zero: U256     = unsafe(BigInteger.ZERO)
   val One: U256      = unsafe(BigInteger.ONE)
   val Two: U256      = unsafe(BigInteger.valueOf(2))
