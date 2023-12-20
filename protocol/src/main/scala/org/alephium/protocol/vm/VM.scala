@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, EitherF}
+import org.alephium.util.{AVector, EitherF, U256}
 
 sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
@@ -342,6 +342,7 @@ final class StatefulVM(
   }
 
   private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+    val hardFork = ctx.getHardFork()
     if (lastFrame.method.usesAssets()) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
@@ -353,17 +354,79 @@ final class StatefulVM(
           case Some(_) => okay
           case None    => failed(InvalidBalances)
         }
+        _ <- reimburseGas(hardFork)
         _ <- outputGeneratedBalances(ctx.outputBalances)
         _ <- ctx.checkAllAssetsFlushed()
       } yield ()
     } else {
       if (ctx.getHardFork().isLemanEnabled()) {
         for {
+          _ <- reimburseGas(hardFork)
           _ <- outputGeneratedBalances(ctx.outputBalances)
           _ <- ctx.checkAllAssetsFlushed()
         } yield ()
       } else {
         Right(())
+      }
+    }
+  }
+
+  def reimburseGas(hardFork: HardFork): ExeResult[Unit] = {
+    if (hardFork.isGhostEnabled()) {
+      val totalGasFee = ctx.txEnv.gasFeeUnsafe
+      val gasFeePaid  = ctx.gasFeePaid
+
+      totalGasFee.sub(gasFeePaid) match {
+        case Some(gasFeeRemaining @ _) =>
+          ctx.txEnv.prevOutputs.headOption match {
+            case Some(firstInput) =>
+              for {
+                reimbursedGasFee <- calculateReimbursedGasFee(firstInput.lockupScript)
+                _ <-
+                  if (reimbursedGasFee > U256.Zero) {
+                    ctx.outputBalances
+                      .addAlph(firstInput.lockupScript, reimbursedGasFee)
+                      .toRight(Right(InvalidBalances))
+                  } else {
+                    okay
+                  }
+              } yield ()
+            case None =>
+              okay
+          }
+
+        case None =>
+          failed(GasOverflow)
+      }
+    } else {
+      okay
+    }
+  }
+
+  private def calculateReimbursedGasFee(lockupScript: LockupScript.Asset): ExeResult[U256] = {
+    val totalGasFee = ctx.txEnv.gasFeeUnsafe
+    val gasFeePaid  = ctx.gasFeePaid
+
+    if (gasFeePaid == U256.Zero) {
+      Right(U256.Zero)
+    } else {
+      val initialBalance: ExeResult[U256] = Right(U256.Zero)
+      val inputBalance: ExeResult[U256] = ctx.txEnv.prevOutputs.fold(initialBalance) {
+        case (balance, input) if input.lockupScript == lockupScript =>
+          balance.flatMap(_.add(input.amount).toRight(Right(InvalidBalances)))
+        case (balance, _) =>
+          balance
+      }
+      val finalBalance = ctx.txEnv.fixedOutputs.fold(inputBalance) {
+        case (balance, output) if output.lockupScript == lockupScript =>
+          balance.flatMap(_.sub(output.amount).toRight(Right(InvalidBalances)))
+        case (balance, _) =>
+          balance
+      }
+
+      finalBalance.map { balance =>
+        val prepaidGas = U256.min(totalGasFee, balance)
+        U256.min(prepaidGas, gasFeePaid)
       }
     }
   }

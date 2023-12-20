@@ -1540,6 +1540,18 @@ object BuiltIn {
       retComment = "the contract code hash of the contract"
     )
 
+  val payGasFee: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.asset(
+      "payGasFee",
+      Seq.empty,
+      Seq.empty,
+      PayGasFee,
+      argsName = Seq.empty,
+      retComment = "",
+      doc = "Pay gas fee.",
+      usePreapprovedAssets = true
+    )
+
   sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] with DocUtils {
     def name: String
     def category: Category            = Category.SubContract
@@ -1731,7 +1743,8 @@ object BuiltIn {
       subContractIdOf,
       subContractIdInParentGroup,
       nullContractAddress,
-      selfContract
+      selfContract,
+      payGasFee
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
