@@ -19,9 +19,11 @@ package org.alephium.protocol.vm
 import akka.util.ByteString
 
 import org.alephium.protocol.model.HardFork
+import org.alephium.util.U256
 
 trait CostStrategy {
   var gasRemaining: GasBox
+  var gasFeePaid: U256 = U256.Zero
 
   def chargeGas(instr: GasSimple): ExeResult[Unit] = chargeGas(instr.gas())
 
@@ -77,5 +79,15 @@ trait CostStrategy {
 
   @inline private def updateGas(f: => ExeResult[GasBox]): ExeResult[Unit] = {
     f.map(gasRemaining = _)
+  }
+
+  def payGasFee(amount: U256): ExeResult[Unit] = {
+    gasFeePaid.add(amount) match {
+      case Some(paid) =>
+        gasFeePaid = paid
+        okay
+      case None =>
+        failed(GasOverflow)
+    }
   }
 }

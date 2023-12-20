@@ -91,6 +91,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     // format: on
   }
 
+  trait GhostForkFixture extends AllInstrsFixture {
+    val ghostStatelessInstrs = AVector[GhostInstr[StatelessContext]]()
+    val ghostStatefulInstrs  = AVector[GhostInstr[StatefulContext]](PayGasFee)
+  }
+
   it should "check all LemanInstr" in new LemanForkFixture {
     lemanStatelessInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
     lemanStatefulInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
@@ -98,6 +103,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       .map(_.isInstanceOf[LemanInstr[_]] is false)
     (statefulInstrs.toSet -- lemanStatefulInstrs.toSet)
       .map(_.isInstanceOf[LemanInstr[_]] is false)
+  }
+
+  it should "check all GhostInstr" in new GhostForkFixture {
+    ghostStatelessInstrs.foreach(_.isInstanceOf[GhostInstr[_]] is true)
+    ghostStatefulInstrs.foreach(_.isInstanceOf[GhostInstr[_]] is true)
+    (statelessInstrs.toSet -- ghostStatelessInstrs.toSet)
+      .map(_.isInstanceOf[GhostInstr[_]] is false)
+    (statefulInstrs.toSet -- ghostStatefulInstrs.toSet)
+      .map(_.isInstanceOf[GhostInstr[_]] is false)
   }
 
   it should "fail if the fork is not activated yet for stateless instrs" in new LemanForkFixture
@@ -3775,7 +3789,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 5, StoreMutFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
       CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
       NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199, ALPHTokenId -> 2,
-      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5
+      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -3905,7 +3919,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 195, StoreMutFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
       CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
       NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204, ALPHTokenId -> 205,
-      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207
+      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208
     )
     // format: on
 
@@ -3966,7 +3980,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
       NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-      LoadImmField(0.toByte), LoadImmFieldByIndex
+      LoadImmField(0.toByte), LoadImmFieldByIndex, PayGasFee
     )
     // format: on
   }
