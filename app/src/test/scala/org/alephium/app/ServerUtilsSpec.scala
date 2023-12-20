@@ -2412,6 +2412,28 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(testAddress, testAddressBalance)
 
     def scriptCaller = genesisAddress
+
+    def fooContract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |  }
+         |}
+         |""".stripMargin
+
+    def fooContractConditional: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo(contractPay: Bool) -> () {
+         |    if (contractPay) {
+         |      payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |    }
+         |  }
+         |}
+         |""".stripMargin
   }
 
   it should "should throw exception for payGasFee instr before Ghost hardfork" in new GasFeeFixture {
@@ -2476,16 +2498,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(contractAddress, ALPH.alph(3).subUnsafe(scriptTxGasFee))
   }
 
-  it should "not charge caller gas fee when contract is paying gas conditionally" in new GasFeeFixture {
+  it should "charge caller gas fee when contract is not paying gas fee" in new GasFeeFixture {
     def contract: String =
       s"""
          |Contract Foo() {
          |  @using(assetsInContract = true)
-         |  pub fn foo(contractPay: Bool) -> () {
+         |  pub fn foo() -> () {
          |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
-         |    if (contractPay) {
-         |      payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
-         |    }
          |  }
          |}
          |""".stripMargin
@@ -2495,7 +2514,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     def script =
       s"""
          |TxScript Main {
-         |  Foo(#${contractAddress.toBase58}).foo(true)
+         |  Foo(#${contractAddress.toBase58}).foo()
          |}
          |
          |$contract
@@ -2507,24 +2526,101 @@ class ServerUtilsSpec extends AlephiumSpec {
     val scriptBlock    = executeScript(script)
     val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
 
-    checkAddressBalance(scriptCaller, ALPH.alph(1000000).addUnsafe(ALPH.oneAlph))
-    checkAddressBalance(contractAddress, ALPH.alph(2).subUnsafe(scriptTxGasFee))
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).addUnsafe(ALPH.oneAlph).subUnsafe(scriptTxGasFee)
+    )
+    checkAddressBalance(contractAddress, ALPH.alph(2))
+  }
+
+  it should "charge caller gas fee when paying full gas fee in the TxScript" in new GasFeeFixture {
+    def script =
+      s"""
+         |TxScript Main {
+         |  payGasFee!{callerAddress!() -> ALPH: txGasFee!()}()
+         |}
+         |
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).subUnsafe(scriptTxGasFee)
+    )
+  }
+
+  it should "charge caller gas fee when paying partial gas fee in the TxScript" in new GasFeeFixture {
+    val halfGasFee = nonCoinbaseMinGasFee.divUnsafe(2)
+    def script =
+      s"""
+         |TxScript Main {
+         |  payGasFee!{callerAddress!() -> ALPH: ${halfGasFee}}()
+         |}
+         |
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).subUnsafe(scriptTxGasFee)
+    )
+  }
+
+  it should "charge caller gas fee when paying gas fee using multiple payGasFee function the TxScript" in new GasFeeFixture {
+    val halfGasFee = nonCoinbaseMinGasFee.divUnsafe(2)
+    def script =
+      s"""
+         |TxScript Main {
+         |  payGasFee!{callerAddress!() -> ALPH: ${halfGasFee}}()
+         |  payGasFee!{callerAddress!() -> ALPH: ${halfGasFee}}()
+         |  payGasFee!{callerAddress!() -> ALPH: ${halfGasFee}}()
+         |}
+         |
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).subUnsafe(scriptTxGasFee)
+    )
+  }
+
+  it should "not charge caller gas fee when contract is paying gas conditionally" in new GasFeeFixture {
+    val contractAddress = deployContract(fooContractConditional)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo(true)
+         |}
+         |
+         |$fooContractConditional
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3).subUnsafe(scriptTxGasFee))
   }
 
   it should "charge caller gas fee when contract is not paying gas conditionally" in new GasFeeFixture {
-    def contract: String =
-      s"""
-         |Contract Foo() {
-         |  @using(assetsInContract = true)
-         |  pub fn foo(contractPay: Bool) -> () {
-         |    if (contractPay) {
-         |      payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
-         |    }
-         |  }
-         |}
-         |""".stripMargin
-
-    val contractAddress = deployContract(contract)
+    val contractAddress = deployContract(fooContractConditional)
 
     def script =
       s"""
@@ -2532,7 +2628,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  Foo(#${contractAddress.toBase58}).foo(false)
          |}
          |
-         |$contract
+         |$fooContractConditional
          |""".stripMargin
 
     checkAddressBalance(scriptCaller, ALPH.alph(1000000))
@@ -2639,7 +2735,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val barContractAddress =
       deployContract(barContract, Amount(ALPH.alph(1).addUnsafe(partialGasFee)))
 
-    def fooContract: String =
+    override def fooContract: String =
       s"""
          |Contract Foo() {
          |  @using(assetsInContract = true)
@@ -2692,7 +2788,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val barContractAddress = deployContract(barContract, Amount(ALPH.alph(10)))
 
-    def fooContract: String =
+    override def fooContract: String =
       s"""
          |Contract Foo() {
          |  @using(assetsInContract = true)
