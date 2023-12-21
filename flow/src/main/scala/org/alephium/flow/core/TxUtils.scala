@@ -78,6 +78,69 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  // scalastyle:off parameter.number
+  private def selectUTXOs(
+      targetBlockHashOpt: Option[BlockHash],
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      totalAmount: U256,
+      totalAmountPerToken: AVector[(TokenId, U256)],
+      gasOpt: Option[GasBox],
+      gasPrice: GasPrice,
+      utxosLimit: Int,
+      txOutputLength: Int
+  ): IOResult[Either[String, UtxoSelectionAlgo.Selected]] = {
+    getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit)
+      .map { utxos =>
+        UtxoSelectionAlgo
+          .Build(ProvidedGas(gasOpt, gasPrice))
+          .select(
+            AssetAmounts(totalAmount, totalAmountPerToken),
+            fromUnlockScript,
+            utxos,
+            txOutputLength,
+            txScriptOpt = None,
+            AssetScriptGasEstimator.Default(Self.blockFlow),
+            TxScriptGasEstimator.NotImplemented
+          )
+      }
+  }
+
+  private def getUTXOsFromRefs(
+      groupIndex: GroupIndex,
+      targetBlockHashOpt: Option[BlockHash],
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      utxoRefs: AVector[AssetOutputRef],
+      outputInfos: AVector[TxOutputInfo],
+      gasOpt: Option[GasBox]
+  ): IOResult[Either[String, AssetOutputInfoWithGas]] = {
+    getImmutableGroupViewIncludePool(groupIndex, targetBlockHashOpt)
+      .flatMap(_.getPrevAssetOutputs(utxoRefs))
+      .map { utxosOpt =>
+        val outputScripts = fromLockupScript +: outputInfos.map(_.lockupScript)
+        for {
+          gas <- gasOpt match {
+            case None =>
+              for {
+                estimatedGas <- GasEstimation.estimateWithInputScript(
+                  fromUnlockScript,
+                  utxoRefs.length,
+                  outputScripts.length,
+                  AssetScriptGasEstimator.NotImplemented // Not P2SH
+                )
+                _ <- checkEstimatedGasAmount(estimatedGas)
+              } yield estimatedGas
+            case Some(gas) =>
+              Right(gas)
+          }
+          utxos <- utxosOpt.toRight("Can not find all selected UTXOs")
+        } yield {
+          AssetOutputInfoWithGas(utxos, gas)
+        }
+      }
+  }
+
   // return the total balance, the locked balance, and the number of all utxos
   def getBalance(
       lockupScript: LockupScript,
@@ -180,35 +243,31 @@ trait TxUtils { Self: FlowUtils =>
 
     totalAmountsE match {
       case Right((totalAmount, totalAmountPerToken, txOutputLength)) =>
-        getUsableUtxos(targetBlockHashOpt, fromLockupScript, utxosLimit)
-          .map { utxos =>
-            UtxoSelectionAlgo
-              .Build(ProvidedGas(gasOpt, gasPrice))
-              .select(
-                AssetAmounts(totalAmount, totalAmountPerToken),
+        selectUTXOs(
+          targetBlockHashOpt,
+          fromLockupScript,
+          fromUnlockScript,
+          totalAmount,
+          totalAmountPerToken,
+          gasOpt,
+          gasPrice,
+          utxosLimit,
+          txOutputLength
+        ).map { utxoSelectionResult =>
+          for {
+            selected <- utxoSelectionResult
+            _        <- checkEstimatedGasAmount(selected.gas)
+            unsignedTx <- UnsignedTransaction
+              .buildTransferTx(
+                fromLockupScript,
                 fromUnlockScript,
-                utxos,
-                txOutputLength,
-                txScriptOpt = None,
-                AssetScriptGasEstimator.Default(Self.blockFlow),
-                TxScriptGasEstimator.NotImplemented
+                selected.assets.map(asset => (asset.ref, asset.output)),
+                outputInfos,
+                selected.gas,
+                gasPrice
               )
-          }
-          .map { utxoSelectionResult =>
-            for {
-              selected <- utxoSelectionResult
-              _        <- checkEstimatedGasAmount(selected.gas)
-              unsignedTx <- UnsignedTransaction
-                .buildTransferTx(
-                  fromLockupScript,
-                  fromUnlockScript,
-                  selected.assets.map(asset => (asset.ref, asset.output)),
-                  outputInfos,
-                  selected.gas,
-                  gasPrice
-                )
-            } yield unsignedTx
-          }
+          } yield unsignedTx
+        }
 
       case Left(e) =>
         Right(Left(e))
@@ -262,37 +321,25 @@ trait TxUtils { Self: FlowUtils =>
 
       checkResult match {
         case Right(()) =>
-          getImmutableGroupViewIncludePool(groupIndex, targetBlockHashOpt)
-            .flatMap(_.getPrevAssetOutputs(utxoRefs))
-            .map { utxosOpt =>
-              val outputScripts = fromLockupScript +: outputInfos.map(_.lockupScript)
-              for {
-                gas <- gasOpt match {
-                  case None =>
-                    for {
-                      estimatedGas <- GasEstimation.estimateWithInputScript(
-                        fromUnlockScript,
-                        utxoRefs.length,
-                        outputScripts.length,
-                        AssetScriptGasEstimator.NotImplemented // Not P2SH
-                      )
-                      _ <- checkEstimatedGasAmount(estimatedGas)
-                    } yield estimatedGas
-                  case Some(gas) =>
-                    Right(gas)
-                }
-                utxos <- utxosOpt.toRight("Can not find all selected UTXOs")
-                unsignedTx <- UnsignedTransaction
-                  .buildTransferTx(
-                    fromLockupScript,
-                    fromUnlockScript,
-                    utxos,
-                    outputInfos,
-                    gas,
-                    gasPrice
-                  )
-              } yield unsignedTx
-            }
+          getUTXOsFromRefs(
+            groupIndex,
+            targetBlockHashOpt,
+            fromLockupScript,
+            fromUnlockScript,
+            utxoRefs,
+            outputInfos,
+            gasOpt
+          ).map(_.flatMap { assetsWithGas =>
+            UnsignedTransaction
+              .buildTransferTx(
+                fromLockupScript,
+                fromUnlockScript,
+                assetsWithGas.assets,
+                outputInfos,
+                assetsWithGas.gas,
+                gasPrice
+              )
+          })
         case Left(e) =>
           Right(Left(e))
       }
@@ -642,6 +689,11 @@ trait TxUtils { Self: FlowUtils =>
 }
 
 object TxUtils {
+  final case class AssetOutputInfoWithGas(
+      assets: AVector[(AssetOutputRef, AssetOutput)],
+      gas: GasBox
+  )
+
   def isSpent(blockCaches: AVector[BlockCache], outputRef: TxOutputRef): Boolean = {
     blockCaches.exists(_.inputs.contains(outputRef))
   }
