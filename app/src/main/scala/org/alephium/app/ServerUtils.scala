@@ -29,6 +29,7 @@ import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
+import org.alephium.flow.core.TxUtils.InputData
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
@@ -216,6 +217,19 @@ class ServerUtils(implicit
     }
   }
 
+  def buildMultiInputsTransaction(
+      blockFlow: BlockFlow,
+      query: BuildMultiInputsTransaction
+  ): Try[BuildTransactionResult] = {
+    for {
+      unsignedTx <- prepareMultiInputsUnsignedTransactionFromQuery(
+        blockFlow,
+        query
+      )
+    } yield {
+      BuildTransactionResult.from(unsignedTx)
+    }
+  }
   def buildMultisig(
       blockFlow: BlockFlow,
       query: BuildMultisig
@@ -604,6 +618,54 @@ class ServerUtils(implicit
     }
   }
 
+  def prepareMultiInputsUnsignedTransactionFromQuery(
+      blockFlow: BlockFlow,
+      query: BuildMultiInputsTransaction
+  ): Try[UnsignedTransaction] = {
+    val outputInfos = prepareOutputInfos(query.destinations)
+
+    val transferResult = for {
+      inputs <- query.from.mapE { in =>
+        for {
+          lockUnlock <- in.getLockPair()
+          utxos      <- prepareOutputRefsOpt(in.utxos).left.map(failed)
+        } yield {
+          lockUnlock match {
+            case (lock, unlock) =>
+              InputData(
+                lock,
+                unlock,
+                in.amount.value,
+                in.tokens.map(_.map(t => (t.id, t.amount))),
+                in.gasAmount,
+                utxos
+              )
+          }
+        }
+      }
+      _ <- checkUniqueInputs(inputs)
+      result <-
+        blockFlow
+          .transferMultiInputs(
+            query.targetBlockHash,
+            inputs,
+            outputInfos,
+            query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
+            apiConfig.defaultUtxosLimit
+          )
+          .left
+          .map(failedInIO)
+    } yield {
+      result
+    }
+
+    transferResult match {
+      case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
+      case Right(Left(error))                => Left(failed(error))
+      case Left(error)                       => Left(error)
+    }
+  }
+
   def prepareUnsignedTransaction(
       blockFlow: BlockFlow,
       fromPublicKey: PublicKey,
@@ -805,6 +867,16 @@ class ServerUtils(implicit
   def checkHashChainIndex(hash: BlockHash): Try[ChainIndex] = {
     val chainIndex = ChainIndex.from(hash)
     checkChainIndex(chainIndex, hash.toHexString)
+  }
+
+  def checkUniqueInputs(
+      inputs: AVector[InputData]
+  ): Try[Unit] = {
+    if (inputs.groupBy(_.fromLockupScript).values.exists(_.length > 1)) {
+      Left(badRequest("Some addresses defined multiple time"))
+    } else {
+      Right(())
+    }
   }
 
   def execute(f: => Unit): FutureTry[Boolean] =
