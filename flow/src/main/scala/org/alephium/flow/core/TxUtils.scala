@@ -28,10 +28,12 @@ import org.alephium.flow.gasestimation._
 import org.alephium.io.{IOResult, IOUtils}
 import org.alephium.protocol.{ALPH, PublicKey}
 import org.alephium.protocol.model._
-import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
+import org.alephium.protocol.model.UnsignedTransaction.{TxOutputInfo, UnlockScriptWithAssets}
+import org.alephium.protocol.vm.{GasBox, GasPrice, GasSchedule, LockupScript, UnlockScript}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
+// scalastyle:off number.of.methods
+// scalastyle:off file.size.limit number.of.types
 trait TxUtils { Self: FlowUtils =>
 
   // We call getUsableUtxosOnce multiple times until the resulted tx does not change
@@ -345,6 +347,258 @@ trait TxUtils { Self: FlowUtils =>
       }
     }
   }
+
+  def transferMultiInputs(
+      targetBlockHashOpt: Option[BlockHash],
+      inputs: AVector[InputData],
+      outputInfos: AVector[TxOutputInfo],
+      gasPrice: GasPrice,
+      utxosLimit: Int
+  ): IOResult[Either[String, UnsignedTransaction]] = {
+    val dustAmountsE = for {
+      groupIndex  <- checkMultiInputsGroup(inputs)
+      _           <- checkOutputInfos(groupIndex, outputInfos)
+      _           <- inputs.mapE(in => checkProvidedGas(in.gasOpt, gasPrice))
+      dustAmounts <- calculateDustAmountNeeded(outputInfos)
+    } yield dustAmounts
+
+    dustAmountsE match {
+      case Right((dustAmountNeeded, dustAmountPerTokenNeeded, txOutputLength)) =>
+        selectMultiInputsUtxos(
+          inputs,
+          outputInfos,
+          dustAmountNeeded,
+          dustAmountPerTokenNeeded,
+          targetBlockHashOpt,
+          gasPrice,
+          utxosLimit,
+          txOutputLength
+        ).map(_.flatMap { selecteds =>
+          buildMultiInputUnsignedTransaction(selecteds, outputInfos, gasPrice)
+        })
+
+      case Left(e) =>
+        Right(Left(e))
+    }
+  }
+
+  /*
+   * If the input has define `utxos`, we try to get them.
+   * If none was defined, we let the `UtxoSelectionAlgo` finding enough
+   * utxos to cover everything: ALPH, tokens and gas.
+   */
+  // scalastyle:off parameter.number
+  def selectInputDataUtxos(
+      input: InputData,
+      outputInfos: AVector[TxOutputInfo],
+      dustAmountPerInputNeeded: U256,
+      dustAmountPerTokenNeeded: Map[TokenId, U256],
+      targetBlockHashOpt: Option[BlockHash],
+      gasPrice: GasPrice,
+      utxosLimit: Int,
+      txOutputLength: Int
+  ): IOResult[Either[String, AssetOutputInfoWithGas]] = {
+    input.utxos match {
+      case None =>
+        val amountWithDust = input.amount.add(dustAmountPerInputNeeded).getOrElse(input.amount)
+        val tokensWithDust = input.tokens.getOrElse(AVector.empty).map { case (id, a) =>
+          (id, a.add(dustAmountPerTokenNeeded.getOrElse(id, U256.Zero)).getOrElse(a))
+        }
+        selectUTXOs(
+          targetBlockHashOpt,
+          input.fromLockupScript,
+          input.fromUnlockScript,
+          amountWithDust,
+          tokensWithDust,
+          input.gasOpt,
+          gasPrice,
+          utxosLimit,
+          txOutputLength
+        ).map(_.map { selected =>
+          AssetOutputInfoWithGas(
+            selected.assets.map(asset => (asset.ref, asset.output)),
+            selected.gas
+          )
+        })
+
+      case Some(utxoRefs) =>
+        getUTXOsFromRefs(
+          input.fromLockupScript.groupIndex,
+          targetBlockHashOpt,
+          input.fromLockupScript,
+          input.fromUnlockScript,
+          utxoRefs,
+          outputInfos,
+          input.gasOpt
+        )
+    }
+  }
+
+  def selectMultiInputsUtxos(
+      inputs: AVector[InputData],
+      outputInfos: AVector[TxOutputInfo],
+      dustAmountPerInputNeeded: U256,
+      dustAmountPerTokenNeeded: Map[TokenId, U256],
+      targetBlockHashOpt: Option[BlockHash],
+      gasPrice: GasPrice,
+      utxosLimit: Int,
+      txOutputLength: Int
+  ): IOResult[Either[String, AVector[(InputData, AssetOutputInfoWithGas)]]] = {
+    /*
+     * If one `gasOpt` is defined, then every input is following its `gasOpt` value
+     * If `gasOpt` is empty, we let the `UtxoSelectionAlgo` choose enough utxos so everyone can
+     * pay the base fee and a simple tx, but later we reduce the fees.
+     */
+    val gasDefined = inputs.exists(_.gasOpt.isDefined)
+
+    inputs
+      .mapE { input =>
+        val gas = if (gasDefined) input.gasOpt.orElse(Some(GasBox.zero)) else None
+        selectInputDataUtxos(
+          input.copy(gasOpt = gas),
+          outputInfos,
+          dustAmountPerInputNeeded,
+          dustAmountPerTokenNeeded,
+          targetBlockHashOpt,
+          gasPrice,
+          utxosLimit,
+          txOutputLength
+        ).map(_.map(utxosWithGas => (input, utxosWithGas)))
+      }
+      .map(_.mapE(identity))
+      .map(_.map { selecteds =>
+        if (gasDefined) {
+          // If gas was defined we just take what was returned by the selection algo
+          selecteds
+        } else {
+          // If gas was not defined, we can lower gas for every inputs
+          updateSelectedGas(selecteds)
+        }
+      })
+  }
+
+  def buildMultiInputUnsignedTransaction(
+      inputs: AVector[(InputData, AssetOutputInfoWithGas)],
+      outputInfos: AVector[TxOutputInfo],
+      gasPrice: GasPrice
+  ): Either[String, UnsignedTransaction] = {
+    inputs
+      .mapE { case (input, utxosWithGas) =>
+        makeChangeOutput(input, utxosWithGas, gasPrice).map { change =>
+          val from =
+            UnlockScriptWithAssets(
+              input.fromUnlockScript,
+              utxosWithGas.assets
+            )
+          (from, change, utxosWithGas.gas)
+        }
+      }
+      .flatMap { result =>
+        val (froms, changes, gases) = result.toSeq.unzip3
+        UnsignedTransaction.buildGeneric(
+          AVector.from(froms),
+          outputInfos ++ AVector.from(changes.flatMap(identity)),
+          gases.fold(GasBox.zero)(_ addUnsafe _),
+          gasPrice
+        )
+      }
+  }
+
+  /*
+  * Update the gas for all inputs.
+  * Each input pay individually for their own utxos, more inputs mean higher fees
+  * The base fee needed for the tx is then shared by everyone
+  */
+  def updateSelectedGas(
+      inputs: AVector[(InputData, AssetOutputInfoWithGas)]
+  ): AVector[(InputData, AssetOutputInfoWithGas)] = {
+    val gasPerInput = inputs.map { case (input, selected) =>
+      val inGas = GasSchedule.txInputBaseGas.mulUnsafe(selected.assets.length)
+      // 1 output for change TODO can we have more? we could have 0 tho
+      val outGas   = GasSchedule.txOutputBaseGas
+      val inOutGas = inGas.addUnsafe(outGas)
+      val baseFee  = selected.gas.sub(inOutGas).getOrElse(GasBox.zero)
+      (input, selected.copy(gas = inOutGas), baseFee)
+    }
+
+    val baseFeeShared = GasBox.unsafe(gasPerInput.map(_._3.value).sum / (2 * inputs.length))
+
+    gasPerInput.map { case (input, selected, _) =>
+      val payedGas = selected.gas.addUnsafe(baseFeeShared)
+      (input, selected.copy(gas = payedGas))
+    }
+  }
+
+  private def makeChangeOutput(
+      input: InputData,
+      selected: AssetOutputInfoWithGas,
+      gasPrice: GasPrice
+  ): Either[String, AVector[TxOutputInfo]] = {
+    for {
+      alphRemainder   <- calculateAlphRemainder(input, selected, gasPrice)
+      tokensRemainder <- calculateTokensRemainder(input, selected)
+      changes <- UnsignedTransaction.calculateChangeOutputs(
+        alphRemainder,
+        tokensRemainder,
+        input.fromLockupScript
+      )
+    } yield {
+      changes.map { asset =>
+        TxOutputInfo(
+          asset.lockupScript,
+          asset.amount,
+          asset.tokens,
+          Some(asset.lockTime),
+          Some(asset.additionalData)
+        )
+      }
+    }
+  }
+
+  private def calculateAlphRemainder(
+      input: InputData,
+      selected: AssetOutputInfoWithGas,
+      gasPrice: GasPrice
+  ): Either[String, U256] = {
+    UnsignedTransaction.calculateAlphRemainder(
+      selected.assets.map(_._2.amount),
+      AVector(input.amount),
+      gasPrice * selected.gas
+    )
+  }
+
+  private def calculateTokensRemainder(
+      input: InputData,
+      selected: AssetOutputInfoWithGas
+  ): Either[String, AVector[(TokenId, U256)]] = {
+    UnsignedTransaction.calculateTokensRemainder(
+      selected.assets.map(_._2).flatMap(_.tokens),
+      input.tokens.getOrElse(AVector.empty)
+    )
+  }
+
+  // Each inputs will need to add some dust amount when selecting UTXOs to cover the complicated cases
+  def calculateDustAmountNeeded(
+      outputInfos: AVector[TxOutputInfo]
+  ): Either[String, (U256, Map[TokenId, U256], Int)] = {
+    for {
+      totalAmount <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
+      totalPerToken <- UnsignedTransaction
+        .calculateTotalAmountPerToken(outputInfos.flatMap(_.tokens))
+        .map(_.view.toMap)
+      calculateResult <- UnsignedTransaction.calculateTotalAmountNeeded(outputInfos)
+      (totalAmountNeeded, totalAmountPerTokenNeeded, txOutputLength) = calculateResult
+      dustAmount <- totalAmountNeeded.sub(totalAmount).toRight("ALPH underflow")
+      dustAmountPerToken <- totalAmountPerTokenNeeded
+        .mapE { case (id, amount) =>
+          totalPerToken.get(id) match {
+            case Some(value) => amount.sub(value).map(v => (id, v)).toRight("ALPH underflow")
+            case None        => Right((id, U256.Zero))
+          }
+        }
+    } yield (dustAmount, dustAmountPerToken.view.toMap, txOutputLength)
+  }
+
 
   def sweepAddress(
       targetBlockHashOpt: Option[BlockHash],
@@ -686,9 +940,36 @@ trait TxUtils { Self: FlowUtils =>
       "Selected UTXOs are not from the same group"
     )
   }
+
+  private def checkMultiInputsGroup(
+      inputs: AVector[InputData]
+  ): Either[String, GroupIndex] = {
+    if (inputs.isEmpty) {
+      Left("Zero transaction inputs")
+    } else {
+      val groupIndexes = inputs.map(_.fromLockupScript.groupIndex)
+      val groupIndex   = groupIndexes.head
+
+      if (groupIndexes.forall(_ == groupIndex)) {
+        Right(groupIndex)
+      } else {
+        Left("Different groups for transaction inputs")
+      }
+    }
+  }
+
 }
 
 object TxUtils {
+  final case class InputData(
+      fromLockupScript: LockupScript.Asset,
+      fromUnlockScript: UnlockScript,
+      amount: U256,                             // How much ALPH must be payed by this address
+      tokens: Option[AVector[(TokenId, U256)]], // How much tokens must be payed by this address
+      gasOpt: Option[GasBox],
+      utxos: Option[AVector[AssetOutputRef]]
+  )
+
   final case class AssetOutputInfoWithGas(
       assets: AVector[(AssetOutputRef, AssetOutput)],
       gas: GasBox
