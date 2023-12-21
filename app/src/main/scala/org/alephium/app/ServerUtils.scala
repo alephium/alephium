@@ -641,20 +641,19 @@ class ServerUtils(implicit
 
     val transferResult = outputRefsOpt match {
       case Some(outputRefs) =>
-        val allAssetType = outputRefs.forall(outputRef => Hint.unsafe(outputRef.hint).isAssetType)
-        if (allAssetType) {
-          val assetOutputRefs = outputRefs.map(_.unsafeToAssetOutputRef())
-          blockFlow.transfer(
-            targetBlockHashOpt,
-            fromLockupScript,
-            fromUnlockScript,
-            assetOutputRefs,
-            outputInfos,
-            gasOpt,
-            gasPrice
-          )
-        } else {
-          Right(Left("Selected UTXOs must be of asset type"))
+        prepareOutputRefs(outputRefs) match {
+          case Right(assetOutputRefs) =>
+            blockFlow.transfer(
+              targetBlockHashOpt,
+              fromLockupScript,
+              fromUnlockScript,
+              assetOutputRefs,
+              outputInfos,
+              gasOpt,
+              gasPrice
+            )
+          case Left(error) =>
+            Right(Left(error))
         }
       case None =>
         blockFlow.transfer(
@@ -749,6 +748,26 @@ class ServerUtils(implicit
       gasPrice,
       targetBlockHashOpt
     )
+  }
+
+  def prepareOutputRefsOpt(
+      outputRefsOpt: Option[AVector[OutputRef]]
+  ): Either[String, Option[AVector[AssetOutputRef]]] = {
+    outputRefsOpt match {
+      case Some(outputRefs) => prepareOutputRefs(outputRefs).map(Some(_))
+      case None             => Right(None)
+    }
+  }
+
+  def prepareOutputRefs(
+      outputRefs: AVector[OutputRef]
+  ): Either[String, AVector[AssetOutputRef]] = {
+    val allAssetType = outputRefs.forall(outputRef => Hint.unsafe(outputRef.hint).isAssetType)
+    if (allAssetType) {
+      Right(outputRefs.map(_.unsafeToAssetOutputRef()))
+    } else {
+      Left("Selected UTXOs must be of asset type")
+    }
   }
 
   def checkGroup(lockupScript: LockupScript): Try[Unit] = {
