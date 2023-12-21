@@ -16,7 +16,6 @@
 
 package org.alephium.protocol.model
 
-import scala.collection.IndexedSeqView
 import scala.collection.immutable.ListMap
 
 import akka.util.ByteString
@@ -189,7 +188,7 @@ object UnsignedTransaction {
       txOutputs: AVector[AssetOutput],
       gasFee: U256
   ): Either[String, AVector[AssetOutput]] = {
-    val inputUTXOView = inputs.view.map(_._2)
+    val inputUTXOView = inputs.map(_._2)
     for {
       alphRemainder   <- calculateAlphRemainder(inputUTXOView, txOutputs, gasFee)
       tokensRemainder <- calculateTokensRemainder(inputUTXOView, txOutputs)
@@ -288,30 +287,50 @@ object UnsignedTransaction {
     )
   }
 
-  def calculateAlphRemainder(
-      inputs: IndexedSeqView[AssetOutput],
+  private def calculateAlphRemainder(
+      inputs: AVector[AssetOutput],
       outputs: AVector[AssetOutput],
       gasFee: U256
   ): Either[String, U256] = {
+    calculateAlphRemainder(
+      inputs.map(_.amount),
+      outputs.map(_.amount),
+      gasFee
+    )
+  }
+
+  def calculateAlphRemainder(
+      inputs: AVector[U256],
+      outputs: AVector[U256],
+      gasFee: U256
+  ): Either[String, U256] = {
     for {
-      inputSum <- EitherF.foldTry(inputs, U256.Zero)(_ add _.amount toRight "Input amount overflow")
+      inputSum <- EitherF.foldTry(inputs, U256.Zero)(_ add _ toRight "Input amount overflow")
       outputAmount <- outputs.foldE(U256.Zero)(
-        _ add _.amount toRight "Output amount overflow"
+        _ add _ toRight "Output amount overflow"
       )
       remainder0 <- inputSum.sub(outputAmount).toRight("Not enough balance")
       remainder  <- remainder0.sub(gasFee).toRight("Not enough balance for gas fee")
     } yield remainder
   }
 
-  def calculateTokensRemainder(
-      inputs: IndexedSeqView[AssetOutput],
+  private def calculateTokensRemainder(
+      inputs: AVector[AssetOutput],
       outputs: AVector[AssetOutput]
   ): Either[String, AVector[(TokenId, U256)]] = {
+    calculateTokensRemainder(
+      inputs.flatMap(_.tokens),
+      outputs.flatMap(_.tokens)
+    )
+  }
+
+  def calculateTokensRemainder(
+      inputs: AVector[(TokenId, U256)],
+      outputs: AVector[(TokenId, U256)]
+  ): Either[String, AVector[(TokenId, U256)]] = {
     for {
-      inputs <- calculateTotalAmountPerToken(
-        inputs.foldLeft(AVector.empty[(TokenId, U256)])(_ ++ _.tokens)
-      )
-      outputs   <- calculateTotalAmountPerToken(outputs.flatMap(_.tokens))
+      inputs    <- calculateTotalAmountPerToken(inputs)
+      outputs   <- calculateTotalAmountPerToken(outputs)
       _         <- checkNoNewTokensInOutputs(inputs, outputs)
       remainder <- calculateRemainingTokens(inputs, outputs)
     } yield {
