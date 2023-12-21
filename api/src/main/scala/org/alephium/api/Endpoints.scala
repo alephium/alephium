@@ -305,6 +305,16 @@ trait Endpoints
       .out(jsonBody[BuildTransactionResult])
       .summary("Build an unsigned transaction to a number of recipients")
 
+  val buildMultiInputsTransaction
+      : BaseEndpoint[BuildMultiInputsTransaction, BuildTransactionResult] =
+    transactionsEndpoint.post
+      .in("build-multi-inputs")
+      .in(jsonBodyWithAlph[BuildMultiInputsTransaction])
+      .out(jsonBody[BuildTransactionResult])
+      .summary(
+        "Build an unsigned transaction with multiple input addresses to a number of recipients"
+      )
+
   val buildSweepAddressTransactions
       : BaseEndpoint[BuildSweepAddressTransactions, BuildSweepAddressTransactionsResult] =
     transactionsEndpoint.post
