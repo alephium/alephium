@@ -453,9 +453,8 @@ trait TxUtils { Self: FlowUtils =>
 
     inputs
       .mapE { input =>
-        val gas = if (gasDefined) input.gasOpt.orElse(Some(GasBox.zero)) else None
         selectInputDataUtxos(
-          input.copy(gasOpt = gas),
+          input.copy(gasOpt = if (gasDefined) input.gasOpt.orElse(Some(GasBox.zero)) else None),
           outputInfos,
           dustAmountPerInputNeeded,
           dustAmountPerTokenNeeded,
@@ -505,10 +504,10 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   /*
-  * Update the gas for all inputs.
-  * Each input pay individually for their own utxos, more inputs mean higher fees
-  * The base fee needed for the tx is then shared by everyone
-  */
+   * Update the gas for all inputs.
+   * Each input pay individually for their own utxos, more inputs mean higher fees
+   * The base fee needed for the tx is then shared by everyone
+   */
   def updateSelectedGas(
       inputs: AVector[(InputData, AssetOutputInfoWithGas)]
   ): AVector[(InputData, AssetOutputInfoWithGas)] = {
@@ -598,7 +597,6 @@ trait TxUtils { Self: FlowUtils =>
         }
     } yield (dustAmount, dustAmountPerToken.view.toMap, txOutputLength)
   }
-
 
   def sweepAddress(
       targetBlockHashOpt: Option[BlockHash],

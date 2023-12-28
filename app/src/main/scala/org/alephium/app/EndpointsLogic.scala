@@ -419,7 +419,7 @@ trait EndpointsLogic extends Endpoints {
     bt =>
       bt.from.headOption
         .map(t => t.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply))
-        .getOrElse(Left(ApiError.BadRequest("prout")))
+        .getOrElse(Left(ApiError.BadRequest("Empty list of input")))
   )
 
   val buildSweepAddressTransactionsLogic = serverLogicRedirect(buildSweepAddressTransactions)(

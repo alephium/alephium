@@ -93,8 +93,8 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     confirmTx(tx2, clique.masterRestPort)
 
     info("Building and sending actual generic tx")
-    val utxos  = currentUTXOs(address).utxos
-    //val utxos2 = currentUTXOs(address2).utxos
+    val utxos = currentUTXOs(address).utxos
+    // val utxos2 = currentUTXOs(address2).utxos
 
     // val totalAmount = (utxos ++ utxos2).map(_.amount.value).fold(U256.Zero)(_ addUnsafe _)
 

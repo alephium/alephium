@@ -163,12 +163,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       inputs: AVector[BuildMultiInputsTransaction.Source],
       destinations: AVector[Destination],
       gas: Option[Int],
-      privateKey: AVector[String],
+      privateKeys: AVector[String],
       restPort: Int
   ): SubmitTxResult = eventually {
     val buildTx          = buildGenericTransaction(inputs, destinations, gas)
     val unsignedTx       = request[BuildTransactionResult](buildTx, restPort)
-    val submitMultisigTx = signAndSubmitMultisigTransaction(unsignedTx, privateKey)
+    val submitMultisigTx = signAndSubmitMultisigTransaction(unsignedTx, privateKeys)
     val res              = request[SubmitTxResult](submitMultisigTx, restPort)
     res
   }
