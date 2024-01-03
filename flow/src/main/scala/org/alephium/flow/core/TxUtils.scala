@@ -358,6 +358,7 @@ trait TxUtils { Self: FlowUtils =>
     val dustAmountsE = for {
       groupIndex  <- checkMultiInputsGroup(inputs)
       _           <- checkOutputInfos(groupIndex, outputInfos)
+      _           <- checkInOutAmounts(inputs, outputInfos)
       dustAmounts <- calculateDustAmountNeeded(outputInfos)
     } yield dustAmounts
 
@@ -961,6 +962,25 @@ trait TxUtils { Self: FlowUtils =>
     }
   }
 
+  private def checkInOutAmounts(
+      inputs: AVector[InputData],
+      outputInfos: AVector[TxOutputInfo]
+  ): Either[String, Unit] = {
+    for {
+      in  <- checkTotalAttoAlphAmount(inputs.map(_.amount))
+      out <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
+      _   <- Either.cond(in == out, (), "Total input amount doesn't match total output amount")
+      inToken <- UnsignedTransaction.calculateTotalAmountPerToken(
+        inputs.flatMap(_.tokens.getOrElse(AVector.empty))
+      )
+      outToken <- UnsignedTransaction.calculateTotalAmountPerToken(outputInfos.flatMap(_.tokens))
+      _ <- Either.cond(
+        inToken.toSet == outToken.toSet,
+        (),
+        "Total token input amount doesn't match total output amount"
+      )
+    } yield ()
+  }
 }
 
 object TxUtils {
