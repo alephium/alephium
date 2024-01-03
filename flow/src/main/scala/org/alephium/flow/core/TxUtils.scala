@@ -358,7 +358,6 @@ trait TxUtils { Self: FlowUtils =>
     val dustAmountsE = for {
       groupIndex  <- checkMultiInputsGroup(inputs)
       _           <- checkOutputInfos(groupIndex, outputInfos)
-      _           <- inputs.mapE(in => checkProvidedGas(in.gasOpt, gasPrice))
       dustAmounts <- calculateDustAmountNeeded(outputInfos)
     } yield dustAmounts
 
@@ -374,7 +373,13 @@ trait TxUtils { Self: FlowUtils =>
           utxosLimit,
           txOutputLength
         ).map(_.flatMap { selecteds =>
-          buildMultiInputUnsignedTransaction(selecteds, outputInfos, gasPrice)
+          for {
+            _ <- checkProvidedGas(
+              Some(selecteds.map(_._2.gas).fold(GasBox.zero)(_ addUnsafe _)),
+              gasPrice
+            )
+            tx <- buildMultiInputUnsignedTransaction(selecteds, outputInfos, gasPrice)
+          } yield tx
         })
 
       case Left(e) =>
