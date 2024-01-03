@@ -363,12 +363,11 @@ trait TxUtils { Self: FlowUtils =>
     } yield dustAmounts
 
     dustAmountsE match {
-      case Right((dustAmountNeeded, dustAmountPerTokenNeeded, txOutputLength)) =>
+      case Right((dustAmountNeeded, txOutputLength)) =>
         selectMultiInputsUtxos(
           inputs,
           outputInfos,
           dustAmountNeeded,
-          dustAmountPerTokenNeeded,
           targetBlockHashOpt,
           gasPrice,
           utxosLimit,
@@ -398,7 +397,6 @@ trait TxUtils { Self: FlowUtils =>
       input: InputData,
       outputInfos: AVector[TxOutputInfo],
       dustAmountPerInputNeeded: U256,
-      dustAmountPerTokenNeeded: Map[TokenId, U256],
       targetBlockHashOpt: Option[BlockHash],
       gasPrice: GasPrice,
       utxosLimit: Int,
@@ -407,15 +405,12 @@ trait TxUtils { Self: FlowUtils =>
     input.utxos match {
       case None =>
         val amountWithDust = input.amount.add(dustAmountPerInputNeeded).getOrElse(input.amount)
-        val tokensWithDust = input.tokens.getOrElse(AVector.empty).map { case (id, a) =>
-          (id, a.add(dustAmountPerTokenNeeded.getOrElse(id, U256.Zero)).getOrElse(a))
-        }
         selectUTXOs(
           targetBlockHashOpt,
           input.fromLockupScript,
           input.fromUnlockScript,
           amountWithDust,
-          tokensWithDust,
+          input.tokens.getOrElse(AVector.empty),
           input.gasOpt,
           gasPrice,
           utxosLimit,
@@ -444,7 +439,6 @@ trait TxUtils { Self: FlowUtils =>
       inputs: AVector[InputData],
       outputInfos: AVector[TxOutputInfo],
       dustAmountPerInputNeeded: U256,
-      dustAmountPerTokenNeeded: Map[TokenId, U256],
       targetBlockHashOpt: Option[BlockHash],
       gasPrice: GasPrice,
       utxosLimit: Int,
@@ -463,7 +457,6 @@ trait TxUtils { Self: FlowUtils =>
           input.copy(gasOpt = if (gasDefined) input.gasOpt.orElse(Some(GasBox.zero)) else None),
           outputInfos,
           dustAmountPerInputNeeded,
-          dustAmountPerTokenNeeded,
           targetBlockHashOpt,
           gasPrice,
           utxosLimit,
@@ -585,23 +578,13 @@ trait TxUtils { Self: FlowUtils =>
   // Each inputs will need to add some dust amount when selecting UTXOs to cover the complicated cases
   def calculateDustAmountNeeded(
       outputInfos: AVector[TxOutputInfo]
-  ): Either[String, (U256, Map[TokenId, U256], Int)] = {
+  ): Either[String, (U256, Int)] = {
     for {
-      totalAmount <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
-      totalPerToken <- UnsignedTransaction
-        .calculateTotalAmountPerToken(outputInfos.flatMap(_.tokens))
-        .map(_.view.toMap)
+      totalAmount     <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
       calculateResult <- UnsignedTransaction.calculateTotalAmountNeeded(outputInfos)
-      (totalAmountNeeded, totalAmountPerTokenNeeded, txOutputLength) = calculateResult
+      (totalAmountNeeded, _, txOutputLength) = calculateResult
       dustAmount <- totalAmountNeeded.sub(totalAmount).toRight("ALPH underflow")
-      dustAmountPerToken <- totalAmountPerTokenNeeded
-        .mapE { case (id, amount) =>
-          totalPerToken.get(id) match {
-            case Some(value) => amount.sub(value).map(v => (id, v)).toRight("ALPH underflow")
-            case None        => Right((id, U256.Zero))
-          }
-        }
-    } yield (dustAmount, dustAmountPerToken.view.toMap, txOutputLength)
+    } yield (dustAmount, txOutputLength)
   }
 
   def sweepAddress(
