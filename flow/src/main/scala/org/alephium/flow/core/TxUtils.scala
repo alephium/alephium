@@ -519,7 +519,9 @@ trait TxUtils { Self: FlowUtils =>
       (input, selected.copy(gas = inOutGas), baseFee)
     }
 
-    val baseFeeShared = GasBox.unsafe(gasPerInput.map(_._3.value).sum / (2 * inputs.length))
+    // We compute the average of the base fee and then we split it between all inputs
+    val baseFeeShared =
+      GasBox.unsafe(gasPerInput.map(_._3.value).sum / inputs.length / inputs.length)
 
     gasPerInput.map { case (input, selected, _) =>
       val payedGas = selected.gas.addUnsafe(baseFeeShared)
