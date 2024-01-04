@@ -519,8 +519,8 @@ trait TxUtils { Self: FlowUtils =>
 
       gasPerInput.map { case (input, selected, _, initialGas) =>
         val newGas = selected.gas.addUnsafe(baseFeeShared)
-        //We don't want to update to a higher gas
-        val payedGas = if(newGas < initialGas) newGas else initialGas
+        // We don't want to update to a higher gas
+        val payedGas = if (newGas < initialGas) newGas else initialGas
 
         (input, selected.copy(gas = payedGas))
       }
