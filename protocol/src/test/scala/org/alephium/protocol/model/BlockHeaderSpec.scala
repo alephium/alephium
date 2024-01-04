@@ -105,16 +105,6 @@ class BlockHeaderSpec
     header.version is 0.toByte
   }
 
-  it should "get block version" in {
-    val now = TimeStamp.now()
-    val config = new NetworkConfigFixture.Default {
-      override val ghostHardForkTimestamp = now
-    }.networkConfig
-    BlockHeader.getBlockVersion(now.minusUnsafe(Duration.unsafe(1)))(config) is DefaultBlockVersion
-    BlockHeader.getBlockVersion(now)(config) is GhostBlockVersion
-    BlockHeader.getBlockVersion(now.plusMillisUnsafe(1))(config) is GhostBlockVersion
-  }
-
   it should "serde the snapshots properly" in new ModelSnapshots {
     implicit val basePath = "src/test/resources/models/blockheader"
 

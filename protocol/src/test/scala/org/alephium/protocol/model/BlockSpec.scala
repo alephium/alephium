@@ -396,7 +396,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     {
       info("with empty uncles")
-      block(GhostBlockVersion, AVector.empty).verify("with-empty-uncles")
+      block(DefaultBlockVersion, AVector.empty).verify("with-empty-uncles")
     }
 
     {

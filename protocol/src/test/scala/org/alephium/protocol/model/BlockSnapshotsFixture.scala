@@ -48,14 +48,13 @@ trait BlockSnapshotsFixture extends TransactionSnapshotsFixture {
   }
 
   def block(
-      version: Byte,
       uncles: AVector[(BlockHeader, LockupScript.Asset)],
       transactions: Transaction*
   )(implicit networkConfig: NetworkConfig): Block = {
     val coinbaseTx = coinbaseTransaction(uncles, transactions: _*)
     val allTxs     = AVector.from(transactions) :+ coinbaseTx
 
-    val header = blockHeader(Block.calTxsHash(allTxs), version)
+    val header = blockHeader(Block.calTxsHash(allTxs))
     Block(header, uncles.map(_._1), allTxs)
   }
 }

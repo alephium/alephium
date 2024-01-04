@@ -19,7 +19,7 @@ package org.alephium.protocol.model
 import scala.annotation.tailrec
 
 import org.alephium.protocol.{ALPH, Hash}
-import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig, NetworkConfig}
+import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.BlockHash
 import org.alephium.serde.{u256Serde => _, _}
@@ -133,15 +133,6 @@ object BlockHeader {
     iter(U256.Zero)
   }
 
-  def getBlockVersion(timestamp: TimeStamp)(implicit networkConfig: NetworkConfig): Byte = {
-    val hardFork = networkConfig.getHardFork(timestamp)
-    if (hardFork >= HardFork.Ghost) {
-      GhostBlockVersion
-    } else {
-      DefaultBlockVersion
-    }
-  }
-
   def unsafeWithRawDeps(
       deps: AVector[BlockHash],
       depStateHash: Hash,
@@ -149,17 +140,9 @@ object BlockHeader {
       timestamp: TimeStamp,
       target: Target,
       nonce: Nonce
-  )(implicit networkConfig: NetworkConfig): BlockHeader = {
+  ): BlockHeader = {
     val blockDeps = BlockDeps.unsafe(deps)
-    BlockHeader(
-      nonce,
-      getBlockVersion(timestamp),
-      blockDeps,
-      depStateHash,
-      txsHash,
-      timestamp,
-      target
-    )
+    BlockHeader(nonce, DefaultBlockVersion, blockDeps, depStateHash, txsHash, timestamp, target)
   }
 
   def unsafe(
@@ -169,7 +152,7 @@ object BlockHeader {
       timestamp: TimeStamp,
       target: Target,
       nonce: Nonce
-  )(implicit networkConfig: NetworkConfig): BlockHeader = {
+  ): BlockHeader = {
     unsafeWithRawDeps(deps.deps, depStateHash, txsHash, timestamp, target, nonce)
   }
 }
