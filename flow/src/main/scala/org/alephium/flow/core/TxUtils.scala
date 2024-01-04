@@ -449,12 +449,10 @@ trait TxUtils { Self: FlowUtils =>
      * If `gasOpt` is empty, we let the `UtxoSelectionAlgo` choose enough utxos so everyone can
      * pay the base fee and a simple tx, but later we reduce the fees.
      */
-    val gasDefined = inputs.exists(_.gasOpt.isDefined)
-
     inputs
       .mapE { input =>
         selectInputDataUtxos(
-          input.copy(gasOpt = if (gasDefined) input.gasOpt.orElse(Some(GasBox.zero)) else None),
+          input,
           outputInfos,
           dustAmountPerInputNeeded,
           targetBlockHashOpt,
@@ -465,13 +463,8 @@ trait TxUtils { Self: FlowUtils =>
       }
       .map(_.mapE(identity))
       .map(_.map { selecteds =>
-        if (gasDefined) {
-          // If gas was defined we just take what was returned by the selection algo
-          selecteds
-        } else {
-          // If gas was not defined, we can lower gas for every inputs
-          updateSelectedGas(selecteds)
-        }
+        // Reduce if posible the overall gas for every input
+        updateSelectedGas(selecteds)
       })
   }
 
@@ -510,22 +503,26 @@ trait TxUtils { Self: FlowUtils =>
   def updateSelectedGas(
       inputs: AVector[(InputData, AssetOutputInfoWithGas)]
   ): AVector[(InputData, AssetOutputInfoWithGas)] = {
-    val gasPerInput = inputs.map { case (input, selected) =>
-      val inGas = GasSchedule.txInputBaseGas.mulUnsafe(selected.assets.length)
-      // 1 output for change TODO can we have more? we could have 0 tho
-      val outGas   = GasSchedule.txOutputBaseGas
-      val inOutGas = inGas.addUnsafe(outGas)
-      val baseFee  = selected.gas.sub(inOutGas).getOrElse(GasBox.zero)
-      (input, selected.copy(gas = inOutGas), baseFee)
-    }
+    if (inputs.nonEmpty) {
+      val gasPerInput = inputs.map { case (input, selected) =>
+        val inGas = GasSchedule.txInputBaseGas.mulUnsafe(selected.assets.length)
+        // 1 output for change TODO can we have more? we could have 0 tho
+        val outGas   = GasSchedule.txOutputBaseGas
+        val inOutGas = inGas.addUnsafe(outGas)
+        val baseFee  = selected.gas.sub(inOutGas).getOrElse(GasBox.zero)
+        (input, selected.copy(gas = inOutGas), baseFee)
+      }
 
-    // We compute the average of the base fee and then we split it between all inputs
-    val baseFeeShared =
-      GasBox.unsafe(gasPerInput.map(_._3.value).sum / inputs.length / inputs.length)
+      // We compute the average of the base fee and then we split it between all inputs
+      val baseFeeShared =
+        GasBox.unsafe(gasPerInput.map(_._3.value).sum / inputs.length / inputs.length)
 
-    gasPerInput.map { case (input, selected, _) =>
-      val payedGas = selected.gas.addUnsafe(baseFeeShared)
-      (input, selected.copy(gas = payedGas))
+      gasPerInput.map { case (input, selected, _) =>
+        val payedGas = selected.gas.addUnsafe(baseFeeShared)
+        (input, selected.copy(gas = payedGas))
+      }
+    } else {
+      AVector.empty
     }
   }
 
