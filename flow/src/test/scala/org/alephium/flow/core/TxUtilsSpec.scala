@@ -220,6 +220,20 @@ class TxUtilsSpec extends AlephiumSpec {
     val fromUnlockScript = UnlockScript.p2pkh(fromPubKey)
   }
 
+  trait MultiInputTransactionFixture extends UnsignedTransactionFixture {
+    val inputData = TxUtils.InputData(
+      fromLockupScript,
+      fromUnlockScript,
+      ALPH.alph(1),
+      None,
+      None,
+      None
+    )
+
+    def buildInputs(nb: Int): AVector[(AssetOutputRef, AssetOutput)] =
+      AVector.fill(nb)(input("input1", ALPH.alph(10), fromLockupScript))
+  }
+
   "UnsignedTransaction.buildTransferTx" should "build transaction successfully" in new UnsignedTransactionFixture {
     val inputs = {
       val input1 = input("input1", ALPH.oneAlph, fromLockupScript)
@@ -1081,6 +1095,66 @@ class TxUtilsSpec extends AlephiumSpec {
     blockFlow
       .getGrandPool()
       .add(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToMemPool
+  }
+
+  it should "Update selected gas" in new MultiInputTransactionFixture {
+    {
+      info("empty list")
+      blockFlow.updateSelectedGas(AVector.empty) is AVector
+        .empty[(TxUtils.InputData, TxUtils.AssetOutputInfoWithGas)]
+    }
+
+    {
+      info("one address with one input")
+      val gas = minimalGas
+
+      val inputs          = buildInputs(1)
+      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+
+      val entries = AVector((inputData, selectedWithGas))
+      val updated = blockFlow.updateSelectedGas(entries)
+
+      updated.length is entries.length
+
+      // Nothing to update
+      updated.head._2.gas is gas
+    }
+
+    {
+      info("one address with many inputs")
+      val gas = minimalGas.mulUnsafe(10)
+
+      val inputs          = buildInputs(10)
+      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+
+      val entries = AVector((inputData, selectedWithGas))
+      val updated = blockFlow.updateSelectedGas(entries)
+
+      updated.length is entries.length
+
+      // One input will always pay for everything
+      updated.head._2.gas is gas
+    }
+
+    {
+      info("multiple addresses with one input")
+      val gas = minimalGas.mulUnsafe(100)
+
+      val inputs          = buildInputs(1)
+      val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
+
+      val entries = AVector(
+        (inputData, selectedWithGas),
+        (inputData, selectedWithGas),
+        (inputData, selectedWithGas)
+      )
+
+      val updated = blockFlow.updateSelectedGas(entries)
+
+      updated.length is entries.length
+      // TODO do we want to test how much was reduced?
+      updated.head._2.gas < gas is true
+    }
   }
 
   trait BuildScriptTxFixture extends UnsignedTransactionFixture {
