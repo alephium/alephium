@@ -510,15 +510,18 @@ trait TxUtils { Self: FlowUtils =>
         val outGas   = GasSchedule.txOutputBaseGas
         val inOutGas = inGas.addUnsafe(outGas)
         val baseFee  = selected.gas.sub(inOutGas).getOrElse(GasBox.zero)
-        (input, selected.copy(gas = inOutGas), baseFee)
+        (input, selected.copy(gas = inOutGas), baseFee, selected.gas)
       }
 
       // We compute the average of the base fee and then we split it between all inputs
       val baseFeeShared =
         GasBox.unsafe(gasPerInput.map(_._3.value).sum / inputs.length / inputs.length)
 
-      gasPerInput.map { case (input, selected, _) =>
-        val payedGas = selected.gas.addUnsafe(baseFeeShared)
+      gasPerInput.map { case (input, selected, _, initialGas) =>
+        val newGas = selected.gas.addUnsafe(baseFeeShared)
+        //We don't want to update to a higher gas
+        val payedGas = if(newGas < initialGas) newGas else initialGas
+
         (input, selected.copy(gas = payedGas))
       }
     } else {
