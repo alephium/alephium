@@ -58,17 +58,26 @@ class RocksDBKeyValueStorage[K, V](
   protected val handle: ColumnFamilyHandle = storage.handle(cf)
 
   def iterateE(f: (K, V) => IOResult[Unit]): IOResult[Unit] = {
+    iterateRawE { (keyBytes, valBytes) =>
+      (for {
+        key   <- keySerde.deserialize(keyBytes)
+        value <- valueSerde.deserialize(valBytes)
+        _     <- f(key, value)
+      } yield ()) match {
+        case Left(err) => throw err
+        case _         => Right(())
+      }
+    }
+  }
+
+  def iterateRawE(f: (ByteString, ByteString) => IOResult[Unit]): IOResult[Unit] = {
     IOUtils.tryExecute {
       val iterator = db.newIterator(handle)
       iterator.seekToFirst()
       while (iterator.isValid()) {
         val keyBytes = ByteString.fromArrayUnsafe(iterator.key())
         val valBytes = ByteString.fromArrayUnsafe(iterator.value())
-        (for {
-          key   <- keySerde.deserialize(keyBytes)
-          value <- valueSerde.deserialize(valBytes)
-          _     <- f(key, value)
-        } yield ()) match {
+        f(keyBytes, valBytes) match {
           case Left(err) =>
             iterator.close()
             throw err
