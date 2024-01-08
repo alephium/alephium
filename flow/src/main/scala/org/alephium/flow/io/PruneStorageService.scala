@@ -24,10 +24,10 @@ import org.slf4j.{Logger, LoggerFactory}
 import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.validation.BlockValidation
-import org.alephium.io.{IOError, IOResult, RocksDBKeyValueStorage, SparseMerkleTrie}
+import org.alephium.io.{IOResult, RocksDBKeyValueStorage, SparseMerkleTrie}
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.config.GroupConfig
-import org.alephium.protocol.model.{Block, BlockHash, ChainIndex}
+import org.alephium.protocol.model.{BlockHash, ChainIndex}
 import org.alephium.util.AVector
 import org.alephium.util.BloomFilter
 
@@ -237,27 +237,6 @@ class PruneStorageService(
         case Left(err) =>
           Left(err)
       }
-    }
-  }
-
-  def getLatestBlocks(currentBlockHash: BlockHash): IOResult[AVector[Block]] = {
-    val chainIndex = ChainIndex.from(currentBlockHash)
-    assume(chainIndex.isIntraGroup)
-    val blockchain = blockFlow.getBlockChain(chainIndex)
-    for {
-      bestTip <- blockchain.getBestTip()
-      diff    <- blockchain.calHashDiff(bestTip, currentBlockHash)
-      _ = assume(diff.toRemove.isEmpty)
-      blocks <- diff.toAdd.mapE(hash => blockchain.getBlock(hash))
-    } yield blocks
-  }
-
-  def from[Invalid, T](
-      result: IOResult[T]
-  ): Either[Either[IOError, Invalid], T] = {
-    result match {
-      case Right(t)    => Right(t)
-      case Left(error) => Left(Left(error))
     }
   }
 }
