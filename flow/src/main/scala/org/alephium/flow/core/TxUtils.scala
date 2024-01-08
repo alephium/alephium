@@ -938,9 +938,18 @@ trait TxUtils { Self: FlowUtils =>
     } else {
       val groupIndexes = inputs.map(_.fromLockupScript.groupIndex)
       val groupIndex   = groupIndexes.head
+      val utxos        = inputs.flatMap(_.utxos.getOrElse(AVector.empty))
 
       if (groupIndexes.forall(_ == groupIndex)) {
-        Right(groupIndex)
+        utxos.headOption match {
+          case Some(utxo) =>
+            if (utxo.hint.groupIndex == groupIndex) {
+              checkUTXOsInSameGroup(utxos).map(_ => groupIndex)
+            } else {
+              Left("Selected UTXOs different from lockup script group")
+            }
+          case None => Right(groupIndex)
+        }
       } else {
         Left("Different groups for transaction inputs")
       }

@@ -1230,6 +1230,25 @@ class TxUtilsSpec extends AlephiumSpec {
         .rightValue
         .leftValue is "Total input amount doesn't match total output amount"
     }
+    {
+      info("Utxos not in same group as lockup script")
+      input("input1", ALPH.alph(10), fromLockupScript)
+      val utxos = Some(
+        AVector(AssetOutputRef.from(new ScriptHint(1), TxOutputRef.unsafeKey(Hash.hash("input1"))))
+      )
+
+      val inputs = AVector(input1.copy(utxos = utxos))
+      blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputInfos,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
+        )
+        .rightValue
+        .leftValue is "Selected UTXOs different from lockup script group"
+    }
   }
 
   it should "Update selected gas" in new MultiInputTransactionFixture {
