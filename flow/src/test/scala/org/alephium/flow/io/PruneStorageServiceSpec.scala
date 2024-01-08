@@ -23,10 +23,11 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.io.RocksDBKeyValueStorage
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
+import org.alephium.protocol.model.Address
 import org.alephium.protocol.model.Block
 import org.alephium.protocol.model.ChainIndex
-import org.alephium.util.AlephiumSpec
-import org.alephium.util.UnsecureRandom
+import org.alephium.protocol.vm.TokenIssuance
+import org.alephium.util.{AlephiumSpec, AVector, UnsecureRandom}
 
 class PruneStorageServiceSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
@@ -41,17 +42,49 @@ class PruneStorageServiceSpec extends AlephiumSpec {
   }
 
   it should "verify that applyBlock works" in new Fixture {
+    val genesisLockup     = getGenesisLockupScript(chainIndex)
+    val genesisAddress    = Address.Asset(genesisLockup)
     val pruneStateService = new PruneStorageService(storages)(blockFlow, groupConfig)
+
     val trieStorage =
       storages.worldStateStorage.trieStorage.asInstanceOf[RocksDBKeyValueStorage[Hash, Node]]
 
     addOneBlock(blockFlow, transfer(blockFlow, chainIndex))
     addOneBlock(blockFlow, emptyBlock(blockFlow, chainIndex))
 
-    val block3          = addOneBlock(blockFlow, transfer(blockFlow, chainIndex))
-    val allKeysAtBlock3 = getAllKeys(trieStorage)
+    val tokenContract =
+      s"""
+         |Contract Token() {
+         |  @using(assetsInContract = true)
+         |  pub fn withdraw(address: Address, amount: U256) -> () {
+         |    transferTokenFromSelf!(address, selfTokenId!(), amount)
+         |  }
+         |}
+         |""".stripMargin
 
-    val restOfBlocks = (0 until 97).map { _ =>
+    val (contractId, _) = createContract(
+      tokenContract,
+      AVector.empty,
+      AVector.empty,
+      tokenIssuanceInfo = Some(TokenIssuance.Info(1024)),
+      chainIndex = chainIndex
+    )
+
+    val block4          = addOneBlock(blockFlow, transfer(blockFlow, chainIndex))
+    val allKeysAtBlock4 = getAllKeys(trieStorage)
+
+    val block5 = callTxScript(
+      s"""
+         |TxScript Main {
+         |  let token = Token(#${contractId.toHexString})
+         |  token.withdraw(@${genesisAddress.toBase58}, 1024)
+         |}
+         |
+         |$tokenContract
+         |""".stripMargin
+    )
+
+    val restOfBlocks = (0 until 95).map { _ =>
       val block = Random.nextBoolean() match {
         case true  => transfer(blockFlow, chainIndex)
         case false => emptyBlock(blockFlow, chainIndex)
@@ -63,9 +96,9 @@ class PruneStorageServiceSpec extends AlephiumSpec {
 
     blockFlow.getMaxHeight(chainIndex).rightValue is 100
 
-    val keysAfterApplyingRestOfBlocks = restOfBlocks
-      .foldLeft(allKeysAtBlock3) { (acc, block) =>
-        val result = pruneStateService.applyBlock(block3.hash, block.hash).rightValue
+    val keysAfterApplyingRestOfBlocks = (block5 +: restOfBlocks)
+      .foldLeft(allKeysAtBlock4) { (acc, block) =>
+        val result = pruneStateService.applyBlock(block4.hash, block.hash).rightValue
         acc ++ result
       }
       .toSet
