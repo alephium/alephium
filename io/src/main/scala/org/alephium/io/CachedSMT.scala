@@ -18,7 +18,8 @@ package org.alephium.io
 
 import scala.collection.mutable
 
-import org.alephium.util.EitherF
+import org.alephium.crypto.{Blake2b => Hash}
+import org.alephium.util.{AVector, EitherF}
 
 final class CachedSMT[K, V](
     val underlying: SparseMerkleTrie[K, V],
@@ -29,6 +30,17 @@ final class CachedSMT[K, V](
   }
 
   def persist(): IOResult[SparseMerkleTrie[K, V]] = {
+    for {
+      inMemoryTrie <- persistInMemory()
+      persisted    <- inMemoryTrie.persistInBatch()
+    } yield persisted
+  }
+
+  def getNodeKeys(): IOResult[AVector[Hash]] = {
+    persistInMemory().map(_.getAllKeys())
+  }
+
+  def persistInMemory(): IOResult[InMemorySparseMerkleTrie[K, V]] = {
     val inMemoryTrie = underlying.inMemory()
     for {
       _ <- EitherF.foreachTry(caches) {
@@ -37,8 +49,7 @@ final class CachedSMT[K, V](
         case (key, Inserted(value)) => inMemoryTrie.put(key, value)
         case (key, Removed())       => inMemoryTrie.remove(key)
       }
-      persisted <- inMemoryTrie.persistInBatch()
-    } yield persisted
+    } yield inMemoryTrie
   }
 
   def staging(): StagingSMT[K, V] = new StagingSMT[K, V](this, mutable.Map.empty)

@@ -636,24 +636,32 @@ final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
     put(rootHash, nibbles, value).map(applyActions)
   }
 
-  def persistInBatch(): IOResult[SparseMerkleTrie[K, V]] = {
-    @inline def preOrderTraversal(accumulatePut: (Hash, Node) => Unit): Unit = {
-      val queue = mutable.Queue(rootHash)
-      while (queue.nonEmpty) {
-        val current = queue.dequeue()
-        cache.get(current) match {
-          case Some(node: BranchNode) =>
-            accumulatePut(current, node)
-            node.children.foreach { childOpt =>
-              childOpt.foreach(queue.enqueue)
-            }
-          case Some(node: LeafNode) =>
-            accumulatePut(current, node)
-          case None => ()
-        }
+  def getAllKeys(): AVector[Hash] = {
+    var keys = AVector.empty[Hash]
+    preOrderTraversal { (hash, _) =>
+      keys = keys :+ hash
+    }
+    keys
+  }
+
+  @inline def preOrderTraversal(f: (Hash, Node) => Unit): Unit = {
+    val queue = mutable.Queue(rootHash)
+    while (queue.nonEmpty) {
+      val current = queue.dequeue()
+      cache.get(current) match {
+        case Some(node: BranchNode) =>
+          f(current, node)
+          node.children.foreach { childOpt =>
+            childOpt.foreach(queue.enqueue)
+          }
+        case Some(node: LeafNode) =>
+          f(current, node)
+        case None => ()
       }
     }
+  }
 
+  def persistInBatch(): IOResult[SparseMerkleTrie[K, V]] = {
     storage
       .putBatch(preOrderTraversal)
       .map(_ => SparseMerkleTrie(rootHash, storage))
