@@ -558,6 +558,10 @@ final class SparseMerkleTrie[K: Serde, V: Serde](
 
   def getNode(hash: Hash): IOResult[Node] = storage.get(hash)
 
+  def getNodesUnsafe(hashes: Seq[Hash]): Seq[Node] = {
+    storage.multiGetUnsafe(hashes)
+  }
+
   def applyActions(result: TrieUpdateActions): IOResult[SparseMerkleTrie[K, V]] = {
     result.toAdd
       .foreachE { node => storage.put(node.hash, node) }

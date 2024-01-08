@@ -23,7 +23,7 @@ import akka.util.ByteString
 class BloomFilterSpec extends AlephiumSpec {
   it should "check membership of hashes" in {
     val falsePositiveRate = 0.01
-    val filter = BloomFilter(1000000L, falsePositiveRate)
+    val filter            = BloomFilter(1000000L, falsePositiveRate)
     val hashes = (1 to 500000).map { _ =>
       val hash = randomHash()
       filter.add(hash)
@@ -31,7 +31,7 @@ class BloomFilterSpec extends AlephiumSpec {
     }
     hashes.foreach(filter.mightContain(_) is true)
 
-    val testTotal = 5000
+    val testTotal      = 5000
     var falsePositives = 0.0
     (1 to testTotal).foreach { _ =>
       val hash = randomHash()
