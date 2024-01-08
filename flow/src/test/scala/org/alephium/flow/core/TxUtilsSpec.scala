@@ -27,7 +27,7 @@ import org.alephium.flow.gasestimation.*
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.TxValidation
-import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, Signature}
+import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, PublicKey, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.{GasBox, LockupScript, StatefulScript, TokenIssuance, UnlockScript}
@@ -221,6 +221,12 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   trait MultiInputTransactionFixture extends UnsignedTransactionFixture {
+    val (genesisPriKey, _, _) = genesisKeys(0)
+    val (_, pub1)             = chainIndex.from.generateKey
+    val (_, pub2)             = chainIndex.from.generateKey
+    val (_, pub3)             = chainIndex.from.generateKey
+    val (_, pub4)             = chainIndex.from.generateKey
+
     val inputData = TxUtils.InputData(
       fromLockupScript,
       fromUnlockScript,
@@ -232,6 +238,15 @@ class TxUtilsSpec extends AlephiumSpec {
 
     def buildInputs(nb: Int): AVector[(AssetOutputRef, AssetOutput)] =
       AVector.fill(nb)(input("input1", ALPH.alph(10), fromLockupScript))
+
+    def buildInputData(pubKey: PublicKey, alph: Long) = TxUtils.InputData(
+      LockupScript.p2pkh(pubKey),
+      UnlockScript.p2pkh(pubKey),
+      ALPH.alph(alph),
+      None,
+      None,
+      None
+    )
   }
 
   "UnsignedTransaction.buildTransferTx" should "build transaction successfully" in new UnsignedTransactionFixture {
@@ -1095,6 +1110,126 @@ class TxUtilsSpec extends AlephiumSpec {
     blockFlow
       .getGrandPool()
       .add(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToMemPool
+  }
+
+  it should "transfer multi inputs" in new MultiInputTransactionFixture {
+    val block0 = transfer(blockFlow, genesisPriKey, pub1, amount = ALPH.alph(100))
+    addAndCheck(blockFlow, block0)
+    val block1 = transfer(blockFlow, genesisPriKey, pub2, amount = ALPH.alph(100))
+    addAndCheck(blockFlow, block1)
+    val block2 = transfer(blockFlow, genesisPriKey, pub3, amount = ALPH.alph(100))
+    addAndCheck(blockFlow, block2)
+    val block3 = transfer(blockFlow, genesisPriKey, pub4, amount = ALPH.alph(100))
+    addAndCheck(blockFlow, block3)
+
+    val amount = 5L
+    val input1 = buildInputData(pub1, amount)
+    val input2 = buildInputData(pub2, amount)
+    val input3 = buildInputData(pub3, amount)
+    val input4 = buildInputData(pub3, 3 * amount)
+
+    val inputs0 = AVector(input1, input2)
+    val inputs1 = AVector(input1, input2, input3)
+    val inputs2 = AVector(input1, input2, input4)
+
+    val outputInfos0 =
+      AVector(TxOutputInfo(LockupScript.p2pkh(pub1), ALPH.alph(2 * amount), AVector.empty, None))
+    val outputInfos1 =
+      AVector(TxOutputInfo(LockupScript.p2pkh(pub2), ALPH.alph(3 * amount), AVector.empty, None))
+
+    info("2 inputs - 1 output")
+    val utx0 = blockFlow
+      .transferMultiInputs(
+        inputs0,
+        outputInfos0,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        None
+      )
+      .rightValue
+      .rightValue
+
+    utx0.inputs.length is 2
+    utx0.fixedOutputs.length is 3
+    utx0.fixedOutputs.head.amount is ALPH.alph(2 * amount)
+
+    info("3 inputs - 1 output")
+    val utx1 = blockFlow
+      .transferMultiInputs(
+        inputs1,
+        outputInfos1,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        None
+      )
+      .rightValue
+      .rightValue
+
+    utx1.inputs.length is 3
+    utx1.fixedOutputs.length is 4
+    utx1.fixedOutputs.head.amount is ALPH.alph(3 * amount)
+
+    (utx0.gasAmount < utx1.gasAmount) is true
+
+    info("3 inputs - 2 outputs")
+    val utx2 = blockFlow
+      .transferMultiInputs(
+        inputs2,
+        outputInfos0 ++ outputInfos1,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        None
+      )
+      .rightValue
+      .rightValue
+
+    utx2.inputs.length is 3
+    utx2.fixedOutputs.length is 5
+  }
+
+  it should "fail to transfer multi inputs" in new MultiInputTransactionFixture {
+    val block0 = transfer(blockFlow, genesisPriKey, pub1, amount = ALPH.alph(100))
+    addAndCheck(blockFlow, block0)
+    val block1 = transfer(blockFlow, genesisPriKey, pub2, amount = ALPH.alph(100))
+    addAndCheck(blockFlow, block1)
+
+    val amount = 5L
+    val input1 = buildInputData(pub1, amount)
+
+    val outputInfos =
+      AVector(TxOutputInfo(LockupScript.p2pkh(pub1), ALPH.alph(2 * amount), AVector.empty, None))
+
+    {
+      info("same inputs")
+
+      val inputs = AVector(input1, input1)
+      blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputInfos,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
+        )
+        .rightValue
+        .leftValue is "Inputs not unique"
+    }
+
+    {
+      info("Inputs not equal outputs")
+
+      val inputs = AVector(input1)
+      blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputInfos,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
+        )
+        .rightValue
+        .leftValue is "Total input amount doesn't match total output amount"
+    }
   }
 
   it should "Update selected gas" in new MultiInputTransactionFixture {
