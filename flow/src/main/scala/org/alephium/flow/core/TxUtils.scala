@@ -349,11 +349,11 @@ trait TxUtils { Self: FlowUtils =>
   }
 
   def transferMultiInputs(
-      targetBlockHashOpt: Option[BlockHash],
       inputs: AVector[InputData],
       outputInfos: AVector[TxOutputInfo],
       gasPrice: GasPrice,
-      utxosLimit: Int
+      utxosLimit: Int,
+      targetBlockHashOpt: Option[BlockHash]
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val dustAmountsE = for {
       groupIndex  <- checkMultiInputsGroup(inputs)

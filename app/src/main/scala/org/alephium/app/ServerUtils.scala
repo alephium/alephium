@@ -647,11 +647,11 @@ class ServerUtils(implicit
       result <-
         blockFlow
           .transferMultiInputs(
-            query.targetBlockHash,
             inputs,
             outputInfos,
             query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
-            apiConfig.defaultUtxosLimit
+            apiConfig.defaultUtxosLimit,
+            query.targetBlockHash
           )
           .left
           .map(failedInIO)
