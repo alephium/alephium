@@ -33,6 +33,8 @@ trait AbstractKeyValueStorage[K, V] {
 
   def getOptUnsafe(key: K): Option[V]
 
+  def multiGetUnsafe(keys: Seq[K]): Seq[V]
+
   def put(key: K, value: V): IOResult[Unit]
 
   def putUnsafe(key: K, value: V): Unit
@@ -68,6 +70,16 @@ trait KeyValueStorage[K, V]
 
   def getOptUnsafe(key: K): Option[V] = {
     getOptRawUnsafe(storageKey(key)) map { data =>
+      deserialize[V](data) match {
+        case Left(e)  => throw e
+        case Right(v) => v
+      }
+    }
+  }
+
+  def multiGetUnsafe(keys: Seq[K]): Seq[V] = {
+    val storageKeys: Seq[ByteString] = keys.map(storageKey(_))
+    multiGetRawUnsafe(storageKeys) map { data =>
       deserialize[V](data) match {
         case Left(e)  => throw e
         case Right(v) => v

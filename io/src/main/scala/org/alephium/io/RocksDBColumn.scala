@@ -16,6 +16,8 @@
 
 package org.alephium.io
 
+import scala.jdk.CollectionConverters._
+
 import akka.util.ByteString
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, WriteBatch, WriteOptions}
 
@@ -72,6 +74,17 @@ trait RocksDBColumn extends RawKeyValueStorage {
 
   override def putRawUnsafe(key: ByteString, value: ByteString): Unit = {
     db.put(handle, writeOptions, key.toArray, value.toArray)
+  }
+
+  override def multiGetRawUnsafe(keys: Seq[ByteString]): Seq[ByteString] = {
+    val convertedKeys = keys.map(_.toArray).asJava
+    val handles       = keys.map(_ => handle).asJava
+    db.multiGetAsList(handles, convertedKeys)
+      .asScala
+      .flatMap { value =>
+        Option(value).map(ByteString.fromArrayUnsafe)
+      }
+      .toSeq
   }
 
   override def putBatchRawUnsafe(f: ((ByteString, ByteString) => Unit) => Unit): Unit = {
