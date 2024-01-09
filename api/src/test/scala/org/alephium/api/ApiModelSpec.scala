@@ -1180,6 +1180,18 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(tx, jsonRaw)
   }
 
+  it should "calc output ref correctly" in {
+    val tx = api.Transaction.fromProtocol(transaction)
+    tx.unsigned.fixedOutputs.zipWithIndex.foreach { case (output, index) =>
+      output.key is transaction.assetOutputRefs(index).key.value
+    }
+    tx.generatedOutputs.length is 2
+    tx.generatedOutputs.zipWithIndex.foreach { case (output, index) =>
+      val key = TxOutputRef.key(transaction.id, index + transaction.unsigned.fixedOutputs.length)
+      output.key is key.value
+    }
+  }
+
   it should "encode/decode TransactionTemplate" in {
     val tx = api.TransactionTemplate.fromProtocol(transactionTemplate)
     val jsonRaw = s"""
