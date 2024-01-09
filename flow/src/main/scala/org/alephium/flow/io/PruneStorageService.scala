@@ -232,7 +232,7 @@ class PruneStorageService(
           getRetainBlockHashes(
             parentHash,
             currentHeight + 1,
-            allBlockHashes :+ parentHash
+            parentHash +: allBlockHashes
           )
         case Left(err) =>
           Left(err)
