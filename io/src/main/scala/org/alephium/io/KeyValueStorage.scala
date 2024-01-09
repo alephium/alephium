@@ -101,6 +101,11 @@ trait KeyValueStorage[K, V]
     putBatchRawUnsafe(g => f((k, v) => g(storageKey(k), serialize(v))))
   }
 
+  def deleteBatchUnsafe(keys: Seq[K]): Unit = {
+    val storageKeys: Seq[ByteString] = keys.map(storageKey(_))
+    deleteBatchRawUnsafe(storageKeys)
+  }
+
   def exists(key: K): IOResult[Boolean] = IOUtils.tryExecute(existsUnsafe(key))
 
   def existsUnsafe(key: K): Boolean = {

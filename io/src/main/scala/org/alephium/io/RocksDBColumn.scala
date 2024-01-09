@@ -94,6 +94,13 @@ trait RocksDBColumn extends RawKeyValueStorage {
     writeBatch.close()
   }
 
+  override def deleteBatchRawUnsafe(keys: Seq[ByteString]): Unit = {
+    val writeBatch = new WriteBatch()
+    keys.foreach(key => writeBatch.delete(handle, key.toArray))
+    db.write(writeOptions, writeBatch)
+    writeBatch.close()
+  }
+
   override def existsRawUnsafe(key: ByteString): Boolean = {
     val result = db.get(handle, key.toArray)
     result != null
