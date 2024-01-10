@@ -247,6 +247,60 @@ class TxUtilsSpec extends AlephiumSpec {
       None,
       None
     )
+
+    // scalastyle:off method.length
+    def checkMultiInputTx(nbOfInput: Int, nbOfOutput: Int) = {
+
+      val publicKeys = AVector.fill(nbOfInput)(chainIndex.from.generateKey._2)
+
+      publicKeys.foreach { pubKey =>
+        val block = transfer(blockFlow, genesisPriKey, pubKey, amount = ALPH.alph(100))
+        addAndCheck(blockFlow, block)
+      }
+
+      val amount = 10L
+
+      val inputs = publicKeys.map { pubKey =>
+        buildInputData(pubKey, amount)
+      }
+
+      val totalAmount     = amount * nbOfInput
+      val amountPerOutput = totalAmount / nbOfOutput
+      val rest            = totalAmount % nbOfOutput
+
+      val outputs =
+        AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
+          val amount = if (i == 0) amountPerOutput + rest else amountPerOutput
+          TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amount), AVector.empty, None)
+        }
+
+      val utx = blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputs,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
+        )
+        .rightValue
+        .rightValue
+
+      utx.inputs.length is nbOfInput
+      utx.fixedOutputs.length is (nbOfInput + nbOfOutput)
+
+      val fixedOutputs = utx.fixedOutputs.take(nbOfOutput)
+      fixedOutputs.head.amount is ALPH.alph(amountPerOutput + rest)
+      fixedOutputs.tail.foreach(_.amount is ALPH.alph(amountPerOutput))
+
+      val gasEstimation = GasEstimation.estimateWithP2PKHInputs(nbOfInput, nbOfOutput + nbOfInput)
+
+      utx.gasAmount <= gasEstimation is true
+
+      val changeOutputs = utx.fixedOutputs.drop(nbOfOutput).map(_.amount)
+
+      // As they all had 1 utxo, they all had to pay same gas, so same change output
+      changeOutputs.toSeq.distinct.length is 1
+    }
   }
 
   "UnsignedTransaction.buildTransferTx" should "build transaction successfully" in new UnsignedTransactionFixture {
@@ -1113,78 +1167,14 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "transfer multi inputs" in new MultiInputTransactionFixture {
-    val block0 = transfer(blockFlow, genesisPriKey, pub1, amount = ALPH.alph(100))
-    addAndCheck(blockFlow, block0)
-    val block1 = transfer(blockFlow, genesisPriKey, pub2, amount = ALPH.alph(100))
-    addAndCheck(blockFlow, block1)
-    val block2 = transfer(blockFlow, genesisPriKey, pub3, amount = ALPH.alph(100))
-    addAndCheck(blockFlow, block2)
-    val block3 = transfer(blockFlow, genesisPriKey, pub4, amount = ALPH.alph(100))
-    addAndCheck(blockFlow, block3)
-
-    val amount = 5L
-    val input1 = buildInputData(pub1, amount)
-    val input2 = buildInputData(pub2, amount)
-    val input3 = buildInputData(pub3, amount)
-    val input4 = buildInputData(pub3, 3 * amount)
-
-    val inputs0 = AVector(input1, input2)
-    val inputs1 = AVector(input1, input2, input3)
-    val inputs2 = AVector(input1, input2, input4)
-
-    val outputInfos0 =
-      AVector(TxOutputInfo(LockupScript.p2pkh(pub1), ALPH.alph(2 * amount), AVector.empty, None))
-    val outputInfos1 =
-      AVector(TxOutputInfo(LockupScript.p2pkh(pub2), ALPH.alph(3 * amount), AVector.empty, None))
-
-    info("2 inputs - 1 output")
-    val utx0 = blockFlow
-      .transferMultiInputs(
-        inputs0,
-        outputInfos0,
-        nonCoinbaseMinGasPrice,
-        Int.MaxValue,
-        None
-      )
-      .rightValue
-      .rightValue
-
-    utx0.inputs.length is 2
-    utx0.fixedOutputs.length is 3
-    utx0.fixedOutputs.head.amount is ALPH.alph(2 * amount)
-
-    info("3 inputs - 1 output")
-    val utx1 = blockFlow
-      .transferMultiInputs(
-        inputs1,
-        outputInfos1,
-        nonCoinbaseMinGasPrice,
-        Int.MaxValue,
-        None
-      )
-      .rightValue
-      .rightValue
-
-    utx1.inputs.length is 3
-    utx1.fixedOutputs.length is 4
-    utx1.fixedOutputs.head.amount is ALPH.alph(3 * amount)
-
-    (utx0.gasAmount < utx1.gasAmount) is true
-
-    info("3 inputs - 2 outputs")
-    val utx2 = blockFlow
-      .transferMultiInputs(
-        inputs2,
-        outputInfos0 ++ outputInfos1,
-        nonCoinbaseMinGasPrice,
-        Int.MaxValue,
-        None
-      )
-      .rightValue
-      .rightValue
-
-    utx2.inputs.length is 3
-    utx2.fixedOutputs.length is 5
+    checkMultiInputTx(1, 1)
+    checkMultiInputTx(2, 1)
+    checkMultiInputTx(5, 1)
+    checkMultiInputTx(5, 4)
+    checkMultiInputTx(5, 30)
+    checkMultiInputTx(30, 1)
+    checkMultiInputTx(10, 10)
+    checkMultiInputTx(20, 30)
   }
 
   it should "fail to transfer multi inputs" in new MultiInputTransactionFixture {
@@ -1254,7 +1244,7 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "Update selected gas" in new MultiInputTransactionFixture {
     {
       info("empty list")
-      blockFlow.updateSelectedGas(AVector.empty) is AVector
+      blockFlow.updateSelectedGas(AVector.empty, 0) is AVector
         .empty[(TxUtils.InputData, TxUtils.AssetOutputInfoWithGas)]
     }
 
@@ -1266,7 +1256,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
 
       val entries = AVector((inputData, selectedWithGas))
-      val updated = blockFlow.updateSelectedGas(entries)
+      val updated = blockFlow.updateSelectedGas(entries, 2)
 
       updated.length is entries.length
 
@@ -1282,7 +1272,7 @@ class TxUtilsSpec extends AlephiumSpec {
       val selectedWithGas = TxUtils.AssetOutputInfoWithGas(inputs, gas)
 
       val entries = AVector((inputData, selectedWithGas))
-      val updated = blockFlow.updateSelectedGas(entries)
+      val updated = blockFlow.updateSelectedGas(entries, 2)
 
       updated.length is entries.length
 
@@ -1303,7 +1293,7 @@ class TxUtilsSpec extends AlephiumSpec {
         (inputData, selectedWithGas)
       )
 
-      val updated = blockFlow.updateSelectedGas(entries)
+      val updated = blockFlow.updateSelectedGas(entries, 2)
 
       updated.length is entries.length
       // TODO do we want to test how much was reduced?

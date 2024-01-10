@@ -464,7 +464,7 @@ trait TxUtils { Self: FlowUtils =>
       .map(_.mapE(identity))
       .map(_.map { selecteds =>
         // Reduce if posible the overall gas for every input
-        updateSelectedGas(selecteds)
+        updateSelectedGas(selecteds, txOutputLength)
       })
   }
 
@@ -499,23 +499,49 @@ trait TxUtils { Self: FlowUtils =>
    * Update the gas for all inputs.
    * Each input pay individually for their own utxos, more inputs mean higher fees
    * The base fee needed for the tx is then shared by everyone
+   *
+   * The intial selected gas of each input contains the gas for the destinations' outputs,
+   * We remove that gas to avoid double counting them, it's then added back to the average
+   * base fee before being splited over all inputs.
    */
   def updateSelectedGas(
-      inputs: AVector[(InputData, AssetOutputInfoWithGas)]
+      inputs: AVector[(InputData, AssetOutputInfoWithGas)],
+      txOutputLength: Int
   ): AVector[(InputData, AssetOutputInfoWithGas)] = {
-    if (inputs.nonEmpty) {
+    // With 1 input, it's like a simple transfer and the gas was already correctly selected.
+    if (inputs.length > 1) {
+      val destinationsGas = GasSchedule.txOutputBaseGas.mulUnsafe(txOutputLength - 1)
+
       val gasPerInput = inputs.map { case (input, selected) =>
-        val inGas = GasSchedule.txInputBaseGas.mulUnsafe(selected.assets.length)
         // 1 output for change TODO can we have more? we could have 0 tho
-        val outGas   = GasSchedule.txOutputBaseGas
-        val inOutGas = inGas.addUnsafe(outGas)
-        val baseFee  = selected.gas.sub(inOutGas).getOrElse(GasBox.zero)
+        val outputLength = 1
+        val outGas       = GasSchedule.txOutputBaseGas.mulUnsafe(outputLength)
+        val inGas        = GasEstimation.estimateP2PKHInputs(selected.assets.length)
+        val inOutGas     = inGas.addUnsafe(outGas)
+
+        // If current selected gas is equal to minimal gas, it means it could probably be lower
+        // So the average base fee could be lowered
+        val selectedGas =
+          if (selected.gas == minimalGas) {
+            GasEstimation.rawEstimate(inGas, txOutputLength)
+          } else {
+            selected.gas
+          }
+
+        val baseFee = (for {
+          base <- selectedGas.sub(inOutGas)
+          // We remove double counting gas of destinations
+          res <- base.sub(destinationsGas)
+        } yield res).getOrElse(GasBox.zero)
         (input, selected.copy(gas = inOutGas), baseFee, selected.gas)
       }
 
       // We compute the average of the base fee and then we split it between all inputs
+      val averageBaseFee = gasPerInput.map(_._3.value).sum / inputs.length
+      // We add back the gas for destinations
+      val averargeWithTxOutputFee = averageBaseFee + destinationsGas.value
       val baseFeeShared =
-        GasBox.unsafe(gasPerInput.map(_._3.value).sum / inputs.length / inputs.length)
+        GasBox.unsafe(averargeWithTxOutputFee / inputs.length)
 
       gasPerInput.map { case (input, selected, _, initialGas) =>
         val newGas = selected.gas.addUnsafe(baseFeeShared)
@@ -525,7 +551,7 @@ trait TxUtils { Self: FlowUtils =>
         (input, selected.copy(gas = payedGas))
       }
     } else {
-      AVector.empty
+      inputs
     }
   }
 
