@@ -19,6 +19,7 @@ package org.alephium.flow.io
 import scala.annotation.tailrec
 import scala.collection.mutable.Queue
 
+import akka.util.ByteString
 import org.slf4j.{Logger, LoggerFactory}
 
 import org.alephium.crypto.{Blake2b => Hash}
@@ -28,6 +29,8 @@ import org.alephium.io.{IOResult, RocksDBKeyValueStorage, SparseMerkleTrie}
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHash, ChainIndex}
+import org.alephium.protocol.vm.ContractStorageImmutableState
+import org.alephium.serde.Serde
 import org.alephium.util.AVector
 import org.alephium.util.BloomFilter
 
@@ -182,12 +185,12 @@ class PruneStorageService(
     var totalCount = 0
     var pruneCount = 0
 
-    val result = trieStorage.iterateRawE((key, _) => {
+    val result = trieStorage.iterateRawE((key, value) => {
       if (totalCount % 1000000 == 0) {
         logger.info(s"[Pruning..] totalCount: ${totalCount}, pruneCount: ${pruneCount}")
       }
 
-      if (!bloomFilter.mightContain(key)) {
+      if (!bloomFilter.mightContain(key) && notImmutableState(value)) {
         pruneCount += 1
         trieStorage.deleteRawUnsafe(key)
       }
@@ -238,5 +241,9 @@ class PruneStorageService(
           Left(err)
       }
     }
+  }
+
+  def notImmutableState(value: ByteString): Boolean = {
+    implicitly[Serde[ContractStorageImmutableState]].deserialize(value).isLeft
   }
 }

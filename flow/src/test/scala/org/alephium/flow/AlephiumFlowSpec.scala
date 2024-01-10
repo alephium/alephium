@@ -780,8 +780,8 @@ trait FlowFixture
   }
 
   def callTxScript(
-    input: String,
-    chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
+      input: String,
+      chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
   ): Block = {
     val script = Compiler.compileTxScript(input).rightValue
     script.toTemplateString() is Hex.toHexString(serialize(script))
