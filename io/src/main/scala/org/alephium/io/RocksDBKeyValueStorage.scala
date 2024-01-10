@@ -91,4 +91,8 @@ class RocksDBKeyValueStorage[K, V](
   def iterate(f: (K, V) => Unit): IOResult[Unit] = {
     iterateE((k, v) => Right(f(k, v)))
   }
+
+  def iterateRaw(f: (ByteString, ByteString) => Unit): IOResult[Unit] = {
+    iterateRawE((k, v) => Right(f(k, v)))
+  }
 }

@@ -182,28 +182,34 @@ class PruneStorageService(
   def prune(bloomFilter: BloomFilter): (Int, Int) = {
     val trieStorage =
       storages.worldStateStorage.trieStorage.asInstanceOf[RocksDBKeyValueStorage[Hash, Node]]
-    var totalCount = 0
-    var pruneCount = 0
+    var totalCount      = 0
+    var pruneCount      = 0
+    var batchDeleteKeys = Seq.empty[ByteString]
+    val batchDeleteSize = 256
 
-    val result = trieStorage.iterateRawE((key, value) => {
+    trieStorage.iterateRaw((key, value) => {
       if (totalCount % 1000000 == 0) {
         logger.info(s"[Pruning..] totalCount: ${totalCount}, pruneCount: ${pruneCount}")
       }
 
       if (!bloomFilter.mightContain(key) && notImmutableState(value)) {
         pruneCount += 1
-        trieStorage.deleteRawUnsafe(key)
+        batchDeleteKeys = key +: batchDeleteKeys
       }
+
+      if (batchDeleteKeys.length >= batchDeleteSize) {
+        trieStorage.deleteBatchRawUnsafe(batchDeleteKeys)
+        batchDeleteKeys = Seq.empty[ByteString]
+      }
+
       totalCount += 1
-      Right(())
     })
 
-    result match {
-      case Left(error) =>
-        throw error
-      case Right(_) =>
-        (totalCount, pruneCount)
+    if (batchDeleteKeys.nonEmpty) {
+      trieStorage.deleteBatchRawUnsafe(batchDeleteKeys)
     }
+
+    (totalCount, pruneCount)
   }
 
   def getRetainedBlockHashes(): IOResult[AVector[AVector[BlockHash]]] = {
