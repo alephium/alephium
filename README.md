@@ -22,7 +22,6 @@ The protocol's innovations extend battle-tested ideas from [Bitcoin](https://bit
   * Flash loan is not available by design
   * Eliminate many attack vectors of EVM, including unlimited authorization, double dip issue, reentrancy attack, etc
   * UTXO style `fine-grained execution model` reduces risk-free arbitrage
-* `Front-running mitigation` through random execution of transactions (see code, wiki to come)
 * PoLW algorithm reduces the energy consumption of PoW in the long term ([research paper](https://github.com/alephium/research/blob/master/polw.pdf))
   * Adaptive rewards based on hashrate and timestamp are designed and implemented
   * Internal mining cost through burning will be activated when hashrate and energy consumption is significantly high
