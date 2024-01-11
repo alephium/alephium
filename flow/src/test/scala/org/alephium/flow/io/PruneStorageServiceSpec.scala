@@ -27,18 +27,30 @@ import org.alephium.protocol.model.Address
 import org.alephium.protocol.model.Block
 import org.alephium.protocol.model.ChainIndex
 import org.alephium.protocol.vm.TokenIssuance
-import org.alephium.util.{AlephiumSpec, AVector, UnsecureRandom}
+import org.alephium.util.{AlephiumSpec, AVector}
 
 class PruneStorageServiceSpec extends AlephiumSpec {
   trait Fixture extends FlowFixture {
-    lazy val brokerGroup = UnsecureRandom.sample(brokerConfig.groupRange)
-    lazy val chainIndex  = ChainIndex.unsafe(brokerGroup, brokerGroup)
-    val blockChain       = blockFlow.getBlockChain(chainIndex)
+    override val configValues = Map(
+      ("alephium.broker.groups", 4),
+      ("alephium.broker.broker-num", 1),
+      ("alephium.broker.broker-id", 0)
+    )
 
-    def addOneBlock(blockFlow: BlockFlow, block: Block): Block = {
+    lazy val chainIndex = ChainIndex.unsafe(0, 0)
+    val blockChain      = blockFlow.getBlockChain(chainIndex)
+
+    def addOneBlock(chainIndex: ChainIndex, blockFlow: BlockFlow): Block = {
+      val block = Random.nextBoolean() match {
+        case true  => transfer(blockFlow, chainIndex)
+        case false => emptyBlock(blockFlow, chainIndex)
+      }
       addAndCheck(blockFlow, block)
       block
     }
+
+    val trieStorage =
+      storages.worldStateStorage.trieStorage.asInstanceOf[RocksDBKeyValueStorage[Hash, Node]]
   }
 
   it should "verify that applyBlock works" in new Fixture {
@@ -46,11 +58,8 @@ class PruneStorageServiceSpec extends AlephiumSpec {
     val genesisAddress    = Address.Asset(genesisLockup)
     val pruneStateService = new PruneStorageService(storages)(blockFlow, groupConfig)
 
-    val trieStorage =
-      storages.worldStateStorage.trieStorage.asInstanceOf[RocksDBKeyValueStorage[Hash, Node]]
-
-    addOneBlock(blockFlow, transfer(blockFlow, chainIndex))
-    addOneBlock(blockFlow, emptyBlock(blockFlow, chainIndex))
+    addOneBlock(chainIndex, blockFlow)
+    addOneBlock(chainIndex, blockFlow)
 
     val tokenContract =
       s"""
@@ -70,7 +79,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
       chainIndex = chainIndex
     )
 
-    val block4          = addOneBlock(blockFlow, transfer(blockFlow, chainIndex))
+    val block4          = addOneBlock(chainIndex, blockFlow)
     val allKeysAtBlock4 = getAllKeys(trieStorage)
 
     val block5 = callTxScript(
@@ -84,13 +93,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
          |""".stripMargin
     )
 
-    val restOfBlocks = (0 until 95).map { _ =>
-      val block = Random.nextBoolean() match {
-        case true  => transfer(blockFlow, chainIndex)
-        case false => emptyBlock(blockFlow, chainIndex)
-      }
-      addOneBlock(blockFlow, block)
-    }
+    val restOfBlocks = (0 until 95).map { _ => addOneBlock(chainIndex, blockFlow) }
 
     val allKeysFinal: Set[Hash] = getAllKeys(trieStorage).toSet
 
@@ -104,6 +107,36 @@ class PruneStorageServiceSpec extends AlephiumSpec {
       .toSet
 
     allKeysFinal is keysAfterApplyingRestOfBlocks
+  }
+
+  it should "continue to work after pruning" in new Fixture {
+    val pruneStateService = new PruneStorageService(storages)(blockFlow, groupConfig)
+
+    groupConfig.cliqueGroupIndexes.foreach { groupIndex =>
+      val ci = ChainIndex(groupIndex, groupIndex)
+      (0 until 200).map { _ => addOneBlock(ci, blockFlow) }
+
+      blockFlow.getMaxHeight(ci).rightValue is 200
+    }
+
+    val keysBeforePruning: Set[Hash] = getAllKeys(trieStorage).toSet
+    pruneStateService.prune()
+    val keysAfterPruning: Set[Hash] = getAllKeys(trieStorage).toSet
+
+    keysBeforePruning.size > keysAfterPruning.size is true
+
+    (0 until 200).map { _ => addOneBlock(chainIndex, blockFlow) }
+
+    val keysAfterReSync: Set[Hash] = getAllKeys(trieStorage).toSet
+    keysAfterReSync.size > keysAfterPruning.size is true
+  }
+
+  it should "not work if there are less than 128 blocks" in new Fixture {
+    val pruneStateService = new PruneStorageService(storages)(blockFlow, groupConfig)
+
+    (0 until 100).map { _ => addOneBlock(chainIndex, blockFlow) }
+
+    assertThrows[AssertionError](pruneStateService.prune())
   }
 
   private def getAllKeys(trieStorage: RocksDBKeyValueStorage[Hash, Node]): Seq[Hash] = {

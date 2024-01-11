@@ -59,13 +59,13 @@ class PruneStorageService(
   def buildBloomFilter(): IOResult[BloomFilter] = {
     for {
       retainedBlockHashes <- getRetainedBlockHashes()
-      _ = assume(
-        retainedBlockHashes.length == retainedHeight,
-        s"blocks length ${retainedBlockHashes.length} should be equal to $retainedHeight"
-      )
       bloomFilter <- retainedBlockHashes
         .foldE(BloomFilter(bloomNumberOfHashes, bloomFalsePositiveRate)) {
           case (bloomFilter, blockHashes) =>
+            assume(
+              blockHashes.length == retainedHeight,
+              s"blocks length ${blockHashes.length} should be equal to $retainedHeight"
+            )
             buildBloomFilter(blockHashes.head, blockHashes.tail, bloomFilter)
         }
     } yield bloomFilter
@@ -270,7 +270,7 @@ class PruneStorageService(
     }
   }
 
-  def notImmutableState(value: ByteString): Boolean = {
+  private def notImmutableState(value: ByteString): Boolean = {
     implicitly[Serde[ContractStorageImmutableState]].deserialize(value).isLeft
   }
 }
