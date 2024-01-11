@@ -16,20 +16,15 @@
 
 package org.alephium.tools
 
-import org.slf4j.{Logger, LoggerFactory}
-
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.PruneStorageService
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, Configs}
-import org.alephium.io.IOResult
 import org.alephium.io.RocksDBSource.Settings
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.{Env, Files}
-import org.alephium.util.BloomFilter
 
 object PruneStorage extends App {
-  private val logger: Logger = LoggerFactory.getLogger(this.getClass)
   private val rootPath       = Files.homeDir.resolve(".alephium/mainnet")
   private val typesafeConfig = Configs.parseConfigAndValidate(Env.Prod, rootPath, overwrite = true)
   private val config         = AlephiumConfig.load(typesafeConfig, "alephium")
@@ -38,14 +33,5 @@ object PruneStorage extends App {
   private val groupConfig = new GroupConfig { override def groups: Int = 4 }
 
   private val pruneStateService = new PruneStorageService(storages)(blockFlow, groupConfig)
-
-  val bloomFilterResult: IOResult[BloomFilter] = pruneStateService.buildBloomFilter()
-
-  bloomFilterResult match {
-    case Right(bloomFilter) =>
-      val (totalCount, pruneCount) = pruneStateService.prune(bloomFilter)
-      logger.info(s"[FINAL] totalCount: ${totalCount}, pruneCount: ${pruneCount}")
-    case Left(error) =>
-      logger.info(s"error: ${error}")
-  }
+  pruneStateService.prune()
 }

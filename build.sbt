@@ -260,6 +260,8 @@ lazy val tools = mainProject("tools")
     assembly / test            := {},
     assemblyMergeStrategy := {
       case "logback.xml" => MergeStrategy.first
+      case PathList("META-INF", "io.netty.versions.properties", xs @ _*) =>
+        MergeStrategy.first
       case PathList("module-info.class") =>
         MergeStrategy.discard
       case x if x.endsWith("module-info.class") =>

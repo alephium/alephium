@@ -45,71 +45,91 @@ class PruneStorageService(
   private val bloomNumberOfHashes    = 80000000L
   private val bloomFalsePositiveRate = 0.01
 
+  def prune(): Unit = {
+    val bloomFilterResult = buildBloomFilter()
+    bloomFilterResult match {
+      case Right(bloomFilter) =>
+        val (totalCount, pruneCount) = prune(bloomFilter)
+        logger.info(s"[FINAL] totalCount: ${totalCount}, pruneCount: ${pruneCount}")
+      case Left(error) =>
+        logger.info(s"error: ${error}")
+    }
+  }
+
   def buildBloomFilter(): IOResult[BloomFilter] = {
     for {
       retainedBlockHashes <- getRetainedBlockHashes()
+      _ = assume(
+        retainedBlockHashes.length == retainedHeight,
+        s"blocks length ${retainedBlockHashes.length} should be equal to $retainedHeight"
+      )
       bloomFilter <- retainedBlockHashes
         .foldE(BloomFilter(bloomNumberOfHashes, bloomFalsePositiveRate)) {
           case (bloomFilter, blockHashes) =>
-            buildBloomFilter(blockHashes, bloomFilter)
+            buildBloomFilter(blockHashes.head, blockHashes.tail, bloomFilter)
         }
     } yield bloomFilter
   }
 
   def buildBloomFilter(
-      blockHashes: AVector[BlockHash],
+      baseBlockHash: BlockHash,
+      latestBlockHashesToBeApplied: AVector[BlockHash],
       bloomFilter: BloomFilter
   ): IOResult[BloomFilter] = {
-    assume(
-      blockHashes.length == retainedHeight,
-      s"blocks length ${blockHashes.length} should be equal to $retainedHeight"
-    )
     for {
-      bloomFilter0 <- buildBloomFilter(blockHashes.head, bloomFilter)
-      bloomFilter  <- applyLatestBlocks(blockHashes.head, blockHashes.tail, bloomFilter0)
+      bloomFilter0 <- buildBaseBloomFilter(baseBlockHash, bloomFilter)
+      bloomFilter  <- applyLatestBlocks(baseBlockHash, latestBlockHashesToBeApplied, bloomFilter0)
     } yield bloomFilter
   }
 
-  def buildBloomFilter(
+  private def buildBaseBloomFilter(
       blockHash: BlockHash,
       bloomFilter: BloomFilter
   ): IOResult[BloomFilter] = {
     val chainIndex = ChainIndex.from(blockHash)
     for {
       persistedWorldState <- storages.worldStateStorage.getPersistedWorldState(blockHash)
-      bloomFilter0 <- buildBloomFilter(
-        s"outputState for ${chainIndex}",
+      bloomFilter0 <- buildBloomFilterForSMT(
+        s"outputState (${chainIndex.prettyString})",
         persistedWorldState.outputState,
-        Queue(Seq(persistedWorldState.outputState.rootHash)),
-        bloomFilter,
-        0
+        bloomFilter
       )
-      bloomFilter1 <- buildBloomFilter(
-        s"contractState for ${chainIndex}",
+      bloomFilter1 <- buildBloomFilterForSMT(
+        s"contractState (${chainIndex.prettyString})",
         persistedWorldState.contractState,
-        Queue(Seq(persistedWorldState.contractState.rootHash)),
-        bloomFilter0,
-        0
+        bloomFilter0
       )
-      bloomFilter <- buildBloomFilter(
-        s"codeState for ${chainIndex}",
+      bloomFilter <- buildBloomFilterForSMT(
+        s"codeState (${chainIndex.prettyString})",
         persistedWorldState.codeState,
-        Queue(Seq(persistedWorldState.codeState.rootHash)),
-        bloomFilter1,
-        0
+        bloomFilter1
       )
     } yield bloomFilter
   }
 
+  private def buildBloomFilterForSMT[K, V](
+      label: String,
+      smt: SparseMerkleTrie[K, V],
+      bloomFilter: BloomFilter
+  ): IOResult[BloomFilter] = {
+    buildBloomFilterForSMT(label, smt, Queue(Seq(smt.rootHash)), bloomFilter, 0, 0)
+  }
+
   @tailrec
-  final def buildBloomFilter[K, V](
+  private def buildBloomFilterForSMT[K, V](
       label: String,
       smt: SparseMerkleTrie[K, V],
       currentHashesQueue: Queue[Seq[Hash]],
       bloomFilter: BloomFilter,
-      accHashes: Int
+      totalCount: Int,
+      lastLoggingCount: Int
   ): IOResult[BloomFilter] = {
-    logger.info(s"$label: current bloom filter items: ${accHashes}")
+    val updatedLastLoggingCount = if (totalCount - lastLoggingCount > 100000) {
+      logger.info(s"[Building Bloom Filter..] $label, current items: ${totalCount}")
+      totalCount
+    } else {
+      lastLoggingCount
+    }
 
     if (currentHashesQueue.nonEmpty) {
       val currentHashes = currentHashesQueue.dequeue()
@@ -126,19 +146,20 @@ class PruneStorageService(
         }
       }
       newHashes.grouped(256).foreach(currentHashesQueue.enqueue(_))
-      buildBloomFilter(
+      buildBloomFilterForSMT(
         label,
         smt,
         currentHashesQueue,
         bloomFilter,
-        accHashes + currentHashes.length
+        totalCount + currentHashes.length,
+        updatedLastLoggingCount
       )
     } else {
       Right(bloomFilter)
     }
   }
 
-  def applyLatestBlocks(
+  private def applyLatestBlocks(
       currentBlockHash: BlockHash,
       blockHashesToApply: AVector[BlockHash],
       bloomFilter: BloomFilter
@@ -153,7 +174,7 @@ class PruneStorageService(
     }
   }
 
-  def applyBlock(
+  private[io] def applyBlock(
       currentBlockHash: BlockHash,
       blockHash: BlockHash
   ): IOResult[AVector[Hash]] = {
@@ -179,7 +200,7 @@ class PruneStorageService(
     } yield outputStateKeys ++ contractStateKeys ++ codeStateKeys
   }
 
-  def prune(bloomFilter: BloomFilter): (Int, Int) = {
+  private def prune(bloomFilter: BloomFilter): (Int, Int) = {
     val trieStorage =
       storages.worldStateStorage.trieStorage.asInstanceOf[RocksDBKeyValueStorage[Hash, Node]]
     var totalCount      = 0
@@ -212,7 +233,7 @@ class PruneStorageService(
     (totalCount, pruneCount)
   }
 
-  def getRetainedBlockHashes(): IOResult[AVector[AVector[BlockHash]]] = {
+  private def getRetainedBlockHashes(): IOResult[AVector[AVector[BlockHash]]] = {
     for {
       result <- groupConfig.cliqueGroupIndexes.mapE { groupIndex =>
         getRetainBlockHashesForChain(ChainIndex(groupIndex, groupIndex))
@@ -220,7 +241,7 @@ class PruneStorageService(
     } yield result
   }
 
-  def getRetainBlockHashesForChain(chainIndex: ChainIndex): IOResult[AVector[BlockHash]] = {
+  private def getRetainBlockHashesForChain(chainIndex: ChainIndex): IOResult[AVector[BlockHash]] = {
     for {
       bestTip <- blockFlow.getHeaderChain(chainIndex).getBestTip()
       result  <- getRetainBlockHashes(bestTip, 0, AVector(bestTip))
