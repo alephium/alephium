@@ -239,14 +239,19 @@ class TxUtilsSpec extends AlephiumSpec {
     def buildInputs(nb: Int): AVector[(AssetOutputRef, AssetOutput)] =
       AVector.fill(nb)(input("input1", ALPH.alph(10), fromLockupScript))
 
-    def buildInputData(pubKey: PublicKey, alph: Long, gas: Option[GasBox] = None) =
+    def buildInputData(
+        pubKey: PublicKey,
+        alph: Long,
+        gas: Option[GasBox] = None,
+        utxos: Option[AVector[AssetOutputRef]] = None
+    ) =
       TxUtils.InputData(
         LockupScript.p2pkh(pubKey),
         UnlockScript.p2pkh(pubKey),
         ALPH.alph(alph),
         None,
         gas,
-        None
+        utxos
       )
 
     // scalastyle:off method.length
@@ -1289,6 +1294,61 @@ class TxUtilsSpec extends AlephiumSpec {
         ALPH.alph(amountPerBlock - amount) - nonCoinbaseMinGasPrice * minimalGas.mulUnsafe(i)
       change is expected
     }
+  }
+
+  it should "transfer multi inputs with explicit utxos" in new MultiInputTransactionFixture {
+    val nbOfInput  = 4
+    val nbOfOutput = 1
+
+    val publicKeys = AVector.fill(nbOfInput)(chainIndex.from.generateKey._2)
+
+    val amount         = 10L
+    val amountPerBlock = 100L
+
+    publicKeys.foreach { pubKey =>
+      def block = transfer(blockFlow, genesisPriKey, pubKey, amount = ALPH.alph(amountPerBlock))
+      // Force 2 utxos
+      addAndCheck(blockFlow, block)
+      addAndCheck(blockFlow, block)
+    }
+
+    val inputs = publicKeys.mapWithIndex { case (pubKey, i) =>
+      if (i == 0) {
+        // First input pass all it's utxos, it should be merged
+        val availableUtxos = blockFlow
+          .getUTXOs(Address.p2pkh(pubKey).lockupScript, Int.MaxValue, true)
+          .rightValue
+          .asUnsafe[AssetOutputInfo]
+
+        // First pubKey will use both utxos
+        buildInputData(pubKey, amountPerBlock + amount, utxos = Some(availableUtxos.map(_.ref)))
+      } else {
+        buildInputData(pubKey, amount)
+      }
+    }
+
+    val totalAmount     = amountPerBlock + (amount * nbOfInput)
+    val amountPerOutput = totalAmount / nbOfOutput
+    val rest            = totalAmount % nbOfOutput
+
+    val outputs =
+      AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
+        val amount = if (i == 0) amountPerOutput + rest else amountPerOutput
+        TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amount), AVector.empty, None)
+      }
+
+    val utx = blockFlow
+      .transferMultiInputs(
+        inputs,
+        outputs,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        None
+      )
+      .rightValue
+      .rightValue
+
+    utx.inputs.length is nbOfInput + 1 // for the extra utxos of first pub key
   }
 
   it should "fail to transfer multi inputs" in new MultiInputTransactionFixture {
