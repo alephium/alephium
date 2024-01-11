@@ -30,7 +30,7 @@ import org.alephium.flow.validation.TxValidation
 import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, PublicKey, Signature}
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
-import org.alephium.protocol.vm.{GasBox, LockupScript, StatefulScript, TokenIssuance, UnlockScript}
+import org.alephium.protocol.vm._
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
 // scalastyle:off file.size.limit
@@ -221,11 +221,11 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   trait MultiInputTransactionFixture extends UnsignedTransactionFixture {
-    val (genesisPriKey, _, _) = genesisKeys(0)
-    val (_, pub1)             = chainIndex.from.generateKey
-    val (_, pub2)             = chainIndex.from.generateKey
-    val (_, pub3)             = chainIndex.from.generateKey
-    val (_, pub4)             = chainIndex.from.generateKey
+    val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
+    val (_, pub1)                         = chainIndex.from.generateKey
+    val (_, pub2)                         = chainIndex.from.generateKey
+    val (_, pub3)                         = chainIndex.from.generateKey
+    val (_, pub4)                         = chainIndex.from.generateKey
 
     val inputData = TxUtils.InputData(
       fromLockupScript,
@@ -243,13 +243,14 @@ class TxUtilsSpec extends AlephiumSpec {
         pubKey: PublicKey,
         alph: Long,
         gas: Option[GasBox] = None,
-        utxos: Option[AVector[AssetOutputRef]] = None
+        utxos: Option[AVector[AssetOutputRef]] = None,
+        tokens: Option[AVector[(TokenId, U256)]] = None
     ) =
       TxUtils.InputData(
         LockupScript.p2pkh(pubKey),
         UnlockScript.p2pkh(pubKey),
         ALPH.alph(alph),
-        None,
+        tokens,
         gas,
         utxos
       )
@@ -1349,6 +1350,81 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
 
     utx.inputs.length is nbOfInput + 1 // for the extra utxos of first pub key
+  }
+
+  it should "transfer multi inputs with tokens" in new MultiInputTransactionFixture
+    with ContractFixture {
+    val nbOfInput  = 10
+    val nbOfOutput = 5
+
+    val (cId, _) = createContract(
+      code,
+      AVector.empty,
+      AVector.empty,
+      tokenIssuanceInfo = Some(
+        TokenIssuance.Info(
+          Val.U256(U256.unsafe(nbOfInput)),
+          Some(Address.p2pkh(genesisPubKey).lockupScript)
+        )
+      )
+    )
+
+    val publicKeys = AVector.fill(nbOfInput)(chainIndex.from.generateKey._2)
+
+    val amount         = 10L
+    val amountPerBlock = 100L
+    val tokenId        = TokenId.from(cId)
+
+    val issuedTokens = AVector((tokenId, U256.unsafe(nbOfInput)))
+    val tokens       = AVector((tokenId, U256.One))
+
+    publicKeys.foreach { pubKey =>
+      val block = transfer(
+        blockFlow,
+        genesisPriKey,
+        Address.p2pkh(pubKey).lockupScript,
+        tokens = tokens,
+        amount = ALPH.alph(amountPerBlock)
+      )
+      addAndCheck(blockFlow, block)
+    }
+
+    val inputs = publicKeys.map { pubKey =>
+      buildInputData(pubKey, amount, tokens = Some(tokens))
+    }
+
+    val totalAmount     = amount * nbOfInput
+    val amountPerOutput = totalAmount / nbOfOutput
+    val rest            = totalAmount % nbOfOutput
+
+    val outputs =
+      AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
+        if (i == 0) {
+          TxOutputInfo(
+            LockupScript.p2pkh(pubKey),
+            ALPH.alph(amountPerOutput + rest),
+            issuedTokens,
+            None
+          )
+        } else {
+          TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amountPerOutput), AVector.empty, None)
+        }
+      }
+
+    val utx = blockFlow
+      .transferMultiInputs(
+        inputs,
+        outputs,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        None
+      )
+      .rightValue
+      .rightValue
+
+    utx.inputs.length is nbOfInput + nbOfInput // double of inputs as each input has tokens
+    utx.fixedOutputs.head.tokens is issuedTokens
+    utx.fixedOutputs.tail.foreach(_.tokens is AVector.empty[(TokenId, U256)])
   }
 
   it should "fail to transfer multi inputs" in new MultiInputTransactionFixture {
