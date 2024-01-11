@@ -357,6 +357,7 @@ trait TxUtils { Self: FlowUtils =>
   ): IOResult[Either[String, UnsignedTransaction]] = {
     val dustAmountsE = for {
       groupIndex  <- checkMultiInputsGroup(inputs)
+      _           <- checkMultiInputsGas(inputs)
       _           <- checkOutputInfos(groupIndex, outputInfos)
       _           <- checkInOutAmounts(inputs, outputInfos)
       dustAmounts <- calculateDustAmountNeeded(outputInfos)
@@ -509,7 +510,8 @@ trait TxUtils { Self: FlowUtils =>
       txOutputLength: Int
   ): AVector[(InputData, AssetOutputInfoWithGas)] = {
     // With 1 input, it's like a simple transfer and the gas was already correctly selected.
-    if (inputs.length > 1) {
+    // If some input have explicit gas, we don't update either
+    if (inputs.length > 1 && !inputs.exists(_._1.gasOpt.isDefined)) {
       val destinationsGas = GasSchedule.txOutputBaseGas.mulUnsafe(txOutputLength - 1)
 
       val gasPerInput = inputs.map { case (input, selected) =>
@@ -978,6 +980,24 @@ trait TxUtils { Self: FlowUtils =>
         }
       } else {
         Left("Different groups for transaction inputs")
+      }
+    }
+  }
+
+  /*
+   * Either every input defined gas or none
+   */
+  private def checkMultiInputsGas(
+      inputs: AVector[InputData]
+  ): Either[String, Unit] = {
+    if (inputs.isEmpty) {
+      Left("Zero transaction inputs")
+    } else {
+      val definedGas = inputs.filter(_.gasOpt.isDefined).length
+      if (definedGas == 0 || definedGas == inputs.length) {
+        Right(())
+      } else {
+        Left("Missing `gasAmount` in some input")
       }
     }
   }

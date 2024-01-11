@@ -239,14 +239,15 @@ class TxUtilsSpec extends AlephiumSpec {
     def buildInputs(nb: Int): AVector[(AssetOutputRef, AssetOutput)] =
       AVector.fill(nb)(input("input1", ALPH.alph(10), fromLockupScript))
 
-    def buildInputData(pubKey: PublicKey, alph: Long) = TxUtils.InputData(
-      LockupScript.p2pkh(pubKey),
-      UnlockScript.p2pkh(pubKey),
-      ALPH.alph(alph),
-      None,
-      None,
-      None
-    )
+    def buildInputData(pubKey: PublicKey, alph: Long, gas: Option[GasBox] = None) =
+      TxUtils.InputData(
+        LockupScript.p2pkh(pubKey),
+        UnlockScript.p2pkh(pubKey),
+        ALPH.alph(alph),
+        None,
+        gas,
+        None
+      )
 
     // scalastyle:off method.length
     def checkMultiInputTx(nbOfInput: Int, nbOfOutput: Int) = {
@@ -1242,6 +1243,54 @@ class TxUtilsSpec extends AlephiumSpec {
     changeOutputs.toSeq.distinct.length is changeOutputs.length
   }
 
+  it should "transfer multi inputs with gas defined" in new MultiInputTransactionFixture {
+    val nbOfInput  = 4
+    val nbOfOutput = 1
+
+    val publicKeys = AVector.fill(nbOfInput)(chainIndex.from.generateKey._2)
+
+    val amount         = 10L
+    val amountPerBlock = 100L
+
+    publicKeys.foreach { pubKey =>
+      val block = transfer(blockFlow, genesisPriKey, pubKey, amount = ALPH.alph(amountPerBlock))
+      addAndCheck(blockFlow, block)
+    }
+
+    val inputs = publicKeys.mapWithIndex { case (pubKey, i) =>
+      buildInputData(pubKey, amount, Some(minimalGas.mulUnsafe(i)))
+    }
+
+    val totalAmount     = amount * nbOfInput
+    val amountPerOutput = totalAmount / nbOfOutput
+    val rest            = totalAmount % nbOfOutput
+
+    val outputs =
+      AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
+        val amount = if (i == 0) amountPerOutput + rest else amountPerOutput
+        TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amount), AVector.empty, None)
+      }
+
+    val utx = blockFlow
+      .transferMultiInputs(
+        inputs,
+        outputs,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        None
+      )
+      .rightValue
+      .rightValue
+
+    val changeOutputs = utx.fixedOutputs.drop(nbOfOutput).map(_.amount)
+
+    changeOutputs.zipWithIndex.foreach { case (change, i) =>
+      val expected =
+        ALPH.alph(amountPerBlock - amount) - nonCoinbaseMinGasPrice * minimalGas.mulUnsafe(i)
+      change is expected
+    }
+  }
+
   it should "fail to transfer multi inputs" in new MultiInputTransactionFixture {
     val block0 = transfer(blockFlow, genesisPriKey, pub1, amount = ALPH.alph(100))
     addAndCheck(blockFlow, block0)
@@ -1287,7 +1336,6 @@ class TxUtilsSpec extends AlephiumSpec {
     }
     {
       info("Utxos not in same group as lockup script")
-      input("input1", ALPH.alph(10), fromLockupScript)
       val utxos = Some(
         AVector(AssetOutputRef.from(new ScriptHint(1), TxOutputRef.unsafeKey(Hash.hash("input1"))))
       )
@@ -1303,6 +1351,23 @@ class TxUtilsSpec extends AlephiumSpec {
         )
         .rightValue
         .leftValue is "Selected UTXOs different from lockup script group"
+    }
+
+    {
+      info("Not all gasAmount are defined")
+      val i1     = buildInputData(pub1, amount, gas = Some(GasBox.zero))
+      val i2     = buildInputData(pub1, amount, gas = None)
+      val inputs = AVector(i1, i2)
+      blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputInfos,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
+        )
+        .rightValue
+        .leftValue is "Missing `gasAmount` in some input"
     }
   }
 
