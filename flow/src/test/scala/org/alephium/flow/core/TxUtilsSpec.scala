@@ -1177,6 +1177,71 @@ class TxUtilsSpec extends AlephiumSpec {
     checkMultiInputTx(20, 30)
   }
 
+  it should "transfer multi inputs with different nb of utxos per input" in new MultiInputTransactionFixture {
+    val nbOfInput  = 4
+    val nbOfOutput = 4
+
+    val publicKeys = AVector.fill(nbOfInput)(chainIndex.from.generateKey._2)
+
+    val amount = 5L
+
+    publicKeys.zipWithIndex.foreach { case (pubKey, i) =>
+      def block = transfer(blockFlow, genesisPriKey, pubKey, amount = ALPH.alph(amount + 1))
+      (0 to i).foreach { _ =>
+        addAndCheck(blockFlow, block)
+      }
+    }
+
+    // each input will use different number of utxos
+    val inputs = publicKeys.mapWithIndex { case (pubKey, i) =>
+      val amnt = (i + 1) * amount
+      buildInputData(pubKey, amnt)
+    }
+
+    val totalAmount = (1 to nbOfInput).map { i =>
+      i * amount
+    }.sum
+
+    val amountPerOutput = totalAmount / nbOfOutput
+    val rest            = totalAmount % nbOfOutput
+
+    val outputs =
+      AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
+        val amount = if (i == 0) amountPerOutput + rest else amountPerOutput
+        TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amount), AVector.empty, None)
+      }
+
+    val utx = blockFlow
+      .transferMultiInputs(
+        inputs,
+        outputs,
+        nonCoinbaseMinGasPrice,
+        Int.MaxValue,
+        None
+      )
+      .rightValue
+      .rightValue
+
+    (utx.gasAmount > GasEstimation.estimateWithP2PKHInputs(
+      nbOfInput,
+      nbOfOutput + nbOfInput
+    )) is true
+    (utx.gasAmount > GasEstimation.estimateWithP2PKHInputs(
+      (1 to nbOfInput).sum - 1,
+      nbOfOutput + nbOfInput
+    )) is true
+
+    (utx.gasAmount <= GasEstimation.estimateWithP2PKHInputs(
+      (1 to nbOfInput).sum,
+      nbOfOutput + nbOfInput
+    )) is true
+
+    val changeOutputs = utx.fixedOutputs.drop(nbOfOutput).map(_.amount)
+
+    // Each input will pay different fee, so each change output is different
+    changeOutputs.toSeq.distinct.length is changeOutputs.length
+  }
+
   it should "fail to transfer multi inputs" in new MultiInputTransactionFixture {
     val block0 = transfer(blockFlow, genesisPriKey, pub1, amount = ALPH.alph(100))
     addAndCheck(blockFlow, block0)
