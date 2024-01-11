@@ -59,14 +59,11 @@ class RocksDBKeyValueStorage[K, V](
 
   def iterateE(f: (K, V) => IOResult[Unit]): IOResult[Unit] = {
     iterateRawE { (keyBytes, valBytes) =>
-      (for {
-        key   <- keySerde.deserialize(keyBytes)
-        value <- valueSerde.deserialize(valBytes)
+      for {
+        key   <- keySerde.deserialize(keyBytes).left.map(IOError.Serde(_))
+        value <- valueSerde.deserialize(valBytes).left.map(IOError.Serde(_))
         _     <- f(key, value)
-      } yield ()) match {
-        case Left(err) => throw err
-        case _         => Right(())
-      }
+      } yield ()
     }
   }
 

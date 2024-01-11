@@ -21,17 +21,15 @@ import org.alephium.flow.io.PruneStorageService
 import org.alephium.flow.io.Storages
 import org.alephium.flow.setting.{AlephiumConfig, Configs}
 import org.alephium.io.RocksDBSource.Settings
-import org.alephium.protocol.config.GroupConfig
 import org.alephium.util.{Env, Files}
 
 object PruneStorage extends App {
-  private val rootPath       = Files.homeDir.resolve(".alephium/mainnet")
+  private val rootPath       = Files.homeDir.resolve(".alephium")
   private val typesafeConfig = Configs.parseConfigAndValidate(Env.Prod, rootPath, overwrite = true)
   private val config         = AlephiumConfig.load(typesafeConfig, "alephium")
-  private val storages = Storages.createUnsafe(rootPath, "db", Settings.writeOptions)(config.broker)
-  private val blockFlow   = BlockFlow.fromStorageUnsafe(config, storages)
-  private val groupConfig = new GroupConfig { override def groups: Int = 4 }
+  private val dbPath         = rootPath.resolve(config.network.networkId.nodeFolder)
+  private val storages  = Storages.createUnsafe(dbPath, "db", Settings.writeOptions)(config.broker)
+  private val blockFlow = BlockFlow.fromStorageUnsafe(config, storages)
 
-  private val pruneStateService = new PruneStorageService(storages)(blockFlow, groupConfig)
-  pruneStateService.prune()
+  new PruneStorageService(storages)(blockFlow, blockFlow.brokerConfig).prune()
 }

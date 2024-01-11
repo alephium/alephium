@@ -30,7 +30,7 @@ import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{BlockHash, ChainIndex}
 import org.alephium.protocol.vm.ContractStorageImmutableState
-import org.alephium.serde.Serde
+import org.alephium.serde.deserialize
 import org.alephium.util.AVector
 import org.alephium.util.BloomFilter
 
@@ -44,6 +44,7 @@ class PruneStorageService(
   private val retainedHeight         = 128
   private val bloomNumberOfHashes    = 80000000L
   private val bloomFalsePositiveRate = 0.01
+  private val blockValidation        = BlockValidation.build(blockFlow)
 
   def prune(): Unit = {
     val bloomFilterResult = buildBloomFilter()
@@ -178,8 +179,7 @@ class PruneStorageService(
       currentBlockHash: BlockHash,
       blockHash: BlockHash
   ): IOResult[AVector[Hash]] = {
-    val blockValidation = BlockValidation.build(blockFlow)
-    val chainIndex      = ChainIndex.from(currentBlockHash)
+    val chainIndex = ChainIndex.from(currentBlockHash)
     assume(chainIndex.isIntraGroup)
     val blockchain = blockFlow.getBlockChain(chainIndex)
 
@@ -271,6 +271,6 @@ class PruneStorageService(
   }
 
   private def notImmutableState(value: ByteString): Boolean = {
-    implicitly[Serde[ContractStorageImmutableState]].deserialize(value).isLeft
+    deserialize[ContractStorageImmutableState](value).isLeft
   }
 }

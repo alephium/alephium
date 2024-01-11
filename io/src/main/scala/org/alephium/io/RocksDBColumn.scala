@@ -81,8 +81,14 @@ trait RocksDBColumn extends RawKeyValueStorage {
     val handles       = keys.map(_ => handle).asJava
     db.multiGetAsList(handles, convertedKeys)
       .asScala
-      .flatMap { value =>
-        Option(value).map(ByteString.fromArrayUnsafe)
+      .zipWithIndex
+      .map { case (value, index) =>
+        Option(value) match {
+          case Some(v) =>
+            ByteString.fromArrayUnsafe(v)
+          case None =>
+            throw IOError.keyNotFound(keys(index), "RocksDBColumn.multiGetRawUnsafe")
+        }
       }
       .toSeq
   }

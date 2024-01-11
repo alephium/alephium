@@ -23,9 +23,7 @@ import org.alephium.flow.core.BlockFlow
 import org.alephium.io.RocksDBKeyValueStorage
 import org.alephium.io.SparseMerkleTrie.Node
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.Address
-import org.alephium.protocol.model.Block
-import org.alephium.protocol.model.ChainIndex
+import org.alephium.protocol.model.{Address, Block, ChainIndex, ContractId}
 import org.alephium.protocol.vm.TokenIssuance
 import org.alephium.util.{AlephiumSpec, AVector}
 
@@ -38,10 +36,35 @@ class PruneStorageServiceSpec extends AlephiumSpec {
     )
 
     lazy val chainIndex     = ChainIndex.unsafe(0, 0)
+    val genesisLockup       = getGenesisLockupScript(chainIndex)
+    val genesisAddress      = Address.Asset(genesisLockup)
     val blockChain          = blockFlow.getBlockChain(chainIndex)
     val pruneStorageService = new PruneStorageService(storages)(blockFlow, groupConfig)
     val trieStorage =
       storages.worldStateStorage.trieStorage.asInstanceOf[RocksDBKeyValueStorage[Hash, Node]]
+
+    val tokenContract =
+      s"""
+         |Contract Token() {
+         |  @using(assetsInContract = true)
+         |  pub fn withdraw(address: Address, amount: U256) -> () {
+         |    transferTokenFromSelf!(address, selfTokenId!(), amount)
+         |  }
+         |}
+         |""".stripMargin
+
+    def callContract(contractId: ContractId) = {
+      callTxScript(
+        s"""
+           |TxScript Main {
+           |  let token = Token(#${contractId.toHexString})
+           |  token.withdraw(@${genesisAddress.toBase58}, 1024)
+           |}
+           |
+           |$tokenContract
+           |""".stripMargin
+      )
+    }
 
     def addOneBlock(chainIndex: ChainIndex, blockFlow: BlockFlow): Block = {
       val block = Random.nextBoolean() match {
@@ -71,21 +94,8 @@ class PruneStorageServiceSpec extends AlephiumSpec {
   }
 
   it should "verify that applyBlock works" in new Fixture {
-    val genesisLockup  = getGenesisLockupScript(chainIndex)
-    val genesisAddress = Address.Asset(genesisLockup)
-
     addOneBlock(chainIndex, blockFlow)
     addOneBlock(chainIndex, blockFlow)
-
-    val tokenContract =
-      s"""
-         |Contract Token() {
-         |  @using(assetsInContract = true)
-         |  pub fn withdraw(address: Address, amount: U256) -> () {
-         |    transferTokenFromSelf!(address, selfTokenId!(), amount)
-         |  }
-         |}
-         |""".stripMargin
 
     val (contractId, _) = createContract(
       tokenContract,
@@ -98,16 +108,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
     val block4          = addOneBlock(chainIndex, blockFlow)
     val allKeysAtBlock4 = getAllKeysInTrie()
 
-    val block5 = callTxScript(
-      s"""
-         |TxScript Main {
-         |  let token = Token(#${contractId.toHexString})
-         |  token.withdraw(@${genesisAddress.toBase58}, 1024)
-         |}
-         |
-         |$tokenContract
-         |""".stripMargin
-    )
+    val block5 = callContract(contractId)
 
     val restOfBlocks = (0 until 95).map { _ => addOneBlock(chainIndex, blockFlow) }
 
@@ -133,9 +134,19 @@ class PruneStorageServiceSpec extends AlephiumSpec {
       blockFlow.getMaxHeight(ci).rightValue is 200
     }
 
+    val (contractId, _) = createContract(
+      tokenContract,
+      AVector.empty,
+      AVector.empty,
+      tokenIssuanceInfo = Some(TokenIssuance.Info(1024)),
+      chainIndex = chainIndex
+    )
+
     val keysAfterPruning = pruneAndVerify()
 
     (0 until 200).map { _ => addOneBlock(chainIndex, blockFlow) }
+
+    callContract(contractId)
 
     val keysAfterReSync: Set[Hash] = getAllKeysInTrie().toSet
     keysAfterReSync.size > keysAfterPruning.size is true
