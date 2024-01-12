@@ -227,6 +227,8 @@ class TxUtilsSpec extends AlephiumSpec {
     val (_, pub3)                         = chainIndex.from.generateKey
     val (_, pub4)                         = chainIndex.from.generateKey
 
+    val amount = 10L
+
     val inputData = TxUtils.InputData(
       fromLockupScript,
       fromUnlockScript,
@@ -237,7 +239,7 @@ class TxUtilsSpec extends AlephiumSpec {
     )
 
     def buildInputs(nb: Int): AVector[(AssetOutputRef, AssetOutput)] =
-      AVector.fill(nb)(input("input1", ALPH.alph(10), fromLockupScript))
+      AVector.fill(nb)(input("input1", ALPH.alph(amount), fromLockupScript))
 
     def buildInputData(
         pubKey: PublicKey,
@@ -255,31 +257,61 @@ class TxUtilsSpec extends AlephiumSpec {
         utxos
       )
 
+    def genPublicKeys(nb: Int): AVector[PublicKey] =
+      AVector.fill(nb)(chainIndex.from.generateKey._2)
+
+    def computeAmountPerOutput(totalAmount: Long, nbOfOutput: Int): (Long, Long) = {
+      val amountPerOutput = totalAmount / nbOfOutput
+      val rest            = totalAmount % nbOfOutput
+      (amountPerOutput, rest)
+    }
+
+    def buildBlock(
+        pubKey: PublicKey,
+        transferAmount: Long,
+        tokensOpt: Option[AVector[(TokenId, U256)]] = None
+    ) = {
+      tokensOpt match {
+        case None =>
+          transfer(blockFlow, genesisPriKey, pubKey, amount = ALPH.alph(transferAmount))
+        case Some(tokens) =>
+          val lockupScript = Address.p2pkh(pubKey).lockupScript
+          transfer(
+            blockFlow,
+            genesisPriKey,
+            lockupScript,
+            tokens = tokens,
+            amount = ALPH.alph(transferAmount)
+          )
+      }
+    }
+
+    def buildOutputs(nbOfOutput: Int, totalAmount: Long) = {
+      val (amountPerOutput, rest) = computeAmountPerOutput(totalAmount, nbOfOutput)
+      AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
+        val amount = if (i == 0) amountPerOutput + rest else amountPerOutput
+        TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amount), AVector.empty, None)
+      }
+    }
+
     // scalastyle:off method.length
     def checkMultiInputTx(nbOfInput: Int, nbOfOutput: Int) = {
 
-      val publicKeys = AVector.fill(nbOfInput)(chainIndex.from.generateKey._2)
+      val publicKeys = genPublicKeys(nbOfInput)
 
       publicKeys.foreach { pubKey =>
-        val block = transfer(blockFlow, genesisPriKey, pubKey, amount = ALPH.alph(100))
+        val block = buildBlock(pubKey, 100)
         addAndCheck(blockFlow, block)
       }
-
-      val amount = 10L
 
       val inputs = publicKeys.map { pubKey =>
         buildInputData(pubKey, amount)
       }
 
-      val totalAmount     = amount * nbOfInput
-      val amountPerOutput = totalAmount / nbOfOutput
-      val rest            = totalAmount % nbOfOutput
+      val totalAmount             = amount * nbOfInput
+      val (amountPerOutput, rest) = computeAmountPerOutput(totalAmount, nbOfOutput)
 
-      val outputs =
-        AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
-          val amount = if (i == 0) amountPerOutput + rest else amountPerOutput
-          TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amount), AVector.empty, None)
-        }
+      val outputs = buildOutputs(nbOfOutput, totalAmount)
 
       val utx = blockFlow
         .transferMultiInputs(
@@ -1173,7 +1205,7 @@ class TxUtilsSpec extends AlephiumSpec {
       .add(chainIndex, tx, TimeStamp.now()) is MemPool.AddedToMemPool
   }
 
-  it should "transfer multi inputs" in new MultiInputTransactionFixture {
+  "TxUtils.transferMultiInputs" should "transfer multi inputs" in new MultiInputTransactionFixture {
     checkMultiInputTx(1, 1)
     checkMultiInputTx(2, 1)
     checkMultiInputTx(5, 1)
@@ -1187,13 +1219,11 @@ class TxUtilsSpec extends AlephiumSpec {
   it should "transfer multi inputs with different nb of utxos per input" in new MultiInputTransactionFixture {
     val nbOfInput  = 4
     val nbOfOutput = 4
-
-    val publicKeys = AVector.fill(nbOfInput)(chainIndex.from.generateKey._2)
-
-    val amount = 5L
+    val publicKeys = genPublicKeys(nbOfInput)
 
     publicKeys.zipWithIndex.foreach { case (pubKey, i) =>
-      def block = transfer(blockFlow, genesisPriKey, pubKey, amount = ALPH.alph(amount + 1))
+      def block = buildBlock(pubKey, amount + 1)
+      // each address will get different number of utxos
       (0 to i).foreach { _ =>
         addAndCheck(blockFlow, block)
       }
@@ -1209,14 +1239,7 @@ class TxUtilsSpec extends AlephiumSpec {
       i * amount
     }.sum
 
-    val amountPerOutput = totalAmount / nbOfOutput
-    val rest            = totalAmount % nbOfOutput
-
-    val outputs =
-      AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
-        val amount = if (i == 0) amountPerOutput + rest else amountPerOutput
-        TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amount), AVector.empty, None)
-      }
+    val outputs = buildOutputs(nbOfOutput, totalAmount)
 
     val utx = blockFlow
       .transferMultiInputs(
@@ -1250,16 +1273,13 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "transfer multi inputs with gas defined" in new MultiInputTransactionFixture {
-    val nbOfInput  = 4
-    val nbOfOutput = 1
-
-    val publicKeys = AVector.fill(nbOfInput)(chainIndex.from.generateKey._2)
-
-    val amount         = 10L
+    val nbOfInput      = 4
+    val nbOfOutput     = 1
+    val publicKeys     = genPublicKeys(nbOfInput)
     val amountPerBlock = 100L
 
     publicKeys.foreach { pubKey =>
-      val block = transfer(blockFlow, genesisPriKey, pubKey, amount = ALPH.alph(amountPerBlock))
+      val block = buildBlock(pubKey, amountPerBlock)
       addAndCheck(blockFlow, block)
     }
 
@@ -1267,15 +1287,9 @@ class TxUtilsSpec extends AlephiumSpec {
       buildInputData(pubKey, amount, Some(minimalGas.mulUnsafe(i)))
     }
 
-    val totalAmount     = amount * nbOfInput
-    val amountPerOutput = totalAmount / nbOfOutput
-    val rest            = totalAmount % nbOfOutput
+    val totalAmount = amount * nbOfInput
 
-    val outputs =
-      AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
-        val amount = if (i == 0) amountPerOutput + rest else amountPerOutput
-        TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amount), AVector.empty, None)
-      }
+    val outputs = buildOutputs(nbOfOutput, totalAmount)
 
     val utx = blockFlow
       .transferMultiInputs(
@@ -1298,16 +1312,13 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "transfer multi inputs with explicit utxos" in new MultiInputTransactionFixture {
-    val nbOfInput  = 4
-    val nbOfOutput = 1
-
-    val publicKeys = AVector.fill(nbOfInput)(chainIndex.from.generateKey._2)
-
-    val amount         = 10L
+    val nbOfInput      = 4
+    val nbOfOutput     = 1
+    val publicKeys     = genPublicKeys(nbOfInput)
     val amountPerBlock = 100L
 
     publicKeys.foreach { pubKey =>
-      def block = transfer(blockFlow, genesisPriKey, pubKey, amount = ALPH.alph(amountPerBlock))
+      def block = buildBlock(pubKey, amountPerBlock)
       // Force 2 utxos
       addAndCheck(blockFlow, block)
       addAndCheck(blockFlow, block)
@@ -1328,15 +1339,9 @@ class TxUtilsSpec extends AlephiumSpec {
       }
     }
 
-    val totalAmount     = amountPerBlock + (amount * nbOfInput)
-    val amountPerOutput = totalAmount / nbOfOutput
-    val rest            = totalAmount % nbOfOutput
+    val totalAmount = amountPerBlock + (amount * nbOfInput)
 
-    val outputs =
-      AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
-        val amount = if (i == 0) amountPerOutput + rest else amountPerOutput
-        TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amount), AVector.empty, None)
-      }
+    val outputs = buildOutputs(nbOfOutput, totalAmount)
 
     val utx = blockFlow
       .transferMultiInputs(
@@ -1354,8 +1359,10 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "transfer multi inputs with tokens" in new MultiInputTransactionFixture
     with ContractFixture {
-    val nbOfInput  = 10
-    val nbOfOutput = 5
+    val nbOfInput      = 10
+    val nbOfOutput     = 5
+    val publicKeys     = genPublicKeys(nbOfInput)
+    val amountPerBlock = 100L
 
     val (cId, _) = createContract(
       code,
@@ -1369,23 +1376,13 @@ class TxUtilsSpec extends AlephiumSpec {
       )
     )
 
-    val publicKeys = AVector.fill(nbOfInput)(chainIndex.from.generateKey._2)
-
-    val amount         = 10L
-    val amountPerBlock = 100L
-    val tokenId        = TokenId.from(cId)
+    val tokenId = TokenId.from(cId)
 
     val issuedTokens = AVector((tokenId, U256.unsafe(nbOfInput)))
     val tokens       = AVector((tokenId, U256.One))
 
     publicKeys.foreach { pubKey =>
-      val block = transfer(
-        blockFlow,
-        genesisPriKey,
-        Address.p2pkh(pubKey).lockupScript,
-        tokens = tokens,
-        amount = ALPH.alph(amountPerBlock)
-      )
+      val block = buildBlock(pubKey, amountPerBlock, Some(tokens))
       addAndCheck(blockFlow, block)
     }
 
@@ -1393,23 +1390,11 @@ class TxUtilsSpec extends AlephiumSpec {
       buildInputData(pubKey, amount, tokens = Some(tokens))
     }
 
-    val totalAmount     = amount * nbOfInput
-    val amountPerOutput = totalAmount / nbOfOutput
-    val rest            = totalAmount % nbOfOutput
+    val totalAmount = amount * nbOfInput
 
+    val outputsWithoutTokens = buildOutputs(nbOfOutput, totalAmount)
     val outputs =
-      AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
-        if (i == 0) {
-          TxOutputInfo(
-            LockupScript.p2pkh(pubKey),
-            ALPH.alph(amountPerOutput + rest),
-            issuedTokens,
-            None
-          )
-        } else {
-          TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amountPerOutput), AVector.empty, None)
-        }
-      }
+      outputsWithoutTokens.replace(0, outputsWithoutTokens.head.copy(tokens = issuedTokens))
 
     val utx = blockFlow
       .transferMultiInputs(
@@ -1433,7 +1418,6 @@ class TxUtilsSpec extends AlephiumSpec {
     val block1 = transfer(blockFlow, genesisPriKey, pub2, amount = ALPH.alph(100))
     addAndCheck(blockFlow, block1)
 
-    val amount = 5L
     val input1 = buildInputData(pub1, amount)
 
     val outputInfos =
@@ -1507,7 +1491,7 @@ class TxUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "Update selected gas" in new MultiInputTransactionFixture {
+  "TxUtils.updateSelectedGas" should "Update selected gas" in new MultiInputTransactionFixture {
     {
       info("empty list")
       blockFlow.updateSelectedGas(AVector.empty, 0) is AVector
