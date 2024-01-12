@@ -1,0 +1,22 @@
+FROM eclipse-temurin:17-jre
+
+ARG RELEASE=0.0.0
+
+RUN curl -L https://github.com/alephium/alephium/releases/download/v${RELEASE}/alephium-tools-${RELEASE}.jar -o /alephium-tools.jar && \
+  mkdir -p /alephium-home && usermod -d /alephium-home nobody && chown nobody /alephium-home && \
+  mkdir -p ~nobody/.alephium && chown nobody ~nobody/.alephium
+
+COPY user-mainnet-release.conf /alephium-home/.alephium/user.conf
+
+COPY entrypoint-tools.sh /entrypoint.sh
+
+VOLUME /alephium-home/.alephium
+
+USER nobody
+
+ENV JAVA_NET_OPTS="-Djava.net.preferIPv4Stack=true"
+ENV JAVA_MEM_OPTS="-Xms512M -XX:+UseStringDeduplication -XX:+OptimizeStringConcat -XX:+UseNUMA"
+ENV JAVA_GC_OPTS="-XX:+UseShenandoahGC -XX:ShenandoahGCHeuristics=static -XX:+UnlockExperimentalVMOptions -XX:ShenandoahGuaranteedGCInterval=16000 -XX:ShenandoahUncommitDelay=60000 -XX:MaxGCPauseMillis=1 -XX:+ParallelRefProcEnabled -XX:-UseGCOverheadLimit -XX:+DisableExplicitGC"
+ENV JAVA_EXTRA_OPTS=""
+
+ENTRYPOINT /entrypoint.sh
