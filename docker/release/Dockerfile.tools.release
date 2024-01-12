@@ -1,4 +1,4 @@
-FROM openjdk:17-jdk
+FROM eclipse-temurin:17-jre
 
 ARG RELEASE=0.0.0
 
@@ -7,8 +7,6 @@ RUN curl -L https://github.com/alephium/alephium/releases/download/v${RELEASE}/a
   mkdir -p ~nobody/.alephium && chown nobody ~nobody/.alephium
 
 COPY user-mainnet-release.conf /alephium-home/.alephium/user.conf
-
-COPY entrypoint-tools.sh /entrypoint.sh
 
 VOLUME /alephium-home/.alephium
 
