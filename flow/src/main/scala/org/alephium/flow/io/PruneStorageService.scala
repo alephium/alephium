@@ -62,8 +62,9 @@ class PruneStorageService(
       bloomFilter <- retainedBlockHashes
         .foldE(BloomFilter(bloomNumberOfHashes, bloomFalsePositiveRate)) {
           case (bloomFilter, blockHashes) =>
+            // With blocks in the forked chain, we should at least have `retainedHeight` blocks
             assume(
-              blockHashes.length == retainedHeight,
+              blockHashes.length >= retainedHeight,
               s"blocks length ${blockHashes.length} should be equal to $retainedHeight"
             )
             buildBloomFilter(blockHashes.head, blockHashes.tail, bloomFilter)
