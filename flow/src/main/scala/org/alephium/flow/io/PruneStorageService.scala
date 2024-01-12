@@ -239,11 +239,14 @@ class PruneStorageService(
   private def getRetainBlockHashesForChain(chainIndex: ChainIndex): IOResult[AVector[BlockHash]] = {
     val headerChain = blockFlow.getHeaderChain(chainIndex)
     for {
-      bestTip    <- headerChain.getBestTip()
-      maxHeight  <- headerChain.getHeight(bestTip)
-      baseBlock  <- getBaseBlockHash(bestTip, 0)
-      baseHeight <- headerChain.getHeight(baseBlock)
-      result     <- getRetainBlockHashes(baseHeight + 1, maxHeight, headerChain, AVector(baseBlock))
+      bestTip   <- headerChain.getBestTip()
+      maxHeight <- headerChain.getHeight(bestTip)
+      result <- getRetainBlockHashes(
+        maxHeight - (retainedHeight - 1),
+        maxHeight,
+        headerChain,
+        AVector.empty
+      )
     } yield result
   }
 
@@ -264,26 +267,6 @@ class PruneStorageService(
             maxHeight,
             headerChain,
             allBlockHashes ++ blockHashes
-          )
-        case Left(err) =>
-          Left(err)
-      }
-    }
-  }
-
-  @tailrec
-  private def getBaseBlockHash(
-      blockHash: BlockHash,
-      currentHeight: Int
-  ): IOResult[BlockHash] = {
-    if (currentHeight >= retainedHeight - 1) {
-      Right(blockHash)
-    } else {
-      storages.headerStorage.get(blockHash).map(_.parentHash) match {
-        case Right(parentHash) =>
-          getBaseBlockHash(
-            parentHash,
-            currentHeight + 1
           )
         case Left(err) =>
           Left(err)
