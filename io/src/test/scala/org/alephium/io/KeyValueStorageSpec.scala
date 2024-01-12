@@ -40,6 +40,6 @@ class KeyValueStorageSpec extends AlephiumSpec {
 
     db.removeBatchUnsafe(keys)
 
-    db.multiGetUnsafe(keys).length is 0
+    assertThrows[IOError.KeyNotFound](db.multiGetUnsafe(keys))
   }
 }
