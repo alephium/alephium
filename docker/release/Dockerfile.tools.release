@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jre
+FROM openjdk:17-jdk
 
 ARG RELEASE=0.0.0
 
@@ -14,9 +14,4 @@ VOLUME /alephium-home/.alephium
 
 USER nobody
 
-ENV JAVA_NET_OPTS="-Djava.net.preferIPv4Stack=true"
-ENV JAVA_MEM_OPTS="-Xms512M -XX:+UseStringDeduplication -XX:+OptimizeStringConcat -XX:+UseNUMA"
-ENV JAVA_GC_OPTS="-XX:+UseShenandoahGC -XX:ShenandoahGCHeuristics=static -XX:+UnlockExperimentalVMOptions -XX:ShenandoahGuaranteedGCInterval=16000 -XX:ShenandoahUncommitDelay=60000 -XX:MaxGCPauseMillis=1 -XX:+ParallelRefProcEnabled -XX:-UseGCOverheadLimit -XX:+DisableExplicitGC"
-ENV JAVA_EXTRA_OPTS=""
-
-ENTRYPOINT /entrypoint.sh
+ENTRYPOINT ["java", "-cp", "/alephium-tools.jar"]
