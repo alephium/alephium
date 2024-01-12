@@ -36,11 +36,7 @@ final class CachedSMT[K, V](
     } yield persisted
   }
 
-  def getNodeKeys(): IOResult[AVector[Hash]] = {
-    persistInMemory().map(_.getAllKeys())
-  }
-
-  def persistInMemory(): IOResult[InMemorySparseMerkleTrie[K, V]] = {
+  private def persistInMemory(): IOResult[InMemorySparseMerkleTrie[K, V]] = {
     val inMemoryTrie = underlying.inMemory()
     for {
       _ <- EitherF.foreachTry(caches) {
@@ -50,6 +46,10 @@ final class CachedSMT[K, V](
         case (key, Removed())       => inMemoryTrie.remove(key)
       }
     } yield inMemoryTrie
+  }
+
+  def getNewTrieNodeKeys(): IOResult[AVector[Hash]] = {
+    persistInMemory().map(_.getNewTrieNodeKeys())
   }
 
   def staging(): StagingSMT[K, V] = new StagingSMT[K, V](this, mutable.Map.empty)

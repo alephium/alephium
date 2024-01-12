@@ -640,15 +640,15 @@ final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
     put(rootHash, nibbles, value).map(applyActions)
   }
 
-  def getAllKeys(): AVector[Hash] = {
+  def getNewTrieNodeKeys(): AVector[Hash] = {
     var keys = AVector.empty[Hash]
-    preOrderTraversal { (hash, _) =>
+    preOrderCacheTraversal { (hash, _) =>
       keys = keys :+ hash
     }
     keys
   }
 
-  @inline def preOrderTraversal(f: (Hash, Node) => Unit): Unit = {
+  @inline private def preOrderCacheTraversal(f: (Hash, Node) => Unit): Unit = {
     val queue = mutable.Queue(rootHash)
     while (queue.nonEmpty) {
       val current = queue.dequeue()
@@ -667,7 +667,7 @@ final class InMemorySparseMerkleTrie[K: Serde, V: Serde](
 
   def persistInBatch(): IOResult[SparseMerkleTrie[K, V]] = {
     storage
-      .putBatch(preOrderTraversal)
+      .putBatch(preOrderCacheTraversal)
       .map(_ => SparseMerkleTrie(rootHash, storage))
   }
 }

@@ -19,12 +19,12 @@ package org.alephium.tools
 import org.alephium.flow.core.BlockFlow
 import org.alephium.flow.io.PruneStorageService
 import org.alephium.flow.io.Storages
-import org.alephium.flow.setting.{AlephiumConfig, Configs}
+import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
 import org.alephium.io.RocksDBSource.Settings
-import org.alephium.util.{Env, Files}
+import org.alephium.util.Env
 
 object PruneStorage extends App {
-  private val rootPath       = Files.homeDir.resolve(".alephium")
+  private val rootPath       = Platform.getRootPath()
   private val typesafeConfig = Configs.parseConfigAndValidate(Env.Prod, rootPath, overwrite = true)
   private val config         = AlephiumConfig.load(typesafeConfig, "alephium")
   private val dbPath         = rootPath.resolve(config.network.networkId.nodeFolder)

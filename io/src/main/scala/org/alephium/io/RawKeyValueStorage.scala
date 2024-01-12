@@ -29,9 +29,9 @@ trait RawKeyValueStorage {
 
   def putBatchRawUnsafe(f: ((ByteString, ByteString) => Unit) => Unit): Unit
 
-  def deleteBatchRawUnsafe(keys: Seq[ByteString]): Unit
-
   def existsRawUnsafe(key: ByteString): Boolean
 
   def deleteRawUnsafe(key: ByteString): Unit
+
+  def deleteBatchRawUnsafe(keys: Seq[ByteString]): Unit
 }
