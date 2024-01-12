@@ -210,7 +210,7 @@ class PruneStorageService(
 
       if (!bloomFilter.mightContain(key) && notImmutableState(value)) {
         pruneCount += 1
-        batchDeleteKeys += batchDeleteKeys
+        batchDeleteKeys += key
       }
 
       if (batchDeleteKeys.length >= batchDeleteSize) {
