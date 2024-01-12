@@ -17,10 +17,10 @@
 package org.alephium.flow.io
 
 import scala.annotation.tailrec
-import scala.collection.mutable.Queue
+import scala.collection.mutable.{ArrayBuffer, Queue}
 
 import akka.util.ByteString
-import org.slf4j.{Logger, LoggerFactory}
+import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.crypto.{Blake2b => Hash}
 import org.alephium.flow.core.BlockFlow
@@ -39,10 +39,9 @@ class PruneStorageService(
 )(implicit
     blockFlow: BlockFlow,
     groupConfig: GroupConfig
-) {
-  private val logger: Logger         = LoggerFactory.getLogger(this.getClass)
+) extends StrictLogging {
   private val retainedHeight         = 128
-  private val bloomNumberOfHashes    = 80000000L
+  private val bloomNumberOfHashes    = 250000000L
   private val bloomFalsePositiveRate = 0.01
   private val blockValidation        = BlockValidation.build(blockFlow)
 
@@ -53,7 +52,7 @@ class PruneStorageService(
         val (totalCount, pruneCount) = prune(bloomFilter)
         logger.info(s"[FINAL] totalCount: ${totalCount}, pruneCount: ${pruneCount}")
       case Left(error) =>
-        logger.info(s"error: ${error}")
+        logger.error(s"Error: ${error}")
     }
   }
 
@@ -79,7 +78,7 @@ class PruneStorageService(
   ): IOResult[BloomFilter] = {
     for {
       bloomFilter0 <- buildBaseBloomFilter(baseBlockHash, bloomFilter)
-      bloomFilter  <- applyLatestBlocks(baseBlockHash, latestBlockHashesToBeApplied, bloomFilter0)
+      bloomFilter  <- applyLatestBlocks(latestBlockHashesToBeApplied, bloomFilter0)
     } yield bloomFilter
   }
 
@@ -135,7 +134,7 @@ class PruneStorageService(
     if (currentHashesQueue.nonEmpty) {
       val currentHashes = currentHashesQueue.dequeue()
 
-      currentHashes.map(_.bytes).foreach(bloomFilter.add(_))
+      currentHashes.foreach(hash => bloomFilter.add(hash.bytes))
 
       val allNodes = smt.getNodesUnsafe(currentHashes)
       val newHashes: Seq[Hash] = allNodes.flatMap { node =>
@@ -161,25 +160,21 @@ class PruneStorageService(
   }
 
   private def applyLatestBlocks(
-      currentBlockHash: BlockHash,
       blockHashesToApply: AVector[BlockHash],
       bloomFilter: BloomFilter
   ): IOResult[BloomFilter] = {
     blockHashesToApply.foldE(bloomFilter) { (bloomFilter, blockHash) =>
       logger.info(s"applying block ${blockHash.toHexString}")
 
-      applyBlock(currentBlockHash, blockHash).map { newKeys =>
-        newKeys.map(_.bytes).foreach(bloomFilter.add(_))
+      applyBlock(blockHash).map { newKeys =>
+        newKeys.foreach(key => bloomFilter.add(key.bytes))
         bloomFilter
       }
     }
   }
 
-  private[io] def applyBlock(
-      currentBlockHash: BlockHash,
-      blockHash: BlockHash
-  ): IOResult[AVector[Hash]] = {
-    val chainIndex = ChainIndex.from(currentBlockHash)
+  private[io] def applyBlock(blockHash: BlockHash): IOResult[AVector[Hash]] = {
+    val chainIndex = ChainIndex.from(blockHash)
     assume(chainIndex.isIntraGroup)
     val blockchain = blockFlow.getBlockChain(chainIndex)
 
@@ -194,9 +189,9 @@ class PruneStorageService(
           throw new Error(s"block ${blockHash.toHexString} is invalid")
       }
       _                 <- blockFlow.updateState(cachedWorldState, block)
-      outputStateKeys   <- cachedWorldState.outputState.getNodeKeys()
-      contractStateKeys <- cachedWorldState.contractState.getNodeKeys()
-      codeStateKeys     <- cachedWorldState.codeState.getNodeKeys()
+      outputStateKeys   <- cachedWorldState.outputState.getNewTrieNodeKeys()
+      contractStateKeys <- cachedWorldState.contractState.getNewTrieNodeKeys()
+      codeStateKeys     <- cachedWorldState.codeState.getNewTrieNodeKeys()
     } yield outputStateKeys ++ contractStateKeys ++ codeStateKeys
   }
 
@@ -205,7 +200,7 @@ class PruneStorageService(
       storages.worldStateStorage.trieStorage.asInstanceOf[RocksDBKeyValueStorage[Hash, Node]]
     var totalCount      = 0
     var pruneCount      = 0
-    var batchDeleteKeys = Seq.empty[ByteString]
+    val batchDeleteKeys = ArrayBuffer.empty[ByteString]
     val batchDeleteSize = 256
 
     trieStorage.iterateRaw((key, value) => {
@@ -215,19 +210,19 @@ class PruneStorageService(
 
       if (!bloomFilter.mightContain(key) && notImmutableState(value)) {
         pruneCount += 1
-        batchDeleteKeys = key +: batchDeleteKeys
+        batchDeleteKeys += key
       }
 
       if (batchDeleteKeys.length >= batchDeleteSize) {
-        trieStorage.deleteBatchRawUnsafe(batchDeleteKeys)
-        batchDeleteKeys = Seq.empty[ByteString]
+        trieStorage.deleteBatchRawUnsafe(batchDeleteKeys.toSeq)
+        batchDeleteKeys.clear()
       }
 
       totalCount += 1
     })
 
     if (batchDeleteKeys.nonEmpty) {
-      trieStorage.deleteBatchRawUnsafe(batchDeleteKeys)
+      trieStorage.deleteBatchRawUnsafe(batchDeleteKeys.toSeq)
     }
 
     (totalCount, pruneCount)

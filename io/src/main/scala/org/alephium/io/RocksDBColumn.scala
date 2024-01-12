@@ -81,6 +81,7 @@ trait RocksDBColumn extends RawKeyValueStorage {
     val handles       = keys.map(_ => handle).asJava
     db.multiGetAsList(handles, convertedKeys)
       .asScala
+      .view
       .zipWithIndex
       .map { case (value, index) =>
         Option(value) match {
@@ -100,13 +101,6 @@ trait RocksDBColumn extends RawKeyValueStorage {
     writeBatch.close()
   }
 
-  override def deleteBatchRawUnsafe(keys: Seq[ByteString]): Unit = {
-    val writeBatch = new WriteBatch()
-    keys.foreach(key => writeBatch.delete(handle, key.toArray))
-    db.write(writeOptions, writeBatch)
-    writeBatch.close()
-  }
-
   override def existsRawUnsafe(key: ByteString): Boolean = {
     val result = db.get(handle, key.toArray)
     result != null
@@ -114,5 +108,12 @@ trait RocksDBColumn extends RawKeyValueStorage {
 
   override def deleteRawUnsafe(key: ByteString): Unit = {
     db.delete(handle, key.toArray)
+  }
+
+  override def deleteBatchRawUnsafe(keys: Seq[ByteString]): Unit = {
+    val writeBatch = new WriteBatch()
+    keys.foreach(key => writeBatch.delete(handle, key.toArray))
+    db.write(writeOptions, writeBatch)
+    writeBatch.close()
   }
 }

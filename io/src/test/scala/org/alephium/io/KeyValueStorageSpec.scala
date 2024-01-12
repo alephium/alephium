@@ -38,7 +38,7 @@ class KeyValueStorageSpec extends AlephiumSpec {
 
     db.multiGetUnsafe(keys) is values
 
-    db.deleteBatchUnsafe(keys)
+    db.removeBatchUnsafe(keys)
 
     db.multiGetUnsafe(keys).length is 0
   }
