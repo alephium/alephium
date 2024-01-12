@@ -216,7 +216,7 @@ class CachedTrieSpec extends AlephiumSpec {
   }
 
   it should "be able to persist twice" in new Fixture {
-    val tests = Array.fill(10)(generateKV())
+    val tests     = Array.fill(10)(generateKV())
     val cachedSMT = CachedSMT.from(unCached)
     tests.foreach { case (key, value) =>
       cachedSMT.put(key, value)

@@ -105,7 +105,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
       chainIndex = chainIndex
     )
 
-    val block4          = addOneBlock(chainIndex, blockFlow)
+    addOneBlock(chainIndex, blockFlow)
     val allKeysAtBlock4 = getAllKeysInTrie()
 
     val block5 = callContract(contractId)
@@ -118,7 +118,7 @@ class PruneStorageServiceSpec extends AlephiumSpec {
 
     val keysAfterApplyingRestOfBlocks = (block5 +: restOfBlocks)
       .foldLeft(allKeysAtBlock4) { (acc, block) =>
-        val result = pruneStorageService.applyBlock(block4.hash, block.hash).rightValue
+        val result = pruneStorageService.applyBlock(block.hash).rightValue
         acc ++ result
       }
       .toSet

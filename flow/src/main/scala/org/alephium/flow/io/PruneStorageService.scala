@@ -23,7 +23,7 @@ import akka.util.ByteString
 import com.typesafe.scalalogging.StrictLogging
 
 import org.alephium.crypto.{Blake2b => Hash}
-import org.alephium.flow.core.BlockFlow
+import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.flow.validation.BlockValidation
 import org.alephium.io.{IOResult, RocksDBKeyValueStorage, SparseMerkleTrie}
 import org.alephium.io.SparseMerkleTrie.Node
@@ -41,7 +41,7 @@ class PruneStorageService(
     groupConfig: GroupConfig
 ) extends StrictLogging {
   private val retainedHeight         = 128
-  private val bloomNumberOfHashes    = 250000000L
+  private val bloomNumberOfHashes    = 80000000L
   private val bloomFalsePositiveRate = 0.01
   private val blockValidation        = BlockValidation.build(blockFlow)
 
@@ -237,27 +237,53 @@ class PruneStorageService(
   }
 
   private def getRetainBlockHashesForChain(chainIndex: ChainIndex): IOResult[AVector[BlockHash]] = {
+    val headerChain = blockFlow.getHeaderChain(chainIndex)
     for {
-      bestTip <- blockFlow.getHeaderChain(chainIndex).getBestTip()
-      result  <- getRetainBlockHashes(bestTip, 0, AVector(bestTip))
+      bestTip    <- headerChain.getBestTip()
+      maxHeight  <- headerChain.getHeight(bestTip)
+      baseBlock  <- getBaseBlockHash(bestTip, 0)
+      baseHeight <- headerChain.getHeight(baseBlock)
+      result     <- getRetainBlockHashes(baseHeight + 1, maxHeight, headerChain, AVector(baseBlock))
     } yield result
   }
 
   @tailrec
   private def getRetainBlockHashes(
-      blockHash: BlockHash,
       currentHeight: Int,
+      maxHeight: Int,
+      headerChain: BlockHeaderChain,
       allBlockHashes: AVector[BlockHash]
   ): IOResult[AVector[BlockHash]] = {
-    if (currentHeight >= retainedHeight - 1) {
+    if (currentHeight > maxHeight) {
       Right(allBlockHashes)
+    } else {
+      headerChain.getHashes(currentHeight) match {
+        case Right(blockHashes) =>
+          getRetainBlockHashes(
+            currentHeight + 1,
+            maxHeight,
+            headerChain,
+            allBlockHashes ++ blockHashes
+          )
+        case Left(err) =>
+          Left(err)
+      }
+    }
+  }
+
+  @tailrec
+  private def getBaseBlockHash(
+      blockHash: BlockHash,
+      currentHeight: Int
+  ): IOResult[BlockHash] = {
+    if (currentHeight >= retainedHeight - 1) {
+      Right(blockHash)
     } else {
       storages.headerStorage.get(blockHash).map(_.parentHash) match {
         case Right(parentHash) =>
-          getRetainBlockHashes(
+          getBaseBlockHash(
             parentHash,
-            currentHeight + 1,
-            parentHash +: allBlockHashes
+            currentHeight + 1
           )
         case Left(err) =>
           Left(err)
