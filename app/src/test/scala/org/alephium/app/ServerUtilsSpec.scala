@@ -2435,7 +2435,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
   }
 
-  it should "deploy contract with preapproved assets" in new Fixture {
+  trait ContractDeploymentFixture extends Fixture {
     val chainIndex                 = ChainIndex.unsafe(0, 0)
     val lockupScript               = getGenesisLockupScript(chainIndex)
     val (privateKey, publicKey, _) = genesisKeys(chainIndex.from.value)
@@ -2447,6 +2447,29 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
     val contract = Compiler.compileContract(code).rightValue
 
+    implicit val serverUtils = new ServerUtils()
+    def buildDeployContractTx(query: BuildDeployContractTx): BuildDeployContractTxResult = {
+      val result = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
+      signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      result
+    }
+
+    def checkBalance(
+        lockupScript: LockupScript,
+        expectedAlphBalanceOpt: Option[U256],
+        tokenId: TokenId,
+        expectedTokenBalance: Option[U256]
+    ) = {
+      val (alphAmount, _, tokens, _, _) =
+        blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
+      expectedAlphBalanceOpt.foreach(_ is alphAmount)
+      tokens.find(_._1 == tokenId).map(_._2) is expectedTokenBalance
+    }
+  }
+
+  it should "deploy contract with preapproved assets" in new ContractDeploymentFixture {
     def createToken(amount: U256): ContractId = {
       val issuanceInfo = Some(TokenIssuance.Info(vm.Val.U256(amount), Some(lockupScript)))
       val script =
@@ -2474,31 +2497,18 @@ class ServerUtilsSpec extends AlephiumSpec {
       initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
       initialTokenAmounts = Some(AVector(Token(tokenId, U256.unsafe(4))))
     )
-    implicit val serverUtils = new ServerUtils()
-    val result               = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
-    signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
-    val block = mineFromMemPool(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block)
 
-    val (alphAmount, _, tokens1, _, _) = blockFlow
-      .getBalance(LockupScript.P2C(result.contractAddress.contractId), defaultUtxoLimit, true)
-      .rightValue
-    alphAmount is ALPH.alph(2)
-    tokens1.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(4))
+    val result = buildDeployContractTx(query)
+
+    checkBalance(
+      LockupScript.P2C(result.contractAddress.contractId),
+      Some(ALPH.alph(2)),
+      tokenId,
+      Some(U256.unsafe(4))
+    )
   }
 
-  it should "deploy contract with token issuance" in new Fixture {
-    val chainIndex                 = ChainIndex.unsafe(0, 0)
-    val (privateKey, publicKey, _) = genesisKeys(chainIndex.from.value)
-
-    val code =
-      s"""
-         |Contract Foo() {
-         |  pub fn foo() -> () {}
-         |}
-         |""".stripMargin
-    val contract = Compiler.compileContract(code).rightValue
-
+  it should "deploy contract with token issuance" in new ContractDeploymentFixture {
     val query = BuildDeployContractTx(
       fromPublicKey = publicKey.bytes,
       bytecode = serialize(contract) ++ ByteString(0, 0),
@@ -2507,23 +2517,38 @@ class ServerUtilsSpec extends AlephiumSpec {
       issueTokenTo = Some(Address.p2pkh(publicKey))
     )
 
-    implicit val serverUtils = new ServerUtils()
-    val result               = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
-    val tokenId              = TokenId.from(result.contractAddress.contractId)
-    signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
-    val block = mineFromMemPool(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block)
+    val result  = buildDeployContractTx(query)
+    val tokenId = TokenId.from(result.contractAddress.contractId)
 
-    val (alphAmount, _, tokens1, _, _) = blockFlow
-      .getBalance(LockupScript.P2C(result.contractAddress.contractId), defaultUtxoLimit, true)
-      .rightValue
-    alphAmount is ALPH.alph(2)
-    tokens1.find(_._1 == tokenId).map(_._2) is None
+    checkBalance(
+      LockupScript.P2C(result.contractAddress.contractId),
+      Some(ALPH.alph(2)),
+      tokenId,
+      None
+    )
 
-    val (_, _, issueToTokens1, _, _) = blockFlow
-      .getBalance(LockupScript.p2pkh(publicKey), defaultUtxoLimit, true)
-      .rightValue
-    issueToTokens1.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(10))
+    checkBalance(
+      LockupScript.p2pkh(publicKey),
+      None,
+      tokenId,
+      Some(U256.unsafe(10))
+    )
+  }
+
+  it should "fail when `issueTokenTo` is specified but `issueTokenAmount` is not" in new ContractDeploymentFixture {
+    val query = BuildDeployContractTx(
+      fromPublicKey = publicKey.bytes,
+      bytecode = serialize(contract) ++ ByteString(0, 0),
+      initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
+      issueTokenAmount = None,
+      issueTokenTo = Some(Address.p2pkh(publicKey))
+    )
+
+    serverUtils.buildDeployContractTx(blockFlow, query) is Left(
+      ApiError.BadRequest(
+        "`issueTokenTo` is specified, but `issueTokenAmount` is not specified"
+      )
+    )
   }
 
   private def generateDestination(
