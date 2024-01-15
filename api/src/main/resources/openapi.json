@@ -7327,6 +7327,7 @@
                       }
                     ],
                     "issueTokenAmount": "2000000000000000000",
+                    "issueTokenTo": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
                     "gasAmount": 20000,
                     "gasPrice": "100000000000"
                   }
@@ -10317,6 +10318,10 @@
           "issueTokenAmount": {
             "type": "string",
             "format": "uint256"
+          },
+          "issueTokenTo": {
+            "type": "string",
+            "format": "address"
           },
           "gasAmount": {
             "type": "integer",
