@@ -948,10 +948,13 @@ class ServerUtils(implicit
         amounts._2,
         tokenIssuanceInfo
       )
+      totalAttoAlphAmount <- initialAttoAlphAmount
+        .add(query.issueTokenTo.map(_ => dustUtxoAmount).getOrElse(U256.Zero))
+        .toRight(failed("ALPH amount overflow"))
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        initialAttoAlphAmount,
+        totalAttoAlphAmount,
         amounts._2,
         lockPair._1,
         lockPair._2,
@@ -1537,7 +1540,10 @@ object ServerUtils {
     val mutStateRaw = Hex.toHexString(serialize(initialMutFields))
     def toCreate(approveAssets: String): String = tokenIssuanceInfo match {
       case Some((issueAmount, Some(issueTo))) =>
-        s"createContractWithToken!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${issueAmount.v}, @$issueTo)"
+        s"""
+           |createContractWithToken!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${issueAmount.v}, @$issueTo)
+           |  transferToken!{@$address -> ALPH: dustAmount!()}(@$address, @$issueTo, ALPH, dustAmount!())
+           |""".stripMargin.stripLeading().stripTrailing()
       case Some((issueAmount, None)) =>
         s"createContractWithToken!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${issueAmount.v})"
       case None =>
