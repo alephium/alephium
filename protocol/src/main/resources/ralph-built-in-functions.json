@@ -887,11 +887,11 @@
     "name": "blake2b",
     "category": "Cryptography",
     "signature": "fn blake2b!(data:ByteVec) -> (ByteVec)",
-    "doc": "Computes the Blake2b256 hash of the input.",
+    "doc": "Computes the Blake2b-256 hash of the input.",
     "params": [
       "@param data the input data to be hashed"
     ],
-    "returns": "@returns the 32 byte hash result"
+    "returns": "@returns the 32 bytes hash result"
   },
   {
     "name": "keccak256",
