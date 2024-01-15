@@ -28,13 +28,13 @@ import org.alephium.util._
 object GasEstimation extends StrictLogging {
   def sweepAddress: (Int, Int) => GasBox = estimateWithP2PKHInputs _
 
-  def estimateP2PKHInputs(numInputs: Int): GasBox = {
+  def gasForP2PKHInputs(numInputs: Int): GasBox = {
     val inputGas = GasSchedule.txInputBaseGas.addUnsafe(GasSchedule.p2pkUnlockGas)
     inputGas.mulUnsafe(numInputs)
   }
 
   def estimateWithP2PKHInputs(numInputs: Int, numOutputs: Int): GasBox = {
-    val inputGas = estimateP2PKHInputs(numInputs)
+    val inputGas = gasForP2PKHInputs(numInputs)
     estimate(inputGas, numOutputs)
   }
 

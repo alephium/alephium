@@ -260,9 +260,9 @@ class TxUtilsSpec extends AlephiumSpec {
     def genPublicKeys(nb: Int): AVector[PublicKey] =
       AVector.fill(nb)(chainIndex.from.generateKey._2)
 
-    def computeAmountPerOutput(totalAmount: Long, nbOfOutput: Int): (Long, Long) = {
-      val amountPerOutput = totalAmount / nbOfOutput
-      val rest            = totalAmount % nbOfOutput
+    def computeAmountPerOutput(totalAmount: Long, nbOfOutputs: Int): (Long, Long) = {
+      val amountPerOutput = totalAmount / nbOfOutputs
+      val rest            = totalAmount % nbOfOutputs
       (amountPerOutput, rest)
     }
 
@@ -286,18 +286,18 @@ class TxUtilsSpec extends AlephiumSpec {
       }
     }
 
-    def buildOutputs(nbOfOutput: Int, totalAmount: Long) = {
-      val (amountPerOutput, rest) = computeAmountPerOutput(totalAmount, nbOfOutput)
-      AVector.fill(nbOfOutput)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
+    def buildOutputs(nbOfOutputs: Int, totalAmount: Long) = {
+      val (amountPerOutput, rest) = computeAmountPerOutput(totalAmount, nbOfOutputs)
+      AVector.fill(nbOfOutputs)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
         val amount = if (i == 0) amountPerOutput + rest else amountPerOutput
         TxOutputInfo(LockupScript.p2pkh(pubKey), ALPH.alph(amount), AVector.empty, None)
       }
     }
 
     // scalastyle:off method.length
-    def checkMultiInputTx(nbOfInput: Int, nbOfOutput: Int) = {
+    def checkMultiInputTx(nbOfInputs: Int, nbOfOutputs: Int) = {
 
-      val publicKeys = genPublicKeys(nbOfInput)
+      val publicKeys = genPublicKeys(nbOfInputs)
 
       publicKeys.foreach { pubKey =>
         val block = buildBlock(pubKey, 100)
@@ -308,10 +308,10 @@ class TxUtilsSpec extends AlephiumSpec {
         buildInputData(pubKey, amount)
       }
 
-      val totalAmount             = amount * nbOfInput
-      val (amountPerOutput, rest) = computeAmountPerOutput(totalAmount, nbOfOutput)
+      val totalAmount             = amount * nbOfInputs
+      val (amountPerOutput, rest) = computeAmountPerOutput(totalAmount, nbOfOutputs)
 
-      val outputs = buildOutputs(nbOfOutput, totalAmount)
+      val outputs = buildOutputs(nbOfOutputs, totalAmount)
 
       val utx = blockFlow
         .transferMultiInputs(
@@ -324,18 +324,19 @@ class TxUtilsSpec extends AlephiumSpec {
         .rightValue
         .rightValue
 
-      utx.inputs.length is nbOfInput
-      utx.fixedOutputs.length is (nbOfInput + nbOfOutput)
+      utx.inputs.length is nbOfInputs
+      utx.fixedOutputs.length is (nbOfInputs + nbOfOutputs)
 
-      val fixedOutputs = utx.fixedOutputs.take(nbOfOutput)
+      val fixedOutputs = utx.fixedOutputs.take(nbOfOutputs)
       fixedOutputs.head.amount is ALPH.alph(amountPerOutput + rest)
       fixedOutputs.tail.foreach(_.amount is ALPH.alph(amountPerOutput))
 
-      val gasEstimation = GasEstimation.estimateWithP2PKHInputs(nbOfInput, nbOfOutput + nbOfInput)
+      val gasEstimation =
+        GasEstimation.estimateWithP2PKHInputs(nbOfInputs, nbOfOutputs + nbOfInputs)
 
       utx.gasAmount <= gasEstimation is true
 
-      val changeOutputs = utx.fixedOutputs.drop(nbOfOutput).map(_.amount)
+      val changeOutputs = utx.fixedOutputs.drop(nbOfOutputs).map(_.amount)
 
       // As they all had 1 utxo, they all had to pay same gas, so same change output
       changeOutputs.toSeq.distinct.length is 1
@@ -1217,9 +1218,9 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "transfer multi inputs with different nb of utxos per input" in new MultiInputTransactionFixture {
-    val nbOfInput  = 4
-    val nbOfOutput = 4
-    val publicKeys = genPublicKeys(nbOfInput)
+    val nbOfInputs  = 4
+    val nbOfOutputs = 4
+    val publicKeys  = genPublicKeys(nbOfInputs)
 
     publicKeys.zipWithIndex.foreach { case (pubKey, i) =>
       def block = buildBlock(pubKey, amount + 1)
@@ -1235,11 +1236,11 @@ class TxUtilsSpec extends AlephiumSpec {
       buildInputData(pubKey, amnt)
     }
 
-    val totalAmount = (1 to nbOfInput).map { i =>
+    val totalAmount = (1 to nbOfInputs).map { i =>
       i * amount
     }.sum
 
-    val outputs = buildOutputs(nbOfOutput, totalAmount)
+    val outputs = buildOutputs(nbOfOutputs, totalAmount)
 
     val utx = blockFlow
       .transferMultiInputs(
@@ -1253,29 +1254,29 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
 
     (utx.gasAmount > GasEstimation.estimateWithP2PKHInputs(
-      nbOfInput,
-      nbOfOutput + nbOfInput
+      nbOfInputs,
+      nbOfOutputs + nbOfInputs
     )) is true
     (utx.gasAmount > GasEstimation.estimateWithP2PKHInputs(
-      (1 to nbOfInput).sum - 1,
-      nbOfOutput + nbOfInput
+      (1 to nbOfInputs).sum - 1,
+      nbOfOutputs + nbOfInputs
     )) is true
 
     (utx.gasAmount <= GasEstimation.estimateWithP2PKHInputs(
-      (1 to nbOfInput).sum,
-      nbOfOutput + nbOfInput
+      (1 to nbOfInputs).sum,
+      nbOfOutputs + nbOfInputs
     )) is true
 
-    val changeOutputs = utx.fixedOutputs.drop(nbOfOutput).map(_.amount)
+    val changeOutputs = utx.fixedOutputs.drop(nbOfOutputs).map(_.amount)
 
     // Each input will pay different fee, so each change output is different
     changeOutputs.toSeq.distinct.length is changeOutputs.length
   }
 
   it should "transfer multi inputs with gas defined" in new MultiInputTransactionFixture {
-    val nbOfInput      = 4
-    val nbOfOutput     = 1
-    val publicKeys     = genPublicKeys(nbOfInput)
+    val nbOfInputs     = 4
+    val nbOfOutputs    = 1
+    val publicKeys     = genPublicKeys(nbOfInputs)
     val amountPerBlock = 100L
 
     publicKeys.foreach { pubKey =>
@@ -1283,13 +1284,16 @@ class TxUtilsSpec extends AlephiumSpec {
       addAndCheck(blockFlow, block)
     }
 
+    // We show that we can even define less than the minimal gas, as the overall gas will be enough
+    val gas = GasBox.unsafe(minimalGas.value - (minimalGas.value / 4))
+
     val inputs = publicKeys.mapWithIndex { case (pubKey, i) =>
-      buildInputData(pubKey, amount, Some(minimalGas.mulUnsafe(i)))
+      buildInputData(pubKey, amount, Some(gas.mulUnsafe(i)))
     }
 
-    val totalAmount = amount * nbOfInput
+    val totalAmount = amount * nbOfInputs
 
-    val outputs = buildOutputs(nbOfOutput, totalAmount)
+    val outputs = buildOutputs(nbOfOutputs, totalAmount)
 
     val utx = blockFlow
       .transferMultiInputs(
@@ -1302,19 +1306,19 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .rightValue
 
-    val changeOutputs = utx.fixedOutputs.drop(nbOfOutput).map(_.amount)
+    val changeOutputs = utx.fixedOutputs.drop(nbOfOutputs).map(_.amount)
 
     changeOutputs.zipWithIndex.foreach { case (change, i) =>
       val expected =
-        ALPH.alph(amountPerBlock - amount) - nonCoinbaseMinGasPrice * minimalGas.mulUnsafe(i)
+        ALPH.alph(amountPerBlock - amount) - nonCoinbaseMinGasPrice * gas.mulUnsafe(i)
       change is expected
     }
   }
 
   it should "transfer multi inputs with explicit utxos" in new MultiInputTransactionFixture {
-    val nbOfInput      = 4
-    val nbOfOutput     = 1
-    val publicKeys     = genPublicKeys(nbOfInput)
+    val nbOfInputs     = 4
+    val nbOfOutputs    = 1
+    val publicKeys     = genPublicKeys(nbOfInputs)
     val amountPerBlock = 100L
 
     publicKeys.foreach { pubKey =>
@@ -1339,9 +1343,9 @@ class TxUtilsSpec extends AlephiumSpec {
       }
     }
 
-    val totalAmount = amountPerBlock + (amount * nbOfInput)
+    val totalAmount = amountPerBlock + (amount * nbOfInputs)
 
-    val outputs = buildOutputs(nbOfOutput, totalAmount)
+    val outputs = buildOutputs(nbOfOutputs, totalAmount)
 
     val utx = blockFlow
       .transferMultiInputs(
@@ -1354,47 +1358,67 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .rightValue
 
-    utx.inputs.length is nbOfInput + 1 // for the extra utxos of first pub key
+    utx.inputs.length is nbOfInputs + 1 // for the extra utxos of first pub key
   }
 
   it should "transfer multi inputs with tokens" in new MultiInputTransactionFixture
     with ContractFixture {
-    val nbOfInput      = 10
-    val nbOfOutput     = 5
-    val publicKeys     = genPublicKeys(nbOfInput)
+    val nbOfInputs     = 10
+    val nbOfOutputs    = 5
+    val publicKeys     = genPublicKeys(nbOfInputs)
     val amountPerBlock = 100L
+    val tokenAmount    = 2 * nbOfInputs
 
-    val (cId, _) = createContract(
-      code,
-      AVector.empty,
-      AVector.empty,
-      tokenIssuanceInfo = Some(
-        TokenIssuance.Info(
-          Val.U256(U256.unsafe(nbOfInput)),
-          Some(Address.p2pkh(genesisPubKey).lockupScript)
+    // How many tokens will be created
+    val nbOfTokens = 3
+    // How many inputs will send only half of their tokens
+    val nbOfTokenHolders = 2
+
+    val tokens = AVector.fill(nbOfTokens) {
+      val (cId, _) = createContract(
+        code,
+        AVector.empty,
+        AVector.empty,
+        tokenIssuanceInfo = Some(
+          TokenIssuance.Info(
+            Val.U256(U256.unsafe(tokenAmount)),
+            Some(Address.p2pkh(genesisPubKey).lockupScript)
+          )
         )
       )
-    )
 
-    val tokenId = TokenId.from(cId)
-
-    val issuedTokens = AVector((tokenId, U256.unsafe(nbOfInput)))
-    val tokens       = AVector((tokenId, U256.One))
+      (TokenId.from(cId), U256.Two)
+    }
 
     publicKeys.foreach { pubKey =>
       val block = buildBlock(pubKey, amountPerBlock, Some(tokens))
       addAndCheck(blockFlow, block)
     }
 
-    val inputs = publicKeys.map { pubKey =>
-      buildInputData(pubKey, amount, tokens = Some(tokens))
+    val inputs = publicKeys.mapWithIndex { case (pubKey, i) =>
+      // Holders will send only half of each of their tokens
+      if (i < nbOfTokenHolders) {
+        buildInputData(
+          pubKey,
+          amount,
+          tokens = Some(tokens.map { case (tokenId, _) => (tokenId, U256.One) })
+        )
+      } else {
+        buildInputData(pubKey, amount, tokens = Some(tokens))
+      }
     }
 
-    val totalAmount = amount * nbOfInput
+    val totalAmount = amount * nbOfInputs
 
-    val outputsWithoutTokens = buildOutputs(nbOfOutput, totalAmount)
+    val outputTokens =
+      tokens.map { case (tokenId, _) =>
+        (tokenId, U256.unsafe(tokenAmount - nbOfTokenHolders))
+      }
+
+    val outputsWithoutTokens = buildOutputs(nbOfOutputs, totalAmount)
+    // We send the tokens to the first output
     val outputs =
-      outputsWithoutTokens.replace(0, outputsWithoutTokens.head.copy(tokens = issuedTokens))
+      outputsWithoutTokens.replace(0, outputsWithoutTokens.head.copy(tokens = outputTokens))
 
     val utx = blockFlow
       .transferMultiInputs(
@@ -1407,9 +1431,37 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .rightValue
 
-    utx.inputs.length is nbOfInput + nbOfInput // double of inputs as each input has tokens
-    utx.fixedOutputs.head.tokens is issuedTokens
-    utx.fixedOutputs.tail.foreach(_.tokens is AVector.empty[(TokenId, U256)])
+    utx.inputs.length is nbOfInputs + (nbOfInputs * nbOfTokens)
+
+    utx.fixedOutputs.length is tokens.length + nbOfOutputs + (nbOfTokenHolders * tokens.length) + nbOfInputs
+
+    utx.fixedOutputs.take(nbOfTokens).map(_.tokens) is
+      tokens.map { case (tokenId, _) =>
+        AVector((tokenId, U256.unsafe(tokenAmount - nbOfTokenHolders)))
+      }
+
+    utx.fixedOutputs
+      .drop(nbOfTokens)
+      .take(nbOfOutputs)
+      .foreach(_.tokens is AVector.empty[(TokenId, U256)])
+
+    val changeOutputs = utx.fixedOutputs.drop(nbOfTokens + nbOfOutputs)
+
+    val tokensChange =
+      tokens.map { case (tokenId, _) =>
+        AVector((tokenId, U256.One))
+      } :+ AVector.empty[(TokenId, U256)]
+
+    (0 to nbOfTokenHolders - 1).foreach { i =>
+      changeOutputs
+        .drop(i * tokensChange.length)
+        .take(tokensChange.length)
+        .map(_.tokens) is tokensChange
+    }
+
+    changeOutputs
+      .drop(nbOfTokenHolders * tokensChange.length)
+      .foreach(_.tokens is AVector.empty[(TokenId, U256)])
   }
 
   it should "fail to transfer multi inputs" in new MultiInputTransactionFixture {
@@ -1487,7 +1539,7 @@ class TxUtilsSpec extends AlephiumSpec {
           None
         )
         .rightValue
-        .leftValue is "Missing `gasAmount` in some input"
+        .leftValue is "Missing `gasAmount` in some inputs"
     }
   }
 

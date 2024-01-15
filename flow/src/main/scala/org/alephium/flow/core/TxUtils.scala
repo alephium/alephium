@@ -512,13 +512,18 @@ trait TxUtils { Self: FlowUtils =>
     // With 1 input, it's like a simple transfer and the gas was already correctly selected.
     // If some input have explicit gas, we don't update either
     if (inputs.length > 1 && !inputs.exists(_._1.gasOpt.isDefined)) {
-      val destinationsGas = GasSchedule.txOutputBaseGas.mulUnsafe(txOutputLength - 1)
+      val destinationsGas = GasSchedule.txOutputBaseGas.mulUnsafe(txOutputLength)
 
       val gasPerInput = inputs.map { case (input, selected) =>
-        // 1 output for change TODO can we have more? we could have 0 tho
+        /*
+         We only consider 1 change output here.
+         In the cases where there are 0 change output we will over-estimate
+         If there are multiple change outputs we could underestimate the gas (e.g. with tokens).
+         TODO If a tx with lots of tokens fails because of not enough gas, we might need to adapt the output length here.
+         */
         val outputLength = 1
         val outGas       = GasSchedule.txOutputBaseGas.mulUnsafe(outputLength)
-        val inGas        = GasEstimation.estimateP2PKHInputs(selected.assets.length)
+        val inGas        = GasEstimation.gasForP2PKHInputs(selected.assets.length)
         val inOutGas     = inGas.addUnsafe(outGas)
 
         // If current selected gas is equal to minimal gas, it means it could probably be lower
@@ -614,7 +619,10 @@ trait TxUtils { Self: FlowUtils =>
       calculateResult <- UnsignedTransaction.calculateTotalAmountNeeded(outputInfos)
       (totalAmountNeeded, _, txOutputLength) = calculateResult
       dustAmount <- totalAmountNeeded.sub(totalAmount).toRight("ALPH underflow")
-    } yield (dustAmount, txOutputLength)
+    } yield {
+      // `calculateTotalAmountNeeded` is adding a +1 length for the sender's output
+      (dustAmount, txOutputLength - 1)
+    }
   }
 
   def sweepAddress(
@@ -997,7 +1005,7 @@ trait TxUtils { Self: FlowUtils =>
       if (definedGas == 0 || definedGas == inputs.length) {
         Right(())
       } else {
-        Left("Missing `gasAmount` in some input")
+        Left("Missing `gasAmount` in some inputs")
       }
     }
   }
