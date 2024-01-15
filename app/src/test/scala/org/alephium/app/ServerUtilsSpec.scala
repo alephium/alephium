@@ -2107,9 +2107,62 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val contract          = Compiler.compileContract(rawCode).rightValue
-    val (_, publicKey, _) = genesisKeys(0)
-    val fromAddress       = Address.p2pkh(publicKey)
+    val contract              = Compiler.compileContract(rawCode).rightValue
+    val (_, fromPublicKey, _) = genesisKeys(0)
+    val fromAddress           = Address.p2pkh(fromPublicKey)
+    val (_, toPublicKey, _)   = genesisKeys(1)
+    val toAddress             = Address.p2pkh(toPublicKey)
+
+    {
+      info("Without token issuance")
+      val codeRaw                        = Hex.toHexString(serialize(contract))
+      val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
+      val stateRaw                       = Hex.toHexString(serialize(initialFields))
+
+      val expected =
+        s"""
+           |TxScript Main {
+           |  createContract!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00)
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(expected).isRight is true
+      ServerUtils
+        .buildDeployContractScriptRawWithParsedState(
+          codeRaw,
+          fromAddress,
+          initialImmFields = initialFields,
+          initialMutFields = AVector.empty,
+          U256.unsafe(10),
+          AVector.empty,
+          None
+        ) is expected
+    }
+
+    {
+      info("Issue token and transfer to an address")
+      val codeRaw                        = Hex.toHexString(serialize(contract))
+      val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
+      val stateRaw                       = Hex.toHexString(serialize(initialFields))
+
+      val expected =
+        s"""
+           |TxScript Main {
+           |  createContractWithToken!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50, @$toAddress)
+           |  transferToken!{@$fromAddress -> ALPH: dustAmount!()}(@$fromAddress, @$toAddress, ALPH, dustAmount!())
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(expected).isRight is true
+      ServerUtils
+        .buildDeployContractScriptRawWithParsedState(
+          codeRaw,
+          fromAddress,
+          initialImmFields = initialFields,
+          initialMutFields = AVector.empty,
+          U256.unsafe(10),
+          AVector.empty,
+          Some((U256.unsafe(50), Some(toAddress)))
+        ) is expected
+    }
 
     {
       info("With approved tokens")
@@ -2432,6 +2485,45 @@ class ServerUtilsSpec extends AlephiumSpec {
       .rightValue
     alphAmount is ALPH.alph(2)
     tokens1.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(4))
+  }
+
+  it should "deploy contract with token issuance" in new Fixture {
+    val chainIndex                 = ChainIndex.unsafe(0, 0)
+    val (privateKey, publicKey, _) = genesisKeys(chainIndex.from.value)
+
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {}
+         |}
+         |""".stripMargin
+    val contract = Compiler.compileContract(code).rightValue
+
+    val query = BuildDeployContractTx(
+      fromPublicKey = publicKey.bytes,
+      bytecode = serialize(contract) ++ ByteString(0, 0),
+      initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
+      issueTokenAmount = Some(Amount(U256.unsafe(10))),
+      issueTokenTo = Some(Address.p2pkh(publicKey))
+    )
+
+    implicit val serverUtils = new ServerUtils()
+    val result               = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
+    val tokenId              = TokenId.from(result.contractAddress.contractId)
+    signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
+    val block = mineFromMemPool(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+
+    val (alphAmount, _, tokens1, _, _) = blockFlow
+      .getBalance(LockupScript.P2C(result.contractAddress.contractId), defaultUtxoLimit, true)
+      .rightValue
+    alphAmount is ALPH.alph(2)
+    tokens1.find(_._1 == tokenId).map(_._2) is None
+
+    val (_, _, issueToTokens1, _, _) = blockFlow
+      .getBalance(LockupScript.p2pkh(publicKey), defaultUtxoLimit, true)
+      .rightValue
+    issueToTokens1.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(10))
   }
 
   private def generateDestination(
