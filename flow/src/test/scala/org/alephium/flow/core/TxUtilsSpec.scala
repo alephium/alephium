@@ -27,7 +27,7 @@ import org.alephium.flow.gasestimation.*
 import org.alephium.flow.mempool.MemPool
 import org.alephium.flow.setting.AlephiumConfigFixture
 import org.alephium.flow.validation.TxValidation
-import org.alephium.protocol.{ALPH, Generators, Hash, PrivateKey, PublicKey, Signature}
+import org.alephium.protocol._
 import org.alephium.protocol.model._
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm._
@@ -257,8 +257,12 @@ class TxUtilsSpec extends AlephiumSpec {
         utxos
       )
 
-    def genPublicKeys(nb: Int): AVector[PublicKey] =
-      AVector.fill(nb)(chainIndex.from.generateKey._2)
+    def genKeys(nb: Int): (AVector[PublicKey], AVector[PrivateKey]) = {
+      val keys        = AVector.fill(nb)(chainIndex.from.generateKey)
+      val publicKeys  = keys.map(_._2)
+      val privateKeys = keys.map(_._1)
+      (publicKeys, privateKeys)
+    }
 
     def computeAmountPerOutput(totalAmount: Long, nbOfOutputs: Int): (Long, Long) = {
       val amountPerOutput = totalAmount / nbOfOutputs
@@ -286,6 +290,23 @@ class TxUtilsSpec extends AlephiumSpec {
       }
     }
 
+    def validateSubmit(utx: UnsignedTransaction, privateKeys: AVector[PrivateKey]) = {
+
+      val signatures = privateKeys.map { privateKey =>
+        SignatureSchema.sign(utx.id.bytes, privateKey)
+      }
+
+      val template = TransactionTemplate(
+        utx,
+        signatures,
+        scriptSignatures = AVector.empty
+      )
+
+      val txValidation = TxValidation.build
+
+      txValidation.validateMempoolTxTemplate(template, blockFlow) is Right(())
+    }
+
     def buildOutputs(nbOfOutputs: Int, totalAmount: Long) = {
       val (amountPerOutput, rest) = computeAmountPerOutput(totalAmount, nbOfOutputs)
       AVector.fill(nbOfOutputs)(chainIndex.from.generateKey._2).mapWithIndex { (pubKey, i) =>
@@ -297,7 +318,7 @@ class TxUtilsSpec extends AlephiumSpec {
     // scalastyle:off method.length
     def checkMultiInputTx(nbOfInputs: Int, nbOfOutputs: Int) = {
 
-      val publicKeys = genPublicKeys(nbOfInputs)
+      val (publicKeys, privateKeys) = genKeys(nbOfInputs)
 
       publicKeys.foreach { pubKey =>
         val block = buildBlock(pubKey, 100)
@@ -339,7 +360,10 @@ class TxUtilsSpec extends AlephiumSpec {
       val changeOutputs = utx.fixedOutputs.drop(nbOfOutputs).map(_.amount)
 
       // As they all had 1 utxo, they all had to pay same gas, so same change output
-      changeOutputs.toSeq.distinct.length is 1
+      // Maybe first input will pay the rest of base fee, so it could be 2
+      changeOutputs.toSeq.distinct.length <= 2 is true
+
+      validateSubmit(utx, privateKeys)
     }
   }
 
@@ -1209,6 +1233,7 @@ class TxUtilsSpec extends AlephiumSpec {
   "TxUtils.transferMultiInputs" should "transfer multi inputs" in new MultiInputTransactionFixture {
     checkMultiInputTx(1, 1)
     checkMultiInputTx(2, 1)
+    checkMultiInputTx(3, 1)
     checkMultiInputTx(5, 1)
     checkMultiInputTx(5, 4)
     checkMultiInputTx(5, 30)
@@ -1218,9 +1243,9 @@ class TxUtilsSpec extends AlephiumSpec {
   }
 
   it should "transfer multi inputs with different nb of utxos per input" in new MultiInputTransactionFixture {
-    val nbOfInputs  = 4
-    val nbOfOutputs = 4
-    val publicKeys  = genPublicKeys(nbOfInputs)
+    val nbOfInputs                = 4
+    val nbOfOutputs               = 4
+    val (publicKeys, privateKeys) = genKeys(nbOfInputs)
 
     publicKeys.zipWithIndex.foreach { case (pubKey, i) =>
       def block = buildBlock(pubKey, amount + 1)
@@ -1271,13 +1296,15 @@ class TxUtilsSpec extends AlephiumSpec {
 
     // Each input will pay different fee, so each change output is different
     changeOutputs.toSeq.distinct.length is changeOutputs.length
+
+    validateSubmit(utx, privateKeys)
   }
 
   it should "transfer multi inputs with gas defined" in new MultiInputTransactionFixture {
-    val nbOfInputs     = 4
-    val nbOfOutputs    = 1
-    val publicKeys     = genPublicKeys(nbOfInputs)
-    val amountPerBlock = 100L
+    val nbOfInputs                = 4
+    val nbOfOutputs               = 1
+    val (publicKeys, privateKeys) = genKeys(nbOfInputs)
+    val amountPerBlock            = 100L
 
     publicKeys.foreach { pubKey =>
       val block = buildBlock(pubKey, amountPerBlock)
@@ -1313,13 +1340,15 @@ class TxUtilsSpec extends AlephiumSpec {
         ALPH.alph(amountPerBlock - amount) - nonCoinbaseMinGasPrice * gas.mulUnsafe(i)
       change is expected
     }
+
+    validateSubmit(utx, privateKeys)
   }
 
   it should "transfer multi inputs with explicit utxos" in new MultiInputTransactionFixture {
-    val nbOfInputs     = 4
-    val nbOfOutputs    = 1
-    val publicKeys     = genPublicKeys(nbOfInputs)
-    val amountPerBlock = 100L
+    val nbOfInputs                = 4
+    val nbOfOutputs               = 1
+    val (publicKeys, privateKeys) = genKeys(nbOfInputs)
+    val amountPerBlock            = 100L
 
     publicKeys.foreach { pubKey =>
       def block = buildBlock(pubKey, amountPerBlock)
@@ -1358,16 +1387,22 @@ class TxUtilsSpec extends AlephiumSpec {
       .rightValue
       .rightValue
 
+    val gasEstimation =
+      GasEstimation.estimateWithP2PKHInputs(utx.inputs.length, utx.fixedOutputs.length)
+    utx.gasAmount <= gasEstimation is true
+
     utx.inputs.length is nbOfInputs + 1 // for the extra utxos of first pub key
+
+    validateSubmit(utx, privateKeys)
   }
 
   it should "transfer multi inputs with tokens" in new MultiInputTransactionFixture
     with ContractFixture {
-    val nbOfInputs     = 10
-    val nbOfOutputs    = 5
-    val publicKeys     = genPublicKeys(nbOfInputs)
-    val amountPerBlock = 100L
-    val tokenAmount    = 2 * nbOfInputs
+    val nbOfInputs                = 10
+    val nbOfOutputs               = 5
+    val (publicKeys, privateKeys) = genKeys(nbOfInputs)
+    val amountPerBlock            = 100L
+    val tokenAmount               = 2 * nbOfInputs
 
     // How many tokens will be created
     val nbOfTokens = 3
@@ -1445,6 +1480,11 @@ class TxUtilsSpec extends AlephiumSpec {
       .take(nbOfOutputs)
       .foreach(_.tokens is AVector.empty[(TokenId, U256)])
 
+    val gasEstimation =
+      GasEstimation.estimateWithP2PKHInputs(utx.inputs.length, utx.fixedOutputs.length)
+
+    utx.gasAmount < gasEstimation is true
+
     val changeOutputs = utx.fixedOutputs.drop(nbOfTokens + nbOfOutputs)
 
     val tokensChange =
@@ -1462,6 +1502,8 @@ class TxUtilsSpec extends AlephiumSpec {
     changeOutputs
       .drop(nbOfTokenHolders * tokensChange.length)
       .foreach(_.tokens is AVector.empty[(TokenId, U256)])
+
+    validateSubmit(utx, privateKeys)
   }
 
   it should "fail to transfer multi inputs" in new MultiInputTransactionFixture {

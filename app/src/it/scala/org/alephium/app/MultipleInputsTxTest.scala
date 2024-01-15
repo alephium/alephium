@@ -39,8 +39,6 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     info("Building and sending actual generic tx")
     val utxos = currentUTXOs(address).utxos
 
-    // val totalAmount = (utxos ++ utxos2).map(_.amount.value).fold(U256.Zero)(_ addUnsafe _)
-
     val amount = utxos.map(_.amount.value).fold(U256.Zero)(_ addUnsafe _).divUnsafe(U256.Two)
 
     val inputs: AVector[BuildMultiInputsTransaction.Source] = AVector(
@@ -81,43 +79,48 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
 
     info("Transfering to one p2pkh address and one p2mpkh to test the generic build tx")
     val (address2, publicKey2, privateKey2) = generateAccount(addressGroupIndex)
-    val (address3, _, _)                    = generateAccount(addressGroupIndex)
+    val (address3, publicKey3, privateKey3) = generateAccount(addressGroupIndex)
+    val (address4, _, _)                    = generateAccount(addressGroupIndex)
 
     val tx =
       transfer(publicKey, address2, transferAmount, privateKey, clique.masterRestPort)
     val tx2 =
       transfer(publicKey, address2, transferAmount, privateKey, clique.masterRestPort)
+    val tx3 =
+      transfer(publicKey, address3, transferAmount, privateKey, clique.masterRestPort)
 
     clique.startMining()
     confirmTx(tx, clique.masterRestPort)
     confirmTx(tx2, clique.masterRestPort)
+    confirmTx(tx3, clique.masterRestPort)
 
     info("Building and sending actual generic tx")
     val utxos = currentUTXOs(address).utxos
-    // val utxos2 = currentUTXOs(address2).utxos
-
-    // val totalAmount = (utxos ++ utxos2).map(_.amount.value).fold(U256.Zero)(_ addUnsafe _)
 
     val amount = utxos.map(_.amount.value).fold(U256.Zero)(_ addUnsafe _).divUnsafe(U256.Two)
     // Force Two utxos
     val amount2 = transferAmount.mulUnsafe(U256.Two) - transferAmount.divUnsafe(U256.Two)
 
+    val utxos3  = currentUTXOs(address3).utxos
+    val amount3 = utxos3.map(_.amount.value).fold(U256.Zero)(_ addUnsafe _).divUnsafe(U256.Two)
+
     val inputs: AVector[BuildMultiInputsTransaction.Source] = AVector(
       BuildMultiInputsTransaction.Source(pubKey(publicKey).bytes, Amount(amount)),
-      BuildMultiInputsTransaction.Source(pubKey(publicKey2).bytes, Amount(amount2))
+      BuildMultiInputsTransaction.Source(pubKey(publicKey2).bytes, Amount(amount2)),
+      BuildMultiInputsTransaction.Source(pubKey(publicKey3).bytes, Amount(amount3))
     )
 
-    val destAmount = amount.addUnsafe(amount2)
+    val destAmount = amount.addUnsafe(amount2).addUnsafe(amount3)
 
     val destinations = AVector(
-      Destination(Address.asset(address3).get, Amount(destAmount))
+      Destination(Address.asset(address4).get, Amount(destAmount))
     )
 
     val genericTx = transferGeneric(
       inputs,
       destinations,
       None,
-      AVector(privateKey, privateKey2),
+      AVector(privateKey, privateKey2, privateKey3),
       clique.masterRestPort
     )
 
@@ -125,7 +128,7 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
 
     clique.stopMining()
 
-    currentUTXOs(address3).utxos.length is 1
+    currentUTXOs(address4).utxos.length is 1
 
     clique.stop()
   }

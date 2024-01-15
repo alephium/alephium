@@ -527,10 +527,11 @@ trait TxUtils { Self: FlowUtils =>
         val inOutGas     = inGas.addUnsafe(outGas)
 
         // If current selected gas is equal to minimal gas, it means it could probably be lower
-        // So the average base fee could be lowered
+        // So the average base fee could be lowered, we still need to take into account the
+        // gas for the output given by txOutputLength
         val selectedGas =
           if (selected.gas == minimalGas) {
-            GasEstimation.rawEstimate(inGas, txOutputLength)
+            GasEstimation.rawEstimate(inGas, outputLength + txOutputLength)
           } else {
             selected.gas
           }
@@ -539,7 +540,7 @@ trait TxUtils { Self: FlowUtils =>
           base <- selectedGas.sub(inOutGas)
           // We remove double counting gas of destinations
           res <- base.sub(destinationsGas)
-        } yield res).getOrElse(GasBox.zero)
+        } yield res).getOrElse(GasSchedule.txBaseGas)//We can't go less than the `txBaseGas`
         (input, selected.copy(gas = inOutGas), baseFee, selected.gas)
       }
 
@@ -549,13 +550,19 @@ trait TxUtils { Self: FlowUtils =>
       val averargeWithTxOutputFee = averageBaseFee + destinationsGas.value
       val baseFeeShared =
         GasBox.unsafe(averargeWithTxOutputFee / inputs.length)
+      val baseFeeSharedRest =
+        GasBox.unsafe(averargeWithTxOutputFee % inputs.length)
 
-      gasPerInput.map { case (input, selected, _, initialGas) =>
+      gasPerInput.mapWithIndex { case ((input, selected, _, initialGas), i) =>
         val newGas = selected.gas.addUnsafe(baseFeeShared)
         // We don't want to update to a higher gas
         val payedGas = if (newGas < initialGas) newGas else initialGas
-
-        (input, selected.copy(gas = payedGas))
+        //First input is paying for the rest that cannot be divided by everyone
+        if (i == 0) {
+          (input, selected.copy(gas = payedGas.addUnsafe(baseFeeSharedRest)))
+        } else {
+          (input, selected.copy(gas = payedGas))
+        }
       }
     } else {
       inputs
