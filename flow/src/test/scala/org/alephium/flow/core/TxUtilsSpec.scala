@@ -1398,112 +1398,116 @@ class TxUtilsSpec extends AlephiumSpec {
 
   it should "transfer multi inputs with tokens" in new MultiInputTransactionFixture
     with ContractFixture {
-    val nbOfInputs                = 10
-    val nbOfOutputs               = 5
-    val (publicKeys, privateKeys) = genKeys(nbOfInputs)
-    val amountPerBlock            = 100L
-    val tokenAmount               = 2 * nbOfInputs
 
-    // How many tokens will be created
-    val nbOfTokens = 3
-    // How many inputs will send only half of their tokens
-    val nbOfTokenHolders = 2
+    def test(nbOfInputs: Int, nbOfOutputs: Int, nbOfTokens: Int, nbOfTokenHolders: Int) = {
+      val (publicKeys, privateKeys) = genKeys(nbOfInputs)
+      val amountPerBlock            = 100L
+      val tokenAmount               = 2 * nbOfInputs
 
-    val tokens = AVector.fill(nbOfTokens) {
-      val (cId, _) = createContract(
-        code,
-        AVector.empty,
-        AVector.empty,
-        tokenIssuanceInfo = Some(
-          TokenIssuance.Info(
-            Val.U256(U256.unsafe(tokenAmount)),
-            Some(Address.p2pkh(genesisPubKey).lockupScript)
+      val tokens = AVector.fill(nbOfTokens) {
+        val (cId, _) = createContract(
+          code,
+          AVector.empty,
+          AVector.empty,
+          tokenIssuanceInfo = Some(
+            TokenIssuance.Info(
+              Val.U256(U256.unsafe(tokenAmount)),
+              Some(Address.p2pkh(genesisPubKey).lockupScript)
+            )
           )
         )
-      )
 
-      (TokenId.from(cId), U256.Two)
-    }
+        (TokenId.from(cId), U256.Two)
+      }
 
-    publicKeys.foreach { pubKey =>
-      val block = buildBlock(pubKey, amountPerBlock, Some(tokens))
-      addAndCheck(blockFlow, block)
-    }
+      publicKeys.foreach { pubKey =>
+        val block = buildBlock(pubKey, amountPerBlock, Some(tokens))
+        addAndCheck(blockFlow, block)
+      }
 
-    val inputs = publicKeys.mapWithIndex { case (pubKey, i) =>
-      // Holders will send only half of each of their tokens
-      if (i < nbOfTokenHolders) {
-        buildInputData(
-          pubKey,
-          amount,
-          tokens = Some(tokens.map { case (tokenId, _) => (tokenId, U256.One) })
+      val inputs = publicKeys.mapWithIndex { case (pubKey, i) =>
+        // Holders will send only half of each of their tokens
+        if (i < nbOfTokenHolders) {
+          buildInputData(
+            pubKey,
+            amount,
+            tokens = Some(tokens.map { case (tokenId, _) => (tokenId, U256.One) })
+          )
+        } else {
+          buildInputData(pubKey, amount, tokens = Some(tokens))
+        }
+      }
+
+      val totalAmount = amount * nbOfInputs
+
+      val outputTokens =
+        tokens.map { case (tokenId, _) =>
+          (tokenId, U256.unsafe(tokenAmount - nbOfTokenHolders))
+        }
+
+      val outputsWithoutTokens = buildOutputs(nbOfOutputs, totalAmount)
+      // We send the tokens to the first output
+      val outputs =
+        outputsWithoutTokens.replace(0, outputsWithoutTokens.head.copy(tokens = outputTokens))
+
+      val utx = blockFlow
+        .transferMultiInputs(
+          inputs,
+          outputs,
+          nonCoinbaseMinGasPrice,
+          Int.MaxValue,
+          None
         )
-      } else {
-        buildInputData(pubKey, amount, tokens = Some(tokens))
+        .rightValue
+        .rightValue
+
+      utx.inputs.length is nbOfInputs + (nbOfInputs * nbOfTokens)
+
+      utx.fixedOutputs.length is tokens.length + nbOfOutputs + (nbOfTokenHolders * tokens.length) + nbOfInputs
+
+      utx.fixedOutputs.take(nbOfTokens).map(_.tokens) is
+        tokens.map { case (tokenId, _) =>
+          AVector((tokenId, U256.unsafe(tokenAmount - nbOfTokenHolders)))
+        }
+
+      utx.fixedOutputs
+        .drop(nbOfTokens)
+        .take(nbOfOutputs)
+        .foreach(_.tokens is AVector.empty[(TokenId, U256)])
+
+      val gasEstimation =
+        GasEstimation.estimateWithP2PKHInputs(utx.inputs.length, utx.fixedOutputs.length)
+
+      utx.gasAmount <= gasEstimation is true
+
+      val changeOutputs = utx.fixedOutputs.drop(nbOfTokens + nbOfOutputs)
+
+      val tokensChange =
+        tokens.map { case (tokenId, _) =>
+          AVector((tokenId, U256.One))
+        } :+ AVector.empty[(TokenId, U256)]
+
+      (0 to nbOfTokenHolders - 1).foreach { i =>
+        changeOutputs
+          .drop(i * tokensChange.length)
+          .take(tokensChange.length)
+          .map(_.tokens) is tokensChange
       }
-    }
 
-    val totalAmount = amount * nbOfInputs
-
-    val outputTokens =
-      tokens.map { case (tokenId, _) =>
-        (tokenId, U256.unsafe(tokenAmount - nbOfTokenHolders))
-      }
-
-    val outputsWithoutTokens = buildOutputs(nbOfOutputs, totalAmount)
-    // We send the tokens to the first output
-    val outputs =
-      outputsWithoutTokens.replace(0, outputsWithoutTokens.head.copy(tokens = outputTokens))
-
-    val utx = blockFlow
-      .transferMultiInputs(
-        inputs,
-        outputs,
-        nonCoinbaseMinGasPrice,
-        Int.MaxValue,
-        None
-      )
-      .rightValue
-      .rightValue
-
-    utx.inputs.length is nbOfInputs + (nbOfInputs * nbOfTokens)
-
-    utx.fixedOutputs.length is tokens.length + nbOfOutputs + (nbOfTokenHolders * tokens.length) + nbOfInputs
-
-    utx.fixedOutputs.take(nbOfTokens).map(_.tokens) is
-      tokens.map { case (tokenId, _) =>
-        AVector((tokenId, U256.unsafe(tokenAmount - nbOfTokenHolders)))
-      }
-
-    utx.fixedOutputs
-      .drop(nbOfTokens)
-      .take(nbOfOutputs)
-      .foreach(_.tokens is AVector.empty[(TokenId, U256)])
-
-    val gasEstimation =
-      GasEstimation.estimateWithP2PKHInputs(utx.inputs.length, utx.fixedOutputs.length)
-
-    utx.gasAmount < gasEstimation is true
-
-    val changeOutputs = utx.fixedOutputs.drop(nbOfTokens + nbOfOutputs)
-
-    val tokensChange =
-      tokens.map { case (tokenId, _) =>
-        AVector((tokenId, U256.One))
-      } :+ AVector.empty[(TokenId, U256)]
-
-    (0 to nbOfTokenHolders - 1).foreach { i =>
       changeOutputs
-        .drop(i * tokensChange.length)
-        .take(tokensChange.length)
-        .map(_.tokens) is tokensChange
+        .drop(nbOfTokenHolders * tokensChange.length)
+        .foreach(_.tokens is AVector.empty[(TokenId, U256)])
+
+      validateSubmit(utx, privateKeys)
     }
 
-    changeOutputs
-      .drop(nbOfTokenHolders * tokensChange.length)
-      .foreach(_.tokens is AVector.empty[(TokenId, U256)])
-
-    validateSubmit(utx, privateKeys)
+    test(nbOfInputs = 1, nbOfOutputs = 1, nbOfTokens = 1, nbOfTokenHolders = 0)
+    test(nbOfInputs = 1, nbOfOutputs = 1, nbOfTokens = 1, nbOfTokenHolders = 1)
+    test(nbOfInputs = 1, nbOfOutputs = 1, nbOfTokens = 2, nbOfTokenHolders = 0)
+    test(nbOfInputs = 1, nbOfOutputs = 1, nbOfTokens = 2, nbOfTokenHolders = 1)
+    test(nbOfInputs = 2, nbOfOutputs = 1, nbOfTokens = 3, nbOfTokenHolders = 0)
+    test(nbOfInputs = 2, nbOfOutputs = 1, nbOfTokens = 3, nbOfTokenHolders = 2)
+    test(nbOfInputs = 10, nbOfOutputs = 5, nbOfTokens = 5, nbOfTokenHolders = 3)
   }
 
   it should "fail to transfer multi inputs" in new MultiInputTransactionFixture {

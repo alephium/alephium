@@ -359,12 +359,12 @@ trait TxUtils { Self: FlowUtils =>
       groupIndex  <- checkMultiInputsGroup(inputs)
       _           <- checkMultiInputsGas(inputs)
       _           <- checkOutputInfos(groupIndex, outputInfos)
-      _           <- checkInOutAmounts(inputs, outputInfos)
+      nbOfTokens  <- checkInOutAmounts(inputs, outputInfos)
       dustAmounts <- calculateDustAmountNeeded(outputInfos)
-    } yield dustAmounts
+    } yield (dustAmounts, nbOfTokens)
 
     dustAmountsE match {
-      case Right((dustAmountNeeded, txOutputLength)) =>
+      case Right(((dustAmountNeeded, txOutputLength), nbOfTokens)) =>
         selectMultiInputsUtxos(
           inputs,
           outputInfos,
@@ -372,7 +372,8 @@ trait TxUtils { Self: FlowUtils =>
           targetBlockHashOpt,
           gasPrice,
           utxosLimit,
-          txOutputLength
+          txOutputLength,
+          nbOfTokens
         ).map(_.flatMap { selecteds =>
           for {
             _ <- checkProvidedGas(
@@ -443,7 +444,8 @@ trait TxUtils { Self: FlowUtils =>
       targetBlockHashOpt: Option[BlockHash],
       gasPrice: GasPrice,
       utxosLimit: Int,
-      txOutputLength: Int
+      txOutputLength: Int,
+      nbOfTokens: Int
   ): IOResult[Either[String, AVector[(InputData, AssetOutputInfoWithGas)]]] = {
     /*
      * If one `gasOpt` is defined, then every input is following its `gasOpt` value
@@ -465,7 +467,7 @@ trait TxUtils { Self: FlowUtils =>
       .map(_.mapE(identity))
       .map(_.map { selecteds =>
         // Reduce if posible the overall gas for every input
-        updateSelectedGas(selecteds, txOutputLength)
+        updateSelectedGas(selecteds, outputInfos.length + nbOfTokens)
       })
   }
 
@@ -503,19 +505,24 @@ trait TxUtils { Self: FlowUtils =>
    */
   def updateSelectedGas(
       inputs: AVector[(InputData, AssetOutputInfoWithGas)],
-      txOutputLength: Int
+      destinationOutputLengths: Int
   ): AVector[(InputData, AssetOutputInfoWithGas)] = {
-    // With 1 input, it's like a simple transfer and the gas was already correctly selected.
-    // If some input have explicit gas, we don't update either
-    if (inputs.length > 1 && !inputs.exists(_._1.gasOpt.isDefined)) {
+    // If some input have explicit gas, we don't update
+    if (inputs.length > 0 && !inputs.exists(_._1.gasOpt.isDefined)) {
       val gasPerInput = inputs.map { case (input, selected) =>
         /*
          We only consider 1 change output here.
          In the cases where there are 0 change output we will over-estimate
-         If there are multiple change outputs we could underestimate the gas (e.g. with tokens).
-         TODO If a tx with lots of tokens fails because of not enough gas, we might need to adapt the output length here.
          */
-        val changeOutputLength = 1
+        val changeTokenOutputs = UnsignedTransaction
+          .calculateTokensRemainder(
+            selected.assets.flatMap(_._2.tokens),
+            input.tokens.getOrElse(AVector.empty)
+          )
+          .map(_.length)
+          .getOrElse(0)
+
+        val changeOutputLength = 1 + changeTokenOutputs
         val outGas             = GasSchedule.txOutputBaseGas.mulUnsafe(changeOutputLength)
         val inGas              = GasEstimation.gasForP2PKHInputs(selected.assets.length)
         val inOutGas           = inGas.addUnsafe(outGas)
@@ -524,7 +531,7 @@ trait TxUtils { Self: FlowUtils =>
       }
 
       // Computing base fee and splitting it between all inputs
-      val destinationsGas   = GasSchedule.txOutputBaseGas.mulUnsafe(txOutputLength)
+      val destinationsGas   = GasSchedule.txOutputBaseGas.mulUnsafe(destinationOutputLengths)
       val baseFee           = GasSchedule.txBaseGas.value + destinationsGas.value
       val baseFeeShared     = GasBox.unsafe(baseFee / inputs.length)
       val baseFeeSharedRest = GasBox.unsafe(baseFee % inputs.length)
@@ -533,8 +540,14 @@ trait TxUtils { Self: FlowUtils =>
         val newGas = selected.gas.addUnsafe(baseFeeShared)
         // We don't want to update to a higher gas
         val payedGas = if (newGas < initialGas) newGas else initialGas
-        // First input is paying for the rest that cannot be divided by everyone
-        if (i == 0) {
+
+        // If we had only 1 input, we need to make sure we don't update
+        // below minimal gas, as its the only one paying.
+        if (inputs.length == 1) {
+          val oneInputGas = if (payedGas < minimalGas) minimalGas else payedGas
+          (input, selected.copy(gas = oneInputGas))
+        } else if (i == 0) {
+          // First input is paying for the rest that cannot be divided by everyone
           (input, selected.copy(gas = payedGas.addUnsafe(baseFeeSharedRest)))
         } else {
           (input, selected.copy(gas = payedGas))
@@ -604,7 +617,7 @@ trait TxUtils { Self: FlowUtils =>
       dustAmount <- totalAmountNeeded.sub(totalAmount).toRight("ALPH underflow")
     } yield {
       // `calculateTotalAmountNeeded` is adding a +1 length for the sender's output
-      (dustAmount, txOutputLength - 1)
+      (dustAmount, txOutputLength)
     }
   }
 
@@ -996,7 +1009,7 @@ trait TxUtils { Self: FlowUtils =>
   private def checkInOutAmounts(
       inputs: AVector[InputData],
       outputInfos: AVector[TxOutputInfo]
-  ): Either[String, Unit] = {
+  ): Either[String, Int] = {
     for {
       in  <- checkTotalAttoAlphAmount(inputs.map(_.amount))
       out <- checkTotalAttoAlphAmount(outputInfos.map(_.attoAlphAmount))
@@ -1010,7 +1023,7 @@ trait TxUtils { Self: FlowUtils =>
         (),
         "Total token input amount doesn't match total output amount"
       )
-    } yield ()
+    } yield outToken.length
   }
 }
 
