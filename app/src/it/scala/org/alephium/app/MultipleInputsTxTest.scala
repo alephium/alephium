@@ -27,16 +27,13 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     clique.start()
 
     def currentUTXOs(addr: String) = {
-      val utxos = request[UTXOs](getUTXOs(addr), clique.masterRestPort)
-      utxos
+      request[UTXOs](getUTXOs(addr), clique.masterRestPort)
     }
 
-    info("Transfering to one p2pkh address and one p2mpkh to test the generic build tx")
     val (address2, _, _) = generateAccount(addressGroupIndex)
 
     clique.startMining()
 
-    info("Building and sending actual generic tx")
     val utxos = currentUTXOs(address).utxos
 
     val amount = utxos.map(_.amount.value).fold(U256.Zero)(_ addUnsafe _).divUnsafe(U256.Two)
@@ -54,7 +51,6 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     val genericTx = transferGeneric(
       inputs,
       destinations,
-      None,
       AVector(privateKey),
       clique.masterRestPort
     )
@@ -73,11 +69,9 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     clique.start()
 
     def currentUTXOs(addr: String) = {
-      val utxos = request[UTXOs](getUTXOs(addr), clique.masterRestPort)
-      utxos
+      request[UTXOs](getUTXOs(addr), clique.masterRestPort)
     }
 
-    info("Transfering to one p2pkh address and one p2mpkh to test the generic build tx")
     val (address2, publicKey2, privateKey2) = generateAccount(addressGroupIndex)
     val (address3, publicKey3, privateKey3) = generateAccount(addressGroupIndex)
     val (address4, _, _)                    = generateAccount(addressGroupIndex)
@@ -94,7 +88,6 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     confirmTx(tx2, clique.masterRestPort)
     confirmTx(tx3, clique.masterRestPort)
 
-    info("Building and sending actual generic tx")
     val utxos = currentUTXOs(address).utxos
 
     val amount = utxos.map(_.amount.value).fold(U256.Zero)(_ addUnsafe _).divUnsafe(U256.Two)
@@ -119,7 +112,6 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     val genericTx = transferGeneric(
       inputs,
       destinations,
-      None,
       AVector(privateKey, privateKey2, privateKey3),
       clique.masterRestPort
     )

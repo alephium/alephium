@@ -162,11 +162,10 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   def transferGeneric(
       inputs: AVector[BuildMultiInputsTransaction.Source],
       destinations: AVector[Destination],
-      gas: Option[Int],
       privateKeys: AVector[String],
       restPort: Int
   ): SubmitTxResult = eventually {
-    val buildTx          = buildGenericTransaction(inputs, destinations, gas)
+    val buildTx          = buildGenericTransaction(inputs, destinations)
     val unsignedTx       = request[BuildTransactionResult](buildTx, restPort)
     val submitMultisigTx = signAndSubmitMultisigTransaction(unsignedTx, privateKeys)
     val res              = request[SubmitTxResult](submitMultisigTx, restPort)
@@ -451,14 +450,12 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def buildGenericTransaction(
       inputs: AVector[BuildMultiInputsTransaction.Source],
-      destinations: AVector[Destination],
-      gas: Option[Int]
+      destinations: AVector[Destination]
   ): Int => HttpRequest = {
     val p = s"""
                |{
                |  "from": ${write(inputs)},
                |  "destinations": ${write(destinations)}
-               |  ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
                |}
         """.stripMargin
     httpPost(

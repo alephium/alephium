@@ -319,7 +319,7 @@ object UnsignedTransaction {
 
   def checkNoTokensRemainder(tokensRemainder: AVector[(TokenId, U256)]): Either[String, Unit] = {
     if (tokensRemainder.exists { case (_, value) => value != U256.Zero }) {
-      Left("Inputs' tokens don't sum up to outputs' tokens  ")
+      Left("Inputs' tokens don't sum up to outputs' tokens")
     } else {
       Right(())
     }
