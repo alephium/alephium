@@ -635,7 +635,7 @@ class ServerUtils(implicit
               InputData(
                 lock,
                 unlock,
-                in.amount.value,
+                in.attoAlphAmount.value,
                 in.tokens.map(_.map(t => (t.id, t.amount))),
                 in.gasAmount,
                 utxos

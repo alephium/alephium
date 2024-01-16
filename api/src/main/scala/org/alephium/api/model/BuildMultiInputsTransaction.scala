@@ -35,7 +35,7 @@ object BuildMultiInputsTransaction {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Source(
       fromPublicKey: ByteString,
-      amount: Amount,
+      attoAlphAmount: Amount,
       fromPublicKeyType: Option[BuildTxCommon.PublicKeyType] = None,
       tokens: Option[AVector[Token]] = None,
       gasAmount: Option[GasBox] = None,

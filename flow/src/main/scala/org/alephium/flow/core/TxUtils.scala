@@ -540,7 +540,7 @@ trait TxUtils { Self: FlowUtils =>
           base <- selectedGas.sub(inOutGas)
           // We remove double counting gas of destinations
           res <- base.sub(destinationsGas)
-        } yield res).getOrElse(GasSchedule.txBaseGas)//We can't go less than the `txBaseGas`
+        } yield res).getOrElse(GasSchedule.txBaseGas) // We can't go less than the `txBaseGas`
         (input, selected.copy(gas = inOutGas), baseFee, selected.gas)
       }
 
@@ -557,7 +557,7 @@ trait TxUtils { Self: FlowUtils =>
         val newGas = selected.gas.addUnsafe(baseFeeShared)
         // We don't want to update to a higher gas
         val payedGas = if (newGas < initialGas) newGas else initialGas
-        //First input is paying for the rest that cannot be divided by everyone
+        // First input is paying for the rest that cannot be divided by everyone
         if (i == 0) {
           (input, selected.copy(gas = payedGas.addUnsafe(baseFeeSharedRest)))
         } else {

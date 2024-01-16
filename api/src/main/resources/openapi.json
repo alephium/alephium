@@ -5385,7 +5385,7 @@
                     "from": [
                       {
                         "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                        "amount": "1000000000000000000"
+                        "attoAlphAmount": "1000000000000000000"
                       }
                     ],
                     "destinations": [
@@ -12272,7 +12272,7 @@
       "Source": {
         "required": [
           "fromPublicKey",
-          "amount"
+          "attoAlphAmount"
         ],
         "type": "object",
         "properties": {
@@ -12280,7 +12280,7 @@
             "type": "string",
             "format": "hex-string"
           },
-          "amount": {
+          "attoAlphAmount": {
             "type": "string",
             "format": "uint256"
           },
