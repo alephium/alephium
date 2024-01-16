@@ -226,19 +226,6 @@ class VMSpec extends AlephiumSpec with Generators {
       (contractId, contractOutputRef)
     }
 
-    def callTxScript(input: String, chainIndex: ChainIndex = chainIndex): Block = {
-      val script = Compiler.compileTxScript(input).rightValue
-      script.toTemplateString() is Hex.toHexString(serialize(script))
-      val block =
-        if (script.entryMethod.usePreapprovedAssets) {
-          payableCall(blockFlow, chainIndex, script)
-        } else {
-          simpleScript(blockFlow, chainIndex, script)
-        }
-      addAndCheck(blockFlow, block)
-      block
-    }
-
     def callTxScriptMulti(input: Int => String, func: StatefulScript => StatefulScript): Block = {
       val block0 = transfer(blockFlow, chainIndex, numReceivers = 10)
       addAndCheck(blockFlow, block0)
