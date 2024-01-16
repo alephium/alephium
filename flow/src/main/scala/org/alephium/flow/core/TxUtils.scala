@@ -500,10 +500,6 @@ trait TxUtils { Self: FlowUtils =>
    * Update the gas for all inputs.
    * Each input pay individually for their own utxos, more inputs mean higher fees
    * The base fee needed for the tx is then shared by everyone
-   *
-   * The intial selected gas of each input contains the gas for the destinations' outputs,
-   * We remove that gas to avoid double counting them, it's then added back to the average
-   * base fee before being splited over all inputs.
    */
   def updateSelectedGas(
       inputs: AVector[(InputData, AssetOutputInfoWithGas)],
@@ -512,8 +508,6 @@ trait TxUtils { Self: FlowUtils =>
     // With 1 input, it's like a simple transfer and the gas was already correctly selected.
     // If some input have explicit gas, we don't update either
     if (inputs.length > 1 && !inputs.exists(_._1.gasOpt.isDefined)) {
-      val destinationsGas = GasSchedule.txOutputBaseGas.mulUnsafe(txOutputLength)
-
       val gasPerInput = inputs.map { case (input, selected) =>
         /*
          We only consider 1 change output here.
@@ -521,39 +515,21 @@ trait TxUtils { Self: FlowUtils =>
          If there are multiple change outputs we could underestimate the gas (e.g. with tokens).
          TODO If a tx with lots of tokens fails because of not enough gas, we might need to adapt the output length here.
          */
-        val outputLength = 1
-        val outGas       = GasSchedule.txOutputBaseGas.mulUnsafe(outputLength)
-        val inGas        = GasEstimation.gasForP2PKHInputs(selected.assets.length)
-        val inOutGas     = inGas.addUnsafe(outGas)
+        val changeOutputLength = 1
+        val outGas             = GasSchedule.txOutputBaseGas.mulUnsafe(changeOutputLength)
+        val inGas              = GasEstimation.gasForP2PKHInputs(selected.assets.length)
+        val inOutGas           = inGas.addUnsafe(outGas)
 
-        // If current selected gas is equal to minimal gas, it means it could probably be lower
-        // So the average base fee could be lowered, we still need to take into account the
-        // gas for the output given by txOutputLength
-        val selectedGas =
-          if (selected.gas == minimalGas) {
-            GasEstimation.rawEstimate(inGas, outputLength + txOutputLength)
-          } else {
-            selected.gas
-          }
-
-        val baseFee = (for {
-          base <- selectedGas.sub(inOutGas)
-          // We remove double counting gas of destinations
-          res <- base.sub(destinationsGas)
-        } yield res).getOrElse(GasSchedule.txBaseGas) // We can't go less than the `txBaseGas`
-        (input, selected.copy(gas = inOutGas), baseFee, selected.gas)
+        (input, selected.copy(gas = inOutGas), selected.gas)
       }
 
-      // We compute the average of the base fee and then we split it between all inputs
-      val averageBaseFee = gasPerInput.map(_._3.value).sum / inputs.length
-      // We add back the gas for destinations
-      val averargeWithTxOutputFee = averageBaseFee + destinationsGas.value
-      val baseFeeShared =
-        GasBox.unsafe(averargeWithTxOutputFee / inputs.length)
-      val baseFeeSharedRest =
-        GasBox.unsafe(averargeWithTxOutputFee % inputs.length)
+      // Computing base fee and splitting it between all inputs
+      val destinationsGas   = GasSchedule.txOutputBaseGas.mulUnsafe(txOutputLength)
+      val baseFee           = GasSchedule.txBaseGas.value + destinationsGas.value
+      val baseFeeShared     = GasBox.unsafe(baseFee / inputs.length)
+      val baseFeeSharedRest = GasBox.unsafe(baseFee % inputs.length)
 
-      gasPerInput.mapWithIndex { case ((input, selected, _, initialGas), i) =>
+      gasPerInput.mapWithIndex { case ((input, selected, initialGas), i) =>
         val newGas = selected.gas.addUnsafe(baseFeeShared)
         // We don't want to update to a higher gas
         val payedGas = if (newGas < initialGas) newGas else initialGas
