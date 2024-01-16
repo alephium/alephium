@@ -1543,7 +1543,7 @@ object ServerUtils {
         s"""
            |createContractWithToken!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${issueAmount.v}, @$issueTo)
            |  transferToken!{@$address -> ALPH: dustAmount!()}(@$address, @$issueTo, ALPH, dustAmount!())
-           |""".stripMargin.stripLeading().stripTrailing()
+           |""".stripMargin.stripLeading.stripTrailing
       case Some((issueAmount, None)) =>
         s"createContractWithToken!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${issueAmount.v})"
       case None =>

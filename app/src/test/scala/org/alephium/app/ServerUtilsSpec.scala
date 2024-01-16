@@ -2439,6 +2439,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val chainIndex                 = ChainIndex.unsafe(0, 0)
     val lockupScript               = getGenesisLockupScript(chainIndex)
     val (privateKey, publicKey, _) = genesisKeys(chainIndex.from.value)
+    val (_, toPublicKey)           = chainIndex.from.generateKey
     val code =
       s"""
          |Contract Foo() {
@@ -2458,13 +2459,13 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     def checkBalance(
         lockupScript: LockupScript,
-        expectedAlphBalanceOpt: Option[U256],
+        expectedAlphBalance: U256,
         tokenId: TokenId,
         expectedTokenBalance: Option[U256]
     ) = {
       val (alphAmount, _, tokens, _, _) =
         blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
-      expectedAlphBalanceOpt.foreach(_ is alphAmount)
+      expectedAlphBalance is alphAmount
       tokens.find(_._1 == tokenId).map(_._2) is expectedTokenBalance
     }
   }
@@ -2502,7 +2503,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     checkBalance(
       LockupScript.P2C(result.contractAddress.contractId),
-      Some(ALPH.alph(2)),
+      ALPH.alph(2),
       tokenId,
       Some(U256.unsafe(4))
     )
@@ -2514,7 +2515,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       bytecode = serialize(contract) ++ ByteString(0, 0),
       initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
       issueTokenAmount = Some(Amount(U256.unsafe(10))),
-      issueTokenTo = Some(Address.p2pkh(publicKey))
+      issueTokenTo = Some(Address.p2pkh(toPublicKey))
     )
 
     val result  = buildDeployContractTx(query)
@@ -2522,14 +2523,14 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     checkBalance(
       LockupScript.P2C(result.contractAddress.contractId),
-      Some(ALPH.alph(2)),
+      ALPH.alph(2),
       tokenId,
       None
     )
 
     checkBalance(
-      LockupScript.p2pkh(publicKey),
-      None,
+      LockupScript.p2pkh(toPublicKey),
+      dustUtxoAmount,
       tokenId,
       Some(U256.unsafe(10))
     )
