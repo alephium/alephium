@@ -308,7 +308,15 @@ object BuiltIn {
   }
 
   val blake2b: SimpleBuiltIn[StatelessContext] =
-    SimpleBuiltIn.hash("blake2b", Seq(Type.ByteVec), Seq(Type.ByteVec), Blake2b)
+    SimpleBuiltIn.cryptography(
+      "blake2b",
+      Seq(Type.ByteVec),
+      Seq(Type.ByteVec),
+      Blake2b,
+      argsName = Seq("data" -> "the input data to be hashed"),
+      retComment = "the 32 bytes hash result",
+      doc = s"Computes the Blake2b-256 hash of the input."
+    )
   val keccak256: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.hash("keccak256", Seq(Type.ByteVec), Seq(Type.ByteVec), Keccak256)
   val sha256: SimpleBuiltIn[StatelessContext] =
