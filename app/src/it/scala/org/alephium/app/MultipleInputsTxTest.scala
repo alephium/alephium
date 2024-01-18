@@ -16,6 +16,8 @@
 
 package org.alephium.app
 
+import akka.util.ByteString
+
 import org.alephium.api.model._
 import org.alephium.protocol._
 import org.alephium.protocol.model.Address
@@ -38,19 +40,18 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
 
     val amount = utxos.map(_.amount.value).fold(U256.Zero)(_ addUnsafe _).divUnsafe(U256.Two)
 
-    val inputs: AVector[BuildMultiInputsTransaction.Source] = AVector(
-      BuildMultiInputsTransaction.Source(pubKey(publicKey).bytes, Amount(amount))
-    )
-
     val destAmount = amount
 
     val destinations = AVector(
       Destination(Address.asset(address2).get, Amount(destAmount))
     )
 
+    val inputs: AVector[BuildMultiInputsTransaction.Source] = AVector(
+      BuildMultiInputsTransaction.Source(pubKey(publicKey).bytes, destinations)
+    )
+
     val genericTx = transferGeneric(
       inputs,
-      destinations,
       AVector(privateKey),
       clique.masterRestPort
     )
@@ -74,7 +75,8 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
 
     val (address2, publicKey2, privateKey2) = generateAccount(addressGroupIndex)
     val (address3, publicKey3, privateKey3) = generateAccount(addressGroupIndex)
-    val (address4, _, _)                    = generateAccount(addressGroupIndex)
+    val (address4, publicKey4, privateKey4) = generateAccount(addressGroupIndex)
+    val (destAddress, _, _)                 = generateAccount(addressGroupIndex)
 
     val tx =
       transfer(publicKey, address2, transferAmount, privateKey, clique.masterRestPort)
@@ -82,11 +84,14 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
       transfer(publicKey, address2, transferAmount, privateKey, clique.masterRestPort)
     val tx3 =
       transfer(publicKey, address3, transferAmount, privateKey, clique.masterRestPort)
+    val tx4 =
+      transfer(publicKey, address4, transferAmount, privateKey, clique.masterRestPort)
 
     clique.startMining()
     confirmTx(tx, clique.masterRestPort)
     confirmTx(tx2, clique.masterRestPort)
     confirmTx(tx3, clique.masterRestPort)
+    confirmTx(tx4, clique.masterRestPort)
 
     val utxos = currentUTXOs(address).utxos
 
@@ -97,22 +102,36 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     val utxos3  = currentUTXOs(address3).utxos
     val amount3 = utxos3.map(_.amount.value).fold(U256.Zero)(_ addUnsafe _).divUnsafe(U256.Two)
 
-    val inputs: AVector[BuildMultiInputsTransaction.Source] = AVector(
-      BuildMultiInputsTransaction.Source(pubKey(publicKey).bytes, Amount(amount)),
-      BuildMultiInputsTransaction.Source(pubKey(publicKey2).bytes, Amount(amount2)),
-      BuildMultiInputsTransaction.Source(pubKey(publicKey3).bytes, Amount(amount3))
+    val utxos4  = currentUTXOs(address4).utxos
+    val amount4 = utxos4.map(_.amount.value).fold(U256.Zero)(_ addUnsafe _).divUnsafe(U256.Two)
+
+    def destinations(
+        amount: U256,
+        lockTime: Option[TimeStamp] = None,
+        message: Option[ByteString] = None
+    ) = AVector(
+      Destination(
+        Address.asset(destAddress).get,
+        Amount(amount),
+        lockTime = lockTime,
+        message = message
+      )
     )
 
-    val destAmount = amount.addUnsafe(amount2).addUnsafe(amount3)
-
-    val destinations = AVector(
-      Destination(Address.asset(address4).get, Amount(destAmount))
+    val inputs: AVector[BuildMultiInputsTransaction.Source] = AVector(
+      BuildMultiInputsTransaction.Source(pubKey(publicKey).bytes, destinations(amount)),
+      BuildMultiInputsTransaction.Source(pubKey(publicKey2).bytes, destinations(amount2)),
+      BuildMultiInputsTransaction
+        .Source(pubKey(publicKey3).bytes, destinations(amount3, lockTime = Some(TimeStamp.now()))),
+      BuildMultiInputsTransaction.Source(
+        pubKey(publicKey4).bytes,
+        destinations(amount4, message = Some(ByteString.empty))
+      )
     )
 
     val genericTx = transferGeneric(
       inputs,
-      destinations,
-      AVector(privateKey, privateKey2, privateKey3),
+      AVector(privateKey, privateKey2, privateKey3, privateKey4),
       clique.masterRestPort
     )
 
@@ -120,7 +139,8 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
 
     clique.stopMining()
 
-    currentUTXOs(address4).utxos.length is 1
+    // not only 1 utoxs as there are input with locktime and message
+    currentUTXOs(destAddress).utxos.length is 3
 
     clique.stop()
   }

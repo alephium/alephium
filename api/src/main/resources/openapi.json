@@ -5385,13 +5385,12 @@
                     "from": [
                       {
                         "fromPublicKey": "d1b70d2226308b46da297486adb6b4f1a8c1842cb159ac5ec04f384fe2d6f5da28",
-                        "attoAlphAmount": "1000000000000000000"
-                      }
-                    ],
-                    "destinations": [
-                      {
-                        "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
-                        "attoAlphAmount": "2000000000000000000"
+                        "destinations": [
+                          {
+                            "address": "1AujpupFP4KWeZvqA7itsHY9cLJmx4qTzojVZrg8W9y",
+                            "attoAlphAmount": "2000000000000000000"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -10593,8 +10592,7 @@
       },
       "BuildMultiInputsTransaction": {
         "required": [
-          "from",
-          "destinations"
+          "from"
         ],
         "type": "object",
         "properties": {
@@ -10602,12 +10600,6 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Source"
-            }
-          },
-          "destinations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Destination"
             }
           },
           "gasPrice": {
@@ -12272,7 +12264,7 @@
       "Source": {
         "required": [
           "fromPublicKey",
-          "attoAlphAmount"
+          "destinations"
         ],
         "type": "object",
         "properties": {
@@ -12280,19 +12272,15 @@
             "type": "string",
             "format": "hex-string"
           },
-          "attoAlphAmount": {
-            "type": "string",
-            "format": "uint256"
+          "destinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Destination"
+            }
           },
           "fromPublicKeyType": {
             "type": "string",
             "format": "hex-string"
-          },
-          "tokens": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Token"
-            }
           },
           "gasAmount": {
             "type": "integer",

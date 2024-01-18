@@ -29,6 +29,7 @@ import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
+import org.alephium.flow.core.TxUtils
 import org.alephium.flow.core.TxUtils.InputData
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
@@ -597,6 +598,28 @@ class ServerUtils(implicit
     }
   }
 
+  private def mergeAndprepareOutputInfos(
+      destinations: AVector[Destination]
+  ): Either[String, AVector[TxOutputInfo]] = {
+    AVector.from(destinations.groupBy(_.address)).flatMapE { case (address, dests) =>
+      val simpleDests = dests.filter(dest => dest.lockTime.isEmpty && dest.message.isEmpty)
+      for {
+        amount <- TxUtils.checkTotalAttoAlphAmount(simpleDests.map(_.attoAlphAmount.value))
+        tokens <- UnsignedTransaction
+          .calculateTotalAmountPerToken(
+            simpleDests.flatMap(
+              _.tokens.map(_.map(t => (t.id, t.amount))).getOrElse(AVector.empty)
+            )
+          )
+      } yield {
+        TxOutputInfo(address.lockupScript, amount, tokens, None, None) +:
+          prepareOutputInfos(
+            dests.filter(dest => dest.lockTime.isDefined || dest.message.isDefined)
+          )
+      }
+    }
+  }
+
   private def prepareOutputInfos(destinations: AVector[Destination]): AVector[TxOutputInfo] = {
     destinations.map { destination =>
       val tokensInfo = destination.tokens match {
@@ -618,25 +641,38 @@ class ServerUtils(implicit
     }
   }
 
+  // scalastyle:off method.length
   def prepareMultiInputsUnsignedTransactionFromQuery(
       blockFlow: BlockFlow,
       query: BuildMultiInputsTransaction
   ): Try[UnsignedTransaction] = {
-    val outputInfos = prepareOutputInfos(query.destinations)
 
     val transferResult = for {
+      outputInfos <- mergeAndprepareOutputInfos(query.from.flatMap(_.destinations)).left.map(failed)
       inputs <- query.from.mapE { in =>
         for {
           lockUnlock <- in.getLockPair()
           utxos      <- prepareOutputRefsOpt(in.utxos).left.map(failed)
+          amount <- TxUtils
+            .checkTotalAttoAlphAmount(in.destinations.map(_.attoAlphAmount.value))
+            .left
+            .map(failed)
+          tokens <- UnsignedTransaction
+            .calculateTotalAmountPerToken(
+              in.destinations.flatMap(
+                _.tokens.map(_.map(t => (t.id, t.amount))).getOrElse(AVector.empty)
+              )
+            )
+            .left
+            .map(failed)
         } yield {
           lockUnlock match {
             case (lock, unlock) =>
               InputData(
                 lock,
                 unlock,
-                in.attoAlphAmount.value,
-                in.tokens.map(_.map(t => (t.id, t.amount))),
+                amount,
+                Option.when(tokens.nonEmpty)(tokens),
                 in.gasAmount,
                 utxos
               )

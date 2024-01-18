@@ -1142,7 +1142,7 @@ object TxUtils {
     )
   }
 
-  private[core] def checkTotalAttoAlphAmount(
+  def checkTotalAttoAlphAmount(
       amounts: AVector[U256]
   ): Either[String, U256] = {
     amounts.foldE(U256.Zero) { case (acc, amount) =>

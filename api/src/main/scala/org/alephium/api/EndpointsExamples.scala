@@ -429,10 +429,9 @@ trait EndpointsExamples extends ErrorExamples {
           AVector(
             BuildMultiInputsTransaction.Source(
               publicKey.bytes,
-              Amount(ALPH.oneAlph)
+              defaultDestinations
             )
           ),
-          defaultDestinations,
           None
         )
       )

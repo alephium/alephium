@@ -25,7 +25,6 @@ import org.alephium.util.AVector
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class BuildMultiInputsTransaction(
     from: AVector[BuildMultiInputsTransaction.Source],
-    destinations: AVector[Destination],
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
 )
@@ -35,9 +34,8 @@ object BuildMultiInputsTransaction {
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Source(
       fromPublicKey: ByteString,
-      attoAlphAmount: Amount,
+      destinations: AVector[Destination],
       fromPublicKeyType: Option[BuildTxCommon.PublicKeyType] = None,
-      tokens: Option[AVector[Token]] = None,
       gasAmount: Option[GasBox] = None,
       utxos: Option[AVector[OutputRef]] = None
   ) extends BuildTxCommon.FromPublicKey
