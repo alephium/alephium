@@ -116,7 +116,7 @@ class SmartContractTest extends AlephiumActorSpec {
           mutFields,
           minimalAlphInContract,
           AVector.empty,
-          issueTokenAmount
+          issueTokenAmount.map((_, None))
         )
         .rightValue
 
