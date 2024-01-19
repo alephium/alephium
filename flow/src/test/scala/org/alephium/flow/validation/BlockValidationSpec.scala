@@ -175,11 +175,12 @@ class BlockValidationSpec extends AlephiumSpec {
 
   trait CoinbaseDataFixture extends Fixture {
     def block: Block
+    def uncles: AVector[BlockHash]
     lazy val coinbaseData: CoinbaseData =
-      CoinbaseData.from(chainIndex, block.timestamp, block.uncles.map(_.hash), ByteString.empty)
+      CoinbaseData.from(chainIndex, block.timestamp, uncles, ByteString.empty)
 
     def wrongTimeStamp(ts: TimeStamp): ByteString = {
-      serialize(CoinbaseData.from(chainIndex, ts, block.uncles.map(_.hash), ByteString.empty))
+      serialize(CoinbaseData.from(chainIndex, ts, uncles, ByteString.empty))
     }
 
     def wrongChainIndex(chainIndex: ChainIndex): ByteString = {
@@ -187,7 +188,7 @@ class BlockValidationSpec extends AlephiumSpec {
         CoinbaseData.from(
           chainIndex,
           block.header.timestamp,
-          block.uncles.map(_.hash),
+          uncles,
           ByteString.empty
         )
       )
@@ -197,11 +198,6 @@ class BlockValidationSpec extends AlephiumSpec {
       val coinbaseDataV2 = coinbaseData.asInstanceOf[CoinbaseDataV2]
       serialize[CoinbaseData](coinbaseDataV2.copy(version = version))
     }
-
-    def wrongUncleHashes(uncleHashes: AVector[BlockHash]): ByteString = {
-      val coinbaseDataV2 = coinbaseData.asInstanceOf[CoinbaseDataV2]
-      serialize[CoinbaseData](coinbaseDataV2.copy(uncleHashes = uncleHashes))
-    }
   }
 
   it should "check coinbase data for pre-ghost hardfork" in new CoinbaseDataFixture {
@@ -209,9 +205,10 @@ class BlockValidationSpec extends AlephiumSpec {
       Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()) isnot HardFork.Ghost
 
-    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk)
+    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
 
-    val block = emptyBlock(blockFlow, chainIndex)
+    val block  = emptyBlock(blockFlow, chainIndex)
+    val uncles = AVector.empty
     block.coinbase.unsigned.fixedOutputs.head.additionalData is serialize(coinbaseData)
     block.pass()
 
@@ -232,11 +229,17 @@ class BlockValidationSpec extends AlephiumSpec {
     override val configValues = Map(("alephium.network.ghost-hard-fork-timestamp", 0))
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
 
-    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk)
+    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
 
     val uncleBlock = blockGen(chainIndex).sample.get
-    val uncles     = AVector((uncleBlock.header, p2pkScriptGen(chainIndex.to).sample.get.lockup))
-    val block = mineWithoutCoinbase(blockFlow, chainIndex, AVector.empty, TimeStamp.now(), uncles)
+    val uncles     = AVector(uncleBlock.hash)
+    val block = mineWithoutCoinbase(
+      blockFlow,
+      chainIndex,
+      AVector.empty,
+      TimeStamp.now(),
+      uncles.map(hash => (hash, p2pkScriptGen(chainIndex.to).sample.get.lockup))
+    )
     block.coinbase.unsigned.fixedOutputs.head.additionalData is serialize(coinbaseData)
     block.pass()
 
@@ -251,20 +254,6 @@ class BlockValidationSpec extends AlephiumSpec {
     info("wrong version")
     val data2 = wrongVersion((CoinbaseData.GhostVersion + 1).toByte)
     block.Coinbase.output(_.copy(additionalData = data2)).fail(InvalidCoinbaseData)
-
-    info("wrong uncleHashes")
-    val invalidHashes = AVector.fill(2)(BlockHash.random)
-    block.Coinbase
-      .output(_.copy(additionalData = wrongUncleHashes(AVector.empty)))
-      .fail(InvalidCoinbaseData)
-    block.Coinbase
-      .output(_.copy(additionalData = wrongUncleHashes(invalidHashes)))
-      .fail(InvalidCoinbaseData)
-    block.Coinbase
-      .output(
-        _.copy(additionalData = wrongUncleHashes(AVector(uncleBlock.hash, invalidHashes.head)))
-      )
-      .fail(InvalidCoinbaseData)
 
     info("wrong format")
     val wrongFormat = ByteString("wrong-coinbase-data-format")
@@ -294,7 +283,7 @@ class BlockValidationSpec extends AlephiumSpec {
     val block = emptyBlock(blockFlow, chainIndex)
     implicit val validator = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
-      checkCoinbase(blk.chainIndex, blk, groupView, HardFork.Leman)
+      checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Leman)
     }
 
     val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
@@ -309,7 +298,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
     implicit val validator = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
-      checkCoinbase(blk.chainIndex, blk, groupView, HardFork.Mainnet)
+      checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Mainnet)
     }
 
     val block0 = transfer(blockFlow, chainIndex)
@@ -339,7 +328,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
     implicit val validator = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
-      checkCoinbase(blk.chainIndex, blk, groupView, HardFork.Leman)
+      checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Leman)
     }
 
     val block = transfer(blockFlow, chainIndex)
@@ -470,7 +459,6 @@ class BlockValidationSpec extends AlephiumSpec {
         blockFlow,
         index,
         newDeps,
-        block.uncles,
         block.transactions,
         block.header.timestamp
       )
@@ -580,22 +568,6 @@ class BlockValidationSpec extends AlephiumSpec {
     validatorLeman.validate(block, blockflowLeman).isRight is true
   }
 
-  it should "invalidate blocks with uncles before ghost hardfork" in new Fixture { F =>
-    override val configValues = Map(("alephium.network.ghost-hard-fork-timestamp", Long.MaxValue))
-
-    val block00 = emptyBlock(blockFlow, chainIndex)
-    val block01 = emptyBlock(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block00, block01)
-    val uncleHeaders =
-      blockFlow.getHashes(chainIndex, 1).rightValue.tail.map(blockFlow.getBlockHeaderUnsafe)
-
-    val template =
-      blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
-    val block = mine(blockFlow, template.copy(uncles = uncleHeaders))
-    block.uncles.nonEmpty is true
-    checkBlockAfterHeader(block, blockFlow).left.value isE InvalidUnclesBeforeGhostHardFork
-  }
-
   trait GhostFixture extends Fixture {
     override val configValues = Map(
       ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.now().millis)
@@ -625,10 +597,10 @@ class BlockValidationSpec extends AlephiumSpec {
   it should "invalidate block with invalid uncles size" in new GhostFixture {
     val hashes        = mineBlocks(ALPH.MaxUncleSize + 1)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    blockTemplate.uncles.length is ALPH.MaxUncleSize
-    val uncleHeaders = hashes.tail.map(blockFlow.getBlockHeaderUnsafe)
-    uncleHeaders.length is ALPH.MaxUncleSize + 1
-    val block = mine(blockFlow, blockTemplate.setUncles(uncleHeaders.map((_, miner))))
+    blockTemplate.uncleHashes.length is ALPH.MaxUncleSize
+    val uncleHashes = hashes.tail
+    uncleHashes.length is ALPH.MaxUncleSize + 1
+    val block = mine(blockFlow, blockTemplate.setUncles(uncleHashes.map((_, miner))))
     checkBlock(block, blockFlow).left.value isE InvalidUncleSize
   }
 
@@ -636,7 +608,10 @@ class BlockValidationSpec extends AlephiumSpec {
     mineBlocks(ALPH.MaxUncleSize)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     val block =
-      mine(blockFlow, blockTemplate.setUncles(AVector.fill(2)((blockTemplate.uncles.head, miner))))
+      mine(
+        blockFlow,
+        blockTemplate.setUncles(AVector.fill(2)((blockTemplate.uncleHashes.head, miner)))
+      )
     checkBlock(block, blockFlow).left.value isE DuplicatedUncles
   }
 
@@ -646,8 +621,11 @@ class BlockValidationSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block0)
 
     val block1Template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    block1Template.uncles.isEmpty is true
-    val block1 = mine(blockFlow, block1Template.setUncles(AVector((block0.uncles.head, miner))))
+    block1Template.uncleHashes.isEmpty is true
+    val block1 = mine(
+      blockFlow,
+      block1Template.setUncles(AVector((block0.uncleHashes.rightValue.head, miner)))
+    )
     checkBlock(block1, blockFlow).left.value isE InvalidUncles
   }
 
@@ -658,7 +636,8 @@ class BlockValidationSpec extends AlephiumSpec {
     block10.parentHash is block0.hash
 
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    val block11       = mine(blockFlow, blockTemplate.setUncles(AVector((block10.header, miner))))
+    val block11       = mine(blockFlow, blockTemplate.setUncles(AVector((block10.hash, miner))))
+    addAndCheck(blockFlow, block10)
     block11.parentHash is block0.hash
     checkBlock(block11, blockFlow).left.value isE InvalidUncles
   }
@@ -670,7 +649,7 @@ class BlockValidationSpec extends AlephiumSpec {
     var parentBlock = block0
     (0 until ALPH.MaxUncleAge).foreach { _ =>
       val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-      val invalidBlock  = mine(blockFlow, blockTemplate.setUncles(AVector((block0.header, miner))))
+      val invalidBlock  = mine(blockFlow, blockTemplate.setUncles(AVector((block0.hash, miner))))
       invalidBlock.parentHash is parentBlock.hash
       checkBlock(invalidBlock, blockFlow).left.value isE InvalidUncles
 
@@ -685,13 +664,13 @@ class BlockValidationSpec extends AlephiumSpec {
     addAndCheck(blockFlow, blocks1.toSeq: _*)
     val hashes = blockFlow.getHashes(chainIndex, 3).rightValue
     hashes.length is 2
-    val uncleHeaders = hashes.tail.map(blockFlow.getBlockHeaderUnsafe)
+    val uncleHashes = hashes.tail
 
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    blockTemplate.uncles.length is 1
+    blockTemplate.uncleHashes.length is 1
     val block = mine(
       blockFlow,
-      blockTemplate.setUncles((blockTemplate.uncles ++ uncleHeaders).map((_, miner)))
+      blockTemplate.setUncles((blockTemplate.uncleHashes ++ uncleHashes).map((_, miner)))
     )
     checkBlock(block, blockFlow).left.value isE InvalidUncles
   }
@@ -731,24 +710,28 @@ class BlockValidationSpec extends AlephiumSpec {
     val block0 =
       mine(
         blockFlow,
-        blockTemplate.setUncles(AVector((validUncle.header, miner), (invalidUncle.header, miner)))
+        blockTemplate.setUncles(AVector((validUncle.hash, miner), (invalidUncle.hash, miner)))
       )
+    addAndCheck(blockFlow, uncle0, uncle1)
     checkBlock(block0, blockFlow).leftValue is Right(InvalidUncles)
 
-    val block1 = mine(blockFlow, blockTemplate.setUncles(AVector((validUncle.header, miner))))
+    val block1 = mine(blockFlow, blockTemplate.setUncles(AVector((validUncle.hash, miner))))
     checkBlock(block1, blockFlow).isRight is true
 
-    val block2 = mine(blockFlow, blockTemplate.setUncles(AVector((invalidUncle.header, miner))))
+    val block2 = mine(blockFlow, blockTemplate.setUncles(AVector((invalidUncle.hash, miner))))
     checkBlock(block2, blockFlow).leftValue is Right(InvalidUncles)
   }
 
   it should "validate block with valid uncles" in new GhostFixture {
     mineBlocks(ALPH.MaxUncleSize)
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    blockTemplate.uncles.length is ALPH.MaxUncleSize
-    (0 until blockTemplate.uncles.length).foreach { size =>
+    blockTemplate.uncleHashes.length is ALPH.MaxUncleSize
+    (0 until blockTemplate.uncleHashes.length).foreach { size =>
       val block =
-        mine(blockFlow, blockTemplate.setUncles(blockTemplate.uncles.take(size).map((_, miner))))
+        mine(
+          blockFlow,
+          blockTemplate.setUncles(blockTemplate.uncleHashes.take(size).map((_, miner)))
+        )
       checkBlock(block, blockFlow).isRight is true
     }
   }
@@ -763,7 +746,7 @@ class BlockValidationSpec extends AlephiumSpec {
     val block20 = emptyBlock(blockFlow, chainIndex)
     block20.parentHash is hashesAtHeight1.head
     val block21Template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    block21Template.uncles.map(_.hash) is hashesAtHeight1.tail
+    block21Template.uncleHashes is hashesAtHeight1.tail
     val block21 = mine(blockFlow, block21Template)
 
     addAndCheck(blockFlow, block20)
@@ -771,7 +754,7 @@ class BlockValidationSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block21)
 
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
-    blockTemplate.uncles.map(_.hash) is block21.hash +: hashesAtHeight1.tail
+    blockTemplate.uncleHashes is block21.hash +: hashesAtHeight1.tail
     addAndCheck(blockFlow, mine(blockFlow, blockTemplate))
   }
 }

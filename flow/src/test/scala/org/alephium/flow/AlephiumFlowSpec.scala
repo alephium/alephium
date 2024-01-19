@@ -398,7 +398,6 @@ trait FlowFixture
     def iter(current: Block): Block = {
       val tmp = Block(
         current.header.copy(nonce = Nonce.unsecureRandom()),
-        current.uncles,
         current.transactions
       )
       if (!PoW.checkWork(tmp) && (tmp.chainIndex equals chainIndex)) tmp else iter(tmp)
@@ -419,7 +418,7 @@ trait FlowFixture
     val target = blockFlow.getNextHashTarget(chainIndex, deps, blockTs).rightValue
     val coinbaseTx =
       Transaction.coinbase(chainIndex, txs, lockupScript, target, blockTs, AVector.empty)
-    mine0(blockFlow, chainIndex, deps, AVector.empty, txs :+ coinbaseTx, blockTs, target)
+    mine0(blockFlow, chainIndex, deps, txs :+ coinbaseTx, blockTs, target)
   }
 
   def mineWithoutCoinbase(
@@ -427,7 +426,7 @@ trait FlowFixture
       chainIndex: ChainIndex,
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHeader, LockupScript.Asset)] = AVector.empty
+      uncles: AVector[(BlockHash, LockupScript.Asset)] = AVector.empty
   ): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
     val (_, toPublicKey) = chainIndex.to.generateKey
@@ -443,7 +442,7 @@ trait FlowFixture
         uncles
       )
 
-    mine0(blockFlow, chainIndex, deps, uncles.map(_._1), txs :+ coinbaseTx, blockTs)
+    mine0(blockFlow, chainIndex, deps, txs :+ coinbaseTx, blockTs)
   }
 
   def mineBlockTemplate(blockFlow: BlockFlow, chainIndex: ChainIndex): Block = {
@@ -452,7 +451,7 @@ trait FlowFixture
   }
 
   implicit class RichBlockFlowTemplate(template: BlockFlowTemplate) {
-    def setUncles(uncles: AVector[(BlockHeader, LockupScript.Asset)]): BlockFlowTemplate = {
+    def setUncles(uncles: AVector[(BlockHash, LockupScript.Asset)]): BlockFlowTemplate = {
       val txs   = template.transactions.init
       val miner = template.transactions.last.unsigned.fixedOutputs.head.lockupScript
       val coinbaseTx = Transaction.coinbase(
@@ -463,7 +462,18 @@ trait FlowFixture
         template.templateTs,
         uncles
       )
-      template.copy(transactions = txs :+ coinbaseTx, uncles = uncles.map(_._1))
+      template.copy(transactions = txs :+ coinbaseTx)
+    }
+
+    lazy val uncleHashes: AVector[BlockHash] = {
+      val coinbase = template.transactions.last
+      deserialize[CoinbaseData](
+        coinbase.unsigned.fixedOutputs.head.additionalData
+      ).rightValue match {
+        case v2: CoinbaseDataV2 => v2.uncleHashes
+        case _: CoinbaseDataV1  => AVector.empty
+      }
+
     }
   }
 
@@ -472,7 +482,6 @@ trait FlowFixture
       blockFlow,
       template.index,
       template.deps,
-      template.uncles,
       template.transactions,
       template.templateTs,
       template.target
@@ -483,12 +492,11 @@ trait FlowFixture
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
       deps: AVector[BlockHash],
-      uncles: AVector[BlockHeader],
       txs: AVector[Transaction],
       blockTs: TimeStamp,
       target: Target = Target.Max
   ): Block = {
-    mine0(blockFlow, chainIndex, BlockDeps.unsafe(deps), uncles, txs, blockTs, target)
+    mine0(blockFlow, chainIndex, BlockDeps.unsafe(deps), txs, blockTs, target)
   }
 
   def reMine(blockFlow: BlockFlow, chainIndex: ChainIndex, block: Block): Block = {
@@ -496,7 +504,6 @@ trait FlowFixture
       blockFlow,
       chainIndex,
       block.blockDeps,
-      block.uncles,
       block.transactions,
       block.timestamp,
       block.target
@@ -507,7 +514,6 @@ trait FlowFixture
       blockFlow: BlockFlow,
       chainIndex: ChainIndex,
       deps: BlockDeps,
-      uncles: AVector[BlockHeader],
       txs: AVector[Transaction],
       blockTs: TimeStamp,
       target: Target = Target.Max
@@ -520,7 +526,6 @@ trait FlowFixture
     val txsHash = Block.calTxsHash(txs)
     Block(
       mineHeader(chainIndex, loosenDeps.deps, depStateHash, txsHash, blockTs, target),
-      uncles,
       txs
     )
   }

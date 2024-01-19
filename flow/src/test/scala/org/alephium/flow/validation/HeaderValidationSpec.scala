@@ -196,15 +196,6 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
 
     header.version is DefaultBlockVersion
     passValidation(header)
-    val modified = updateNonce(header.copy(version = GhostBlockVersion))
-    failValidation(modified, InvalidBlockVersion)
-  }
-
-  it should "check header version for ghost hardfork" in new HeaderFixture {
-    header.version is GhostBlockVersion
-    passValidation(header)
-    val modified = updateNonce(header.copy(version = DefaultBlockVersion))
-    failValidation(modified, InvalidBlockVersion)
   }
 
   it should "check header timestamp increasing" in new HeaderFixture {

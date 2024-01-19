@@ -445,10 +445,10 @@ class FlowUtilsSpec extends AlephiumSpec {
     val blockTemplate =
       blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
     networkConfig.getHardFork(blockTemplate.templateTs) is HardFork.Leman
-    blockTemplate.uncles.isEmpty is true
 
     val block = mine(blockFlow, blockTemplate)
     block.header.version is DefaultBlockVersion
+    block.uncleHashes.rightValue.isEmpty is true
     addAndCheck(blockFlow, block)
   }
 
@@ -459,11 +459,9 @@ class FlowUtilsSpec extends AlephiumSpec {
     val blockTemplate =
       blockFlow.prepareBlockFlowUnsafe(chainIndex, getGenesisLockupScript(chainIndex.to))
     networkConfig.getHardFork(blockTemplate.templateTs) is HardFork.Ghost
-    blockTemplate.uncles.length is 1
-    blockTemplate.uncles.head.hash is uncleHash
 
     val block = mine(blockFlow, blockTemplate)
-    block.header.version is GhostBlockVersion
+    block.uncleHashes.rightValue is AVector(uncleHash)
     addAndCheck(blockFlow, block)
   }
 
@@ -496,7 +494,6 @@ class FlowUtilsSpec extends AlephiumSpec {
     addAndCheck(blockFlow, uncle0, uncle1)
 
     val block2 = mineBlockTemplate(blockFlow, chainIndex)
-    block2.uncles.length is 1
-    block2.uncles.head.hash is uncle1.hash
+    block2.uncleHashes.rightValue is AVector(uncle1.hash)
   }
 }

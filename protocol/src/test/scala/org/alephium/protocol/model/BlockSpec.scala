@@ -89,7 +89,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
             AVector.empty[Signature]
           )
         )
-      Block(header, AVector.empty, txs :+ txs.head) // add a fake coinbase tx
+      Block(header, txs :+ txs.head) // add a fake coinbase tx
     }
     val blockGen = Gen.const(()).map(_ => gen())
 
@@ -181,10 +181,10 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         AVector.empty
       )
 
-      val block0 = Block(header, AVector.empty, AVector(tx0, tx1, coinbase))
+      val block0 = Block(header, AVector(tx0, tx1, coinbase))
       Block.scriptIndexes(block0.nonCoinbase).toSeq is Seq(0)
       block0.getNonCoinbaseExecutionOrder.last is 1
-      val block1 = Block(header, AVector.empty, AVector(tx1, tx0, coinbase))
+      val block1 = Block(header, AVector(tx1, tx0, coinbase))
       Block.scriptIndexes(block1.nonCoinbase).toSeq is Seq(1)
       block1.getNonCoinbaseExecutionOrder.last is 0
     }
@@ -199,7 +199,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
     {
       info("empty block")
 
-      block(DefaultBlockVersion, AVector.empty).verify("empty-block")
+      block().verify("empty-block")
     }
 
     {
@@ -239,7 +239,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         inputSign(unsignedTx, privKey2)
       }
 
-      val blk = block(DefaultBlockVersion, AVector.empty, transaction1, transaction2)
+      val blk = block(transaction1, transaction2)
       blk.verify("txs-with-p2pkh-p2sh-outputs")
     }
 
@@ -271,7 +271,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         inputSign(unsignedTx, privKey1)
       }
 
-      val blk = block(DefaultBlockVersion, AVector.empty, transaction)
+      val blk = block(transaction)
       blk.verify("txs-with-tokens")
     }
 
@@ -310,7 +310,7 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         inputSign(unsignedTx, privKey1)
       }
 
-      val blk = block(DefaultBlockVersion, AVector.empty, transaction)
+      val blk = block(transaction)
       blk.verify("txs-with-script")
     }
 
@@ -385,62 +385,8 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
         contractSign(updatedTransaction, privKey2)
       }
 
-      val blk = block(DefaultBlockVersion, AVector.empty, transaction)
+      val blk = block(transaction)
       blk.verify("txs-with-contract-inputs-outputs")
-    }
-  }
-
-  it should "serde the ghost snapshots properly" in new BlockSnapshotsFixture {
-    implicit val basePath = "src/test/resources/models/block"
-    import Hex._
-
-    {
-      info("with empty uncles")
-      block(DefaultBlockVersion, AVector.empty).verify("with-empty-uncles")
-    }
-
-    {
-      info("with uncles")
-
-      val uncles: AVector[(BlockHeader, LockupScript.Asset)] = AVector(
-        (
-          BlockHeader(
-            nonce = Nonce.unsafe(hex"52acaf38ddfff7cc4ae1723ab9842686c6bc056daf3fcb7c"),
-            version = DefaultBlockVersion,
-            blockDeps = BlockDeps.build(
-              deps = AVector(
-                BlockHash.unsafe(
-                  hex"cbf8869398bad1eb68e58af85128bb22b7976cacfb42070c5c9b4f69d32146b7"
-                ),
-                BlockHash.unsafe(
-                  hex"bbbc11f318135f468270f8d35497ba4c5591075b694807c7a7e40978c1fc1ed4"
-                ),
-                BlockHash.unsafe(
-                  hex"08132ccc4f31de49708d0b9352a97e794f88739ded503cca6a963a0712586c67"
-                ),
-                BlockHash.unsafe(
-                  hex"ced09f04543d00ce5fae5bfa9eac0da3cb04207de0bbf7b2ebf52d1f2cc0d3dc"
-                ),
-                BlockHash.unsafe(
-                  hex"db1706ede1bf93314ec3050acefac0e1e072a7e37c2f8bd6824f2f72f8bc5c00"
-                )
-              )
-            ),
-            depStateHash =
-              Hash.unsafe(hex"32b9583dd392ea5090a026333f9d79a71b2d04c264114d491e45b373633efb3b"),
-            txsHash =
-              Hash.unsafe(hex"89675dacae61dddb4cb5cb928f01155afe566c14198f8377c16c0d74de184bae"),
-            timestamp = TimeStamp.unsafe(1695624515382L),
-            target = Target(hex"20ffffff")
-          ),
-          LockupScript.p2pkh(
-            Hash.unsafe(
-              Hex.unsafe("4be8d142765543981828b824af3c5ffe6aee00d2b22f9c8c86bba768a6313ce3")
-            )
-          )
-        )
-      )
-      block(GhostBlockVersion, uncles).verify("with-uncles")
     }
   }
 }

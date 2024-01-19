@@ -392,7 +392,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
 
     info("blocks request / blocks response")
 
-    val block1 = block(DefaultBlockVersion, AVector.empty)
+    val block1 = block()
 
     val tx1 = {
       val unsignedTx = unsignedTransaction(
@@ -429,7 +429,7 @@ class PayloadSpec extends AlephiumSpec with NoIndexModelGenerators {
       inputSign(unsignedTx, privKey2)
     }
 
-    val block2 = block(DefaultBlockVersion, AVector.empty, tx1, tx2)
+    val block2 = block(tx1, tx2)
 
     val blockRequest = BlocksRequest(requestId, AVector(block1.hash, block2.hash))
     blockRequest.asInstanceOf[Payload].verify("block-request")

@@ -18,14 +18,9 @@ package org.alephium.protocol.model
 
 import org.alephium.crypto.Blake3
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{
-  ConsensusConfigsFixture,
-  GroupConfigFixture,
-  NetworkConfigFixture
-}
-import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.config.{ConsensusConfigsFixture, GroupConfigFixture}
 import org.alephium.serde.serialize
-import org.alephium.util.{AlephiumSpec, AVector, Duration, Hex, TimeStamp, U256}
+import org.alephium.util.{AlephiumSpec, AVector, Hex, TimeStamp, U256}
 
 class BlockHeaderSpec
     extends AlephiumSpec
@@ -37,8 +32,9 @@ class BlockHeaderSpec
       i <- 0 until groups
       j <- 0 until groups
     } {
-      val chainIndex = ChainIndex.unsafe(i, j)
-      val genesis    = BlockHeader.genesis(chainIndex, Hash.zero)
+      implicit val consensusConfig = consensusConfigs.mainnet
+      val chainIndex               = ChainIndex.unsafe(i, j)
+      val genesis                  = BlockHeader.genesis(chainIndex, Hash.zero)
 
       genesis.isGenesis is true
       genesis.copy(timestamp = TimeStamp.unsafe(1)).isGenesis is false
@@ -54,8 +50,9 @@ class BlockHeaderSpec
       AVector.tabulate(groupConfig.depsNum)(i => BlockHash.unsafe(Blake3.hash(Seq(i.toByte))))
     val blockDeps = BlockDeps.build(deps)
 
-    val genesis = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
-    val header  = genesis.copy(blockDeps = blockDeps, timestamp = TimeStamp.unsafe(1))
+    implicit val consensusConfig = consensusConfigs.mainnet
+    val genesis                  = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
+    val header = genesis.copy(blockDeps = blockDeps, timestamp = TimeStamp.unsafe(1))
 
     val chainIndex = header.chainIndex
     header.parentHash is blockDeps.deps(2 + chainIndex.to.value)
@@ -99,7 +96,8 @@ class BlockHeaderSpec
   it should "handle version properly" in {
     DefaultBlockVersion is 0.toByte
 
-    val genesis = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
+    implicit val consensusConfig = consensusConfigs.mainnet
+    val genesis                  = BlockHeader.genesis(ChainIndex.unsafe(0, 0), Hash.zero)
     genesis.version is 0.toByte
 
     val header = genesis.copy(version = DefaultBlockVersion)
