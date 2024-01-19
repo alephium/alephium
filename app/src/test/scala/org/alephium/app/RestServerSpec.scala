@@ -128,7 +128,7 @@ abstract class RestServerSpec(
           response.code is StatusCode.Ok
           response.as[BlockHeaderEntry] is BlockHeaderEntry.from(
             dummyBlockHeader,
-            dummyBlockEntry.header.height
+            dummyBlockEntry.height
           )
       }
     }

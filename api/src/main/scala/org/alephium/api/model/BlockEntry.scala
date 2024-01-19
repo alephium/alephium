@@ -16,30 +16,71 @@
 
 package org.alephium.api.model
 
+import akka.util.ByteString
+
+import org.alephium.protocol.Hash
 import org.alephium.protocol.config.NetworkConfig
-import org.alephium.protocol.model.Block
-import org.alephium.util.AVector
+import org.alephium.protocol.model.{Block, BlockDeps, BlockHash, BlockHeader, Nonce, Target}
+import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockEntry(
-    header: BlockHeaderEntry,
+    hash: BlockHash,
+    timestamp: TimeStamp,
+    chainFrom: Int,
+    chainTo: Int,
+    height: Int,
+    deps: AVector[BlockHash],
     transactions: AVector[Transaction],
-    uncles: AVector[BlockHeaderEntry]
+    nonce: ByteString,
+    version: Byte,
+    depStateHash: Hash,
+    txsHash: Hash,
+    target: ByteString
 ) {
   def toProtocol()(implicit networkConfig: NetworkConfig): Either[String, Block] = {
     for {
-      protocolHeader <- header.toProtocol()
-      _              <- Either.cond(protocolHeader.hash == header.hash, (), "Invalid hash")
-      transactions   <- transactions.mapE(_.toProtocol())
-      uncles         <- uncles.mapE(_.toProtocol())
-    } yield Block(protocolHeader, uncles, transactions)
+      header       <- toBlockHeader()
+      _            <- Either.cond(hash == header.hash, (), "Invalid hash")
+      transactions <- transactions.mapE(_.toProtocol())
+    } yield {
+      Block(
+        header,
+        AVector.empty,
+        transactions
+      )
+    }
   }
+
+  def toBlockHeader(): Either[String, BlockHeader] =
+    for {
+      _nonce <- Nonce.from(nonce).toRight("Invalid nonce")
+    } yield {
+      BlockHeader(
+        _nonce,
+        version,
+        BlockDeps.unsafe(deps),
+        depStateHash,
+        txsHash,
+        timestamp,
+        Target.unsafe(target)
+      )
+    }
 }
 
 object BlockEntry {
-  def from(block: Block, height: Int, uncles: AVector[BlockHeaderEntry]): BlockEntry =
+  def from(block: Block, height: Int): BlockEntry =
     BlockEntry(
-      header = BlockHeaderEntry.from(block.header, height),
-      transactions = block.transactions.map(Transaction.fromProtocol),
-      uncles = uncles
+      hash = block.header.hash,
+      timestamp = block.header.timestamp,
+      chainFrom = block.header.chainIndex.from.value,
+      chainTo = block.header.chainIndex.to.value,
+      height = height,
+      deps = block.header.blockDeps.deps,
+      transactions = block.transactions.map(Transaction.fromProtocol(_)),
+      nonce = block.header.nonce.value,
+      version = block.header.version,
+      depStateHash = block.header.depStateHash,
+      txsHash = block.header.txsHash,
+      target = block.header.target.bits
     )
 }

@@ -151,16 +151,12 @@ object WebSocketServer {
     }
   }
 
-  private def blockHeaderEntryFrom(blockNotify: BlockNotify): BlockEntry = {
-    BlockEntry.from(
-      blockNotify.block,
-      blockNotify.height,
-      AVector.empty // TODO: do we need uncles here?
-    )
+  private def blockHeaderEntryfrom(blockNotify: BlockNotify): BlockEntry = {
+    BlockEntry.from(blockNotify.block, blockNotify.height)
   }
 
   def blockNotifyEncode(blockNotify: BlockNotify)(implicit
       writer: Writer[BlockEntry]
   ): ujson.Value =
-    writeJs(blockHeaderEntryFrom(blockNotify))
+    writeJs(blockHeaderEntryfrom(blockNotify))
 }

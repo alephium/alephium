@@ -16,49 +16,20 @@
 
 package org.alephium.api.model
 
-import akka.util.ByteString
-
-import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{BlockDeps, BlockHash, BlockHeader, Nonce, Target}
+import org.alephium.protocol.model.{BlockHash, BlockHeader}
 import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockHeaderEntry(
-    nonce: ByteString,
-    version: Byte,
-    depStateHash: Hash,
-    txsHash: Hash,
-    target: ByteString,
     hash: BlockHash,
     timestamp: TimeStamp,
     chainFrom: Int,
     chainTo: Int,
     height: Int,
     deps: AVector[BlockHash]
-) {
-  def toProtocol(): Either[String, BlockHeader] =
-    for {
-      _nonce <- Nonce.from(nonce).toRight("Invalid nonce")
-    } yield {
-      BlockHeader(
-        _nonce,
-        version,
-        BlockDeps.unsafe(deps),
-        depStateHash,
-        txsHash,
-        timestamp,
-        Target.unsafe(target)
-      )
-    }
-}
-
+)
 object BlockHeaderEntry {
   def from(header: BlockHeader, height: Int): BlockHeaderEntry = {
     BlockHeaderEntry(
-      nonce = header.nonce.value,
-      version = header.version,
-      depStateHash = header.depStateHash,
-      txsHash = header.txsHash,
-      target = header.target.bits,
       hash = header.hash,
       timestamp = header.timestamp,
       chainFrom = header.chainIndex.from.value,

@@ -61,12 +61,12 @@ trait ServerFixture
     blockGen.sample.get.header.copy(timestamp = (TimeStamp.now() - Duration.ofMinutes(5).get).get)
   lazy val dummyBlock = blockGen.sample.get.copy(header = dummyBlockHeader)
   lazy val dummyFetchResponse = BlocksPerTimeStampRange(
-    AVector(AVector(BlockEntry.from(dummyBlock, 1, AVector.empty)))
+    AVector(AVector(BlockEntry.from(dummyBlock, 1)))
   )
   lazy val dummyIntraCliqueInfo = genIntraCliqueInfo
   lazy val dummySelfClique =
     EndpointsLogic.selfCliqueFrom(dummyIntraCliqueInfo, true, true)
-  lazy val dummyBlockEntry    = BlockEntry.from(dummyBlock, 1, AVector.empty)
+  lazy val dummyBlockEntry    = BlockEntry.from(dummyBlock, 1)
   lazy val dummyNeighborPeers = NeighborPeers(AVector.empty)
   lazy val dummyBalance =
     Balance.from(

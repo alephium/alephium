@@ -111,11 +111,10 @@ class ProtocolConversionSpec extends AlephiumSpec with EitherValues with Numeric
       val content = readFile(file)
       val block   = deserialize[protocol.Block](content).value
 
-      val uncles = block.uncles.map(BlockHeaderEntry.from(_, 0))
       checkData[BlockEntry, protocol.Block](
         block,
-        BlockEntry.from(_, 0, uncles), // height not needed for protocol
-        _.toProtocol().rightValue
+        BlockEntry.from(_, 0), // height not needed for protocol
+        _.toProtocol().rightValue.copy(uncles = block.uncles)
       )
     }
   }
