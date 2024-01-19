@@ -82,7 +82,7 @@ object TxHandler {
       blockFlow: BlockFlow,
       txTemplate: TransactionTemplate,
       publishBlock: Block => Unit
-  )(implicit groupConfig: GroupConfig, networkSetting: NetworkSetting): Either[String, Unit] = {
+  )(implicit groupConfig: GroupConfig): Either[String, Unit] = {
     val chainIndex = txTemplate.chainIndex
     val grandPool  = blockFlow.getGrandPool()
     grandPool.add(chainIndex, txTemplate, TimeStamp.now()) match {
@@ -102,9 +102,7 @@ object TxHandler {
   }
 
   def mineTxForDev(blockFlow: BlockFlow, chainIndex: ChainIndex, publishBlock: Block => Unit)(
-      implicit
-      groupConfig: GroupConfig,
-      networkSetting: NetworkSetting
+      implicit groupConfig: GroupConfig
   ): Either[String, Unit] = {
     val memPool          = blockFlow.getMemPool(chainIndex)
     val (_, minerPubKey) = chainIndex.to.generateKey
@@ -130,8 +128,7 @@ object TxHandler {
       publishBlock: Block => Unit
   )(implicit
       groupConfig: GroupConfig,
-      memPoolSetting: MemPoolSetting,
-      networkSetting: NetworkSetting
+      memPoolSetting: MemPoolSetting
   ): Either[String, Unit] = {
     if (env != Env.Prod || memPoolSetting.autoMineForDev) {
       mineTxForDev(blockFlow, chainIndex, publishBlock)

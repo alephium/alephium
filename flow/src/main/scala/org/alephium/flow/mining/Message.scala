@@ -24,7 +24,6 @@ import akka.util.ByteString
 
 import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
 import org.alephium.flow.network.bootstrap.SimpleSerde
-import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.serde.{intSerde => _, _}
 import org.alephium.util.{AVector, Bytes}
@@ -118,7 +117,7 @@ object Job {
     )
   }
 
-  def from(template: BlockFlowTemplate)(implicit networkSetting: NetworkSetting): Job = {
+  def from(template: BlockFlowTemplate): Job = {
     val blobs = MiningBlob.from(template)
     Job(
       template.index.from.value,

@@ -201,7 +201,8 @@ object Configs extends StrictLogging {
       } else {
         AVector.empty[Transaction]
       }
-      Block.genesis(ChainIndex.from(from, to).get, transactions)
+      Block
+        .genesis(ChainIndex.from(from, to).get, transactions)(groupConfig, consensusConfigs.mainnet)
     }
   }
 }

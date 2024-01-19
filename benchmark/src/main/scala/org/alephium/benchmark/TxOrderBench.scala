@@ -63,7 +63,7 @@ class TxOrderBench {
         AVector.empty[Signature]
       )
     )
-  val block: Block = Block(header, AVector.empty, txs)
+  val block: Block = Block(header, txs)
 
   @Benchmark
   def calculateRandomOrder(bh: Blackhole): Unit = {

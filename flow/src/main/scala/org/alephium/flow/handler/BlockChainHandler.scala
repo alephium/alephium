@@ -169,8 +169,7 @@ class BlockChainHandler(
   }
 
   override def show(block: Block): String = {
-    showHeader(block.header) +
-      s"; #tx: ${block.transactions.length}" + s"; #uncle: ${block.uncles.length}"
+    showHeader(block.header) + s"; #tx: ${block.transactions.length}"
   }
 
   private val blocksTotalLabeled = blocksTotal.labels(chainIndexFromString, chainIndexToString)

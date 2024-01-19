@@ -207,7 +207,7 @@ trait FlowUtils
       hardFork: HardFork,
       deps: BlockDeps,
       parentHeader: BlockHeader
-  ): IOResult[AVector[(BlockHeader, LockupScript.Asset)]] = {
+  ): IOResult[AVector[(BlockHash, LockupScript.Asset)]] = {
     if (hardFork.isGhostEnabled()) {
       getUncles(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
     } else {
@@ -264,7 +264,7 @@ trait FlowUtils
       chainIndex: ChainIndex,
       loosenDeps: BlockDeps,
       groupView: BlockFlowGroupView[WorldState.Cached],
-      uncles: AVector[(BlockHeader, LockupScript.Asset)],
+      uncles: AVector[(BlockHash, LockupScript.Asset)],
       candidates: AVector[TransactionTemplate],
       target: Target,
       templateTs: TimeStamp,
@@ -282,7 +282,6 @@ trait FlowUtils
         depStateHash,
         target,
         templateTs,
-        uncles.map(_._1),
         fullTxs :+ coinbaseTx
       )
     }

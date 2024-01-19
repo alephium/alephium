@@ -24,7 +24,7 @@ import org.alephium.protocol.mining.Emission
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm.{BlockEnv, GasPrice, LogConfig, WorldState}
 import org.alephium.serde._
-import org.alephium.util.{EitherF, U256}
+import org.alephium.util.{AVector, EitherF, U256}
 
 // scalastyle:off number.of.methods
 
@@ -56,7 +56,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       template.target,
       Nonce.zero
     )
-    val dummyBlock = Block(dummyHeader, template.uncles, template.transactions)
+    val dummyBlock = Block(dummyHeader, template.transactions)
     checkTemplate(chainIndex, dummyBlock, blockFlow)
   }
 
@@ -131,24 +131,34 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       _          <- checkTotalGas(block)
       _          <- checkMerkleRoot(block)
       _          <- checkFlow(block, flow)
-      _          <- checkUncles(block, flow)
       sideResult <- checkTxs(block.chainIndex, block, flow)
     } yield sideResult
   }
 
-  private def checkUncles(block: Block, flow: BlockFlow): BlockValidationResult[Unit] = {
-    if (brokerConfig.contains(block.chainIndex.from)) {
+  private def checkUncles(
+      flow: BlockFlow,
+      chainIndex: ChainIndex,
+      block: Block,
+      uncleHashes: AVector[BlockHash]
+  ): BlockValidationResult[Unit] = {
+    if (brokerConfig.contains(chainIndex.from)) {
       val hardFork = networkConfig.getHardFork(block.timestamp)
-      if (hardFork.isGhostEnabled() && block.uncles.nonEmpty) {
+      if (hardFork.isGhostEnabled() && uncleHashes.nonEmpty) {
+        val blockchain = flow.getBlockChain(chainIndex)
         for {
-          _       <- checkUncleSize(block)
-          _       <- checkDuplicateUncles(block)
-          isValid <- from(flow.getBlockChain(block.chainIndex).validateUncles(block))
-          _       <- if (isValid) validBlock(()) else invalidBlock(InvalidUncles)
-          _ <- if (isUncleDepsValid(block, flow)) validBlock(()) else invalidBlock(InvalidUncles)
-          _ <- block.uncles.foreachE(header => headerValidation.validate(header, flow))
+          _            <- checkUncleSize(uncleHashes)
+          _            <- checkDuplicateUncles(uncleHashes)
+          uncleHeaders <- from(uncleHashes.mapE(hash => blockchain.getBlockHeader(hash)))
+          _            <- validateUncles(flow, chainIndex, block, uncleHeaders)
+          _ <-
+            if (isUncleDepsValid(block, flow, uncleHeaders)) {
+              validBlock(())
+            } else {
+              invalidBlock(InvalidUncles)
+            }
+          _ <- uncleHeaders.foreachE(header => headerValidation.validate(header, flow))
         } yield ()
-      } else if (block.uncles.nonEmpty) {
+      } else if (uncleHashes.nonEmpty) {
         invalidBlock(InvalidUnclesBeforeGhostHardFork)
       } else {
         validBlock(())
@@ -158,24 +168,52 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  @inline private def checkUncleSize(block: Block): BlockValidationResult[Unit] = {
-    if (block.uncles.length > ALPH.MaxUncleSize) {
+  private def validateUncles(
+      flow: BlockFlow,
+      chainIndex: ChainIndex,
+      block: Block,
+      uncles: AVector[BlockHeader]
+  ): BlockValidationResult[Unit] = {
+    assume(uncles.nonEmpty)
+    val blockchain = flow.getBlockChain(chainIndex)
+    for {
+      parentHeader           <- from(blockchain.getBlockHeader(block.uncleHash(chainIndex.to)))
+      usedUnclesAndAncestors <- from(blockchain.getUsedUnclesAndAncestors(parentHeader))
+      (usedUncles, ancestors) = usedUnclesAndAncestors
+      isValid = uncles.forall { uncle =>
+        uncle.hash != parentHeader.hash &&
+        !ancestors.exists(_ == uncle.hash) &&
+        ancestors.exists(_ == uncle.parentHash) &&
+        !usedUncles.contains(uncle.hash)
+      }
+      _ <- if (isValid) validBlock(()) else invalidBlock(InvalidUncles)
+    } yield ()
+  }
+
+  @inline private def checkUncleSize(uncles: AVector[BlockHash]): BlockValidationResult[Unit] = {
+    if (uncles.length > ALPH.MaxUncleSize) {
       invalidBlock(InvalidUncleSize)
     } else {
       validBlock(())
     }
   }
 
-  @inline private def checkDuplicateUncles(block: Block): BlockValidationResult[Unit] = {
-    if (block.uncles.toSeq.distinctBy(_.hash).length != block.uncles.length) {
+  @inline private def checkDuplicateUncles(
+      uncles: AVector[BlockHash]
+  ): BlockValidationResult[Unit] = {
+    if (uncles.toSeq.distinct.length != uncles.length) {
       invalidBlock(DuplicatedUncles)
     } else {
       validBlock(())
     }
   }
 
-  @inline private def isUncleDepsValid(block: Block, flow: BlockFlow): Boolean = {
-    block.uncles.forall(uncle => flow.isExtendingUnsafe(block.blockDeps, uncle.blockDeps))
+  @inline private def isUncleDepsValid(
+      block: Block,
+      flow: BlockFlow,
+      uncles: AVector[BlockHeader]
+  ): Boolean = {
+    uncles.forall(uncle => flow.isExtendingUnsafe(block.blockDeps, uncle.blockDeps))
   }
 
   private def checkTxs(
@@ -189,6 +227,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         groupView <- from(flow.getMutableGroupView(chainIndex.from, block.blockDeps))
         _         <- checkNonCoinbases(chainIndex, block, groupView, hardFork)
         _ <- checkCoinbase(
+          flow,
           chainIndex,
           block,
           groupView,
@@ -238,6 +277,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   }
 
   private[validation] def checkCoinbase(
+      flow: BlockFlow,
       chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
@@ -247,11 +287,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     val result = consensusConfig.emission.reward(block.header) match {
       case Emission.PoW(miningReward) =>
         val netReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
-        checkCoinbase(chainIndex, block, groupView, 1 + block.uncles.length, netReward, netReward)
+        checkCoinbase(flow, chainIndex, block, groupView, 1, netReward, netReward)
       case Emission.PoLW(miningReward, burntAmount) =>
         val lockedReward = Transaction.totalReward(block.gasFee, miningReward, hardFork)
         val netReward    = lockedReward.subUnsafe(burntAmount)
-        checkCoinbase(chainIndex, block, groupView, 2, netReward, lockedReward)
+        checkCoinbase(flow, chainIndex, block, groupView, 2, netReward, lockedReward)
     }
 
     result match {
@@ -261,6 +301,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   }
 
   private[validation] def checkCoinbase(
+      flow: BlockFlow,
       chainIndex: ChainIndex,
       block: Block,
       groupView: BlockFlowGroupView[WorldState.Cached],
@@ -269,10 +310,12 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       lockedReward: U256
   ): BlockValidationResult[Unit] = {
     // FIXME
-    val rewards = netReward.mulUnsafe(U256.unsafe(outputNum))
     for {
-      _ <- checkCoinbaseEasy(block, outputNum)
-      _ <- checkCoinbaseData(chainIndex, block)
+      uncleHashes <- checkCoinbaseData(chainIndex, block)
+      totalOutputNum = outputNum + uncleHashes.length
+      _ <- checkCoinbaseEasy(block, totalOutputNum)
+      _ <- checkUncles(flow, chainIndex, block, uncleHashes)
+      rewards = netReward.mulUnsafe(U256.unsafe(totalOutputNum))
       _ <- checkCoinbaseAsTx(chainIndex, block, groupView, rewards.addUnsafe(coinbaseGasFee))
       _ <- checkLockedReward(block, lockedReward)
     } yield ()
@@ -327,23 +370,22 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
   private[validation] def checkCoinbaseData(
       chainIndex: ChainIndex,
       block: Block
-  ): BlockValidationResult[Unit] = {
+  ): BlockValidationResult[AVector[BlockHash]] = {
     val coinbase = block.coinbase
     val data     = coinbase.unsigned.fixedOutputs.head.additionalData
     deserialize[CoinbaseData](data) match {
       case Right(CoinbaseDataV1(prefix, _)) =>
         if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
-          validBlock(())
+          validBlock(AVector.empty)
         } else {
           invalidBlock(InvalidCoinbaseData)
         }
       case Right(CoinbaseDataV2(prefix, version, uncleHashes, _)) =>
         if (
           prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp) &&
-          version == CoinbaseData.GhostVersion &&
-          uncleHashes == block.uncles.map(_.hash)
+          version == CoinbaseData.GhostVersion
         ) {
-          validBlock(())
+          validBlock(uncleHashes)
         } else {
           invalidBlock(InvalidCoinbaseData)
         }

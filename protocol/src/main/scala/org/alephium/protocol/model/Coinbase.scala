@@ -97,9 +97,9 @@ object Coinbase {
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHeader, LockupScript.Asset)]
+      uncles: AVector[(BlockHash, LockupScript.Asset)]
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
-    val coinbaseData = CoinbaseData.from(chainIndex, blockTs, uncles.map(_._1.hash), minerData)
+    val coinbaseData = CoinbaseData.from(chainIndex, blockTs, uncles.map(_._1), minerData)
     val lockTime     = blockTs + networkConfig.coinbaseLockupPeriod
     val reward       = miningReward(gasFee, target, blockTs)
     val hardFork     = networkConfig.getHardFork(blockTs)

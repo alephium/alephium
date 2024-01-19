@@ -111,7 +111,7 @@ trait HeaderValidation extends Validation[BlockHeader, InvalidHeaderStatus, Unit
   protected[validation] def checkGenesisWorkAmount(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkGenesisWorkTarget(header: BlockHeader): HeaderValidationResult[Unit]
 
-  protected[validation] def checkVersion(header: BlockHeader)(implicit networkConfig: NetworkConfig): HeaderValidationResult[Unit]
+  protected[validation] def checkVersion(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkTimeStampIncreasing(header: BlockHeader, parent: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkTimeStampDrift(header: BlockHeader): HeaderValidationResult[Unit]
   protected[validation] def checkWorkAmount(header: BlockHeader): HeaderValidationResult[Unit]
@@ -194,8 +194,8 @@ object HeaderValidation {
 
     protected[validation] def checkVersion(
         header: BlockHeader
-    )(implicit networkConfig: NetworkConfig): HeaderValidationResult[Unit] = {
-      if (header.version == BlockHeader.getBlockVersion(header.timestamp)) {
+    ): HeaderValidationResult[Unit] = {
+      if (header.version == DefaultBlockVersion) {
         validHeader(())
       } else {
         invalidHeader(InvalidBlockVersion)

@@ -17,7 +17,7 @@
 package org.alephium.flow.model
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.model.{Block, BlockHash, BlockHeader, ChainIndex, Target, Transaction}
+import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, Target, Transaction}
 import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockFlowTemplate(
@@ -26,7 +26,6 @@ final case class BlockFlowTemplate(
     depStateHash: Hash,
     target: Target,
     templateTs: TimeStamp,
-    uncles: AVector[BlockHeader],
     transactions: AVector[Transaction]
 ) {
   lazy val txsHash = Block.calTxsHash(transactions)

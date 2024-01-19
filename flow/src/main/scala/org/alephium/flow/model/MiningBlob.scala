@@ -21,7 +21,6 @@ import java.math.BigInteger
 import akka.util.ByteString
 
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util.{AVector, TimeStamp}
@@ -37,19 +36,18 @@ final case class MiningBlob(
 }
 
 object MiningBlob {
-  def from(template: BlockFlowTemplate)(implicit networkConfig: NetworkConfig): MiningBlob = {
+  def from(template: BlockFlowTemplate): MiningBlob = {
     from(
       template.deps,
       template.depStateHash,
       template.txsHash,
       template.target,
       template.templateTs,
-      template.transactions,
-      template.uncles
+      template.transactions
     )
   }
 
-  def from(block: Block)(implicit networkConfig: NetworkConfig): MiningBlob = {
+  def from(block: Block): MiningBlob = {
     val header = block.header
     from(
       header.blockDeps.deps,
@@ -57,8 +55,7 @@ object MiningBlob {
       header.txsHash,
       header.target,
       header.timestamp,
-      block.transactions,
-      block.uncles
+      block.transactions
     )
   }
 
@@ -68,16 +65,13 @@ object MiningBlob {
       txsHash: Hash,
       target: Target,
       blockTs: TimeStamp,
-      transactions: AVector[Transaction],
-      uncles: AVector[BlockHeader]
-  )(implicit networkConfig: NetworkConfig): MiningBlob = {
+      transactions: AVector[Transaction]
+  ): MiningBlob = {
     val dummyHeader =
       BlockHeader.unsafe(BlockDeps.unsafe(deps), depStateHash, txsHash, blockTs, target, Nonce.zero)
 
     val headerBlob = serialize(dummyHeader)
     val txsBlob    = serialize(transactions)
-    val hardFork   = networkConfig.getHardFork(blockTs)
-    val bodyBlob   = if (hardFork.isGhostEnabled()) txsBlob ++ serialize(uncles) else txsBlob
-    MiningBlob(headerBlob.drop(Nonce.byteLength), target.value, bodyBlob)
+    MiningBlob(headerBlob.drop(Nonce.byteLength), target.value, txsBlob)
   }
 }

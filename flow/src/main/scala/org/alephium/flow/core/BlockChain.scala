@@ -22,7 +22,7 @@ import org.alephium.flow.Utils
 import org.alephium.flow.core.BlockChain.{ChainDiff, TxIndex, TxStatus}
 import org.alephium.flow.io._
 import org.alephium.flow.setting.ConsensusSettings
-import org.alephium.io.{IOResult, IOUtils}
+import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.{ALPH}
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
 import org.alephium.protocol.model._
@@ -64,17 +64,24 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         unclesAcc: AVector[BlockHash],
         ancestorsAcc: AVector[BlockHash]
     ): IOResult[(AVector[BlockHash], AVector[BlockHash])] = {
-      for {
-        block <- getBlock(fromHash)
-        result <-
-          if (block.isGenesis || num == 0) {
-            Right((unclesAcc, ancestorsAcc))
-          } else {
-            val uncles     = block.uncles.map(_.hash)
-            val parentHash = block.parentHash
-            iter(parentHash, num - 1, unclesAcc ++ uncles, ancestorsAcc :+ parentHash)
-          }
-      } yield result
+      if (num == 0) {
+        Right((unclesAcc, ancestorsAcc))
+      } else {
+        for {
+          block <- getBlock(fromHash)
+          result <-
+            if (block.isGenesis) {
+              Right((unclesAcc, ancestorsAcc))
+            } else {
+              val parentHash = block.parentHash
+              block.uncleHashes.left
+                .map(IOError.Serde)
+                .flatMap(uncles =>
+                  iter(parentHash, num - 1, unclesAcc ++ uncles, ancestorsAcc :+ parentHash)
+                )
+            }
+        } yield result
+      }
     }
     iter(header.hash, ALPH.MaxUncleAge, AVector.empty, AVector.empty)
   }
@@ -82,15 +89,15 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def selectUncles(
       header: BlockHeader,
       validator: BlockHeader => Boolean
-  ): IOResult[AVector[(BlockHeader, LockupScript.Asset)]] = {
+  ): IOResult[AVector[(BlockHash, LockupScript.Asset)]] = {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def iter(
         fromHeader: BlockHeader,
         num: Int,
         usedUncles: AVector[BlockHash],
         ancestors: AVector[BlockHash],
-        unclesAcc: AVector[(BlockHeader, LockupScript.Asset)]
-    ): IOResult[AVector[(BlockHeader, LockupScript.Asset)]] = {
+        unclesAcc: AVector[(BlockHash, LockupScript.Asset)]
+    ): IOResult[AVector[(BlockHash, LockupScript.Asset)]] = {
       if (fromHeader.isGenesis || num == 0 || unclesAcc.length >= ALPH.MaxUncleSize) {
         Right(unclesAcc)
       } else {
@@ -104,7 +111,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
                 ancestors.exists(_ == uncle.parentHash) &&
                 validator(uncle.header)
             )
-            .map(block => (block.header, block.coinbase.unsigned.fixedOutputs(0).lockupScript))
+            .map(block => (block.hash, block.coinbase.unsigned.fixedOutputs(0).lockupScript))
           parentHeader <- getBlockHeader(fromHeader.parentHash)
           result       <- iter(parentHeader, num - 1, usedUncles, ancestors, unclesAcc ++ selected)
         } yield result
@@ -120,22 +127,6 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         availableUncles
       } else {
         availableUncles.take(ALPH.MaxUncleSize)
-      }
-    }
-  }
-
-  def validateUncles(block: Block): IOResult[Boolean] = {
-    assume(block.uncles.nonEmpty)
-    for {
-      parentHeader           <- getBlockHeader(block.parentHash)
-      usedUnclesAndAncestors <- getUsedUnclesAndAncestors(parentHeader)
-    } yield {
-      val (usedUncles, ancestors) = usedUnclesAndAncestors
-      block.uncles.forall { uncle =>
-        uncle.hash != parentHeader.hash &&
-        !ancestors.exists(_ == uncle.hash) &&
-        ancestors.exists(_ == uncle.parentHash) &&
-        !usedUncles.contains(uncle.hash)
       }
     }
   }

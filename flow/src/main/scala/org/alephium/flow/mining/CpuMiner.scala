@@ -22,20 +22,19 @@ import org.alephium.flow.client.Node
 import org.alephium.flow.handler.{AllHandlers, BlockChainHandler, ViewHandler}
 import org.alephium.flow.model.{BlockFlowTemplate, MiningBlob}
 import org.alephium.flow.model.DataOrigin.Local
-import org.alephium.flow.setting.{AlephiumConfig, MiningSetting, NetworkSetting}
+import org.alephium.flow.setting.{AlephiumConfig, MiningSetting}
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{Block, ChainIndex}
 import org.alephium.util.ActorRefT
 
 object CpuMiner {
   def props(node: Node)(implicit config: AlephiumConfig): Props = {
-    props(node.allHandlers)(config.broker, config.mining, config.network)
+    props(node.allHandlers)(config.broker, config.mining)
   }
 
   def props(allHandlers: AllHandlers)(implicit
       brokerConfig: BrokerConfig,
-      miningConfig: MiningSetting,
-      networkSetting: NetworkSetting
+      miningConfig: MiningSetting
   ): Props = {
     Props(new CpuMiner(allHandlers)).withDispatcher(MiningDispatcher)
   }
@@ -43,8 +42,7 @@ object CpuMiner {
 
 class CpuMiner(val allHandlers: AllHandlers)(implicit
     val brokerConfig: BrokerConfig,
-    val miningConfig: MiningSetting,
-    val networkSetting: NetworkSetting
+    val miningConfig: MiningSetting
 ) extends Miner {
 
   def receive: Receive = handleMining orElse handleMiningTasks

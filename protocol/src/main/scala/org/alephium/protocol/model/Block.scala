@@ -23,9 +23,9 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol.Hash
-import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.BlockHash
-import org.alephium.serde.Serde
+import org.alephium.serde.{deserialize, Serde, SerdeResult}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
 final case class Block(header: BlockHeader, transactions: AVector[Transaction]) extends FlowData {
@@ -34,6 +34,13 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
   def chainIndex: ChainIndex = header.chainIndex
 
   def coinbase: Transaction = transactions.last
+
+  def uncleHashes(implicit networkConfig: NetworkConfig): SerdeResult[AVector[BlockHash]] = {
+    deserialize[CoinbaseData](coinbase.unsigned.fixedOutputs.head.additionalData).map {
+      case v2: CoinbaseDataV2 => v2.uncleHashes
+      case _: CoinbaseDataV1  => AVector.empty
+    }
+  }
 
   def coinbaseReward: U256 = coinbase.unsigned.fixedOutputs.head.amount
 
