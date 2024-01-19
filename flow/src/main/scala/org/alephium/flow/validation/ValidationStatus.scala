@@ -72,6 +72,7 @@ case object InvalidUnclesBeforeGhostHardFork                        extends Inva
 case object InvalidUncleSize                                        extends InvalidBlockStatus
 case object DuplicatedUncles                                        extends InvalidBlockStatus
 case object InvalidUncles                                           extends InvalidBlockStatus
+case object UncleDoesNotExist                                       extends InvalidBlockStatus
 
 object ValidationStatus {
   private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =

@@ -18,6 +18,7 @@ package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
 import org.alephium.flow.model.BlockFlowTemplate
+import org.alephium.io.IOError
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs, NetworkConfig}
 import org.alephium.protocol.mining.Emission
@@ -146,10 +147,13 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       if (hardFork.isGhostEnabled() && uncleHashes.nonEmpty) {
         val blockchain = flow.getBlockChain(chainIndex)
         for {
-          _            <- checkUncleSize(uncleHashes)
-          _            <- checkDuplicateUncles(uncleHashes)
-          uncleHeaders <- from(uncleHashes.mapE(hash => blockchain.getBlockHeader(hash)))
-          _            <- validateUncles(flow, chainIndex, block, uncleHeaders)
+          _ <- checkUncleSize(uncleHashes)
+          _ <- checkDuplicateUncles(uncleHashes)
+          uncleHeaders <- uncleHashes.mapE(blockchain.getBlockHeader) match {
+            case Left(IOError.KeyNotFound(_)) => invalidBlock(UncleDoesNotExist)
+            case result                       => from(result)
+          }
+          _ <- validateUncles(flow, chainIndex, block, uncleHeaders)
           _ <-
             if (isUncleDepsValid(block, flow, uncleHeaders)) {
               validBlock(())

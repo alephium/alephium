@@ -637,8 +637,10 @@ class BlockValidationSpec extends AlephiumSpec {
 
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     val block11       = mine(blockFlow, blockTemplate.setUncles(AVector((block10.hash, miner))))
-    addAndCheck(blockFlow, block10)
     block11.parentHash is block0.hash
+    checkBlock(block11, blockFlow).left.value isE UncleDoesNotExist
+
+    addAndCheck(blockFlow, block10)
     checkBlock(block11, blockFlow).left.value isE InvalidUncles
   }
 
