@@ -28,10 +28,10 @@ import org.alephium.util.{AVector, TimeStamp}
 final case class MiningBlob(
     headerBlob: ByteString,
     target: BigInteger,
-    bodyBlob: ByteString
+    txsBlob: ByteString
 ) {
   def toBlockBlob(nonce: Nonce): ByteString = {
-    nonce.value ++ headerBlob ++ bodyBlob
+    nonce.value ++ headerBlob ++ txsBlob
   }
 }
 

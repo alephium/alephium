@@ -123,7 +123,7 @@ object Job {
       template.index.from.value,
       template.index.to.value,
       blobs.headerBlob,
-      blobs.bodyBlob,
+      blobs.txsBlob,
       blobs.target
     )
   }

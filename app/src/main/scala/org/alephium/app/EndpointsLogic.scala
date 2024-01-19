@@ -858,7 +858,7 @@ object EndpointsLogic {
       toGroup = chainIndex.to.value,
       headerBlob = template.headerBlob,
       target = template.target,
-      bodyBlob = template.bodyBlob
+      bodyBlob = template.txsBlob
     )
   }
 
