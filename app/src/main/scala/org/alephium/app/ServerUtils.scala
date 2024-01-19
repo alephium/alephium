@@ -1297,11 +1297,12 @@ class ServerUtils(implicit
       args: AVector[Val],
       method: Method[StatefulContext]
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    val consensusConfig = consensusConfigs.getConsensusConfig(blockTimeStamp)
     val blockEnv = BlockEnv(
       ChainIndex(groupIndex, groupIndex),
       networkConfig.networkId,
       blockTimeStamp,
-      consensusConfigs.maxMiningTarget,
+      consensusConfig.maxMiningTarget,
       Some(blockHash)
     )
     val testGasFee = nonCoinbaseMinGasPrice * maximalGasPerTx

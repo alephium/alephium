@@ -31,7 +31,8 @@ import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp}
 
 class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   trait Fixture extends AlephiumConfigFixture with NoIndexModelGeneratorsLike {
-    lazy val genesis   = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)
+    lazy val genesis =
+      Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty)(brokerConfig, consensusConfigs.mainnet)
     lazy val blockGen0 = blockGenOf(AVector.fill(brokerConfig.depsNum)(genesis.hash), Hash.zero)
     lazy val chainGen  = chainGenOf(4, genesis)
 
@@ -376,7 +377,8 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
   it should "update mainchain hash based on heights instead of weight" in new Fixture {
     override val configValues = Map(
-      ("alephium.consensus.num-zeros-at-least-in-hash", 10)
+      ("alephium.consensus.mainnet.num-zeros-at-least-in-hash", 10),
+      ("alephium.consensus.ghost.num-zeros-at-least-in-hash", 10)
     )
 
     val longChain   = chainGenOf(3, genesis).sample.get
@@ -434,27 +436,29 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "compute correct weights for a single chain" in new Fixture {
-    val blocks = chainGenOf(5).sample.get
-    val chain  = createBlockChain(blocks.init)
+    val consensusConfig = consensusConfigs.getConsensusConfig(TimeStamp.now())
+    val blocks          = chainGenOf(5).sample.get
+    val chain           = createBlockChain(blocks.init)
     blocks.init.foreach(block => chain.contains(block) isE true)
     chain.maxHeight isE 3
-    chain.maxWeight isE consensusConfigs.minBlockWeight * 3
+    chain.maxWeight isE consensusConfig.minBlockWeight * 3
     addBlock(chain, blocks.last)
     chain.contains(blocks.last) isE true
     chain.maxHeight isE 4
-    chain.maxWeight isE consensusConfigs.minBlockWeight * 4
+    chain.maxWeight isE consensusConfig.minBlockWeight * 4
   }
 
   it should "compute correct weights for two chains with same root" in new Fixture {
-    val blocks1 = chainGenOf(5).sample.get
-    val blocks2 = chainGenOf(1, blocks1.head).sample.get
-    val chain   = createBlockChain(blocks1)
+    val consensusConfig = consensusConfigs.getConsensusConfig(TimeStamp.now())
+    val blocks1         = chainGenOf(5).sample.get
+    val blocks2         = chainGenOf(1, blocks1.head).sample.get
+    val chain           = createBlockChain(blocks1)
     addBlocks(chain, blocks2)
 
     blocks1.foreach(block => chain.contains(block) isE true)
     blocks2.foreach(block => chain.contains(block) isE true)
     chain.maxHeight isE 4
-    chain.maxWeight isE consensusConfigs.minBlockWeight * 4
+    chain.maxWeight isE consensusConfig.minBlockWeight * 4
     chain.getHashesAfter(blocks1.head.hash) isE {
       val branch1 = blocks1.tail
       AVector(branch1.head.hash) ++ blocks2.map(_.hash) ++ branch1.tail.map(_.hash)

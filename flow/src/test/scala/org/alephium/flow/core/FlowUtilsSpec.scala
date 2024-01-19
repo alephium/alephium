@@ -81,7 +81,8 @@ class FlowUtilsSpec extends AlephiumSpec {
     } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
     newBlocks.foreach { block =>
       addAndCheck(blockFlow, block, 1)
-      blockFlow.getWeight(block) isE consensusConfigs.minBlockWeight * 1
+      val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
+      blockFlow.getWeight(block) isE consensusConfig.minBlockWeight * 1
     }
 
     newBlocks.map(_.hash).sorted(blockFlow.blockHashOrdering).map(_.bytes) is

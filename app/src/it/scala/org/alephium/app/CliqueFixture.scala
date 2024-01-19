@@ -267,7 +267,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
         ("alephium.broker.broker-num", brokerNum),
         ("alephium.broker.broker-id", brokerId),
         ("alephium.consensus.block-target-time", "1 seconds"),
-        ("alephium.consensus.num-zeros-at-least-in-hash", "8"),
+        ("alephium.consensus.mainnet.num-zeros-at-least-in-hash", "8"),
+        ("alephium.consensus.ghost.num-zeros-at-least-in-hash", "8"),
         ("alephium.mining.batch-delay", "200 milli"),
         ("alephium.wallet.port", walletPort),
         ("alephium.wallet.secret-dir", s"${java.nio.file.Files.createTempDirectory("it-test")}")

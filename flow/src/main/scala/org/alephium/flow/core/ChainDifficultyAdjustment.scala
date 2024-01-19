@@ -18,7 +18,7 @@ package org.alephium.flow.core
 
 import java.math.BigInteger
 
-import org.alephium.flow.setting.{ConsensusSetting, ConsensusSettings}
+import org.alephium.flow.setting.ConsensusSetting
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.NetworkConfig
@@ -26,7 +26,6 @@ import org.alephium.protocol.model.{BlockHash, Target}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait ChainDifficultyAdjustment {
-  def consensusConfigs: ConsensusSettings
   implicit def networkConfig: NetworkConfig
 
   val difficultyBombPatchConfig =
@@ -118,7 +117,7 @@ trait ChainDifficultyAdjustment {
             val target = ChainDifficultyAdjustment.calNextHashTargetRaw(
               currentTarget,
               timeSpan,
-              consensusConfigs.maxMiningTarget
+              consensusConfig.maxMiningTarget
             )
             Right(calIceAgeTarget(target, currentTimeStamp, nextTimeStamp))
           case None =>

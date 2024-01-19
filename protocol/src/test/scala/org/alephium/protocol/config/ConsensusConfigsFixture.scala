@@ -30,17 +30,18 @@ object ConsensusConfigsFixture {
   trait Default extends ConsensusConfigsFixture with GroupConfigFixture.Default {
     implicit lazy val consensusConfigs: ConsensusConfigs = new ConsensusConfigs {
       val mainnet: ConsensusConfig = new ConsensusConfig {
+        val maxMiningTarget: Target          = Target.Max
         val blockTargetTime: Duration        = Duration.ofSecondsUnsafe(64)
         val uncleDependencyGapTime: Duration = blockTargetTime
         val emission: Emission               = Emission.mainnet(groupConfig, blockTargetTime)
       }
       val ghost: ConsensusConfig = new ConsensusConfig {
+        val maxMiningTarget: Target          = Target.Max
         val blockTargetTime: Duration        = Duration.ofSecondsUnsafe(16)
         val uncleDependencyGapTime: Duration = blockTargetTime
         val emission: Emission =
           Emission.ghost(groupConfig, mainnet.blockTargetTime, blockTargetTime)
       }
-      val maxMiningTarget: Target = Target.Max
     }
   }
 }

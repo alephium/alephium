@@ -49,8 +49,14 @@ final case class BrokerSetting(groups: Int, brokerNum: Int, brokerId: Int) exten
 final case class ConsensusSetting(
     blockTargetTime: Duration,
     uncleDependencyGapTime: Duration,
+    numZerosAtLeastInHash: Int,
     emission: Emission
 ) extends ConsensusConfig {
+  val maxMiningTarget: Target =
+    Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
+  val minMiningDiff: Difficulty = maxMiningTarget.getDifficulty()
+  val minBlockWeight: Weight    = Weight.from(maxMiningTarget)
+
   val expectedTimeSpan: Duration        = blockTargetTime
   val powAveragingWindow: Int           = 17
   val expectedWindowTimeSpan: Duration  = expectedTimeSpan.timesUnsafe(powAveragingWindow.toLong)
@@ -79,14 +85,8 @@ final case class ConsensusSetting(
 final case class ConsensusSettings(
     mainnet: ConsensusSetting,
     ghost: ConsensusSetting,
-    numZerosAtLeastInHash: Int,
     blockCacheCapacityPerChain: Int
 ) extends ConsensusConfigs {
-  val maxMiningTarget: Target =
-    Target.unsafe(BigInteger.ONE.shiftLeft(256 - numZerosAtLeastInHash).subtract(BigInteger.ONE))
-  val minMiningDiff: Difficulty = maxMiningTarget.getDifficulty()
-  val minBlockWeight: Weight    = Weight.from(maxMiningTarget)
-
   override def getConsensusConfig(hardFork: HardFork): ConsensusSetting = {
     if (hardFork.isGhostEnabled()) ghost else mainnet
   }
@@ -247,7 +247,6 @@ object AlephiumConfig {
   final private case class TempConsensusSettings(
       mainnet: TempConsensusSetting,
       ghost: TempConsensusSetting,
-      numZerosAtLeastInHash: Int,
       blockCacheCapacityPerChain: Int
   ) {
     def toConsensusSettings(groupConfig: GroupConfig): ConsensusSettings = {
@@ -257,19 +256,20 @@ object AlephiumConfig {
       ConsensusSettings(
         mainnet.toConsensusSetting(mainnetEmission),
         ghost.toConsensusSetting(ghostEmission),
-        numZerosAtLeastInHash,
         blockCacheCapacityPerChain
       )
     }
   }
   final private case class TempConsensusSetting(
       blockTargetTime: Duration,
-      uncleDependencyGapTime: Option[Duration]
+      uncleDependencyGapTime: Option[Duration],
+      numZerosAtLeastInHash: Int
   ) {
     def toConsensusSetting(emission: Emission): ConsensusSetting = {
       ConsensusSetting(
         blockTargetTime,
         uncleDependencyGapTime.getOrElse(blockTargetTime.divUnsafe(4)),
+        numZerosAtLeastInHash,
         emission
       )
     }

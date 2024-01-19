@@ -432,12 +432,13 @@ trait FlowFixture
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
     val (_, toPublicKey) = chainIndex.to.generateKey
     val lockupScript     = LockupScript.p2pkh(toPublicKey)
+    val consensusConfig  = consensusConfigs.getConsensusConfig(blockTs)
     val coinbaseTx =
       Transaction.coinbase(
         chainIndex,
         txs,
         lockupScript,
-        consensusConfigs.maxMiningTarget,
+        consensusConfig.maxMiningTarget,
         blockTs,
         uncles
       )
@@ -485,7 +486,7 @@ trait FlowFixture
       uncles: AVector[BlockHeader],
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      target: Target = consensusConfigs.maxMiningTarget
+      target: Target = Target.Max
   ): Block = {
     mine0(blockFlow, chainIndex, BlockDeps.unsafe(deps), uncles, txs, blockTs, target)
   }
@@ -509,7 +510,7 @@ trait FlowFixture
       uncles: AVector[BlockHeader],
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      target: Target = consensusConfigs.maxMiningTarget
+      target: Target = Target.Max
   ): Block = {
     val hardFork = networkConfig.getHardFork(blockTs)
     val loosenDeps =
@@ -530,7 +531,7 @@ trait FlowFixture
       depStateHash: Hash,
       txsHash: Hash,
       blockTs: TimeStamp,
-      target: Target = consensusConfigs.maxMiningTarget
+      target: Target = Target.Max
   ): BlockHeader = {
     val blockDeps = BlockDeps.build(deps)
 
@@ -587,7 +588,8 @@ trait FlowFixture
 
   def addAndCheck(blockFlow: BlockFlow, block: Block, weightRatio: Int): Assertion = {
     addAndCheck0(blockFlow, block)
-    blockFlow.getWeight(block) isE consensusConfigs.minBlockWeight * weightRatio
+    val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
+    blockFlow.getWeight(block) isE consensusConfig.minBlockWeight * weightRatio
   }
 
   def addAndCheck(blockFlow: BlockFlow, header: BlockHeader): Assertion = {
@@ -602,7 +604,8 @@ trait FlowFixture
 
   def addAndCheck(blockFlow: BlockFlow, header: BlockHeader, weightFactor: Int): Assertion = {
     addAndCheck(blockFlow, header)
-    blockFlow.getWeight(header) isE consensusConfigs.minBlockWeight * weightFactor
+    val consensusConfig = consensusConfigs.getConsensusConfig(header.timestamp)
+    blockFlow.getWeight(header) isE consensusConfig.minBlockWeight * weightFactor
   }
 
   def checkBalance(blockFlow: BlockFlow, groupIndex: Int, expected: U256): Assertion = {
@@ -720,11 +723,12 @@ trait FlowFixture
     val initialGas  = tx0.unsigned.gasAmount
     val worldState  = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
     val prevOutputs = worldState.getPreOutputs(tx0).rightValue
+    val now         = TimeStamp.now()
     val blockEnv = BlockEnv(
       chainIndex,
       networkConfig.networkId,
-      TimeStamp.now(),
-      consensusConfigs.maxMiningTarget,
+      now,
+      consensusConfigs.getConsensusConfig(now).maxMiningTarget,
       None
     )
     val txValidation = TxValidation.build

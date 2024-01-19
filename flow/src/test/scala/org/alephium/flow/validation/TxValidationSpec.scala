@@ -1145,14 +1145,16 @@ class TxValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike 
     def groupIndex: GroupIndex
     def tx: Transaction
     lazy val initialGas = minimalGas
-    lazy val blockEnv =
+    lazy val blockEnv = {
+      val now = TimeStamp.now()
       BlockEnv(
         tx.chainIndex,
         NetworkId.AlephiumMainNet,
-        TimeStamp.now(),
-        consensusConfigs.maxMiningTarget,
+        now,
+        consensusConfigs.getConsensusConfig(now).maxMiningTarget,
         None
       )
+    }
     lazy val prevOutputs = blockFlow
       .getBestPersistedWorldState(groupIndex)
       .rightValue

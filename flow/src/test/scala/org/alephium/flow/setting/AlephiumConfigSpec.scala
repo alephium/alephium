@@ -60,9 +60,12 @@ class AlephiumConfigSpec extends AlephiumSpec {
     val config   = AlephiumConfig.load(Env.Prod, rootPath, "alephium")
 
     config.broker.groups is 4
-    config.consensus.numZerosAtLeastInHash is 37
+    config.consensus.mainnet.numZerosAtLeastInHash is 37
     val initialHashRate =
-      HashRate.from(config.consensus.maxMiningTarget, config.consensus.mainnet.blockTargetTime)(
+      HashRate.from(
+        config.consensus.mainnet.maxMiningTarget,
+        config.consensus.mainnet.blockTargetTime
+      )(
         config.broker
       )
     initialHashRate is HashRate.unsafe(new BigInteger("549756862464"))

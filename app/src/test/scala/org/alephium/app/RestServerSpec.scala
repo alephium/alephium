@@ -778,9 +778,10 @@ abstract class RestServerSpec(
   it should "call GET /infos/chain-params" in {
     Get(s"/infos/chain-params") check { response =>
       response.code is StatusCode.Ok
+      val now = TimeStamp.now()
       response.as[ChainParams] is ChainParams(
         networkConfig.networkId,
-        consensusConfigs.numZerosAtLeastInHash,
+        consensusConfigs.getConsensusConfig(now).numZerosAtLeastInHash,
         brokerConfig.groupNumPerBroker,
         brokerConfig.groups
       )

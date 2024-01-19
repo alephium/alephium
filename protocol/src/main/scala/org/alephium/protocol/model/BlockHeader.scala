@@ -19,7 +19,7 @@ package org.alephium.protocol.model
 import scala.annotation.tailrec
 
 import org.alephium.protocol.{ALPH, Hash}
-import org.alephium.protocol.config.{ConsensusConfigs, GroupConfig}
+import org.alephium.protocol.config.{ConsensusConfig, GroupConfig}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model.BlockHash
 import org.alephium.serde.{u256Serde => _, _}
@@ -120,12 +120,12 @@ object BlockHeader {
 
   def genesis(chainIndex: ChainIndex, txsHash: Hash)(implicit
       groupConfig: GroupConfig,
-      consensusConfigs: ConsensusConfigs
+      consensusConfig: ConsensusConfig
   ): BlockHeader = {
     @tailrec
     def iter(count: U256): BlockHeader = {
       val nonce  = Nonce.unsafe(count.toBytes.takeRight(Nonce.byteLength))
-      val header = BlockHeader.genesis(txsHash, consensusConfigs.maxMiningTarget, nonce)
+      val header = BlockHeader.genesis(txsHash, consensusConfig.maxMiningTarget, nonce)
       // Note: we do not validate difficulty target here
       if (header.chainIndex == chainIndex) header else iter(count.addOneUnsafe())
     }

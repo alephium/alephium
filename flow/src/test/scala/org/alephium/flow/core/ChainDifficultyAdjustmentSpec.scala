@@ -27,12 +27,7 @@ import org.alephium.flow.AlephiumFlowSpec
 import org.alephium.flow.setting.{ConsensusSetting, ConsensusSettings}
 import org.alephium.io.IOResult
 import org.alephium.protocol.ALPH
-import org.alephium.protocol.config.{
-  ConsensusConfig,
-  ConsensusConfigsFixture,
-  NetworkConfig,
-  NetworkConfigFixture
-}
+import org.alephium.protocol.config._
 import org.alephium.protocol.model.{BlockHash, HardFork, NetworkId, Target}
 import org.alephium.util.{AVector, Duration, NumericHelpers, TimeStamp}
 
@@ -41,12 +36,12 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
   trait MockFixture extends ChainDifficultyAdjustment with NumericHelpers {
     def toConsensusSetting(config: ConsensusConfig): ConsensusSetting =
-      ConsensusSetting(config.blockTargetTime, config.uncleDependencyGapTime, config.emission)
+      ConsensusSetting(config.blockTargetTime, config.uncleDependencyGapTime, 18, config.emission)
     val consensusConfigs: ConsensusSettings = {
       val configFixture = (new ConsensusConfigsFixture.Default {}).consensusConfigs
       val mainnet       = toConsensusSetting(configFixture.mainnet)
       val ghost         = toConsensusSetting(configFixture.ghost)
-      ConsensusSettings(mainnet, ghost, 18, 25)
+      ConsensusSettings(mainnet, ghost, 25)
     }
     implicit override def networkConfig: NetworkConfig = NetworkConfigFixture.Leman
     implicit val consensusConfig =
@@ -103,22 +98,22 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
   }
 
   it should "calculate target correctly" in new MockFixture {
-    val currentTarget = Target.unsafe((consensusConfigs.maxMiningTarget / 4).underlying())
+    val currentTarget = Target.unsafe((consensusConfig.maxMiningTarget / 4).underlying())
     reTarget(
       currentTarget,
       consensusConfig.expectedWindowTimeSpan.millis,
-      consensusConfigs.maxMiningTarget
+      consensusConfig.maxMiningTarget
     ) is currentTarget
     reTarget(
       currentTarget,
       (consensusConfig.expectedWindowTimeSpan timesUnsafe 2).millis,
-      consensusConfigs.maxMiningTarget
+      consensusConfig.maxMiningTarget
     ).value is
       (currentTarget * 2).underlying()
     reTarget(
       currentTarget,
       (consensusConfig.expectedWindowTimeSpan divUnsafe 2).millis,
-      consensusConfigs.maxMiningTarget
+      consensusConfig.maxMiningTarget
     ) is
       Target.unsafe((currentTarget.value / 2).underlying())
   }
@@ -196,7 +191,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         reTarget(
           currentTarget,
           consensusConfig.windowTimeSpanMax.millis,
-          consensusConfigs.maxMiningTarget
+          consensusConfig.maxMiningTarget
         )
     }
   }
@@ -222,7 +217,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         reTarget(
           currentTarget,
           consensusConfig.windowTimeSpanMin.millis,
-          consensusConfigs.maxMiningTarget
+          consensusConfig.maxMiningTarget
         )
     }
   }
@@ -247,7 +242,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
       )
     }
 
-    val currentTarget           = consensusConfigs.maxMiningTarget
+    val currentTarget           = consensusConfig.maxMiningTarget
     val diffBombEnabledTs       = ALPH.PreLemanDifficultyBombEnabledTimestamp
     val diffBombFirstAdjustment = diffBombEnabledTs.plusUnsafe(ALPH.ExpDiffPeriod)
 
@@ -320,7 +315,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
     }
 
     val initialTarget =
-      Target.unsafe(consensusConfigs.maxMiningTarget.value.divide(BigInteger.valueOf(128)))
+      Target.unsafe(consensusConfig.maxMiningTarget.value.divide(BigInteger.valueOf(128)))
     var currentTarget =
       calNextHashTargetRaw(
         getHash(currentHeight),
@@ -398,7 +393,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         reTarget(
           currentTarget,
           consensusConfig.windowTimeSpanMin.millis,
-          consensusConfigs.maxMiningTarget
+          consensusConfig.maxMiningTarget
         )
     }
 
@@ -427,7 +422,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         reTarget(
           currentTarget,
           consensusConfig.windowTimeSpanMin.millis,
-          consensusConfigs.maxMiningTarget
+          consensusConfig.maxMiningTarget
         )
     }
   }

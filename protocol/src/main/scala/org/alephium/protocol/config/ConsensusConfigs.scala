@@ -17,13 +17,13 @@
 package org.alephium.protocol.config
 
 import org.alephium.protocol.model.{HardFork, Target}
-import org.alephium.util.{Duration, TimeStamp}
+import org.alephium.util.{Duration, Math, TimeStamp}
 
 trait ConsensusConfigs {
   def mainnet: ConsensusConfig
   def ghost: ConsensusConfig
 
-  def maxMiningTarget: Target
+  lazy val maxAllowedMiningTarget: Target = Math.max(mainnet.maxMiningTarget, ghost.maxMiningTarget)
 
   def getConsensusConfig(hardFork: HardFork): ConsensusConfig = {
     if (hardFork.isGhostEnabled()) ghost else mainnet

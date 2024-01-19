@@ -72,7 +72,8 @@ class BlockHeaderSpec
   }
 
   it should "not extract dependencies for genesis headers" in {
-    val genesis = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty).header
+    implicit val consensusConfig = consensusConfigs.mainnet
+    val genesis                  = Block.genesis(ChainIndex.unsafe(0, 0), AVector.empty).header
     assertThrows[AssertionError](genesis.parentHash)
     assertThrows[AssertionError](genesis.intraDep)
     assertThrows[AssertionError](genesis.inDeps)
@@ -122,13 +123,13 @@ class BlockHeaderSpec
         Hash.unsafe(hex"e5d64f886664c58378d41fe3b8c29dd7975da59245a4a6bf92c3a47339a9a0a9"),
       txsHash = Hash.unsafe(hex"c78682d23662320d6f59d6612f26e2bcb08caff68b589523064924328f6d0d59"),
       timestamp = TimeStamp.unsafe(1),
-      target = consensusConfigs.maxMiningTarget,
+      target = consensusConfigs.mainnet.maxMiningTarget,
       nonce = nonce1
     )
 
     val header1Blob = header1.verify("header1")
 
-    val block     = Block(header1, AVector.empty, AVector.empty)
+    val block     = Block(header1, AVector.empty)
     val blockBlob = header1Blob ++ hex"00"
     serialize(block) is blockBlob
 
@@ -150,7 +151,7 @@ class BlockHeaderSpec
         Hash.unsafe(hex"798e9e137aec7c2d59d9655b4ffa640f301f628bf7c365083bb255f6aa5f89ef"),
       txsHash = Hash.unsafe(hex"bdaf9dc514ce7d34b6474b8ca10a3dfb93ba997cb9d5ff1ea724ebe2af48abe5"),
       timestamp = TimeStamp.unsafe(102348),
-      target = consensusConfigs.maxMiningTarget,
+      target = consensusConfigs.mainnet.maxMiningTarget,
       nonce = nonce2
     )
 

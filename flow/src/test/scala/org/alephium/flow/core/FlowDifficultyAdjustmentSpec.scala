@@ -34,10 +34,10 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
       .rightValue
       .value
-    (BigInt(nextTargetRaw) < BigInt(consensusConfigs.maxMiningTarget.value) / 2) is true
+    (BigInt(nextTargetRaw) < BigInt(consensusConfig.maxMiningTarget.value) / 2) is true
     val nextTargetClipped =
       blockFlow.getNextHashTarget(chainIndex, bestDeps, TimeStamp.now()).rightValue
-    (nextTargetClipped > Target.unsafe(consensusConfigs.maxMiningTarget.value / 2)) is true
+    (nextTargetClipped > Target.unsafe(consensusConfig.maxMiningTarget.value / 2)) is true
   }
 
   it should "clip target" in new PreLemanDifficultyFixture {
@@ -49,20 +49,20 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       .getNextHashTargetRaw(bestDeps.uncleHash(chainIndex.to), TimeStamp.now())
       .rightValue
       .value
-    (BigInt(nextTargetRaw) < BigInt(consensusConfigs.maxMiningTarget.value) / 2) is true
+    (BigInt(nextTargetRaw) < BigInt(consensusConfig.maxMiningTarget.value) / 2) is true
     val nextTargetClipped =
       blockFlow.getNextHashTarget(chainIndex, bestDeps, TimeStamp.now()).rightValue
-    nextTargetClipped is Target.unsafe(consensusConfigs.maxMiningTarget.value / 2)
+    nextTargetClipped is Target.unsafe(consensusConfig.maxMiningTarget.value / 2)
   }
 
   behavior of "Leman DAA"
 
   it should "calculate the same target for different groups" in new LemanDifficultyFixture {
-    checkTemplates(Some(target => { target is consensusConfigs.maxMiningTarget; () }))
+    checkTemplates(Some(target => { target is consensusConfig.maxMiningTarget; () }))
 
     prepareBlocks(Range(2, 100).iterator.next())
     checkTemplates(Some(target => {
-      (BigInt(target.value) < BigInt(consensusConfigs.maxMiningTarget.value) / 2) is true
+      (BigInt(target.value) < BigInt(consensusConfig.maxMiningTarget.value) / 2) is true
       ()
     }))
   }
@@ -111,13 +111,13 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
         brokerConfig.cliqueChainIndexes.foreach { index =>
           val hash = blockFlow.getBlockChain(index).getHashesUnsafe(height).head
           blockFlow.getDiffAndTimeSpanUnsafe(hash) is
-            (consensusConfigs.minMiningDiff,
+            (consensusConfig.minMiningDiff,
             consensusConfig.expectedWindowTimeSpan)
 
           if (index.isIntraGroup) {
             val earliestOutDepTs = getEarliestOutDepTs(index, height)
             blockFlow.getDiffAndTimeSpanForIntraDepUnsafe(hash) is
-              (consensusConfigs.minMiningDiff.times(brokerConfig.groups),
+              (consensusConfig.minMiningDiff.times(brokerConfig.groups),
               consensusConfig.expectedWindowTimeSpan.timesUnsafe(brokerConfig.groups.toLong),
               earliestOutDepTs)
           }
@@ -125,7 +125,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
           blockFlow.getDiffAndTimeSpanUnsafe(
             blockFlow.getBlockHeaderUnsafe(hash).blockDeps.unorderedIntraDeps(index.from)
           ) is
-            (consensusConfigs.minMiningDiff.times(brokerConfig.chainNum),
+            (consensusConfig.minMiningDiff.times(brokerConfig.chainNum),
             consensusConfig.expectedWindowTimeSpan.timesUnsafe(
               brokerConfig.chainNum.toLong
             ), getEarliestDepTs(height))
@@ -138,13 +138,13 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
         .getHashesUnsafe(height)
         .head
       val (diff, timeSpan) = blockFlow.getDiffAndTimeSpanUnsafe(hash)
-      diff is consensusConfigs.minMiningDiff
+      diff is consensusConfig.minMiningDiff
       (timeSpan <= TimeStamp.now().deltaUnsafe(startTs)) is true
 
       if (index.isIntraGroup) {
         val (diffSum, timeSpanSum, earliestOutDepTs) =
           blockFlow.getDiffAndTimeSpanForIntraDepUnsafe(hash)
-        diffSum is consensusConfigs.minMiningDiff.times(brokerConfig.groups)
+        diffSum is consensusConfig.minMiningDiff.times(brokerConfig.groups)
         (timeSpanSum <= TimeStamp
           .now()
           .deltaUnsafe(startTs)
@@ -155,7 +155,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       val (diffSum, timeSpanSum, earliestDepTs) = blockFlow.getDiffAndTimeSpanUnsafe(
         blockFlow.getBlockHeaderUnsafe(hash).blockDeps.unorderedIntraDeps(index.from)
       )
-      diffSum is consensusConfigs.minMiningDiff.times(brokerConfig.chainNum)
+      diffSum is consensusConfig.minMiningDiff.times(brokerConfig.chainNum)
       (timeSpanSum <= TimeStamp
         .now()
         .deltaUnsafe(startTs)
@@ -169,13 +169,13 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
         .getHashesUnsafe(height)
         .head
       val (diff, timeSpan) = blockFlow.getDiffAndTimeSpanUnsafe(hash)
-      diff is consensusConfigs.minMiningDiff.times(2)
+      diff is consensusConfig.minMiningDiff.times(2)
       (timeSpan <= TimeStamp.now().deltaUnsafe(startTs)) is true
 
       if (index.isIntraGroup) {
         val (diffSum, timeSpanSum, earliestOutDepTs) =
           blockFlow.getDiffAndTimeSpanForIntraDepUnsafe(hash)
-        diffSum is consensusConfigs.minMiningDiff.times(brokerConfig.groups + 1)
+        diffSum is consensusConfig.minMiningDiff.times(brokerConfig.groups + 1)
         (timeSpanSum <= TimeStamp
           .now()
           .deltaUnsafe(startTs)
@@ -186,7 +186,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       val (diffSum, timeSpanSum, earliestDepTs) = blockFlow.getDiffAndTimeSpanUnsafe(
         blockFlow.getBlockHeaderUnsafe(hash).blockDeps.unorderedIntraDeps(index.from)
       )
-      diffSum is consensusConfigs.minMiningDiff.times(brokerConfig.chainNum)
+      diffSum is consensusConfig.minMiningDiff.times(brokerConfig.chainNum)
       (timeSpanSum <= TimeStamp
         .now()
         .deltaUnsafe(startTs)
@@ -197,7 +197,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       val blockDeps = blockFlow.getBestDeps(groupIndex)
       val intraDeps = blockFlow.calCommonIntraGroupDepsUnsafe(blockDeps, groupIndex)
       val (diffSum, timeSpanSum, earliestDepTs) = blockFlow.getDiffAndTimeSpanUnsafe(intraDeps)
-      diffSum is consensusConfigs.minMiningDiff.times(brokerConfig.chainNum * 2)
+      diffSum is consensusConfig.minMiningDiff.times(brokerConfig.chainNum * 2)
       (timeSpanSum <= TimeStamp
         .now()
         .deltaUnsafe(startTs)
@@ -213,32 +213,32 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       ("alephium.network.network-id", NetworkId.AlephiumDevNet.id),
       ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(-1).millis),
       ("alephium.network.ghost-hard-fork-timestamp ", TimeStamp.Max.millis),
-      ("alephium.consensus.num-zeros-at-least-in-hash", 3)
+      ("alephium.consensus.mainnet.num-zeros-at-least-in-hash", 3)
     )
     config.network.networkId is NetworkId.AlephiumDevNet
     config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is true
-    config.consensus.numZerosAtLeastInHash is 3
     implicit val consensusConfig = consensusConfigs.mainnet
+    consensusConfig.numZerosAtLeastInHash is 3
 
     val chainIndex = ChainIndex.unsafe(0, 0)
     (0 until consensusConfig.powAveragingWindow).foreach { _ =>
       val block = emptyBlock(blockFlow, chainIndex)
-      block.target is consensusConfigs.maxMiningTarget
+      block.target is consensusConfig.maxMiningTarget
       addAndCheck(blockFlow, block)
     }
     (0 until 5).foreach { k =>
-      val expectedDiff = consensusConfigs.minMiningDiff.times(100 + 5 * k).divide(100)
+      val expectedDiff = consensusConfig.minMiningDiff.times(100 + 5 * k).divide(100)
       val expectedTarget = ChainDifficultyAdjustment.calNextHashTargetRaw(
         expectedDiff.getTarget(),
         consensusConfig.blockTargetTime.timesUnsafe(consensusConfig.powAveragingWindow.toLong),
-        consensusConfigs.maxMiningTarget
+        consensusConfig.maxMiningTarget
       )
       val block = emptyBlock(blockFlow, chainIndex)
       block.target is expectedTarget
       addAndCheck(blockFlow, block)
     }
     val block = emptyBlock(blockFlow, chainIndex)
-    (block.target < consensusConfigs.maxMiningTarget) is true
+    (block.target < consensusConfig.maxMiningTarget) is true
   }
 
   trait PreLemanDifficultyFixture extends FlowFixture {
@@ -256,7 +256,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
         val block = emptyBlock(blockFlow, chainIndex)
         // we increase the difficulty for the last block of the DAA window (17 blocks)
         if (k equals consensusConfig.powAveragingWindow) {
-          val newTarget = Target.unsafe(consensusConfigs.maxMiningTarget.value.divide(scale))
+          val newTarget = Target.unsafe(consensusConfig.maxMiningTarget.value.divide(scale))
           val newBlock  = block.copy(header = block.header.copy(target = newTarget))
           blockFlow.addAndUpdateView(reMine(blockFlow, chainIndex, newBlock), None)
         } else {
@@ -266,7 +266,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
             chainIndex,
             bestDep,
             TimeStamp.now()
-          ) isE consensusConfigs.maxMiningTarget
+          ) isE consensusConfig.maxMiningTarget
         }
       }
     }
@@ -298,13 +298,13 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
         }
         blocks.foreach(addAndCheck(blockFlow, _))
         checkTemplates(Some(target => {
-          target is consensusConfigs.minMiningDiff.getTarget(); ()
+          target is consensusConfig.minMiningDiff.getTarget(); ()
         }))
       }
       (0 until 3).foreach { _ =>
         val blocks = brokerConfig.cliqueChainIndexes.map { chainIndex =>
           val block     = emptyBlock(blockFlow, chainIndex)
-          val newTarget = Target.unsafe(consensusConfigs.maxMiningTarget.value.divide(scale))
+          val newTarget = Target.unsafe(consensusConfig.maxMiningTarget.value.divide(scale))
           chainIndex -> block.copy(header = block.header.copy(target = newTarget))
         }
         blocks.foreach { case (chainIndex, block) =>

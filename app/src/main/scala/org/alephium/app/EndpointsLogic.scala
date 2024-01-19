@@ -733,11 +733,12 @@ trait EndpointsLogic extends Endpoints {
   }
 
   def fetchChainParams(): FutureTry[ChainParams] = {
+    val now = TimeStamp.now()
     Future.successful(
       Right(
         ChainParams(
           networkConfig.networkId,
-          consenseConfigs.numZerosAtLeastInHash,
+          consenseConfigs.getConsensusConfig(now).numZerosAtLeastInHash,
           brokerConfig.groupNumPerBroker,
           brokerConfig.groups
         )

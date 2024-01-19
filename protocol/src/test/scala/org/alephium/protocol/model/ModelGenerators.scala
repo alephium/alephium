@@ -553,11 +553,12 @@ trait BlockGenerators extends TxGenerators {
       txs: AVector[Transaction],
       uncles: AVector[(BlockHeader, LockupScript.Asset)]
   ): Block = {
+    val consensusConfig = consensusConfigs.getConsensusConfig(blockTs)
     val coinbase = Transaction.coinbase(
       chainIndex,
       txs,
       p2pkhLockupGen(chainIndex.to).sample.get,
-      consensusConfigs.maxMiningTarget,
+      consensusConfig.maxMiningTarget,
       blockTs,
       uncles
     )
@@ -567,9 +568,8 @@ trait BlockGenerators extends TxGenerators {
       val block = Block.from(
         deps,
         depStateHash,
-        uncles.map(_._1),
         txsWithCoinbase,
-        consensusConfigs.maxMiningTarget,
+        consensusConfig.maxMiningTarget,
         blockTs,
         Nonce.unsecureRandom()
       )

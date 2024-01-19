@@ -127,7 +127,8 @@ class BlockFlowSpec extends AlephiumSpec {
       } yield transferOnlyForIntraGroup(blockFlow, ChainIndex.unsafe(i, j))
       newBlocks1.foreach { block =>
         addAndCheck(blockFlow, block, 1)
-        blockFlow.getWeight(block) isE consensusConfigs.minBlockWeight * 1
+        val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
+        blockFlow.getWeight(block) isE consensusConfig.minBlockWeight * 1
       }
       checkInBestDeps(GroupIndex.unsafe(0), blockFlow, newBlocks1)
       checkBalance(blockFlow, 0, genesisBalance - ALPH.alph(1))
@@ -401,7 +402,7 @@ class BlockFlowSpec extends AlephiumSpec {
       targets.head
     }
 
-    var lastTarget = consensusConfigs.maxMiningTarget
+    var lastTarget = consensusConfigs.getConsensusConfig(TimeStamp.now()).maxMiningTarget
     while ({
       val newTarget = step()
       if (lastTarget != Target.Max) {

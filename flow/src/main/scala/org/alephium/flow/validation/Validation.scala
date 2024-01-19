@@ -47,7 +47,7 @@ object Validation {
       datas: AVector[T]
   )(implicit consensusConfigs: ConsensusConfigs): Boolean = {
     datas.forall { data =>
-      (data.target <= consensusConfigs.maxMiningTarget) && PoW.checkWork(data)
+      (data.target <= consensusConfigs.maxAllowedMiningTarget) && PoW.checkWork(data)
     }
   }
 }

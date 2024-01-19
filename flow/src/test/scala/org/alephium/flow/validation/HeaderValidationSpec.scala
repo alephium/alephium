@@ -53,9 +53,10 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   behavior of "genesis validation"
 
   trait GenesisFixture extends Fixture {
-    val chainIndex      = ChainIndex.unsafe(1, 2)
-    val genesis         = BlockHeader.genesis(chainIndex, Hash.zero)
-    val headerValidator = HeaderValidation.build
+    val chainIndex               = ChainIndex.unsafe(1, 2)
+    implicit val consensusConfig = consensusConfigs.mainnet
+    val genesis                  = BlockHeader.genesis(chainIndex, Hash.zero)
+    val headerValidator          = HeaderValidation.build
 
     def passValidation(header: BlockHeader): Assertion = {
       passValidation(headerValidator.validateGenesisHeader(header))
@@ -126,7 +127,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
   }
 
   it should "check genesis PoW target" in new GenesisFixture {
-    genesis.target is consensusConfigs.maxMiningTarget
+    genesis.target is consensusConfigs.mainnet.maxMiningTarget
 
     val modified = genesis.copy(target = Target.unsafe(BigInteger.ZERO))
     failValidation(headerValidator.validateGenesisHeader(modified), InvalidGenesisWorkTarget)
@@ -139,7 +140,8 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
 
     override val configValues = Map(
       ("alephium.broker.broker-num", 1),
-      ("alephium.consensus.num-zeros-at-least-in-hash", 1),
+      ("alephium.consensus.mainnet.num-zeros-at-least-in-hash", 1),
+      ("alephium.consensus.ghost.num-zeros-at-least-in-hash", 1),
       ("alephium.network.ghost-hard-fork-timestamp", ghostHardForkTimestamp.millis)
     )
 

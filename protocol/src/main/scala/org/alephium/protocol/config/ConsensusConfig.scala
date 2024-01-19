@@ -16,9 +16,11 @@
 
 package org.alephium.protocol.config
 
+import org.alephium.protocol.model.Target
 import org.alephium.util.Duration
 
 trait ConsensusConfig extends EmissionConfig {
+  def maxMiningTarget: Target
   def blockTargetTime: Duration
   def uncleDependencyGapTime: Duration
 }
