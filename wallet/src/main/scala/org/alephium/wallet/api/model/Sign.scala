@@ -16,8 +16,8 @@
 
 package org.alephium.wallet.api.model
 
-import org.alephium.protocol.Signature
+import org.alephium.protocol.{Hash, Signature}
 
-final case class Sign(data: String)
+final case class Sign(data: Hash)
 
 final case class SignResult(signature: Signature)

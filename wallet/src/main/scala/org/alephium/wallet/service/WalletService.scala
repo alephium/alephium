@@ -33,11 +33,11 @@ import org.alephium.api.ApiError
 import org.alephium.api.model.{Amount, Destination, SweepAddressTransaction}
 import org.alephium.crypto.wallet.BIP32.ExtendedPrivateKey
 import org.alephium.crypto.wallet.Mnemonic
-import org.alephium.protocol.{Signature, SignatureSchema}
+import org.alephium.protocol.{Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config.GroupConfig
 import org.alephium.protocol.model.{Address, GroupIndex, TransactionId}
 import org.alephium.protocol.vm.{GasBox, GasPrice}
-import org.alephium.util.{discard, AVector, Duration, FutureCollection, Hex, Service, TimeStamp}
+import org.alephium.util.{discard, AVector, Duration, FutureCollection, Service, TimeStamp}
 import org.alephium.wallet.Constants
 import org.alephium.wallet.api.model.{Addresses, AddressInfo}
 import org.alephium.wallet.storage.SecretStorage
@@ -103,7 +103,7 @@ trait WalletService extends Service {
   ): Future[Either[WalletError, AVector[(TransactionId, GroupIndex, GroupIndex)]]]
   def sign(
       wallet: String,
-      data: String
+      data: Hash
   ): Either[WalletError, Signature]
   def deriveNextAddress(
       wallet: String,
@@ -478,14 +478,10 @@ object WalletService {
 
     def sign(
         wallet: String,
-        data: String
+        data: Hash
     ): Either[WalletError, Signature] = {
       withPrivateKey(wallet) { privateKey =>
-        for {
-          bytes <- Hex.from(data).toRight(OtherError(s"Invalid hex string"))
-        } yield {
-          SignatureSchema.sign(bytes, privateKey.privateKey)
-        }
+        Right(SignatureSchema.sign(data.bytes, privateKey.privateKey))
       }
     }
 
