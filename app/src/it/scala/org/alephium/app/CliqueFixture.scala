@@ -454,7 +454,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
                |}
         """.stripMargin
     httpPost(
-      "/transactions/build-multi-inputs",
+      "/transactions/build-multi-addresses",
       Some(p)
     )
   }
