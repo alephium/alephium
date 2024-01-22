@@ -422,7 +422,8 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
-  implicit val buildMultiAddressesTransactionExamples: List[Example[BuildMultiAddressesTransaction]] =
+  implicit val buildMultiAddressesTransactionExamples
+      : List[Example[BuildMultiAddressesTransaction]] =
     List(
       defaultExample(
         BuildMultiAddressesTransaction(
