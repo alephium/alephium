@@ -5364,19 +5364,19 @@
         }
       }
     },
-    "/transactions/build-multi-inputs": {
+    "/transactions/build-multi-addresses": {
       "post": {
         "tags": [
           "Transactions"
         ],
-        "summary": "Build an unsigned transaction with multiple input addresses to a number of recipients",
-        "operationId": "postTransactionsBuild-multi-inputs",
+        "summary": "Build an unsigned transaction with multiple addresses to a number of recipients",
+        "operationId": "postTransactionsBuild-multi-addresses",
         "requestBody": {
           "description": "Format 1: `1000000000000000000`\n\nFormat 2: `x.y ALPH`, where `1 ALPH = 1000000000000000000\n\nField fromPublicKeyType can be  `default` or `bip340-schnorr`",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BuildMultiInputsTransaction"
+                "$ref": "#/components/schemas/BuildMultiAddressesTransaction"
               },
               "examples": {
                 "Example": {
@@ -10595,7 +10595,7 @@
           }
         }
       },
-      "BuildMultiInputsTransaction": {
+      "BuildMultiAddressesTransaction": {
         "required": [
           "from"
         ],

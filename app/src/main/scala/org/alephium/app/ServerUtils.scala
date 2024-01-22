@@ -220,7 +220,7 @@ class ServerUtils(implicit
 
   def buildMultiInputsTransaction(
       blockFlow: BlockFlow,
-      query: BuildMultiInputsTransaction
+      query: BuildMultiAddressesTransaction
   ): Try[BuildTransactionResult] = {
     for {
       unsignedTx <- prepareMultiInputsUnsignedTransactionFromQuery(
@@ -648,7 +648,7 @@ class ServerUtils(implicit
   // scalastyle:off method.length
   def prepareMultiInputsUnsignedTransactionFromQuery(
       blockFlow: BlockFlow,
-      query: BuildMultiInputsTransaction
+      query: BuildMultiAddressesTransaction
   ): Try[UnsignedTransaction] = {
 
     val transferResult = for {

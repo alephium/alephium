@@ -405,7 +405,7 @@ trait EndpointsLogic extends Endpoints {
     bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
   )
 
-  val buildMultiInputsTransactionLogic = serverLogicRedirect(buildMultiInputsTransaction)(
+  val buildMultiInputsTransactionLogic = serverLogicRedirect(buildMultiAddressesTransaction)(
     buildMultiInputsTransaction =>
       withSyncedClique {
         Future.successful(

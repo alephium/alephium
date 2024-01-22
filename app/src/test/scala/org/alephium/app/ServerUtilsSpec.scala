@@ -989,7 +989,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val amount                = Amount(ALPH.oneAlph)
     val destination           = Destination(generateAddress(chainIndex), amount)
 
-    val source = BuildMultiInputsTransaction.Source(
+    val source = BuildMultiAddressesTransaction.Source(
       fromPublicKey.bytes,
       AVector(destination)
     )
@@ -997,7 +997,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransaction = serverUtils
       .buildMultiInputsTransaction(
         blockFlow,
-        BuildMultiInputsTransaction(AVector(source))
+        BuildMultiAddressesTransaction(AVector(source))
       )
       .rightValue
 
@@ -1025,7 +1025,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
 
     val sources = inputPubKeys.map { pubKey =>
-      BuildMultiInputsTransaction.Source(
+      BuildMultiAddressesTransaction.Source(
         pubKey.bytes,
         AVector(destination)
       )
@@ -1034,7 +1034,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val buildTransaction = serverUtils
       .buildMultiInputsTransaction(
         blockFlow,
-        BuildMultiInputsTransaction(sources)
+        BuildMultiAddressesTransaction(sources)
       )
       .rightValue
 
@@ -1052,7 +1052,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
     val destination           = generateDestination(chainIndex)
 
-    val source = BuildMultiInputsTransaction.Source(
+    val source = BuildMultiAddressesTransaction.Source(
       fromPublicKey.bytes,
       AVector(destination)
     )
@@ -1060,7 +1060,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     serverUtils
       .buildMultiInputsTransaction(
         blockFlow,
-        BuildMultiInputsTransaction(AVector(source, source))
+        BuildMultiAddressesTransaction(AVector(source, source))
       )
       .leftValue
       .detail is "Some addresses defined multiple time"

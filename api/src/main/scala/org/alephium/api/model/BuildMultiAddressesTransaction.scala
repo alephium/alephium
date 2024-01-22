@@ -23,13 +23,13 @@ import org.alephium.protocol.vm.{GasBox, GasPrice}
 import org.alephium.util.AVector
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
-final case class BuildMultiInputsTransaction(
-    from: AVector[BuildMultiInputsTransaction.Source],
+final case class BuildMultiAddressesTransaction(
+    from: AVector[BuildMultiAddressesTransaction.Source],
     gasPrice: Option[GasPrice] = None,
     targetBlockHash: Option[BlockHash] = None
 )
 
-object BuildMultiInputsTransaction {
+object BuildMultiAddressesTransaction {
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   final case class Source(
