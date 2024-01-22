@@ -21,6 +21,7 @@ import java.net.InetSocketAddress
 import scala.util.Random
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 
 import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
@@ -980,6 +981,253 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
+  "ServerUtils.buildMultiInputsTransaction" should "transfer a single input" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex            = ChainIndex.unsafe(0, 0)
+    val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val amount                = Amount(ALPH.oneAlph)
+    val destination           = Destination(generateAddress(chainIndex), amount)
+
+    val source = BuildMultiInputsTransaction.Source(
+      fromPublicKey.bytes,
+      AVector(destination)
+    )
+
+    val buildTransaction = serverUtils
+      .buildMultiInputsTransaction(
+        blockFlow,
+        BuildMultiInputsTransaction(AVector(source))
+      )
+      .rightValue
+
+    val unsignedTransaction =
+      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+
+    unsignedTransaction.inputs.length is 1
+    unsignedTransaction.fixedOutputs.length is 2
+  }
+
+  it should "transfer a multiple inputs" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val nbOfInputs             = 10
+    val chainIndex             = ChainIndex.unsafe(0, 0)
+    val (fromPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val amount                 = ALPH.alph(10)
+    val destination            = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph))
+
+    val inputPubKeys = AVector.fill(10)(chainIndex.to.generateKey._2)
+
+    inputPubKeys.foreach { pubKey =>
+      val block = transfer(blockFlow, fromPrivateKey, pubKey, amount)
+      addAndCheck(blockFlow, block)
+    }
+
+    val sources = inputPubKeys.map { pubKey =>
+      BuildMultiInputsTransaction.Source(
+        pubKey.bytes,
+        AVector(destination)
+      )
+    }
+
+    val buildTransaction = serverUtils
+      .buildMultiInputsTransaction(
+        blockFlow,
+        BuildMultiInputsTransaction(sources)
+      )
+      .rightValue
+
+    val unsignedTransaction =
+      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+
+    unsignedTransaction.inputs.length is nbOfInputs
+    unsignedTransaction.fixedOutputs.length is 1 + nbOfInputs
+  }
+
+  it should "fail with non unique inputs" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex            = ChainIndex.unsafe(0, 0)
+    val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val destination           = generateDestination(chainIndex)
+
+    val source = BuildMultiInputsTransaction.Source(
+      fromPublicKey.bytes,
+      AVector(destination)
+    )
+
+    serverUtils
+      .buildMultiInputsTransaction(
+        blockFlow,
+        BuildMultiInputsTransaction(AVector(source, source))
+      )
+      .leftValue
+      .detail is "Some addresses defined multiple time"
+  }
+
+  "ServerUtils.mergeAndprepareOutputInfos" should "with empty list" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+    serverUtils.mergeAndprepareOutputInfos(AVector.empty).rightValue is AVector
+      .empty[UnsignedTransaction.TxOutputInfo]
+  }
+
+  it should "merge simple destinations" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val destination = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils.mergeAndprepareOutputInfos(AVector.fill(i)(destination)).rightValue
+      outputs.length is 1
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector.empty[(TokenId, U256)]
+    }
+
+    val destination2 = Destination(generateAddress(chainIndex), Amount(ALPH.alph(2)))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils
+        .mergeAndprepareOutputInfos(
+          AVector.fill(i)(AVector(destination, destination2)).flatMap(identity)
+        )
+        .rightValue
+      outputs.length is 2
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector.empty[(TokenId, U256)]
+      outputs(1).attoAlphAmount is ALPH.alph(2 * i.toLong)
+      outputs(1).tokens is AVector.empty[(TokenId, U256)]
+    }
+  }
+
+  it should "merge tokens" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val tokenId1 = TokenId.random
+    val tokenId2 = TokenId.random
+
+    val tokens = AVector(Token(tokenId1, U256.One), Token(tokenId2, U256.Two))
+
+    val destination = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph), Some(tokens))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils.mergeAndprepareOutputInfos(AVector.fill(i)(destination)).rightValue
+      outputs.length is 1
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector(
+        (tokenId1, U256.unsafe(i)),
+        (tokenId2, U256.unsafe(2 * i.toLong))
+      )
+    }
+
+    val destination2 = Destination(generateAddress(chainIndex), Amount(ALPH.alph(2)), Some(tokens))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils
+        .mergeAndprepareOutputInfos(
+          AVector.fill(i)(AVector(destination, destination2)).flatMap(identity)
+        )
+        .rightValue
+      outputs.length is 2
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector(
+        (tokenId1, U256.unsafe(i)),
+        (tokenId2, U256.unsafe(2 * i.toLong))
+      )
+      outputs(1).attoAlphAmount is ALPH.alph(2 * i.toLong)
+      outputs(1).tokens is AVector(
+        (tokenId1, U256.unsafe(i)),
+        (tokenId2, U256.unsafe(2 * i.toLong))
+      )
+    }
+  }
+
+  it should "separate destinations with lockTime or message" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val destAddress = generateAddress(chainIndex)
+    val destination = Destination(destAddress, Amount(ALPH.oneAlph))
+    val destinationLockTime =
+      Destination(destAddress, Amount(ALPH.oneAlph), lockTime = Some(TimeStamp.now()))
+    val destinationMessage =
+      Destination(destAddress, Amount(ALPH.oneAlph), message = Some(ByteString.empty))
+    val destinationBoth = Destination(
+      destAddress,
+      Amount(ALPH.oneAlph),
+      lockTime = Some(TimeStamp.now()),
+      message = Some(ByteString.empty)
+    )
+
+    val destinations = AVector(
+      destination,
+      destination,
+      destinationLockTime,
+      destinationMessage,
+      destinationBoth
+    )
+
+    val outputs = serverUtils.mergeAndprepareOutputInfos(destinations).rightValue
+    outputs.length is 4
+    outputs(0).attoAlphAmount is ALPH.alph(2)
+
+    outputs(1).attoAlphAmount is ALPH.alph(1)
+    outputs(1).lockTime.isDefined is true
+    outputs(1).additionalDataOpt.isEmpty is true
+
+    outputs(2).attoAlphAmount is ALPH.alph(1)
+    outputs(2).lockTime.isEmpty is true
+    outputs(2).additionalDataOpt.isDefined is true
+
+    outputs(3).attoAlphAmount is ALPH.alph(1)
+    outputs(3).lockTime.isDefined is true
+    outputs(3).additionalDataOpt.isDefined is true
+  }
+
+  it should "work with only `complex` destinations" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val destAddress = generateAddress(chainIndex)
+    val destinationLockTime =
+      Destination(destAddress, Amount(ALPH.oneAlph), lockTime = Some(TimeStamp.now()))
+    val destinationMessage =
+      Destination(destAddress, Amount(ALPH.oneAlph), message = Some(ByteString.empty))
+    val destinationBoth = Destination(
+      destAddress,
+      Amount(ALPH.oneAlph),
+      lockTime = Some(TimeStamp.now()),
+      message = Some(ByteString.empty)
+    )
+
+    val destinations = AVector(
+      destinationLockTime,
+      destinationMessage,
+      destinationBoth
+    )
+
+    val outputs = serverUtils.mergeAndprepareOutputInfos(destinations).rightValue
+    outputs.length is 3
+
+    outputs(0).attoAlphAmount is ALPH.alph(1)
+    outputs(0).lockTime.isDefined is true
+    outputs(0).additionalDataOpt.isEmpty is true
+
+    outputs(1).attoAlphAmount is ALPH.alph(1)
+    outputs(1).lockTime.isEmpty is true
+    outputs(1).additionalDataOpt.isDefined is true
+
+    outputs(2).attoAlphAmount is ALPH.alph(1)
+    outputs(2).lockTime.isDefined is true
+    outputs(2).additionalDataOpt.isDefined is true
+  }
+
   trait CallContractFixture extends Fixture {
     val chainIndex    = ChainIndex.unsafe(0, 0)
     val lockupScript  = getGenesisLockupScript(chainIndex)
@@ -1060,7 +1308,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "call contract" in new CallContractFixture {
+  "ServerUtils.callContract" should "call contract" in new CallContractFixture {
     executeScript(callScript)
     checkContractStates(barId, U256.unsafe(1), minimalAlphInContract)
     checkContractStates(fooId, U256.unsafe(1), minimalAlphInContract + ALPH.oneNanoAlph)

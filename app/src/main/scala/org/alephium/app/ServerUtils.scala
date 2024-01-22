@@ -598,24 +598,28 @@ class ServerUtils(implicit
     }
   }
 
-  private def mergeAndprepareOutputInfos(
+  private[app] def mergeAndprepareOutputInfos(
       destinations: AVector[Destination]
   ): Either[String, AVector[TxOutputInfo]] = {
     AVector.from(destinations.groupBy(_.address)).flatMapE { case (address, dests) =>
       val simpleDests = dests.filter(dest => dest.lockTime.isEmpty && dest.message.isEmpty)
-      for {
-        amount <- TxUtils.checkTotalAttoAlphAmount(simpleDests.map(_.attoAlphAmount.value))
-        tokens <- UnsignedTransaction
-          .calculateTotalAmountPerToken(
-            simpleDests.flatMap(
-              _.tokens.map(_.map(t => (t.id, t.amount))).getOrElse(AVector.empty)
+      val otherDests =
+        prepareOutputInfos(dests.filter(dest => dest.lockTime.isDefined || dest.message.isDefined))
+
+      if (simpleDests.nonEmpty) {
+        for {
+          amount <- TxUtils.checkTotalAttoAlphAmount(simpleDests.map(_.attoAlphAmount.value))
+          tokens <- UnsignedTransaction
+            .calculateTotalAmountPerToken(
+              simpleDests.flatMap(
+                _.tokens.map(_.map(t => (t.id, t.amount))).getOrElse(AVector.empty)
+              )
             )
-          )
-      } yield {
-        TxOutputInfo(address.lockupScript, amount, tokens, None, None) +:
-          prepareOutputInfos(
-            dests.filter(dest => dest.lockTime.isDefined || dest.message.isDefined)
-          )
+        } yield {
+          TxOutputInfo(address.lockupScript, amount, tokens, None, None) +: otherDests
+        }
+      } else {
+        Right(otherDests)
       }
     }
   }
