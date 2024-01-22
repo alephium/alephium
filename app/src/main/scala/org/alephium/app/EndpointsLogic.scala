@@ -405,6 +405,23 @@ trait EndpointsLogic extends Endpoints {
     bt => Right(Some(bt.fromAddress.lockupScript.groupIndex(brokerConfig)))
   )
 
+  val buildMultiInputsTransactionLogic = serverLogicRedirect(buildMultiInputsTransaction)(
+    buildMultiInputsTransaction =>
+      withSyncedClique {
+        Future.successful(
+          serverUtils
+            .buildMultiInputsTransaction(
+              blockFlow,
+              buildMultiInputsTransaction
+            )
+        )
+      },
+    bt =>
+      bt.from.headOption
+        .map(t => t.getLockPair().map(_._1.groupIndex(brokerConfig)).map(Option.apply))
+        .getOrElse(Left(ApiError.BadRequest("Empty list of input")))
+  )
+
   val buildSweepAddressTransactionsLogic = serverLogicRedirect(buildSweepAddressTransactions)(
     buildSweepAddressTransactions =>
       withSyncedClique {

@@ -529,6 +529,83 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
   }
 
+  it should "encode/decode BuildMultiInputsTransaction" in {
+    forAll(Gen.option(Gen.const(GasPrice(1))), Gen.option(Gen.const(BlockHash.generate))) {
+      case (gasPrice, targetBlockHash) =>
+        val fromPublicKeys = AVector.fill(10)(PublicKey.generate)
+        val toKeys         = AVector.fill(10)(PublicKey.generate)
+        val toAddresses    = toKeys.map(Address.p2pkh)
+        val utxoKey1       = Hash.hash("utxo1")
+
+        // `Destination` is already well tested, so we use simple data
+        val destinations = toAddresses.map { toAddress =>
+          Destination(toAddress, Amount(1))
+        }
+
+        val sources = fromPublicKeys.map { publicKey =>
+          BuildMultiInputsTransaction.Source(
+            publicKey.bytes,
+            destinations,
+            Gen
+              .option(Gen.oneOf(Seq(BuildTxCommon.Default, BuildTxCommon.BIP340Schnorr)))
+              .sample
+              .get,
+            Gen.option(GasBox.unsafe(1)).sample.get,
+            Gen.option(Gen.const(AVector(OutputRef(1, utxoKey1)))).sample.get
+          )
+        }
+
+        val destinationsJson = destinations
+          .map { dest =>
+            s"""
+               |{
+               |  "address": "${dest.address.toBase58}",
+               |  "attoAlphAmount": "${dest.attoAlphAmount.value}"
+               |}
+        """.stripMargin
+          }
+          .mkString("[", ",", "]")
+
+        val sourcesJson = sources
+          .map { source =>
+            s"""
+               |{
+               |  "fromPublicKey": "${Hex.toHexString(source.fromPublicKey)}",
+               |  "destinations": ${destinationsJson}
+               |  ${source.fromPublicKeyType
+                .map(keyType => s""","fromPublicKeyType": ${write(keyType)}""")
+                .getOrElse("")}
+               | ${source.gasAmount
+                .map(gasAmount => s""","gasAmount": ${gasAmount.value}""")
+                .getOrElse("")}
+               |  ${source.utxos
+                .map(utxos => s""","utxos": ${write(utxos)}""")
+                .getOrElse("")}
+               |}
+        """.stripMargin
+          }
+          .mkString("[", ",", "]")
+
+        val transfer =
+          BuildMultiInputsTransaction(sources, gasPrice, targetBlockHash)
+
+        val jsonRaw =
+          s"""
+             |{
+             |  "from": ${sourcesJson}
+             |  ${gasPrice
+              .map(price => s""","gasPrice": ${write(price)}""")
+              .getOrElse("")}
+             |  ${targetBlockHash
+              .map(target => s""","targetBlockHash": ${write(target)}""")
+              .getOrElse("")}
+             |}
+        """.stripMargin
+
+        checkData(transfer, jsonRaw)
+    }
+  }
+
   it should "encode/decode BuildSweepMultisig" in {
     val fromAddress        = generateAddress()
     val fromPublicKeys     = AVector(PublicKey.generate, PublicKey.generate)

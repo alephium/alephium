@@ -262,6 +262,10 @@ trait ApiModelCodec {
   )
   implicit val buildTransactionRW: RW[BuildTransaction] = macroRW
 
+  implicit val buildMultiInputsTransactionSourceRW: RW[BuildMultiInputsTransaction.Source] = macroRW
+
+  implicit val buildMultiInputsTransactionRW: RW[BuildMultiInputsTransaction] = macroRW
+
   implicit val buildSweepAddressTransactionsRW: RW[BuildSweepAddressTransactions] = macroRW
 
   implicit val groupRW: RW[Group] = macroRW

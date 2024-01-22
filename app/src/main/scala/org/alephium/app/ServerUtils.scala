@@ -29,6 +29,8 @@ import org.alephium.api.model
 import org.alephium.api.model.{AssetOutput => _, Transaction => _, TransactionTemplate => _, _}
 import org.alephium.crypto.Byte32
 import org.alephium.flow.core.{BlockFlow, BlockFlowState, UtxoSelectionAlgo}
+import org.alephium.flow.core.TxUtils
+import org.alephium.flow.core.TxUtils.InputData
 import org.alephium.flow.core.UtxoSelectionAlgo._
 import org.alephium.flow.gasestimation._
 import org.alephium.flow.handler.TxHandler
@@ -216,6 +218,19 @@ class ServerUtils(implicit
     }
   }
 
+  def buildMultiInputsTransaction(
+      blockFlow: BlockFlow,
+      query: BuildMultiInputsTransaction
+  ): Try[BuildTransactionResult] = {
+    for {
+      unsignedTx <- prepareMultiInputsUnsignedTransactionFromQuery(
+        blockFlow,
+        query
+      )
+    } yield {
+      BuildTransactionResult.from(unsignedTx)
+    }
+  }
   def buildMultisig(
       blockFlow: BlockFlow,
       query: BuildMultisig
@@ -583,6 +598,32 @@ class ServerUtils(implicit
     }
   }
 
+  private[app] def mergeAndprepareOutputInfos(
+      destinations: AVector[Destination]
+  ): Either[String, AVector[TxOutputInfo]] = {
+    AVector.from(destinations.groupBy(_.address)).flatMapE { case (address, dests) =>
+      val simpleDests = dests.filter(dest => dest.lockTime.isEmpty && dest.message.isEmpty)
+      val otherDests =
+        prepareOutputInfos(dests.filter(dest => dest.lockTime.isDefined || dest.message.isDefined))
+
+      if (simpleDests.nonEmpty) {
+        for {
+          amount <- TxUtils.checkTotalAttoAlphAmount(simpleDests.map(_.attoAlphAmount.value))
+          tokens <- UnsignedTransaction
+            .calculateTotalAmountPerToken(
+              simpleDests.flatMap(
+                _.tokens.map(_.map(t => (t.id, t.amount))).getOrElse(AVector.empty)
+              )
+            )
+        } yield {
+          TxOutputInfo(address.lockupScript, amount, tokens, None, None) +: otherDests
+        }
+      } else {
+        Right(otherDests)
+      }
+    }
+  }
+
   private def prepareOutputInfos(destinations: AVector[Destination]): AVector[TxOutputInfo] = {
     destinations.map { destination =>
       val tokensInfo = destination.tokens match {
@@ -601,6 +642,67 @@ class ServerUtils(implicit
         destination.lockTime,
         destination.message
       )
+    }
+  }
+
+  // scalastyle:off method.length
+  def prepareMultiInputsUnsignedTransactionFromQuery(
+      blockFlow: BlockFlow,
+      query: BuildMultiInputsTransaction
+  ): Try[UnsignedTransaction] = {
+
+    val transferResult = for {
+      outputInfos <- mergeAndprepareOutputInfos(query.from.flatMap(_.destinations)).left.map(failed)
+      inputs <- query.from.mapE { in =>
+        for {
+          lockUnlock <- in.getLockPair()
+          utxos      <- prepareOutputRefsOpt(in.utxos).left.map(failed)
+          amount <- TxUtils
+            .checkTotalAttoAlphAmount(in.destinations.map(_.attoAlphAmount.value))
+            .left
+            .map(failed)
+          tokens <- UnsignedTransaction
+            .calculateTotalAmountPerToken(
+              in.destinations.flatMap(
+                _.tokens.map(_.map(t => (t.id, t.amount))).getOrElse(AVector.empty)
+              )
+            )
+            .left
+            .map(failed)
+        } yield {
+          lockUnlock match {
+            case (lock, unlock) =>
+              InputData(
+                lock,
+                unlock,
+                amount,
+                Option.when(tokens.nonEmpty)(tokens),
+                in.gasAmount,
+                utxos
+              )
+          }
+        }
+      }
+      _ <- checkUniqueInputs(inputs)
+      result <-
+        blockFlow
+          .transferMultiInputs(
+            inputs,
+            outputInfos,
+            query.gasPrice.getOrElse(nonCoinbaseMinGasPrice),
+            apiConfig.defaultUtxosLimit,
+            query.targetBlockHash
+          )
+          .left
+          .map(failedInIO)
+    } yield {
+      result
+    }
+
+    transferResult match {
+      case Right(Right(unsignedTransaction)) => validateUnsignedTransaction(unsignedTransaction)
+      case Right(Left(error))                => Left(failed(error))
+      case Left(error)                       => Left(error)
     }
   }
 
@@ -641,20 +743,19 @@ class ServerUtils(implicit
 
     val transferResult = outputRefsOpt match {
       case Some(outputRefs) =>
-        val allAssetType = outputRefs.forall(outputRef => Hint.unsafe(outputRef.hint).isAssetType)
-        if (allAssetType) {
-          val assetOutputRefs = outputRefs.map(_.unsafeToAssetOutputRef())
-          blockFlow.transfer(
-            targetBlockHashOpt,
-            fromLockupScript,
-            fromUnlockScript,
-            assetOutputRefs,
-            outputInfos,
-            gasOpt,
-            gasPrice
-          )
-        } else {
-          Right(Left("Selected UTXOs must be of asset type"))
+        prepareOutputRefs(outputRefs) match {
+          case Right(assetOutputRefs) =>
+            blockFlow.transfer(
+              targetBlockHashOpt,
+              fromLockupScript,
+              fromUnlockScript,
+              assetOutputRefs,
+              outputInfos,
+              gasOpt,
+              gasPrice
+            )
+          case Left(error) =>
+            Right(Left(error))
         }
       case None =>
         blockFlow.transfer(
@@ -751,6 +852,26 @@ class ServerUtils(implicit
     )
   }
 
+  def prepareOutputRefsOpt(
+      outputRefsOpt: Option[AVector[OutputRef]]
+  ): Either[String, Option[AVector[AssetOutputRef]]] = {
+    outputRefsOpt match {
+      case Some(outputRefs) => prepareOutputRefs(outputRefs).map(Some(_))
+      case None             => Right(None)
+    }
+  }
+
+  def prepareOutputRefs(
+      outputRefs: AVector[OutputRef]
+  ): Either[String, AVector[AssetOutputRef]] = {
+    val allAssetType = outputRefs.forall(outputRef => Hint.unsafe(outputRef.hint).isAssetType)
+    if (allAssetType) {
+      Right(outputRefs.map(_.unsafeToAssetOutputRef()))
+    } else {
+      Left("Selected UTXOs must be of asset type")
+    }
+  }
+
   def checkGroup(lockupScript: LockupScript): Try[Unit] = {
     checkGroup(
       lockupScript.groupIndex(brokerConfig),
@@ -786,6 +907,16 @@ class ServerUtils(implicit
   def checkHashChainIndex(hash: BlockHash): Try[ChainIndex] = {
     val chainIndex = ChainIndex.from(hash)
     checkChainIndex(chainIndex, hash.toHexString)
+  }
+
+  def checkUniqueInputs(
+      inputs: AVector[InputData]
+  ): Try[Unit] = {
+    if (inputs.groupBy(_.fromLockupScript).values.exists(_.length > 1)) {
+      Left(badRequest("Some addresses defined multiple time"))
+    } else {
+      Right(())
+    }
   }
 
   def execute(f: => Unit): FutureTry[Boolean] =

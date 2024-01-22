@@ -48,7 +48,7 @@ import org.alephium.flow.validation.BlockValidation
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, PrivateKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, Block, ChainIndex, TokenId, TransactionId}
+import org.alephium.protocol.model.{Address, Block, ChainIndex, GroupIndex, TokenId, TransactionId}
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{GasPrice, LockupScript}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -80,6 +80,11 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def generateAccount: (String, String, String) = {
     val (priKey, pubKey) = SignatureSchema.generatePriPub()
+    (Address.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
+  }
+
+  def generateAccount(groupIndex: GroupIndex): (String, String, String) = {
+    val (priKey, pubKey) = groupIndex.generateKey
     (Address.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
@@ -149,6 +154,18 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
     val submitTx   = submitTransaction(unsignedTx, privateKey)
     val res        = request[SubmitTxResult](submitTx, restPort)
+    res
+  }
+
+  def transferGeneric(
+      inputs: AVector[BuildMultiInputsTransaction.Source],
+      privateKeys: AVector[String],
+      restPort: Int
+  ): SubmitTxResult = eventually {
+    val buildTx          = buildGenericTransaction(inputs)
+    val unsignedTx       = request[BuildTransactionResult](buildTx, restPort)
+    val submitMultisigTx = signAndSubmitMultisigTransaction(unsignedTx, privateKeys)
+    val res              = request[SubmitTxResult](submitMultisigTx, restPort)
     res
   }
 
@@ -425,6 +442,20 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
               |  "destinations": ${write(destinations)}
               |}
         """.stripMargin)
+    )
+  }
+
+  def buildGenericTransaction(
+      inputs: AVector[BuildMultiInputsTransaction.Source]
+  ): Int => HttpRequest = {
+    val p = s"""
+               |{
+               |  "from": ${write(inputs)}
+               |}
+        """.stripMargin
+    httpPost(
+      "/transactions/build-multi-inputs",
+      Some(p)
     )
   }
 

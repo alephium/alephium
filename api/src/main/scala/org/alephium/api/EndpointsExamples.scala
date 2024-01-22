@@ -422,6 +422,21 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
+  implicit val buildMultiInputsTransactionExamples: List[Example[BuildMultiInputsTransaction]] =
+    List(
+      defaultExample(
+        BuildMultiInputsTransaction(
+          AVector(
+            BuildMultiInputsTransaction.Source(
+              publicKey.bytes,
+              defaultDestinations
+            )
+          ),
+          None
+        )
+      )
+    )
+
   implicit val buildSweepAddressTransactionExamples: List[Example[BuildSweepAddressTransactions]] =
     List(
       defaultExample(
