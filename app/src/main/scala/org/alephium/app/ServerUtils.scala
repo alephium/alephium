@@ -1059,6 +1059,10 @@ class ServerUtils(implicit
         .getAlphAndTokenAmounts(query.initialAttoAlphAmount, query.initialTokenAmounts)
         .left
         .map(badRequest)
+      tokenIssuanceInfo <- BuildTxCommon
+        .getTokenIssuanceInfo(query.issueTokenAmount, query.issueTokenTo)
+        .left
+        .map(badRequest)
       initialAttoAlphAmount <- getInitialAttoAlphAmount(amounts._1)
       code                  <- query.decodeBytecode()
       lockPair              <- query.getLockPair()
@@ -1069,12 +1073,15 @@ class ServerUtils(implicit
         code.initialMutFields,
         initialAttoAlphAmount,
         amounts._2,
-        query.issueTokenAmount.map(_.value)
+        tokenIssuanceInfo
       )
+      totalAttoAlphAmount <- initialAttoAlphAmount
+        .add(query.issueTokenTo.map(_ => dustUtxoAmount).getOrElse(U256.Zero))
+        .toRight(failed("ALPH amount overflow"))
       utx <- unsignedTxFromScript(
         blockFlow,
         script,
-        initialAttoAlphAmount,
+        totalAttoAlphAmount,
         amounts._2,
         lockPair._1,
         lockPair._2,
@@ -1610,7 +1617,7 @@ object ServerUtils {
       _mutFields: Option[String],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
-      newTokenAmount: Option[U256]
+      tokenIssuraneInfo: Option[(U256, Option[Address.Asset])]
   ): Try[StatefulScript] = {
     for {
       immFields <- parseState(_immFields)
@@ -1622,7 +1629,7 @@ object ServerUtils {
         mutFields,
         initialAttoAlphAmount,
         initialTokenAmounts,
-        newTokenAmount
+        tokenIssuraneInfo
       )
     } yield script
   }
@@ -1634,7 +1641,7 @@ object ServerUtils {
       initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
-      newTokenAmount: Option[U256]
+      tokenIssuanceInfo: Option[(U256, Option[Address.Asset])]
   ): Try[StatefulScript] = {
     buildDeployContractScriptWithParsedState(
       Hex.toHexString(serialize(contract)),
@@ -1643,7 +1650,7 @@ object ServerUtils {
       initialMutFields,
       initialAttoAlphAmount,
       initialTokenAmounts,
-      newTokenAmount
+      tokenIssuanceInfo
     )
   }
 
@@ -1654,14 +1661,20 @@ object ServerUtils {
       initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
-      newTokenAmount: Option[U256]
+      tokenIssuanceInfo: Option[(U256, Option[Address.Asset])]
   ): String = {
     val immStateRaw = Hex.toHexString(serialize(initialImmFields))
     val mutStateRaw = Hex.toHexString(serialize(initialMutFields))
-    def toCreate(approveAssets: String): String = newTokenAmount match {
-      case Some(amount) =>
-        s"createContractWithToken!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${amount.v})"
-      case None => s"createContract!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw)"
+    def toCreate(approveAssets: String): String = tokenIssuanceInfo match {
+      case Some((issueAmount, Some(issueTo))) =>
+        s"""
+           |createContractWithToken!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${issueAmount.v}, @$issueTo)
+           |  transferToken!{@$address -> ALPH: dustAmount!()}(@$address, @$issueTo, ALPH, dustAmount!())
+           |""".stripMargin.stripLeading.stripTrailing
+      case Some((issueAmount, None)) =>
+        s"createContractWithToken!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw, ${issueAmount.v})"
+      case None =>
+        s"createContract!$approveAssets(#$codeRaw, #$immStateRaw, #$mutStateRaw)"
     }
 
     val create = if (initialTokenAmounts.isEmpty) {
@@ -1690,7 +1703,7 @@ object ServerUtils {
       initialMutFields: AVector[vm.Val],
       initialAttoAlphAmount: U256,
       initialTokenAmounts: AVector[(TokenId, U256)],
-      newTokenAmount: Option[U256]
+      tokenIssuanceInfo: Option[(U256, Option[Address.Asset])]
   ): Try[StatefulScript] = {
     val scriptRaw = buildDeployContractScriptRawWithParsedState(
       codeRaw,
@@ -1699,7 +1712,7 @@ object ServerUtils {
       initialMutFields,
       initialAttoAlphAmount,
       initialTokenAmounts,
-      newTokenAmount
+      tokenIssuanceInfo
     )
 
     wrapCompilerResult(Compiler.compileTxScript(scriptRaw))

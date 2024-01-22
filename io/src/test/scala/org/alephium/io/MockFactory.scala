@@ -28,8 +28,10 @@ trait MockFactory {
 
       override def getRawUnsafe(key: ByteString): ByteString                     = ???
       override def getOptRawUnsafe(key: ByteString): Option[ByteString]          = ???
+      override def multiGetRawUnsafe(keys: Seq[ByteString]): Seq[ByteString]     = ???
       override def putRawUnsafe(key: ByteString, value: ByteString): Unit        = ???
       def putBatchRawUnsafe(f: ((ByteString, ByteString) => Unit) => Unit): Unit = ???
+      def deleteBatchRawUnsafe(keys: Seq[ByteString]): Unit                      = ???
       override def existsRawUnsafe(key: ByteString): Boolean                     = ???
       override def deleteRawUnsafe(key: ByteString): Unit                        = ???
     }

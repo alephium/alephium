@@ -691,6 +691,7 @@ trait EndpointsExamples extends ErrorExamples {
         Some(bigAmount),
         Some(tokens),
         Some(bigAmount),
+        Some(address),
         Some(model.minimalGas),
         Some(model.nonCoinbaseMinGasPrice)
       )
