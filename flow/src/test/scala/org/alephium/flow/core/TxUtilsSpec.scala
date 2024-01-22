@@ -1624,8 +1624,7 @@ class TxUtilsSpec extends AlephiumSpec {
 
       updated.length is entries.length
 
-      // One input will always pay for everything
-      updated.head._2.gas is gas
+      updated.head._2.gas < gas is true
     }
 
     {
