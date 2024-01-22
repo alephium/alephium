@@ -529,7 +529,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     }
   }
 
-  it should "encode/decode BuildMultiInputsTransaction" in {
+  it should "encode/decode BuildMultiAddressesTransaction" in {
     forAll(Gen.option(Gen.const(GasPrice(1))), Gen.option(Gen.const(BlockHash.generate))) {
       case (gasPrice, targetBlockHash) =>
         val fromPublicKeys = AVector.fill(10)(PublicKey.generate)
@@ -543,7 +543,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
         }
 
         val sources = fromPublicKeys.map { publicKey =>
-          BuildMultiInputsTransaction.Source(
+          BuildMultiAddressesTransaction.Source(
             publicKey.bytes,
             destinations,
             Gen
@@ -587,7 +587,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
           .mkString("[", ",", "]")
 
         val transfer =
-          BuildMultiInputsTransaction(sources, gasPrice, targetBlockHash)
+          BuildMultiAddressesTransaction(sources, gasPrice, targetBlockHash)
 
         val jsonRaw =
           s"""

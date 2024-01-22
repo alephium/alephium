@@ -158,7 +158,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def transferGeneric(
-      inputs: AVector[BuildMultiInputsTransaction.Source],
+      inputs: AVector[BuildMultiAddressesTransaction.Source],
       privateKeys: AVector[String],
       restPort: Int
   ): SubmitTxResult = eventually {
@@ -446,7 +446,7 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
   }
 
   def buildGenericTransaction(
-      inputs: AVector[BuildMultiInputsTransaction.Source]
+      inputs: AVector[BuildMultiAddressesTransaction.Source]
   ): Int => HttpRequest = {
     val p = s"""
                |{

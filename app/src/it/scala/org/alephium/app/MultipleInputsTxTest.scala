@@ -48,8 +48,8 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
       Destination(Address.asset(address2).get, Amount(destAmount))
     )
 
-    val inputs: AVector[BuildMultiInputsTransaction.Source] = AVector(
-      BuildMultiInputsTransaction.Source(pubKey(publicKey).bytes, destinations)
+    val inputs: AVector[BuildMultiAddressesTransaction.Source] = AVector(
+      BuildMultiAddressesTransaction.Source(pubKey(publicKey).bytes, destinations)
     )
 
     val genericTx = transferGeneric(
@@ -122,12 +122,12 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
       )
     )
 
-    val inputs: AVector[BuildMultiInputsTransaction.Source] = AVector(
-      BuildMultiInputsTransaction.Source(pubKey(publicKey).bytes, destinations(amount)),
-      BuildMultiInputsTransaction.Source(pubKey(publicKey2).bytes, destinations(amount2)),
-      BuildMultiInputsTransaction
+    val inputs: AVector[BuildMultiAddressesTransaction.Source] = AVector(
+      BuildMultiAddressesTransaction.Source(pubKey(publicKey).bytes, destinations(amount)),
+      BuildMultiAddressesTransaction.Source(pubKey(publicKey2).bytes, destinations(amount2)),
+      BuildMultiAddressesTransaction
         .Source(pubKey(publicKey3).bytes, destinations(amount3, lockTime = Some(TimeStamp.now()))),
-      BuildMultiInputsTransaction.Source(
+      BuildMultiAddressesTransaction.Source(
         pubKey(publicKey4).bytes,
         destinations(amount4, message = Some(ByteString.empty))
       )
