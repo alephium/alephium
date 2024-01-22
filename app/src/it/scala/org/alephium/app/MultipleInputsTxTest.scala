@@ -32,6 +32,8 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
       request[UTXOs](getUTXOs(addr), clique.masterRestPort)
     }
 
+    val addressGroupIndex = Address.fromBase58(address).get.groupIndex
+
     val (address2, _, _) = generateAccount(addressGroupIndex)
 
     clique.startMining()
@@ -72,6 +74,8 @@ class MultipleInputsTxTest extends AlephiumActorSpec {
     def currentUTXOs(addr: String) = {
       request[UTXOs](getUTXOs(addr), clique.masterRestPort)
     }
+
+    val addressGroupIndex = Address.fromBase58(address).get.groupIndex
 
     val (address2, publicKey2, privateKey2) = generateAccount(addressGroupIndex)
     val (address3, publicKey3, privateKey3) = generateAccount(addressGroupIndex)

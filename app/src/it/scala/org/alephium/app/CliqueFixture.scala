@@ -96,8 +96,6 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     "toward outdoor daughter deny mansion bench water alien crumble mother exchange screen salute antenna abuse key hair crisp debate goose great market core screen"
   val (transferAddress, transferPubKey, transferPriKey) = generateAccount
 
-  val addressGroupIndex = GroupIndex.unsafe(2)
-
   val password = "password"
 
   val initialBalance = Balance.from(Amount(genesisBalance), Amount.Zero, None, None, 1)
