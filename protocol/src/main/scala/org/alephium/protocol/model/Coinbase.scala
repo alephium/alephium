@@ -43,29 +43,6 @@ object Coinbase {
     miningReward
   }
 
-  def build(
-      coinbaseData: CoinbaseData,
-      miningReward: U256,
-      lockupScript: LockupScript.Asset,
-      lockTime: TimeStamp
-  )(implicit networkConfig: NetworkConfig): Transaction = {
-    val txOutput = AssetOutput(
-      miningReward,
-      lockupScript,
-      lockTime,
-      tokens = AVector.empty,
-      serialize(coinbaseData)
-    )
-    Transaction(
-      UnsignedTransaction.coinbase(AVector.empty, AVector(txOutput)),
-      scriptExecutionOk = true,
-      contractInputs = AVector.empty,
-      generatedOutputs = AVector.empty,
-      inputSignatures = AVector.empty,
-      scriptSignatures = AVector.empty
-    )
-  }
-
   // scalastyle:off parameter.number
   def build(
       coinbaseData: CoinbaseData,
@@ -102,11 +79,6 @@ object Coinbase {
     val coinbaseData = CoinbaseData.from(chainIndex, blockTs, uncles.map(_._1), minerData)
     val lockTime     = blockTs + networkConfig.coinbaseLockupPeriod
     val reward       = miningReward(gasFee, target, blockTs)
-    val hardFork     = networkConfig.getHardFork(blockTs)
-    if (hardFork.isGhostEnabled()) {
-      build(coinbaseData, reward, lockupScript, lockTime, uncles.map(_._2))
-    } else {
-      build(coinbaseData, reward, lockupScript, lockTime)
-    }
+    build(coinbaseData, reward, lockupScript, lockTime, uncles.map(_._2))
   }
 }

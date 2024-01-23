@@ -25,5 +25,5 @@ final case class BlockCandidate(
     toGroup: Int,
     headerBlob: ByteString,
     target: BigInteger,
-    bodyBlob: ByteString
+    txsBlob: ByteString
 )

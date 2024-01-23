@@ -55,12 +55,11 @@ class CoinbaseDataSpec extends AlephiumSpec with Generators with GroupConfigFixt
     val hashes = AVector.from(Gen.listOfN(2, blockHashGen).sample.get)
 
     implicit val networkConfig = NetworkConfigFixture.Ghost
-    val data0 = CoinbaseDataV2(prefix, CoinbaseData.GhostVersion, hashes, ByteString.empty)
+    val data0                  = CoinbaseDataV2(prefix, hashes, ByteString.empty)
     deserialize[CoinbaseData](serialize[CoinbaseData](data0)).rightValue is data0
 
     val data1 = CoinbaseDataV2(
       prefix,
-      CoinbaseData.GhostVersion,
       hashes,
       ByteString.fromArrayUnsafe(Random.nextBytes(40))
     )

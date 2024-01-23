@@ -230,8 +230,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       val expectedDiff = consensusConfig.minMiningDiff.times(100 + 5 * k).divide(100)
       val expectedTarget = ChainDifficultyAdjustment.calNextHashTargetRaw(
         expectedDiff.getTarget(),
-        consensusConfig.blockTargetTime.timesUnsafe(consensusConfig.powAveragingWindow.toLong),
-        consensusConfig.maxMiningTarget
+        consensusConfig.blockTargetTime.timesUnsafe(consensusConfig.powAveragingWindow.toLong)
       )
       val block = emptyBlock(blockFlow, chainIndex)
       block.target is expectedTarget

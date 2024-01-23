@@ -384,11 +384,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
         } else {
           invalidBlock(InvalidCoinbaseData)
         }
-      case Right(CoinbaseDataV2(prefix, version, uncleHashes, _)) =>
-        if (
-          prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp) &&
-          version == CoinbaseData.GhostVersion
-        ) {
+      case Right(CoinbaseDataV2(prefix, uncleHashes, _)) =>
+        if (prefix == CoinbaseDataPrefix.from(chainIndex, block.timestamp)) {
           validBlock(uncleHashes)
         } else {
           invalidBlock(InvalidCoinbaseData)

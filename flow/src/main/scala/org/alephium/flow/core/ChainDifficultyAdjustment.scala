@@ -116,8 +116,7 @@ trait ChainDifficultyAdjustment {
           case Some(timeSpan) =>
             val target = ChainDifficultyAdjustment.calNextHashTargetRaw(
               currentTarget,
-              timeSpan,
-              consensusConfig.maxMiningTarget
+              timeSpan
             )
             Right(calIceAgeTarget(target, currentTimeStamp, nextTimeStamp))
           case None =>
@@ -140,8 +139,7 @@ object ChainDifficultyAdjustment {
 
   def calNextHashTargetRaw(
       currentTarget: Target,
-      lastWindowTimeSpan: Duration,
-      maxMiningTarget: Target
+      lastWindowTimeSpan: Duration
   )(implicit consensusConfig: ConsensusSetting): Target = {
     var clippedTimeSpan =
       consensusConfig.expectedWindowTimeSpan.millis + (lastWindowTimeSpan.millis - consensusConfig.expectedWindowTimeSpan.millis) / 4
@@ -150,19 +148,19 @@ object ChainDifficultyAdjustment {
     } else if (clippedTimeSpan > consensusConfig.windowTimeSpanMax.millis) {
       clippedTimeSpan = consensusConfig.windowTimeSpanMax.millis
     }
-    reTarget(currentTarget, clippedTimeSpan, maxMiningTarget)
+    reTarget(currentTarget, clippedTimeSpan)
   }
 
-  @inline def reTarget(currentTarget: Target, timeSpanMs: Long, maxMiningTarget: Target)(implicit
+  @inline def reTarget(currentTarget: Target, timeSpanMs: Long)(implicit
       consensusConfig: ConsensusSetting
   ): Target = {
     val nextTarget = currentTarget.value
       .multiply(BigInteger.valueOf(timeSpanMs))
       .divide(BigInteger.valueOf(consensusConfig.expectedWindowTimeSpan.millis))
-    if (nextTarget.compareTo(maxMiningTarget.value) <= 0) {
+    if (nextTarget.compareTo(consensusConfig.maxMiningTarget.value) <= 0) {
       Target.unsafe(nextTarget)
     } else {
-      maxMiningTarget
+      consensusConfig.maxMiningTarget
     }
   }
 }

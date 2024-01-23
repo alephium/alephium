@@ -47,14 +47,11 @@ final case class CoinbaseDataV1(
 
 final case class CoinbaseDataV2(
     prefix: CoinbaseDataPrefix,
-    version: Byte,
     uncleHashes: AVector[BlockHash],
     minerData: ByteString
 ) extends CoinbaseData
 
 object CoinbaseData {
-  val GhostVersion: Byte = 1
-
   implicit def serde(implicit networkConfig: NetworkConfig): Serde[CoinbaseData] =
     new Serde[CoinbaseData] {
       def _deserialize(input: ByteString): SerdeResult[Staging[CoinbaseData]] = {
@@ -64,12 +61,10 @@ object CoinbaseData {
           coinbaseData <-
             if (hardFork.isGhostEnabled()) {
               for {
-                versionResult     <- _decode[Byte](prefixResult.rest)
-                uncleHashesResult <- _decode[AVector[BlockHash]](versionResult.rest)
+                uncleHashesResult <- _decode[AVector[BlockHash]](prefixResult.rest)
               } yield Staging[CoinbaseData](
                 CoinbaseDataV2(
                   prefixResult.value,
-                  versionResult.value,
                   uncleHashesResult.value,
                   uncleHashesResult.rest
                 ),
@@ -90,9 +85,7 @@ object CoinbaseData {
         d match {
           case data: CoinbaseDataV1 => encode(data.prefix) ++ data.minerData
           case data: CoinbaseDataV2 =>
-            encode(data.prefix) ++ encode(data.version) ++ encode(
-              data.uncleHashes
-            ) ++ data.minerData
+            encode(data.prefix) ++ encode(data.uncleHashes) ++ data.minerData
         }
       }
     }
@@ -108,7 +101,7 @@ object CoinbaseData {
     val prefix   = CoinbaseDataPrefix.from(chainIndex, blockTs)
     val hardFork = networkConfig.getHardFork(blockTs)
     if (hardFork.isGhostEnabled()) {
-      CoinbaseDataV2(prefix, GhostVersion, uncleHashes, minerData)
+      CoinbaseDataV2(prefix, uncleHashes, minerData)
     } else {
       CoinbaseDataV1(prefix, minerData)
     }

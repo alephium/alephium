@@ -247,25 +247,25 @@ object AlephiumConfig {
   final private case class TempConsensusSettings(
       mainnet: TempConsensusSetting,
       ghost: TempConsensusSetting,
-      blockCacheCapacityPerChain: Int
+      blockCacheCapacityPerChain: Int,
+      numZerosAtLeastInHash: Int
   ) {
     def toConsensusSettings(groupConfig: GroupConfig): ConsensusSettings = {
       val mainnetEmission = Emission.mainnet(groupConfig, mainnet.blockTargetTime)
       val ghostEmission =
         Emission.ghost(groupConfig, mainnet.blockTargetTime, ghost.blockTargetTime)
       ConsensusSettings(
-        mainnet.toConsensusSetting(mainnetEmission),
-        ghost.toConsensusSetting(ghostEmission),
+        mainnet.toConsensusSetting(mainnetEmission, numZerosAtLeastInHash),
+        ghost.toConsensusSetting(ghostEmission, numZerosAtLeastInHash),
         blockCacheCapacityPerChain
       )
     }
   }
   final private case class TempConsensusSetting(
       blockTargetTime: Duration,
-      uncleDependencyGapTime: Option[Duration],
-      numZerosAtLeastInHash: Int
+      uncleDependencyGapTime: Option[Duration]
   ) {
-    def toConsensusSetting(emission: Emission): ConsensusSetting = {
+    def toConsensusSetting(emission: Emission, numZerosAtLeastInHash: Int): ConsensusSetting = {
       ConsensusSetting(
         blockTargetTime,
         uncleDependencyGapTime.getOrElse(blockTargetTime.divUnsafe(4)),

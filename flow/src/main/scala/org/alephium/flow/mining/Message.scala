@@ -89,10 +89,10 @@ final case class Job(
     fromGroup: Int,
     toGroup: Int,
     headerBlob: ByteString,
-    bodyBlob: ByteString,
+    txsBlob: ByteString,
     target: BigInteger
 ) {
-  def toMiningBlob: MiningBlob = MiningBlob(headerBlob, target, bodyBlob)
+  def toMiningBlob: MiningBlob = MiningBlob(headerBlob, target, txsBlob)
 }
 object Job {
   implicit val serde: Serde[Job] = {
@@ -113,7 +113,7 @@ object Job {
     }
     Serde.forProduct5(
       Job.apply,
-      t => (t.fromGroup, t.toGroup, t.headerBlob, t.bodyBlob, t.target)
+      t => (t.fromGroup, t.toGroup, t.headerBlob, t.txsBlob, t.target)
     )
   }
 

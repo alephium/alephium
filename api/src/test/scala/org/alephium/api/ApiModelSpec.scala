@@ -637,7 +637,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
       hex"bbbbbbbbbb"
     )
     val jsonRaw =
-      s"""{"fromGroup":1,"toGroup":0,"headerBlob":"aaaa","target":"${target.value}","bodyBlob":"bbbbbbbbbb"}"""
+      s"""{"fromGroup":1,"toGroup":0,"headerBlob":"aaaa","target":"${target.value}","txsBlob":"bbbbbbbbbb"}"""
     checkData(blockCandidate, jsonRaw)
   }
 

@@ -99,22 +99,10 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
 
   it should "calculate target correctly" in new MockFixture {
     val currentTarget = Target.unsafe((consensusConfig.maxMiningTarget / 4).underlying())
-    reTarget(
-      currentTarget,
-      consensusConfig.expectedWindowTimeSpan.millis,
-      consensusConfig.maxMiningTarget
-    ) is currentTarget
-    reTarget(
-      currentTarget,
-      (consensusConfig.expectedWindowTimeSpan timesUnsafe 2).millis,
-      consensusConfig.maxMiningTarget
-    ).value is
+    reTarget(currentTarget, consensusConfig.expectedWindowTimeSpan.millis) is currentTarget
+    reTarget(currentTarget, (consensusConfig.expectedWindowTimeSpan timesUnsafe 2).millis).value is
       (currentTarget * 2).underlying()
-    reTarget(
-      currentTarget,
-      (consensusConfig.expectedWindowTimeSpan divUnsafe 2).millis,
-      consensusConfig.maxMiningTarget
-    ) is
+    reTarget(currentTarget, (consensusConfig.expectedWindowTimeSpan divUnsafe 2).millis) is
       Target.unsafe((currentTarget.value / 2).underlying())
   }
 
@@ -188,11 +176,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         data(height)._2 deltaUnsafe data(height - 17)._2
       )
       calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp, TimeStamp.now()) isE
-        reTarget(
-          currentTarget,
-          consensusConfig.windowTimeSpanMax.millis,
-          consensusConfig.maxMiningTarget
-        )
+        reTarget(currentTarget, consensusConfig.windowTimeSpanMax.millis)
     }
   }
 
@@ -214,11 +198,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         data(height)._2 deltaUnsafe data(height - 17)._2
       )
       calNextHashTargetRaw(hash, currentTarget, ALPH.LaunchTimestamp, TimeStamp.now()) isE
-        reTarget(
-          currentTarget,
-          consensusConfig.windowTimeSpanMin.millis,
-          consensusConfig.maxMiningTarget
-        )
+        reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
   }
 
@@ -390,11 +370,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         ALPH.LaunchTimestamp,
         getTimestamp(hash).rightValue
       ) isE
-        reTarget(
-          currentTarget,
-          consensusConfig.windowTimeSpanMin.millis,
-          consensusConfig.maxMiningTarget
-        )
+        reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
 
     (threshold * 2 until threshold * 3 - 1).foreach { height =>
@@ -419,11 +395,7 @@ class ChainDifficultyAdjustmentSpec extends AlephiumFlowSpec { Test =>
         ALPH.LaunchTimestamp,
         getTimestamp(hash).rightValue
       ) isE
-        reTarget(
-          currentTarget,
-          consensusConfig.windowTimeSpanMin.millis,
-          consensusConfig.maxMiningTarget
-        )
+        reTarget(currentTarget, consensusConfig.windowTimeSpanMin.millis)
     }
   }
 }

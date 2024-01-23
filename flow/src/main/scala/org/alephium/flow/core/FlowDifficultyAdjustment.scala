@@ -83,11 +83,7 @@ trait FlowDifficultyAdjustment {
     val chainDep   = deps.getOutDep(chainIndex.to)
     val heightGap  = calHeightDiffUnsafe(chainDep, oldestTs)
     val targetDiff = consensusConfig.penalizeDiffForHeightGapLeman(diffAverage, heightGap)
-    ChainDifficultyAdjustment.calNextHashTargetRaw(
-      targetDiff.getTarget(),
-      timeSpanAverage,
-      consensusConfig.maxMiningTarget
-    )
+    ChainDifficultyAdjustment.calNextHashTargetRaw(targetDiff.getTarget(), timeSpanAverage)
   }
 
   def getNextHashTargetLeman(

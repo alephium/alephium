@@ -193,11 +193,6 @@ class BlockValidationSpec extends AlephiumSpec {
         )
       )
     }
-
-    def wrongVersion(version: Byte): ByteString = {
-      val coinbaseDataV2 = coinbaseData.asInstanceOf[CoinbaseDataV2]
-      serialize[CoinbaseData](coinbaseDataV2.copy(version = version))
-    }
   }
 
   it should "check coinbase data for pre-ghost hardfork" in new CoinbaseDataFixture {
@@ -250,10 +245,6 @@ class BlockValidationSpec extends AlephiumSpec {
     info("wrong chain index")
     val data1 = wrongChainIndex(chainIndexGen.retryUntil(_ != chainIndex).sample.get)
     block.Coinbase.output(_.copy(additionalData = data1)).fail(InvalidCoinbaseData)
-
-    info("wrong version")
-    val data2 = wrongVersion((CoinbaseData.GhostVersion + 1).toByte)
-    block.Coinbase.output(_.copy(additionalData = data2)).fail(InvalidCoinbaseData)
 
     info("wrong format")
     val wrongFormat = ByteString("wrong-coinbase-data-format")
