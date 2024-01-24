@@ -24,8 +24,7 @@ import org.alephium.util.{AVector, Duration}
 
 class ValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsLike {
   override val configValues = Map(
-    ("alephium.consensus.mainnet.num-zeros-at-least-in-hash", 1),
-    ("alephium.consensus.ghost.num-zeros-at-least-in-hash", 1)
+    ("alephium.consensus.num-zeros-at-least-in-hash", 1)
   )
 
   it should "pre-validate blocks" in {

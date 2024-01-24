@@ -377,8 +377,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
   it should "update mainchain hash based on heights instead of weight" in new Fixture {
     override val configValues = Map(
-      ("alephium.consensus.mainnet.num-zeros-at-least-in-hash", 10),
-      ("alephium.consensus.ghost.num-zeros-at-least-in-hash", 10)
+      ("alephium.consensus.num-zeros-at-least-in-hash", 10)
     )
 
     val longChain   = chainGenOf(3, genesis).sample.get

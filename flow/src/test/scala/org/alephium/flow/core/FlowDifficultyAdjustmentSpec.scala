@@ -213,7 +213,7 @@ class FlowDifficultyAdjustmentSpec extends AlephiumSpec {
       ("alephium.network.network-id", NetworkId.AlephiumDevNet.id),
       ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(-1).millis),
       ("alephium.network.ghost-hard-fork-timestamp ", TimeStamp.Max.millis),
-      ("alephium.consensus.mainnet.num-zeros-at-least-in-hash", 3)
+      ("alephium.consensus.num-zeros-at-least-in-hash", 3)
     )
     config.network.networkId is NetworkId.AlephiumDevNet
     config.network.getHardFork(TimeStamp.now()).isLemanEnabled() is true

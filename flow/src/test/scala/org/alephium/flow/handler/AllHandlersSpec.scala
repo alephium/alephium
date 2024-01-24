@@ -27,8 +27,7 @@ import org.alephium.util.AVector
 
 class AllHandlersSpec extends AlephiumFlowActorSpec {
   override val configValues = Map(
-    ("alephium.consensus.mainnet.num-zeros-at-least-in-hash", 1),
-    ("alephium.consensus.ghost.num-zeros-at-least-in-hash", 1)
+    ("alephium.consensus.num-zeros-at-least-in-hash", 1)
   )
 
   it should "work for valid block" in {

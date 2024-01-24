@@ -140,8 +140,7 @@ class HeaderValidationSpec extends AlephiumFlowSpec with NoIndexModelGeneratorsL
 
     override val configValues = Map(
       ("alephium.broker.broker-num", 1),
-      ("alephium.consensus.mainnet.num-zeros-at-least-in-hash", 1),
-      ("alephium.consensus.ghost.num-zeros-at-least-in-hash", 1),
+      ("alephium.consensus.num-zeros-at-least-in-hash", 1),
       ("alephium.network.ghost-hard-fork-timestamp", ghostHardForkTimestamp.millis)
     )
 
