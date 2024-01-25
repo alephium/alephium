@@ -140,6 +140,12 @@ trait MultiChain extends BlockPool with BlockHeaderPool with FlowDifficultyAdjus
   ): IOResult[AVector[(BlockHash, LockupScript.Asset)]] =
     getBlockChain(header.chainIndex).selectUncles(header, validator)
 
+  def getUnclesUnsafe(
+      header: BlockHeader,
+      validator: BlockHeader => Boolean
+  ): AVector[(BlockHash, LockupScript.Asset)] =
+    getBlockChain(header.chainIndex).selectUnclesUnsafe(header, validator)
+
   def add(header: BlockHeader): IOResult[Unit]
 
   def getHashes(chainIndex: ChainIndex, height: Int): IOResult[AVector[BlockHash]] =

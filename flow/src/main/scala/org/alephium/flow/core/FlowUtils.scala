@@ -203,16 +203,24 @@ trait FlowUtils
     }
   }
 
+  private def getUnclesUnsafe(
+      hardFork: HardFork,
+      deps: BlockDeps,
+      parentHeader: BlockHeader
+  ): AVector[(BlockHash, LockupScript.Asset)] = {
+    if (hardFork.isGhostEnabled()) {
+      getUnclesUnsafe(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
+    } else {
+      AVector.empty
+    }
+  }
+
   @inline private def getUncles(
       hardFork: HardFork,
       deps: BlockDeps,
       parentHeader: BlockHeader
   ): IOResult[AVector[(BlockHash, LockupScript.Asset)]] = {
-    if (hardFork.isGhostEnabled()) {
-      getUncles(parentHeader, uncle => isExtendingUnsafe(deps, uncle.blockDeps))
-    } else {
-      Right(AVector.empty)
-    }
+    IOUtils.tryExecute(getUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
   def prepareBlockFlow(
