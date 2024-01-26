@@ -190,12 +190,10 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
   }
 
   def getNextHashTargetRaw(hash: BlockHash, nextTimeStamp: TimeStamp): IOResult[Target] = {
+    implicit val consensusConfig = consensusConfigs.getConsensusConfig(nextTimeStamp)
     for {
       header <- getBlockHeader(hash)
-      consensusConfig = consensusConfigs.getConsensusConfig(nextTimeStamp)
-      newTarget <- calNextHashTargetRaw(hash, header.target, header.timestamp, nextTimeStamp)(
-        consensusConfig
-      )
+      newTarget <- calNextHashTargetRaw(hash, header.target, header.timestamp, nextTimeStamp)
     } yield newTarget
   }
 

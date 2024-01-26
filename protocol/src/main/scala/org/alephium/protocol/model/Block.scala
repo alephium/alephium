@@ -25,6 +25,7 @@ import org.alephium.crypto.MerkleHashable
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{ConsensusConfig, GroupConfig, NetworkConfig}
 import org.alephium.protocol.model.BlockHash
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.serde.{deserialize, Serde, SerdeResult}
 import org.alephium.util.{AVector, TimeStamp, U256}
 
@@ -34,6 +35,8 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
   def chainIndex: ChainIndex = header.chainIndex
 
   def coinbase: Transaction = transactions.last
+
+  def minerLockupScript: LockupScript.Asset = coinbase.unsigned.fixedOutputs(0).lockupScript
 
   def uncleHashes(implicit networkConfig: NetworkConfig): SerdeResult[AVector[BlockHash]] = {
     deserialize[CoinbaseData](coinbase.unsigned.fixedOutputs.head.additionalData).map {

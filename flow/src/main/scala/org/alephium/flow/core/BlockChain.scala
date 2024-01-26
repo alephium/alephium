@@ -57,7 +57,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def getUsedUnclesAndAncestorsUnsafe(
       header: BlockHeader
   ): (AVector[BlockHash], AVector[BlockHash]) = {
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    @tailrec
     def iter(
         fromHash: BlockHash,
         num: Int,
@@ -90,10 +90,10 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def selectUnclesUnsafe(
-      header: BlockHeader,
+      parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
   ): AVector[(BlockHash, LockupScript.Asset)] = {
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    @tailrec
     def iter(
         fromHeader: BlockHeader,
         num: Int,
@@ -113,14 +113,14 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
               ancestors.exists(_ == uncle.parentHash) &&
               validator(uncle.header)
           )
-          .map(block => (block.hash, block.coinbase.unsigned.fixedOutputs(0).lockupScript))
+          .map(block => (block.hash, block.minerLockupScript))
         val parentHeader = getBlockHeaderUnsafe(fromHeader.parentHash)
         iter(parentHeader, num - 1, usedUncles, ancestors, unclesAcc ++ selected)
       }
     }
 
-    val (usedUncles, ancestors) = getUsedUnclesAndAncestorsUnsafe(header)
-    val availableUncles = iter(header, ALPH.MaxUncleAge, usedUncles, ancestors, AVector.empty)
+    val (usedUncles, ancestors) = getUsedUnclesAndAncestorsUnsafe(parentHeader)
+    val availableUncles = iter(parentHeader, ALPH.MaxUncleAge, usedUncles, ancestors, AVector.empty)
     if (availableUncles.length <= ALPH.MaxUncleSize) {
       availableUncles
     } else {
@@ -129,10 +129,10 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def selectUncles(
-      header: BlockHeader,
+      parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
   ): IOResult[AVector[(BlockHash, LockupScript.Asset)]] = {
-    IOUtils.tryExecute(selectUnclesUnsafe(header, validator))
+    IOUtils.tryExecute(selectUnclesUnsafe(parentHeader, validator))
   }
 
   def getMainChainBlockByHeight(height: Int): IOResult[Option[Block]] = {

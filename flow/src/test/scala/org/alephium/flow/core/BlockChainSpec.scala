@@ -645,7 +645,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain
     }
 
-    def createBlockChainWithUncles(length: Int): (BlockChain, Set[BlockHeader]) = {
+    def createBlockChainWithUnusedUncles(length: Int): (BlockChain, Set[BlockHeader]) = {
       val chain = buildBlockChain()
       // generate `length + 1` blocks to make sure this is the canonical chain
       val blocks    = chainGenOf(chainIndex, length + 1, genesis.hash, TimeStamp.now()).sample.get
@@ -657,6 +657,33 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         allUncles ++= uncles.map(_.header)
         addBlocks(chain, uncles)
       }
+      (chain, Set.from(allUncles))
+    }
+
+    def createBlockChainWithUsedUncles(length: Int): (BlockChain, Set[BlockHeader]) = {
+      val chain              = buildBlockChain()
+      val allUncles          = ArrayBuffer.empty[BlockHeader]
+      val allMainchainBlocks = ArrayBuffer.empty[BlockHash]
+      // generate `length + 1` blocks to make sure this is the canonical chain
+      (0 until length + 1).foreach { k =>
+        val parentHash = allMainchainBlocks.lastOption.getOrElse(genesis.hash)
+        val uncleHashes = if (allUncles.size >= 2) {
+          AVector.from(allUncles.takeRight(2).map(_.hash))
+        } else {
+          AVector.empty
+        }
+        val unclePairs =
+          uncleHashes.map(hash => (hash: BlockHash, chain.getBlockUnsafe(hash).minerLockupScript))
+        val block     = blockGen(chainIndex, TimeStamp.now(), parentHash, unclePairs).sample.get
+        val uncleGen  = blockGen(block.chainIndex, block.timestamp, block.parentHash)
+        val uncleSize = if (k == length) 0 else ALPH.MaxUncleSize // no uncles for the latest block
+        val newUncles = AVector.fill(uncleSize)(uncleGen.sample.get)
+        allUncles ++= newUncles.map(_.header)
+        addBlocks(chain, block +: newUncles)
+        allMainchainBlocks += block.hash
+      }
+      allMainchainBlocks.size is length + 1
+      allUncles.size is 2 * length
       (chain, Set.from(allUncles))
     }
 
@@ -674,9 +701,35 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     }
   }
 
+  it should "get the right used uncles when no uncles are used" in new GhostFixture {
+    val (chain, _) = createBlockChainWithUnusedUncles(1)
+    val bestTip    = chain.getBestTipUnsafe()
+    val bestHeader = chain.getBlockHeaderUnsafe(bestTip)
+    chain.getHeightUnsafe(bestTip) is 2
+    chain.getHashes(1).rightValue.length is 3
+
+    val (usedUncleHashes, ancestors) =
+      chain.getUsedUnclesAndAncestors(bestHeader).rightValue
+    usedUncleHashes.isEmpty is true
+    ancestors.map(chain.getHeightUnsafe) is AVector(1, 0)
+  }
+
+  it should "get the right used uncles all uncles are used" in new GhostFixture {
+    val (chain, allUncles) = createBlockChainWithUsedUncles(1)
+    val bestTip            = chain.getBestTipUnsafe()
+    val bestHeader         = chain.getBlockHeaderUnsafe(bestTip)
+    chain.getHeightUnsafe(bestTip) is 2
+    chain.getHashes(1).rightValue.length is 3
+
+    val (usedUncleHashes, ancestors) =
+      chain.getUsedUnclesAndAncestors(bestHeader).rightValue
+    usedUncleHashes.toSet is allUncles.map(_.hash)
+    ancestors.map(chain.getHeightUnsafe) is AVector(1, 0)
+  }
+
   it should "select recent available uncles" in new GhostFixture {
     private def test(chainLength: Int) = {
-      val (chain, _) = createBlockChainWithUncles(chainLength)
+      val (chain, _) = createBlockChainWithUnusedUncles(chainLength)
       (1 to chainLength).reverse.foreach(height => {
         val currentBlock = chain.getMainChainBlockByHeight(height).rightValue.get
         val (usedUncleHashes, ancestors) =
@@ -685,7 +738,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         val fromHeight = if (height > ALPH.MaxUncleAge) height - ALPH.MaxUncleAge else 0
         ancestors is AVector.from(
           (fromHeight until height).view
-            .map(chain.getMainChainBlockByHeight(_).rightValue.get.header.hash)
+            .map(chain.getMainChainBlockByHeight(_).rightValue.get.hash)
             .reverse
         )
 
@@ -704,7 +757,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   }
 
   it should "select uncles from unused uncles set" in new GhostFixture {
-    val (chain, _)    = createBlockChainWithUncles(ALPH.MaxUncleAge)
+    val (chain, _)    = createBlockChainWithUnusedUncles(ALPH.MaxUncleAge)
     val currentHeight = ALPH.MaxUncleAge
     var currentBlock  = chain.getMainChainBlockByHeight(ALPH.MaxUncleAge).rightValue.get
     (1 to ALPH.MaxUncleAge).foreach(index => {
