@@ -1,12 +1,12 @@
 Docker Stack Setup
 ====
 
-This folder container all the necessary material to build and run Alephium via docker container.
+This folder containes all the necessary material to build and run Alephium via docker container.
 
 ## Prerequisites
 
 We're using [docker-compose](https://docs.docker.com/compose/) to run Alephium here.
-Make sure you installed `docker` and `docker-compose` before proceeding further.
+Make sure you have installed `docker` and `docker-compose` before proceeding further.
 
 If you prefer running `docker` or `docker-compose` command without `sudo`, add your use name
 in the `docker` group by running the following command.
