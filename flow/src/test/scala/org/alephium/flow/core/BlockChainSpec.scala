@@ -629,6 +629,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val longHash  = longChain(1).hash
     chain.getHashes(2) isE AVector(longHash, shortHash)
     chain.heightIndexStorage.put(2, AVector(shortHash, longHash))
+    chain.hashesCache.put(2, AVector(shortHash, longHash))
     chain.getHashes(2) isE AVector(shortHash, longHash)
 
     chain.checkHashIndexingUnsafe(3)

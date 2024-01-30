@@ -90,12 +90,15 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   ): IOResult[Unit] = {
     heightIndexStorage.getOpt(height).flatMap {
       case Some(hashes) =>
-        if (isCanonical) {
-          heightIndexStorage.put(height, hash +: hashes)
+        val blockHashes = if (isCanonical) {
+          hash +: hashes
         } else {
-          heightIndexStorage.put(height, hashes :+ hash)
+          hashes :+ hash
         }
-      case None => heightIndexStorage.put(height, AVector(hash))
+        heightIndexStorage.put(height, blockHashes).map(_ => cacheHashes(height, blockHashes))
+      case None =>
+        val blockHashes = AVector(hash)
+        heightIndexStorage.put(height, blockHashes).map(_ => cacheHashes(height, blockHashes))
     }
   }
 
@@ -154,12 +157,17 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
 
   def isTip(hash: BlockHash): Boolean = tips.contains(hash)
 
+  private[core] lazy val hashesCache =
+    HashesCache(consensusConfigs.blockCacheCapacityPerChain * 4)
+
+  def cacheHashes(height: Int, hashes: AVector[BlockHash]): Unit = hashesCache.put(height, hashes)
+
   def getHashesUnsafe(height: Int): AVector[BlockHash] = {
-    heightIndexStorage.getOptUnsafe(height).getOrElse(AVector.empty)
+    hashesCache.getUnsafe(height)(heightIndexStorage.getOptUnsafe(height).getOrElse(AVector.empty))
   }
 
   def getHashes(height: Int): IOResult[AVector[BlockHash]] = {
-    heightIndexStorage.getOpt(height).map(_.getOrElse(AVector.empty))
+    hashesCache.getE(height)(heightIndexStorage.getOpt(height).map(_.getOrElse(AVector.empty)))
   }
 
   def getBestTipUnsafe(): BlockHash = {

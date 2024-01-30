@@ -22,7 +22,7 @@ import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.Utils
 import org.alephium.flow.io._
-import org.alephium.flow.setting.ConsensusSettings
+import org.alephium.flow.setting.{ConsensusSetting, ConsensusSettings}
 import org.alephium.io.{IOError, IOResult}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.{BrokerConfig, NetworkConfig}
@@ -157,8 +157,10 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
       if (hashes.head == hash) {
         Right(())
       } else {
+        val blockHashes = hash +: hashes.filter(_ != hash)
         for {
-          _      <- heightIndexStorage.put(height, hash +: hashes.filter(_ != hash))
+          _ <- heightIndexStorage.put(height, blockHashes)
+          _ = cacheHashes(height, blockHashes)
           parent <- getParentHash(hash)
           _      <- reorgFrom(parent, height - 1)
         } yield ()
@@ -190,9 +192,10 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
   }
 
   def getNextHashTargetRaw(hash: BlockHash, nextTimeStamp: TimeStamp): IOResult[Target] = {
-    implicit val consensusConfig = consensusConfigs.getConsensusConfig(nextTimeStamp)
+    implicit val consensusConfig: ConsensusSetting =
+      consensusConfigs.getConsensusConfig(nextTimeStamp)
     for {
-      header <- getBlockHeader(hash)
+      header    <- getBlockHeader(hash)
       newTarget <- calNextHashTargetRaw(hash, header.target, header.timestamp, nextTimeStamp)
     } yield newTarget
   }
@@ -282,7 +285,11 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
       val nextHashes = getHashesUnsafe(nextHeight)
       if (nextHashes.head != nextHash) {
         logger.warn(s"Update hashes order at: chainIndex $chainIndex; height $nextHeight")
-        heightIndexStorage.put(nextHeight, nextHash +: nextHashes.filter(_ != nextHash))
+        val blockHashes = nextHash +: nextHashes.filter(_ != nextHash)
+        heightIndexStorage.put(nextHeight, blockHashes)
+        if (hashesCache.exists(nextHeight)) {
+          hashesCache.put(nextHeight, blockHashes)
+        }
       }
 
       currentHeight = nextHeight
