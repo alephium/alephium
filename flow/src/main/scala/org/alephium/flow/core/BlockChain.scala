@@ -46,12 +46,19 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
+  private[core] lazy val blockCache =
+    FlowCache.blocks(consensusConfigs.blockCacheCapacityPerChain * 4)
+
+  def cacheBlock(block: Block): Unit = {
+    blockCache.put(block.hash, block)
+  }
+
   def getBlock(hash: BlockHash): IOResult[Block] = {
-    blockStorage.get(hash)
+    blockCache.getE(hash)(blockStorage.get(hash))
   }
 
   def getBlockUnsafe(hash: BlockHash): Block = {
-    blockStorage.getUnsafe(hash)
+    blockCache.getUnsafe(hash)(blockStorage.getUnsafe(hash))
   }
 
   def getUsedUnclesAndAncestorsUnsafe(
@@ -305,7 +312,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   protected def persistBlock(block: Block): IOResult[Unit] = {
-    blockStorage.put(block)
+    blockStorage.put(block).map(_ => cacheBlock(block))
   }
 
   protected def persistTxs(block: Block): IOResult[Unit] = {

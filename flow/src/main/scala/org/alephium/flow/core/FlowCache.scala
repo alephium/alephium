@@ -19,15 +19,15 @@ package org.alephium.flow.core
 import org.alephium.flow.core.BlockFlowState.BlockCache
 import org.alephium.flow.model.BlockState
 import org.alephium.protocol.config.BrokerConfig
-import org.alephium.protocol.model.{BlockHash, BlockHeader}
+import org.alephium.protocol.model.{Block, BlockHash, BlockHeader}
 import org.alephium.util.{RWLock, ValueSortedMap}
 
 object FlowCache {
   import org.alephium.util.Bytes.byteStringOrdering
   implicit val hashOrdering: Ordering[BlockHash] = Ordering.by(_.bytes)
 
-  implicit val blockOrdering: Ordering[BlockCache] = Ordering.by(_.blockTime)
-  def blocks(
+  implicit val blockCacheOrdering: Ordering[BlockCache] = Ordering.by(_.blockTime)
+  def blockCaches(
       capacityPerChain: Int
   )(implicit brokerConfig: BrokerConfig): FlowCache[BlockHash, BlockCache] = {
     val m        = ValueSortedMap.empty[BlockHash, BlockCache]
@@ -39,6 +39,12 @@ object FlowCache {
   def headers(capacity: Int): FlowCache[BlockHash, BlockHeader] = {
     val m = ValueSortedMap.empty[BlockHash, BlockHeader]
     new FlowCache[BlockHash, BlockHeader](m, capacity)
+  }
+
+  implicit val blockOrdering: Ordering[Block] = Ordering.by(_.timestamp)
+  def blocks(capacity: Int): FlowCache[BlockHash, Block] = {
+    val m = ValueSortedMap.empty[BlockHash, Block]
+    new FlowCache[BlockHash, Block](m, capacity)
   }
 
   implicit val stateOrdering: Ordering[BlockState] = Ordering.by(_.height)

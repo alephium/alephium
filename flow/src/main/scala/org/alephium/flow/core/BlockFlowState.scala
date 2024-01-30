@@ -129,7 +129,7 @@ trait BlockFlowState extends FlowTipsUtil {
 
   // Cache latest blocks for trie update, UTXO indexing
   lazy val groupCaches = AVector.fill(brokerConfig.groupNumPerBroker) {
-    FlowCache.blocks(consensusConfigs.blockCacheCapacityPerChain)
+    FlowCache.blockCaches(consensusConfigs.blockCacheCapacityPerChain)
   }
 
   def getGroupCache(groupIndex: GroupIndex): FlowCache[BlockHash, BlockCache] = {

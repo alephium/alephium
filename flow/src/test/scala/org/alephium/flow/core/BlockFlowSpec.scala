@@ -547,10 +547,12 @@ class BlockFlowSpec extends AlephiumSpec {
       consensusConfigs.blockCacheCapacityPerChain + 1
   }
 
-  it should "cache block hashes" in new FlowFixture {
-    val chainIndex = ChainIndex.unsafe(0, 0)
-    val blockChain = blockFlow.getBlockChain(chainIndex)
+  it should "cache block and block hashes" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+    val chainIndex            = ChainIndex.random
+    val blockChain            = blockFlow.getBlockChain(chainIndex)
     blockChain.hashesCache.size is 1
+    blockChain.blockCache.size is 1
 
     blockChain.hashesCache.get(1) is None
     val block00 = emptyBlock(blockFlow, chainIndex)
@@ -558,6 +560,10 @@ class BlockFlowSpec extends AlephiumSpec {
     addAndCheck(blockFlow, block00)
     blockChain.hashesCache.get(1) is Some(AVector(block00.hash))
     addAndCheck(blockFlow, block01)
+
+    blockChain.blockCache.get(block00.hash) is Some(block00)
+    blockChain.blockCache.get(block01.hash) is Some(block01)
+    blockChain.blockCache.size is 3
 
     val hashes0 = blockChain.hashesCache.get(1).get
     hashes0.toSet is Set(block00.hash, block01.hash)
@@ -567,6 +573,9 @@ class BlockFlowSpec extends AlephiumSpec {
     val block1 = emptyBlock(blockFlow, chainIndex)
     blockChain.hashesCache.get(2) is None
     addAndCheck(blockFlow, block1)
+    blockChain.blockCache.size is 4
+    blockChain.blockCache.get(block1.hash) is Some(block1)
+
     val hashes1 = blockChain.hashesCache.get(2).get
     hashes1 is AVector(block1.hash)
     hashes1 is blockChain.heightIndexStorage.getUnsafe(2)
