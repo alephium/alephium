@@ -193,6 +193,7 @@ object BlockFlow extends StrictLogging {
     (startHeight to maxHeight).foreach { height =>
       val block = chain.getBlockUnsafe(chain.getHashesUnsafe(height).head)
       blockflow.cacheBlock(block)
+      chain.cacheBlock(block)
     }
   }
 
@@ -206,6 +207,7 @@ object BlockFlow extends StrictLogging {
       val header = chain.getBlockHeaderUnsafe(chain.getHashesUnsafe(height).head)
       chain.cacheHeader(header)
       chain.cacheState(header.hash, chain.getStateUnsafe(header.hash))
+      chain.cacheHashes(height, chain.getHashesUnsafe(height))
     }
   }
 

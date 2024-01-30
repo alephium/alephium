@@ -525,6 +525,7 @@ class BlockFlowSpec extends AlephiumSpec {
   }
 
   it should "cache blocks & headers during initialization" in new FlowFixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
     blockFlow.getGroupCache(GroupIndex.unsafe(0)).size is 5
 
     val blockFlow1 = storageBlockFlow()
@@ -532,19 +533,28 @@ class BlockFlowSpec extends AlephiumSpec {
     blockFlow1.blockHeaderChains.foreach(_.foreach { chain =>
       chain.headerCache.size is 1
       chain.stateCache.size is 1
+      chain.hashesCache.size is 1
+    })
+    (blockFlow1.inBlockChains ++ blockFlow1.outBlockChains).foreach(_.foreach { chain =>
+      chain.blockCache.size is 1
     })
 
     (0 until consensusConfigs.blockCacheCapacityPerChain).foreach { _ =>
       addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(0, 1)))
+      addAndCheck(blockFlow, emptyBlock(blockFlow, ChainIndex.unsafe(1, 1)))
     }
 
     val blockFlow2 = storageBlockFlow()
     blockFlow2.getGroupCache(GroupIndex.unsafe(0)).size is
       consensusConfigs.blockCacheCapacityPerChain + 5
-    blockFlow2.getHeaderChain(ChainIndex.unsafe(0, 1)).headerCache.size is
-      consensusConfigs.blockCacheCapacityPerChain + 1
-    blockFlow2.getHeaderChain(ChainIndex.unsafe(0, 1)).stateCache.size is
-      consensusConfigs.blockCacheCapacityPerChain + 1
+    val headerChain = blockFlow2.getHeaderChain(ChainIndex.unsafe(0, 1))
+    headerChain.headerCache.size is consensusConfigs.blockCacheCapacityPerChain + 1
+    headerChain.stateCache.size is consensusConfigs.blockCacheCapacityPerChain + 1
+    headerChain.hashesCache.size is consensusConfigs.blockCacheCapacityPerChain + 1
+    blockFlow2
+      .getBlockChain(ChainIndex.unsafe(1, 1))
+      .blockCache
+      .size is consensusConfigs.blockCacheCapacityPerChain + 1
   }
 
   it should "cache block and block hashes" in new FlowFixture {
