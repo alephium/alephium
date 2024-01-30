@@ -908,7 +908,7 @@ object BuiltIn {
           Seq(Type.Address)
         } else {
           throw Error(
-            s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(",")}"
+            s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(", ")}"
           )
         }
       }
@@ -1699,7 +1699,7 @@ object BuiltIn {
           Seq(Type.ByteVec)
         } else {
           throw Error(
-            s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(",")}"
+            s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(", ")}"
           )
         }
       }

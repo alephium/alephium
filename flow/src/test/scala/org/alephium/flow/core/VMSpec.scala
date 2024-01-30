@@ -4415,7 +4415,7 @@ class VMSpec extends AlephiumSpec with Generators {
     def verifyInvalidNumberOfArguments(func: String, assertValue: String) = {
       val code = barCode(s"$func!(1, caller) == $assertValue")
       intercept[Throwable](createContract(code)).getMessage is
-        s"org.alephium.ralph.Compiler$$Error: Invalid argument type for $func, expected Contract, got U256,Address"
+        s"org.alephium.ralph.Compiler$$Error: Invalid argument type for $func, expected Contract, got U256, Address"
     }
 
     def verifyTransferToken(func: String, assertValue: String) = {
@@ -4445,7 +4445,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     {
-      info("Invalid number of arguments for tokenId")
+      info("Invalid number of arguments")
       verifyInvalidNumberOfArguments("tokenId", s"#${fooId.toHexString}")
       verifyInvalidNumberOfArguments("contractId", s"#${fooId.toHexString}")
       verifyInvalidNumberOfArguments("contractAddress", s"@${fooAddress.toBase58}")
