@@ -1,5 +1,15 @@
 [
   {
+    "name": "contractAddress",
+    "category": "Contract",
+    "signature": "fn contractAddress!(contract:<Contract>) -> (Address)",
+    "doc": "Returns the address of the contract",
+    "params": [
+      "@param contract the contract variable"
+    ],
+    "returns": "@returns the address of the contract"
+  },
+  {
     "name": "createContract",
     "category": "Contract",
     "signature": "fn createContract!(bytecode:ByteVec, encodedImmFields:ByteVec, encodedMutFields:ByteVec) -> (ByteVec)",

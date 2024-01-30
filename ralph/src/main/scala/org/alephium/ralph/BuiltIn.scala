@@ -891,6 +891,40 @@ object BuiltIn {
     doc = "Converts contract address (Address) to contract id (ByteVec)"
   )
 
+  val contractAddress: BuiltIn[StatelessContext] = {
+    new BuiltIn[StatelessContext] with DocUtils {
+      val name: String       = "contractAddress"
+      val category: Category = Category.Contract
+
+      def signature: String             = s"fn contractAddress!(contract:<Contract>) -> (Address)"
+      def usePreapprovedAssets: Boolean = false
+      def useAssetsInContract: Boolean  = false
+
+      def returnType(selfContractType: Type): Seq[Type] = Seq(Type.Address)
+
+      @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+      def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
+        if (inputType.length == 1 && inputType(0).isInstanceOf[Type.Contract]) {
+          Seq(Type.Address)
+        } else {
+          throw Error(
+            s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(",")}"
+          )
+        }
+      }
+
+      def genCode(inputType: Seq[Type]): Seq[Instr[StatelessContext]] = Seq(
+        ContractIdToAddress
+      )
+
+      val argsCommentedName: Seq[(String, String)] =
+        Seq("contract" -> "the contract variable")
+
+      val retComment: String = "the address of the contract"
+      def doc: String        = s"Returns $retComment"
+    }
+  }
+
   val dustAmount: SimpleBuiltIn[StatelessContext] =
     SimpleBuiltIn.chainSimple(
       "dustAmount",
@@ -1046,6 +1080,7 @@ object BuiltIn {
     zeros,
     contractIdToAddress,
     addressToContractId,
+    contractAddress,
     byteVecToAddress,
     u256To1Byte,
     u256To2Byte,
