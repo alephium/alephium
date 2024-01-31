@@ -102,6 +102,16 @@
     "returns": "@returns the id of the contract"
   },
   {
+    "name": "contractAddress",
+    "category": "Contract",
+    "signature": "fn contractAddress!(contract:<Contract>) -> (Address)",
+    "doc": "Returns the address of the contract",
+    "params": [
+      "@param contract the contract variable"
+    ],
+    "returns": "@returns the address of the contract"
+  },
+  {
     "name": "callerContractId",
     "category": "Contract",
     "signature": "fn callerContractId!() -> (ByteVec)",

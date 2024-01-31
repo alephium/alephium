@@ -1664,7 +1664,7 @@ object BuiltIn {
           Seq(Type.ByteVec)
         } else {
           throw Error(
-            s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(",")}"
+            s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(", ")}"
           )
         }
       }
@@ -1702,6 +1702,40 @@ object BuiltIn {
   val tokenId: BuiltIn[StatefulContext]    = contractIdBuiltIn("tokenId")
   val contractId: BuiltIn[StatefulContext] = contractIdBuiltIn("contractId")
 
+  val contractAddress: BuiltIn[StatefulContext] = {
+    new BuiltIn[StatefulContext] with DocUtils {
+      val name: String       = "contractAddress"
+      val category: Category = Category.Contract
+
+      def signature: String             = s"fn contractAddress!(contract:<Contract>) -> (Address)"
+      def usePreapprovedAssets: Boolean = false
+      def useAssetsInContract: Boolean  = false
+
+      def returnType(selfContractType: Type): Seq[Type] = Seq(Type.Address)
+
+      @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+      def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
+        if (inputType.length == 1 && inputType(0).isInstanceOf[Type.Contract]) {
+          Seq(Type.Address)
+        } else {
+          throw Error(
+            s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(", ")}"
+          )
+        }
+      }
+
+      def genCode(inputType: Seq[Type]): Seq[Instr[StatefulContext]] = Seq(
+        ContractIdToAddress
+      )
+
+      val argsCommentedName: Seq[(String, String)] =
+        Seq("contract" -> "the contract variable")
+
+      val retComment: String = "the address of the contract"
+      def doc: String        = s"Returns $retComment"
+    }
+  }
+
   val statefulFuncsSeq: Seq[(String, BuiltIn[StatefulContext])] =
     statelessFuncsSeq ++ Seq(
       approveToken,
@@ -1724,6 +1758,7 @@ object BuiltIn {
       selfTokenId,
       tokenId,
       contractId,
+      contractAddress,
       callerContractId,
       callerAddress,
       contractInitialStateHash,
