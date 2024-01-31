@@ -29,6 +29,7 @@ import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.model._
 import org.alephium.util.{AlephiumSpec, AVector, Bytes, Duration, TimeStamp}
 
+// scalastyle:off file.size.limit
 class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
   trait Fixture extends AlephiumConfigFixture with NoIndexModelGeneratorsLike {
     lazy val genesis =

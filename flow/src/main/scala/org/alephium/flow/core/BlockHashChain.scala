@@ -26,9 +26,9 @@ import org.alephium.io.{IOError, IOResult, IOUtils}
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model.{BlockHash, ChainIndex, Weight}
-import org.alephium.util.{AVector, EitherF, Math, TimeStamp}
+import org.alephium.util.{AVector, Cache, EitherF, Math, TimeStamp}
 
-// scalastyle:off number.of.methods
+// scalastyle:off number.of.methods file.size.limit
 trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with BlockHashChainState {
   implicit def brokerConfig: BrokerConfig
 
@@ -158,16 +158,22 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
   def isTip(hash: BlockHash): Boolean = tips.contains(hash)
 
   private[core] lazy val hashesCache =
-    HashesCache(consensusConfigs.blockCacheCapacityPerChain * 4)
+    Cache.lruSafe[Int, AVector[BlockHash]](consensusConfigs.blockCacheCapacityPerChain * 4)
 
   def cacheHashes(height: Int, hashes: AVector[BlockHash]): Unit = hashesCache.put(height, hashes)
 
   def getHashesUnsafe(height: Int): AVector[BlockHash] = {
-    hashesCache.getUnsafe(height)(heightIndexStorage.getOptUnsafe(height).getOrElse(AVector.empty))
+    hashesCache.get(height) match {
+      case Some(hashes) => hashes
+      case None         => heightIndexStorage.getOptUnsafe(height).getOrElse(AVector.empty)
+    }
   }
 
   def getHashes(height: Int): IOResult[AVector[BlockHash]] = {
-    hashesCache.getE(height)(heightIndexStorage.getOpt(height).map(_.getOrElse(AVector.empty)))
+    hashesCache.get(height) match {
+      case Some(hashes) => Right(hashes)
+      case None         => heightIndexStorage.getOpt(height).map(_.getOrElse(AVector.empty))
+    }
   }
 
   def getBestTipUnsafe(): BlockHash = {

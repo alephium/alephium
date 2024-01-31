@@ -287,7 +287,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
         logger.warn(s"Update hashes order at: chainIndex $chainIndex; height $nextHeight")
         val blockHashes = nextHash +: nextHashes.filter(_ != nextHash)
         heightIndexStorage.put(nextHeight, blockHashes)
-        if (hashesCache.exists(nextHeight)) {
+        if (hashesCache.contains(nextHeight)) {
           hashesCache.put(nextHeight, blockHashes)
         }
       }
