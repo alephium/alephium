@@ -22,7 +22,7 @@ import org.alephium.protocol.model.{dustUtxoAmount, TokenId}
 import org.alephium.util._
 
 class GaslessTxTest extends AlephiumActorSpec {
-  it should "only pay gas when users is in posession of certain token" in new WalletFixture {
+  it should "pay appropriate amount of gas depending on tokens under possession" in new WalletFixture {
     val contractDeployer = wallets.head
     val subsidizeGasForTokenHolderContract =
       s"""
@@ -144,6 +144,129 @@ class GaslessTxTest extends AlephiumActorSpec {
     wallet3AlphBalance = wallet3AlphBalance.subUnsafe(gasFee)
     checkBalance(wallet3.activeAddress, wallet3AlphBalance, Some(wallet3TokenBalance))
     checkBalance(deployResult.contractAddress.toBase58, contractAlphBalance, Some(345))
+
+    clique.selfClique().nodes.foreach { peer =>
+      request[Boolean](stopMining, peer.restPort) is true
+    }
+    clique.stop()
+  }
+
+  it should "be able to pay using USD stablecoin" in new WalletFixture {
+    val contractDeployer = wallets.head
+    val usdContract =
+      s"""
+         |Contract USDContract() {
+         |  @using(assetsInContract = true)
+         |  pub fn getUSD(amount: U256) -> () {
+         |     transferTokenFromSelf!(callerAddress!(), selfTokenId!(), amount)
+         |  }
+         | }
+      """.stripMargin
+
+    val usdContractDeployResult = contract(
+      contractDeployer,
+      usdContract,
+      None,
+      None,
+      Some(500),
+      Some(ALPH.oneAlph)
+    )
+
+    val usdTokenId = TokenId.from(usdContractDeployResult.contractId)
+
+    def getUSD(wallet: Wallet, amount: U256): SubmitTxResult = {
+      val getUSDScript =
+        s"""
+           |TxScript GetUSD {
+           |  USDContract(#${usdContractDeployResult.contractAddress.toBase58}).getUSD(${amount})
+           |}
+           $usdContract
+         """.stripMargin
+      script(
+        wallet.publicKey.toHexString,
+        getUSDScript,
+        wallet.creation.walletName,
+        attoAlphAmount = Some(Amount(dustUtxoAmount))
+      )
+    }
+
+    def checkBalance(address: String, alphBalance: U256, usdBalance: U256) = {
+      eventually {
+        val balance = request[Balance](getBalance(address), restPort)
+        balance.tokenBalances
+          .flatMap(_.find(_.id == usdTokenId))
+          .map(_.amount)
+          .value is usdBalance
+        balance.balance.value is alphBalance
+      }
+    }
+
+    val gasFeeInUSD = U256.unsafe(5)
+    val gasWithUSDContract =
+      s"""
+         |Contract GasWithUSDContract() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn payGasWithUSD() -> () {
+         |    let gasFee = txGasFee!()
+         |    transferTokenToSelf!(callerAddress!(), #${usdTokenId.toHexString}, ${gasFeeInUSD.v.toString})
+         |    payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |  }
+         | }
+      """.stripMargin
+
+    var gasWithUSDContractAlphBalance = ALPH.alph(100)
+    val gasWithUSDContractDeployResult = contract(
+      contractDeployer,
+      gasWithUSDContract,
+      None,
+      None,
+      None,
+      Some(gasWithUSDContractAlphBalance)
+    )
+    val gasWithUSDContractAddress = gasWithUSDContractDeployResult.contractAddress
+
+    def payGasWithUSD(
+        wallet: Wallet,
+        tokenAmount: U256
+    ): SubmitTxResult = {
+      val interactScript =
+        s"""
+           |TxScript Interact {
+           |  GasWithUSDContract(#${gasWithUSDContractAddress.toBase58})
+           |    .payGasWithUSD{callerAddress!() -> #${usdTokenId.toHexString}: ${tokenAmount}}()
+           |}
+           $gasWithUSDContract
+         """.stripMargin
+      script(
+        wallet.publicKey.toHexString,
+        interactScript,
+        wallet.creation.walletName,
+        attoAlphAmount = Some(Amount(dustUtxoAmount)),
+        tokens = Some((usdTokenId, tokenAmount))
+      )
+    }
+
+    val gasFee            = ALPH.nanoAlph(10000000)
+    var walletAlphBalance = ALPH.alph(1000)
+    var walletUSDBalance  = U256.unsafe(100)
+
+    val wallet = wallets(1)
+
+    // Get USD
+    getUSD(wallet, walletUSDBalance)
+    walletAlphBalance = walletAlphBalance.subUnsafe(gasFee)
+    checkBalance(wallet.activeAddress, walletAlphBalance, walletUSDBalance)
+
+    // Pay gas with USD
+    payGasWithUSD(wallet, gasFeeInUSD)
+    gasWithUSDContractAlphBalance = gasWithUSDContractAlphBalance.subUnsafe(gasFee)
+    walletUSDBalance = walletUSDBalance.subUnsafe(gasFeeInUSD)
+    checkBalance(wallet.activeAddress, walletAlphBalance, walletUSDBalance)
+    checkBalance(
+      gasWithUSDContractAddress.toBase58,
+      gasWithUSDContractAlphBalance,
+      gasFeeInUSD
+    )
 
     clique.selfClique().nodes.foreach { peer =>
       request[Boolean](stopMining, peer.restPort) is true
