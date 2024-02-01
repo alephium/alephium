@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, EitherF, U256}
+import org.alephium.util.{AVector, EitherF, Math, U256}
 
 sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
@@ -425,8 +425,8 @@ final class StatefulVM(
       }
 
       finalBalance.map { balance =>
-        val prepaidGas = U256.min(totalGasFee, balance)
-        U256.min(prepaidGas, gasFeePaid)
+        val prepaidGas = Math.min(totalGasFee, balance)
+        Math.min(prepaidGas, gasFeePaid)
       }
     }
   }

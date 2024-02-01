@@ -35,7 +35,7 @@ import org.alephium.protocol.vm.TokenIssuance.{
   NoIssuance
 }
 import org.alephium.serde.{deserialize => decode, serialize => encode, _}
-import org.alephium.util.{AVector, Bytes, Duration, TimeStamp, U256}
+import org.alephium.util.{AVector, Bytes, Duration, Math, TimeStamp, U256}
 import org.alephium.util
 
 // scalastyle:off file.size.limit number.of.types
@@ -550,7 +550,7 @@ case object PayGasFee
             ()
           } else {
             val (lockupScript, balance) = approved.all(index)
-            val toBePaid                = U256.min(remaining, balance.attoAlphAmount)
+            val toBePaid                = Math.min(remaining, balance.attoAlphAmount)
             gasFeeToBePaid = gasFeeToBePaid :+ (lockupScript, toBePaid)
             remaining = remaining.subUnsafe(toBePaid)
             iter(index + 1)
