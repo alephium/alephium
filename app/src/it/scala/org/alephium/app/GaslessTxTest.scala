@@ -22,7 +22,7 @@ import org.alephium.protocol.model.{dustUtxoAmount, TokenId}
 import org.alephium.util._
 
 class GaslessTxTest extends AlephiumActorSpec {
-  it should "only pay gas when users is in posession of certain token" in new WalletFixture{
+  it should "only pay gas when users is in posession of certain token" in new WalletFixture {
     val contractDeployer = wallets.head
     val subsidizeGasForTokenHolderContract =
       s"""
@@ -55,14 +55,14 @@ class GaslessTxTest extends AlephiumActorSpec {
     )
 
     def getTokens(
-      wallet: Wallet,
-      amount: U256
+        wallet: Wallet,
+        amount: U256
     ): SubmitTxResult = {
       val getTokenScript =
-         s"""
-            |TxScript GetTokens {
-            |  SubsidizeGasForTokenHolderContract(#${deployResult.contractAddress.toBase58}).getTokens(${amount})
-            |}
+        s"""
+           |TxScript GetTokens {
+           |  SubsidizeGasForTokenHolderContract(#${deployResult.contractAddress.toBase58}).getTokens(${amount})
+           |}
            $subsidizeGasForTokenHolderContract
          """.stripMargin
       script(
@@ -74,15 +74,15 @@ class GaslessTxTest extends AlephiumActorSpec {
     }
 
     def subsidizeGasBasedOnTokenAmount(
-      wallet: Wallet,
-      tokenAmount: U256
+        wallet: Wallet,
+        tokenAmount: U256
     ): SubmitTxResult = {
       val interactScript =
-         s"""
-            |TxScript Interact {
-            |  SubsidizeGasForTokenHolderContract(#${deployResult.contractAddress.toBase58})
-            |    .subsidizeGasBasedOnTokenAmount{callerAddress!() -> #${deployResult.contractId.toHexString}: ${tokenAmount}}()
-            |}
+        s"""
+           |TxScript Interact {
+           |  SubsidizeGasForTokenHolderContract(#${deployResult.contractAddress.toBase58})
+           |    .subsidizeGasBasedOnTokenAmount{callerAddress!() -> #${deployResult.contractId.toHexString}: ${tokenAmount}}()
+           |}
            $subsidizeGasForTokenHolderContract
          """.stripMargin
       script(
@@ -99,31 +99,33 @@ class GaslessTxTest extends AlephiumActorSpec {
         alphBalance: U256,
         tokenBalance: Option[U256]
     ) = {
-       eventually {
-         val balance = request[Balance](getBalance(address), restPort)
-         balance.tokenBalances.flatMap(_.find(_.id.value == deployResult.contractId.value)).map(_.amount) is tokenBalance
-         balance.balance.value is alphBalance
-       }
+      eventually {
+        val balance = request[Balance](getBalance(address), restPort)
+        balance.tokenBalances
+          .flatMap(_.find(_.id.value == deployResult.contractId.value))
+          .map(_.amount) is tokenBalance
+        balance.balance.value is alphBalance
+      }
     }
 
-    val gasFee = ALPH.nanoAlph(10000000)
+    val gasFee               = ALPH.nanoAlph(10000000)
     val initialWalletBalance = ALPH.alph(1000)
 
-    val wallet1 = wallets(1)
+    val wallet1             = wallets(1)
     val wallet1TokenBalance = U256.unsafe(101)
     getTokens(wallet1, wallet1TokenBalance)
     val wallet1AlphBalance = initialWalletBalance.subUnsafe(gasFee)
     checkBalance(wallet1.activeAddress, wallet1AlphBalance, Some(wallet1TokenBalance))
 
-    val wallet2 = wallets(2)
+    val wallet2             = wallets(2)
     val wallet2TokenBalance = U256.unsafe(49)
     getTokens(wallet2, wallet2TokenBalance)
     var wallet2AlphBalance = initialWalletBalance.subUnsafe(gasFee)
     checkBalance(wallet2.activeAddress, wallet2AlphBalance, Some(wallet2TokenBalance))
 
-    val wallet3 = wallets(3)
+    val wallet3             = wallets(3)
     val wallet3TokenBalance = U256.unsafe(5)
-    var wallet3AlphBalance = initialWalletBalance.subUnsafe(gasFee)
+    var wallet3AlphBalance  = initialWalletBalance.subUnsafe(gasFee)
     getTokens(wallet3, wallet3TokenBalance)
     checkBalance(wallet3.activeAddress, wallet3AlphBalance, Some(wallet3TokenBalance))
 

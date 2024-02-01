@@ -19,13 +19,7 @@ package org.alephium.app
 import org.alephium.api.model._
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, PublicKey}
-import org.alephium.protocol.model.{
-  dustUtxoAmount,
-  Address,
-  ContractId,
-  TokenId,
-  TransactionId
-}
+import org.alephium.protocol.model.{dustUtxoAmount, Address, ContractId, TokenId, TransactionId}
 import org.alephium.protocol.vm
 import org.alephium.util._
 import org.alephium.wallet.api.model._
