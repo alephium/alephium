@@ -4664,7 +4664,7 @@ class VMSpec extends AlephiumSpec with Generators {
       emptyTemplate.copy(transactions = AVector(tx, emptyTemplate.transactions.last))
 
     // The invalid tx is removed
-    blockFlow.validateTemplate(chainIndex, newTemplate)
+    blockFlow.validateTemplate(chainIndex, newTemplate, AVector.empty, miner)
     blockFlow.getGrandPool().size is 0
   }
 

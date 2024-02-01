@@ -496,4 +496,63 @@ class FlowUtilsSpec extends AlephiumSpec {
     val block2 = mineBlockTemplate(blockFlow, chainIndex)
     block2.uncleHashes.rightValue is AVector(uncle1.hash)
   }
+
+  it should "rebuild block template if there are invalid txs" in new FlowFixture {
+    val chainIndex = ChainIndex.unsafe(0, 0)
+    val block      = transfer(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block)
+
+    val miner     = getGenesisLockupScript(chainIndex.to)
+    val invalidTx = block.transactions.head
+    blockFlow.grandPool.add(chainIndex, invalidTx.toTemplate, TimeStamp.now())
+    val (template0, _) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
+    val template1      = template0.rebuild(AVector(invalidTx), AVector.empty, miner)
+    template1.transactions.head is invalidTx
+    val template2 =
+      blockFlow.validateTemplate(chainIndex, template1, AVector.empty, miner).rightValue
+    template2 isnot template1
+    template2 is template1.rebuild(AVector.empty, AVector.empty, miner)
+  }
+
+  it should "rebuild block template if there are invalid uncles" in new PrepareBlockFlowFixture {
+    def ghostHardForkTimestamp: TimeStamp = TimeStamp.now()
+
+    val miner               = getGenesisLockupScript(chainIndex.to)
+    val uncleHash           = prepare()
+    val (template0, uncles) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
+    uncles.map(_._1) is AVector(uncleHash)
+    blockFlow.validateTemplate(chainIndex, template0, uncles, miner).rightValue is template0
+
+    val block = mine(blockFlow, template0)
+    addAndCheck(blockFlow, block)
+
+    val (template1, _) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
+    val template2      = template1.rebuild(template1.transactions.init, uncles, miner)
+    val template3      = blockFlow.validateTemplate(chainIndex, template2, uncles, miner).rightValue
+    template3 isnot template2
+    template3 is template2.rebuild(template2.transactions.init, AVector.empty, miner)
+  }
+
+  it should "rebuild block template if there are invalid txs and uncles" in new PrepareBlockFlowFixture {
+    def ghostHardForkTimestamp: TimeStamp = TimeStamp.now()
+
+    prepare()
+    val miner               = getGenesisLockupScript(chainIndex.to)
+    val (template0, uncles) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
+    val block0              = mine(blockFlow, template0)
+    addAndCheck(blockFlow, block0)
+
+    val block1 = transfer(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block1)
+    val invalidTx = block1.transactions.head
+    blockFlow.grandPool.add(chainIndex, invalidTx.toTemplate, TimeStamp.now())
+
+    val (template1, _) = blockFlow.createBlockTemplate(chainIndex, miner).rightValue
+    val template2      = template1.rebuild(AVector(invalidTx), uncles, miner)
+    template2.transactions.head is invalidTx
+
+    val template3 = blockFlow.validateTemplate(chainIndex, template2, uncles, miner).rightValue
+    template3 isnot template2
+    template3 is template2.rebuild(AVector.empty, AVector.empty, miner)
+  }
 }

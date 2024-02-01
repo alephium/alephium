@@ -34,6 +34,7 @@ import org.alephium.protocol.vm.StatefulVM.TxScriptExecution
 import org.alephium.serde.serialize
 import org.alephium.util.{AVector, Hex, TimeStamp}
 
+// scalastyle:off number.of.methods
 trait FlowUtils
     extends MultiChain
     with BlockFlowState
@@ -223,10 +224,10 @@ trait FlowUtils
     IOUtils.tryExecute(getUnclesUnsafe(hardFork, deps, parentHeader))
   }
 
-  def prepareBlockFlow(
+  private[core] def createBlockTemplate(
       chainIndex: ChainIndex,
       miner: LockupScript.Asset
-  ): IOResult[BlockFlowTemplate] = {
+  ): IOResult[(BlockFlowTemplate, AVector[(BlockHash, LockupScript.Asset)])] = {
     assume(brokerConfig.contains(chainIndex.from))
     val bestDeps = getBestDeps(chainIndex.from)
     for {
@@ -248,23 +249,15 @@ trait FlowUtils
         templateTs,
         miner
       )
-      validated <- validateTemplate(chainIndex, template)
-    } yield {
-      if (validated) {
-        template
-      } else {
-        logger.warn("Assemble empty block due to invalid txs")
-        val coinbaseTx =
-          Transaction.coinbase(
-            chainIndex,
-            AVector.empty[Transaction],
-            miner,
-            target,
-            templateTs,
-            uncles
-          )
-        template.copy(transactions = AVector(coinbaseTx)) // fall back to empty block
-      }
+    } yield (template, uncles)
+  }
+
+  def prepareBlockFlow(
+      chainIndex: ChainIndex,
+      miner: LockupScript.Asset
+  ): IOResult[BlockFlowTemplate] = {
+    createBlockTemplate(chainIndex, miner).flatMap { case (template, uncles) =>
+      validateTemplate(chainIndex, template, uncles, miner)
     }
   }
 
@@ -297,23 +290,34 @@ trait FlowUtils
 
   lazy val templateValidator =
     BlockValidation.build(brokerConfig, networkConfig, consensusConfigs, logConfig)
-  def validateTemplate(
+  @tailrec
+  final def validateTemplate(
       chainIndex: ChainIndex,
-      template: BlockFlowTemplate
-  ): IOResult[Boolean] = {
+      template: BlockFlowTemplate,
+      uncles: AVector[(BlockHash, LockupScript.Asset)],
+      miner: LockupScript.Asset
+  ): IOResult[BlockFlowTemplate] = {
     templateValidator.validateTemplate(chainIndex, template, this) match {
       case Left(Left(error)) => Left(error)
       case Left(Right(error)) =>
         error match {
+          case _: InvalidUncleStatus =>
+            logger.warn("Assemble block with empty uncles due to invalid uncles")
+            Right(template.rebuild(template.transactions.init, AVector.empty, miner))
           case ExistInvalidTx(t, _) =>
             logger.warn(
               s"Remove invalid mempool tx: ${t.id.toHexString} - ${Hex.toHexString(serialize(t))}"
             )
+            logger.warn("Assemble block with empty txs due to invalid txs")
             this.getMemPool(chainIndex).removeUnusedTxs(AVector(t.toTemplate))
-          case _ => ()
+            val newTemplate = template.rebuild(AVector.empty, uncles, miner)
+            // we need to validate the template again since we don't know if uncles are valid
+            validateTemplate(chainIndex, newTemplate, uncles, miner)
+          case _ =>
+            logger.warn(s"Assemble empty block due to error: ${error}")
+            Right(template.rebuild(AVector.empty, AVector.empty, miner))
         }
-        Right(false)
-      case Right(_) => Right(true)
+      case Right(_) => Right(template)
     }
   }
 
