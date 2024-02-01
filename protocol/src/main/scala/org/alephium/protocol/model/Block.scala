@@ -38,10 +38,20 @@ final case class Block(header: BlockHeader, transactions: AVector[Transaction]) 
 
   def minerLockupScript: LockupScript.Asset = coinbase.unsigned.fixedOutputs(0).lockupScript
 
+  private[model] var _uncleHashes: Option[AVector[BlockHash]] = None
   def uncleHashes(implicit networkConfig: NetworkConfig): SerdeResult[AVector[BlockHash]] = {
-    deserialize[CoinbaseData](coinbase.unsigned.fixedOutputs.head.additionalData).map {
-      case v2: CoinbaseDataV2 => v2.uncleHashes
-      case _: CoinbaseDataV1  => AVector.empty
+    _uncleHashes match {
+      case Some(hashes) => Right(hashes)
+      case None =>
+        deserialize[CoinbaseData](coinbase.unsigned.fixedOutputs.head.additionalData).map {
+          case v2: CoinbaseDataV2 =>
+            _uncleHashes = Some(v2.uncleHashes)
+            v2.uncleHashes
+          case _: CoinbaseDataV1 =>
+            val hashes = AVector.empty[BlockHash]
+            _uncleHashes = Some(hashes)
+            hashes
+        }
     }
   }
 
