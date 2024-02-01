@@ -2825,6 +2825,41 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(barContractAddress, ALPH.alph(10).subUnsafe(scriptTxGasFee))
   }
 
+  it should "split gas fee between contract and caller depending on approved token amount" in new GasFeeFixture {
+    def contract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    payGasFee!{
+         |      selfAddress!()   -> ALPH: txGasFee!() / 2;
+         |      callerAddress!() -> ALPH: txGasFee!() / 2
+         |    }()
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractAddress = deployContract(contract)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo{callerAddress!() -> ALPH: txGasFee!() / 2}()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000).subUnsafe(scriptTxGasFee / 2))
+    checkAddressBalance(contractAddress, ALPH.alph(3).subUnsafe(scriptTxGasFee / 2))
+  }
+
   it should "considers dustAmount for change output when selecting UTXOs, without amounts" in new DustAmountFixture {
     override def attoAlphAmount: Option[Amount] = None
     executeTxScript()
