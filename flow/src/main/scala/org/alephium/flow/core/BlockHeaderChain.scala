@@ -159,8 +159,9 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
       } else {
         val blockHashes = hash +: hashes.filter(_ != hash)
         for {
-          _ <- heightIndexStorage.put(height, blockHashes)
-          _ = cacheHashes(height, blockHashes)
+          _ <- heightIndexStorage
+            .put(height, blockHashes)
+            .map(_ => cacheHashes(height, blockHashes))
           parent <- getParentHash(hash)
           _      <- reorgFrom(parent, height - 1)
         } yield ()
@@ -287,6 +288,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
         logger.warn(s"Update hashes order at: chainIndex $chainIndex; height $nextHeight")
         val blockHashes = nextHash +: nextHashes.filter(_ != nextHash)
         heightIndexStorage.put(nextHeight, blockHashes)
+        // Update cache if the height is cached
         if (hashesCache.contains(nextHeight)) {
           hashesCache.put(nextHeight, blockHashes)
         }

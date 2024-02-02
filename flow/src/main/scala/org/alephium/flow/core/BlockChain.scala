@@ -128,11 +128,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
     val (usedUncles, ancestors) = getUsedUnclesAndAncestorsUnsafe(parentHeader)
     val availableUncles = iter(parentHeader, ALPH.MaxUncleAge, usedUncles, ancestors, AVector.empty)
-    if (availableUncles.length <= ALPH.MaxUncleSize) {
-      availableUncles
-    } else {
-      availableUncles.take(ALPH.MaxUncleSize)
-    }
+    availableUncles.takeUpto(ALPH.MaxUncleSize)
   }
 
   def selectUncles(

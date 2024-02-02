@@ -158,7 +158,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
             if (isUncleDepsValid(block, flow, uncleHeaders)) {
               validBlock(())
             } else {
-              invalidBlock(InvalidUncles)
+              invalidBlock(InvalidUncleDeps)
             }
           _ <- uncleHeaders.foreachE(header => headerValidation.validate(header, flow))
         } yield ()
