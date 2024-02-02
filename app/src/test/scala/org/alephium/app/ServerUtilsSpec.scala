@@ -2860,6 +2860,43 @@ class ServerUtilsSpec extends AlephiumSpec {
     checkAddressBalance(contractAddress, ALPH.alph(3).subUnsafe(scriptTxGasFee / 2))
   }
 
+  it should "fail if caller doesn't have enough to pay for gas even if contract pays for it" in new GasFeeFixture {
+    val contractAddress = deployContract(fooContract)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo()
+         |}
+         |
+         |$fooContract
+         |""".stripMargin
+
+    {
+      info("Caller doesn't have enough to pay for gas")
+      val (testPriKey, testPubKey) = chainIndex.from.generateKey
+      val testAddress              = Address.p2pkh(testPubKey)
+
+      val block1 = transfer(blockFlow, genesisPriKey, testPubKey, dustUtxoAmount)
+      addAndCheck(blockFlow, block1)
+      checkAddressBalance(testAddress, dustUtxoAmount)
+
+      val exception =
+        intercept[AssertionError](executeScript(script, Some((testPriKey, testPubKey))))
+      exception.getMessage() is "Right(InvalidRemainingBalancesForFailedScriptTx)"
+    }
+
+    {
+      info("Caller has no inputs")
+      val (testPriKey, testPubKey) = chainIndex.from.generateKey
+
+      checkAddressBalance(contractAddress, ALPH.alph(3))
+      val exception =
+        intercept[AssertionError](executeScript(script, Some((testPriKey, testPubKey))))
+      exception.getMessage() is "Right(InvalidInputGroupIndex)"
+    }
+  }
+
   it should "considers dustAmount for change output when selecting UTXOs, without amounts" in new DustAmountFixture {
     override def attoAlphAmount: Option[Amount] = None
     executeTxScript()
