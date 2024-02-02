@@ -2441,17 +2441,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       ghostHardForkTimestamp = TimeStamp.unsafe(Long.MaxValue)
     )
 
-    def contract: String =
-      s"""
-         |Contract Foo() {
-         |  @using(assetsInContract = true)
-         |  pub fn foo() -> () {
-         |    payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
-         |  }
-         |}
-         |""".stripMargin
-
-    val contractAddress = deployContract(contract)
+    val contractAddress = deployContract(fooContract)
 
     def script =
       s"""
@@ -2459,7 +2449,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  Foo(#${contractAddress.toBase58}).foo()
          |}
          |
-         |$contract
+         |$fooContract
          |""".stripMargin
 
     val exception = intercept[AssertionError](executeScript(script))
@@ -2467,17 +2457,7 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "not charge caller gas fee when contract is paying gas" in new GasFeeFixture {
-    def contract: String =
-      s"""
-         |Contract Foo() {
-         |  @using(assetsInContract = true)
-         |  pub fn foo() -> () {
-         |    payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
-         |  }
-         |}
-         |""".stripMargin
-
-    val contractAddress = deployContract(contract)
+    val contractAddress = deployContract(fooContract)
 
     def script =
       s"""
@@ -2485,7 +2465,7 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  Foo(#${contractAddress.toBase58}).foo()
          |}
          |
-         |$contract
+         |$fooContract
          |""".stripMargin
 
     checkAddressBalance(scriptCaller, ALPH.alph(1000000))
