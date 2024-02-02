@@ -395,6 +395,16 @@
     "returns": "@returns "
   },
   {
+    "name": "payGasFee",
+    "category": "Asset",
+    "signature": "fn payGasFee!() -> ()",
+    "doc": "Pay gas fee.",
+    "params": [
+      
+    ],
+    "returns": "@returns "
+  },
+  {
     "name": "assert",
     "category": "Utils",
     "signature": "fn assert!(condition:Bool, errorCode:U256) -> ()",
