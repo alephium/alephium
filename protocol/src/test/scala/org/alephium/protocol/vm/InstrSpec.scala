@@ -2559,7 +2559,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val from  = LockupScript.P2C(contractId)
     val txEnv = genTxEnv(None, AVector.empty)
-    val balanceState =
+    def balanceState =
       MutBalanceState(remaining = MutBalances.empty, approved = alphBalance(from, contractBalance))
 
     override lazy val frame =
@@ -2589,6 +2589,41 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     lazy val twiceGas                  = txEnv.gasFeeUnsafe.mul(2).get
     override def contractBalance: U256 = minimalAlphInContract.addUnsafe(twiceGas)
     override def gasFeePaid: U256      = txEnv.gasFeeUnsafe
+  }
+
+  it should "pay gas from all the approved ALPH, not enough for all gas [PayGasFee]" in new PayGasFeeFixture {
+    lazy val halfGas                   = txEnv.gasFeeUnsafe.div(2).get
+    override def contractBalance: U256 = halfGas
+    override def gasFeePaid: U256      = txEnv.gasFeeUnsafe.subUnsafe(1)
+
+    override def balanceState =
+      MutBalanceState(
+        remaining = MutBalances.empty,
+        approved = MutBalances(
+          ArrayBuffer(
+            (LockupScript.P2C(contractId), MutBalancesPerLockup.alph(contractBalance)),
+            (LockupScript.P2PKH(Hash.generate), MutBalancesPerLockup.alph(halfGas.subUnsafe(1)))
+          )
+        )
+      )
+  }
+
+  it should "pay gas from all the approved ALPH, enough for all gas [PayGasFee]" in new PayGasFeeFixture {
+    lazy val halfGas                   = txEnv.gasFeeUnsafe.div(2).get
+    override def contractBalance: U256 = halfGas
+    override def gasFeePaid: U256      = txEnv.gasFeeUnsafe
+
+    override def balanceState =
+      MutBalanceState(
+        remaining = MutBalances.empty,
+        approved = MutBalances(
+          ArrayBuffer(
+            (LockupScript.P2C(contractId), MutBalancesPerLockup.alph(contractBalance)),
+            (LockupScript.P2PKH(Hash.generate), MutBalancesPerLockup.alph(halfGas)),
+            (LockupScript.P2PKH(Hash.generate), MutBalancesPerLockup.alph(halfGas))
+          )
+        )
+      )
   }
 
   trait TransferTokenFixture extends ContractOutputFixture {
