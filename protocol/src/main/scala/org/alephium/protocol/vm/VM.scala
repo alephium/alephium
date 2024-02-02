@@ -380,17 +380,14 @@ final class StatefulVM(
         case Some(gasFeeRemaining @ _) =>
           ctx.txEnv.prevOutputs.headOption match {
             case Some(firstInput) =>
-              for {
-                reimbursedGasFee <- calculateReimbursedGasFee(firstInput.lockupScript)
-                _ <-
-                  if (reimbursedGasFee > U256.Zero) {
-                    ctx.outputBalances
-                      .addAlph(firstInput.lockupScript, reimbursedGasFee)
-                      .toRight(Right(InvalidBalances))
-                  } else {
-                    okay
-                  }
-              } yield ()
+              val reimbursedGasFee = Math.min(totalGasFee, gasFeePaid)
+              if (reimbursedGasFee > U256.Zero) {
+                ctx.outputBalances
+                  .addAlph(firstInput.lockupScript, reimbursedGasFee)
+                  .toRight(Right(InvalidBalances))
+              } else {
+                okay
+              }
             case None =>
               okay
           }
@@ -400,34 +397,6 @@ final class StatefulVM(
       }
     } else {
       okay
-    }
-  }
-
-  private def calculateReimbursedGasFee(lockupScript: LockupScript.Asset): ExeResult[U256] = {
-    val totalGasFee = ctx.txEnv.gasFeeUnsafe
-    val gasFeePaid  = ctx.gasFeePaid
-
-    if (gasFeePaid == U256.Zero) {
-      Right(U256.Zero)
-    } else {
-      val initialBalance: ExeResult[U256] = Right(U256.Zero)
-      val inputBalance: ExeResult[U256] = ctx.txEnv.prevOutputs.fold(initialBalance) {
-        case (balance, input) if input.lockupScript == lockupScript =>
-          balance.flatMap(_.add(input.amount).toRight(Right(InvalidBalances)))
-        case (balance, _) =>
-          balance
-      }
-      val finalBalance = ctx.txEnv.fixedOutputs.fold(inputBalance) {
-        case (balance, output) if output.lockupScript == lockupScript =>
-          balance.flatMap(_.sub(output.amount).toRight(Right(InvalidBalances)))
-        case (balance, _) =>
-          balance
-      }
-
-      finalBalance.map { balance =>
-        val prepaidGas = Math.min(totalGasFee, balance)
-        Math.min(prepaidGas, gasFeePaid)
-      }
     }
   }
 
