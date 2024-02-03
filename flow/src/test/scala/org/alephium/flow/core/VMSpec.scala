@@ -4381,7 +4381,7 @@ class VMSpec extends AlephiumSpec with Generators {
     event.fields is AVector[Val](Val.ByteVec(ByteString.fromString("Hello, Alephium!")))
   }
 
-  it should "test tokenId/contractId built-in function" in new ContractFixture {
+  it should "test tokenId/contractId/contractAddress built-in function" in new ContractFixture {
     val foo =
       s"""
          |Contract Foo() {
@@ -4391,14 +4391,14 @@ class VMSpec extends AlephiumSpec with Generators {
 
     val tokenIssuanceInfo = TokenIssuance.Info(Val.U256(U256.unsafe(1024)), Some(genesisLockup))
     val (fooId, _)        = createContract(foo, tokenIssuanceInfo = Some(tokenIssuanceInfo))
+    val fooAddress        = Address.contract(fooId)
 
-    def barCode(arguments: String): String = {
+    def barCode(assertStmt: String): String = {
       s"""
          |Contract Bar() {
          |  @using(preapprovedAssets = true, assetsInContract = true)
          |  pub fn bar(foo: Foo, caller: Address) -> () {
-         |    assert!(tokenId!($arguments) == #${fooId.toHexString}, 1)
-         |    assert!(contractId!($arguments) == #${fooId.toHexString}, 1)
+         |    assert!($assertStmt, 1)
          |    transferTokenToSelf!(caller, tokenId!(foo), 1)
          |  }
          |}
@@ -4406,23 +4406,20 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
     }
 
-    {
-      info("Invalid argument type")
-      val code = barCode("caller")
+    def verifyInvalidArgumentType(func: String, assertValue: String) = {
+      val code = barCode(s"$func!(caller) == $assertValue")
       intercept[Throwable](createContract(code)).getMessage is
-        "org.alephium.ralph.Compiler$Error: Invalid argument type for tokenId, expected Contract, got Address"
+        s"org.alephium.ralph.Compiler$$Error: Invalid argument type for $func, expected Contract, got Address"
     }
 
-    {
-      info("Invalid number of arguments")
-      val code = barCode("1, caller")
+    def verifyInvalidNumberOfArguments(func: String, assertValue: String) = {
+      val code = barCode(s"$func!(1, caller) == $assertValue")
       intercept[Throwable](createContract(code)).getMessage is
-        "org.alephium.ralph.Compiler$Error: Invalid argument type for tokenId, expected Contract, got U256,Address"
+        s"org.alephium.ralph.Compiler$$Error: Invalid argument type for $func, expected Contract, got U256, Address"
     }
 
-    {
-      info("Transfer token by tokenId")
-      val bar        = barCode("foo")
+    def verifyTransferToken(func: String, assertValue: String) = {
+      val bar        = barCode(s"$func!(foo) == $assertValue")
       val (barId, _) = createContract(bar)
       val script =
         s"""
@@ -4438,6 +4435,27 @@ class VMSpec extends AlephiumSpec with Generators {
       val barState   = worldState.getContractState(barId).rightValue
       val barContractOutput = worldState.getContractOutput(barState.contractOutputRef).rightValue
       barContractOutput.tokens is AVector((TokenId.from(fooId), U256.One))
+    }
+
+    {
+      info("Invalid argument type")
+      verifyInvalidArgumentType("tokenId", s"#${fooId.toHexString}")
+      verifyInvalidArgumentType("contractId", s"#${fooId.toHexString}")
+      verifyInvalidArgumentType("contractAddress", s"@${fooAddress.toBase58}")
+    }
+
+    {
+      info("Invalid number of arguments")
+      verifyInvalidNumberOfArguments("tokenId", s"#${fooId.toHexString}")
+      verifyInvalidNumberOfArguments("contractId", s"#${fooId.toHexString}")
+      verifyInvalidNumberOfArguments("contractAddress", s"@${fooAddress.toBase58}")
+    }
+
+    {
+      info("Transfer token successfully")
+      verifyTransferToken("tokenId", s"#${fooId.toHexString}")
+      verifyTransferToken("contractId", s"#${fooId.toHexString}")
+      verifyTransferToken("contractAddress", s"@${fooAddress.toBase58}")
     }
   }
 

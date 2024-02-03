@@ -95,6 +95,7 @@ class RestServer(
       buildMultisigAddressLogic,
       buildMultisigLogic,
       buildSweepMultisigLogic,
+      buildMultiInputsTransactionLogic,
       submitMultisigTransactionLogic,
       getTransactionStatusLogic,
       getTransactionStatusLocalLogic,

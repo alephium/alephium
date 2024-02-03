@@ -21,6 +21,7 @@ import java.net.InetSocketAddress
 import scala.util.Random
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 
 import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
@@ -980,6 +981,253 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
+  "ServerUtils.buildMultiInputsTransaction" should "transfer a single input" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex            = ChainIndex.unsafe(0, 0)
+    val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val amount                = Amount(ALPH.oneAlph)
+    val destination           = Destination(generateAddress(chainIndex), amount)
+
+    val source = BuildMultiAddressesTransaction.Source(
+      fromPublicKey.bytes,
+      AVector(destination)
+    )
+
+    val buildTransaction = serverUtils
+      .buildMultiInputsTransaction(
+        blockFlow,
+        BuildMultiAddressesTransaction(AVector(source))
+      )
+      .rightValue
+
+    val unsignedTransaction =
+      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+
+    unsignedTransaction.inputs.length is 1
+    unsignedTransaction.fixedOutputs.length is 2
+  }
+
+  it should "transfer a multiple inputs" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val nbOfInputs             = 10
+    val chainIndex             = ChainIndex.unsafe(0, 0)
+    val (fromPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val amount                 = ALPH.alph(10)
+    val destination            = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph))
+
+    val inputPubKeys = AVector.fill(10)(chainIndex.to.generateKey._2)
+
+    inputPubKeys.foreach { pubKey =>
+      val block = transfer(blockFlow, fromPrivateKey, pubKey, amount)
+      addAndCheck(blockFlow, block)
+    }
+
+    val sources = inputPubKeys.map { pubKey =>
+      BuildMultiAddressesTransaction.Source(
+        pubKey.bytes,
+        AVector(destination)
+      )
+    }
+
+    val buildTransaction = serverUtils
+      .buildMultiInputsTransaction(
+        blockFlow,
+        BuildMultiAddressesTransaction(sources)
+      )
+      .rightValue
+
+    val unsignedTransaction =
+      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+
+    unsignedTransaction.inputs.length is nbOfInputs
+    unsignedTransaction.fixedOutputs.length is 1 + nbOfInputs
+  }
+
+  it should "fail with non unique inputs" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex            = ChainIndex.unsafe(0, 0)
+    val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val destination           = generateDestination(chainIndex)
+
+    val source = BuildMultiAddressesTransaction.Source(
+      fromPublicKey.bytes,
+      AVector(destination)
+    )
+
+    serverUtils
+      .buildMultiInputsTransaction(
+        blockFlow,
+        BuildMultiAddressesTransaction(AVector(source, source))
+      )
+      .leftValue
+      .detail is "Some addresses defined multiple time"
+  }
+
+  "ServerUtils.mergeAndprepareOutputInfos" should "with empty list" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+    serverUtils.mergeAndprepareOutputInfos(AVector.empty).rightValue is AVector
+      .empty[UnsignedTransaction.TxOutputInfo]
+  }
+
+  it should "merge simple destinations" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val destination = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils.mergeAndprepareOutputInfos(AVector.fill(i)(destination)).rightValue
+      outputs.length is 1
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector.empty[(TokenId, U256)]
+    }
+
+    val destination2 = Destination(generateAddress(chainIndex), Amount(ALPH.alph(2)))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils
+        .mergeAndprepareOutputInfos(
+          AVector.fill(i)(AVector(destination, destination2)).flatMap(identity)
+        )
+        .rightValue
+      outputs.length is 2
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector.empty[(TokenId, U256)]
+      outputs(1).attoAlphAmount is ALPH.alph(2 * i.toLong)
+      outputs(1).tokens is AVector.empty[(TokenId, U256)]
+    }
+  }
+
+  it should "merge tokens" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val tokenId1 = TokenId.random
+    val tokenId2 = TokenId.random
+
+    val tokens = AVector(Token(tokenId1, U256.One), Token(tokenId2, U256.Two))
+
+    val destination = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph), Some(tokens))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils.mergeAndprepareOutputInfos(AVector.fill(i)(destination)).rightValue
+      outputs.length is 1
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector(
+        (tokenId1, U256.unsafe(i)),
+        (tokenId2, U256.unsafe(2 * i.toLong))
+      )
+    }
+
+    val destination2 = Destination(generateAddress(chainIndex), Amount(ALPH.alph(2)), Some(tokens))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils
+        .mergeAndprepareOutputInfos(
+          AVector.fill(i)(AVector(destination, destination2)).flatMap(identity)
+        )
+        .rightValue
+      outputs.length is 2
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector(
+        (tokenId1, U256.unsafe(i)),
+        (tokenId2, U256.unsafe(2 * i.toLong))
+      )
+      outputs(1).attoAlphAmount is ALPH.alph(2 * i.toLong)
+      outputs(1).tokens is AVector(
+        (tokenId1, U256.unsafe(i)),
+        (tokenId2, U256.unsafe(2 * i.toLong))
+      )
+    }
+  }
+
+  it should "separate destinations with lockTime or message" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val destAddress = generateAddress(chainIndex)
+    val destination = Destination(destAddress, Amount(ALPH.oneAlph))
+    val destinationLockTime =
+      Destination(destAddress, Amount(ALPH.oneAlph), lockTime = Some(TimeStamp.now()))
+    val destinationMessage =
+      Destination(destAddress, Amount(ALPH.oneAlph), message = Some(ByteString.empty))
+    val destinationBoth = Destination(
+      destAddress,
+      Amount(ALPH.oneAlph),
+      lockTime = Some(TimeStamp.now()),
+      message = Some(ByteString.empty)
+    )
+
+    val destinations = AVector(
+      destination,
+      destination,
+      destinationLockTime,
+      destinationMessage,
+      destinationBoth
+    )
+
+    val outputs = serverUtils.mergeAndprepareOutputInfos(destinations).rightValue
+    outputs.length is 4
+    outputs(0).attoAlphAmount is ALPH.alph(2)
+
+    outputs(1).attoAlphAmount is ALPH.alph(1)
+    outputs(1).lockTime.isDefined is true
+    outputs(1).additionalDataOpt.isEmpty is true
+
+    outputs(2).attoAlphAmount is ALPH.alph(1)
+    outputs(2).lockTime.isEmpty is true
+    outputs(2).additionalDataOpt.isDefined is true
+
+    outputs(3).attoAlphAmount is ALPH.alph(1)
+    outputs(3).lockTime.isDefined is true
+    outputs(3).additionalDataOpt.isDefined is true
+  }
+
+  it should "work with only `complex` destinations" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val destAddress = generateAddress(chainIndex)
+    val destinationLockTime =
+      Destination(destAddress, Amount(ALPH.oneAlph), lockTime = Some(TimeStamp.now()))
+    val destinationMessage =
+      Destination(destAddress, Amount(ALPH.oneAlph), message = Some(ByteString.empty))
+    val destinationBoth = Destination(
+      destAddress,
+      Amount(ALPH.oneAlph),
+      lockTime = Some(TimeStamp.now()),
+      message = Some(ByteString.empty)
+    )
+
+    val destinations = AVector(
+      destinationLockTime,
+      destinationMessage,
+      destinationBoth
+    )
+
+    val outputs = serverUtils.mergeAndprepareOutputInfos(destinations).rightValue
+    outputs.length is 3
+
+    outputs(0).attoAlphAmount is ALPH.alph(1)
+    outputs(0).lockTime.isDefined is true
+    outputs(0).additionalDataOpt.isEmpty is true
+
+    outputs(1).attoAlphAmount is ALPH.alph(1)
+    outputs(1).lockTime.isEmpty is true
+    outputs(1).additionalDataOpt.isDefined is true
+
+    outputs(2).attoAlphAmount is ALPH.alph(1)
+    outputs(2).lockTime.isDefined is true
+    outputs(2).additionalDataOpt.isDefined is true
+  }
+
   trait CallContractFixture extends Fixture {
     val chainIndex    = ChainIndex.unsafe(0, 0)
     val lockupScript  = getGenesisLockupScript(chainIndex)
@@ -1060,7 +1308,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "call contract" in new CallContractFixture {
+  "ServerUtils.callContract" should "call contract" in new CallContractFixture {
     executeScript(callScript)
     checkContractStates(barId, U256.unsafe(1), minimalAlphInContract)
     checkContractStates(fooId, U256.unsafe(1), minimalAlphInContract + ALPH.oneNanoAlph)
@@ -2107,9 +2355,62 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val contract          = Compiler.compileContract(rawCode).rightValue
-    val (_, publicKey, _) = genesisKeys(0)
-    val fromAddress       = Address.p2pkh(publicKey)
+    val contract              = Compiler.compileContract(rawCode).rightValue
+    val (_, fromPublicKey, _) = genesisKeys(0)
+    val fromAddress           = Address.p2pkh(fromPublicKey)
+    val (_, toPublicKey, _)   = genesisKeys(1)
+    val toAddress             = Address.p2pkh(toPublicKey)
+
+    {
+      info("Without token issuance")
+      val codeRaw                        = Hex.toHexString(serialize(contract))
+      val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
+      val stateRaw                       = Hex.toHexString(serialize(initialFields))
+
+      val expected =
+        s"""
+           |TxScript Main {
+           |  createContract!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00)
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(expected).isRight is true
+      ServerUtils
+        .buildDeployContractScriptRawWithParsedState(
+          codeRaw,
+          fromAddress,
+          initialImmFields = initialFields,
+          initialMutFields = AVector.empty,
+          U256.unsafe(10),
+          AVector.empty,
+          None
+        ) is expected
+    }
+
+    {
+      info("Issue token and transfer to an address")
+      val codeRaw                        = Hex.toHexString(serialize(contract))
+      val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
+      val stateRaw                       = Hex.toHexString(serialize(initialFields))
+
+      val expected =
+        s"""
+           |TxScript Main {
+           |  createContractWithToken!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50, @$toAddress)
+           |  transferToken!{@$fromAddress -> ALPH: dustAmount!()}(@$fromAddress, @$toAddress, ALPH, dustAmount!())
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(expected).isRight is true
+      ServerUtils
+        .buildDeployContractScriptRawWithParsedState(
+          codeRaw,
+          fromAddress,
+          initialImmFields = initialFields,
+          initialMutFields = AVector.empty,
+          U256.unsafe(10),
+          AVector.empty,
+          Some((U256.unsafe(50), Some(toAddress)))
+        ) is expected
+    }
 
     {
       info("With approved tokens")
@@ -2134,7 +2435,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           initialMutFields = AVector.empty,
           U256.unsafe(10),
           AVector((token1, U256.unsafe(10)), (token2, U256.unsafe(20))),
-          Some(U256.unsafe(50))
+          Some((U256.unsafe(50), None))
         ) is expected
     }
 
@@ -2159,7 +2460,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           initialMutFields = AVector.empty,
           U256.unsafe(10),
           AVector.empty,
-          Some(U256.unsafe(50))
+          Some((U256.unsafe(50), None))
         ) is expected
     }
   }
@@ -2382,10 +2683,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
   }
 
-  it should "deploy contract with preapproved assets" in new Fixture {
+  trait ContractDeploymentFixture extends Fixture {
     val chainIndex                 = ChainIndex.unsafe(0, 0)
     val lockupScript               = getGenesisLockupScript(chainIndex)
     val (privateKey, publicKey, _) = genesisKeys(chainIndex.from.value)
+    val (_, toPublicKey)           = chainIndex.from.generateKey
     val code =
       s"""
          |Contract Foo() {
@@ -2394,6 +2696,29 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
     val contract = Compiler.compileContract(code).rightValue
 
+    implicit val serverUtils = new ServerUtils()
+    def buildDeployContractTx(query: BuildDeployContractTx): BuildDeployContractTxResult = {
+      val result = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
+      signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      result
+    }
+
+    def checkBalance(
+        lockupScript: LockupScript,
+        expectedAlphBalance: U256,
+        tokenId: TokenId,
+        expectedTokenBalance: Option[U256]
+    ) = {
+      val (alphAmount, _, tokens, _, _) =
+        blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
+      expectedAlphBalance is alphAmount
+      tokens.find(_._1 == tokenId).map(_._2) is expectedTokenBalance
+    }
+  }
+
+  it should "deploy contract with preapproved assets" in new ContractDeploymentFixture {
     def createToken(amount: U256): ContractId = {
       val issuanceInfo = Some(TokenIssuance.Info(vm.Val.U256(amount), Some(lockupScript)))
       val script =
@@ -2421,17 +2746,58 @@ class ServerUtilsSpec extends AlephiumSpec {
       initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
       initialTokenAmounts = Some(AVector(Token(tokenId, U256.unsafe(4))))
     )
-    implicit val serverUtils = new ServerUtils()
-    val result               = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
-    signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
-    val block = mineFromMemPool(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block)
 
-    val (alphAmount, _, tokens1, _, _) = blockFlow
-      .getBalance(LockupScript.P2C(result.contractAddress.contractId), defaultUtxoLimit, true)
-      .rightValue
-    alphAmount is ALPH.alph(2)
-    tokens1.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(4))
+    val result = buildDeployContractTx(query)
+
+    checkBalance(
+      LockupScript.P2C(result.contractAddress.contractId),
+      ALPH.alph(2),
+      tokenId,
+      Some(U256.unsafe(4))
+    )
+  }
+
+  it should "deploy contract with token issuance" in new ContractDeploymentFixture {
+    val query = BuildDeployContractTx(
+      fromPublicKey = publicKey.bytes,
+      bytecode = serialize(contract) ++ ByteString(0, 0),
+      initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
+      issueTokenAmount = Some(Amount(U256.unsafe(10))),
+      issueTokenTo = Some(Address.p2pkh(toPublicKey))
+    )
+
+    val result  = buildDeployContractTx(query)
+    val tokenId = TokenId.from(result.contractAddress.contractId)
+
+    checkBalance(
+      LockupScript.P2C(result.contractAddress.contractId),
+      ALPH.alph(2),
+      tokenId,
+      None
+    )
+
+    checkBalance(
+      LockupScript.p2pkh(toPublicKey),
+      dustUtxoAmount,
+      tokenId,
+      Some(U256.unsafe(10))
+    )
+  }
+
+  it should "fail when `issueTokenTo` is specified but `issueTokenAmount` is not" in new ContractDeploymentFixture {
+    val query = BuildDeployContractTx(
+      fromPublicKey = publicKey.bytes,
+      bytecode = serialize(contract) ++ ByteString(0, 0),
+      initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
+      issueTokenAmount = None,
+      issueTokenTo = Some(Address.p2pkh(publicKey))
+    )
+
+    serverUtils.buildDeployContractTx(blockFlow, query) is Left(
+      ApiError.BadRequest(
+        "`issueTokenTo` is specified, but `issueTokenAmount` is not specified"
+      )
+    )
   }
 
   private def generateDestination(

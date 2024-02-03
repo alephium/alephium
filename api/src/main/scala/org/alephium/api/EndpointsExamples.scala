@@ -422,6 +422,22 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
+  implicit val buildMultiAddressesTransactionExamples
+      : List[Example[BuildMultiAddressesTransaction]] =
+    List(
+      defaultExample(
+        BuildMultiAddressesTransaction(
+          AVector(
+            BuildMultiAddressesTransaction.Source(
+              publicKey.bytes,
+              defaultDestinations
+            )
+          ),
+          None
+        )
+      )
+    )
+
   implicit val buildSweepAddressTransactionExamples: List[Example[BuildSweepAddressTransactions]] =
     List(
       defaultExample(
@@ -676,6 +692,7 @@ trait EndpointsExamples extends ErrorExamples {
         Some(bigAmount),
         Some(tokens),
         Some(bigAmount),
+        Some(address),
         Some(model.minimalGas),
         Some(model.nonCoinbaseMinGasPrice)
       )
