@@ -2,7 +2,7 @@ FROM eclipse-temurin:17-jre
 
 ARG RELEASE=0.0.0
 
-RUN curl -L https://github.com/alephium/alephium/releases/download/v${RELEASE}/alephium-${RELEASE}.jar -o /alephium.jar && \
+RUN curl -L --proto "=https" https://github.com/alephium/alephium/releases/download/v${RELEASE}/alephium-${RELEASE}.jar -o /alephium.jar && \
   mkdir -p /alephium-home && usermod -d /alephium-home nobody && chown nobody /alephium-home && \
   mkdir -p ~nobody/.alephium && chown nobody ~nobody/.alephium && \
   mkdir -p ~nobody/.alephium-wallets && chown nobody ~nobody/.alephium-wallets

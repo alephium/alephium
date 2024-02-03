@@ -5,7 +5,7 @@ package:
 	sbt app/universal:packageBin
 
 docker:
-	sbt app/docker
+	sbt app/docker sbt tools/docker
 
 clean:
 	sbt clean
