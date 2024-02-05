@@ -18,7 +18,7 @@ package org.alephium.flow.validation
 
 import org.alephium.flow.core.{BlockFlow, BlockFlowGroupView}
 import org.alephium.flow.model.BlockFlowTemplate
-import org.alephium.io.IOError
+import org.alephium.io.{IOError, IOUtils}
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs, NetworkConfig}
 import org.alephium.protocol.mining.Emission
@@ -154,12 +154,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
             case result                       => from(result)
           }
           _ <- validateUncles(flow, chainIndex, block, uncleHeaders)
-          _ <-
-            if (isUncleDepsValid(block, flow, uncleHeaders)) {
-              validBlock(())
-            } else {
-              invalidBlock(InvalidUncleDeps)
-            }
+          _ <- checkUncleDeps(block, flow, uncleHeaders)
           _ <- uncleHeaders.foreachE(header => headerValidation.validate(header, flow))
         } yield ()
       } else if (uncleHashes.nonEmpty) {
@@ -212,12 +207,24 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
     }
   }
 
-  @inline private def isUncleDepsValid(
+  @inline private def checkUncleDeps(
       block: Block,
       flow: BlockFlow,
       uncles: AVector[BlockHeader]
-  ): Boolean = {
-    uncles.forall(uncle => flow.isExtendingUnsafe(block.blockDeps, uncle.blockDeps))
+  ): BlockValidationResult[Unit] = {
+    for {
+      isValid <- from(
+        IOUtils.tryExecute(
+          uncles.forall(uncle => flow.isExtendingUnsafe(block.blockDeps, uncle.blockDeps))
+        )
+      )
+      _ <-
+        if (isValid) {
+          validBlock(())
+        } else {
+          invalidBlock(InvalidUncleDeps)
+        }
+    } yield ()
   }
 
   private def checkTxs(

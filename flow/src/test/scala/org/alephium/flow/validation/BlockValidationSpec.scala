@@ -706,13 +706,13 @@ class BlockValidationSpec extends AlephiumSpec {
         blockTemplate.setUncles(AVector((validUncle.hash, miner), (invalidUncle.hash, miner)))
       )
     addAndCheck(blockFlow, uncle0, uncle1)
-    checkBlock(block0, blockFlow).leftValue is Right(InvalidUncles)
+    checkBlock(block0, blockFlow).leftValue is Right(InvalidUncleDeps)
 
     val block1 = mine(blockFlow, blockTemplate.setUncles(AVector((validUncle.hash, miner))))
     checkBlock(block1, blockFlow).isRight is true
 
     val block2 = mine(blockFlow, blockTemplate.setUncles(AVector((invalidUncle.hash, miner))))
-    checkBlock(block2, blockFlow).leftValue is Right(InvalidUncles)
+    checkBlock(block2, blockFlow).leftValue is Right(InvalidUncleDeps)
   }
 
   it should "validate block with valid uncles" in new GhostFixture {
