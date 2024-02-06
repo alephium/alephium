@@ -32,11 +32,14 @@ object ArrayTransformer {
       isUnused: Boolean,
       isLocal: Boolean,
       isGenerated: Boolean,
+      isTemplate: Boolean,
       varInfoBuilder: Compiler.VarInfoBuilder,
       getIndex: () => Byte,
       increaseIndex: () => Unit
   ): ArrayRef[Ctx] = {
-    val offset = if (isLocal) {
+    val offset = if (isTemplate) {
+      ConstantArrayVarOffset[Ctx](getIndex().toInt)
+    } else if (isLocal) {
       ConstantArrayVarOffset[Ctx](state.currentScopeState.varIndex)
     } else if (isMutable) {
       ConstantArrayVarOffset[Ctx](state.mutFieldsIndex)
@@ -50,11 +53,12 @@ object ArrayTransformer {
       isMutable,
       isUnused,
       isLocal,
+      isTemplate,
       varInfoBuilder,
       getIndex,
       increaseIndex
     )
-    val ref = ArrayRef[Ctx](isLocal, isMutable, tpe, offset)
+    val ref = ArrayRef[Ctx](isLocal, isMutable, isTemplate, tpe, offset)
     state.addArrayRef(Ident(baseName), isMutable, isUnused, isGenerated, ref)
     ref
   }
@@ -67,6 +71,7 @@ object ArrayTransformer {
       isMutable: Boolean,
       isUnused: Boolean,
       isLocal: Boolean,
+      isTemplate: Boolean,
       varInfoBuilder: Compiler.VarInfoBuilder,
       getIndex: () => Byte,
       increaseIndex: () => Unit
@@ -82,6 +87,7 @@ object ArrayTransformer {
             isMutable,
             isUnused,
             isLocal,
+            isTemplate,
             varInfoBuilder,
             getIndex,
             increaseIndex
@@ -97,6 +103,7 @@ object ArrayTransformer {
             isUnused,
             isLocal,
             isGenerated = true,
+            isTemplate,
             varInfoBuilder,
             getIndex,
             increaseIndex
@@ -151,6 +158,7 @@ object ArrayTransformer {
   final case class ArrayRef[Ctx <: StatelessContext](
       isLocal: Boolean,
       isMutable: Boolean,
+      isTemplate: Boolean,
       tpe: Type.FixedSizeArray,
       offset: ArrayVarOffset[Ctx]
   ) {
@@ -177,7 +185,7 @@ object ArrayTransformer {
         case VariableArrayVarOffset(instrs) =>
           offset.add(instrs ++ Seq(ConstInstr.u256(Val.U256.unsafe(flattenSize)), U256Mul))
       }
-      ArrayRef(isLocal, isMutable, baseType, newOffset)
+      ArrayRef(isLocal, isMutable, isTemplate, baseType, newOffset)
     }
 
     private def calcOffset(
@@ -227,16 +235,12 @@ object ArrayTransformer {
               ConstInstr.u256(Val.U256(U256.unsafe(idx))),
               U256Add
             )
-            state.genLoadCode(VariableArrayVarOffset(calcOffsetCode), isLocal, isMutable)
+            state.genLoadCode(this, VariableArrayVarOffset(calcOffsetCode))
           }
           codes ++ loadCodes
         case ConstantArrayVarOffset(value) =>
           (0 until flattenSize).flatMap(idx =>
-            state.genLoadCode(
-              ConstantArrayVarOffset(value + idx),
-              isLocal,
-              isMutable
-            )
+            state.genLoadCode(this, ConstantArrayVarOffset(value + idx))
           )
       }
     }
@@ -262,7 +266,7 @@ object ArrayTransformer {
     }
 
     def genLoadCode(state: Compiler.State[Ctx], indexes: Seq[Ast.Expr[Ctx]]): Seq[Instr[Ctx]] = {
-      state.genLoadCode(calcOffset(state, indexes), isLocal, isMutable)
+      state.genLoadCode(this, calcOffset(state, indexes))
     }
 
     def genStoreCode(

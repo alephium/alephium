@@ -2414,6 +2414,68 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     script.toTemplateString() is "0101030001000c{3}1700{0}{1}{2}a3{0}{2}0e0c16000100"
   }
 
+  it should "test template array variables" in {
+    {
+      info("Gen code for template array variables")
+      val code =
+        s"""
+           |TxScript Main(address: Address, numbers0: [[U256; 2]; 2], bytes: ByteVec, numbers1: [U256; 3]) {
+           |  let _ = bytes
+           |  let _ = address
+           |  assert!(numbers0[1][1] == 0 && numbers0[0][0] == 0, 0)
+           |  let _ = numbers0[1]
+           |  assert!(numbers1[2] == 0 && numbers1[1] == 0 && numbers1[0] == 0, 0)
+         }
+           |""".stripMargin
+      val script = Compiler.compileTxScript(code).rightValue
+      script.toTemplateString() is "0101030000001e{5}18{0}18{4}0c2f{1}0c2f1a0c7b{3}{4}1818{8}0c2f{7}0c2f1a{6}0c2f1a0c7b"
+    }
+
+    {
+      info("Throw an error if the index is not constant")
+      val code =
+        s"""
+           |TxScript Main(number: [U256; 3]) {
+           |  for (let mut i = 0; i < 3; i = i + 1) {
+           |    let _ = number[i]
+           |  }
+           |}
+           |""".stripMargin
+      Compiler
+        .compileTxScript(code)
+        .leftValue
+        .message is "Expected constant index for template variable"
+    }
+
+    {
+      info("Throw an error if the index is greater than max var index")
+      val code =
+        s"""
+           |TxScript Main(number: [U256; 3]) {
+           |  let _ = number[257]
+           |}
+           |""".stripMargin
+      Compiler
+        .compileTxScript(code)
+        .leftValue
+        .message is "Invalid array index 257, it must be within the range [0, 255)"
+    }
+
+    {
+      info("Throw an error if the number of template variables exceeds the limit")
+      val code =
+        s"""
+           |TxScript Main(numbers0: [U256; 128], numbers1: [U256; 128]) {
+           |  return
+           |}
+           |""".stripMargin
+      Compiler
+        .compileTxScript(code)
+        .leftValue
+        .message is "Number of template variables more than 255"
+    }
+  }
+
   it should "use ApproveAlph instr for approve ALPH" in {
     val code =
       s"""

@@ -992,12 +992,21 @@ object Ast {
       table
     }
 
+    private def addTemplateVars(state: Compiler.State[Ctx]): Unit = {
+      val index = templateVars.foldLeft(0) { case (index, templateVar) =>
+        state.addTemplateVariable(templateVar.ident, templateVar.tpe, index)
+      }
+      if (index >= Compiler.State.maxVarIndex) {
+        throw Compiler.Error(
+          s"Number of template variables more than ${Compiler.State.maxVarIndex}"
+        )
+      }
+    }
+
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setCheckPhase()
       state.checkArguments(fields)
-      templateVars.zipWithIndex.foreach { case (temp, index) =>
-        state.addTemplateVariable(temp.ident, temp.tpe, index)
-      }
+      addTemplateVars(state)
       fields.foreach(field =>
         state.addFieldVariable(
           field.ident,
