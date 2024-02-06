@@ -62,7 +62,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def getUsedUnclesAndAncestorsUnsafe(
-      header: BlockHeader
+      parentHeader: BlockHeader
   ): (AVector[BlockHash], AVector[BlockHash]) = {
     @tailrec
     def iter(
@@ -87,13 +87,13 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         }
       }
     }
-    iter(header.hash, ALPH.MaxUncleAge, AVector.empty, AVector.empty)
+    iter(parentHeader.hash, ALPH.MaxUncleAge, AVector.empty, AVector.empty)
   }
 
   def getUsedUnclesAndAncestors(
-      header: BlockHeader
+      parentHeader: BlockHeader
   ): IOResult[(AVector[BlockHash], AVector[BlockHash])] = {
-    IOUtils.tryExecute(getUsedUnclesAndAncestorsUnsafe(header))
+    IOUtils.tryExecute(getUsedUnclesAndAncestorsUnsafe(parentHeader))
   }
 
   def selectUnclesUnsafe(
