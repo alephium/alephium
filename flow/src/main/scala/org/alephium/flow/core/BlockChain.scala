@@ -82,6 +82,25 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def getHashesUnsafe(header: BlockHeader, acc: AVector[BlockHash]): AVector[BlockHash] = {
+    val hardFork = networkConfig.getHardFork(header.timestamp)
+    if (hardFork.isGhostEnabled()) {
+      val block = getBlockUnsafe(header.hash)
+      val uncles = block.uncleHashes match {
+        case Right(hashes) => hashes
+        case Left(error)   => throw error
+      }
+      val newAcc = if (acc.contains(header.hash)) acc else acc :+ header.hash
+      uncles.fold(newAcc) { case (acc, uncleHash) =>
+        val uncleHeader = getBlockHeaderUnsafe(uncleHash)
+        getHashesUnsafe(uncleHeader, acc)
+      }
+    } else {
+      acc :+ header.hash
+    }
+  }
+
   // heightFrom is exclusive, heightTo is inclusive
   def getSyncDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
     @tailrec
@@ -91,10 +110,11 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         acc: AVector[BlockHash]
     ): AVector[BlockHash] = {
       if (currentHeight <= heightFrom) {
-        acc :+ currentHeader.hash
+        getHashesUnsafe(currentHeader, acc)
       } else {
+        val newAcc       = getHashesUnsafe(currentHeader, acc)
         val parentHeader = getBlockHeaderUnsafe(currentHeader.parentHash)
-        iter(parentHeader, currentHeight - 1, acc :+ currentHeader.hash)
+        iter(parentHeader, currentHeight - 1, newAcc)
       }
     }
 
@@ -103,7 +123,21 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   }
 
   def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
-    AVector.from(heightFrom to heightTo).flatMap(getHashesUnsafe)
+    // For a block with a height from `heightFrom` to `uncleHeightTo`, its uncle's height may lower than `heightFrom`
+    val uncleHeightTo = math.min(heightFrom + ALPH.MaxUncleAge - 1, heightTo)
+    val hashes = AVector.from(heightFrom to uncleHeightTo).fold(AVector.empty[BlockHash]) {
+      case (acc, height) =>
+        val hashes = getHashesUnsafe(height)
+        hashes.fold(acc) { case (acc, hash) =>
+          val header = getBlockHeaderUnsafe(hash)
+          getHashesUnsafe(header, acc)
+        }
+    }
+    if (uncleHeightTo < heightTo) {
+      hashes ++ AVector.from((uncleHeightTo + 1) to heightTo).flatMap(getHashesUnsafe)
+    } else {
+      hashes
+    }
   }
 
   def getUsedUnclesAndAncestorsUnsafe(

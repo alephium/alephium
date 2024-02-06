@@ -799,4 +799,100 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       chain.getHeight(block.hash).isE(height + 1)
     })
   }
+
+  trait GetSyncDataFixture extends Fixture {
+    val chainIndex   = genesis.chainIndex
+    val lockupScript = assetLockupGen(chainIndex.to).sample.get
+    val blockChain   = buildBlockChain()
+
+    var main  = AVector.empty[Block]
+    var fork0 = AVector.empty[Block]
+    var fork1 = AVector.empty[Block]
+
+    def createBlockChain(length: Int): Unit = {
+      (0 until length).foreach { _ =>
+        val now = TimeStamp.now()
+        val block = blockGen(
+          chainIndex,
+          now,
+          main.lastOption.getOrElse(genesis).hash,
+          fork0.lastOption
+            .map(block => AVector((block.hash, lockupScript)))
+            .getOrElse(AVector.empty)
+        ).sample.get
+        val fork0Block = blockGen(
+          chainIndex,
+          now,
+          fork0.lastOption.getOrElse(genesis).hash,
+          fork1.lastOption
+            .map(block => AVector((block.hash, lockupScript)))
+            .getOrElse(AVector.empty)
+        ).sample.get
+        val fork1Block =
+          blockGen(chainIndex, now, fork1.lastOption.getOrElse(genesis).hash).sample.get
+        main = main :+ block
+        fork0 = fork0 :+ fork0Block
+        fork1 = fork1 :+ fork1Block
+      }
+    }
+
+    def getHashesAtHeight(height: Int): AVector[BlockHash] = {
+      assume(height <= main.length)
+      val index = height - 1
+      AVector(main(index).hash, fork0(index).hash, fork1(index).hash)
+    }
+  }
+
+  it should "get sync data" in new GetSyncDataFixture {
+    val length = ALPH.MaxUncleAge + 1
+    createBlockChain(length)
+
+    val uncles = AVector((fork1(length - 2).hash, lockupScript))
+    val block  = blockGen(chainIndex, TimeStamp.now(), main.last.hash, uncles).sample.get
+    block.uncleHashes.rightValue is fork0.last.uncleHashes.rightValue
+    // make sure `main` is the canonical chain
+    addBlocks(blockChain, (main :+ block) ++ fork0 ++ fork1)
+
+    val result0 = blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, length)
+    result0.length is 21
+    val expected =
+      (AVector(main.head, fork0.head, main(1)) ++ AVector.from(2 until length).flatMap { index =>
+        AVector(fork1(index - 2), fork0(index - 1), main(index))
+      }).map(_.hash)
+    result0 is expected
+
+    val result1 = blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, length + 1)
+    result1 is (result0.filter(_ != uncles.head._1) ++ AVector(uncles.head._1, block.hash))
+  }
+
+  it should "get recent data" in new GetSyncDataFixture {
+    val length = ALPH.MaxUncleAge + 1
+    createBlockChain(length)
+
+    val uncles = AVector((fork1.last.hash, lockupScript))
+    val block0 = blockGen(chainIndex, TimeStamp.now(), main.last.hash, uncles).sample.get
+    addBlocks(blockChain, (main :+ block0) ++ fork0 ++ fork1)
+
+    blockChain.getRecentDataUnsafe(length - 1, length) is
+      AVector(main(length - 2).hash, fork0(length - 3).hash, fork1(length - 4).hash) ++
+      AVector(fork0(length - 2).hash, fork1(length - 3).hash, fork1(length - 2).hash) ++
+      getHashesAtHeight(length)
+
+    val result0 = blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, length - 1)
+    result0 is AVector.from(1 to (length - 1)).flatMap(getHashesAtHeight)
+
+    val result1 = blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, length)
+    result1 is AVector.from(1 to length).flatMap(getHashesAtHeight)
+
+    val result2 = blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, length + 1)
+    result2 is (result1 :+ block0.hash)
+
+    // `main` and `fork0` has same uncles at height `length + 1`
+    val block2 = blockGen(chainIndex, TimeStamp.now(), fork0.last.hash, uncles).sample.get
+    val block3 = blockGen(chainIndex, TimeStamp.now(), block0.hash).sample.get
+    addBlocks(blockChain, AVector(block3, block2))
+
+    val result3 = blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, length + 1)
+    result3 is (result1 ++ AVector(block0.hash, block2.hash))
+  }
 }
