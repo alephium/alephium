@@ -17,6 +17,7 @@
 package org.alephium.flow.core
 
 import scala.collection.mutable.ArrayBuffer
+import scala.util.Random
 
 import org.scalatest.BeforeAndAfter
 import org.scalatest.EitherValues._
@@ -643,7 +644,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     def createBlockChain(length: Int): BlockChain = {
       val chain  = buildBlockChain()
       val blocks = chainGenOf(chainIndex, length, genesis.hash, TimeStamp.now()).sample.get
-      addBlocks(chain, blocks.tail)
+      addBlocks(chain, blocks)
       chain
     }
 
@@ -801,6 +802,19 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       addBlock(chain, block)
       chain.getHeight(block.hash).isE(height + 1)
     })
+  }
+
+  it should "select uncles and calc the block diff" in new GhostFixture {
+    val length = ALPH.MaxUncleAge + 1
+    val chain  = createBlockChain(length)
+    chain.maxHeightUnsafe is length
+    val parentHeight = Random.between(1, length - 2)
+    val parentHash   = chain.getHashesUnsafe(parentHeight).head
+    val uncle        = blockGen(chainIndex, TimeStamp.now(), parentHash).sample.get
+    addBlock(chain, uncle)
+    val bestTip        = chain.getBestTipUnsafe()
+    val selectedUncles = chain.selectUnclesUnsafe(chain.getBlockHeaderUnsafe(bestTip), _ => true)
+    selectedUncles is AVector((uncle.hash, uncle.minerLockupScript, length - parentHeight))
   }
 
   trait GetSyncDataFixture extends Fixture {
