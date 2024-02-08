@@ -256,7 +256,7 @@ class BlockValidationSpec extends AlephiumSpec {
     val consensusConfig    = consensusConfigs.getConsensusConfig(block.timestamp)
     val miningReward       = consensusConfig.emission.reward(block.header).miningReward
     val lockedAmount       = miningReward
-    implicit val validator = (blk: Block) => checkLockedReward(blk, lockedAmount)
+    implicit val validator = (blk: Block) => checkLockedReward(blk, AVector(lockedAmount))
 
     info("valid")
     block.pass()
