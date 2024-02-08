@@ -426,7 +426,7 @@ trait FlowFixture
       chainIndex: ChainIndex,
       txs: AVector[Transaction],
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHash, LockupScript.Asset)] = AVector.empty
+      uncles: AVector[(BlockHash, LockupScript.Asset, Int)] = AVector.empty
   ): Block = {
     val deps             = blockFlow.calBestDepsUnsafe(chainIndex.from)
     val (_, toPublicKey) = chainIndex.to.generateKey
@@ -451,7 +451,7 @@ trait FlowFixture
   }
 
   implicit class RichBlockFlowTemplate(template: BlockFlowTemplate) {
-    def setUncles(uncles: AVector[(BlockHash, LockupScript.Asset)]): BlockFlowTemplate = {
+    def setUncles(uncles: AVector[(BlockHash, LockupScript.Asset, Int)]): BlockFlowTemplate = {
       val txs   = template.transactions.init
       val miner = template.transactions.last.unsigned.fixedOutputs.head.lockupScript
       val coinbaseTx = Transaction.coinbase(

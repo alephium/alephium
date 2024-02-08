@@ -34,7 +34,7 @@ final case class BlockFlowTemplate(
 
   def rebuild(
       txs: AVector[Transaction],
-      uncles: AVector[(BlockHash, LockupScript.Asset)],
+      uncles: AVector[(BlockHash, LockupScript.Asset, Int)],
       miner: LockupScript.Asset
   )(implicit
       consensusConfigs: ConsensusConfigs,

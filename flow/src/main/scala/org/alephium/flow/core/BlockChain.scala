@@ -178,15 +178,15 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
   def selectUnclesUnsafe(
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
-  ): AVector[(BlockHash, LockupScript.Asset)] = {
+  ): AVector[(BlockHash, LockupScript.Asset, Int)] = {
     @tailrec
     def iter(
         fromHeader: BlockHeader,
         num: Int,
         usedUncles: AVector[BlockHash],
         ancestors: AVector[BlockHash],
-        unclesAcc: AVector[(BlockHash, LockupScript.Asset)]
-    ): AVector[(BlockHash, LockupScript.Asset)] = {
+        unclesAcc: AVector[(BlockHash, LockupScript.Asset, Int)]
+    ): AVector[(BlockHash, LockupScript.Asset, Int)] = {
       if (fromHeader.isGenesis || num == 0 || unclesAcc.length >= ALPH.MaxUncleSize) {
         unclesAcc
       } else {
@@ -199,7 +199,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
               ancestors.exists(_ == uncle.parentHash) &&
               validator(uncle.header)
           )
-          .map(block => (block.hash, block.minerLockupScript))
+          .map(block => (block.hash, block.minerLockupScript, height))
         val parentHeader = getBlockHeaderUnsafe(fromHeader.parentHash)
         iter(parentHeader, num - 1, usedUncles, ancestors, unclesAcc ++ selected)
       }
@@ -207,13 +207,14 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
     val (usedUncles, ancestors) = getUsedUnclesAndAncestorsUnsafe(parentHeader)
     val availableUncles = iter(parentHeader, ALPH.MaxUncleAge, usedUncles, ancestors, AVector.empty)
-    availableUncles.takeUpto(ALPH.MaxUncleSize)
+    val blockHeight     = getHeightUnsafe(parentHeader.hash) + 1
+    availableUncles.takeUpto(ALPH.MaxUncleSize).map(u => (u._1, u._2, blockHeight - u._3))
   }
 
   def selectUncles(
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
-  ): IOResult[AVector[(BlockHash, LockupScript.Asset)]] = {
+  ): IOResult[AVector[(BlockHash, LockupScript.Asset, Int)]] = {
     IOUtils.tryExecute(selectUnclesUnsafe(parentHeader, validator))
   }
 

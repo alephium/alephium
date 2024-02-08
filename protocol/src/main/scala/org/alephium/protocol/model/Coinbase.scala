@@ -38,9 +38,57 @@ object Coinbase {
     }
   }
 
-  def uncleReward(miningReward: U256): U256 = {
-    // FIXME
-    miningReward
+  @inline
+  def calcMainChainReward(miningReward: U256): U256 = {
+    val numerator   = U256.unsafe(100 * 8 * 32)
+    val denominator = U256.unsafe(5 * 7 * 33 + 95 * 8 * 32)
+    miningReward.mulUnsafe(numerator).divUnsafe(denominator)
+  }
+
+  @inline
+  def calcUncleReward(mainChainReward: U256, heightDiff: Int): U256 = {
+    assume(heightDiff > 0 && heightDiff < 8)
+    val numerator = U256.unsafe(8 - heightDiff)
+    mainChainReward.mulUnsafe(numerator).divUnsafe(U256.unsafe(8))
+  }
+
+  @inline
+  def calcBlockReward(mainChainReward: U256, uncleRewards: AVector[U256]): U256 = {
+    val inclusionReward = uncleRewards.fold(U256.Zero)(_ addUnsafe _).divUnsafe(U256.unsafe(32))
+    mainChainReward.addUnsafe(inclusionReward)
+  }
+
+  def coinbaseOutputsPreGhost(
+      coinbaseData: CoinbaseData,
+      miningReward: U256,
+      lockupScript: LockupScript.Asset,
+      lockTime: TimeStamp
+  )(implicit networkConfig: NetworkConfig): AVector[AssetOutput] = {
+    AVector(
+      AssetOutput(miningReward, lockupScript, lockTime, AVector.empty, serialize(coinbaseData))
+    )
+  }
+
+  def coinbaseOutputsGhost(
+      coinbaseData: CoinbaseData,
+      miningReward: U256,
+      lockupScript: LockupScript.Asset,
+      lockTime: TimeStamp,
+      uncleMiners: AVector[(BlockHash, LockupScript.Asset, Int)]
+  )(implicit networkConfig: NetworkConfig): AVector[AssetOutput] = {
+    val mainChainReward = calcMainChainReward(miningReward)
+    val uncleRewardOutputs = uncleMiners.map { case (_, uncleLockupScript, heightDiff) =>
+      val uncleReward = calcUncleReward(mainChainReward, heightDiff)
+      AssetOutput(uncleReward, uncleLockupScript, lockTime, AVector.empty, ByteString.empty)
+    }
+    val blockRewardOutput = AssetOutput(
+      calcBlockReward(mainChainReward, uncleRewardOutputs.map(_.amount)),
+      lockupScript,
+      lockTime,
+      AVector.empty,
+      serialize(coinbaseData)
+    )
+    blockRewardOutput +: uncleRewardOutputs
   }
 
   // scalastyle:off parameter.number
@@ -48,16 +96,18 @@ object Coinbase {
       coinbaseData: CoinbaseData,
       miningReward: U256,
       lockupScript: LockupScript.Asset,
-      lockTime: TimeStamp,
-      uncleMiners: AVector[LockupScript.Asset]
+      blockTs: TimeStamp,
+      uncleMiners: AVector[(BlockHash, LockupScript.Asset, Int)]
   )(implicit networkConfig: NetworkConfig): Transaction = {
-    val txOutput =
-      AssetOutput(miningReward, lockupScript, lockTime, AVector.empty, serialize(coinbaseData))
-    val uncleRewardOutputs = uncleMiners.map(
-      AssetOutput(uncleReward(miningReward), _, lockTime, AVector.empty, ByteString.empty)
-    )
+    val lockTime = blockTs + networkConfig.coinbaseLockupPeriod
+    val hardFork = networkConfig.getHardFork(blockTs)
+    val outputs = if (hardFork.isGhostEnabled()) {
+      coinbaseOutputsGhost(coinbaseData, miningReward, lockupScript, lockTime, uncleMiners)
+    } else {
+      coinbaseOutputsPreGhost(coinbaseData, miningReward, lockupScript, lockTime)
+    }
     Transaction(
-      UnsignedTransaction.coinbase(AVector.empty, txOutput +: uncleRewardOutputs),
+      UnsignedTransaction.coinbase(AVector.empty, outputs),
       scriptExecutionOk = true,
       contractInputs = AVector.empty,
       generatedOutputs = AVector.empty,
@@ -74,11 +124,10 @@ object Coinbase {
       minerData: ByteString,
       target: Target,
       blockTs: TimeStamp,
-      uncles: AVector[(BlockHash, LockupScript.Asset)]
+      uncles: AVector[(BlockHash, LockupScript.Asset, Int)]
   )(implicit emissionConfig: EmissionConfig, networkConfig: NetworkConfig): Transaction = {
     val coinbaseData = CoinbaseData.from(chainIndex, blockTs, uncles.map(_._1), minerData)
-    val lockTime     = blockTs + networkConfig.coinbaseLockupPeriod
     val reward       = miningReward(gasFee, target, blockTs)
-    build(coinbaseData, reward, lockupScript, lockTime, uncles.map(_._2))
+    build(coinbaseData, reward, lockupScript, blockTs, uncles)
   }
 }

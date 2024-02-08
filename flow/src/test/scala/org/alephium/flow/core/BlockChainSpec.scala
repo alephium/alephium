@@ -675,7 +675,9 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
           AVector.empty
         }
         val unclePairs =
-          uncleHashes.map(hash => (hash: BlockHash, chain.getBlockUnsafe(hash).minerLockupScript))
+          uncleHashes.map(hash =>
+            (hash: BlockHash, chain.getBlockUnsafe(hash).minerLockupScript, 1)
+          )
         val block     = blockGen(chainIndex, TimeStamp.now(), parentHash, unclePairs).sample.get
         val uncleGen  = blockGen(block.chainIndex, block.timestamp, block.parentHash)
         val uncleSize = if (k == length) 0 else ALPH.MaxUncleSize // no uncles for the latest block
@@ -746,9 +748,10 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
         val selectedUncles = chain.selectUncles(currentBlock.header, _ => true).rightValue
         selectedUncles.length is ALPH.MaxUncleSize
-        selectedUncles.foreach { case (hash, miner) =>
+        selectedUncles.foreach { case (hash, miner, heightDiff) =>
           miner is chain.getBlockUnsafe(hash).coinbase.unsigned.fixedOutputs(0).lockupScript
           chain.getHeightUnsafe(hash) is height
+          heightDiff is 1
         }
       })
     }
@@ -817,7 +820,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
           now,
           main.lastOption.getOrElse(genesis).hash,
           fork0.lastOption
-            .map(block => AVector((block.hash, lockupScript)))
+            .map(block => AVector((block.hash, lockupScript, 1)))
             .getOrElse(AVector.empty)
         ).sample.get
         val fork0Block = blockGen(
@@ -825,7 +828,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
           now,
           fork0.lastOption.getOrElse(genesis).hash,
           fork1.lastOption
-            .map(block => AVector((block.hash, lockupScript)))
+            .map(block => AVector((block.hash, lockupScript, 1)))
             .getOrElse(AVector.empty)
         ).sample.get
         val fork1Block =
@@ -847,7 +850,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val length = ALPH.MaxUncleAge + 1
     createBlockChain(length)
 
-    val uncles = AVector((fork1(length - 2).hash, lockupScript))
+    val uncles = AVector((fork1(length - 2).hash, lockupScript, 1))
     val block  = blockGen(chainIndex, TimeStamp.now(), main.last.hash, uncles).sample.get
     block.uncleHashes.rightValue is fork0.last.uncleHashes.rightValue
     // make sure `main` is the canonical chain
@@ -869,7 +872,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val length = ALPH.MaxUncleAge + 1
     createBlockChain(length)
 
-    val uncles = AVector((fork1.last.hash, lockupScript))
+    val uncles = AVector((fork1.last.hash, lockupScript, 1))
     val block0 = blockGen(chainIndex, TimeStamp.now(), main.last.hash, uncles).sample.get
     addBlocks(blockChain, (main :+ block0) ++ fork0 ++ fork1)
 

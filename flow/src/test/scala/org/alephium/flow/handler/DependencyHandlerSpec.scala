@@ -314,7 +314,7 @@ class DependencyHandlerSpec extends AlephiumActorSpec {
       val parentIndex = brokerConfig.groups - 1 + chainIndex.to.value
       val newDeps     = template0.deps.replace(parentIndex, parentHash)
       val uncles =
-        uncleHashes.map(hash => (hash, blockFlow0.getBlockUnsafe(hash).minerLockupScript))
+        uncleHashes.map(hash => (hash, blockFlow0.getBlockUnsafe(hash).minerLockupScript, 1))
       val template1 = template0
         .rebuild(template0.transactions.init, uncles, lockupScript)
         .copy(
