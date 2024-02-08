@@ -153,9 +153,8 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
             case Left(IOError.KeyNotFound(_)) => invalidBlock(UncleDoesNotExist)
             case result                       => from(result)
           }
-          _ <- validateUncles(flow, chainIndex, block, uncleBlocks)
-          _ <- checkUncleDeps(block, flow, uncleBlocks)
-          _ <- uncleBlocks.foreachE(block => headerValidation.validate(block.header, flow))
+          _            <- validateUncles(flow, chainIndex, block, uncleBlocks)
+          _            <- checkUncleDeps(block, flow, uncleBlocks)
           blockHeight  <- from(blockchain.getHeight(block.uncleHash(chainIndex.to)).map(_ + 1))
           uncleHeights <- from(uncleHashes.mapE(blockchain.getHeight))
         } yield uncleBlocks.zipWithIndex.map { case (uncleBlock, index) =>
