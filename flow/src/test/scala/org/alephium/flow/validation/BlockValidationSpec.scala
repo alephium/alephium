@@ -251,7 +251,9 @@ class BlockValidationSpec extends AlephiumSpec {
     block.Coinbase.output(_.copy(additionalData = wrongFormat)).fail(InvalidCoinbaseData)
   }
 
-  it should "check coinbase locked amount" in new Fixture {
+  it should "check coinbase locked amount pre-ghost" in new Fixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     val block              = emptyBlock(blockFlow, chainIndex)
     val consensusConfig    = consensusConfigs.getConsensusConfig(block.timestamp)
     val miningReward       = consensusConfig.emission.reward(block.header).miningReward
@@ -708,7 +710,7 @@ class BlockValidationSpec extends AlephiumSpec {
     addAndCheck(blockFlow, uncle0, uncle1)
     checkBlock(block0, blockFlow).leftValue is Right(InvalidUncleDeps)
 
-    val block1 = mine(blockFlow, blockTemplate.setUncles(AVector((validUncle.hash, miner, 1))))
+    val block1 = mine(blockFlow, blockTemplate.setUncles(AVector((validUncle.hash, miner, 2))))
     checkBlock(block1, blockFlow).isRight is true
 
     val block2 = mine(blockFlow, blockTemplate.setUncles(AVector((invalidUncle.hash, miner, 1))))
@@ -720,11 +722,12 @@ class BlockValidationSpec extends AlephiumSpec {
     val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     blockTemplate.uncleHashes.length is ALPH.MaxUncleSize
     (0 until blockTemplate.uncleHashes.length).foreach { size =>
-      val block =
-        mine(
-          blockFlow,
-          blockTemplate.setUncles(blockTemplate.uncleHashes.take(size).map((_, miner, 1)))
-        )
+      val uncleHashes = blockTemplate.uncleHashes.take(size)
+      val uncleMiners = uncleHashes.map { hash =>
+        val lockupScript = blockFlow.getBlockUnsafe(hash).minerLockupScript
+        (hash, lockupScript, 1)
+      }
+      val block = mine(blockFlow, blockTemplate.setUncles(uncleMiners))
       checkBlock(block, blockFlow).isRight is true
     }
   }

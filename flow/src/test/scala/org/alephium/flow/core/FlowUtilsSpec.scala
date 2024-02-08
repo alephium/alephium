@@ -201,43 +201,56 @@ class FlowUtilsSpec extends AlephiumSpec {
   it should "prepare block with correct coinbase reward for ghost hardfork" in new CoinbaseRewardFixture {
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
     val emptyBlock = mineFromMemPool(blockFlow, chainIndex)
-    emptyBlock.coinbaseReward is consensusConfigs.ghost.emission
+    val miningReward = consensusConfigs.ghost.emission
       .reward(emptyBlock.header)
       .miningReward
-    emptyBlock.coinbaseReward is (ALPH.alph(30) / 9 / 4)
+    miningReward is (ALPH.alph(30) / 9 / 4)
+    emptyBlock.coinbase.unsigned.fixedOutputs.length is 1
+    val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+    emptyBlock.coinbaseReward is mainChainReward
     addAndCheck(blockFlow, emptyBlock)
 
     val transferBlock = newTransferBlock()
-    transferBlock.coinbaseReward is consensusConfigs.ghost.emission
-      .reward(transferBlock.header)
-      .miningReward
+    transferBlock.coinbaseReward is Coinbase.calcMainChainReward(miningReward)
     addAndCheck(blockFlow, transferBlock)
 
-    // TODO: add more tests for uncle miner rewards
-  }
-
-  it should "prepare block with correct coinbase reward" in new FlowFixture {
-    val chainIndex      = ChainIndex.unsafe(0, 0)
-    val emptyBlock      = mineFromMemPool(blockFlow, chainIndex)
-    val consensusConfig = consensusConfigs.getConsensusConfig(emptyBlock.timestamp)
-    emptyBlock.coinbaseReward is consensusConfig.emission
-      .reward(emptyBlock.header)
-      .miningReward
-    emptyBlock.coinbaseReward is (ALPH.alph(30) / 9 / 4)
-    addAndCheck(blockFlow, emptyBlock)
-
-    // generate the block using mineFromMemPool as it uses FlowUtils.prepareBlockFlow
-    val transferBlock = {
-      val tmpBlock = transfer(blockFlow, chainIndex)
-      blockFlow
-        .getGrandPool()
-        .add(chainIndex, tmpBlock.nonCoinbase.head.toTemplate, TimeStamp.now())
-      mineFromMemPool(blockFlow, chainIndex)
+    {
+      val block0 = emptyBlock(blockFlow, chainIndex)
+      val block1 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block0, block1)
+      blockFlow.getMaxHeight(chainIndex).rightValue is 3
+      val block2          = mineBlockTemplate(blockFlow, chainIndex)
+      val hashesAtHeight3 = blockFlow.getHashes(chainIndex, 3).rightValue
+      block2.uncleHashes.rightValue is hashesAtHeight3.tail
+      block2.coinbase.unsigned.fixedOutputs.length is 2
+      val uncleReward = block2.coinbase.unsigned.fixedOutputs(1).amount
+      uncleReward is Coinbase.calcUncleReward(mainChainReward, 1)
+      block2.coinbaseReward is mainChainReward.addUnsafe(uncleReward.divUnsafe(32))
+      addAndCheck(blockFlow, block2)
     }
-    transferBlock.coinbaseReward is consensusConfig.emission
-      .reward(transferBlock.header)
-      .miningReward
-    addAndCheck(blockFlow, transferBlock)
+
+    {
+      val block0 = emptyBlock(blockFlow, chainIndex)
+      val block1 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block0, block1)
+      val block2 = emptyBlock(blockFlow, chainIndex)
+      val block3 = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block2, block3)
+      val block4 = mineBlockTemplate(blockFlow, chainIndex)
+      blockFlow.getMaxHeight(chainIndex).rightValue is 6
+      val hashesAtHeight5 = blockFlow.getHashes(chainIndex, 5).rightValue
+      val hashesAtHeight6 = blockFlow.getHashes(chainIndex, 6).rightValue
+      block4.uncleHashes.rightValue is AVector(hashesAtHeight6(1), hashesAtHeight5(1))
+      block4.coinbase.unsigned.fixedOutputs.length is 3
+      val uncle0Reward = block4.coinbase.unsigned.fixedOutputs(1).amount
+      val uncle1Reward = block4.coinbase.unsigned.fixedOutputs(2).amount
+      uncle0Reward is Coinbase.calcUncleReward(mainChainReward, 1)
+      uncle1Reward is Coinbase.calcUncleReward(mainChainReward, 2)
+      block4.coinbaseReward is mainChainReward.addUnsafe(
+        uncle0Reward.addUnsafe(uncle1Reward).divUnsafe(32)
+      )
+      addAndCheck(blockFlow, block4)
+    }
   }
 
   it should "prepare block template when txs are inter-dependent" in new FlowFixture {
