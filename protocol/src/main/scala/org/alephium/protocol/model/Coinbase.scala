@@ -41,7 +41,7 @@ object Coinbase {
   @inline
   def calcMainChainReward(miningReward: U256): U256 = {
     val numerator   = U256.unsafe(100 * 8 * 32)
-    val denominator = U256.unsafe(5 * 7 * 33 + 95 * 8 * 32)
+    val denominator = U256.unsafe(5 * 7 * 33 + 100 * 8 * 32)
     miningReward.mulUnsafe(numerator).divUnsafe(denominator)
   }
 

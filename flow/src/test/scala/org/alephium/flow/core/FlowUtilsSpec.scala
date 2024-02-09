@@ -208,6 +208,7 @@ class FlowUtilsSpec extends AlephiumSpec {
     emptyBlock.coinbase.unsigned.fixedOutputs.length is 1
     val mainChainReward = Coinbase.calcMainChainReward(miningReward)
     emptyBlock.coinbaseReward is mainChainReward
+    miningReward > mainChainReward is true
     addAndCheck(blockFlow, emptyBlock)
 
     val transferBlock = newTransferBlock()
