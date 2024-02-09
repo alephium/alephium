@@ -1224,7 +1224,10 @@ class ServerUtils(implicit
       contractsState <- contractAddresses.mapE(address =>
         fetchContractState(worldState, address.contractId)
       )
+      events = fetchContractEvents(worldState)
+      eventsSplit <- extractDebugMessages(events)
     } yield {
+      logger.info("\n" + showDebugMessages(eventsSplit._2))
       CallContractSucceeded(
         returns.map(Val.from),
         maximalGasPerTx.subUnsafe(result.gasBox).value,
@@ -1233,7 +1236,8 @@ class ServerUtils(implicit
         result.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, txId, index)
         },
-        fetchContractEvents(worldState)
+        events = eventsSplit._1,
+        debugMessages = eventsSplit._2
       )
     }
     result match {
