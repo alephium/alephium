@@ -560,7 +560,7 @@ object StatefulVM {
             logState.fields.headOption.foreach {
               case Val.ByteVec(bytes) =>
                 print(
-                  s"Debug - ${Address.contract(logStates.contractId).toBase58} - ${bytes.utf8String}\n"
+                  s"> Contract - ${Address.contract(logStates.contractId).toBase58} - ${bytes.utf8String}\n"
                 )
               case _ => ()
             }

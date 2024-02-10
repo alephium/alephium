@@ -1291,7 +1291,6 @@ class ServerUtils(implicit
       val executionOutputs = executionResultPair._1
       val executionResult  = executionResultPair._2
       val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
-      logger.info("\n" + showDebugMessages(eventsSplit._2))
       TestContractResult(
         address = Address.contract(testContract.contractId),
         codeHash = postState._2,
