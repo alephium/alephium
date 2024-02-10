@@ -525,8 +525,10 @@ object StatefulVM {
       obj: ContractObj[StatefulContext],
       args: AVector[Val]
   ): ExeResult[Unit] = {
-    val vm = default(context)
-    vm.execute(obj, 0, args)
+    val vm      = default(context)
+    val results = vm.execute(obj, 0, args)
+    maybeShowDebug(context)
+    results
   }
 
   def executeWithOutputs(
@@ -539,34 +541,32 @@ object StatefulVM {
     vm.executeWithOutputs(obj, methodIndex, args)
   }
 
-  def executeWithOutputsWithDebug(
-      context: StatefulContext,
-      obj: ContractObj[StatefulContext],
-      args: AVector[Val],
-      methodIndex: Int
-  ): ExeResult[AVector[Val]] = {
-    val results = executeWithOutputs(context, obj, args, methodIndex)
-    context.worldState.logState.getNewLogs().map { logStates =>
-      logStates.states.foreach { logState =>
-        if (logState.index == debugEventIndex.v.v.intValue().toByte) {
-          logState.fields.headOption.foreach {
-            case Val.ByteVec(bytes) =>
-              print(
-                s"Debug - ${Address.contract(logStates.contractId).toBase58} - ${bytes.utf8String}\n"
-              )
-            case _ => ()
-          }
-        }
-      }
-    }
-    results
-  }
-
   def executeWithOutputs(
       context: StatefulContext,
       obj: ContractObj[StatefulContext],
       args: AVector[Val]
   ): ExeResult[AVector[Val]] = {
-    executeWithOutputs(context, obj, args, 0)
+    val results = executeWithOutputs(context, obj, args, 0)
+    maybeShowDebug(context)
+    results
+  }
+
+  private def maybeShowDebug(context: StatefulContext): Unit = {
+    val networkId = context.networkConfig.networkId
+    if (networkId.networkType != NetworkId.MainNet) {
+      context.worldState.logState.getNewLogs().foreach { logStates =>
+        logStates.states.foreach { logState =>
+          if (logState.index == debugEventIndex.v.v.intValue().toByte) {
+            logState.fields.headOption.foreach {
+              case Val.ByteVec(bytes) =>
+                print(
+                  s"Debug - ${Address.contract(logStates.contractId).toBase58} - ${bytes.utf8String}\n"
+                )
+              case _ => ()
+            }
+          }
+        }
+      }
+    }
   }
 }

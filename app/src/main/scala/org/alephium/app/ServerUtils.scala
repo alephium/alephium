@@ -1227,7 +1227,6 @@ class ServerUtils(implicit
       events = fetchContractEvents(worldState)
       eventsSplit <- extractDebugMessages(events)
     } yield {
-      logger.info("\n" + showDebugMessages(eventsSplit._2))
       CallContractSucceeded(
         returns.map(Val.from),
         maximalGasPerTx.subUnsafe(result.gasBox).value,
@@ -1492,7 +1491,6 @@ class ServerUtils(implicit
         val events      = fetchContractEvents(context.worldState)
         extractDebugMessages(events).flatMap { case (_, debugMessages) =>
           val detail = showDebugMessages(debugMessages) ++ errorString
-          logger.info("\n" + detail)
           Left(failed(detail))
         }
     }
