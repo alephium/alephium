@@ -1229,6 +1229,8 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   trait CallContractFixture extends Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
     val chainIndex    = ChainIndex.unsafe(0, 0)
     val lockupScript  = getGenesisLockupScript(chainIndex)
     val callerAddress = Address.Asset(lockupScript)
@@ -1412,6 +1414,19 @@ class ServerUtilsSpec extends AlephiumSpec {
       .multipleCallContract(blockFlow, multipleCallContract)
       .leftValue
       .detail is "The number of contract calls exceeds the maximum limit(3)"
+  }
+
+  it should "returns error if caller is in different group than contract" in new CallContractFixture {
+    val params0 = CallContract(
+      group = 1,
+      address = fooAddress,
+      methodIndex = 0,
+      inputAssets = Some(AVector(inputAsset)),
+      existingContracts = Some(AVector(barAddress))
+    )
+    val callContractResult0 =
+      serverUtils.callContract(blockFlow, params0).asInstanceOf[CallContractFailed]
+    callContractResult0.error is s"Group mismatch: provided group is 1; group for ${fooAddress.toBase58} is 0"
   }
 
   "the test contract endpoint" should "handle create and destroy contracts properly" in new Fixture {
