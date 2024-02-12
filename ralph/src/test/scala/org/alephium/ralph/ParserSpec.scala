@@ -78,6 +78,34 @@ class ParserSpec extends AlephiumSpec {
       )
   }
 
+  it should "parse string literals" in {
+    fastparse.parse("b`Foo`", StatelessParser.expr(_)).get.value is
+      StringLiteral[StatelessContext](
+        AVector(Val.ByteVec(ByteString.fromString("Foo"))),
+        Seq.empty
+      )
+
+    fastparse.parse("b``", StatelessParser.expr(_)).get.value is
+      StringLiteral[StatelessContext](AVector(Val.ByteVec(ByteString.empty)), Seq.empty)
+
+    fastparse.parse(s"b`$${a}`", StatelessParser.expr(_)).get.value is
+      StringLiteral[StatelessContext](
+        AVector(Val.ByteVec(ByteString.empty), Val.ByteVec(ByteString.empty)),
+        Seq(Variable(Ident("a")))
+      )
+
+    fastparse.parse(s"b`Hello, $${a}$${b} $${c} $$$$ $$` !`", StatelessParser.expr(_)).get.value is
+      StringLiteral[StatelessContext](
+        AVector(
+          Val.ByteVec(ByteString.fromString("Hello, ")),
+          Val.ByteVec(ByteString.empty),
+          Val.ByteVec(ByteString.fromString(" ")),
+          Val.ByteVec(ByteString.fromString(" $ ` !"))
+        ),
+        Seq(Variable(Ident("a")), Variable(Ident("b")), Variable(Ident("c")))
+      )
+  }
+
   it should "parse function" in {
     info("Function")
     fastparse.parse("foo(x)", StatelessParser.expr(_)).get.value is
