@@ -1224,6 +1224,8 @@ class ServerUtils(implicit
       contractsState <- contractAddresses.mapE(address =>
         fetchContractState(worldState, address.contractId)
       )
+      events = fetchContractEvents(worldState)
+      eventsSplit <- extractDebugMessages(events)
     } yield {
       CallContractSucceeded(
         returns.map(Val.from),
@@ -1233,7 +1235,8 @@ class ServerUtils(implicit
         result.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, txId, index)
         },
-        fetchContractEvents(worldState)
+        events = eventsSplit._1,
+        debugMessages = eventsSplit._2
       )
     }
     result match {
@@ -1288,7 +1291,6 @@ class ServerUtils(implicit
       val executionOutputs = executionResultPair._1
       val executionResult  = executionResultPair._2
       val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
-      logger.info("\n" + showDebugMessages(eventsSplit._2))
       TestContractResult(
         address = Address.contract(testContract.contractId),
         codeHash = postState._2,
@@ -1488,7 +1490,6 @@ class ServerUtils(implicit
         val events      = fetchContractEvents(context.worldState)
         extractDebugMessages(events).flatMap { case (_, debugMessages) =>
           val detail = showDebugMessages(debugMessages) ++ errorString
-          logger.info("\n" + detail)
           Left(failed(detail))
         }
     }
