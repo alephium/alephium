@@ -508,6 +508,37 @@ object Ast {
     }
   }
 
+  final case class StringLiteral[Ctx <: StatelessContext](
+      stringParts: AVector[Val.ByteVec],
+      interpolationParts: Seq[Expr[Ctx]]
+  ) extends Expr[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.ByteVec)
+
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      var result = Seq.empty[Instr[Ctx]]
+      interpolationParts.indices.foreach { k =>
+        val interpolationType = interpolationParts(k).getType(state)
+        if (interpolationParts(k).getType(state) != Seq(Type.ByteVec)) {
+          throw Compiler
+            .Error(s"String interpolation only support ByteVec type, got ${interpolationType}")
+        }
+
+        result = result :+ BytesConst(stringParts(k))
+        if (result.length > 1) {
+          result = result :+ ByteVecConcat
+        }
+
+        result = result ++ interpolationParts(k).genCode(state) :+ ByteVecConcat
+      }
+
+      if (result.isEmpty) {
+        Seq(BytesConst(stringParts.last))
+      } else {
+        result :+ BytesConst(stringParts.last) :+ ByteVecConcat
+      }
+    }
+  }
+
   sealed trait Statement[Ctx <: StatelessContext] {
     def check(state: Compiler.State[Ctx]): Unit
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]

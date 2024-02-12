@@ -21,6 +21,7 @@ import scala.collection.mutable
 import org.alephium.protocol.vm.Val
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
+//scalastyle:off file.size.limit
 class AstSpec extends AlephiumSpec {
 
   behavior of "Check external caller"
@@ -779,5 +780,52 @@ class AstSpec extends AlephiumSpec {
         foo.ident
       )
     ).message is "There are different std id enabled options on the inheritance chain of contract Foo"
+  }
+
+  it should "compile contract with string interpolation" in {
+    def code(a: String) = {
+      s"""
+         |Contract Foo() {
+         |  fn foo() -> () {
+         |    let a = $a
+         |    let b = b`hello $${a}`
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    def verifySuccess(a: String) = {
+      Compiler
+        .compileContractFull(code(a))
+        .rightValue
+    }
+
+    def verifyFailure(a: String, errorMessage: String) = {
+      Compiler
+        .compileContractFull(code(a))
+        .leftValue
+        .message is errorMessage
+    }
+
+    verifySuccess("b`world`")
+    verifySuccess("toByteVec!(100)")
+    verifyFailure("10", "String interpolation only support ByteVec type, got List(U256)")
+    verifyFailure("100 + 10", "String interpolation only support ByteVec type, got List(U256)")
+    verifyFailure("-10", "String interpolation only support ByteVec type, got List(I256)")
+    verifyFailure("true", "String interpolation only support ByteVec type, got List(Bool)")
+
+    Compiler
+      .compileContractFull(
+        s"""
+           |Contract Foo() {
+           |  fn foo() -> () {
+           |    let a = 10
+           |    let b = 100
+           |    let c = b`hello $${toByteVec!(a + b)}`
+           |  }
+           |}
+           |""".stripMargin
+      )
+      .rightValue
   }
 }

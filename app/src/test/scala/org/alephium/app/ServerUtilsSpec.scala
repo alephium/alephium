@@ -1267,7 +1267,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val barAddress = Address.contract(barId)
     val fooCode =
       s"""
-         |Contract Foo(mut value: U256) {
+         |Contract Foo0(mut value: U256) {
          |  @using(preapprovedAssets = true, assetsInContract = true, updateFields = true)
          |  pub fn addOne() -> U256 {
          |    transferTokenToSelf!(@$callerAddress, ALPH, ${ALPH.oneNanoAlph})
@@ -1278,6 +1278,11 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  }
          |  pub fn getContractId() -> ByteVec {
          |    return selfContractId!()
+         |  }
+         |  pub fn getName() -> ByteVec {
+         |    let className = b`Foo`
+         |    let index = b`0`
+         |    return b`Class $${className}$${index}`
          |  }
          |}
          |
@@ -1291,7 +1296,7 @@ class ServerUtilsSpec extends AlephiumSpec {
       s"""
          |@using(preapprovedAssets = true)
          |TxScript Main {
-         |  let foo = Foo(#${fooId.toHexString})
+         |  let foo = Foo0(#${fooId.toHexString})
          |  foo.addOne{@$callerAddress -> ALPH: 1 alph}()
          |}
          |
@@ -1324,7 +1329,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val callContractResult0 =
       serverUtils.callContract(blockFlow, params0).asInstanceOf[CallContractSucceeded]
     callContractResult0.returns is AVector[Val](ValU256(2))
-    callContractResult0.gasUsed is 23200
+    callContractResult0.gasUsed is 23205
     callContractResult0.txOutputs.length is 2
     val contractAttoAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
     callContractResult0.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount0
@@ -1346,7 +1351,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val callContractResult1 =
       serverUtils.callContract(blockFlow, params1).asInstanceOf[CallContractSucceeded]
     callContractResult1.returns is AVector[Val](ValU256(1))
-    callContractResult1.gasUsed is 23200
+    callContractResult1.gasUsed is 23205
     callContractResult1.txOutputs.length is 2
     val contractAttoAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
     callContractResult1.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount1
@@ -1362,6 +1367,13 @@ class ServerUtilsSpec extends AlephiumSpec {
     fooState1.mutFields is AVector[Val](ValU256(1))
     fooState1.address is fooAddress
     fooState1.asset is AssetState(contractAttoAlphAmount1, Some(AVector.empty))
+
+    info("call getName method successfully")
+    val params2 = params0.copy(methodIndex = 2)
+    val callContractResult2 =
+      serverUtils.callContract(blockFlow, params2).asInstanceOf[CallContractSucceeded]
+    callContractResult2.returns is AVector[Val](ValByteVec(ByteString("Class Foo0".getBytes())))
+    callContractResult2.gasUsed is 5635
   }
 
   it should "multiple call contract" in new CallContractFixture {
