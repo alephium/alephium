@@ -6,7 +6,7 @@ alephium {
   }
 
   consensus {
-    block-target-time = 10 millis
+    block-target-time = 64 seconds
     uncle-dependency-gap-time = 0 seconds
     num-zeros-at-least-in-hash = 0
   }
@@ -18,75 +18,25 @@ alephium {
     ]
 
     leman-hard-fork-timestamp = 1643500800000 // GMT: 30 January 2022 00:00:00
-
-    rest-port = 22973
-    ws-port = 22973
-    miner-api-port = 20973
-
-    bind-address  = "0.0.0.0:19973"
-    internal-address  = "127.0.0.1:19973"
-    coordinator-address  = "127.0.0.1:19973"
   }
 
   genesis {
     allocations = [
       {
-        address = "1DrDyTr9RpRsQnDnXo2YRiPzPW4ooHX5LLoqXrqfMrpQH",
-        amount = 1000000000000000000000000,
+        address = "17Ey9PHogBdGS5361s6WQeTXNG2KNFoEtdkJVJvM7KKwU",
+        amount = "1000000000000000000000000",
         lock-duration = 0 seconds
       },
       {
-        address = "14UAjZ3qcmEVKdTo84Kwf4RprTQi86w2TefnnGFjov9xF",
-        amount = 1000000000000000000000000,
+        address = "1GtpWTB3QEfHZg6Rfr5TCaxRRkLTXhDT1Dtk4Rm8kCPoc",
+        amount = "1000000000000000000000000",
         lock-duration = 0 seconds
       },
       {
-        address = "15jjExDyS8q3Wqk9v29PCQ21jDqubDrD8WQdgn6VW2oi4",
-        amount = 1000000000000000000000000,
-        lock-duration = 0 seconds
-      },
-      {
-        address = "17cBiTcWhung3WDLuc9ja5Y7BMus5Q7CD9wYBxS1r1P2R",
-        amount = 1000000000000000000000000,
+        address = "17Tyyh8iG5JQkF7DFPeUXzPbK6JG4FW4erCmXHNA6a9qP",
+        amount = "1000000000000000000000000",
         lock-duration = 0 seconds
       }
-    ]
-  }
-
-  discovery {
-    bootstrap = []
-  }
-
-  wallet {
-    locking-timeout = 99999 minutes
-  }
-
-  mempool {
-    auto-mine-for-dev = true
-  }
-
-  node {
-    event-log {
-      enabled = true
-      index-by-tx-id = true
-      index-by-block-hash = true
-    }
-  }
-
-  api {
-    network-interface = "0.0.0.0"
-    api-key-enabled = false
-  }
-
-  mining {
-    api-interface = "0.0.0.0"
-
-    // arbitrary mining addresses
-    miner-addresses = [
-      "1FsroWmeJPBhcPiUr37pWXdojRBe6jdey9uukEXk1TheA",
-      "1CQvSXsmM5BMFKguKDPpNUfw1idiut8UifLtT8748JdHc",
-      "193maApeJWrz9GFwWCfa982ccLARVE9Y1WgKSJaUs7UAx",
-      "16fZKYPCZJv2TP3FArA9FLUQceTS9U8xVnSjxFG9MBKyY"
     ]
   }
 }
