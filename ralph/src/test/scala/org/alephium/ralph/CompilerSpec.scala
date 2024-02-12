@@ -466,7 +466,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       deserialize[StatefulContract](serialize(contract)) isE contract
       val (obj, context) = prepareContract(contract, immFields, mutFields)
-      StatefulVM.executeWithOutputsWithDebug(context, obj, args, methodIndex) isE output
+      StatefulVM.executeWithOutputs(context, obj, args, methodIndex) isE output
     }
 
     def fail(
