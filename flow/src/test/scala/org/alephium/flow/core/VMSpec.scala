@@ -1630,6 +1630,20 @@ class VMSpec extends AlephiumSpec with Generators {
     )
   }
 
+  it should "test convert pubkey to address" in new ContractFixture {
+    val (_, publicKey, _) = genesisKeys(chainIndex.from.value)
+    def main() =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  let caller = callerAddress!()
+         |  let address = byteVecToAddress!(#00 ++ blake2b!(#${publicKey.toHexString}))
+         |  assert!(address == caller, 0)
+         |}
+         |""".stripMargin
+    testSimpleScript(main())
+  }
+
   it should "test eth ecrecover" in new ContractFixture with EthEcRecoverFixture {
     def main(messageHash: ByteString, signature: ByteString, address: ByteString) =
       s"""
