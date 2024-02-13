@@ -78,6 +78,25 @@ class ParserSpec extends AlephiumSpec {
       )
   }
 
+  it should "parse string literals" in {
+    def test(testString: String) = {
+      fastparse.parse(s"b`$testString`", StatelessParser.expr(_)).get.value is
+        StringLiteral[StatelessContext](
+          Val.ByteVec(ByteString.fromString(testString))
+        )
+    }
+
+    test("Foo")
+    test(" Foo")
+    test("Foo ")
+    test(" Foo ")
+    test("Foo Bar")
+    test("")
+    test(s"$$$${a}")
+    test(s"Hello, $$$${a}$$$${b} $$$${c} $$$$$$$$ $$$$ !")
+    test(s"Sharding is hard $$")
+  }
+
   it should "parse function" in {
     info("Function")
     fastparse.parse("foo(x)", StatelessParser.expr(_)).get.value is

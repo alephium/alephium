@@ -160,6 +160,8 @@ object Lexer {
     P("$$" | "$`").!.map(_.tail)
   def stringChars[Unknown: P]: P[String] =
     P(CharsWhile(c => c != '$' && c != '`').!)
+  def string[Unknown: P]: P[String] =
+    P("`" ~ (CharsWhile(c => c != '`').! | stringNoChar) ~ "`")
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def stringPart[Unknown: P]: P[String] =
     P((stringChars | stringEscaping).rep(1).map(_.reduce(_ ++ _)) | stringNoChar)

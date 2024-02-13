@@ -151,6 +151,10 @@ abstract class Parser[Ctx <: StatelessContext] {
       case (_, _, index, None) =>
         throw CompilerError.`Expected else statement`(index)
     }
+  def stringLiteral[Unknown: P]: P[Ast.StringLiteral[Ctx]] =
+    P("b" ~ Lexer.string).map { s =>
+      Ast.StringLiteral(Val.ByteVec(ByteString.fromString(s)))
+    }
 
   def ret[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
     P(normalRet.rep(1)).map { returnStmts =>
@@ -513,7 +517,9 @@ object Parser {
 )
 object StatelessParser extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
-    P(const | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr)
+    P(
+      const | stringLiteral | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr
+    )
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
     P(varDef | assign | debug | funcCall | ifelseStmt | whileStmt | forLoopStmt | ret)
@@ -537,7 +543,7 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | alphTokenId | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
+      const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.Expr[StatefulContext]] =

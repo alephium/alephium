@@ -508,6 +508,16 @@ object Ast {
     }
   }
 
+  final case class StringLiteral[Ctx <: StatelessContext](
+      string: Val.ByteVec
+  ) extends Expr[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.ByteVec)
+
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      Seq(BytesConst(string))
+    }
+  }
+
   sealed trait Statement[Ctx <: StatelessContext] {
     def check(state: Compiler.State[Ctx]): Unit
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
