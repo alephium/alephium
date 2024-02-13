@@ -79,28 +79,22 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse string literals" in {
-    fastparse.parse("b`Foo`", StatelessParser.expr(_)).get.value is
-      StringLiteral[StatelessContext](
-        Val.ByteVec(ByteString.fromString("Foo"))
-      )
+    def test(testString: String) = {
+      fastparse.parse(s"b`$testString`", StatelessParser.expr(_)).get.value is
+        StringLiteral[StatelessContext](
+          Val.ByteVec(ByteString.fromString(testString))
+        )
+    }
 
-    fastparse.parse("b``", StatelessParser.expr(_)).get.value is
-      StringLiteral[StatelessContext](Val.ByteVec(ByteString.empty))
-
-    fastparse.parse(s"b`$${a}`", StatelessParser.expr(_)).get.value is
-      StringLiteral[StatelessContext](
-        Val.ByteVec(ByteString.fromString(s"$${a}"))
-      )
-
-    fastparse.parse(s"b`Hello, $${a}$${b} $${c} $$$$ $$ !`", StatelessParser.expr(_)).get.value is
-      StringLiteral[StatelessContext](
-        Val.ByteVec(ByteString.fromString(s"Hello, $${a}$${b} $${c} $$$$ $$ !"))
-      )
-
-    fastparse.parse("b`Sharding is hard $`", StatelessParser.expr(_)).get.value is
-      StringLiteral[StatelessContext](
-        Val.ByteVec(ByteString.fromString("Sharding is hard $"))
-      )
+    test("Foo")
+    test(" Foo")
+    test("Foo ")
+    test(" Foo ")
+    test("Foo Bar")
+    test("")
+    test(s"$$$${a}")
+    test(s"Hello, $$$${a}$$$${b} $$$${c} $$$$$$$$ $$$$ !")
+    test(s"Sharding is hard $$")
   }
 
   it should "parse function" in {
