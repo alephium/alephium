@@ -1622,7 +1622,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testContract = TestContract(bytecode = code).toComplete().rightValue
     val testError    = serverUtils.runTestContract(blockFlow, testContract).leftValue.detail
     testError is
-      s"DEBUG - ${Address.contract(testContract.contractId).toBase58} - Hello, Alephium!\n" ++
+      s"> Contract @ ${Address.contract(testContract.contractId).toBase58} - Hello, Alephium!\n" ++
       "VM execution error: AssertionFailedWithErrorCode(tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq,0)"
   }
 

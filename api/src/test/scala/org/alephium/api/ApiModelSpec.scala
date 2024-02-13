@@ -1336,6 +1336,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
           AVector(contractState),
           AVector.empty,
           AVector.empty,
+          AVector.empty,
           AVector.empty
         ),
         CallContractFailed("InvalidContractMethodIndex")
@@ -1363,7 +1364,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |      ],
          |      "txInputs": [],
          |      "txOutputs": [],
-         |      "events": []
+         |      "events": [],
+         |      "debugMessages": []
          |    },
          |    {
          |      "type": "CallContractFailed",

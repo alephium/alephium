@@ -810,7 +810,8 @@ trait EndpointsExamples extends ErrorExamples {
     contracts = AVector(existingContract),
     txInputs = AVector(contractAddress),
     txOutputs = AVector(ContractOutput(1, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
-    events = AVector(eventByTxId)
+    events = AVector(eventByTxId),
+    debugMessages = AVector(DebugMessage(contractAddress, "Debugging!"))
   )
   implicit val callContractResultExamples: List[Example[CallContractResult]] = {
     simpleExample(callContractResultExample)

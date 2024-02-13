@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "2.8.0"
+    "version": "2.8.2"
   },
   "servers": [
     {
@@ -8068,6 +8068,12 @@
                         }
                       ]
                     }
+                  ],
+                  "debugMessages": [
+                    {
+                      "contractAddress": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                      "message": "Debugging!"
+                    }
                   ]
                 }
               }
@@ -8277,6 +8283,12 @@
                               "value": "10"
                             }
                           ]
+                        }
+                      ],
+                      "debugMessages": [
+                        {
+                          "contractAddress": "uomjgUz6D4tLejTkQtbNJMY8apAjTm1bgQf7em1wDV7S",
+                          "message": "Debugging!"
                         }
                       ]
                     }
@@ -10960,6 +10972,7 @@
           "txInputs",
           "txOutputs",
           "events",
+          "debugMessages",
           "type"
         ],
         "type": "object",
@@ -10997,6 +11010,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ContractEventByTxId"
+            }
+          },
+          "debugMessages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DebugMessage"
             }
           },
           "type": {
