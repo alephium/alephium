@@ -152,11 +152,8 @@ abstract class Parser[Ctx <: StatelessContext] {
         throw CompilerError.`Expected else statement`(index)
     }
   def stringLiteral[Unknown: P]: P[Ast.StringLiteral[Ctx]] =
-    P("b" ~ Lexer.string(() => stringInterpolator)).map { case (stringParts, interpolationParts) =>
-      Ast.StringLiteral(
-        stringParts.map(s => Val.ByteVec(ByteString.fromString(s))),
-        interpolationParts
-      )
+    P("b" ~ Lexer.string).map { s =>
+      Ast.StringLiteral(Val.ByteVec(ByteString.fromString(s)))
     }
 
   def ret[Unknown: P]: P[Ast.ReturnStmt[Ctx]] =
