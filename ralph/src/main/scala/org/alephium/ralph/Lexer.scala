@@ -42,23 +42,27 @@ object Lexer {
   def letter[Unknown: P]: P[Unit]    = P(lowercase | uppercase)
   def newline[Unknown: P]: P[Unit]   = P(NoTrace(StringIn("\r\n", "\n")))
 
-  private def id[Unknown: P, T](prefix: => P[Unit], func: String => T): P[T] =
-    P(prefix ~ (letter | digit | "_").rep).!.filter(!Keyword.Used.exists(_)).map(func)
+  private def id[Unknown: P, T <: Ast.Positioned](prefix: => P[Unit], func: String => T): P[T] =
+    P(Index ~ (prefix ~ (letter | digit | "_").rep).!.filter(!Keyword.Used.exists(_))).map {
+      case (pos, i) => func(i).atSourceIndex(pos)
+    }
   def ident[Unknown: P]: P[Ast.Ident] = id(lowercase, Ast.Ident)
   def constantIdent[Unknown: P]: P[Ast.Ident] =
     id(uppercase.opaque("constant variables must start with an uppercase letter"), Ast.Ident)
   def typeId[Unknown: P]: P[Ast.TypeId] = id(uppercase, Ast.TypeId)
   def funcId[Unknown: P]: P[Ast.FuncId] =
     P(ident ~ "!".?.!).map { case (id, postfix) =>
-      Ast.FuncId(id.name, postfix.nonEmpty)
+      Ast.FuncId(id.name, postfix.nonEmpty).atSourceIndex(id.sourceIndex)
     }
 
   private[ralph] def getSimpleName(obj: Object): String = {
     obj.getClass.getSimpleName.dropRight(1)
   }
 
-  def token[Unknown: P](keyword: Keyword): P[Unit] = {
-    keyword.name ~ !(letter | digit | "_")
+  def token[Unknown: P](keyword: Keyword): P[SourceIndex] = {
+    P(Index ~ keyword.name ~ !(letter | digit | "_")).map { fromIndex =>
+      SourceIndex(fromIndex, keyword.name.length)
+    }
   }
 
   def unused[Unknown: P]: P[Boolean] = token(Keyword.`@unused`).?.!.map(_.nonEmpty)
