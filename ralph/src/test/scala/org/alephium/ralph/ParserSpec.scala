@@ -175,7 +175,7 @@ class ParserSpec extends AlephiumSpec {
     val emptyAssetsCode = "Foo(x).bar{ z -> }(x)"
     intercept[CompilerError.`Expected non-empty asset(s) for address`](
       fastparse.parse(emptyAssetsCode, StatefulParser.contractCallExpr(_))
-    ).toError(emptyAssetsCode).message is
+    ).format(emptyAssetsCode) is
       """-- error (1:17): Syntax error
         |1 |Foo(x).bar{ z -> }(x)
         |  |                ^
@@ -389,7 +389,7 @@ class ParserSpec extends AlephiumSpec {
     val error = intercept[CompilerError.`Expected else statement`](
       fastparse.parse(missingElseCode, StatelessParser.expr(_))
     )
-    error.toError(missingElseCode).message is
+    error.format(missingElseCode) is
       """-- error (1:13): Syntax error
         |1 |if (cond0) 0
         |  |            ^

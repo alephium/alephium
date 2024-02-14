@@ -155,7 +155,7 @@ class StatelessParserSpec extends AlephiumSpec {
     error is CompilerError.ExpectedEndOfInput('B', indexOfB)
 
     if (!OperatingSystem.isWindows) {
-      error.toError(program).message is
+      error.format(program) is
         """-- error (8:1): Syntax error
           |8 |Blah
           |  |^
