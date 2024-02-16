@@ -1527,6 +1527,54 @@ class ServerUtilsSpec extends AlephiumSpec {
     result.txOutputs(0).address is assetAddress
   }
 
+  it should "test with caller address" in new Fixture {
+    val child =
+      s"""
+         |Contract Child(parentId: ByteVec, parentAddress: Address) {
+         |  pub fn checkParent() -> () {
+         |    assert!(callerContractId!() == parentId, 0)
+         |    assert!(callerAddress!() == parentAddress, 1)
+         |  }
+         |}
+         |""".stripMargin
+    val childContract = Compiler.compileContract(child).rightValue
+    val childAddress  = Address.contract(ContractId.random)
+
+    val parentContractId   = ContractId.random
+    val parentAddress      = Address.contract(parentContractId)
+    val wrongParentId      = ContractId.random
+    val wrongParentAddress = Address.contract(wrongParentId)
+
+    val serverUtils = new ServerUtils()
+
+    def buildTestParam(callerAddressOpt: Option[Address.Contract]): TestContract.Complete = {
+      TestContract(
+        bytecode = childContract,
+        address = Some(childAddress),
+        callerAddress = callerAddressOpt,
+        initialImmFields = Option(
+          AVector[Val](
+            ValByteVec(parentContractId.bytes),
+            ValAddress(parentAddress)
+          )
+        )
+      )
+        .toComplete()
+        .rightValue
+    }
+    val testContractParams0 = buildTestParam(Some(parentAddress))
+    val testResult0         = serverUtils.runTestContract(blockFlow, testContractParams0)
+    testResult0.isRight is true
+
+    val testContractParams1 = buildTestParam(Some(wrongParentAddress))
+    val testResult1         = serverUtils.runTestContract(blockFlow, testContractParams1)
+    testResult1.leftValue.detail is s"VM execution error: AssertionFailedWithErrorCode(${childAddress.toBase58},0)"
+
+    val testContractParams2 = buildTestParam(None)
+    val testResult2         = serverUtils.runTestContract(blockFlow, testContractParams2)
+    testResult2.leftValue.detail is "VM execution error: ExpectAContract"
+  }
+
   trait DestroyFixture extends Fixture {
     val (_, pubKey)  = SignatureSchema.generatePriPub()
     val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))

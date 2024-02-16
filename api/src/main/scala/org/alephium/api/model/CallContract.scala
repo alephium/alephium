@@ -27,6 +27,7 @@ final case class CallContract(
     worldStateBlockHash: Option[BlockHash] = None,
     txId: Option[TransactionId] = None,
     address: Address.Contract,
+    callerAddress: Option[Address.Contract] = None,
     methodIndex: Int,
     args: Option[AVector[Val]] = None,
     existingContracts: Option[AVector[Address.Contract]] = None,

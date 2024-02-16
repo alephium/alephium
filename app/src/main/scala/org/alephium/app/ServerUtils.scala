@@ -1209,6 +1209,7 @@ class ServerUtils(implicit
         worldState,
         groupIndex,
         contractId,
+        params.callerAddress.map(_.contractId),
         txId,
         blockHash,
         TimeStamp.now(),
@@ -1275,6 +1276,7 @@ class ServerUtils(implicit
         worldState,
         groupIndex,
         contractId,
+        testContract.callerContractIdOpt,
         testContract.txId,
         testContract.blockHash,
         testContract.blockTimeStamp,
@@ -1421,6 +1423,7 @@ class ServerUtils(implicit
       worldState: WorldState.Staging,
       groupIndex: GroupIndex,
       contractId: ContractId,
+      callerContractIdOpt: Option[ContractId],
       txId: TransactionId,
       blockHash: BlockHash,
       blockTimeStamp: TimeStamp,
@@ -1447,28 +1450,18 @@ class ServerUtils(implicit
       isEntryMethodPayable = true
     )
     val context = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
-    val script = StatefulScript.unsafe(
-      AVector(
-        Method[StatefulContext](
-          isPublic = true,
-          usePreapprovedAssets = inputAssets.nonEmpty,
-          useContractAssets = false,
-          argsLength = 0,
-          localsLength = 0,
-          returnLength = method.returnLength,
-          instrs = approveAsset(inputAssets, testGasFee) ++ callExternal(
-            args,
-            methodIndex,
-            method.argsLength,
-            method.returnLength,
-            contractId
-          )
-        )
-      )
-    )
     for {
-      _      <- checkArgs(args, method)
-      result <- runWithDebugError(context, script)
+      _ <- checkArgs(args, method)
+      result <- runWithDebugError(
+        context,
+        contractId,
+        callerContractIdOpt,
+        inputAssets,
+        methodIndex,
+        args,
+        method,
+        testGasFee
+      )
     } yield result
   }
   // scalastyle:on method.length parameter.number
@@ -1485,12 +1478,68 @@ class ServerUtils(implicit
     }
   }
 
+  // scalastyle:off method.length
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def runWithDebugError(
       context: StatefulContext,
-      script: StatefulScript
+      contractId: ContractId,
+      callerContractIdOpt: Option[ContractId],
+      inputAssets: AVector[TestInputAsset],
+      methodIndex: Int,
+      args: AVector[Val],
+      method: Method[StatefulContext],
+      testGasFee: U256
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
-    StatefulVM.runTxScriptWithOutputs(context, script) match {
+    val executionResult = callerContractIdOpt match {
+      case None =>
+        val script = StatefulScript.unsafe(
+          AVector(
+            Method[StatefulContext](
+              isPublic = true,
+              usePreapprovedAssets = inputAssets.nonEmpty,
+              useContractAssets = false,
+              argsLength = 0,
+              localsLength = 0,
+              returnLength = method.returnLength,
+              instrs = approveAsset(inputAssets, testGasFee) ++ callExternal(
+                args,
+                methodIndex,
+                method.argsLength,
+                method.returnLength,
+                contractId
+              )
+            )
+          )
+        )
+        StatefulVM.runTxScriptWithOutputsTestOnly(context, script)
+      case Some(callerContractId) =>
+        val mockCallerContract = StatefulContract(
+          0,
+          AVector(
+            Method[StatefulContext](
+              isPublic = true,
+              usePreapprovedAssets = inputAssets.nonEmpty,
+              useContractAssets = false,
+              argsLength = 0,
+              localsLength = 0,
+              returnLength = method.returnLength,
+              instrs = approveAsset(inputAssets, testGasFee) ++ callExternal(
+                args,
+                methodIndex,
+                method.argsLength,
+                method.returnLength,
+                contractId
+              )
+            )
+          )
+        )
+        StatefulVM.runCallerContractWithOutputsTestOnly(
+          context,
+          mockCallerContract,
+          callerContractId
+        )
+    }
+    executionResult match {
       case Right(result)         => Right(result)
       case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
       case Left(Right(exeFailure)) =>
@@ -1502,6 +1551,7 @@ class ServerUtils(implicit
         }
     }
   }
+  // scalastyle:on method.length
 
   def showDebugMessages(messages: AVector[DebugMessage]): String = {
     if (messages.isEmpty) {
