@@ -41,6 +41,10 @@ object Ast {
       this.sourceIndex = Some(SourceIndex(fromIndex))
       this
     }
+    def atSourceIndex(fromIndex: Int, endIndex: Int): this.type = {
+      this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
+      this
+    }
     def atSourceIndex(sourceIndex: Option[SourceIndex]): this.type = {
       this.sourceIndex = sourceIndex
       this
