@@ -740,6 +740,7 @@ class ParserSpec extends AlephiumSpec {
       ("const C = 1", Val.U256(U256.One)),
       ("const C = 1i", Val.I256(I256.One)),
       ("const C = #11", Val.ByteVec(Hex.unsafe("11"))),
+      ("const C = b`hello`", Val.ByteVec(ByteString.fromString("hello"))),
       (s"const C = @${address.toBase58}", Val.Address(address.lockupScript))
     )
     definitions.foreach { definition =>
