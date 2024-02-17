@@ -992,7 +992,7 @@ class TxUtilsSpec extends AlephiumSpec {
         nonCoinbaseMinGasPrice
       )
       .rightValue
-      .leftValue is "Estimated gas GasBox(627120) too large, maximal GasBox(625000). Consider consolidating UTXOs using the sweep endpoints"
+      .leftValue is "Estimated gas GasBox(627120) too large, maximal GasBox(625000). Consider consolidating UTXOs using the sweep endpoints or sending to less addresses"
 
     info("Without provided Utxos")
 
@@ -1022,7 +1022,7 @@ class TxUtilsSpec extends AlephiumSpec {
         defaultUtxoLimit
       )
       .rightValue
-      .leftValue is "Estimated gas GasBox(627120) too large, maximal GasBox(625000). Consider consolidating UTXOs using the sweep endpoints"
+      .leftValue is "Estimated gas GasBox(627120) too large, maximal GasBox(625000). Consider consolidating UTXOs using the sweep endpoints or sending to less addresses"
   }
 
   it should "sweep as much as we can" in new LargeUtxos {
