@@ -1487,6 +1487,46 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
+  it should "test destroying self" in new Fixture {
+    val groupIndex   = brokerConfig.chainIndexes.sample().from
+    val (_, pubKey)  = SignatureSchema.generatePriPub()
+    val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn destroy() -> () {
+         |    destroySelf!(@$assetAddress)
+         |  }
+         |}
+         |""".stripMargin
+
+    val fooContract        = Compiler.compileContract(foo).rightValue
+    val fooContractId      = ContractId.random
+    val fooContractAddress = Address.contract(fooContractId)
+
+    val testContractParams = TestContract(
+      group = Some(groupIndex.value),
+      address = Some(fooContractAddress),
+      bytecode = fooContract,
+      initialAsset = Some(AssetState(ALPH.alph(10))),
+      existingContracts = None,
+      inputAssets = None
+    ).toComplete().rightValue
+
+    val testFlow    = BlockFlow.emptyUnsafe(config)
+    val serverUtils = new ServerUtils()
+    val result =
+      serverUtils.runTestContract(testFlow, testContractParams).rightValue
+
+    result.contracts.isEmpty is true
+    result.txInputs.length is 1
+    result.txInputs(0).lockupScript is fooContractAddress.lockupScript
+    result.txOutputs.length is 1
+    result.txOutputs(0).attoAlphAmount.value is ALPH.alph(10)
+    result.txOutputs(0).address is assetAddress
+  }
+
   trait DestroyFixture extends Fixture {
     val (_, pubKey)  = SignatureSchema.generatePriPub()
     val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))

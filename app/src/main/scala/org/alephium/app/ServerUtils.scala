@@ -1356,18 +1356,26 @@ class ServerUtils(implicit
       case (ids, contractState) =>
         if (destroyedContractIds.contains(contractState.id)) ids else ids :+ contractState.id
     }
-    for {
-      existingContractsState <- contractIds.mapE(id => fetchContractState(worldState, id))
-      testContractState <- fetchContractState(
-        worldState,
-        testContract.contractId
-      )
-    } yield {
+    contractIds.mapE(id => fetchContractState(worldState, id)).flatMap { existingContractsState =>
+      if (destroyedContractIds.contains(testContract.contractId)) {
+        Right((existingContractsState, testContract.code.hash))
+      } else {
+        fetchTestContractState(worldState, testContract).map {
+          case (testContractState, testCodeHash) =>
+            (existingContractsState :+ testContractState, testCodeHash)
+        }
+      }
+    }
+  }
+
+  private def fetchTestContractState(
+      worldState: WorldState.Staging,
+      testContract: TestContract.Complete
+  ): Try[(ContractState, Hash)] = {
+    fetchContractState(worldState, testContract.contractId) map { testContractState =>
       val codeHash = testContract.codeHash(testContractState.codeHash)
-      val states = existingContractsState ++ AVector(
-        testContractState.copy(codeHash = codeHash)
-      )
-      (states, codeHash)
+      // Note that we need to update the code hash as the contract might have been migrated
+      (testContractState.copy(codeHash = codeHash), codeHash)
     }
   }
 
