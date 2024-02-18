@@ -10907,6 +10907,10 @@
             "type": "string",
             "format": "address"
           },
+          "callerAddress": {
+            "type": "string",
+            "format": "address"
+          },
           "methodIndex": {
             "type": "integer",
             "format": "int32"
@@ -12456,6 +12460,10 @@
             "format": "32-byte-hash"
           },
           "address": {
+            "type": "string",
+            "format": "address"
+          },
+          "callerAddress": {
             "type": "string",
             "format": "address"
           },
