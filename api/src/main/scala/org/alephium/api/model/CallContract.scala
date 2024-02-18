@@ -41,6 +41,17 @@ final case class CallContract(
         } else {
           Left(badRequest(s"Invalid group $group"))
         }
+      addressGroup = address.groupIndex.value
+      _ <-
+        if (addressGroup == group) {
+          Right(())
+        } else {
+          Left(
+            badRequest(
+              s"Group mismatch: provided group is ${group}; group for $address is ${addressGroup}"
+            )
+          )
+        }
       chainIndex = ChainIndex.unsafe(group, group)
       _ <-
         if (worldStateBlockHash.map(ChainIndex.from).getOrElse(chainIndex) != chainIndex) {

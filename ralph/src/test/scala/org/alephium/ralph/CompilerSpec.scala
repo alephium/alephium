@@ -3808,7 +3808,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     Compiler.compileContract(code("I256", "I256", "**", "I256")).leftValue.message is
-      "Invalid param types List(I256, I256) for exp operator"
+      "Invalid param types List(I256, I256) for ** operator"
     Compiler.compileContract(code("U256", "U256", "**", "U256")).isRight is true
     Compiler.compileContract(code("U256", "U256", "**", "I256")).leftValue.message is
       s"""Invalid return types: expected "List(I256)", got "List(U256)""""
@@ -3823,6 +3823,41 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       "Invalid param types List(I256, U256) for ArithOperator"
     Compiler.compileContract(code("U256", "U256", "|**|", "I256")).leftValue.message is
       """Invalid return types: expected "List(I256)", got "List(U256)""""
+  }
+
+  it should "compile check equality operation" in {
+    def code(inputType: String, op: String): String = {
+      s"""
+         |Contract Foo() {
+         |  pub fn foo(a: $inputType, b: $inputType) -> () {
+         |    if (a $op b) {
+         |      emit Debug(`hello`)
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    def success(inputType: String, op: String) = {
+      Compiler.compileContract(code(inputType, op)).isRight is true
+    }
+
+    def fail(inputType: String, op: String) = {
+      Compiler
+        .compileContract(code(inputType, op))
+        .leftValue
+        .message is s"Expect I256/U256 for $op operator"
+    }
+
+    Seq(">", "<", "<=", ">=", "==", "!=").foreach(success("I256", _))
+    Seq(">", "<", "<=", ">=", "==", "!=").foreach(success("U256", _))
+
+    Seq("==", "!=").foreach(success("Address", _))
+    Seq("==", "!=").foreach(success("ByteVec", _))
+    Seq("==", "!=").foreach(success("Bool", _))
+    Seq(">", "<", "<=", ">=").foreach(fail("Address", _))
+    Seq(">", "<", "<=", ">=").foreach(fail("ByteVec", _))
+    Seq(">", "<", "<=", ">=").foreach(fail("Bool", _))
   }
 
   it should "compile Schnorr address lockup script" in {
