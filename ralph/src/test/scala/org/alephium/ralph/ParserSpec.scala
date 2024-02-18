@@ -141,6 +141,23 @@ class ParserSpec extends AlephiumSpec {
         List(Variable(Ident("z")))
       )
 
+    fastparse.parse("foo(1)", StatelessParser.expr(_)).get.value is
+      CallExpr[StatelessContext](FuncId("foo", false), Seq.empty, List(Const(Val.U256(U256.One))))
+
+    fastparse.parse("foo(#00)", StatelessParser.expr(_)).get.value is
+      CallExpr[StatelessContext](
+        FuncId("foo", false),
+        Seq.empty,
+        List(Const(Val.ByteVec(ByteString(Hex.unsafe("00")))))
+      )
+
+    fastparse.parse("foo(b`Hello`)", StatelessParser.expr(_)).get.value is
+      CallExpr[StatelessContext](
+        FuncId("foo", false),
+        Seq.empty,
+        List(StringLiteral(Val.ByteVec(ByteString.fromString("Hello"))))
+      )
+
     info("Braces syntax")
     fastparse.parse("{ x -> ALPH: 1 alph }", StatelessParser.approveAssets(_)).isSuccess is true
     fastparse.parse("{ x -> tokenId: 2 }", StatelessParser.approveAssets(_)).isSuccess is true
@@ -816,7 +833,7 @@ class ParserSpec extends AlephiumSpec {
     }
 
     {
-      info("Enum definition")
+      info("Enum definition with U256 fields")
       val definition =
         s"""
            |enum ErrorCodes {
@@ -829,6 +846,44 @@ class ParserSpec extends AlephiumSpec {
         Seq(
           EnumField(Ident("Error0"), Val.U256(U256.Zero)),
           EnumField(Ident("Error1"), Val.U256(U256.One))
+        )
+      )
+    }
+
+    {
+      info("Enum definition with ByteVec fields")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = #00
+           |  Error1 = #01
+           |}
+           |""".stripMargin
+      fastparse.parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
+        TypeId("ErrorCodes"),
+        Seq(
+          EnumField(Ident("Error0"), Val.ByteVec(Hex.unsafe("00"))),
+          EnumField(Ident("Error1"), Val.ByteVec(Hex.unsafe("01")))
+        )
+      )
+    }
+
+    {
+      info("Enum definition with String Literals fields")
+      val definition =
+        s"""
+           |enum ErrorCodes {
+           |  Error0 = #00
+           |  Error1 = b`hello`
+           |  Error2 = b`world`
+           |}
+           |""".stripMargin
+      fastparse.parse(definition, StatefulParser.enumDef(_)).get.value is EnumDef(
+        TypeId("ErrorCodes"),
+        Seq(
+          EnumField(Ident("Error0"), Val.ByteVec(Hex.unsafe("00"))),
+          EnumField(Ident("Error1"), Val.ByteVec(ByteString.fromString("hello"))),
+          EnumField(Ident("Error2"), Val.ByteVec(ByteString.fromString("world")))
         )
       )
     }
