@@ -4291,6 +4291,33 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     testContractFullError(code(s"Bar.$$bar$$()"), s"""Expected static function, got "Bar.bar"""")
   }
 
+  it should "fail when using wrong operator on addresses" in {
+    def code(operator: String) = {
+      s"""
+         |Contract Foo() {
+         |  pub fn foo(a1: Address, a2: Address) -> () {
+         |    if($$a1 $operator a2$$) {
+         |      return
+         |    } else {
+         |    return
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+    }
+    def test(operator: String) = {
+      testContractError(
+        code(operator),
+        s"""Expect I256/U256 for $operator operator"""
+      )
+    }
+
+    test("<")
+    test(">")
+    test(">=")
+    test("<=")
+  }
+
   it should "check parent std interface id" in {
     val code = s"""
                   |@std(id = #0005)

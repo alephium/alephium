@@ -129,7 +129,8 @@ object TestOperator {
         case Type.Bool    => Seq(BoolEq)
         case Type.ByteVec => Seq(ByteVecEq)
         case Type.Address => Seq(AddressEq)
-        case _ => throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for == operator", None)
+        case _ =>
+          throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for == operator", None)
       }
     }
   }
@@ -141,7 +142,8 @@ object TestOperator {
         case Type.Bool    => Seq(BoolNeq)
         case Type.ByteVec => Seq(ByteVecNeq)
         case Type.Address => Seq(AddressNeq)
-        case _ => throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for != operator", None)
+        case _ =>
+          throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for != operator", None)
       }
     }
   }

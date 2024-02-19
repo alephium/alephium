@@ -786,7 +786,7 @@ object StatefulParser extends Parser[StatefulContext] {
       Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ (value | stringLiteral.map(
         _.string
       ))
-  ){ case (_, ident, v) =>
+    ) { case (_, ident, v) =>
       Ast.ConstantVarDef(ident, v.asInstanceOf[Val])
     }
 

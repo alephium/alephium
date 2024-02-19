@@ -254,8 +254,10 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      left.genCode(state) ++ right.genCode(state) ++ op.genCode(
-        left.getType(state) ++ right.getType(state)
+      positionedError(
+        left.genCode(state) ++ right.genCode(state) ++ op.genCode(
+          left.getType(state) ++ right.getType(state)
+        )
       )
     }
   }
