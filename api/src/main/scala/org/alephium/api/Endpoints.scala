@@ -542,6 +542,13 @@ trait Endpoints
       .in("check-hash-indexing")
       .summary("Check and repair the indexing of block hashes")
 
+  val targetToHashrate: BaseEndpoint[TargetToHashrate, TargetToHashrate.Result] =
+    utilsEndpoint.post
+      .in("target-to-hashrate")
+      .in(jsonBody[TargetToHashrate])
+      .out(jsonBody[TargetToHashrate.Result])
+      .summary("Convert a target to hashrate")
+
   lazy val getContractEvents
       : BaseEndpoint[(Address.Contract, CounterRange, Option[GroupIndex]), ContractEvents] =
     contractEventsEndpoint.get

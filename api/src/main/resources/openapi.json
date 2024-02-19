@@ -8967,6 +8967,108 @@
         }
       }
     },
+    "/utils/target-to-hashrate": {
+      "post": {
+        "tags": [
+          "Utils"
+        ],
+        "summary": "Convert a target to hashrate",
+        "operationId": "postUtilsTarget-to-hashrate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetToHashrate"
+              },
+              "example": {
+                "target": "1b032b55"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                },
+                "example": {
+                  "hashrate": "355255758493400"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequest"
+                },
+                "example": {
+                  "detail": "Something bad in the request"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unauthorized"
+                },
+                "example": {
+                  "detail": "You shall not pass"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFound"
+                },
+                "example": {
+                  "resource": "wallet-name",
+                  "detail": "wallet-name not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalServerError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerError"
+                },
+                "example": {
+                  "detail": "Ouch"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailable"
+                },
+                "example": {
+                  "detail": "Self clique unsynced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/utils/check-hash-indexing": {
       "put": {
         "tags": [
@@ -12192,6 +12294,18 @@
           }
         }
       },
+      "Result": {
+        "required": [
+          "hashrate"
+        ],
+        "type": "object",
+        "properties": {
+          "hashrate": {
+            "type": "string",
+            "format": "bigint"
+          }
+        }
+      },
       "RevealMnemonic": {
         "required": [
           "password"
@@ -12434,6 +12548,18 @@
           "gasPrice": {
             "type": "string",
             "format": "uint256"
+          }
+        }
+      },
+      "TargetToHashrate": {
+        "required": [
+          "target"
+        ],
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "format": "hex-string"
           }
         }
       },
