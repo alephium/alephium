@@ -643,8 +643,12 @@ trait EndpointsLogic extends Endpoints {
           HashRate.from(Target.unsafe(targetToHashrate.target), consenseConfig.blockTargetTime)
         Right(TargetToHashrate.Result(hashrate.value))
       } catch {
-        case error: Throwable =>
-          Left(ApiError.BadRequest(error.getMessage))
+        case _: Throwable =>
+          Left(
+            ApiError.BadRequest(
+              s"Invalid target string: ${Hex.toHexString(targetToHashrate.target)}"
+            )
+          )
       }
     )
   }

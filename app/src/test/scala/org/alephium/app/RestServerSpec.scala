@@ -1205,6 +1205,21 @@ abstract class RestServerSpec(
 
       hashrateResponse.hashrate is expected
     }
+
+    Post(
+      s"/utils/target-to-hashrate",
+      body = s"""
+                |{
+                |  "target": "1234"
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.BadRequest
+
+      val badRequest = response.as[ApiError.BadRequest]
+
+      badRequest.detail is "Invalid target string: 1234"
+    }
   }
 
   def verifyNonEmptyEvents(response: Response[Either[String, String]]): Assertion = {
