@@ -780,17 +780,23 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef] =
-    PP(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ value) { case (_, ident, v) =>
-      Ast.ConstantVarDef(ident, v)
+    PP(
+      Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ (value | stringLiteral.map(
+        _.string
+      ))
+  ){ case (_, ident, v) =>
+      Ast.ConstantVarDef(ident, v.asInstanceOf[Val])
     }
 
   def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[StatefulContext]] =
     PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>
       Ast.EnumFieldSelector(enumId, field)
     }
+
   def enumField[Unknown: P]: P[Ast.EnumField] =
-    PP(Lexer.constantIdent ~ "=" ~ value) { case (ident, value) =>
+    PP(Lexer.constantIdent ~ "=" ~ (value | stringLiteral.map(_.string))) { case (ident, value) =>
       Ast.EnumField(ident, value)
     }
   def rawEnumDef[Unknown: P]: P[Ast.EnumDef] =

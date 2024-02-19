@@ -35,14 +35,15 @@ sealed trait ArithOperator extends Operator {
 object ArithOperator {
   private def binary(
       i256Instr: BinaryArithmeticInstr[Val.I256],
-      u256Instr: BinaryArithmeticInstr[Val.U256]
+      u256Instr: BinaryArithmeticInstr[Val.U256],
+      operator: String
   ): ArithOperator = {
     new ArithOperator {
       override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
         argsType(0) match {
           case Type.I256 => Seq(i256Instr)
           case Type.U256 => Seq(u256Instr)
-          case _         => throw new RuntimeException("Dead branch")
+          case _         => throw Compiler.Error(s"Expect I256/U256 for $operator operator", None)
         }
       }
     }
@@ -63,7 +64,7 @@ object ArithOperator {
     new ArithOperator {
       override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
         if (argsType.length != 2 || !argsType(0).toVal.isNumeric || argsType(1) != Type.U256) {
-          throw Compiler.Error(s"Invalid param types $argsType for exp operator", None)
+          throw Compiler.Error(s"Invalid param types $argsType for ** operator", None)
         } else {
           Seq(argsType(0))
         }
@@ -73,17 +74,17 @@ object ArithOperator {
         argsType(0) match {
           case Type.I256 => Seq(i256Instr)
           case Type.U256 => Seq(u256Instr)
-          case _         => throw new RuntimeException("Dead branch")
+          case _         => throw Compiler.Error(s"Expect I256/U256 for ** operator", None)
         }
       }
     }
 
-  val Add: ArithOperator = binary(I256Add, U256Add)
-  val Sub: ArithOperator = binary(I256Sub, U256Sub)
-  val Mul: ArithOperator = binary(I256Mul, U256Mul)
+  val Add: ArithOperator = binary(I256Add, U256Add, "+")
+  val Sub: ArithOperator = binary(I256Sub, U256Sub, "-")
+  val Mul: ArithOperator = binary(I256Mul, U256Mul, "*")
   val Exp: ArithOperator = exp(I256Exp, U256Exp)
-  val Div: ArithOperator = binary(I256Div, U256Div)
-  val Mod: ArithOperator = binary(I256Mod, U256Mod)
+  val Div: ArithOperator = binary(I256Div, U256Div, "/")
+  val Mod: ArithOperator = binary(I256Mod, U256Mod, "%")
 
   val ModAdd: ArithOperator = u256Binary("ModAdd", U256ModAdd)
   val ModSub: ArithOperator = u256Binary("ModSub", U256ModSub)
@@ -128,7 +129,7 @@ object TestOperator {
         case Type.Bool    => Seq(BoolEq)
         case Type.ByteVec => Seq(ByteVecEq)
         case Type.Address => Seq(AddressEq)
-        case _            => throw new RuntimeException("Dead branch")
+        case _ => throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for == operator", None)
       }
     }
   }
@@ -140,30 +141,31 @@ object TestOperator {
         case Type.Bool    => Seq(BoolNeq)
         case Type.ByteVec => Seq(ByteVecNeq)
         case Type.Address => Seq(AddressNeq)
-        case _            => throw new RuntimeException("Dead branch")
+        case _ => throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for != operator", None)
       }
     }
   }
 
   private def inequality(
       i256Instr: BinaryArithmeticInstr[Val.I256],
-      u256Instr: BinaryArithmeticInstr[Val.U256]
+      u256Instr: BinaryArithmeticInstr[Val.U256],
+      operator: String
   ): TestOperator = {
     new TestOperator {
       override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
         argsType(0) match {
           case Type.I256 => Seq(i256Instr)
           case Type.U256 => Seq(u256Instr)
-          case _         => throw new RuntimeException("Expect I256/U256 for inequality test")
+          case _         => throw Compiler.Error(s"Expect I256/U256 for $operator operator", None)
         }
       }
     }
   }
 
-  val Lt: TestOperator = inequality(I256Lt, U256Lt)
-  val Le: TestOperator = inequality(I256Le, U256Le)
-  val Gt: TestOperator = inequality(I256Gt, U256Gt)
-  val Ge: TestOperator = inequality(I256Ge, U256Ge)
+  val Lt: TestOperator = inequality(I256Lt, U256Lt, "<")
+  val Le: TestOperator = inequality(I256Le, U256Le, "<=")
+  val Gt: TestOperator = inequality(I256Gt, U256Gt, ">")
+  val Ge: TestOperator = inequality(I256Ge, U256Ge, ">=")
 }
 
 sealed trait LogicalOperator extends TestOperator

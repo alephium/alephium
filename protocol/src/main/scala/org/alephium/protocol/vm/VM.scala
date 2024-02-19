@@ -484,13 +484,28 @@ object StatefulVM {
     )
   }
 
-  def runTxScriptWithOutputs(
+  def runTxScriptWithOutputsTestOnly(
       context: StatefulContext,
       script: StatefulScript
   ): ExeResult[(AVector[Val], TxScriptExecution)] = {
     for {
       outputs <- executeWithOutputs(context, script.toObject, AVector.empty)
       result  <- prepareResult(context)
+    } yield (outputs, result)
+  }
+
+  def runCallerContractWithOutputsTestOnly(
+      context: StatefulContext,
+      contract: StatefulContract,
+      contractId: ContractId
+  ): ExeResult[(AVector[Val], TxScriptExecution)] = {
+    for {
+      outputs <- executeWithOutputs(
+        context,
+        contract.toHalfDecoded().toObjectUnsafeTestOnly(contractId, AVector.empty, AVector.empty),
+        AVector.empty
+      )
+      result <- prepareResult(context)
     } yield (outputs, result)
   }
 

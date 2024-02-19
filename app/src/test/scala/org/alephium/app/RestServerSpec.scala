@@ -44,6 +44,7 @@ import org.alephium.http.HttpFixture._
 import org.alephium.http.HttpRouteFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, Hash}
+import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{Transaction => _, _}
 import org.alephium.protocol.model.UnsignedTransaction.TxOutputInfo
 import org.alephium.protocol.vm.LockupScript
@@ -1182,6 +1183,42 @@ abstract class RestServerSpec(
         chainIndex,
         server.port
       )(verifyNonEmptyEvents)
+    }
+  }
+
+  it should "convert target to hashrate" in {
+    val target = "1b032b55"
+
+    Post(
+      s"/utils/target-to-hashrate",
+      body = s"""
+                |{
+                |  "target": "$target"
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.Ok
+
+      val hashrateResponse = response.as[TargetToHashrate.Result]
+      val expected =
+        HashRate.from(Target.unsafe(Hex.unsafe(target)), consensusConfig.blockTargetTime).value
+
+      hashrateResponse.hashrate is expected
+    }
+
+    Post(
+      s"/utils/target-to-hashrate",
+      body = s"""
+                |{
+                |  "target": "1234"
+                |}
+        """.stripMargin
+    ) check { response =>
+      response.code is StatusCode.BadRequest
+
+      val badRequest = response.as[ApiError.BadRequest]
+
+      badRequest.detail is "Invalid target string: 1234"
     }
   }
 
