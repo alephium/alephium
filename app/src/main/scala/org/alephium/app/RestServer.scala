@@ -121,6 +121,7 @@ class RestServer(
       exportBlocksLogic,
       verifySignatureLogic,
       checkHashIndexingLogic,
+      targetToHashrateLogic,
       getContractEventsLogic,
       getContractEventsCurrentCountLogic,
       getEventsByTxIdLogic,

@@ -843,6 +843,12 @@ trait EndpointsExamples extends ErrorExamples {
   implicit val verifySignatureExamples: List[Example[VerifySignature]] =
     simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
 
+  implicit val targetToHashrateExamples: List[Example[TargetToHashrate]] =
+    simpleExample(TargetToHashrate(target = model.Target.unsafe(Hex.unsafe("1b032b55")).bits))
+
+  implicit val targetToHashrateResultExamples: List[Example[TargetToHashrate.Result]] =
+    simpleExample(TargetToHashrate.Result(new BigInteger("355255758493400")))
+
   implicit val eventsExamples: List[Example[ContractEvents]] =
     simpleExample(ContractEvents(events = AVector(event), 2))
 

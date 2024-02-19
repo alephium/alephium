@@ -16,6 +16,7 @@
 
 package org.alephium.api
 
+import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
 import akka.util.ByteString
@@ -947,6 +948,32 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
                      |}
         """.stripMargin
     checkData(verifySignature, jsonRaw)
+  }
+
+  it should "encode/decode TargetToHashrate" in {
+    val target = Hash.generate.bytes
+
+    val targetToHashrate =
+      TargetToHashrate(target)
+    val jsonRaw = s"""
+                     |{
+                     |  "target": "${Hex.toHexString(target)}"
+                     |}
+        """.stripMargin
+    checkData(targetToHashrate, jsonRaw)
+  }
+
+  it should "encode/decode TargetToHashrate.Result" in {
+    val hashrate = new BigInteger("10000000000000")
+
+    val targetToHashrateResult =
+      TargetToHashrate.Result(hashrate)
+    val jsonRaw = s"""
+                     |{
+                     |  "hashrate": "${hashrate}"
+                     |}
+        """.stripMargin
+    checkData(targetToHashrateResult, jsonRaw)
   }
 
   it should "encode/decode AssetState" in {
