@@ -43,8 +43,8 @@ object Lexer {
   def newline[Unknown: P]: P[Unit]   = P(NoTrace(StringIn("\r\n", "\n")))
 
   private def id[Unknown: P, T <: Ast.Positioned](prefix: => P[Unit], func: String => T): P[T] =
-    P(Index ~ (prefix ~ (letter | digit | "_").rep).!.filter(!Keyword.Used.exists(_)) ~ Index).map {
-      case (fromIndex, i, endIndex) => func(i).atSourceIndex(fromIndex, endIndex)
+    P(Index ~ (prefix ~ (letter | digit | "_").rep).!.filter(!Keyword.Used.exists(_))).map {
+      case (fromIndex, i) => func(i).atSourceIndex(Some(SourceIndex(fromIndex, i.length)))
     }
   def ident[Unknown: P]: P[Ast.Ident] = id(lowercase, Ast.Ident)
   def constantIdent[Unknown: P]: P[Ast.Ident] =

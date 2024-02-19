@@ -37,10 +37,6 @@ object Ast {
 
   trait Positioned {
     var sourceIndex: Option[SourceIndex] = None
-    def atSourceIndex(fromIndex: Int): this.type = {
-      this.sourceIndex = Some(SourceIndex(fromIndex))
-      this
-    }
     def atSourceIndex(fromIndex: Int, endIndex: Int): this.type = {
       this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
       this
@@ -92,7 +88,7 @@ object Ast {
   final case class ApproveAsset[Ctx <: StatelessContext](
       address: Expr[Ctx],
       tokenAmounts: Seq[(Expr[Ctx], Expr[Ctx])]
-  ) {
+  ) extends Positioned {
     def check(state: Compiler.State[Ctx]): Unit = {
       if (address.getType(state) != Seq(Type.Address)) {
         throw Compiler.Error(s"Invalid address type: ${address}", address.sourceIndex)
@@ -150,7 +146,7 @@ object Ast {
     }
   }
 
-  trait Typed[Ctx <: StatelessContext, T] {
+  trait Typed[Ctx <: StatelessContext, T] extends Positioned {
     var tpe: Option[T] = None
     protected def _getType(state: Compiler.State[Ctx]): T
     def getType(state: Compiler.State[Ctx]): T =
@@ -163,7 +159,7 @@ object Ast {
       }
   }
 
-  sealed trait Expr[Ctx <: StatelessContext] extends Typed[Ctx, Seq[Type]] with Positioned {
+  sealed trait Expr[Ctx <: StatelessContext] extends Typed[Ctx, Seq[Type]] {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
 
