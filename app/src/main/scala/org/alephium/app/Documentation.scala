@@ -77,9 +77,6 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     buildMultisig,
     buildSweepMultisig,
     submitMultisigTransaction,
-    verifySignature,
-    targetToHashrate,
-    checkHashIndexing,
     minerAction,
     mineOneBlock,
     minerListAddresses,
@@ -87,7 +84,10 @@ trait Documentation extends Endpoints with OpenAPIDocsInterpreter {
     getContractEvents,
     getContractEventsCurrentCount,
     getEventsByTxId,
-    getEventsByBlockHash
+    getEventsByBlockHash,
+    verifySignature,
+    targetToHashrate,
+    checkHashIndexing
   )
 
   private lazy val servers = List(
