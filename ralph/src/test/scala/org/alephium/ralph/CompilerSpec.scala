@@ -2491,7 +2491,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |TxScript Main(fooContractId: ByteVec, amount: U256) {
          |  let foo = Foo(fooContractId)
-         |  foo.$$foo$$${bracesPart}()
+         |  $$foo.foo${bracesPart}()$$
          |}
          |
          |Interface Foo {

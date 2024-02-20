@@ -135,8 +135,7 @@ object Ast {
 
     def genApproveCode(
         state: Compiler.State[Ctx],
-        func: Compiler.FuncInfo[Ctx],
-        sourceIndex: Option[SourceIndex]
+        func: Compiler.FuncInfo[Ctx]
     ): Seq[Instr[Ctx]] = {
       (approveAssets.nonEmpty, func.usePreapprovedAssets) match {
         case (true, false) =>
@@ -320,7 +319,7 @@ object Ast {
           } else {
             Seq.empty
           }
-          val instrs = genApproveCode(state, func, sourceIndex) ++
+          val instrs = genApproveCode(state, func) ++
             func.genCodeForArgs(args, state) ++
             variadicInstrs ++
             func.genCode(argsType)
@@ -447,7 +446,7 @@ object Ast {
       val argLength = Type.flattenTypeLength(func.argsType)
       val retLength =
         func.getReturnLength(args.flatMap(_.getType(state)), state.selfContractType)
-      genApproveCode(state, func, callId.sourceIndex) ++
+      genApproveCode(state, func) ++
         args.flatMap(_.genCode(state)) ++
         Seq(
           ConstInstr.u256(Val.U256(U256.unsafe(argLength))),
