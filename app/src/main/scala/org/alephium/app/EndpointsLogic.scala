@@ -653,12 +653,13 @@ trait EndpointsLogic extends Endpoints {
     )
   }
 
-  val contractStateLogic = serverLogic(contractState) { case (contractAddress, groupIndex) =>
+  val contractStateLogic = serverLogic(contractState) { contractAddress =>
+    val groupIndex = contractAddress.groupIndex
     requestFromGroupIndex(
       groupIndex,
-      Future.successful(serverUtils.getContractState(blockFlow, contractAddress, groupIndex)),
+      Future.successful(serverUtils.getContractState(blockFlow, contractAddress)),
       contractState,
-      (contractAddress, groupIndex)
+      contractAddress
     )
   }
 

@@ -1182,9 +1182,9 @@ class ServerUtils(implicit
 
   def getContractState(
       blockFlow: BlockFlow,
-      address: Address.Contract,
-      groupIndex: GroupIndex
+      address: Address.Contract
   ): Try[ContractState] = {
+    val groupIndex = address.groupIndex
     for {
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex))
       state      <- fetchContractState(worldState, address.contractId)
