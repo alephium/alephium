@@ -820,7 +820,7 @@ object StatefulParser extends Parser[StatefulContext] {
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawContract[Unknown: P]: P[Ast.Contract] =
     P(
-      annotation.rep ~ Index ~~ Lexer.`abstract` ~ Lexer.token(
+      annotation.rep ~ Index ~ Lexer.`abstract` ~ Lexer.token(
         Keyword.Contract
       ) ~/ Lexer.typeId ~ contractFields ~
         contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
