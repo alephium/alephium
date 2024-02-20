@@ -38,10 +38,12 @@ object Ast {
   trait Positioned {
     var sourceIndex: Option[SourceIndex] = None
     def atSourceIndex(fromIndex: Int, endIndex: Int): this.type = {
+      require(this.sourceIndex.isEmpty)
       this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
       this
     }
     def atSourceIndex(sourceIndex: Option[SourceIndex]): this.type = {
+      require(this.sourceIndex.isEmpty)
       this.sourceIndex = sourceIndex
       this
     }

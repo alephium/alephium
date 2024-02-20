@@ -184,12 +184,14 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
 
   def ifBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
-    PP(Lexer.token(Keyword.`if`) ~/ "(" ~ expr ~ ")" ~ expr) { case (_, condition, expr) =>
-      Ast.IfBranchExpr(condition, expr)
+    P(Lexer.token(Keyword.`if`) ~/ "(" ~ expr ~ ")" ~ expr).map { case (ifIndex, condition, expr) =>
+      val sourceIndex = SourceIndex(Some(ifIndex), expr.sourceIndex)
+      Ast.IfBranchExpr(condition, expr).atSourceIndex(sourceIndex)
     }
   def elseIfBranchExpr[Unknown: P]: P[Ast.IfBranchExpr[Ctx]] =
-    PP(Lexer.token(Keyword.`else`) ~ ifBranchExpr) { case (_, ifBranch) =>
-      ifBranch
+    P(Lexer.token(Keyword.`else`) ~ ifBranchExpr).map { case (elseIndex, ifBranch) =>
+      val sourceIndex = SourceIndex(Some(elseIndex), ifBranch.sourceIndex)
+      Ast.IfBranchExpr(ifBranch.condition, ifBranch.expr).atSourceIndex(sourceIndex)
     }
   def elseBranchExpr[Unknown: P]: P[Ast.ElseBranchExpr[Ctx]] =
     P(Lexer.token(Keyword.`else`) ~ expr).map { case (elseIndex, expr) =>
@@ -405,9 +407,9 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.IfBranchStatement(condition, body).atSourceIndex(ifIndex.index, endIndex)
     }
   def elseIfBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
-    P(Lexer.token(Keyword.`else`) ~ ifBranchStmt ~~ Index).map {
-      case (elseIfIndex, ifBranch, endIndex) =>
-        ifBranch.atSourceIndex(elseIfIndex.index, endIndex)
+    P(Lexer.token(Keyword.`else`) ~ ifBranchStmt).map { case (elseIndex, ifBranch) =>
+      val sourceIndex = SourceIndex(Some(elseIndex), ifBranch.sourceIndex)
+      Ast.IfBranchStatement(ifBranch.condition, ifBranch.body).atSourceIndex(sourceIndex)
     }
   def elseBranchStmt[Unknown: P]: P[Ast.ElseBranchStatement[Ctx]] =
     P(Lexer.token(Keyword.`else`) ~ (block | emptyBlock) ~~ Index).map {
