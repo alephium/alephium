@@ -828,15 +828,9 @@ abstract class RestServerSpec(
   }
 
   it should "call GET /contracts/<address>/state" in {
-    0.until(brokerConfig.groups).filter(_ != dummyContractGroup.group).foreach { group =>
-      Get(s"/contracts/${dummyContractAddress}/state?group=${group}") check { response =>
-        response.code is StatusCode.InternalServerError
-      }
-    }
-    Get(s"/contracts/${dummyContractAddress}/state?group=${dummyContractGroup.group}") check {
-      response =>
-        response.code is StatusCode.Ok
-        response.as[ContractState].address.toBase58 is dummyContractAddress
+    Get(s"/contracts/${dummyContractAddress.toBase58}/state") check { response =>
+      response.code is StatusCode.Ok
+      response.as[ContractState].address is dummyContractAddress
     }
   }
 
