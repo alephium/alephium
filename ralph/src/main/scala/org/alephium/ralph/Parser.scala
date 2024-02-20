@@ -801,9 +801,10 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   def rawEnumDef[Unknown: P]: P[Ast.EnumDef] =
     PP(Lexer.token(Keyword.`enum`) ~/ Lexer.typeId ~ "{" ~ enumField.rep ~ "}") {
-      case (_, id, fields) =>
+      case (enumIndex, id, fields) =>
         if (fields.length == 0) {
-          throw Compiler.Error(s"No field definition in Enum ${id.name}", id.sourceIndex)
+          val sourceIndex = SourceIndex(Some(enumIndex), id.sourceIndex)
+          throw Compiler.Error(s"No field definition in Enum ${id.name}", sourceIndex)
         }
         Ast.UniqueDef.checkDuplicates(fields, "enum fields")
         if (fields.distinctBy(_.value.tpe).size != 1) {
@@ -819,7 +820,7 @@ object StatefulParser extends Parser[StatefulContext] {
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawContract[Unknown: P]: P[Ast.Contract] =
     P(
-      annotation.rep ~ Lexer.`abstract` ~ Lexer.token(
+      annotation.rep ~ Index ~~ Lexer.`abstract` ~ Lexer.token(
         Keyword.Contract
       ) ~/ Lexer.typeId ~ contractFields ~
         contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
@@ -827,8 +828,9 @@ object StatefulParser extends Parser[StatefulContext] {
     ).map {
       case (
             annotations,
-            isAbstract,
             fromIndex,
+            isAbstract,
+            _,
             typeId,
             fields,
             contractInheritances,
@@ -853,7 +855,7 @@ object StatefulParser extends Parser[StatefulContext] {
             enums,
             contractInheritances.getOrElse(Seq.empty)
           )
-          .atSourceIndex(fromIndex.index, endIndex)
+          .atSourceIndex(fromIndex, endIndex)
     }
   def contract[Unknown: P]: P[Ast.Contract] = P(Start ~ rawContract ~ End)
 

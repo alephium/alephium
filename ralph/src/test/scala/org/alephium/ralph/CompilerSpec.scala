@@ -2925,6 +2925,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(code, "Variable foo.ErrorCodes.Error1 does not exist")
     }
+    {
+      info("Enum field does not exist")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  $$enum ErrorCodes$$ {
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "No field definition in Enum ErrorCodes")
+    }
   }
 
   it should "test contract enums" in new Fixture {
@@ -3353,7 +3364,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "not generate code for abstract contract" in {
     val foo =
       s"""
-         |Abstract $$Contract Foo() {
+         |$$Abstract Contract Foo() {
          |  pub fn foo() -> () {}
          |  pub fn bar() -> () {}
          |}$$
