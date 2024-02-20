@@ -106,9 +106,13 @@ object ArrayTransformer {
   }
   // scalastyle:on parameter.number
 
-  @inline def checkArrayIndex(index: Int, arraySize: Int): Unit = {
+  @inline def checkArrayIndex(
+      index: Int,
+      arraySize: Int,
+      sourceIndex: Option[SourceIndex]
+  ): Unit = {
     if (index < 0 || index >= arraySize) {
-      throw Compiler.Error(s"Invalid array index: $index, array size: $arraySize")
+      throw Compiler.Error(s"Invalid array index: $index, array size: $arraySize", sourceIndex)
     }
   }
 
@@ -169,7 +173,7 @@ object ArrayTransformer {
           val length = baseType.flattenSize()
           (baseType, length)
         case _ =>
-          throw Compiler.Error(s"Expect multi-dimension array type, have $tpe")
+          throw Compiler.Error(s"Expect multi-dimension array type, have $tpe", index.sourceIndex)
       }
       val newOffset = calcOffset(state, index) match {
         case ConstantArrayVarOffset(value) =>
@@ -186,7 +190,7 @@ object ArrayTransformer {
     ): ArrayVarOffset[Ctx] = {
       Compiler.State.getAndCheckConstantIndex(index) match {
         case Some(idx) =>
-          checkArrayIndex(idx, tpe.size)
+          checkArrayIndex(idx, tpe.size, index.sourceIndex)
           ConstantArrayVarOffset(idx)
         case None =>
           val instrs = index.genCode(state) ++ Seq(

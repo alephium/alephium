@@ -18,7 +18,7 @@ package org.alephium.ralph.error
 
 import fastparse.Parsed
 
-import org.alephium.ralph.{Ast, Compiler}
+import org.alephium.ralph.{Ast, SourceIndex}
 
 /** Typed compiler errors. */
 sealed trait CompilerError extends Product {
@@ -27,6 +27,11 @@ sealed trait CompilerError extends Product {
 }
 
 object CompilerError {
+
+  // scalastyle:off null
+  def apply(message: String, sourceIndex: Option[SourceIndex]): Default =
+    Default(message, sourceIndex, null)
+  // scalastyle:on null
 
   /** String only error message. */
   case object `an I256 or U256 value` extends CompilerError
@@ -49,8 +54,8 @@ object CompilerError {
     def toFormatter(program: String): CompilerErrorFormatter =
       CompilerErrorFormatter(this, program)
 
-    def toError(program: String): Compiler.Error =
-      Compiler.Error(toFormatter(program).format(None))
+    def format(program: String): String =
+      toFormatter(program).format(None)
   }
 
   /** ****** Section: Syntax Errors ******
@@ -78,9 +83,6 @@ object CompilerError {
 
     override def footer: Option[String] =
       Some(tracedMsg)
-
-    def toError(): Compiler.Error =
-      super.toError(program)
 
     def toFormatter(): CompilerErrorFormatter =
       super.toFormatter(program)
@@ -168,4 +170,26 @@ object CompilerError {
       address.length
   }
 
+  /** ****** Section: Default Error ****** This error is used when a specific error is not
+    * available.
+    */
+  final case class Default(
+      override val message: String,
+      sourceIndex: Option[SourceIndex],
+      cause: Throwable
+  ) extends Exception(message, cause)
+      with FormattableError {
+    def title: String =
+      "Compilation error"
+    override val position: Int =
+      sourceIndex.map(_.index).getOrElse(0)
+    override val foundLength: Int =
+      sourceIndex.map(_.width).getOrElse(0)
+  }
+  object Default {
+    // scalastyle:off null
+    def apply(message: String, sourceIndex: Option[SourceIndex]): Default =
+      Default(message, sourceIndex, null)
+    // scalastyle:on null
+  }
 }

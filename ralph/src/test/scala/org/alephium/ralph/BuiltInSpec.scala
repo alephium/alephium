@@ -119,4 +119,21 @@ class BuiltInSpec extends AlephiumSpec {
 
     test(false, Seq(U256Const(Val.U256(U256.Zero)), Encode))
   }
+
+  it should "return correct error source index" in {
+    val code =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    assert!($$addModN!(2, 4) == 1, 0)
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    val index = code.indexOf("$")
+    val error = Compiler.compileContractFull(code.replace("$", "")).leftValue
+
+    error.message is "Invalid args type List(U256, U256) for builtin func addModN, expected List(U256, U256, U256)"
+    error.position is index
+  }
 }
