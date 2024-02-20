@@ -48,6 +48,13 @@ object Ast {
       this
     }
 
+    /*
+     * This function update a `CompilerError` when the source index was not
+     * available at the time of the error.
+     * For example for `Operator` or `BuiltIn`, we could add the `SourceIndex`
+     * to the `getReturnType` function, but it implies a lot of changes in the
+     * all `ralph` module, while the position is not useful along the way.
+     */
     def positionedError[T](f: => T): T = {
       try {
         f
