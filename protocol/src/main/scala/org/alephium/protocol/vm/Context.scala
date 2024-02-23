@@ -183,7 +183,9 @@ trait StatelessContext extends CostStrategy {
   def signatures: Stack[Signature] = txEnv.signatures
 
   def getTxPrevOutput(indexRaw: Val.U256): ExeResult[AssetOutput] = {
-    indexRaw.v.toInt.flatMap(txEnv.prevOutputs.get).toRight(Right(InvalidTxInputIndex))
+    indexRaw.v.toInt
+      .flatMap(txEnv.prevOutputs.get)
+      .toRight(Right(InvalidTxInputIndex(indexRaw.v.toInt)))
   }
 
   def getTxInputAddressAt(indexRaw: Val.U256): ExeResult[Val.Address] = {
@@ -205,7 +207,10 @@ trait StatelessContext extends CostStrategy {
         if (txEnv.prevOutputs.tail.forall(_.lockupScript == firstInput.lockupScript)) {
           Right(Val.Address(firstInput.lockupScript))
         } else {
-          failed(TxInputAddressesAreNotIdentical)
+          val addresses = txEnv.prevOutputs.map { v =>
+            Address.Asset(v.lockupScript).toBase58
+          }.toSet
+          failed(TxInputAddressesAreNotIdentical(addresses))
         }
       case None =>
         failed(NoTxInput)
@@ -235,7 +240,7 @@ object StatelessContext {
       var gasRemaining: GasBox
   )(implicit val networkConfig: NetworkConfig)
       extends StatelessContext {
-    def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
+    def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectPayableMethod)
 
     def writeLog(
         contractIdOpt: Option[ContractId],
@@ -282,7 +287,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
   ): ExeResult[Unit] = {
     val inputIndex = contractInputs.indexWhere(_._2.lockupScript.contractId == contractId)
     if (inputIndex == -1) {
-      failed(ContractAssetUnloaded)
+      failed(ContractAssetUnloaded(Address.contract(contractId).toBase58))
     } else {
       val (_, input) = contractInputs(inputIndex)
       if (contractOutput == input) {
@@ -527,7 +532,7 @@ object StatefulContext {
             .toRight(Right(UnableToPayGasFee))
         } yield balances
       } else {
-        failed(ExpectNonPayableMethod)
+        failed(ExpectPayableMethod)
       }
 
     val outputBalances: MutBalances = MutBalances.empty

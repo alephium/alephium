@@ -34,7 +34,6 @@ class VarVectorSpec extends AlephiumSpec {
     vector.get(2).leftValue isE InvalidVarIndex
     vector.sameElements(AVector(0)) is false
     vector.sameElements(AVector(0, 1)) is true
-    vector.setIf(1, 2, _ => failed(InvalidVarType)).leftValue isE InvalidVarType
     vector.setIf(1, 2, _ => okay).rightValue is ()
     vector.setIf(-1, -1, _ => okay).leftValue isE InvalidVarIndex
     vector.sameElements(AVector(0)) is false

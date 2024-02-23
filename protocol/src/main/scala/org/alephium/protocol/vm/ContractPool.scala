@@ -20,7 +20,13 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.IOError
-import org.alephium.protocol.model.{ContractId, ContractOutput, ContractOutputRef, HardFork}
+import org.alephium.protocol.model.{
+  Address,
+  ContractId,
+  ContractOutput,
+  ContractOutputRef,
+  HardFork
+}
 import org.alephium.util.{AVector, EitherF}
 
 trait ContractPool extends CostStrategy {
@@ -156,7 +162,7 @@ trait ContractPool extends CostStrategy {
     assetStatus.get(contractId) match {
       case Some(ContractAssetInUsing) => Right(assetStatus.update(contractId, ContractAssetFlushed))
       case Some(ContractAssetFlushed) => failed(ContractAssetAlreadyFlushed)
-      case None                       => failed(ContractAssetUnloaded)
+      case None => failed(ContractAssetUnloaded(Address.contract(contractId).toBase58))
     }
   }
 

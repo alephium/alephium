@@ -183,7 +183,7 @@ sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
   def methodsLength: Int = methods.length
 
   def getMethod(index: Int): ExeResult[Method[Ctx]] = {
-    methods.get(index).toRight(Right(InvalidMethodIndex(index)))
+    methods.get(index).toRight(Right(InvalidMethodIndex(index, methodsLength)))
   }
 
   def toTemplateString(): String = {
@@ -275,7 +275,7 @@ final case class StatefulContract(
   def methodsLength: Int = methods.length
 
   def getMethod(index: Int): ExeResult[Method[StatefulContext]] = {
-    methods.get(index).toRight(Right(InvalidMethodIndex(index)))
+    methods.get(index).toRight(Right(InvalidMethodIndex(index, methodsLength)))
   }
 
   def toHalfDecoded(): StatefulContract.HalfDecoded = {
@@ -321,7 +321,7 @@ object StatefulContract {
           Right(method)
         }
       } else {
-        failed(InvalidMethodIndex(index))
+        failed(InvalidMethodIndex(index, methodsLength))
       }
     }
 

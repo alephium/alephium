@@ -269,13 +269,15 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
 
   it should "toTxOutput for Leman fork + contract lockup script" in new ToTxOutputFixture {
     override val lockupScript = LockupScript.p2c(ContractId.generate)
+    val address               = Address.Contract(lockupScript)
 
     Test(0).expectLeman()
-    Test(ALPH.oneAlph - 1).failLeman(LowerThanContractMinimalBalance)
+    Test(ALPH.oneAlph - 1).failLeman(LowerThanContractMinimalBalance(address, ALPH.oneAlph - 1))
     Test(ALPH.oneAlph).expectLeman(ALPH.oneAlph -> Seq.empty)
 
     Test(0, tokenId -> 1).failLeman()
-    Test(ALPH.oneAlph - 1, tokenId -> 1).failLeman(LowerThanContractMinimalBalance)
+    Test(ALPH.oneAlph - 1, tokenId -> 1)
+      .failLeman(LowerThanContractMinimalBalance(address, ALPH.oneAlph - 1))
     Test(ALPH.oneAlph, tokenId -> 1).expectLeman(
       ALPH.oneAlph -> Seq(tokenId -> 1)
     )
@@ -283,7 +285,7 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
       ALPH.oneAlph -> tokens.init.map(_ -> U256.One).toSeq
     )
     Test(ALPH.oneAlph, tokens.map(_ -> U256.One).toSeq: _*)
-      .failLeman(InvalidTokenNumForContractOutput)
+      .failLeman(InvalidTokenNumForContractOutput(address, tokens.length))
   }
 
   trait Fixture extends TxGenerators with NetworkConfigFixture.Default {
