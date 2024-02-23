@@ -81,7 +81,13 @@ case object PayToContractAddressNotInCallerTrace               extends ExeFailur
 case object InvalidAddressTypeInContractDestroy                extends ExeFailure
 case object ExpectNonPayableMethod                             extends ExeFailure
 case object ExpectStatefulContractObj                          extends ExeFailure
-case object NoBalanceAvailable                                 extends ExeFailure
+case object NoBalanceAvailable extends ExeFailure {
+  override def toString: String = {
+    s"No balance available. To fix, enable approved assets with `@using(preapprovedAssets = true)`, " +
+      s"or utilize contract assets with `@using(assetsInContract = true)`, " +
+      s"or use both with `@using(preapprovedAssets = true, assetsInContract = true)`"
+  }
+}
 final case class NotEnoughApprovedBalance(
     lockupScript: LockupScript,
     tokenId: TokenId,
@@ -122,17 +128,20 @@ final case class InvalidOutputBalances(
       s"got $attoAlphAmount, you need to transfer more ALPH to this address)"
   }
 }
-case object InvalidTokenNumForContractOutput                   extends ExeFailure
-case object InvalidTokenId                                     extends ExeFailure
-case object InvalidContractId                                  extends ExeFailure
-case object ExpectAContract                                    extends ExeFailure
-case object OutOfGas                                           extends ExeFailure
-case object ContractPoolOverflow                               extends ExeFailure
-case object ContractFieldOverflow                              extends ExeFailure
-final case class ContractLoadDisallowed(id: ContractId)        extends ExeFailure
-case object ContractAssetAlreadyInUsing                        extends ExeFailure
-case object ContractAssetAlreadyFlushed                        extends ExeFailure
-case object ContractAssetUnloaded                              extends ExeFailure
+case object InvalidTokenNumForContractOutput            extends ExeFailure
+case object InvalidTokenId                              extends ExeFailure
+case object InvalidContractId                           extends ExeFailure
+case object ExpectAContract                             extends ExeFailure
+case object OutOfGas                                    extends ExeFailure
+case object ContractPoolOverflow                        extends ExeFailure
+case object ContractFieldOverflow                       extends ExeFailure
+final case class ContractLoadDisallowed(id: ContractId) extends ExeFailure
+case object ContractAssetAlreadyInUsing                 extends ExeFailure
+case object ContractAssetAlreadyFlushed                 extends ExeFailure
+case object ContractAssetUnloaded extends ExeFailure {
+  override def toString: String =
+    s"The contract assets are not loaded, please annotate the function with `@using(assetsInContract = true)`"
+}
 case object EmptyContractAsset                                 extends ExeFailure
 case object NoCaller                                           extends ExeFailure
 final case class NegativeTimeStamp(millis: Long)               extends ExeFailure
