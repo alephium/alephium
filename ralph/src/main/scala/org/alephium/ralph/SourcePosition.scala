@@ -51,14 +51,14 @@ object SourcePosition {
         )
       catch {
         case throwable: Throwable =>
-          throw Compiler.Error(unsupportedLineNumberFormat(lineNum), throwable)
+          throw Compiler.Error(unsupportedLineNumberFormat(lineNum), None, throwable)
       }
     } else {
       // TODO: is there a preferred way of handling error like these other than
       //       throwing exception?
       // There is no usage of other line number formats supported by FastParse.
       // So this is reported as unsupported.
-      throw Compiler.Error(unsupportedLineNumberFormat(lineNum))
+      throw Compiler.Error(unsupportedLineNumberFormat(lineNum), None)
     }
   }
 

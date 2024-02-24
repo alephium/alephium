@@ -3042,9 +3042,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |  }
          |}
          |""".stripMargin
-    Compiler.compileContract(contractRaw).leftValue is Compiler.Error(
+    Compiler.compileContract(contractRaw).leftValue.message is
       "Array type not supported for event \"Foo.TestEvent\""
-    )
   }
 
   private def getLogStates(
@@ -3648,7 +3647,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     intercept[Throwable](test("", "1, #11, 2i", "", "")).getMessage is
-      "org.alephium.ralph.Compiler$Error: Invalid args type List(U256, ByteVec, I256) for function encodeFields"
+      "org.alephium.ralph.error.CompilerError$Default: Invalid args type List(U256, ByteVec, I256) for function encodeFields"
     test("", "1, 2i, #11", "020201030111", "010102")
     test("@std(id = #0001)", "1, 2i, #11", "0302010301110306414c50480001", "010102")
   }
@@ -3773,7 +3772,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
     }
     intercept[Throwable](test("AbstractFoo(selfContractId!())")).getMessage is
-      "org.alephium.ralph.Compiler$Error: AbstractFoo is not instantiable"
+      "org.alephium.ralph.error.CompilerError$Default: AbstractFoo is not instantiable"
     test("Foo(selfContractId!())")
     test("selfContract!()")
   }
@@ -3826,7 +3825,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
     }
     intercept[Throwable](test("AbstractFooGrandParent(selfContractId!())")).getMessage is
-      "org.alephium.ralph.Compiler$Error: AbstractFooGrandParent is not instantiable"
+      "org.alephium.ralph.error.CompilerError$Default: AbstractFooGrandParent is not instantiable"
     test("Foo(selfContractId!())")
     test("selfContract!()")
   }
@@ -3859,7 +3858,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
     }
     intercept[Throwable](test("FooParent2(selfContractId!())")).getMessage is
-      "org.alephium.ralph.Compiler$Error: FooParent2 is not instantiable"
+      "org.alephium.ralph.error.CompilerError$Default: FooParent2 is not instantiable"
     test("Foo(selfContractId!())")
     test("selfContract!()")
   }
@@ -4439,13 +4438,13 @@ class VMSpec extends AlephiumSpec with Generators {
     def verifyInvalidArgumentType(func: String, assertValue: String) = {
       val code = barCode(s"$func!(caller) == $assertValue")
       intercept[Throwable](createContract(code)).getMessage is
-        s"org.alephium.ralph.Compiler$$Error: Invalid argument type for $func, expected Contract, got Address"
+        s"org.alephium.ralph.error.CompilerError$$Default: Invalid argument type for $func, expected Contract, got Address"
     }
 
     def verifyInvalidNumberOfArguments(func: String, assertValue: String) = {
       val code = barCode(s"$func!(1, caller) == $assertValue")
       intercept[Throwable](createContract(code)).getMessage is
-        s"org.alephium.ralph.Compiler$$Error: Invalid argument type for $func, expected Contract, got U256, Address"
+        s"org.alephium.ralph.error.CompilerError$$Default: Invalid argument type for $func, expected Contract, got U256, Address"
     }
 
     def verifyTransferToken(func: String, assertValue: String) = {

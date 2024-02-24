@@ -197,7 +197,15 @@ case object ExpectStatefulContractObj extends ExeFailure {
   override def toString: String =
     "`callerInitialStateHash` or `callerCodeHash` functions can only be called from the contract"
 }
-case object NoBalanceAvailable extends ExeFailure
+
+case object NoBalanceAvailable extends ExeFailure {
+  override def toString: String = {
+    s"No balance available. To fix, enable approved assets with `@using(preapprovedAssets = true)`, " +
+      s"or utilize contract assets with `@using(assetsInContract = true)`, " +
+      s"or use both with `@using(preapprovedAssets = true, assetsInContract = true)`"
+  }
+}
+
 final case class NotEnoughApprovedBalance(
     lockupScript: LockupScript,
     tokenId: TokenId,
@@ -279,7 +287,7 @@ case object ContractAssetAlreadyFlushed                 extends ExeFailure
 
 final case class ContractAssetUnloaded(address: String) extends ExeFailure {
   override def toString: String = {
-    s"Assets for contract $address is not loaded, consider setting the `assetsInContract` annotation to true"
+    s"Assets for contract $address is not loaded, please annotate the function with `@using(assetsInContract = true)`"
   }
 }
 
@@ -304,26 +312,26 @@ final case class SerdeErrorByteVecToAddress(bytes: ByteString, error: SerdeError
     s"Failed to deserialize ${Hex.toHexString(bytes)} to address: $error"
 }
 
-case object FailedInRecoverEthAddress                          extends ExeFailure
-case object UnexpectedRecursiveCallInMigration                 extends ExeFailure
-case object UnableToMigratePreLemanContract                    extends ExeFailure
+case object FailedInRecoverEthAddress          extends ExeFailure
+case object UnexpectedRecursiveCallInMigration extends ExeFailure
+case object UnableToMigratePreLemanContract    extends ExeFailure
 
-final case class InvalidAssetAddress(address: Address)         extends ExeFailure {
+final case class InvalidAssetAddress(address: Address) extends ExeFailure {
   override def toString: String = s"Invalid asset address ${address.toBase58}"
 }
 
 final case class ContractAlreadyExists(contractId: ContractId) extends ExeFailure {
   override def toString: String = s"Contract ${contractId.toHexString} already exists"
 }
-case object NoBlockHashAvailable                               extends ExeFailure
-case object DebugIsNotSupportedForMainnet                      extends ExeFailure {
+case object NoBlockHashAvailable extends ExeFailure
+case object DebugIsNotSupportedForMainnet extends ExeFailure {
   override def toString: String = "Debug is not supported for mainnet"
 }
-case object DebugMessageIsEmpty                                extends ExeFailure
-case object ZeroContractId                                     extends ExeFailure {
+case object DebugMessageIsEmpty extends ExeFailure
+case object ZeroContractId extends ExeFailure {
   override def toString: String = s"Can not create contract with id ${ContractId.zero.toHexString}"
 }
-case object BurningAlphNotAllowed                              extends ExeFailure {
+case object BurningAlphNotAllowed extends ExeFailure {
   override def toString: String = "Burning ALPH is not allowed for `burnToken` function"
 }
 

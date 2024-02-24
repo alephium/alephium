@@ -1159,7 +1159,7 @@ class ServerUtils(implicit
       .compileTxScriptFull(query.code, compilerOptions = query.getLangCompilerOptions())
       .map(CompileScriptResult.from)
       .left
-      .map(error => failed(error.toString))
+      .map(error => failed(error.format(query.code)))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -1168,7 +1168,7 @@ class ServerUtils(implicit
       .compileContractFull(query.code, compilerOptions = query.getLangCompilerOptions())
       .map(CompileContractResult.from)
       .left
-      .map(error => failed(error.toString))
+      .map(error => failed(error.format(query.code)))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -1177,14 +1177,14 @@ class ServerUtils(implicit
       .compileProject(query.code, compilerOptions = query.getLangCompilerOptions())
       .map(p => CompileProjectResult.from(p._1, p._2))
       .left
-      .map(error => failed(error.toString))
+      .map(error => failed(error.format(query.code)))
   }
 
   def getContractState(
       blockFlow: BlockFlow,
-      address: Address.Contract,
-      groupIndex: GroupIndex
+      address: Address.Contract
   ): Try[ContractState] = {
+    val groupIndex = address.groupIndex
     for {
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex))
       state      <- fetchContractState(worldState, address.contractId)

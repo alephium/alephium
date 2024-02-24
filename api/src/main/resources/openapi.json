@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "2.8.4"
+    "version": "2.8.5"
   },
   "servers": [
     {
@@ -7563,15 +7563,6 @@
             "schema": {
               "type": "string",
               "format": "address"
-            }
-          },
-          {
-            "name": "group",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
             }
           }
         ],

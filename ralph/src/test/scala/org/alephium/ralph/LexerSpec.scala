@@ -92,7 +92,7 @@ class LexerSpec extends AlephiumSpec {
       val failure =
         intercept[CompilerError.`Expected an U256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.toError(input).message is
+      failure.format(input) is
         """-- error (1:1): Syntax error
           |1 |123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
           |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -106,7 +106,7 @@ class LexerSpec extends AlephiumSpec {
       val failure =
         intercept[CompilerError.`Expected an I256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.toError(input).message is
+      failure.format(input) is
         """-- error (1:1): Syntax error
           |1 |-123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
           |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -120,7 +120,7 @@ class LexerSpec extends AlephiumSpec {
       val failure =
         intercept[CompilerError.`Expected an I256 value`](fastparse.parse(input, Lexer.typedNum(_)))
 
-      failure.toError(input).message is
+      failure.format(input) is
         """-- error (1:1): Syntax error
           |1 |123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789i
           |  |^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -152,7 +152,7 @@ class LexerSpec extends AlephiumSpec {
             fastparse.parse(errorScript, StatelessParser.assetScript(_))
           }
 
-        failure.toError(errorScript).message is
+        failure.format(errorScript) is
           """-- error (5:13): Syntax error
             |5 |    let c = 123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789
             |  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -192,8 +192,7 @@ class LexerSpec extends AlephiumSpec {
 
       val invalidByteVec = "#12DRq8VCM7kTs7eDjGyvKWuqJVbYS6DysC3ttguLabGD2"
       intercept[CompilerError.`Invalid byteVec`](fastparse.parse(invalidByteVec, Lexer.bytes(_)))
-        .toError(invalidByteVec)
-        .message is
+        .format(invalidByteVec) is
         """-- error (1:2): Type error
           |1 |#12DRq8VCM7kTs7eDjGyvKWuqJVbYS6DysC3ttguLabGD2
           |  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -225,7 +224,7 @@ class LexerSpec extends AlephiumSpec {
             .parse(code, Lexer.mutMaybe(allowMutable = false)(_))
         }
 
-      error.toError(code).message is
+      error.format(code) is
         """-- error (1:1): Syntax error
           |1 |mut foo
           |  |^^^
@@ -276,8 +275,7 @@ class LexerSpec extends AlephiumSpec {
     error is CompilerError.`Invalid number`(number, 0)
 
     error
-      .toError(number)
-      .message is
+      .format(number) is
       """-- error (1:1): Type error
         |1 |0.1
         |  |^^^
@@ -295,7 +293,7 @@ class LexerSpec extends AlephiumSpec {
 
     error is CompilerError.`Invalid address`(contractAddress, 0)
 
-    error.toError(contractAddress).message is
+    error.format(contractAddress) is
       """-- error (1:1): Type error
         |1 |abcefgh
         |  |^^^^^^^

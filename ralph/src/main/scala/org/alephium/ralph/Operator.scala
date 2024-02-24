@@ -26,7 +26,7 @@ sealed trait Operator {
 sealed trait ArithOperator extends Operator {
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {
     if (argsType.length != 2 || argsType(0) != argsType(1) || !argsType(0).toVal.isNumeric) {
-      throw Compiler.Error(s"Invalid param types $argsType for ArithOperator")
+      throw Compiler.Error(s"Invalid param types $argsType for ArithOperator", None)
     } else {
       Seq(argsType(0))
     }
@@ -43,7 +43,7 @@ object ArithOperator {
         argsType(0) match {
           case Type.I256 => Seq(i256Instr)
           case Type.U256 => Seq(u256Instr)
-          case _         => throw Compiler.Error(s"Expect I256/U256 for $operator operator")
+          case _         => throw Compiler.Error(s"Expect I256/U256 for $operator operator", None)
         }
       }
     }
@@ -54,7 +54,7 @@ object ArithOperator {
       override def genCode(argsType: Seq[Type]): Seq[Instr[StatelessContext]] = {
         argsType(0) match {
           case Type.U256 => Seq(instr)
-          case _         => throw Compiler.Error(s"$name accepts U256 only")
+          case _         => throw Compiler.Error(s"$name accepts U256 only", None)
         }
       }
     }
@@ -64,7 +64,7 @@ object ArithOperator {
     new ArithOperator {
       override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
         if (argsType.length != 2 || !argsType(0).toVal.isNumeric || argsType(1) != Type.U256) {
-          throw Compiler.Error(s"Invalid param types $argsType for ** operator")
+          throw Compiler.Error(s"Invalid param types $argsType for ** operator", None)
         } else {
           Seq(argsType(0))
         }
@@ -74,7 +74,7 @@ object ArithOperator {
         argsType(0) match {
           case Type.I256 => Seq(i256Instr)
           case Type.U256 => Seq(u256Instr)
-          case _         => throw Compiler.Error(s"Expect I256/U256 for ** operator")
+          case _         => throw Compiler.Error(s"Expect I256/U256 for ** operator", None)
         }
       }
     }
@@ -99,7 +99,7 @@ object ArithOperator {
   val Concat: Operator = new Operator {
     override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
       if (argsType.length != 2 || argsType(0) != Type.ByteVec || argsType(1) != Type.ByteVec) {
-        throw Compiler.Error(s"Invalid param types $argsType for $this")
+        throw Compiler.Error(s"Invalid param types $argsType for $this", None)
       } else {
         Seq(Type.ByteVec)
       }
@@ -114,7 +114,7 @@ object ArithOperator {
 sealed trait TestOperator extends Operator {
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {
     if (argsType.length != 2 || argsType(0) != argsType(1) || argsType(0).isArrayType) {
-      throw Compiler.Error(s"Invalid param types $argsType for $this")
+      throw Compiler.Error(s"Invalid param types $argsType for $this", None)
     } else {
       Seq(Type.Bool)
     }
@@ -129,7 +129,8 @@ object TestOperator {
         case Type.Bool    => Seq(BoolEq)
         case Type.ByteVec => Seq(ByteVecEq)
         case Type.Address => Seq(AddressEq)
-        case _ => throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for == operator")
+        case _ =>
+          throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for == operator", None)
       }
     }
   }
@@ -141,7 +142,8 @@ object TestOperator {
         case Type.Bool    => Seq(BoolNeq)
         case Type.ByteVec => Seq(ByteVecNeq)
         case Type.Address => Seq(AddressNeq)
-        case _ => throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for != operator")
+        case _ =>
+          throw Compiler.Error("Expect I256/U256/Bool/ByteVec/Address for != operator", None)
       }
     }
   }
@@ -156,7 +158,7 @@ object TestOperator {
         argsType(0) match {
           case Type.I256 => Seq(i256Instr)
           case Type.U256 => Seq(u256Instr)
-          case _         => throw Compiler.Error(s"Expect I256/U256 for $operator operator")
+          case _         => throw Compiler.Error(s"Expect I256/U256 for $operator operator", None)
         }
       }
     }
@@ -174,7 +176,7 @@ object LogicalOperator {
   case object Not extends LogicalOperator {
     override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
       if (argsType.length != 1 || argsType(0) != Type.Bool) {
-        throw Compiler.Error(s"Invalid param types $argsType for $this")
+        throw Compiler.Error(s"Invalid param types $argsType for $this", None)
       } else {
         Seq(Type.Bool)
       }
@@ -186,7 +188,7 @@ object LogicalOperator {
   sealed trait BinaryLogicalOperator extends LogicalOperator {
     override def getReturnType(argsType: Seq[Type]): Seq[Type] = {
       if (argsType.length != 2 || argsType(0) != Type.Bool || argsType(1) != Type.Bool) {
-        throw Compiler.Error(s"Invalid param types $argsType for $this")
+        throw Compiler.Error(s"Invalid param types $argsType for $this", None)
       } else {
         Seq(Type.Bool)
       }
