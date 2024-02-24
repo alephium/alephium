@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm
 
+import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 
 import scala.annotation.switch
@@ -387,12 +388,12 @@ object StoreLocal extends StatelessInstrCompanion1[Byte]
 sealed trait VarIndexInstr[Ctx <: StatelessContext]
     extends LemanInstrWithSimpleGas[Ctx]
     with GasLow {
-  def popIndex[C <: Ctx](frame: Frame[C], error: ExeFailure): ExeResult[Int] = {
+  def popIndex[C <: Ctx](frame: Frame[C], error: (BigInteger) => ExeFailure): ExeResult[Int] = {
     for {
       u256 <- frame.popOpStackU256()
       index <- u256.v.toInt
         .flatMap(v => if (v > 0xff) None else Some(v))
-        .toRight(Right(error))
+        .toRight(Right(error(u256.v.v)))
     } yield index
   }
 }

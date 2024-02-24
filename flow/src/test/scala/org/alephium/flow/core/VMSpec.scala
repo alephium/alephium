@@ -1562,7 +1562,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
     testSimpleScript(main(0), gasAmount.value)
-    failSimpleScript(main(1), InvalidTxInputIndex(Some(1)))
+    failSimpleScript(main(1), InvalidTxInputIndex(1))
   }
 
   it should "test dust amount" in new ContractFixture {
@@ -1679,7 +1679,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
     testSimpleScript(main(block.timestamp, Duration.unsafe(1), 0))
-    failSimpleScript(main(block.timestamp, Duration.unsafe(1), 1), InvalidTxInputIndex(Some(1)))
+    failSimpleScript(main(block.timestamp, Duration.unsafe(1), 1), InvalidTxInputIndex(1))
 
     val absoluteLockTimeScript = Compiler
       .compileTxScript(main(TimeStamp.now() + Duration.ofMinutesUnsafe(1), Duration.unsafe(1), 0))

@@ -47,7 +47,10 @@ case object ExpectStatefulFrame     extends ExeFailure
 case object StackOverflow           extends ExeFailure
 case object StackUnderflow          extends ExeFailure
 case object NegativeArgumentInStack extends ExeFailure
-case object TooManySignatures       extends ExeFailure
+
+final case class TooManySignatures(extraLength: Int) extends ExeFailure {
+  override def toString: String = s"$extraLength signature(s) remain unverified"
+}
 
 final case class InvalidPublicKey(publicKeyBytes: ByteString) extends ExeFailure {
   override def toString: String = s"Invalid public key: ${Hex.toHexString(publicKeyBytes)}"
@@ -65,8 +68,8 @@ final case class InvalidSignature(rawSignature: String) extends ExeFailure {
   override def toString: String = s"Verification failed for signature $rawSignature"
 }
 
-final case class InvalidTxInputIndex(index: Option[Int]) extends ExeFailure {
-  override def toString: String = s"Invalid tx input index${index.fold("")(i => s": $i")}"
+final case class InvalidTxInputIndex(index: BigInteger) extends ExeFailure {
+  override def toString: String = s"Invalid tx input index $index"
 }
 
 case object NoTxInput extends ExeFailure
@@ -78,7 +81,7 @@ final case class TxInputAddressesAreNotIdentical(addresses: Set[String]) extends
 
 case object AccessTxInputAddressInContract extends ExeFailure {
   override def toString: String =
-    "txInputsSize and txInputAddress functions are only allowed in TxScript"
+    "`txInputsSize` and `txInputAddress` functions are only allowed in TxScript"
 }
 
 case object LockTimeOverflow extends ExeFailure
@@ -103,10 +106,20 @@ case object RelativeLockTimeExpectPersistedUtxo extends ExeFailure {
 }
 
 final case class ArithmeticError(message: String) extends ExeFailure
-case object InvalidVarIndex                       extends ExeFailure
-case object InvalidMutFieldIndex                  extends ExeFailure
-case object InvalidImmFieldIndex                  extends ExeFailure
-case object InvalidFieldLength                    extends ExeFailure
+
+final case class InvalidVarIndex(index: BigInteger) extends ExeFailure {
+  override def toString: String = s"Invalid var index: $index"
+}
+
+final case class InvalidMutFieldIndex(index: BigInteger) extends ExeFailure {
+  override def toString: String = s"Invalid mutable field index: $index"
+}
+
+final case class InvalidImmFieldIndex(index: Int) extends ExeFailure {
+  override def toString: String = s"Invalid immutable field index: $index"
+}
+
+case object InvalidFieldLength extends ExeFailure
 
 case object TooManyFields extends ExeFailure {
   override def toString: String = "Contract can not have more than 255 fields"

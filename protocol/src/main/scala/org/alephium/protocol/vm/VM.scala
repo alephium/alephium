@@ -532,7 +532,7 @@ object StatefulVM {
     if (context.txEnv.signatures.isEmpty) {
       okay
     } else {
-      failed(TooManySignatures)
+      failed(TooManySignatures(context.txEnv.signatures.size))
     }
   }
 

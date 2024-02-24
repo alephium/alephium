@@ -185,7 +185,7 @@ trait StatelessContext extends CostStrategy {
   def getTxPrevOutput(indexRaw: Val.U256): ExeResult[AssetOutput] = {
     indexRaw.v.toInt
       .flatMap(txEnv.prevOutputs.get)
-      .toRight(Right(InvalidTxInputIndex(indexRaw.v.toInt)))
+      .toRight(Right(InvalidTxInputIndex(indexRaw.v.v)))
   }
 
   def getTxInputAddressAt(indexRaw: Val.U256): ExeResult[Val.Address] = {

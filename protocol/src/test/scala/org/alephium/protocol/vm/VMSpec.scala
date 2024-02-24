@@ -568,7 +568,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
     val signature = Signature.generate
     val context1  = genStatefulContext(None, signatures = AVector(signature))
-    StatefulVM.checkRemainingSignatures(context1).leftValue isE TooManySignatures
+    StatefulVM.checkRemainingSignatures(context1).leftValue isE TooManySignatures(1)
   }
 
   trait NetworkFixture extends ContextGenerators {

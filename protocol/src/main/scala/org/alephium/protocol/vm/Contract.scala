@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import java.math.BigInteger
+
 import scala.annotation.switch
 import scala.collection.mutable
 
@@ -440,17 +442,21 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
   def getImmField(index: Int): ExeResult[Val] = {
     immFields.get(index) match {
       case Some(v) => Right(v)
-      case None    => failed(InvalidImmFieldIndex)
+      case None    => failed(InvalidImmFieldIndex(index))
     }
   }
 
   def getMutField(index: Int): ExeResult[Val] = {
-    if (mutFields.isDefinedAt(index)) Right(mutFields(index)) else failed(InvalidMutFieldIndex)
+    if (mutFields.isDefinedAt(index)) {
+      Right(mutFields(index))
+    } else {
+      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong)))
+    }
   }
 
   def setMutField(index: Int, v: Val): ExeResult[Unit] = {
     if (!mutFields.isDefinedAt(index)) {
-      failed(InvalidMutFieldIndex)
+      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong)))
     } else if (mutFields(index).tpe != v.tpe) {
       failed(InvalidMutFieldType)
     } else {
