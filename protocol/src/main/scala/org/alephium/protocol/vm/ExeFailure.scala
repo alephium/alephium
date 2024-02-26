@@ -49,7 +49,7 @@ case object StackUnderflow          extends ExeFailure
 case object NegativeArgumentInStack extends ExeFailure
 
 final case class TooManySignatures(extraLength: Int) extends ExeFailure {
-  override def toString: String = s"$extraLength signature(s) remain unverified"
+  override def toString: String = s"$extraLength signature(s) remain unused"
 }
 
 final case class InvalidPublicKey(publicKeyBytes: ByteString) extends ExeFailure {
@@ -60,12 +60,17 @@ final case class SignedDataIsNot32Bytes(length: Int) extends ExeFailure {
   override def toString: String = s"Signed data bytes should have 32 bytes, get $length instead"
 }
 
-final case class InvalidSignatureFormat(rawSignature: String) extends ExeFailure {
-  override def toString: String = s"Signature $rawSignature is not in the correct format"
+final case class InvalidSignatureFormat(signature: ByteString) extends ExeFailure {
+  override def toString: String = s"Signature $signature is not in the correct format"
 }
 
-final case class InvalidSignature(rawSignature: String) extends ExeFailure {
-  override def toString: String = s"Verification failed for signature $rawSignature"
+final case class InvalidSignature(
+    publicKey: ByteString,
+    message: ByteString,
+    rawSignature: ByteString
+) extends ExeFailure {
+  override def toString: String =
+    s"Verification failed for signature $rawSignature, public key: $publicKey, message: $message"
 }
 
 final case class InvalidTxInputIndex(index: BigInteger) extends ExeFailure {
@@ -74,9 +79,9 @@ final case class InvalidTxInputIndex(index: BigInteger) extends ExeFailure {
 
 case object NoTxInput extends ExeFailure
 
-final case class TxInputAddressesAreNotIdentical(addresses: Set[String]) extends ExeFailure {
+final case class TxInputAddressesAreNotIdentical(addresses: Set[Address.Asset]) extends ExeFailure {
   override def toString: String =
-    s"Tx input addresses are not identical: ${addresses.mkString(", ")}"
+    s"Tx input addresses are not identical for `callerAddress` function: ${addresses.mkString(", ")}"
 }
 
 case object AccessTxInputAddressInContract extends ExeFailure {
@@ -85,8 +90,9 @@ case object AccessTxInputAddressInContract extends ExeFailure {
 }
 
 case object LockTimeOverflow extends ExeFailure
-final case class InvalidLockTime(timestamp: TimeStamp) extends ExeFailure {
-  override def toString: String = s"Invalid lock time: $timestamp"
+final case class InvalidLockTime(timestamp: TimeStamp, blockTime: TimeStamp) extends ExeFailure {
+  override def toString: String =
+    s"Invalid lock time: $timestamp, it should be greater than blocktime: $blockTime"
 }
 
 final case class AbsoluteLockTimeVerificationFailed(lockUntil: TimeStamp, blockTime: TimeStamp)
@@ -107,16 +113,18 @@ case object RelativeLockTimeExpectPersistedUtxo extends ExeFailure {
 
 final case class ArithmeticError(message: String) extends ExeFailure
 
-final case class InvalidVarIndex(index: BigInteger) extends ExeFailure {
-  override def toString: String = s"Invalid var index: $index"
+final case class InvalidVarIndex(index: BigInteger, maxIndex: Int) extends ExeFailure {
+  override def toString: String = s"Invalid var index: $index, max index is: $maxIndex"
 }
 
-final case class InvalidMutFieldIndex(index: BigInteger) extends ExeFailure {
-  override def toString: String = s"Invalid mutable field index: $index"
+final case class InvalidMutFieldIndex(index: BigInteger, mutFieldsLength: Int) extends ExeFailure {
+  override def toString: String =
+    s"Invalid mutable field index: $index, mutable fields length is: $mutFieldsLength"
 }
 
-final case class InvalidImmFieldIndex(index: Int) extends ExeFailure {
-  override def toString: String = s"Invalid immutable field index: $index"
+final case class InvalidImmFieldIndex(index: Int, immFieldsLength: Int) extends ExeFailure {
+  override def toString: String =
+    s"Invalid immutable field index: $index, immutable fields length is: $immFieldsLength"
 }
 
 case object InvalidFieldLength extends ExeFailure
@@ -181,9 +189,9 @@ final case class SerdeErrorCreateContract(error: SerdeError) extends ExeFailure 
   override def toString: String = s"Deserialization error while creating contract: $error"
 }
 
-final case class NonExistContract(contractId: ContractId) extends ExeFailure {
+final case class NonExistContract(address: Address.Contract) extends ExeFailure {
   override def toString: String =
-    s"Contract ${contractId.toHexString} does not exist"
+    s"Contract $address does not exist"
 }
 
 case object ContractDestructionShouldNotBeCalledFromSelf extends ExeFailure {
@@ -194,16 +202,15 @@ case object ContractDestructionShouldNotBeCalledFromSelf extends ExeFailure {
 final case class PayToContractAddressNotInCallerTrace(address: Address.Contract)
     extends ExeFailure {
   override def toString: String =
-    s"Pay to contract address ${address.toBase58} directly is not allowed, consider implementing a function from the contract to receive the payment"
+    s"Pay to contract address $address is not allowed when this contract address is in the call stack"
 }
 
 case object InvalidAddressTypeInContractDestroy extends ExeFailure {
   override def toString: String = "Pay to contract is not allowed before Leman upgrade"
 }
 
-case object ExpectPayableMethod extends ExeFailure {
-  override def toString: String =
-    "Method should have approved assets, please annotate the function with `@using(preapprovedAssets = true)"
+case object ExpectNonPayableMethod extends ExeFailure {
+  override def toString: String = "Expect non payable method in AssetScript"
 }
 
 case object ExpectStatefulContractObj extends ExeFailure {
@@ -298,14 +305,20 @@ final case class ContractLoadDisallowed(id: ContractId) extends ExeFailure
 case object ContractAssetAlreadyInUsing                 extends ExeFailure
 case object ContractAssetAlreadyFlushed                 extends ExeFailure
 
-final case class ContractAssetUnloaded(address: String) extends ExeFailure {
+final case class ContractAssetUnloaded(address: Address.Contract) extends ExeFailure {
   override def toString: String = {
     s"Assets for contract $address is not loaded, please annotate the function with `@using(assetsInContract = true)`"
   }
 }
 
-case object EmptyContractAsset extends ExeFailure
-case object NoCaller           extends ExeFailure
+case object EmptyContractAsset extends ExeFailure {
+  override def toString: String =
+    s"The contract's asset(s) have been used up, but a minimum of ${dustUtxoAmount} ALPH is required"
+}
+
+case object NoCaller extends ExeFailure {
+  override def toString: String = "The current method does not have a caller"
+}
 
 final case class NegativeTimeStamp(millis: Long) extends ExeFailure {
   override def toString: String = s"Negative timestamp $millis"
@@ -325,16 +338,21 @@ final case class SerdeErrorByteVecToAddress(bytes: ByteString, error: SerdeError
     s"Failed to deserialize ${Hex.toHexString(bytes)} to address: $error"
 }
 
-case object FailedInRecoverEthAddress          extends ExeFailure
-case object UnexpectedRecursiveCallInMigration extends ExeFailure
-case object UnableToMigratePreLemanContract    extends ExeFailure
+case object FailedInRecoverEthAddress extends ExeFailure
+
+case object UnexpectedRecursiveCallInMigration extends ExeFailure {
+  override def toString: String =
+    "Can not migrate a contract that is calling its own migration method"
+}
+
+case object UnableToMigratePreLemanContract extends ExeFailure
 
 final case class InvalidAssetAddress(address: Address) extends ExeFailure {
   override def toString: String = s"Invalid asset address ${address.toBase58}"
 }
 
-final case class ContractAlreadyExists(contractId: ContractId) extends ExeFailure {
-  override def toString: String = s"Contract ${contractId.toHexString} already exists"
+final case class ContractAlreadyExists(address: Address.Contract) extends ExeFailure {
+  override def toString: String = s"Contract $address already exists"
 }
 case object NoBlockHashAvailable extends ExeFailure
 case object DebugIsNotSupportedForMainnet extends ExeFailure {

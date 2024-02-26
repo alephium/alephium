@@ -432,8 +432,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.size is 1
     stack.top.get is bool
 
-    LoadLocal(1.toByte).runWith(frame).leftValue isE InvalidVarIndex(1)
-    LoadLocal(-1.toByte).runWith(frame).leftValue isE InvalidVarIndex(255)
+    LoadLocal(1.toByte).runWith(frame).leftValue isE InvalidVarIndex(1, 0)
+    LoadLocal(-1.toByte).runWith(frame).leftValue isE InvalidVarIndex(255, 0)
   }
 
   it should "StoreLocal" in new StatelessInstrFixture {
@@ -449,9 +449,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     StoreLocal(1.toByte).runWith(frame).leftValue isE StackUnderflow
 
     stack.push(bool)
-    StoreLocal(1.toByte).runWith(frame).leftValue isE InvalidVarIndex(1)
+    StoreLocal(1.toByte).runWith(frame).leftValue isE InvalidVarIndex(1, 0)
     stack.push(bool)
-    StoreLocal(-1.toByte).runWith(frame).leftValue isE InvalidVarIndex(255)
+    StoreLocal(-1.toByte).runWith(frame).leftValue isE InvalidVarIndex(255, 0)
   }
 
   it should "LoadLocalByIndex" in new StatelessInstrFixture {
@@ -467,11 +467,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.top.get is bool
 
     stack.push(Val.U256(1)) isE ()
-    LoadLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex(1)
+    LoadLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex(1, 0)
     stack.push(Val.U256(0xff)) isE ()
     LoadLocalByIndex.popIndex(frame, InvalidVarIndex) isE 0xff
     stack.push(Val.U256(0xff + 1)) isE ()
-    LoadLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex(0xff + 1)
+    LoadLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex(0xff + 1, 0xff)
   }
 
   it should "StoreLocalByIndex" in new StatelessInstrFixture {
@@ -485,13 +485,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(bool)
     stack.push(Val.U256(1))
-    StoreLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex(1)
+    StoreLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex(1, 0)
     stack.push(bool)
     stack.push(Val.U256(0xff))
     StoreLocalByIndex.popIndex(frame, InvalidVarIndex) isE 0xff
     stack.push(bool)
     stack.push(Val.U256(0xff + 1))
-    StoreLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex(0xff + 1)
+    StoreLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex(0xff + 1, 0xff)
   }
 
   it should "Pop" in new StatelessInstrFixture {
@@ -1502,7 +1502,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     signatureStack.push(signature)
     stack.push(Val.ByteVec(wrongKey.bytes))
     VerifyTxSignature.runWith(frame).leftValue isE InvalidSignature(
-      Hex.toHexString(signature.bytes)
+      wrongKey.bytes,
+      tx.id.bytes,
+      signature.bytes
     )
 
     signatureStack.push(signature)
@@ -1553,7 +1555,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       initialGas.subUnsafe(context.gasRemaining) is instr.gas()
 
       stack.push(Val.ByteVec(ByteString("zzz")))
-      instr.runWith(frame).leftValue isE InvalidSignatureFormat(Hex.toHexString(ByteString("zzz")))
+      instr.runWith(frame).leftValue isE InvalidSignatureFormat(ByteString("zzz"))
 
       val wrongData = dataGen.sample.get
       stack.push(Val.ByteVec(wrongData))
@@ -2050,8 +2052,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.size is 1
     stack.top.get is Val.False
 
-    LoadImmField(1.toByte).runWith(frame).leftValue isE InvalidImmFieldIndex(1)
-    LoadImmField(-1.toByte).runWith(frame).leftValue isE InvalidImmFieldIndex(255)
+    LoadImmField(1.toByte).runWith(frame).leftValue isE InvalidImmFieldIndex(1, 1)
+    LoadImmField(-1.toByte).runWith(frame).leftValue isE InvalidImmFieldIndex(255, 1)
   }
 
   it should "LoadMutField(byte)" in new StatefulInstrFixture {
@@ -2059,8 +2061,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.size is 1
     stack.top.get is Val.True
 
-    LoadMutField(1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(1)
-    LoadMutField(-1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(255)
+    LoadMutField(1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(1, 1)
+    LoadMutField(-1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(255, 1)
   }
 
   it should "StoreMutField(byte)" in new StatefulInstrFixture {
@@ -2070,9 +2072,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     frame.obj.getMutField(0) isE Val.False
 
     stack.push(Val.True)
-    StoreMutField(1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(1)
+    StoreMutField(1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(1, 1)
     stack.push(Val.True)
-    StoreMutField(-1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(255)
+    StoreMutField(-1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(255, 1)
   }
 
   it should "LoadImmFieldByIndex" in new StatefulInstrFixture {
@@ -2082,12 +2084,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.top.get is Val.False
 
     stack.push(Val.U256(1))
-    LoadImmFieldByIndex.runWith(frame).leftValue isE InvalidImmFieldIndex(1)
+    LoadImmFieldByIndex.runWith(frame).leftValue isE InvalidImmFieldIndex(1, 1)
     stack.push(Val.U256(0xff))
     LoadImmFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
     stack.push(Val.U256(0xff + 1))
     LoadImmFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex(
-      0xff + 1
+      0xff + 1,
+      0xff
     )
   }
 
@@ -2098,12 +2101,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.top.get is Val.True
 
     stack.push(Val.U256(1))
-    LoadMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex(1)
+    LoadMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex(1, 1)
     stack.push(Val.U256(0xff))
     LoadMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
     stack.push(Val.U256(0xff + 1))
     LoadMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex(
-      0xff + 1
+      0xff + 1,
+      0xff
     )
   }
 
@@ -2116,14 +2120,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(Val.False)
     stack.push(Val.U256(1))
-    StoreMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex(1)
+    StoreMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex(1, 1)
     stack.push(Val.False)
     stack.push(Val.U256(0xff))
     StoreMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
     stack.push(Val.False)
     stack.push(Val.U256(0xff + 1))
     StoreMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex(
-      0xff + 1
+      0xff + 1,
+      0xff
     )
   }
 
@@ -3625,7 +3630,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .runWith(frame)
         .leftValue
         .rightValue
-        .toString is s"Tx input addresses are not identical: ${randomAddresses.mkString(", ")}"
+        .toString is s"Tx input addresses are not identical for `callerAddress` function: ${randomAddresses
+          .mkString(", ")}"
     }
   }
 

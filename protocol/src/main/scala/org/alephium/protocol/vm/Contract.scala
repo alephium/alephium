@@ -442,7 +442,7 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
   def getImmField(index: Int): ExeResult[Val] = {
     immFields.get(index) match {
       case Some(v) => Right(v)
-      case None    => failed(InvalidImmFieldIndex(index))
+      case None    => failed(InvalidImmFieldIndex(index, immFields.length))
     }
   }
 
@@ -450,13 +450,13 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
     if (mutFields.isDefinedAt(index)) {
       Right(mutFields(index))
     } else {
-      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong)))
+      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), immFields.length))
     }
   }
 
   def setMutField(index: Int, v: Val): ExeResult[Unit] = {
     if (!mutFields.isDefinedAt(index)) {
-      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong)))
+      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), immFields.length))
     } else if (mutFields(index).tpe != v.tpe) {
       failed(InvalidMutFieldType)
     } else {

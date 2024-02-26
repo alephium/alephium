@@ -232,7 +232,7 @@ final class StatelessVM(
       args: AVector[Val],
       operandStack: Stack[Val],
       returnTo: AVector[Val] => ExeResult[Unit]
-  ): ExeResult[Frame[StatelessContext]] = failed(ExpectPayableMethod)
+  ): ExeResult[Frame[StatelessContext]] = failed(ExpectNonPayableMethod)
 
   protected def completeLastFrame(lastFrame: Frame[StatelessContext]): ExeResult[Unit] = Right(())
 }
@@ -377,7 +377,7 @@ final class StatefulVM(
     EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
       lockupScript match {
         case l: LockupScript.P2C if ctx.assetStatus.get(l.contractId).isEmpty =>
-          failed(ContractAssetUnloaded(Address.contract(l.contractId).toBase58))
+          failed(ContractAssetUnloaded(Address.contract(l.contractId)))
         case _ =>
           balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
             outputs.foreachE(output => ctx.generateOutput(output))

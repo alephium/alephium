@@ -65,7 +65,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
 
   it should "check the entry method of stateless scripts" in new StatelessFixture {
     test1(baseMethod, okay)
-    test1(baseMethod.copy(usePreapprovedAssets = true), failed(ExpectPayableMethod))
+    test1(baseMethod.copy(usePreapprovedAssets = true), failed(ExpectNonPayableMethod))
     test1(baseMethod.copy(argsLength = -1), failed(InvalidMethodArgLength(0, -1)))
     intercept[AssertionError](
       test1(baseMethod.copy(localsLength = -1), okay)

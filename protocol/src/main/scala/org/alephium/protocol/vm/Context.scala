@@ -208,7 +208,7 @@ trait StatelessContext extends CostStrategy {
           Right(Val.Address(firstInput.lockupScript))
         } else {
           val addresses = txEnv.prevOutputs.map { v =>
-            Address.Asset(v.lockupScript).toBase58
+            Address.Asset(v.lockupScript)
           }.toSet
           failed(TxInputAddressesAreNotIdentical(addresses))
         }
@@ -240,7 +240,7 @@ object StatelessContext {
       var gasRemaining: GasBox
   )(implicit val networkConfig: NetworkConfig)
       extends StatelessContext {
-    def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectPayableMethod)
+    def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
 
     def writeLog(
         contractIdOpt: Option[ContractId],
@@ -287,7 +287,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
   ): ExeResult[Unit] = {
     val inputIndex = contractInputs.indexWhere(_._2.lockupScript.contractId == contractId)
     if (inputIndex == -1) {
-      failed(ContractAssetUnloaded(Address.contract(contractId).toBase58))
+      failed(ContractAssetUnloaded(Address.contract(contractId)))
     } else {
       val (_, input) = contractInputs(inputIndex)
       if (contractOutput == input) {
@@ -364,7 +364,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
           case Left(otherIOError) =>
             ioFailed(IOErrorLoadContract(otherIOError))
           case Right(_) =>
-            Left(Right(ContractAlreadyExists(contractId)))
+            Left(Right(ContractAlreadyExists(Address.contract(contractId))))
         }
       _ <- code.check(initialImmFields, initialMutFields)
       _ <- createContract(
@@ -532,7 +532,7 @@ object StatefulContext {
             .toRight(Right(UnableToPayGasFee))
         } yield balances
       } else {
-        failed(ExpectPayableMethod)
+        failed(ExpectNonPayableMethod)
       }
 
     val outputBalances: MutBalances = MutBalances.empty

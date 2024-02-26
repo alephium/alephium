@@ -1708,7 +1708,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         testContractParams.toComplete().rightValue
       )
       .leftValue
-      .detail is s"VM execution error: Pay to contract address $randomAddress directly is not allowed, consider implementing a function from the contract to receive the payment"
+      .detail is s"VM execution error: Pay to contract address $randomAddress is not allowed when this contract address is in the call stack"
   }
 
   it should "show debug message when contract execution failed" in new Fixture {

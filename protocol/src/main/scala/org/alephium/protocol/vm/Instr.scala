@@ -388,12 +388,17 @@ object StoreLocal extends StatelessInstrCompanion1[Byte]
 sealed trait VarIndexInstr[Ctx <: StatelessContext]
     extends LemanInstrWithSimpleGas[Ctx]
     with GasLow {
-  def popIndex[C <: Ctx](frame: Frame[C], error: (BigInteger) => ExeFailure): ExeResult[Int] = {
+  def popIndex[C <: Ctx](
+      frame: Frame[C],
+      error: (BigInteger, Int) => ExeFailure
+  ): ExeResult[Int] = {
+    val maxIndex = 0xff
+
     for {
       u256 <- frame.popOpStackU256()
       index <- u256.v.toInt
-        .flatMap(v => if (v > 0xff) None else Some(v))
-        .toRight(Right(error(u256.v.v)))
+        .flatMap(v => if (v > maxIndex) None else Some(v))
+        .toRight(Right(error(u256.v.v, maxIndex)))
     } yield index
   }
 }
@@ -1320,7 +1325,7 @@ case object VerifyTxSignature
         if (SignatureSchema.verify(rawData, signature, publicKey)) {
           okay
         } else {
-          failed(InvalidSignature(util.Hex.toHexString(signature.bytes)))
+          failed(InvalidSignature(rawPublicKey.bytes, rawData, signature.bytes))
         }
       }
     } yield ()
@@ -1359,7 +1364,7 @@ sealed trait GenericVerifySignature[PubKey, Sig]
     for {
       rawSignature <- frame.popOpStackByteVec()
       signature <- buildSignature(rawSignature).toRight(
-        Right(InvalidSignatureFormat(util.Hex.toHexString(rawSignature.bytes)))
+        Right(InvalidSignatureFormat(rawSignature.bytes))
       )
       rawPublicKey <- frame.popOpStackByteVec()
       publicKey    <- buildPubKey(rawPublicKey).toRight(Right(InvalidPublicKey(rawPublicKey.bytes)))
@@ -1374,7 +1379,7 @@ sealed trait GenericVerifySignature[PubKey, Sig]
         if (verify(rawData.bytes, signature, publicKey)) {
           okay
         } else {
-          failed(InvalidSignature(util.Hex.toHexString(rawSignature.bytes)))
+          failed(InvalidSignature(rawPublicKey.bytes, rawData.bytes, rawSignature.bytes))
         }
     } yield ()
   }
@@ -1522,8 +1527,9 @@ sealed trait LockApprovedAssetsInstr extends LemanAssetInstr with StatefulInstrC
     for {
       timestampU256 <- frame.popOpStackU256()
       timestamp     <- timestampU256.v.toLong.map(TimeStamp.unsafe).toRight(Right(LockTimeOverflow))
+      blockTime = frame.ctx.blockEnv.timeStamp
       _ <-
-        if (timestamp > frame.ctx.blockEnv.timeStamp) okay else failed(InvalidLockTime(timestamp))
+        if (timestamp > blockTime) okay else failed(InvalidLockTime(timestamp, blockTime))
     } yield timestamp
   }
 }

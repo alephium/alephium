@@ -1210,6 +1210,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
     val (fooId, fooAssetRef) = prepareContract(foo, AVector(Val.U256(0)))
     checkContractState(fooId, foo, fooAssetRef, true)
+    val fooAddress = Address.contract(ContractId.unsafe(Hash.unsafe(Hex.unsafe(fooId))))
 
     lazy val fooCaller =
       s"""
@@ -1263,8 +1264,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
     {
       info("Destroy a contract and and transfer value to itself")
-      val fooAddress = Address.contract(ContractId.unsafe(Hash.unsafe(Hex.unsafe(fooId))))
-      val script     = Compiler.compileTxScript(destroy(fooAddress.toBase58)).rightValue
+      val script = Compiler.compileTxScript(destroy(fooAddress.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, ContractAssetAlreadyFlushed)
       checkContractState(fooId, foo, fooAssetRef, true)
     }
@@ -1282,7 +1282,9 @@ class VMSpec extends AlephiumSpec with Generators {
            |""".stripMargin
       val script = Compiler.compileTxScript(main).rightValue
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
-        .startsWith(s"Right(TxScriptExeFailed(Contract ${fooId} does not exist") is true
+        .startsWith(
+          s"Right(TxScriptExeFailed(Contract ${fooAddress.toBase58} does not exist"
+        ) is true
       checkContractState(
         fooId,
         foo,
@@ -1616,20 +1618,32 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
     testSimpleScript(main(p256Sig, ed25519Sig, bip340Sig))
-    val randomSecP256K1Signature = SecP256K1Signature.generate.toHexString
+    val randomSecP256K1Signature = SecP256K1Signature.generate
     failSimpleScript(
-      main(randomSecP256K1Signature, ed25519Sig, bip340Sig),
-      InvalidSignature(randomSecP256K1Signature)
+      main(randomSecP256K1Signature.toHexString, ed25519Sig, bip340Sig),
+      InvalidSignature(
+        p256Pub.bytes,
+        Hash.zero.bytes,
+        randomSecP256K1Signature.bytes
+      )
     )
-    val randomEd25519Signature = ED25519Signature.generate.toHexString
+    val randomEd25519Signature = ED25519Signature.generate
     failSimpleScript(
-      main(p256Sig, randomEd25519Signature, bip340Sig),
-      InvalidSignature(randomEd25519Signature)
+      main(p256Sig, randomEd25519Signature.toHexString, bip340Sig),
+      InvalidSignature(
+        ed25519Pub.bytes,
+        Hash.zero.bytes,
+        randomEd25519Signature.bytes
+      )
     )
-    val randomBIP340SchnorrSignature = BIP340SchnorrSignature.generate.toHexString
+    val randomBIP340SchnorrSignature = BIP340SchnorrSignature.generate
     failSimpleScript(
-      main(p256Sig, ed25519Sig, randomBIP340SchnorrSignature),
-      InvalidSignature(randomBIP340SchnorrSignature)
+      main(p256Sig, ed25519Sig, randomBIP340SchnorrSignature.toHexString),
+      InvalidSignature(
+        bip340Pub.bytes,
+        Hash.zero.bytes,
+        randomBIP340SchnorrSignature.bytes
+      )
     )
   }
 
@@ -3170,14 +3184,15 @@ class VMSpec extends AlephiumSpec with Generators {
 
       callTxScript(createSubContractRaw)
 
-      val subContractId = contractId.subContractId(serialize(subContractPath), chainIndex.from)
-      val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val subContractId      = contractId.subContractId(serialize(subContractPath), chainIndex.from)
+      val subContractAddress = Address.contract(subContractId)
+      val worldState         = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       worldState.getContractState(contractId).rightValue.mutFields is AVector[Val](
         Val.ByteVec(subContractId.bytes)
       )
 
       intercept[AssertionError](callTxScript(createSubContractRaw)).getMessage.startsWith(
-        s"Right(TxScriptExeFailed(ContractAlreadyExists(${subContractId.toHexString}))"
+        s"Right(TxScriptExeFailed(ContractAlreadyExists(${subContractAddress}))"
       )
 
       val subContractPathHex = Hex.toHexString(serialize(subContractPath))
@@ -4604,7 +4619,7 @@ class VMSpec extends AlephiumSpec with Generators {
       if (useContractAsset) {
         callTxScript(script)
       } else {
-        failCallTxScript(script, ContractAssetUnloaded(Address.contract(contractId).toBase58))
+        failCallTxScript(script, ContractAssetUnloaded(Address.contract(contractId)))
       }
     }
 

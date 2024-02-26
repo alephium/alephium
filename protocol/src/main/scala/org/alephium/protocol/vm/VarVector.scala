@@ -32,7 +32,11 @@ final case class VarVector[T] private (
   }
   @inline
   private def validate[S](index: Int)(f: => S): ExeResult[S] = {
-    if (checkIndex(index)) Right(f) else failed(InvalidVarIndex(BigInteger.valueOf(index.toLong)))
+    if (checkIndex(index)) {
+      Right(f)
+    } else {
+      failed(InvalidVarIndex(BigInteger.valueOf(index.toLong), length - 1))
+    }
   }
 
   @inline def getUnsafe(index: Int): T = underlying(start + index)
@@ -49,7 +53,7 @@ final case class VarVector[T] private (
 
   def setIf(index: Int, t: T, predicate: T => ExeResult[Unit]): ExeResult[Unit] = {
     if (!checkIndex(index)) {
-      failed(InvalidVarIndex(BigInteger.valueOf(index.toLong)))
+      failed(InvalidVarIndex(BigInteger.valueOf(index.toLong), length - 1))
     } else {
       val oldT = underlying(start + index)
       predicate(oldT).map { _ =>
