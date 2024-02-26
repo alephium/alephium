@@ -269,7 +269,7 @@ class MutBalancesPerLockupSpec extends AlephiumSpec {
 
   it should "toTxOutput for Leman fork + contract lockup script" in new ToTxOutputFixture {
     override val lockupScript = LockupScript.p2c(ContractId.generate)
-    val address               = Address.Contract(lockupScript)
+    val address               = Address.from(lockupScript)
 
     Test(0).expectLeman()
     Test(ALPH.oneAlph - 1).failLeman(LowerThanContractMinimalBalance(address, ALPH.oneAlph - 1))
