@@ -1400,7 +1400,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.returns is AVector[Val](ValByteVec(fooId.bytes))
 
     val result2 = multipleCallContractResult.results(2).asInstanceOf[CallContractFailed]
-    result2.error is s"VM execution error: InvalidMethodIndex($invalidMethodIndex)"
+    result2.error is s"VM execution error: Invalid method index $invalidMethodIndex, method length: 3"
   }
 
   it should "returns error if the number of contract calls exceeds the maximum limit" in new CallContractFixture {
@@ -1583,7 +1583,7 @@ class ServerUtilsSpec extends AlephiumSpec {
 
     val testContractParams1 = buildTestParam(Some(wrongParentAddress))
     val testResult1         = serverUtils.runTestContract(blockFlow, testContractParams1)
-    testResult1.leftValue.detail is s"VM execution error: AssertionFailedWithErrorCode(${childAddress.toBase58},0)"
+    testResult1.leftValue.detail is s"VM execution error: Assertion Failed in Contract @ ${childAddress.toBase58}, Error Code: 0"
 
     val testContractParams2 = buildTestParam(None)
     val testResult2         = serverUtils.runTestContract(blockFlow, testContractParams2)
@@ -1688,12 +1688,14 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "fail to destroy contracts and transfer fund to non-calling address" in new DestroyFixture {
+    lazy val randomAddress = Address.contract(ContractId.random).toBase58
+
     override def fooCaller: String =
       s"""
          |Contract FooCaller(fooId: ByteVec) {
          |  pub fn destroyFoo() -> () {
          |    let foo = Foo(fooId)
-         |    foo.destroy(@${Address.contract(ContractId.random).toBase58})
+         |    foo.destroy(@${randomAddress})
          |  }
          |}
          |
@@ -1706,7 +1708,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         testContractParams.toComplete().rightValue
       )
       .leftValue
-      .detail is "VM execution error: PayToContractAddressNotInCallerTrace"
+      .detail is s"VM execution error: Pay to contract address $randomAddress is not allowed when this contract address is in the call stack"
   }
 
   it should "show debug message when contract execution failed" in new Fixture {
@@ -1726,7 +1728,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testError    = serverUtils.runTestContract(blockFlow, testContract).leftValue.detail
     testError is
       s"> Contract @ ${Address.contract(testContract.contractId).toBase58} - Hello, Alephium!\n" ++
-      "VM execution error: AssertionFailedWithErrorCode(tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq,0)"
+      "VM execution error: Assertion Failed in Contract @ tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, Error Code: 0"
   }
 
   ignore should "test blockHash function for Ralph" in new TestContractFixture {

@@ -169,7 +169,7 @@ object VM {
     val maximalCodeSize =
       if (hardFork.isLemanEnabled()) maximalCodeSizeLeman else maximalCodeSizePreLeman
     if (codeBytes.length > maximalCodeSize) {
-      failed(CodeSizeTooLarge)
+      failed(CodeSizeTooLarge(codeBytes.length, maximalCodeSize))
     } else {
       initialGas.use(GasCall.scriptBaseGas(codeBytes.length))
     }
@@ -178,7 +178,7 @@ object VM {
   def checkFieldSize(initialGas: GasBox, fields: Iterable[Val]): ExeResult[GasBox] = {
     val estimatedSize = fields.foldLeft(0)(_ + _.estimateByteSize())
     if (estimatedSize >= maximalFieldSize) {
-      failed(FieldsSizeTooLarge)
+      failed(FieldsSizeTooLarge(estimatedSize))
     } else {
       initialGas.use(GasCall.fieldsBaseGas(estimatedSize))
     }
@@ -188,12 +188,17 @@ object VM {
       outputs: Iterable[TxOutput],
       hardFork: HardFork
   ): ExeResult[Unit] = {
-    val allChecked = outputs.forall {
-      case output: ContractOutput => output.amount >= minimalAlphInContract
-      case _                      => true
+    val contractOutputWithoutEnoughAlphOpt = outputs.find {
+      case output: ContractOutput => output.amount < minimalAlphInContract
+      case _                      => false
     }
-    if (hardFork.isLemanEnabled() && !allChecked) {
-      failed(LowerThanContractMinimalBalance)
+    if (hardFork.isLemanEnabled()) {
+      contractOutputWithoutEnoughAlphOpt match {
+        case Some(output) =>
+          failed(LowerThanContractMinimalBalance(Address.from(output.lockupScript), output.amount))
+        case None =>
+          okay
+      }
     } else {
       okay
     }
@@ -372,7 +377,7 @@ final class StatefulVM(
     EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
       lockupScript match {
         case l: LockupScript.P2C if ctx.assetStatus.get(l.contractId).isEmpty =>
-          failed(ContractAssetUnloaded)
+          failed(ContractAssetUnloaded(Address.contract(l.contractId)))
         case _ =>
           balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
             outputs.foreachE(output => ctx.generateOutput(output))
@@ -527,7 +532,7 @@ object StatefulVM {
     if (context.txEnv.signatures.isEmpty) {
       okay
     } else {
-      failed(TooManySignatures)
+      failed(TooManySignatures(context.txEnv.signatures.size))
     }
   }
 

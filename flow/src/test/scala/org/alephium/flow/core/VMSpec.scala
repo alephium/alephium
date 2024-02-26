@@ -377,17 +377,17 @@ class VMSpec extends AlephiumSpec with Generators {
       info("create contract and transfer token to contract address")
       val contract         = Compiler.compileContract(code).rightValue
       val contractByteCode = Hex.toHexString(serialize(contract))
-      val contractAddress  = Address.contract(ContractId.random).toBase58
+      val contractAddress  = Address.contract(ContractId.random)
       val encodedMutFields = Hex.toHexString(serialize[AVector[Val]](AVector.empty))
 
       val script: String =
         s"""
            |TxScript Main {
-           |  createContractWithToken!{ @$genesisAddress -> ALPH: 1 alph }(#$contractByteCode, #, #$encodedMutFields, 1, @$contractAddress)
+           |  createContractWithToken!{ @$genesisAddress -> ALPH: 1 alph }(#$contractByteCode, #, #$encodedMutFields, 1, @${contractAddress.toBase58})
            |}
            |""".stripMargin
 
-      failCallTxScript(script, InvalidAssetAddress)
+      failCallTxScript(script, InvalidAssetAddress(contractAddress))
     }
   }
 
@@ -1015,7 +1015,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |}
            |""".stripMargin
 
-      failCallTxScript(script, InvalidAssetAddress)
+      failCallTxScript(script, InvalidAssetAddress(contractAddress))
     }
   }
 
@@ -1210,6 +1210,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
     val (fooId, fooAssetRef) = prepareContract(foo, AVector(Val.U256(0)))
     checkContractState(fooId, foo, fooAssetRef, true)
+    val fooAddress = Address.contract(ContractId.unsafe(Hash.unsafe(Hex.unsafe(fooId))))
 
     lazy val fooCaller =
       s"""
@@ -1257,14 +1258,13 @@ class VMSpec extends AlephiumSpec with Generators {
       info("Destroy a contract and transfer value to non-calling contract address")
       val address = Address.Contract(LockupScript.P2C(ContractId.generate))
       val script  = Compiler.compileTxScript(destroy(address.toBase58)).rightValue
-      fail(blockFlow, chainIndex, script, PayToContractAddressNotInCallerTrace)
+      fail(blockFlow, chainIndex, script, PayToContractAddressNotInCallerTrace(address))
       checkContractState(fooId, foo, fooAssetRef, true)
     }
 
     {
       info("Destroy a contract and and transfer value to itself")
-      val fooAddress = Address.contract(ContractId.unsafe(Hash.unsafe(Hex.unsafe(fooId))))
-      val script     = Compiler.compileTxScript(destroy(fooAddress.toBase58)).rightValue
+      val script = Compiler.compileTxScript(destroy(fooAddress.toBase58)).rightValue
       fail(blockFlow, chainIndex, script, ContractAssetAlreadyFlushed)
       checkContractState(fooId, foo, fooAssetRef, true)
     }
@@ -1282,7 +1282,9 @@ class VMSpec extends AlephiumSpec with Generators {
            |""".stripMargin
       val script = Compiler.compileTxScript(main).rightValue
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
-        .startsWith("Right(TxScriptExeFailed(NonExistContract") is true
+        .startsWith(
+          s"Right(TxScriptExeFailed(Contract ${fooAddress.toBase58} does not exist"
+        ) is true
       checkContractState(
         fooId,
         foo,
@@ -1562,7 +1564,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
     testSimpleScript(main(0), gasAmount.value)
-    failSimpleScript(main(1), InvalidTxInputIndex)
+    failSimpleScript(main(1), InvalidTxInputIndex(1))
   }
 
   it should "test dust amount" in new ContractFixture {
@@ -1616,17 +1618,32 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
     testSimpleScript(main(p256Sig, ed25519Sig, bip340Sig))
+    val randomSecP256K1Signature = SecP256K1Signature.generate
     failSimpleScript(
-      main(SecP256K1Signature.generate.toHexString, ed25519Sig, bip340Sig),
-      InvalidSignature
+      main(randomSecP256K1Signature.toHexString, ed25519Sig, bip340Sig),
+      InvalidSignature(
+        p256Pub.bytes,
+        Hash.zero.bytes,
+        randomSecP256K1Signature.bytes
+      )
     )
+    val randomEd25519Signature = ED25519Signature.generate
     failSimpleScript(
-      main(p256Sig, ED25519Signature.generate.toHexString, bip340Sig),
-      InvalidSignature
+      main(p256Sig, randomEd25519Signature.toHexString, bip340Sig),
+      InvalidSignature(
+        ed25519Pub.bytes,
+        Hash.zero.bytes,
+        randomEd25519Signature.bytes
+      )
     )
+    val randomBIP340SchnorrSignature = BIP340SchnorrSignature.generate
     failSimpleScript(
-      main(p256Sig, ed25519Sig, BIP340SchnorrSignature.generate.toHexString),
-      InvalidSignature
+      main(p256Sig, ed25519Sig, randomBIP340SchnorrSignature.toHexString),
+      InvalidSignature(
+        bip340Pub.bytes,
+        Hash.zero.bytes,
+        randomBIP340SchnorrSignature.bytes
+      )
     )
   }
 
@@ -1676,14 +1693,24 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
     testSimpleScript(main(block.timestamp, Duration.unsafe(1), 0))
-    failSimpleScript(main(block.timestamp, Duration.unsafe(1), 1), InvalidTxInputIndex)
-    failSimpleScript(
-      main(TimeStamp.now() + Duration.ofMinutesUnsafe(1), Duration.unsafe(1), 0),
-      AbsoluteLockTimeVerificationFailed
+    failSimpleScript(main(block.timestamp, Duration.unsafe(1), 1), InvalidTxInputIndex(1))
+
+    val absoluteLockTimeScript = Compiler
+      .compileTxScript(main(TimeStamp.now() + Duration.ofMinutesUnsafe(1), Duration.unsafe(1), 0))
+      .rightValue
+    intercept[AssertionError](
+      simpleScript(blockFlow, chainIndex, absoluteLockTimeScript)
+    ).getMessage.startsWith(
+      s"Right(TxScriptExeFailed(Absolute lock time verification failed"
     )
-    failSimpleScript(
-      main(block.timestamp, Duration.ofMinutesUnsafe(1), 0),
-      RelativeLockTimeVerificationFailed
+
+    val relativeLockTimeScript = Compiler
+      .compileTxScript(main(block.timestamp, Duration.ofMinutesUnsafe(1), 0))
+      .rightValue
+    intercept[AssertionError](
+      simpleScript(blockFlow, chainIndex, relativeLockTimeScript)
+    ).getMessage.startsWith(
+      s"Right(TxScriptExeFailed(Relative lock time verification failed"
     )
   }
 
@@ -3157,14 +3184,15 @@ class VMSpec extends AlephiumSpec with Generators {
 
       callTxScript(createSubContractRaw)
 
-      val subContractId = contractId.subContractId(serialize(subContractPath), chainIndex.from)
-      val worldState    = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
+      val subContractId      = contractId.subContractId(serialize(subContractPath), chainIndex.from)
+      val subContractAddress = Address.contract(subContractId)
+      val worldState         = blockFlow.getBestCachedWorldState(chainIndex.from).rightValue
       worldState.getContractState(contractId).rightValue.mutFields is AVector[Val](
         Val.ByteVec(subContractId.bytes)
       )
 
       intercept[AssertionError](callTxScript(createSubContractRaw)).getMessage.startsWith(
-        s"Right(TxScriptExeFailed(ContractAlreadyExists(${subContractId.toHexString}))"
+        s"Right(TxScriptExeFailed(ContractAlreadyExists(${subContractAddress}))"
       )
 
       val subContractPathHex = Hex.toHexString(serialize(subContractPath))
@@ -3263,7 +3291,7 @@ class VMSpec extends AlephiumSpec with Generators {
       val contractAddress  = Address.contract(ContractId.random)
       verify(
         s"createSubContractWithToken!{callerAddress!() -> ALPH: 1 alph}(#$subContractPath4, #$subContractByteCode, #00, #00, 10, @${contractAddress.toBase58})",
-        InvalidAssetAddress
+        InvalidAssetAddress(contractAddress)
       )
     }
   }
@@ -3321,7 +3349,7 @@ class VMSpec extends AlephiumSpec with Generators {
       val contractAddress  = Address.contract(ContractId.random)
       verify(
         s"copyCreateSubContractWithToken!{callerAddress!() -> ALPH: 1 alph}(#$subContractPath4, #${subContractId.toHexString}, #00, #00, 10, @${contractAddress.toBase58})",
-        InvalidAssetAddress
+        InvalidAssetAddress(contractAddress)
       )
     }
   }
@@ -3421,7 +3449,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
     callTxScript(script)
     upgrade()
-    failCallTxScript(script, InvalidExternalMethodArgLength)
+    failCallTxScript(script, InvalidExternalMethodArgLength(0, 2))
   }
 
   it should "check external method return length" in new CheckArgAndReturnLengthFixture {
@@ -3446,7 +3474,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
     callTxScript(script)
     upgrade()
-    failCallTxScript(script, InvalidExternalMethodReturnLength)
+    failCallTxScript(script, InvalidExternalMethodReturnLength(0, 3))
   }
 
   it should "not load contract just after creation" in new ContractFixture {
@@ -3521,7 +3549,7 @@ class VMSpec extends AlephiumSpec with Generators {
     val script = Compiler.compileTxScript(main).rightValue
     val errorMessage =
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
-    errorMessage is "Right(TxScriptExeFailed(ContractDestructionShouldNotBeCalledFromSelf))"
+    errorMessage is "Right(TxScriptExeFailed(`destroySelf` function should not be called from the same contract))"
   }
 
   it should "encode values" in new ContractFixture {
@@ -3860,18 +3888,18 @@ class VMSpec extends AlephiumSpec with Generators {
          |}
          |""".stripMargin
     val fooId      = createContract(foo)._1
-    val fooAddress = Address.contract(fooId).toBase58
+    val fooAddress = Address.contract(fooId)
 
     val main: String =
       s"""
          |TxScript Main {
          |  Foo(#${fooId.toHexString}).foo()
-         |  transferToken!(callerAddress!(), @${fooAddress}, ALPH, 1 alph)
+         |  transferToken!(callerAddress!(), @${fooAddress.toBase58}, ALPH, 1 alph)
          |}
          |
          |$foo
          |""".stripMargin
-    failCallTxScript(main, PayToContractAddressNotInCallerTrace)
+    failCallTxScript(main, PayToContractAddressNotInCallerTrace(fooAddress))
   }
 
   it should "work with interface" in new ContractFixture {
@@ -4131,11 +4159,13 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     callTxScript(createFooContract(false))
-    failCallTxScript(createFooContract(true), PayToContractAddressNotInCallerTrace)
+    intercept[AssertionError](callTxScript(createFooContract(true))).getMessage.startsWith(
+      s"Right(TxScriptExeFailed(Pay to contract address"
+    )
   }
 
   it should "not transfer assets to arbitrary contract" in new ContractFixture {
-    val randomContract = Address.contract(ContractId.random).toBase58
+    val randomContract = Address.contract(ContractId.random)
 
     {
       info("Transfer to random contract address in TxScript")
@@ -4143,10 +4173,11 @@ class VMSpec extends AlephiumSpec with Generators {
         s"""
            |TxScript Main {
            |  let caller = callerAddress!()
-           |  transferToken!(caller, @${randomContract}, ALPH, 0.01 alph)
+           |  transferToken!(caller, @${randomContract.toBase58}, ALPH, 0.01 alph)
            |}
            |""".stripMargin
-      failCallTxScript(script, PayToContractAddressNotInCallerTrace)
+
+      failCallTxScript(script, PayToContractAddressNotInCallerTrace(randomContract))
     }
 
     {
@@ -4157,7 +4188,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |Contract Foo() {
            |  @using(assetsInContract = true)
            |  pub fn foo() -> () {
-           |    transferTokenFromSelf!(@${randomContract}, ALPH, 0.01 alph)
+           |    transferTokenFromSelf!(@${randomContract.toBase58}, ALPH, 0.01 alph)
            |  }
            |}
            |""".stripMargin
@@ -4175,7 +4206,7 @@ class VMSpec extends AlephiumSpec with Generators {
            |
            |$foo
            |""".stripMargin
-      failCallTxScript(script, PayToContractAddressNotInCallerTrace)
+      failCallTxScript(script, PayToContractAddressNotInCallerTrace(fooAddress))
     }
 
     {
@@ -4289,7 +4320,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
     val script = Compiler.compileTxScript(main).rightValue
     intercept[AssertionError](simpleScript(blockFlow, chainIndex, script)).getMessage is
-      s"Right(TxScriptExeFailed(AssertionFailedWithErrorCode(${Address.contract(fooId).toBase58},0)))"
+      s"Right(TxScriptExeFailed(Assertion Failed in Contract @ ${Address.contract(fooId).toBase58}, Error Code: 0))"
   }
 
   it should "test Contract type" in new ContractFixture {
@@ -4572,13 +4603,13 @@ class VMSpec extends AlephiumSpec with Generators {
            |}
            |""".stripMargin
 
-      val contractId = createContract(code)._1.toHexString
+      val contractId = createContract(code)._1
 
       val script: String =
         s"""|
             |@using(preapprovedAssets = true)
             |TxScript Bar {
-            |  let foo = Foo(#${contractId})
+            |  let foo = Foo(#${contractId.toHexString})
             |  foo.payMe{callerAddress!() -> ALPH: $amount}($amount)
             |}
             |
@@ -4588,7 +4619,7 @@ class VMSpec extends AlephiumSpec with Generators {
       if (useContractAsset) {
         callTxScript(script)
       } else {
-        failCallTxScript(script, ContractAssetUnloaded)
+        failCallTxScript(script, ContractAssetUnloaded(Address.contract(contractId)))
       }
     }
 
@@ -4610,13 +4641,14 @@ class VMSpec extends AlephiumSpec with Generators {
            |}
            |""".stripMargin
 
-      val contractId = createContract(code, initialAttoAlphAmount = ALPH.oneAlph * 2)._1.toHexString
+      val contractInitialAlphAmount = ALPH.oneAlph * 2
+      val contractId = createContract(code, initialAttoAlphAmount = contractInitialAlphAmount)._1
 
       val script: String =
         s"""|
             |@using(preapprovedAssets = true)
             |TxScript Bar {
-            |  let foo = Foo(#${contractId})
+            |  let foo = Foo(#${contractId.toHexString})
             |  foo.payMe{callerAddress!() -> ALPH: $amount}($amount)
             |}
             |
@@ -4624,7 +4656,13 @@ class VMSpec extends AlephiumSpec with Generators {
             |""".stripMargin
 
       if (amount > ALPH.oneAlph) {
-        failCallTxScript(script, LowerThanContractMinimalBalance)
+        failCallTxScript(
+          script,
+          LowerThanContractMinimalBalance(
+            Address.contract(contractId),
+            contractInitialAlphAmount - amount
+          )
+        )
       } else {
         callTxScript(script)
       }
