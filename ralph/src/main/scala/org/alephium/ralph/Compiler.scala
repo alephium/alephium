@@ -872,9 +872,10 @@ object Compiler {
     ): Seq[Instr[Ctx]] = {
       offset match {
         case index: ArrayTransformer.ConstantArrayVarOffset[_] =>
-          State.checkConstantIndex(index.value, None)
-          Seq(TemplateVariable("template-array", arrayRef.tpe.elementType.toVal, index.value))
-        case _ => throw Error("Expected constant index for template variable", None)
+          State.checkConstantIndex(index.value, arrayRef.ident.sourceIndex)
+          Seq(TemplateVariable(arrayRef.ident.name, arrayRef.tpe.elementType.toVal, index.value))
+        case _ =>
+          throw Error("Expected constant index for template variable", arrayRef.ident.sourceIndex)
       }
     }
 

@@ -58,8 +58,9 @@ object ArrayTransformer {
       getIndex,
       increaseIndex
     )
-    val ref = ArrayRef[Ctx](isLocal, isMutable, isTemplate, tpe, offset)
-    state.addArrayRef(Ident(baseName), isMutable, isUnused, isGenerated, ref)
+    val ident = Ident(baseName)
+    val ref   = ArrayRef[Ctx](ident, isLocal, isMutable, isTemplate, tpe, offset)
+    state.addArrayRef(ident, isMutable, isUnused, isGenerated, ref)
     ref
   }
 
@@ -160,6 +161,7 @@ object ArrayTransformer {
   }
 
   final case class ArrayRef[Ctx <: StatelessContext](
+      ident: Ident,
       isLocal: Boolean,
       isMutable: Boolean,
       isTemplate: Boolean,
@@ -189,7 +191,7 @@ object ArrayTransformer {
         case VariableArrayVarOffset(instrs) =>
           offset.add(instrs ++ Seq(ConstInstr.u256(Val.U256.unsafe(flattenSize)), U256Mul))
       }
-      ArrayRef(isLocal, isMutable, isTemplate, baseType, newOffset)
+      ArrayRef(ident, isLocal, isMutable, isTemplate, baseType, newOffset)
     }
 
     private def calcOffset(
