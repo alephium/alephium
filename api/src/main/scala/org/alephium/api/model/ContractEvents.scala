@@ -17,7 +17,7 @@
 package org.alephium.api.model
 
 import org.alephium.protocol.model.{Address, BlockHash, ContractId, TransactionId}
-import org.alephium.protocol.vm.{LockupScript, LogState, LogStateRef, LogStates}
+import org.alephium.protocol.vm.{debugEventIndex, LockupScript, LogState, LogStateRef, LogStates}
 import org.alephium.util.AVector
 
 final case class ContractEvents(
@@ -85,13 +85,19 @@ object ContractEventByBlockHash {
 
 object ContractEvents {
   def from(logStates: LogStates): AVector[ContractEvent] = {
-    logStates.states.map { logState =>
-      ContractEvent(
-        logStates.blockHash,
-        logState.txId,
-        logState.index.toInt,
-        logState.fields.map(Val.from)
-      )
+    logStates.states.flatMap { logState =>
+      if (logState.index != debugEventIndex.v.v.intValue().toByte) {
+        AVector(
+          ContractEvent(
+            logStates.blockHash,
+            logState.txId,
+            logState.index.toInt,
+            logState.fields.map(Val.from)
+          )
+        )
+      } else {
+        AVector.empty
+      }
     }
   }
 

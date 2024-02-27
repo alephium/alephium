@@ -26,6 +26,7 @@ import org.alephium.ralph.error.CompilerError
 import org.alephium.ralph.error.CompilerError.FastParseError
 import org.alephium.util.AVector
 
+//TODO add SourceIndex to warnings
 final case class CompiledContract(
     code: StatefulContract,
     ast: Ast.Contract,
@@ -57,8 +58,7 @@ object Compiler {
           Left(Error.parse(failure))
       }
     } catch {
-      case e: CompilerError.FormattableError => Left(e.toError(input))
-      case e: Error                          => Left(e)
+      case e: Error => Left(e)
     }
 
   def compileTxScript(
@@ -93,8 +93,7 @@ object Compiler {
     try {
       compileMultiContract(input).map(genCode)
     } catch {
-      case e: CompilerError.FormattableError => Left(e.toError(input))
-      case e: Error                          => Left(e)
+      case e: Error => Left(e)
     }
   }
 
@@ -117,8 +116,9 @@ object Compiler {
   def compileMultiContract(input: String): Either[Error, MultiContract] = {
     try {
       fastparse.parse(input, StatefulParser.multiContract(_)) match {
-        case Parsed.Success(multiContract, _) => Right(multiContract.extendedContracts())
-        case failure: Parsed.Failure          => Left(Error.parse(failure))
+        case Parsed.Success(multiContract, _) =>
+          Right(multiContract.extendedContracts())
+        case failure: Parsed.Failure => Left(Error.parse(failure))
       }
     } catch {
       case e: Error => Left(e)
@@ -154,20 +154,24 @@ object Compiler {
     def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
   }
 
-  final case class Error(message: String, cause: Throwable) extends Exception(message, cause)
+  type Error = CompilerError.FormattableError
+
   object Error {
     // scalastyle:off null
-    def apply(message: String): Error = new Error(message, null)
+    def apply(message: String, sourceIndex: Option[SourceIndex]): Error =
+      new CompilerError.Default(message, sourceIndex, null)
     // scalastyle:on null
+    def apply(message: String, sourceIndex: Option[SourceIndex], cause: Throwable): Error =
+      new CompilerError.Default(message, sourceIndex, cause)
 
-    def parse(failure: Parsed.Failure): Error = FastParseError(failure).toError()
+    def parse(failure: Parsed.Failure): Error = FastParseError(failure)
   }
 
   def expectOneType(ident: Ast.Ident, tpe: Seq[Type]): Type = {
     if (tpe.length == 1) {
       tpe(0)
     } else {
-      throw Error(s"Try to set types $tpe for variable $ident")
+      throw Error(s"Try to set types $tpe for variable $ident", ident.sourceIndex)
     }
   }
 
@@ -243,7 +247,7 @@ object Compiler {
       if (inputType == argsType) {
         returnType
       } else {
-        throw Error(s"Invalid args type $inputType for function $name")
+        throw Error(s"Invalid args type $inputType for function $name", id.sourceIndex)
       }
     }
 
@@ -255,7 +259,7 @@ object Compiler {
       if (isPublic) {
         Seq(CallExternal(index))
       } else {
-        throw Error(s"Call external private function of ${typeId.name}")
+        throw Error(s"Call external private function of ${typeId.name}", typeId.sourceIndex)
       }
     }
   }
@@ -277,10 +281,10 @@ object Compiler {
   }
 
   final case class EventInfo(typeId: Ast.TypeId, fieldTypes: Seq[Type]) {
-    def checkFieldTypes(argTypes: Seq[Type]): Unit = {
+    def checkFieldTypes(argTypes: Seq[Type], sourceIndex: Option[SourceIndex]): Unit = {
       if (fieldTypes != argTypes) {
         val eventAbi = s"""${typeId.name}${fieldTypes.mkString("(", ", ", ")")}"""
-        throw Error(s"Invalid args type $argTypes for event $eventAbi")
+        throw Error(s"Invalid args type $argTypes for event $eventAbi", sourceIndex)
       }
     }
   }
@@ -288,7 +292,7 @@ object Compiler {
   object State {
     private[ralph] val maxVarIndex: Int = 0xff
 
-    // scalastyle:off cyclomatic.complexity
+    // scalastyle:off cyclomatic.complexity method.length
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     // we have checked the index type(U256)
     def getConstantIndex[Ctx <: StatelessContext](index: Ast.Expr[Ctx]): Ast.Expr[Ctx] = {
@@ -297,15 +301,40 @@ object Compiler {
         case Ast.Binop(op: ArithOperator, Ast.Const(Val.U256(l)), Ast.Const(Val.U256(r))) =>
           op match {
             case ArithOperator.Add =>
-              Ast.Const(Val.U256(l.add(r).getOrElse(throw Error(s"Invalid array index ${index}"))))
+              Ast.Const(
+                Val.U256(
+                  l.add(r)
+                    .getOrElse(throw Error(s"Invalid array index ${index}", index.sourceIndex))
+                )
+              )
             case ArithOperator.Sub =>
-              Ast.Const(Val.U256(l.sub(r).getOrElse(throw Error(s"Invalid array index ${index}"))))
+              Ast.Const(
+                Val.U256(
+                  l.sub(r)
+                    .getOrElse(throw Error(s"Invalid array index ${index}", index.sourceIndex))
+                )
+              )
             case ArithOperator.Mul =>
-              Ast.Const(Val.U256(l.mul(r).getOrElse(throw Error(s"Invalid array index ${index}"))))
+              Ast.Const(
+                Val.U256(
+                  l.mul(r)
+                    .getOrElse(throw Error(s"Invalid array index ${index}", index.sourceIndex))
+                )
+              )
             case ArithOperator.Div =>
-              Ast.Const(Val.U256(l.div(r).getOrElse(throw Error(s"Invalid array index ${index}"))))
+              Ast.Const(
+                Val.U256(
+                  l.div(r)
+                    .getOrElse(throw Error(s"Invalid array index ${index}", index.sourceIndex))
+                )
+              )
             case ArithOperator.Mod =>
-              Ast.Const(Val.U256(l.mod(r).getOrElse(throw Error(s"Invalid array index ${index}"))))
+              Ast.Const(
+                Val.U256(
+                  l.mod(r)
+                    .getOrElse(throw Error(s"Invalid array index ${index}", index.sourceIndex))
+                )
+              )
             case ArithOperator.ModAdd => Ast.Const(Val.U256(l.modAdd(r)))
             case ArithOperator.ModSub => Ast.Const(Val.U256(l.modSub(r)))
             case ArithOperator.ModMul => Ast.Const(Val.U256(l.modMul(r)))
@@ -325,17 +354,18 @@ object Compiler {
     }
     // scalastyle:on cyclomatic.complexity
 
-    def checkConstantIndex(index: Int): Unit = {
+    def checkConstantIndex(index: Int, sourceIndex: Option[SourceIndex]): Unit = {
       if (index < 0 || index >= maxVarIndex) {
-        throw Error(s"Invalid array index $index, it must be within the range [0, $maxVarIndex)")
+        throw Error(s"Invalid array index $index", sourceIndex)
       }
     }
 
     def getAndCheckConstantIndex[Ctx <: StatelessContext](index: Ast.Expr[Ctx]): Option[Int] = {
       getConstantIndex(index) match {
         case Ast.Const(Val.U256(v)) =>
-          val idx = v.toInt.getOrElse(throw Compiler.Error(s"Invalid array index: $v"))
-          checkConstantIndex(idx)
+          val idx =
+            v.toInt.getOrElse(throw Compiler.Error(s"Invalid array index: $v", index.sourceIndex))
+          checkConstantIndex(idx, index.sourceIndex)
           Some(idx)
         case _ => None
       }
@@ -515,7 +545,7 @@ object Compiler {
     def getArrayRef(ident: Ast.Ident): ArrayTransformer.ArrayRef[Ctx] = {
       getVariable(ident) match {
         case info: VarInfo.ArrayRef[Ctx @unchecked] => info.ref
-        case _                                      => throw Error(s"Array $ident does not exist")
+        case _ => throw Error(s"Array $ident does not exist", ident.sourceIndex)
       }
     }
 
@@ -660,11 +690,14 @@ object Compiler {
       val name  = ident.name
       val sname = scopedName(name)
       if (varTable.contains(name)) {
-        throw Error(s"Global variable has the same name as local variable: $name")
+        throw Error(
+          s"Global variable has the same name as local variable: $name",
+          ident.sourceIndex
+        )
       } else if (varTable.contains(sname)) {
-        throw Error(s"Local variables have the same name: $name")
+        throw Error(s"Local variables have the same name: $name", ident.sourceIndex)
       } else if (currentScopeState.varIndex >= State.maxVarIndex) {
-        throw Error(s"Number of variables more than ${State.maxVarIndex}")
+        throw Error(s"Number of variables more than ${State.maxVarIndex}", ident.sourceIndex)
       }
       sname
     }
@@ -677,7 +710,7 @@ object Compiler {
         case None =>
           varTable.get(name) match {
             case Some(varInfo) => (name, varInfo)
-            case None          => throw Error(s"Variable $sname does not exist")
+            case None          => throw Error(s"Variable $sname does not exist", ident.sourceIndex)
           }
       }
       if (isWrite) {
@@ -722,7 +755,8 @@ object Compiler {
       if (unassignedMutableVars.nonEmpty) {
         throw Compiler.Error(
           s"There are unassigned mutable local vars in function ${typeId.name}.${funcId.name}: ${unassignedMutableVars
-              .mkString(",")}"
+              .mkString(",")}",
+          funcId.sourceIndex
         )
       }
       accessedVars.filterInPlace {
@@ -764,7 +798,8 @@ object Compiler {
       if (unassignedMutableFields.nonEmpty) {
         throw Compiler.Error(
           s"There are unassigned mutable fields in contract ${typeId.name}: ${unassignedMutableFields
-              .mkString(",")}"
+              .mkString(",")}",
+          typeId.sourceIndex
         )
       }
     }
@@ -783,7 +818,10 @@ object Compiler {
       index.getType(this) match {
         case Seq(Type.U256) =>
         case tpe =>
-          throw Compiler.Error(s"Invalid array index type ${quote(tpe)}, expected ${quote("U256")}")
+          throw Compiler.Error(
+            s"Invalid array index type ${quote(tpe)}, expected ${quote("U256")}",
+            index.sourceIndex
+          )
       }
     }
 
@@ -797,7 +835,11 @@ object Compiler {
       } else {
         arrayType.baseType match {
           case baseType: Type.FixedSizeArray => arrayElementType(baseType, indexes.drop(1))
-          case tpe => throw Compiler.Error(s"Expected array type, got ${quote(tpe)}")
+          case tpe =>
+            throw Compiler.Error(
+              s"Expected array type, got ${quote(tpe)}",
+              indexes.headOption.flatMap(_.sourceIndex)
+            )
         }
       }
     }
@@ -810,7 +852,10 @@ object Compiler {
       tpes match {
         case Seq(tpe: Type.FixedSizeArray) => arrayElementType(tpe, indexes)
         case tpe =>
-          throw Compiler.Error(s"Expected array type, got ${quote(tpe)}")
+          throw Compiler.Error(
+            s"Expected array type, got ${quote(tpe)}",
+            indexes.headOption.flatMap(_.sourceIndex)
+          )
       }
     }
 
@@ -827,9 +872,9 @@ object Compiler {
     ): Seq[Instr[Ctx]] = {
       offset match {
         case index: ArrayTransformer.ConstantArrayVarOffset[_] =>
-          State.checkConstantIndex(index.value)
+          State.checkConstantIndex(index.value, None)
           Seq(TemplateVariable("template-array", arrayRef.tpe.elementType.toVal, index.value))
-        case _ => throw Error("Expected constant index for template variable")
+        case _ => throw Error("Expected constant index for template variable", None)
       }
     }
 
@@ -853,31 +898,40 @@ object Compiler {
     def getContract(objId: Ast.Ident): Ast.TypeId = {
       getVariable(objId).tpe match {
         case c: Type.Contract => c.id
-        case _                => throw Error(s"Invalid contract object id ${objId.name}")
+        case _ => throw Error(s"Invalid contract object id ${objId.name}", objId.sourceIndex)
       }
     }
 
     def getFunc(typeId: Ast.TypeId, callId: Ast.FuncId): ContractFunc[Ctx] = {
       getContractInfo(typeId).funcs
-        .getOrElse(callId, throw Error(s"Function ${typeId}.${callId.name} does not exist"))
+        .getOrElse(
+          callId,
+          throw Error(s"Function ${typeId}.${callId.name} does not exist", callId.sourceIndex)
+        )
     }
 
     def getContractInfo(typeId: Ast.TypeId): ContractInfo[Ctx] = {
-      contractTable.getOrElse(typeId, throw Error(s"Contract ${typeId.name} does not exist"))
+      contractTable.getOrElse(
+        typeId,
+        throw Error(s"Contract ${typeId.name} does not exist", typeId.sourceIndex)
+      )
     }
 
     def getEvent(typeId: Ast.TypeId): EventInfo = {
       eventsInfo
-        .find(_.typeId == typeId)
+        .find(_.typeId.name == typeId.name)
         .getOrElse(
-          throw Error(s"Event ${typeId.name} does not exist")
+          throw Error(s"Event ${typeId.name} does not exist", typeId.sourceIndex)
         )
     }
 
     def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[Ctx]
 
     private def getNewFunc(call: Ast.FuncId): FuncInfo[Ctx] = {
-      funcIdents.getOrElse(call, throw Error(s"Function ${call.name} does not exist"))
+      funcIdents.getOrElse(
+        call,
+        throw Error(s"Function ${call.name} does not exist", call.sourceIndex)
+      )
     }
 
     def checkArguments(args: Seq[Ast.Argument]): Unit = {
@@ -889,7 +943,7 @@ object Compiler {
 
     def checkContractType(typeId: Ast.TypeId): Unit = {
       if (!contractTable.contains(typeId)) {
-        throw Error(s"Contract ${typeId.name} does not exist")
+        throw Error(s"Contract ${typeId.name} does not exist", typeId.sourceIndex)
       }
     }
 
@@ -899,14 +953,21 @@ object Compiler {
 
     def checkAssign(ident: Ast.Ident, tpe: Type): Unit = {
       val varInfo = getVariable(ident)
-      if (varInfo.tpe != tpe) throw Error(s"Assign $tpe value to $ident: ${varInfo.tpe.toVal}")
-      if (!varInfo.isMutable) throw Error(s"Assign value to immutable variable $ident")
+      if (varInfo.tpe != tpe) {
+        throw Error(s"Assign $tpe value to $ident: ${varInfo.tpe.toVal}", ident.sourceIndex)
+      }
+      if (!varInfo.isMutable) {
+        throw Error(s"Assign value to immutable variable $ident", ident.sourceIndex)
+      }
     }
 
-    def checkReturn(returnType: Seq[Type]): Unit = {
+    def checkReturn(returnType: Seq[Type], sourceIndex: Option[SourceIndex]): Unit = {
       val rtype = funcIdents(currentScope).returnType
       if (returnType != rtype) {
-        throw Error(s"Invalid return types: expected ${quote(rtype)}, got ${quote(returnType)}")
+        throw Error(
+          s"Invalid return types: expected ${quote(rtype)}, got ${quote(returnType)}",
+          sourceIndex
+        )
       }
     }
   }
@@ -925,7 +986,10 @@ object Compiler {
 
     def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatelessContext] = {
       BuiltIn.statelessFuncs
-        .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
+        .getOrElse(
+          call.name,
+          throw Error(s"Built-in function ${call.name} does not exist", call.sourceIndex)
+        )
     }
 
     private def genVarIndexCode(
@@ -935,12 +999,12 @@ object Compiler {
         varIndex: Instr[StatelessContext]
     ): Seq[Instr[StatelessContext]] = {
       if (!isLocal) {
-        throw Error(s"Script should not have fields")
+        throw Error(s"Script should not have fields", typeId.sourceIndex)
       }
 
       offset match {
         case ArrayTransformer.ConstantArrayVarOffset(value) =>
-          State.checkConstantIndex(value)
+          State.checkConstantIndex(value, typeId.sourceIndex)
           Seq(constantIndex(value.toByte))
         case ArrayTransformer.VariableArrayVarOffset(instrs) =>
           instrs :+ varIndex
@@ -967,7 +1031,7 @@ object Compiler {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatelessContext]] = {
       getVariable(ident) match {
-        case _: VarInfo.Field    => throw Error("Script should not have fields")
+        case _: VarInfo.Field    => throw Error("Script should not have fields", typeId.sourceIndex)
         case v: VarInfo.Local    => Seq(LoadLocal(v.index))
         case v: VarInfo.Template => Seq(TemplateVariable(ident.name, v.tpe.toVal, v.index))
         case _: VarInfo.ArrayRef[StatelessContext @unchecked] =>
@@ -979,12 +1043,13 @@ object Compiler {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[StatelessContext]]] = {
       getVariable(ident) match {
-        case _: VarInfo.Field    => throw Error("Script should not have fields")
-        case v: VarInfo.Local    => Seq(Seq(StoreLocal(v.index)))
-        case _: VarInfo.Template => throw Error(s"Unexpected template variable: ${ident.name}")
+        case _: VarInfo.Field => throw Error("Script should not have fields", typeId.sourceIndex)
+        case v: VarInfo.Local => Seq(Seq(StoreLocal(v.index)))
+        case _: VarInfo.Template =>
+          throw Error(s"Unexpected template variable: ${ident.name}", ident.sourceIndex)
         case ref: VarInfo.ArrayRef[StatelessContext @unchecked] => ref.ref.genStoreCode(this)
         case _: VarInfo.Constant[StatelessContext @unchecked] =>
-          throw Error(s"Unexpected constant variable: ${ident.name}")
+          throw Error(s"Unexpected constant variable: ${ident.name}", ident.sourceIndex)
       }
     }
   }
@@ -1001,7 +1066,10 @@ object Compiler {
       extends State[StatefulContext] {
     def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatefulContext] = {
       BuiltIn.statefulFuncs
-        .getOrElse(call.name, throw Error(s"Built-in function ${call.name} does not exist"))
+        .getOrElse(
+          call.name,
+          throw Error(s"Built-in function ${call.name} does not exist", call.sourceIndex)
+        )
     }
 
     private def genVarIndexCode(
@@ -1014,7 +1082,7 @@ object Compiler {
     ): Seq[Instr[StatefulContext]] = {
       offset match {
         case ArrayTransformer.ConstantArrayVarOffset(value) =>
-          State.checkConstantIndex(value)
+          State.checkConstantIndex(value, typeId.sourceIndex)
           val index = value.toByte
           if (isLocal) Seq(localConstantIndex(index)) else Seq(fieldConstantIndex(index))
         case ArrayTransformer.VariableArrayVarOffset(instrs) =>
@@ -1070,21 +1138,22 @@ object Compiler {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[StatefulContext]]] = {
       getVariable(ident) match {
-        case v: VarInfo.Field    => Seq(Seq(StoreMutField(v.index)))
-        case v: VarInfo.Local    => Seq(Seq(StoreLocal(v.index)))
-        case _: VarInfo.Template => throw Error(s"Unexpected template variable: ${ident.name}")
+        case v: VarInfo.Field => Seq(Seq(StoreMutField(v.index)))
+        case v: VarInfo.Local => Seq(Seq(StoreLocal(v.index)))
+        case _: VarInfo.Template =>
+          throw Error(s"Unexpected template variable: ${ident.name}", ident.sourceIndex)
         case ref: VarInfo.ArrayRef[StatefulContext @unchecked] => ref.ref.genStoreCode(this)
         case _: VarInfo.Constant[StatefulContext @unchecked] =>
-          throw Error(s"Unexpected constant variable: ${ident.name}")
+          throw Error(s"Unexpected constant variable: ${ident.name}", ident.sourceIndex)
       }
     }
   }
 
-  def genLogs(logFieldLength: Int): LogInstr = {
+  def genLogs(logFieldLength: Int, sourceIndex: Option[SourceIndex]): LogInstr = {
     if (logFieldLength >= 0 && logFieldLength < Instr.allLogInstrs.length) {
       Instr.allLogInstrs(logFieldLength)
     } else {
-      throw Compiler.Error(s"Contract events allow up to 8 fields")
+      throw Compiler.Error(s"Contract events allow up to 8 fields", sourceIndex)
     }
   }
 }

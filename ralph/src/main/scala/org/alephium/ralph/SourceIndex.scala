@@ -14,25 +14,19 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.api.model
+package org.alephium.ralph
 
-import org.alephium.protocol.model.Address
-import org.alephium.util.AVector
+final case class SourceIndex(index: Int, width: Int) {
+  val endIndex: Int = index + width
+}
 
-sealed trait CallContractResult
+object SourceIndex {
+  def apply(index: Int): SourceIndex = SourceIndex(index, 1)
+  def apply(from: Option[SourceIndex], to: Option[SourceIndex]): Option[SourceIndex] =
+    for {
+      f <- from
+      t <- to
+    } yield SourceIndex(f.index, t.endIndex - f.index)
 
-@upickle.implicits.key("CallContractSucceeded")
-final case class CallContractSucceeded(
-    returns: AVector[Val],
-    gasUsed: Int,
-    contracts: AVector[ContractState],
-    txInputs: AVector[Address],
-    txOutputs: AVector[Output],
-    events: AVector[ContractEventByTxId],
-    debugMessages: AVector[DebugMessage]
-) extends CallContractResult
-
-@upickle.implicits.key("CallContractFailed")
-final case class CallContractFailed(error: String) extends CallContractResult
-
-final case class MultipleCallContractResult(results: AVector[CallContractResult])
+  def empty: SourceIndex = SourceIndex(0, 0)
+}

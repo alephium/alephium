@@ -293,7 +293,7 @@ class CompilerErrorFormatterSpec extends AlephiumSpec {
       formatter.copy(foundLength = 6).format(None) is
         """-- error (1:22): error title
           |1 |this is the error line
-          |  |                     ^^^^^^
+          |  |                     ^
           |  |                     failed here
           |""".stripMargin
     }

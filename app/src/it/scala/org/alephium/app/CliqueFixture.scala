@@ -661,8 +661,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost(s"/contracts/compile-contract", Some(contract))
   }
 
-  def getContractState(address: String, group: Int) = {
-    httpGet(s"/contracts/${address}/state?group=${group}")
+  def getContractState(address: String) = {
+    httpGet(s"/contracts/${address}/state")
   }
 
   def getContractEvents(start: Int, address: Address) = {

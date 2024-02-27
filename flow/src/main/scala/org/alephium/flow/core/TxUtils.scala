@@ -913,7 +913,8 @@ trait TxUtils { Self: FlowUtils =>
     if (gas > maximalGasPerTx) {
       Left(
         s"Estimated gas $gas too large, maximal $maximalGasPerTx. " ++
-          "Consider consolidating UTXOs using the sweep endpoints"
+          "Consider consolidating UTXOs using the sweep endpoints or " ++
+          "sending to less addresses"
       )
     } else {
       Right(())

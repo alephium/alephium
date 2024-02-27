@@ -169,7 +169,7 @@ object VM {
     val maximalCodeSize =
       if (hardFork.isLemanEnabled()) maximalCodeSizeLeman else maximalCodeSizePreLeman
     if (codeBytes.length > maximalCodeSize) {
-      failed(CodeSizeTooLarge)
+      failed(CodeSizeTooLarge(codeBytes.length, maximalCodeSize))
     } else {
       initialGas.use(GasCall.scriptBaseGas(codeBytes.length))
     }
@@ -178,7 +178,7 @@ object VM {
   def checkFieldSize(initialGas: GasBox, fields: Iterable[Val]): ExeResult[GasBox] = {
     val estimatedSize = fields.foldLeft(0)(_ + _.estimateByteSize())
     if (estimatedSize >= maximalFieldSize) {
-      failed(FieldsSizeTooLarge)
+      failed(FieldsSizeTooLarge(estimatedSize))
     } else {
       initialGas.use(GasCall.fieldsBaseGas(estimatedSize))
     }
@@ -188,12 +188,17 @@ object VM {
       outputs: Iterable[TxOutput],
       hardFork: HardFork
   ): ExeResult[Unit] = {
-    val allChecked = outputs.forall {
-      case output: ContractOutput => output.amount >= minimalAlphInContract
-      case _                      => true
+    val contractOutputWithoutEnoughAlphOpt = outputs.find {
+      case output: ContractOutput => output.amount < minimalAlphInContract
+      case _                      => false
     }
-    if (hardFork.isLemanEnabled() && !allChecked) {
-      failed(LowerThanContractMinimalBalance)
+    if (hardFork.isLemanEnabled()) {
+      contractOutputWithoutEnoughAlphOpt match {
+        case Some(output) =>
+          failed(LowerThanContractMinimalBalance(Address.from(output.lockupScript), output.amount))
+        case None =>
+          okay
+      }
     } else {
       okay
     }
@@ -372,7 +377,7 @@ final class StatefulVM(
     EitherF.foreachTry(outputBalances.all) { case (lockupScript, balances) =>
       lockupScript match {
         case l: LockupScript.P2C if ctx.assetStatus.get(l.contractId).isEmpty =>
-          failed(ContractAssetUnloaded)
+          failed(ContractAssetUnloaded(Address.contract(l.contractId)))
         case _ =>
           balances.toTxOutput(lockupScript, ctx.getHardFork()).flatMap { outputs =>
             outputs.foreachE(output => ctx.generateOutput(output))
@@ -484,13 +489,28 @@ object StatefulVM {
     )
   }
 
-  def runTxScriptWithOutputs(
+  def runTxScriptWithOutputsTestOnly(
       context: StatefulContext,
       script: StatefulScript
   ): ExeResult[(AVector[Val], TxScriptExecution)] = {
     for {
       outputs <- executeWithOutputs(context, script.toObject, AVector.empty)
       result  <- prepareResult(context)
+    } yield (outputs, result)
+  }
+
+  def runCallerContractWithOutputsTestOnly(
+      context: StatefulContext,
+      contract: StatefulContract,
+      contractId: ContractId
+  ): ExeResult[(AVector[Val], TxScriptExecution)] = {
+    for {
+      outputs <- executeWithOutputs(
+        context,
+        contract.toHalfDecoded().toObjectUnsafeTestOnly(contractId, AVector.empty, AVector.empty),
+        AVector.empty
+      )
+      result <- prepareResult(context)
     } yield (outputs, result)
   }
 
@@ -512,7 +532,7 @@ object StatefulVM {
     if (context.txEnv.signatures.isEmpty) {
       okay
     } else {
-      failed(TooManySignatures)
+      failed(TooManySignatures(context.txEnv.signatures.size))
     }
   }
 
@@ -525,8 +545,10 @@ object StatefulVM {
       obj: ContractObj[StatefulContext],
       args: AVector[Val]
   ): ExeResult[Unit] = {
-    val vm = default(context)
-    vm.execute(obj, 0, args)
+    val vm      = default(context)
+    val results = vm.execute(obj, 0, args)
+    maybeShowDebug(context)
+    results
   }
 
   def executeWithOutputs(
@@ -539,34 +561,32 @@ object StatefulVM {
     vm.executeWithOutputs(obj, methodIndex, args)
   }
 
-  def executeWithOutputsWithDebug(
-      context: StatefulContext,
-      obj: ContractObj[StatefulContext],
-      args: AVector[Val],
-      methodIndex: Int
-  ): ExeResult[AVector[Val]] = {
-    val results = executeWithOutputs(context, obj, args, methodIndex)
-    context.worldState.logState.getNewLogs().map { logStates =>
-      logStates.states.foreach { logState =>
-        if (logState.index == debugEventIndex.v.v.intValue().toByte) {
-          logState.fields.headOption.foreach {
-            case Val.ByteVec(bytes) =>
-              print(
-                s"Debug - ${Address.contract(logStates.contractId).toBase58} - ${bytes.utf8String}\n"
-              )
-            case _ => ()
-          }
-        }
-      }
-    }
-    results
-  }
-
   def executeWithOutputs(
       context: StatefulContext,
       obj: ContractObj[StatefulContext],
       args: AVector[Val]
   ): ExeResult[AVector[Val]] = {
-    executeWithOutputs(context, obj, args, 0)
+    val results = executeWithOutputs(context, obj, args, 0)
+    maybeShowDebug(context)
+    results
+  }
+
+  private def maybeShowDebug(context: StatefulContext): Unit = {
+    val networkId = context.networkConfig.networkId
+    if (networkId.networkType != NetworkId.MainNet) {
+      context.worldState.logState.getNewLogs().foreach { logStates =>
+        logStates.states.foreach { logState =>
+          if (logState.index == debugEventIndex.v.v.intValue().toByte) {
+            logState.fields.headOption.foreach {
+              case Val.ByteVec(bytes) =>
+                print(
+                  s"> Contract @ ${Address.contract(logStates.contractId).toBase58} - ${bytes.utf8String}\n"
+                )
+              case _ => ()
+            }
+          }
+        }
+      }
+    }
   }
 }

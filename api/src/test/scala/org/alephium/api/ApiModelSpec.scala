@@ -16,6 +16,7 @@
 
 package org.alephium.api
 
+import java.math.BigInteger
 import java.net.{InetAddress, InetSocketAddress}
 
 import akka.util.ByteString
@@ -949,6 +950,32 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     checkData(verifySignature, jsonRaw)
   }
 
+  it should "encode/decode TargetToHashrate" in {
+    val target = Hash.generate.bytes
+
+    val targetToHashrate =
+      TargetToHashrate(target)
+    val jsonRaw = s"""
+                     |{
+                     |  "target": "${Hex.toHexString(target)}"
+                     |}
+        """.stripMargin
+    checkData(targetToHashrate, jsonRaw)
+  }
+
+  it should "encode/decode TargetToHashrate.Result" in {
+    val hashrate = new BigInteger("10000000000000")
+
+    val targetToHashrateResult =
+      TargetToHashrate.Result(hashrate)
+    val jsonRaw = s"""
+                     |{
+                     |  "hashrate": "${hashrate}"
+                     |}
+        """.stripMargin
+    checkData(targetToHashrateResult, jsonRaw)
+  }
+
   it should "encode/decode AssetState" in {
     val asset1   = AssetState(U256.unsafe(100))
     val jsonRaw1 = s"""{"attoAlphAmount": "100"}"""
@@ -1336,6 +1363,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
           AVector(contractState),
           AVector.empty,
           AVector.empty,
+          AVector.empty,
           AVector.empty
         ),
         CallContractFailed("InvalidContractMethodIndex")
@@ -1363,7 +1391,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |      ],
          |      "txInputs": [],
          |      "txOutputs": [],
-         |      "events": []
+         |      "events": [],
+         |      "debugMessages": []
          |    },
          |    {
          |      "type": "CallContractFailed",

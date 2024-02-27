@@ -16,23 +16,16 @@
 
 package org.alephium.api.model
 
-import org.alephium.protocol.model.Address
-import org.alephium.util.AVector
+import java.math.BigInteger
 
-sealed trait CallContractResult
+import akka.util.ByteString
 
-@upickle.implicits.key("CallContractSucceeded")
-final case class CallContractSucceeded(
-    returns: AVector[Val],
-    gasUsed: Int,
-    contracts: AVector[ContractState],
-    txInputs: AVector[Address],
-    txOutputs: AVector[Output],
-    events: AVector[ContractEventByTxId],
-    debugMessages: AVector[DebugMessage]
-) extends CallContractResult
+final case class TargetToHashrate(
+    target: ByteString
+)
 
-@upickle.implicits.key("CallContractFailed")
-final case class CallContractFailed(error: String) extends CallContractResult
-
-final case class MultipleCallContractResult(results: AVector[CallContractResult])
+object TargetToHashrate {
+  final case class Result(
+      hashrate: BigInteger
+  )
+}

@@ -21,6 +21,7 @@ import scala.collection.mutable
 import org.alephium.protocol.vm.Val
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
+//scalastyle:off file.size.limit
 class AstSpec extends AlephiumSpec {
 
   behavior of "Check external caller"

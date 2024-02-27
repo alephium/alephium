@@ -1159,7 +1159,7 @@ class ServerUtils(implicit
       .compileTxScriptFull(query.code, compilerOptions = query.getLangCompilerOptions())
       .map(CompileScriptResult.from)
       .left
-      .map(error => failed(error.toString))
+      .map(error => failed(error.format(query.code)))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -1168,7 +1168,7 @@ class ServerUtils(implicit
       .compileContractFull(query.code, compilerOptions = query.getLangCompilerOptions())
       .map(CompileContractResult.from)
       .left
-      .map(error => failed(error.toString))
+      .map(error => failed(error.format(query.code)))
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
@@ -1177,14 +1177,14 @@ class ServerUtils(implicit
       .compileProject(query.code, compilerOptions = query.getLangCompilerOptions())
       .map(p => CompileProjectResult.from(p._1, p._2))
       .left
-      .map(error => failed(error.toString))
+      .map(error => failed(error.format(query.code)))
   }
 
   def getContractState(
       blockFlow: BlockFlow,
-      address: Address.Contract,
-      groupIndex: GroupIndex
+      address: Address.Contract
   ): Try[ContractState] = {
+    val groupIndex = address.groupIndex
     for {
       worldState <- wrapResult(blockFlow.getBestCachedWorldState(groupIndex))
       state      <- fetchContractState(worldState, address.contractId)
@@ -1209,6 +1209,7 @@ class ServerUtils(implicit
         worldState,
         groupIndex,
         contractId,
+        params.callerAddress.map(_.contractId),
         txId,
         blockHash,
         TimeStamp.now(),
@@ -1224,6 +1225,8 @@ class ServerUtils(implicit
       contractsState <- contractAddresses.mapE(address =>
         fetchContractState(worldState, address.contractId)
       )
+      events = fetchContractEvents(worldState)
+      eventsSplit <- extractDebugMessages(events)
     } yield {
       CallContractSucceeded(
         returns.map(Val.from),
@@ -1233,7 +1236,8 @@ class ServerUtils(implicit
         result.generatedOutputs.mapWithIndex { case (output, index) =>
           Output.from(output, txId, index)
         },
-        fetchContractEvents(worldState)
+        events = eventsSplit._1,
+        debugMessages = eventsSplit._2
       )
     }
     result match {
@@ -1272,6 +1276,7 @@ class ServerUtils(implicit
         worldState,
         groupIndex,
         contractId,
+        testContract.callerContractIdOpt,
         testContract.txId,
         testContract.blockHash,
         testContract.blockTimeStamp,
@@ -1288,7 +1293,6 @@ class ServerUtils(implicit
       val executionOutputs = executionResultPair._1
       val executionResult  = executionResultPair._2
       val gasUsed          = maximalGasPerTx.subUnsafe(executionResult.gasBox)
-      logger.info("\n" + showDebugMessages(eventsSplit._2))
       TestContractResult(
         address = Address.contract(testContract.contractId),
         codeHash = postState._2,
@@ -1354,18 +1358,26 @@ class ServerUtils(implicit
       case (ids, contractState) =>
         if (destroyedContractIds.contains(contractState.id)) ids else ids :+ contractState.id
     }
-    for {
-      existingContractsState <- contractIds.mapE(id => fetchContractState(worldState, id))
-      testContractState <- fetchContractState(
-        worldState,
-        testContract.contractId
-      )
-    } yield {
+    contractIds.mapE(id => fetchContractState(worldState, id)).flatMap { existingContractsState =>
+      if (destroyedContractIds.contains(testContract.contractId)) {
+        Right((existingContractsState, testContract.code.hash))
+      } else {
+        fetchTestContractState(worldState, testContract).map {
+          case (testContractState, testCodeHash) =>
+            (existingContractsState :+ testContractState, testCodeHash)
+        }
+      }
+    }
+  }
+
+  private def fetchTestContractState(
+      worldState: WorldState.Staging,
+      testContract: TestContract.Complete
+  ): Try[(ContractState, Hash)] = {
+    fetchContractState(worldState, testContract.contractId) map { testContractState =>
       val codeHash = testContract.codeHash(testContractState.codeHash)
-      val states = existingContractsState ++ AVector(
-        testContractState.copy(codeHash = codeHash)
-      )
-      (states, codeHash)
+      // Note that we need to update the code hash as the contract might have been migrated
+      (testContractState.copy(codeHash = codeHash), codeHash)
     }
   }
 
@@ -1411,6 +1423,7 @@ class ServerUtils(implicit
       worldState: WorldState.Staging,
       groupIndex: GroupIndex,
       contractId: ContractId,
+      callerContractIdOpt: Option[ContractId],
       txId: TransactionId,
       blockHash: BlockHash,
       blockTimeStamp: TimeStamp,
@@ -1437,28 +1450,18 @@ class ServerUtils(implicit
       isEntryMethodPayable = true
     )
     val context = StatefulContext(blockEnv, txEnv, worldState, maximalGasPerTx)
-    val script = StatefulScript.unsafe(
-      AVector(
-        Method[StatefulContext](
-          isPublic = true,
-          usePreapprovedAssets = inputAssets.nonEmpty,
-          useContractAssets = false,
-          argsLength = 0,
-          localsLength = 0,
-          returnLength = method.returnLength,
-          instrs = approveAsset(inputAssets, testGasFee) ++ callExternal(
-            args,
-            methodIndex,
-            method.argsLength,
-            method.returnLength,
-            contractId
-          )
-        )
-      )
-    )
     for {
-      _      <- checkArgs(args, method)
-      result <- runWithDebugError(context, script)
+      _ <- checkArgs(args, method)
+      result <- runWithDebugError(
+        context,
+        contractId,
+        callerContractIdOpt,
+        inputAssets,
+        methodIndex,
+        args,
+        method,
+        testGasFee
+      )
     } yield result
   }
   // scalastyle:on method.length parameter.number
@@ -1475,12 +1478,68 @@ class ServerUtils(implicit
     }
   }
 
+  // scalastyle:off method.length
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def runWithDebugError(
       context: StatefulContext,
-      script: StatefulScript
+      contractId: ContractId,
+      callerContractIdOpt: Option[ContractId],
+      inputAssets: AVector[TestInputAsset],
+      methodIndex: Int,
+      args: AVector[Val],
+      method: Method[StatefulContext],
+      testGasFee: U256
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
-    StatefulVM.runTxScriptWithOutputs(context, script) match {
+    val executionResult = callerContractIdOpt match {
+      case None =>
+        val script = StatefulScript.unsafe(
+          AVector(
+            Method[StatefulContext](
+              isPublic = true,
+              usePreapprovedAssets = inputAssets.nonEmpty,
+              useContractAssets = false,
+              argsLength = 0,
+              localsLength = 0,
+              returnLength = method.returnLength,
+              instrs = approveAsset(inputAssets, testGasFee) ++ callExternal(
+                args,
+                methodIndex,
+                method.argsLength,
+                method.returnLength,
+                contractId
+              )
+            )
+          )
+        )
+        StatefulVM.runTxScriptWithOutputsTestOnly(context, script)
+      case Some(callerContractId) =>
+        val mockCallerContract = StatefulContract(
+          0,
+          AVector(
+            Method[StatefulContext](
+              isPublic = true,
+              usePreapprovedAssets = inputAssets.nonEmpty,
+              useContractAssets = false,
+              argsLength = 0,
+              localsLength = 0,
+              returnLength = method.returnLength,
+              instrs = approveAsset(inputAssets, testGasFee) ++ callExternal(
+                args,
+                methodIndex,
+                method.argsLength,
+                method.returnLength,
+                contractId
+              )
+            )
+          )
+        )
+        StatefulVM.runCallerContractWithOutputsTestOnly(
+          context,
+          mockCallerContract,
+          callerContractId
+        )
+    }
+    executionResult match {
       case Right(result)         => Right(result)
       case Left(Left(ioFailure)) => Left(failedInIO(ioFailure.error))
       case Left(Right(exeFailure)) =>
@@ -1488,11 +1547,11 @@ class ServerUtils(implicit
         val events      = fetchContractEvents(context.worldState)
         extractDebugMessages(events).flatMap { case (_, debugMessages) =>
           val detail = showDebugMessages(debugMessages) ++ errorString
-          logger.info("\n" + detail)
           Left(failed(detail))
         }
     }
   }
+  // scalastyle:on method.length
 
   def showDebugMessages(messages: AVector[DebugMessage]): String = {
     if (messages.isEmpty) {

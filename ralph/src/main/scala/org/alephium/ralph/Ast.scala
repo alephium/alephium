@@ -35,10 +35,46 @@ object Ast {
   private val stdArg: Argument =
     Argument(Ident("__stdInterfaceId"), Type.ByteVec, isMutable = false, isUnused = true)
 
-  final case class Ident(name: String)
-  final case class TypeId(name: String)
-  final case class FuncId(name: String, isBuiltIn: Boolean)
-  final case class Argument(ident: Ident, tpe: Type, isMutable: Boolean, isUnused: Boolean) {
+  trait Positioned {
+    var sourceIndex: Option[SourceIndex] = None
+    def atSourceIndex(fromIndex: Int, endIndex: Int): this.type = {
+      require(this.sourceIndex.isEmpty)
+      this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
+      this
+    }
+    def atSourceIndex(sourceIndex: Option[SourceIndex]): this.type = {
+      require(this.sourceIndex.isEmpty)
+      this.sourceIndex = sourceIndex
+      this
+    }
+
+    /*
+     * This function update a `CompilerError` when the source index was not
+     * available at the time of the error.
+     * For example for `Operator` or `BuiltIn`, we could add the `SourceIndex`
+     * to the `getReturnType` function, but it implies a lot of changes in the
+     * all `ralph` module, while the position is not useful along the way.
+     */
+    def positionedError[T](f: => T): T = {
+      try {
+        f
+      } catch {
+        case e: error.CompilerError.Default =>
+          if (sourceIndex.isDefined && e.sourceIndex.isEmpty) {
+            throw e.copy(sourceIndex = sourceIndex)
+          } else {
+            throw e
+          }
+      }
+    }
+  }
+
+  final case class Ident(name: String)                      extends Positioned
+  final case class TypeId(name: String)                     extends Positioned
+  final case class FuncId(name: String, isBuiltIn: Boolean) extends Positioned
+
+  final case class Argument(ident: Ident, tpe: Type, isMutable: Boolean, isUnused: Boolean)
+      extends Positioned {
     def signature: String = {
       val prefix = if (isMutable) "mut " else ""
       s"${prefix}${ident.name}:${tpe.signature}"
@@ -49,8 +85,8 @@ object Ast {
     def signature: String = s"${ident.name}:${tpe.signature}"
   }
 
-  final case class AnnotationField(ident: Ident, value: Val)
-  final case class Annotation(id: Ident, fields: Seq[AnnotationField])
+  final case class AnnotationField(ident: Ident, value: Val)           extends Positioned
+  final case class Annotation(id: Ident, fields: Seq[AnnotationField]) extends Positioned
 
   object FuncId {
     lazy val empty: FuncId = FuncId("", isBuiltIn = false)
@@ -61,18 +97,18 @@ object Ast {
   final case class ApproveAsset[Ctx <: StatelessContext](
       address: Expr[Ctx],
       tokenAmounts: Seq[(Expr[Ctx], Expr[Ctx])]
-  ) {
+  ) extends Positioned {
     def check(state: Compiler.State[Ctx]): Unit = {
       if (address.getType(state) != Seq(Type.Address)) {
-        throw Compiler.Error(s"Invalid address type: ${address}")
+        throw Compiler.Error(s"Invalid address type: ${address}", address.sourceIndex)
       }
-      if (
-        tokenAmounts
-          .exists(p =>
-            (p._1.getType(state), p._2.getType(state)) != (Seq(Type.ByteVec), Seq(Type.U256))
-          )
-      ) {
-        throw Compiler.Error(s"Invalid token amount type: ${tokenAmounts}")
+      tokenAmounts
+        .find(p =>
+          (p._1.getType(state), p._2.getType(state)) != (Seq(Type.ByteVec), Seq(Type.U256))
+        ) match {
+        case None => ()
+        case Some((exp, _)) =>
+          throw Compiler.Error(s"Invalid token amount type: ${tokenAmounts}", exp.sourceIndex)
       }
     }
 
@@ -90,7 +126,7 @@ object Ast {
     }
   }
 
-  trait ApproveAssets[Ctx <: StatelessContext] {
+  trait ApproveAssets[Ctx <: StatelessContext] extends Positioned {
     def approveAssets: Seq[ApproveAsset[Ctx]]
 
     def checkApproveAssets(state: Compiler.State[Ctx]): Unit = {
@@ -103,10 +139,14 @@ object Ast {
     ): Seq[Instr[Ctx]] = {
       (approveAssets.nonEmpty, func.usePreapprovedAssets) match {
         case (true, false) =>
-          throw Compiler.Error(s"Function `${func.name}` does not use preapproved assets")
+          throw Compiler.Error(
+            s"Function `${func.name}` does not use preapproved assets",
+            sourceIndex
+          )
         case (false, true) =>
           throw Compiler.Error(
-            s"Function `${func.name}` needs preapproved assets, please use braces syntax"
+            s"Function `${func.name}` needs preapproved assets, please use braces syntax",
+            sourceIndex
           )
         case _ => ()
       }
@@ -114,7 +154,7 @@ object Ast {
     }
   }
 
-  trait Typed[Ctx <: StatelessContext, T] {
+  trait Typed[Ctx <: StatelessContext, T] extends Positioned {
     var tpe: Option[T] = None
     protected def _getType(state: Compiler.State[Ctx]): T
     def getType(state: Compiler.State[Ctx]): T =
@@ -152,10 +192,16 @@ object Ast {
       assume(elements.nonEmpty)
       val baseType = elements(0).getType(state)
       if (baseType.length != 1) {
-        throw Compiler.Error(s"Expected single type for array element, got ${quote(elements)}")
+        throw Compiler.Error(
+          s"Expected single type for array element, got ${quote(elements)}",
+          sourceIndex
+        )
       }
       if (elements.drop(0).exists(_.getType(state) != baseType)) {
-        throw Compiler.Error(s"Array elements should have same type, got ${quote(elements)}")
+        throw Compiler.Error(
+          s"Array elements should have same type, got ${quote(elements)}",
+          sourceIndex
+        )
       }
       Seq(Type.FixedSizeArray(baseType(0), elements.size))
     }
@@ -202,7 +248,7 @@ object Ast {
   final case class UnaryOp[Ctx <: StatelessContext](op: Operator, expr: Expr[Ctx])
       extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      op.getReturnType(expr.getType(state))
+      positionedError(op.getReturnType(expr.getType(state)))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -212,12 +258,14 @@ object Ast {
   final case class Binop[Ctx <: StatelessContext](op: Operator, left: Expr[Ctx], right: Expr[Ctx])
       extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      op.getReturnType(left.getType(state) ++ right.getType(state))
+      positionedError(op.getReturnType(left.getType(state) ++ right.getType(state)))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      left.genCode(state) ++ right.genCode(state) ++ op.genCode(
-        left.getType(state) ++ right.getType(state)
+      positionedError(
+        left.genCode(state) ++ right.genCode(state) ++ op.genCode(
+          left.getType(state) ++ right.getType(state)
+        )
       )
     }
   }
@@ -227,12 +275,12 @@ object Ast {
       state.checkContractType(contractType)
 
       if (address.getType(state) != Seq(Type.ByteVec)) {
-        throw Compiler.Error(s"Invalid expr $address for contract address")
+        throw Compiler.Error(s"Invalid expr $address for contract address", address.sourceIndex)
       }
 
       val contractInfo = state.getContractInfo(contractType)
       if (!contractInfo.kind.instantiable) {
-        throw Compiler.Error(s"${contractType.name} is not instantiable")
+        throw Compiler.Error(s"${contractType.name} is not instantiable", sourceIndex)
       }
 
       Seq(Type.Contract.stack(contractType))
@@ -276,7 +324,7 @@ object Ast {
             variadicInstrs ++
             func.genCode(argsType)
           if (ignoreReturn) {
-            val returnType = func.getReturnType(argsType, state.selfContractType)
+            val returnType = positionedError(func.getReturnType(argsType, state.selfContractType))
             instrs ++ Seq.fill(Type.flattenTypeLength(returnType))(Pop)
           } else {
             instrs
@@ -290,7 +338,10 @@ object Ast {
         func: Compiler.ContractFunc[Ctx]
     ): Unit = {
       if (!func.isStatic) {
-        throw Compiler.Error(s"Expected static function, got ${funcName(typeId, funcId)}")
+        throw Compiler.Error(
+          s"Expected static function, got ${funcName(typeId, funcId)}",
+          funcId.sourceIndex
+        )
       }
     }
   }
@@ -308,7 +359,9 @@ object Ast {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
-      funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
+      positionedError(
+        funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
+      )
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -335,7 +388,9 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
+      positionedError(
+        funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
+      )
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -351,12 +406,18 @@ object Ast {
     @inline def getContractType(state: Compiler.State[StatefulContext]): Type.Contract = {
       val objType = obj.getType(state)
       if (objType.length != 1) {
-        throw Compiler.Error(s"Expected a single parameter for contract object, got ${quote(obj)}")
+        throw Compiler.Error(
+          s"Expected a single parameter for contract object, got ${quote(obj)}",
+          obj.sourceIndex
+        )
       } else {
         objType(0) match {
           case contract: Type.Contract => contract
           case _ =>
-            throw Compiler.Error(s"Expected a contract for ${quote(callId)}, got ${quote(obj)}")
+            throw Compiler.Error(
+              s"Expected a contract for ${quote(callId)}, got ${quote(obj)}",
+              obj.sourceIndex
+            )
         }
       }
     }
@@ -370,7 +431,9 @@ object Ast {
       val funcInfo = state.getFunc(contractType.id, callId)
       checkNonStaticContractFunction(contractType.id, callId, funcInfo)
       state.addExternalCall(contractType.id, callId)
-      funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
+      positionedError(
+        funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
+      )
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -401,7 +464,10 @@ object Ast {
     ): Unit = {
       if (func.isStatic) {
         // TODO: use `obj.funcId` instead of `typeId.funcId`
-        throw Compiler.Error(s"Expected non-static function, got ${funcName(typeId, funcId)}")
+        throw Compiler.Error(
+          s"Expected non-static function, got ${funcName(typeId, funcId)}",
+          funcId.sourceIndex
+        )
       }
     }
   }
@@ -429,20 +495,23 @@ object Ast {
       expr.genCode(state)
   }
 
-  trait IfBranch[Ctx <: StatelessContext] {
+  trait IfBranch[Ctx <: StatelessContext] extends Positioned {
     def condition: Expr[Ctx]
     def checkCondition(state: Compiler.State[Ctx]): Unit = {
       val conditionType = condition.getType(state)
       if (conditionType != Seq(Type.Bool)) {
-        throw Compiler.Error(s"Invalid type of condition expr: $conditionType")
+        throw Compiler.Error(
+          s"Invalid type of condition expr: $conditionType",
+          condition.sourceIndex
+        )
       }
     }
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
-  trait ElseBranch[Ctx <: StatelessContext] {
+  trait ElseBranch[Ctx <: StatelessContext] extends Positioned {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
-  trait IfElse[Ctx <: StatelessContext] {
+  trait IfElse[Ctx <: StatelessContext] extends Positioned {
     def ifBranches: Seq[IfBranch[Ctx]]
     def elseBranchOpt: Option[ElseBranch[Ctx]]
 
@@ -500,7 +569,8 @@ object Ast {
         val ifBranchType = ifBranch.expr.getType(state)
         if (ifBranchType != elseBranchType) {
           throw Compiler.Error(
-            s"Invalid types of if-else expression branches, expected ${quote(elseBranchType)}, got ${quote(ifBranchType)}"
+            s"Invalid types of if-else expression branches, expected ${quote(elseBranchType)}, got ${quote(ifBranchType)}",
+            sourceIndex
           )
         }
       }
@@ -508,7 +578,18 @@ object Ast {
     }
   }
 
-  sealed trait Statement[Ctx <: StatelessContext] {
+  final case class StringLiteral[Ctx <: StatelessContext](
+      string: Val.ByteVec
+  ) extends Expr[Ctx]
+      with Positioned {
+    def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(Type.ByteVec)
+
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      Seq(BytesConst(string))
+    }
+  }
+
+  sealed trait Statement[Ctx <: StatelessContext] extends Positioned {
     def check(state: Compiler.State[Ctx]): Unit
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
@@ -539,7 +620,8 @@ object Ast {
       val types = value.getType(state)
       if (types.length != vars.length) {
         throw Compiler.Error(
-          s"Invalid variable declaration, expected ${types.length} variables, got ${vars.length} variables"
+          s"Invalid variable declaration, expected ${types.length} variables, got ${vars.length} variables",
+          sourceIndex
         )
       }
       vars.zip(types).foreach {
@@ -560,23 +642,28 @@ object Ast {
     }
   }
 
-  trait UniqueDef {
+  trait UniqueDef extends Positioned {
     def name: String
   }
 
   object UniqueDef {
     def checkDuplicates(defs: Seq[UniqueDef], name: String): Unit = {
       if (defs.distinctBy(_.name).size != defs.size) {
-        throw Compiler.Error(s"These $name are defined multiple times: ${duplicates(defs)}")
+        val (dups, sourceIndex) = duplicates(defs)
+        throw Compiler.Error(
+          s"These $name are defined multiple times: ${dups}",
+          sourceIndex
+        )
       }
     }
 
-    def duplicates(defs: Seq[UniqueDef]): String = {
-      defs
+    def duplicates(defs: Seq[UniqueDef]): (String, Option[SourceIndex]) = {
+      val dups = defs
         .groupBy(_.name)
         .filter(_._2.size > 1)
-        .keys
-        .mkString(", ")
+      val sourceIndex = dups.values.headOption.flatMap(_.drop(1).headOption.flatMap(_.sourceIndex))
+
+      (dups.keys.mkString(", "), sourceIndex)
     }
   }
 
@@ -642,9 +729,12 @@ object Ast {
         case Some(IfElseStatement(ifBranches, elseBranchOpt)) =>
           ifBranches.foreach(branch => checkRetTypes(branch.body.lastOption))
           checkRetTypes(elseBranchOpt.flatMap(_.body.lastOption))
-        case Some(call: FuncCall[_]) if call.id == FuncId("panic", isBuiltIn = true) => ()
+        case Some(call: FuncCall[_]) if call.id.name == "panic" && call.id.isBuiltIn == true => ()
         case _ =>
-          throw Compiler.Error(s"Expected return statement for function ${quote(id.name)}")
+          throw Compiler.Error(
+            s"Expected return statement for function ${quote(id.name)}",
+            id.sourceIndex
+          )
       }
     }
 
@@ -746,7 +836,7 @@ object Ast {
   }
   object EnumDef {
     def fieldIdent(enumId: TypeId, field: Ident): Ident =
-      Ident(s"${enumId.name}.${field.name}")
+      Ident(s"${enumId.name}.${field.name}").atSourceIndex(field.sourceIndex)
   }
 
   final case class EventDef(
@@ -765,7 +855,10 @@ object Ast {
       extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
       val eventInfo = state.getEvent(id)
-      eventInfo.checkFieldTypes(args.flatMap(_.getType(state)))
+      eventInfo.checkFieldTypes(
+        args.flatMap(_.getType(state)),
+        args.headOption.flatMap(_.sourceIndex)
+      )
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -779,10 +872,11 @@ object Ast {
       val argsType = args.flatMap(_.getType(state))
       if (argsType.exists(_.isArrayType)) {
         throw Compiler.Error(
-          s"Array type not supported for event ${quote(s"${state.typeId.name}.${id.name}")}"
+          s"Array type not supported for event ${quote(s"${state.typeId.name}.${id.name}")}",
+          sourceIndex
         )
       }
-      val logOpCode = Compiler.genLogs(args.length)
+      val logOpCode = Compiler.genLogs(args.length, id.sourceIndex)
       eventIndex ++ args.flatMap(_.genCode(state)) :+ logOpCode
     }
   }
@@ -795,11 +889,11 @@ object Ast {
       val leftTypes  = targets.map(_.getType(state))
       val rightTypes = rhs.getType(state)
       if (leftTypes != rightTypes) {
-        throw Compiler.Error(s"Assign $rightTypes to $leftTypes")
+        throw Compiler.Error(s"Assign $rightTypes to $leftTypes", sourceIndex)
       }
       targets.foreach { target =>
         if (!target.isMutable(state)) {
-          throw Compiler.Error(s"Assign to immutable variable: ${target.ident.name}")
+          throw Compiler.Error(s"Assign to immutable variable: ${target.ident.name}", sourceIndex)
         }
       }
     }
@@ -821,7 +915,9 @@ object Ast {
     override def check(state: Compiler.State[Ctx]): Unit = {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
-      funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
+      positionedError(
+        funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
+      )
       ()
     }
 
@@ -848,7 +944,9 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
+      positionedError(
+        funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
+      )
       ()
     }
 
@@ -896,11 +994,13 @@ object Ast {
       elseBranchOpt.foreach(_.body.foreach(_.check(state)))
     }
   }
-  final case class While[Ctx <: StatelessContext](condition: Expr[Ctx], body: Seq[Statement[Ctx]])
-      extends Statement[Ctx] {
+  final case class While[Ctx <: StatelessContext](
+      condition: Expr[Ctx],
+      body: Seq[Statement[Ctx]]
+  ) extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
       if (condition.getType(state) != Seq(Type.Bool)) {
-        throw Compiler.Error(s"Invalid type of conditional expr ${quote(condition)}")
+        throw Compiler.Error(s"Invalid type of conditional expr ${quote(condition)}", sourceIndex)
       }
       body.foreach(_.check(state))
     }
@@ -911,7 +1011,7 @@ object Ast {
       val whileLen = condIR.length + bodyIR.length + 1
       if (whileLen > 0xff) {
         // TODO: support long branches
-        throw Compiler.Error(s"Too many instructions for if-else branches")
+        throw Compiler.Error(s"Too many instructions for if-else branches", sourceIndex)
       }
       condIR ++ bodyIR :+ Jump(-whileLen)
     }
@@ -925,7 +1025,7 @@ object Ast {
     override def check(state: Compiler.State[Ctx]): Unit = {
       initialize.check(state)
       if (condition.getType(state) != Seq(Type.Bool)) {
-        throw Compiler.Error(s"Invalid condition type: $condition")
+        throw Compiler.Error(s"Invalid condition type: $condition", sourceIndex)
       }
       body.foreach(_.check(state))
       update.check(state)
@@ -944,7 +1044,7 @@ object Ast {
   final case class ReturnStmt[Ctx <: StatelessContext](exprs: Seq[Expr[Ctx]])
       extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
-      state.checkReturn(exprs.flatMap(_.getType(state)))
+      state.checkReturn(exprs.flatMap(_.getType(state)), sourceIndex)
     }
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
       exprs.flatMap(_.genCode(state)) :+ Return
@@ -994,8 +1094,11 @@ object Ast {
         .toMap[FuncId, Compiler.ContractFunc[Ctx]]
       builtInFuncs.foreach(func => table = table + (FuncId(func.name, isBuiltIn = true) -> func))
       if (table.size != (funcs.size + builtInFuncs.length)) {
-        val duplicates = UniqueDef.duplicates(funcs)
-        throw Compiler.Error(s"These functions are defined multiple times: $duplicates")
+        val (duplicates, sourceIndex) = UniqueDef.duplicates(funcs)
+        throw Compiler.Error(
+          s"These functions are defined multiple times: $duplicates",
+          sourceIndex
+        )
       }
       table
     }
@@ -1012,7 +1115,8 @@ object Ast {
       }
       if (index >= Compiler.State.maxVarIndex) {
         throw Compiler.Error(
-          s"Number of template variables more than ${Compiler.State.maxVarIndex}"
+          s"Number of template variables more than ${Compiler.State.maxVarIndex}",
+          ident.sourceIndex
         )
       }
     }
@@ -1055,7 +1159,9 @@ object Ast {
       state.setGenCodePhase()
       StatelessScript
         .from(genMethods(state))
-        .getOrElse(throw Compiler.Error(s"No methods found in ${quote(ident.name)}"))
+        .getOrElse(
+          throw Compiler.Error(s"No methods found in ${quote(ident.name)}", ident.sourceIndex)
+        )
     }
 
     def genCodeFull(state: Compiler.State[StatelessContext]): StatelessScript = {
@@ -1095,7 +1201,7 @@ object Ast {
     val inheritances: Seq[ContractInheritance] = Seq.empty
 
     def error(tpe: String): Compiler.Error =
-      Compiler.Error(s"TxScript ${ident.name} should not contain any $tpe")
+      Compiler.Error(s"TxScript ${ident.name} should not contain any $tpe", sourceIndex)
     def constantVars: Seq[ConstantVarDef] = throw error("constant variable")
     def enums: Seq[EnumDef]               = throw error("enum")
     def getTemplateVarsSignature(): String =
@@ -1114,7 +1220,8 @@ object Ast {
         .from(methods)
         .getOrElse(
           throw Compiler.Error(
-            "Expected the 1st function to be public and the other functions to be private for tx script"
+            "Expected the 1st function to be public and the other functions to be private for tx script",
+            sourceIndex
           )
         )
     }
@@ -1182,7 +1289,10 @@ object Ast {
 
     private def checkFuncs(): Unit = {
       if (funcs.length < 1) {
-        throw Compiler.Error(s"No function found in Contract ${quote(ident.name)}")
+        throw Compiler.Error(
+          s"No function found in Contract ${quote(ident.name)}",
+          ident.sourceIndex
+        )
       }
     }
 
@@ -1211,7 +1321,7 @@ object Ast {
         val id   = inheritance.parentId
         val kind = state.getContractInfo(id).kind
         if (!kind.inheritable) {
-          throw Compiler.Error(s"$kind ${id.name} can not be inherited")
+          throw Compiler.Error(s"$kind ${id.name} can not be inherited", id.sourceIndex)
         }
       }
     }
@@ -1276,7 +1386,10 @@ object Ast {
       inheritances: Seq[InterfaceInheritance]
   ) extends ContractWithState {
     def error(tpe: String): Compiler.Error =
-      Compiler.Error(s"Interface ${quote(ident.name)} should not contain any ${quote(tpe)}")
+      Compiler.Error(
+        s"Interface ${quote(ident.name)} should not contain any ${quote(tpe)}",
+        sourceIndex
+      )
 
     def templateVars: Seq[Argument]       = throw error("template variable")
     def fields: Seq[Argument]             = throw error("field")
@@ -1286,14 +1399,14 @@ object Ast {
     def enums: Seq[EnumDef]               = throw error("enum")
 
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
-      throw Compiler.Error(s"Interface ${quote(ident.name)} should not generate code")
+      throw Compiler.Error(s"Interface ${quote(ident.name)} should not generate code", sourceIndex)
     }
   }
 
   final case class MultiContract(
       contracts: Seq[ContractWithState],
       dependencies: Option[Map[TypeId, Seq[TypeId]]]
-  ) {
+  ) extends Positioned {
     lazy val contractsTable = contracts.map { contract =>
       val kind = contract match {
         case _: Ast.ContractInterface =>
@@ -1310,22 +1423,27 @@ object Ast {
       if (contractIndex >= 0 && contractIndex < contracts.size) {
         contracts(contractIndex)
       } else {
-        throw Compiler.Error(s"Invalid contract index $contractIndex")
+        throw Compiler.Error(s"Invalid contract index $contractIndex", None)
       }
     }
 
     private def getContract(typeId: TypeId): ContractWithState = {
-      contracts.find(_.ident == typeId) match {
-        case None => throw Compiler.Error(s"Contract ${quote(typeId.name)} does not exist")
-        case Some(_: TxScript) =>
-          throw Compiler.Error(s"Expected contract ${quote(typeId.name)}, but was script")
+      contracts.find(_.ident.name == typeId.name) match {
+        case None =>
+          throw Compiler.Error(s"Contract ${quote(typeId.name)} does not exist", typeId.sourceIndex)
+        case Some(ts: TxScript) =>
+          throw Compiler.Error(
+            s"Expected contract ${quote(typeId.name)}, but was script",
+            ts.sourceIndex
+          )
         case Some(contract: ContractWithState) => contract
       }
     }
 
     def isContract(typeId: TypeId): Boolean = {
-      contracts.find(_.ident == typeId) match {
-        case None => throw Compiler.Error(s"Contract ${quote(typeId.name)} does not exist")
+      contracts.find(_.ident.name == typeId.name) match {
+        case None =>
+          throw Compiler.Error(s"Contract ${quote(typeId.name)} does not exist", typeId.sourceIndex)
         case Some(contract: Contract) if !contract.isAbstract => true
         case _                                                => false
       }
@@ -1334,7 +1452,8 @@ object Ast {
     def getInterface(typeId: TypeId): ContractInterface = {
       getContract(typeId) match {
         case interface: ContractInterface => interface
-        case _ => throw Compiler.Error(s"Interface ${typeId.name} does not exist")
+        case _ =>
+          throw Compiler.Error(s"Interface ${typeId.name} does not exist", typeId.sourceIndex)
       }
     }
 
@@ -1345,7 +1464,10 @@ object Ast {
         visited: mutable.Set[TypeId]
     ): Unit = {
       if (!visited.add(contract.ident)) {
-        throw Compiler.Error(s"Cyclic inheritance detected for contract ${contract.ident.name}")
+        throw Compiler.Error(
+          s"Cyclic inheritance detected for contract ${contract.ident.name}",
+          contract.sourceIndex
+        )
       }
 
       val allParents = mutable.LinkedHashMap.empty[TypeId, ContractWithState]
@@ -1401,10 +1523,12 @@ object Ast {
             constantVars,
             enums,
             c.inheritances
-          )
+          ).atSourceIndex(c.sourceIndex)
         case i: ContractInterface =>
           val (_, stdId, funcs, events, _, _) = MultiContract.extractDefs(parentsCache, i)
-          ContractInterface(stdId, i.ident, funcs, events, i.inheritances)
+          ContractInterface(stdId, i.ident, funcs, events, i.inheritances).atSourceIndex(
+            i.sourceIndex
+          )
       }
       val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
       MultiContract(newContracts, Some(dependencies))
@@ -1427,9 +1551,10 @@ object Ast {
           state.allowDebug = true
           val statefulDebugScript = script.genCode(state)
           CompiledScript(statefulScript, script, warnings, statefulDebugScript)
-        case _: Contract => throw Compiler.Error(s"The code is for Contract, not for TxScript")
-        case _: ContractInterface =>
-          throw Compiler.Error(s"The code is for Interface, not for TxScript")
+        case c: Contract =>
+          throw Compiler.Error(s"The code is for Contract, not for TxScript", c.sourceIndex)
+        case ci: ContractInterface =>
+          throw Compiler.Error(s"The code is for Interface, not for TxScript", ci.sourceIndex)
       }
     }
 
@@ -1478,18 +1603,23 @@ object Ast {
         case contract: Contract =>
           if (contract.isAbstract) {
             throw Compiler.Error(
-              s"Code generation is not supported for abstract contract ${quote(contract.ident.name)}"
+              s"Code generation is not supported for abstract contract ${quote(contract.ident.name)}",
+              contract.sourceIndex
             )
           }
           val statefulContracts = genStatefulContracts()
           statefulContracts.find(_._2 == contractIndex) match {
             case Some(v) => v._1
             case None => // should never happen
-              throw Compiler.Error(s"Failed to compile contract ${contract.ident.name}")
+              throw Compiler.Error(
+                s"Failed to compile contract ${contract.ident.name}",
+                contract.sourceIndex
+              )
           }
-        case _: TxScript => throw Compiler.Error(s"The code is for TxScript, not for Contract")
-        case _: ContractInterface =>
-          throw Compiler.Error(s"The code is for Interface, not for Contract")
+        case ts: TxScript =>
+          throw Compiler.Error(s"The code is for TxScript, not for Contract", ts.sourceIndex)
+        case ci: ContractInterface =>
+          throw Compiler.Error(s"The code is for Interface, not for Contract", ci.sourceIndex)
       }
     }
   }
@@ -1512,16 +1642,18 @@ object Ast {
     ): Unit = {
       val fields = inheritance.idents.map { ident =>
         contract.fields
-          .find(_.ident == ident)
+          .find(_.ident.name == ident.name)
           .getOrElse(
             throw Compiler.Error(
-              s"Inherited field ${quote(ident.name)} does not exist in contract ${quote(contract.name)}"
+              s"Inherited field ${quote(ident.name)} does not exist in contract ${quote(contract.name)}",
+              ident.sourceIndex
             )
           )
       }
       if (fields != parentContract.fields) {
         throw Compiler.Error(
-          s"Invalid contract inheritance fields, expected ${quote(parentContract.fields)}, got ${quote(fields)}"
+          s"Invalid contract inheritance fields, expected ${quote(parentContract.fields)}, got ${quote(fields)}",
+          fields.headOption.flatMap(_.sourceIndex)
         )
       }
     }
@@ -1534,13 +1666,15 @@ object Ast {
           case (Some(parentStdId), Some(stdId)) =>
             if (stdId.bytes == parentStdId.bytes) {
               throw Compiler.Error(
-                s"The std id of interface ${interface.ident.name} is the same as parent interface"
+                s"The std id of interface ${interface.ident.name} is the same as parent interface",
+                interface.sourceIndex
               )
             }
             if (!stdId.bytes.startsWith(parentStdId.bytes)) {
               throw Compiler.Error(
                 s"The std id of interface ${interface.ident.name} should start with ${Hex
-                    .toHexString(parentStdId.bytes.drop(Ast.StdInterfaceIdPrefix.length))}"
+                    .toHexString(parentStdId.bytes.drop(Ast.StdInterfaceIdPrefix.length))}",
+                interface.sourceIndex
               )
             }
             Some(stdId)
@@ -1560,7 +1694,8 @@ object Ast {
           case (v, contract) =>
             if (contract.stdIdEnabled.nonEmpty && contract.stdIdEnabled != v) {
               throw Compiler.Error(
-                s"There are different std id enabled options on the inheritance chain of contract ${typeId.name}"
+                s"There are different std id enabled options on the inheritance chain of contract ${typeId.name}",
+                typeId.sourceIndex
               )
             }
             v
@@ -1602,13 +1737,14 @@ object Ast {
       val events         = sortedInterfaces.flatMap(_.events) ++ contractEvents
 
       val resultFuncs = contract match {
-        case _: TxScript =>
-          throw Compiler.Error("Extract definitions from TxScript is unexpected")
+        case txs: TxScript =>
+          throw Compiler.Error("Extract definitions from TxScript is unexpected", txs.sourceIndex)
         case txContract: Contract =>
           if (!txContract.isAbstract && unimplementedFuncs.nonEmpty) {
             val methodNames = unimplementedFuncs.map(_.name).mkString(",")
             throw Compiler.Error(
-              s"Contract ${txContract.name} has unimplemented methods: $methodNames"
+              s"Contract ${txContract.name} has unimplemented methods: $methodNames",
+              txContract.sourceIndex
             )
           }
 
@@ -1617,7 +1753,8 @@ object Ast {
           if (nonAbstractFuncs.nonEmpty) {
             val methodNames = nonAbstractFuncs.map(_.name).mkString(",")
             throw Compiler.Error(
-              s"Interface ${interface.name} has implemented methods: $methodNames"
+              s"Interface ${interface.name} has implemented methods: $methodNames",
+              interface.sourceIndex
             )
           }
           unimplementedFuncs
@@ -1632,9 +1769,10 @@ object Ast {
       if (sortedInterfaces.length >= 2) {
         val parent = sortedInterfaces(0)
         val child  = sortedInterfaces(1)
-        if (!child.inheritances.exists(_.parentId == parent.ident)) {
+        if (!child.inheritances.exists(_.parentId.name == parent.ident.name)) {
           throw Compiler.Error(
-            s"Only single inheritance is allowed. Interface ${child.ident.name} does not inherit from ${parent.ident.name}"
+            s"Only single inheritance is allowed. Interface ${child.ident.name} does not inherit from ${parent.ident.name}",
+            child.sourceIndex
           )
         }
 
@@ -1659,13 +1797,15 @@ object Ast {
             val haveType     = fields(0).value.tpe
             if (expectedType != haveType) {
               throw Compiler.Error(
-                s"There are different field types in the enum ${enumDef.id.name}: $expectedType,$haveType"
+                s"There are different field types in the enum ${enumDef.id.name}: $expectedType,$haveType",
+                fields(0).sourceIndex
               )
             }
             val conflictFields = enumDef.fields.filter(f => fields.exists(_.name == f.name))
             if (conflictFields.nonEmpty) {
               throw Compiler.Error(
-                s"There are conflict fields in the enum ${enumDef.id.name}: ${conflictFields.map(_.name).mkString(",")}"
+                s"There are conflict fields in the enum ${enumDef.id.name}: ${conflictFields.map(_.name).mkString(",")}",
+                conflictFields.headOption.flatMap(_.sourceIndex)
               )
             }
             fields.appendAll(enumDef.fields)
@@ -1682,13 +1822,19 @@ object Ast {
       val nonAbstractFuncSet = nonAbstractFuncs.view.map(f => f.id.name -> f).toMap
       val abstractFuncsSet   = abstractFuncs.view.map(f => f.id.name -> f).toMap
       if (nonAbstractFuncSet.size != nonAbstractFuncs.size) {
-        val duplicates = UniqueDef.duplicates(nonAbstractFuncs)
-        throw Compiler.Error(s"These functions are implemented multiple times: $duplicates")
+        val (duplicates, sourceIndex) = UniqueDef.duplicates(nonAbstractFuncs)
+        throw Compiler.Error(
+          s"These functions are implemented multiple times: $duplicates",
+          sourceIndex
+        )
       }
 
       if (abstractFuncsSet.size != abstractFuncs.size) {
-        val duplicates = UniqueDef.duplicates(abstractFuncs)
-        throw Compiler.Error(s"These abstract functions are defined multiple times: $duplicates")
+        val (duplicates, sourceIndex) = UniqueDef.duplicates(abstractFuncs)
+        throw Compiler.Error(
+          s"These abstract functions are defined multiple times: $duplicates",
+          sourceIndex
+        )
       }
 
       val (implementedFuncs, unimplementedFuncs) =
@@ -1699,7 +1845,8 @@ object Ast {
         val implementedAbstractFunc = nonAbstractFuncSet(funcName)
         if (implementedAbstractFunc.signature != abstractFunc.signature) {
           throw Compiler.Error(
-            s"Function ${quote(funcName)} is implemented with wrong signature"
+            s"Function ${quote(funcName)} is implemented with wrong signature",
+            implementedAbstractFunc.sourceIndex
           )
         }
       }

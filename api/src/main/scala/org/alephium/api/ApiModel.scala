@@ -445,6 +445,9 @@ trait ApiModelCodec {
 
   implicit val verifySignatureRW: RW[VerifySignature] = macroRW
 
+  implicit val targetToHashrateRW: RW[TargetToHashrate]              = macroRW
+  implicit val targetToHashrateResultRW: RW[TargetToHashrate.Result] = macroRW
+
   implicit val releaseVersionEncoder: Writer[model.ReleaseVersion] = StringWriter.comap(_.toString)
   implicit val releaseVersionDecoder: Reader[model.ReleaseVersion] = StringReader.map { raw =>
     model.ReleaseVersion.from(raw) match {
