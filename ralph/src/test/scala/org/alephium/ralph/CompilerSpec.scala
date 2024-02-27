@@ -2466,6 +2466,128 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     script.toTemplateString() is "0101030001000c{3}1700{0}{1}{2}a3{0}{2}0e0c16000100"
   }
 
+  it should "test template array variables" in {
+    def runScript(script: StatefulScript, templateVars: AVector[Val]): Unit = {
+      val templateCode = script.toTemplateString()
+      val pattern      = "\\{(\\d+)\\}".r
+      val bytecode = pattern.replaceAllIn(
+        templateCode,
+        m => {
+          val index = m.group(1).toInt
+          val value = templateVars(index)
+          val instr: Instr[StatefulContext] = value match {
+            case Val.Bool(v)    => if (v) ConstTrue else ConstFalse
+            case v: Val.I256    => I256Const(v)
+            case v: Val.U256    => U256Const(v)
+            case v: Val.ByteVec => BytesConst(v)
+            case v: Val.Address => AddressConst(v)
+          }
+          Hex.toHexString(serialize(instr))
+        }
+      )
+      val txScript = deserialize[StatefulScript](Hex.unsafe(bytecode)).rightValue
+      val (scriptObj, statefulContext) = prepareStatefulScript(txScript)
+      StatefulVM.execute(statefulContext, scriptObj, AVector.empty).isRight is true
+      ()
+    }
+
+    {
+      info("Gen code for template array variables")
+      val code =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main(address: Address, numbers0: [[U256; 2]; 2], bytes: ByteVec, numbers1: [U256; 3]) {
+           |  let _ = bytes
+           |  let _ = address
+           |  assert!(numbers0[1][1] == 3 && numbers0[0][0] == 0, 0)
+           |  let _ = numbers0[1]
+           |  assert!(numbers1[2] == 2 && numbers1[1] == 1 && numbers1[0] == 0, 0)
+         }
+           |""".stripMargin
+      val script = Compiler.compileTxScript(code).rightValue
+      script.toTemplateString() is "010100000700402c{1}{2}{3}{4}1703170217011700{6}{7}{8}170617051704{5}18{0}1816030f2f16000c2f1a0c7b16021603181816060e2f16050d2f1a16040c2f1a0c7b"
+      runScript(
+        script,
+        AVector(
+          Val.Address(lockupScriptGen.sample.get),
+          Val.U256(0),
+          Val.U256(1),
+          Val.U256(2),
+          Val.U256(3),
+          Val.ByteVec(Hex.unsafe("0011")),
+          Val.U256(0),
+          Val.U256(1),
+          Val.U256(2)
+        )
+      )
+    }
+
+    {
+      info("Gen code for variable index")
+      val code =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main(numbers: [U256; 3]) {
+           |  for (let mut i = 0; i < 3; i = i + 1) {
+           |    assert!(numbers[i] == i, 0)
+           |  }
+           |}
+           |""".stripMargin
+      val script = Compiler.compileTxScript(code).rightValue
+      script.toTemplateString() is "0101000004001b{0}{1}{2}1702170117000c170316030f314c0f16037a0f314d7816032f0c7b16030d2a17034a2d"
+      runScript(script, AVector(Val.U256(0), Val.U256(1), Val.U256(2)))
+    }
+
+    {
+      info("Access template array in non-main functions")
+      val code =
+        s"""
+           |@using(preapprovedAssets = false)
+           |TxScript Main(numbers: [U256; 3]) {
+           |  let _ = numbers[0]
+           |  foo()
+           |
+           |  fn foo() -> () {
+           |    for (let mut i = 0; i < 3; i = i + 1) {
+           |      assert!(numbers[i] == i, 0)
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      val script = Compiler.compileTxScript(code).rightValue
+      script.toTemplateString() is "02010000030009{0}{1}{2}170217011700160018000100000004001b{0}{1}{2}1702170117000c170316030f314c0f16037a0f314d7816032f0c7b16030d2a17034a2d"
+      runScript(script, AVector(Val.U256(0), Val.U256(1), Val.U256(2)))
+    }
+
+    {
+      info("Throw an error if the index is greater than max var index")
+      val code =
+        s"""
+           |TxScript Main(numbers: [U256; 3]) {
+           |  let _ = numbers[257]
+           |}
+           |""".stripMargin
+      Compiler
+        .compileTxScript(code)
+        .leftValue
+        .message is "Invalid array index 257"
+    }
+
+    {
+      info("Throw an error if the number of template variables exceeds the limit")
+      val code =
+        s"""
+           |TxScript Main(numbers0: [U256; 128], numbers1: [U256; 128]) {
+           |  return
+           |}
+           |""".stripMargin
+      Compiler
+        .compileTxScript(code)
+        .leftValue
+        .message is "Number of template variables more than 255"
+    }
+  }
+
   it should "use ApproveAlph instr for approve ALPH" in {
     val code =
       s"""

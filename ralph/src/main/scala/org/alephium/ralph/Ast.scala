@@ -1068,6 +1068,14 @@ object Ast {
     }
   }
 
+  object TemplateArray {
+    private val suffix = "-template-array"
+
+    @inline private[ralph] def renameTemplateArrayVar(ident: Ident): Ident = {
+      Ident(s"_${ident.name}$suffix")
+    }
+  }
+
   sealed trait ContractT[Ctx <: StatelessContext] extends UniqueDef {
     def ident: TypeId
     def templateVars: Seq[Argument]
@@ -1095,12 +1103,28 @@ object Ast {
       table
     }
 
+    private def addTemplateVars(state: Compiler.State[Ctx]): Unit = {
+      val index = templateVars.foldLeft(0) { case (index, templateVar) =>
+        templateVar.tpe match {
+          case _: Type.FixedSizeArray =>
+            val arrayVar = TemplateArray.renameTemplateArrayVar(templateVar.ident)
+            state.addTemplateVariable(arrayVar, templateVar.tpe, index)
+          case _ =>
+            state.addTemplateVariable(templateVar.ident, templateVar.tpe, index)
+        }
+      }
+      if (index >= Compiler.State.maxVarIndex) {
+        throw Compiler.Error(
+          s"Number of template variables more than ${Compiler.State.maxVarIndex}",
+          ident.sourceIndex
+        )
+      }
+    }
+
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setCheckPhase()
       state.checkArguments(fields)
-      templateVars.zipWithIndex.foreach { case (temp, index) =>
-        state.addTemplateVariable(temp.ident, temp.tpe, index)
-      }
+      addTemplateVars(state)
       fields.foreach(field =>
         state.addFieldVariable(
           field.ident,
@@ -1207,6 +1231,24 @@ object Ast {
       val script = genCode(state)
       StaticAnalysis.checkMethodsStateful(this, script.methods, state)
       script
+    }
+  }
+
+  object TxScript {
+    def from(
+        typeId: TypeId,
+        templateVars: Seq[Argument],
+        funcs: Seq[FuncDef[StatefulContext]]
+    ): TxScript = {
+      val arrayVarDefs: Seq[Statement[StatefulContext]] = templateVars.collect { arg =>
+        arg.tpe match {
+          case _: Type.FixedSizeArray =>
+            val arrayVar = TemplateArray.renameTemplateArrayVar(arg.ident)
+            VarDef(Seq(NamedVar(mutable = false, arg.ident)), Variable(arrayVar))
+        }
+      }
+      val newFuncs = funcs.map(func => func.copy(bodyOpt = Some(arrayVarDefs ++ func.body)))
+      TxScript(typeId, templateVars, newFuncs)
     }
   }
 
