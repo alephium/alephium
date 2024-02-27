@@ -1072,7 +1072,7 @@ object Ast {
     private val suffix = "-template-array"
 
     @inline private[ralph] def renameTemplateArrayVar(ident: Ident): Ident = {
-      Ident(s"${ident.name}$suffix")
+      Ident(s"_${ident.name}$suffix")
     }
   }
 

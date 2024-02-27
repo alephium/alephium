@@ -866,17 +866,13 @@ object Compiler {
         offset: ArrayTransformer.ArrayVarOffset[Ctx]
     ): Seq[Instr[Ctx]]
 
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def genLoadTemplateArray(
         arrayRef: ArrayTransformer.ArrayRef[Ctx],
         offset: ArrayTransformer.ArrayVarOffset[Ctx]
     ): Seq[Instr[Ctx]] = {
-      offset match {
-        case index: ArrayTransformer.ConstantArrayVarOffset[_] =>
-          State.checkConstantIndex(index.value, arrayRef.ident.sourceIndex)
-          Seq(TemplateVariable(arrayRef.ident.name, arrayRef.tpe.elementType.toVal, index.value))
-        case _ =>
-          throw Error("Expected constant index for template variable", arrayRef.ident.sourceIndex)
-      }
+      val index = offset.asInstanceOf[ArrayTransformer.ConstantArrayVarOffset[Ctx]].value
+      Seq(TemplateVariable(arrayRef.ident.name, arrayRef.tpe.elementType.toVal, index))
     }
 
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[Ctx]]]
