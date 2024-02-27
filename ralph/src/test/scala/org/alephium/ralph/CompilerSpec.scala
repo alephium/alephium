@@ -2428,11 +2428,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          }
            |""".stripMargin
       val script = Compiler.compileTxScript(code).rightValue
-      script.toTemplateString() is "0101030000001e{5}18{0}18{4}0c2f{1}0c2f1a0c7b{3}{4}1818{8}0c2f{7}0c2f1a{6}0c2f1a0c7b"
+      script.toTemplateString() is "010103000700402c{1}{2}{3}{4}1703170217011700{6}{7}{8}170617051704{5}18{0}1816030c2f16000c2f1a0c7b16021603181816060c2f16050c2f1a16040c2f1a0c7b"
     }
 
     {
-      info("Throw an error if the index is not constant")
+      info("Gen code for variable index")
       val code =
         s"""
            |TxScript Main(number: [U256; 3]) {
@@ -2441,10 +2441,27 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      Compiler
-        .compileTxScript(code)
-        .leftValue
-        .message is "Expected constant index for template variable"
+      val script = Compiler.compileTxScript(code).rightValue
+      script.toTemplateString() is "01010300040018{0}{1}{2}1702170117000c170316030f314c0c16037a0f314d781816030d2a17034a30"
+    }
+
+    {
+      info("Access template array in non-main functions")
+      val code =
+        s"""
+           |TxScript Main(number: [U256; 3]) {
+           |  let _ = number[0]
+           |  foo()
+           |
+           |  fn foo() -> () {
+           |    for (let mut i = 0; i < 3; i = i + 1) {
+           |      let _ = number[i]
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      val script = Compiler.compileTxScript(code).rightValue
+      script.toTemplateString() is "02010300030009{0}{1}{2}1702170117001600180001000000040018{0}{1}{2}1702170117000c170316030f314c0c16037a0f314d781816030d2a17034a30"
     }
 
     {
