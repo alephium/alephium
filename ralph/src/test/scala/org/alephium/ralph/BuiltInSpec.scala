@@ -167,7 +167,7 @@ class BuiltInSpec extends AlephiumSpec {
     val invalidReturnError =
       Compiler.compileContractFull(invalidReturnCode.replace("$", "")).leftValue
 
-    invalidReturnError.message is s"Invalid return types: expected \"List(ByteVec)\", got \"List(BarContract)\""
+    invalidReturnError.message is s"Invalid return types \"List(BarContract)\" for func foo, expected \"List(ByteVec)\""
     invalidReturnError.position is invalidReturnIndex
   }
 }

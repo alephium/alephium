@@ -333,7 +333,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin,
-        """Invalid return types: expected "List()", got "List(U256)""""
+        """Invalid return types "List(U256)" for func foo, expected "List()""""
       ),
       (
         s"""
@@ -343,7 +343,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin,
-        """Invalid return types: expected "List(U256)", got "List()""""
+        """Invalid return types "List()" for func foo, expected "List(U256)""""
       )
     )
     invalidReturnCases.foreach { case (code, error) =>
@@ -4004,10 +4004,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       "Invalid param types List(I256, I256) for ** operator"
     Compiler.compileContract(code("U256", "U256", "**", "U256")).isRight is true
     Compiler.compileContract(code("U256", "U256", "**", "I256")).leftValue.message is
-      s"""Invalid return types: expected "List(I256)", got "List(U256)""""
+      s"""Invalid return types "List(U256)" for func foo, expected "List(I256)""""
     Compiler.compileContract(code("I256", "U256", "**", "I256")).isRight is true
     Compiler.compileContract(code("I256", "U256", "**", "U256")).leftValue.message is
-      s"""Invalid return types: expected "List(U256)", got "List(I256)""""
+      s"""Invalid return types "List(I256)" for func foo, expected "List(U256)""""
 
     Compiler.compileContract(code("I256", "I256", "|**|", "I256")).leftValue.message is
       "ModExp accepts U256 only"
@@ -4015,7 +4015,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     Compiler.compileContract(code("I256", "U256", "|**|", "U256")).leftValue.message is
       "Invalid param types List(I256, U256) for ArithOperator"
     Compiler.compileContract(code("U256", "U256", "|**|", "I256")).leftValue.message is
-      """Invalid return types: expected "List(I256)", got "List(U256)""""
+      """Invalid return types "List(U256)" for func foo, expected "List(I256)""""
   }
 
   it should "compile check equality operation" in {

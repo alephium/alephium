@@ -962,7 +962,7 @@ object Compiler {
       val rtype = funcIdents(currentScope).returnType
       if (returnType != rtype) {
         throw Error(
-          s"Invalid return types: expected ${quote(rtype)}, got ${quote(returnType)}",
+          s"Invalid return types ${quote(returnType)} for func ${currentScope.name}, expected ${quote(rtype)}",
           sourceIndex
         )
       }
