@@ -87,7 +87,7 @@ object BuiltIn {
         returnType(selfContractType)
       } else {
         throw Error(
-          s"Invalid args type $inputType for builtin func $name, expected $argsType",
+          s"Invalid args type ${quote(inputType)} for builtin func $name, expected ${quote(argsType)}",
           None
         )
       }
@@ -258,7 +258,7 @@ object BuiltIn {
       if (argsTypeWithInstrs.exists(_.argsTypes == inputType)) {
         returnType
       } else {
-        throw Error(s"Invalid args type $inputType for builtin func $name", None)
+        throw Error(s"Invalid args type ${quote(inputType)} for builtin func $name", None)
       }
     }
 
@@ -269,7 +269,7 @@ object BuiltIn {
         case Some(ArgsTypeWithInstrs(_, instrs)) =>
           instrs
         case None =>
-          throw Error(s"Invalid args type $inputType for builtin func $name", None)
+          throw Error(s"Invalid args type ${quote(inputType)} for builtin func $name", None)
       }
     }
   }
@@ -548,7 +548,7 @@ object BuiltIn {
 
     override def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
       if (inputType.length != 1 || !validate(inputType(0))) {
-        throw Error(s"Invalid args type $inputType for builtin func $name", None)
+        throw Error(s"Invalid args type ${quote(inputType)} for builtin func $name", None)
       } else {
         Seq(toType)
       }
@@ -914,7 +914,10 @@ object BuiltIn {
     def useAssetsInContract: Boolean  = false
     override def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
       if (inputType.nonEmpty && inputType != Seq(Type.U256)) {
-        throw Compiler.Error(s"Invalid argument type for $name, optional U256 expected", None)
+        throw Compiler.Error(
+          s"""Invalid args type for builtin func $name, optional "List(U256)" expected""",
+          None
+        )
       }
       Seq(Type.Panic)
     }
@@ -1593,7 +1596,12 @@ object BuiltIn {
       ) {
         Seq(Type.ByteVec)
       } else {
-        throw Error(s"Invalid argument type for $name, (Contract, ByteVec) expected", None)
+        throw Error(
+          s"""Invalid args type ${quote(
+              inputType
+            )} for builtin func $name, expected "List(Contract, ByteVec)"""",
+          None
+        )
       }
     }
 
@@ -1670,7 +1678,9 @@ object BuiltIn {
           Seq(Type.ByteVec)
         } else {
           throw Error(
-            s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(", ")}",
+            s"""Invalid args type ${quote(
+                inputType
+              )} for builtin func ${name}, expected "List(Contract)"""",
             None
           )
         }
@@ -1726,7 +1736,9 @@ object BuiltIn {
           Seq(Type.Address)
         } else {
           throw Error(
-            s"Invalid argument type for ${name}, expected Contract, got ${inputType.mkString(", ")}",
+            s"""Invalid args type ${quote(
+                inputType
+              )} for builtin func ${name}, expected "List(Contract)"""",
             None
           )
         }
@@ -1802,7 +1814,7 @@ object BuiltIn {
       if (inputType == argsType) {
         returnType
       } else {
-        throw Error(s"Invalid args type $inputType for function $name", None)
+        throw Error(s"Invalid args type ${quote(inputType)} for builtin func $name", None)
       }
     }
   }

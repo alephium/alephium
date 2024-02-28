@@ -133,7 +133,7 @@ class BuiltInSpec extends AlephiumSpec {
     val index = code.indexOf("$")
     val error = Compiler.compileContractFull(code.replace("$", "")).leftValue
 
-    error.message is "Invalid args type List(U256, U256) for builtin func addModN, expected List(U256, U256, U256)"
+    error.message is "Invalid args type \"List(U256, U256)\" for builtin func addModN, expected \"List(U256, U256, U256)\""
     error.position is index
   }
 
@@ -151,7 +151,7 @@ class BuiltInSpec extends AlephiumSpec {
     val invalidArgsIndex = invalidArgsCode.indexOf("$")
     val invalidArgsError = Compiler.compileContractFull(invalidArgsCode.replace("$", "")).leftValue
 
-    invalidArgsError.message is "Invalid args type List(BarContract) for builtin func subContractId, expected List(ByteVec)"
+    invalidArgsError.message is "Invalid args type \"List(BarContract)\" for builtin func subContractId, expected \"List(ByteVec)\""
     invalidArgsError.position is invalidArgsIndex
 
     val invalidReturnCode =
