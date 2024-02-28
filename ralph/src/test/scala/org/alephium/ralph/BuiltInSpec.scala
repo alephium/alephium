@@ -133,7 +133,41 @@ class BuiltInSpec extends AlephiumSpec {
     val index = code.indexOf("$")
     val error = Compiler.compileContractFull(code.replace("$", "")).leftValue
 
-    error.message is "Invalid args type List(U256, U256) for builtin func addModN, expected List(U256, U256, U256)"
+    error.message is "Invalid args type \"List(U256, U256)\" for builtin func addModN, expected \"List(U256, U256, U256)\""
     error.position is index
+  }
+
+  it should "display contract type correctly in error message" in {
+    val barCode = "Contract BarContract() {}"
+    val invalidArgsCode =
+      s"""
+         |Contract Foo(barContract: BarContract) {
+         |  pub fn foo() -> () {
+         |    let _ = $$subContractId!(barContract)
+         |  }
+         |}
+         |$barCode
+         |""".stripMargin
+    val invalidArgsIndex = invalidArgsCode.indexOf("$")
+    val invalidArgsError = Compiler.compileContractFull(invalidArgsCode.replace("$", "")).leftValue
+
+    invalidArgsError.message is "Invalid args type \"List(BarContract)\" for builtin func subContractId, expected \"List(ByteVec)\""
+    invalidArgsError.position is invalidArgsIndex
+
+    val invalidReturnCode =
+      s"""
+         |Contract Foo(barContract: BarContract) {
+         |  pub fn foo() -> ByteVec {
+         |    $$return barContract
+         |  }
+         |}
+         |$barCode
+         |""".stripMargin
+    val invalidReturnIndex = invalidReturnCode.indexOf("$")
+    val invalidReturnError =
+      Compiler.compileContractFull(invalidReturnCode.replace("$", "")).leftValue
+
+    invalidReturnError.message is s"Invalid return types \"List(BarContract)\" for func foo, expected \"List(ByteVec)\""
+    invalidReturnError.position is invalidReturnIndex
   }
 }

@@ -247,7 +247,10 @@ object Compiler {
       if (inputType == argsType) {
         returnType
       } else {
-        throw Error(s"Invalid args type $inputType for function $name", id.sourceIndex)
+        throw Error(
+          s"Invalid args type ${quote(inputType)} for func $name, expected ${quote(argsType)}",
+          None
+        )
       }
     }
 
@@ -962,7 +965,7 @@ object Compiler {
       val rtype = funcIdents(currentScope).returnType
       if (returnType != rtype) {
         throw Error(
-          s"Invalid return types: expected ${quote(rtype)}, got ${quote(returnType)}",
+          s"Invalid return types ${quote(returnType)} for func ${currentScope.name}, expected ${quote(rtype)}",
           sourceIndex
         )
       }

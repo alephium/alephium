@@ -88,6 +88,8 @@ object Type {
         case that: Contract => this.id == that.id
         case _              => false
       }
+
+    override def toString(): String = id.name
   }
   object Contract {
     def local(id: Ast.TypeId, variable: Ast.Ident): LocalVar   = new LocalVar(id, variable)
