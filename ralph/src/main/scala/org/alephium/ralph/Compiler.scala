@@ -247,7 +247,10 @@ object Compiler {
       if (inputType == argsType) {
         returnType
       } else {
-        throw Error(s"Invalid args type ${quote(inputType)} for func $name", id.sourceIndex)
+        throw Error(
+          s"Invalid args type ${quote(inputType)} for func $name, expected ${quote(argsType)}",
+          None
+        )
       }
     }
 

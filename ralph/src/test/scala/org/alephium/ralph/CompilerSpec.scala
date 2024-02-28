@@ -4466,4 +4466,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     testContractFullError(code, "The std id of interface Bar should start with 0005")
   }
+
+  it should "report args type error for function at the call site" in {
+    val code =
+      s"""
+         |Contract Foo(barContract: BarContract) {
+         |  pub fn foo() -> () {
+         |    $$barContract.bar(#00)
+         |  }
+         |}
+         |
+         |Contract BarContract() {
+         |  pub fn bar(address: Address, byteVec: ByteVec) -> () {
+         |    assert!(byteVecToAddress!(byteVec) == address, 0)
+         |  }
+         |}
+         |""".stripMargin
+    val index = code.indexOf("$")
+    val error = Compiler.compileContractFull(code.replace("$", "")).leftValue
+
+    error.message is "Invalid args type \"List(ByteVec)\" for func bar, expected \"List(Address, ByteVec)\""
+    error.position is index
+  }
 }
