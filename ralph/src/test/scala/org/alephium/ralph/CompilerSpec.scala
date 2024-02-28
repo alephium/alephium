@@ -4472,7 +4472,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       s"""
          |Contract Foo(barContract: BarContract) {
          |  pub fn foo() -> () {
-         |    $$barContract.bar(#00)
+         |    $$barContract.bar(#00)$$
          |  }
          |}
          |
@@ -4482,10 +4482,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin
-    val index = code.indexOf("$")
-    val error = Compiler.compileContractFull(code.replace("$", "")).leftValue
 
-    error.message is "Invalid args type \"List(ByteVec)\" for func bar, expected \"List(Address, ByteVec)\""
-    error.position is index
+    testContractFullError(
+      code,
+      "Invalid args type \"List(ByteVec)\" for func bar, expected \"List(Address, ByteVec)\""
+    )
   }
 }
