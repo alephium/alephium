@@ -3662,7 +3662,7 @@ class VMSpec extends AlephiumSpec with Generators {
     }
 
     intercept[Throwable](test("", "1, #11, 2i", "", "")).getMessage is
-      "org.alephium.ralph.error.CompilerError$Default: Invalid args type List(U256, ByteVec, I256) for function encodeFields"
+      "org.alephium.ralph.error.CompilerError$Default: Invalid args type \"List(U256, ByteVec, I256)\" for builtin func encodeFields"
     test("", "1, 2i, #11", "020201030111", "010102")
     test("@std(id = #0001)", "1, 2i, #11", "0302010301110306414c50480001", "010102")
   }
@@ -4453,13 +4453,13 @@ class VMSpec extends AlephiumSpec with Generators {
     def verifyInvalidArgumentType(func: String, assertValue: String) = {
       val code = barCode(s"$func!(caller) == $assertValue")
       intercept[Throwable](createContract(code)).getMessage is
-        s"org.alephium.ralph.error.CompilerError$$Default: Invalid argument type for $func, expected Contract, got Address"
+        s"org.alephium.ralph.error.CompilerError$$Default: Invalid args type \"List(Address)\" for builtin func $func, expected \"List(Contract)\""
     }
 
     def verifyInvalidNumberOfArguments(func: String, assertValue: String) = {
       val code = barCode(s"$func!(1, caller) == $assertValue")
       intercept[Throwable](createContract(code)).getMessage is
-        s"org.alephium.ralph.error.CompilerError$$Default: Invalid argument type for $func, expected Contract, got U256, Address"
+        s"org.alephium.ralph.error.CompilerError$$Default: Invalid args type \"List(U256, Address)\" for builtin func $func, expected \"List(Contract)\""
     }
 
     def verifyTransferToken(func: String, assertValue: String) = {
