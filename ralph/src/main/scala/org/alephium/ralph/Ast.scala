@@ -26,6 +26,7 @@ import akka.util.ByteString
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{ALPHTokenId => ALPHTokenIdInstr, Contract => VmContract, _}
 import org.alephium.ralph.LogicalOperator.Not
+import org.alephium.ralph.Parser.UsingAnnotation
 import org.alephium.util.{AVector, Hex, I256, U256}
 
 // scalastyle:off number.of.methods number.of.types file.size.limit
@@ -692,6 +693,14 @@ object Ast {
     val body: Seq[Statement[Ctx]] = bodyOpt.getOrElse(Seq.empty)
 
     private var funcAccessedVarsCache: Option[Set[Compiler.AccessVariable]] = None
+
+    def hasCheckExternalCallerAnnotation: Boolean = {
+      annotations.find(_.id.name == UsingAnnotation.id) match {
+        case Some(usingAnnotation) =>
+          usingAnnotation.fields.exists(_.ident.name == UsingAnnotation.useCheckExternalCallerKey)
+        case None => false
+      }
+    }
 
     def isSimpleViewFunc(state: Compiler.State[Ctx]): Boolean = {
       val hasInterfaceFuncCall = state.hasInterfaceFuncCallSet.contains(id)
@@ -1370,6 +1379,9 @@ object Ast {
       }
 
       funcs.foreach { func =>
+        if (!func.isPublic && func.hasCheckExternalCallerAnnotation) {
+          state.warnPrivateFuncHasCheckExternalCaller(ident, func.id)
+        }
         if (func.hasDirectCheckExternalCaller()) {
           updateCheckedRecursively(func)
         }
