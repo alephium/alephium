@@ -174,7 +174,7 @@ final case class MemPoolSetting(
     autoMineForDev: Boolean // for dev only
 )
 
-final case class WalletSetting(secretDir: Path, lockingTimeout: Duration)
+final case class WalletSetting(enabled: Boolean, secretDir: Path, lockingTimeout: Duration)
 
 object WalletSetting {
   final case class BlockFlow(host: String, port: Int, groups: Int)
