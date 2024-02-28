@@ -14,19 +14,18 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the library. If not, see <http://www.gnu.org/licenses/>.
 
-package org.alephium.ralph
+package org.alephium.api.model
 
-final case class SourceIndex(index: Int, width: Int) {
-  val endIndex: Int = index + width
-}
+import java.math.BigInteger
 
-object SourceIndex {
-  def apply(index: Int): SourceIndex = SourceIndex(index, 1)
-  def apply(from: Option[SourceIndex], to: Option[SourceIndex]): Option[SourceIndex] =
-    for {
-      f <- from
-      t <- to
-    } yield SourceIndex(f.index, t.endIndex - f.index)
+import akka.util.ByteString
 
-  def empty: SourceIndex = SourceIndex(0, 0)
+final case class TargetToHashrate(
+    target: ByteString
+)
+
+object TargetToHashrate {
+  final case class Result(
+      hashrate: BigInteger
+  )
 }

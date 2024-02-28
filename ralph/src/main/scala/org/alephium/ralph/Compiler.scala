@@ -202,11 +202,10 @@ object Compiler {
     ) extends VarInfo {
       def isLocal: Boolean = false
     }
-    final case class Template(tpe: Type, index: Int) extends VarInfo {
-      def isMutable: Boolean   = false
-      def isUnused: Boolean    = false
-      def isGenerated: Boolean = false
-      def isLocal: Boolean     = false
+    final case class Template(tpe: Type, index: Int, isGenerated: Boolean) extends VarInfo {
+      def isMutable: Boolean = false
+      def isUnused: Boolean  = false
+      def isLocal: Boolean   = false
     }
     final case class ArrayRef[Ctx <: StatelessContext](
         isMutable: Boolean,
@@ -291,7 +290,7 @@ object Compiler {
   }
 
   object State {
-    private val maxVarIndex: Int = 0xff
+    private[ralph] val maxVarIndex: Int = 0xff
 
     // scalastyle:off cyclomatic.complexity method.length
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -521,6 +520,7 @@ object Compiler {
               isUnused = false,
               isLocal = true,
               isGenerated = true,
+              isTemplate = false,
               VarInfo.Local,
               () => currentScopeState.varIndex.toByte,
               () => currentScopeState.varIndex += 1
@@ -558,16 +558,32 @@ object Compiler {
       s"${scopedNamePrefix(scopeId)}$name"
     }
 
-    def addTemplateVariable(ident: Ast.Ident, tpe: Type, index: Int): Unit = {
-      val sname = checkNewVariable(ident)
+    def addTemplateVariable(ident: Ast.Ident, tpe: Type, index: Int): Int = {
+      val sname        = checkNewVariable(ident)
+      var currentIndex = index
       tpe match {
-        case _: Type.FixedSizeArray =>
-          throw Error("Template variable does not support Array yet", ident.sourceIndex)
+        case array: Type.FixedSizeArray =>
+          ArrayTransformer.init(
+            this,
+            array,
+            ident.name,
+            isMutable = false,
+            isUnused = false,
+            isLocal = false,
+            isGenerated = false,
+            isTemplate = true,
+            (tpe, _, _, index, isGenerated) => VarInfo.Template(tpe, index.toInt, isGenerated),
+            () => currentIndex.toByte,
+            () => currentIndex += 1
+          )
+          currentIndex
         case c: Type.Contract =>
           val varType = Type.Contract.local(c.id, ident)
-          varTable(sname) = VarInfo.Template(varType, index)
+          varTable(sname) = VarInfo.Template(varType, index, isGenerated = false)
+          currentIndex + 1
         case _ =>
-          varTable(sname) = VarInfo.Template(tpe, index)
+          varTable(sname) = VarInfo.Template(tpe, index, isGenerated = false)
+          currentIndex + 1
       }
     }
     def addFieldVariable(
@@ -584,6 +600,7 @@ object Compiler {
         isUnused,
         isLocal = false,
         isGenerated,
+        isTemplate = false,
         VarInfo.Field,
         () => if (isMutable) this.mutFieldsIndex.toByte else this.immFieldsIndex.toByte,
         () => if (isMutable) this.mutFieldsIndex += 1 else this.immFieldsIndex += 1
@@ -603,12 +620,14 @@ object Compiler {
         isUnused,
         isLocal = true,
         isGenerated,
+        isTemplate = false,
         VarInfo.Local,
         () => currentScopeState.varIndex.toByte,
         () => currentScopeState.varIndex += 1
       )
     }
     // scalastyle:off parameter.number
+    // scalastyle:off method.length
     def addVariable(
         ident: Ast.Ident,
         tpe: Type,
@@ -616,6 +635,7 @@ object Compiler {
         isUnused: Boolean,
         isLocal: Boolean,
         isGenerated: Boolean,
+        isTemplate: Boolean,
         varInfoBuilder: Compiler.VarInfoBuilder,
         getIndex: () => Byte,
         increaseIndex: () => Unit
@@ -631,6 +651,7 @@ object Compiler {
             isUnused,
             isLocal,
             isGenerated,
+            isTemplate,
             varInfoBuilder,
             getIndex,
             increaseIndex
@@ -841,10 +862,18 @@ object Compiler {
     def genLoadCode(ident: Ast.Ident): Seq[Instr[Ctx]]
 
     def genLoadCode(
-        offset: ArrayTransformer.ArrayVarOffset[Ctx],
-        isLocal: Boolean,
-        isMutable: Boolean
+        arrayRef: ArrayTransformer.ArrayRef[Ctx],
+        offset: ArrayTransformer.ArrayVarOffset[Ctx]
     ): Seq[Instr[Ctx]]
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def genLoadTemplateArray(
+        arrayRef: ArrayTransformer.ArrayRef[Ctx],
+        offset: ArrayTransformer.ArrayVarOffset[Ctx]
+    ): Seq[Instr[Ctx]] = {
+      val index = offset.asInstanceOf[ArrayTransformer.ConstantArrayVarOffset[Ctx]].value
+      Seq(TemplateVariable(arrayRef.ident.name, arrayRef.tpe.elementType.toVal, index))
+    }
 
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[Ctx]]]
 
@@ -980,11 +1009,15 @@ object Compiler {
     }
 
     def genLoadCode(
-        offset: ArrayTransformer.ArrayVarOffset[StatelessContext],
-        isLocal: Boolean,
-        isMutable: Boolean
-    ): Seq[Instr[StatelessContext]] =
-      genVarIndexCode(offset, isLocal, LoadLocal.apply, LoadLocalByIndex)
+        arrayRef: ArrayTransformer.ArrayRef[StatelessContext],
+        offset: ArrayTransformer.ArrayVarOffset[StatelessContext]
+    ): Seq[Instr[StatelessContext]] = {
+      if (arrayRef.isTemplate) {
+        genLoadTemplateArray(arrayRef, offset)
+      } else {
+        genVarIndexCode(offset, arrayRef.isLocal, LoadLocal.apply, LoadLocalByIndex)
+      }
+    }
 
     def genStoreCode(
         offset: ArrayTransformer.ArrayVarOffset[StatelessContext],
@@ -1056,18 +1089,22 @@ object Compiler {
     }
 
     def genLoadCode(
-        offset: ArrayTransformer.ArrayVarOffset[StatefulContext],
-        isLocal: Boolean,
-        isMutable: Boolean
-    ): Seq[Instr[StatefulContext]] =
-      genVarIndexCode(
-        offset,
-        isLocal,
-        LoadLocal.apply,
-        if (isMutable) LoadMutField.apply else LoadImmField.apply,
-        LoadLocalByIndex,
-        if (isMutable) LoadMutFieldByIndex else LoadImmFieldByIndex
-      )
+        arrayRef: ArrayTransformer.ArrayRef[StatefulContext],
+        offset: ArrayTransformer.ArrayVarOffset[StatefulContext]
+    ): Seq[Instr[StatefulContext]] = {
+      if (arrayRef.isTemplate) {
+        genLoadTemplateArray(arrayRef, offset)
+      } else {
+        genVarIndexCode(
+          offset,
+          arrayRef.isLocal,
+          LoadLocal.apply,
+          if (arrayRef.isMutable) LoadMutField.apply else LoadImmField.apply,
+          LoadLocalByIndex,
+          if (arrayRef.isMutable) LoadMutFieldByIndex else LoadImmFieldByIndex
+        )
+      }
+    }
 
     def genStoreCode(
         offset: ArrayTransformer.ArrayVarOffset[StatefulContext],
@@ -1085,12 +1122,11 @@ object Compiler {
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
-      val varInfo = getVariable(ident)
       getVariable(ident) match {
         case v: VarInfo.Field =>
           if (v.isMutable) Seq(LoadMutField(v.index)) else Seq(LoadImmField(v.index))
         case v: VarInfo.Local    => Seq(LoadLocal(v.index))
-        case v: VarInfo.Template => Seq(TemplateVariable(ident.name, varInfo.tpe.toVal, v.index))
+        case v: VarInfo.Template => Seq(TemplateVariable(ident.name, v.tpe.toVal, v.index))
         case _: VarInfo.ArrayRef[StatefulContext @unchecked] => getArrayRef(ident).genLoadCode(this)
         case v: VarInfo.Constant[StatefulContext @unchecked] => v.instrs
       }

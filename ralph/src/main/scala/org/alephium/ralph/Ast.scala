@@ -37,15 +37,24 @@ object Ast {
 
   trait Positioned {
     var sourceIndex: Option[SourceIndex] = None
-    def atSourceIndex(fromIndex: Int): this.type = {
-      this.sourceIndex = Some(SourceIndex(fromIndex))
+    def atSourceIndex(fromIndex: Int, endIndex: Int): this.type = {
+      require(this.sourceIndex.isEmpty)
+      this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
       this
     }
     def atSourceIndex(sourceIndex: Option[SourceIndex]): this.type = {
+      require(this.sourceIndex.isEmpty)
       this.sourceIndex = sourceIndex
       this
     }
 
+    /*
+     * This function update a `CompilerError` when the source index was not
+     * available at the time of the error.
+     * For example for `Operator` or `BuiltIn`, we could add the `SourceIndex`
+     * to the `getReturnType` function, but it implies a lot of changes in the
+     * all `ralph` module, while the position is not useful along the way.
+     */
     def positionedError[T](f: => T): T = {
       try {
         f
@@ -88,7 +97,7 @@ object Ast {
   final case class ApproveAsset[Ctx <: StatelessContext](
       address: Expr[Ctx],
       tokenAmounts: Seq[(Expr[Ctx], Expr[Ctx])]
-  ) {
+  ) extends Positioned {
     def check(state: Compiler.State[Ctx]): Unit = {
       if (address.getType(state) != Seq(Type.Address)) {
         throw Compiler.Error(s"Invalid address type: ${address}", address.sourceIndex)
@@ -126,8 +135,7 @@ object Ast {
 
     def genApproveCode(
         state: Compiler.State[Ctx],
-        func: Compiler.FuncInfo[Ctx],
-        sourceIndex: Option[SourceIndex]
+        func: Compiler.FuncInfo[Ctx]
     ): Seq[Instr[Ctx]] = {
       (approveAssets.nonEmpty, func.usePreapprovedAssets) match {
         case (true, false) =>
@@ -146,7 +154,7 @@ object Ast {
     }
   }
 
-  trait Typed[Ctx <: StatelessContext, T] {
+  trait Typed[Ctx <: StatelessContext, T] extends Positioned {
     var tpe: Option[T] = None
     protected def _getType(state: Compiler.State[Ctx]): T
     def getType(state: Compiler.State[Ctx]): T =
@@ -159,7 +167,7 @@ object Ast {
       }
   }
 
-  sealed trait Expr[Ctx <: StatelessContext] extends Typed[Ctx, Seq[Type]] with Positioned {
+  sealed trait Expr[Ctx <: StatelessContext] extends Typed[Ctx, Seq[Type]] {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   }
 
@@ -254,8 +262,10 @@ object Ast {
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      left.genCode(state) ++ right.genCode(state) ++ op.genCode(
-        left.getType(state) ++ right.getType(state)
+      positionedError(
+        left.genCode(state) ++ right.genCode(state) ++ op.genCode(
+          left.getType(state) ++ right.getType(state)
+        )
       )
     }
   }
@@ -309,7 +319,7 @@ object Ast {
           } else {
             Seq.empty
           }
-          val instrs = genApproveCode(state, func, sourceIndex) ++
+          val instrs = genApproveCode(state, func) ++
             func.genCodeForArgs(args, state) ++
             variadicInstrs ++
             func.genCode(argsType)
@@ -436,7 +446,7 @@ object Ast {
       val argLength = Type.flattenTypeLength(func.argsType)
       val retLength =
         func.getReturnLength(args.flatMap(_.getType(state)), state.selfContractType)
-      genApproveCode(state, func, callId.sourceIndex) ++
+      genApproveCode(state, func) ++
         args.flatMap(_.genCode(state)) ++
         Seq(
           ConstInstr.u256(Val.U256(U256.unsafe(argLength))),
@@ -1058,6 +1068,14 @@ object Ast {
     }
   }
 
+  object TemplateArray {
+    private val suffix = "-template-array"
+
+    @inline private[ralph] def renameTemplateArrayVar(ident: Ident): Ident = {
+      Ident(s"_${ident.name}$suffix")
+    }
+  }
+
   sealed trait ContractT[Ctx <: StatelessContext] extends UniqueDef {
     def ident: TypeId
     def templateVars: Seq[Argument]
@@ -1085,12 +1103,28 @@ object Ast {
       table
     }
 
+    private def addTemplateVars(state: Compiler.State[Ctx]): Unit = {
+      val index = templateVars.foldLeft(0) { case (index, templateVar) =>
+        templateVar.tpe match {
+          case _: Type.FixedSizeArray =>
+            val arrayVar = TemplateArray.renameTemplateArrayVar(templateVar.ident)
+            state.addTemplateVariable(arrayVar, templateVar.tpe, index)
+          case _ =>
+            state.addTemplateVariable(templateVar.ident, templateVar.tpe, index)
+        }
+      }
+      if (index >= Compiler.State.maxVarIndex) {
+        throw Compiler.Error(
+          s"Number of template variables more than ${Compiler.State.maxVarIndex}",
+          ident.sourceIndex
+        )
+      }
+    }
+
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setCheckPhase()
       state.checkArguments(fields)
-      templateVars.zipWithIndex.foreach { case (temp, index) =>
-        state.addTemplateVariable(temp.ident, temp.tpe, index)
-      }
+      addTemplateVars(state)
       fields.foreach(field =>
         state.addFieldVariable(
           field.ident,
@@ -1197,6 +1231,24 @@ object Ast {
       val script = genCode(state)
       StaticAnalysis.checkMethodsStateful(this, script.methods, state)
       script
+    }
+  }
+
+  object TxScript {
+    def from(
+        typeId: TypeId,
+        templateVars: Seq[Argument],
+        funcs: Seq[FuncDef[StatefulContext]]
+    ): TxScript = {
+      val arrayVarDefs: Seq[Statement[StatefulContext]] = templateVars.collect { arg =>
+        arg.tpe match {
+          case _: Type.FixedSizeArray =>
+            val arrayVar = TemplateArray.renameTemplateArrayVar(arg.ident)
+            VarDef(Seq(NamedVar(mutable = false, arg.ident)), Variable(arrayVar))
+        }
+      }
+      val newFuncs = funcs.map(func => func.copy(bodyOpt = Some(arrayVarDefs ++ func.body)))
+      TxScript(typeId, templateVars, newFuncs)
     }
   }
 

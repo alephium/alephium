@@ -63,6 +63,12 @@ object Type {
   final case class FixedSizeArray(baseType: Type, size: Int) extends Type {
     override def toVal: Val.Type = Val.FixedSizeArray(baseType.toVal, size)
 
+    @scala.annotation.tailrec
+    def elementType: Type = baseType match {
+      case array: FixedSizeArray => array.elementType
+      case tpe                   => tpe
+    }
+
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def flattenSize(): Int = baseType match {
       case baseType: FixedSizeArray =>

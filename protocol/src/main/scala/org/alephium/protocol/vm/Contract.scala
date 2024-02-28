@@ -16,6 +16,8 @@
 
 package org.alephium.protocol.vm
 
+import java.math.BigInteger
+
 import scala.annotation.switch
 import scala.collection.mutable
 
@@ -183,7 +185,7 @@ sealed trait Script[Ctx <: StatelessContext] extends Contract[Ctx] {
   def methodsLength: Int = methods.length
 
   def getMethod(index: Int): ExeResult[Method[Ctx]] = {
-    methods.get(index).toRight(Right(InvalidMethodIndex(index)))
+    methods.get(index).toRight(Right(InvalidMethodIndex(index, methodsLength)))
   }
 
   def toTemplateString(): String = {
@@ -275,7 +277,7 @@ final case class StatefulContract(
   def methodsLength: Int = methods.length
 
   def getMethod(index: Int): ExeResult[Method[StatefulContext]] = {
-    methods.get(index).toRight(Right(InvalidMethodIndex(index)))
+    methods.get(index).toRight(Right(InvalidMethodIndex(index, methodsLength)))
   }
 
   def toHalfDecoded(): StatefulContract.HalfDecoded = {
@@ -321,7 +323,7 @@ object StatefulContract {
           Right(method)
         }
       } else {
-        failed(InvalidMethodIndex(index))
+        failed(InvalidMethodIndex(index, methodsLength))
       }
     }
 
@@ -440,17 +442,21 @@ sealed trait ContractObj[Ctx <: StatelessContext] {
   def getImmField(index: Int): ExeResult[Val] = {
     immFields.get(index) match {
       case Some(v) => Right(v)
-      case None    => failed(InvalidImmFieldIndex)
+      case None    => failed(InvalidImmFieldIndex(index, immFields.length))
     }
   }
 
   def getMutField(index: Int): ExeResult[Val] = {
-    if (mutFields.isDefinedAt(index)) Right(mutFields(index)) else failed(InvalidMutFieldIndex)
+    if (mutFields.isDefinedAt(index)) {
+      Right(mutFields(index))
+    } else {
+      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), immFields.length))
+    }
   }
 
   def setMutField(index: Int, v: Val): ExeResult[Unit] = {
     if (!mutFields.isDefinedAt(index)) {
-      failed(InvalidMutFieldIndex)
+      failed(InvalidMutFieldIndex(BigInteger.valueOf(index.toLong), immFields.length))
     } else if (mutFields(index).tpe != v.tpe) {
       failed(InvalidMutFieldType)
     } else {
