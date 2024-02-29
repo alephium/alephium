@@ -715,9 +715,12 @@ class AstSpec extends AlephiumSpec {
                   |TxScript Main {
                   |  return
                   |}
+                  |struct Foo {
+                  |  amount: U256
+                  |}
                   |""".stripMargin
     val error = Compiler.compileProject(code).leftValue
-    error.message is "These TxScript/Contract/Interface are defined multiple times: Bar, Foo, Main"
+    error.message is "These TxScript/Contract/Interface/Struct are defined multiple times: Bar, Foo, Main"
   }
 
   it should "check interface std id" in {

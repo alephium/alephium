@@ -461,12 +461,25 @@ abstract class Parser[Ctx <: StatelessContext] {
   def templateParams[Unknown: P]: P[Seq[Ast.Argument]] =
     P("(" ~ contractField(allowMutable = false).rep(0, ",") ~ ")")
 
-  def eventField[Unknown: P]: P[Ast.EventField] =
-    P(Lexer.ident ~ ":").flatMap { case (ident) =>
-      parseType(typeId => Type.Contract.global(typeId, ident)).map { tpe =>
-        Ast.EventField(ident, tpe)
-      }
+  def field[Unknown: P]: P[(Ast.Ident, Type)] = P(Lexer.ident ~ ":").flatMap { ident =>
+    parseType(typeId => Type.Contract.global(typeId, ident)).map { tpe =>
+      (ident, tpe)
     }
+  }
+
+  def eventField[Unknown: P]: P[Ast.EventField]   = P(field).map(Ast.EventField.tupled)
+  def structField[Unknown: P]: P[Ast.StructField] = P(field).map(Ast.StructField.tupled)
+  def rawStruct[Unknown: P]: P[Ast.Struct] =
+    PP(Lexer.token(Keyword.struct) ~/ Lexer.typeId ~ "{" ~ structField.rep ~ "}") {
+      case (structIndex, id, fields) =>
+        if (fields.isEmpty) {
+          val sourceIndex = SourceIndex(Some(structIndex), id.sourceIndex)
+          throw Compiler.Error(s"No field definition in struct ${id.name}", sourceIndex)
+        }
+        Ast.UniqueDef.checkDuplicates(fields, "struct fields")
+        Ast.Struct(id, fields)
+    }
+  def struct[Unknown: P]: P[Ast.Struct] = P(Start ~ rawStruct ~ End)
 
   def annotationField[Unknown: P]: P[Ast.AnnotationField] =
     P(Index ~ Lexer.ident ~ "=" ~ expr ~~ Index).map {
@@ -925,10 +938,21 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   def interface[Unknown: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
 
+  def contractWithState[Unknown: P]: P[Ast.ContractWithState] = P(
+    rawTxScript | rawContract | rawInterface
+  )
+  def contractWithStateOrStruct[Unknown: P]: P[(Ast.ContractWithState, Seq[Ast.Struct])] = P(
+    rawStruct.rep ~ contractWithState ~ rawStruct.rep
+  ).map { case (defs0, contract, defs1) =>
+    (contract, defs0 ++ defs1)
+  }
+
   def multiContract[Unknown: P]: P[Ast.MultiContract] =
-    P(Start ~~ Index ~ (rawTxScript | rawContract | rawInterface).rep(1) ~~ Index ~ End)
+    P(Start ~~ Index ~ contractWithStateOrStruct.rep(1) ~~ Index ~ End)
       .map { case (fromIndex, defs, endIndex) =>
-        Ast.MultiContract(defs, None).atSourceIndex(fromIndex, endIndex)
+        val contracts = defs.map(_._1)
+        val structs   = defs.flatMap(_._2)
+        Ast.MultiContract(contracts, structs, None).atSourceIndex(fromIndex, endIndex)
       }
 
   def state[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] =

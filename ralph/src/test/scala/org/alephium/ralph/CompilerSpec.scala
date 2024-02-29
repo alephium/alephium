@@ -135,8 +135,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           |3 |  event Add(a: U256, b: U256)
           |  |  ^^^^^^^^^^
           |  |  Expected "}"
-          |  |-------------------------------------------------------------------------------------
-          |  |Trace log: Expected multiContract:1:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
+          |  |---------------------------------------------------------------------------------------------------------------------------------------------
+          |  |Trace log: Expected multiContract:1:1 / contractWithStateOrStruct:2:1 / contractWithState:2:1 / rawTxScript:2:1 / "}":3:3, found "event Add("
           |""".stripMargin
     }
   }

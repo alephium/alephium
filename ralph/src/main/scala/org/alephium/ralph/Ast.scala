@@ -590,6 +590,13 @@ object Ast {
     }
   }
 
+  final case class StructField(ident: Ident, tpe: Type) extends UniqueDef {
+    def name: String = ident.name
+  }
+  final case class Struct(id: TypeId, fields: Seq[StructField]) extends UniqueDef {
+    def name: String = id.name
+  }
+
   sealed trait Statement[Ctx <: StatelessContext] extends Positioned {
     def check(state: Compiler.State[Ctx]): Unit
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
@@ -1417,6 +1424,7 @@ object Ast {
 
   final case class MultiContract(
       contracts: Seq[ContractWithState],
+      structs: Seq[Struct],
       dependencies: Option[Map[TypeId, Seq[TypeId]]]
   ) extends Positioned {
     lazy val contractsTable = contracts.map { contract =>
@@ -1514,7 +1522,7 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def extendedContracts(): MultiContract = {
-      UniqueDef.checkDuplicates(contracts, "TxScript/Contract/Interface")
+      UniqueDef.checkDuplicates(contracts ++ structs, "TxScript/Contract/Interface/Struct")
 
       val parentsCache = buildDependencies()
       val newContracts: Seq[ContractWithState] = contracts.map {
@@ -1543,7 +1551,7 @@ object Ast {
           )
       }
       val dependencies = Map.from(parentsCache.map(p => (p._1, p._2.map(_.ident))))
-      MultiContract(newContracts, Some(dependencies))
+      MultiContract(newContracts, structs, Some(dependencies))
     }
 
     def genStatefulScripts()(implicit compilerOptions: CompilerOptions): AVector[CompiledScript] = {

@@ -1563,4 +1563,57 @@ class ParserSpec extends AlephiumSpec {
     intercept[Compiler.Error](parse(code, StatefulParser.contract(_))).message is
       "Debug is a built-in event name"
   }
+
+  it should "parse struct" in {
+    val code0 =
+      s"""
+         |struct Foo {
+         |  amount: U256
+         |  address: Address
+         |}
+         |""".stripMargin
+    parse(code0, StatelessParser.struct(_)).get.value is Ast.Struct(
+      TypeId("Foo"),
+      List(
+        StructField(Ident("amount"), Type.U256),
+        StructField(Ident("address"), Type.Address)
+      )
+    )
+
+    val code1 =
+      s"""
+         |struct Foo {
+         |  amount: U256
+         |  address: Address
+         |}
+         |Contract Bar(foo: Foo) {
+         |  pub fn f() -> () {}
+         |}
+         |struct Baz {
+         |  id: ByteVec
+         |  account: Foo
+         |}
+         |""".stripMargin
+
+    val result = parse(code1, StatefulParser.multiContract(_)).get.value
+    result.contracts.length is 1
+    result.structs.length is 2
+    result.structs(0) is Ast.Struct(
+      TypeId("Foo"),
+      List(
+        StructField(Ident("amount"), Type.U256),
+        StructField(Ident("address"), Type.Address)
+      )
+    )
+    result.structs(1) is Ast.Struct(
+      TypeId("Baz"),
+      List(
+        StructField(Ident("id"), Type.ByteVec),
+        StructField(
+          Ident("account"),
+          Type.Contract.global(TypeId("Foo"), Ident("account"))
+        ) // TODO: fix the type of `Foo`
+      )
+    )
+  }
 }
