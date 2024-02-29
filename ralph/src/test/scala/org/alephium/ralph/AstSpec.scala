@@ -610,6 +610,42 @@ class AstSpec extends AlephiumSpec {
       s"""No external caller check for function "Foo.bar". Please use "checkCaller!(...)" in the function or its callees, or disable it with "@using(checkExternalCaller = false)"."""
   }
 
+  it should "warning if private function has checkExternalCaller annotation" in {
+    def code(annotation: String): String = {
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    bar()
+         |  }
+         |
+         |  $annotation
+         |  fn bar() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    Compiler.compileContractFull(code(""), 0).rightValue.warnings.isEmpty is true
+    Compiler
+      .compileContractFull(code("@using(checkExternalCaller = true)"), 0)
+      .rightValue
+      .warnings is AVector(
+      """No need to add the checkExternalCaller annotation to the private function "Foo.bar""""
+    )
+    Compiler
+      .compileContractFull(code("@using(checkExternalCaller = false)"), 0)
+      .rightValue
+      .warnings is AVector(
+      """No need to add the checkExternalCaller annotation to the private function "Foo.bar""""
+    )
+    Compiler
+      .compileContractFull(code("@using(preapprovedAssets = false)"), 0)
+      .rightValue
+      .warnings
+      .isEmpty is true
+  }
+
   behavior of "Private function usage"
 
   it should "check if private functions are used" in {

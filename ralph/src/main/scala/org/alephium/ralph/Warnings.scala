@@ -87,6 +87,13 @@ trait Warnings {
       warnings += Warnings.noCheckExternalCallerMsg(typeId.name, funcId.name)
     }
   }
+
+  def warnPrivateFuncHasCheckExternalCaller(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+    if (!compilerOptions.ignoreCheckExternalCallerWarnings) {
+      warnings += s"No need to add the checkExternalCaller annotation to the private function ${Ast
+          .funcName(typeId, funcId)}"
+    }
+  }
 }
 
 object Warnings {
