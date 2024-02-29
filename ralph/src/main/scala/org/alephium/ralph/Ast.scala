@@ -82,7 +82,7 @@ object Ast {
     }
   }
 
-  final case class EventField(ident: Ident, tpe: Type) {
+  final case class EventField(ident: Ident, tpe: Type) extends Positioned {
     def signature: String = s"${ident.name}:${tpe.signature}"
   }
 
@@ -609,7 +609,7 @@ object Ast {
     }
   }
 
-  sealed trait VarDeclaration
+  sealed trait VarDeclaration                               extends Positioned
   final case class NamedVar(mutable: Boolean, ident: Ident) extends VarDeclaration
   case object AnonymousVar                                  extends VarDeclaration
 

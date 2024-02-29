@@ -246,9 +246,11 @@ abstract class Parser[Ctx <: StatelessContext] {
           .atSourceIndex(fromIndex, endIndex)
       }
 
-  def anonymousVar[Unknown: P]: P[Ast.VarDeclaration] = P("_").map(_ => Ast.AnonymousVar)
+  def anonymousVar[Unknown: P]: P[Ast.VarDeclaration] = PP("_")(_ => Ast.AnonymousVar)
   def namedVar[Unknown: P]: P[Ast.VarDeclaration] =
-    P(Lexer.mut ~ Lexer.ident).map(Ast.NamedVar.tupled)
+    P(Index ~ Lexer.mut ~ Lexer.ident ~~ Index).map { case (from, mutable, id, to) =>
+      Ast.NamedVar(mutable, id).atSourceIndex(from, to)
+    }
 
   def varDeclaration[Unknown: P]: P[Ast.VarDeclaration] = P(namedVar | anonymousVar)
   def varDeclarations[Unknown: P]: P[Seq[Ast.VarDeclaration]] = P(
@@ -462,9 +464,9 @@ abstract class Parser[Ctx <: StatelessContext] {
     P("(" ~ contractField(allowMutable = false).rep(0, ",") ~ ")")
 
   def eventField[Unknown: P]: P[Ast.EventField] =
-    P(Lexer.ident ~ ":").flatMap { case (ident) =>
-      parseType(typeId => Type.Contract.global(typeId, ident)).map { tpe =>
-        Ast.EventField(ident, tpe)
+    P(Index ~ Lexer.ident ~ ":").flatMap { case (from, ident) =>
+      P(parseType(typeId => Type.Contract.global(typeId, ident)) ~~ Index).map { case (tpe, to) =>
+        Ast.EventField(ident, tpe).atSourceIndex(from, to)
       }
     }
 
