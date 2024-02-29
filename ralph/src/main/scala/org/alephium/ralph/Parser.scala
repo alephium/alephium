@@ -291,20 +291,20 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
   def argument[Unknown: P](
       allowMutable: Boolean
-  )(contractTypeCtor: (Ast.TypeId, Ast.Ident) => Type): P[Ast.Argument] =
+  )(contractTypeCtor: Ast.TypeId => Type): P[Ast.Argument] =
     P(Index ~ Lexer.unused ~ Lexer.mutMaybe(allowMutable) ~ Lexer.ident ~ ":").flatMap {
       case (fromIndex, isUnused, isMutable, ident) =>
-        P(parseType(contractTypeCtor(_, ident)) ~~ Index).map { case (tpe, endIndex) =>
+        P(parseType(contractTypeCtor) ~~ Index).map { case (tpe, endIndex) =>
           Ast.Argument(ident, tpe, isMutable, isUnused).atSourceIndex(fromIndex, endIndex)
         }
     }
-  def funcArgument[Unknown: P]: P[Ast.Argument] = argument(allowMutable = true)(Type.Contract.local)
+  def funcArgument[Unknown: P]: P[Ast.Argument]   = argument(allowMutable = true)(Type.NamedType)
   def funParams[Unknown: P]: P[Seq[Ast.Argument]] = P("(" ~ funcArgument.rep(0, ",") ~ ")")
   def returnType[Unknown: P]: P[Seq[Type]]        = P(simpleReturnType | bracketReturnType)
   def simpleReturnType[Unknown: P]: P[Seq[Type]] =
-    P("->" ~ parseType(Type.Contract.stack)).map(tpe => Seq(tpe))
+    P("->" ~ parseType(Type.NamedType)).map(tpe => Seq(tpe))
   def bracketReturnType[Unknown: P]: P[Seq[Type]] =
-    P("->" ~ "(" ~ parseType(Type.Contract.stack).rep(0, ",") ~ ")")
+    P("->" ~ "(" ~ parseType(Type.NamedType).rep(0, ",") ~ ")")
   def funcTmp[Unknown: P]: P[FuncDefTmp[Ctx]] =
     PP(
       annotation.rep(0) ~
@@ -456,19 +456,17 @@ abstract class Parser[Ctx <: StatelessContext] {
   def statement[Unknown: P]: P[Ast.Statement[Ctx]]
 
   def contractField[Unknown: P](allowMutable: Boolean): P[Ast.Argument] =
-    argument(allowMutable)(Type.Contract.global)
+    argument(allowMutable)(Type.NamedType)
 
   def templateParams[Unknown: P]: P[Seq[Ast.Argument]] =
     P("(" ~ contractField(allowMutable = false).rep(0, ",") ~ ")")
 
   def field[Unknown: P]: P[(Ast.Ident, Type)] = P(Lexer.ident ~ ":").flatMap { ident =>
-    parseType(typeId => Type.Contract.global(typeId, ident)).map { tpe =>
-      (ident, tpe)
-    }
+    parseType(Type.NamedType).map { tpe => (ident, tpe) }
   }
 
   def eventField[Unknown: P]: P[Ast.EventField]   = P(field).map(Ast.EventField.tupled)
-  def structField[Unknown: P]: P[Ast.StructField] = P(field).map(Ast.StructField.tupled)
+  def structField[Unknown: P]: P[Ast.StructField] = PP(field)(Ast.StructField.tupled)
   def rawStruct[Unknown: P]: P[Ast.Struct] =
     PP(Lexer.token(Keyword.struct) ~/ Lexer.typeId ~ "{" ~ structField.rep ~ "}") {
       case (structIndex, id, fields) =>
@@ -952,7 +950,7 @@ object StatefulParser extends Parser[StatefulContext] {
       .map { case (fromIndex, defs, endIndex) =>
         val contracts = defs.map(_._1)
         val structs   = defs.flatMap(_._2)
-        Ast.MultiContract(contracts, structs, None).atSourceIndex(fromIndex, endIndex)
+        Ast.MultiContract(contracts, structs, None).updateType().atSourceIndex(fromIndex, endIndex)
       }
 
   def state[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] =

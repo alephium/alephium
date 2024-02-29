@@ -579,7 +579,7 @@ class ParserSpec extends AlephiumSpec {
           ),
           Argument(
             Ident("c"),
-            Type.FixedSizeArray(Type.Contract.local(TypeId("Foo"), Ident("c")), 4),
+            Type.FixedSizeArray(Type.NamedType(TypeId("Foo")), 4),
             isMutable = false,
             isUnused = false
           ),
@@ -1565,55 +1565,107 @@ class ParserSpec extends AlephiumSpec {
   }
 
   it should "parse struct" in {
-    val code0 =
-      s"""
-         |struct Foo {
-         |  amount: U256
-         |  address: Address
-         |}
-         |""".stripMargin
-    parse(code0, StatelessParser.struct(_)).get.value is Ast.Struct(
-      TypeId("Foo"),
-      List(
-        StructField(Ident("amount"), Type.U256),
-        StructField(Ident("address"), Type.Address)
+    {
+      info("Simple struct")
+      val code =
+        s"""
+           |struct Foo {
+           |  amount: U256
+           |  address: Address
+           |}
+           |""".stripMargin
+      parse(code, StatelessParser.struct(_)).get.value is Ast.Struct(
+        TypeId("Foo"),
+        List(
+          StructField(Ident("amount"), Type.U256),
+          StructField(Ident("address"), Type.Address)
+        )
       )
-    )
+    }
 
-    val code1 =
+    {
+      info("Nested struct")
+      val code =
+        s"""
+           |struct Foo {
+           |  amount: U256
+           |  address: Address
+           |}
+           |Contract Bar(foo: Foo, baz: Baz) {
+           |  pub fn f() -> () {}
+           |}
+           |struct Baz {
+           |  id: ByteVec
+           |  account: Foo
+           |  accounts: [Foo; 2]
+           |}
+           |""".stripMargin
+
+      val result = parse(code, StatefulParser.multiContract(_)).get.value
+      result.contracts.length is 1
+      result.contracts.head.fields.map(_.tpe) is Seq(
+        Type.Struct(TypeId("Foo"), 2),
+        Type.Struct(TypeId("Baz"), 7)
+      )
+      result.structs.length is 2
+      result.structs(0) is Ast.Struct(
+        TypeId("Foo"),
+        List(
+          StructField(Ident("amount"), Type.U256),
+          StructField(Ident("address"), Type.Address)
+        )
+      )
+      result.structs(1) is Ast.Struct(
+        TypeId("Baz"),
+        List(
+          StructField(Ident("id"), Type.ByteVec),
+          StructField(
+            Ident("account"),
+            Type.Struct(TypeId("Foo"), 2)
+          ),
+          StructField(
+            Ident("accounts"),
+            Type.FixedSizeArray(Type.Struct(TypeId("Foo"), 2), 2)
+          )
+        )
+      )
+    }
+
+    {
+      info("Duplicate field definition")
+      val code =
+        s"""
+           |struct Foo {
+           |  a: U256
+           |  $$a: ByteVec
+           |}
+           |""".stripMargin
+      val error =
+        intercept[Compiler.Error](fastparse.parse(code.replace("$", ""), StatefulParser.struct(_)))
+      error.message is "These struct fields are defined multiple times: a"
+      error.position is code.indexOf("$")
+    }
+
+    info("Circular references")
+    val code =
       s"""
          |struct Foo {
-         |  amount: U256
-         |  address: Address
+         |  bar: Bar
          |}
-         |Contract Bar(foo: Foo) {
-         |  pub fn f() -> () {}
+         |struct Bar {
+         |  baz: Baz
          |}
          |struct Baz {
-         |  id: ByteVec
-         |  account: Foo
+         |  foo: $$Foo
+         |}
+         |Contract Baz(foo: Foo) {
+         |  pub fn f() -> () {}
          |}
          |""".stripMargin
-
-    val result = parse(code1, StatefulParser.multiContract(_)).get.value
-    result.contracts.length is 1
-    result.structs.length is 2
-    result.structs(0) is Ast.Struct(
-      TypeId("Foo"),
-      List(
-        StructField(Ident("amount"), Type.U256),
-        StructField(Ident("address"), Type.Address)
-      )
+    val error = intercept[Compiler.Error](
+      fastparse.parse(code.replace("$", ""), StatefulParser.multiContract(_))
     )
-    result.structs(1) is Ast.Struct(
-      TypeId("Baz"),
-      List(
-        StructField(Ident("id"), Type.ByteVec),
-        StructField(
-          Ident("account"),
-          Type.Contract.global(TypeId("Foo"), Ident("account"))
-        ) // TODO: fix the type of `Foo`
-      )
-    )
+    error.message is "These structs \"List(Foo, Bar, Baz)\" have circular references"
+    error.position is code.indexOf("$")
   }
 }

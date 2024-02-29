@@ -479,7 +479,7 @@ object Compiler {
       with Scope
       with PhaseLike {
     def typeId: Ast.TypeId
-    def selfContractType: Type = Type.Contract.stack(typeId)
+    def selfContractType: Type = Type.Contract(typeId)
     def varTable: mutable.HashMap[String, VarInfo]
     var allowDebug: Boolean = false
 
@@ -581,7 +581,7 @@ object Compiler {
           )
           currentIndex
         case c: Type.Contract =>
-          val varType = Type.Contract.local(c.id, ident)
+          val varType = Type.Contract(c.id)
           varTable(sname) = VarInfo.Template(varType, index, isGenerated = false)
           currentIndex + 1
         case _ =>
@@ -661,9 +661,8 @@ object Compiler {
           )
           ()
         case c: Type.Contract =>
-          val varType = Type.Contract.local(c.id, ident)
           varTable(sname) = varInfoBuilder(
-            varType,
+            Type.Contract(c.id),
             isMutable,
             isUnused,
             getIndex(),

@@ -29,6 +29,16 @@ sealed trait Type {
     case _: Type.FixedSizeArray => true
     case _                      => false
   }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  def update(typer: Type.NamedType => Type): Type = {
+    this match {
+      case t: Type.NamedType => typer(t)
+      case Type.FixedSizeArray(t, size) =>
+        Type.FixedSizeArray(t.update(typer), size)
+      case _ => this
+    }
+  }
 }
 
 object Type {
@@ -52,6 +62,7 @@ object Type {
       case Val.ByteVec                        => ByteVec
       case Val.Address                        => Address
       case Val.FixedSizeArray(baseType, size) => FixedSizeArray(fromVal(baseType), size)
+      case Val.Struct(name, size)             => Struct(Ast.TypeId(name), size)
     }
   }
 
@@ -73,32 +84,25 @@ object Type {
     def flattenSize(): Int = baseType match {
       case baseType: FixedSizeArray =>
         baseType.flattenSize() * size
+      case baseType: Struct =>
+        baseType.flattenSize * size
       case _ => size
     }
   }
 
-  sealed trait Contract extends Type {
-    def id: Ast.TypeId
-    def toVal: Val.Type = Val.ByteVec
-
-    override def hashCode(): Int = id.hashCode()
-
-    override def equals(obj: Any): Boolean =
-      obj match {
-        case that: Contract => this.id == that.id
-        case _              => false
-      }
-
-    override def toString(): String = id.name
+  final case class NamedType(id: Ast.TypeId) extends Type {
+    def toVal: Val.Type           = ???
+    override def toString: String = id.name
   }
-  object Contract {
-    def local(id: Ast.TypeId, variable: Ast.Ident): LocalVar   = new LocalVar(id, variable)
-    def global(id: Ast.TypeId, variable: Ast.Ident): GlobalVar = new GlobalVar(id, variable)
-    def stack(id: Ast.TypeId): Stack                           = new Stack(id)
 
-    final class LocalVar(val id: Ast.TypeId, val variable: Ast.Ident)  extends Contract
-    final class GlobalVar(val id: Ast.TypeId, val variable: Ast.Ident) extends Contract
-    final class Stack(val id: Ast.TypeId)                              extends Contract
+  final case class Struct(id: Ast.TypeId, flattenSize: Int) extends Type {
+    def toVal: Val.Type           = Val.Struct(id.name, flattenSize)
+    override def toString: String = id.name
+  }
+
+  final case class Contract(id: Ast.TypeId) extends Type {
+    def toVal: Val.Type           = Val.ByteVec
+    override def toString: String = id.name
   }
 
   // The naming is more specific than Bottom or Nothing

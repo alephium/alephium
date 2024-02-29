@@ -80,6 +80,10 @@ object Ast {
       val prefix = if (isMutable) "mut " else ""
       s"${prefix}${ident.name}:${tpe.signature}"
     }
+
+    def updateType(typer: Type.NamedType => Type): Argument = {
+      this.copy(tpe = this.tpe.update(typer)).atSourceIndex(this.sourceIndex)
+    }
   }
 
   final case class EventField(ident: Ident, tpe: Type) {
@@ -284,7 +288,7 @@ object Ast {
         throw Compiler.Error(s"${contractType.name} is not instantiable", sourceIndex)
       }
 
-      Seq(Type.Contract.stack(contractType))
+      Seq(Type.Contract(contractType))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] =
@@ -595,6 +599,13 @@ object Ast {
   }
   final case class Struct(id: TypeId, fields: Seq[StructField]) extends UniqueDef {
     def name: String = id.name
+
+    def updateType(typer: Type.NamedType => Type): Struct = {
+      val newFields = fields.map { field =>
+        field.copy(tpe = field.tpe.update(typer))
+      }
+      this.copy(fields = newFields).atSourceIndex(this.sourceIndex)
+    }
   }
 
   sealed trait Statement[Ctx <: StatelessContext] extends Positioned {
@@ -790,6 +801,12 @@ object Ast {
         AVector.from(instrs)
       )
     }
+
+    def updateType(typer: Type.NamedType => Type): FuncDef[Ctx] = {
+      val newArgs     = args.map(_.updateType(typer))
+      val newRetTypes = rtypes.map(_.update(typer))
+      this.copy(args = newArgs, rtypes = newRetTypes).atSourceIndex(this.sourceIndex)
+    }
   }
 
   object FuncDef {
@@ -865,6 +882,13 @@ object Ast {
 
     def getFieldNames(): AVector[String]          = AVector.from(fields.view.map(_.ident.name))
     def getFieldTypeSignatures(): AVector[String] = AVector.from(fields.view.map(_.tpe.signature))
+
+    def updateType(typer: Type.NamedType => Type): EventDef = {
+      val newFields = fields.map { field =>
+        field.copy(tpe = field.tpe.update(typer))
+      }
+      this.copy(fields = newFields).atSourceIndex(this.sourceIndex)
+    }
   }
 
   final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
@@ -1189,6 +1213,8 @@ object Ast {
   }
 
   sealed trait ContractWithState extends ContractT[StatefulContext] {
+    type Self <: ContractWithState
+    def updateType(typer: Type.NamedType => Type): Self
     def inheritances: Seq[Inheritance]
 
     def templateVars: Seq[Argument]
@@ -1248,6 +1274,13 @@ object Ast {
       StaticAnalysis.checkMethodsStateful(this, script.methods, state)
       script
     }
+
+    type Self = TxScript
+    def updateType(typer: Type.NamedType => Type): TxScript = {
+      val newTemplateVars = templateVars.map(_.updateType(typer))
+      val newFuncs        = funcs.map(_.updateType(typer))
+      this.copy(templateVars = newTemplateVars, funcs = newFuncs).atSourceIndex(this.sourceIndex)
+    }
   }
 
   object TxScript {
@@ -1301,6 +1334,22 @@ object Ast {
         BuiltIn.encodeMutFields(fields),
         BuiltIn.encodeFields(stdInterfaceIdOpt, fields)
       )
+    }
+
+    type Self = Contract
+    def updateType(typer: Type.NamedType => Type): Contract = {
+      val newTemplateVars = templateVars.map(_.updateType(typer))
+      val newFields       = fields.map(_.updateType(typer))
+      val newFuncs        = funcs.map(_.updateType(typer))
+      val newEvents       = events.map(_.updateType(typer))
+      this
+        .copy(
+          templateVars = newTemplateVars,
+          fields = newFields,
+          funcs = newFuncs,
+          events = newEvents
+        )
+        .atSourceIndex(this.sourceIndex)
     }
 
     private def checkFuncs(): Unit = {
@@ -1420,13 +1469,70 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       throw Compiler.Error(s"Interface ${quote(ident.name)} should not generate code", sourceIndex)
     }
+
+    type Self = ContractInterface
+    def updateType(typer: Type.NamedType => Type): ContractInterface = {
+      val newFuncs  = funcs.map(_.updateType(typer))
+      val newEvents = events.map(_.updateType(typer))
+      this.copy(funcs = newFuncs, events = newEvents).atSourceIndex(this.sourceIndex)
+    }
+  }
+
+  trait Typer {
+    def contracts: Seq[ContractWithState]
+    def structs: Seq[Struct]
+
+    private val flattenSizeCache = mutable.Map.empty[Type, Int]
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    private def flattenSize(tpe: Type, accessedTypes: Seq[Type]): Int = {
+      tpe match {
+        case Type.NamedType(id) =>
+          if (accessedTypes.contains(tpe)) {
+            throw Compiler.Error(
+              s"These structs ${quote(accessedTypes)} have circular references",
+              id.sourceIndex
+            )
+          }
+          structs.find(_.id == id) match {
+            case Some(struct) =>
+              struct.fields.map(f => getFlattenSize(f.tpe, accessedTypes :+ tpe)).sum
+            case None => 1
+          }
+        case Type.FixedSizeArray(baseType, size) =>
+          size * flattenSize(baseType, accessedTypes)
+        case _ => 1
+      }
+    }
+
+    private def getFlattenSize(tpe: Type, accessedTypes: Seq[Type]): Int = {
+      flattenSizeCache.get(tpe) match {
+        case Some(size) => size
+        case None =>
+          val size = flattenSize(tpe, accessedTypes)
+          flattenSizeCache(tpe) = size
+          size
+      }
+    }
+
+    def getType(tpe: Type.NamedType): Type = {
+      contracts.find(_.ident == tpe.id) match {
+        case Some(contract) => Type.Contract(contract.ident)
+        case None =>
+          structs.find(_.id == tpe.id) match {
+            case Some(struct) => Type.Struct(struct.id, getFlattenSize(tpe, Seq.empty))
+            case None =>
+              throw Compiler.Error(s"Type ${quote(tpe.id.name)} does not exist", tpe.id.sourceIndex)
+          }
+      }
+    }
   }
 
   final case class MultiContract(
       contracts: Seq[ContractWithState],
       structs: Seq[Struct],
       dependencies: Option[Map[TypeId, Seq[TypeId]]]
-  ) extends Positioned {
+  ) extends Typer
+      with Positioned {
     lazy val contractsTable = contracts.map { contract =>
       val kind = contract match {
         case _: Ast.ContractInterface =>
@@ -1467,6 +1573,12 @@ object Ast {
         case Some(contract: Contract) if !contract.isAbstract => true
         case _                                                => false
       }
+    }
+
+    def updateType(): MultiContract = {
+      val newContracts = contracts.map(_.updateType(this.getType))
+      val newStructs   = structs.map(_.updateType(this.getType))
+      this.copy(contracts = newContracts, structs = newStructs)
     }
 
     def getInterface(typeId: TypeId): ContractInterface = {
