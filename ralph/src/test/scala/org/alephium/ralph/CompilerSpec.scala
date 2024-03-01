@@ -906,7 +906,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |Contract Foo() {
          |  fn foo() -> () {
          |    let mut x = [1, 2]
-         |    x[$$0$$][0] = 2
+         |    x[0][$$0$$] = 2
          |    return
          |  }
          |}
@@ -917,7 +917,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |Contract Foo() {
          |  fn foo() -> () {
          |    let x = [1, 2]
-         |    let y = x[$$0$$][0]
+         |    let y = x[0][$$0$$]
          |    return
          |  }
          |}
@@ -933,7 +933,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expected array type, got \"List(U256)\"",
+        "Expected array type, got \"U256\"",
       s"""
          |// invalid binary expression(compare array)
          |Contract Foo() {

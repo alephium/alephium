@@ -608,6 +608,18 @@ object Ast {
     }
   }
 
+  final case class StructCtor[Ctx <: StatelessContext](id: TypeId, fields: Seq[(Ident, Expr[Ctx])])
+      extends Expr[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Seq[Type]      = ???
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = ???
+  }
+
+  final case class StructFieldSelector[Ctx <: StatelessContext](expr: Expr[Ctx], selector: Ident)
+      extends Expr[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Seq[Type]      = ???
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = ???
+  }
+
   sealed trait Statement[Ctx <: StatelessContext] extends Positioned {
     def check(state: Compiler.State[Ctx]): Unit
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
@@ -843,18 +855,27 @@ object Ast {
   }
   final case class AssignmentArrayElementTarget[Ctx <: StatelessContext](
       ident: Ident,
-      indexes: Seq[Ast.Expr[Ctx]]
+      from: Ast.Expr[Ctx],
+      index: Ast.Expr[Ctx]
   ) extends AssignmentTarget[Ctx] {
-    def _getType(state: Compiler.State[Ctx]): Type =
-      state.getArrayElementType(Seq(state.getVariable(ident, isWrite = true).tpe), indexes)
+    def _getType(state: Compiler.State[Ctx]): Type = {
+      state.getVariable(ident, isWrite = true)
+      state.getArrayElementType(from, Seq(index))
+    }
 
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-      val arrayRef = state.getArrayRef(ident)
-      getType(state) match {
-        case _: Type.FixedSizeArray => arrayRef.subArray(state, indexes).genStoreCode(state)
-        case _                      => arrayRef.genStoreCode(state, indexes)
-      }
+      val (arrayRef, codes) = state.getOrCreateArrayRef(from)
+      assume(codes.isEmpty)
+      arrayRef.genStoreCode(state, Seq(index)) // FIXME
     }
+  }
+  final case class AssignmentStructFieldTarget[Ctx <: StatelessContext](
+      ident: Ident,
+      from: Ast.Expr[Ctx],
+      selector: Ast.Ident
+  ) extends AssignmentTarget[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Type                 = ???
+    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = ???
   }
 
   final case class ConstantVarDef(ident: Ident, value: Val) extends UniqueDef {

@@ -165,18 +165,35 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(chain(arithExpr0, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
   def arithExpr0[Unknown: P]: P[Ast.Expr[Ctx]] = P(chain(unaryExpr, Lexer.opExp | Lexer.opModExp))
   def unaryExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(arrayElementOrAtom | PP(Lexer.opNot ~ arrayElementOrAtom) { case (op, expr) =>
-      Ast.UnaryOp.apply[Ctx](op, expr)
+    P(arrayElementOrStructFieldSelector | PP(Lexer.opNot ~ arrayElementOrStructFieldSelector) {
+      case (op, expr) =>
+        Ast.UnaryOp.apply[Ctx](op, expr)
     })
-  def arrayElementOrAtom[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(Index ~~ atom ~ arrayIndex.rep(0) ~~ Index).map { case (from, expr, indexes, to) =>
-      if (indexes.nonEmpty) {
-        Ast.ArrayElement(expr, indexes).atSourceIndex(from, to)
-      } else {
-        expr
-      }
+  def arrayElementOrStructFieldSelector[Unknown: P]: P[Ast.Expr[Ctx]] =
+    P(Index ~~ atom ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0) ~~ Index).map {
+      case (from, expr, list, to) =>
+        val result = list.foldLeft(expr) { case (acc, e) =>
+          e match {
+            case arrayIndex: Ast.Expr[Ctx @unchecked] => Ast.ArrayElement(acc, Seq(arrayIndex))
+            case ident: Ast.Ident                     => Ast.StructFieldSelector(acc, ident)
+          }
+        }
+        if (list.nonEmpty) {
+          result.atSourceIndex(from, to)
+        } else {
+          result
+        }
     }
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
+
+  def structCtor[Unknown: P]: P[Ast.StructCtor[Ctx]] =
+    PP(Lexer.typeId ~ "{" ~ P(Lexer.ident ~ ":" ~ expr).rep(0, ",") ~ "}") {
+      case (typeId, fields) =>
+        if (fields.isEmpty) {
+          throw Compiler.Error(s"No field definition in struct ${typeId.name}", typeId.sourceIndex)
+        }
+        Ast.StructCtor(typeId, fields)
+    }
 
   def parenExpr[Unknown: P]: P[Ast.ParenExpr[Ctx]] =
     PP("(" ~ expr ~ ")") { case (ex) =>
@@ -258,16 +275,27 @@ abstract class Parser[Ctx <: StatelessContext] {
     PP(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr) { case (_, vars, expr) =>
       Ast.VarDef(vars, expr)
     }
-  def assignmentSimpleTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
-    PP(Lexer.ident)(Ast.AssignmentSimpleTarget.apply[Ctx])
-  def assignmentArrayElementTarget[Unknown: P]: P[Ast.AssignmentArrayElementTarget[Ctx]] = PP(
-    Lexer.ident ~ arrayIndex.rep(1)
-  ) { case (ident, indexes) =>
-    Ast.AssignmentArrayElementTarget[Ctx](ident, indexes)
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = PP(
+    Lexer.ident ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0)
+  ) { case (ident, list) =>
+    if (list.isEmpty) {
+      Ast.AssignmentSimpleTarget(ident)
+    } else {
+      val variable: Ast.Expr[Ctx] = Ast.Variable(ident).atSourceIndex(ident.sourceIndex)
+      val expr = list.init.foldLeft(variable) { case (acc, e) =>
+        e match {
+          case arrayIndex: Ast.Expr[Ctx @unchecked] => Ast.ArrayElement(acc, Seq(arrayIndex))
+          case ident: Ast.Ident                     => Ast.StructFieldSelector(acc, ident)
+        }
+      }
+      list.last match {
+        case arrayIndex: Ast.Expr[Ctx @unchecked] =>
+          Ast.AssignmentArrayElementTarget(ident, expr, arrayIndex)
+        case selector: Ast.Ident => Ast.AssignmentStructFieldTarget(ident, expr, selector)
+      }
+    }
   }
-  def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = P(
-    assignmentArrayElementTarget | assignmentSimpleTarget
-  )
 
   def assign[Unknown: P]: P[Ast.Assign[Ctx]] =
     P(assignmentTarget.rep(1, ",") ~ "=" ~ expr).map { case (targets, expr) =>
@@ -645,7 +673,8 @@ object Parser {
 object StatelessParser extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
-      const | stringLiteral | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr
+      const | stringLiteral | alphTokenId | callExpr | contractConv |
+        structCtor | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
@@ -672,7 +701,8 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
+      const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv |
+        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.Expr[StatefulContext]] =

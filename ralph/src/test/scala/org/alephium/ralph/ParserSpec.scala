@@ -92,6 +92,70 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         Seq(EnumFieldSelector(TypeId("ErrorCodes"), Ident("Error")))
       )
+    parse("Foo { x: 1, y: false }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq(
+          (Ident("x"), Const(Val.U256(U256.unsafe(1)))),
+          (Ident("y"), Const(Val.False))
+        )
+      )
+    parse("Foo { x: true, bar: Bar { y: false } }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq(
+          (Ident("x"), Const(Val.True)),
+          (Ident("bar"), StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False)))))
+        )
+      )
+    parse("Foo { x: true, bar: [Bar { y: false }; 2] }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq(
+          (Ident("x"), Const(Val.True)),
+          (
+            Ident("bar"),
+            CreateArrayExpr(
+              Seq(
+                StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False)))),
+                StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False))))
+              )
+            )
+          )
+        )
+      )
+    parse("a.b.c", StatefulParser.expr(_)).get.value is
+      StructFieldSelector[StatefulContext](
+        StructFieldSelector(Variable(Ident("a")), Ident("b")),
+        Ident("c")
+      )
+    parse("a[0].b.c", StatefulParser.expr(_)).get.value is
+      StructFieldSelector[StatefulContext](
+        StructFieldSelector(
+          ArrayElement(Variable(Ident("a")), Seq(Const(Val.U256(U256.unsafe(0))))),
+          Ident("b")
+        ),
+        Ident("c")
+      )
+    parse("a.b[0].c", StatefulParser.expr(_)).get.value is
+      StructFieldSelector[StatefulContext](
+        ArrayElement(
+          StructFieldSelector[StatefulContext](Variable(Ident("a")), Ident("b")),
+          Seq(Const(Val.U256(U256.unsafe(0))))
+        ),
+        Ident("c")
+      )
+    parse("a.b[0][1].c", StatefulParser.expr(_)).get.value is
+      StructFieldSelector[StatefulContext](
+        ArrayElement(
+          ArrayElement(
+            StructFieldSelector[StatefulContext](Variable(Ident("a")), Ident("b")),
+            Seq(Const(Val.U256(U256.unsafe(0))))
+          ),
+          Seq(Const(Val.U256(U256.unsafe(1))))
+        ),
+        Ident("c")
+      )
   }
 
   it should "parse string literals" in {
@@ -646,7 +710,10 @@ class ParserSpec extends AlephiumSpec {
   it should "parse array expression" in {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
       "a[0u][1u]" -> Ast
-        .ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1))),
+        .ArrayElement(
+          ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0))),
+          Seq(constantIndex(1))
+        ),
       "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(Variable(Ast.Ident("i")))),
       "a[foo()]" -> Ast
         .ArrayElement(
@@ -659,7 +726,10 @@ class ParserSpec extends AlephiumSpec {
       ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
-        Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1)))
+        Ast.ArrayElement(
+          ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0))),
+          Seq(constantIndex(1))
+        )
       ),
       "[a, a]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
       "[a; 2]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
@@ -679,11 +749,23 @@ class ParserSpec extends AlephiumSpec {
   it should "parse assign statement" in {
     val stats: List[(String, Ast.Statement[StatelessContext])] = List(
       "a[0] = b" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0)))),
+        Seq(
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            Variable(Ident("a")),
+            constantIndex(0)
+          )
+        ),
         Ast.Variable(Ast.Ident("b"))
       ),
       "a[0][1] = b[0]" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0), constantIndex(1)))),
+        Seq(
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            ArrayElement(Variable(Ident("a")), Seq(constantIndex(0))),
+            constantIndex(1)
+          )
+        ),
         Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), Seq(constantIndex(0)))
       ),
       "a, b = foo()" -> Assign(
@@ -691,14 +773,21 @@ class ParserSpec extends AlephiumSpec {
         CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "a[i] = b" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Variable(Ident("i"))))),
+        Seq(
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            Variable(Ident("a")),
+            Variable(Ident("i"))
+          )
+        ),
         Ast.Variable(Ast.Ident("b"))
       ),
       "a[foo()] = b" -> Assign(
         Seq(
           AssignmentArrayElementTarget(
             Ident("a"),
-            Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+            Variable(Ident("a")),
+            CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)
           )
         ),
         Ast.Variable(Ast.Ident("b"))
@@ -707,10 +796,54 @@ class ParserSpec extends AlephiumSpec {
         Seq(
           AssignmentArrayElementTarget(
             Ident("a"),
-            Seq(Binop(ArithOperator.Add, Variable(Ident("i")), Const(Val.U256(U256.unsafe(1)))))
+            Variable(Ident("a")),
+            Binop(ArithOperator.Add, Variable(Ident("i")), Const(Val.U256(U256.unsafe(1))))
           )
         ),
         Ast.Variable(Ast.Ident("b"))
+      ),
+      "a.b = c" -> Assign(
+        Seq(
+          AssignmentStructFieldTarget(
+            Ident("a"),
+            Variable(Ident("a")),
+            Ident("b")
+          )
+        ),
+        Ast.Variable(Ast.Ident("c"))
+      ),
+      "a[0].b = c" -> Assign(
+        Seq(
+          AssignmentStructFieldTarget(
+            Ident("a"),
+            ArrayElement(Variable(Ident("a")), Seq(constantIndex(0))),
+            Ident("b")
+          )
+        ),
+        Ast.Variable(Ast.Ident("c"))
+      ),
+      "a.b[0] = c" -> Assign(
+        Seq(
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            StructFieldSelector(Variable(Ident("a")), Ident("b")),
+            constantIndex(0)
+          )
+        ),
+        Ast.Variable(Ast.Ident("c"))
+      ),
+      "a.b[0].c = d" -> Assign(
+        Seq(
+          AssignmentStructFieldTarget(
+            Ident("a"),
+            ArrayElement(
+              StructFieldSelector(Variable(Ident("a")), Ident("b")),
+              Seq(constantIndex(0))
+            ),
+            Ident("c")
+          )
+        ),
+        Ast.Variable(Ast.Ident("d"))
       )
     )
 

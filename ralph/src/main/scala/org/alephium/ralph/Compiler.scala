@@ -855,7 +855,7 @@ object Compiler {
         case Seq(tpe: Type.FixedSizeArray) => arrayElementType(tpe, indexes)
         case tpe =>
           throw Compiler.Error(
-            s"Expected array type, got ${quote(tpe)}",
+            s"Expected array type, got ${if (tpe.length == 1) quote(tpe(0)) else quote(tpe)}",
             indexes.headOption.flatMap(_.sourceIndex)
           )
       }
