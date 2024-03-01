@@ -46,6 +46,7 @@ object Type {
     types.foldLeft(0) { case (acc, tpe) =>
       tpe match {
         case t: Type.FixedSizeArray => acc + t.flattenSize()
+        case t: Type.Struct         => acc + t.flattenSize
         case _                      => acc + 1
       }
     }

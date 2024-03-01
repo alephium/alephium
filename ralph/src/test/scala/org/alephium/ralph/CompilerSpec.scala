@@ -4546,4 +4546,254 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     error.message is "Type \"Bar\" does not exist"
     error.position is code1.indexOf("$")
   }
+
+  it should "compile struct failed" in {
+    {
+      info("Field does not exist in struct")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |
+           |Contract C() {
+           |  fn func(foo: Foo) -> U256 {
+           |    return foo.$$y$$
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Field y does not exist in struct Foo")
+    }
+
+    {
+      info("Type does not exist")
+      val code =
+        s"""
+           |Contract C(foo: $$Foo$$) {
+           |  fn func() -> () {
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Type \"Foo\" does not exist")
+    }
+
+    {
+      info("Duplicate struct definitions")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |$$struct Foo { y: ByteVec }$$
+           |
+           |Contract C() {
+           |  fn func() -> () {}
+           |}
+           |""".stripMargin
+
+      testContractError(
+        code,
+        "These TxScript/Contract/Interface/Struct are defined multiple times: Foo"
+      )
+    }
+
+    {
+      info("Assign to immutable struct")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |Contract C() {
+           |  pub fn f() -> () {
+           |    let foo = Foo { x: 1 }
+           |    $$foo.x = 0$$
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Assign to immutable variable: foo")
+    }
+
+    {
+      info("Create struct with invalid fields")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |
+           |Contract C() {
+           |  fn func() -> () {
+           |    let foo = $$Foo$$ {
+           |      x: 1,
+           |      y: 2
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(code, "Invalid struct fields, expect List(x:U256)")
+    }
+  }
+
+  it should "test struct" in new Fixture {
+    {
+      info("Struct as contract fields")
+      val code =
+        s"""
+           |struct Foo {
+           |  x: U256
+           |  y: ByteVec
+           |}
+           |Contract Bar(mut foo: Foo) {
+           |  @using(checkExternalCaller = false)
+           |  pub fn f() -> () {
+           |    assert!(foo.x == 1, 0)
+           |    assert!(foo.y == #0011, 0)
+           |    foo.x = 2
+           |    foo.y = #0022
+           |    assert!(foo.x == 2, 0)
+           |    assert!(foo.y == #0022, 0)
+           |    foo = Foo { y: #0033, x: 3 }
+           |    assert!(foo.x == 3, 0)
+           |    assert!(foo.y == #0033, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code, mutFields = AVector(Val.U256(1), Val.ByteVec(Hex.unsafe("0011"))))
+    }
+
+    {
+      info("Struct as function parameters and return values")
+      val code =
+        s"""
+           |struct Foo {
+           |  x: U256
+           |  y: ByteVec
+           |}
+           |Contract Bar() {
+           |  pub fn f0() -> () {
+           |    let mut foo = f2()
+           |    foo = Foo { x: 2, y: #0022 }
+           |    f1(foo)
+           |  }
+           |
+           |  fn f1(foo: Foo) -> () {
+           |    assert!(foo.x == 2, 0)
+           |    assert!(foo.y == #0022, 0)
+           |  }
+           |
+           |  fn f2() -> Foo {
+           |    return Foo {
+           |      x: 1,
+           |      y: #0011
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("Struct as local variables")
+      val code =
+        s"""
+           |struct Foo {
+           |  x: U256
+           |  y: ByteVec
+           |}
+           |Contract Bar() {
+           |  pub fn f() -> () {
+           |    let foo0 = Foo {
+           |      x: 1,
+           |      y: #0011
+           |    }
+           |    let mut foo1 = foo0
+           |    assert!(foo1.x == 1, 0)
+           |    assert!(foo1.y == #0011, 0)
+           |    foo1 = Foo { x: 2, y: #0022 }
+           |    assert!(foo1.x == 2, 0)
+           |    assert!(foo1.y == #0022, 0)
+           |  }
+           |}
+           |""".stripMargin
+      test(code)
+    }
+
+    {
+      info("Nested struct")
+      val code =
+        s"""
+           |struct Foo {
+           |  x: U256
+           |  y: ByteVec
+           |}
+           |struct Bar {
+           |  a: Bool
+           |  b: [Foo; 2]
+           |  c: Foo
+           |}
+           |Contract Baz(mut bar: Bar) {
+           |  @using(checkExternalCaller = false)
+           |  pub fn f() -> () {
+           |    let mut bar0 = f1()
+           |    assert!(!bar0.a, 0)
+           |    assert!(bar0.b[0].x == 0 && bar0.b[0].y == #00, 0)
+           |    assert!(bar0.b[1].x == 1 && bar0.b[1].y == #01, 0)
+           |    assert!(bar0.c.x == 2 && bar0.c.y == #02, 0)
+           |    bar0.b[0] = Foo { y: #02, x: 2 }
+           |    assert!(bar0.b[0].x == 2 && bar0.b[0].y == #02, 0)
+           |    assert!(bar0.b[1].x == 1 && bar0.b[1].y == #01, 0)
+           |    assert!(bar0.c.x == 2 && bar0.c.y == #02, 0)
+           |    bar0.b = [Foo { x: 3, y: #03 }; 2]
+           |    assert!(bar0.b[0].x == 3 && bar0.b[0].y == #03, 0)
+           |    assert!(bar0.b[1].x == 3 && bar0.b[1].y == #03, 0)
+           |    assert!(bar0.c.x == 2 && bar0.c.y == #02, 0)
+           |    bar0.c = Foo { y: #04, x: 4 }
+           |    assert!(bar0.c.x == 4 && bar0.c.y == #04, 0)
+           |
+           |    bar.a = !bar0.a
+           |    assert!(bar.a != bar0.a, 0)
+           |    bar.b = bar0.b
+           |    bar.c = bar0.c
+           |    assert!(bar.b[0].x == 3 && bar.b[0].y == #03, 0)
+           |    assert!(bar.b[1].x == 3 && bar.b[1].y == #03, 0)
+           |    assert!(bar.c.x == 4 && bar.c.y == #04, 0)
+           |    bar.b[1] = Foo { y: #04, x: 4 }
+           |    assert!(bar.b[1].x == 4 && bar.b[1].y == #04, 0)
+           |    assert!(bar.b[0].x == 3 && bar.b[0].y == #03, 0)
+           |    assert!(bar.c.x == 4 && bar.c.y == #04, 0)
+           |    bar.b[0] = Foo { y: #05, x: 5 }
+           |    assert!(bar.b[1].x == 4 && bar.b[1].y == #04, 0)
+           |    assert!(bar.b[0].x == 5 && bar.b[0].y == #05, 0)
+           |    assert!(bar.c.x == 4 && bar.c.y == #04, 0)
+           |    bar.b = [Foo { x: 6, y: #06 }; 2]
+           |    assert!(bar.b[1].x == 6 && bar.b[1].y == #06, 0)
+           |    assert!(bar.b[0].x == 6 && bar.b[0].y == #06, 0)
+           |    assert!(bar.c.x == 4 && bar.c.y == #04, 0)
+           |    bar.c = Foo { x: 7, y: #07 }
+           |    assert!(bar.b[1].x == 6 && bar.b[1].y == #06, 0)
+           |    assert!(bar.b[0].x == 6 && bar.b[0].y == #06, 0)
+           |    assert!(bar.c.x == 7 && bar.c.y == #07, 0)
+           |  }
+           |
+           |  fn f1() -> Bar {
+           |    return Bar {
+           |      a: false,
+           |      b: [Foo { x: 0, y: #00 }, Foo { x: 1, y: #01 }],
+           |      c: Foo { x: 2, y: #02 }
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+
+      test(
+        code,
+        mutFields = AVector(
+          Val.False,
+          Val.U256(0),
+          Val.ByteVec(Hex.unsafe("00")),
+          Val.U256(0),
+          Val.ByteVec(Hex.unsafe("00")),
+          Val.U256(0),
+          Val.ByteVec(Hex.unsafe("00"))
+        )
+      )
+    }
+  }
 }

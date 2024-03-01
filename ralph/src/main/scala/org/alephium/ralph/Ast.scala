@@ -225,12 +225,7 @@ object Ast {
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val (arrayRef, codes) = state.getOrCreateArrayRef(array)
-      getType(state) match {
-        case Seq(_: Type.FixedSizeArray) =>
-          codes ++ arrayRef.subArray(state, indexes).genLoadCode(state)
-        case _ =>
-          codes ++ arrayRef.genLoadCode(state, indexes)
-      }
+      codes ++ arrayRef.genLoadCode(state, getType(state)(0), indexes)
     }
   }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
@@ -595,9 +590,21 @@ object Ast {
   }
 
   final case class StructField(ident: Ident, tpe: Type) extends UniqueDef {
-    def name: String = ident.name
+    def name: String      = ident.name
+    def signature: String = s"${ident.name}:${tpe.signature}"
   }
   final case class Struct(id: TypeId, fields: Seq[StructField]) extends UniqueDef {
+    lazy val tpe: Type.Struct = {
+      val flattenSize = fields
+        .map(_.tpe match {
+          case t: Type.FixedSizeArray => t.flattenSize()
+          case t: Type.Struct         => t.flattenSize
+          case _                      => 1
+        })
+        .sum
+      Type.Struct(id, flattenSize)
+    }
+
     def name: String = id.name
 
     def updateType(typer: Type.NamedType => Type): Struct = {
@@ -606,18 +613,60 @@ object Ast {
       }
       this.copy(fields = newFields).atSourceIndex(this.sourceIndex)
     }
+
+    def getField(selector: Ident): StructField = {
+      fields
+        .find(_.ident == selector)
+        .getOrElse(
+          throw Compiler.Error(
+            s"Field ${selector.name} does not exist in struct ${id.name}",
+            selector.sourceIndex
+          )
+        )
+    }
+
+    def offsetOf(selector: Ident): Int = {
+      val types = fields.slice(0, fields.indexWhere(_.ident == selector)).map(_.tpe)
+      Type.flattenTypeLength(types)
+    }
   }
 
   final case class StructCtor[Ctx <: StatelessContext](id: TypeId, fields: Seq[(Ident, Expr[Ctx])])
       extends Expr[Ctx] {
-    def _getType(state: Compiler.State[Ctx]): Seq[Type]      = ???
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = ???
+    def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      val struct   = state.getStruct(id)
+      val expected = struct.fields.map(field => (field.ident, Seq(field.tpe)))
+      val have     = fields.map { case (ident, expr) => (ident, expr.getType(state)) }
+      if (expected.length != have.length || have.exists(f => !expected.contains(f))) {
+        throw Compiler.Error(
+          s"Invalid struct fields, expect ${struct.fields.map(_.signature)}",
+          id.sourceIndex
+        )
+      }
+      Seq(struct.tpe)
+    }
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val struct = state.getStruct(id)
+      val sortedFields = struct.fields.map { field =>
+        fields
+          .find(_._1 == field.ident)
+          .getOrElse(
+            throw Compiler.Error(s"Struct field ${field.ident} does not exist", id.sourceIndex)
+          )
+      }
+      sortedFields.flatMap(_._2.genCode(state))
+    }
   }
 
   final case class StructFieldSelector[Ctx <: StatelessContext](expr: Expr[Ctx], selector: Ident)
       extends Expr[Ctx] {
-    def _getType(state: Compiler.State[Ctx]): Seq[Type]      = ???
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = ???
+    def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      Seq(state.getStructFieldType(expr, selector))
+    }
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val (structRef, codes) = state.getOrCreateStructRef(expr)
+      codes ++ structRef.genLoadCode(state, selector)
+    }
   }
 
   sealed trait Statement[Ctx <: StatelessContext] extends Positioned {
@@ -667,6 +716,8 @@ object Ast {
         case (NamedVar(_, ident), _) => state.genStoreCode(ident)
         case (AnonymousVar, tpe: Type.FixedSizeArray) =>
           Seq(Seq.fill(tpe.flattenSize())(Pop))
+        case (AnonymousVar, tpe: Type.Struct) =>
+          Seq(Seq.fill(tpe.flattenSize)(Pop))
         case (AnonymousVar, _) => Seq(Seq(Pop))
       }
       value.genCode(state) ++ storeCodes.reverse.flatten
@@ -866,7 +917,7 @@ object Ast {
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
       val (arrayRef, codes) = state.getOrCreateArrayRef(from)
       assume(codes.isEmpty)
-      arrayRef.genStoreCode(state, Seq(index)) // FIXME
+      arrayRef.genStoreCode(state, getType(state), Seq(index))
     }
   }
   final case class AssignmentStructFieldTarget[Ctx <: StatelessContext](
@@ -874,8 +925,15 @@ object Ast {
       from: Ast.Expr[Ctx],
       selector: Ast.Ident
   ) extends AssignmentTarget[Ctx] {
-    def _getType(state: Compiler.State[Ctx]): Type                 = ???
-    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = ???
+    def _getType(state: Compiler.State[Ctx]): Type = {
+      state.getVariable(ident, isWrite = true)
+      state.getStructFieldType(from, selector)
+    }
+    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
+      val (structRef, codes) = state.getOrCreateStructRef(from)
+      assume(codes.isEmpty)
+      structRef.genStoreCode(state, selector)
+    }
   }
 
   final case class ConstantVarDef(ident: Ident, value: Val) extends UniqueDef {
