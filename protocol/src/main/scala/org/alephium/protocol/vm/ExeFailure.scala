@@ -202,7 +202,7 @@ case object ContractDestructionShouldNotBeCalledFromSelf extends ExeFailure {
 final case class PayToContractAddressNotInCallerTrace(address: Address.Contract)
     extends ExeFailure {
   override def toString: String =
-    s"Pay to contract address $address is not allowed when this contract address is in the call stack"
+    s"Pay to contract address $address is not allowed when this contract address is not in the call stack"
 }
 
 case object InvalidAddressTypeInContractDestroy extends ExeFailure {
