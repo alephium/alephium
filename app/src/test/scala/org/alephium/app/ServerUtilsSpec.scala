@@ -1803,7 +1803,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testResult  = serverUtils.runTestContract(blockFlow, testContract).rightValue
     testResult.events.isEmpty is true
     testResult.debugMessages is AVector(
-      DebugMessage(Address.contract(testContract.contractId), "Hello, Alephium!")
+      DebugMessage(Address.contract(testContract.contractId), "Hello, 416c65706869756d!")
     )
   }
 

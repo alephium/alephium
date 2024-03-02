@@ -3693,7 +3693,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Val.ByteVec.fromString("Hello")
     DEBUG(AVector(Val.ByteVec.fromString("Hello "), Val.ByteVec.fromString("!")))
       .combineUnsafe(AVector(Val.ByteVec.fromString("Alephium"))) is
-      Val.ByteVec.fromString("Hello Alephium!")
+      Val.ByteVec.fromString("Hello 416c65706869756d!")
   }
 
   it should "Debug" in new StatefulInstrFixture {
@@ -3704,7 +3704,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     {
       info("Simple message")
-      DEBUG(AVector(Val.ByteVec.fromString("Hello, Alephium!"))).runWith(frame) isE ()
+      DEBUG(AVector(Val.ByteVec.fromString("Hello, 416c65706869756d!"))).runWith(frame) isE ()
     }
 
     {
@@ -3723,7 +3723,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .rightValue
         .states
         .head
-        .fields is AVector[Val](Val.ByteVec.fromString("Hello, Alephium!"))
+        .fields is AVector[Val](Val.ByteVec.fromString("Hello, 416c65706869756d!"))
     }
   }
 

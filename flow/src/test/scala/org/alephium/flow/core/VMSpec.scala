@@ -4422,7 +4422,7 @@ class VMSpec extends AlephiumSpec with Generators {
     logStates.states.length is 1
     val event = logStates.states.head
     event.index is debugEventIndex.v.v.toInt.toByte
-    event.fields is AVector[Val](Val.ByteVec(ByteString.fromString("Hello, Alephium!")))
+    event.fields is AVector[Val](Val.ByteVec(ByteString.fromString("Hello, 416c65706869756d!")))
   }
 
   it should "test tokenId/contractId/contractAddress built-in function" in new ContractFixture {
