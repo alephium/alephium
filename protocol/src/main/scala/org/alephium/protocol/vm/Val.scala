@@ -130,7 +130,7 @@ object Val {
 
     override def toByteVec(): ByteVec = this
 
-    override def toDebugString(): ByteString = bytes
+    override def toDebugString(): ByteString = ByteString.fromString(Hex.toHexString(bytes))
 
     override def estimateByteSize(): Int = bytes.length
 
