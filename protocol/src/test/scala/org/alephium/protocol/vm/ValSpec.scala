@@ -27,7 +27,7 @@ class ValSpec extends AlephiumSpec {
     Val.False.toDebugString() is ByteString.fromString("false")
     Val.I256(I256.from(-123456)).toDebugString() is ByteString.fromString("-123456")
     Val.U256(U256.unsafe(123456)).toDebugString() is ByteString.fromString("123456")
-    Val.ByteVec(ByteString.fromString("Hello")).toDebugString() is ByteString.fromString("Hello")
+    Val.ByteVec(ByteString(0, 1, 2, 3)).toDebugString() is ByteString.fromString("00010203")
     val addressString = "1C2RAVWSuaXw8xtUxqVERR7ChKBE1XgscNFw73NSHE1v3"
     Val
       .Address(Address.fromBase58(addressString).value.lockupScript)
