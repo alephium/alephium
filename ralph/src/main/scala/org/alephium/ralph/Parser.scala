@@ -174,7 +174,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       case (from, expr, list, to) =>
         val result = list.foldLeft(expr) { case (acc, e) =>
           e match {
-            case arrayIndex: Ast.Expr[Ctx @unchecked] => Ast.ArrayElement(acc, Seq(arrayIndex))
+            case arrayIndex: Ast.Expr[Ctx @unchecked] => Ast.ArrayElement(acc, arrayIndex)
             case ident: Ast.Ident                     => Ast.StructFieldSelector(acc, ident)
           }
         }
@@ -285,7 +285,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       val variable: Ast.Expr[Ctx] = Ast.Variable(ident).atSourceIndex(ident.sourceIndex)
       val expr = list.init.foldLeft(variable) { case (acc, e) =>
         e match {
-          case arrayIndex: Ast.Expr[Ctx @unchecked] => Ast.ArrayElement(acc, Seq(arrayIndex))
+          case arrayIndex: Ast.Expr[Ctx @unchecked] => Ast.ArrayElement(acc, arrayIndex)
           case ident: Ast.Ident                     => Ast.StructFieldSelector(acc, ident)
         }
       }

@@ -55,11 +55,104 @@ final case class VariableVarOffset[Ctx <: StatelessContext](instrs: Seq[Instr[Ct
 }
 
 sealed trait VariablesRef[Ctx <: StatelessContext] {
+  type Selector
+
   def ident: Ast.Ident
   def isLocal: Boolean
   def isMutable: Boolean
   def isTemplate: Boolean
   def offset: VarOffset[Ctx]
+  def tpe: Type
+
+  def subRef(state: Compiler.State[Ctx], selector: Selector): VariablesRef[Ctx]
+
+  def genLoadCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
+  def genLoadCode(state: Compiler.State[Ctx], selector: Selector): Seq[Instr[Ctx]]
+  def genStoreCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
+  def genStoreCode(state: Compiler.State[Ctx], selector: Selector): Seq[Seq[Instr[Ctx]]]
+}
+
+object VariablesRef {
+  @inline def getOffset[Ctx <: StatelessContext](
+      state: Compiler.State[Ctx],
+      getIndex: () => Byte,
+      isTemplate: Boolean,
+      isLocal: Boolean,
+      isMutable: Boolean
+  ): VarOffset[Ctx] = {
+    if (isTemplate) {
+      ConstantVarOffset[Ctx](getIndex().toInt)
+    } else if (isLocal) {
+      ConstantVarOffset[Ctx](state.currentScopeState.varIndex)
+    } else if (isMutable) {
+      ConstantVarOffset[Ctx](state.mutFieldsIndex)
+    } else {
+      ConstantVarOffset[Ctx](state.immFieldsIndex)
+    }
+  }
+
+  // scalastyle:off parameter.number
+  // scalastyle:off method.length
+  def init[Ctx <: StatelessContext](
+      state: Compiler.State[Ctx],
+      tpe: Type,
+      baseName: String,
+      isMutable: Boolean,
+      isUnused: Boolean,
+      isLocal: Boolean,
+      isGenerated: Boolean,
+      isTemplate: Boolean,
+      varInfoBuilder: Compiler.VarInfoBuilder,
+      getIndex: () => Byte,
+      increaseIndex: () => Unit
+  ): VariablesRef[Ctx] = {
+    val offset = VariablesRef.getOffset(state, getIndex, isTemplate, isLocal, isMutable)
+    val ref: VariablesRef[Ctx] = tpe match {
+      case arrayType: Type.FixedSizeArray =>
+        (0 until arrayType.size).foreach { idx =>
+          val ident = Ast.Ident(ArrayRef.arrayVarName(baseName, idx))
+          state.addVariable(
+            ident,
+            arrayType.baseType,
+            isMutable,
+            isUnused,
+            isLocal,
+            isGenerated = true,
+            isTemplate,
+            varInfoBuilder,
+            getIndex,
+            increaseIndex
+          )
+        }
+        val ident = Ast.Ident(baseName)
+        ArrayRef[Ctx](ident, arrayType, isLocal, isMutable, isTemplate, offset)
+      case structType: Type.Struct =>
+        val ast = state.getStruct(structType.id)
+        ast.fields.foreach { field =>
+          val ident = Ast.Ident(StructRef.structVarName(baseName, field.name))
+          state.addVariable(
+            ident,
+            field.tpe,
+            isMutable,
+            isUnused,
+            isLocal,
+            isGenerated = true,
+            isTemplate,
+            varInfoBuilder,
+            getIndex,
+            increaseIndex
+          )
+        }
+        val ident = Ast.Ident(baseName)
+        StructRef[Ctx](ident, isLocal, isMutable, isTemplate, offset, ast)
+      case _ => // dead branch
+        throw Compiler.Error(s"Expected array or struct type, got $tpe", None)
+    }
+    state.addVariablesRef(ref.ident, isMutable, isUnused, isGenerated, ref)
+    ref
+  }
+  // scalastyle:on parameter.number
+  // scalastyle:on method.length
 }
 
 final case class StructRef[Ctx <: StatelessContext](
@@ -70,26 +163,21 @@ final case class StructRef[Ctx <: StatelessContext](
     offset: VarOffset[Ctx],
     ast: Ast.Struct
 ) extends VariablesRef[Ctx] {
+  type Selector = Ast.Ident
+
   def tpe: Type.Struct = ast.tpe
 
-  def subArray(selector: Ast.Ident): ArrayRef[Ctx] = {
+  def subRef(state: Compiler.State[Ctx], selector: Ast.Ident): VariablesRef[Ctx] = {
     ast.getField(selector).tpe match {
       case tpe: Type.FixedSizeArray =>
         val newOffset = offset.add(ast.offsetOf(selector))
         ArrayRef(selector, tpe, isLocal, isMutable, isTemplate, newOffset)
-      case tpe =>
-        throw Compiler.Error(s"Expected array type, got $tpe", selector.sourceIndex)
-    }
-  }
-
-  def subStruct(state: Compiler.State[Ctx], selector: Ast.Ident): StructRef[Ctx] = {
-    ast.getField(selector).tpe match {
       case tpe: Type.Struct =>
         val struct    = state.getStruct(tpe.id)
         val newOffset = offset.add(ast.offsetOf(selector))
         StructRef(selector, isLocal, isMutable, isTemplate, newOffset, struct)
       case tpe =>
-        throw Compiler.Error(s"Expected struct type, got $tpe", selector.sourceIndex)
+        throw Compiler.Error(s"Expected array or struct type, got $tpe", selector.sourceIndex)
     }
   }
 
@@ -100,9 +188,9 @@ final case class StructRef[Ctx <: StatelessContext](
   ): Seq[Instr[Ctx]] = {
     tpe match {
       case _: Type.FixedSizeArray =>
-        subArray(selector).genStoreCode(state).reverse.flatten
+        subRef(state, selector).genStoreCode(state).reverse.flatten
       case _: Type.Struct =>
-        subStruct(state, selector).genStoreCode(state).reverse.flatten
+        subRef(state, selector).genStoreCode(state).reverse.flatten
       case _ =>
         val newOffset = offset.add(ast.offsetOf(selector))
         state.genStoreCode(newOffset, isLocal)
@@ -126,9 +214,9 @@ final case class StructRef[Ctx <: StatelessContext](
   ): Seq[Instr[Ctx]] = {
     tpe match {
       case _: Type.FixedSizeArray =>
-        subArray(selector).genLoadCode(state)
+        subRef(state, selector).genLoadCode(state)
       case _: Type.Struct =>
-        subStruct(state, selector).genLoadCode(state)
+        subRef(state, selector).genLoadCode(state)
       case _ =>
         val newOffset = offset.add(ast.offsetOf(selector))
         state.genLoadCode(this, tpe, newOffset)
@@ -148,51 +236,6 @@ final case class StructRef[Ctx <: StatelessContext](
 
 object StructRef {
   @inline def structVarName(baseName: String, field: String): String = s"_$baseName-$field"
-
-  // scalastyle:off parameter.number
-  def init[Ctx <: StatelessContext](
-      state: Compiler.State[Ctx],
-      ast: Ast.Struct,
-      baseName: String,
-      isMutable: Boolean,
-      isUnused: Boolean,
-      isLocal: Boolean,
-      isGenerated: Boolean,
-      isTemplate: Boolean,
-      varInfoBuilder: Compiler.VarInfoBuilder,
-      getIndex: () => Byte,
-      increaseIndex: () => Unit
-  ): StructRef[Ctx] = {
-    val offset = if (isTemplate) {
-      ConstantVarOffset[Ctx](getIndex().toInt)
-    } else if (isLocal) {
-      ConstantVarOffset[Ctx](state.currentScopeState.varIndex)
-    } else if (isMutable) {
-      ConstantVarOffset[Ctx](state.mutFieldsIndex)
-    } else {
-      ConstantVarOffset[Ctx](state.immFieldsIndex)
-    }
-    ast.fields.foreach { field =>
-      val ident = Ast.Ident(structVarName(baseName, field.name))
-      state.addVariable(
-        ident,
-        field.tpe,
-        isMutable,
-        isUnused,
-        isLocal,
-        isGenerated = true,
-        isTemplate,
-        varInfoBuilder,
-        getIndex,
-        increaseIndex
-      )
-    }
-    val ident = Ast.Ident(baseName)
-    val ref   = StructRef[Ctx](ident, isLocal, isMutable, isTemplate, offset, ast)
-    state.addStructRef(ident, isMutable, isUnused, isGenerated, ref)
-    ref
-  }
-  // scalastyle:on parameter.number
 }
 
 final case class ArrayRef[Ctx <: StatelessContext](
@@ -203,43 +246,21 @@ final case class ArrayRef[Ctx <: StatelessContext](
     isTemplate: Boolean,
     offset: VarOffset[Ctx]
 ) extends VariablesRef[Ctx] {
-  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-  def subStruct(state: Compiler.State[Ctx], indexes: Seq[Ast.Expr[Ctx]]): StructRef[Ctx] = {
-    assume(indexes.nonEmpty)
-    val subArrayRef = subArray(state, indexes.dropRight(1))
-    subArrayRef.subStruct(state, indexes.last)
-  }
+  type Selector = Ast.Expr[Ctx]
 
-  private def subStruct(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): StructRef[Ctx] = {
+  def subRef(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): VariablesRef[Ctx] = {
     tpe.baseType match {
+      case baseType: Type.FixedSizeArray =>
+        val flattenSize = baseType.flattenSize()
+        val newOffset   = calcOffset(state, index, flattenSize)
+        ArrayRef(ident, baseType, isLocal, isMutable, isTemplate, newOffset)
       case tpe: Type.Struct =>
         val struct    = state.getStruct(tpe.id)
         val newOffset = calcOffset(state, index, tpe.flattenSize)
         StructRef(ident, isLocal, isMutable, isTemplate, newOffset, struct)
-      case tpe =>
-        throw Compiler.Error(s"Expected struct type, got $tpe", index.sourceIndex)
-    }
-  }
-
-  @scala.annotation.tailrec
-  def subArray(state: Compiler.State[Ctx], indexes: Seq[Ast.Expr[Ctx]]): ArrayRef[Ctx] = {
-    if (indexes.isEmpty) {
-      this
-    } else {
-      subArray(state, indexes(0)).subArray(state, indexes.drop(1))
-    }
-  }
-
-  private def subArray(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): ArrayRef[Ctx] = {
-    val (baseType, flattenSize) = tpe.baseType match {
-      case baseType: Type.FixedSizeArray =>
-        val length = baseType.flattenSize()
-        (baseType, length)
       case _ =>
         throw Compiler.Error(s"Expect multi-dimension array type, have $tpe", index.sourceIndex)
     }
-    val newOffset = calcOffset(state, index, flattenSize)
-    ArrayRef(ident, baseType, isLocal, isMutable, isTemplate, newOffset)
   }
 
   private def calcOffset(
@@ -272,16 +293,6 @@ final case class ArrayRef[Ctx <: StatelessContext](
         )
         VariableVarOffset(instrs)
     }
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-  private def calcOffset(
-      state: Compiler.State[Ctx],
-      indexes: Seq[Ast.Expr[Ctx]]
-  ): VarOffset[Ctx] = {
-    assume(indexes.nonEmpty)
-    val subArrayRef = subArray(state, indexes.dropRight(1))
-    subArrayRef.offset.add(subArrayRef.calcOffset(state, indexes.last))
   }
 
   private def storeArrayIndexVar(
@@ -334,124 +345,31 @@ final case class ArrayRef[Ctx <: StatelessContext](
 
   def genLoadCode(
       state: Compiler.State[Ctx],
-      tpe: Type,
-      indexes: Seq[Ast.Expr[Ctx]]
+      index: Ast.Expr[Ctx]
   ): Seq[Instr[Ctx]] = {
-    tpe match {
+    tpe.baseType match {
       case _: Type.FixedSizeArray =>
-        subArray(state, indexes).genLoadCode(state)
+        subRef(state, index).genLoadCode(state)
       case _: Type.Struct =>
-        subStruct(state, indexes).genLoadCode(state)
-      case _ => state.genLoadCode(this, tpe, calcOffset(state, indexes))
+        subRef(state, index).genLoadCode(state)
+      case _ => state.genLoadCode(this, tpe.baseType, offset.add(calcOffset(state, index)))
     }
   }
 
   def genStoreCode(
       state: Compiler.State[Ctx],
-      tpe: Type,
-      indexes: Seq[Ast.Expr[Ctx]]
+      index: Ast.Expr[Ctx]
   ): Seq[Seq[Instr[Ctx]]] = {
-    tpe match {
-      case _: Type.FixedSizeArray => subArray(state, indexes).genStoreCode(state)
-      case _: Type.Struct         => subStruct(state, indexes).genStoreCode(state)
-      case _                      => Seq(state.genStoreCode(calcOffset(state, indexes), isLocal))
+    tpe.baseType match {
+      case _: Type.FixedSizeArray => subRef(state, index).genStoreCode(state)
+      case _: Type.Struct         => subRef(state, index).genStoreCode(state)
+      case _ => Seq(state.genStoreCode(offset.add(calcOffset(state, index)), isLocal))
     }
   }
 }
 
 object ArrayRef {
   @inline def arrayVarName(baseName: String, idx: Int): String = s"_$baseName-$idx"
-
-  // scalastyle:off parameter.number
-  def init[Ctx <: StatelessContext](
-      state: Compiler.State[Ctx],
-      tpe: Type.FixedSizeArray,
-      baseName: String,
-      isMutable: Boolean,
-      isUnused: Boolean,
-      isLocal: Boolean,
-      isGenerated: Boolean,
-      isTemplate: Boolean,
-      varInfoBuilder: Compiler.VarInfoBuilder,
-      getIndex: () => Byte,
-      increaseIndex: () => Unit
-  ): ArrayRef[Ctx] = {
-    val offset = if (isTemplate) {
-      ConstantVarOffset[Ctx](getIndex().toInt)
-    } else if (isLocal) {
-      ConstantVarOffset[Ctx](state.currentScopeState.varIndex)
-    } else if (isMutable) {
-      ConstantVarOffset[Ctx](state.mutFieldsIndex)
-    } else {
-      ConstantVarOffset[Ctx](state.immFieldsIndex)
-    }
-    initArrayVars(
-      state,
-      tpe,
-      baseName,
-      isMutable,
-      isUnused,
-      isLocal,
-      isTemplate,
-      varInfoBuilder,
-      getIndex,
-      increaseIndex
-    )
-    val ident = Ast.Ident(baseName)
-    val ref   = ArrayRef[Ctx](ident, tpe, isLocal, isMutable, isTemplate, offset)
-    state.addArrayRef(ident, isMutable, isUnused, isGenerated, ref)
-    ref
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def initArrayVars[Ctx <: StatelessContext](
-      state: Compiler.State[Ctx],
-      tpe: Type.FixedSizeArray,
-      baseName: String,
-      isMutable: Boolean,
-      isUnused: Boolean,
-      isLocal: Boolean,
-      isTemplate: Boolean,
-      varInfoBuilder: Compiler.VarInfoBuilder,
-      getIndex: () => Byte,
-      increaseIndex: () => Unit
-  ): Unit = {
-    tpe.baseType match {
-      case baseType: Type.FixedSizeArray =>
-        (0 until tpe.size).foreach { idx =>
-          val newBaseName = arrayVarName(baseName, idx)
-          initArrayVars(
-            state,
-            baseType,
-            newBaseName,
-            isMutable,
-            isUnused,
-            isLocal,
-            isTemplate,
-            varInfoBuilder,
-            getIndex,
-            increaseIndex
-          )
-        }
-      case baseType =>
-        (0 until tpe.size).foreach { idx =>
-          val ident = Ast.Ident(arrayVarName(baseName, idx))
-          state.addVariable(
-            ident,
-            baseType,
-            isMutable,
-            isUnused,
-            isLocal,
-            isGenerated = true,
-            isTemplate,
-            varInfoBuilder,
-            getIndex,
-            increaseIndex
-          )
-        }
-    }
-  }
-  // scalastyle:on parameter.number
 
   @inline def checkArrayIndex(
       index: Int,

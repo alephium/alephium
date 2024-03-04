@@ -217,15 +217,15 @@ object Ast {
   }
   final case class ArrayElement[Ctx <: StatelessContext](
       array: Expr[Ctx],
-      indexes: Seq[Ast.Expr[Ctx]]
+      index: Ast.Expr[Ctx]
   ) extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      Seq(state.getArrayElementType(array, indexes))
+      Seq(state.getArrayElementType(array, index))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val (arrayRef, codes) = state.getOrCreateArrayRef(array)
-      codes ++ arrayRef.genLoadCode(state, getType(state)(0), indexes)
+      codes ++ arrayRef.genLoadCode(state, index)
     }
   }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
@@ -911,13 +911,13 @@ object Ast {
   ) extends AssignmentTarget[Ctx] {
     def _getType(state: Compiler.State[Ctx]): Type = {
       state.getVariable(ident, isWrite = true)
-      state.getArrayElementType(from, Seq(index))
+      state.getArrayElementType(from, index)
     }
 
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
       val (arrayRef, codes) = state.getOrCreateArrayRef(from)
       assume(codes.isEmpty)
-      arrayRef.genStoreCode(state, getType(state), Seq(index))
+      arrayRef.genStoreCode(state, index)
     }
   }
   final case class AssignmentStructFieldTarget[Ctx <: StatelessContext](

@@ -132,7 +132,7 @@ class ParserSpec extends AlephiumSpec {
     parse("a[0].b.c", StatefulParser.expr(_)).get.value is
       StructFieldSelector[StatefulContext](
         StructFieldSelector(
-          ArrayElement(Variable(Ident("a")), Seq(Const(Val.U256(U256.unsafe(0))))),
+          ArrayElement(Variable(Ident("a")), Const(Val.U256(U256.unsafe(0)))),
           Ident("b")
         ),
         Ident("c")
@@ -141,7 +141,7 @@ class ParserSpec extends AlephiumSpec {
       StructFieldSelector[StatefulContext](
         ArrayElement(
           StructFieldSelector[StatefulContext](Variable(Ident("a")), Ident("b")),
-          Seq(Const(Val.U256(U256.unsafe(0))))
+          Const(Val.U256(U256.unsafe(0)))
         ),
         Ident("c")
       )
@@ -150,9 +150,9 @@ class ParserSpec extends AlephiumSpec {
         ArrayElement(
           ArrayElement(
             StructFieldSelector[StatefulContext](Variable(Ident("a")), Ident("b")),
-            Seq(Const(Val.U256(U256.unsafe(0))))
+            Const(Val.U256(U256.unsafe(0)))
           ),
-          Seq(Const(Val.U256(U256.unsafe(1))))
+          Const(Val.U256(U256.unsafe(1)))
         ),
         Ident("c")
       )
@@ -711,24 +711,24 @@ class ParserSpec extends AlephiumSpec {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
       "a[0u][1u]" -> Ast
         .ArrayElement(
-          ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0))),
-          Seq(constantIndex(1))
+          ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
+          constantIndex(1)
         ),
-      "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(Variable(Ast.Ident("i")))),
+      "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Variable(Ast.Ident("i"))),
       "a[foo()]" -> Ast
         .ArrayElement(
           Variable(Ast.Ident("a")),
-          Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+          CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)
         ),
       "a[i + 1]" -> Ast.ArrayElement(
         Variable(Ast.Ident("a")),
-        Seq(Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1)))))
+        Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1))))
       ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
         Ast.ArrayElement(
-          ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0))),
-          Seq(constantIndex(1))
+          ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
+          constantIndex(1)
         )
       ),
       "[a, a]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
@@ -762,11 +762,11 @@ class ParserSpec extends AlephiumSpec {
         Seq(
           AssignmentArrayElementTarget(
             Ident("a"),
-            ArrayElement(Variable(Ident("a")), Seq(constantIndex(0))),
+            ArrayElement(Variable(Ident("a")), constantIndex(0)),
             constantIndex(1)
           )
         ),
-        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), Seq(constantIndex(0)))
+        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), constantIndex(0))
       ),
       "a, b = foo()" -> Assign(
         Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
@@ -816,7 +816,7 @@ class ParserSpec extends AlephiumSpec {
         Seq(
           AssignmentStructFieldTarget(
             Ident("a"),
-            ArrayElement(Variable(Ident("a")), Seq(constantIndex(0))),
+            ArrayElement(Variable(Ident("a")), constantIndex(0)),
             Ident("b")
           )
         ),
@@ -838,7 +838,7 @@ class ParserSpec extends AlephiumSpec {
             Ident("a"),
             ArrayElement(
               StructFieldSelector(Variable(Ident("a")), Ident("b")),
-              Seq(constantIndex(0))
+              constantIndex(0)
             ),
             Ident("c")
           )
