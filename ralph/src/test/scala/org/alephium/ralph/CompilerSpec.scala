@@ -68,18 +68,44 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     error
   }
 
-  it should "parse asset script" in {
-    val script =
-      s"""
-         |// comment
-         |AssetScript Foo {
-         |  pub fn bar(a: U256, b: U256) -> (U256) {
-         |    return (a + b)
-         |  }
-         |}
-         |""".stripMargin
-    val (_, warnings) = Compiler.compileAssetScript(script).rightValue
-    warnings.isEmpty is true
+  it should "compile asset script" in {
+    def runScript(assetScript: StatelessScript, args: AVector[Val]): AVector[Val] = {
+      val (scriptObj, statelessContext) = prepareStatelessScript(assetScript)
+      StatelessVM.executeWithOutputs(statelessContext, scriptObj, args).rightValue
+    }
+
+    {
+      val code =
+        s"""
+           |// comment
+           |AssetScript Foo {
+           |  pub fn bar(a: U256, b: U256) -> (U256) {
+           |    return (a + b)
+           |  }
+           |}
+           |""".stripMargin
+      val (script, warnings) = Compiler.compileAssetScript(code).rightValue
+      warnings.isEmpty is true
+      runScript(script, AVector(Val.U256(2), Val.U256(3))) is AVector[Val](Val.U256(5))
+    }
+
+    {
+      val code =
+        s"""
+           |struct Foo {
+           |  x: U256
+           |  y: ByteVec
+           |}
+           |AssetScript Foo {
+           |  pub fn f0() -> Foo {
+           |    return Foo { x: 1, y: #0011 }
+           |  }
+           |}
+           |""".stripMargin
+      val (script, warnings) = Compiler.compileAssetScript(code).rightValue
+      warnings.isEmpty is true
+      runScript(script, AVector.empty) is AVector[Val](Val.U256(1), Val.ByteVec(Hex.unsafe("0011")))
+    }
   }
 
   it should "parse tx script" in {

@@ -383,7 +383,7 @@ object Compiler {
         0,
         script.funcTable,
         immutable.Map(script.ident -> ContractInfo(ContractKind.TxScript, script.funcTable)),
-        immutable.Map.empty // TODO: support struct in AssetScript
+        script.structs.map(s => (s.id, s)).toMap
       )
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))

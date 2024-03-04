@@ -1265,11 +1265,20 @@ object Ast {
   final case class AssetScript(
       ident: TypeId,
       templateVars: Seq[Argument],
-      funcs: Seq[FuncDef[StatelessContext]]
-  ) extends ContractT[StatelessContext] {
-    val fields: Seq[Argument] = Seq.empty
+      funcs: Seq[FuncDef[StatelessContext]],
+      structs: Seq[Struct]
+  ) extends ContractT[StatelessContext]
+      with Typer {
+    val fields: Seq[Argument]             = Seq.empty
+    val contractTypes: Seq[Type.Contract] = Seq.empty
 
     def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatelessContext]] = Seq.empty
+
+    def updateType(): AssetScript = {
+      val newTemplateVars = templateVars.map(_.updateType(this.getType))
+      val newFuncs        = funcs.map(_.updateType(this.getType))
+      this.copy(templateVars = newTemplateVars, funcs = newFuncs).atSourceIndex(this.sourceIndex)
+    }
 
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
       state.setGenCodePhase()
@@ -1542,7 +1551,7 @@ object Ast {
   }
 
   trait Typer {
-    def contracts: Seq[ContractWithState]
+    def contractTypes: Seq[Type.Contract]
     def structs: Seq[Struct]
 
     private val flattenSizeCache = mutable.Map.empty[Type, Int]
@@ -1578,8 +1587,8 @@ object Ast {
     }
 
     def getType(tpe: Type.NamedType): Type = {
-      contracts.find(_.ident == tpe.id) match {
-        case Some(contract) => Type.Contract(contract.ident)
+      contractTypes.find(_.id == tpe.id) match {
+        case Some(contract) => contract
         case None =>
           structs.find(_.id == tpe.id) match {
             case Some(struct) => Type.Struct(struct.id, getFlattenSize(tpe, Seq.empty))
@@ -1596,6 +1605,8 @@ object Ast {
       dependencies: Option[Map[TypeId, Seq[TypeId]]]
   ) extends Typer
       with Positioned {
+    val contractTypes: Seq[Type.Contract] = contracts.map(c => Type.Contract(c.ident))
+
     lazy val contractsTable = contracts.map { contract =>
       val kind = contract match {
         case _: Ast.ContractInterface =>

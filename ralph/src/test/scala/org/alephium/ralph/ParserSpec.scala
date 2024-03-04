@@ -1631,18 +1631,36 @@ class ParserSpec extends AlephiumSpec {
     )
   }
 
-  it should "parse AssetScript" in new ScriptFixture {
-    val usePreapprovedAssets = false
+  it should "parse AssetScript" in {
     val script = s"""
+                    |struct Foo { x: U256 }
                     |AssetScript Main(x: U256) {
-                    |  pub fn main() -> () {
-                    |    return
+                    |  pub fn main(foo: Foo) -> Foo {
+                    |    return foo
                     |  }
                     |}
                     |""".stripMargin
 
     parse(script, StatelessParser.assetScript(_)).get.value is
-      AssetScript(ident, templateVars, funcs)
+      AssetScript(
+        TypeId("Main"),
+        Seq(Argument(Ident("x"), Type.U256, false, false)),
+        Seq(
+          FuncDef(
+            Seq.empty,
+            FuncId("main", false),
+            true,
+            false,
+            false,
+            true,
+            false,
+            Seq(Argument(Ident("foo"), Type.Struct(TypeId("Foo"), 1), false, false)),
+            Seq(Type.Struct(TypeId("Foo"), 1)),
+            Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
+          )
+        ),
+        Seq(Struct(TypeId("Foo"), Seq(StructField(Ident("x"), Type.U256))))
+      )
   }
 
   // scalastyle:off no.equal
