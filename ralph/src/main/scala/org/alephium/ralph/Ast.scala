@@ -974,10 +974,14 @@ object Ast {
       extends Statement[Ctx] {
     override def check(state: Compiler.State[Ctx]): Unit = {
       val eventInfo = state.getEvent(id)
-      eventInfo.checkFieldTypes(
-        args.flatMap(_.getType(state)),
-        args.headOption.flatMap(_.sourceIndex)
-      )
+      val argsType  = args.flatMap(_.getType(state))
+      if (argsType.exists(!_.isPrimitive)) {
+        throw Compiler.Error(
+          s"Only primitive types are supported for event ${quote(s"${state.typeId.name}.${id.name}")}",
+          sourceIndex
+        )
+      }
+      eventInfo.checkFieldTypes(argsType, args.headOption.flatMap(_.sourceIndex))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -987,13 +991,6 @@ object Ast {
         assume(index >= 0)
 
         Const[Ctx](Val.I256(I256.from(index))).genCode(state)
-      }
-      val argsType = args.flatMap(_.getType(state))
-      if (argsType.exists(_.isArrayType)) {
-        throw Compiler.Error(
-          s"Array type not supported for event ${quote(s"${state.typeId.name}.${id.name}")}",
-          sourceIndex
-        )
       }
       val logOpCode = Compiler.genLogs(args.length, id.sourceIndex)
       eventIndex ++ args.flatMap(_.genCode(state)) :+ logOpCode

@@ -25,9 +25,9 @@ sealed trait Type {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def signature: String = toVal.toString
 
-  def isArrayType: Boolean = this match {
-    case _: Type.FixedSizeArray => true
-    case _                      => false
+  def isPrimitive: Boolean = this match {
+    case _: Type.FixedSizeArray | _: Type.Struct | _: Type.NamedType => false
+    case _                                                           => true
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))

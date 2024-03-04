@@ -1887,6 +1887,32 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(contract, "Invalid args type List(U256, Bool) for event Add(U256, U256)")
     }
+
+    {
+      info("array/struct field type")
+      def contract(tpe: String, value: String): String =
+        s"""
+           |struct Bar { x: U256 }
+           |Contract Foo(result: U256) {
+           |
+           |  event TestEvent(f: $tpe)
+           |
+           |  pub fn testArrayEventType() -> (U256) {
+           |    $$emit TestEvent($value)$$
+           |    return 0
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(
+        contract("[U256; 2]", "[1, 2]"),
+        "Only primitive types are supported for event \"Foo.TestEvent\""
+      )
+      testContractError(
+        contract("Bar", "Bar { x: 0 }"),
+        "Only primitive types are supported for event \"Foo.TestEvent\""
+      )
+    }
   }
 
   it should "test contract inheritance compilation" in {
@@ -4628,6 +4654,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
 
       testContractError(code, "Invalid struct fields, expect List(x:U256)")
+    }
+
+    {
+      info("Compare struct")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |
+           |Contract C() {
+           |  pub fn f(foo0: Foo, foo1: Foo) -> Bool {
+           |    return foo0 == foo1
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContractFull(code).leftValue.message is
+        s"Invalid param types List(Foo, Foo) for Eq"
     }
   }
 
