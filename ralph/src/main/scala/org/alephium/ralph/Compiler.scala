@@ -590,10 +590,10 @@ object Compiler {
       val sname        = checkNewVariable(ident)
       var currentIndex = index
       tpe match {
-        case array: Type.FixedSizeArray =>
+        case _: Type.FixedSizeArray | _: Type.Struct =>
           VariablesRef.init(
             this,
-            array,
+            tpe,
             ident.name,
             isMutable = false,
             isUnused = false,

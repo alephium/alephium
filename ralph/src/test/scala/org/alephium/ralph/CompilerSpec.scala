@@ -2493,7 +2493,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     script.toTemplateString() is "0101030001000c{3}1700{0}{1}{2}a3{0}{2}0e0c16000100"
   }
 
-  it should "test template array variables" in {
+  it should "test template variables" in {
     def runScript(script: StatefulScript, templateVars: AVector[Val]): Unit = {
       val templateCode = script.toTemplateString()
       val pattern      = "\\{(\\d+)\\}".r
@@ -2612,6 +2612,41 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         .compileTxScript(code)
         .leftValue
         .message is "Number of template variables more than 255"
+    }
+
+    {
+      info("Gen code for struct template variables")
+      val code =
+        s"""
+           |struct Foo {
+           |  x: U256
+           |  y: ByteVec
+           |}
+           |@using(preapprovedAssets = false)
+           |TxScript Main(a: U256, foo: Foo, array: [Foo; 2], b: Bool) {
+           |  assert!(a == 0, 0)
+           |  assert!(b, 0)
+           |  assert!(foo.x == 0 && foo.y == #00, 0)
+           |  assert!(array[0].y == #01 && array[0].x == 1, 0)
+           |  assert!(array[1].y == #02 && array[1].x == 2, 0)
+           |}
+           |""".stripMargin
+
+      val script = Compiler.compileTxScript(code).rightValue
+      script.toTemplateString() is "010100000600402f{1}{2}17011700{3}{4}{5}{6}1705170417031702{0}0c2f0c7b{7}0c7b16000c2f1601140100411a0c7b16031401014116020d2f1a0c7b16051401024116040e2f1a0c7b"
+      runScript(
+        script,
+        AVector(
+          Val.U256(0),
+          Val.U256(0),
+          Val.ByteVec(Hex.unsafe("00")),
+          Val.U256(1),
+          Val.ByteVec(Hex.unsafe("01")),
+          Val.U256(2),
+          Val.ByteVec(Hex.unsafe("02")),
+          Val.True
+        )
+      )
     }
   }
 

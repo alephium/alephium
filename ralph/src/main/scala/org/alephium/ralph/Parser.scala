@@ -779,8 +779,8 @@ object StatefulParser extends Parser[StatefulContext] {
               usingAnnotation.assetsInContract,
               usingAnnotation.updateFields
             )
-            Ast.TxScript
-              .from(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
+            Ast
+              .TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
               .atSourceIndex(scriptIndex.index, endIndex)
           }
       }

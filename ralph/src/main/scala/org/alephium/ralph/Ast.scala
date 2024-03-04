@@ -1184,11 +1184,16 @@ object Ast {
     }
   }
 
-  object TemplateArray {
-    private val suffix = "-template-array"
+  object TemplateVar {
+    private val arraySuffix  = "-template-array"
+    private val structSuffix = "-template-struct"
 
-    @inline private[ralph] def renameTemplateArrayVar(ident: Ident): Ident = {
-      Ident(s"_${ident.name}$suffix")
+    @inline private[ralph] def rename(arg: Argument): Ident = {
+      arg.tpe match {
+        case _: Type.FixedSizeArray => Ident(s"_${arg.ident.name}$arraySuffix")
+        case _: Type.Struct         => Ident(s"_${arg.ident.name}$structSuffix")
+        case _                      => arg.ident
+      }
     }
   }
 
@@ -1221,13 +1226,8 @@ object Ast {
 
     private def addTemplateVars(state: Compiler.State[Ctx]): Unit = {
       val index = templateVars.foldLeft(0) { case (index, templateVar) =>
-        templateVar.tpe match {
-          case _: Type.FixedSizeArray =>
-            val arrayVar = TemplateArray.renameTemplateArrayVar(templateVar.ident)
-            state.addTemplateVariable(arrayVar, templateVar.tpe, index)
-          case _ =>
-            state.addTemplateVariable(templateVar.ident, templateVar.tpe, index)
-        }
+        val ident = TemplateVar.rename(templateVar)
+        state.addTemplateVariable(ident, templateVar.tpe, index)
       }
       if (index >= Compiler.State.maxVarIndex) {
         throw Compiler.Error(
@@ -1354,26 +1354,13 @@ object Ast {
     type Self = TxScript
     def updateType(typer: Type.NamedType => Type): TxScript = {
       val newTemplateVars = templateVars.map(_.updateType(typer))
-      val newFuncs        = funcs.map(_.updateType(typer))
-      this.copy(templateVars = newTemplateVars, funcs = newFuncs).atSourceIndex(this.sourceIndex)
-    }
-  }
-
-  object TxScript {
-    def from(
-        typeId: TypeId,
-        templateVars: Seq[Argument],
-        funcs: Seq[FuncDef[StatefulContext]]
-    ): TxScript = {
-      val arrayVarDefs: Seq[Statement[StatefulContext]] = templateVars.collect { arg =>
-        arg.tpe match {
-          case _: Type.FixedSizeArray =>
-            val arrayVar = TemplateArray.renameTemplateArrayVar(arg.ident)
-            VarDef(Seq(NamedVar(mutable = false, arg.ident)), Variable(arrayVar))
-        }
+      val templateVarDefs: Seq[Statement[StatefulContext]] = newTemplateVars.collect {
+        case arg @ Argument(ident, tpe, _, _) if !tpe.isPrimitive =>
+          VarDef(Seq(NamedVar(mutable = false, ident)), Variable(TemplateVar.rename(arg)))
       }
-      val newFuncs = funcs.map(func => func.copy(bodyOpt = Some(arrayVarDefs ++ func.body)))
-      TxScript(typeId, templateVars, newFuncs)
+      val newFuncs =
+        funcs.map(func => func.copy(bodyOpt = Some(templateVarDefs ++ func.body)).updateType(typer))
+      this.copy(templateVars = newTemplateVars, funcs = newFuncs).atSourceIndex(this.sourceIndex)
     }
   }
 
