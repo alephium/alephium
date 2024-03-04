@@ -683,7 +683,7 @@ class AstSpec extends AlephiumSpec {
          |  pub fn baz() -> () { foo1() }
          |}
          |""".stripMargin
-    val (contracts, _) = Compiler.compileProject(code1).rightValue
+    val (contracts, _, _) = Compiler.compileProject(code1).rightValue
     contracts.length is 2
     contracts.foreach(_.warnings.isEmpty is true)
   }

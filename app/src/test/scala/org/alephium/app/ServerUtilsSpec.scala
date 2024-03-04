@@ -2327,9 +2327,9 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  Bar(id).foo()
          |}
          |""".stripMargin
-    val (contracts, scripts) = Compiler.compileProject(rawCode).rightValue
-    val query                = Compile.Project(rawCode)
-    val result               = serverUtils.compileProject(query).rightValue
+    val (contracts, scripts, _) = Compiler.compileProject(rawCode).rightValue
+    val query                   = Compile.Project(rawCode)
+    val result                  = serverUtils.compileProject(query).rightValue
 
     result.contracts.length is 1
     contracts.length is 1

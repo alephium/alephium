@@ -320,6 +320,7 @@ trait ApiModelCodec {
   implicit val compileResultConstantRW: RW[CompileResult.Constant]    = macroRW
   implicit val compileResultEnumFieldRW: RW[CompileResult.EnumField]  = macroRW
   implicit val compileResultEnumRW: RW[CompileResult.Enum]            = macroRW
+  implicit val compileResultStructRW: RW[CompileResult.StructSig]     = macroRW
   implicit val compileScriptResultRW: RW[CompileScriptResult]         = macroRW
   implicit val compileContractResultRW: RW[CompileContractResult]     = macroRW
   implicit val compileProjectResultRW: RW[CompileProjectResult]       = macroRW

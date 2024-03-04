@@ -3492,7 +3492,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn baz() -> () { foo(0) }
            |}
            |""".stripMargin
-      val (contracts, _) = Compiler.compileProject(code).rightValue
+      val (contracts, _, _) = Compiler.compileProject(code).rightValue
       contracts.length is 2
       contracts.foreach(_.warnings.isEmpty is true)
     }

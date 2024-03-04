@@ -607,6 +607,9 @@ object Ast {
 
     def name: String = id.name
 
+    def getFieldNames(): AVector[String]          = AVector.from(fields.view.map(_.ident.name))
+    def getFieldTypeSignatures(): AVector[String] = AVector.from(fields.view.map(_.tpe.signature))
+
     def updateType(typer: Type.NamedType => Type): Struct = {
       val newFields = fields.map { field =>
         field.copy(tpe = field.tpe.update(typer))

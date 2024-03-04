@@ -100,13 +100,13 @@ object Compiler {
   def compileProject(
       input: String,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, (AVector[CompiledContract], AVector[CompiledScript])] = {
+  ): Either[Error, (AVector[CompiledContract], AVector[CompiledScript], AVector[Ast.Struct])] = {
     try {
       compileMultiContract(input).map { multiContract =>
         val statefulContracts =
           multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
         val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
-        (statefulContracts, statefulScripts)
+        (statefulContracts, statefulScripts, AVector.from(multiContract.structs))
       }
     } catch {
       case e: Error => Left(e)

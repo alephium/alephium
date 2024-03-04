@@ -21,13 +21,13 @@ import org.alephium.util.{AlephiumFixture, AlephiumSpec, AVector}
 class TypeSpec extends AlephiumSpec {
   it should "return correct signature" in new TypeSignatureFixture {
     contractAst.getFieldsSignature() is
-      "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])"
+      "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2],gg:Account)"
     contractAst.getFieldNames() is
-      AVector("aa", "bb", "cc", "dd", "ee", "ff")
+      AVector("aa", "bb", "cc", "dd", "ee", "ff", "gg")
     contractAst.getFieldTypes() is
-      AVector("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]")
+      AVector("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]", "Account")
     contractAst.getFieldMutability() is
-      AVector(false, true, false, true, false, false)
+      AVector(false, true, false, true, false, false, false)
     contractAst.funcs.map(_.getArgNames()) is
       Seq(AVector("a", "b", "c", "d", "e", "f"))
     contractAst.funcs.map(_.getArgTypeSignatures()) is
@@ -59,7 +59,11 @@ class TypeSpec extends AlephiumSpec {
 trait TypeSignatureFixture extends AlephiumFixture {
   val contractStr =
     s"""
-       |Contract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2]) {
+       |struct Account {
+       |  amount: U256
+       |  id: ByteVec
+       |}
+       |Contract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2], gg: Account) {
        |  event Bar(a: Bool, b: U256, d: ByteVec, e: Address)
        |
        |  const A = true
@@ -73,6 +77,7 @@ trait TypeSignatureFixture extends AlephiumFixture {
        |    emit Bar(aa, bb, dd, ee)
        |    emit Debug(`xx`)
        |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+       |    let _ = gg
        |    b = 0
        |    bb = 0
        |    d = #
@@ -86,12 +91,17 @@ trait TypeSignatureFixture extends AlephiumFixture {
 
   val scriptStr =
     s"""
+       |struct Account {
+       |  amount: U256
+       |  id: ByteVec
+       |}
        |TxScript Foo(aa: Bool, bb: U256, cc: I256, dd: ByteVec, ee: Address) {
        |  return
-       |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
+       |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2], g: Account) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
        |    emit Debug(`xx`)
        |    b = 0
        |    d = #
+       |    let _ = g
        |    return b, c, d, e, f
        |  }
        |}

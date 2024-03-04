@@ -624,6 +624,11 @@ trait EndpointsExamples extends ErrorExamples {
     ),
     warnings = AVector("Found unused fields in Foo: a")
   )
+  private val structSig = CompileResult.StructSig(
+    name = "Foo",
+    fieldNames = AVector("amount", "id"),
+    fieldTypes = AVector("U256", "ByteVec")
+  )
   implicit val compileScriptResultExamples: List[Example[CompileScriptResult]] =
     simpleExample(compileScriptResult)
 
@@ -678,7 +683,8 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       CompileProjectResult(
         contracts = AVector(compileContractResult),
-        scripts = AVector(compileScriptResult)
+        scripts = AVector(compileScriptResult),
+        structs = AVector(structSig)
       )
     )
 

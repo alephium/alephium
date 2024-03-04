@@ -111,17 +111,23 @@ object CompileContractResult {
 
 final case class CompileProjectResult(
     contracts: AVector[CompileContractResult],
-    scripts: AVector[CompileScriptResult]
+    scripts: AVector[CompileScriptResult],
+    structs: AVector[CompileResult.StructSig]
 )
 
 object CompileProjectResult {
   def from(
       contracts: AVector[CompiledContract],
-      scripts: AVector[CompiledScript]
+      scripts: AVector[CompiledScript],
+      structs: AVector[Ast.Struct]
   ): CompileProjectResult = {
     val compiledContracts = contracts.map(c => CompileContractResult.from(c))
     val compiledScripts   = scripts.map(s => CompileScriptResult.from(s))
-    CompileProjectResult(compiledContracts, compiledScripts)
+    CompileProjectResult(
+      compiledContracts,
+      compiledScripts,
+      structs.map(CompileResult.StructSig.from)
+    )
   }
 
   final case class Patch(value: String) extends AnyVal
@@ -231,6 +237,21 @@ object CompileResult {
         event.name,
         event.getFieldNames(),
         event.getFieldTypeSignatures()
+      )
+    }
+  }
+
+  final case class StructSig(
+      name: String,
+      fieldNames: AVector[String],
+      fieldTypes: AVector[String]
+  )
+  object StructSig {
+    def from(struct: Ast.Struct): StructSig = {
+      StructSig(
+        struct.id.name,
+        struct.getFieldNames(),
+        struct.getFieldTypeSignatures()
       )
     }
   }

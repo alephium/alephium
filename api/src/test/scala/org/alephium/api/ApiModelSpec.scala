@@ -1056,11 +1056,11 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     CompileProjectResult.diffPatch("Hello", "Hello").value is ""
 
     val bytecode = Hex.toHexString(serialize(compiledContract.code))
-    bytecode is "0701403701010707061805ce00a000a001ce0261b413c40de0b6b3a7640000a90c17010ca100140017031400a10116011602160316041605160602"
+    bytecode is "0901403d01010707061c05ce00a000a001ce0261b413c40de0b6b3a7640000a9ce05ce0618180c17010ca100140017031400a10116011602160316041605160602"
     val debugBytecode = Hex.toHexString(serialize(compiledContract.debugCode))
-    debugBytecode is "0701403c01010707061905ce00a000a001ce02617e01027878b413c40de0b6b3a7640000a90c17010ca100140017031400a10116011602160316041605160602"
+    debugBytecode is "0901404201010707061d05ce00a000a001ce02617e01027878b413c40de0b6b3a7640000a9ce05ce0618180c17010ca100140017031400a10116011602160316041605160602"
     val diff = CompileProjectResult.diffPatch(bytecode, debugBytecode)
-    diff.value is "=7-1+c=11-1+9=20+7e01027878=78"
+    diff.value is "=6-2+42=11-1+d=20+7e01027878=90"
     val patchedCode = CompileProjectResult.applyPatchUnsafe(bytecode, diff)
     patchedCode is debugBytecode
   }
@@ -1072,14 +1072,14 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "version": "${ReleaseVersion.current}",
          |  "name": "Foo",
-         |  "bytecode": "0701403701010707061805ce00a000a001ce0261b413c40de0b6b3a7640000a90c17010ca100140017031400a10116011602160316041605160602",
-         |  "bytecodeDebugPatch": "=7-1+c=11-1+9=20+7e01027878=78",
-         |  "codeHash": "6ee50d3b19b5dcc42ca293ce86ba9b962c597e28eb931ccb2f92468db682b126",
-         |  "codeHashDebug":"a57454cfd739e83190ec0494fafddb1fada6d24c1540a885f4f9b3fea742db85",
+         |  "bytecode": "0901403d01010707061c05ce00a000a001ce0261b413c40de0b6b3a7640000a9ce05ce0618180c17010ca100140017031400a10116011602160316041605160602",
+         |  "bytecodeDebugPatch": "=6-2+42=11-1+d=20+7e01027878=90",
+         |  "codeHash": "8232ffadc0c21503d4968607332b425617fd05e62edd0a27bb34df02fd191016",
+         |  "codeHashDebug":"049ce2b22e2eed2d6b92326f2e4677aa899a50f7922f8da3102dbe36ca1ae965",
          |  "fields": {
-         |    "names": ["aa","bb","cc","dd","ee","ff"],
-         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
-         |    "isMutable": [false, true, false, true, false, false]
+         |    "names": ["aa","bb","cc","dd","ee","ff", "gg"],
+         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]", "Account"],
+         |    "isMutable": [false, true, false, true, false, false, false]
          |  },
          |  "functions": [
          |    {
@@ -1136,8 +1136,8 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |{
          |  "version": "${ReleaseVersion.current}",
          |  "name": "Foo",
-         |  "bytecodeTemplate": "020103000000010201000707060b0c17011400170316011602160316041605160602",
-         |  "bytecodeDebugPatch": "=27-1+c7e01027878=40",
+         |  "bytecodeTemplate": "020103000000010201000909060f0c17011400170316071608181816011602160316041605160602",
+         |  "bytecodeDebugPatch": "=26+1=1-1+7e01027878=52",
          |  "fields": {
          |    "names": ["aa","bb","cc","dd","ee"],
          |    "types": ["Bool", "U256", "I256", "ByteVec", "Address"],
@@ -1159,9 +1159,9 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |      "usePreapprovedAssets": false,
          |      "useAssetsInContract": false,
          |      "isPublic": true,
-         |      "paramNames": ["a","b","c","d","e","f"],
-         |      "paramTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"],
-         |      "paramIsMutable": [false, true, false, true, false, false],
+         |      "paramNames": ["a","b","c","d","e","f","g"],
+         |      "paramTypes": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]", "Account"],
+         |      "paramIsMutable": [false, true, false, true, false, false, false],
          |      "returnTypes": ["U256", "I256", "ByteVec", "Address", "[[Bool;1];2]"]
          |    }
          |  ],
@@ -1173,12 +1173,28 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |""".stripMargin
     write(result1).filter(!_.isWhitespace) is jsonRaw1.filter(!_.isWhitespace)
 
-    val result2 = CompileProjectResult(AVector(result0), AVector(result1))
+    val struct = CompileResult.StructSig(
+      "Account",
+      AVector("amount", "id"),
+      AVector("U256", "ByteVec")
+    )
+    val structJson =
+      s"""
+         |{
+         |  "name": "Account",
+         |  "fieldNames": ["amount", "id"],
+         |  "fieldTypes": ["U256", "ByteVec"]
+         |}
+         |""".stripMargin
+    write(struct).filter(!_.isWhitespace) is structJson.filter(!_.isWhitespace)
+
+    val result2 = CompileProjectResult(AVector(result0), AVector(result1), AVector(struct))
     val jsonRaw2 =
       s"""
          |{
          |  "contracts": [$jsonRaw0],
-         |  "scripts": [$jsonRaw1]
+         |  "scripts": [$jsonRaw1],
+         |  "structs": [$structJson]
          |}
          |""".stripMargin
     write(result2).filter(!_.isWhitespace) is jsonRaw2.filter(!_.isWhitespace)

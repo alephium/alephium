@@ -7337,6 +7337,19 @@
                         "Found unused fields in Foo: a"
                       ]
                     }
+                  ],
+                  "structs": [
+                    {
+                      "name": "Foo",
+                      "fieldNames": [
+                        "amount",
+                        "id"
+                      ],
+                      "fieldTypes": [
+                        "U256",
+                        "ByteVec"
+                      ]
+                    }
                   ]
                 }
               }
@@ -11248,7 +11261,8 @@
       "CompileProjectResult": {
         "required": [
           "contracts",
-          "scripts"
+          "scripts",
+          "structs"
         ],
         "type": "object",
         "properties": {
@@ -11262,6 +11276,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CompileScriptResult"
+            }
+          },
+          "structs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StructSig"
             }
           }
         }
@@ -12423,6 +12443,31 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/OutputRef"
+            }
+          }
+        }
+      },
+      "StructSig": {
+        "required": [
+          "name",
+          "fieldNames",
+          "fieldTypes"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "fieldNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fieldTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           }
         }
