@@ -9,7 +9,7 @@
       "result"
     ],
     "types": [
-      "ByteVec",
+      "Sub",
       "U256"
     ],
     "isMutable": [

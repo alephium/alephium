@@ -80,10 +80,6 @@ object Ast {
       val prefix = if (isMutable) "mut " else ""
       s"${prefix}${ident.name}:${tpe.signature}"
     }
-
-    def updateType(typer: Type.NamedType => Type): Argument = {
-      this.copy(tpe = this.tpe.update(typer)).atSourceIndex(this.sourceIndex)
-    }
   }
 
   final case class EventField(ident: Ident, tpe: Type) {
@@ -229,7 +225,7 @@ object Ast {
     }
   }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
-    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(state.getType(id))
+    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(state.resolveType(id))
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       state.genLoadCode(id)
@@ -324,8 +320,8 @@ object Ast {
             variadicInstrs ++
             func.genCode(argsType)
           if (ignoreReturn) {
-            val returnType = positionedError(func.getReturnType(argsType, state.selfContractType))
-            instrs ++ Seq.fill(Type.flattenTypeLength(returnType))(Pop)
+            val returnType = positionedError(func.getReturnType(argsType, state))
+            instrs ++ Seq.fill(state.flattenTypeLength(returnType))(Pop)
           } else {
             instrs
           }
@@ -359,9 +355,7 @@ object Ast {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       checkApproveAssets(state)
       val funcInfo = state.getFunc(id)
-      positionedError(
-        funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
-      )
+      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -388,9 +382,7 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      positionedError(
-        funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
-      )
+      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -411,7 +403,7 @@ object Ast {
           obj.sourceIndex
         )
       } else {
-        objType(0) match {
+        state.resolveType(objType(0)) match {
           case contract: Type.Contract => contract
           case _ =>
             throw Compiler.Error(
@@ -431,9 +423,7 @@ object Ast {
       val funcInfo = state.getFunc(contractType.id, callId)
       checkNonStaticContractFunction(contractType.id, callId, funcInfo)
       state.addExternalCall(contractType.id, callId)
-      positionedError(
-        funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
-      )
+      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -443,9 +433,10 @@ object Ast {
     ): Seq[Instr[StatefulContext]] = {
       val contract  = obj.getType(state)(0).asInstanceOf[Type.Contract]
       val func      = state.getFunc(contract.id, callId)
-      val argLength = Type.flattenTypeLength(func.argsType)
-      val retLength =
-        func.getReturnLength(args.flatMap(_.getType(state)), state.selfContractType)
+      val argLength = state.flattenTypeLength(func.argsType)
+      val argTypes  = args.flatMap(_.getType(state))
+      val retTypes  = func.getReturnType(argTypes, state)
+      val retLength = state.flattenTypeLength(retTypes)
       genApproveCode(state, func) ++
         args.flatMap(_.genCode(state)) ++
         Seq(
@@ -594,28 +585,12 @@ object Ast {
     def signature: String = s"${ident.name}:${tpe.signature}"
   }
   final case class Struct(id: TypeId, fields: Seq[StructField]) extends UniqueDef {
-    lazy val tpe: Type.Struct = {
-      val flattenSize = fields
-        .map(_.tpe match {
-          case t: Type.FixedSizeArray => t.flattenSize()
-          case t: Type.Struct         => t.flattenSize
-          case _                      => 1
-        })
-        .sum
-      Type.Struct(id, flattenSize)
-    }
+    lazy val tpe: Type.Struct = Type.Struct(id)
 
     def name: String = id.name
 
     def getFieldNames(): AVector[String]          = AVector.from(fields.view.map(_.ident.name))
     def getFieldTypeSignatures(): AVector[String] = AVector.from(fields.view.map(_.tpe.signature))
-
-    def updateType(typer: Type.NamedType => Type): Struct = {
-      val newFields = fields.map { field =>
-        field.copy(tpe = field.tpe.update(typer))
-      }
-      this.copy(fields = newFields).atSourceIndex(this.sourceIndex)
-    }
 
     def getField(selector: Ident): StructField = {
       fields
@@ -628,9 +603,9 @@ object Ast {
         )
     }
 
-    def offsetOf(selector: Ident): Int = {
+    def offsetOf[Ctx <: StatelessContext](state: Compiler.State[Ctx], selector: Ident): Int = {
       val types = fields.slice(0, fields.indexWhere(_.ident == selector)).map(_.tpe)
-      Type.flattenTypeLength(types)
+      state.flattenTypeLength(types)
     }
   }
 
@@ -638,7 +613,7 @@ object Ast {
       extends Expr[Ctx] {
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
       val struct   = state.getStruct(id)
-      val expected = struct.fields.map(field => (field.ident, Seq(field.tpe)))
+      val expected = struct.fields.map(field => (field.ident, Seq(state.resolveType(field.tpe))))
       val have     = fields.map { case (ident, expr) => (ident, expr.getType(state)) }
       if (expected.length != have.length || have.exists(f => !expected.contains(f))) {
         throw Compiler.Error(
@@ -717,11 +692,8 @@ object Ast {
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
       val storeCodes = vars.zip(value.getType(state)).flatMap {
         case (NamedVar(_, ident), _) => state.genStoreCode(ident)
-        case (AnonymousVar, tpe: Type.FixedSizeArray) =>
-          Seq(Seq.fill(tpe.flattenSize())(Pop))
-        case (AnonymousVar, tpe: Type.Struct) =>
-          Seq(Seq.fill(tpe.flattenSize)(Pop))
-        case (AnonymousVar, _) => Seq(Seq(Pop))
+        case (AnonymousVar, tpe) =>
+          Seq(Seq.fill(state.flattenTypeLength(Seq(tpe)))(Pop))
       }
       value.genCode(state) ++ storeCodes.reverse.flatten
     }
@@ -834,9 +806,10 @@ object Ast {
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setFuncScope(id)
       state.checkArguments(args)
-      args.foreach(arg =>
-        state.addLocalVariable(arg.ident, arg.tpe, arg.isMutable, arg.isUnused, isGenerated = false)
-      )
+      args.foreach { arg =>
+        val argTpe = state.resolveType(arg.tpe)
+        state.addLocalVariable(arg.ident, argTpe, arg.isMutable, arg.isUnused, isGenerated = false)
+      }
       funcAccessedVarsCache match {
         case Some(vars) => // the function has been compiled before
           state.addAccessedVars(vars)
@@ -861,17 +834,11 @@ object Ast {
         isPublic,
         usePreapprovedAssets,
         useAssetsInContract,
-        argsLength = Type.flattenTypeLength(args.map(_.tpe)),
+        argsLength = state.flattenTypeLength(args.map(_.tpe)),
         localsLength = localVars.length,
-        returnLength = Type.flattenTypeLength(rtypes),
+        returnLength = state.flattenTypeLength(rtypes),
         AVector.from(instrs)
       )
-    }
-
-    def updateType(typer: Type.NamedType => Type): FuncDef[Ctx] = {
-      val newArgs     = args.map(_.updateType(typer))
-      val newRetTypes = rtypes.map(_.update(typer))
-      this.copy(args = newArgs, rtypes = newRetTypes).atSourceIndex(this.sourceIndex)
     }
   }
 
@@ -904,7 +871,10 @@ object Ast {
   }
   final case class AssignmentSimpleTarget[Ctx <: StatelessContext](ident: Ident)
       extends AssignmentTarget[Ctx] {
-    def _getType(state: Compiler.State[Ctx]): Type = state.getVariable(ident, isWrite = true).tpe
+    def _getType(state: Compiler.State[Ctx]): Type = {
+      val variable = state.getVariable(ident, isWrite = true)
+      state.resolveType(variable.tpe)
+    }
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
   }
   final case class AssignmentArrayElementTarget[Ctx <: StatelessContext](
@@ -964,13 +934,6 @@ object Ast {
 
     def getFieldNames(): AVector[String]          = AVector.from(fields.view.map(_.ident.name))
     def getFieldTypeSignatures(): AVector[String] = AVector.from(fields.view.map(_.tpe.signature))
-
-    def updateType(typer: Type.NamedType => Type): EventDef = {
-      val newFields = fields.map { field =>
-        field.copy(tpe = field.tpe.update(typer))
-      }
-      this.copy(fields = newFields).atSourceIndex(this.sourceIndex)
-    }
   }
 
   final case class EmitEvent[Ctx <: StatefulContext](id: TypeId, args: Seq[Expr[Ctx]])
@@ -1034,9 +997,7 @@ object Ast {
     override def check(state: Compiler.State[Ctx]): Unit = {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
-      positionedError(
-        funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
-      )
+      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
       ()
     }
 
@@ -1063,9 +1024,7 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      positionedError(
-        funcInfo.getReturnType(args.flatMap(_.getType(state)), state.selfContractType)
-      )
+      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
       ()
     }
 
@@ -1191,11 +1150,87 @@ object Ast {
     private val arraySuffix  = "-template-array"
     private val structSuffix = "-template-struct"
 
-    @inline private[ralph] def rename(arg: Argument): Ident = {
-      arg.tpe match {
-        case _: Type.FixedSizeArray => Ident(s"_${arg.ident.name}$arraySuffix")
-        case _: Type.Struct         => Ident(s"_${arg.ident.name}$structSuffix")
-        case _                      => arg.ident
+    @inline private[ralph] def rename(ident: Ident, tpe: Type): Ident = {
+      tpe match {
+        case _: Type.FixedSizeArray => Ident(s"_${ident.name}$arraySuffix")
+        case _: Type.Struct         => Ident(s"_${ident.name}$structSuffix")
+        case _                      => ident
+      }
+    }
+  }
+
+  final case class GlobalState(structs: Seq[Struct]) {
+    private val flattenSizeCache = mutable.Map.empty[Type, Int]
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    private def flattenSize(tpe: Type, accessedTypes: Seq[TypeId]): Int = {
+      tpe match {
+        case Type.NamedType(id) =>
+          if (accessedTypes.contains(id)) {
+            throw Compiler.Error(
+              s"These structs ${quote(accessedTypes.map(_.name))} have circular references",
+              id.sourceIndex
+            )
+          }
+          structs.find(_.id == id) match {
+            case Some(struct) =>
+              struct.fields.map(f => getFlattenSize(f.tpe, accessedTypes :+ id)).sum
+            case None => 1
+          }
+        case Type.FixedSizeArray(baseType, size) =>
+          size * flattenSize(baseType, accessedTypes)
+        case Type.Struct(id) => flattenSize(Type.NamedType(id), accessedTypes)
+        case _               => 1
+      }
+    }
+
+    private def getFlattenSize(tpe: Type, accessedTypes: Seq[TypeId]): Int = {
+      flattenSizeCache.get(tpe) match {
+        case Some(size) => size
+        case None =>
+          val size = flattenSize(tpe, accessedTypes)
+          flattenSizeCache(tpe) = size
+          size
+      }
+    }
+
+    private val typeCache: mutable.Map[Type, Type] = mutable.Map.empty
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    private def _resolveType(tpe: Type): Type = {
+      tpe match {
+        case t: Type.NamedType =>
+          structs.find(_.id == t.id) match {
+            case Some(struct) => struct.tpe
+            case None         => Type.Contract(t.id)
+          }
+        case Type.FixedSizeArray(baseType, size) =>
+          Type.FixedSizeArray(resolveType(baseType), size)
+        case _ => tpe
+      }
+    }
+
+    @inline def resolveType(tpe: Type): Type = {
+      tpe match {
+        case _: Type.NamedType | _: Type.FixedSizeArray =>
+          typeCache.get(tpe) match {
+            case Some(tpe) => tpe
+            case None =>
+              val resolvedType = _resolveType(tpe)
+              typeCache.update(tpe, resolvedType)
+              resolvedType
+          }
+        case _ => tpe
+      }
+    }
+
+    @inline def resolveTypes(types: Seq[Type]): Seq[Type] = types.map(resolveType)
+
+    def flattenTypeLength(types: Seq[Type]): Int = {
+      types.foldLeft(0) { case (acc, tpe) =>
+        tpe match {
+          case _: Type.FixedSizeArray | _: Type.NamedType | _: Type.Struct =>
+            acc + getFlattenSize(tpe, Seq.empty)
+          case _ => acc + 1
+        }
       }
     }
   }
@@ -1208,29 +1243,39 @@ object Ast {
 
     def name: String = ident.name
 
-    def builtInContractFuncs(): Seq[Compiler.ContractFunc[Ctx]]
+    def builtInContractFuncs(globalState: GlobalState): Seq[Compiler.ContractFunc[Ctx]]
 
-    lazy val funcTable: Map[FuncId, Compiler.ContractFunc[Ctx]] = {
-      val builtInFuncs = builtInContractFuncs()
-      var table = Compiler.SimpleFunc
-        .from(funcs)
-        .map(f => f.id -> f)
-        .toMap[FuncId, Compiler.ContractFunc[Ctx]]
-      builtInFuncs.foreach(func => table = table + (FuncId(func.name, isBuiltIn = true) -> func))
-      if (table.size != (funcs.size + builtInFuncs.length)) {
-        val (duplicates, sourceIndex) = UniqueDef.duplicates(funcs)
-        throw Compiler.Error(
-          s"These functions are defined multiple times: $duplicates",
-          sourceIndex
-        )
+    private var functionTable: Option[Map[FuncId, Compiler.ContractFunc[Ctx]]] = None
+
+    def funcTable(globalState: GlobalState): Map[FuncId, Compiler.ContractFunc[Ctx]] = {
+      functionTable match {
+        case Some(funcs) => funcs
+        case None =>
+          val builtInFuncs = builtInContractFuncs(globalState)
+          var table = Compiler.SimpleFunc
+            .from(funcs)
+            .map(f => f.id -> f)
+            .toMap[FuncId, Compiler.ContractFunc[Ctx]]
+          builtInFuncs.foreach(func =>
+            table = table + (FuncId(func.name, isBuiltIn = true) -> func)
+          )
+          if (table.size != (funcs.size + builtInFuncs.length)) {
+            val (duplicates, sourceIndex) = UniqueDef.duplicates(funcs)
+            throw Compiler.Error(
+              s"These functions are defined multiple times: $duplicates",
+              sourceIndex
+            )
+          }
+          functionTable = Some(table)
+          table
       }
-      table
     }
 
     private def addTemplateVars(state: Compiler.State[Ctx]): Unit = {
       val index = templateVars.foldLeft(0) { case (index, templateVar) =>
-        val ident = TemplateVar.rename(templateVar)
-        state.addTemplateVariable(ident, templateVar.tpe, index)
+        val tpe   = state.resolveType(templateVar.tpe)
+        val ident = TemplateVar.rename(templateVar.ident, tpe)
+        state.addTemplateVariable(ident, tpe, index)
       }
       if (index >= Compiler.State.maxVarIndex) {
         throw Compiler.Error(
@@ -1247,7 +1292,7 @@ object Ast {
       fields.foreach(field =>
         state.addFieldVariable(
           field.ident,
-          field.tpe,
+          state.resolveType(field.tpe),
           field.isMutable,
           field.isUnused,
           isGenerated = false
@@ -1270,18 +1315,12 @@ object Ast {
       templateVars: Seq[Argument],
       funcs: Seq[FuncDef[StatelessContext]],
       structs: Seq[Struct]
-  ) extends ContractT[StatelessContext]
-      with Typer {
-    val fields: Seq[Argument]             = Seq.empty
-    val contractTypes: Seq[Type.Contract] = Seq.empty
+  ) extends ContractT[StatelessContext] {
+    val fields: Seq[Argument] = Seq.empty
 
-    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatelessContext]] = Seq.empty
-
-    def updateType(): AssetScript = {
-      val newTemplateVars = templateVars.map(_.updateType(this.getType))
-      val newFuncs        = funcs.map(_.updateType(this.getType))
-      this.copy(templateVars = newTemplateVars, funcs = newFuncs).atSourceIndex(this.sourceIndex)
-    }
+    def builtInContractFuncs(
+        globalState: GlobalState
+    ): Seq[Compiler.ContractFunc[StatelessContext]] = Seq.empty
 
     def genCode(state: Compiler.State[StatelessContext]): StatelessScript = {
       state.setGenCodePhase()
@@ -1301,8 +1340,6 @@ object Ast {
   }
 
   sealed trait ContractWithState extends ContractT[StatefulContext] {
-    type Self <: ContractWithState
-    def updateType(typer: Type.NamedType => Type): Self
     def inheritances: Seq[Inheritance]
 
     def templateVars: Seq[Argument]
@@ -1311,7 +1348,9 @@ object Ast {
     def constantVars: Seq[ConstantVarDef]
     def enums: Seq[EnumDef]
 
-    def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = Seq.empty
+    def builtInContractFuncs(
+        globalState: GlobalState
+    ): Seq[Compiler.ContractFunc[StatefulContext]] = Seq.empty
 
     def eventsInfo(): Seq[Compiler.EventInfo] = {
       UniqueDef.checkDuplicates(events, "events")
@@ -1342,6 +1381,23 @@ object Ast {
     def getTemplateVarsMutability(): AVector[Boolean] =
       AVector.from(templateVars.view.map(_.isMutable))
 
+    def withTemplateVarDefs(globalState: GlobalState): TxScript = {
+      val templateVarDefs = templateVars.foldLeft(Seq.empty[Statement[StatefulContext]]) {
+        case (acc, arg) =>
+          val argType = globalState.resolveType(arg.tpe)
+          argType match {
+            case _: Type.FixedSizeArray | _: Type.Struct =>
+              acc :+ VarDef(
+                Seq(NamedVar(mutable = false, arg.ident)),
+                Variable(TemplateVar.rename(arg.ident, argType))
+              )
+            case _ => acc
+          }
+      }
+      val newFuncs = funcs.map(func => func.copy(bodyOpt = Some(templateVarDefs ++ func.body)))
+      this.copy(funcs = newFuncs)
+    }
+
     @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genCode(state: Compiler.State[StatefulContext]): StatefulScript = {
       state.setGenCodePhase()
@@ -1361,18 +1417,6 @@ object Ast {
       val script = genCode(state)
       StaticAnalysis.checkMethodsStateful(this, script.methods, state)
       script
-    }
-
-    type Self = TxScript
-    def updateType(typer: Type.NamedType => Type): TxScript = {
-      val newTemplateVars = templateVars.map(_.updateType(typer))
-      val templateVarDefs: Seq[Statement[StatefulContext]] = newTemplateVars.collect {
-        case arg @ Argument(ident, tpe, _, _) if !tpe.isPrimitive =>
-          VarDef(Seq(NamedVar(mutable = false, ident)), Variable(TemplateVar.rename(arg)))
-      }
-      val newFuncs =
-        funcs.map(func => func.copy(bodyOpt = Some(templateVarDefs ++ func.body)).updateType(typer))
-      this.copy(templateVars = newTemplateVars, funcs = newFuncs).atSourceIndex(this.sourceIndex)
     }
   }
 
@@ -1402,29 +1446,15 @@ object Ast {
     def getFieldTypes(): AVector[String] = AVector.from(contractFields.view.map(_.tpe.signature))
     def getFieldMutability(): AVector[Boolean] = AVector.from(contractFields.view.map(_.isMutable))
 
-    override def builtInContractFuncs(): Seq[Compiler.ContractFunc[StatefulContext]] = {
+    override def builtInContractFuncs(
+        globalState: GlobalState
+    ): Seq[Compiler.ContractFunc[StatefulContext]] = {
       val stdInterfaceIdOpt = if (hasStdIdField) stdInterfaceId else None
       Seq(
-        BuiltIn.encodeImmFields(stdInterfaceIdOpt, fields),
-        BuiltIn.encodeMutFields(fields),
-        BuiltIn.encodeFields(stdInterfaceIdOpt, fields)
+        BuiltIn.encodeImmFields(stdInterfaceIdOpt, fields, globalState),
+        BuiltIn.encodeMutFields(fields, globalState),
+        BuiltIn.encodeFields(stdInterfaceIdOpt, fields, globalState)
       )
-    }
-
-    type Self = Contract
-    def updateType(typer: Type.NamedType => Type): Contract = {
-      val newTemplateVars = templateVars.map(_.updateType(typer))
-      val newFields       = fields.map(_.updateType(typer))
-      val newFuncs        = funcs.map(_.updateType(typer))
-      val newEvents       = events.map(_.updateType(typer))
-      this
-        .copy(
-          templateVars = newTemplateVars,
-          fields = newFields,
-          funcs = newFuncs,
-          events = newEvents
-        )
-        .atSourceIndex(this.sourceIndex)
     }
 
     private def checkFuncs(): Unit = {
@@ -1479,7 +1509,7 @@ object Ast {
       state.setGenCodePhase()
       val methods = genMethods(state)
       val fieldsLength =
-        Type.flattenTypeLength(fields.map(_.tpe)) + (if (hasStdIdField) 1 else 0)
+        state.flattenTypeLength(fields.map(_.tpe)) + (if (hasStdIdField) 1 else 0)
       StatefulContract(fieldsLength, methods)
     }
 
@@ -1544,71 +1574,14 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       throw Compiler.Error(s"Interface ${quote(ident.name)} should not generate code", sourceIndex)
     }
-
-    type Self = ContractInterface
-    def updateType(typer: Type.NamedType => Type): ContractInterface = {
-      val newFuncs  = funcs.map(_.updateType(typer))
-      val newEvents = events.map(_.updateType(typer))
-      this.copy(funcs = newFuncs, events = newEvents).atSourceIndex(this.sourceIndex)
-    }
-  }
-
-  trait Typer {
-    def contractTypes: Seq[Type.Contract]
-    def structs: Seq[Struct]
-
-    private val flattenSizeCache = mutable.Map.empty[Type, Int]
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    private def flattenSize(tpe: Type, accessedTypes: Seq[Type]): Int = {
-      tpe match {
-        case Type.NamedType(id) =>
-          if (accessedTypes.contains(tpe)) {
-            throw Compiler.Error(
-              s"These structs ${quote(accessedTypes)} have circular references",
-              id.sourceIndex
-            )
-          }
-          structs.find(_.id == id) match {
-            case Some(struct) =>
-              struct.fields.map(f => getFlattenSize(f.tpe, accessedTypes :+ tpe)).sum
-            case None => 1
-          }
-        case Type.FixedSizeArray(baseType, size) =>
-          size * flattenSize(baseType, accessedTypes)
-        case _ => 1
-      }
-    }
-
-    private def getFlattenSize(tpe: Type, accessedTypes: Seq[Type]): Int = {
-      flattenSizeCache.get(tpe) match {
-        case Some(size) => size
-        case None =>
-          val size = flattenSize(tpe, accessedTypes)
-          flattenSizeCache(tpe) = size
-          size
-      }
-    }
-
-    def getType(tpe: Type.NamedType): Type = {
-      contractTypes.find(_.id == tpe.id) match {
-        case Some(contract) => contract
-        case None =>
-          structs.find(_.id == tpe.id) match {
-            case Some(struct) => Type.Struct(struct.id, getFlattenSize(tpe, Seq.empty))
-            case None =>
-              throw Compiler.Error(s"Type ${quote(tpe.id.name)} does not exist", tpe.id.sourceIndex)
-          }
-      }
-    }
   }
 
   final case class MultiContract(
       contracts: Seq[ContractWithState],
       structs: Seq[Struct],
       dependencies: Option[Map[TypeId, Seq[TypeId]]]
-  ) extends Typer
-      with Positioned {
-    val contractTypes: Seq[Type.Contract] = contracts.map(c => Type.Contract(c.ident))
+  ) extends Positioned {
+    lazy val globalState = GlobalState(structs)
 
     lazy val contractsTable = contracts.map { contract =>
       val kind = contract match {
@@ -1619,7 +1592,7 @@ object Ast {
         case txContract: Ast.Contract =>
           Compiler.ContractKind.Contract(txContract.isAbstract)
       }
-      contract.ident -> Compiler.ContractInfo(kind, contract.funcTable)
+      contract.ident -> Compiler.ContractInfo(kind, contract.funcTable(globalState))
     }.toMap
 
     def get(contractIndex: Int): ContractWithState = {
@@ -1650,12 +1623,6 @@ object Ast {
         case Some(contract: Contract) if !contract.isAbstract => true
         case _                                                => false
       }
-    }
-
-    def updateType(): MultiContract = {
-      val newContracts = contracts.map(_.updateType(this.getType))
-      val newStructs   = structs.map(_.updateType(this.getType))
-      this.copy(contracts = newContracts, structs = newStructs)
     }
 
     def getInterface(typeId: TypeId): ContractInterface = {
@@ -1716,7 +1683,7 @@ object Ast {
       val parentsCache = buildDependencies()
       val newContracts: Seq[ContractWithState] = contracts.map {
         case script: TxScript =>
-          script
+          script.withTemplateVarDefs(globalState).atSourceIndex(script.sourceIndex)
         case c: Contract =>
           val (stdIdEnabled, stdId, funcs, events, constantVars, enums) =
             MultiContract.extractDefs(parentsCache, c)

@@ -207,7 +207,7 @@ object Val {
     override def isNumeric: Boolean = false
     override def toString: String   = s"[$baseType;$size]"
   }
-  final case class Struct(name: String, flattenedSize: Int) extends Type {
+  final case class Struct(name: String) extends Type {
     override def id: scala.Byte     = throw new RuntimeException("Struct has no type id")
     override def default: Val       = throw new RuntimeException("Struct has no default value")
     override def isNumeric: Boolean = false

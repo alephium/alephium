@@ -106,8 +106,9 @@ object VariablesRef {
       getIndex: () => Byte,
       increaseIndex: () => Unit
   ): VariablesRef[Ctx] = {
-    val offset = VariablesRef.getOffset(state, getIndex, isTemplate, isLocal, isMutable)
-    val ref: VariablesRef[Ctx] = tpe match {
+    val offset  = VariablesRef.getOffset(state, getIndex, isTemplate, isLocal, isMutable)
+    val varType = state.resolveType(tpe)
+    val ref: VariablesRef[Ctx] = varType match {
       case arrayType: Type.FixedSizeArray =>
         (0 until arrayType.size).foreach { idx =>
           val ident = Ast.Ident(ArrayRef.arrayVarName(baseName, idx))
@@ -132,7 +133,7 @@ object VariablesRef {
           val ident = Ast.Ident(StructRef.structVarName(baseName, field.name))
           state.addVariable(
             ident,
-            field.tpe,
+            state.resolveType(field.tpe),
             isMutable,
             isUnused,
             isLocal,
@@ -146,7 +147,7 @@ object VariablesRef {
         val ident = Ast.Ident(baseName)
         StructRef[Ctx](ident, isLocal, isMutable, isTemplate, offset, ast)
       case _ => // dead branch
-        throw Compiler.Error(s"Expected array or struct type, got $tpe", None)
+        throw Compiler.Error(s"Expected array or struct type, got $varType", None)
     }
     state.addVariablesRef(ref.ident, isMutable, isUnused, isGenerated, ref)
     ref
@@ -168,13 +169,14 @@ final case class StructRef[Ctx <: StatelessContext](
   def tpe: Type.Struct = ast.tpe
 
   def subRef(state: Compiler.State[Ctx], selector: Ast.Ident): VariablesRef[Ctx] = {
-    ast.getField(selector).tpe match {
+    val field = ast.getField(selector)
+    state.resolveType(field.tpe) match {
       case tpe: Type.FixedSizeArray =>
-        val newOffset = offset.add(ast.offsetOf(selector))
+        val newOffset = offset.add(ast.offsetOf(state, selector))
         ArrayRef(selector, tpe, isLocal, isMutable, isTemplate, newOffset)
       case tpe: Type.Struct =>
         val struct    = state.getStruct(tpe.id)
-        val newOffset = offset.add(ast.offsetOf(selector))
+        val newOffset = offset.add(ast.offsetOf(state, selector))
         StructRef(selector, isLocal, isMutable, isTemplate, newOffset, struct)
       case tpe =>
         throw Compiler.Error(s"Expected array or struct type, got $tpe", selector.sourceIndex)
@@ -192,19 +194,19 @@ final case class StructRef[Ctx <: StatelessContext](
       case _: Type.Struct =>
         subRef(state, selector).genStoreCode(state).reverse.flatten
       case _ =>
-        val newOffset = offset.add(ast.offsetOf(selector))
+        val newOffset = offset.add(ast.offsetOf(state, selector))
         state.genStoreCode(newOffset, isLocal)
     }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def genStoreCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-    ast.fields.map(field => genStoreCode(state, field.ident, field.tpe))
+    ast.fields.map(field => genStoreCode(state, field.ident, state.resolveType(field.tpe)))
   }
 
   def genStoreCode(state: Compiler.State[Ctx], selector: Ast.Ident): Seq[Seq[Instr[Ctx]]] = {
     val field = ast.getField(selector)
-    Seq(genStoreCode(state, field.ident, field.tpe))
+    Seq(genStoreCode(state, field.ident, state.resolveType(field.tpe)))
   }
 
   private def genLoadCode(
@@ -218,19 +220,19 @@ final case class StructRef[Ctx <: StatelessContext](
       case _: Type.Struct =>
         subRef(state, selector).genLoadCode(state)
       case _ =>
-        val newOffset = offset.add(ast.offsetOf(selector))
+        val newOffset = offset.add(ast.offsetOf(state, selector))
         state.genLoadCode(this, tpe, newOffset)
     }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def genLoadCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-    ast.fields.flatMap(field => genLoadCode(state, field.ident, field.tpe))
+    ast.fields.flatMap(field => genLoadCode(state, field.ident, state.resolveType(field.tpe)))
   }
 
   def genLoadCode(state: Compiler.State[Ctx], selector: Ast.Ident): Seq[Instr[Ctx]] = {
     val field = ast.getField(selector)
-    genLoadCode(state, field.ident, field.tpe)
+    genLoadCode(state, field.ident, state.resolveType(field.tpe))
   }
 }
 
@@ -251,15 +253,18 @@ final case class ArrayRef[Ctx <: StatelessContext](
   def subRef(state: Compiler.State[Ctx], index: Ast.Expr[Ctx]): VariablesRef[Ctx] = {
     tpe.baseType match {
       case baseType: Type.FixedSizeArray =>
-        val flattenSize = baseType.flattenSize()
+        val flattenSize = state.flattenTypeLength(Seq(baseType))
         val newOffset   = calcOffset(state, index, flattenSize)
         ArrayRef(ident, baseType, isLocal, isMutable, isTemplate, newOffset)
       case tpe: Type.Struct =>
         val struct    = state.getStruct(tpe.id)
-        val newOffset = calcOffset(state, index, tpe.flattenSize)
+        val newOffset = calcOffset(state, index, state.flattenTypeLength(Seq(tpe)))
         StructRef(ident, isLocal, isMutable, isTemplate, newOffset, struct)
       case _ =>
-        throw Compiler.Error(s"Expect multi-dimension array type, have $tpe", index.sourceIndex)
+        throw Compiler.Error(
+          s"Expect array or struct type, have ${tpe.baseType}",
+          index.sourceIndex
+        )
     }
   }
 
@@ -304,7 +309,7 @@ final case class ArrayRef[Ctx <: StatelessContext](
   }
 
   def genLoadCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-    val flattenSize = tpe.flattenSize()
+    val flattenSize = state.flattenTypeLength(Seq(tpe))
     offset match {
       case VariableVarOffset(instrs) =>
         val (ident, codes) = storeArrayIndexVar(state, instrs)
@@ -324,7 +329,7 @@ final case class ArrayRef[Ctx <: StatelessContext](
   }
 
   def genStoreCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-    val flattenSize = tpe.flattenSize()
+    val flattenSize = state.flattenTypeLength(Seq(tpe))
     offset match {
       case VariableVarOffset(instrs) =>
         val (ident, codes) = storeArrayIndexVar(state, instrs)

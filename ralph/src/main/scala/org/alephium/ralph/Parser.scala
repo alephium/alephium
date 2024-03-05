@@ -687,7 +687,6 @@ object StatelessParser extends Parser[StatelessContext] {
     ).map { case (defs0, assetIndex, typeId, templateVars, funcs, endIndex, defs1) =>
       Ast
         .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs, defs0 ++ defs1)
-        .updateType()
         .atSourceIndex(assetIndex.index, endIndex)
     }
 }
@@ -981,7 +980,7 @@ object StatefulParser extends Parser[StatefulContext] {
       .map { case (fromIndex, defs, endIndex) =>
         val contracts = defs.map(_._1)
         val structs   = defs.flatMap(_._2)
-        Ast.MultiContract(contracts, structs, None).updateType().atSourceIndex(fromIndex, endIndex)
+        Ast.MultiContract(contracts, structs, None).atSourceIndex(fromIndex, endIndex)
       }
 
   def state[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] =

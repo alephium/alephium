@@ -29,29 +29,9 @@ sealed trait Type {
     case _: Type.FixedSizeArray | _: Type.Struct | _: Type.NamedType => false
     case _                                                           => true
   }
-
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def update(typer: Type.NamedType => Type): Type = {
-    this match {
-      case t: Type.NamedType => typer(t)
-      case Type.FixedSizeArray(t, size) =>
-        Type.FixedSizeArray(t.update(typer), size)
-      case _ => this
-    }
-  }
 }
 
 object Type {
-  def flattenTypeLength(types: Seq[Type]): Int = {
-    types.foldLeft(0) { case (acc, tpe) =>
-      tpe match {
-        case t: Type.FixedSizeArray => acc + t.flattenSize()
-        case t: Type.Struct         => acc + t.flattenSize
-        case _                      => acc + 1
-      }
-    }
-  }
-
   val primitives: AVector[Type] = AVector[Type](Bool, I256, U256, ByteVec, Address)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -63,7 +43,7 @@ object Type {
       case Val.ByteVec                        => ByteVec
       case Val.Address                        => Address
       case Val.FixedSizeArray(baseType, size) => FixedSizeArray(fromVal(baseType), size)
-      case Val.Struct(name, size)             => Struct(Ast.TypeId(name), size)
+      case Val.Struct(name)                   => Struct(Ast.TypeId(name))
     }
   }
 
@@ -80,24 +60,15 @@ object Type {
       case array: FixedSizeArray => array.elementType
       case tpe                   => tpe
     }
-
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def flattenSize(): Int = baseType match {
-      case baseType: FixedSizeArray =>
-        baseType.flattenSize() * size
-      case baseType: Struct =>
-        baseType.flattenSize * size
-      case _ => size
-    }
   }
 
   final case class NamedType(id: Ast.TypeId) extends Type {
-    def toVal: Val.Type           = ???
-    override def toString: String = id.name
+    def toVal: Val.Type            = ???
+    override def signature: String = id.name
   }
 
-  final case class Struct(id: Ast.TypeId, flattenSize: Int) extends Type {
-    def toVal: Val.Type           = Val.Struct(id.name, flattenSize)
+  final case class Struct(id: Ast.TypeId) extends Type {
+    def toVal: Val.Type           = Val.Struct(id.name)
     override def toString: String = id.name
   }
 

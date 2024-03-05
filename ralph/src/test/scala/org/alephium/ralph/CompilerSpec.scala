@@ -473,10 +473,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |}
          |""".stripMargin
     )
-    failed.init.foreach { code =>
-      testContractError(code, "Type \"Bar\" does not exist")
+    failed.foreach { code =>
+      testContractError(code, "Contract Bar does not exist")
     }
-    testContractError(failed.last, "Contract Bar does not exist")
 
     val barContract =
       s"""
@@ -4577,63 +4576,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     )
   }
 
-  it should "update type" in {
-    val code0 =
-      s"""
-         |struct Balance {
-         |  amount: U256
-         |  address: Address
-         |}
-         |Contract Foo(b0: Balance) {
-         |  event E(b1: Balance)
-         |  pub fn foo(b2: Balance) -> Balance {
-         |    return b2
-         |  }
-         |}
-         |TxScript Main(b0: Balance) {
-         |  foo()
-         |  pub fn foo(b1: Balance) -> Balance {
-         |    return b1
-         |  }
-         |}
-         |Interface I {
-         |  event E(b: Balance)
-         |  pub fn foo(b: Balance) -> Balance
-         |}
-         |""".stripMargin
-
-    val result = Compiler.compileMultiContract(code0).rightValue
-    result.contracts.length is 3
-    result.structs.length is 1
-    val contract     = result.contracts.head
-    val expectedType = Type.Struct(Ast.TypeId("Balance"), 2)
-    contract.fields.head.tpe is expectedType
-    contract.events.head.fields.head.tpe is expectedType
-    contract.funcs.head.args.head.tpe is expectedType
-    contract.funcs.head.rtypes.head is expectedType
-
-    val script = result.contracts(1)
-    script.templateVars.head.tpe is expectedType
-    script.funcs(1).args.head.tpe is expectedType
-    script.funcs(1).rtypes.head is expectedType
-
-    val interface = result.contracts(2)
-    interface.events.head.fields.head.tpe is expectedType
-    interface.funcs.head.args.head.tpe is expectedType
-    interface.funcs.head.rtypes.head is expectedType
-
-    val code1 =
-      s"""
-         |Contract Foo(bar: $$Bar) {
-         |  pub fn foo() -> () {
-         |  }
-         |}
-         |""".stripMargin
-    val error = Compiler.compileContract(code1.replace("$", "")).leftValue
-    error.message is "Type \"Bar\" does not exist"
-    error.position is code1.indexOf("$")
-  }
-
   it should "compile struct failed" in {
     {
       info("Field does not exist in struct")
@@ -4661,7 +4603,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      testContractError(code, "Type \"Foo\" does not exist")
+      testContractError(code, "Contract Foo does not exist")
     }
 
     {
@@ -4732,6 +4674,26 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       Compiler.compileContractFull(code).leftValue.message is
         s"Invalid param types List(Foo, Foo) for Eq"
+    }
+
+    {
+      info("Circular references")
+      val code =
+        s"""
+           |struct Foo {
+           |  bar: Bar
+           |}
+           |struct Bar {
+           |  baz: Baz
+           |}
+           |struct Baz {
+           |  foo: $$Foo$$
+           |}
+           |Contract C(foo: Foo) {
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "These structs \"List(Foo, Bar, Baz)\" have circular references")
     }
   }
 

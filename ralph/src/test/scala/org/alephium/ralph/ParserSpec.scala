@@ -1654,8 +1654,8 @@ class ParserSpec extends AlephiumSpec {
             false,
             true,
             false,
-            Seq(Argument(Ident("foo"), Type.Struct(TypeId("Foo"), 1), false, false)),
-            Seq(Type.Struct(TypeId("Foo"), 1)),
+            Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
+            Seq(Type.NamedType(TypeId("Foo"))),
             Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
           )
         ),
@@ -1755,8 +1755,8 @@ class ParserSpec extends AlephiumSpec {
       val result = parse(code, StatefulParser.multiContract(_)).get.value
       result.contracts.length is 1
       result.contracts.head.fields.map(_.tpe) is Seq(
-        Type.Struct(TypeId("Foo"), 2),
-        Type.Struct(TypeId("Baz"), 7)
+        Type.NamedType(TypeId("Foo")),
+        Type.NamedType(TypeId("Baz"))
       )
       result.structs.length is 2
       result.structs(0) is Ast.Struct(
@@ -1772,11 +1772,11 @@ class ParserSpec extends AlephiumSpec {
           StructField(Ident("id"), Type.ByteVec),
           StructField(
             Ident("account"),
-            Type.Struct(TypeId("Foo"), 2)
+            Type.NamedType(TypeId("Foo"))
           ),
           StructField(
             Ident("accounts"),
-            Type.FixedSizeArray(Type.Struct(TypeId("Foo"), 2), 2)
+            Type.FixedSizeArray(Type.NamedType(TypeId("Foo")), 2)
           )
         )
       )
@@ -1796,27 +1796,5 @@ class ParserSpec extends AlephiumSpec {
       error.message is "These struct fields are defined multiple times: a"
       error.position is code.indexOf("$")
     }
-
-    info("Circular references")
-    val code =
-      s"""
-         |struct Foo {
-         |  bar: Bar
-         |}
-         |struct Bar {
-         |  baz: Baz
-         |}
-         |struct Baz {
-         |  foo: $$Foo
-         |}
-         |Contract Baz(foo: Foo) {
-         |  pub fn f() -> () {}
-         |}
-         |""".stripMargin
-    val error = intercept[Compiler.Error](
-      fastparse.parse(code.replace("$", ""), StatefulParser.multiContract(_))
-    )
-    error.message is "These structs \"List(Foo, Bar, Baz)\" have circular references"
-    error.position is code.indexOf("$")
   }
 }
