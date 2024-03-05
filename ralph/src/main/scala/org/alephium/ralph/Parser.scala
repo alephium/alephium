@@ -285,8 +285,14 @@ abstract class Parser[Ctx <: StatelessContext] {
       val variable: Ast.Expr[Ctx] = Ast.Variable(ident).atSourceIndex(ident.sourceIndex)
       val expr = list.init.foldLeft(variable) { case (acc, e) =>
         e match {
-          case arrayIndex: Ast.Expr[Ctx @unchecked] => Ast.ArrayElement(acc, arrayIndex)
-          case ident: Ast.Ident                     => Ast.StructFieldSelector(acc, ident)
+          case index: Ast.Expr[Ctx @unchecked] =>
+            Ast
+              .ArrayElement(acc, index)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex))
+          case ident: Ast.Ident =>
+            Ast
+              .StructFieldSelector(acc, ident)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex))
         }
       }
       list.last match {
@@ -493,8 +499,12 @@ abstract class Parser[Ctx <: StatelessContext] {
     parseType(Type.NamedType).map { tpe => (ident, tpe) }
   }
 
-  def eventField[Unknown: P]: P[Ast.EventField]   = P(field).map(Ast.EventField.tupled)
-  def structField[Unknown: P]: P[Ast.StructField] = PP(field)(Ast.StructField.tupled)
+  def eventField[Unknown: P]: P[Ast.EventField] = P(field).map(Ast.EventField.tupled)
+  def structField[Unknown: P]: P[Ast.StructField] = PP(
+    Lexer.mut ~ Lexer.ident ~ ":" ~ parseType(Type.NamedType)
+  ) { case (mutable, ident, tpe) =>
+    Ast.StructField(ident, mutable, tpe)
+  }
   def rawStruct[Unknown: P]: P[Ast.Struct] =
     PP(Lexer.token(Keyword.struct) ~/ Lexer.typeId ~ "{" ~ structField.rep ~ "}") {
       case (structIndex, id, fields) =>

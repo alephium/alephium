@@ -1659,7 +1659,7 @@ class ParserSpec extends AlephiumSpec {
             Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
           )
         ),
-        Seq(Struct(TypeId("Foo"), Seq(StructField(Ident("x"), Type.U256))))
+        Seq(Struct(TypeId("Foo"), Seq(StructField(Ident("x"), false, Type.U256))))
       )
   }
 
@@ -1722,14 +1722,14 @@ class ParserSpec extends AlephiumSpec {
         s"""
            |struct Foo {
            |  amount: U256
-           |  address: Address
+           |  mut address: Address
            |}
            |""".stripMargin
       parse(code, StatelessParser.struct(_)).get.value is Ast.Struct(
         TypeId("Foo"),
         List(
-          StructField(Ident("amount"), Type.U256),
-          StructField(Ident("address"), Type.Address)
+          StructField(Ident("amount"), false, Type.U256),
+          StructField(Ident("address"), true, Type.Address)
         )
       )
     }
@@ -1748,7 +1748,7 @@ class ParserSpec extends AlephiumSpec {
            |struct Baz {
            |  id: ByteVec
            |  account: Foo
-           |  accounts: [Foo; 2]
+           |  mut accounts: [Foo; 2]
            |}
            |""".stripMargin
 
@@ -1762,20 +1762,22 @@ class ParserSpec extends AlephiumSpec {
       result.structs(0) is Ast.Struct(
         TypeId("Foo"),
         List(
-          StructField(Ident("amount"), Type.U256),
-          StructField(Ident("address"), Type.Address)
+          StructField(Ident("amount"), false, Type.U256),
+          StructField(Ident("address"), false, Type.Address)
         )
       )
       result.structs(1) is Ast.Struct(
         TypeId("Baz"),
         List(
-          StructField(Ident("id"), Type.ByteVec),
+          StructField(Ident("id"), false, Type.ByteVec),
           StructField(
             Ident("account"),
+            false,
             Type.NamedType(TypeId("Foo"))
           ),
           StructField(
             Ident("accounts"),
+            true,
             Type.FixedSizeArray(Type.NamedType(TypeId("Foo")), 2)
           )
         )

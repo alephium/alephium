@@ -134,7 +134,7 @@ object VariablesRef {
           state.addVariable(
             ident,
             state.resolveType(field.tpe),
-            isMutable,
+            isMutable && field.isMutable,
             isUnused,
             isLocal,
             isGenerated = true,
@@ -173,11 +173,11 @@ final case class StructRef[Ctx <: StatelessContext](
     state.resolveType(field.tpe) match {
       case tpe: Type.FixedSizeArray =>
         val newOffset = offset.add(ast.offsetOf(state, selector))
-        ArrayRef(selector, tpe, isLocal, isMutable, isTemplate, newOffset)
+        ArrayRef(selector, tpe, isLocal, isMutable && field.isMutable, isTemplate, newOffset)
       case tpe: Type.Struct =>
         val struct    = state.getStruct(tpe.id)
         val newOffset = offset.add(ast.offsetOf(state, selector))
-        StructRef(selector, isLocal, isMutable, isTemplate, newOffset, struct)
+        StructRef(selector, isLocal, isMutable && field.isMutable, isTemplate, newOffset, struct)
       case tpe =>
         throw Compiler.Error(s"Expected array or struct type, got $tpe", selector.sourceIndex)
     }

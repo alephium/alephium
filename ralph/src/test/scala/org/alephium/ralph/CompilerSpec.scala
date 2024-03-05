@@ -877,23 +877,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |// assign to immutable array element(contract field)
          |Contract Foo(x: [U256; 2]) {
          |  fn set() -> () {
-         |    $$x[0] = 2$$
+         |    $$x$$[0] = 2
          |    return
          |  }
          |}
          |""".stripMargin ->
-        "Assign to immutable variable: x",
+        "Assign to immutable element in array x",
       s"""
          |// assign to immutable array element(local variable)
          |Contract Foo() {
          |  fn foo() -> () {
          |    let x = [2; 4]
-         |    $$x[0] = 3$$
+         |    $$x$$[0] = 3
          |   return
          |  }
          |}
          |""".stripMargin ->
-        "Assign to immutable variable: x",
+        "Assign to immutable element in array x",
       s"""
          |// out of index
          |Contract Foo() {
@@ -4576,7 +4576,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     )
   }
 
-  it should "compile struct failed" in {
+  it should "compile struct" in {
     {
       info("Field does not exist in struct")
       val code =
@@ -4625,19 +4625,104 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
-      info("Assign to immutable struct")
+      info("Assign to struct with invalid type")
       val code =
         s"""
-           |struct Foo { x: U256 }
+           |struct Foo { mut x: U256 }
            |Contract C() {
            |  pub fn f() -> () {
-           |    let foo = Foo { x: 1 }
-           |    $$foo.x = 0$$
+           |    let mut foo = Foo { x: 1 }
+           |    $$foo = 2$$
            |  }
            |}
            |""".stripMargin
 
-      testContractError(code, "Assign to immutable variable: foo")
+      testContractError(code, "Assign List(U256) to List(Foo)")
+    }
+
+    {
+      info("Assign to struct field")
+      def code(stmt: String) =
+        s"""
+           |struct Foo {
+           |  x: U256
+           |  mut y: U256
+           |}
+           |Contract C() {
+           |  pub fn f() -> () {
+           |    let mut foo = Foo { x: 0, y: 1 }
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(s"$$foo.x$$ = 1"), "Struct field Foo.x is immutable")
+      Compiler.compileContractFull(code("foo.y = 1")).isRight is true
+    }
+
+    {
+      info("Assign to immutable nested struct field")
+      def code(stmt: String, mut: String = "") =
+        s"""
+           |struct Bar { x: U256 }
+           |struct Foo { $mut bar: Bar }
+           |Contract C() {
+           |  pub fn f() -> () {
+           |    let mut foo = Foo { bar: Bar { x: 0 } }
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(s"$$foo.bar$$.x = 1"), "Assign to immutable field in struct foo")
+      testContractError(code(s"$$foo.bar$$ = Bar{x: 1}"), "Struct field Foo.bar is immutable")
+      testContractError(code(s"$$foo$$ = Foo{bar: Bar{x: 1}}"), "Struct field Foo.bar is immutable")
+      testContractError(
+        code(s"$$foo$$ = Foo{bar: Bar{x: 1}}", "mut"),
+        "Struct field Bar.x is immutable"
+      )
+    }
+
+    {
+      info("Assign to struct in array")
+      def code(stmt: String, mut: String = "") =
+        s"""
+           |struct Foo { $mut x: U256 }
+           |Contract C() {
+           |  pub fn f() -> () {
+           |    let mut array = [Foo { x : 1 }; 2]
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code(s"$$array$$ = [Foo { x : 2 }; 2]"), "Struct field Foo.x is immutable")
+      testContractError(code(s"$$array[0]$$ = Foo { x : 2 }"), "Struct field Foo.x is immutable")
+      testContractError(code(s"$$array[0].x$$ = 2"), "Struct field Foo.x is immutable")
+      Compiler.compileContractFull(code("array = [Foo { x : 2 }; 2]", "mut")).isRight is true
+      Compiler.compileContractFull(code("array[0] = Foo { x : 2 }", "mut")).isRight is true
+      Compiler.compileContractFull(code("array[0].x = 2", "mut")).isRight is true
+    }
+
+    {
+      info("Assign to nested array in struct")
+      def code(stmt: String, mut: String = "") =
+        s"""
+           |struct Bar { $mut x: U256 }
+           |struct Foo { mut bars: [Bar; 2] }
+           |Contract C() {
+           |  pub fn f() -> () {
+           |    let mut foo = Foo { bars: [Bar {x: 0}; 2] }
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code(s"$$foo$$ = Foo{bars: [Bar{x: 1}; 2]}"),
+        "Struct field Bar.x is immutable"
+      )
+      testContractError(code(s"$$foo.bars$$ = [Bar{x: 1}; 2]"), "Struct field Bar.x is immutable")
+      testContractError(code(s"$$foo.bars[0].x$$ = 2"), "Struct field Bar.x is immutable")
+      Compiler.compileContractFull(code("foo = Foo{bars: [Bar{x: 1}; 2]}", "mut")).isRight is true
+      Compiler.compileContractFull(code("foo.bars = [Bar{x: 1}; 2]", "mut")).isRight is true
+      Compiler.compileContractFull(code("foo.bars[0].x = 2", "mut")).isRight is true
     }
 
     {
@@ -4703,8 +4788,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  x: U256
-           |  y: ByteVec
+           |  mut x: U256
+           |  mut y: ByteVec
            |}
            |Contract Bar(mut foo: Foo) {
            |  @using(checkExternalCaller = false)
@@ -4729,8 +4814,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  x: U256
-           |  y: ByteVec
+           |  mut x: U256
+           |  mut y: ByteVec
            |}
            |Contract Bar() {
            |  pub fn f0() -> () {
@@ -4760,8 +4845,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  x: U256
-           |  y: ByteVec
+           |  mut x: U256
+           |  mut y: ByteVec
            |}
            |Contract Bar() {
            |  pub fn f() -> () {
@@ -4786,13 +4871,13 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  x: U256
-           |  y: ByteVec
+           |  mut x: U256
+           |  mut y: ByteVec
            |}
            |struct Bar {
            |  a: Bool
-           |  b: [Foo; 2]
-           |  c: Foo
+           |  mut b: [Foo; 2]
+           |  mut c: Foo
            |}
            |Contract Baz(mut bar: Bar) {
            |  @using(checkExternalCaller = false)
@@ -4813,8 +4898,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    bar0.c = Foo { y: #04, x: 4 }
            |    assert!(bar0.c.x == 4 && bar0.c.y == #04, 0)
            |
-           |    bar.a = !bar0.a
-           |    assert!(bar.a != bar0.a, 0)
+           |    assert!(bar.a == bar0.a, 0)
            |    bar.b = bar0.b
            |    bar.c = bar0.c
            |    assert!(bar.b[0].x == 3 && bar.b[0].y == #03, 0)
