@@ -130,7 +130,9 @@ abstract class Parser[Ctx <: StatelessContext] {
       idx
   }
 
-  def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = P("[" ~ expr ~ "]")
+  def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
+    case (from, expr, to) => expr.overwriteSourceIndex(from, to)
+  }
 
   // Optimize chained comparisons
   def expr[Unknown: P]: P[Ast.Expr[Ctx]]    = P(chain(andExpr, Lexer.opOr))
@@ -170,19 +172,19 @@ abstract class Parser[Ctx <: StatelessContext] {
         Ast.UnaryOp.apply[Ctx](op, expr)
     })
   def arrayElementOrStructFieldSelector[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(Index ~~ atom ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0) ~~ Index).map {
-      case (from, expr, list, to) =>
-        val result = list.foldLeft(expr) { case (acc, e) =>
-          e match {
-            case arrayIndex: Ast.Expr[Ctx @unchecked] => Ast.ArrayElement(acc, arrayIndex)
-            case ident: Ast.Ident                     => Ast.StructFieldSelector(acc, ident)
-          }
+    P(atom ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0)).map { case (expr, list) =>
+      list.foldLeft(expr) { case (acc, e) =>
+        e match {
+          case index: Ast.Expr[Ctx @unchecked] =>
+            Ast
+              .ArrayElement(acc, index)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex))
+          case ident: Ast.Ident =>
+            Ast
+              .StructFieldSelector(acc, ident)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex))
         }
-        if (list.nonEmpty) {
-          result.atSourceIndex(from, to)
-        } else {
-          result
-        }
+      }
     }
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
 

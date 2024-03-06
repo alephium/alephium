@@ -864,7 +864,7 @@ object Compiler {
         case tpe =>
           throw Compiler.Error(
             s"Expected array type, got ${if (tpe.length == 1) quote(tpe(0)) else quote(tpe)}",
-            index.sourceIndex
+            array.sourceIndex
           )
       }
     }
