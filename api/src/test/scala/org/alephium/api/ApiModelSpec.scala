@@ -1176,14 +1176,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
     val struct = CompileResult.StructSig(
       "Account",
       AVector("amount", "id"),
-      AVector("U256", "ByteVec")
+      AVector("U256", "ByteVec"),
+      AVector(false, false)
     )
     val structJson =
       s"""
          |{
          |  "name": "Account",
          |  "fieldNames": ["amount", "id"],
-         |  "fieldTypes": ["U256", "ByteVec"]
+         |  "fieldTypes": ["U256", "ByteVec"],
+         |  "isMutable": [false, false]
          |}
          |""".stripMargin
     write(struct).filter(!_.isWhitespace) is structJson.filter(!_.isWhitespace)

@@ -7348,6 +7348,10 @@
                       "fieldTypes": [
                         "U256",
                         "ByteVec"
+                      ],
+                      "isMutable": [
+                        false,
+                        true
                       ]
                     }
                   ]
@@ -12451,7 +12455,8 @@
         "required": [
           "name",
           "fieldNames",
-          "fieldTypes"
+          "fieldTypes",
+          "isMutable"
         ],
         "type": "object",
         "properties": {
@@ -12468,6 +12473,12 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "isMutable": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
             }
           }
         }

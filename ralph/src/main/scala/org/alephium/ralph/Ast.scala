@@ -598,6 +598,7 @@ object Ast {
 
     def getFieldNames(): AVector[String]          = AVector.from(fields.view.map(_.ident.name))
     def getFieldTypeSignatures(): AVector[String] = AVector.from(fields.view.map(_.tpe.signature))
+    def getFieldsMutability(): AVector[Boolean]   = AVector.from(fields.view.map(_.isMutable))
 
     def getField(selector: Ident): StructField = {
       fields

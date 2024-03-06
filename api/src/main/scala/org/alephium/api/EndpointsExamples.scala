@@ -627,7 +627,8 @@ trait EndpointsExamples extends ErrorExamples {
   private val structSig = CompileResult.StructSig(
     name = "Foo",
     fieldNames = AVector("amount", "id"),
-    fieldTypes = AVector("U256", "ByteVec")
+    fieldTypes = AVector("U256", "ByteVec"),
+    isMutable = AVector(false, true)
   )
   implicit val compileScriptResultExamples: List[Example[CompileScriptResult]] =
     simpleExample(compileScriptResult)

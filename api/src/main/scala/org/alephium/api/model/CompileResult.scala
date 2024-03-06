@@ -244,14 +244,16 @@ object CompileResult {
   final case class StructSig(
       name: String,
       fieldNames: AVector[String],
-      fieldTypes: AVector[String]
+      fieldTypes: AVector[String],
+      isMutable: AVector[Boolean]
   )
   object StructSig {
     def from(struct: Ast.Struct): StructSig = {
       StructSig(
         struct.id.name,
         struct.getFieldNames(),
-        struct.getFieldTypeSignatures()
+        struct.getFieldTypeSignatures(),
+        struct.getFieldsMutability()
       )
     }
   }
