@@ -995,14 +995,14 @@ object Ast {
       val ref = getStructRef(state)
       if (!ref.isMutable) {
         throw Compiler.Error(
-          s"Cannot assign to immutable field ${selector.name} in ${getVarType(state)} ${ident.name}",
+          s"Cannot assign to immutable (sub-)field ${selector.name} in ${getVarType(state)} ${ident.name}",
           sourceIndex
         )
       }
       val field = state.getStruct(ref.tpe.id).getField(selector)
       if (!field.isMutable) {
         throw Compiler.Error(
-          s"Cannot assign to immutable field ${field.name} in ${getVarType(state)} ${ident.name}",
+          s"Cannot assign to immutable (sub-)field ${field.name} in ${getVarType(state)} ${ident.name}",
           sourceIndex
         )
       }

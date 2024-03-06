@@ -4655,7 +4655,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      testContractError(code(s"$$foo.x = 1$$"), "Cannot assign to immutable field x in struct foo")
+      testContractError(
+        code(s"$$foo.x = 1$$"),
+        "Cannot assign to immutable (sub-)field x in struct foo"
+      )
       Compiler.compileContractFull(code("foo.y = 1")).isRight is true
     }
 
@@ -4674,11 +4677,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(
         code(s"$$foo.bar.x = 1$$"),
-        "Cannot assign to immutable field x in struct foo"
+        "Cannot assign to immutable (sub-)field x in struct foo"
       )
       testContractError(
         code(s"$$foo.bar = Bar{x: 1}$$"),
-        "Cannot assign to immutable field bar in struct foo"
+        "Cannot assign to immutable (sub-)field bar in struct foo"
       )
       testContractError(
         code(s"$$foo = Foo{bar: Bar{x: 1}}$$"),
@@ -4712,7 +4715,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$foos[0].x = 2$$"),
-        "Cannot assign to immutable field x in array foos"
+        "Cannot assign to immutable (sub-)field x in array foos"
       )
       Compiler.compileContractFull(code("foos = [Foo { x : 2 }; 2]", "mut")).isRight is true
       Compiler.compileContractFull(code("foos[0] = Foo { x : 2 }", "mut")).isRight is true
@@ -4742,7 +4745,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$foo.bars[0].x = 2$$"),
-        "Cannot assign to immutable field x in struct foo"
+        "Cannot assign to immutable (sub-)field x in struct foo"
       )
       Compiler.compileContractFull(code("foo = Foo{bars: [Bar{x: 1}; 2]}", "mut")).isRight is true
       Compiler.compileContractFull(code("foo.bars = [Bar{x: 1}; 2]", "mut")).isRight is true
