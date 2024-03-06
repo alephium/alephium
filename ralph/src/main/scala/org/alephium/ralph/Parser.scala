@@ -87,7 +87,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def approveAssetPerAddress[Unknown: P]: P[Ast.ApproveAsset[Ctx]] =
     PP(expr ~ "->" ~~ Index ~ amountList) { case (address, index, amounts) =>
       if (amounts.isEmpty) {
-        throw CompilerError.`Expected non-empty asset(s) for address`(index)
+        throw CompilerError.`Expected non-empty asset(s) for address`(index, Parser.getFileURI)
       }
       Ast.ApproveAsset(address, amounts)
     }
@@ -121,11 +121,14 @@ abstract class Parser[Ctx <: StatelessContext] {
     }
   }
 
-  def nonNegativeNum[Unknown: P](errorMsg: String): P[Int] = P(Index ~ Lexer.num).map {
-    case (fromIndex, value) =>
+  def nonNegativeNum[Unknown: P](errorMsg: String): P[Int] = P(Index ~ Lexer.num ~~ Index).map {
+    case (fromIndex, value, endIndex) =>
       val idx = value.intValue()
       if (idx < 0) {
-        throw Compiler.Error(s"Invalid $errorMsg: $idx", Some(SourceIndex(fromIndex)))
+        throw Compiler.Error(
+          s"Invalid $errorMsg: $idx",
+          Some(SourceIndex(fromIndex, endIndex - fromIndex, Parser.getFileURI))
+        )
       }
       idx
   }
@@ -205,7 +208,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         val sourceIndex = SourceIndex(ifBranch.sourceIndex, elseBranch.sourceIndex)
         Ast.IfElseExpr(ifBranch +: elseIfBranches, elseBranch).atSourceIndex(sourceIndex)
       case (_, _, index, None) =>
-        throw CompilerError.`Expected else statement`(index)
+        throw CompilerError.`Expected else statement`(index, Parser.getFileURI)
     }
 
   def stringLiteral[Unknown: P]: P[Ast.StringLiteral[Ctx]] =
@@ -218,7 +221,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       if (returnStmts.length > 1) {
         throw Compiler.Error(
           "Consecutive return statements are not allowed",
-          Some(SourceIndex(fromIndex, endIndex - fromIndex))
+          Some(SourceIndex(fromIndex, endIndex - fromIndex, Parser.getFileURI))
         )
       } else {
         returnStmts(0)
@@ -329,7 +332,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         if (modifiers.toSet.size != modifiers.length) {
           throw Compiler.Error(
             s"Duplicated function modifiers: $modifiers",
-            Some(SourceIndex(modifiersStart, modifiersEnd - modifiersStart))
+            Some(SourceIndex(modifiersStart, modifiersEnd - modifiersStart, Parser.getFileURI))
           )
         } else {
           val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
@@ -380,7 +383,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         if (fields.length >= Instr.allLogInstrs.length) {
           throw Compiler.Error(
             "Max 8 fields allowed for contract events",
-            Some(SourceIndex(eventIndex.index, endIndex - eventIndex.index))
+            Some(SourceIndex(eventIndex.index, endIndex - eventIndex.index, Parser.getFileURI))
           )
         }
         if (typeId.name == "Debug") {
@@ -503,6 +506,17 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
 ) extends Ast.Positioned
 
 object Parser {
+
+  private val fileURIMisc = "fileURI"
+
+  def setFileURI(uri: java.net.URI)(implicit ctx: fastparse.P[_]): Unit = {
+    ctx.misc.update(fileURIMisc, uri)
+  }
+
+  def getFileURI(implicit ctx: fastparse.P[_]): Option[java.net.URI] = {
+    ctx.misc.get(fileURIMisc).map(_.asInstanceOf[java.net.URI])
+  }
+
   sealed trait RalphAnnotation[T] {
     def id: String
     def keys: AVector[String]
@@ -723,7 +737,11 @@ object StatefulParser extends Parser[StatefulContext] {
               endIndex
             ) =>
           if (mainStmts.isEmpty) {
-            throw CompilerError.`Expected main statements`(typeId, mainStmtsIndex)
+            throw CompilerError.`Expected main statements`(
+              typeId,
+              mainStmtsIndex,
+              Parser.getFileURI
+            )
           } else {
             val usingAnnotation = Parser.UsingAnnotation.extractFields(
               annotations,
@@ -775,7 +793,7 @@ object StatefulParser extends Parser[StatefulContext] {
           val interfaceNames = implementedInterfaces.map(_.parentId.name).mkString(", ")
           throw Compiler.Error(
             s"Contract only supports implementing single interface: $interfaceNames",
-            Some(SourceIndex(fromIndex, endIndex - fromIndex))
+            Some(SourceIndex(fromIndex, endIndex - fromIndex, Parser.getFileURI))
           )
         }
 

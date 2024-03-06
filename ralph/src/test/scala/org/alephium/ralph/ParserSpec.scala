@@ -1563,4 +1563,42 @@ class ParserSpec extends AlephiumSpec {
     intercept[Compiler.Error](parse(code, StatefulParser.contract(_))).message is
       "Debug is a built-in event name"
   }
+
+  it should "add a fileURI" in {
+    val code: String =
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+
+    def multiContractWithFileURI[Unkonwn: fastparse.P](
+        fileURI: java.net.URI
+    ): fastparse.P[MultiContract] = {
+      Parser.setFileURI(fileURI)
+      StatefulParser.multiContract
+    }
+
+    val fileURI = new java.net.URI("my-file-name")
+    parse(
+      code,
+      multiContractWithFileURI(fileURI)(_)
+    ).get.value.sourceIndex.get.fileURI.get is fileURI
+
+    val codeWithError: String =
+      s"""
+         |Contract Foo() {
+         |  event Debug(x: U256)
+         |  pub fn foo() -> () {
+         |    emit Debug(0)
+         |  }
+         |}
+         |""".stripMargin
+
+    intercept[Compiler.Error](
+      parse(codeWithError, multiContractWithFileURI(fileURI)(_))
+    ).fileURI.get is fileURI
+  }
 }

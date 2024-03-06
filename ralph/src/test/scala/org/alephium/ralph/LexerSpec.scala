@@ -183,7 +183,7 @@ class LexerSpec extends AlephiumSpec {
       Val.Address(address.lockupScript)
     intercept[CompilerError.`Invalid byteVec`](
       fastparse.parse(s"#${address.toBase58}", Lexer.bytes(_))
-    ) is CompilerError.`Invalid byteVec`(address.toBase58, 1)
+    ) is CompilerError.`Invalid byteVec`(address.toBase58, 1, None)
     fastparse.parse(s"#${contract.toBase58}", Lexer.bytes(_)).get.value is
       Val.ByteVec(contract.contractId.bytes)
 
@@ -272,7 +272,7 @@ class LexerSpec extends AlephiumSpec {
     val error =
       intercept[CompilerError.`Invalid number`](fastparse.parse(number, Lexer.integer(_)))
 
-    error is CompilerError.`Invalid number`(number, 0)
+    error is CompilerError.`Invalid number`(number, 0, None)
 
     error
       .format(number) is
@@ -291,7 +291,7 @@ class LexerSpec extends AlephiumSpec {
         fastparse.parse(contractAddress, Lexer.contractAddress(_))
       }
 
-    error is CompilerError.`Invalid address`(contractAddress, 0)
+    error is CompilerError.`Invalid address`(contractAddress, 0, None)
 
     error.format(contractAddress) is
       """-- error (1:1): Type error

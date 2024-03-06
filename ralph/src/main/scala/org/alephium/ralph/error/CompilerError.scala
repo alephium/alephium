@@ -44,6 +44,8 @@ object CompilerError {
 
     def foundLength: Int
 
+    def fileURI: Option[java.net.URI]
+
     /** Implement footer to have this String added to the footer of the formatted error message.
       *
       * [[FastParseError]] uses this to display traced log. Other error messages can use this to
@@ -76,7 +78,8 @@ object CompilerError {
       override val message: String,
       found: String,
       tracedMsg: String,
-      program: String
+      program: String,
+      fileURI: Option[java.net.URI]
   ) extends SyntaxError {
     override def foundLength: Int =
       found.length
@@ -88,23 +91,35 @@ object CompilerError {
       super.toFormatter(program)
   }
 
-  final case class `Expected an I256 value`(position: Int, found: BigInt) extends SyntaxError {
+  final case class `Expected an I256 value`(
+      position: Int,
+      found: BigInt,
+      fileURI: Option[java.net.URI]
+  ) extends SyntaxError {
     override def foundLength: Int =
       found.toString().length
   }
 
-  final case class `Expected an U256 value`(position: Int, found: BigInt) extends SyntaxError {
+  final case class `Expected an U256 value`(
+      position: Int,
+      found: BigInt,
+      fileURI: Option[java.net.URI]
+  ) extends SyntaxError {
     override def foundLength: Int =
       found.toString().length
   }
 
-  final case class `Expected an immutable variable`(position: Int) extends SyntaxError {
+  final case class `Expected an immutable variable`(position: Int, fileURI: Option[java.net.URI])
+      extends SyntaxError {
     override def foundLength: Int =
       3 // "mut".length
   }
 
-  final case class `Expected main statements`(typeId: Ast.TypeId, position: Int)
-      extends SyntaxError {
+  final case class `Expected main statements`(
+      typeId: Ast.TypeId,
+      position: Int,
+      fileURI: Option[java.net.URI]
+  ) extends SyntaxError {
     override def message: String =
       s"""Expected main statements for type `${typeId.name}`"""
 
@@ -112,12 +127,16 @@ object CompilerError {
       1
   }
 
-  final case class `Expected non-empty asset(s) for address`(position: Int) extends SyntaxError {
+  final case class `Expected non-empty asset(s) for address`(
+      position: Int,
+      fileURI: Option[java.net.URI]
+  ) extends SyntaxError {
     override def foundLength: Int =
       1
   }
 
-  final case class `Expected else statement`(position: Int) extends SyntaxError {
+  final case class `Expected else statement`(position: Int, fileURI: Option[java.net.URI])
+      extends SyntaxError {
     override def foundLength: Int =
       1
 
@@ -130,7 +149,8 @@ object CompilerError {
       )
   }
 
-  final case class ExpectedEndOfInput(found: Char, position: Int) extends SyntaxError {
+  final case class ExpectedEndOfInput(found: Char, position: Int, fileURI: Option[java.net.URI])
+      extends SyntaxError {
     override def foundLength: Int =
       1
 
@@ -150,22 +170,29 @@ object CompilerError {
       "Type error"
   }
 
-  final case class `Invalid byteVec`(byteVec: String, position: Int) extends TypeError {
+  final case class `Invalid byteVec`(byteVec: String, position: Int, fileURI: Option[java.net.URI])
+      extends TypeError {
     override def foundLength: Int =
       byteVec.length
   }
 
-  final case class `Invalid number`(number: String, position: Int) extends TypeError {
+  final case class `Invalid number`(number: String, position: Int, fileURI: Option[java.net.URI])
+      extends TypeError {
     override def foundLength: Int =
       number.length
   }
 
-  final case class `Invalid contract address`(address: String, position: Int) extends TypeError {
+  final case class `Invalid contract address`(
+      address: String,
+      position: Int,
+      fileURI: Option[java.net.URI]
+  ) extends TypeError {
     override def foundLength: Int =
       address.length
   }
 
-  final case class `Invalid address`(address: String, position: Int) extends TypeError {
+  final case class `Invalid address`(address: String, position: Int, fileURI: Option[java.net.URI])
+      extends TypeError {
     override def foundLength: Int =
       address.length
   }
@@ -185,6 +212,8 @@ object CompilerError {
       sourceIndex.map(_.index).getOrElse(0)
     override val foundLength: Int =
       sourceIndex.map(_.width).getOrElse(0)
+    override def fileURI: Option[java.net.URI] =
+      sourceIndex.flatMap(_.fileURI)
   }
   object Default {
     // scalastyle:off null

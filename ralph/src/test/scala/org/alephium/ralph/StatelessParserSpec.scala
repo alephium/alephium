@@ -152,7 +152,7 @@ class StatelessParserSpec extends AlephiumSpec {
       )
 
     val indexOfB = program.indexOf("Blah")
-    error is CompilerError.ExpectedEndOfInput('B', indexOfB)
+    error is CompilerError.ExpectedEndOfInput('B', indexOfB, None)
 
     if (!OperatingSystem.isWindows) {
       error.format(program) is
