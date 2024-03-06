@@ -685,7 +685,7 @@ trait EndpointsExamples extends ErrorExamples {
       CompileProjectResult(
         contracts = AVector(compileContractResult),
         scripts = AVector(compileScriptResult),
-        structs = AVector(structSig)
+        structs = Some(AVector(structSig))
       )
     )
 

@@ -11265,8 +11265,7 @@
       "CompileProjectResult": {
         "required": [
           "contracts",
-          "scripts",
-          "structs"
+          "scripts"
         ],
         "type": "object",
         "properties": {

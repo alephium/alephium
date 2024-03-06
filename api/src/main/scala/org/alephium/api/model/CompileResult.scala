@@ -109,10 +109,11 @@ object CompileContractResult {
   }
 }
 
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class CompileProjectResult(
     contracts: AVector[CompileContractResult],
     scripts: AVector[CompileScriptResult],
-    structs: AVector[CompileResult.StructSig]
+    structs: Option[AVector[CompileResult.StructSig]] = None
 )
 
 object CompileProjectResult {
@@ -126,7 +127,7 @@ object CompileProjectResult {
     CompileProjectResult(
       compiledContracts,
       compiledScripts,
-      structs.map(CompileResult.StructSig.from)
+      Option.when(structs.nonEmpty)(structs.map(CompileResult.StructSig.from))
     )
   }
 

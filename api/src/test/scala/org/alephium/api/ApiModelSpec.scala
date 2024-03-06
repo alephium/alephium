@@ -1190,7 +1190,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |""".stripMargin
     write(struct).filter(!_.isWhitespace) is structJson.filter(!_.isWhitespace)
 
-    val result2 = CompileProjectResult(AVector(result0), AVector(result1), AVector(struct))
+    val result2 = CompileProjectResult(AVector(result0), AVector(result1), Some(AVector(struct)))
     val jsonRaw2 =
       s"""
          |{
@@ -1200,6 +1200,16 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |}
          |""".stripMargin
     write(result2).filter(!_.isWhitespace) is jsonRaw2.filter(!_.isWhitespace)
+
+    val result3 = CompileProjectResult(AVector(result0), AVector(result1), None)
+    val jsonRaw3 =
+      s"""
+         |{
+         |  "contracts": [$jsonRaw0],
+         |  "scripts": [$jsonRaw1]
+         |}
+         |""".stripMargin
+    write(result3).filter(!_.isWhitespace) is jsonRaw3.filter(!_.isWhitespace)
   }
 
   behavior of "TimeInterval"
