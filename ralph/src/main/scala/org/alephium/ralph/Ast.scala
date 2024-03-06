@@ -589,7 +589,9 @@ object Ast {
     def name: String      = ident.name
     def signature: String = s"${ident.name}:${tpe.signature}"
   }
-  final case class Struct(id: TypeId, fields: Seq[StructField]) extends UniqueDef {
+
+  sealed trait Entity
+  final case class Struct(id: TypeId, fields: Seq[StructField]) extends UniqueDef with Entity {
     lazy val tpe: Type.Struct = Type.Struct(id)
 
     def name: String = id.name
@@ -1333,7 +1335,7 @@ object Ast {
     }
   }
 
-  sealed trait ContractT[Ctx <: StatelessContext] extends UniqueDef {
+  sealed trait ContractT[Ctx <: StatelessContext] extends UniqueDef with Entity {
     def ident: TypeId
     def templateVars: Seq[Argument]
     def fields: Seq[Argument]

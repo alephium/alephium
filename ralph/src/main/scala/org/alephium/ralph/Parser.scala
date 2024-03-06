@@ -978,20 +978,18 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   def interface[Unknown: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
 
-  def contractWithState[Unknown: P]: P[Ast.ContractWithState] = P(
-    rawTxScript | rawContract | rawInterface
+  private def entities[Unknown: P]: P[Ast.Entity] = P(
+    rawTxScript | rawContract | rawInterface | rawStruct
   )
-  def contractWithStateOrStruct[Unknown: P]: P[(Ast.ContractWithState, Seq[Ast.Struct])] = P(
-    rawStruct.rep ~ contractWithState ~ rawStruct.rep
-  ).map { case (defs0, contract, defs1) =>
-    (contract, defs0 ++ defs1)
-  }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def multiContract[Unknown: P]: P[Ast.MultiContract] =
-    P(Start ~~ Index ~ contractWithStateOrStruct.rep(1) ~~ Index ~ End)
+    P(Start ~~ Index ~ entities.rep(1) ~~ Index ~ End)
       .map { case (fromIndex, defs, endIndex) =>
-        val contracts = defs.map(_._1)
-        val structs   = defs.flatMap(_._2)
+        val contracts = defs
+          .filter(_.isInstanceOf[Ast.ContractWithState])
+          .asInstanceOf[Seq[Ast.ContractWithState]]
+        val structs = defs.filter(_.isInstanceOf[Ast.Struct]).asInstanceOf[Seq[Ast.Struct]]
         Ast.MultiContract(contracts, structs, None).atSourceIndex(fromIndex, endIndex)
       }
 
