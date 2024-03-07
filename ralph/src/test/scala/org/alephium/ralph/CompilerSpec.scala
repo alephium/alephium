@@ -4894,6 +4894,107 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Load mutable and immutable struct fields correctly")
+      val code =
+        s"""
+           |struct TokenBalance {
+           |  tokenId: ByteVec
+           |  mut amount: U256
+           |}
+           |struct Balances {
+           |  mut totalAmount: U256
+           |  mut tokens: [TokenBalance; 2]
+           |}
+           |Contract UserAccount(
+           |  @unused id: ByteVec,
+           |  @unused mut age: U256,
+           |  @unused mut balances: Balances,
+           |  @unused name: ByteVec
+           |) {
+           |  pub fn getId() -> ByteVec {
+           |    return id
+           |  }
+           |  pub fn getAge() -> U256 {
+           |    return age
+           |  }
+           |  pub fn getBalances() -> Balances {
+           |    return balances
+           |  }
+           |  pub fn getName() -> ByteVec {
+           |    return name
+           |  }
+           |}
+           |""".stripMargin
+
+      val immFields = AVector[Val](
+        Val.ByteVec(Hex.unsafe("01")), // id
+        Val.ByteVec(Hex.unsafe("02")), // tokenId0
+        Val.ByteVec(Hex.unsafe("03")), // tokenId1
+        Val.ByteVec(Hex.unsafe("04"))  // name
+      )
+      val mutFields = AVector[Val](
+        Val.U256(10), // age
+        Val.U256(20), // totalAmount
+        Val.U256(30), // amount0
+        Val.U256(40)  // amount1
+      )
+      test(code, AVector.empty, AVector(immFields(0)), immFields, mutFields, methodIndex = 0)
+      test(code, AVector.empty, AVector(mutFields(0)), immFields, mutFields, methodIndex = 1)
+      test(
+        code,
+        AVector.empty,
+        AVector(
+          mutFields(1),
+          immFields(1),
+          mutFields(2),
+          immFields(2),
+          mutFields(3)
+        ),
+        immFields,
+        mutFields,
+        methodIndex = 2
+      )
+      test(code, AVector.empty, AVector(immFields(3)), immFields, mutFields, methodIndex = 3)
+    }
+
+    {
+      info("Read/write local and field struct vars")
+      val code =
+        s"""
+           |struct Foo {
+           |  a: U256
+           |  mut b: U256
+           |}
+           |Contract Baz(mut foos0: [Foo; 2], mut foos1: [Foo; 2]) {
+           |  pub fn f0() -> () {
+           |    let mut local = [Foo{a: 0, b: 1}; 2]
+           |    for (let mut i = 0; i < 2; i = i + 1) {
+           |      foos0[i].b = 1
+           |      foos1[i].b = 1
+           |    }
+           |
+           |    for (let mut j = 0; j < 2; j = j + 1) {
+           |      assert!(local[j].a == 0, 0)
+           |      assert!(local[j].b == 1, 0)
+           |      assert!(foos0[j].a == 0, 0)
+           |      assert!(foos0[j].b == 1, 0)
+           |      assert!(foos1[j].a == 0, 0)
+           |      assert!(foos1[j].b == 1, 0)
+           |    }
+           |
+           |    local[0].b = 2
+           |    local[1].b = 3
+           |    assert!(local[1].b == 3 && local[0].b == 2, 0)
+           |  }
+           |}
+           |""".stripMargin
+
+      val immFields: AVector[Val] = AVector.fill(4)(Val.U256(0))
+      val mutFields: AVector[Val] = AVector.fill(4)(Val.U256(0))
+      test(code, immFields = immFields, mutFields = mutFields)
+    }
+
+    {
       info("Nested struct")
       val code =
         s"""
@@ -4947,6 +5048,16 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    assert!(bar.b[1].x == 6 && bar.b[1].y == #06, 0)
            |    assert!(bar.b[0].x == 6 && bar.b[0].y == #06, 0)
            |    assert!(bar.c.x == 7 && bar.c.y == #07, 0)
+           |
+           |    f2(0, Foo { x: 8, y: #08 })
+           |    assert!(bar.b[0].x == 8 && bar.b[0].y == #08, 0)
+           |    f2(1, Foo { x: 9, y: #09 })
+           |    assert!(bar.b[1].x == 9 && bar.b[1].y == #09, 0)
+           |
+           |    bar.b[0].x = 10
+           |    bar.b[1].y = #10
+           |    assert!(bar.b[0].x == 10 && bar.b[0].y == #08, 0)
+           |    assert!(bar.b[1].x == 9 && bar.b[1].y == #10, 0)
            |  }
            |
            |  fn f1() -> Bar {
@@ -4956,13 +5067,17 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |      c: Foo { x: 2, y: #02 }
            |    }
            |  }
+           |
+           |  fn f2(i: U256, foo: Foo) -> () {
+           |    bar.b[i] = foo
+           |  }
            |}
            |""".stripMargin
 
       test(
         code,
+        immFields = AVector(Val.False),
         mutFields = AVector(
-          Val.False,
           Val.U256(0),
           Val.ByteVec(Hex.unsafe("00")),
           Val.U256(0),

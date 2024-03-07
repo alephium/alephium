@@ -611,7 +611,23 @@ object Ast {
         )
     }
 
-    def offsetOf[Ctx <: StatelessContext](state: Compiler.State[Ctx], selector: Ident): Int = {
+    def calcFieldOffset[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        selector: Ast.Ident,
+        isMutable: Boolean
+    ): (Int, Int) = {
+      val result = fields.slice(0, fields.indexWhere(_.ident == selector)).flatMap { field =>
+        val isFieldMutable = isMutable && field.isMutable
+        state.flattenTypeMutability(field.tpe, isFieldMutable)
+      }
+      val mutFieldSize = result.count(identity)
+      (result.length - mutFieldSize, mutFieldSize)
+    }
+
+    def calcLocalOffset[Ctx <: StatelessContext](
+        state: Compiler.State[Ctx],
+        selector: Ast.Ident
+    ): Int = {
       val types = fields.slice(0, fields.indexWhere(_.ident == selector)).map(_.tpe)
       state.flattenTypeLength(types)
     }
@@ -1373,12 +1389,12 @@ object Ast {
     }
 
     private def addTemplateVars(state: Compiler.State[Ctx]): Unit = {
-      val index = templateVars.foldLeft(0) { case (index, templateVar) =>
+      templateVars.foreach { templateVar =>
         val tpe   = state.resolveType(templateVar.tpe)
         val ident = TemplateVar.rename(templateVar.ident, tpe)
-        state.addTemplateVariable(ident, tpe, index)
+        state.addTemplateVariable(ident, tpe)
       }
-      if (index >= Compiler.State.maxVarIndex) {
+      if (state.templateVarIndex >= Compiler.State.maxVarIndex) {
         throw Compiler.Error(
           s"Number of template variables more than ${Compiler.State.maxVarIndex}",
           ident.sourceIndex

@@ -545,17 +545,27 @@ object Compiler {
             isLocal = true,
             isGenerated = true,
             isTemplate = false,
-            VarInfo.Local,
-            () => currentScopeState.varIndex.toByte,
-            () => currentScopeState.varIndex += 1
+            VarInfo.Local
           )
           val codes = expr.genCode(this) ++ ref.genStoreCode(this).reverse.flatten
           (ref, codes)
       }
     }
 
-    def getArrayIndexVar(): Ast.Ident = {
-      getArrayIndexVar(
+    def getLocalArrayVarIndex(): Ast.Ident = {
+      getLocalArrayVarIndex(
+        addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
+      )
+    }
+
+    def getImmFieldArrayVarIndex(): Ast.Ident = {
+      getImmFieldArrayVarIndex(
+        addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
+      )
+    }
+
+    def getMutFieldArrayVarIndex(): Ast.Ident = {
+      getImmFieldArrayVarIndex(
         addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
       )
     }
@@ -588,33 +598,17 @@ object Compiler {
       s"${scopedNamePrefix(scopeId)}$name"
     }
 
-    def addTemplateVariable(ident: Ast.Ident, tpe: Type, index: Int): Int = {
-      val sname        = checkNewVariable(ident)
-      var currentIndex = index
-      tpe match {
-        case _: Type.FixedSizeArray | _: Type.Struct =>
-          VariablesRef.init(
-            this,
-            tpe,
-            ident.name,
-            isMutable = false,
-            isUnused = false,
-            isLocal = false,
-            isGenerated = false,
-            isTemplate = true,
-            (tpe, _, _, index, isGenerated) => VarInfo.Template(tpe, index.toInt, isGenerated),
-            () => currentIndex.toByte,
-            () => currentIndex += 1
-          )
-          currentIndex
-        case c: Type.Contract =>
-          val varType = Type.Contract(c.id)
-          varTable(sname) = VarInfo.Template(varType, index, isGenerated = false)
-          currentIndex + 1
-        case _ =>
-          varTable(sname) = VarInfo.Template(tpe, index, isGenerated = false)
-          currentIndex + 1
-      }
+    def addTemplateVariable(ident: Ast.Ident, tpe: Type): Unit = {
+      addVariable(
+        ident,
+        tpe,
+        isMutable = false,
+        isUnused = false,
+        isLocal = false,
+        isGenerated = false,
+        isTemplate = true,
+        (tpe, _, _, index, isGenerated) => VarInfo.Template(tpe, index.toInt, isGenerated)
+      )
     }
     def addFieldVariable(
         ident: Ast.Ident,
@@ -631,9 +625,7 @@ object Compiler {
         isLocal = false,
         isGenerated,
         isTemplate = false,
-        VarInfo.Field,
-        () => if (isMutable) this.mutFieldsIndex.toByte else this.immFieldsIndex.toByte,
-        () => if (isMutable) this.mutFieldsIndex += 1 else this.immFieldsIndex += 1
+        VarInfo.Field
       )
     }
     def addLocalVariable(
@@ -651,9 +643,7 @@ object Compiler {
         isLocal = true,
         isGenerated,
         isTemplate = false,
-        VarInfo.Local,
-        () => currentScopeState.varIndex.toByte,
-        () => currentScopeState.varIndex += 1
+        VarInfo.Local
       )
     }
     // scalastyle:off parameter.number
@@ -666,9 +656,7 @@ object Compiler {
         isLocal: Boolean,
         isGenerated: Boolean,
         isTemplate: Boolean,
-        varInfoBuilder: Compiler.VarInfoBuilder,
-        getIndex: () => Byte,
-        increaseIndex: () => Unit
+        varInfoBuilder: Compiler.VarInfoBuilder
     ): Unit = {
       val sname = checkNewVariable(ident)
       tpe match {
@@ -684,9 +672,7 @@ object Compiler {
             isLocal,
             isGenerated,
             isTemplate,
-            varInfoBuilder,
-            getIndex,
-            increaseIndex
+            varInfoBuilder
           )
           ()
         case c: Type.Contract =>
@@ -694,21 +680,19 @@ object Compiler {
             Type.Contract(c.id),
             isMutable,
             isUnused,
-            getIndex(),
+            getAndUpdateVarIndex(isTemplate, isLocal, isMutable).toByte,
             isGenerated
           )
           trackGenCodePhaseNewVars(sname)
-          increaseIndex()
         case _ =>
           varTable(sname) = varInfoBuilder(
             tpe,
             isMutable,
             isUnused,
-            getIndex(),
+            getAndUpdateVarIndex(isTemplate, isLocal, isMutable).toByte,
             isGenerated
           )
           trackGenCodePhaseNewVars(sname)
-          increaseIndex()
       }
     }
     // scalastyle:on parameter.number
@@ -880,7 +864,14 @@ object Compiler {
 
     def genLoadCode(ident: Ast.Ident): Seq[Instr[Ctx]]
 
-    def genLoadCode(ref: VariablesRef[Ctx], tpe: Type, offset: VarOffset[Ctx]): Seq[Instr[Ctx]]
+    def genLoadCode(
+        ident: Ast.Ident,
+        isTemplate: Boolean,
+        isLocal: Boolean,
+        isMutable: Boolean,
+        tpe: Type,
+        offset: VarOffset[Ctx]
+    ): Seq[Instr[Ctx]]
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def genLoadTemplateRef(ident: Ast.Ident, tpe: Type, offset: VarOffset[Ctx]): Seq[Instr[Ctx]] = {
@@ -896,6 +887,25 @@ object Compiler {
     @inline def resolveType(tpe: Type): Type = globalState.resolveType(tpe)
     @inline def resolveTypes(types: Seq[Type]): Seq[Type] = globalState.resolveTypes(types)
     @inline def flattenTypeLength(types: Seq[Type]): Int  = globalState.flattenTypeLength(types)
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def flattenTypeMutability(tpe: Type, isMutable: Boolean): Seq[Boolean] = {
+      val resolvedType = resolveType(tpe)
+      if (isMutable) {
+        resolvedType match {
+          case Type.FixedSizeArray(baseType, size) =>
+            val array = flattenTypeMutability(baseType, isMutable)
+            Seq.fill(size)(array).flatten
+          case Type.Struct(id) =>
+            getStruct(id).fields.flatMap(field =>
+              flattenTypeMutability(resolveType(field.tpe), field.isMutable && isMutable)
+            )
+          case _ => Seq(isMutable)
+        }
+      } else {
+        Seq.fill(flattenTypeLength(Seq(resolvedType)))(false)
+      }
+    }
 
     def getFunc(call: Ast.FuncId): FuncInfo[Ctx] = {
       if (call.isBuiltIn) {
@@ -1030,14 +1040,17 @@ object Compiler {
     }
 
     def genLoadCode(
-        ref: VariablesRef[StatelessContext],
+        ident: Ast.Ident,
+        isTemplate: Boolean,
+        isLocal: Boolean,
+        isMutable: Boolean,
         tpe: Type,
         offset: VarOffset[StatelessContext]
     ): Seq[Instr[StatelessContext]] = {
-      if (ref.isTemplate) {
-        genLoadTemplateRef(ref.ident, tpe, offset)
+      if (isTemplate) {
+        genLoadTemplateRef(ident, tpe, offset)
       } else {
-        genVarIndexCode(offset, ref.isLocal, LoadLocal.apply, LoadLocalByIndex)
+        genVarIndexCode(offset, isLocal, LoadLocal.apply, LoadLocalByIndex)
       }
     }
 
@@ -1112,20 +1125,23 @@ object Compiler {
     }
 
     def genLoadCode(
-        ref: VariablesRef[StatefulContext],
+        ident: Ast.Ident,
+        isTemplate: Boolean,
+        isLocal: Boolean,
+        isMutable: Boolean,
         tpe: Type,
         offset: VarOffset[StatefulContext]
     ): Seq[Instr[StatefulContext]] = {
-      if (ref.isTemplate) {
-        genLoadTemplateRef(ref.ident, tpe, offset)
+      if (isTemplate) {
+        genLoadTemplateRef(ident, tpe, offset)
       } else {
         genVarIndexCode(
           offset,
-          ref.isLocal,
+          isLocal,
           LoadLocal.apply,
-          if (ref.isMutable) LoadMutField.apply else LoadImmField.apply,
+          if (isMutable) LoadMutField.apply else LoadImmField.apply,
           LoadLocalByIndex,
-          if (ref.isMutable) LoadMutFieldByIndex else LoadImmFieldByIndex
+          if (isMutable) LoadMutFieldByIndex else LoadImmFieldByIndex
         )
       }
     }
