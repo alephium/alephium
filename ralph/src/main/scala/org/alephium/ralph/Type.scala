@@ -60,6 +60,8 @@ object Type {
       case array: FixedSizeArray => array.elementType
       case tpe                   => tpe
     }
+
+    override def signature: String = s"[${baseType.signature};$size]"
   }
 
   final case class NamedType(id: Ast.TypeId) extends Type {

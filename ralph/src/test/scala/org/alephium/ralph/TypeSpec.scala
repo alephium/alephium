@@ -54,6 +54,15 @@ class TypeSpec extends AlephiumSpec {
       AVector(false, false, false, false, false)
     scriptAst.events.map(_.signature) is Seq.empty
   }
+
+  it should "get the signature of array type" in {
+    Type.FixedSizeArray(Type.U256, 2).signature is "[U256;2]"
+    Type.FixedSizeArray(Type.NamedType(Ast.TypeId("Foo")), 2).signature is "[Foo;2]"
+    Type.FixedSizeArray(Type.FixedSizeArray(Type.U256, 3), 2).signature is "[[U256;3];2]"
+    Type
+      .FixedSizeArray(Type.FixedSizeArray(Type.NamedType(Ast.TypeId("Foo")), 3), 2)
+      .signature is "[[Foo;3];2]"
+  }
 }
 
 trait TypeSignatureFixture extends AlephiumFixture {
