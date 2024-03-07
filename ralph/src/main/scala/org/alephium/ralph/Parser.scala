@@ -34,7 +34,10 @@ import org.alephium.util.AVector
   )
 )
 abstract class Parser[Ctx <: StatelessContext] {
+  private val Lexer                        = new SourceFileLexer()(fileURI)
   implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] => Lexer.emptyChars(ctx) }
+
+  implicit def fileURI: Option[java.net.URI]
 
   /*
    * PP: Positioned Parser
@@ -87,7 +90,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def approveAssetPerAddress[Unknown: P]: P[Ast.ApproveAsset[Ctx]] =
     PP(expr ~ "->" ~~ Index ~ amountList) { case (address, index, amounts) =>
       if (amounts.isEmpty) {
-        throw CompilerError.`Expected non-empty asset(s) for address`(index, Parser.getFileURI)
+        throw CompilerError.`Expected non-empty asset(s) for address`(index, fileURI)
       }
       Ast.ApproveAsset(address, amounts)
     }
@@ -127,7 +130,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       if (idx < 0) {
         throw Compiler.Error(
           s"Invalid $errorMsg: $idx",
-          Some(SourceIndex(fromIndex, endIndex - fromIndex, Parser.getFileURI))
+          Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
         )
       }
       idx
@@ -208,7 +211,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         val sourceIndex = SourceIndex(ifBranch.sourceIndex, elseBranch.sourceIndex)
         Ast.IfElseExpr(ifBranch +: elseIfBranches, elseBranch).atSourceIndex(sourceIndex)
       case (_, _, index, None) =>
-        throw CompilerError.`Expected else statement`(index, Parser.getFileURI)
+        throw CompilerError.`Expected else statement`(index, fileURI)
     }
 
   def stringLiteral[Unknown: P]: P[Ast.StringLiteral[Ctx]] =
@@ -221,7 +224,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       if (returnStmts.length > 1) {
         throw Compiler.Error(
           "Consecutive return statements are not allowed",
-          Some(SourceIndex(fromIndex, endIndex - fromIndex, Parser.getFileURI))
+          Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
         )
       } else {
         returnStmts(0)
@@ -332,7 +335,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         if (modifiers.toSet.size != modifiers.length) {
           throw Compiler.Error(
             s"Duplicated function modifiers: $modifiers",
-            Some(SourceIndex(modifiersStart, modifiersEnd - modifiersStart, Parser.getFileURI))
+            Some(SourceIndex(modifiersStart, modifiersEnd - modifiersStart, fileURI))
           )
         } else {
           val isPublic = modifiers.contains(Lexer.FuncModifier.Pub)
@@ -383,7 +386,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         if (fields.length >= Instr.allLogInstrs.length) {
           throw Compiler.Error(
             "Max 8 fields allowed for contract events",
-            Some(SourceIndex(eventIndex.index, endIndex - eventIndex.index, Parser.getFileURI))
+            Some(SourceIndex(eventIndex.index, endIndex - eventIndex.index, fileURI))
           )
         }
         if (typeId.name == "Debug") {
@@ -506,16 +509,6 @@ final case class FuncDefTmp[Ctx <: StatelessContext](
 ) extends Ast.Positioned
 
 object Parser {
-
-  private val fileURIMisc = "fileURI"
-
-  def setFileURI(uri: java.net.URI)(implicit ctx: fastparse.P[_]): Unit = {
-    ctx.misc.update(fileURIMisc, uri)
-  }
-
-  def getFileURI(implicit ctx: fastparse.P[_]): Option[java.net.URI] = {
-    ctx.misc.get(fileURIMisc).map(_.asInstanceOf[java.net.URI])
-  }
 
   sealed trait RalphAnnotation[T] {
     def id: String
@@ -640,6 +633,7 @@ object Parser {
   }
 }
 
+object StatelessParser extends SourceFileStatelessParser()(None)
 @SuppressWarnings(
   Array(
     "org.wartremover.warts.JavaSerializable",
@@ -647,7 +641,9 @@ object Parser {
     "org.wartremover.warts.Serializable"
   )
 )
-object StatelessParser extends Parser[StatelessContext] {
+class SourceFileStatelessParser(implicit val fileURI: Option[java.net.URI])
+    extends Parser[StatelessContext] {
+  private val Lexer = new SourceFileLexer()(fileURI)
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
       const | stringLiteral | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr
@@ -667,6 +663,7 @@ object StatelessParser extends Parser[StatelessContext] {
     }
 }
 
+object StatefulParser extends SourceFileStatefulParser()(None)
 @SuppressWarnings(
   Array(
     "org.wartremover.warts.JavaSerializable",
@@ -674,7 +671,9 @@ object StatelessParser extends Parser[StatelessContext] {
     "org.wartremover.warts.Serializable"
   )
 )
-object StatefulParser extends Parser[StatefulContext] {
+class SourceFileStatefulParser(implicit val fileURI: Option[java.net.URI])
+    extends Parser[StatefulContext] {
+  private val Lexer = new SourceFileLexer()(fileURI)
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
       const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
@@ -740,7 +739,7 @@ object StatefulParser extends Parser[StatefulContext] {
             throw CompilerError.`Expected main statements`(
               typeId,
               mainStmtsIndex,
-              Parser.getFileURI
+              fileURI
             )
           } else {
             val usingAnnotation = Parser.UsingAnnotation.extractFields(
@@ -793,7 +792,7 @@ object StatefulParser extends Parser[StatefulContext] {
           val interfaceNames = implementedInterfaces.map(_.parentId.name).mkString(", ")
           throw Compiler.Error(
             s"Contract only supports implementing single interface: $interfaceNames",
-            Some(SourceIndex(fromIndex, endIndex - fromIndex, Parser.getFileURI))
+            Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
           )
         }
 

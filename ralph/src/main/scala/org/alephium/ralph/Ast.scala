@@ -39,9 +39,11 @@ object Ast {
   trait Positioned {
     var sourceIndex: Option[SourceIndex] = None
 
-    def atSourceIndex(fromIndex: Int, endIndex: Int)(implicit ctx: fastparse.P[_]): this.type = {
+    def atSourceIndex(fromIndex: Int, endIndex: Int)(implicit
+        fileURI: Option[java.net.URI]
+    ): this.type = {
       require(this.sourceIndex.isEmpty)
-      this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, Parser.getFileURI))
+      this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
       this
     }
     def atSourceIndex(sourceIndex: Option[SourceIndex]): this.type = {

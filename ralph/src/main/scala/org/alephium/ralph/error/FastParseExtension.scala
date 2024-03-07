@@ -18,19 +18,17 @@ package org.alephium.ralph.error
 
 import fastparse.{P, Pass}
 
-import org.alephium.ralph.Parser
-
 object FastParseExtension {
 
   /** Throws [[CompilerError.ExpectedEndOfInput]] if the last character is not the end-of-input.
     *
     * FastParse's default equivalent is `fastparse.End`.
     */
-  def endOfInput(implicit ctx: P[_]): P[Unit] = {
+  def endOfInput(implicit ctx: P[_], fileURI: Option[java.net.URI]): P[Unit] = {
     val index = ctx.index
     if (ctx.input.isReachable(index)) {
       val character = ctx.input.slice(index, index + 1).head
-      throw CompilerError.ExpectedEndOfInput(character, index, Parser.getFileURI)
+      throw CompilerError.ExpectedEndOfInput(character, index, fileURI)
     } else {
       Pass(())
     }

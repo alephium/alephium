@@ -1574,17 +1574,13 @@ class ParserSpec extends AlephiumSpec {
          |}
          |""".stripMargin
 
-    def multiContractWithFileURI[Unkonwn: fastparse.P](
-        fileURI: java.net.URI
-    ): fastparse.P[MultiContract] = {
-      Parser.setFileURI(fileURI)
-      StatefulParser.multiContract
-    }
-
     val fileURI = new java.net.URI("my-file-name")
+
+    val parser = new SourceFileStatefulParser()(Some(fileURI))
+
     parse(
       code,
-      multiContractWithFileURI(fileURI)(_)
+      parser.multiContract(_)
     ).get.value.sourceIndex.get.fileURI.get is fileURI
 
     val codeWithError: String =
@@ -1598,7 +1594,7 @@ class ParserSpec extends AlephiumSpec {
          |""".stripMargin
 
     intercept[Compiler.Error](
-      parse(codeWithError, multiContractWithFileURI(fileURI)(_))
+      parse(codeWithError, parser.multiContract(_))
     ).fileURI.get is fileURI
   }
 }
