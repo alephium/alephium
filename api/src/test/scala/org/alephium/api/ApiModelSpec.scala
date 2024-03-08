@@ -1173,12 +1173,7 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |""".stripMargin
     write(result1).filter(!_.isWhitespace) is jsonRaw1.filter(!_.isWhitespace)
 
-    val struct = CompileResult.StructSig(
-      "Account",
-      AVector("amount", "id"),
-      AVector("U256", "ByteVec"),
-      AVector(false, false)
-    )
+    val struct = CompileResult.StructSig.from(compiledStruct)
     val structJson =
       s"""
          |{

@@ -565,7 +565,7 @@ object Compiler {
     }
 
     def getMutFieldArrayVarIndex(): Ast.Ident = {
-      getImmFieldArrayVarIndex(
+      getMutFieldArrayVarIndex(
         addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
       )
     }

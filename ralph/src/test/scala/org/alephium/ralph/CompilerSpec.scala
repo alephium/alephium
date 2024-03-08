@@ -4789,6 +4789,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Compare struct variable")
+      val code =
+        s"""
+           |struct Foo { a: U256 }
+           |Contract Bar() {
+           |  pub fn f(foo0: Foo, foo1: Foo) -> () {
+           |    assert!(foo0 == foo1, 0)
+           |  }
+           |}
+           |""".stripMargin
+      Compiler
+        .compileContractFull(code)
+        .leftValue
+        .message is "Invalid param types List(Foo, Foo) for Eq"
+    }
+
+    {
       info("Circular references")
       val code =
         s"""
@@ -4992,6 +5009,86 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val immFields: AVector[Val] = AVector.fill(4)(Val.U256(0))
       val mutFields: AVector[Val] = AVector.fill(4)(Val.U256(0))
       test(code, immFields = immFields, mutFields = mutFields)
+    }
+
+    {
+      info("Load/store array field by variable index")
+      val code =
+        s"""
+           |struct Foo {
+           |  mut a: U256
+           |  b: U256
+           |  mut c: U256
+           |}
+           |Contract Bar(mut foos: [[Foo; 3]; 2]) {
+           |  pub fn f0(index: U256) -> [Foo; 3] {
+           |    f1()
+           |    for (let mut i = 0; i < 2; i = i + 1) {
+           |      for (let mut j = 0; j < 3; j = j + 1)  {
+           |        assert!(foos[i][j].a == i + j, 0)
+           |        assert!(foos[i][j].c == i * j, 0)
+           |      }
+           |    }
+           |    return foos[index]
+           |  }
+           |
+           |  fn f1() -> () {
+           |    for (let mut i = 0; i < 2; i = i + 1) {
+           |      for (let mut j = 0; j < 3; j = j + 1)  {
+           |        foos[i][j].a = i + j
+           |        foos[i][j].c = i * j
+           |      }
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      val immFields: AVector[Val] = AVector.fill(6)(Val.U256(0))
+      val mutFields: AVector[Val] = AVector.fill(12)(Val.U256(0))
+      val result0: AVector[Val]   = AVector(0, 0, 0, 1, 0, 0, 2, 0, 0).map(v => Val.U256(v))
+      test(code, AVector(Val.U256(0)), result0, immFields, mutFields)
+      val result1: AVector[Val] = AVector(1, 0, 0, 2, 0, 1, 3, 0, 2).map(v => Val.U256(v))
+      test(code, AVector(Val.U256(1)), result1, immFields, mutFields)
+    }
+
+    {
+      info("Load/store struct field by variable index")
+      val code =
+        s"""
+           |struct Foo {
+           |  mut a: U256
+           |  b: U256
+           |  mut c: U256
+           |}
+           |struct Baz {
+           |  x: U256
+           |  mut y: [Foo; 3]
+           |}
+           |Contract Bar(mut baz: Baz) {
+           |  pub fn f0(index: U256) -> Foo {
+           |    f1()
+           |    for (let mut i = 0; i < 3; i = i + 1) {
+           |      assert!(baz.y[i].a == i, 0)
+           |      assert!(baz.y[i].c == i * 2, 0)
+           |    }
+           |    return baz.y[index]
+           |  }
+           |
+           |  fn f1() -> () {
+           |    for (let mut i = 0; i < 3; i = i + 1) {
+           |      baz.y[i].a = i
+           |      baz.y[i].c = i * 2
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+      val immFields: AVector[Val] = AVector.fill(4)(Val.U256(0))
+      val mutFields: AVector[Val] = AVector.fill(6)(Val.U256(0))
+      val result0: AVector[Val]   = AVector(0, 0, 0).map(v => Val.U256(v))
+      test(code, AVector(Val.U256(0)), result0, immFields, mutFields)
+      val result1: AVector[Val] = AVector(1, 0, 2).map(v => Val.U256(v))
+      test(code, AVector(Val.U256(1)), result1, immFields, mutFields)
+      val result2: AVector[Val] = AVector(2, 0, 4).map(v => Val.U256(v))
+      test(code, AVector(Val.U256(2)), result2, immFields, mutFields)
     }
 
     {
