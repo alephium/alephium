@@ -100,6 +100,19 @@ class ParserSpec extends AlephiumSpec {
           (Ident("y"), Const(Val.False))
         )
       )
+    parse("(Foo { x: 1, y: false }).x", StatefulParser.expr(_)).get.value is
+      StructFieldSelector[StatefulContext](
+        ParenExpr(
+          StructCtor(
+            TypeId("Foo"),
+            Seq(
+              (Ident("x"), Const(Val.U256(U256.unsafe(1)))),
+              (Ident("y"), Const(Val.False))
+            )
+          )
+        ),
+        Ident("x")
+      )
     parse("Foo { x: true, bar: Bar { y: false } }", StatefulParser.expr(_)).get.value is
       StructCtor[StatefulContext](
         TypeId("Foo"),

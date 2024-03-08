@@ -4807,7 +4807,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     {
       info("Circular references")
-      val code =
+      val code0 =
         s"""
            |struct Foo {
            |  bar: Bar
@@ -4822,7 +4822,29 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn f() -> () {}
            |}
            |""".stripMargin
-      testContractError(code, "These structs \"List(Foo, Bar, Baz)\" have circular references")
+      testContractError(code0, "These structs \"List(Foo, Bar, Baz)\" have circular references")
+
+      val code1 =
+        s"""
+           |struct Foo {x: $$Foo$$}
+           |Contract C(foo: Foo) {
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code1, "These structs \"List(Foo)\" have circular references")
+    }
+
+    {
+      info("Struct as constant")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |Contract C() {
+           |  const V = $$Foo {x: 0}$$
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Expected (value | PP)")
     }
   }
 
