@@ -5114,6 +5114,65 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Load immutable struct field")
+      val code =
+        s"""
+           |struct Foo {
+           |  a: U256
+           |  mut b: U256
+           |  mut c: U256
+           |}
+           |struct Bar {
+           |  x: U256
+           |  mut y: U256
+           |  foo0: [Foo; 2]
+           |  mut foo1: [Foo; 2]
+           |}
+           |Contract Baz(mut a: U256, b: U256, bar: Bar) { // only `a` is mutable in contract `Baz`
+           |  pub fn f0() -> () {
+           |    assert!(a == 0, 0)
+           |    a = 2
+           |    assert!(a == 2, 0)
+           |    assert!(b == 1, 0)
+           |    assert!(bar.x == 2, 0)
+           |    assert!(bar.y == 3, 0)
+           |    assert!(bar.foo0[0].a == 4, 0)
+           |    assert!(bar.foo0[0].b == 5, 0)
+           |    assert!(bar.foo0[0].c == 6, 0)
+           |    assert!(bar.foo0[1].a == 7, 0)
+           |    assert!(bar.foo0[1].b == 8, 0)
+           |    assert!(bar.foo0[1].c == 9, 0)
+           |    assert!(bar.foo1[0].a == 10, 0)
+           |    assert!(bar.foo1[0].b == 11, 0)
+           |    assert!(bar.foo1[0].c == 12, 0)
+           |    assert!(bar.foo1[1].a == 13, 0)
+           |    assert!(bar.foo1[1].b == 14, 0)
+           |    assert!(bar.foo1[1].c == 15, 0)
+           |
+           |    let mut number = 4
+           |    for (let mut i = 0; i < 2; i = i + 1) {
+           |      assert!(bar.foo0[i].a == number, 0)
+           |      assert!(bar.foo0[i].b == number + 1, 0)
+           |      assert!(bar.foo0[i].c == number + 2, 0)
+           |      number = number + 3
+           |    }
+           |
+           |    for (let mut j = 0; j < 2; j = j + 1) {
+           |      assert!(bar.foo1[j].a == number, 0)
+           |      assert!(bar.foo1[j].b == number + 1, 0)
+           |      assert!(bar.foo1[j].c == number + 2, 0)
+           |      number = number + 3
+           |    }
+           |
+           |    assert!(number == 16, 0)
+           |  }
+           |}
+           |""".stripMargin
+      val allFields: AVector[Val] = AVector.from(0 until 16).map(v => Val.U256(v))
+      test(code, immFields = allFields.tail, mutFields = AVector(allFields.head))
+    }
+
+    {
       info("Nested struct")
       val code =
         s"""
