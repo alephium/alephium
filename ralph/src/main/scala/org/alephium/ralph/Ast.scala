@@ -891,45 +891,87 @@ object Ast {
   sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
     def ident: Ident
 
-    @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
-    protected def getVarType(state: Compiler.State[Ctx]): String = {
-      if (state.getVariable(ident).tpe.isInstanceOf[Type.Struct]) "struct" else "array"
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    protected def isTypeMutable(tpe: Type, state: Compiler.State[Ctx]): Boolean = {
+      state.resolveType(tpe) match {
+        case t: Type.Struct =>
+          val struct = state.getStruct(t.id)
+          struct.fields.forall(field => field.isMutable && isTypeMutable(field.tpe, state))
+        case t: Type.FixedSizeArray => isTypeMutable(t.baseType, state)
+        case _                      => true
+      }
     }
-    private def invalidAssignment(
+    protected def checkArrayElement(
         state: Compiler.State[Ctx],
+        arrayRef: ArrayRef[Ctx],
+        checkType: Boolean,
         sourceIndex: Option[SourceIndex]
     ): Unit = {
-      state.getVariable(ident).tpe match {
-        case Type.FixedSizeArray(Type.Struct(id), _) =>
-          throw Compiler.Error(
-            s"Cannot assign to array of struct ${id.name}, where ${id.name} has immutable (sub-)fields",
-            sourceIndex
-          )
-        case Type.Struct(id) =>
-          throw Compiler.Error(
-            s"Cannot assign to struct ${id.name}, which has immutable (sub-)fields",
-            sourceIndex
-          )
-        case _ => // dead branch
+      if (checkType && !isTypeMutable(arrayRef.tpe.baseType, state)) {
+        val extraMsg = arrayRef.tpe.baseType match {
+          case Type.Struct(id) =>
+            s" Assignment only works when all of the fields in struct ${id.name} are mutable."
+          case _ => ""
+        }
+        throw Compiler.Error(s"Cannot assign to immutable array element.$extraMsg", sourceIndex)
+      }
+      if (!arrayRef.isMutable) {
+        throw Compiler.Error(s"Cannot assign to immutable array.", sourceIndex)
+      }
+    }
+    protected def checkStructField(
+        state: Compiler.State[Ctx],
+        structRef: StructRef[Ctx],
+        selector: Ident,
+        checkType: Boolean,
+        sourceIndex: Option[SourceIndex]
+    ): Unit = {
+      val field = structRef.ast.getField(selector)
+      if (!field.isMutable) {
+        throw Compiler.Error(
+          s"Cannot assign to immutable field ${field.name} in struct ${structRef.tpe.id.name}.",
+          sourceIndex
+        )
+      }
+      if (checkType && !isTypeMutable(field.tpe, state)) {
+        throw Compiler.Error(
+          s"Cannot assign to immutable field ${field.name} in struct ${structRef.tpe.id.name}." +
+            s" Assignment only works when all of the field selectors are mutable.",
+          sourceIndex
+        )
+      }
+      if (!structRef.isMutable) {
+        throw Compiler.Error(
+          s"Cannot assign to immutable struct ${structRef.tpe.id.name}. Assignment only works when all of the field selectors are mutable.",
+          sourceIndex
+        )
       }
     }
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    protected def checkMutable(
-        tpe: Type,
+    protected def getRef(
         state: Compiler.State[Ctx],
+        expr: Expr[Ctx],
         sourceIndex: Option[SourceIndex]
-    ): Unit = {
-      tpe match {
-        case t: Type.Struct =>
-          val struct = state.getStruct(t.id)
-          struct.fields.foreach { field =>
-            if (!field.isMutable) {
-              invalidAssignment(state, sourceIndex)
-            }
-            checkMutable(state.resolveType(field.tpe), state, sourceIndex)
+    ): VariablesRef[Ctx] = {
+      expr match {
+        case ArrayElement(array, index) =>
+          getRef(state, array, sourceIndex) match {
+            case arrayRef: ArrayRef[Ctx @unchecked] =>
+              checkArrayElement(state, arrayRef, checkType = false, sourceIndex)
+              arrayRef.subRef(state, index)
+            case ref =>
+              throw Compiler.Error(s"Expected array type, got ${ref.tpe}", array.sourceIndex)
           }
-        case t: Type.FixedSizeArray => checkMutable(t.baseType, state, sourceIndex)
-        case _                      => ()
+        case StructFieldSelector(struct, selector) =>
+          getRef(state, struct, sourceIndex) match {
+            case structRef: StructRef[Ctx @unchecked] =>
+              checkStructField(state, structRef, selector, checkType = false, sourceIndex)
+              structRef.subRef(state, selector)
+            case ref =>
+              throw Compiler.Error(s"Expected struct type, got ${ref.tpe}", struct.sourceIndex)
+          }
+        case Variable(ident) => state.getVariablesRef(ident)
+        case _ => throw Compiler.Error(s"Invalid selector $expr", sourceIndex) // dead branch
       }
     }
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit
@@ -945,7 +987,12 @@ object Ast {
       if (!state.getVariable(ident).isMutable) {
         throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}", sourceIndex)
       }
-      checkMutable(getType(state), state, sourceIndex)
+      if (!isTypeMutable(getType(state), state)) {
+        throw Compiler.Error(
+          s"Cannot assign to variable ${ident.name}. Assignment only works when all of the field selectors are mutable.",
+          sourceIndex
+        )
+      }
     }
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
   }
@@ -955,12 +1002,15 @@ object Ast {
       index: Ast.Expr[Ctx]
   ) extends AssignmentTarget[Ctx] {
     private var arrayRef: Option[ArrayRef[Ctx]] = None
-    private def getArrayRef(state: Compiler.State[Ctx]): ArrayRef[Ctx] = {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    private def getArrayRef(
+        state: Compiler.State[Ctx],
+        sourceIndex: Option[SourceIndex]
+    ): ArrayRef[Ctx] = {
       arrayRef match {
         case Some(ref) => ref
         case None =>
-          val (ref, codes) = state.getOrCreateArrayRef(from)
-          assume(codes.isEmpty)
+          val ref = getRef(state, from, sourceIndex).asInstanceOf[ArrayRef[Ctx]]
           arrayRef = Some(ref)
           ref
       }
@@ -972,18 +1022,12 @@ object Ast {
     }
 
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit = {
-      val ref = getArrayRef(state)
-      if (!ref.isMutable) {
-        throw Compiler.Error(
-          s"Cannot assign to immutable element in ${getVarType(state)} ${ident.name}",
-          sourceIndex
-        )
-      }
-      checkMutable(getType(state), state, sourceIndex)
+      val arrayRef = getArrayRef(state, sourceIndex)
+      checkArrayElement(state, arrayRef, checkType = true, sourceIndex)
     }
 
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-      getArrayRef(state).genStoreCode(state, index)
+      getArrayRef(state, None).genStoreCode(state, index)
     }
   }
   final case class AssignmentStructFieldTarget[Ctx <: StatelessContext](
@@ -992,12 +1036,15 @@ object Ast {
       selector: Ast.Ident
   ) extends AssignmentTarget[Ctx] {
     private var structRef: Option[StructRef[Ctx]] = None
-    private def getStructRef(state: Compiler.State[Ctx]): StructRef[Ctx] = {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    private def getStructRef(
+        state: Compiler.State[Ctx],
+        sourceIndex: Option[SourceIndex]
+    ): StructRef[Ctx] = {
       structRef match {
         case Some(ref) => ref
         case None =>
-          val (ref, codes) = state.getOrCreateStructRef(from)
-          assume(codes.isEmpty)
+          val ref = getRef(state, from, sourceIndex).asInstanceOf[StructRef[Ctx]]
           structRef = Some(ref)
           ref
       }
@@ -1008,25 +1055,12 @@ object Ast {
     }
 
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit = {
-      val ref = getStructRef(state)
-      if (!ref.isMutable) {
-        throw Compiler.Error(
-          s"Cannot assign to immutable (sub-)field ${selector.name} in ${getVarType(state)} ${ident.name}",
-          sourceIndex
-        )
-      }
-      val field = state.getStruct(ref.tpe.id).getField(selector)
-      if (!field.isMutable) {
-        throw Compiler.Error(
-          s"Cannot assign to immutable (sub-)field ${field.name} in ${getVarType(state)} ${ident.name}",
-          sourceIndex
-        )
-      }
-      checkMutable(getType(state), state, sourceIndex)
+      val structRef = getStructRef(state, sourceIndex)
+      checkStructField(state, structRef, selector, checkType = true, sourceIndex)
     }
 
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-      getStructRef(state).genStoreCode(state, selector)
+      getStructRef(state, None).genStoreCode(state, selector)
     }
   }
 

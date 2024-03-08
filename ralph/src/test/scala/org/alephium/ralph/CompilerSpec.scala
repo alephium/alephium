@@ -882,7 +882,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Cannot assign to immutable element in array x",
+        "Cannot assign to immutable array.",
       s"""
          |// assign to immutable array element(local variable)
          |Contract Foo() {
@@ -893,7 +893,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Cannot assign to immutable element in array x",
+        "Cannot assign to immutable array.",
       s"""
          |// out of index
          |Contract Foo() {
@@ -4657,7 +4657,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(
         code(s"$$foo.x = 1$$"),
-        "Cannot assign to immutable (sub-)field x in struct foo"
+        "Cannot assign to immutable field x in struct Foo."
       )
       Compiler.compileContractFull(code("foo.y = 1")).isRight is true
     }
@@ -4677,19 +4677,23 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(
         code(s"$$foo.bar.x = 1$$"),
-        "Cannot assign to immutable (sub-)field x in struct foo"
+        "Cannot assign to immutable field bar in struct Foo."
+      )
+      testContractError(
+        code(s"$$foo.bar.x = 1$$", "mut"),
+        "Cannot assign to immutable field x in struct Bar."
       )
       testContractError(
         code(s"$$foo.bar = Bar{x: 1}$$"),
-        "Cannot assign to immutable (sub-)field bar in struct foo"
+        "Cannot assign to immutable field bar in struct Foo."
       )
       testContractError(
         code(s"$$foo = Foo{bar: Bar{x: 1}}$$"),
-        "Cannot assign to struct Foo, which has immutable (sub-)fields"
+        "Cannot assign to variable foo. Assignment only works when all of the field selectors are mutable."
       )
       testContractError(
         code(s"$$foo = Foo{bar: Bar{x: 1}}$$", "mut"),
-        "Cannot assign to struct Foo, which has immutable (sub-)fields"
+        "Cannot assign to variable foo. Assignment only works when all of the field selectors are mutable."
       )
     }
 
@@ -4707,15 +4711,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(
         code(s"$$foos = [Foo { x : 2 }; 2]$$"),
-        "Cannot assign to array of struct Foo, where Foo has immutable (sub-)fields"
+        "Cannot assign to variable foos. Assignment only works when all of the field selectors are mutable."
       )
       testContractError(
         code(s"$$foos[0] = Foo { x : 2 }$$"),
-        "Cannot assign to array of struct Foo, where Foo has immutable (sub-)fields"
+        "Cannot assign to immutable array element. Assignment only works when all of the fields in struct Foo are mutable."
       )
       testContractError(
         code(s"$$foos[0].x = 2$$"),
-        "Cannot assign to immutable (sub-)field x in array foos"
+        "Cannot assign to immutable field x in struct Foo."
       )
       Compiler.compileContractFull(code("foos = [Foo { x : 2 }; 2]", "mut")).isRight is true
       Compiler.compileContractFull(code("foos[0] = Foo { x : 2 }", "mut")).isRight is true
@@ -4737,15 +4741,15 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(
         code(s"$$foo = Foo{bars: [Bar{x: 1}; 2]}$$"),
-        "Cannot assign to struct Foo, which has immutable (sub-)fields"
+        "Cannot assign to variable foo. Assignment only works when all of the field selectors are mutable."
       )
       testContractError(
         code(s"$$foo.bars = [Bar{x: 1}; 2]$$"),
-        "Cannot assign to struct Foo, which has immutable (sub-)fields"
+        "Cannot assign to immutable field bars in struct Foo. Assignment only works when all of the field selectors are mutable."
       )
       testContractError(
         code(s"$$foo.bars[0].x = 2$$"),
-        "Cannot assign to immutable (sub-)field x in struct foo"
+        "Cannot assign to immutable field x in struct Bar."
       )
       Compiler.compileContractFull(code("foo = Foo{bars: [Bar{x: 1}; 2]}", "mut")).isRight is true
       Compiler.compileContractFull(code("foo.bars = [Bar{x: 1}; 2]", "mut")).isRight is true
