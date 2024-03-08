@@ -882,7 +882,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Cannot assign to immutable array.",
+        "Cannot assign to immutable variable x.",
       s"""
          |// assign to immutable array element(local variable)
          |Contract Foo() {
@@ -893,7 +893,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Cannot assign to immutable array.",
+        "Cannot assign to immutable variable x.",
       s"""
          |// out of index
          |Contract Foo() {
@@ -4699,31 +4699,56 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
     {
       info("Assign to struct in array")
-      def code(stmt: String, mut: String = "") =
+      def code(stmt: String, fieldMut: String, varMut: String) =
         s"""
-           |struct Foo { $mut x: U256 }
+           |struct Foo { $fieldMut x: U256 }
            |Contract C() {
            |  pub fn f() -> () {
-           |    let mut foos = [Foo { x : 1 }; 2]
+           |    let $varMut foos = [[Foo { x : 1 }; 2]; 2]
            |    $stmt
            |  }
            |}
            |""".stripMargin
       testContractError(
-        code(s"$$foos = [Foo { x : 2 }; 2]$$"),
+        code(s"$$foos = [[Foo { x : 2 }; 2]; 2]$$", "", ""),
+        "Cannot assign to immutable variable foos."
+      )
+      testContractError(
+        code(s"$$foos = [[Foo { x : 2 }; 2]; 2]$$", "", "mut"),
         "Cannot assign to variable foos. Assignment only works when all of the field selectors are mutable."
       )
       testContractError(
-        code(s"$$foos[0] = Foo { x : 2 }$$"),
-        "Cannot assign to immutable array element. Assignment only works when all of the fields in struct Foo are mutable."
+        code(s"$$foos[0] = [Foo { x : 2 }; 2]$$", "", ""),
+        "Cannot assign to immutable variable foos."
       )
       testContractError(
-        code(s"$$foos[0].x = 2$$"),
+        code(s"$$foos[0] = [Foo { x : 2 }; 2]$$", "", "mut"),
+        "Cannot assign to immutable element in array foos. Assignment only works when all of the field selectors are mutable."
+      )
+      testContractError(
+        code(s"$$foos[0][0] = Foo { x : 2 }$$", "", ""),
+        "Cannot assign to immutable variable foos."
+      )
+      testContractError(
+        code(s"$$foos[0][0] = Foo { x : 2 }$$", "", "mut"),
+        "Cannot assign to immutable element in array foos. Assignment only works when all of the field selectors are mutable."
+      )
+      testContractError(
+        code(s"$$foos[0][0].x = 2$$", "", ""),
+        "Cannot assign to immutable variable foos."
+      )
+      testContractError(
+        code(s"$$foos[0][0].x = 2$$", "", "mut"),
         "Cannot assign to immutable field x in struct Foo."
       )
-      Compiler.compileContractFull(code("foos = [Foo { x : 2 }; 2]", "mut")).isRight is true
-      Compiler.compileContractFull(code("foos[0] = Foo { x : 2 }", "mut")).isRight is true
-      Compiler.compileContractFull(code("foos[0].x = 2", "mut")).isRight is true
+      Compiler
+        .compileContractFull(code("foos = [[Foo { x : 2 }; 2]; 2]", "mut", "mut"))
+        .isRight is true
+      Compiler
+        .compileContractFull(code("foos[0] = [Foo { x : 2 }; 2]", "mut", "mut"))
+        .isRight is true
+      Compiler.compileContractFull(code("foos[0][0] = Foo { x : 2 }", "mut", "mut")).isRight is true
+      Compiler.compileContractFull(code("foos[0][0].x = 2", "mut", "mut")).isRight is true
     }
 
     {
@@ -4745,7 +4770,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
       testContractError(
         code(s"$$foo.bars = [Bar{x: 1}; 2]$$"),
-        "Cannot assign to immutable field bars in struct Foo. Assignment only works when all of the field selectors are mutable."
+        "Cannot assign to field bars in struct Foo. Assignment only works when all of the field selectors are mutable."
+      )
+      testContractError(
+        code(s"$$foo.bars[0] = Bar{x: 1}$$"),
+        "Cannot assign to immutable element in array Foo.bars. Assignment only works when all of the field selectors are mutable."
       )
       testContractError(
         code(s"$$foo.bars[0].x = 2$$"),
