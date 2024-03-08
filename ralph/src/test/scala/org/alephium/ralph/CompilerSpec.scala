@@ -93,7 +93,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  x: U256
+           |  x: U256,
            |  y: ByteVec
            |}
            |AssetScript Foo {
@@ -2644,7 +2644,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  x: U256
+           |  x: U256,
            |  y: ByteVec
            |}
            |@using(preapprovedAssets = false)
@@ -4645,7 +4645,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       def code(stmt: String) =
         s"""
            |struct Foo {
-           |  x: U256
+           |  x: U256,
            |  mut y: U256
            |}
            |Contract C() {
@@ -4858,7 +4858,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  mut x: U256
+           |  mut x: U256,
            |  mut y: ByteVec
            |}
            |Contract Bar(mut foo: Foo) {
@@ -4884,7 +4884,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  mut x: U256
+           |  mut x: U256,
            |  mut y: ByteVec
            |}
            |Contract Bar() {
@@ -4915,7 +4915,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  mut x: U256
+           |  mut x: U256,
            |  mut y: ByteVec
            |}
            |Contract Bar() {
@@ -4941,11 +4941,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct TokenBalance {
-           |  tokenId: ByteVec
+           |  tokenId: ByteVec,
            |  mut amount: U256
            |}
            |struct Balances {
-           |  mut totalAmount: U256
+           |  mut totalAmount: U256,
            |  mut tokens: [TokenBalance; 2]
            |}
            |Contract UserAccount(
@@ -5005,7 +5005,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  a: U256
+           |  a: U256,
            |  mut b: U256
            |}
            |Contract Baz(mut foos0: [Foo; 2], mut foos1: [Foo; 2]) {
@@ -5042,8 +5042,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  mut a: U256
-           |  b: U256
+           |  mut a: U256,
+           |  b: U256,
            |  mut c: U256
            |}
            |Contract Bar(mut foos: [[Foo; 3]; 2]) {
@@ -5081,12 +5081,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  mut a: U256
-           |  b: U256
+           |  mut a: U256,
+           |  b: U256,
            |  mut c: U256
            |}
            |struct Baz {
-           |  x: U256
+           |  x: U256,
            |  mut y: [Foo; 3]
            |}
            |Contract Bar(mut baz: Baz) {
@@ -5122,14 +5122,14 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  a: U256
-           |  mut b: U256
+           |  a: U256,
+           |  mut b: U256,
            |  mut c: U256
            |}
            |struct Bar {
-           |  x: U256
-           |  mut y: U256
-           |  foo0: [Foo; 2]
+           |  x: U256,
+           |  mut y: U256,
+           |  foo0: [Foo; 2],
            |  mut foo1: [Foo; 2]
            |}
            |Contract Baz(mut a: U256, b: U256, bar: Bar) { // only `a` is mutable in contract `Baz`
@@ -5181,12 +5181,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       val code =
         s"""
            |struct Foo {
-           |  mut x: U256
+           |  mut x: U256,
            |  mut y: ByteVec
            |}
            |struct Bar {
-           |  a: Bool
-           |  mut b: [Foo; 2]
+           |  a: Bool,
+           |  mut b: [Foo; 2],
            |  mut c: Foo
            |}
            |Contract Baz(mut bar: Bar) {

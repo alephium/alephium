@@ -69,7 +69,7 @@ trait TypeSignatureFixture extends AlephiumFixture {
   val contractStr =
     s"""
        |struct Account {
-       |  amount: U256
+       |  amount: U256,
        |  id: ByteVec
        |}
        |Contract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2], gg: Account) {
@@ -103,7 +103,7 @@ trait TypeSignatureFixture extends AlephiumFixture {
   val scriptStr =
     s"""
        |struct Account {
-       |  amount: U256
+       |  amount: U256,
        |  id: ByteVec
        |}
        |TxScript Foo(aa: Bool, bb: U256, cc: I256, dd: ByteVec, ee: Address) {

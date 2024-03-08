@@ -1734,7 +1734,7 @@ class ParserSpec extends AlephiumSpec {
       val code =
         s"""
            |struct Foo {
-           |  amount: U256
+           |  amount: U256,
            |  mut address: Address
            |}
            |""".stripMargin
@@ -1752,15 +1752,15 @@ class ParserSpec extends AlephiumSpec {
       val code =
         s"""
            |struct Foo {
-           |  amount: U256
+           |  amount: U256,
            |  address: Address
            |}
            |Contract Bar(foo: Foo, baz: Baz) {
            |  pub fn f() -> () {}
            |}
            |struct Baz {
-           |  id: ByteVec
-           |  account: Foo
+           |  id: ByteVec,
+           |  account: Foo,
            |  mut accounts: [Foo; 2]
            |}
            |""".stripMargin
@@ -1802,7 +1802,7 @@ class ParserSpec extends AlephiumSpec {
       val code =
         s"""
            |struct Foo {
-           |  a: U256
+           |  a: U256,
            |  $$a: ByteVec
            |}
            |""".stripMargin

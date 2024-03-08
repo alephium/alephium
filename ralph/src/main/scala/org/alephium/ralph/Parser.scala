@@ -508,7 +508,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     Ast.StructField(ident, mutable, tpe)
   }
   def rawStruct[Unknown: P]: P[Ast.Struct] =
-    PP(Lexer.token(Keyword.struct) ~/ Lexer.typeId ~ "{" ~ structField.rep ~ "}") {
+    PP(Lexer.token(Keyword.struct) ~/ Lexer.typeId ~ "{" ~ structField.rep(0, ",") ~ "}") {
       case (structIndex, id, fields) =>
         if (fields.isEmpty) {
           val sourceIndex = SourceIndex(Some(structIndex), id.sourceIndex)
