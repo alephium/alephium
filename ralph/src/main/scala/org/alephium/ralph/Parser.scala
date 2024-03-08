@@ -130,7 +130,9 @@ abstract class Parser[Ctx <: StatelessContext] {
       idx
   }
 
-  def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = P("[" ~ expr ~ "]")
+  def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
+    case (from, expr, to) => expr.overwriteSourceIndex(from, to)
+  }
 
   // Optimize chained comparisons
   def expr[Unknown: P]: P[Ast.Expr[Ctx]]    = P(chain(andExpr, Lexer.opOr))
@@ -165,18 +167,35 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(chain(arithExpr0, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
   def arithExpr0[Unknown: P]: P[Ast.Expr[Ctx]] = P(chain(unaryExpr, Lexer.opExp | Lexer.opModExp))
   def unaryExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(arrayElementOrAtom | PP(Lexer.opNot ~ arrayElementOrAtom) { case (op, expr) =>
-      Ast.UnaryOp.apply[Ctx](op, expr)
+    P(arrayElementOrStructFieldSelector | PP(Lexer.opNot ~ arrayElementOrStructFieldSelector) {
+      case (op, expr) =>
+        Ast.UnaryOp.apply[Ctx](op, expr)
     })
-  def arrayElementOrAtom[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(Index ~~ atom ~ arrayIndex.rep(0) ~~ Index).map { case (from, expr, indexes, to) =>
-      if (indexes.nonEmpty) {
-        Ast.ArrayElement(expr, indexes).atSourceIndex(from, to)
-      } else {
-        expr
+  def arrayElementOrStructFieldSelector[Unknown: P]: P[Ast.Expr[Ctx]] =
+    P(atom ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0)).map { case (expr, list) =>
+      list.foldLeft(expr) { case (acc, e) =>
+        e match {
+          case index: Ast.Expr[Ctx @unchecked] =>
+            Ast
+              .ArrayElement(acc, index)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex))
+          case ident: Ast.Ident =>
+            Ast
+              .StructFieldSelector(acc, ident)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex))
+        }
       }
     }
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
+
+  def structCtor[Unknown: P]: P[Ast.StructCtor[Ctx]] =
+    PP(Lexer.typeId ~ "{" ~ P(Lexer.ident ~ ":" ~ expr).rep(0, ",") ~ "}") {
+      case (typeId, fields) =>
+        if (fields.isEmpty) {
+          throw Compiler.Error(s"No field definition in struct ${typeId.name}", typeId.sourceIndex)
+        }
+        Ast.StructCtor(typeId, fields)
+    }
 
   def parenExpr[Unknown: P]: P[Ast.ParenExpr[Ctx]] =
     PP("(" ~ expr ~ ")") { case (ex) =>
@@ -258,16 +277,33 @@ abstract class Parser[Ctx <: StatelessContext] {
     PP(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr) { case (_, vars, expr) =>
       Ast.VarDef(vars, expr)
     }
-  def assignmentSimpleTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
-    PP(Lexer.ident)(Ast.AssignmentSimpleTarget.apply[Ctx])
-  def assignmentArrayElementTarget[Unknown: P]: P[Ast.AssignmentArrayElementTarget[Ctx]] = PP(
-    Lexer.ident ~ arrayIndex.rep(1)
-  ) { case (ident, indexes) =>
-    Ast.AssignmentArrayElementTarget[Ctx](ident, indexes)
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = PP(
+    Lexer.ident ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0)
+  ) { case (ident, list) =>
+    if (list.isEmpty) {
+      Ast.AssignmentSimpleTarget(ident)
+    } else {
+      val variable: Ast.Expr[Ctx] = Ast.Variable(ident).atSourceIndex(ident.sourceIndex)
+      val expr = list.init.foldLeft(variable) { case (acc, e) =>
+        e match {
+          case index: Ast.Expr[Ctx @unchecked] =>
+            Ast
+              .ArrayElement(acc, index)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex))
+          case ident: Ast.Ident =>
+            Ast
+              .StructFieldSelector(acc, ident)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex))
+        }
+      }
+      list.last match {
+        case arrayIndex: Ast.Expr[Ctx @unchecked] =>
+          Ast.AssignmentArrayElementTarget(ident, expr, arrayIndex)
+        case selector: Ast.Ident => Ast.AssignmentStructFieldTarget(ident, expr, selector)
+      }
+    }
   }
-  def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = P(
-    assignmentArrayElementTarget | assignmentSimpleTarget
-  )
 
   def assign[Unknown: P]: P[Ast.Assign[Ctx]] =
     P(assignmentTarget.rep(1, ",") ~ "=" ~ expr).map { case (targets, expr) =>
@@ -291,20 +327,20 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
   def argument[Unknown: P](
       allowMutable: Boolean
-  )(contractTypeCtor: (Ast.TypeId, Ast.Ident) => Type): P[Ast.Argument] =
+  )(contractTypeCtor: Ast.TypeId => Type): P[Ast.Argument] =
     P(Index ~ Lexer.unused ~ Lexer.mutMaybe(allowMutable) ~ Lexer.ident ~ ":").flatMap {
       case (fromIndex, isUnused, isMutable, ident) =>
-        P(parseType(contractTypeCtor(_, ident)) ~~ Index).map { case (tpe, endIndex) =>
+        P(parseType(contractTypeCtor) ~~ Index).map { case (tpe, endIndex) =>
           Ast.Argument(ident, tpe, isMutable, isUnused).atSourceIndex(fromIndex, endIndex)
         }
     }
-  def funcArgument[Unknown: P]: P[Ast.Argument] = argument(allowMutable = true)(Type.Contract.local)
+  def funcArgument[Unknown: P]: P[Ast.Argument]   = argument(allowMutable = true)(Type.NamedType)
   def funParams[Unknown: P]: P[Seq[Ast.Argument]] = P("(" ~ funcArgument.rep(0, ",") ~ ")")
   def returnType[Unknown: P]: P[Seq[Type]]        = P(simpleReturnType | bracketReturnType)
   def simpleReturnType[Unknown: P]: P[Seq[Type]] =
-    P("->" ~ parseType(Type.Contract.stack)).map(tpe => Seq(tpe))
+    P("->" ~ parseType(Type.NamedType)).map(tpe => Seq(tpe))
   def bracketReturnType[Unknown: P]: P[Seq[Type]] =
-    P("->" ~ "(" ~ parseType(Type.Contract.stack).rep(0, ",") ~ ")")
+    P("->" ~ "(" ~ parseType(Type.NamedType).rep(0, ",") ~ ")")
   def funcTmp[Unknown: P]: P[FuncDefTmp[Ctx]] =
     PP(
       annotation.rep(0) ~
@@ -456,17 +492,32 @@ abstract class Parser[Ctx <: StatelessContext] {
   def statement[Unknown: P]: P[Ast.Statement[Ctx]]
 
   def contractField[Unknown: P](allowMutable: Boolean): P[Ast.Argument] =
-    argument(allowMutable)(Type.Contract.global)
+    argument(allowMutable)(Type.NamedType)
 
   def templateParams[Unknown: P]: P[Seq[Ast.Argument]] =
     P("(" ~ contractField(allowMutable = false).rep(0, ",") ~ ")")
 
-  def eventField[Unknown: P]: P[Ast.EventField] =
-    P(Lexer.ident ~ ":").flatMap { case (ident) =>
-      parseType(typeId => Type.Contract.global(typeId, ident)).map { tpe =>
-        Ast.EventField(ident, tpe)
-      }
+  def field[Unknown: P]: P[(Ast.Ident, Type)] = P(Lexer.ident ~ ":").flatMap { ident =>
+    parseType(Type.NamedType).map { tpe => (ident, tpe) }
+  }
+
+  def eventField[Unknown: P]: P[Ast.EventField] = P(field).map(Ast.EventField.tupled)
+  def structField[Unknown: P]: P[Ast.StructField] = PP(
+    Lexer.mut ~ Lexer.ident ~ ":" ~ parseType(Type.NamedType)
+  ) { case (mutable, ident, tpe) =>
+    Ast.StructField(ident, mutable, tpe)
+  }
+  def rawStruct[Unknown: P]: P[Ast.Struct] =
+    PP(Lexer.token(Keyword.struct) ~/ Lexer.typeId ~ "{" ~ structField.rep(0, ",") ~ "}") {
+      case (structIndex, id, fields) =>
+        if (fields.isEmpty) {
+          val sourceIndex = SourceIndex(Some(structIndex), id.sourceIndex)
+          throw Compiler.Error(s"No field definition in struct ${id.name}", sourceIndex)
+        }
+        Ast.UniqueDef.checkDuplicates(fields, "struct fields")
+        Ast.Struct(id, fields)
     }
+  def struct[Unknown: P]: P[Ast.Struct] = P(Start ~ rawStruct ~ End)
 
   def annotationField[Unknown: P]: P[Ast.AnnotationField] =
     P(Index ~ Lexer.ident ~ "=" ~ expr ~~ Index).map {
@@ -634,7 +685,8 @@ object Parser {
 object StatelessParser extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
-      const | stringLiteral | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr
+      const | stringLiteral | alphTokenId | callExpr | contractConv |
+        structCtor | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
@@ -642,11 +694,11 @@ object StatelessParser extends Parser[StatelessContext] {
 
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
-      Start ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~ templateParams.? ~
-        "{" ~ func.rep(1) ~ "}" ~~ Index ~ endOfInput
-    ).map { case (assetIndex, typeId, templateVars, funcs, endIndex) =>
+      Start ~ rawStruct.rep(0) ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~
+        templateParams.? ~ "{" ~ func.rep(1) ~ "}" ~~ Index ~ rawStruct.rep(0) ~ endOfInput
+    ).map { case (defs0, assetIndex, typeId, templateVars, funcs, endIndex, defs1) =>
       Ast
-        .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
+        .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs, defs0 ++ defs1)
         .atSourceIndex(assetIndex.index, endIndex)
     }
 }
@@ -661,7 +713,8 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
+      const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv |
+        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.Expr[StatefulContext]] =
@@ -738,8 +791,8 @@ object StatefulParser extends Parser[StatefulContext] {
               usingAnnotation.assetsInContract,
               usingAnnotation.updateFields
             )
-            Ast.TxScript
-              .from(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
+            Ast
+              .TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
               .atSourceIndex(scriptIndex.index, endIndex)
           }
       }
@@ -925,10 +978,19 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   def interface[Unknown: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
 
+  private def entities[Unknown: P]: P[Ast.Entity] = P(
+    rawTxScript | rawContract | rawInterface | rawStruct
+  )
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def multiContract[Unknown: P]: P[Ast.MultiContract] =
-    P(Start ~~ Index ~ (rawTxScript | rawContract | rawInterface).rep(1) ~~ Index ~ End)
+    P(Start ~~ Index ~ entities.rep(1) ~~ Index ~ End)
       .map { case (fromIndex, defs, endIndex) =>
-        Ast.MultiContract(defs, None).atSourceIndex(fromIndex, endIndex)
+        val contracts = defs
+          .filter(_.isInstanceOf[Ast.ContractWithState])
+          .asInstanceOf[Seq[Ast.ContractWithState]]
+        val structs = defs.filter(_.isInstanceOf[Ast.Struct]).asInstanceOf[Seq[Ast.Struct]]
+        Ast.MultiContract(contracts, structs, None).atSourceIndex(fromIndex, endIndex)
       }
 
   def state[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] =

@@ -25,22 +25,13 @@ sealed trait Type {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def signature: String = toVal.toString
 
-  def isArrayType: Boolean = this match {
-    case _: Type.FixedSizeArray => true
-    case _                      => false
+  def isPrimitive: Boolean = this match {
+    case _: Type.FixedSizeArray | _: Type.Struct | _: Type.NamedType => false
+    case _                                                           => true
   }
 }
 
 object Type {
-  def flattenTypeLength(types: Seq[Type]): Int = {
-    types.foldLeft(0) { case (acc, tpe) =>
-      tpe match {
-        case t: Type.FixedSizeArray => acc + t.flattenSize()
-        case _                      => acc + 1
-      }
-    }
-  }
-
   val primitives: AVector[Type] = AVector[Type](Bool, I256, U256, ByteVec, Address)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -52,6 +43,7 @@ object Type {
       case Val.ByteVec                        => ByteVec
       case Val.Address                        => Address
       case Val.FixedSizeArray(baseType, size) => FixedSizeArray(fromVal(baseType), size)
+      case Val.Struct(name)                   => Struct(Ast.TypeId(name))
     }
   }
 
@@ -69,36 +61,22 @@ object Type {
       case tpe                   => tpe
     }
 
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def flattenSize(): Int = baseType match {
-      case baseType: FixedSizeArray =>
-        baseType.flattenSize() * size
-      case _ => size
-    }
+    override def signature: String = s"[${baseType.signature};$size]"
   }
 
-  sealed trait Contract extends Type {
-    def id: Ast.TypeId
-    def toVal: Val.Type = Val.ByteVec
-
-    override def hashCode(): Int = id.hashCode()
-
-    override def equals(obj: Any): Boolean =
-      obj match {
-        case that: Contract => this.id == that.id
-        case _              => false
-      }
-
-    override def toString(): String = id.name
+  final case class NamedType(id: Ast.TypeId) extends Type {
+    def toVal: Val.Type            = ???
+    override def signature: String = id.name
   }
-  object Contract {
-    def local(id: Ast.TypeId, variable: Ast.Ident): LocalVar   = new LocalVar(id, variable)
-    def global(id: Ast.TypeId, variable: Ast.Ident): GlobalVar = new GlobalVar(id, variable)
-    def stack(id: Ast.TypeId): Stack                           = new Stack(id)
 
-    final class LocalVar(val id: Ast.TypeId, val variable: Ast.Ident)  extends Contract
-    final class GlobalVar(val id: Ast.TypeId, val variable: Ast.Ident) extends Contract
-    final class Stack(val id: Ast.TypeId)                              extends Contract
+  final case class Struct(id: Ast.TypeId) extends Type {
+    def toVal: Val.Type           = Val.Struct(id.name)
+    override def toString: String = id.name
+  }
+
+  final case class Contract(id: Ast.TypeId) extends Type {
+    def toVal: Val.Type           = Val.ByteVec
+    override def toString: String = id.name
   }
 
   // The naming is more specific than Bottom or Nothing

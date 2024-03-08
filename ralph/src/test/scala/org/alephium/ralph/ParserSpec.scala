@@ -92,6 +92,83 @@ class ParserSpec extends AlephiumSpec {
         Seq.empty,
         Seq(EnumFieldSelector(TypeId("ErrorCodes"), Ident("Error")))
       )
+    parse("Foo { x: 1, y: false }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq(
+          (Ident("x"), Const(Val.U256(U256.unsafe(1)))),
+          (Ident("y"), Const(Val.False))
+        )
+      )
+    parse("(Foo { x: 1, y: false }).x", StatefulParser.expr(_)).get.value is
+      StructFieldSelector[StatefulContext](
+        ParenExpr(
+          StructCtor(
+            TypeId("Foo"),
+            Seq(
+              (Ident("x"), Const(Val.U256(U256.unsafe(1)))),
+              (Ident("y"), Const(Val.False))
+            )
+          )
+        ),
+        Ident("x")
+      )
+    parse("Foo { x: true, bar: Bar { y: false } }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq(
+          (Ident("x"), Const(Val.True)),
+          (Ident("bar"), StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False)))))
+        )
+      )
+    parse("Foo { x: true, bar: [Bar { y: false }; 2] }", StatefulParser.expr(_)).get.value is
+      StructCtor[StatefulContext](
+        TypeId("Foo"),
+        Seq(
+          (Ident("x"), Const(Val.True)),
+          (
+            Ident("bar"),
+            CreateArrayExpr(
+              Seq(
+                StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False)))),
+                StructCtor(TypeId("Bar"), Seq((Ident("y"), Const(Val.False))))
+              )
+            )
+          )
+        )
+      )
+    parse("a.b.c", StatefulParser.expr(_)).get.value is
+      StructFieldSelector[StatefulContext](
+        StructFieldSelector(Variable(Ident("a")), Ident("b")),
+        Ident("c")
+      )
+    parse("a[0].b.c", StatefulParser.expr(_)).get.value is
+      StructFieldSelector[StatefulContext](
+        StructFieldSelector(
+          ArrayElement(Variable(Ident("a")), Const(Val.U256(U256.unsafe(0)))),
+          Ident("b")
+        ),
+        Ident("c")
+      )
+    parse("a.b[0].c", StatefulParser.expr(_)).get.value is
+      StructFieldSelector[StatefulContext](
+        ArrayElement(
+          StructFieldSelector[StatefulContext](Variable(Ident("a")), Ident("b")),
+          Const(Val.U256(U256.unsafe(0)))
+        ),
+        Ident("c")
+      )
+    parse("a.b[0][1].c", StatefulParser.expr(_)).get.value is
+      StructFieldSelector[StatefulContext](
+        ArrayElement(
+          ArrayElement(
+            StructFieldSelector[StatefulContext](Variable(Ident("a")), Ident("b")),
+            Const(Val.U256(U256.unsafe(0)))
+          ),
+          Const(Val.U256(U256.unsafe(1)))
+        ),
+        Ident("c")
+      )
   }
 
   it should "parse string literals" in {
@@ -579,7 +656,7 @@ class ParserSpec extends AlephiumSpec {
           ),
           Argument(
             Ident("c"),
-            Type.FixedSizeArray(Type.Contract.local(TypeId("Foo"), Ident("c")), 4),
+            Type.FixedSizeArray(Type.NamedType(TypeId("Foo")), 4),
             isMutable = false,
             isUnused = false
           ),
@@ -646,20 +723,26 @@ class ParserSpec extends AlephiumSpec {
   it should "parse array expression" in {
     val exprs: List[(String, Ast.Expr[StatelessContext])] = List(
       "a[0u][1u]" -> Ast
-        .ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1))),
-      "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(Variable(Ast.Ident("i")))),
+        .ArrayElement(
+          ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
+          constantIndex(1)
+        ),
+      "a[i]" -> Ast.ArrayElement(Variable(Ast.Ident("a")), Variable(Ast.Ident("i"))),
       "a[foo()]" -> Ast
         .ArrayElement(
           Variable(Ast.Ident("a")),
-          Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+          CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)
         ),
       "a[i + 1]" -> Ast.ArrayElement(
         Variable(Ast.Ident("a")),
-        Seq(Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1)))))
+        Binop(ArithOperator.Add, Variable(Ast.Ident("i")), Const(Val.U256(U256.unsafe(1))))
       ),
       "!a[0][1]" -> Ast.UnaryOp(
         LogicalOperator.Not,
-        Ast.ArrayElement(Variable(Ast.Ident("a")), Seq(constantIndex(0), constantIndex(1)))
+        Ast.ArrayElement(
+          ArrayElement(Variable(Ast.Ident("a")), constantIndex(0)),
+          constantIndex(1)
+        )
       ),
       "[a, a]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
       "[a; 2]" -> Ast.CreateArrayExpr(Seq(Variable(Ast.Ident("a")), Variable(Ast.Ident("a")))),
@@ -679,26 +762,45 @@ class ParserSpec extends AlephiumSpec {
   it should "parse assign statement" in {
     val stats: List[(String, Ast.Statement[StatelessContext])] = List(
       "a[0] = b" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0)))),
+        Seq(
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            Variable(Ident("a")),
+            constantIndex(0)
+          )
+        ),
         Ast.Variable(Ast.Ident("b"))
       ),
       "a[0][1] = b[0]" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(constantIndex(0), constantIndex(1)))),
-        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), Seq(constantIndex(0)))
+        Seq(
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            ArrayElement(Variable(Ident("a")), constantIndex(0)),
+            constantIndex(1)
+          )
+        ),
+        Ast.ArrayElement(Ast.Variable(Ast.Ident("b")), constantIndex(0))
       ),
       "a, b = foo()" -> Assign(
         Seq(AssignmentSimpleTarget(Ident("a")), AssignmentSimpleTarget(Ident("b"))),
         CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)
       ),
       "a[i] = b" -> Assign(
-        Seq(AssignmentArrayElementTarget(Ident("a"), Seq(Variable(Ident("i"))))),
+        Seq(
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            Variable(Ident("a")),
+            Variable(Ident("i"))
+          )
+        ),
         Ast.Variable(Ast.Ident("b"))
       ),
       "a[foo()] = b" -> Assign(
         Seq(
           AssignmentArrayElementTarget(
             Ident("a"),
-            Seq(CallExpr(FuncId("foo", false), Seq.empty, Seq.empty))
+            Variable(Ident("a")),
+            CallExpr(FuncId("foo", false), Seq.empty, Seq.empty)
           )
         ),
         Ast.Variable(Ast.Ident("b"))
@@ -707,10 +809,54 @@ class ParserSpec extends AlephiumSpec {
         Seq(
           AssignmentArrayElementTarget(
             Ident("a"),
-            Seq(Binop(ArithOperator.Add, Variable(Ident("i")), Const(Val.U256(U256.unsafe(1)))))
+            Variable(Ident("a")),
+            Binop(ArithOperator.Add, Variable(Ident("i")), Const(Val.U256(U256.unsafe(1))))
           )
         ),
         Ast.Variable(Ast.Ident("b"))
+      ),
+      "a.b = c" -> Assign(
+        Seq(
+          AssignmentStructFieldTarget(
+            Ident("a"),
+            Variable(Ident("a")),
+            Ident("b")
+          )
+        ),
+        Ast.Variable(Ast.Ident("c"))
+      ),
+      "a[0].b = c" -> Assign(
+        Seq(
+          AssignmentStructFieldTarget(
+            Ident("a"),
+            ArrayElement(Variable(Ident("a")), constantIndex(0)),
+            Ident("b")
+          )
+        ),
+        Ast.Variable(Ast.Ident("c"))
+      ),
+      "a.b[0] = c" -> Assign(
+        Seq(
+          AssignmentArrayElementTarget(
+            Ident("a"),
+            StructFieldSelector(Variable(Ident("a")), Ident("b")),
+            constantIndex(0)
+          )
+        ),
+        Ast.Variable(Ast.Ident("c"))
+      ),
+      "a.b[0].c = d" -> Assign(
+        Seq(
+          AssignmentStructFieldTarget(
+            Ident("a"),
+            ArrayElement(
+              StructFieldSelector(Variable(Ident("a")), Ident("b")),
+              constantIndex(0)
+            ),
+            Ident("c")
+          )
+        ),
+        Ast.Variable(Ast.Ident("d"))
       )
     )
 
@@ -1498,18 +1644,36 @@ class ParserSpec extends AlephiumSpec {
     )
   }
 
-  it should "parse AssetScript" in new ScriptFixture {
-    val usePreapprovedAssets = false
+  it should "parse AssetScript" in {
     val script = s"""
+                    |struct Foo { x: U256 }
                     |AssetScript Main(x: U256) {
-                    |  pub fn main() -> () {
-                    |    return
+                    |  pub fn main(foo: Foo) -> Foo {
+                    |    return foo
                     |  }
                     |}
                     |""".stripMargin
 
     parse(script, StatelessParser.assetScript(_)).get.value is
-      AssetScript(ident, templateVars, funcs)
+      AssetScript(
+        TypeId("Main"),
+        Seq(Argument(Ident("x"), Type.U256, false, false)),
+        Seq(
+          FuncDef(
+            Seq.empty,
+            FuncId("main", false),
+            true,
+            false,
+            false,
+            true,
+            false,
+            Seq(Argument(Ident("foo"), Type.NamedType(TypeId("Foo")), false, false)),
+            Seq(Type.NamedType(TypeId("Foo"))),
+            Some(Seq(ReturnStmt(Seq(Variable(Ident("foo"))))))
+          )
+        ),
+        Seq(Struct(TypeId("Foo"), Seq(StructField(Ident("x"), false, Type.U256))))
+      )
   }
 
   // scalastyle:off no.equal
@@ -1562,5 +1726,90 @@ class ParserSpec extends AlephiumSpec {
          |""".stripMargin
     intercept[Compiler.Error](parse(code, StatefulParser.contract(_))).message is
       "Debug is a built-in event name"
+  }
+
+  it should "parse struct" in {
+    {
+      info("Simple struct")
+      val code =
+        s"""
+           |struct Foo {
+           |  amount: U256,
+           |  mut address: Address
+           |}
+           |""".stripMargin
+      parse(code, StatelessParser.struct(_)).get.value is Ast.Struct(
+        TypeId("Foo"),
+        List(
+          StructField(Ident("amount"), false, Type.U256),
+          StructField(Ident("address"), true, Type.Address)
+        )
+      )
+    }
+
+    {
+      info("Nested struct")
+      val code =
+        s"""
+           |struct Foo {
+           |  amount: U256,
+           |  address: Address
+           |}
+           |Contract Bar(foo: Foo, baz: Baz) {
+           |  pub fn f() -> () {}
+           |}
+           |struct Baz {
+           |  id: ByteVec,
+           |  account: Foo,
+           |  mut accounts: [Foo; 2]
+           |}
+           |""".stripMargin
+
+      val result = parse(code, StatefulParser.multiContract(_)).get.value
+      result.contracts.length is 1
+      result.contracts.head.fields.map(_.tpe) is Seq(
+        Type.NamedType(TypeId("Foo")),
+        Type.NamedType(TypeId("Baz"))
+      )
+      result.structs.length is 2
+      result.structs(0) is Ast.Struct(
+        TypeId("Foo"),
+        List(
+          StructField(Ident("amount"), false, Type.U256),
+          StructField(Ident("address"), false, Type.Address)
+        )
+      )
+      result.structs(1) is Ast.Struct(
+        TypeId("Baz"),
+        List(
+          StructField(Ident("id"), false, Type.ByteVec),
+          StructField(
+            Ident("account"),
+            false,
+            Type.NamedType(TypeId("Foo"))
+          ),
+          StructField(
+            Ident("accounts"),
+            true,
+            Type.FixedSizeArray(Type.NamedType(TypeId("Foo")), 2)
+          )
+        )
+      )
+    }
+
+    {
+      info("Duplicate field definition")
+      val code =
+        s"""
+           |struct Foo {
+           |  a: U256,
+           |  $$a: ByteVec
+           |}
+           |""".stripMargin
+      val error =
+        intercept[Compiler.Error](fastparse.parse(code.replace("$", ""), StatefulParser.struct(_)))
+      error.message is "These struct fields are defined multiple times: a"
+      error.position is code.indexOf("$")
+    }
   }
 }

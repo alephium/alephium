@@ -100,13 +100,13 @@ object Compiler {
   def compileProject(
       input: String,
       compilerOptions: CompilerOptions = CompilerOptions.Default
-  ): Either[Error, (AVector[CompiledContract], AVector[CompiledScript])] = {
+  ): Either[Error, (AVector[CompiledContract], AVector[CompiledScript], AVector[Ast.Struct])] = {
     try {
       compileMultiContract(input).map { multiContract =>
         val statefulContracts =
           multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
         val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
-        (statefulContracts, statefulScripts)
+        (statefulContracts, statefulScripts, AVector.from(multiContract.structs))
       }
     } catch {
       case e: Error => Left(e)
@@ -143,11 +143,7 @@ object Compiler {
     def usePreapprovedAssets: Boolean
     def useAssetsInContract: Boolean
     def useUpdateFields: Boolean
-    def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type]
-    def getReturnLength(inputType: Seq[Type], selfContractType: Type): Int = {
-      val retTypes = getReturnType(inputType, selfContractType)
-      Type.flattenTypeLength(retTypes)
-    }
+    def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type]
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
       args.flatMap(_.genCode(state))
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
@@ -207,11 +203,11 @@ object Compiler {
       def isUnused: Boolean  = false
       def isLocal: Boolean   = false
     }
-    final case class ArrayRef[Ctx <: StatelessContext](
+    final case class MultipleVar[Ctx <: StatelessContext](
         isMutable: Boolean,
         isUnused: Boolean,
         isGenerated: Boolean,
-        ref: ArrayTransformer.ArrayRef[Ctx]
+        ref: VariablesRef[Ctx]
     ) extends VarInfo {
       def tpe: Type        = ref.tpe
       def isLocal: Boolean = ref.isLocal
@@ -243,9 +239,12 @@ object Compiler {
   ) extends ContractFunc[Ctx] {
     def name: String = id.name
 
-    override def getReturnType(inputType: Seq[Type], selfContractType: Type): Seq[Type] = {
-      if (inputType == argsType) {
-        returnType
+    override def getReturnType[C <: Ctx](
+        inputType: Seq[Type],
+        state: Compiler.State[C]
+    ): Seq[Type] = {
+      if (inputType == state.resolveTypes(argsType)) {
+        state.resolveTypes(returnType)
       } else {
         throw Error(
           s"Invalid args type ${quote(inputType)} for func $name, expected ${quote(argsType)}",
@@ -376,14 +375,18 @@ object Compiler {
 
     def buildFor(script: Ast.AssetScript)(implicit
         compilerOptions: CompilerOptions
-    ): State[StatelessContext] =
+    ): State[StatelessContext] = {
+      val globalState = Ast.GlobalState(script.structs)
+      val funcTable   = script.funcTable(globalState)
       StateForScript(
         script.ident,
         mutable.HashMap.empty,
         0,
-        script.funcTable,
-        immutable.Map(script.ident -> ContractInfo(ContractKind.TxScript, script.funcTable))
+        funcTable,
+        immutable.Map(script.ident -> ContractInfo(ContractKind.TxScript, funcTable)),
+        globalState
       )
+    }
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def buildFor(
@@ -396,9 +399,10 @@ object Compiler {
         contract.isInstanceOf[Ast.TxScript],
         mutable.HashMap.empty,
         0,
-        contract.funcTable,
+        contract.funcTable(multiContract.globalState),
         contract.eventsInfo(),
-        multiContract.contractsTable
+        multiContract.contractsTable,
+        multiContract.globalState
       )
     }
   }
@@ -479,7 +483,7 @@ object Compiler {
       with Scope
       with PhaseLike {
     def typeId: Ast.TypeId
-    def selfContractType: Type = Type.Contract.stack(typeId)
+    def selfContractType: Type = Type.Contract(typeId)
     def varTable: mutable.HashMap[String, VarInfo]
     var allowDebug: Boolean = false
 
@@ -490,65 +494,98 @@ object Compiler {
 
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
+    def globalState: Ast.GlobalState
     val accessedVars: mutable.Set[AccessVariable] = mutable.Set.empty[AccessVariable]
     def eventsInfo: Seq[EventInfo]
 
-    def getArrayIndexVar(): Ast.Ident = {
-      getArrayIndexVar(
+    def getStruct(typeId: Ast.TypeId): Ast.Struct = {
+      globalState.structs.find(_.id == typeId) match {
+        case Some(struct) => struct
+        case None =>
+          throw Compiler.Error(s"Struct ${quote(typeId.name)} does not exist", typeId.sourceIndex)
+      }
+    }
+
+    def getOrCreateStructRef(expr: Ast.Expr[Ctx]): (StructRef[Ctx], Seq[Instr[Ctx]]) = {
+      val (ref, codes) = getOrCreateVariablesRef(expr)
+      ref match {
+        case ref: StructRef[Ctx @unchecked] => (ref, codes)
+        case _ =>
+          throw Compiler.Error(s"Expected struct type, got ${ref.tpe}", expr.sourceIndex)
+      }
+    }
+
+    def getOrCreateArrayRef(expr: Ast.Expr[Ctx]): (ArrayRef[Ctx], Seq[Instr[Ctx]]) = {
+      val (ref, codes) = getOrCreateVariablesRef(expr)
+      ref match {
+        case ref: ArrayRef[Ctx @unchecked] => (ref, codes)
+        case _ =>
+          throw Compiler.Error(s"Expected array type, got ${ref.tpe}", expr.sourceIndex)
+      }
+    }
+
+    @scala.annotation.tailrec
+    def getOrCreateVariablesRef(expr: Ast.Expr[Ctx]): (VariablesRef[Ctx], Seq[Instr[Ctx]]) = {
+      expr match {
+        case Ast.StructFieldSelector(struct, selector) =>
+          val (ref, codes) = getOrCreateStructRef(struct)
+          (ref.subRef(this, selector), codes)
+        case Ast.ArrayElement(array, index) =>
+          val (ref, codes) = getOrCreateArrayRef(array)
+          (ref.subRef(this, index), codes)
+        case Ast.Variable(ident)  => (getVariablesRef(ident), Seq.empty)
+        case Ast.ParenExpr(inner) => getOrCreateVariablesRef(inner)
+        case _ =>
+          val ref = VariablesRef.init(
+            this,
+            expr.getType(this)(0),
+            freshName(),
+            isMutable = false,
+            isUnused = false,
+            isLocal = true,
+            isGenerated = true,
+            isTemplate = false,
+            VarInfo.Local
+          )
+          val codes = expr.genCode(this) ++ ref.genStoreCode(this).reverse.flatten
+          (ref, codes)
+      }
+    }
+
+    def getLocalArrayVarIndex(): Ast.Ident = {
+      getLocalArrayVarIndex(
         addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
       )
     }
 
-    @SuppressWarnings(
-      Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Recursion")
-    )
-    def getOrCreateArrayRef(
-        expr: Ast.Expr[Ctx]
-    ): (ArrayTransformer.ArrayRef[Ctx], Seq[Instr[Ctx]]) = {
-      expr match {
-        case Ast.ArrayElement(array, indexes) =>
-          val (arrayRef, codes) = getOrCreateArrayRef(array)
-          val subArrayRef       = arrayRef.subArray(this, indexes)
-          (subArrayRef, codes)
-        case Ast.Variable(ident)  => (getArrayRef(ident), Seq.empty)
-        case Ast.ParenExpr(inner) => getOrCreateArrayRef(inner)
-        case _ =>
-          val arrayType = expr.getType(this)(0).asInstanceOf[Type.FixedSizeArray]
-          val arrayRef =
-            ArrayTransformer.init(
-              this,
-              arrayType,
-              freshName(),
-              isMutable = false,
-              isUnused = false,
-              isLocal = true,
-              isGenerated = true,
-              isTemplate = false,
-              VarInfo.Local,
-              () => currentScopeState.varIndex.toByte,
-              () => currentScopeState.varIndex += 1
-            )
-          val codes = expr.genCode(this) ++ arrayRef.genStoreCode(this).reverse.flatten
-          (arrayRef, codes)
-      }
+    def getImmFieldArrayVarIndex(): Ast.Ident = {
+      getImmFieldArrayVarIndex(
+        addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
+      )
     }
 
-    def addArrayRef(
+    def getMutFieldArrayVarIndex(): Ast.Ident = {
+      getMutFieldArrayVarIndex(
+        addLocalVariable(_, Type.U256, isMutable = true, isUnused = false, isGenerated = true)
+      )
+    }
+
+    def addVariablesRef(
         ident: Ast.Ident,
         isMutable: Boolean,
         isUnused: Boolean,
         isGenerated: Boolean,
-        arrayRef: ArrayTransformer.ArrayRef[Ctx]
+        ref: VariablesRef[Ctx]
     ): Unit = {
       val sname = checkNewVariable(ident)
-      varTable(sname) = VarInfo.ArrayRef(isMutable, isUnused, isGenerated, arrayRef)
+      varTable(sname) = VarInfo.MultipleVar(isMutable, isUnused, isGenerated, ref)
       trackGenCodePhaseNewVars(sname)
     }
 
-    def getArrayRef(ident: Ast.Ident): ArrayTransformer.ArrayRef[Ctx] = {
+    def getVariablesRef(ident: Ast.Ident): VariablesRef[Ctx] = {
       getVariable(ident) match {
-        case info: VarInfo.ArrayRef[Ctx @unchecked] => info.ref
-        case _ => throw Error(s"Array $ident does not exist", ident.sourceIndex)
+        case v: VarInfo.MultipleVar[Ctx @unchecked] => v.ref
+        case _ => throw Error(s"Struct ${ident.name} does not exist", ident.sourceIndex)
       }
     }
 
@@ -561,33 +598,17 @@ object Compiler {
       s"${scopedNamePrefix(scopeId)}$name"
     }
 
-    def addTemplateVariable(ident: Ast.Ident, tpe: Type, index: Int): Int = {
-      val sname        = checkNewVariable(ident)
-      var currentIndex = index
-      tpe match {
-        case array: Type.FixedSizeArray =>
-          ArrayTransformer.init(
-            this,
-            array,
-            ident.name,
-            isMutable = false,
-            isUnused = false,
-            isLocal = false,
-            isGenerated = false,
-            isTemplate = true,
-            (tpe, _, _, index, isGenerated) => VarInfo.Template(tpe, index.toInt, isGenerated),
-            () => currentIndex.toByte,
-            () => currentIndex += 1
-          )
-          currentIndex
-        case c: Type.Contract =>
-          val varType = Type.Contract.local(c.id, ident)
-          varTable(sname) = VarInfo.Template(varType, index, isGenerated = false)
-          currentIndex + 1
-        case _ =>
-          varTable(sname) = VarInfo.Template(tpe, index, isGenerated = false)
-          currentIndex + 1
-      }
+    def addTemplateVariable(ident: Ast.Ident, tpe: Type): Unit = {
+      addVariable(
+        ident,
+        tpe,
+        isMutable = false,
+        isUnused = false,
+        isLocal = false,
+        isGenerated = false,
+        isTemplate = true,
+        (tpe, _, _, index, isGenerated) => VarInfo.Template(tpe, index.toInt, isGenerated)
+      )
     }
     def addFieldVariable(
         ident: Ast.Ident,
@@ -604,9 +625,7 @@ object Compiler {
         isLocal = false,
         isGenerated,
         isTemplate = false,
-        VarInfo.Field,
-        () => if (isMutable) this.mutFieldsIndex.toByte else this.immFieldsIndex.toByte,
-        () => if (isMutable) this.mutFieldsIndex += 1 else this.immFieldsIndex += 1
+        VarInfo.Field
       )
     }
     def addLocalVariable(
@@ -624,9 +643,7 @@ object Compiler {
         isLocal = true,
         isGenerated,
         isTemplate = false,
-        VarInfo.Local,
-        () => currentScopeState.varIndex.toByte,
-        () => currentScopeState.varIndex += 1
+        VarInfo.Local
       )
     }
     // scalastyle:off parameter.number
@@ -639,51 +656,47 @@ object Compiler {
         isLocal: Boolean,
         isGenerated: Boolean,
         isTemplate: Boolean,
-        varInfoBuilder: Compiler.VarInfoBuilder,
-        getIndex: () => Byte,
-        increaseIndex: () => Unit
+        varInfoBuilder: Compiler.VarInfoBuilder
     ): Unit = {
       val sname = checkNewVariable(ident)
       tpe match {
-        case t: Type.FixedSizeArray =>
-          ArrayTransformer.init(
+        case tpe: Type.NamedType => // this should never happen
+          throw Error(s"Unresolved named type $tpe", ident.sourceIndex)
+        case _: Type.FixedSizeArray | _: Type.Struct =>
+          VariablesRef.init(
             this,
-            t,
+            tpe,
             ident.name,
             isMutable,
             isUnused,
             isLocal,
             isGenerated,
             isTemplate,
-            varInfoBuilder,
-            getIndex,
-            increaseIndex
+            varInfoBuilder
           )
           ()
         case c: Type.Contract =>
-          val varType = Type.Contract.local(c.id, ident)
           varTable(sname) = varInfoBuilder(
-            varType,
+            Type.Contract(c.id),
             isMutable,
             isUnused,
-            getIndex(),
+            getAndUpdateVarIndex(isTemplate, isLocal, isMutable).toByte,
             isGenerated
           )
           trackGenCodePhaseNewVars(sname)
-          increaseIndex()
         case _ =>
           varTable(sname) = varInfoBuilder(
             tpe,
             isMutable,
             isUnused,
-            getIndex(),
+            getAndUpdateVarIndex(isTemplate, isLocal, isMutable).toByte,
             isGenerated
           )
           trackGenCodePhaseNewVars(sname)
-          increaseIndex()
       }
     }
     // scalastyle:on parameter.number
+    // scalastyle:off method.length
     def addConstantVariable(ident: Ast.Ident, tpe: Type, instrs: Seq[Instr[Ctx]]): Unit = {
       val sname = checkNewVariable(ident)
       varTable(sname) = VarInfo.Constant(tpe, instrs)
@@ -828,64 +841,71 @@ object Compiler {
       }
     }
 
-    @scala.annotation.tailrec
-    private def arrayElementType(
-        arrayType: Type.FixedSizeArray,
-        indexes: Seq[Ast.Expr[Ctx]]
-    ): Type = {
-      if (indexes.length == 1) {
-        arrayType.baseType
-      } else {
-        arrayType.baseType match {
-          case baseType: Type.FixedSizeArray => arrayElementType(baseType, indexes.drop(1))
-          case tpe =>
-            throw Compiler.Error(
-              s"Expected array type, got ${quote(tpe)}",
-              indexes.headOption.flatMap(_.sourceIndex)
-            )
-        }
+    def getArrayElementType(array: Ast.Expr[Ctx], index: Ast.Expr[Ctx]): Type = {
+      checkArrayIndexType(index)
+      array.getType(this) match {
+        case Seq(tpe: Type.FixedSizeArray) => resolveType(tpe.baseType)
+        case tpe =>
+          throw Compiler.Error(
+            s"Expected array type, got ${if (tpe.length == 1) quote(tpe(0)) else quote(tpe)}",
+            array.sourceIndex
+          )
       }
     }
 
-    def getArrayElementType(array: Ast.Expr[Ctx], indexes: Seq[Ast.Expr[Ctx]]): Type = {
-      getArrayElementType(array.getType(this), indexes)
-    }
-    def getArrayElementType(tpes: Seq[Type], indexes: Seq[Ast.Expr[Ctx]]): Type = {
-      indexes.foreach(checkArrayIndexType)
-      tpes match {
-        case Seq(tpe: Type.FixedSizeArray) => arrayElementType(tpe, indexes)
-        case tpe =>
-          throw Compiler.Error(
-            s"Expected array type, got ${quote(tpe)}",
-            indexes.headOption.flatMap(_.sourceIndex)
-          )
+    def getStructFieldType(expr: Ast.Expr[Ctx], selector: Ast.Ident): Type = {
+      expr.getType(this) match {
+        case Seq(tpe: Type.Struct) =>
+          val struct = getStruct(tpe.id)
+          resolveType(struct.getField(selector).tpe)
+        case tpe => throw Compiler.Error(s"Expected struct type, got $tpe", expr.sourceIndex)
       }
     }
 
     def genLoadCode(ident: Ast.Ident): Seq[Instr[Ctx]]
 
     def genLoadCode(
-        arrayRef: ArrayTransformer.ArrayRef[Ctx],
-        offset: ArrayTransformer.ArrayVarOffset[Ctx]
+        ident: Ast.Ident,
+        isTemplate: Boolean,
+        isLocal: Boolean,
+        isMutable: Boolean,
+        tpe: Type,
+        offset: VarOffset[Ctx]
     ): Seq[Instr[Ctx]]
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-    def genLoadTemplateArray(
-        arrayRef: ArrayTransformer.ArrayRef[Ctx],
-        offset: ArrayTransformer.ArrayVarOffset[Ctx]
-    ): Seq[Instr[Ctx]] = {
-      val index = offset.asInstanceOf[ArrayTransformer.ConstantArrayVarOffset[Ctx]].value
-      Seq(TemplateVariable(arrayRef.ident.name, arrayRef.tpe.elementType.toVal, index))
+    def genLoadTemplateRef(ident: Ast.Ident, tpe: Type, offset: VarOffset[Ctx]): Seq[Instr[Ctx]] = {
+      val index = offset.asInstanceOf[ConstantVarOffset[Ctx]].value
+      Seq(TemplateVariable(ident.name, resolveType(tpe).toVal, index))
     }
 
     def genStoreCode(ident: Ast.Ident): Seq[Seq[Instr[Ctx]]]
 
-    def genStoreCode(
-        offset: ArrayTransformer.ArrayVarOffset[Ctx],
-        isLocal: Boolean
-    ): Seq[Instr[Ctx]]
+    def genStoreCode(offset: VarOffset[Ctx], isLocal: Boolean): Seq[Instr[Ctx]]
 
-    def getType(ident: Ast.Ident): Type = getVariable(ident).tpe
+    def resolveType(ident: Ast.Ident): Type  = globalState.resolveType(getVariable(ident).tpe)
+    @inline def resolveType(tpe: Type): Type = globalState.resolveType(tpe)
+    @inline def resolveTypes(types: Seq[Type]): Seq[Type] = globalState.resolveTypes(types)
+    @inline def flattenTypeLength(types: Seq[Type]): Int  = globalState.flattenTypeLength(types)
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def flattenTypeMutability(tpe: Type, isMutable: Boolean): Seq[Boolean] = {
+      val resolvedType = resolveType(tpe)
+      if (isMutable) {
+        resolvedType match {
+          case Type.FixedSizeArray(baseType, size) =>
+            val array = flattenTypeMutability(baseType, isMutable)
+            Seq.fill(size)(array).flatten
+          case Type.Struct(id) =>
+            getStruct(id).fields.flatMap(field =>
+              flattenTypeMutability(resolveType(field.tpe), field.isMutable && isMutable)
+            )
+          case _ => Seq(isMutable)
+        }
+      } else {
+        Seq.fill(flattenTypeLength(Seq(resolvedType)))(false)
+      }
+    }
 
     def getFunc(call: Ast.FuncId): FuncInfo[Ctx] = {
       if (call.isBuiltIn) {
@@ -936,8 +956,12 @@ object Compiler {
 
     def checkArguments(args: Seq[Ast.Argument]): Unit = {
       args.foreach(_.tpe match {
-        case c: Type.Contract => checkContractType(c.id)
-        case _                =>
+        case c: Type.NamedType =>
+          resolveType(c) match {
+            case c: Type.Contract => checkContractType(c.id)
+            case _                =>
+          }
+        case _ =>
       })
     }
 
@@ -954,7 +978,10 @@ object Compiler {
     def checkAssign(ident: Ast.Ident, tpe: Type): Unit = {
       val varInfo = getVariable(ident)
       if (varInfo.tpe != tpe) {
-        throw Error(s"Assign $tpe value to $ident: ${varInfo.tpe.toVal}", ident.sourceIndex)
+        throw Error(
+          s"Assign $tpe value to $ident: ${resolveType(varInfo.tpe).toVal}",
+          ident.sourceIndex
+        )
       }
       if (!varInfo.isMutable) {
         throw Error(s"Assign value to immutable variable $ident", ident.sourceIndex)
@@ -963,7 +990,7 @@ object Compiler {
 
     def checkReturn(returnType: Seq[Type], sourceIndex: Option[SourceIndex]): Unit = {
       val rtype = funcIdents(currentScope).returnType
-      if (returnType != rtype) {
+      if (returnType != resolveTypes(rtype)) {
         throw Error(
           s"Invalid return types ${quote(returnType)} for func ${currentScope.name}, expected ${quote(rtype)}",
           sourceIndex
@@ -979,7 +1006,8 @@ object Compiler {
       varTable: mutable.HashMap[String, VarInfo],
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatelessContext]],
-      contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatelessContext]]
+      contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatelessContext]],
+      globalState: Ast.GlobalState
   )(implicit val compilerOptions: CompilerOptions)
       extends State[StatelessContext] {
     override def eventsInfo: Seq[EventInfo] = Seq.empty
@@ -993,7 +1021,7 @@ object Compiler {
     }
 
     private def genVarIndexCode(
-        offset: ArrayTransformer.ArrayVarOffset[StatelessContext],
+        offset: VarOffset[StatelessContext],
         isLocal: Boolean,
         constantIndex: Byte => Instr[StatelessContext],
         varIndex: Instr[StatelessContext]
@@ -1003,27 +1031,31 @@ object Compiler {
       }
 
       offset match {
-        case ArrayTransformer.ConstantArrayVarOffset(value) =>
+        case ConstantVarOffset(value) =>
           State.checkConstantIndex(value, typeId.sourceIndex)
           Seq(constantIndex(value.toByte))
-        case ArrayTransformer.VariableArrayVarOffset(instrs) =>
+        case VariableVarOffset(instrs) =>
           instrs :+ varIndex
       }
     }
 
     def genLoadCode(
-        arrayRef: ArrayTransformer.ArrayRef[StatelessContext],
-        offset: ArrayTransformer.ArrayVarOffset[StatelessContext]
+        ident: Ast.Ident,
+        isTemplate: Boolean,
+        isLocal: Boolean,
+        isMutable: Boolean,
+        tpe: Type,
+        offset: VarOffset[StatelessContext]
     ): Seq[Instr[StatelessContext]] = {
-      if (arrayRef.isTemplate) {
-        genLoadTemplateArray(arrayRef, offset)
+      if (isTemplate) {
+        genLoadTemplateRef(ident, tpe, offset)
       } else {
-        genVarIndexCode(offset, arrayRef.isLocal, LoadLocal.apply, LoadLocalByIndex)
+        genVarIndexCode(offset, isLocal, LoadLocal.apply, LoadLocalByIndex)
       }
     }
 
     def genStoreCode(
-        offset: ArrayTransformer.ArrayVarOffset[StatelessContext],
+        offset: VarOffset[StatelessContext],
         isLocal: Boolean
     ): Seq[Instr[StatelessContext]] =
       genVarIndexCode(offset, isLocal, StoreLocal.apply, StoreLocalByIndex)
@@ -1031,12 +1063,12 @@ object Compiler {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatelessContext]] = {
       getVariable(ident) match {
-        case _: VarInfo.Field    => throw Error("Script should not have fields", typeId.sourceIndex)
-        case v: VarInfo.Local    => Seq(LoadLocal(v.index))
-        case v: VarInfo.Template => Seq(TemplateVariable(ident.name, v.tpe.toVal, v.index))
-        case _: VarInfo.ArrayRef[StatelessContext @unchecked] =>
-          getArrayRef(ident).genLoadCode(this)
-        case v: VarInfo.Constant[StatelessContext @unchecked] => v.instrs
+        case _: VarInfo.Field => throw Error("Script should not have fields", typeId.sourceIndex)
+        case v: VarInfo.Local => Seq(LoadLocal(v.index))
+        case v: VarInfo.Template =>
+          Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
+        case v: VarInfo.MultipleVar[StatelessContext @unchecked] => v.ref.genLoadCode(this)
+        case v: VarInfo.Constant[StatelessContext @unchecked]    => v.instrs
       }
     }
 
@@ -1047,7 +1079,7 @@ object Compiler {
         case v: VarInfo.Local => Seq(Seq(StoreLocal(v.index)))
         case _: VarInfo.Template =>
           throw Error(s"Unexpected template variable: ${ident.name}", ident.sourceIndex)
-        case ref: VarInfo.ArrayRef[StatelessContext @unchecked] => ref.ref.genStoreCode(this)
+        case v: VarInfo.MultipleVar[StatelessContext @unchecked] => v.ref.genStoreCode(this)
         case _: VarInfo.Constant[StatelessContext @unchecked] =>
           throw Error(s"Unexpected constant variable: ${ident.name}", ident.sourceIndex)
       }
@@ -1061,7 +1093,8 @@ object Compiler {
       var varIndex: Int,
       funcIdents: immutable.Map[Ast.FuncId, ContractFunc[StatefulContext]],
       eventsInfo: Seq[EventInfo],
-      contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatefulContext]]
+      contractTable: immutable.Map[Ast.TypeId, ContractInfo[StatefulContext]],
+      globalState: Ast.GlobalState
   )(implicit val compilerOptions: CompilerOptions)
       extends State[StatefulContext] {
     def getBuiltInFunc(call: Ast.FuncId): BuiltIn.BuiltIn[StatefulContext] = {
@@ -1073,7 +1106,7 @@ object Compiler {
     }
 
     private def genVarIndexCode(
-        offset: ArrayTransformer.ArrayVarOffset[StatefulContext],
+        offset: VarOffset[StatefulContext],
         isLocal: Boolean,
         localConstantIndex: Byte => Instr[StatefulContext],
         fieldConstantIndex: Byte => Instr[StatefulContext],
@@ -1081,36 +1114,40 @@ object Compiler {
         fieldVarIndex: Instr[StatefulContext]
     ): Seq[Instr[StatefulContext]] = {
       offset match {
-        case ArrayTransformer.ConstantArrayVarOffset(value) =>
+        case ConstantVarOffset(value) =>
           State.checkConstantIndex(value, typeId.sourceIndex)
           val index = value.toByte
           if (isLocal) Seq(localConstantIndex(index)) else Seq(fieldConstantIndex(index))
-        case ArrayTransformer.VariableArrayVarOffset(instrs) =>
+        case VariableVarOffset(instrs) =>
           val instr = if (isLocal) localVarIndex else fieldVarIndex
           instrs :+ instr
       }
     }
 
     def genLoadCode(
-        arrayRef: ArrayTransformer.ArrayRef[StatefulContext],
-        offset: ArrayTransformer.ArrayVarOffset[StatefulContext]
+        ident: Ast.Ident,
+        isTemplate: Boolean,
+        isLocal: Boolean,
+        isMutable: Boolean,
+        tpe: Type,
+        offset: VarOffset[StatefulContext]
     ): Seq[Instr[StatefulContext]] = {
-      if (arrayRef.isTemplate) {
-        genLoadTemplateArray(arrayRef, offset)
+      if (isTemplate) {
+        genLoadTemplateRef(ident, tpe, offset)
       } else {
         genVarIndexCode(
           offset,
-          arrayRef.isLocal,
+          isLocal,
           LoadLocal.apply,
-          if (arrayRef.isMutable) LoadMutField.apply else LoadImmField.apply,
+          if (isMutable) LoadMutField.apply else LoadImmField.apply,
           LoadLocalByIndex,
-          if (arrayRef.isMutable) LoadMutFieldByIndex else LoadImmFieldByIndex
+          if (isMutable) LoadMutFieldByIndex else LoadImmFieldByIndex
         )
       }
     }
 
     def genStoreCode(
-        offset: ArrayTransformer.ArrayVarOffset[StatefulContext],
+        offset: VarOffset[StatefulContext],
         isLocal: Boolean
     ): Seq[Instr[StatefulContext]] = {
       genVarIndexCode(
@@ -1128,10 +1165,11 @@ object Compiler {
       getVariable(ident) match {
         case v: VarInfo.Field =>
           if (v.isMutable) Seq(LoadMutField(v.index)) else Seq(LoadImmField(v.index))
-        case v: VarInfo.Local    => Seq(LoadLocal(v.index))
-        case v: VarInfo.Template => Seq(TemplateVariable(ident.name, v.tpe.toVal, v.index))
-        case _: VarInfo.ArrayRef[StatefulContext @unchecked] => getArrayRef(ident).genLoadCode(this)
-        case v: VarInfo.Constant[StatefulContext @unchecked] => v.instrs
+        case v: VarInfo.Local => Seq(LoadLocal(v.index))
+        case v: VarInfo.Template =>
+          Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
+        case v: VarInfo.MultipleVar[StatefulContext @unchecked] => v.ref.genLoadCode(this)
+        case v: VarInfo.Constant[StatefulContext @unchecked]    => v.instrs
       }
     }
 
@@ -1142,7 +1180,7 @@ object Compiler {
         case v: VarInfo.Local => Seq(Seq(StoreLocal(v.index)))
         case _: VarInfo.Template =>
           throw Error(s"Unexpected template variable: ${ident.name}", ident.sourceIndex)
-        case ref: VarInfo.ArrayRef[StatefulContext @unchecked] => ref.ref.genStoreCode(this)
+        case v: VarInfo.MultipleVar[StatefulContext @unchecked] => v.ref.genStoreCode(this)
         case _: VarInfo.Constant[StatefulContext @unchecked] =>
           throw Error(s"Unexpected constant variable: ${ident.name}", ident.sourceIndex)
       }

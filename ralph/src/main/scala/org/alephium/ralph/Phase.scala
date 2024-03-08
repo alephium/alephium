@@ -61,7 +61,9 @@ trait PhaseLike { self: Compiler.State[_] =>
     scopes.foreach { case (scopeId, scopeState) =>
       scopeState.varIndex = checkPhaseVarIndexes(scopeId)
       scopeState.freshNameIndex = 0
-      scopeState.arrayIndexVar = None
+      scopeState.localArrayIndexVar = None
+      scopeState.immFieldArrayIndexVar = None
+      scopeState.mutFieldArrayIndexVar = None
     }
   }
 

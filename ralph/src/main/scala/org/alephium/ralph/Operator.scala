@@ -113,7 +113,7 @@ object ArithOperator {
 
 sealed trait TestOperator extends Operator {
   def getReturnType(argsType: Seq[Type]): Seq[Type] = {
-    if (argsType.length != 2 || argsType(0) != argsType(1) || argsType(0).isArrayType) {
+    if (argsType.length != 2 || argsType(0) != argsType(1) || !argsType(0).isPrimitive) {
       throw Compiler.Error(s"Invalid param types $argsType for $this", None)
     } else {
       Seq(Type.Bool)

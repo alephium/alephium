@@ -3043,23 +3043,6 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
-  it should "not compile when emitting events with array field types" in new FlowFixture {
-    def contractRaw: String =
-      s"""
-         |Contract Foo(result: U256) {
-         |
-         |  event TestEvent(f: [U256; 2])
-         |
-         |  pub fn testArrayEventType() -> (U256) {
-         |    emit TestEvent([1, 2])
-         |    return 0
-         |  }
-         |}
-         |""".stripMargin
-    Compiler.compileContract(contractRaw).leftValue.message is
-      "Array type not supported for event \"Foo.TestEvent\""
-  }
-
   private def getLogStates(
       blockFlow: BlockFlow,
       contractId: ContractId,
