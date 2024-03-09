@@ -5306,4 +5306,29 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       )
     }
   }
+
+  it should "compile successfully when statements in contract body are not in strict order" in new Fixture {
+    val statements = Seq(
+      "event E(v: U256)",
+      "enum FooErrorCodes { Error0 = 0 }",
+      "const V = 1",
+      "pub fn f() -> () {}"
+    )
+
+    def success(indexes: Int*) = {
+      val code =
+        s"""
+           |Contract C() {
+           |  ${statements(indexes(0))}
+           |  ${statements(indexes(1))}
+           |  ${statements(indexes(2))}
+           |  ${statements(indexes(3))}
+           |}
+           |""".stripMargin
+
+      Compiler.compileContract(code).rightValue
+    }
+
+    Seq(0, 1, 2, 3).permutations.foreach(success)
+  }
 }

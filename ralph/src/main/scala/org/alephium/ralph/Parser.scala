@@ -892,7 +892,7 @@ object StatefulParser extends Parser[StatefulContext] {
       annotation.rep ~ Index ~ Lexer.`abstract` ~ Lexer.token(
         Keyword.Contract
       ) ~/ Lexer.typeId ~ contractFields ~
-        contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
+        contractInheritances.? ~ "{" ~ (eventDef | constantVarDef | rawEnumDef | func).rep ~ "}"
         ~~ Index
     ).map {
       case (
@@ -903,13 +903,16 @@ object StatefulParser extends Parser[StatefulContext] {
             typeId,
             fields,
             contractInheritances,
-            events,
-            constantVars,
-            enums,
-            funcs,
+            statements,
             endIndex
           ) =>
         val contractStdAnnotation = Parser.ContractStdAnnotation.extractFields(annotations, None)
+        val funcs = statements.collect { case f: Ast.FuncDef[_] =>
+          f.asInstanceOf[Ast.FuncDef[StatefulContext]]
+        }
+        val events       = statements.collect { case e: Ast.EventDef => e }
+        val constantVars = statements.collect { case c: Ast.ConstantVarDef => c }
+        val enums        = statements.collect { case e: Ast.EnumDef => e }
         Ast
           .Contract(
             contractStdAnnotation.map(_.enabled),
