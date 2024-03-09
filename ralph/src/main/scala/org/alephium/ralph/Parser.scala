@@ -16,6 +16,8 @@
 
 package org.alephium.ralph
 
+import scala.collection.mutable.ArrayBuffer
+
 import akka.util.ByteString
 import fastparse._
 
@@ -908,29 +910,29 @@ object StatefulParser extends Parser[StatefulContext] {
             endIndex
           ) =>
         val contractStdAnnotation = Parser.ContractStdAnnotation.extractFields(annotations, None)
-        var funcs                 = Seq.empty[Ast.FuncDef[StatefulContext]]
-        var events                = Seq.empty[Ast.EventDef]
-        var constantVars          = Seq.empty[Ast.ConstantVarDef]
-        var enums                 = Seq.empty[Ast.EnumDef]
+        val funcs                 = ArrayBuffer.empty[Ast.FuncDef[StatefulContext]]
+        val events                = ArrayBuffer.empty[Ast.EventDef]
+        val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef]
+        val enums                 = ArrayBuffer.empty[Ast.EnumDef]
 
         statements.foreach {
           case e: Ast.EventDef =>
             if (constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty) {
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
-            events = events :+ e
+            events += e
           case c: Ast.ConstantVarDef =>
             if (funcs.nonEmpty || enums.nonEmpty) {
               throwContractStmtsOutOfOrderException(c.sourceIndex)
             }
-            constantVars = constantVars :+ c
+            constantVars += c
           case e: Ast.EnumDef =>
             if (funcs.nonEmpty) {
               throwContractStmtsOutOfOrderException(e.sourceIndex)
             }
-            enums = enums :+ e
+            enums += e
           case f: Ast.FuncDef[_] =>
-            funcs = funcs :+ f.asInstanceOf[Ast.FuncDef[StatefulContext]]
+            funcs += f.asInstanceOf[Ast.FuncDef[StatefulContext]]
           case _ =>
         }
 
@@ -942,10 +944,10 @@ object StatefulParser extends Parser[StatefulContext] {
             typeId,
             Seq.empty,
             fields,
-            funcs,
-            events,
-            constantVars,
-            enums,
+            funcs.toSeq,
+            events.toSeq,
+            constantVars.toSeq,
+            enums.toSeq,
             contractInheritances.getOrElse(Seq.empty)
           )
           .atSourceIndex(fromIndex, endIndex)
@@ -954,7 +956,7 @@ object StatefulParser extends Parser[StatefulContext] {
 
   private def throwContractStmtsOutOfOrderException(sourceIndex: Option[SourceIndex]) = {
     throw Compiler.Error(
-      "Contract statements should be in the order of `events`, `enums`, `consts` and `methods`",
+      "Contract statements should be in the order of `events`, `consts`, `enums` and `methods`",
       sourceIndex
     )
   }

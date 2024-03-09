@@ -5332,7 +5332,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         Compiler
           .compileContract(code)
           .leftValue
-          .message is "Contract statements should be in the order of `events`, `enums`, `consts` and `methods`"
+          .message is "Contract statements should be in the order of `events`, `consts`, `enums` and `methods`"
       }
     }
 
