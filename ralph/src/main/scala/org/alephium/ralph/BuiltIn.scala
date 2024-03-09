@@ -1898,37 +1898,39 @@ object BuiltIn {
       fields: Seq[Ast.Argument],
       globalState: Ast.GlobalState
   ): Compiler.ContractFunc[Ctx] = {
-    val fieldTypes             = fields.map(_.tpe)
-    val (mutFields, immFields) = fields.view.partition(_.isMutable)
-    val immFieldsLength        = globalState.flattenTypeLength(immFields.map(_.tpe).toSeq)
-    val mutFieldsLength        = globalState.flattenTypeLength(mutFields.map(_.tpe).toSeq)
+    val fieldsMutability =
+      fields.flatMap(arg => globalState.flattenTypeMutability(arg.tpe, arg.isMutable))
+    val immFieldsLength = fieldsMutability.count(!_)
+    val mutFieldsLength = fieldsMutability.length - immFieldsLength
     new ContractBuiltIn[Ctx] {
       val name: String          = "encodeFields"
-      val argsType: Seq[Type]   = globalState.resolveTypes(fieldTypes)
+      val argsType: Seq[Type]   = globalState.resolveTypes(fields.map(_.tpe))
       val returnType: Seq[Type] = Seq(Type.ByteVec, Type.ByteVec)
 
       override def genCodeForArgs[C <: Ctx](
           args: Seq[Ast.Expr[C]],
           state: Compiler.State[C]
       ): Seq[Instr[C]] = {
-        val (immFields, mutFields) = args.view.zipWithIndex
-          .foldLeft[(Seq[Ast.Expr[C]], Seq[Ast.Expr[C]])]((Seq.empty, Seq.empty)) {
-            case ((immFields, mutFields), (expr, index)) =>
-              if (fields(index).isMutable) {
-                (immFields, mutFields :+ expr)
+        val (initCodes, argCodes) = state.flattenArgs(args)
+        assume(argCodes.length == fieldsMutability.length)
+        val (immFields, mutFields) = argCodes.view.zipWithIndex
+          .foldLeft[(Seq[Instr[C]], Seq[Instr[C]])]((Seq.empty, Seq.empty)) {
+            case ((immFields, mutFields), (instrs, index)) =>
+              if (fieldsMutability(index)) {
+                (immFields, mutFields ++ instrs)
               } else {
-                (immFields :+ expr, mutFields)
+                (immFields ++ instrs, mutFields)
               }
           }
-        val immFieldInstrs = immFields.flatMap(_.genCode(state)) ++ ContractBuiltIn.genCodeForStdId(
+        val immFieldInstrs = immFields ++ ContractBuiltIn.genCodeForStdId(
           stdInterfaceIdOpt,
           immFieldsLength
         )
-        val mutFieldInstrs = mutFields.flatMap(_.genCode(state)) ++ Seq[Instr[Ctx]](
+        val mutFieldInstrs = mutFields ++ Seq[Instr[Ctx]](
           U256Const(Val.U256.unsafe(mutFieldsLength)),
           Encode
         )
-        immFieldInstrs ++ mutFieldInstrs
+        initCodes ++ immFieldInstrs ++ mutFieldInstrs
       }
 
       def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] = Seq.empty
