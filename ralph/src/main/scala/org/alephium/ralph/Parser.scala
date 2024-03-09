@@ -835,15 +835,29 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef] =
-    PP(
-      Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ (value | stringLiteral.map(
-        _.string
-      ))
-    ) { case (_, ident, v) =>
-      Ast.ConstantVarDef(ident, v.asInstanceOf[Val])
+    PP(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ atom) { case (_, ident, value) =>
+      value match {
+        case Ast.Const(v) =>
+          Ast.ConstantVarDef(ident, v)
+        case Ast.StringLiteral(v) =>
+          Ast.ConstantVarDef(ident, v)
+        case v: Ast.CreateArrayExpr[_] =>
+          throwConstantVarDefException("arrays", v)
+        case v: Ast.StructCtor[_] =>
+          throwConstantVarDefException("structs", v)
+        case v: Ast.Positioned =>
+          throwConstantVarDefException("other expressions", v)
+      }
     }
+
+  private val primitiveTypes = Type.primitives.map(_.signature).mkString("/")
+  private def throwConstantVarDefException(label: String, v: Ast.Positioned) = {
+    throw Compiler.Error(
+      s"Expected constant value with primitive types ${primitiveTypes}, $label are not supported",
+      v.sourceIndex
+    )
+  }
 
   def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[StatefulContext]] =
     PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>

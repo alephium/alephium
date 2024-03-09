@@ -4837,19 +4837,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(code1, "These structs \"List(Foo)\" have circular references")
     }
-
-    {
-      info("Struct as constant")
-      val code =
-        s"""
-           |struct Foo { x: U256 }
-           |Contract C() {
-           |  const V = $$Foo {x: 0}$$
-           |  pub fn f() -> () {}
-           |}
-           |""".stripMargin
-      testContractError(code, "Expected (value | PP)")
-    }
   }
 
   it should "test struct" in new Fixture {
@@ -5267,6 +5254,55 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           Val.U256(0),
           Val.ByteVec(Hex.unsafe("00"))
         )
+      )
+    }
+  }
+
+  it should "report friendly error for non-primitive types for consts" in new Fixture {
+    {
+      info("Array as constant")
+      val code =
+        s"""
+           |Contract C() {
+           |  const V = $$[0, 0]$$
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Expected constant value with primitive types Bool/I256/U256/ByteVec/Address, arrays are not supported"
+      )
+    }
+
+    {
+      info("Struct as constant")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |Contract C() {
+           |  const V = $$Foo {x: 0}$$
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Expected constant value with primitive types Bool/I256/U256/ByteVec/Address, structs are not supported"
+      )
+    }
+
+    {
+      info("Other expressions as constant")
+      val code =
+        s"""
+           |Contract C() {
+           |  const V = $$if (1) 2 else 3$$
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+
+      testContractError(
+        code,
+        "Expected constant value with primitive types Bool/I256/U256/ByteVec/Address, other expressions are not supported"
       )
     }
   }
