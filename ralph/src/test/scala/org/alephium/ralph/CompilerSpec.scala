@@ -5310,12 +5310,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   it should "compile successfully when statements in contract body are not in strict order" in new Fixture {
     val statements = Seq(
       "event E(v: U256)",
-      "enum FooErrorCodes { Error0 = 0 }",
       "const V = 1",
+      "enum FooErrorCodes { Error0 = 0 }",
       "pub fn f() -> () {}"
     )
 
-    def success(indexes: Int*) = {
+    def verify(success: Boolean, indexes: Int*) = {
       val code =
         s"""
            |Contract C() {
@@ -5326,9 +5326,20 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
 
-      Compiler.compileContract(code).rightValue
+      if (success) {
+        Compiler.compileContract(code).rightValue
+      } else {
+        Compiler
+          .compileContract(code)
+          .leftValue
+          .message is "Contract statements should be in the order of `events`, `enums`, `consts` and `methods`"
+      }
     }
 
-    Seq(0, 1, 2, 3).permutations.foreach(success)
+    verify(success = true, 0, 1, 2, 3)
+
+    (Seq(0, 1, 2, 3).permutations.toSet - Seq(0, 1, 2, 3)).foreach { permutation =>
+      verify(success = false, permutation: _*)
+    }
   }
 }

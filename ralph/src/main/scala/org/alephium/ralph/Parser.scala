@@ -843,19 +843,19 @@ object StatefulParser extends Parser[StatefulContext] {
         case Ast.StringLiteral(v) =>
           Ast.ConstantVarDef(ident, v)
         case v: Ast.CreateArrayExpr[_] =>
-          throwConstantVarDefException("arrays", v)
+          throwConstantVarDefException("arrays", v.sourceIndex)
         case v: Ast.StructCtor[_] =>
-          throwConstantVarDefException("structs", v)
+          throwConstantVarDefException("structs", v.sourceIndex)
         case v: Ast.Positioned =>
-          throwConstantVarDefException("other expressions", v)
+          throwConstantVarDefException("other expressions", v.sourceIndex)
       }
     }
 
   private val primitiveTypes = Type.primitives.map(_.signature).mkString("/")
-  private def throwConstantVarDefException(label: String, v: Ast.Positioned) = {
+  private def throwConstantVarDefException(label: String, sourceIndex: Option[SourceIndex]) = {
     throw Compiler.Error(
       s"Expected constant value with primitive types ${primitiveTypes}, $label are not supported",
-      v.sourceIndex
+      sourceIndex
     )
   }
 
@@ -886,6 +886,7 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   def enumDef[Unknown: P]: P[Ast.EnumDef] = P(Start ~ rawEnumDef ~ End)
 
+  // scalastyle:off method.length
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawContract[Unknown: P]: P[Ast.Contract] =
     P(
@@ -907,12 +908,32 @@ object StatefulParser extends Parser[StatefulContext] {
             endIndex
           ) =>
         val contractStdAnnotation = Parser.ContractStdAnnotation.extractFields(annotations, None)
-        val funcs = statements.collect { case f: Ast.FuncDef[_] =>
-          f.asInstanceOf[Ast.FuncDef[StatefulContext]]
+        var funcs                 = Seq.empty[Ast.FuncDef[StatefulContext]]
+        var events                = Seq.empty[Ast.EventDef]
+        var constantVars          = Seq.empty[Ast.ConstantVarDef]
+        var enums                 = Seq.empty[Ast.EnumDef]
+
+        statements.foreach {
+          case e: Ast.EventDef =>
+            if (constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty) {
+              throwContractStmtsOutOfOrderException(e.sourceIndex)
+            }
+            events = events :+ e
+          case c: Ast.ConstantVarDef =>
+            if (funcs.nonEmpty || enums.nonEmpty) {
+              throwContractStmtsOutOfOrderException(c.sourceIndex)
+            }
+            constantVars = constantVars :+ c
+          case e: Ast.EnumDef =>
+            if (funcs.nonEmpty) {
+              throwContractStmtsOutOfOrderException(e.sourceIndex)
+            }
+            enums = enums :+ e
+          case f: Ast.FuncDef[_] =>
+            funcs = funcs :+ f.asInstanceOf[Ast.FuncDef[StatefulContext]]
+          case _ =>
         }
-        val events       = statements.collect { case e: Ast.EventDef => e }
-        val constantVars = statements.collect { case c: Ast.ConstantVarDef => c }
-        val enums        = statements.collect { case e: Ast.EnumDef => e }
+
         Ast
           .Contract(
             contractStdAnnotation.map(_.enabled),
@@ -929,6 +950,15 @@ object StatefulParser extends Parser[StatefulContext] {
           )
           .atSourceIndex(fromIndex, endIndex)
     }
+  // scalastyle:on method.length
+
+  private def throwContractStmtsOutOfOrderException(sourceIndex: Option[SourceIndex]) = {
+    throw Compiler.Error(
+      "Contract statements should be in the order of `events`, `enums`, `consts` and `methods`",
+      sourceIndex
+    )
+  }
+
   def contract[Unknown: P]: P[Ast.Contract] = P(Start ~ rawContract ~ End)
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
