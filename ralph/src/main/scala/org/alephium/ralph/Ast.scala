@@ -1419,6 +1419,33 @@ object Ast {
         }
       }
     }
+
+    def getStruct(typeId: Ast.TypeId): Ast.Struct = {
+      structs.find(_.id == typeId) match {
+        case Some(struct) => struct
+        case None =>
+          throw Compiler.Error(s"Struct ${quote(typeId.name)} does not exist", typeId.sourceIndex)
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def flattenTypeMutability(tpe: Type, isMutable: Boolean): Seq[Boolean] = {
+      val resolvedType = resolveType(tpe)
+      if (isMutable) {
+        resolvedType match {
+          case Type.FixedSizeArray(baseType, size) =>
+            val array = flattenTypeMutability(baseType, isMutable)
+            Seq.fill(size)(array).flatten
+          case Type.Struct(id) =>
+            getStruct(id).fields.flatMap(field =>
+              flattenTypeMutability(resolveType(field.tpe), field.isMutable && isMutable)
+            )
+          case _ => Seq(isMutable)
+        }
+      } else {
+        Seq.fill(flattenTypeLength(Seq(resolvedType)))(false)
+      }
+    }
   }
 
   sealed trait ContractT[Ctx <: StatelessContext] extends UniqueDef with Entity {
