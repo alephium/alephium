@@ -498,13 +498,7 @@ object Compiler {
     val accessedVars: mutable.Set[AccessVariable] = mutable.Set.empty[AccessVariable]
     def eventsInfo: Seq[EventInfo]
 
-    def getStruct(typeId: Ast.TypeId): Ast.Struct = {
-      globalState.structs.find(_.id == typeId) match {
-        case Some(struct) => struct
-        case None =>
-          throw Compiler.Error(s"Struct ${quote(typeId.name)} does not exist", typeId.sourceIndex)
-      }
-    }
+    @inline def getStruct(typeId: Ast.TypeId): Ast.Struct = globalState.getStruct(typeId)
 
     def getOrCreateStructRef(expr: Ast.Expr[Ctx]): (StructRef[Ctx], Seq[Instr[Ctx]]) = {
       val (ref, codes) = getOrCreateVariablesRef(expr)
@@ -888,22 +882,18 @@ object Compiler {
     @inline def resolveTypes(types: Seq[Type]): Seq[Type] = globalState.resolveTypes(types)
     @inline def flattenTypeLength(types: Seq[Type]): Int  = globalState.flattenTypeLength(types)
 
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    def flattenTypeMutability(tpe: Type, isMutable: Boolean): Seq[Boolean] = {
-      val resolvedType = resolveType(tpe)
-      if (isMutable) {
-        resolvedType match {
-          case Type.FixedSizeArray(baseType, size) =>
-            val array = flattenTypeMutability(baseType, isMutable)
-            Seq.fill(size)(array).flatten
-          case Type.Struct(id) =>
-            getStruct(id).fields.flatMap(field =>
-              flattenTypeMutability(resolveType(field.tpe), field.isMutable && isMutable)
-            )
-          case _ => Seq(isMutable)
-        }
-      } else {
-        Seq.fill(flattenTypeLength(Seq(resolvedType)))(false)
+    @inline def flattenTypeMutability(tpe: Type, isMutable: Boolean): Seq[Boolean] =
+      globalState.flattenTypeMutability(tpe, isMutable)
+
+    def flattenArgs(exprs: Seq[Ast.Expr[Ctx]]): (Seq[Instr[Ctx]], Seq[Seq[Instr[Ctx]]]) = {
+      exprs.foldLeft((Seq.empty[Instr[Ctx]], Seq.empty[Seq[Instr[Ctx]]])) {
+        case ((initCodes, argCodes), expr) =>
+          expr.getType(this) match {
+            case Seq(_: Type.FixedSizeArray) | Seq(_: Type.Struct) =>
+              val (ref, codes) = getOrCreateVariablesRef(expr)
+              (initCodes ++ codes, argCodes ++ ref.genLoadFieldsCode(this))
+            case _ => (initCodes, argCodes :+ expr.genCode(this))
+          }
       }
     }
 

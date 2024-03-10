@@ -78,6 +78,7 @@ sealed trait VariablesRef[Ctx <: StatelessContext] {
   def tpe: Type
 
   def subRef(state: Compiler.State[Ctx], selector: Selector): VariablesRef[Ctx]
+  def genLoadFieldsCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
 
   def genLoadCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
   def genStoreCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
@@ -220,6 +221,16 @@ sealed trait StructRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
     ast.fields.flatMap(field => genLoadCode(state, field.ident, state.resolveType(field.tpe)))
   }
 
+  def genLoadFieldsCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
+    ast.fields.foldLeft(Seq.empty[Seq[Instr[Ctx]]]) { case (acc, field) =>
+      state.resolveType(field.tpe) match {
+        case _: Type.Struct | _: Type.FixedSizeArray =>
+          acc ++ subRef(state, field.ident).genLoadFieldsCode(state)
+        case _ => acc :+ genLoadCode(state, field.ident)
+      }
+    }
+  }
+
   def genLoadCode(state: Compiler.State[Ctx], selector: Ast.Ident): Seq[Instr[Ctx]] = {
     val field = ast.getField(selector)
     genLoadCode(state, field.ident, state.resolveType(field.tpe))
@@ -323,6 +334,17 @@ sealed trait ArrayRef[Ctx <: StatelessContext] extends VariablesRef[Ctx] {
       case _ =>
         val offset = refOffset.getStoreOffset
         Seq(state.genStoreCode(offset.add(calcOffset(state, index)), isLocal))
+    }
+  }
+
+  def genLoadFieldsCode(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
+    (0 until tpe.size).foldLeft(Seq.empty[Seq[Instr[Ctx]]]) { case (acc, index) =>
+      val indexExpr = Ast.Const[Ctx](Val.U256(U256.unsafe(index)))
+      tpe.baseType match {
+        case _: Type.Struct | _: Type.FixedSizeArray =>
+          acc ++ subRef(state, indexExpr).genLoadFieldsCode(state)
+        case _ => acc :+ genLoadCode(state, indexExpr)
+      }
     }
   }
 
