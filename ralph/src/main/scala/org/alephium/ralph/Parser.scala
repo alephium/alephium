@@ -16,6 +16,8 @@
 
 package org.alephium.ralph
 
+import scala.collection.mutable.ArrayBuffer
+
 import akka.util.ByteString
 import fastparse._
 
@@ -835,15 +837,31 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef] =
-    PP(
-      Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ (value | stringLiteral.map(
-        _.string
-      ))
-    ) { case (_, ident, v) =>
-      Ast.ConstantVarDef(ident, v.asInstanceOf[Val])
+    PP(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ atom) { case (_, ident, value) =>
+      value match {
+        case Ast.Const(v) =>
+          Ast.ConstantVarDef(ident, v)
+        case Ast.StringLiteral(v) =>
+          Ast.ConstantVarDef(ident, v)
+        case v: Ast.CreateArrayExpr[_] =>
+          throwConstantVarDefException("arrays", v.sourceIndex)
+        case v: Ast.StructCtor[_] =>
+          throwConstantVarDefException("structs", v.sourceIndex)
+        case v: Ast.ContractConv[_] =>
+          throwConstantVarDefException("contract instances", v.sourceIndex)
+        case v: Ast.Positioned =>
+          throwConstantVarDefException("other expressions", v.sourceIndex)
+      }
     }
+
+  private val primitiveTypes = Type.primitives.map(_.signature).mkString("/")
+  private def throwConstantVarDefException(label: String, sourceIndex: Option[SourceIndex]) = {
+    throw Compiler.Error(
+      s"Expected constant value with primitive types ${primitiveTypes}, $label are not supported",
+      sourceIndex
+    )
+  }
 
   def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[StatefulContext]] =
     PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>
@@ -872,13 +890,14 @@ object StatefulParser extends Parser[StatefulContext] {
     }
   def enumDef[Unknown: P]: P[Ast.EnumDef] = P(Start ~ rawEnumDef ~ End)
 
+  // scalastyle:off method.length
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawContract[Unknown: P]: P[Ast.Contract] =
     P(
       annotation.rep ~ Index ~ Lexer.`abstract` ~ Lexer.token(
         Keyword.Contract
       ) ~/ Lexer.typeId ~ contractFields ~
-        contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
+        contractInheritances.? ~ "{" ~ (eventDef | constantVarDef | rawEnumDef | func).rep ~ "}"
         ~~ Index
     ).map {
       case (
@@ -889,13 +908,36 @@ object StatefulParser extends Parser[StatefulContext] {
             typeId,
             fields,
             contractInheritances,
-            events,
-            constantVars,
-            enums,
-            funcs,
+            statements,
             endIndex
           ) =>
         val contractStdAnnotation = Parser.ContractStdAnnotation.extractFields(annotations, None)
+        val funcs                 = ArrayBuffer.empty[Ast.FuncDef[StatefulContext]]
+        val events                = ArrayBuffer.empty[Ast.EventDef]
+        val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef]
+        val enums                 = ArrayBuffer.empty[Ast.EnumDef]
+
+        statements.foreach {
+          case e: Ast.EventDef =>
+            if (constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty) {
+              throwContractStmtsOutOfOrderException(e.sourceIndex)
+            }
+            events += e
+          case c: Ast.ConstantVarDef =>
+            if (funcs.nonEmpty || enums.nonEmpty) {
+              throwContractStmtsOutOfOrderException(c.sourceIndex)
+            }
+            constantVars += c
+          case e: Ast.EnumDef =>
+            if (funcs.nonEmpty) {
+              throwContractStmtsOutOfOrderException(e.sourceIndex)
+            }
+            enums += e
+          case f: Ast.FuncDef[_] =>
+            funcs += f.asInstanceOf[Ast.FuncDef[StatefulContext]]
+          case _ =>
+        }
+
         Ast
           .Contract(
             contractStdAnnotation.map(_.enabled),
@@ -904,14 +946,23 @@ object StatefulParser extends Parser[StatefulContext] {
             typeId,
             Seq.empty,
             fields,
-            funcs,
-            events,
-            constantVars,
-            enums,
+            funcs.toSeq,
+            events.toSeq,
+            constantVars.toSeq,
+            enums.toSeq,
             contractInheritances.getOrElse(Seq.empty)
           )
           .atSourceIndex(fromIndex, endIndex)
     }
+  // scalastyle:on method.length
+
+  private def throwContractStmtsOutOfOrderException(sourceIndex: Option[SourceIndex]) = {
+    throw Compiler.Error(
+      "Contract statements should be in the order of `events`, `consts`, `enums` and `methods`",
+      sourceIndex
+    )
+  }
+
   def contract[Unknown: P]: P[Ast.Contract] = P(Start ~ rawContract ~ End)
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
