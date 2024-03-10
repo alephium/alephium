@@ -4866,19 +4866,6 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(code1, "These structs \"List(Foo)\" have circular references")
     }
-
-    {
-      info("Struct as constant")
-      val code =
-        s"""
-           |struct Foo { x: U256 }
-           |Contract C() {
-           |  const V = $$Foo {x: 0}$$
-           |  pub fn f() -> () {}
-           |}
-           |""".stripMargin
-      testContractError(code, "Expected (value | PP)")
-    }
   }
 
   it should "test struct" in new Fixture {
@@ -5297,6 +5284,107 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
           Val.ByteVec(Hex.unsafe("00"))
         )
       )
+    }
+  }
+
+  it should "report friendly error for non-primitive types for consts" in new Fixture {
+    {
+      info("Array as constant")
+      val code =
+        s"""
+           |Contract C() {
+           |  const V = $$[0, 0]$$
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Expected constant value with primitive types Bool/I256/U256/ByteVec/Address, arrays are not supported"
+      )
+    }
+
+    {
+      info("Struct as constant")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |Contract C() {
+           |  const V = $$Foo {x: 0}$$
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Expected constant value with primitive types Bool/I256/U256/ByteVec/Address, structs are not supported"
+      )
+    }
+
+    {
+      info("Contract instance as constant")
+      val code =
+        s"""
+           |Contract Foo() { pub fn f() -> () {} }
+           |Contract C(fooId: ByteVec) {
+           |  const V = $$Foo(fooId)$$
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Expected constant value with primitive types Bool/I256/U256/ByteVec/Address, contract instances are not supported"
+      )
+    }
+
+    {
+      info("Other expressions as constant")
+      val code =
+        s"""
+           |Contract C() {
+           |  const V = $$if (1) 2 else 3$$
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+
+      testContractError(
+        code,
+        "Expected constant value with primitive types Bool/I256/U256/ByteVec/Address, other expressions are not supported"
+      )
+    }
+  }
+
+  it should "compile successfully when statements in contract body are not in strict order" in new Fixture {
+    val statements = Seq(
+      "event E(v: U256)",
+      "const V = 1",
+      "enum FooErrorCodes { Error0 = 0 }",
+      "pub fn f() -> () {}"
+    )
+
+    def verify(success: Boolean, indexes: Int*) = {
+      val code =
+        s"""
+           |Contract C() {
+           |  ${statements(indexes(0))}
+           |  ${statements(indexes(1))}
+           |  ${statements(indexes(2))}
+           |  ${statements(indexes(3))}
+           |}
+           |""".stripMargin
+
+      if (success) {
+        Compiler.compileContract(code).rightValue
+      } else {
+        Compiler
+          .compileContract(code)
+          .leftValue
+          .message is "Contract statements should be in the order of `events`, `consts`, `enums` and `methods`"
+      }
+    }
+
+    verify(success = true, 0, 1, 2, 3)
+
+    (Seq(0, 1, 2, 3).permutations.toSet - Seq(0, 1, 2, 3)).foreach { permutation =>
+      verify(success = false, permutation: _*)
     }
   }
 }
