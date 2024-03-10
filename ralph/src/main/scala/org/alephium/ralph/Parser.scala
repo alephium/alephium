@@ -848,6 +848,8 @@ object StatefulParser extends Parser[StatefulContext] {
           throwConstantVarDefException("arrays", v.sourceIndex)
         case v: Ast.StructCtor[_] =>
           throwConstantVarDefException("structs", v.sourceIndex)
+        case v: Ast.ContractConv[_] =>
+          throwConstantVarDefException("contract instances", v.sourceIndex)
         case v: Ast.Positioned =>
           throwConstantVarDefException("other expressions", v.sourceIndex)
       }

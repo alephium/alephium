@@ -5291,6 +5291,22 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
 
     {
+      info("Contract instance as constant")
+      val code =
+        s"""
+           |Contract Foo() { pub fn f() -> () {} }
+           |Contract C(fooId: ByteVec) {
+           |  const V = $$Foo(fooId)$$
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(
+        code,
+        "Expected constant value with primitive types Bool/I256/U256/ByteVec/Address, contract instances are not supported"
+      )
+    }
+
+    {
       info("Other expressions as constant")
       val code =
         s"""
