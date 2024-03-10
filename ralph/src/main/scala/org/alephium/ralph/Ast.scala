@@ -419,7 +419,7 @@ object Ast {
       }
     }
 
-    def _getTypeBase(state: Compiler.State[StatefulContext]): Seq[Type] = {
+    def _getTypeBase(state: Compiler.State[StatefulContext]): (TypeId, Seq[Type]) = {
       val contractType = getContractType(state)
       val contractInfo = state.getContractInfo(contractType.id)
       if (contractInfo.kind == Compiler.ContractKind.Interface) {
@@ -428,7 +428,8 @@ object Ast {
       val funcInfo = state.getFunc(contractType.id, callId)
       checkNonStaticContractFunction(contractType.id, callId, funcInfo)
       state.addExternalCall(contractType.id, callId)
-      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      (contractType.id, retTypes)
     }
 
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -476,7 +477,7 @@ object Ast {
       with ContractCallBase {
     override def _getType(state: Compiler.State[StatefulContext]): Seq[Type] = {
       checkApproveAssets(state)
-      _getTypeBase(state)
+      _getTypeBase(state)._2
     }
 
     override def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
@@ -1170,11 +1171,23 @@ object Ast {
       rhs.genCode(state) ++ targets.flatMap(_.genStore(state)).reverse.flatten
     }
   }
+  sealed trait CallStatement[Ctx <: StatelessContext] extends Statement[Ctx] {
+    def checkReturnValueUsed(
+        state: Compiler.State[Ctx],
+        typeId: TypeId,
+        funcId: FuncId,
+        retTypes: Seq[Type]
+    ): Unit = {
+      if (retTypes.nonEmpty && retTypes != Seq(Type.Panic)) {
+        state.warningUnusedCallReturn(typeId, funcId)
+      }
+    }
+  }
   final case class FuncCall[Ctx <: StatelessContext](
       id: FuncId,
       approveAssets: Seq[ApproveAsset[Ctx]],
       args: Seq[Expr[Ctx]]
-  ) extends Statement[Ctx]
+  ) extends CallStatement[Ctx]
       with CallAst[Ctx] {
     def ignoreReturn: Boolean = true
 
@@ -1183,8 +1196,8 @@ object Ast {
     override def check(state: Compiler.State[Ctx]): Unit = {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
-      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
-      ()
+      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      checkReturnValueUsed(state, state.typeId, id, retTypes)
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -1199,7 +1212,7 @@ object Ast {
       id: FuncId,
       approveAssets: Seq[ApproveAsset[Ctx]],
       args: Seq[Expr[Ctx]]
-  ) extends Statement[Ctx]
+  ) extends CallStatement[Ctx]
       with CallAst[Ctx] {
     def ignoreReturn: Boolean = true
 
@@ -1210,8 +1223,8 @@ object Ast {
       checkApproveAssets(state)
       val funcInfo = getFunc(state)
       checkStaticContractFunction(contractId, id, funcInfo)
-      positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
-      ()
+      val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      checkReturnValueUsed(state, contractId, id, retTypes)
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
@@ -1223,12 +1236,12 @@ object Ast {
       callId: FuncId,
       approveAssets: Seq[ApproveAsset[StatefulContext]],
       args: Seq[Expr[StatefulContext]]
-  ) extends Statement[StatefulContext]
+  ) extends CallStatement[StatefulContext]
       with ContractCallBase {
     override def check(state: Compiler.State[StatefulContext]): Unit = {
       checkApproveAssets(state)
-      _getTypeBase(state)
-      ()
+      val (contractId, retTypes) = _getTypeBase(state)
+      checkReturnValueUsed(state, contractId, callId, retTypes)
     }
 
     override def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
