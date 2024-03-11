@@ -203,7 +203,7 @@ object Instr {
     NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
     LoadImmField, LoadImmFieldByIndex,
     /* Below are instructions for Ghost hard fork */
-    PayGasFee
+    PayGasFee, MinimalContractDeposit
   )
   // format: on
 
@@ -570,6 +570,15 @@ case object PayGasFee
         )
       _ <- frame.ctx.payGasFee(amount.v)
     } yield ()
+  }
+}
+
+case object MinimalContractDeposit
+    extends GhostInstrWithSimpleGas[StatefulContext]
+    with GasBase
+    with StatefulInstrCompanion0 {
+  def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
+    frame.pushOpStack(Val.U256(model.minimalAlphInContract))
   }
 }
 

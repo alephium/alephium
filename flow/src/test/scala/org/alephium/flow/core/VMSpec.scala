@@ -996,6 +996,18 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(main)
   }
 
+  it should "test minimalContractDeposit" in new ContractFixture {
+    val main: String =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  assert!(minimalContractDeposit!() == 1 alph, 0)
+         |}
+         |""".stripMargin
+
+    testSimpleScript(main)
+  }
+
   it should "test conversion functions" in new ContractFixture {
     val main: String =
       s"""
