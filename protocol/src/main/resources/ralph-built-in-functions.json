@@ -541,6 +541,16 @@
     "returns": "@returns the null contract address with contract id being zeros"
   },
   {
+    "name": "minimalContractDeposit",
+    "category": "Utils",
+    "signature": "fn minimalContractDeposit!() -> (U256)",
+    "doc": "The minimal contract deposit",
+    "params": [
+      
+    ],
+    "returns": "@returns the minimal ALPH amount of contract deposit"
+  },
+  {
     "name": "networkId",
     "category": "Chain",
     "signature": "fn networkId!() -> (ByteVec)",

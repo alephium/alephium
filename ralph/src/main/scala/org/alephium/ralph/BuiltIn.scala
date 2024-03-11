@@ -1582,6 +1582,17 @@ object BuiltIn {
       usePreapprovedAssets = true
     )
 
+  val minimalContractDeposit: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.utils(
+      "minimalContractDeposit",
+      Seq.empty,
+      Seq(Type.U256),
+      MinimalContractDeposit,
+      argsName = Seq.empty,
+      retComment = "the minimal ALPH amount of contract deposit",
+      doc = "The minimal contract deposit"
+    )
+
   sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] with DocUtils {
     def name: String
     def category: Category            = Category.SubContract
@@ -1832,7 +1843,8 @@ object BuiltIn {
       subContractIdInParentGroup,
       nullContractAddress,
       selfContract,
-      payGasFee
+      payGasFee,
+      minimalContractDeposit
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
