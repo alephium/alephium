@@ -787,8 +787,24 @@ object StatefulParser extends Parser[StatefulContext] {
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | assign | debug | funcCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | assign | debug | funcCall | mapCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
+
+  def insertToMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
+    P(Index ~ Lexer.ident ~ "." ~ "insert!" ~ approveAssets ~ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index)
+      .map { case (fromIndex, ident, approveAssets, exprs, endIndex) =>
+        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
+        Ast.InsertToMap(ident, approveAssets, exprs).atSourceIndex(sourceIndex)
+      }
+
+  def removeFromMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
+    P(Index ~ Lexer.ident ~ "." ~ "remove!" ~ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index).map {
+      case (fromIndex, ident, exprs, endIndex) =>
+        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
+        Ast.RemoveFromMap(ident, exprs).atSourceIndex(sourceIndex)
+    }
+
+  def mapCall[Unknown: P]: P[Ast.Statement[StatefulContext]] = P(insertToMap | removeFromMap)
 
   def contractFields[Unknown: P]: P[Seq[Ast.Argument]] =
     P(
