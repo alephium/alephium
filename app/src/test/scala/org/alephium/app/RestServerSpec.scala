@@ -1194,6 +1194,7 @@ abstract class RestServerSpec(
     ) check { response =>
       response.code is StatusCode.Ok
 
+      val consensusConfig  = consensusConfigs.getConsensusConfig(TimeStamp.now())
       val hashrateResponse = response.as[TargetToHashrate.Result]
       val expected =
         HashRate.from(Target.unsafe(Hex.unsafe(target)), consensusConfig.blockTargetTime).value
