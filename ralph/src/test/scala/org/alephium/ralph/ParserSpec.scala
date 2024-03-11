@@ -17,6 +17,7 @@
 package org.alephium.ralph
 
 import akka.util.ByteString
+import fastparse._
 
 import org.alephium.protocol.{Hash, PublicKey}
 import org.alephium.protocol.model.Address
@@ -1895,6 +1896,52 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       error.message is "These struct fields are defined multiple times: a"
       error.position is code.indexOf("$")
     }
+  }
+
+  it should "parse map" in {
+    def fail[T](code: String, parser: P[_] => P[T], errMsg: String) = {
+      val error = intercept[Compiler.Error](fastparse.parse(code.replace("$", ""), parser))
+      error.message is errMsg
+      error.position is code.indexOf("$")
+    }
+
+    parse("emptyMap[U256, U256]", StatefulParser.expr(_)).get.value is
+      EmptyMap[StatefulContext](Type.U256, Type.U256)
+    parse("emptyMap[U256, Foo]", StatefulParser.expr(_)).get.value is
+      EmptyMap[StatefulContext](Type.U256, Type.NamedType(TypeId("Foo")))
+    fail(
+      s"emptyMap[$$Foo, Foo]",
+      StatefulParser.expr(_),
+      "The key type of map can only be primitive type"
+    )
+    fail(
+      s"emptyMap[U256, $$Map[U256, Foo]]",
+      StatefulParser.expr(_),
+      "The value type of map cannot be map"
+    )
+
+    fastparse
+      .parse("Map[U256, U256]", StatefulParser.parseType(Type.NamedType)(_))
+      .get
+      .value is Type.Map(
+      Type.U256,
+      Type.U256
+    )
+    fastparse.parse("Map[U256, Foo]", StatefulParser.parseType(Type.NamedType)(_)).get.value is Type
+      .Map(
+        Type.U256,
+        Type.NamedType(TypeId("Foo"))
+      )
+    fail(
+      s"Map[$$Foo, Foo]",
+      StatefulParser.parseType(Type.NamedType)(_),
+      "The key type of map can only be primitive type"
+    )
+    fail(
+      s"Map[U256, $$Map[U256, Foo]]",
+      StatefulParser.parseType(Type.NamedType)(_),
+      "The value type of map cannot be map"
+    )
   }
 }
 

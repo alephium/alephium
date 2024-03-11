@@ -671,6 +671,12 @@ object Ast {
     }
   }
 
+  final case class EmptyMap[Ctx <: StatelessContext](keyType: Type, valueType: Type)
+      extends Expr[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Seq[Type]      = ???
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = ???
+  }
+
   final case class StructFieldSelector[Ctx <: StatelessContext](expr: Expr[Ctx], selector: Ident)
       extends Expr[Ctx] {
     def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
