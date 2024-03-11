@@ -23,6 +23,7 @@ import org.alephium.util._
 
 // scalastyle:off no.equal file.size.limit
 class StatelessParserSpec extends AlephiumSpec {
+  val StatelessParser = new StatelessParser(None)
 
   it should "disallow mutable template params" in {
     def createProgram(params: String) =

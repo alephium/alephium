@@ -39,9 +39,7 @@ object Ast {
   trait Positioned {
     var sourceIndex: Option[SourceIndex] = None
 
-    def atSourceIndex(fromIndex: Int, endIndex: Int)(implicit
-        fileURI: Option[java.net.URI]
-    ): this.type = {
+    def atSourceIndex(fromIndex: Int, endIndex: Int, fileURI: Option[java.net.URI]): this.type = {
       require(this.sourceIndex.isEmpty)
       this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
       this

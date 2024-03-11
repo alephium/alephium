@@ -28,11 +28,14 @@ import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AlephiumSpec, AVector, Hex, I256, U256}
 
 // scalastyle:off file.size.limit
-class ParserSpec extends AlephiumSpec {
+class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   import Ast._
 
+  val StatelessParser = new StatelessParser(fileURI)
+  val StatefulParser  = new StatefulParser(fileURI)
   /*
    * parse and check if source index is set on successful parse
+   * check if fileURI is set on successful parse
    *
    * @return: the initial parsed result
    */
@@ -42,7 +45,7 @@ class ParserSpec extends AlephiumSpec {
   ): fastparse.Parsed[A] = {
     val result = fastparse.parse(code, p)
     if (result.isSuccess) {
-      result.get.value.sourceIndex isnot None
+      result.get.value.sourceIndex.get.fileURI is fileURI
     }
     result
   }
@@ -1563,38 +1566,7 @@ class ParserSpec extends AlephiumSpec {
     intercept[Compiler.Error](parse(code, StatefulParser.contract(_))).message is
       "Debug is a built-in event name"
   }
-
-  it should "add a fileURI" in {
-    val code: String =
-      s"""
-         |Contract Foo() {
-         |  pub fn foo() -> () {
-         |    return
-         |  }
-         |}
-         |""".stripMargin
-
-    val fileURI = new java.net.URI("my-file-name")
-
-    val parser = new SourceFileStatefulParser()(Some(fileURI))
-
-    parse(
-      code,
-      parser.multiContract(_)
-    ).get.value.sourceIndex.get.fileURI.get is fileURI
-
-    val codeWithError: String =
-      s"""
-         |Contract Foo() {
-         |  event Debug(x: U256)
-         |  pub fn foo() -> () {
-         |    emit Debug(0)
-         |  }
-         |}
-         |""".stripMargin
-
-    intercept[Compiler.Error](
-      parse(codeWithError, parser.multiContract(_))
-    ).fileURI.get is fileURI
-  }
 }
+
+class ParseNoFileSpec extends ParserSpec(None)
+class ParseFileSpec   extends ParserSpec(Some(new java.net.URI("file:///tmp")))

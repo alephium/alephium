@@ -34,9 +34,7 @@ import org.alephium.ralph.error.CompilerError
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
-object Lexer extends SourceFileLexer()(None)
-
-class SourceFileLexer(implicit val fileURI: Option[java.net.URI]) {
+class Lexer(fileURI: Option[java.net.URI]) {
   def lowercase[Unknown: P]: P[Unit] = P(CharIn("a-z"))
   def uppercase[Unknown: P]: P[Unit] = P(CharIn("A-Z"))
   def digit[Unknown: P]: P[Unit]     = P(CharIn("0-9"))
@@ -46,7 +44,7 @@ class SourceFileLexer(implicit val fileURI: Option[java.net.URI]) {
 
   private def id[Unknown: P, T <: Ast.Positioned](prefix: => P[Unit], func: String => T): P[T] =
     P(Index ~ (prefix ~ (letter | digit | "_").rep).!.filter(!Keyword.Used.exists(_))).map {
-      case (fromIndex, i) => func(i).atSourceIndex(fromIndex, fromIndex + i.length)
+      case (fromIndex, i) => func(i).atSourceIndex(fromIndex, fromIndex + i.length, fileURI)
     }
   def ident[Unknown: P]: P[Ast.Ident] = id(lowercase, Ast.Ident)
   def constantIdent[Unknown: P]: P[Ast.Ident] =

@@ -34,10 +34,11 @@ import org.alephium.util.AVector
   )
 )
 abstract class Parser[Ctx <: StatelessContext] {
-  private val Lexer                        = new SourceFileLexer()(fileURI)
   implicit val whitespace: P[_] => P[Unit] = { implicit ctx: P[_] => Lexer.emptyChars(ctx) }
 
-  implicit def fileURI: Option[java.net.URI]
+  def fileURI: Option[java.net.URI]
+
+  lazy val Lexer: Lexer = new Lexer(fileURI)
 
   /*
    * PP: Positioned Parser
@@ -51,7 +52,7 @@ abstract class Parser[Ctx <: StatelessContext] {
       if (q.sourceIndex.isDefined) {
         q
       } else {
-        q.atSourceIndex(from, to)
+        q.atSourceIndex(from, to, fileURI)
       }
     }
   }
@@ -177,7 +178,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def arrayElementOrAtom[Unknown: P]: P[Ast.Expr[Ctx]] =
     P(Index ~~ atom ~ arrayIndex.rep(0) ~~ Index).map { case (from, expr, indexes, to) =>
       if (indexes.nonEmpty) {
-        Ast.ArrayElement(expr, indexes).atSourceIndex(from, to)
+        Ast.ArrayElement(expr, indexes).atSourceIndex(from, to, fileURI)
       } else {
         expr
       }
@@ -235,7 +236,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Lexer.token(Keyword.`return`) ~/ expr.rep(0, ",")).map { case (returnIndex, returns) =>
       val too =
         returns.lastOption.flatMap(_.sourceIndex.map(_.endIndex)).getOrElse(returnIndex.endIndex)
-      Ast.ReturnStmt.apply[Ctx](returns).atSourceIndex(returnIndex.index, too)
+      Ast.ReturnStmt.apply[Ctx](returns).atSourceIndex(returnIndex.index, too, fileURI)
     }
 
   def stringInterpolator[Unknown: P]: P[Ast.Expr[Ctx]] =
@@ -249,13 +250,13 @@ abstract class Parser[Ctx <: StatelessContext] {
             stringParts.map(s => Val.ByteVec(ByteString.fromString(s))),
             interpolationParts
           )
-          .atSourceIndex(fromIndex, endIndex)
+          .atSourceIndex(fromIndex, endIndex, fileURI)
       }
 
   def anonymousVar[Unknown: P]: P[Ast.VarDeclaration] = PP("_")(_ => Ast.AnonymousVar)
   def namedVar[Unknown: P]: P[Ast.VarDeclaration] =
     P(Index ~ Lexer.mut ~ Lexer.ident ~~ Index).map { case (from, mutable, id, to) =>
-      Ast.NamedVar(mutable, id).atSourceIndex(from, to)
+      Ast.NamedVar(mutable, id).atSourceIndex(from, to, fileURI)
     }
 
   def varDeclaration[Unknown: P]: P[Ast.VarDeclaration] = P(namedVar | anonymousVar)
@@ -303,7 +304,7 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(Index ~ Lexer.unused ~ Lexer.mutMaybe(allowMutable) ~ Lexer.ident ~ ":").flatMap {
       case (fromIndex, isUnused, isMutable, ident) =>
         P(parseType(contractTypeCtor(_, ident)) ~~ Index).map { case (tpe, endIndex) =>
-          Ast.Argument(ident, tpe, isMutable, isUnused).atSourceIndex(fromIndex, endIndex)
+          Ast.Argument(ident, tpe, isMutable, isUnused).atSourceIndex(fromIndex, endIndex, fileURI)
         }
     }
   def funcArgument[Unknown: P]: P[Ast.Argument] = argument(allowMutable = true)(Type.Contract.local)
@@ -392,7 +393,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         if (typeId.name == "Debug") {
           throw Compiler.Error("Debug is a built-in event name", typeId.sourceIndex)
         }
-        Ast.EventDef(typeId, fields).atSourceIndex(eventIndex.index, endIndex)
+        Ast.EventDef(typeId, fields).atSourceIndex(eventIndex.index, endIndex, fileURI)
       }
 
   def funcCall[Unknown: P]: P[Ast.Statement[Ctx]] =
@@ -402,8 +403,9 @@ abstract class Parser[Ctx <: StatelessContext] {
           case Some(contractId) =>
             Ast
               .StaticContractFuncCall(contractId, funcId, approveAssets, exprs)
-              .atSourceIndex(fromIndex, endIndex)
-          case None => Ast.FuncCall(funcId, approveAssets, exprs).atSourceIndex(fromIndex, endIndex)
+              .atSourceIndex(fromIndex, endIndex, fileURI)
+          case None =>
+            Ast.FuncCall(funcId, approveAssets, exprs).atSourceIndex(fromIndex, endIndex, fileURI)
         }
     }
 
@@ -412,7 +414,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def ifBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
     P(Lexer.token(Keyword.`if`) ~ "(" ~ expr ~ ")" ~ block ~~ Index).map {
       case (ifIndex, condition, body, endIndex) =>
-        Ast.IfBranchStatement(condition, body).atSourceIndex(ifIndex.index, endIndex)
+        Ast.IfBranchStatement(condition, body).atSourceIndex(ifIndex.index, endIndex, fileURI)
     }
   def elseIfBranchStmt[Unknown: P]: P[Ast.IfBranchStatement[Ctx]] =
     P(Lexer.token(Keyword.`else`) ~ ifBranchStmt).map { case (elseIndex, ifBranch) =>
@@ -422,7 +424,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def elseBranchStmt[Unknown: P]: P[Ast.ElseBranchStatement[Ctx]] =
     P(Lexer.token(Keyword.`else`) ~ (block | emptyBlock) ~~ Index).map {
       case (index, statement, endIndex) =>
-        Ast.ElseBranchStatement(statement).atSourceIndex(index.index, endIndex)
+        Ast.ElseBranchStatement(statement).atSourceIndex(index.index, endIndex, fileURI)
     }
   def ifelseStmt[Unknown: P]: P[Ast.IfElseStatement[Ctx]] =
     P(ifBranchStmt ~ elseIfBranchStmt.rep(0) ~ elseBranchStmt.?)
@@ -439,7 +441,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   def whileStmt[Unknown: P]: P[Ast.While[Ctx]] =
     P(Lexer.token(Keyword.`while`) ~/ "(" ~ expr ~ ")" ~ block ~~ Index).map {
       case (whileIndex, expr, block, endIndex) =>
-        Ast.While(expr, block).atSourceIndex(whileIndex.index, endIndex)
+        Ast.While(expr, block).atSourceIndex(whileIndex.index, endIndex, fileURI)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -458,7 +460,7 @@ abstract class Parser[Ctx <: StatelessContext] {
         }
         Ast
           .ForLoop(initializeOpt.get, condition, updateOpt.get, body)
-          .atSourceIndex(forIndex.index, endIndex)
+          .atSourceIndex(forIndex.index, endIndex, fileURI)
       }
 
   def statement[Unknown: P]: P[Ast.Statement[Ctx]]
@@ -472,14 +474,14 @@ abstract class Parser[Ctx <: StatelessContext] {
   def eventField[Unknown: P]: P[Ast.EventField] =
     P(Index ~ Lexer.ident ~ ":").flatMap { case (from, ident) =>
       P(parseType(typeId => Type.Contract.global(typeId, ident)) ~~ Index).map { case (tpe, to) =>
-        Ast.EventField(ident, tpe).atSourceIndex(from, to)
+        Ast.EventField(ident, tpe).atSourceIndex(from, to, fileURI)
       }
     }
 
   def annotationField[Unknown: P]: P[Ast.AnnotationField] =
     P(Index ~ Lexer.ident ~ "=" ~ expr ~~ Index).map {
       case (fromIndex, ident, expr: Ast.Const[_], endIndex) =>
-        Ast.AnnotationField(ident, expr.v).atSourceIndex(fromIndex, endIndex)
+        Ast.AnnotationField(ident, expr.v).atSourceIndex(fromIndex, endIndex, fileURI)
       case (_, _, expr, _) =>
         throw Compiler.Error(
           s"Expect const value for annotation field, got ${expr}",
@@ -491,7 +493,9 @@ abstract class Parser[Ctx <: StatelessContext] {
   def annotation[Unknown: P]: P[Ast.Annotation] =
     P(Index ~ "@" ~ Lexer.ident ~ annotationFields.? ~~ Index).map {
       case (fromIndex, id, fieldsOpt, endIndex) =>
-        Ast.Annotation(id, fieldsOpt.getOrElse(Seq.empty)).atSourceIndex(fromIndex, endIndex)
+        Ast
+          .Annotation(id, fieldsOpt.getOrElse(Seq.empty))
+          .atSourceIndex(fromIndex, endIndex, fileURI)
     }
 }
 
@@ -633,7 +637,6 @@ object Parser {
   }
 }
 
-object StatelessParser extends SourceFileStatelessParser()(None)
 @SuppressWarnings(
   Array(
     "org.wartremover.warts.JavaSerializable",
@@ -641,9 +644,7 @@ object StatelessParser extends SourceFileStatelessParser()(None)
     "org.wartremover.warts.Serializable"
   )
 )
-class SourceFileStatelessParser(implicit val fileURI: Option[java.net.URI])
-    extends Parser[StatelessContext] {
-  private val Lexer = new SourceFileLexer()(fileURI)
+class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
       const | stringLiteral | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr
@@ -655,15 +656,14 @@ class SourceFileStatelessParser(implicit val fileURI: Option[java.net.URI])
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
       Start ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~ templateParams.? ~
-        "{" ~ func.rep(1) ~ "}" ~~ Index ~ endOfInput
+        "{" ~ func.rep(1) ~ "}" ~~ Index ~ endOfInput(fileURI)
     ).map { case (assetIndex, typeId, templateVars, funcs, endIndex) =>
       Ast
         .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
-        .atSourceIndex(assetIndex.index, endIndex)
+        .atSourceIndex(assetIndex.index, endIndex, fileURI)
     }
 }
 
-object StatefulParser extends SourceFileStatefulParser()(None)
 @SuppressWarnings(
   Array(
     "org.wartremover.warts.JavaSerializable",
@@ -671,9 +671,7 @@ object StatefulParser extends SourceFileStatefulParser()(None)
     "org.wartremover.warts.Serializable"
   )
 )
-class SourceFileStatefulParser(implicit val fileURI: Option[java.net.URI])
-    extends Parser[StatefulContext] {
-  private val Lexer = new SourceFileLexer()(fileURI)
+class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
       const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
@@ -686,7 +684,7 @@ class SourceFileStatefulParser(implicit val fileURI: Option[java.net.URI])
           val (funcId, approveAssets, arguments) = callAbs
           Ast
             .ContractCallExpr(acc, funcId, approveAssets, arguments)
-            .atSourceIndex(fromIndex, endIndex)
+            .atSourceIndex(fromIndex, endIndex, fileURI)
         })
     }
 
@@ -698,10 +696,12 @@ class SourceFileStatefulParser(implicit val fileURI: Option[java.net.URI])
           val (funcId, approveAssets, arguments) = callAbs
           Ast
             .ContractCallExpr(acc, funcId, approveAssets, arguments)
-            .atSourceIndex(fromIndex, endIndex)
+            .atSourceIndex(fromIndex, endIndex, fileURI)
         })
         val (funcId, approveAssets, arguments) = callAbss.last
-        Ast.ContractCall(base, funcId, approveAssets, arguments).atSourceIndex(fromIndex, endIndex)
+        Ast
+          .ContractCall(base, funcId, approveAssets, arguments)
+          .atSourceIndex(fromIndex, endIndex, fileURI)
     }
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
@@ -759,7 +759,7 @@ class SourceFileStatefulParser(implicit val fileURI: Option[java.net.URI])
             )
             Ast.TxScript
               .from(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
-              .atSourceIndex(scriptIndex.index, endIndex)
+              .atSourceIndex(scriptIndex.index, endIndex, fileURI)
           }
       }
   def txScript[Unknown: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
@@ -876,7 +876,7 @@ class SourceFileStatefulParser(implicit val fileURI: Option[java.net.URI])
             enums,
             contractInheritances.getOrElse(Seq.empty)
           )
-          .atSourceIndex(fromIndex, endIndex)
+          .atSourceIndex(fromIndex, endIndex, fileURI)
     }
   def contract[Unknown: P]: P[Ast.Contract] = P(Start ~ rawContract ~ End)
 
@@ -939,7 +939,7 @@ class SourceFileStatefulParser(implicit val fileURI: Option[java.net.URI])
             events,
             inheritances.map { case (_, inher) => inher }.getOrElse(Seq.empty)
           )
-          .atSourceIndex(fromIndex.index, endIndex)
+          .atSourceIndex(fromIndex.index, endIndex, fileURI)
       }
     }
   def interface[Unknown: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
@@ -947,7 +947,7 @@ class SourceFileStatefulParser(implicit val fileURI: Option[java.net.URI])
   def multiContract[Unknown: P]: P[Ast.MultiContract] =
     P(Start ~~ Index ~ (rawTxScript | rawContract | rawInterface).rep(1) ~~ Index ~ End)
       .map { case (fromIndex, defs, endIndex) =>
-        Ast.MultiContract(defs, None).atSourceIndex(fromIndex, endIndex)
+        Ast.MultiContract(defs, None).atSourceIndex(fromIndex, endIndex, fileURI)
       }
 
   def state[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] =
@@ -965,6 +965,6 @@ class SourceFileStatefulParser(implicit val fileURI: Option[java.net.URI])
   def emitEvent[Unknown: P]: P[Ast.EmitEvent[StatefulContext]] =
     P(Index ~ "emit" ~ Lexer.typeId ~ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index)
       .map { case (fromIndex, typeId, exprs, endIndex) =>
-        Ast.EmitEvent(typeId, exprs).atSourceIndex(fromIndex, endIndex)
+        Ast.EmitEvent(typeId, exprs).atSourceIndex(fromIndex, endIndex, fileURI)
       }
 }
