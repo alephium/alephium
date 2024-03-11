@@ -716,8 +716,48 @@ object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
       const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv |
-        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr
+        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr | emptyMap
     )
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  override def parseType[Unknown: P](contractTypeCtor: Ast.TypeId => Type): P[Type] = {
+    P(
+      mapType | Lexer.typeId.map(id => Lexer.primTpes.getOrElse(id.name, contractTypeCtor(id))) |
+        arrayType(parseType(contractTypeCtor))
+    )
+  }
+
+  def mapKeyType[Unknown: P]: P[Type] = {
+    P(Index ~ parseType(Type.NamedType) ~ Index).map { case (from, tpe, to) =>
+      if (!tpe.isPrimitive) {
+        val sourceIndex = Some(SourceIndex(from, to - from))
+        throw Compiler.Error("The key type of map can only be primitive type", sourceIndex)
+      }
+      tpe
+    }
+  }
+
+  def mapValueType[Unknown: P]: P[Type] = {
+    P(Index ~ parseType(Type.NamedType) ~ Index).map { case (from, tpe, to) =>
+      if (tpe.isMapType) {
+        val sourceIndex = Some(SourceIndex(from, to - from))
+        throw Compiler.Error("The value type of map cannot be map", sourceIndex)
+      }
+      tpe
+    }
+  }
+
+  def mapType[Unknown: P]: P[Type] = {
+    P(Lexer.token(Keyword.Map) ~ "[" ~ mapKeyType ~ "," ~ mapValueType ~ "]").map {
+      case (_, key, value) => Type.Map(key, value)
+    }
+  }
+
+  def emptyMap[Unknown: P]: P[Ast.EmptyMap[StatefulContext]] =
+    PP(Lexer.token(Keyword.emptyMap) ~ "[" ~ mapKeyType ~ "," ~ mapValueType ~ "]") {
+      case (_, key, value) =>
+        Ast.EmptyMap(key, value)
+    }
 
   def contractCallExpr[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(Index ~ (callExpr | contractConv | variableIdOnly) ~ ("." ~ callAbs).rep(1) ~~ Index).map {

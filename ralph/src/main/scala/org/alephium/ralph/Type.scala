@@ -26,8 +26,10 @@ sealed trait Type {
   def signature: String = toVal.toString
 
   def isPrimitive: Boolean = this match {
-    case _: Type.FixedSizeArray | _: Type.Struct | _: Type.NamedType | _: Type.Contract => false
-    case _                                                                              => true
+    case _: Type.FixedSizeArray | _: Type.Struct | _: Type.NamedType | _: Type.Contract |
+        _: Type.Map =>
+      false
+    case _ => true
   }
 
   def isArrayType: Boolean = this match {
@@ -38,6 +40,11 @@ sealed trait Type {
   def isStructType: Boolean = this match {
     case _: Type.Struct => true
     case _              => false
+  }
+
+  def isMapType: Boolean = this match {
+    case _: Type.Map => true
+    case _           => false
   }
 }
 
@@ -54,6 +61,7 @@ object Type {
       case Val.Address                        => Address
       case Val.FixedSizeArray(baseType, size) => FixedSizeArray(fromVal(baseType), size)
       case Val.Struct(name)                   => Struct(Ast.TypeId(name))
+      case Val.Map(key, value)                => Map(fromVal(key), fromVal(value))
     }
   }
 
@@ -82,6 +90,11 @@ object Type {
   final case class Struct(id: Ast.TypeId) extends Type {
     def toVal: Val.Type           = Val.Struct(id.name)
     override def toString: String = id.name
+  }
+
+  final case class Map(key: Type, value: Type) extends Type {
+    def toVal: Val.Type           = Val.Map(key.toVal, value.toVal)
+    override def toString: String = s"Map[$key,$value]"
   }
 
   final case class Contract(id: Ast.TypeId) extends Type {
