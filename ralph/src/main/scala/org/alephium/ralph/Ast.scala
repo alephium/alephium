@@ -712,6 +712,21 @@ object Ast {
     }
   }
 
+  final case class InsertToMap[Ctx <: StatelessContext](
+      ident: Ident,
+      approveAssets: Seq[ApproveAsset[Ctx]],
+      args: Seq[Expr[Ctx]]
+  ) extends Statement[Ctx] {
+    def check(state: Compiler.State[Ctx]): Unit              = ???
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = ???
+  }
+
+  final case class RemoveFromMap[Ctx <: StatelessContext](ident: Ident, args: Seq[Expr[Ctx]])
+      extends Statement[Ctx] {
+    def check(state: Compiler.State[Ctx]): Unit              = ???
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = ???
+  }
+
   sealed trait VarDeclaration                               extends Positioned
   final case class NamedVar(mutable: Boolean, ident: Ident) extends VarDeclaration
   case object AnonymousVar                                  extends VarDeclaration
