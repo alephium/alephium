@@ -285,8 +285,9 @@ abstract class Parser[Ctx <: StatelessContext] {
     varDeclaration.map(Seq(_)) | "(" ~ varDeclaration.rep(1, ",") ~ ")"
   )
   def varDef[Unknown: P]: P[Ast.VarDef[Ctx]] =
-    PP(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr) { case (_, vars, expr) =>
-      Ast.VarDef(vars, expr)
+    P(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr).map { case (from, vars, expr) =>
+      val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
+      Ast.VarDef(vars, expr).atSourceIndex(sourceIndex)
     }
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = PP(
