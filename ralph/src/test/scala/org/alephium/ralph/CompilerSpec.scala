@@ -1931,11 +1931,11 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
       testContractError(
         contract("[U256; 2]", "[1, 2]"),
-        "Only primitive types are supported for event \"Foo.TestEvent\""
+        "Array and struct types are not supported for event \"Foo.TestEvent\""
       )
       testContractError(
         contract("Bar", "Bar { x: 0 }"),
-        "Only primitive types are supported for event \"Foo.TestEvent\""
+        "Array and struct types are not supported for event \"Foo.TestEvent\""
       )
     }
   }
