@@ -5337,6 +5337,22 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     }
   }
 
+  it should "compile map" in {
+    {
+      info("Immutable map")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn f() -> Map[U256, U256] {
+           |    $$let a = emptyMap[U256, U256]$$
+           |    return a
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Map must be declared as mutable")
+    }
+  }
+
   it should "report friendly error for non-primitive types for consts" in new Fixture {
     {
       info("Array as constant")

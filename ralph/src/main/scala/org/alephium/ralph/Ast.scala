@@ -663,7 +663,9 @@ object Ast {
 
   final case class EmptyMap[Ctx <: StatelessContext](keyType: Type, valueType: Type)
       extends Expr[Ctx] {
-    def _getType(state: Compiler.State[Ctx]): Seq[Type]      = ???
+    def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      Seq(state.resolveType(Type.Map(keyType, valueType)))
+    }
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = ???
   }
 
@@ -715,6 +717,9 @@ object Ast {
       }
       vars.zip(types).foreach {
         case (NamedVar(isMutable, ident), tpe) =>
+          if (tpe.isMapType && !isMutable) {
+            throw Compiler.Error(s"Map must be declared as mutable", sourceIndex)
+          }
           state.addLocalVariable(ident, tpe, isMutable, isUnused = false, isGenerated = false)
         case _ =>
       }
@@ -1409,13 +1414,15 @@ object Ast {
           }
         case Type.FixedSizeArray(baseType, size) =>
           Type.FixedSizeArray(resolveType(baseType), size)
+        case Type.Map(key, value) =>
+          Type.Map(resolveType(key), resolveType(value))
         case _ => tpe
       }
     }
 
     @inline def resolveType(tpe: Type): Type = {
       tpe match {
-        case _: Type.NamedType | _: Type.FixedSizeArray =>
+        case _: Type.NamedType | _: Type.FixedSizeArray | _: Type.Map =>
           typeCache.get(tpe) match {
             case Some(tpe) => tpe
             case None =>
