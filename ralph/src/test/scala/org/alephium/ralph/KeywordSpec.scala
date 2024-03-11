@@ -28,6 +28,7 @@ class KeywordSpec extends AlephiumSpec {
       "AssetScript",
       "TxScript",
       "Interface",
+      "struct",
       "let",
       "mut",
       "fn",

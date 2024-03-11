@@ -16,6 +16,8 @@
 
 package org.alephium.ralph
 
+import scala.collection.mutable.ArrayBuffer
+
 import akka.util.ByteString
 import fastparse._
 
@@ -137,7 +139,9 @@ abstract class Parser[Ctx <: StatelessContext] {
       idx
   }
 
-  def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = P("[" ~ expr ~ "]")
+  def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
+    case (from, expr, to) => expr.overwriteSourceIndex(from, to)
+  }
 
   // Optimize chained comparisons
   def expr[Unknown: P]: P[Ast.Expr[Ctx]]    = P(chain(andExpr, Lexer.opOr))
@@ -172,18 +176,35 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(chain(arithExpr0, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
   def arithExpr0[Unknown: P]: P[Ast.Expr[Ctx]] = P(chain(unaryExpr, Lexer.opExp | Lexer.opModExp))
   def unaryExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(arrayElementOrAtom | PP(Lexer.opNot ~ arrayElementOrAtom) { case (op, expr) =>
-      Ast.UnaryOp.apply[Ctx](op, expr)
+    P(arrayElementOrStructFieldSelector | PP(Lexer.opNot ~ arrayElementOrStructFieldSelector) {
+      case (op, expr) =>
+        Ast.UnaryOp.apply[Ctx](op, expr)
     })
-  def arrayElementOrAtom[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(Index ~~ atom ~ arrayIndex.rep(0) ~~ Index).map { case (from, expr, indexes, to) =>
-      if (indexes.nonEmpty) {
-        Ast.ArrayElement(expr, indexes).atSourceIndex(from, to, fileURI)
-      } else {
-        expr
+  def arrayElementOrStructFieldSelector[Unknown: P]: P[Ast.Expr[Ctx]] =
+    P(atom ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0)).map { case (expr, list) =>
+      list.foldLeft(expr) { case (acc, e) =>
+        e match {
+          case index: Ast.Expr[Ctx @unchecked] =>
+            Ast
+              .ArrayElement(acc, index)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex, fileURI))
+          case ident: Ast.Ident =>
+            Ast
+              .StructFieldSelector(acc, ident)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex, fileURI))
+        }
       }
     }
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
+
+  def structCtor[Unknown: P]: P[Ast.StructCtor[Ctx]] =
+    PP(Lexer.typeId ~ "{" ~ P(Lexer.ident ~ ":" ~ expr).rep(0, ",") ~ "}") {
+      case (typeId, fields) =>
+        if (fields.isEmpty) {
+          throw Compiler.Error(s"No field definition in struct ${typeId.name}", typeId.sourceIndex)
+        }
+        Ast.StructCtor(typeId, fields)
+    }
 
   def parenExpr[Unknown: P]: P[Ast.ParenExpr[Ctx]] =
     PP("(" ~ expr ~ ")") { case (ex) =>
@@ -267,16 +288,33 @@ abstract class Parser[Ctx <: StatelessContext] {
     PP(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr) { case (_, vars, expr) =>
       Ast.VarDef(vars, expr)
     }
-  def assignmentSimpleTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
-    PP(Lexer.ident)(Ast.AssignmentSimpleTarget.apply[Ctx])
-  def assignmentArrayElementTarget[Unknown: P]: P[Ast.AssignmentArrayElementTarget[Ctx]] = PP(
-    Lexer.ident ~ arrayIndex.rep(1)
-  ) { case (ident, indexes) =>
-    Ast.AssignmentArrayElementTarget[Ctx](ident, indexes)
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = PP(
+    Lexer.ident ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0)
+  ) { case (ident, list) =>
+    if (list.isEmpty) {
+      Ast.AssignmentSimpleTarget(ident)
+    } else {
+      val variable: Ast.Expr[Ctx] = Ast.Variable(ident).atSourceIndex(ident.sourceIndex)
+      val expr = list.init.foldLeft(variable) { case (acc, e) =>
+        e match {
+          case index: Ast.Expr[Ctx @unchecked] =>
+            Ast
+              .ArrayElement(acc, index)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex))
+          case ident: Ast.Ident =>
+            Ast
+              .StructFieldSelector(acc, ident)
+              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex))
+        }
+      }
+      list.last match {
+        case arrayIndex: Ast.Expr[Ctx @unchecked] =>
+          Ast.AssignmentArrayElementTarget(ident, expr, arrayIndex)
+        case selector: Ast.Ident => Ast.AssignmentStructFieldTarget(ident, expr, selector)
+      }
+    }
   }
-  def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = P(
-    assignmentArrayElementTarget | assignmentSimpleTarget
-  )
 
   def assign[Unknown: P]: P[Ast.Assign[Ctx]] =
     P(assignmentTarget.rep(1, ",") ~ "=" ~ expr).map { case (targets, expr) =>
@@ -300,20 +338,25 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
   def argument[Unknown: P](
       allowMutable: Boolean
-  )(contractTypeCtor: (Ast.TypeId, Ast.Ident) => Type): P[Ast.Argument] =
+  )(contractTypeCtor: Ast.TypeId => Type): P[Ast.Argument] =
     P(Index ~ Lexer.unused ~ Lexer.mutMaybe(allowMutable) ~ Lexer.ident ~ ":").flatMap {
       case (fromIndex, isUnused, isMutable, ident) =>
+<<<<<<< HEAD
         P(parseType(contractTypeCtor(_, ident)) ~~ Index).map { case (tpe, endIndex) =>
           Ast.Argument(ident, tpe, isMutable, isUnused).atSourceIndex(fromIndex, endIndex, fileURI)
+=======
+        P(parseType(contractTypeCtor) ~~ Index).map { case (tpe, endIndex) =>
+          Ast.Argument(ident, tpe, isMutable, isUnused).atSourceIndex(fromIndex, endIndex)
+>>>>>>> origin/master
         }
     }
-  def funcArgument[Unknown: P]: P[Ast.Argument] = argument(allowMutable = true)(Type.Contract.local)
+  def funcArgument[Unknown: P]: P[Ast.Argument]   = argument(allowMutable = true)(Type.NamedType)
   def funParams[Unknown: P]: P[Seq[Ast.Argument]] = P("(" ~ funcArgument.rep(0, ",") ~ ")")
   def returnType[Unknown: P]: P[Seq[Type]]        = P(simpleReturnType | bracketReturnType)
   def simpleReturnType[Unknown: P]: P[Seq[Type]] =
-    P("->" ~ parseType(Type.Contract.stack)).map(tpe => Seq(tpe))
+    P("->" ~ parseType(Type.NamedType)).map(tpe => Seq(tpe))
   def bracketReturnType[Unknown: P]: P[Seq[Type]] =
-    P("->" ~ "(" ~ parseType(Type.Contract.stack).rep(0, ",") ~ ")")
+    P("->" ~ "(" ~ parseType(Type.NamedType).rep(0, ",") ~ ")")
   def funcTmp[Unknown: P]: P[FuncDefTmp[Ctx]] =
     PP(
       annotation.rep(0) ~
@@ -466,17 +509,40 @@ abstract class Parser[Ctx <: StatelessContext] {
   def statement[Unknown: P]: P[Ast.Statement[Ctx]]
 
   def contractField[Unknown: P](allowMutable: Boolean): P[Ast.Argument] =
-    argument(allowMutable)(Type.Contract.global)
+    argument(allowMutable)(Type.NamedType)
 
   def templateParams[Unknown: P]: P[Seq[Ast.Argument]] =
     P("(" ~ contractField(allowMutable = false).rep(0, ",") ~ ")")
 
+<<<<<<< HEAD
   def eventField[Unknown: P]: P[Ast.EventField] =
     P(Index ~ Lexer.ident ~ ":").flatMap { case (from, ident) =>
       P(parseType(typeId => Type.Contract.global(typeId, ident)) ~~ Index).map { case (tpe, to) =>
         Ast.EventField(ident, tpe).atSourceIndex(from, to, fileURI)
       }
+=======
+  def field[Unknown: P]: P[(Ast.Ident, Type)] = P(Lexer.ident ~ ":").flatMap { ident =>
+    parseType(Type.NamedType).map { tpe => (ident, tpe) }
+  }
+
+  def eventField[Unknown: P]: P[Ast.EventField] = P(field).map(Ast.EventField.tupled)
+  def structField[Unknown: P]: P[Ast.StructField] = PP(
+    Lexer.mut ~ Lexer.ident ~ ":" ~ parseType(Type.NamedType)
+  ) { case (mutable, ident, tpe) =>
+    Ast.StructField(ident, mutable, tpe)
+  }
+  def rawStruct[Unknown: P]: P[Ast.Struct] =
+    PP(Lexer.token(Keyword.struct) ~/ Lexer.typeId ~ "{" ~ structField.rep(0, ",") ~ "}") {
+      case (structIndex, id, fields) =>
+        if (fields.isEmpty) {
+          val sourceIndex = SourceIndex(Some(structIndex), id.sourceIndex)
+          throw Compiler.Error(s"No field definition in struct ${id.name}", sourceIndex)
+        }
+        Ast.UniqueDef.checkDuplicates(fields, "struct fields")
+        Ast.Struct(id, fields)
+>>>>>>> origin/master
     }
+  def struct[Unknown: P]: P[Ast.Struct] = P(Start ~ rawStruct ~ End)
 
   def annotationField[Unknown: P]: P[Ast.AnnotationField] =
     P(Index ~ Lexer.ident ~ "=" ~ expr ~~ Index).map {
@@ -647,7 +713,8 @@ object Parser {
 class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[StatelessContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatelessContext]] =
     P(
-      const | stringLiteral | alphTokenId | callExpr | contractConv | variable | parenExpr | arrayExpr | ifelseExpr
+      const | stringLiteral | alphTokenId | callExpr | contractConv |
+        structCtor | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def statement[Unknown: P]: P[Ast.Statement[StatelessContext]] =
@@ -655,12 +722,21 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
 
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
+<<<<<<< HEAD
       Start ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~ templateParams.? ~
         "{" ~ func.rep(1) ~ "}" ~~ Index ~ endOfInput(fileURI)
     ).map { case (assetIndex, typeId, templateVars, funcs, endIndex) =>
       Ast
         .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
         .atSourceIndex(assetIndex.index, endIndex, fileURI)
+=======
+      Start ~ rawStruct.rep(0) ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~
+        templateParams.? ~ "{" ~ func.rep(1) ~ "}" ~~ Index ~ rawStruct.rep(0) ~ endOfInput
+    ).map { case (defs0, assetIndex, typeId, templateVars, funcs, endIndex, defs1) =>
+      Ast
+        .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs, defs0 ++ defs1)
+        .atSourceIndex(assetIndex.index, endIndex)
+>>>>>>> origin/master
     }
 }
 
@@ -674,7 +750,8 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
 class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv | enumFieldSelector | variable | parenExpr | arrayExpr | ifelseExpr
+      const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv |
+        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   def contractCallExpr[Unknown: P]: P[Ast.Expr[StatefulContext]] =
@@ -757,9 +834,15 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               usingAnnotation.assetsInContract,
               usingAnnotation.updateFields
             )
+<<<<<<< HEAD
             Ast.TxScript
               .from(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
               .atSourceIndex(scriptIndex.index, endIndex, fileURI)
+=======
+            Ast
+              .TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
+              .atSourceIndex(scriptIndex.index, endIndex)
+>>>>>>> origin/master
           }
       }
   def txScript[Unknown: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
@@ -801,15 +884,31 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def constantVarDef[Unknown: P]: P[Ast.ConstantVarDef] =
-    PP(
-      Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ (value | stringLiteral.map(
-        _.string
-      ))
-    ) { case (_, ident, v) =>
-      Ast.ConstantVarDef(ident, v.asInstanceOf[Val])
+    PP(Lexer.token(Keyword.const) ~/ Lexer.constantIdent ~ "=" ~ atom) { case (_, ident, value) =>
+      value match {
+        case Ast.Const(v) =>
+          Ast.ConstantVarDef(ident, v)
+        case Ast.StringLiteral(v) =>
+          Ast.ConstantVarDef(ident, v)
+        case v: Ast.CreateArrayExpr[_] =>
+          throwConstantVarDefException("arrays", v.sourceIndex)
+        case v: Ast.StructCtor[_] =>
+          throwConstantVarDefException("structs", v.sourceIndex)
+        case v: Ast.ContractConv[_] =>
+          throwConstantVarDefException("contract instances", v.sourceIndex)
+        case v: Ast.Positioned =>
+          throwConstantVarDefException("other expressions", v.sourceIndex)
+      }
     }
+
+  private val primitiveTypes = Type.primitives.map(_.signature).mkString("/")
+  private def throwConstantVarDefException(label: String, sourceIndex: Option[SourceIndex]) = {
+    throw Compiler.Error(
+      s"Expected constant value with primitive types ${primitiveTypes}, $label are not supported",
+      sourceIndex
+    )
+  }
 
   def enumFieldSelector[Unknown: P]: P[Ast.EnumFieldSelector[StatefulContext]] =
     PP(Lexer.typeId ~ "." ~ Lexer.constantIdent) { case (enumId, field) =>
@@ -838,13 +937,14 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   def enumDef[Unknown: P]: P[Ast.EnumDef] = P(Start ~ rawEnumDef ~ End)
 
+  // scalastyle:off method.length
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def rawContract[Unknown: P]: P[Ast.Contract] =
     P(
       annotation.rep ~ Index ~ Lexer.`abstract` ~ Lexer.token(
         Keyword.Contract
       ) ~/ Lexer.typeId ~ contractFields ~
-        contractInheritances.? ~ "{" ~ eventDef.rep ~ constantVarDef.rep ~ rawEnumDef.rep ~ func.rep ~ "}"
+        contractInheritances.? ~ "{" ~ (eventDef | constantVarDef | rawEnumDef | func).rep ~ "}"
         ~~ Index
     ).map {
       case (
@@ -855,13 +955,36 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
             typeId,
             fields,
             contractInheritances,
-            events,
-            constantVars,
-            enums,
-            funcs,
+            statements,
             endIndex
           ) =>
         val contractStdAnnotation = Parser.ContractStdAnnotation.extractFields(annotations, None)
+        val funcs                 = ArrayBuffer.empty[Ast.FuncDef[StatefulContext]]
+        val events                = ArrayBuffer.empty[Ast.EventDef]
+        val constantVars          = ArrayBuffer.empty[Ast.ConstantVarDef]
+        val enums                 = ArrayBuffer.empty[Ast.EnumDef]
+
+        statements.foreach {
+          case e: Ast.EventDef =>
+            if (constantVars.nonEmpty || funcs.nonEmpty || enums.nonEmpty) {
+              throwContractStmtsOutOfOrderException(e.sourceIndex)
+            }
+            events += e
+          case c: Ast.ConstantVarDef =>
+            if (funcs.nonEmpty || enums.nonEmpty) {
+              throwContractStmtsOutOfOrderException(c.sourceIndex)
+            }
+            constantVars += c
+          case e: Ast.EnumDef =>
+            if (funcs.nonEmpty) {
+              throwContractStmtsOutOfOrderException(e.sourceIndex)
+            }
+            enums += e
+          case f: Ast.FuncDef[_] =>
+            funcs += f.asInstanceOf[Ast.FuncDef[StatefulContext]]
+          case _ =>
+        }
+
         Ast
           .Contract(
             contractStdAnnotation.map(_.enabled),
@@ -870,14 +993,23 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
             typeId,
             Seq.empty,
             fields,
-            funcs,
-            events,
-            constantVars,
-            enums,
+            funcs.toSeq,
+            events.toSeq,
+            constantVars.toSeq,
+            enums.toSeq,
             contractInheritances.getOrElse(Seq.empty)
           )
           .atSourceIndex(fromIndex, endIndex, fileURI)
     }
+  // scalastyle:on method.length
+
+  private def throwContractStmtsOutOfOrderException(sourceIndex: Option[SourceIndex]) = {
+    throw Compiler.Error(
+      "Contract statements should be in the order of `events`, `consts`, `enums` and `methods`",
+      sourceIndex
+    )
+  }
+
   def contract[Unknown: P]: P[Ast.Contract] = P(Start ~ rawContract ~ End)
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
@@ -944,10 +1076,23 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
     }
   def interface[Unknown: P]: P[Ast.ContractInterface] = P(Start ~ rawInterface ~ End)
 
+  private def entities[Unknown: P]: P[Ast.Entity] = P(
+    rawTxScript | rawContract | rawInterface | rawStruct
+  )
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def multiContract[Unknown: P]: P[Ast.MultiContract] =
-    P(Start ~~ Index ~ (rawTxScript | rawContract | rawInterface).rep(1) ~~ Index ~ End)
+    P(Start ~~ Index ~ entities.rep(1) ~~ Index ~ End)
       .map { case (fromIndex, defs, endIndex) =>
+<<<<<<< HEAD
         Ast.MultiContract(defs, None).atSourceIndex(fromIndex, endIndex, fileURI)
+=======
+        val contracts = defs
+          .filter(_.isInstanceOf[Ast.ContractWithState])
+          .asInstanceOf[Seq[Ast.ContractWithState]]
+        val structs = defs.filter(_.isInstanceOf[Ast.Struct]).asInstanceOf[Seq[Ast.Struct]]
+        Ast.MultiContract(contracts, structs, None).atSourceIndex(fromIndex, endIndex)
+>>>>>>> origin/master
       }
 
   def state[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] =

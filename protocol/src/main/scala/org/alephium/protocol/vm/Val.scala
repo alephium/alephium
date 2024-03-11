@@ -59,12 +59,12 @@ object Val {
 
     private def _deserialize(tpe: Type, content: ByteString): SerdeResult[Staging[Val]] =
       tpe match {
-        case Bool              => decode[Boolean](content).map(_.mapValue(Bool(_)))
-        case I256              => decode[util.I256](content).map(_.mapValue(I256(_)))
-        case U256              => decode[util.U256](content).map(_.mapValue(U256(_)))
-        case ByteVec           => decode[ByteString](content).map(_.mapValue(ByteVec(_)))
-        case Address           => decode[LockupScript](content).map(_.mapValue(Address(_)))
-        case _: FixedSizeArray => Left(SerdeError.Other("Unexpected type"))
+        case Bool    => decode[Boolean](content).map(_.mapValue(Bool(_)))
+        case I256    => decode[util.I256](content).map(_.mapValue(I256(_)))
+        case U256    => decode[util.U256](content).map(_.mapValue(U256(_)))
+        case ByteVec => decode[ByteString](content).map(_.mapValue(ByteVec(_)))
+        case Address => decode[LockupScript](content).map(_.mapValue(Address(_)))
+        case _: FixedSizeArray | _: Struct => Left(SerdeError.Other("Unexpected type"))
       }
   }
 
@@ -206,6 +206,12 @@ object Val {
     override def default: Val       = throw new RuntimeException("FixedArray has no default value")
     override def isNumeric: Boolean = false
     override def toString: String   = s"[$baseType;$size]"
+  }
+  final case class Struct(name: String) extends Type {
+    override def id: scala.Byte     = throw new RuntimeException("Struct has no type id")
+    override def default: Val       = throw new RuntimeException("Struct has no default value")
+    override def isNumeric: Boolean = false
+    override def toString: String   = name
   }
 
   val True: Bool                       = Bool(true)

@@ -290,6 +290,20 @@ class VMSpec extends AlephiumSpec with Generators {
       val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).rightValue
       worldState.getContractAsset(contractId).rightValue
     }
+
+    def deployAndCheckContractState(
+        script: String,
+        immFields: AVector[Val],
+        mutFields: AVector[Val]
+    ) = {
+      val block      = callTxScript(script)
+      val tx         = block.nonCoinbase.head
+      val contractId = ContractId.from(tx.id, tx.unsigned.fixedOutputs.length, tx.fromGroup)
+      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+      val contractState = worldState.getContractState(contractId).rightValue
+      contractState.immFields is immFields
+      contractState.mutFields is mutFields
+    }
   }
 
   it should "disallow loading upgraded contract in current tx" in new ContractFixture {
@@ -3043,23 +3057,6 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
-  it should "not compile when emitting events with array field types" in new FlowFixture {
-    def contractRaw: String =
-      s"""
-         |Contract Foo(result: U256) {
-         |
-         |  event TestEvent(f: [U256; 2])
-         |
-         |  pub fn testArrayEventType() -> (U256) {
-         |    emit TestEvent([1, 2])
-         |    return 0
-         |  }
-         |}
-         |""".stripMargin
-    Compiler.compileContract(contractRaw).leftValue.message is
-      "Array type not supported for event \"Foo.TestEvent\""
-  }
-
   private def getLogStates(
       blockFlow: BlockFlow,
       contractId: ContractId,
@@ -3677,20 +3674,6 @@ class VMSpec extends AlephiumSpec with Generators {
 
     val fooContract = Compiler.compileContract(foo).rightValue
     val fooBytecode = Hex.toHexString(serialize(fooContract))
-
-    private def deployAndCheckContractState(
-        script: String,
-        immFields: AVector[Val],
-        mutFields: AVector[Val]
-    ) = {
-      val block      = callTxScript(script)
-      val tx         = block.nonCoinbase.head
-      val contractId = ContractId.from(tx.id, tx.unsigned.fixedOutputs.length, tx.fromGroup)
-      val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
-      val contractState = worldState.getContractState(contractId).rightValue
-      contractState.immFields is immFields
-      contractState.mutFields is mutFields
-    }
 
     val script0 =
       s"""
@@ -4719,6 +4702,41 @@ class VMSpec extends AlephiumSpec with Generators {
     // The invalid tx is removed
     blockFlow.validateTemplate(chainIndex, newTemplate)
     blockFlow.getGrandPool().size is 0
+  }
+
+  it should "test encode struct type contract fields" in new ContractFixture {
+    val contract =
+      s"""
+         |struct Foo {x: U256, mut y: U256}
+         |struct Bar {mut a: [Foo; 2], b: U256 }
+         |Contract C(@unused mut a: U256, @unused b: U256, @unused mut bar: Bar) {
+         |  pub fn f() -> () {}
+         |}
+         |""".stripMargin
+
+    val compiledContract = Compiler.compileContract(contract).rightValue
+    val contractBytecode = Hex.toHexString(serialize(compiledContract))
+    // put field `b` at first for testing
+    val fields = "0, 1, Bar{b:6, a: [Foo{y: 3, x: 2}, Foo{x: 4, y: 5}]}"
+
+    val script =
+      s"""
+         |TxScript Deploy() {
+         |  let (encodedImmFields, encodedMutFields) = C.encodeFields!($fields)
+         |  createContract!{@$genesisAddress -> ALPH: $minimalAlphInContract}(
+         |    #$contractBytecode,
+         |    encodedImmFields,
+         |    encodedMutFields
+         |  )
+         |}
+         |$contract
+         |""".stripMargin
+
+    deployAndCheckContractState(
+      script,
+      AVector.from(Seq(1, 2, 4, 6)).map(v => Val.U256(U256.unsafe(v))),
+      AVector.from(Seq(0, 3, 5)).map(v => Val.U256(U256.unsafe(v)))
+    )
   }
 
   private def getEvents(

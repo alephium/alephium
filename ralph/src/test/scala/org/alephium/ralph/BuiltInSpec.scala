@@ -65,13 +65,15 @@ class BuiltInSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val ast = Compiler.compileContractFull(code).rightValue.ast
-    ast.builtInContractFuncs().length is 3
-    ast.funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is
+    val ast         = Compiler.compileContractFull(code).rightValue.ast
+    val globalState = Ast.GlobalState(Seq.empty)
+    ast.builtInContractFuncs(globalState).length is 3
+    val funcTable = ast.funcTable(globalState)
+    funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is
       Seq(U256Const(Val.U256(U256.Zero)), Encode)
-    ast.funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is
+    funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is
       Seq(U256Const(Val.U256(U256.Zero)), Encode)
-    ast.funcTable(Ast.FuncId("encodeFields", true)).genCode(Seq.empty) is Seq.empty
+    funcTable(Ast.FuncId("encodeFields", true)).genCode(Seq.empty) is Seq.empty
   }
 
   it should "initialize built-in encoding functions for contracts using standard interfaces" in {
@@ -90,20 +92,22 @@ class BuiltInSpec extends AlephiumSpec {
          |""".stripMargin
 
     def test(enabled: Boolean, encodeImmFieldsInstrs: Seq[Instr[StatelessContext]]) = {
-      val ast = Compiler.compileContractFull(code(enabled)).rightValue.ast
-      ast.funcTable.size is 4
-      ast.builtInContractFuncs().length is 3
+      val ast         = Compiler.compileContractFull(code(enabled)).rightValue.ast
+      val globalState = Ast.GlobalState(Seq.empty)
+      val funcTable   = ast.funcTable(globalState)
+      funcTable.size is 4
+      ast.builtInContractFuncs(globalState).length is 3
 
-      val foo = ast.funcTable(Ast.FuncId("foo", false))
+      val foo = funcTable(Ast.FuncId("foo", false))
       foo.isStatic is false
-      val encodeImmFields = ast.funcTable(Ast.FuncId("encodeImmFields", true))
+      val encodeImmFields = funcTable(Ast.FuncId("encodeImmFields", true))
       encodeImmFields.isStatic is true
       encodeImmFields.genCode(Seq.empty) is encodeImmFieldsInstrs
-      val encodeMutFields = ast.funcTable(Ast.FuncId("encodeMutFields", true))
+      val encodeMutFields = funcTable(Ast.FuncId("encodeMutFields", true))
       encodeMutFields.isStatic is true
       encodeMutFields.genCode(Seq.empty) is
         Seq(U256Const(Val.U256(U256.Zero)), Encode)
-      val encodeFields = ast.funcTable(Ast.FuncId("encodeFields", true))
+      val encodeFields = funcTable(Ast.FuncId("encodeFields", true))
       encodeFields.isStatic is true
       encodeFields.genCode(Seq.empty) is Seq.empty
     }

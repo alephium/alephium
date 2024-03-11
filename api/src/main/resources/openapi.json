@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Alephium API",
-    "version": "2.9.1"
+    "version": "2.10.2"
   },
   "servers": [
     {
@@ -7337,6 +7337,23 @@
                         "Found unused fields in Foo: a"
                       ]
                     }
+                  ],
+                  "structs": [
+                    {
+                      "name": "Foo",
+                      "fieldNames": [
+                        "amount",
+                        "id"
+                      ],
+                      "fieldTypes": [
+                        "U256",
+                        "ByteVec"
+                      ],
+                      "isMutable": [
+                        false,
+                        true
+                      ]
+                    }
                   ]
                 }
               }
@@ -11263,6 +11280,12 @@
             "items": {
               "$ref": "#/components/schemas/CompileScriptResult"
             }
+          },
+          "structs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StructSig"
+            }
           }
         }
       },
@@ -12423,6 +12446,38 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/OutputRef"
+            }
+          }
+        }
+      },
+      "StructSig": {
+        "required": [
+          "name",
+          "fieldNames",
+          "fieldTypes",
+          "isMutable"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "fieldNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fieldTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isMutable": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
             }
           }
         }

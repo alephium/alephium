@@ -94,6 +94,11 @@ trait Warnings {
           .funcName(typeId, funcId)}"
     }
   }
+
+  def warningUnusedCallReturn(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+    warnings += s"The return values of the function ${Ast.funcName(typeId, funcId)} are not used." +
+      s" If this is intentional, consider using anonymous variables to suppress this warning."
+  }
 }
 
 object Warnings {
