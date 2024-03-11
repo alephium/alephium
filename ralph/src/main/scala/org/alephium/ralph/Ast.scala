@@ -1132,13 +1132,13 @@ object Ast {
     override def check(state: Compiler.State[Ctx]): Unit = {
       val eventInfo = state.getEvent(id)
       val argsType  = args.flatMap(_.getType(state))
-      if (argsType.exists(!_.isPrimitive)) {
+      if (argsType.exists(t => t.isArrayType || t.isStructType)) {
         throw Compiler.Error(
-          s"Only primitive types are supported for event ${quote(s"${state.typeId.name}.${id.name}")}",
+          s"Array and struct types are not supported for event ${quote(s"${state.typeId.name}.${id.name}")}",
           sourceIndex
         )
       }
-      eventInfo.checkFieldTypes(argsType, args.headOption.flatMap(_.sourceIndex))
+      eventInfo.checkFieldTypes(state, argsType, args.headOption.flatMap(_.sourceIndex))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {

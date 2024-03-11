@@ -2658,12 +2658,14 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |  event Adding(a: U256, b: U256)
          |  event Added()
+         |  event ContractEvent(foo: Foo)
          |
          |  @using(updateFields = true)
          |  pub fn add(a: U256) -> (U256) {
          |    emit Adding(a, result)
          |    result = result + a
          |    emit Added()
+         |    emit ContractEvent(Foo(selfContractId!()))
          |    return result
          |  }
          |
@@ -2695,7 +2697,7 @@ class VMSpec extends AlephiumSpec with Generators {
     ) = {
       logStates.blockHash is block.hash
       logStates.contractId is contractId
-      logStates.states.length is 2
+      logStates.states.length is 3
 
       getCurrentCount(blockFlow, chainIndex.from, contractId).value is currentCount
 
@@ -2710,6 +2712,11 @@ class VMSpec extends AlephiumSpec with Generators {
       addedLogState.txId is block.nonCoinbase.head.id
       addedLogState.index is 1.toByte
       addedLogState.fields.length is 0
+
+      val contractLogState = logStates.states(2)
+      contractLogState.txId is block.nonCoinbase.head.id
+      contractLogState.index is 2.toByte
+      contractLogState.fields is AVector[Val](Val.ByteVec(contractId.bytes))
     }
   }
 
@@ -2782,9 +2789,9 @@ class VMSpec extends AlephiumSpec with Generators {
       val logStates1    = logStatesOpt1.value
       val newCounter    = logStates1.states.length
 
-      newCounter is 2
+      newCounter is 3
 
-      AVector(1, 2, 100).foreach { count =>
+      AVector(1, 2, 3, 100).foreach { count =>
         getLogStates(blockFlow, contractId, count) is None
       }
     }
@@ -3046,7 +3053,7 @@ class VMSpec extends AlephiumSpec with Generators {
 
       logStates2.blockHash is secondCallingBlock.hash
       logStates2.contractId is contractId
-      logStates2.states.length is 2
+      logStates2.states.length is 3
 
       val addingLogState = logStates2.states(0)
       addingLogState.txId is secondCallingBlock.nonCoinbase.head.id
