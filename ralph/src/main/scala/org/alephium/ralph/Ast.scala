@@ -439,6 +439,9 @@ object Ast {
       checkNonStaticContractFunction(contractType.id, callId, funcInfo)
       state.addExternalCall(contractType.id, callId)
       val retTypes = positionedError(funcInfo.getReturnType(args.flatMap(_.getType(state)), state))
+      if (retTypes.exists(_.isMapType)) {
+        throw Compiler.Error("Access to other contracts' maps is not allowed", sourceIndex)
+      }
       (contractType.id, retTypes)
     }
 
