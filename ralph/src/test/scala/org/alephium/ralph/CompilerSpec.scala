@@ -5351,6 +5351,25 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(code, "Map must be declared as mutable")
     }
+
+    {
+      info("Accessing the map of other contracts")
+      val code =
+        s"""
+           |Contract Bar(foo: Foo) {
+           |  pub fn bar(address: Address) -> () {
+           |    let mut map = $$foo.foo()$$
+           |    map.insert!{address -> ALPH: minimalContractDeposit!()}(1, 2)
+           |  }
+           |}
+           |Contract Foo() {
+           |  pub fn foo() -> Map[U256, U256] {
+           |    return emptyMap[U256, U256]
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Access to other contracts' maps is not allowed")
+    }
   }
 
   it should "report friendly error for non-primitive types for consts" in new Fixture {
