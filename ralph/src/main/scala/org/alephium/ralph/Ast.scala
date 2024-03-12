@@ -216,17 +216,63 @@ object Ast {
       elements.flatMap(_.genCode(state))
     }
   }
-  final case class ArrayElement[Ctx <: StatelessContext](
-      array: Expr[Ctx],
-      index: Ast.Expr[Ctx]
-  ) extends Expr[Ctx] {
-    override def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      Seq(state.getArrayElementType(array, index))
-    }
 
-    override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val (arrayRef, codes) = state.getOrCreateArrayRef(array)
-      codes ++ arrayRef.genLoadCode(state, index)
+  sealed trait AccessFieldBase[Ctx <: StatelessContext] { self: Positioned =>
+    def selectors: Seq[FieldSelector]
+    protected def _getType(
+        state: Compiler.State[Ctx],
+        rootType: Type,
+        sourceIndex: Option[SourceIndex]
+    ): Type = {
+      selectors
+        .foldLeft((rootType, sourceIndex)) { case ((tpe, sourceIndex), selector) =>
+          (tpe, selector) match {
+            case (array: Type.FixedSizeArray, selector: IndexSelector[Ctx @unchecked]) =>
+              state.checkArrayIndexType(selector.index)
+              (array.baseType, selector.sourceIndex)
+            case (struct: Type.Struct, IdentSelector(ident)) =>
+              val field = state.getStruct(struct.id).getField(ident)
+              (state.resolveType(field.tpe), selector.sourceIndex)
+            case (tpe, _: IndexSelector[Ctx @unchecked]) =>
+              throw Compiler.Error(
+                s"Expected array type, got ${quote(tpe)}",
+                SourceIndex(this.sourceIndex, sourceIndex)
+              )
+            case (tpe, _: IdentSelector) =>
+              throw Compiler.Error(
+                s"Expected struct type, got ${quote(tpe)}",
+                SourceIndex(this.sourceIndex, sourceIndex)
+              )
+          }
+        }
+        ._1
+    }
+  }
+
+  final case class LoadFieldBySelectors[Ctx <: StatelessContext](
+      base: Expr[Ctx],
+      selectors: Seq[FieldSelector]
+  ) extends Expr[Ctx]
+      with AccessFieldBase[Ctx] {
+    def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
+      base.getType(state) match {
+        case Seq(t: Type.FixedSizeArray) => Seq(_getType(state, t, base.sourceIndex))
+        case Seq(t: Type.Struct)         => Seq(_getType(state, t, base.sourceIndex))
+        case tpe =>
+          val tpeStr = if (tpe.length == 1) quote(tpe(0)) else quote(tpe)
+          selectors.headOption match {
+            case Some(IndexSelector(_)) =>
+              throw Compiler.Error(s"Expected array type, got $tpeStr", base.sourceIndex)
+            case _ =>
+              throw Compiler.Error(s"Expected struct type, got $tpeStr", base.sourceIndex)
+          }
+      }
+    }
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
+      val (ref, codes) = state.getOrCreateVariablesRef(base)
+      val subRef       = ref.subRef(state, selectors.init)
+      codes ++ subRef.genLoadCode(state, selectors.last)
     }
   }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
@@ -672,17 +718,6 @@ object Ast {
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = ???
   }
 
-  final case class StructFieldSelector[Ctx <: StatelessContext](expr: Expr[Ctx], selector: Ident)
-      extends Expr[Ctx] {
-    def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      Seq(state.getStructFieldType(expr, selector))
-    }
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      val (structRef, codes) = state.getOrCreateStructRef(expr)
-      codes ++ structRef.genLoadCode(state, selector)
-    }
-  }
-
   sealed trait Statement[Ctx <: StatelessContext] extends Positioned {
     def check(state: Compiler.State[Ctx]): Unit
     def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]]
@@ -931,76 +966,6 @@ object Ast {
         case _                      => true
       }
     }
-    protected def checkStructField(
-        state: Compiler.State[Ctx],
-        structRef: StructRef[Ctx],
-        selector: Ident,
-        checkType: Boolean,
-        sourceIndex: Option[SourceIndex]
-    ): Unit = {
-      val field = structRef.ast.getField(selector)
-      if (!field.isMutable) {
-        throw Compiler.Error(
-          s"Cannot assign to immutable field ${field.name} in struct ${structRef.tpe.id.name}.",
-          sourceIndex
-        )
-      }
-      if (checkType && !isTypeMutable(field.tpe, state)) {
-        throw Compiler.Error(
-          s"Cannot assign to field ${field.name} in struct ${structRef.tpe.id.name}." +
-            s" Assignment only works when all of the field selectors are mutable.",
-          sourceIndex
-        )
-      }
-      if (!structRef.isMutable) {
-        throw Compiler.Error(
-          s"Cannot assign to immutable struct ${structRef.tpe.id.name}. Assignment only works when all of the field selectors are mutable.",
-          sourceIndex
-        )
-      }
-    }
-    def getStructRef(ref: VariablesRef[Ctx], sourceIndex: Option[SourceIndex]): StructRef[Ctx] = {
-      ref match {
-        case ref: StructRef[Ctx @unchecked] => ref
-        case _ =>
-          throw Compiler.Error(s"Expected struct type, got ${ref.tpe}", sourceIndex)
-      }
-    }
-    def getArrayRef(ref: VariablesRef[Ctx], sourceIndex: Option[SourceIndex]): ArrayRef[Ctx] = {
-      ref match {
-        case ref: ArrayRef[Ctx @unchecked] => ref
-        case _ =>
-          throw Compiler.Error(s"Expected array type, got ${ref.tpe}", sourceIndex)
-      }
-    }
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    protected def getRef(
-        state: Compiler.State[Ctx],
-        expr: Expr[Ctx],
-        sourceIndex: Option[SourceIndex]
-    ): VariablesRef[Ctx] = {
-      expr match {
-        case ArrayElement(array @ StructFieldSelector(struct, selector), index) =>
-          val structRef = getStructRef(getRef(state, struct, sourceIndex), struct.sourceIndex)
-          checkStructField(state, structRef, selector, checkType = false, sourceIndex)
-          val arrayRef = getArrayRef(structRef.subRef(state, selector), array.sourceIndex)
-          arrayRef.subRef(state, index)
-        case ArrayElement(array @ Variable(ident), index) =>
-          val ref = state.getVariablesRef(ident)
-          if (!ref.isMutable) {
-            throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
-          }
-          getArrayRef(ref, array.sourceIndex).subRef(state, index)
-        case ArrayElement(array, index) =>
-          getArrayRef(getRef(state, array, sourceIndex), array.sourceIndex).subRef(state, index)
-        case StructFieldSelector(struct, selector) =>
-          val structRef = getStructRef(getRef(state, struct, sourceIndex), struct.sourceIndex)
-          checkStructField(state, structRef, selector, checkType = false, sourceIndex)
-          structRef.subRef(state, selector)
-        case Variable(ident) => state.getVariablesRef(ident)
-        case _ => throw Compiler.Error(s"Invalid selector $expr", sourceIndex) // dead branch
-      }
-    }
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]]
   }
@@ -1023,109 +988,82 @@ object Ast {
     }
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = state.genStoreCode(ident)
   }
-  final case class AssignmentArrayElementTarget[Ctx <: StatelessContext](
+  sealed trait FieldSelector                                                extends Positioned
+  final case class IndexSelector[Ctx <: StatelessContext](index: Expr[Ctx]) extends FieldSelector
+  final case class IdentSelector(ident: Ident)                              extends FieldSelector
+  final case class AssignmentFieldTarget[Ctx <: StatelessContext](
       ident: Ident,
-      from: Ast.Expr[Ctx],
-      index: Ast.Expr[Ctx]
-  ) extends AssignmentTarget[Ctx] {
-    private var arrayRef: Option[ArrayRef[Ctx]] = None
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-    private def getArrayRef(
-        state: Compiler.State[Ctx],
-        sourceIndex: Option[SourceIndex]
-    ): ArrayRef[Ctx] = {
-      arrayRef match {
-        case Some(ref) => ref
-        case None =>
-          val ref = getRef(state, from, sourceIndex).asInstanceOf[ArrayRef[Ctx]]
-          arrayRef = Some(ref)
-          ref
-      }
-    }
-
-    def _getType(state: Compiler.State[Ctx]): Type = {
-      state.getVariable(ident, isWrite = true)
-      state.getArrayElementType(from, index)
-    }
-
+      selectors: Seq[FieldSelector]
+  ) extends AssignmentTarget[Ctx]
+      with AccessFieldBase[Ctx] {
+    // scalastyle:off method.length
     @scala.annotation.tailrec
-    private def invalidAssignment(
+    private def checkMutable(
         state: Compiler.State[Ctx],
-        expr: Expr[Ctx],
-        isArrayMutable: Boolean,
+        rootType: Type,
+        selectors: Seq[FieldSelector],
+        lastField: Ident,
+        structId: Option[TypeId],
         sourceIndex: Option[SourceIndex]
     ): Unit = {
-      expr match {
-        case StructFieldSelector(struct, selector) =>
-          val structId = struct.getType(state) match {
-            case Seq(Type.Struct(id)) => id
-            case tpe => // dead branch, we have already checked the type
-              throw Compiler.Error(s"Expected struct type, got $tpe", struct.sourceIndex)
+      (rootType, selectors) match {
+        case (array: Type.FixedSizeArray, Seq(IndexSelector(_))) =>
+          if (!isTypeMutable(array.baseType, state)) {
+            val arraySelector =
+              structId.map(id => s"${id.name}.${lastField.name}").getOrElse(lastField.name)
+            throw Compiler.Error(
+              s"Cannot assign to immutable element in array $arraySelector. Assignment only works when all of the field selectors are mutable.",
+              sourceIndex
+            )
           }
-          throw Compiler.Error(
-            s"Cannot assign to immutable element in array ${structId.name}.${selector.name}." +
-              s" Assignment only works when all of the field selectors are mutable.",
-            sourceIndex
-          )
-        case ArrayElement(expr, _) =>
-          invalidAssignment(state, expr, isArrayMutable, sourceIndex)
-        case Variable(ident) =>
-          val errorMsg = if (isArrayMutable) {
-            s"Cannot assign to immutable element in array ${ident.name}. Assignment only works when all of the field selectors are mutable."
-          } else {
-            s"Cannot assign to immutable variable ${ident.name}."
+        case (array: Type.FixedSizeArray, IndexSelector(_) +: tail) =>
+          checkMutable(state, array.baseType, tail, lastField, structId, sourceIndex)
+        case (struct: Type.Struct, Seq(IdentSelector(ident))) =>
+          val field = state.getStruct(struct.id).getField(ident)
+          if (!field.isMutable) {
+            throw Compiler.Error(
+              s"Cannot assign to immutable field ${field.name} in struct ${struct.id.name}.",
+              sourceIndex
+            )
           }
-          throw Compiler.Error(errorMsg, sourceIndex)
-        case _ =>
-          throw Compiler.Error(s"Invalid selector $from", from.sourceIndex) // dead branch
+          if (!isTypeMutable(field.tpe, state)) {
+            throw Compiler.Error(
+              s"Cannot assign to field ${field.name} in struct ${struct.id.name}. Assignment only works when all of the field selectors are mutable.",
+              sourceIndex
+            )
+          }
+        case (struct: Type.Struct, IdentSelector(ident) +: tail) =>
+          val field = state.getStruct(struct.id).getField(ident)
+          if (!field.isMutable) {
+            throw Compiler.Error(
+              s"Cannot assign to immutable field ${field.name} in struct ${struct.id.name}.",
+              sourceIndex
+            )
+          }
+          val fieldType = state.resolveType(field.tpe)
+          checkMutable(state, fieldType, tail, field.ident, Some(struct.id), sourceIndex)
+        case _ => // dead branch
+          throw Compiler.Error(s"Invalid selectors for type $rootType", sourceIndex)
       }
     }
+    // scalastyle:on method.length
 
-    def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit = {
-      val arrayRef = getArrayRef(state, sourceIndex)
-      if (!arrayRef.isMutable) {
-        invalidAssignment(state, from, isArrayMutable = false, sourceIndex)
-      }
-      if (!isTypeMutable(arrayRef.tpe.baseType, state)) {
-        invalidAssignment(state, from, isArrayMutable = true, sourceIndex)
-      }
-    }
-
-    def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-      getArrayRef(state, None).genStoreCode(state, index)
-    }
-  }
-  final case class AssignmentStructFieldTarget[Ctx <: StatelessContext](
-      ident: Ident,
-      from: Ast.Expr[Ctx],
-      selector: Ast.Ident
-  ) extends AssignmentTarget[Ctx] {
-    private var structRef: Option[StructRef[Ctx]] = None
-    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-    private def getStructRef(
-        state: Compiler.State[Ctx],
-        sourceIndex: Option[SourceIndex]
-    ): StructRef[Ctx] = {
-      structRef match {
-        case Some(ref) => ref
-        case None =>
-          val ref = getRef(state, from, sourceIndex).asInstanceOf[StructRef[Ctx]]
-          structRef = Some(ref)
-          ref
-      }
-    }
     def _getType(state: Compiler.State[Ctx]): Type = {
-      state.getVariable(ident, isWrite = true)
-      state.getStructFieldType(from, selector)
+      val variable = state.getVariable(ident, isWrite = true)
+      _getType(state, state.resolveType(variable.tpe), ident.sourceIndex)
     }
-
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit = {
-      val structRef = getStructRef(state, sourceIndex)
-      checkStructField(state, structRef, selector, checkType = true, sourceIndex)
+      val variable = state.getVariable(ident)
+      if (!variable.isMutable) {
+        throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
+      }
+      checkMutable(state, state.resolveType(variable.tpe), selectors, ident, None, sourceIndex)
     }
-
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
     def genStore(state: Compiler.State[Ctx]): Seq[Seq[Instr[Ctx]]] = {
-      getStructRef(state, None).genStoreCode(state, selector)
+      val ref    = state.getVariablesRef(ident)
+      val subRef = ref.subRef(state, selectors.init)
+      subRef.genStoreCode(state, selectors.last)
     }
   }
 

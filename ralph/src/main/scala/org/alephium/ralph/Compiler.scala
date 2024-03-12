@@ -504,33 +504,12 @@ object Compiler {
 
     @inline def getStruct(typeId: Ast.TypeId): Ast.Struct = globalState.getStruct(typeId)
 
-    def getOrCreateStructRef(expr: Ast.Expr[Ctx]): (StructRef[Ctx], Seq[Instr[Ctx]]) = {
-      val (ref, codes) = getOrCreateVariablesRef(expr)
-      ref match {
-        case ref: StructRef[Ctx @unchecked] => (ref, codes)
-        case _ =>
-          throw Compiler.Error(s"Expected struct type, got ${ref.tpe}", expr.sourceIndex)
-      }
-    }
-
-    def getOrCreateArrayRef(expr: Ast.Expr[Ctx]): (ArrayRef[Ctx], Seq[Instr[Ctx]]) = {
-      val (ref, codes) = getOrCreateVariablesRef(expr)
-      ref match {
-        case ref: ArrayRef[Ctx @unchecked] => (ref, codes)
-        case _ =>
-          throw Compiler.Error(s"Expected array type, got ${ref.tpe}", expr.sourceIndex)
-      }
-    }
-
-    @scala.annotation.tailrec
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def getOrCreateVariablesRef(expr: Ast.Expr[Ctx]): (VariablesRef[Ctx], Seq[Instr[Ctx]]) = {
       expr match {
-        case Ast.StructFieldSelector(struct, selector) =>
-          val (ref, codes) = getOrCreateStructRef(struct)
-          (ref.subRef(this, selector), codes)
-        case Ast.ArrayElement(array, index) =>
-          val (ref, codes) = getOrCreateArrayRef(array)
-          (ref.subRef(this, index), codes)
+        case Ast.LoadFieldBySelectors(base, selectors) =>
+          val (ref, codes) = getOrCreateVariablesRef(base)
+          (ref.subRef(this, selectors), codes)
         case Ast.Variable(ident)  => (getVariablesRef(ident), Seq.empty)
         case Ast.ParenExpr(inner) => getOrCreateVariablesRef(inner)
         case _ =>
@@ -836,27 +815,6 @@ object Compiler {
             s"Invalid array index type ${quote(tpe)}, expected ${quote("U256")}",
             index.sourceIndex
           )
-      }
-    }
-
-    def getArrayElementType(array: Ast.Expr[Ctx], index: Ast.Expr[Ctx]): Type = {
-      checkArrayIndexType(index)
-      array.getType(this) match {
-        case Seq(tpe: Type.FixedSizeArray) => resolveType(tpe.baseType)
-        case tpe =>
-          throw Compiler.Error(
-            s"Expected array type, got ${if (tpe.length == 1) quote(tpe(0)) else quote(tpe)}",
-            array.sourceIndex
-          )
-      }
-    }
-
-    def getStructFieldType(expr: Ast.Expr[Ctx], selector: Ast.Ident): Type = {
-      expr.getType(this) match {
-        case Seq(tpe: Type.Struct) =>
-          val struct = getStruct(tpe.id)
-          resolveType(struct.getField(selector).tpe)
-        case tpe => throw Compiler.Error(s"Expected struct type, got $tpe", expr.sourceIndex)
       }
     }
 

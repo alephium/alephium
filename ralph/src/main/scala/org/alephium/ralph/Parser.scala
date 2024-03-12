@@ -132,8 +132,9 @@ abstract class Parser[Ctx <: StatelessContext] {
       idx
   }
 
-  def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
-    case (from, expr, to) => expr.overwriteSourceIndex(from, to)
+  def indexSelector[Unknown: P]: P[Ast.FieldSelector] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
+    case (from, expr, to) =>
+      Ast.IndexSelector(expr.overwriteSourceIndex(from, to)).atSourceIndex(from, to)
   }
 
   // Optimize chained comparisons
@@ -169,24 +170,13 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(chain(arithExpr0, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
   def arithExpr0[Unknown: P]: P[Ast.Expr[Ctx]] = P(chain(unaryExpr, Lexer.opExp | Lexer.opModExp))
   def unaryExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(arrayElementOrStructFieldSelector | PP(Lexer.opNot ~ arrayElementOrStructFieldSelector) {
-      case (op, expr) =>
-        Ast.UnaryOp.apply[Ctx](op, expr)
+    P(loadFieldBySelectors | PP(Lexer.opNot ~ loadFieldBySelectors) { case (op, expr) =>
+      Ast.UnaryOp.apply[Ctx](op, expr)
     })
-  def arrayElementOrStructFieldSelector[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(atom ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0)).map { case (expr, list) =>
-      list.foldLeft(expr) { case (acc, e) =>
-        e match {
-          case index: Ast.Expr[Ctx @unchecked] =>
-            Ast
-              .ArrayElement(acc, index)
-              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex))
-          case ident: Ast.Ident =>
-            Ast
-              .StructFieldSelector(acc, ident)
-              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex))
-        }
-      }
+
+  def loadFieldBySelectors[Unknown: P]: P[Ast.Expr[Ctx]] =
+    PP(atom ~ fieldSelector.rep(0)) { case (expr, selectors) =>
+      if (selectors.isEmpty) expr else Ast.LoadFieldBySelectors(expr, selectors)
     }
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
 
@@ -280,33 +270,22 @@ abstract class Parser[Ctx <: StatelessContext] {
       val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
       Ast.VarDef(vars, expr).atSourceIndex(sourceIndex)
     }
+
+  def identSelector[Unknown: P]: P[Ast.FieldSelector] = P(
+    "." ~ Index ~ Lexer.ident ~ Index
+  ).map { case (from, ident, to) =>
+    Ast.IdentSelector(ident).atSourceIndex(from, to)
+  }
+  def fieldSelector[Unknown: P]: P[Ast.FieldSelector] = P(identSelector | indexSelector)
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-  def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = PP(
-    Lexer.ident ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0)
-  ) { case (ident, list) =>
-    if (list.isEmpty) {
-      Ast.AssignmentSimpleTarget(ident)
-    } else {
-      val variable: Ast.Expr[Ctx] = Ast.Variable(ident).atSourceIndex(ident.sourceIndex)
-      val expr = list.init.foldLeft(variable) { case (acc, e) =>
-        e match {
-          case index: Ast.Expr[Ctx @unchecked] =>
-            Ast
-              .ArrayElement(acc, index)
-              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex))
-          case ident: Ast.Ident =>
-            Ast
-              .StructFieldSelector(acc, ident)
-              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex))
-        }
-      }
-      list.last match {
-        case arrayIndex: Ast.Expr[Ctx @unchecked] =>
-          Ast.AssignmentArrayElementTarget(ident, expr, arrayIndex)
-        case selector: Ast.Ident => Ast.AssignmentStructFieldTarget(ident, expr, selector)
+  def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
+    PP(Lexer.ident ~ fieldSelector.rep(0)) { case (ident, selectors) =>
+      if (selectors.isEmpty) {
+        Ast.AssignmentSimpleTarget(ident)
+      } else {
+        Ast.AssignmentFieldTarget(ident, selectors)
       }
     }
-  }
 
   def assign[Unknown: P]: P[Ast.Assign[Ctx]] =
     P(assignmentTarget.rep(1, ",") ~ "=" ~ expr).map { case (targets, expr) =>
