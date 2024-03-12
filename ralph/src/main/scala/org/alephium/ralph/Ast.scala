@@ -49,9 +49,13 @@ object Ast {
       this.sourceIndex = sourceIndex
       this
     }
-    def overwriteSourceIndex(fromIndex: Int, endIndex: Int): this.type = {
+    def overwriteSourceIndex(
+        fromIndex: Int,
+        endIndex: Int,
+        fileURI: Option[java.net.URI]
+    ): this.type = {
       require(this.sourceIndex.isDefined)
-      this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
+      this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
       this
     }
 

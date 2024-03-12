@@ -140,7 +140,7 @@ abstract class Parser[Ctx <: StatelessContext] {
   }
 
   def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
-    case (from, expr, to) => expr.overwriteSourceIndex(from, to)
+    case (from, expr, to) => expr.overwriteSourceIndex(from, to, fileURI)
   }
 
   // Optimize chained comparisons
@@ -187,11 +187,11 @@ abstract class Parser[Ctx <: StatelessContext] {
           case index: Ast.Expr[Ctx @unchecked] =>
             Ast
               .ArrayElement(acc, index)
-              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex, fileURI))
+              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex))
           case ident: Ast.Ident =>
             Ast
               .StructFieldSelector(acc, ident)
-              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex, fileURI))
+              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex))
         }
       }
     }
@@ -341,13 +341,8 @@ abstract class Parser[Ctx <: StatelessContext] {
   )(contractTypeCtor: Ast.TypeId => Type): P[Ast.Argument] =
     P(Index ~ Lexer.unused ~ Lexer.mutMaybe(allowMutable) ~ Lexer.ident ~ ":").flatMap {
       case (fromIndex, isUnused, isMutable, ident) =>
-<<<<<<< HEAD
-        P(parseType(contractTypeCtor(_, ident)) ~~ Index).map { case (tpe, endIndex) =>
-          Ast.Argument(ident, tpe, isMutable, isUnused).atSourceIndex(fromIndex, endIndex, fileURI)
-=======
         P(parseType(contractTypeCtor) ~~ Index).map { case (tpe, endIndex) =>
-          Ast.Argument(ident, tpe, isMutable, isUnused).atSourceIndex(fromIndex, endIndex)
->>>>>>> origin/master
+          Ast.Argument(ident, tpe, isMutable, isUnused).atSourceIndex(fromIndex, endIndex, fileURI)
         }
     }
   def funcArgument[Unknown: P]: P[Ast.Argument]   = argument(allowMutable = true)(Type.NamedType)
@@ -514,33 +509,29 @@ abstract class Parser[Ctx <: StatelessContext] {
   def templateParams[Unknown: P]: P[Seq[Ast.Argument]] =
     P("(" ~ contractField(allowMutable = false).rep(0, ",") ~ ")")
 
-<<<<<<< HEAD
-  def eventField[Unknown: P]: P[Ast.EventField] =
-    P(Index ~ Lexer.ident ~ ":").flatMap { case (from, ident) =>
-      P(parseType(typeId => Type.Contract.global(typeId, ident)) ~~ Index).map { case (tpe, to) =>
-        Ast.EventField(ident, tpe).atSourceIndex(from, to, fileURI)
-      }
-=======
   def field[Unknown: P]: P[(Ast.Ident, Type)] = P(Lexer.ident ~ ":").flatMap { ident =>
     parseType(Type.NamedType).map { tpe => (ident, tpe) }
   }
 
-  def eventField[Unknown: P]: P[Ast.EventField] = P(field).map(Ast.EventField.tupled)
+  def eventField[Unknown: P]: P[Ast.EventField] = P(Index ~ field ~~ Index).map {
+    case (from, (ident, tpe), to) =>
+      Ast.EventField(ident, tpe).atSourceIndex(from, to, fileURI)
+  }
+
   def structField[Unknown: P]: P[Ast.StructField] = PP(
     Lexer.mut ~ Lexer.ident ~ ":" ~ parseType(Type.NamedType)
   ) { case (mutable, ident, tpe) =>
     Ast.StructField(ident, mutable, tpe)
   }
   def rawStruct[Unknown: P]: P[Ast.Struct] =
-    PP(Lexer.token(Keyword.struct) ~/ Lexer.typeId ~ "{" ~ structField.rep(0, ",") ~ "}") {
-      case (structIndex, id, fields) =>
+    PP(Lexer.token(Keyword.struct) ~/ Lexer.typeId ~ "{" ~ structField.rep(0, ",") ~ "}" ~~ Index) {
+      case (structIndex, id, fields, endIndex) =>
+        val sourceIndex = SourceIndex(structIndex.index, endIndex - structIndex.index, fileURI)
         if (fields.isEmpty) {
-          val sourceIndex = SourceIndex(Some(structIndex), id.sourceIndex)
-          throw Compiler.Error(s"No field definition in struct ${id.name}", sourceIndex)
+          throw Compiler.Error(s"No field definition in struct ${id.name}", Some(sourceIndex))
         }
         Ast.UniqueDef.checkDuplicates(fields, "struct fields")
-        Ast.Struct(id, fields)
->>>>>>> origin/master
+        Ast.Struct(id, fields).atSourceIndex(Some(sourceIndex))
     }
   def struct[Unknown: P]: P[Ast.Struct] = P(Start ~ rawStruct ~ End)
 
@@ -722,21 +713,12 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
 
   def assetScript[Unknown: P]: P[Ast.AssetScript] =
     P(
-<<<<<<< HEAD
-      Start ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~ templateParams.? ~
-        "{" ~ func.rep(1) ~ "}" ~~ Index ~ endOfInput(fileURI)
-    ).map { case (assetIndex, typeId, templateVars, funcs, endIndex) =>
-      Ast
-        .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs)
-        .atSourceIndex(assetIndex.index, endIndex, fileURI)
-=======
       Start ~ rawStruct.rep(0) ~ Lexer.token(Keyword.AssetScript) ~/ Lexer.typeId ~
-        templateParams.? ~ "{" ~ func.rep(1) ~ "}" ~~ Index ~ rawStruct.rep(0) ~ endOfInput
+        templateParams.? ~ "{" ~ func.rep(1) ~ "}" ~~ Index ~ rawStruct.rep(0) ~ endOfInput(fileURI)
     ).map { case (defs0, assetIndex, typeId, templateVars, funcs, endIndex, defs1) =>
       Ast
         .AssetScript(typeId, templateVars.getOrElse(Seq.empty), funcs, defs0 ++ defs1)
-        .atSourceIndex(assetIndex.index, endIndex)
->>>>>>> origin/master
+        .atSourceIndex(assetIndex.index, endIndex, fileURI)
     }
 }
 
@@ -834,15 +816,9 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
               usingAnnotation.assetsInContract,
               usingAnnotation.updateFields
             )
-<<<<<<< HEAD
-            Ast.TxScript
-              .from(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
-              .atSourceIndex(scriptIndex.index, endIndex, fileURI)
-=======
             Ast
               .TxScript(typeId, templateVars.getOrElse(Seq.empty), mainFunc +: funcs)
-              .atSourceIndex(scriptIndex.index, endIndex)
->>>>>>> origin/master
+              .atSourceIndex(scriptIndex.index, endIndex, fileURI)
           }
       }
   def txScript[Unknown: P]: P[Ast.TxScript] = P(Start ~ rawTxScript ~ End)
@@ -1084,15 +1060,11 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def multiContract[Unknown: P]: P[Ast.MultiContract] =
     P(Start ~~ Index ~ entities.rep(1) ~~ Index ~ End)
       .map { case (fromIndex, defs, endIndex) =>
-<<<<<<< HEAD
-        Ast.MultiContract(defs, None).atSourceIndex(fromIndex, endIndex, fileURI)
-=======
         val contracts = defs
           .filter(_.isInstanceOf[Ast.ContractWithState])
           .asInstanceOf[Seq[Ast.ContractWithState]]
         val structs = defs.filter(_.isInstanceOf[Ast.Struct]).asInstanceOf[Seq[Ast.Struct]]
-        Ast.MultiContract(contracts, structs, None).atSourceIndex(fromIndex, endIndex)
->>>>>>> origin/master
+        Ast.MultiContract(contracts, structs, None).atSourceIndex(fromIndex, endIndex, fileURI)
       }
 
   def state[Unknown: P]: P[Seq[Ast.Const[StatefulContext]]] =
