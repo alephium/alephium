@@ -26,8 +26,18 @@ sealed trait Type {
   def signature: String = toVal.toString
 
   def isPrimitive: Boolean = this match {
-    case _: Type.FixedSizeArray | _: Type.Struct | _: Type.NamedType => false
-    case _                                                           => true
+    case _: Type.FixedSizeArray | _: Type.Struct | _: Type.NamedType | _: Type.Contract => false
+    case _                                                                              => true
+  }
+
+  def isArrayType: Boolean = this match {
+    case _: Type.FixedSizeArray => true
+    case _                      => false
+  }
+
+  def isStructType: Boolean = this match {
+    case _: Type.Struct => true
+    case _              => false
   }
 }
 
