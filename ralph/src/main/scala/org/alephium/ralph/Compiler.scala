@@ -807,6 +807,7 @@ object Compiler {
         .filter { case (name, varInfo) =>
           !varInfo.isLocal &&
           varInfo.isMutable &&
+          isTypeMutable(varInfo.tpe) &&
           !varInfo.isGenerated &&
           !varInfo.isUnused &&
           !accessedVars.contains(WriteVariable(name))
@@ -892,6 +893,17 @@ object Compiler {
 
     @inline def flattenTypeMutability(tpe: Type, isMutable: Boolean): Seq[Boolean] =
       globalState.flattenTypeMutability(tpe, isMutable)
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def isTypeMutable(tpe: Type): Boolean = {
+      resolveType(tpe) match {
+        case t: Type.Struct =>
+          val struct = getStruct(t.id)
+          struct.fields.forall(field => field.isMutable && isTypeMutable(field.tpe))
+        case t: Type.FixedSizeArray => isTypeMutable(t.baseType)
+        case _                      => true
+      }
+    }
 
     def flattenArgs(exprs: Seq[Ast.Expr[Ctx]]): (Seq[Instr[Ctx]], Seq[Seq[Instr[Ctx]]]) = {
       exprs.foldLeft((Seq.empty[Instr[Ctx]], Seq.empty[Seq[Instr[Ctx]]])) {

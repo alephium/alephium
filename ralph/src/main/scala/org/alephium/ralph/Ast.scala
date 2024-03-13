@@ -897,16 +897,6 @@ object Ast {
   sealed trait AssignmentTarget[Ctx <: StatelessContext] extends Typed[Ctx, Type] {
     def ident: Ident
 
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-    protected def isTypeMutable(tpe: Type, state: Compiler.State[Ctx]): Boolean = {
-      state.resolveType(tpe) match {
-        case t: Type.Struct =>
-          val struct = state.getStruct(t.id)
-          struct.fields.forall(field => field.isMutable && isTypeMutable(field.tpe, state))
-        case t: Type.FixedSizeArray => isTypeMutable(t.baseType, state)
-        case _                      => true
-      }
-    }
     protected def checkStructField(
         state: Compiler.State[Ctx],
         structRef: StructRef[Ctx],
@@ -921,7 +911,7 @@ object Ast {
           sourceIndex
         )
       }
-      if (checkType && !isTypeMutable(field.tpe, state)) {
+      if (checkType && !state.isTypeMutable(field.tpe)) {
         throw Compiler.Error(
           s"Cannot assign to field ${field.name} in struct ${structRef.tpe.id.name}." +
             s" Assignment only works when all of the field selectors are mutable.",
@@ -990,7 +980,7 @@ object Ast {
       if (!state.getVariable(ident).isMutable) {
         throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
       }
-      if (!isTypeMutable(getType(state), state)) {
+      if (!state.isTypeMutable(getType(state))) {
         throw Compiler.Error(
           s"Cannot assign to variable ${ident.name}. Assignment only works when all of the field selectors are mutable.",
           sourceIndex
@@ -1062,7 +1052,7 @@ object Ast {
       if (!arrayRef.isMutable) {
         invalidAssignment(state, from, isArrayMutable = false, sourceIndex)
       }
-      if (!isTypeMutable(arrayRef.tpe.baseType, state)) {
+      if (!state.isTypeMutable(arrayRef.tpe.baseType)) {
         invalidAssignment(state, from, isArrayMutable = true, sourceIndex)
       }
     }
