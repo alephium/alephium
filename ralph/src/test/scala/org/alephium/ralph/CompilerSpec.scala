@@ -4985,6 +4985,21 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testContractError(code1, "These structs \"List(Foo)\" have circular references")
     }
+
+    {
+      info("Unassigned mutable struct field")
+      val code =
+        s"""
+           |struct Foo { x: U256 }
+           |Contract Bar(mut foo: Foo) {
+           |  pub fn f() -> U256 {
+           |    return foo.x
+           |  }
+           |}
+           |""".stripMargin
+
+      Compiler.compileContractFull(code).rightValue.warnings.isEmpty is true
+    }
   }
 
   it should "test struct" in new Fixture {

@@ -819,6 +819,7 @@ object Compiler {
         .filter { case (name, varInfo) =>
           !varInfo.isLocal &&
           varInfo.isMutable &&
+          isTypeMutable(varInfo.tpe) &&
           !varInfo.isGenerated &&
           !varInfo.isUnused &&
           !accessedVars.contains(WriteVariable(name))
