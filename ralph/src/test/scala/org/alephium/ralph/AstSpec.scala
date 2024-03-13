@@ -119,9 +119,10 @@ class AstSpec extends AlephiumSpec {
   }
 
   it should "build check external caller table" in new InternalCallFixture {
-    val contracts = fastparse.parse(internalCalls, StatefulParser.multiContract(_)).get.value
-    val state     = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
-    val contract  = contracts.contracts(0).asInstanceOf[Ast.Contract]
+    val contracts =
+      fastparse.parse(internalCalls, new StatefulParser(None).multiContract(_)).get.value
+    val state    = Compiler.State.buildFor(contracts, 0)(CompilerOptions.Default)
+    val contract = contracts.contracts(0).asInstanceOf[Ast.Contract]
     contract.check(state)
     contract.genCode(state)
     val interallCalls = state.internalCalls

@@ -34,7 +34,7 @@ import org.alephium.ralph.error.CompilerError
 import org.alephium.util._
 
 // scalastyle:off number.of.methods
-object Lexer {
+class Lexer(fileURI: Option[java.net.URI]) {
   def lowercase[Unknown: P]: P[Unit] = P(CharIn("a-z"))
   def uppercase[Unknown: P]: P[Unit] = P(CharIn("A-Z"))
   def digit[Unknown: P]: P[Unit]     = P(CharIn("0-9"))
@@ -44,7 +44,7 @@ object Lexer {
 
   private def id[Unknown: P, T <: Ast.Positioned](prefix: => P[Unit], func: String => T): P[T] =
     P(Index ~ (prefix ~ (letter | digit | "_").rep).!.filter(!Keyword.Used.exists(_))).map {
-      case (fromIndex, i) => func(i).atSourceIndex(Some(SourceIndex(fromIndex, i.length)))
+      case (fromIndex, i) => func(i).atSourceIndex(fromIndex, fromIndex + i.length, fileURI)
     }
   def ident[Unknown: P]: P[Ast.Ident] = id(lowercase, Ast.Ident)
   def constantIdent[Unknown: P]: P[Ast.Ident] =
@@ -61,7 +61,7 @@ object Lexer {
 
   def token[Unknown: P](keyword: Keyword): P[SourceIndex] = {
     P(Index ~ keyword.name ~ !(letter | digit | "_")).map { fromIndex =>
-      SourceIndex(fromIndex, keyword.name.length)
+      SourceIndex(fromIndex, keyword.name.length, fileURI)
     }
   }
 
@@ -75,7 +75,7 @@ object Lexer {
   def mutMaybe[Unknown: P](allowMutable: Boolean): P[Boolean] =
     P(Index ~ mut) map { case (index, mutable) =>
       if (!allowMutable && mutable) {
-        throw CompilerError.`Expected an immutable variable`(index)
+        throw CompilerError.`Expected an immutable variable`(index, fileURI)
       } else {
         mutable
       }
@@ -95,7 +95,7 @@ object Lexer {
       if (unit == "alph") num = num.multiply(new BigDecimal(ALPH.oneAlph.toBigInt))
       num.toBigIntegerExact()
     } catch {
-      case NonFatal(_) => throw CompilerError.`Invalid number`(input, index)
+      case NonFatal(_) => throw CompilerError.`Invalid number`(input, index, fileURI)
     }
   }
   def num[Unknown: P]: P[BigInteger] = negatable(P(hexNum | integer))
@@ -113,13 +113,13 @@ object Lexer {
         case (index, n, postfix) if Number.isNegative(n) || postfix == "i" =>
           I256.from(n) match {
             case Some(value) => Val.I256(value)
-            case None        => throw CompilerError.`Expected an I256 value`(index, n)
+            case None        => throw CompilerError.`Expected an I256 value`(index, n, fileURI)
           }
 
         case (index, n, _) =>
           U256.from(n) match {
             case Some(value) => Val.U256(value)
-            case None        => throw CompilerError.`Expected an U256 value`(index, n)
+            case None        => throw CompilerError.`Expected an U256 value`(index, n, fileURI)
           }
       }
 
@@ -130,7 +130,7 @@ object Lexer {
         case None =>
           Address.extractLockupScript(string) match {
             case Some(LockupScript.P2C(contractId)) => ByteVec(contractId.bytes)
-            case _ => throw CompilerError.`Invalid byteVec`(string, index)
+            case _ => throw CompilerError.`Invalid byteVec`(string, index, fileURI)
           }
       }
     }
@@ -139,7 +139,11 @@ object Lexer {
     addressInternal.map {
       case (Val.Address(LockupScript.P2C(contractId)), _) => Val.ByteVec(contractId.bytes)
       case (addr, index) =>
-        throw CompilerError.`Invalid contract address`(s"#@${addr.toBase58}", index)
+        throw CompilerError.`Invalid contract address`(
+          s"#@${addr.toBase58}",
+          index,
+          fileURI
+        )
     }
 
   def addressInternal[Unknown: P]: P[(Val.Address, Int)] =
@@ -147,7 +151,7 @@ object Lexer {
       val lockupScriptOpt = Address.extractLockupScript(input)
       lockupScriptOpt match {
         case Some(lockupScript) => (Val.Address(lockupScript), index)
-        case None               => throw CompilerError.`Invalid address`(input, index)
+        case None               => throw CompilerError.`Invalid address`(input, index, fileURI)
       }
     }
   def address[Unknown: P]: P[Val.Address] = P("@" ~ addressInternal.map(_._1))

@@ -1551,6 +1551,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "get constant array index" in {
+    val StatelessParser = new StatelessParser(None)
     def testConstantFolding(before: String, after: String) = {
       val beforeAst = fastparse.parse(before, StatelessParser.expr(_)).get.value
       val afterAst  = fastparse.parse(after, StatelessParser.expr(_)).get.value

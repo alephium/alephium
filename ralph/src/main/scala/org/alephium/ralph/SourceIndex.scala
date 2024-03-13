@@ -16,17 +16,16 @@
 
 package org.alephium.ralph
 
-final case class SourceIndex(index: Int, width: Int) {
+final case class SourceIndex(index: Int, width: Int, fileURI: Option[java.net.URI]) {
   val endIndex: Int = index + width
 }
 
 object SourceIndex {
-  def apply(index: Int): SourceIndex = SourceIndex(index, 1)
   def apply(from: Option[SourceIndex], to: Option[SourceIndex]): Option[SourceIndex] =
     for {
       f <- from
       t <- to
-    } yield SourceIndex(f.index, t.endIndex - f.index)
+    } yield SourceIndex(f.index, t.endIndex - f.index, f.fileURI)
 
-  def empty: SourceIndex = SourceIndex(0, 0)
+  def empty: SourceIndex = SourceIndex(0, 0, None)
 }
