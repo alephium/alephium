@@ -658,6 +658,17 @@ object Ast {
 
     def name: String = id.name
 
+    def checkMapType(): Unit = {
+      fields.find(_.tpe.isMapType) match {
+        case Some(field) =>
+          throw Compiler.Error(
+            s"Map type fields does not support in ${id.name}",
+            field.ident.sourceIndex
+          )
+        case _ =>
+      }
+    }
+
     def getFieldNames(): AVector[String]          = AVector.from(fields.view.map(_.ident.name))
     def getFieldTypeSignatures(): AVector[String] = AVector.from(fields.view.map(_.tpe.signature))
     def getFieldsMutability(): AVector[Boolean]   = AVector.from(fields.view.map(_.isMutable))
@@ -1566,7 +1577,19 @@ object Ast {
       }
     }
 
+    private def checkMapType(): Unit = {
+      (fields ++ templateVars).find(_.tpe.isMapType) match {
+        case Some(field) =>
+          throw Compiler.Error(
+            s"Map type fields does not support in ${name}",
+            field.ident.sourceIndex
+          )
+        case None =>
+      }
+    }
+
     def check(state: Compiler.State[Ctx]): Unit = {
+      checkMapType()
       state.setCheckPhase()
       state.checkArguments(fields)
       addTemplateVars(state)
@@ -1959,6 +1982,7 @@ object Ast {
 
     @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
     def extendedContracts(): MultiContract = {
+      structs.foreach(_.checkMapType())
       UniqueDef.checkDuplicates(contracts ++ structs, "TxScript/Contract/Interface/Struct")
 
       val parentsCache = buildDependencies()
