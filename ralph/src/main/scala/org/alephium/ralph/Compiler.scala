@@ -16,15 +16,18 @@
 
 package org.alephium.ralph
 
+import java.nio.charset.StandardCharsets
+
 import scala.collection.{immutable, mutable}
 
+import akka.util.ByteString
 import fastparse.Parsed
 
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Ast.MultiContract
 import org.alephium.ralph.error.CompilerError
 import org.alephium.ralph.error.CompilerError.FastParseError
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, U256}
 
 //TODO add SourceIndex to warnings
 final case class CompiledContract(
@@ -91,7 +94,9 @@ object Compiler {
 
   private def compileStateful[T](input: String, genCode: MultiContract => T): Either[Error, T] = {
     try {
-      compileMultiContract(input).map(genCode)
+      val result = compileMultiContract(input).map(genCode)
+      ContractGenerator.clearCache()
+      result
     } catch {
       case e: Error => Left(e)
     }
@@ -106,6 +111,7 @@ object Compiler {
         val statefulContracts =
           multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
         val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
+        ContractGenerator.clearCache()
         (statefulContracts, statefulScripts, AVector.from(multiContract.structs))
       }
     } catch {
@@ -147,7 +153,6 @@ object Compiler {
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
       args.flatMap(_.genCode(state))
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
-    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
   }
 
   type Error = CompilerError.FormattableError
@@ -226,6 +231,11 @@ object Compiler {
     def argsType: Seq[Type]
     def returnType: Seq[Type]
     def isStatic: Boolean = false
+    def genExternalCallCode(
+        state: Compiler.State[StatefulContext],
+        objCodes: Seq[Instr[StatefulContext]],
+        typeId: Ast.TypeId
+    ): Seq[Instr[StatefulContext]] = ???
   }
   final case class SimpleFunc[Ctx <: StatelessContext](
       id: Ast.FuncId,
@@ -257,9 +267,18 @@ object Compiler {
       Seq(CallLocal(index))
     }
 
-    override def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
+    override def genExternalCallCode(
+        state: Compiler.State[StatefulContext],
+        objCodes: Seq[Instr[StatefulContext]],
+        typeId: Ast.TypeId
+    ): Seq[Instr[StatefulContext]] = {
       if (isPublic) {
-        Seq(CallExternal(index))
+        val argLength = state.flattenTypeLength(argsType)
+        val retLength = state.flattenTypeLength(returnType)
+        Seq(
+          ConstInstr.u256(Val.U256(U256.unsafe(argLength))),
+          ConstInstr.u256(Val.U256(U256.unsafe(retLength)))
+        ) ++ objCodes :+ CallExternal(index)
       } else {
         throw Error(s"Call external private function of ${typeId.name}", typeId.sourceIndex)
       }
@@ -494,6 +513,13 @@ object Compiler {
     val hasInterfaceFuncCallSet: mutable.Set[Ast.FuncId] = mutable.Set.empty
     def addInterfaceFuncCall(funcId: Ast.FuncId): Unit = {
       hasInterfaceFuncCallSet.addOne(funcId)
+    }
+
+    private var mapIndex: Int = 0
+    def nextMapIndex: ByteString = {
+      val currentMapIndex = mapIndex
+      mapIndex += 1
+      ByteString.fromArrayUnsafe(s"map-$currentMapIndex".getBytes(StandardCharsets.US_ASCII))
     }
 
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
@@ -812,8 +838,21 @@ object Compiler {
       index.getType(this) match {
         case Seq(Type.U256) =>
         case tpe =>
+          val tpeStr = if (tpe.length == 1) quote(tpe(0)) else quote(tpe)
           throw Compiler.Error(
-            s"Invalid array index type ${quote(tpe)}, expected ${quote("U256")}",
+            s"Invalid array index type $tpeStr, expected ${quote("U256")}",
+            index.sourceIndex
+          )
+      }
+    }
+
+    def checkMapKeyType(mapType: Type.Map, index: Ast.Expr[Ctx]): Unit = {
+      index.getType(this) match {
+        case Seq(tpe) if tpe == mapType.key =>
+        case tpe =>
+          val tpeStr = if (tpe.length == 1) quote(tpe(0)) else quote(tpe)
+          throw Compiler.Error(
+            s"Invalid map key type $tpeStr, expected ${quote(mapType.key)}",
             index.sourceIndex
           )
       }
@@ -847,6 +886,17 @@ object Compiler {
 
     @inline def flattenTypeMutability(tpe: Type, isMutable: Boolean): Seq[Boolean] =
       globalState.flattenTypeMutability(tpe, isMutable)
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def isTypeMutable(tpe: Type): Boolean = {
+      resolveType(tpe) match {
+        case t: Type.Struct =>
+          val struct = getStruct(t.id)
+          struct.fields.forall(field => field.isMutable && isTypeMutable(field.tpe))
+        case t: Type.FixedSizeArray => isTypeMutable(t.baseType)
+        case _                      => true
+      }
+    }
 
     def flattenArgs(exprs: Seq[Ast.Expr[Ctx]]): (Seq[Instr[Ctx]], Seq[Seq[Instr[Ctx]]]) = {
       exprs.foldLeft((Seq.empty[Instr[Ctx]], Seq.empty[Seq[Instr[Ctx]]])) {
