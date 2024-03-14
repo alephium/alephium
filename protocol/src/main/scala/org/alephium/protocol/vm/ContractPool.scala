@@ -75,10 +75,15 @@ trait ContractPool extends CostStrategy {
   private var contractFieldSize = 0
   private def add(contractId: ContractId, obj: StatefulContractObject): ExeResult[Unit] = {
     contractFieldSize += (obj.immFields.length + obj.initialMutFields.length)
-    if (contractPool.size >= contractPoolMaxSize) {
-      failed(ContractPoolOverflow)
-    } else if (contractFieldSize > contractFieldMaxSize) {
-      failed(ContractFieldOverflow)
+    if (!getHardFork().isGhostEnabled()) {
+      if (contractPool.size >= contractPoolMaxSize) {
+        failed(ContractPoolOverflow)
+      } else if (contractFieldSize > contractFieldMaxSize) {
+        failed(ContractFieldOverflow)
+      } else {
+        contractPool.addOne(contractId -> obj)
+        okay
+      }
     } else {
       contractPool.addOne(contractId -> obj)
       okay
