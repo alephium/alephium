@@ -738,6 +738,7 @@ class BlockValidationSpec extends AlephiumSpec {
 
     val block20 = emptyBlock(blockFlow, chainIndex)
     block20.parentHash is hashesAtHeight1.head
+    block20.uncleHashes.value.length is 0
     val block21Template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
     block21Template.uncleHashes is hashesAtHeight1.tail
     val block21 = mine(blockFlow, block21Template)
