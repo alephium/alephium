@@ -42,7 +42,7 @@
       "bytecodeDebugPatch": "",
       "codeHashDebug": "",
       "warnings": [
-        
+        "The return values of the function \"Add.add\" are not used. If this is intentional, consider using anonymous variables to suppress this warning."
       ]
     },
     "Sub": {

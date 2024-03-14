@@ -235,9 +235,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     {
       info("time lock is still locked")
-      val now   = TimeStamp.now()
-      val frame = prepare(now, now.minusUnsafe(Duration.ofSecondsUnsafe(1)))
-      VerifyAbsoluteLocktime.runWith(frame) is failed(AbsoluteLockTimeVerificationFailed)
+      val lockUntil = TimeStamp.now()
+      val blockTime = lockUntil.minusUnsafe(Duration.ofSecondsUnsafe(1))
+      val frame     = prepare(lockUntil, blockTime)
+      VerifyAbsoluteLocktime.runWith(frame) is failed(
+        AbsoluteLockTimeVerificationFailed(lockUntil, blockTime)
+      )
     }
 
     {
@@ -299,12 +302,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     {
       info("the relative lock is still locked")
-      val frame = prepare(
-        timeLock = Duration.ofSecondsUnsafe(1),
-        blockTs = TimeStamp.now(),
-        txLockTime = TimeStamp.now()
+      val blockTs    = TimeStamp.now()
+      val txLockTime = TimeStamp.now()
+      val timeLock   = Duration.ofSecondsUnsafe(1)
+      val frame      = prepare(timeLock, blockTs, txLockTime)
+      VerifyRelativeLocktime.runWith(frame) is failed(
+        RelativeLockTimeVerificationFailed(txLockTime.plus(timeLock).value, blockTs)
       )
-      VerifyRelativeLocktime.runWith(frame) is failed(RelativeLockTimeVerificationFailed)
     }
 
     {
@@ -442,8 +446,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.size is 1
     stack.top.get is bool
 
-    LoadLocal(1.toByte).runWith(frame).leftValue isE InvalidVarIndex
-    LoadLocal(-1.toByte).runWith(frame).leftValue isE InvalidVarIndex
+    LoadLocal(1.toByte).runWith(frame).leftValue isE InvalidVarIndex(1, 0)
+    LoadLocal(-1.toByte).runWith(frame).leftValue isE InvalidVarIndex(255, 0)
   }
 
   it should "StoreLocal" in new StatelessInstrFixture {
@@ -459,9 +463,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     StoreLocal(1.toByte).runWith(frame).leftValue isE StackUnderflow
 
     stack.push(bool)
-    StoreLocal(1.toByte).runWith(frame).leftValue isE InvalidVarIndex
+    StoreLocal(1.toByte).runWith(frame).leftValue isE InvalidVarIndex(1, 0)
     stack.push(bool)
-    StoreLocal(-1.toByte).runWith(frame).leftValue isE InvalidVarIndex
+    StoreLocal(-1.toByte).runWith(frame).leftValue isE InvalidVarIndex(255, 0)
   }
 
   it should "LoadLocalByIndex" in new StatelessInstrFixture {
@@ -477,11 +481,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.top.get is bool
 
     stack.push(Val.U256(1)) isE ()
-    LoadLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex
+    LoadLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex(1, 0)
     stack.push(Val.U256(0xff)) isE ()
     LoadLocalByIndex.popIndex(frame, InvalidVarIndex) isE 0xff
     stack.push(Val.U256(0xff + 1)) isE ()
-    LoadLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex
+    LoadLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex(0xff + 1, 0xff)
   }
 
   it should "StoreLocalByIndex" in new StatelessInstrFixture {
@@ -495,13 +499,13 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(bool)
     stack.push(Val.U256(1))
-    StoreLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex
+    StoreLocalByIndex.runWith(frame).leftValue isE InvalidVarIndex(1, 0)
     stack.push(bool)
     stack.push(Val.U256(0xff))
     StoreLocalByIndex.popIndex(frame, InvalidVarIndex) isE 0xff
     stack.push(bool)
     stack.push(Val.U256(0xff + 1))
-    StoreLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex
+    StoreLocalByIndex.popIndex(frame, InvalidVarIndex).leftValue isE InvalidVarIndex(0xff + 1, 0xff)
   }
 
   it should "Pop" in new StatelessInstrFixture {
@@ -556,7 +560,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     val zero = Val.I256(I256.Zero)
     stack.push(zero)
-    BoolNot.runWith(frame).leftValue isE InvalidType(zero)
+    BoolNot.runWith(frame).leftValue isE InvalidType(Val.Bool, zero)
   }
 
   trait BinaryBoolFixture extends StatelessInstrFixture {
@@ -1511,15 +1515,24 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     signatureStack.push(signature)
     stack.push(Val.ByteVec(wrongKey.bytes))
-    VerifyTxSignature.runWith(frame).leftValue isE InvalidSignature
+    VerifyTxSignature.runWith(frame).leftValue isE InvalidSignature(
+      wrongKey.bytes,
+      tx.id.bytes,
+      signature.bytes
+    )
 
     signatureStack.push(signature)
     stack.push(Val.ByteVec(wrongKey.bytes))
     VerifyTxSignature.mockup().runWith(frame) isE ()
     stack.isEmpty is true
 
-    stack.push(Val.ByteVec(dataGen.sample.get))
-    VerifyTxSignature.runWith(frame).leftValue isE InvalidPublicKey
+    val wrongData = dataGen.sample.get
+    stack.push(Val.ByteVec(wrongData))
+    VerifyTxSignature
+      .runWith(frame)
+      .leftValue
+      .rightValue
+      .toString is s"Invalid public key: ${Hex.toHexString(wrongData)}"
   }
 
   it should "GetSegregatedSignature" in new SignatureFixture {
@@ -1532,6 +1545,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       bytes <- Gen.listOfN(32, arbitrary[Byte])
     } yield ByteString(bytes)
 
+    // scalastyle:off method.length
     def test[PriKey <: RandomBytes, PubKey <: RandomBytes, Sig <: RandomBytes](
         instr: GenericVerifySignature[PubKey, Sig],
         genratePriPub: => (PriKey, PubKey),
@@ -1555,21 +1569,31 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       initialGas.subUnsafe(context.gasRemaining) is instr.gas()
 
       stack.push(Val.ByteVec(ByteString("zzz")))
-      instr.runWith(frame).leftValue isE InvalidSignatureFormat
+      instr.runWith(frame).leftValue isE InvalidSignatureFormat(ByteString("zzz"))
 
-      stack.push(Val.ByteVec(dataGen.sample.get))
+      val wrongData = dataGen.sample.get
+      stack.push(Val.ByteVec(wrongData))
       stack.push(Val.ByteVec(signature.bytes))
-      instr.runWith(frame).leftValue isE InvalidPublicKey
+      instr
+        .runWith(frame)
+        .leftValue
+        .rightValue
+        .toString is s"Invalid public key: ${Hex.toHexString(wrongData)}"
 
-      stack.push(Val.ByteVec(dataGen.sample.get))
+      val signedData = dataGen.sample.get
+      stack.push(Val.ByteVec(signedData))
       stack.push(Val.ByteVec(pubKey.bytes))
       stack.push(Val.ByteVec(signature.bytes))
-      instr.runWith(frame).leftValue isE SignedDataIsNot32Bytes
+      instr
+        .runWith(frame)
+        .leftValue
+        .rightValue
+        .toString is s"Signed data bytes should have 32 bytes, get ${signedData.length} instead"
 
       stack.push(Val.ByteVec(data))
       stack.push(Val.ByteVec(pubKey.bytes))
       stack.push(Val.ByteVec(sign(data32Gen.sample.get, priKey).bytes))
-      instr.runWith(frame).leftValue isE InvalidSignature
+      instr.runWith(frame).leftValue isE a[InvalidSignature]
       stack.isEmpty is true
 
       stack.push(Val.ByteVec(data))
@@ -1578,6 +1602,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       instr.mockup().runWith(frame) isE ()
       stack.isEmpty is true
     }
+    // scalastyle:on method.length
   }
 
   it should "VerifySecP256K1" in new GenericSignatureFixture {
@@ -2041,8 +2066,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.size is 1
     stack.top.get is Val.False
 
-    LoadImmField(1.toByte).runWith(frame).leftValue isE InvalidImmFieldIndex
-    LoadImmField(-1.toByte).runWith(frame).leftValue isE InvalidImmFieldIndex
+    LoadImmField(1.toByte).runWith(frame).leftValue isE InvalidImmFieldIndex(1, 1)
+    LoadImmField(-1.toByte).runWith(frame).leftValue isE InvalidImmFieldIndex(255, 1)
   }
 
   it should "LoadMutField(byte)" in new StatefulInstrFixture {
@@ -2050,8 +2075,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.size is 1
     stack.top.get is Val.True
 
-    LoadMutField(1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex
-    LoadMutField(-1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex
+    LoadMutField(1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(1, 1)
+    LoadMutField(-1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(255, 1)
   }
 
   it should "StoreMutField(byte)" in new StatefulInstrFixture {
@@ -2061,9 +2086,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     frame.obj.getMutField(0) isE Val.False
 
     stack.push(Val.True)
-    StoreMutField(1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex
+    StoreMutField(1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(1, 1)
     stack.push(Val.True)
-    StoreMutField(-1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex
+    StoreMutField(-1.toByte).runWith(frame).leftValue isE InvalidMutFieldIndex(255, 1)
   }
 
   it should "LoadImmFieldByIndex" in new StatefulInstrFixture {
@@ -2073,11 +2098,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.top.get is Val.False
 
     stack.push(Val.U256(1))
-    LoadImmFieldByIndex.runWith(frame).leftValue isE InvalidImmFieldIndex
+    LoadImmFieldByIndex.runWith(frame).leftValue isE InvalidImmFieldIndex(1, 1)
     stack.push(Val.U256(0xff))
     LoadImmFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
     stack.push(Val.U256(0xff + 1))
-    LoadImmFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex
+    LoadImmFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex(
+      0xff + 1,
+      0xff
+    )
   }
 
   it should "LoadMutFieldByIndex" in new StatefulInstrFixture {
@@ -2087,11 +2115,14 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.top.get is Val.True
 
     stack.push(Val.U256(1))
-    LoadMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex
+    LoadMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex(1, 1)
     stack.push(Val.U256(0xff))
     LoadMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
     stack.push(Val.U256(0xff + 1))
-    LoadMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex
+    LoadMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex(
+      0xff + 1,
+      0xff
+    )
   }
 
   it should "StoreMutFieldByIndex" in new StatefulInstrFixture {
@@ -2103,13 +2134,16 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(Val.False)
     stack.push(Val.U256(1))
-    StoreMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex
+    StoreMutFieldByIndex.runWith(frame).leftValue isE InvalidMutFieldIndex(1, 1)
     stack.push(Val.False)
     stack.push(Val.U256(0xff))
     StoreMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex) isE 0xff
     stack.push(Val.False)
     stack.push(Val.U256(0xff + 1))
-    StoreMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex
+    StoreMutFieldByIndex.popIndex(frame, InvalidMutFieldIndex).leftValue isE InvalidMutFieldIndex(
+      0xff + 1,
+      0xff
+    )
   }
 
   it should "CallExternal(byte)" in new StatefulInstrFixture {
@@ -2466,10 +2500,10 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     LockApprovedAssets.runWith(frame) isE ()
 
     prepareStack(ALPH.oneAlph, ALPH.alph(2), validTimestamp.millis)
-    LockApprovedAssets.runWith(frame).leftValue isE NoAssetsApproved
+    LockApprovedAssets.runWith(frame).leftValue isE a[NoAssetsApproved]
 
     prepareStack(ALPH.oneAlph, ALPH.alph(2), 0)
-    LockApprovedAssets.runWith(frame).leftValue isE InvalidLockTime
+    LockApprovedAssets.runWith(frame).leftValue isE a[InvalidLockTime]
   }
 
   it should "TransferAlph" in new StatefulInstrFixture {
@@ -2502,7 +2536,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.Address(from))
     stack.push(Val.Address(contractAddress))
     stack.push(Val.U256(ALPH.alph(10)))
-    TransferAlph.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
+    TransferAlph.runWith(frame).leftValue isE a[PayToContractAddressNotInCallerTrace]
   }
 
   trait ContractOutputFixture extends StatefulInstrFixture {
@@ -2532,7 +2566,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(Val.Address(contractAddress))
     stack.push(Val.U256(ALPH.oneNanoAlph))
-    TransferAlphFromSelf.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
+    TransferAlphFromSelf.runWith(frame).leftValue isE a[PayToContractAddressNotInCallerTrace]
   }
 
   it should "TransferAlphToSelf" in new ContractOutputFixture {
@@ -2706,7 +2740,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.Address(contractAddress))
     stack.push(Val.ByteVec(tokenId.bytes))
     stack.push(Val.U256(ALPH.oneNanoAlph))
-    TransferToken.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
+    TransferToken.runWith(frame).leftValue isE a[PayToContractAddressNotInCallerTrace]
 
     stack.push(Val.Address(from))
     stack.push(Val.Address(to))
@@ -2738,7 +2772,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     stack.push(Val.Address(contractAddress))
     stack.push(Val.ByteVec(tokenId.bytes))
     stack.push(Val.U256(ALPH.oneNanoAlph))
-    TransferTokenFromSelf.runWith(frame).leftValue isE PayToContractAddressNotInCallerTrace
+    TransferTokenFromSelf.runWith(frame).leftValue isE a[PayToContractAddressNotInCallerTrace]
   }
 
   it should "TransferTokenToSelf" in new TransferTokenFixture {
@@ -2915,7 +2949,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(Val.U256(ALPH.oneNanoAlph))
       stack.push(Val.Address(contractLockupScriptGen.sample.get))
 
-      CreateContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+      CreateContractAndTransferToken.runWith(frame).leftValue isE a[InvalidAssetAddress]
     }
   }
 
@@ -2992,7 +3026,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(Val.U256(ALPH.oneNanoAlph))
       stack.push(Val.Address(contractLockupScriptGen.sample.get))
 
-      CreateSubContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+      CreateSubContractAndTransferToken.runWith(frame).leftValue isE a[InvalidAssetAddress]
     }
   }
 
@@ -3053,20 +3087,19 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       .execute()
       .isRight is true
 
-    prepareFrame(None)(NetworkConfigFixture.Leman).execute().leftValue is Right(
-      InvalidExternalMethodReturnLength
-    )
+    prepareFrame(None)(NetworkConfigFixture.Leman)
+      .execute()
+      .leftValue isE a[InvalidExternalMethodReturnLength]
+
     prepareFrame(Some((U256.One, U256.One)))(NetworkConfigFixture.Leman).execute().isRight is true
     prepareFrame(Some((U256.One, U256.Zero)))(NetworkConfigFixture.Leman)
       .execute()
-      .leftValue is Right(
-      InvalidExternalMethodReturnLength
-    )
+      .leftValue isE a[InvalidExternalMethodReturnLength]
+
     prepareFrame(Some((U256.One, U256.Two)))(NetworkConfigFixture.Leman)
       .execute()
-      .leftValue is Right(
-      InvalidExternalMethodReturnLength
-    )
+      .leftValue isE a[InvalidExternalMethodReturnLength]
+
     prepareFrame(Some((U256.One, U256.MaxValue)))(NetworkConfigFixture.Leman)
       .execute()
       .leftValue is Right(
@@ -3074,14 +3107,12 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
     prepareFrame(Some((U256.Zero, U256.One)))(NetworkConfigFixture.Leman)
       .execute()
-      .leftValue is Right(
-      InvalidExternalMethodArgLength
-    )
+      .leftValue isE a[InvalidExternalMethodArgLength]
+
     prepareFrame(Some((U256.Two, U256.One)))(NetworkConfigFixture.Leman)
       .execute()
-      .leftValue is Right(
-      InvalidExternalMethodArgLength
-    )
+      .leftValue isE a[InvalidExternalMethodArgLength]
+
     prepareFrame(Some((U256.MaxValue, U256.One)))(NetworkConfigFixture.Leman)
       .execute()
       .leftValue is Right(
@@ -3235,7 +3266,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(mutState)
       stack.push(Val.U256(ALPH.oneNanoAlph))
       stack.push(Val.Address(contractLockupScriptGen.sample.get))
-      CopyCreateContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+      CopyCreateContractAndTransferToken.runWith(frame).leftValue isE a[InvalidAssetAddress]
     }
   }
 
@@ -3338,7 +3369,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       stack.push(Val.U256(ALPH.oneNanoAlph))
       stack.push(Val.Address(contractLockupScriptGen.sample.get))
 
-      CopyCreateContractAndTransferToken.runWith(frame).leftValue isE InvalidAssetAddress
+      CopyCreateContractAndTransferToken.runWith(frame).leftValue isE a[InvalidAssetAddress]
     }
   }
 
@@ -3359,7 +3390,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     frame.opStack.top.get is Val.False
   }
 
-  it should "Not DestroySelf if contract asset is not used" in new StatefulInstrFixture {
+  it should "not DestroySelf if contract asset is not used" in new StatefulInstrFixture {
     val contractOutput =
       ContractOutput(ALPH.alph(0), contractLockupScriptGen.sample.get, AVector.empty)
     val txId = TransactionId.generate
@@ -3382,7 +3413,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     stack.push(Val.Address(assetLockupScriptGen.sample.get))
 
-    DestroySelf.runWith(frame).leftValue isE ContractAssetUnloaded
+    DestroySelf
+      .runWith(frame)
+      .leftValue
+      .rightValue
+      .toString is s"Assets for contract ${Address.contract(contractId).toBase58} is not loaded, please annotate the function with `@using(assetsInContract = true)`"
   }
 
   trait DestroySelfFixture extends GenFixture {
@@ -3467,7 +3502,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val destroyFrame = frame.execute().rightValue.value
 
       destroyFrame.opStack.push(Val.Address(contractLockupScriptGen.sample.get))
-      destroyFrame.execute().leftValue.rightValue is PayToContractAddressNotInCallerTrace
+      destroyFrame.execute().leftValue.rightValue is a[PayToContractAddressNotInCallerTrace]
     }
   }
 
@@ -3651,7 +3686,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .asInstanceOf[StatefulFrame]
         .copy(obj = script)
       val frame = prepareFrame(callerFrameOpt = Some(callerFrame))
-      CallerAddress.runWith(frame).leftValue isE TxInputAddressesAreNotIdentical
+      CallerAddress.runWith(frame).leftValue isE a[TxInputAddressesAreNotIdentical]
     }
 
     {
@@ -3675,7 +3710,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       val frame = prepareFrame(txEnvOpt = Some(txEnvWithRandomAddresses))
         .asInstanceOf[StatefulFrame]
         .copy(obj = script)
-      CallerAddress.runWith(frame).leftValue isE TxInputAddressesAreNotIdentical
+      val randomAddresses = prevOutputs0.map { v =>
+        Address.Asset(v.lockupScript).toBase58
+      }.toSet
+      CallerAddress
+        .runWith(frame)
+        .leftValue
+        .rightValue
+        .toString is s"Tx input addresses are not identical for `callerAddress` function: ${randomAddresses
+          .mkString(", ")}"
     }
   }
 
@@ -3737,7 +3780,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       Val.ByteVec.fromString("Hello")
     DEBUG(AVector(Val.ByteVec.fromString("Hello "), Val.ByteVec.fromString("!")))
       .combineUnsafe(AVector(Val.ByteVec.fromString("Alephium"))) is
-      Val.ByteVec.fromString("Hello Alephium!")
+      Val.ByteVec.fromString("Hello 416c65706869756d!")
   }
 
   it should "Debug" in new StatefulInstrFixture {
@@ -3748,7 +3791,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
     {
       info("Simple message")
-      DEBUG(AVector(Val.ByteVec.fromString("Hello, Alephium!"))).runWith(frame) isE ()
+      DEBUG(AVector(Val.ByteVec.fromString("Hello, 416c65706869756d!"))).runWith(frame) isE ()
     }
 
     {
@@ -3767,7 +3810,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
         .rightValue
         .states
         .head
-        .fields is AVector[Val](Val.ByteVec.fromString("Hello, Alephium!"))
+        .fields is AVector[Val](Val.ByteVec.fromString("Hello, 416c65706869756d!"))
     }
   }
 

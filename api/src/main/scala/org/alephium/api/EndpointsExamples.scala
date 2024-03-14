@@ -422,6 +422,22 @@ trait EndpointsExamples extends ErrorExamples {
     )
   )
 
+  implicit val buildMultiAddressesTransactionExamples
+      : List[Example[BuildMultiAddressesTransaction]] =
+    List(
+      defaultExample(
+        BuildMultiAddressesTransaction(
+          AVector(
+            BuildMultiAddressesTransaction.Source(
+              publicKey.bytes,
+              defaultDestinations
+            )
+          ),
+          None
+        )
+      )
+    )
+
   implicit val buildSweepAddressTransactionExamples: List[Example[BuildSweepAddressTransactions]] =
     List(
       defaultExample(
@@ -608,6 +624,12 @@ trait EndpointsExamples extends ErrorExamples {
     ),
     warnings = AVector("Found unused fields in Foo: a")
   )
+  private val structSig = CompileResult.StructSig(
+    name = "Foo",
+    fieldNames = AVector("amount", "id"),
+    fieldTypes = AVector("U256", "ByteVec"),
+    isMutable = AVector(false, true)
+  )
   implicit val compileScriptResultExamples: List[Example[CompileScriptResult]] =
     simpleExample(compileScriptResult)
 
@@ -662,7 +684,8 @@ trait EndpointsExamples extends ErrorExamples {
     simpleExample(
       CompileProjectResult(
         contracts = AVector(compileContractResult),
-        scripts = AVector(compileScriptResult)
+        scripts = AVector(compileScriptResult),
+        structs = Some(AVector(structSig))
       )
     )
 
@@ -676,6 +699,7 @@ trait EndpointsExamples extends ErrorExamples {
         Some(bigAmount),
         Some(tokens),
         Some(bigAmount),
+        Some(address),
         Some(model.minimalGas),
         Some(model.nonCoinbaseMinGasPrice)
       )
@@ -793,7 +817,8 @@ trait EndpointsExamples extends ErrorExamples {
     contracts = AVector(existingContract),
     txInputs = AVector(contractAddress),
     txOutputs = AVector(ContractOutput(1, hash, Amount(ALPH.oneAlph), contractAddress, tokens)),
-    events = AVector(eventByTxId)
+    events = AVector(eventByTxId),
+    debugMessages = AVector(DebugMessage(contractAddress, "Debugging!"))
   )
   implicit val callContractResultExamples: List[Example[CallContractResult]] = {
     simpleExample(callContractResultExample)
@@ -824,6 +849,12 @@ trait EndpointsExamples extends ErrorExamples {
 
   implicit val verifySignatureExamples: List[Example[VerifySignature]] =
     simpleExample(VerifySignature(Hex.unsafe(hexString), signature, publicKey))
+
+  implicit val targetToHashrateExamples: List[Example[TargetToHashrate]] =
+    simpleExample(TargetToHashrate(target = model.Target.unsafe(Hex.unsafe("1b032b55")).bits))
+
+  implicit val targetToHashrateResultExamples: List[Example[TargetToHashrate.Result]] =
+    simpleExample(TargetToHashrate.Result(new BigInteger("355255758493400")))
 
   implicit val eventsExamples: List[Example[ContractEvents]] =
     simpleExample(ContractEvents(events = AVector(event), 2))

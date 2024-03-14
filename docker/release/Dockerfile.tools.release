@@ -1,0 +1,15 @@
+FROM eclipse-temurin:17-jre
+
+ARG RELEASE=0.0.0
+
+RUN curl -L --proto "=https" https://github.com/alephium/alephium/releases/download/v${RELEASE}/alephium-tools-${RELEASE}.jar -o /alephium-tools.jar && \
+  mkdir -p /alephium-home && usermod -d /alephium-home nobody && chown nobody /alephium-home && \
+  mkdir -p ~nobody/.alephium && chown nobody ~nobody/.alephium
+
+COPY user-mainnet-release.conf /alephium-home/.alephium/user.conf
+
+VOLUME /alephium-home/.alephium
+
+USER nobody
+
+ENTRYPOINT ["java", "-cp", "/alephium-tools.jar"]

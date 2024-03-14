@@ -30,9 +30,9 @@ class ExeFailureSpec extends AlephiumSpec {
       .get
 
     NotEnoughApprovedBalance(lockupScript, tokenId, ALPH.alph(1), U256.Zero).toString is
-      "NotEnoughApprovedBalance(address: 1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6,tokenId: cee16cdfad98e8943fd9a5b45e1765e0a6895608efe3eeeb41a60db55f605b46,expected: 1000000000000000000,got: 0)"
+      "Not enough approved balance for address 1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6, tokenId: cee16cdfad98e8943fd9a5b45e1765e0a6895608efe3eeeb41a60db55f605b46, expected: 1000000000000000000, got: 0"
     NotEnoughApprovedBalance(lockupScript, TokenId.alph, ALPH.alph(2), ALPH.oneAlph).toString is
-      "NotEnoughApprovedBalance(address: 1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6,tokenId: ALPH,expected: 2000000000000000000,got: 1000000000000000000)"
+      "Not enough approved balance for address 1G5fKUFGRFEHXcTeCfgKQNppbumd8E9G8vA6p2wf4n2L6, tokenId: ALPH, expected: 2000000000000000000, got: 1000000000000000000"
   }
 
   it should "test InvalidOutputBalances" in {
@@ -40,25 +40,25 @@ class ExeFailureSpec extends AlephiumSpec {
     val lockupScript = Address.fromBase58(address).get.lockupScript
 
     InvalidOutputBalances(lockupScript, 2, U256.Zero).toString is
-      s"InvalidOutputBalances(Invalid ALPH balance for address $address, expected ${dustUtxoAmount
-          .mulUnsafe(U256.Two)}, got ${U256.Zero}, you need to transfer more ALPH to this address)"
+      s"Invalid ALPH balance for address $address, expected ${dustUtxoAmount
+          .mulUnsafe(U256.Two)}, got ${U256.Zero}, you need to transfer more ALPH to this address"
 
     val attoAlphAmount0 = dustUtxoAmount.subUnsafe(U256.One)
     InvalidOutputBalances(lockupScript, 0, attoAlphAmount0).toString is
-      s"InvalidOutputBalances(Invalid ALPH balance for address $address, expected $dustUtxoAmount, got $attoAlphAmount0, you need to transfer more ALPH to this address)"
+      s"Invalid ALPH balance for address $address, expected $dustUtxoAmount, got $attoAlphAmount0, you need to transfer more ALPH to this address"
 
     InvalidOutputBalances(lockupScript, 2, dustUtxoAmount).toString is
-      s"InvalidOutputBalances(Invalid ALPH balance for address $address, expected ${dustUtxoAmount
-          .mulUnsafe(U256.Two)}, got $dustUtxoAmount, you need to transfer more ALPH to this address)"
+      s"Invalid ALPH balance for address $address, expected ${dustUtxoAmount
+          .mulUnsafe(U256.Two)}, got $dustUtxoAmount, you need to transfer more ALPH to this address"
 
     val attoAlphAmount1 = dustUtxoAmount.addUnsafe(U256.One)
     InvalidOutputBalances(lockupScript, 2, attoAlphAmount1).toString is
-      s"InvalidOutputBalances(Invalid ALPH balance for address $address, expected ${dustUtxoAmount
-          .mulUnsafe(U256.Two)}, got $attoAlphAmount1, you need to transfer more ALPH to this address)"
+      s"Invalid ALPH balance for address $address, expected ${dustUtxoAmount
+          .mulUnsafe(U256.Two)}, got $attoAlphAmount1, you need to transfer more ALPH to this address"
 
     val attoAlphAmount2 = dustUtxoAmount.mulUnsafe(U256.unsafe(3)).subUnsafe(U256.One)
     InvalidOutputBalances(lockupScript, 2, attoAlphAmount2).toString is
-      s"InvalidOutputBalances(Invalid ALPH balance for address $address, expected ${dustUtxoAmount
-          .mulUnsafe(U256.unsafe(3))}, got $attoAlphAmount2, you need to transfer more ALPH to this address)"
+      s"Invalid ALPH balance for address $address, expected ${dustUtxoAmount
+          .mulUnsafe(U256.unsafe(3))}, got $attoAlphAmount2, you need to transfer more ALPH to this address"
   }
 }

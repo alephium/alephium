@@ -21,11 +21,13 @@ import scala.collection.mutable
 final case class ScopeState(
     var varIndex: Int,
     var freshNameIndex: Int,
-    var arrayIndexVar: Option[Ast.Ident]
+    var localArrayIndexVar: Option[Ast.Ident],
+    var immFieldArrayIndexVar: Option[Ast.Ident],
+    var mutFieldArrayIndexVar: Option[Ast.Ident]
 )
 
 object ScopeState {
-  def default(): ScopeState = ScopeState(0, 0, None)
+  def default(): ScopeState = ScopeState(0, 0, None, None, None)
 }
 
 trait Scope { self: Compiler.State[_] =>
@@ -34,6 +36,7 @@ trait Scope { self: Compiler.State[_] =>
   var currentScopeState: ScopeState = ScopeState.default()
   var immFieldsIndex: Int           = 0
   var mutFieldsIndex: Int           = 0
+  var templateVarIndex: Int         = 0
   val currentScopeAccessedVars      = mutable.Set.empty[Compiler.AccessVariable]
 
   def setFuncScope(funcId: Ast.FuncId): Unit = {
@@ -55,14 +58,56 @@ trait Scope { self: Compiler.State[_] =>
     name
   }
 
-  def getArrayIndexVar(addLocalVariable: Ast.Ident => Unit): Ast.Ident = {
-    currentScopeState.arrayIndexVar match {
+  def getLocalArrayVarIndex(addLocalVariable: Ast.Ident => Unit): Ast.Ident = {
+    currentScopeState.localArrayIndexVar match {
       case Some(ident) => ident
       case None =>
         val ident = Ast.Ident(freshName())
         addLocalVariable(ident)
-        currentScopeState.arrayIndexVar = Some(ident)
+        currentScopeState.localArrayIndexVar = Some(ident)
         ident
+    }
+  }
+
+  def getImmFieldArrayVarIndex(addLocalVariable: Ast.Ident => Unit): Ast.Ident = {
+    currentScopeState.immFieldArrayIndexVar match {
+      case Some(ident) => ident
+      case None =>
+        val ident = Ast.Ident(freshName())
+        addLocalVariable(ident)
+        currentScopeState.immFieldArrayIndexVar = Some(ident)
+        ident
+    }
+  }
+
+  def getMutFieldArrayVarIndex(addLocalVariable: Ast.Ident => Unit): Ast.Ident = {
+    currentScopeState.mutFieldArrayIndexVar match {
+      case Some(ident) => ident
+      case None =>
+        val ident = Ast.Ident(freshName())
+        addLocalVariable(ident)
+        currentScopeState.mutFieldArrayIndexVar = Some(ident)
+        ident
+    }
+  }
+
+  def getAndUpdateVarIndex(isTemplate: Boolean, isLocal: Boolean, isMutable: Boolean): Int = {
+    if (isTemplate) {
+      val result = templateVarIndex
+      templateVarIndex += 1
+      result
+    } else if (isLocal) {
+      val result = currentScopeState.varIndex
+      currentScopeState.varIndex += 1
+      result
+    } else if (isMutable) {
+      val result = mutFieldsIndex
+      mutFieldsIndex += 1
+      result
+    } else {
+      val result = immFieldsIndex
+      immFieldsIndex += 1
+      result
     }
   }
 }

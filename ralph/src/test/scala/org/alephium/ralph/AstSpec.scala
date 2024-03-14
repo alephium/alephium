@@ -21,6 +21,7 @@ import scala.collection.mutable
 import org.alephium.protocol.vm.Val
 import org.alephium.util.{AlephiumSpec, AVector, Hex}
 
+//scalastyle:off file.size.limit
 class AstSpec extends AlephiumSpec {
 
   behavior of "Check external caller"
@@ -609,6 +610,42 @@ class AstSpec extends AlephiumSpec {
       s"""No external caller check for function "Foo.bar". Please use "checkCaller!(...)" in the function or its callees, or disable it with "@using(checkExternalCaller = false)"."""
   }
 
+  it should "warning if private function has checkExternalCaller annotation" in {
+    def code(annotation: String): String = {
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    bar()
+         |  }
+         |
+         |  $annotation
+         |  fn bar() -> () {
+         |    return
+         |  }
+         |}
+         |""".stripMargin
+    }
+
+    Compiler.compileContractFull(code(""), 0).rightValue.warnings.isEmpty is true
+    Compiler
+      .compileContractFull(code("@using(checkExternalCaller = true)"), 0)
+      .rightValue
+      .warnings is AVector(
+      """No need to add the checkExternalCaller annotation to the private function "Foo.bar""""
+    )
+    Compiler
+      .compileContractFull(code("@using(checkExternalCaller = false)"), 0)
+      .rightValue
+      .warnings is AVector(
+      """No need to add the checkExternalCaller annotation to the private function "Foo.bar""""
+    )
+    Compiler
+      .compileContractFull(code("@using(preapprovedAssets = false)"), 0)
+      .rightValue
+      .warnings
+      .isEmpty is true
+  }
+
   behavior of "Private function usage"
 
   it should "check if private functions are used" in {
@@ -646,7 +683,7 @@ class AstSpec extends AlephiumSpec {
          |  pub fn baz() -> () { foo1() }
          |}
          |""".stripMargin
-    val (contracts, _) = Compiler.compileProject(code1).rightValue
+    val (contracts, _, _) = Compiler.compileProject(code1).rightValue
     contracts.length is 2
     contracts.foreach(_.warnings.isEmpty is true)
   }
@@ -678,9 +715,12 @@ class AstSpec extends AlephiumSpec {
                   |TxScript Main {
                   |  return
                   |}
+                  |struct Foo {
+                  |  amount: U256
+                  |}
                   |""".stripMargin
     val error = Compiler.compileProject(code).leftValue
-    error.message is "These TxScript/Contract/Interface are defined multiple times: Bar, Foo, Main"
+    error.message is "These TxScript/Contract/Interface/Struct are defined multiple times: Bar, Foo, Main"
   }
 
   it should "check interface std id" in {

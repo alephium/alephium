@@ -21,7 +21,7 @@ import akka.util.ByteString
 import org.alephium.api.{badRequest, Try}
 import org.alephium.crypto.BIP340SchnorrPublicKey
 import org.alephium.protocol.PublicKey
-import org.alephium.protocol.model.{BlockHash, SchnorrAddress, TokenId}
+import org.alephium.protocol.model.{Address, BlockHash, SchnorrAddress, TokenId}
 import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, UnlockScript}
 import org.alephium.util.{AVector, Hex, U256}
 
@@ -94,6 +94,21 @@ object BuildTxCommon {
             }
         }
         amounts.map(v => (v._1, AVector.from(v._2)))
+    }
+  }
+
+  def getTokenIssuanceInfo(
+      issueTokenAmount: Option[Amount],
+      issueTokenTo: Option[Address.Asset]
+  ): Either[String, Option[(U256, Option[Address.Asset])]] = {
+    (issueTokenAmount, issueTokenTo) match {
+      case (None, Some(_)) =>
+        Left("`issueTokenTo` is specified, but `issueTokenAmount` is not specified")
+      case _ =>
+        Right(issueTokenAmount.map { amount =>
+          (amount.value, issueTokenTo)
+
+        })
     }
   }
 }
