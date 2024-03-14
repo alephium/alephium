@@ -30,10 +30,12 @@ import org.alephium.tools.BuiltInFunctions.FunctionInfo
 class BuiltInFunctionsSpec extends AnyFlatSpecLike with Matchers {
   it should "check docs for built in functions are generated and formatted correctly" in {
     val builtInFunctionsDocPath = "../protocol/src/main/resources/ralph-built-in-functions.json"
-    val builtinFunctionsDoc = Using(Source.fromFile(builtInFunctionsDocPath, "UTF-8"))(_.getLines().mkString("\n")).get
+    val builtinFunctionsDoc =
+      Using(Source.fromFile(builtInFunctionsDocPath, "UTF-8"))(_.getLines().mkString("\n")).get
 
-    val allFunctions: immutable.Iterable[FunctionInfo] = BuiltIn.statefulFuncsSeq.map { case (_, f) =>
-      FunctionInfo(f.name, f.category.toString, f.signature, f.doc, f.params, f.returns)
+    val allFunctions: immutable.Iterable[FunctionInfo] = BuiltIn.statefulFuncsSeq.map {
+      case (_, f) =>
+        FunctionInfo(f.name, f.category.toString, f.signature, f.doc, f.params, f.returns)
     }
     val expectedBuiltinFunctionsDoc: String = write(allFunctions.toSeq.sorted, indent = 2)
 
