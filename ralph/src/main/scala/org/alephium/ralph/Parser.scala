@@ -695,7 +695,7 @@ object StatelessParser extends Parser[StatelessContext] {
 object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv |
+      const | stringLiteral | alphTokenId | callExpr | mapContains | contractCallExpr | contractConv |
         enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr | emptyMap
     )
 
@@ -748,6 +748,12 @@ object StatefulParser extends Parser[StatefulContext] {
             .ContractCallExpr(acc, funcId, approveAssets, arguments)
             .atSourceIndex(fromIndex, endIndex)
         })
+    }
+
+  def mapContains[Unknown: P]: P[Ast.Expr[StatefulContext]] =
+    P(Index ~ (callExpr | variableIdOnly) ~ ".contains!" ~ "(" ~ expr ~ ")" ~~ Index).map {
+      case (fromIndex, base, index, endIndex) =>
+        Ast.MapContains(base, index).atSourceIndex(fromIndex, endIndex)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))

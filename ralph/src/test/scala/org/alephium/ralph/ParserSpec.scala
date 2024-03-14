@@ -1895,5 +1895,10 @@ class ParserSpec extends AlephiumSpec {
       Ident("map"),
       Seq[Expr[StatefulContext]](Const(Val.U256(U256.One)), Variable(Ident("address")))
     )
+
+    parse("map.contains!(0)", StatefulParser.expr(_)).get.value is Ast.MapContains(
+      Variable(Ident("map")),
+      constantIndex(0)
+    )
   }
 }
