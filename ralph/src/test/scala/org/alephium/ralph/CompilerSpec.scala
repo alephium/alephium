@@ -5649,6 +5649,40 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
         .compileContractFull(code("map[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]", "mut", "mut"))
         .isRight is true
     }
+
+    {
+      info("Map type fields in struct")
+      val code =
+        s"""
+           |struct Foo { $$map$$: Map[U256, U256] }
+           |Contract Bar(@unused foo: Foo) {
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Map type fields does not support in Foo")
+    }
+
+    {
+      info("Map type fields in contract")
+      val code =
+        s"""
+           |Contract Bar(@unused $$map$$: Map[U256, U256]) {
+           |  pub fn f() -> () {}
+           |}
+           |""".stripMargin
+      testContractError(code, "Map type fields does not support in Bar")
+    }
+
+    {
+      info("Map type fields in script")
+      val code =
+        s"""
+           |TxScript Main($$map$$: Map[U256, U256]) {
+           |  let _ = map[0]
+           |}
+           |""".stripMargin
+      testTxScriptError(code, "Map type fields does not support in Main")
+    }
   }
 
   it should "report friendly error for non-primitive types for consts" in new Fixture {
