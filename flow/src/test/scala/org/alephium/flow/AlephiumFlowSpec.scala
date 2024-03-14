@@ -322,9 +322,12 @@ trait FlowFixture
       chainIndex: ChainIndex,
       script: StatefulScript,
       initialGas: Int = 200000,
-      validation: Boolean = true
+      validation: Boolean = true,
+      keyPairOpt: Option[(PrivateKey, PublicKey)] = None
   ): Block = {
-    mineWithTxs(blockFlow, chainIndex)(payableCallTxs(_, _, script, initialGas, validation))
+    mineWithTxs(blockFlow, chainIndex)(
+      payableCallTxs(_, _, script, initialGas, validation, keyPairOpt)
+    )
   }
 
   def payableCallTxTemplate(
@@ -359,11 +362,17 @@ trait FlowFixture
       chainIndex: ChainIndex,
       script: StatefulScript,
       initialGas: Int,
-      validation: Boolean
+      validation: Boolean,
+      keyPairOpt: Option[(PrivateKey, PublicKey)] = None
   ): AVector[Transaction] = {
-    val mainGroup                  = chainIndex.from
-    val (privateKey, publicKey, _) = genesisKeys(mainGroup.value)
-    val fromLockupScript           = LockupScript.p2pkh(publicKey)
+    val mainGroup = chainIndex.from
+    val (privateKey, publicKey) = keyPairOpt.getOrElse {
+      val keys = genesisKeys(mainGroup.value)
+      (keys._1, keys._2)
+    }
+    val fromLockupScript = LockupScript.p2pkh(publicKey)
+    keyManager += fromLockupScript -> privateKey
+
     val contractTx =
       payableCallTxTemplate(blockFlow, chainIndex, fromLockupScript, script, initialGas, validation)
 

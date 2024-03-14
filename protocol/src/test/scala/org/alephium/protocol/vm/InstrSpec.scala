@@ -91,6 +91,11 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     // format: on
   }
 
+  trait GhostForkFixture extends AllInstrsFixture {
+    val ghostStatelessInstrs = AVector[GhostInstr[StatelessContext]]()
+    val ghostStatefulInstrs  = AVector[GhostInstr[StatefulContext]](PayGasFee)
+  }
+
   it should "check all LemanInstr" in new LemanForkFixture {
     lemanStatelessInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
     lemanStatefulInstrs.foreach(_.isInstanceOf[LemanInstr[_]] is true)
@@ -98,6 +103,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       .map(_.isInstanceOf[LemanInstr[_]] is false)
     (statefulInstrs.toSet -- lemanStatefulInstrs.toSet)
       .map(_.isInstanceOf[LemanInstr[_]] is false)
+  }
+
+  it should "check all GhostInstr" in new GhostForkFixture {
+    ghostStatelessInstrs.foreach(_.isInstanceOf[GhostInstr[_]] is true)
+    ghostStatefulInstrs.foreach(_.isInstanceOf[GhostInstr[_]] is true)
+    (statelessInstrs.toSet -- ghostStatelessInstrs.toSet)
+      .map(_.isInstanceOf[GhostInstr[_]] is false)
+    (statefulInstrs.toSet -- ghostStatefulInstrs.toSet)
+      .map(_.isInstanceOf[GhostInstr[_]] is false)
   }
 
   it should "fail if the fork is not activated yet for stateless instrs" in new LemanForkFixture
@@ -2539,6 +2553,79 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
     )
   }
 
+  trait PayGasFeeFixture extends ContractOutputFixture {
+    def contractBalance: U256
+    def gasFeePaid: U256
+
+    val from  = LockupScript.P2C(contractId)
+    val txEnv = genTxEnv(None, AVector.empty)
+    def balanceState =
+      MutBalanceState(remaining = MutBalances.empty, approved = alphBalance(from, contractBalance))
+
+    override lazy val frame =
+      prepareFrame(
+        Some(balanceState),
+        Some((contractId, contractOutput, contractOutputRef)),
+        Some(txEnv)
+      )
+    runAndCheckGas(PayGasFee)
+
+    frame.ctx.gasFeePaid is gasFeePaid
+    stack.size is 0
+  }
+
+  it should "not pay when contract has no available fund [PayGasFee]" in new PayGasFeeFixture {
+    override def contractBalance: U256 = U256.Zero
+    override def gasFeePaid: U256      = U256.Zero
+  }
+
+  it should "pay partial gas that contract has available fund for [PayGasFee]" in new PayGasFeeFixture {
+    lazy val halfGas                   = txEnv.gasFeeUnsafe.div(2).get
+    override def contractBalance: U256 = halfGas
+    override def gasFeePaid: U256      = halfGas
+  }
+
+  it should "pay all gas if contract has enough fund [PayGasFee]" in new PayGasFeeFixture {
+    lazy val twiceGas                  = txEnv.gasFeeUnsafe.mul(2).get
+    override def contractBalance: U256 = minimalAlphInContract.addUnsafe(twiceGas)
+    override def gasFeePaid: U256      = txEnv.gasFeeUnsafe
+  }
+
+  it should "pay gas from all the approved ALPH, not enough for all gas [PayGasFee]" in new PayGasFeeFixture {
+    lazy val halfGas                   = txEnv.gasFeeUnsafe.div(2).get
+    override def contractBalance: U256 = halfGas
+    override def gasFeePaid: U256      = txEnv.gasFeeUnsafe.subUnsafe(1)
+
+    override def balanceState =
+      MutBalanceState(
+        remaining = MutBalances.empty,
+        approved = MutBalances(
+          ArrayBuffer(
+            (LockupScript.P2C(contractId), MutBalancesPerLockup.alph(contractBalance)),
+            (LockupScript.P2PKH(Hash.generate), MutBalancesPerLockup.alph(halfGas.subUnsafe(1)))
+          )
+        )
+      )
+  }
+
+  it should "pay gas from all the approved ALPH, enough for all gas [PayGasFee]" in new PayGasFeeFixture {
+    lazy val halfGas                   = txEnv.gasFeeUnsafe.div(2).get
+    override def contractBalance: U256 = halfGas
+    override def gasFeePaid: U256      = txEnv.gasFeeUnsafe
+
+    override def balanceState =
+      MutBalanceState(
+        remaining = MutBalances.empty,
+        approved = MutBalances(
+          ArrayBuffer(
+            (LockupScript.P2C(contractId), MutBalancesPerLockup.alph(contractBalance)),
+            (LockupScript.P2PKH(Hash.generate), MutBalancesPerLockup.alph(halfGas)),
+            (LockupScript.P2PKH(Hash.generate), MutBalancesPerLockup.alph(halfGas))
+          )
+        )
+      )
+  }
+
   trait TransferTokenFixture extends ContractOutputFixture {
     def instr: Instr[StatefulContext] with GasSimple
     def from: LockupScript
@@ -3775,7 +3862,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 5, StoreMutFieldByIndex -> 5, ContractExists -> 800, CreateContractAndTransferToken -> 32000,
       CopyCreateContractAndTransferToken -> 24000, CreateSubContractAndTransferToken -> 32000, CopyCreateSubContractAndTransferToken -> 24000,
       NullContractAddress -> 2, SubContractId -> 199, SubContractIdOf -> 199, ALPHTokenId -> 2,
-      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5
+      LoadImmField(byte) -> 3, LoadImmFieldByIndex -> 5, PayGasFee -> 30
     )
     // format: on
     statelessCases.length is Instr.statelessInstrs0.length - 1
@@ -3905,7 +3992,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex -> 195, StoreMutFieldByIndex -> 196, ContractExists -> 197, CreateContractAndTransferToken -> 198,
       CopyCreateContractAndTransferToken -> 199, CreateSubContractAndTransferToken -> 200, CopyCreateSubContractAndTransferToken -> 201,
       NullContractAddress -> 202, SubContractId -> 203, SubContractIdOf -> 204, ALPHTokenId -> 205,
-      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207
+      LoadImmField(byte) -> 206, LoadImmFieldByIndex -> 207, PayGasFee -> 208
     )
     // format: on
 
@@ -3966,7 +4053,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadMutFieldByIndex, StoreMutFieldByIndex, ContractExists, CreateContractAndTransferToken, CopyCreateContractAndTransferToken,
       CreateSubContractAndTransferToken, CopyCreateSubContractAndTransferToken,
       NullContractAddress, SubContractId, SubContractIdOf, ALPHTokenId,
-      LoadImmField(0.toByte), LoadImmFieldByIndex
+      LoadImmField(0.toByte), LoadImmFieldByIndex, PayGasFee
     )
     // format: on
   }

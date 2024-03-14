@@ -22,7 +22,7 @@ import akka.util.ByteString
 
 import org.alephium.protocol.config.NetworkConfig
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, EitherF}
+import org.alephium.util.{AVector, EitherF, Math, U256}
 
 sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
@@ -342,6 +342,7 @@ final class StatefulVM(
   }
 
   private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+    val hardFork = ctx.getHardFork()
     if (lastFrame.method.usesAssets()) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
@@ -353,18 +354,49 @@ final class StatefulVM(
           case Some(_) => okay
           case None    => failed(InvalidBalances)
         }
+        _ <- reimburseGas(hardFork)
         _ <- outputGeneratedBalances(ctx.outputBalances)
         _ <- ctx.checkAllAssetsFlushed()
       } yield ()
     } else {
       if (ctx.getHardFork().isLemanEnabled()) {
         for {
+          _ <- reimburseGas(hardFork)
           _ <- outputGeneratedBalances(ctx.outputBalances)
           _ <- ctx.checkAllAssetsFlushed()
         } yield ()
       } else {
         Right(())
       }
+    }
+  }
+
+  def reimburseGas(hardFork: HardFork): ExeResult[Unit] = {
+    if (hardFork.isGhostEnabled()) {
+      val totalGasFee = ctx.txEnv.gasFeeUnsafe
+      val gasFeePaid  = ctx.gasFeePaid
+
+      totalGasFee.sub(gasFeePaid) match {
+        case Some(gasFeeRemaining @ _) =>
+          ctx.txEnv.prevOutputs.headOption match {
+            case Some(firstInput) =>
+              val reimbursedGasFee = Math.min(totalGasFee, gasFeePaid)
+              if (reimbursedGasFee > U256.Zero) {
+                ctx.outputBalances
+                  .addAlph(firstInput.lockupScript, reimbursedGasFee)
+                  .toRight(Right(InvalidBalances))
+              } else {
+                okay
+              }
+            case None =>
+              okay
+          }
+
+        case None =>
+          failed(GasOverflow)
+      }
+    } else {
+      okay
     }
   }
 

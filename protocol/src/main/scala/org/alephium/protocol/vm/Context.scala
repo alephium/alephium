@@ -170,6 +170,14 @@ trait StatelessContext extends CostStrategy {
     }
   }
 
+  def checkGhostHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
+    if (getHardFork().isGhostEnabled()) {
+      okay
+    } else {
+      failed(InactiveInstr(instr))
+    }
+  }
+
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[MutBalances]
 
