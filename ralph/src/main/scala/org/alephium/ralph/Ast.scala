@@ -1794,11 +1794,7 @@ object Ast {
         globalState: GlobalState
     ): Seq[Compiler.ContractFunc[StatefulContext]] = {
       val stdInterfaceIdOpt = if (hasStdIdField) stdInterfaceId else None
-      Seq(
-        BuiltIn.encodeImmFields(stdInterfaceIdOpt, fields, globalState),
-        BuiltIn.encodeMutFields(fields, globalState),
-        BuiltIn.encodeFields(stdInterfaceIdOpt, fields, globalState)
-      )
+      Seq(BuiltIn.encodeFields(stdInterfaceIdOpt, fields, globalState))
     }
 
     private def checkFuncs(): Unit = {

@@ -16,11 +16,9 @@
 
 package org.alephium.ralph
 
-import akka.util.ByteString
-
 import org.alephium.protocol.vm._
 import org.alephium.ralph.BuiltIn.{OverloadedSimpleBuiltIn, SimpleBuiltIn}
-import org.alephium.util.{AlephiumSpec, U256}
+import org.alephium.util.AlephiumSpec
 
 class BuiltInSpec extends AlephiumSpec {
   it should "check all functions that can use preapproved assets" in {
@@ -67,12 +65,8 @@ class BuiltInSpec extends AlephiumSpec {
          |""".stripMargin
     val ast         = Compiler.compileContractFull(code).rightValue.ast
     val globalState = Ast.GlobalState(Seq.empty)
-    ast.builtInContractFuncs(globalState).length is 3
+    ast.builtInContractFuncs(globalState).length is 1
     val funcTable = ast.funcTable(globalState)
-    funcTable(Ast.FuncId("encodeImmFields", true)).genCode(Seq.empty) is
-      Seq(U256Const(Val.U256(U256.Zero)), Encode)
-    funcTable(Ast.FuncId("encodeMutFields", true)).genCode(Seq.empty) is
-      Seq(U256Const(Val.U256(U256.Zero)), Encode)
     funcTable(Ast.FuncId("encodeFields", true)).genCode(Seq.empty) is Seq.empty
   }
 
@@ -91,37 +85,22 @@ class BuiltInSpec extends AlephiumSpec {
          |}
          |""".stripMargin
 
-    def test(enabled: Boolean, encodeImmFieldsInstrs: Seq[Instr[StatelessContext]]) = {
+    def test(enabled: Boolean) = {
       val ast         = Compiler.compileContractFull(code(enabled)).rightValue.ast
       val globalState = Ast.GlobalState(Seq.empty)
       val funcTable   = ast.funcTable(globalState)
-      funcTable.size is 4
-      ast.builtInContractFuncs(globalState).length is 3
+      funcTable.size is 2
+      ast.builtInContractFuncs(globalState).length is 1
 
       val foo = funcTable(Ast.FuncId("foo", false))
       foo.isStatic is false
-      val encodeImmFields = funcTable(Ast.FuncId("encodeImmFields", true))
-      encodeImmFields.isStatic is true
-      encodeImmFields.genCode(Seq.empty) is encodeImmFieldsInstrs
-      val encodeMutFields = funcTable(Ast.FuncId("encodeMutFields", true))
-      encodeMutFields.isStatic is true
-      encodeMutFields.genCode(Seq.empty) is
-        Seq(U256Const(Val.U256(U256.Zero)), Encode)
       val encodeFields = funcTable(Ast.FuncId("encodeFields", true))
       encodeFields.isStatic is true
       encodeFields.genCode(Seq.empty) is Seq.empty
     }
 
-    test(
-      true,
-      Seq(
-        BytesConst(Val.ByteVec(ByteString("ALPH") ++ ByteString(0xff, 0xff))),
-        U256Const(Val.U256(U256.One)),
-        Encode
-      )
-    )
-
-    test(false, Seq(U256Const(Val.U256(U256.Zero)), Encode))
+    test(true)
+    test(false)
   }
 
   it should "return correct error source index" in {

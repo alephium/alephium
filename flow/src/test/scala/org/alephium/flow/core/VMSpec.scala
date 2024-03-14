@@ -3679,53 +3679,6 @@ class VMSpec extends AlephiumSpec with Generators {
     testSimpleScript(main)
   }
 
-  it should "test Contract.encodeImmFields and Contract.encodeMutFields" in new ContractFixture {
-    def test(stdAnnotation: String, expectedImmFields: String, expectedMutFields: String) = {
-      val foo = s"""
-                   |Contract Bar(a: U256, @unused mut b: I256) implements Foo {
-                   |  @using(checkExternalCaller = false)
-                   |  pub fn foo() -> () {
-                   |    Bar.encodeImmFields!(1)
-                   |    Bar.encodeMutFields!(2i)
-                   |    let bs0 = Bar.encodeImmFields!(1)
-                   |    let bs1 = Bar.encodeMutFields!(2i)
-                   |    assert!(bs0 == #${expectedImmFields}, 0)
-                   |    assert!(bs1 == #${expectedMutFields}, 0)
-                   |  }
-                   |}
-                   |
-                   |$stdAnnotation
-                   |Interface Foo {
-                   |  @using(checkExternalCaller = false)
-                   |  pub fn foo() -> ()
-                   |}
-                   |""".stripMargin
-      val initialFields = if (stdAnnotation == "") {
-        AVector[Val](Val.U256(1))
-      } else {
-        AVector[Val](Val.U256(1), Val.ByteVec(Hex.unsafe("414c50480001")))
-      }
-      val fooId = createContract(
-        foo,
-        initialImmState = initialFields,
-        initialMutState = AVector(Val.I256(I256.unsafe(-2)))
-      )._1
-      val main: String =
-        s"""
-           |@using(preapprovedAssets = false)
-           |TxScript Main {
-           |  Foo(#${fooId.toHexString}).foo()
-           |}
-           |
-           |$foo
-           |""".stripMargin
-      testSimpleScript(main)
-    }
-
-    test("", "010201", "010102")
-    test("@std(id = #0001)", "0202010306414c50480001", "010102")
-  }
-
   it should "test Contract.encodeFields" in new ContractFixture {
     def test(stdAnnotation: String, fields: String, immFields: String, mutFields: String) = {
       val foo = s"""
@@ -3795,22 +3748,6 @@ class VMSpec extends AlephiumSpec with Generators {
       script0,
       AVector.from(Seq(0, 4, 5)).map(v => Val.U256(U256.unsafe(v))),
       AVector.from(Seq(1, 2, 3)).map(v => Val.U256(U256.unsafe(v)))
-    )
-
-    val script1 =
-      s"""
-         |TxScript Deploy() {
-         |  let encodedImmFields = Foo.encodeImmFields!(0, [1, 2])
-         |  let encodedMutFields = Foo.encodeMutFields!([3, 4], 5)
-         |  createContract!{@$genesisAddress -> ALPH: $minimalAlphInContract}(#$fooBytecode, encodedImmFields, encodedMutFields)
-         |}
-         |$foo
-         |""".stripMargin
-
-    deployAndCheckContractState(
-      script1,
-      AVector.from(Seq(0, 1, 2)).map(v => Val.U256(U256.unsafe(v))),
-      AVector.from(Seq(3, 4, 5)).map(v => Val.U256(U256.unsafe(v)))
     )
   }
 
