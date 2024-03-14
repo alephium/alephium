@@ -1877,38 +1877,6 @@ object BuiltIn {
     }
   }
 
-  def encodeImmFields[Ctx <: StatelessContext](
-      stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
-      fields: Seq[Ast.Argument],
-      globalState: Ast.GlobalState
-  ): Compiler.ContractFunc[Ctx] = {
-    val immFieldsTypes = fields.filter(!_.isMutable).map(_.tpe)
-
-    new ContractBuiltIn[Ctx] {
-      val name: String          = "encodeImmFields"
-      val argsType: Seq[Type]   = globalState.resolveTypes(immFieldsTypes)
-      val returnType: Seq[Type] = Seq(Type.ByteVec)
-
-      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
-        ContractBuiltIn.genCodeForStdId(stdInterfaceIdOpt, globalState.flattenTypeLength(argsType))
-    }
-  }
-
-  def encodeMutFields[Ctx <: StatelessContext](
-      fields: Seq[Ast.Argument],
-      globalState: Ast.GlobalState
-  ): Compiler.ContractFunc[Ctx] = {
-    val mutFieldsTypes = fields.filter(_.isMutable).map(_.tpe)
-    new ContractBuiltIn[Ctx] {
-      val name: String          = "encodeMutFields"
-      val argsType: Seq[Type]   = globalState.resolveTypes(mutFieldsTypes)
-      val returnType: Seq[Type] = Seq(Type.ByteVec)
-
-      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
-        Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(globalState.flattenTypeLength(argsType))), Encode)
-    }
-  }
-
   def encodeFields[Ctx <: StatelessContext](
       stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
       fields: Seq[Ast.Argument],

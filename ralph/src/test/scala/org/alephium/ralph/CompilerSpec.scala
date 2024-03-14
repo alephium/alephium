@@ -4451,13 +4451,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |Contract Bar(a: U256, @unused mut b: I256) implements Foo {
          |  @using(checkExternalCaller = false)
          |  pub fn foo() -> () {
-         |    let bs0 = Bar.encodeImmFields!(${input0})
-         |    let bs1 = Bar.encodeMutFields!(${input1})
-         |    let (bs2, bs3) = Bar.encodeFields!($input0, $input1)
+         |    let (bs0, bs1) = Bar.encodeFields!($input0, $input1)
          |    assert!(bs0 == #, 0)
          |    assert!(bs1 == #, 0)
-         |    assert!(bs2 == #, 0)
-         |    assert!(bs3 == #, 0)
          |  }
          |}
          |
@@ -4497,12 +4493,12 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |""".stripMargin
     }
     testContractFullError(
-      code(s"let x = bar.$$encodeImmFields$$!()"),
-      s"""Expected non-static function, got "Bar.encodeImmFields""""
+      code(s"let x = bar.$$encodeFields$$!()"),
+      s"""Expected non-static function, got "Bar.encodeFields""""
     )
     testContractFullError(
-      code(s"bar.$$encodeImmFields$$!()"),
-      s"""Expected non-static function, got "Bar.encodeImmFields""""
+      code(s"bar.$$encodeFields$$!()"),
+      s"""Expected non-static function, got "Bar.encodeFields""""
     )
     testContractFullError(
       code(s"let x = Bar.$$bar$$()"),
