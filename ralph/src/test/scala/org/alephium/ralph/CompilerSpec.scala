@@ -987,7 +987,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Expected array type, got \"U256\"",
+        "Expected array or map type, got \"U256\"",
       s"""
          |// invalid binary expression(compare array)
          |Contract Foo() {
@@ -1027,7 +1027,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Invalid array index type \"List(ByteVec)\", expected \"U256\"",
+        "Invalid array index type \"ByteVec\", expected \"U256\"",
       s"""
          |Contract Foo() {
          |  fn foo() -> () {
@@ -1036,7 +1036,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
          |  }
          |}
          |""".stripMargin ->
-        "Invalid array index type \"List(I256)\", expected \"U256\"",
+        "Invalid array index type \"I256\", expected \"U256\"",
       s"""
          |Contract Foo() {
          |  fn foo() -> () {
@@ -5453,6 +5453,201 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |}
            |""".stripMargin
       testContractError(code, "Access to other contracts' maps is not allowed")
+    }
+
+    {
+      info("Invalid map type for Map.insert")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn f(address: Address) -> () {
+           |    let map = 0
+           |    $$map$$.insert!{address -> ALPH: 1}(0, 0)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Expected map type, got U256")
+    }
+
+    {
+      info("Invalid key or value type for Map.insert")
+      def code(args: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn f(address: Address) -> () {
+           |    let mut a = emptyMap[U256, U256]
+           |    $$a.insert!{address -> ALPH : 1 alph}($args)$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code("1, #00"),
+        "Invalid args type List(U256, ByteVec), expected List(U256, U256)"
+      )
+      testContractError(
+        code("#00, 1"),
+        "Invalid args type List(ByteVec, U256), expected List(U256, U256)"
+      )
+      testContractError(
+        code("1, 1, 1"),
+        "Invalid args type List(U256, U256, U256), expected List(U256, U256)"
+      )
+    }
+
+    {
+      info("Invalid map type for Map.remove")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn f(address: Address) -> () {
+           |    let map = 0
+           |    $$map$$.remove!(0, address)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Expected map type, got U256")
+    }
+
+    {
+      info("Invalid key or value type for Map.remove")
+      def code(args: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn f(address: Address) -> () {
+           |    let mut a = emptyMap[U256, U256]
+           |    $$a.remove!($args)$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code("1, #00"),
+        "Invalid args type List(U256, ByteVec), expected List(U256, Address)"
+      )
+      testContractError(
+        code("#00, address"),
+        "Invalid args type List(ByteVec, Address), expected List(U256, Address)"
+      )
+      testContractError(
+        code("1, address, 1"),
+        "Invalid args type List(U256, Address, U256), expected List(U256, Address)"
+      )
+    }
+
+    {
+      info("Invalid map key or value type")
+      def code(stmt: String) =
+        s"""
+           |Contract Foo() {
+           |  pub fn foo() -> () {
+           |    let mut map = emptyMap[U256, U256]
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(
+        code(s"let _ = map$$[#00]$$"),
+        "Invalid map key type \"ByteVec\", expected \"U256\""
+      )
+      testContractError(
+        code(s"map$$[#00]$$ = 1"),
+        "Invalid map key type \"ByteVec\", expected \"U256\""
+      )
+      testContractError(code(s"$$map[0] = #00$$"), "Cannot assign List(ByteVec) to List(U256)")
+    }
+
+    {
+      info("Invalid map value(struct) assignment")
+      def code(stmt: String, mut0: String = "", mut1: String = "") =
+        s"""
+           |struct Foo { $mut0 a: U256 }
+           |struct Bar {
+           |  $mut1 x: U256,
+           |  mut y: [Foo; 2]
+           |}
+           |Contract Baz() {
+           |  pub fn f() -> () {
+           |    let mut map = emptyMap[U256, Bar]
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(
+        code(s"$$map[0] = Bar{x: 0, y: [Foo{a: 0}; 2]}$$"),
+        "Cannot assign to value in map \"map\". Assignment only works when all of the field selectors are mutable."
+      )
+      testContractError(
+        code(s"$$map[0].x = 1$$"),
+        "Cannot assign to immutable field x in struct Bar."
+      )
+      testContractError(
+        code(s"$$map[0].y = [Foo{a: 0}; 2]$$"),
+        "Cannot assign to field y in struct Bar. Assignment only works when all of the field selectors are mutable."
+      )
+      testContractError(
+        code(s"$$map[0].y[0] = Foo{a: 0}$$"),
+        "Cannot assign to immutable element in array Bar.y. Assignment only works when all of the field selectors are mutable."
+      )
+      testContractError(
+        code(s"$$map[0].y[0].a = 1$$"),
+        "Cannot assign to immutable field a in struct Foo."
+      )
+      Compiler.compileContractFull(code("map[0].x = 1", "", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0].y[0] = Foo{a: 0}", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0].y[0].a = 1", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
+      Compiler
+        .compileContractFull(code("map[0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut"))
+        .isRight is true
+    }
+
+    {
+      info("Invalid map value(array) assignment")
+      def code(stmt: String, mut0: String = "", mut1: String = "") =
+        s"""
+           |struct Foo { $mut0 a: U256 }
+           |struct Bar {
+           |  $mut1 x: U256,
+           |  mut y: [Foo; 2]
+           |}
+           |Contract Baz() {
+           |  pub fn f() -> () {
+           |    let mut map = emptyMap[U256, [Bar; 2]]
+           |    $stmt
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(
+        code(s"$$map[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]$$"),
+        "Cannot assign to value in map \"map\". Assignment only works when all of the field selectors are mutable."
+      )
+      testContractError(
+        code(s"$$map[0][0].x = 1$$"),
+        "Cannot assign to immutable field x in struct Bar."
+      )
+      testContractError(
+        code(s"$$map[0][0].y = [Foo{a: 0}; 2]$$"),
+        "Cannot assign to field y in struct Bar. Assignment only works when all of the field selectors are mutable."
+      )
+      testContractError(
+        code(s"$$map[0][0].y[0] = Foo{a: 0}$$"),
+        "Cannot assign to immutable element in array Bar.y. Assignment only works when all of the field selectors are mutable."
+      )
+      testContractError(
+        code(s"$$map[0][0].y[0].a = 1$$"),
+        "Cannot assign to immutable field a in struct Foo."
+      )
+      Compiler.compileContractFull(code("map[0][0].x = 1", "", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0][0].y[0] = Foo{a: 0}", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0][0].y[0].a = 1", "mut")).isRight is true
+      Compiler.compileContractFull(code("map[0][0].y = [Foo{a: 0}; 2]", "mut")).isRight is true
+      Compiler
+        .compileContractFull(code("map[0][0] = Bar{x: 0, y: [Foo{a: 0}; 2]}", "mut", "mut"))
+        .isRight is true
+      Compiler
+        .compileContractFull(code("map[0] = [Bar{x: 0, y: [Foo{a: 0}; 2]}; 2]", "mut", "mut"))
+        .isRight is true
     }
   }
 

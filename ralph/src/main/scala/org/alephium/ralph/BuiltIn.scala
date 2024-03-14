@@ -37,13 +37,6 @@ object BuiltIn {
 
     def isPublic: Boolean        = true
     def useUpdateFields: Boolean = false
-
-    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
-      throw Compiler.Error(
-        s"Built-in function $name does not belong to contract ${typeId.name}",
-        typeId.sourceIndex
-      )
-    }
   }
 
   sealed trait Category {
@@ -1858,8 +1851,6 @@ object BuiltIn {
     val useUpdateFields: Boolean                          = false
 
     override def isStatic: Boolean = true
-
-    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = ???
 
     def returnType: Seq[Type]
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type] = {
