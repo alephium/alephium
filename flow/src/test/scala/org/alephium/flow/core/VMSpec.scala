@@ -4951,6 +4951,657 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
+  trait MapFixture extends ContractFixture {
+    def mapContract: String
+    lazy val mapContractId = createContract(mapContract)._1
+    lazy val insert =
+      s"""
+         |TxScript Insert {
+         |  let mapContract = MapContract(#${mapContractId.toHexString})
+         |  mapContract.insert{@$genesisAddress -> ALPH: 2 alph}()
+         |}
+         |$mapContract
+         |""".stripMargin
+
+    lazy val checkAndUpdate =
+      s"""
+         |TxScript CheckAndUpdate {
+         |  let mapContract = MapContract(#${mapContractId.toHexString})
+         |  mapContract.checkAndUpdate()
+         |}
+         |$mapContract
+         |""".stripMargin
+
+    lazy val remove =
+      s"""
+         |TxScript Remove {
+         |  let mapContract = MapContract(#${mapContractId.toHexString})
+         |  mapContract.remove()
+         |}
+         |$mapContract
+         |""".stripMargin
+
+    def mapKeyAndValue: Map[Val, (AVector[Val], AVector[Val])]
+
+    def calcSubContractId(key: Val) = {
+      val prefix  = ByteString.fromArrayUnsafe(s"map-0".getBytes(StandardCharsets.US_ASCII))
+      val subPath = prefix ++ key.toByteVec().bytes
+      mapContractId.subContractId(subPath, mapContractId.groupIndex)
+    }
+
+    def runTest() = {
+      mapKeyAndValue.foreach { case (key, _) =>
+        val subContractId = calcSubContractId(key)
+        val worldState = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
+        worldState.contractExists(subContractId).rightValue is false
+      }
+      callTxScript(insert)
+      mapKeyAndValue.foreach { case (key, (immFields, mutFields)) =>
+        val subContractId = calcSubContractId(key)
+        val worldState = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
+        val contractState = worldState.getContractState(subContractId).rightValue
+        contractState.immFields is (immFields :+ Val.ByteVec(mapContractId.bytes))
+        contractState.mutFields is mutFields
+      }
+      callTxScript(checkAndUpdate)
+      callTxScript(remove)
+      mapKeyAndValue.foreach { case (key, _) =>
+        val subContractId = calcSubContractId(key)
+        val worldState = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
+        worldState.contractExists(subContractId).rightValue is false
+      }
+    }
+  }
+
+  it should "test primitive type as map key" in {
+    def getDefaultValue(tpe: Val.Type): (String, Val) = {
+      tpe match {
+        case Val.U256    => (Val.U256.default.v.toString, Val.U256.default)
+        case Val.I256    => ("-1i", Val.I256(I256.unsafe(-1)))
+        case Val.Bool    => (Val.Bool.default.v.toString, Val.Bool.default)
+        case Val.ByteVec => ("#00", Val.ByteVec(Hex.unsafe("00")))
+        case Val.Address =>
+          (s"@${Val.Address.default.toBase58}", Val.Address.default)
+        case _ => throw new RuntimeException("Invalid primitive type")
+      }
+    }
+
+    def contractCode(address: Address.Asset, keyType: String, keyValue: String): String =
+      s"""
+         |Contract MapContract() {
+         |  fn createMap() -> Map[$keyType, U256] {
+         |    return emptyMap[$keyType, U256]
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn insert() -> () {
+         |    let mut map = createMap()
+         |    map.insert!{@$address -> ALPH: minimalContractDeposit!()}($keyValue, 1)
+         |  }
+         |
+         |  pub fn checkAndUpdate() -> () {
+         |    let mut map = createMap()
+         |    assert!(map[$keyValue] == 1, 0)
+         |    map[$keyValue] = 2
+         |    assert!(map[$keyValue] == 2, 0)
+         |  }
+         |
+         |  pub fn remove() -> () {
+         |    let mut map = createMap()
+         |    map.remove!($keyValue, @$address)
+         |  }
+         |}
+         |""".stripMargin
+
+    Val.Type.types.foreach { tpe =>
+      val defaultValue = getDefaultValue(tpe)
+      val fixture = new MapFixture {
+        def mapContract: String = contractCode(genesisAddress, tpe.toString, defaultValue._1)
+        def mapKeyAndValue: Map[Val, (AVector[Val], AVector[Val])] =
+          Map(defaultValue._2 -> (AVector.empty, AVector(Val.U256(1))))
+      }
+      fixture.runTest()
+    }
+  }
+
+  it should "test primitive type as map value" in new MapFixture {
+    val mapContract =
+      s"""
+         |Contract MapContract() {
+         |  fn createMap() -> Map[U256, ByteVec] {
+         |    return emptyMap[U256, ByteVec]
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn insert() -> () {
+         |    let mut map = createMap()
+         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(0, #00)
+         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(1, #01)
+         |  }
+         |
+         |  pub fn checkAndUpdate() -> () {
+         |    let mut map = createMap()
+         |    assert!(map[0] == #00, 0)
+         |    assert!(map[1] == #01, 0)
+         |    map[0] = #02
+         |    map[1] = #03
+         |  }
+         |
+         |  pub fn remove() -> () {
+         |    let mut map = createMap()
+         |    assert!(map[0] == #02, 0)
+         |    assert!(map[1] == #03, 0)
+         |    map.remove!(0, @$genesisAddress)
+         |    map.remove!(1, @$genesisAddress)
+         |  }
+         |}
+         |""".stripMargin
+
+    val mapKeyAndValue = Map(
+      Val.U256(0) -> (AVector.empty, AVector(Val.ByteVec(Hex.unsafe("00")))),
+      Val.U256(1) -> (AVector.empty, AVector(Val.ByteVec(Hex.unsafe("01"))))
+    )
+    runTest()
+  }
+
+  it should "test primitive array type as map value" in new MapFixture {
+    val mapContract =
+      s"""
+         |Contract MapContract() {
+         |  fn createMap() -> Map[U256, [ByteVec; 2]] {
+         |    return emptyMap[U256, [ByteVec; 2]]
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn insert() -> () {
+         |    let mut map = createMap()
+         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(0, [#00, #01])
+         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(1, [#02, #03])
+         |  }
+         |
+         |  pub fn checkAndUpdate() -> () {
+         |    let mut map = createMap()
+         |    assert!(map[0][0] == #00 && map[0][1] == #01, 0)
+         |    assert!(map[1][0] == #02 && map[1][1] == #03, 0)
+         |    let mut number = 0
+         |    for (let mut i = 0; i < 2; i = i + 1) {
+         |      for (let mut j = 0; j < 2; j = j + 1) {
+         |        assert!(map[i][j] == u256To1Byte!(number), 0)
+         |        number = number + 1
+         |      }
+         |    }
+         |    map[0] = [#04, #05]
+         |    map[1] = [#06, #07]
+         |    assert!(map[0][0] == #04 && map[0][1] == #05, 0)
+         |    assert!(map[1][0] == #06 && map[1][1] == #07, 0)
+         |    map[0][0] = #08
+         |    map[0][1] = #09
+         |    map[1][0] = #10
+         |    map[1][1] = #11
+         |  }
+         |
+         |  pub fn remove() -> () {
+         |    let mut map = createMap()
+         |    assert!(map[0][0] == #08 && map[0][1] == #09, 0)
+         |    assert!(map[1][0] == #10 && map[1][1] == #11, 0)
+         |    map.remove!(0, @$genesisAddress)
+         |    map.remove!(1, @$genesisAddress)
+         |  }
+         |}
+         |""".stripMargin
+
+    val mapKeyAndValue = Map(
+      Val.U256(0) -> (AVector.empty, AVector("00", "01").map(s => Val.ByteVec(Hex.unsafe(s)))),
+      Val.U256(1) -> (AVector.empty, AVector("02", "03").map(s => Val.ByteVec(Hex.unsafe(s))))
+    )
+    runTest()
+  }
+
+  it should "test struct array type as map value" in new MapFixture {
+    val mapContract =
+      s"""
+         |struct Foo {
+         |  mut a: U256,
+         |  b: U256
+         |}
+         |Contract MapContract() {
+         |  fn createMap() -> Map[U256, [Foo; 2]] {
+         |    return emptyMap[U256, [Foo; 2]]
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn insert() -> () {
+         |    let mut map = createMap()
+         |    let foo0 = Foo{a: 0, b: 1}
+         |    let foo1 = Foo{a: 2, b: 3}
+         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(0, [foo0, foo1])
+         |  }
+         |
+         |  pub fn checkAndUpdate() -> () {
+         |    let mut map = createMap()
+         |    assert!(map[0][0].a == 0 && map[0][0].b == 1, 0)
+         |    assert!(map[0][1].a == 2 && map[0][1].b == 3, 0)
+         |    let mut number = 0
+         |    for (let mut i = 0; i < 2; i = i + 1) {
+         |      assert!(map[0][i].a == number && map[0][i].b == (number + 1), 0)
+         |      number = number + 2
+         |    }
+         |    map[0][0].a = 4
+         |    map[0][1].a = 5
+         |  }
+         |
+         |  pub fn remove() -> () {
+         |    let mut map = createMap()
+         |    assert!(map[0][0].a == 4 && map[0][0].b == 1, 0)
+         |    assert!(map[0][1].a == 5 && map[0][1].b == 3, 0)
+         |    map.remove!(0, @$genesisAddress)
+         |  }
+         |}
+         |""".stripMargin
+
+    val immFields: AVector[Val] = AVector(1, 3).map(v => Val.U256(U256.unsafe(v)))
+    val mutFields: AVector[Val] = AVector(0, 2).map(v => Val.U256(U256.unsafe(v)))
+    val mapKeyAndValue          = Map(Val.U256(0) -> (immFields, mutFields))
+    runTest()
+  }
+
+  it should "test immutable struct type as map value" in new MapFixture {
+    val mapContract =
+      s"""
+         |struct Foo {
+         |  a: U256,
+         |  mut b: ByteVec
+         |}
+         |struct Bar {
+         |  mut c: I256,
+         |  mut d: [Foo; 2]
+         |}
+         |struct Baz {
+         |  mut x: Bool,
+         |  mut y: [Bar; 2]
+         |}
+         |Contract MapContract() {
+         |  pub fn createMap() -> Map[U256, Baz] {
+         |    return emptyMap[U256, Baz]
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn insert() -> () {
+         |    let mut map = createMap()
+         |    let baz = Baz{
+         |      x: false,
+         |      y: [
+         |        Bar{c: -1i, d: [Foo{a: 1, b: #01}, Foo{a: 2, b: #02}]},
+         |        Bar{c: -2i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
+         |      ]
+         |    }
+         |    map.insert!{@$genesisAddress -> ALPH: 1 alph}(0, baz)
+         |  }
+         |
+         |  pub fn checkAndUpdate() -> () {
+         |    let mut map = createMap()
+         |    f0(map, 0)
+         |    map[0].x = true
+         |    map[0].y[0].c = -3i
+         |    map[0].y[0].d[0].b = #05
+         |    map[0].y[0].d[1].b = #06
+         |    map[0].y[1].c = -4i
+         |    map[0].y[1].d[0].b = #07
+         |    map[0].y[1].d[1].b = #08
+         |    f1(map, 0)
+         |  }
+         |
+         |  fn f0(map: Map[U256, Baz], key: U256) -> () {
+         |    let baz = map[key]
+         |    assert!(!baz.x, 0)
+         |    assert!(baz.y[0].c == -1i, 0)
+         |    assert!(baz.y[0].d[0].a == 1, 0)
+         |    assert!(baz.y[0].d[0].b == #01, 0)
+         |    assert!(baz.y[0].d[1].a == 2, 0)
+         |    assert!(baz.y[0].d[1].b == #02, 0)
+         |    assert!(baz.y[1].c == -2i, 0)
+         |    assert!(baz.y[1].d[0].a == 3, 0)
+         |    assert!(baz.y[1].d[0].b == #03, 0)
+         |    assert!(baz.y[1].d[1].a == 4, 0)
+         |    assert!(baz.y[1].d[1].b == #04, 0)
+         |
+         |    assert!(!map[key].x, 0)
+         |    assert!(map[key].y[0].c == -1i, 0)
+         |    assert!(map[key].y[0].d[0].a == 1, 0)
+         |    assert!(map[key].y[0].d[0].b == #01, 0)
+         |    assert!(map[key].y[0].d[1].a == 2, 0)
+         |    assert!(map[key].y[0].d[1].b == #02, 0)
+         |    assert!(map[key].y[1].c == -2i, 0)
+         |    assert!(map[key].y[1].d[0].a == 3, 0)
+         |    assert!(map[key].y[1].d[0].b == #03, 0)
+         |    assert!(map[key].y[1].d[1].a == 4, 0)
+         |    assert!(map[key].y[1].d[1].b == #04, 0)
+         |  }
+         |
+         |  fn f1(map: Map[U256, Baz], key: U256) -> () {
+         |    assert!(map[key].x, 0)
+         |    assert!(map[key].y[0].c == -3i, 0)
+         |    assert!(map[key].y[0].d[0].a == 1, 0)
+         |    assert!(map[key].y[0].d[0].b == #05, 0)
+         |    assert!(map[key].y[0].d[1].a == 2, 0)
+         |    assert!(map[key].y[0].d[1].b == #06, 0)
+         |    assert!(map[key].y[1].c == -4i, 0)
+         |    assert!(map[key].y[1].d[0].a == 3, 0)
+         |    assert!(map[key].y[1].d[0].b == #07, 0)
+         |    assert!(map[key].y[1].d[1].a == 4, 0)
+         |    assert!(map[key].y[1].d[1].b == #08, 0)
+         |  }
+         |
+         |  pub fn remove() -> () {
+         |    let mut map = createMap()
+         |    map.remove!(0, @$genesisAddress)
+         |  }
+         |}
+         |""".stripMargin
+
+    val immFields: AVector[Val] = AVector(1, 2, 3, 4).map(v => Val.U256(U256.unsafe(v)))
+    val mutFields: AVector[Val] = AVector(
+      Val.False,
+      Val.I256(I256.unsafe(-1)),
+      Val.ByteVec(Hex.unsafe("01")),
+      Val.ByteVec(Hex.unsafe("02")),
+      Val.I256(I256.unsafe(-2)),
+      Val.ByteVec(Hex.unsafe("03")),
+      Val.ByteVec(Hex.unsafe("04"))
+    )
+    val mapKeyAndValue = Map(Val.U256(0) -> (immFields, mutFields))
+  }
+
+  it should "test mutable struct type as map value" in new MapFixture {
+    val mapContract =
+      s"""
+         |struct Foo {
+         |  mut a: U256,
+         |  mut b: ByteVec
+         |}
+         |struct Bar {
+         |  mut c: I256,
+         |  mut d: [Foo; 2]
+         |}
+         |struct Baz {
+         |  mut x: Bool,
+         |  mut y: [Bar; 2]
+         |}
+         |Contract MapContract() {
+         |  pub fn createMap() -> Map[U256, Baz] {
+         |    return emptyMap[U256, Baz]
+         |  }
+         |
+         |  @using(preapprovedAssets = true)
+         |  pub fn insert() -> () {
+         |    let mut map = createMap()
+         |    let baz = Baz{
+         |      x: false,
+         |      y: [
+         |        Bar{c: -1i, d: [Foo{a: 1, b: #01}, Foo{a: 2, b: #02}]},
+         |        Bar{c: -2i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
+         |      ]
+         |    }
+         |    map.insert!{@$genesisAddress -> ALPH: 1 alph}(0, baz)
+         |  }
+         |
+         |  pub fn checkAndUpdate() -> () {
+         |    let mut map = createMap()
+         |    f0(map, 0)
+         |    f1(map, 0)
+         |    f2(map, 0)
+         |    f3(map, 0)
+         |    f4(map, 0)
+         |    f5(map, 0)
+         |  }
+         |
+         |  fn f0(map: Map[U256, Baz], key: U256) -> () {
+         |    assert!(!map[key].x, 0)
+         |    assert!(map[key].y[0].c == -1i, 0)
+         |    assert!(map[key].y[0].d[0].a == 1, 0)
+         |    assert!(map[key].y[0].d[0].b == #01, 0)
+         |    assert!(map[key].y[0].d[1].a == 2, 0)
+         |    assert!(map[key].y[0].d[1].b == #02, 0)
+         |    assert!(map[key].y[1].c == -2i, 0)
+         |    assert!(map[key].y[1].d[0].a == 3, 0)
+         |    assert!(map[key].y[1].d[0].b == #03, 0)
+         |    assert!(map[key].y[1].d[1].a == 4, 0)
+         |    assert!(map[key].y[1].d[1].b == #04, 0)
+         |  }
+         |
+         |  fn f1(map: Map[U256, Baz], key: U256) -> () {
+         |    map[key] = Baz{
+         |      x: true,
+         |      y: [
+         |        Bar{c: -2i, d: [Foo{a: 2, b: #02}, Foo{a: 3, b: #03}]},
+         |        Bar{c: -3i, d: [Foo{a: 4, b: #04}, Foo{a: 5, b: #05}]}
+         |      ]
+         |    }
+         |    let baz = map[key]
+         |    assert!(baz.x, 0)
+         |    assert!(baz.y[0].c == -2i, 0)
+         |    assert!(baz.y[0].d[0].a == 2, 0)
+         |    assert!(baz.y[0].d[0].b == #02, 0)
+         |    assert!(baz.y[0].d[1].a == 3, 0)
+         |    assert!(baz.y[0].d[1].b == #03, 0)
+         |    assert!(baz.y[1].c == -3i, 0)
+         |    assert!(baz.y[1].d[0].a == 4, 0)
+         |    assert!(baz.y[1].d[0].b == #04, 0)
+         |    assert!(baz.y[1].d[1].a == 5, 0)
+         |    assert!(baz.y[1].d[1].b == #05, 0)
+         |  }
+         |
+         |  fn f2(map: Map[U256, Baz], key: U256) -> () {
+         |    map[key].x = false
+         |    map[key].y[0] = Bar{c: -3i, d: [Foo{a: 3, b: #03}, Foo{a: 4, b: #04}]}
+         |    map[key].y[1] = Bar{c: -4i, d: [Foo{a: 5, b: #05}, Foo{a: 6, b: #06}]}
+         |    let baz = map[key]
+         |    assert!(!baz.x, 0)
+         |    assert!(baz.y[0].c == -3i, 0)
+         |    assert!(baz.y[0].d[0].a == 3, 0)
+         |    assert!(baz.y[0].d[0].b == #03, 0)
+         |    assert!(baz.y[0].d[1].a == 4, 0)
+         |    assert!(baz.y[0].d[1].b == #04, 0)
+         |    assert!(baz.y[1].c == -4i, 0)
+         |    assert!(baz.y[1].d[0].a == 5, 0)
+         |    assert!(baz.y[1].d[0].b == #05, 0)
+         |    assert!(baz.y[1].d[1].a == 6, 0)
+         |    assert!(baz.y[1].d[1].b == #06, 0)
+         |  }
+         |
+         |  fn f3(map: Map[U256, Baz], key: U256) -> () {
+         |    map[key].x = true
+         |    map[key].y[0].c = -4i
+         |    map[key].y[0].d = [Foo{a: 4, b: #04}, Foo{a: 5, b: #05}]
+         |    map[key].y[1].c = -5i
+         |    map[key].y[1].d = [Foo{a: 6, b: #06}, Foo{a: 7, b: #07}]
+         |    let baz = map[key]
+         |    assert!(baz.x, 0)
+         |    assert!(baz.y[0].c == -4i, 0)
+         |    assert!(baz.y[0].d[0].a == 4, 0)
+         |    assert!(baz.y[0].d[0].b == #04, 0)
+         |    assert!(baz.y[0].d[1].a == 5, 0)
+         |    assert!(baz.y[0].d[1].b == #05, 0)
+         |    assert!(baz.y[1].c == -5i, 0)
+         |    assert!(baz.y[1].d[0].a == 6, 0)
+         |    assert!(baz.y[1].d[0].b == #06, 0)
+         |    assert!(baz.y[1].d[1].a == 7, 0)
+         |    assert!(baz.y[1].d[1].b == #07, 0)
+         |  }
+         |
+         |  fn f4(map: Map[U256, Baz], key: U256) -> () {
+         |    map[key].x = false
+         |    map[key].y[0].c = -5i
+         |    map[key].y[0].d[0] = Foo{a: 5, b: #05}
+         |    map[key].y[0].d[1] = Foo{a: 6, b: #06}
+         |    map[key].y[1].c = -6i
+         |    map[key].y[1].d[0] = Foo{a: 7, b: #07}
+         |    map[key].y[1].d[1] = Foo{a: 8, b: #08}
+         |    let baz = map[key]
+         |    assert!(!baz.x, 0)
+         |    assert!(baz.y[0].c == -5i, 0)
+         |    assert!(baz.y[0].d[0].a == 5, 0)
+         |    assert!(baz.y[0].d[0].b == #05, 0)
+         |    assert!(baz.y[0].d[1].a == 6, 0)
+         |    assert!(baz.y[0].d[1].b == #06, 0)
+         |    assert!(baz.y[1].c == -6i, 0)
+         |    assert!(baz.y[1].d[0].a == 7, 0)
+         |    assert!(baz.y[1].d[0].b == #07, 0)
+         |    assert!(baz.y[1].d[1].a == 8, 0)
+         |    assert!(baz.y[1].d[1].b == #08, 0)
+         |  }
+         |
+         |  fn f5(map: Map[U256, Baz], key: U256) -> () {
+         |    map[key].x = true
+         |    map[key].y[0].c = -6i
+         |    map[key].y[0].d[0].a = 6
+         |    map[key].y[0].d[0].b = #06
+         |    map[key].y[0].d[1].a = 7
+         |    map[key].y[0].d[1].b = #07
+         |    map[key].y[1].c = -7i
+         |    map[key].y[1].d[0].a = 8
+         |    map[key].y[1].d[0].b = #08
+         |    map[key].y[1].d[1].a = 9
+         |    map[key].y[1].d[1].b = #09
+         |    let baz = map[key]
+         |    assert!(baz.x, 0)
+         |    assert!(baz.y[0].c == -6i, 0)
+         |    assert!(baz.y[0].d[0].a == 6, 0)
+         |    assert!(baz.y[0].d[0].b == #06, 0)
+         |    assert!(baz.y[0].d[1].a == 7, 0)
+         |    assert!(baz.y[0].d[1].b == #07, 0)
+         |    assert!(baz.y[1].c == -7i, 0)
+         |    assert!(baz.y[1].d[0].a == 8, 0)
+         |    assert!(baz.y[1].d[0].b == #08, 0)
+         |    assert!(baz.y[1].d[1].a == 9, 0)
+         |    assert!(baz.y[1].d[1].b == #09, 0)
+         |  }
+         |
+         |  pub fn remove() -> () {
+         |    let mut map = createMap()
+         |    map.remove!(0, @$genesisAddress)
+         |  }
+         |}
+         |""".stripMargin
+
+    val immFields: AVector[Val] = AVector(1, 2, 3, 4).map(v => Val.U256(U256.unsafe(v)))
+    val mutFields: AVector[Val] = AVector(
+      Val.False,
+      Val.I256(I256.unsafe(-1)),
+      Val.ByteVec(Hex.unsafe("01")),
+      Val.ByteVec(Hex.unsafe("02")),
+      Val.I256(I256.unsafe(-2)),
+      Val.ByteVec(Hex.unsafe("03")),
+      Val.ByteVec(Hex.unsafe("04"))
+    )
+    val mapKeyAndValue = Map(Val.U256(0) -> (immFields, mutFields))
+  }
+
+  it should "test multiple maps" in new ContractFixture {
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  fn map0() -> Map[U256, U256] {
+         |    return emptyMap[U256, U256]
+         |  }
+         |  fn map1() -> Map[U256, U256] {
+         |    return emptyMap[U256, U256]
+         |  }
+         |  @using(preapprovedAssets = true)
+         |  pub fn insertToMap0(key: U256, value: U256) -> () {
+         |    let mut map = map0()
+         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(key, value)
+         |  }
+         |  @using(preapprovedAssets = true)
+         |  pub fn insertToMap1(key: U256, value: U256) -> () {
+         |    let mut map = map1()
+         |    map.insert!{@$genesisAddress -> ALPH: minimalContractDeposit!()}(key, value)
+         |  }
+         |  pub fn updateMap0(key: U256, oldValue: U256, newValue: U256) -> () {
+         |    let mut map = map0()
+         |    assert!(map[key] == oldValue, 0)
+         |    map[key] = newValue
+         |  }
+         |  pub fn updateMap1(key: U256, oldValue: U256, newValue: U256) -> () {
+         |    let mut map = map1()
+         |    assert!(map[key] == oldValue, 0)
+         |    map[key] = newValue
+         |  }
+         |  pub fn removeFromMap0(key: U256) -> () {
+         |    let mut map = map0()
+         |    map.remove!(key, @$genesisAddress)
+         |  }
+         |  pub fn removeFromMap1(key: U256) -> () {
+         |    let mut map = map1()
+         |    map.remove!(key, @$genesisAddress)
+         |  }
+         |}
+         |""".stripMargin
+
+    val fooId = createContract(foo)._1
+
+    def calcSubContractId(mapIndex: Int, key: Int) = {
+      val prefix  = ByteString.fromArrayUnsafe(s"map-$mapIndex".getBytes(StandardCharsets.US_ASCII))
+      val subPath = prefix ++ serialize(U256.unsafe(key))
+      fooId.subContractId(subPath, fooId.groupIndex)
+    }
+    def insertToMap(mapIndex: Int, key: Int, value: Int) = {
+      val code =
+        s"""
+           |TxScript Main() {
+           |  let foo = Foo(#${fooId.toHexString})
+           |  foo.insertToMap$mapIndex{@$genesisAddress -> ALPH: minimalContractDeposit!()}($key, $value)
+           |}
+           |$foo
+           |""".stripMargin
+      callTxScript(code)
+      val subContractId    = calcSubContractId(mapIndex, key)
+      val worldState       = blockFlow.getBestPersistedWorldState(fooId.groupIndex).rightValue
+      val subContractState = worldState.getContractState(subContractId).rightValue
+      subContractState.immFields is AVector[Val](Val.ByteVec(fooId.bytes))
+      subContractState.mutFields is AVector[Val](Val.U256(U256.unsafe(value)))
+    }
+
+    def updateMap(mapIndex: Int, key: Int, oldValue: Int, newValue: Int) = {
+      val code =
+        s"""
+           |TxScript Main() {
+           |  let foo = Foo(#${fooId.toHexString})
+           |  foo.updateMap$mapIndex($key, $oldValue, $newValue)
+           |}
+           |$foo
+           |""".stripMargin
+      callTxScript(code)
+      val subContractId    = calcSubContractId(mapIndex, key)
+      val worldState       = blockFlow.getBestPersistedWorldState(fooId.groupIndex).rightValue
+      val subContractState = worldState.getContractState(subContractId).rightValue
+      subContractState.immFields is AVector[Val](Val.ByteVec(fooId.bytes))
+      subContractState.mutFields is AVector[Val](Val.U256(U256.unsafe(newValue)))
+    }
+
+    def removeFromMap(mapIndex: Int, key: Int) = {
+      val code =
+        s"""
+           |TxScript Main() {
+           |  let foo = Foo(#${fooId.toHexString})
+           |  foo.removeFromMap$mapIndex($key)
+           |}
+           |$foo
+           |""".stripMargin
+      callTxScript(code)
+      val subContractId = calcSubContractId(mapIndex, key)
+      val worldState    = blockFlow.getBestPersistedWorldState(fooId.groupIndex).rightValue
+      worldState.contractExists(subContractId).rightValue is false
+    }
+
+    insertToMap(0, 1, 1)
+    insertToMap(1, 1, 2)
+    updateMap(0, 1, 1, 3)
+    updateMap(1, 1, 2, 4)
+    removeFromMap(0, 1)
+    removeFromMap(1, 1)
+  }
+
   private def getEvents(
       blockFlow: BlockFlow,
       contractId: ContractId,
