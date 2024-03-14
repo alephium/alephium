@@ -303,6 +303,26 @@ object Ast {
       }
     }
   }
+  final case class MapContains(base: Expr[StatefulContext], index: Expr[StatefulContext])
+      extends Expr[StatefulContext] {
+    def _getType(state: Compiler.State[StatefulContext]): Seq[Type] = {
+      val mapType = base.getType(state) match {
+        case Seq(t: Type.Map) => t
+        case t => throw Compiler.Error(s"Expected map type, got $t", base.sourceIndex)
+      }
+      val expected = Seq(mapType.key)
+      val argTypes = index.getType(state)
+      if (argTypes != expected) {
+        throw Compiler.Error(s"Invalid args type $argTypes, expected $expected", sourceIndex)
+      }
+      Seq(Type.Bool)
+    }
+
+    def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
+      val pathCodes = ContractGenerator.genSubContractPath(state, base, index)
+      pathCodes ++ Seq(SubContractId, ContractExists)
+    }
+  }
   final case class Variable[Ctx <: StatelessContext](id: Ident) extends Expr[Ctx] {
     override def _getType(state: Compiler.State[Ctx]): Seq[Type] = Seq(state.resolveType(id))
 

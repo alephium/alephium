@@ -5041,6 +5041,7 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |  pub fn checkAndUpdate() -> () {
          |    let mut map = createMap()
+         |    assert!(map.contains!($keyValue), 0)
          |    assert!(map[$keyValue] == 1, 0)
          |    map[$keyValue] = 2
          |    assert!(map[$keyValue] == 2, 0)
@@ -5083,6 +5084,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |    let mut map = createMap()
          |    assert!(map[0] == #00, 0)
          |    assert!(map[1] == #01, 0)
+         |    assert!(map.contains!(0) && map.contains!(1), 0)
+         |    assert!(!map.contains!(2), 0)
          |    map[0] = #02
          |    map[1] = #03
          |  }
@@ -5121,6 +5124,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |  pub fn checkAndUpdate() -> () {
          |    let mut map = createMap()
+         |    assert!(map.contains!(0) && map.contains!(1), 0)
+         |    assert!(!map.contains!(2), 0)
          |    assert!(map[0][0] == #00 && map[0][1] == #01, 0)
          |    assert!(map[1][0] == #02 && map[1][1] == #03, 0)
          |    let mut number = 0
@@ -5179,6 +5184,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |  pub fn checkAndUpdate() -> () {
          |    let mut map = createMap()
+         |    assert!(map.contains!(0), 0)
+         |    assert!(!map.contains!(1), 0)
          |    assert!(map[0][0].a == 0 && map[0][0].b == 1, 0)
          |    assert!(map[0][1].a == 2 && map[0][1].b == 3, 0)
          |    let mut number = 0
@@ -5240,6 +5247,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |  pub fn checkAndUpdate() -> () {
          |    let mut map = createMap()
+         |    assert!(map.contains!(0), 0)
+         |    assert!(!map.contains!(1), 0)
          |    f0(map, 0)
          |    map[0].x = true
          |    map[0].y[0].c = -3i
@@ -5347,6 +5356,8 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |  pub fn checkAndUpdate() -> () {
          |    let mut map = createMap()
+         |    assert!(map.contains!(0), 0)
+         |    assert!(!map.contains!(1), 0)
          |    f0(map, 0)
          |    f1(map, 0)
          |    f2(map, 0)

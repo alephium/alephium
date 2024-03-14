@@ -5683,6 +5683,34 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |""".stripMargin
       testTxScriptError(code, "Map type fields does not support in Main")
     }
+
+    {
+      info("Invalid map type for Map.contains")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn f() -> () {
+           |    let map = 0
+           |    let _ = $$map$$.contains!(0)
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Expected map type, got List(U256)")
+    }
+
+    {
+      info("Invalid key type for Map.contains")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn f() -> () {
+           |    let mut map = emptyMap[U256, U256]
+           |    let _ = $$map.contains!(#00)$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Invalid args type List(ByteVec), expected List(U256)")
+    }
   }
 
   it should "report friendly error for non-primitive types for consts" in new Fixture {

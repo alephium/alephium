@@ -773,7 +773,7 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
 class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv |
+      const | stringLiteral | alphTokenId | callExpr | mapContains | contractCallExpr | contractConv |
         enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr | emptyMap
     )
 
@@ -826,6 +826,12 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
             .ContractCallExpr(acc, funcId, approveAssets, arguments)
             .atSourceIndex(fromIndex, endIndex, fileURI)
         })
+    }
+
+  def mapContains[Unknown: P]: P[Ast.Expr[StatefulContext]] =
+    P(Index ~ (callExpr | variableIdOnly) ~ ".contains!" ~ "(" ~ expr ~ ")" ~~ Index).map {
+      case (fromIndex, base, index, endIndex) =>
+        Ast.MapContains(base, index).atSourceIndex(fromIndex, endIndex)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
