@@ -428,11 +428,17 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val chain      = buildBlockChain()
     addBlocks(chain, shortChain)
     chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(shortChain(1).hash)
+    chain.hashesCache.get(ALPH.GenesisHeight + 2).value is AVector(shortChain(1).hash)
     chain.maxWeight isE chain.getWeightUnsafe(shortChain.last.hash)
     addBlocks(chain, longChain)
     chain.maxWeight isE chain.getWeightUnsafe(longChain.last.hash)
     chain.getHashes(ALPH.GenesisHeight + 2) isE AVector(longChain(1).hash, shortChain(1).hash)
+    chain.hashesCache.get(ALPH.GenesisHeight + 2).value is AVector(
+      longChain(1).hash,
+      shortChain(1).hash
+    )
     chain.getHashes(ALPH.GenesisHeight + 3) isE AVector(longChain.last.hash)
+    chain.hashesCache.get(ALPH.GenesisHeight + 3).value is AVector(longChain.last.hash)
   }
 
   it should "compute correct weights for a single chain" in new Fixture {
@@ -629,12 +635,14 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     val shortHash = shortChain(1).hash
     val longHash  = longChain(1).hash
     chain.getHashes(2) isE AVector(longHash, shortHash)
+    chain.hashesCache.get(2).value is AVector(longHash, shortHash)
     chain.heightIndexStorage.put(2, AVector(shortHash, longHash))
     chain.hashesCache.put(2, AVector(shortHash, longHash))
     chain.getHashes(2) isE AVector(shortHash, longHash)
 
     chain.checkHashIndexingUnsafe(3)
     chain.getHashes(2) isE AVector(longHash, shortHash)
+    chain.hashesCache.get(2).value is AVector(longHash, shortHash)
   }
 
   trait GhostFixture extends Fixture {
@@ -743,7 +751,9 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
             .map(chain.getMainChainBlockByHeight(_).rightValue.get.hash)
             .reverse
         )
+        ancestors.length is math.min(height, ALPH.MaxUncleAge)
 
+        chain.selectUncles(currentBlock.header, _ => false).rightValue.isEmpty is true
         val selectedUncles = chain.selectUncles(currentBlock.header, _ => true).rightValue
         selectedUncles.length is ALPH.MaxUncleSize
         selectedUncles.foreach { case (hash, miner) =>
@@ -760,9 +770,11 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
   it should "select uncles from unused uncles set" in new GhostFixture {
     val (chain, _)    = createBlockChainWithUnusedUncles(ALPH.MaxUncleAge)
-    val currentHeight = ALPH.MaxUncleAge
-    var currentBlock  = chain.getMainChainBlockByHeight(ALPH.MaxUncleAge).rightValue.get
+    val currentHeight = ALPH.MaxUncleAge + 1
+    var currentBlock  = chain.getMainChainBlockByHeight(currentHeight).rightValue.get
+    chain.getHashes(currentHeight).rightValue.length is 1
     (1 to ALPH.MaxUncleAge).foreach(index => {
+      chain.selectUncles(currentBlock.header, _ => false).rightValue.isEmpty is true
       val uncles = chain.selectUncles(currentBlock.header, _ => true).rightValue
       val block =
         blockGen(
@@ -773,9 +785,17 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
         ).sample.get
       addBlock(chain, block)
       chain.getHeight(block.hash).isE(currentHeight + index)
+      if (index >= ALPH.MaxUncleAge + 1 - index) {
+        uncles.isEmpty is true
+      } else {
+        uncles.map { case (hash, _) => chain.getHeightUnsafe(hash) } is AVector.fill(2)(
+          ALPH.MaxUncleAge + 1 - index
+        )
+      }
 
-      val (usedUncles, _) = chain.getUsedUnclesAndAncestors(block.header).rightValue
+      val (usedUncles, ancestors) = chain.getUsedUnclesAndAncestors(block.header).rightValue
       uncles.foreach(uncle => usedUncles.exists(_ == uncle._1) is true)
+      ancestors.length is ALPH.MaxUncleAge
       currentBlock = block
     })
 
