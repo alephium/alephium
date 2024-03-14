@@ -56,6 +56,21 @@ trait ContractPool extends CostStrategy {
     }
   }
 
+  def cacheNewContractIfNecessary(contractId: ContractId): ExeResult[Unit] = {
+    if (getHardFork().isGhostEnabled()) {
+      for {
+        obj <- loadFromWorldState(contractId)
+        _   <- add(contractId, obj)
+      } yield {
+        assetStatus(contractId) = ContractAssetFlushed
+        blockContractLoad(contractId)
+      }
+    } else {
+      // No cache for new contracts before Rhone upgrade
+      Right(blockContractLoad(contractId))
+    }
+  }
+
   def checkIfBlocked(contractId: ContractId): ExeResult[Unit] = {
     if (getHardFork().isLemanEnabled() && contractBlockList.contains(contractId)) {
       failed(ContractLoadDisallowed(contractId))
@@ -149,11 +164,12 @@ trait ContractPool extends CostStrategy {
   }
 
   def markAssetInUsing(contractId: ContractId): ExeResult[Unit] = {
-    if (assetStatus.contains(contractId)) {
-      failed(ContractAssetAlreadyInUsing)
-    } else {
-      assetStatus.put(contractId, ContractAssetInUsing)
-      Right(())
+    assetStatus.get(contractId) match {
+      case None =>
+        assetStatus.put(contractId, ContractAssetInUsing)
+        Right(())
+      case Some(ContractAssetInUsing) => failed(ContractAssetAlreadyInUsing)
+      case Some(ContractAssetFlushed) => failed(ContractAssetAlreadyFlushed)
     }
   }
 

@@ -240,8 +240,4 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.worldState.getOutputOpt(outputRef) isE a[Some[_]]
     pool.assetStatus(contractId) is ContractPool.ContractAssetInUsing
   }
-
-  it should "not cache new contracts before Rhone upgrade" in new NetworkConfigFixture.Default {
-    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
-  }
 }
