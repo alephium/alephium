@@ -5350,17 +5350,29 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
 
   it should "compile map" in {
     {
+      info("Nested map")
+      val code =
+        s"""
+           |Contract Foo(mut map: Map[U256, $$Map[U256, U256]$$]) {
+           |  pub fn f() -> Map[U256, Map[U256, U256]] {
+           |    return map
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "The value type of map cannot be map")
+    }
+
+    {
       info("Immutable map")
       val code =
         s"""
-           |Contract Foo() {
+           |Contract Foo($$a$$: Map[U256, U256]) {
            |  pub fn f() -> Map[U256, U256] {
-           |    $$let a = emptyMap[U256, U256]$$
            |    return a
            |  }
            |}
            |""".stripMargin
-      testContractError(code, "Map must be declared as mutable")
+      testContractError(code, "Map field a must be mutable")
     }
 
     {
@@ -5373,9 +5385,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |    map.insert!{address -> ALPH: minimalContractDeposit!()}(1, 2)
            |  }
            |}
-           |Contract Foo() {
+           |Contract Foo(@unused mut map: Map[U256, U256]) {
            |  pub fn foo() -> Map[U256, U256] {
-           |    return emptyMap[U256, U256]
+           |    return map
            |  }
            |}
            |""".stripMargin
@@ -5400,10 +5412,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Invalid key or value type for Map.insert")
       def code(args: String) =
         s"""
-           |Contract Foo() {
+           |Contract Foo(mut map: Map[U256, U256]) {
            |  pub fn f(address: Address) -> () {
-           |    let mut a = emptyMap[U256, U256]
-           |    $$a.insert!{address -> ALPH : 1 alph}($args)$$
+           |    $$map.insert!{address -> ALPH : 1 alph}($args)$$
            |  }
            |}
            |""".stripMargin
@@ -5439,10 +5450,9 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Invalid key or value type for Map.remove")
       def code(args: String) =
         s"""
-           |Contract Foo() {
+           |Contract Foo(mut map: Map[U256, U256]) {
            |  pub fn f(address: Address) -> () {
-           |    let mut a = emptyMap[U256, U256]
-           |    $$a.remove!($args)$$
+           |    $$map.remove!($args)$$
            |  }
            |}
            |""".stripMargin
@@ -5464,9 +5474,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Invalid map key or value type")
       def code(stmt: String) =
         s"""
-           |Contract Foo() {
+           |Contract Foo(mut map: Map[U256, U256]) {
            |  pub fn foo() -> () {
-           |    let mut map = emptyMap[U256, U256]
            |    $stmt
            |  }
            |}
@@ -5491,9 +5500,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  $mut1 x: U256,
            |  mut y: [Foo; 2]
            |}
-           |Contract Baz() {
+           |Contract Baz(mut map: Map[U256, Bar]) {
            |  pub fn f() -> () {
-           |    let mut map = emptyMap[U256, Bar]
            |    $stmt
            |  }
            |}
@@ -5537,9 +5545,8 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  $mut1 x: U256,
            |  mut y: [Foo; 2]
            |}
-           |Contract Baz() {
+           |Contract Baz(mut map: Map[U256, [Bar; 2]]) {
            |  pub fn f() -> () {
-           |    let mut map = emptyMap[U256, [Bar; 2]]
            |    $stmt
            |  }
            |}
@@ -5586,18 +5593,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  pub fn f() -> () {}
            |}
            |""".stripMargin
-      testContractError(code, "Map type fields does not support in Foo")
-    }
-
-    {
-      info("Map type fields in contract")
-      val code =
-        s"""
-           |Contract Bar(@unused $$map$$: Map[U256, U256]) {
-           |  pub fn f() -> () {}
-           |}
-           |""".stripMargin
-      testContractError(code, "Map type fields does not support in Bar")
+      testContractError(code, "Map type fields does not support in struct Foo")
     }
 
     {
@@ -5608,7 +5604,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  let _ = map[0]
            |}
            |""".stripMargin
-      testTxScriptError(code, "Map type fields does not support in Main")
+      testTxScriptError(code, "Map type fields does not support in script Main")
     }
 
     {
@@ -5629,14 +5625,64 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       info("Invalid key type for Map.contains")
       val code =
         s"""
-           |Contract Foo() {
+           |Contract Foo(mut map: Map[U256, U256]) {
            |  pub fn f() -> () {
-           |    let mut map = emptyMap[U256, U256]
            |    let _ = $$map.contains!(#00)$$
            |  }
            |}
            |""".stripMargin
       testContractError(code, "Invalid args type List(ByteVec), expected List(U256)")
+    }
+
+    {
+      info("Assign to map variable")
+      val code =
+        s"""
+           |Contract Foo(mut map0: Map[U256, U256], mut map1: Map[U256, U256]) {
+           |  pub fn f() -> () {
+           |    $$map0 = map1$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Cannot assign to map field map0.")
+    }
+
+    {
+      info("Assign to local map variable")
+      val code =
+        s"""
+           |Contract Foo(mut map0: Map[U256, U256], mut map1: Map[U256, ByteVec]) {
+           |  pub fn f() -> () {
+           |    let mut localMap0 = map0
+           |    $$localMap0 = map1$$
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "Cannot assign List(Map[U256,ByteVec]) to List(Map[U256,U256])")
+    }
+
+    {
+      info("Map as function arg types")
+      val code =
+        s"""
+           |Contract Foo() {
+           |  pub fn f0($$map$$: Map[U256, U256]) -> () { }
+           |}
+           |""".stripMargin
+      testContractError(code, "The arg type of function f0 cannot be map")
+    }
+
+    {
+      info("Map as function return types")
+      val code =
+        s"""
+           |Contract Foo(mut map: Map[U256, U256]) {
+           |  pub fn $$f0$$() -> Map[U256, U256] {
+           |    return map
+           |  }
+           |}
+           |""".stripMargin
+      testContractError(code, "The return type of function f0 cannot be map")
     }
   }
 

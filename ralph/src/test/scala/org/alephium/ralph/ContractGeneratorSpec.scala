@@ -49,9 +49,8 @@ class ContractGeneratorSpec extends AlephiumSpec {
   it should "generate contract for primitive type" in new Fixture {
     def code(tpe: Type, value: String): String =
       s"""
-         |Contract Foo() {
+         |Contract Foo(mut map: Map[U256, ${ContractGenerator.getTypeSignature(tpe)}]) {
          |  pub fn f(address: Address) -> () {
-         |    let mut map = emptyMap[U256, ${ContractGenerator.getTypeSignature(tpe)}]
          |    map.insert!{address -> ALPH: minimalContractDeposit!()}(0, $value)
          |  }
          |}
@@ -91,9 +90,8 @@ class ContractGeneratorSpec extends AlephiumSpec {
   it should "generate contract for array type" in new Fixture {
     val code: String =
       s"""
-         |Contract Foo() {
+         |Contract Foo(mut map: Map[U256, [U256; 2]]) {
          |  pub fn f(address: Address) -> () {
-         |    let mut map = emptyMap[U256, [U256; 2]]
          |    map.insert!{address -> ALPH: minimalContractDeposit!()}(0, [0; 2])
          |  }
          |}
@@ -135,9 +133,8 @@ class ContractGeneratorSpec extends AlephiumSpec {
   it should "generate contract for multidimensional array type" in new Fixture {
     val code: String =
       s"""
-         |Contract Foo() {
+         |Contract Foo(mut map: Map[U256, [[U256; 2]; 3]]) {
          |  pub fn f(address: Address) -> () {
-         |    let mut map = emptyMap[U256, [[U256; 2]; 3]]
          |    map.insert!{address -> ALPH: minimalContractDeposit!()}(0, [[0; 2]; 3])
          |  }
          |}
@@ -191,9 +188,8 @@ class ContractGeneratorSpec extends AlephiumSpec {
          |  mut x: U256,
          |  y: ByteVec
          |}
-         |Contract Foo() {
+         |Contract Foo(mut map: Map[U256, [Bar; 2]]) {
          |  pub fn f(address: Address) -> () {
-         |    let mut map = emptyMap[U256, [Bar; 2]]
          |    map.insert!{address -> ALPH: minimalContractDeposit!()}(0, [Bar{x: 0, y: #00}; 2])
          |  }
          |}
@@ -244,9 +240,8 @@ class ContractGeneratorSpec extends AlephiumSpec {
          |  a: I256,
          |  mut b: [Foo; 2]
          |}
-         |Contract Baz() {
+         |Contract Baz(mut map: Map[U256, [U256; 2]]) {
          |  pub fn f(address: Address) -> () {
-         |    let mut map = emptyMap[U256, [U256; 2]]
          |    map.insert!{address -> ALPH: minimalContractDeposit!()}(0, [0; 2])
          |  }
          |}
@@ -303,9 +298,8 @@ class ContractGeneratorSpec extends AlephiumSpec {
          |  mut a: I256,
          |  mut b: [Foo; 2]
          |}
-         |Contract Baz() {
+         |Contract Baz(mut map: Map[U256, [U256; 2]]) {
          |  pub fn f(address: Address) -> () {
-         |    let mut map = emptyMap[U256, [U256; 2]]
          |    map.insert!{address -> ALPH: minimalContractDeposit!()}(0, [0; 2])
          |  }
          |}
@@ -391,9 +385,8 @@ class ContractGeneratorSpec extends AlephiumSpec {
          |  c: Bool,
          |  mut d: [Bar; 2]
          |}
-         |Contract C() {
+         |Contract C(mut map: Map[U256, Baz]) {
          |  pub fn f(address: Address) -> () {
-         |    let mut map = emptyMap[U256, Baz]
          |    let baz = Baz{c: false, d: [Bar{a: 0, b: [Foo{x: 0, y: #00}; 2]}; 2]}
          |    map.insert!{address -> ALPH: minimalContractDeposit!()}(0, baz)
          |  }
@@ -453,9 +446,8 @@ class ContractGeneratorSpec extends AlephiumSpec {
     val code =
       s"""
          |struct Foo { mut parentContractId: ByteVec }
-         |Contract Bar() {
+         |Contract Bar(mut map: Map[U256, Foo]) {
          |  pub fn f() -> () {
-         |    let mut map = emptyMap[U256, Foo]
          |    map[0].parentContractId = #00
          |  }
          |}
@@ -469,9 +461,8 @@ class ContractGeneratorSpec extends AlephiumSpec {
   it should "generate fresh one if the contract name has been used" in new Fixture {
     val code =
       s"""
-         |Contract PrimitiveWrapper() {
+         |Contract PrimitiveWrapper(mut map: Map[U256, U256]) {
          |  pub fn f() -> () {
-         |    let mut map = emptyMap[U256, U256]
          |    map[0] = 0
          |  }
          |}

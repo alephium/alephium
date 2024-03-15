@@ -696,7 +696,7 @@ object StatefulParser extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
       const | stringLiteral | alphTokenId | callExpr | mapContains | contractCallExpr | contractConv |
-        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr | emptyMap
+        enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr
     )
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -732,12 +732,6 @@ object StatefulParser extends Parser[StatefulContext] {
       case (_, key, value) => Type.Map(key, value)
     }
   }
-
-  def emptyMap[Unknown: P]: P[Ast.EmptyMap[StatefulContext]] =
-    PP(Lexer.token(Keyword.emptyMap) ~ "[" ~ mapKeyType ~ "," ~ mapValueType ~ "]") {
-      case (_, key, value) =>
-        Ast.EmptyMap(key, value)
-    }
 
   def contractCallExpr[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(Index ~ (callExpr | contractConv | variableIdOnly) ~ ("." ~ callAbs).rep(1) ~~ Index).map {
