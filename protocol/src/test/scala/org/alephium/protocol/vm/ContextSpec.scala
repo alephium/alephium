@@ -93,9 +93,10 @@ class ContextSpec
     context.generatedOutputs.size is 1
   }
 
-  it should "generate contract output when the contract is loaded" in new Fixture {
+  it should "generate contract output when the contract is loaded before Rhone upgrade" in new Fixture {
     override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
-    val contractId                                 = createContract()
+    context.getHardFork() is HardFork.Leman
+    val contractId   = createContract()
     val oldOutputRef = context.worldState.getContractState(contractId).rightValue.contractOutputRef
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
@@ -111,6 +112,13 @@ class ContextSpec
       GasSchedule.txInputBaseGas.value -
       GasSchedule.txOutputBaseGas.value) is context.gasRemaining.value
     context.generatedOutputs.size is 2
+  }
+
+  it should "not generate contract output when the contract is loaded from Rhone upgrade" in new Fixture {
+    context.getHardFork() is HardFork.Ghost
+    val contractId = createContract()
+    context.loadContractObj(contractId).isRight is true
+    context.useContractAssets(contractId).leftValue.rightValue is ContractAssetAlreadyFlushed
   }
 
   it should "not cache new contract before Rhone upgrade" in new Fixture {
