@@ -3452,29 +3452,35 @@ class VMSpec extends AlephiumSpec with Generators {
     failCallTxScript(script, InvalidExternalMethodReturnLength)
   }
 
-  it should "not load contract just after creation" in new ContractFixture {
-    val contract: String =
+  trait CreateContractFixture extends ContractFixture {
+    def useAssets = true
+    lazy val contract: String =
       s"""
-         |Contract Foo(mut subContractId: ByteVec) {
+         |Contract Foo(mut n: U256) {
          |  @using(preapprovedAssets = true, updateFields = true)
          |  pub fn foo() -> () {
-         |    subContractId = copyCreateContract!{
-         |      callerAddress!() -> ALPH: ${ALPH.nanoAlph(1000).v}
-         |    }(selfContractId!(), #00, #010300)
+         |    let subContractId = copyCreateSubContract!{
+         |      callerAddress!() -> ALPH: 1 alph
+         |    }(#00, selfContractId!(), #00, #010201)
          |    let subContract = Foo(subContractId)
-         |    subContract.foo{callerAddress!() -> ALPH: ${ALPH.nanoAlph(1000).v}}()
+         |    subContract.bar()
+         |  }
+         |  @using(${if (useAssets) "assetsInContract = true, " else ""}updateFields = true)
+         |  pub fn bar() -> () {
+         |    ${if (useAssets) "transferTokenFromSelf!(selfAddress!(), ALPH, 1 alph)" else ""}
+         |    n = n + 1
          |  }
          |}
          |""".stripMargin
-    val contractId =
+    lazy val contractId =
       createContractAndCheckState(
         contract,
         2,
         2,
-        initialMutState = AVector(Val.ByteVec(ByteString.empty))
+        initialMutState = AVector(Val.U256(0))
       )._1
 
-    val main: String =
+    lazy val main: String =
       s"""
          |TxScript Main {
          |  Foo(#${contractId.toHexString}).foo{callerAddress!() -> ALPH: 1 alph}()
@@ -3482,10 +3488,45 @@ class VMSpec extends AlephiumSpec with Generators {
          |
          |$contract
          |""".stripMargin
-    val script = Compiler.compileTxScript(main).rightValue
+    lazy val script = Compiler.compileTxScript(main).rightValue
+  }
+
+  it should "not load contract just after creation before Rhone upgrade" in new CreateContractFixture {
+    override val configValues = Map(
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis)
+    )
+    config.network.getHardFork(TimeStamp.now()) is HardFork.Leman
+
     val errorMessage =
       intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
     errorMessage.contains(s"Right(TxScriptExeFailed(ContractLoadDisallowed") is true
+  }
+
+  it should "not load contract assets just after creation from Rhone upgrade" in new CreateContractFixture {
+    config.network.getHardFork(TimeStamp.now()) is HardFork.Ghost
+
+    val errorMessage =
+      intercept[AssertionError](payableCall(blockFlow, chainIndex, script)).getMessage
+    errorMessage.contains(s"Right(TxScriptExeFailed(ContractAssetAlreadyFlushed)") is true
+  }
+
+  it should "load contract fields just after creation from Rhone upgrade" in new CreateContractFixture {
+    override def useAssets: Boolean = false
+
+    config.network.getHardFork(TimeStamp.now()) is HardFork.Ghost
+
+    val block = payableCall(blockFlow, chainIndex, script)
+    addAndCheck(blockFlow, block)
+
+    val worldState = blockFlow.getBestPersistedWorldState(chainIndex.from).fold(throw _, identity)
+    val contractState = worldState.getContractState(contractId).rightValue
+    contractState.immFields.isEmpty is true
+    contractState.mutFields is AVector[Val](Val.U256(0))
+
+    val subContractId = contractId.subContractId(Hex.unsafe("00"), chainIndex.from)
+    val subContractState = worldState.getContractState(subContractId).fold(throw _, identity)
+    subContractState.immFields.isEmpty is true
+    subContractState.mutFields is AVector[Val](Val.U256(2)) // The field was updated from 1 to 2
   }
 
   it should "not call contract destruction from the same contract" in new ContractFixture {

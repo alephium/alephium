@@ -33,7 +33,7 @@ class ContextSpec
     lazy val initialGas = 1000000
     lazy val context    = genStatefulContext(None, gasLimit = initialGas)
 
-    def createContract(): ContractId = {
+    def createContract(unblock: Boolean = true): ContractId = {
       val output =
         contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(ContractId.zero))).sample.get
       val balances = MutBalancesPerLockup.from(output)
@@ -59,7 +59,9 @@ class ContextSpec
       context.generatedOutputs.size is 1
 
       context.checkIfBlocked(contractId).leftValue isE ContractLoadDisallowed(contractId)
-      context.contractBlockList.remove(contractId)
+      if (unblock) {
+        context.contractBlockList.remove(contractId)
+      }
       contractId
     }
   }
@@ -92,7 +94,8 @@ class ContextSpec
   }
 
   it should "generate contract output when the contract is loaded" in new Fixture {
-    val contractId   = createContract()
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    val contractId                                 = createContract()
     val oldOutputRef = context.worldState.getContractState(contractId).rightValue.contractOutputRef
     val newOutput =
       contractOutputGen(scriptGen = Gen.const(contractId).map(LockupScript.p2c)).sample.get
@@ -108,6 +111,22 @@ class ContextSpec
       GasSchedule.txInputBaseGas.value -
       GasSchedule.txOutputBaseGas.value) is context.gasRemaining.value
     context.generatedOutputs.size is 2
+  }
+
+  it should "not cache new contract before Rhone upgrade" in new Fixture {
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    context.getHardFork() is HardFork.Leman
+    val contractId = createContract(unblock = false)
+    context.contractBlockList.contains(contractId) is true
+    context.contractPool.contains(contractId) is false
+  }
+
+  it should "cache new contract from Rhone upgrade" in new Fixture {
+    context.getHardFork() is HardFork.Ghost
+    val contractId = createContract(unblock = false)
+    context.contractBlockList.contains(contractId) is true
+    context.contractPool.contains(contractId) is true
+    context.loadContractObj(contractId).isRight is true
   }
 
   it should "migrate contract without state change" in new Fixture {

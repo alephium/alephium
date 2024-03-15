@@ -22,14 +22,14 @@ import org.scalatest.Assertion
 import org.alephium.protocol.ALPH
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
-import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers}
+import org.alephium.util.{AlephiumSpec, AVector, NumericHelpers, TimeStamp}
 
 class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
-  trait Fixture extends VMFactory {
+  trait Fixture extends VMFactory with NetworkConfigFixture.Default {
     val initialGas = GasBox.unsafe(1000000)
 
-    val pool = new ContractPool {
-      def getHardFork(): HardFork = HardFork.Leman
+    lazy val pool = new ContractPool {
+      def getHardFork(): HardFork = networkConfig.getHardFork(TimeStamp.now())
 
       val worldState: WorldState.Staging = cachedWorldState.staging()
       var gasRemaining: GasBox           = initialGas
@@ -113,30 +113,63 @@ class ContractPoolSpec extends AlephiumSpec with NumericHelpers {
     pool.contractPool.size is 1
   }
 
-  it should "load limited number of contracts" in new Fixture {
-    val contracts = (0 until contractPoolMaxSize + 1).map { k =>
-      createContract(k.toLong)
+  trait ContractNumFixture extends Fixture {
+    def prepare() = {
+      val contracts = (0 until contractPoolMaxSize + 1).map { k =>
+        createContract(k.toLong)
+      }
+      contracts.init.zipWithIndex.foreach { case ((contractId, contract), index) =>
+        pool.loadContractObj(contractId) isE toObject(contract, contractId)
+        pool.contractPool.size is index + 1
+      }
+      contracts
     }
-    contracts.init.zipWithIndex.foreach { case ((contractId, contract), index) =>
-      pool.loadContractObj(contractId) isE toObject(contract, contractId)
-      pool.contractPool.size is index + 1
-    }
+  }
+
+  it should "load limited number of contracts before Rhone" in new ContractNumFixture {
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    pool.getHardFork() is HardFork.Leman
+
+    val contracts = prepare()
     pool.loadContractObj(contracts.last._1) is failed(ContractPoolOverflow)
   }
 
-  it should "load contracts with limited number of fields" in new Fixture {
-    val (contractId0, contract0) = createContract(0, immFieldLength = contractFieldMaxSize / 2)
-    val (contractId1, contract1) = createContract(1, mutFieldLength = contractFieldMaxSize / 2)
-    val (contractId2, _)         = createContract(2, 1)
-    pool.loadContractObj(contractId0) isE
-      contract0
-        .toHalfDecoded()
-        .toObjectUnsafeTestOnly(contractId0, fields(contract0.fieldLength), AVector.empty)
-    pool.loadContractObj(contractId1) isE
-      contract1
-        .toHalfDecoded()
-        .toObjectUnsafeTestOnly(contractId1, AVector.empty, fields(contract1.fieldLength))
+  it should "load unlimited number of contracts from Rhone" in new ContractNumFixture {
+    pool.getHardFork() is HardFork.Ghost
+    val contracts = prepare()
+    pool.loadContractObj(contracts.last._1).isRight is true
+  }
+
+  trait FieldNumFixture extends Fixture {
+    def prepare() = {
+      val (contractId0, contract0) = createContract(0, immFieldLength = contractFieldMaxSize / 2)
+      val (contractId1, contract1) = createContract(1, mutFieldLength = contractFieldMaxSize / 2)
+      val (contractId2, _)         = createContract(2, 1)
+      pool.loadContractObj(contractId0) isE
+        contract0
+          .toHalfDecoded()
+          .toObjectUnsafeTestOnly(contractId0, fields(contract0.fieldLength), AVector.empty)
+      pool.loadContractObj(contractId1) isE
+        contract1
+          .toHalfDecoded()
+          .toObjectUnsafeTestOnly(contractId1, AVector.empty, fields(contract1.fieldLength))
+      contractId2
+    }
+  }
+
+  it should "load contracts with limited number of fields before Rhone" in new FieldNumFixture {
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    pool.getHardFork() is HardFork.Leman
+
+    val contractId2 = prepare()
     pool.loadContractObj(contractId2) is failed(ContractFieldOverflow)
+  }
+
+  it should "load contracts with limited number of fields from Rhone" in new FieldNumFixture {
+    pool.getHardFork() is HardFork.Ghost
+
+    val contractId2 = prepare()
+    pool.loadContractObj(contractId2).isRight is true
   }
 
   it should "charge IO fee once when loading a contract multiple times" in new Fixture {
