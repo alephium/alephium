@@ -203,6 +203,11 @@ object Compiler {
     ) extends VarInfo {
       def isLocal: Boolean = false
     }
+    final case class MapVar(tpe: Type.Map, isUnused: Boolean, index: Int) extends VarInfo {
+      def isMutable: Boolean   = true
+      def isGenerated: Boolean = false
+      def isLocal: Boolean     = false
+    }
     final case class Template(tpe: Type, index: Int, isGenerated: Boolean) extends VarInfo {
       def isMutable: Boolean = false
       def isUnused: Boolean  = false
@@ -548,13 +553,6 @@ object Compiler {
       hasInterfaceFuncCallSet.addOne(funcId)
     }
 
-    private var mapIndex: Int = 0
-    def nextMapIndex: ByteString = {
-      val currentMapIndex = mapIndex
-      mapIndex += 1
-      ByteString.fromArrayUnsafe(s"map-$currentMapIndex".getBytes(StandardCharsets.US_ASCII))
-    }
-
     def funcIdents: immutable.Map[Ast.FuncId, ContractFunc[Ctx]]
     def contractTable: immutable.Map[Ast.TypeId, ContractInfo[Ctx]]
     def globalState: Ast.GlobalState
@@ -613,9 +611,9 @@ object Compiler {
         isGenerated: Boolean,
         ref: VariablesRef[Ctx]
     ): Unit = {
-      val sname = checkNewVariable(ident)
-      varTable(sname) = VarInfo.MultipleVar(isMutable, isUnused, isGenerated, ref)
-      trackGenCodePhaseNewVars(sname)
+      val sname   = checkNewVariable(ident)
+      val varInfo = VarInfo.MultipleVar(isMutable, isUnused, isGenerated, ref)
+      addVarInfo(sname, varInfo)
     }
 
     def getVariablesRef(ident: Ast.Ident): VariablesRef[Ctx] = {
@@ -632,6 +630,21 @@ object Compiler {
     @inline private def scopedNamePrefix(scopeId: Ast.FuncId): String = s"${scopeId.name}."
     protected def scopedName(scopeId: Ast.FuncId, name: String): String = {
       s"${scopedNamePrefix(scopeId)}$name"
+    }
+
+    @inline private def addVarInfo(sname: String, varInfo: VarInfo): Unit = {
+      varTable(sname) = varInfo
+      trackGenCodePhaseNewVars(sname)
+    }
+
+    private[ralph] def addMapVar(
+        ident: Ast.Ident,
+        tpe: Type.Map,
+        isUnused: Boolean,
+        mapIndex: Int
+    ): Unit = {
+      val sname = checkNewVariable(ident)
+      addVarInfo(sname, VarInfo.MapVar(tpe, isUnused, mapIndex))
     }
 
     def addTemplateVariable(ident: Ast.Ident, tpe: Type): Unit = {
@@ -711,24 +724,15 @@ object Compiler {
             varInfoBuilder
           )
           ()
-        case c: Type.Contract =>
-          varTable(sname) = varInfoBuilder(
-            Type.Contract(c.id),
-            isMutable,
-            isUnused,
-            getAndUpdateVarIndex(isTemplate, isLocal, isMutable).toByte,
-            isGenerated
-          )
-          trackGenCodePhaseNewVars(sname)
         case _ =>
-          varTable(sname) = varInfoBuilder(
+          val varInfo = varInfoBuilder(
             tpe,
             isMutable,
             isUnused,
             getAndUpdateVarIndex(isTemplate, isLocal, isMutable).toByte,
             isGenerated
           )
-          trackGenCodePhaseNewVars(sname)
+          addVarInfo(sname, varInfo)
       }
     }
     // scalastyle:on parameter.number
@@ -1109,6 +1113,8 @@ object Compiler {
           Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
         case v: VarInfo.MultipleVar[StatelessContext @unchecked] => v.ref.genLoadCode(this)
         case v: VarInfo.Constant[StatelessContext @unchecked]    => v.instrs
+        case _: VarInfo.MapVar =>
+          throw Error("Script should not have map variables", typeId.sourceIndex)
       }
     }
 
@@ -1122,6 +1128,8 @@ object Compiler {
         case v: VarInfo.MultipleVar[StatelessContext @unchecked] => v.ref.genStoreCode(this)
         case _: VarInfo.Constant[StatelessContext @unchecked] =>
           throw Error(s"Unexpected constant variable: ${ident.name}", ident.sourceIndex)
+        case _: VarInfo.MapVar =>
+          throw Error(s"Unexpected map variable: ${ident.name}", ident.sourceIndex)
       }
     }
   }
@@ -1200,6 +1208,12 @@ object Compiler {
       )
     }
 
+    private def genMapIndex(index: Int): Seq[Instr[StatefulContext]] = {
+      val bytes =
+        ByteString.fromArrayUnsafe(s"__map__${index}__".getBytes(StandardCharsets.US_ASCII))
+      Seq(BytesConst(Val.ByteVec(bytes)))
+    }
+
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
       getVariable(ident) match {
@@ -1210,6 +1224,7 @@ object Compiler {
           Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
         case v: VarInfo.MultipleVar[StatefulContext @unchecked] => v.ref.genLoadCode(this)
         case v: VarInfo.Constant[StatefulContext @unchecked]    => v.instrs
+        case VarInfo.MapVar(_, _, index)                        => genMapIndex(index)
       }
     }
 
@@ -1223,6 +1238,8 @@ object Compiler {
         case v: VarInfo.MultipleVar[StatefulContext @unchecked] => v.ref.genStoreCode(this)
         case _: VarInfo.Constant[StatefulContext @unchecked] =>
           throw Error(s"Unexpected constant variable: ${ident.name}", ident.sourceIndex)
+        case _: VarInfo.MapVar =>
+          throw Error(s"Unexpected map variable: ${ident.name}", ident.sourceIndex)
       }
     }
   }

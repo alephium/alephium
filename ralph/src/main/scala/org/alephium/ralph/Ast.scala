@@ -692,7 +692,7 @@ object Ast {
       fields.find(_.tpe.isMapType) match {
         case Some(field) =>
           throw Compiler.Error(
-            s"Map type fields does not support in ${id.name}",
+            s"Map type fields does not support in struct ${id.name}",
             field.ident.sourceIndex
           )
         case _ =>
@@ -760,16 +760,6 @@ object Ast {
           )
       }
       sortedFields.flatMap(_._2.genCode(state))
-    }
-  }
-
-  final case class EmptyMap[Ctx <: StatelessContext](keyType: Type, valueType: Type)
-      extends Expr[Ctx] {
-    def _getType(state: Compiler.State[Ctx]): Seq[Type] = {
-      Seq(state.resolveType(Type.Map(keyType, valueType)))
-    }
-    def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
-      Seq(BytesConst(Val.ByteVec(state.nextMapIndex)))
     }
   }
 
@@ -999,8 +989,28 @@ object Ast {
       }
     }
 
+    private def checkMapType(): Unit = {
+      args.find(_.tpe.isMapType) match {
+        case Some(arg) =>
+          throw Compiler.Error(
+            s"The arg type of function ${id.name} cannot be map",
+            arg.ident.sourceIndex
+          )
+        case None =>
+      }
+      rtypes.find(_.isMapType) match {
+        case Some(_) =>
+          throw Compiler.Error(
+            s"The return type of function ${id.name} cannot be map",
+            id.sourceIndex
+          )
+        case _ =>
+      }
+    }
+
     def check(state: Compiler.State[Ctx]): Unit = {
       state.setFuncScope(id)
+      checkMapType()
       state.checkArguments(args)
       args.foreach { arg =>
         val argTpe = state.resolveType(arg.tpe)
@@ -1074,7 +1084,13 @@ object Ast {
       state.resolveType(variable.tpe)
     }
     def checkMutable(state: Compiler.State[Ctx], sourceIndex: Option[SourceIndex]): Unit = {
-      if (!state.getVariable(ident).isMutable) {
+      val variable = state.getVariable(ident)
+      variable match {
+        case _: Compiler.VarInfo.MapVar =>
+          throw Compiler.Error(s"Cannot assign to map field ${ident.name}.", sourceIndex)
+        case _ =>
+      }
+      if (!variable.isMutable) {
         throw Compiler.Error(s"Cannot assign to immutable variable ${ident.name}.", sourceIndex)
       }
       if (!state.isTypeMutable(getType(state))) {
@@ -1618,13 +1634,38 @@ object Ast {
     }
 
     private def checkMapType(): Unit = {
-      (fields ++ templateVars).find(_.tpe.isMapType) match {
+      templateVars.find(_.tpe.isMapType) match {
         case Some(field) =>
           throw Compiler.Error(
-            s"Map type fields does not support in ${name}",
+            s"Map type fields does not support in script $name",
             field.ident.sourceIndex
           )
         case None =>
+      }
+    }
+
+    private def checkAndAddFields(state: Compiler.State[Ctx]): Unit = {
+      var mapIndex = 0
+      fields.foreach { field =>
+        state.resolveType(field.tpe) match {
+          case t: Type.Map =>
+            if (!field.isMutable) {
+              throw Compiler.Error(
+                s"Map field ${field.ident.name} must be mutable",
+                field.ident.sourceIndex
+              )
+            }
+            state.addMapVar(field.ident, t, field.isUnused, mapIndex)
+            mapIndex += 1
+          case tpe =>
+            state.addFieldVariable(
+              field.ident,
+              tpe,
+              field.isMutable,
+              field.isUnused,
+              isGenerated = false
+            )
+        }
       }
     }
 
@@ -1633,15 +1674,7 @@ object Ast {
       state.setCheckPhase()
       state.checkArguments(fields)
       addTemplateVars(state)
-      fields.foreach(field =>
-        state.addFieldVariable(
-          field.ident,
-          state.resolveType(field.tpe),
-          field.isMutable,
-          field.isUnused,
-          isGenerated = false
-        )
-      )
+      checkAndAddFields(state)
       funcs.foreach(_.check(state))
       state.checkUnusedFields()
       state.checkUnassignedMutableFields()
@@ -1847,9 +1880,10 @@ object Ast {
     def genCode(state: Compiler.State[StatefulContext]): StatefulContract = {
       assume(!isAbstract)
       state.setGenCodePhase()
-      val methods = genMethods(state)
+      val methods    = genMethods(state)
+      val fieldTypes = fields.view.filterNot(_.tpe.isMapType).map(_.tpe).toSeq
       val fieldsLength =
-        state.flattenTypeLength(fields.map(_.tpe)) + (if (hasStdIdField) 1 else 0)
+        state.flattenTypeLength(fieldTypes) + (if (hasStdIdField) 1 else 0)
       StatefulContract(fieldsLength, methods)
     }
 

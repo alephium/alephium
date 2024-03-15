@@ -1924,21 +1924,6 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       error.position is code.indexOf("$")
     }
 
-    parse("emptyMap[U256, U256]", StatefulParser.expr(_)).get.value is
-      EmptyMap[StatefulContext](Type.U256, Type.U256)
-    parse("emptyMap[U256, Foo]", StatefulParser.expr(_)).get.value is
-      EmptyMap[StatefulContext](Type.U256, Type.NamedType(TypeId("Foo")))
-    fail(
-      s"emptyMap[$$Foo, Foo]",
-      StatefulParser.expr(_),
-      "The key type of map can only be primitive type"
-    )
-    fail(
-      s"emptyMap[U256, $$Map[U256, Foo]]",
-      StatefulParser.expr(_),
-      "The value type of map cannot be map"
-    )
-
     fastparse
       .parse("Map[U256, U256]", StatefulParser.parseType(Type.NamedType)(_))
       .get
