@@ -38,6 +38,10 @@ object CoinbaseDataPrefix {
 
 sealed trait CoinbaseData {
   def prefix: CoinbaseDataPrefix
+  def isV2: Boolean = this match {
+    case _: CoinbaseDataV2 => true
+    case _                 => false
+  }
 }
 
 final case class CoinbaseDataV1(

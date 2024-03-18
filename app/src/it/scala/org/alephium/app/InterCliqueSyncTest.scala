@@ -314,6 +314,8 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
   }
 
   it should "sync uncle blocks" in new CliqueFixture {
+    val allSubmittedBlocks = mutable.ArrayBuffer.empty[Block]
+
     class TestMiner(node: InetSocketAddress) extends ExternalMinerMock(AVector(node)) {
       private val allBlocks = mutable.HashMap.empty[BlockHash, mutable.ArrayBuffer[Block]]
 
@@ -329,7 +331,9 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
             apiConnections.head.foreach(_ ! ConnectionHandler.Send(serialized))
           }(context.dispatcher)
           task.onComplete {
-            case Success(_) => log.info(s"Block ${block.shortHex} is submitted")
+            case Success(_) =>
+              log.info(s"Block ${block.hash.toHexString} is submitted")
+              allSubmittedBlocks.addOne(block)
             case Failure(error) =>
               log.error(s"Submit block ${block.shortHex} failed ${error.getMessage}")
           }(context.dispatcher)
@@ -360,6 +364,16 @@ class InterCliqueSyncTest extends AlephiumActorSpec {
     miner ! Miner.Start
 
     Thread.sleep(60 * 1000)
+
+    val blocks = allSubmittedBlocks.toSeq
+    blocks.nonEmpty is true
+    blocks.foreach { block =>
+      eventually {
+        val response = request[BlockEntry](getBlock(block.hash.toHexString), clique0.masterRestPort)
+        response.toProtocol()(networkConfig).rightValue is block
+      }
+    }
+
     miner ! Miner.Stop
 
     val clique1 =
