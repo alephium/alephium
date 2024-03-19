@@ -828,8 +828,9 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
   def inheritanceFields[Unknown: P]: P[Seq[Ast.Ident]] =
     P("(" ~ Lexer.ident.rep(0, ",") ~ ")")
   def contractInheritance[Unknown: P]: P[Ast.ContractInheritance] =
-    P(Lexer.typeId ~ inheritanceFields).map { case (typeId, fields) =>
-      Ast.ContractInheritance(typeId, fields)
+    P(Index ~ Lexer.typeId ~ inheritanceFields ~~ Index).map {
+      case (startIndex, typeId, fields, endIndex) =>
+        Ast.ContractInheritance(typeId, fields).atSourceIndex(startIndex, endIndex, fileURI)
     }
 
   def interfaceImplementing[Unknown: P]: P[Seq[Ast.Inheritance]] =
@@ -990,7 +991,9 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def interfaceInheritance[Unknown: P]: P[Ast.InterfaceInheritance] =
-    P(Lexer.typeId).map(Ast.InterfaceInheritance)
+    P(Lexer.typeId).map(typeId =>
+      Ast.InterfaceInheritance(typeId).atSourceIndex(typeId.sourceIndex)
+    )
   def interfaceFunc[Unknown: P]: P[Ast.FuncDef[StatefulContext]] = {
     funcTmp.map { f =>
       f.body match {
