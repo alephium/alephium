@@ -28,7 +28,7 @@ import org.alephium.crypto._
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.mempool.MemPool.AddedToMemPool
 import org.alephium.flow.validation.{TxScriptExeFailed, TxValidation}
-import org.alephium.protocol.{ALPH, Generators, Hash, PublicKey}
+import org.alephium.protocol.{vm, ALPH, Generators, Hash, PublicKey}
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Compiler
@@ -2634,6 +2634,9 @@ class VMSpec extends AlephiumSpec with Generators {
     lazy val contractId =
       ContractId.from(createContractBlock.transactions.head.id, 0, chainIndex.from)
 
+    lazy val createContractEventId  = vm.createContractEventId(chainIndex.from.value)
+    lazy val destroyContractEventId = vm.destroyContractEventId(chainIndex.from.value)
+
     addAndCheck(blockFlow, createContractBlock, 1)
     checkState(
       blockFlow,
@@ -2815,7 +2818,7 @@ class VMSpec extends AlephiumSpec with Generators {
       numOfContracts = 2
     )
 
-    val logStatesOpt = getLogStates(blockFlow, createContractEventId, 1)
+    val logStatesOpt = getLogStates(blockFlow, createContractEventId(chainIndex.from.value), 1)
     val logStates    = logStatesOpt.value
 
     val fields = logStates.states(0).fields
@@ -4544,7 +4547,7 @@ class VMSpec extends AlephiumSpec with Generators {
       contractState.immFields is AVector[Val](Val.U256(0), stdId)
       contractState.mutFields is AVector.empty[Val]
 
-      val logStatesOpt = getLogStates(blockFlow, createContractEventId, 0)
+      val logStatesOpt = getLogStates(blockFlow, createContractEventId(chainIndex.from.value), 0)
       val logStates    = logStatesOpt.value
 
       val eventFields = logStates.states(0).fields
@@ -4569,7 +4572,7 @@ class VMSpec extends AlephiumSpec with Generators {
       contractState.immFields is AVector[Val](Val.U256(0))
       contractState.mutFields is AVector.empty[Val]
 
-      val logStatesOpt = getLogStates(blockFlow, createContractEventId, 1)
+      val logStatesOpt = getLogStates(blockFlow, createContractEventId(chainIndex.from.value), 1)
       val logStates    = logStatesOpt.value
 
       val eventFields = logStates.states(0).fields
