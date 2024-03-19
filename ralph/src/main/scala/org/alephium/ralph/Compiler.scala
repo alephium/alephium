@@ -724,7 +724,11 @@ object Compiler {
         case None =>
           varTable.get(name) match {
             case Some(varInfo) => (name, varInfo)
-            case None          => throw Error(s"Variable $sname does not exist", ident.sourceIndex)
+            case None =>
+              throw Error(
+                s"Variable $sname does not exist or is used before declaration",
+                ident.sourceIndex
+              )
           }
       }
       if (isWrite) {

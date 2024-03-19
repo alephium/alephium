@@ -1309,8 +1309,8 @@ object Ast {
       if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid condition type: $condition", sourceIndex)
       }
-      body.foreach(_.check(state))
       update.check(state)
+      body.foreach(_.check(state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {
