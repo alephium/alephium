@@ -2526,6 +2526,40 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
       Compiler.compileContract(bar1).isRight is true
       Compiler.compileContract(bar2).isRight is true
     }
+
+    {
+      info("Find missing inehritance")
+      val code: String =
+        s"""
+           |Contract Foo() implements $$Bar$$ {
+           |  pub fn foo() -> () {
+           |     return
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(
+        code,
+        """Contract "Bar" does not exist"""
+      )
+    }
+
+    {
+      info("Find missing extension")
+      val code: String =
+        s"""
+           |Contract Foo() extends $$Bar$$() {
+           |  pub fn foo() -> () {
+           |     return
+           |  }
+           |}
+           |""".stripMargin
+
+      testContractError(
+        code,
+        """Contract "Bar" does not exist"""
+      )
+    }
   }
 
   it should "compile TxScript" in {
