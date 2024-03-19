@@ -2634,8 +2634,7 @@ class VMSpec extends AlephiumSpec with Generators {
     lazy val contractId =
       ContractId.from(createContractBlock.transactions.head.id, 0, chainIndex.from)
 
-
-    lazy val createContractEventId = vm.createContractEventId(chainIndex.from.value)
+    lazy val createContractEventId  = vm.createContractEventId(chainIndex.from.value)
     lazy val destroyContractEventId = vm.destroyContractEventId(chainIndex.from.value)
 
     addAndCheck(blockFlow, createContractBlock, 1)

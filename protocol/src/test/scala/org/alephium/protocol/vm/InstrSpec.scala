@@ -2753,6 +2753,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       fromContractId.subContractId(serialize(path), frame.ctx.blockEnv.chainIndex.from)
     }
 
+    // scalastyle:off method.length
     def test(
         instr: CreateContractAbstract,
         attoAlphAmount: U256,
