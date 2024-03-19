@@ -385,7 +385,7 @@ final case class StatefulFrame(
       balances     <- balanceState.approved.useForNewContract().toRight(Right(InvalidBalances))
       _ <- ctx.createContract(contractId, code, immFields, balances, mutFields, tokenIssuanceInfo)
       _ <- ctx.writeLog(
-        Some(createContractEventId),
+        Some(createContractEventId(ctx.blockEnv.chainIndex.from.value)),
         contractCreationEventFields(contractId, immFields),
         systemEvent = true
       )
@@ -427,7 +427,7 @@ final case class StatefulFrame(
         .toRight(Right(InvalidBalances))
       _ <- ctx.destroyContract(contractId, contractAssets, refundAddress)
       _ <- ctx.writeLog(
-        Some(destroyContractEventId),
+        Some(destroyContractEventId(ctx.blockEnv.chainIndex.from.value)),
         AVector(destroyContractEventIndex, Val.Address(LockupScript.p2c(contractId))),
         systemEvent = true
       )

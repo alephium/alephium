@@ -34,23 +34,43 @@ package object vm {
   val contractPoolMaxSize: Int  = 16 // upto 16 contracts can be loaded in one tx
   val contractFieldMaxSize: Int = 512
 
-  private def specialContractId(n: Byte): ContractId = {
-    val value = Hash.unsafe(
+  private def specialContractId(eventIndex: Int, group: Int): ContractId = {
+    assume(group >= 0 && group < 128)
+    val contractId = Hash.unsafe(
       ByteString.fromArray(
-        Array.tabulate(ContractId.length)(index => if (index == ContractId.length - 1) n else 0)
+        Array.tabulate(ContractId.length)(index =>
+          if (index == ContractId.length - 1) {
+            group.toByte
+          } else if (index == ContractId.length - 2) {
+            eventIndex.toByte
+          } else {
+            0
+          }
+        )
       )
     )
-
-    ContractId.unsafe(value)
+    ContractId.unsafe(contractId)
   }
 
   // scalastyle:off magic.number
-  val createContractEventId: ContractId           = specialContractId(-1)
-  val createContractEventIndex: Val.I256          = Val.I256(I256.from(-1))
+  lazy val createContractEventIndexInt: Int = -1
+  private[vm] lazy val createContractEventIdCache: Array[ContractId] =
+    Array.tabulate(128)(group => specialContractId(createContractEventIndexInt, group))
+  def createContractEventId(group: Int): ContractId = createContractEventIdCache(group)
+  lazy val createContractEventIndex: Val.I256     = Val.I256(I256.from(createContractEventIndexInt))
   val createContractInterfaceIdPrefix: ByteString = hex"414c5048" // "ALPH"
-  val destroyContractEventId: ContractId          = specialContractId(-2)
-  val destroyContractEventIndex: Val.I256         = Val.I256(I256.from(-2))
-  val debugEventIndex: Val.I256                   = Val.I256(I256.from(-3))
+
+  val destroyContractEventIndexInt: Int = -2
+  private[vm] lazy val destroyContractEventIdCache: Array[(ContractId)] =
+    Array.tabulate(128)(group => specialContractId(destroyContractEventIndexInt, group))
+  def destroyContractEventId(group: Int): ContractId = destroyContractEventIdCache(group)
+  val destroyContractEventIndex: Val.I256 = Val.I256(I256.from(destroyContractEventIndexInt))
+
+  val debugEventIndexInt: Int = -3
+  private[vm] lazy val debugEventIndexCache: Array[ContractId] =
+    Array.tabulate(128)(group => specialContractId(debugEventIndexInt, group))
+  def debugEventId(group: Int): ContractId = debugEventIndexCache(group)
+  val debugEventIndex: Val.I256            = Val.I256(I256.from(debugEventIndexInt))
   // scalastyle:on magic.number
 
   type ContractStorageImmutableState = Either[ContractImmutableState, StatefulContract.HalfDecoded]
