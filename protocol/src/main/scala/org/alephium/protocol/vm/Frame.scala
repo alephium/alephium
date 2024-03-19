@@ -153,6 +153,7 @@ abstract class Frame[Ctx <: StatelessContext] {
 
   def createContract(
       contractId: ContractId,
+      parentContractId: Option[ContractId],
       code: StatefulContract.HalfDecoded,
       immFields: AVector[Val],
       mutFields: AVector[Val],
@@ -227,6 +228,7 @@ final class StatelessFrame(
   def balanceStateOpt: Option[MutBalanceState] = None
   def createContract(
       contractId: ContractId,
+      parentContractId: Option[ContractId],
       code: StatefulContract.HalfDecoded,
       immFields: AVector[Val],
       mutFields: AVector[Val],
@@ -374,6 +376,7 @@ final case class StatefulFrame(
 
   def createContract(
       contractId: ContractId,
+      parentContractId: Option[ContractId],
       code: StatefulContract.HalfDecoded,
       immFields: AVector[Val],
       mutFields: AVector[Val],
@@ -386,7 +389,7 @@ final case class StatefulFrame(
       _ <- ctx.createContract(contractId, code, immFields, balances, mutFields, tokenIssuanceInfo)
       _ <- ctx.writeLog(
         Some(createContractEventId(ctx.blockEnv.chainIndex.from.value)),
-        contractCreationEventFields(contractId, immFields),
+        contractCreationEventFields(contractId, parentContractId, immFields),
         systemEvent = true
       )
     } yield contractId
@@ -394,14 +397,15 @@ final case class StatefulFrame(
 
   def contractCreationEventFields(
       createdContract: ContractId,
+      parentContract: Option[ContractId],
       immFields: AVector[Val]
   ): AVector[Val] = {
     AVector(
       createContractEventIndex,
       Val.Address(LockupScript.p2c(createdContract)),
-      obj.contractIdOpt match {
-        case Some(contractId) => Val.Address(LockupScript.p2c(contractId))
-        case None             => Val.ByteVec(ByteString.empty)
+      parentContract match {
+        case Some(parent) => Val.Address(LockupScript.p2c(parent))
+        case None         => Val.ByteVec(ByteString.empty)
       },
       contractInterfaceIdGuessed(immFields)
     )

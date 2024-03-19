@@ -1919,6 +1919,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
       )
       _ <- frame.createContract(
         newContractId,
+        if (subContract) frame.obj.contractIdOpt else None,
         contractCode,
         immFields,
         mutFields,
