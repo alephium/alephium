@@ -93,8 +93,9 @@ object Type {
   }
 
   final case class Map(key: Type, value: Type) extends Type {
-    def toVal: Val.Type           = Val.Map(key.toVal, value.toVal)
-    override def toString: String = s"Map[$key,$value]"
+    def toVal: Val.Type            = Val.Map(key.toVal, value.toVal)
+    override def toString: String  = s"Map[$key,$value]"
+    override def signature: String = s"Map[${key.signature},${value.signature}]"
   }
 
   final case class Contract(id: Ast.TypeId) extends Type {
