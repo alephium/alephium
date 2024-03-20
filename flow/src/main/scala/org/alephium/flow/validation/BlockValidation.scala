@@ -155,11 +155,11 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           }
           _            <- validateUncles(flow, chainIndex, block, uncleBlocks)
           _            <- checkUncleDeps(block, flow, uncleBlocks)
-          blockHeight  <- from(blockchain.getHeight(block.uncleHash(chainIndex.to)).map(_ + 1))
+          parentHeight <- from(blockchain.getHeight(block.parentHash))
           uncleHeights <- from(uncleHashes.mapE(blockchain.getHeight))
         } yield uncleBlocks.zipWithIndex.map { case (uncleBlock, index) =>
           val uncleHeight = uncleHeights(index)
-          (uncleBlock.minerLockupScript, blockHeight - uncleHeight)
+          (uncleBlock.minerLockupScript, parentHeight + 1 - uncleHeight)
         }
       } else if (uncleHashes.nonEmpty) {
         invalidBlock(InvalidUnclesBeforeGhostHardFork)
