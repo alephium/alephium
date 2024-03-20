@@ -792,7 +792,7 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
       if (index >= ALPH.MaxUncleAge + 1 - index) {
         uncles.isEmpty is true
       } else {
-        uncles.map { case (hash, _) => chain.getHeightUnsafe(hash) } is AVector.fill(2)(
+        uncles.map { case (hash, _, _) => chain.getHeightUnsafe(hash) } is AVector.fill(2)(
           ALPH.MaxUncleAge + 1 - index
         )
       }
