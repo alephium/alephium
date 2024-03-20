@@ -531,6 +531,16 @@
     "returns": "@returns the min value of I256"
   },
   {
+    "name": "groupOfAddress",
+    "category": "Utils",
+    "signature": "fn groupOfAddress!(address:Address) -> (U256)",
+    "doc": "Returns the group of the input address.",
+    "params": [
+      "@param address the input address"
+    ],
+    "returns": "@returns the group of the input address"
+  },
+  {
     "name": "nullContractAddress",
     "category": "Utils",
     "signature": "fn nullContractAddress!() -> (Address)",
