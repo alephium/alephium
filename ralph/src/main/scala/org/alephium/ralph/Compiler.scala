@@ -53,7 +53,7 @@ object Compiler {
       compilerOptions: CompilerOptions = CompilerOptions.Default
   ): Either[Error, (StatelessScript, AVector[String])] =
     try {
-      fastparse.parse(input, StatelessParser.assetScript(_)) match {
+      fastparse.parse(input, new StatelessParser(None).assetScript(_)) match {
         case Parsed.Success(script, _) =>
           val state = State.buildFor(script)(compilerOptions)
           Right((script.genCodeFull(state), state.getWarnings))
@@ -121,7 +121,7 @@ object Compiler {
 
   def compileMultiContract(input: String): Either[Error, MultiContract] = {
     try {
-      fastparse.parse(input, StatefulParser.multiContract(_)) match {
+      fastparse.parse(input, new StatefulParser(None).multiContract(_)) match {
         case Parsed.Success(multiContract, _) =>
           Right(multiContract.extendedContracts())
         case failure: Parsed.Failure => Left(Error.parse(failure))
@@ -133,7 +133,7 @@ object Compiler {
 
   def compileState(stateRaw: String): Either[Error, AVector[Val]] = {
     try {
-      fastparse.parse(stateRaw, StatefulParser.state(_)) match {
+      fastparse.parse(stateRaw, new StatefulParser(None).state(_)) match {
         case Parsed.Success(state, _) => Right(AVector.from(state.map(_.v)))
         case failure: Parsed.Failure  => Left(Error.parse(failure))
       }
@@ -733,7 +733,11 @@ object Compiler {
         case None =>
           varTable.get(name) match {
             case Some(varInfo) => (name, varInfo)
-            case None          => throw Error(s"Variable $sname does not exist", ident.sourceIndex)
+            case None =>
+              throw Error(
+                s"Variable $sname does not exist or is used before declaration",
+                ident.sourceIndex
+              )
           }
       }
       if (isWrite) {

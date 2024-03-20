@@ -688,6 +688,35 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
     )
   }
 
+  it should "declare variables before its usage" in {
+    testContractError(
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> () {
+         |    for (let mut i = 0; i < 2; i = $$j$$ + 1) {
+         |      for (let mut j = 0; j < 2; j = j + 1) {
+         |        let _ = i + j
+         |      }
+         |    }
+         |  }
+         |}
+         |""".stripMargin,
+      "Variable foo.j does not exist or is used before declaration"
+    )
+    testContractError(
+      s"""
+         |Contract Foo() {
+         |  pub fn foo() -> U256 {
+         |    let a = $$b$$
+         |    let b = 10
+         |    return b
+         |  }
+         |}
+         |""".stripMargin,
+      "Variable foo.b does not exist or is used before declaration"
+    )
+  }
+
   it should "test the following typical examples" in new Fixture {
     test(
       s"""
@@ -1551,6 +1580,7 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
   }
 
   it should "get constant array index" in {
+    val StatelessParser = new StatelessParser(None)
     def testConstantFolding(before: String, after: String) = {
       val beforeAst = fastparse.parse(before, StatelessParser.expr(_)).get.value
       val afterAst  = fastparse.parse(after, StatelessParser.expr(_)).get.value
@@ -3132,7 +3162,10 @@ class CompilerSpec extends AlephiumSpec with ContextGenerators {
            |  }
            |}
            |""".stripMargin
-      testContractError(code, "Variable foo.ErrorCodes.Error1 does not exist")
+      testContractError(
+        code,
+        "Variable foo.ErrorCodes.Error1 does not exist or is used before declaration"
+      )
     }
     {
       info("Enum field does not exist")

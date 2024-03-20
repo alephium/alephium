@@ -38,9 +38,10 @@ object Ast {
 
   trait Positioned {
     var sourceIndex: Option[SourceIndex] = None
-    def atSourceIndex(fromIndex: Int, endIndex: Int): this.type = {
+
+    def atSourceIndex(fromIndex: Int, endIndex: Int, fileURI: Option[java.net.URI]): this.type = {
       require(this.sourceIndex.isEmpty)
-      this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
+      this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
       this
     }
     def atSourceIndex(sourceIndex: Option[SourceIndex]): this.type = {
@@ -48,9 +49,13 @@ object Ast {
       this.sourceIndex = sourceIndex
       this
     }
-    def overwriteSourceIndex(fromIndex: Int, endIndex: Int): this.type = {
+    def overwriteSourceIndex(
+        fromIndex: Int,
+        endIndex: Int,
+        fileURI: Option[java.net.URI]
+    ): this.type = {
       require(this.sourceIndex.isDefined)
-      this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex))
+      this.sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
       this
     }
 
@@ -87,7 +92,7 @@ object Ast {
     }
   }
 
-  final case class EventField(ident: Ident, tpe: Type) {
+  final case class EventField(ident: Ident, tpe: Type) extends Positioned {
     def signature: String = s"${ident.name}:${tpe.signature}"
   }
 
@@ -834,7 +839,7 @@ object Ast {
     }
   }
 
-  sealed trait VarDeclaration
+  sealed trait VarDeclaration                               extends Positioned
   final case class NamedVar(mutable: Boolean, ident: Ident) extends VarDeclaration
   case object AnonymousVar                                  extends VarDeclaration
 
@@ -1404,8 +1409,8 @@ object Ast {
       if (condition.getType(state) != Seq(Type.Bool)) {
         throw Compiler.Error(s"Invalid condition type: $condition", sourceIndex)
       }
-      body.foreach(_.check(state))
       update.check(state)
+      body.foreach(_.check(state))
     }
 
     override def genCode(state: Compiler.State[Ctx]): Seq[Instr[Ctx]] = {

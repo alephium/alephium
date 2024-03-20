@@ -1332,13 +1332,13 @@ class ServerUtils(implicit
   ): Try[(AVector[ContractId], AVector[ContractId])] = {
     events.foldE((AVector.empty[ContractId], AVector.empty[ContractId])) {
       case ((createdIds, destroyedIds), event) =>
-        event.contractAddress match {
-          case Address.Contract(LockupScript.P2C(vm.createContractEventId)) =>
+        event.eventIndex match {
+          case vm.createContractEventIndexInt =>
             event.getContractId() match {
               case Some(contractId) => Right((createdIds :+ contractId, destroyedIds))
               case None             => Left(failed(s"invalid create contract event $event"))
             }
-          case Address.Contract(LockupScript.P2C(vm.destroyContractEventId)) =>
+          case vm.destroyContractEventIndexInt =>
             event.getContractId() match {
               case Some(contractId) => Right((createdIds, destroyedIds :+ contractId))
               case None             => Left(failed(s"invalid destroy contract event $event"))

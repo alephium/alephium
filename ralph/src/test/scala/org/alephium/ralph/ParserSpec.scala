@@ -29,11 +29,14 @@ import org.alephium.ralph.error.CompilerError
 import org.alephium.util.{AlephiumSpec, AVector, Hex, I256, U256}
 
 // scalastyle:off file.size.limit
-class ParserSpec extends AlephiumSpec {
+class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
   import Ast._
 
+  val StatelessParser = new StatelessParser(fileURI)
+  val StatefulParser  = new StatefulParser(fileURI)
   /*
    * parse and check if source index is set on successful parse
+   * check if fileURI is set on successful parse
    *
    * @return: the initial parsed result
    */
@@ -43,7 +46,7 @@ class ParserSpec extends AlephiumSpec {
   ): fastparse.Parsed[A] = {
     val result = fastparse.parse(code, p)
     if (result.isSuccess) {
-      result.get.value.sourceIndex isnot None
+      result.get.value.sourceIndex.get.fileURI is fileURI
     }
     result
   }
@@ -1887,3 +1890,6 @@ class ParserSpec extends AlephiumSpec {
     )
   }
 }
+
+class ParseNoFileSpec extends ParserSpec(None)
+class ParseFileSpec   extends ParserSpec(Some(new java.net.URI("file:///tmp")))

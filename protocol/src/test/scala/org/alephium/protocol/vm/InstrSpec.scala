@@ -2856,6 +2856,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       fromContractId.subContractId(serialize(path), frame.ctx.blockEnv.chainIndex.from)
     }
 
+    // scalastyle:off method.length
     def test(
         instr: CreateContractAbstract,
         attoAlphAmount: U256,
@@ -2898,6 +2899,15 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       contractOutput.amount is attoAlphAmount
       val code = frame.ctx.worldState.getContractCode(contractState).rightValue
       code.toContract() isE contract
+
+      val event = frame.ctx.worldState.logState.getNewLogs().last.states.last
+      event.index is createContractEventIndexInt.toByte
+      event.fields(0) is Val.Address(Address.contract(contractId).lockupScript)
+      if (instr.subContract) {
+        event.fields(1) is Val.Address(Address.contract(frame.obj.contractIdOpt.value).lockupScript)
+      } else {
+        event.fields(1) is Val.ByteVec(ByteString.empty)
+      }
     }
   }
 
