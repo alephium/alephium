@@ -4926,6 +4926,16 @@ class VMSpec extends AlephiumSpec with Generators {
       mapContractId.subContractId(subPath, mapContractId.groupIndex)
     }
 
+    lazy val insertAndUpdate =
+      s"""
+         |TxScript Main {
+         |  let mapContract = MapContract(#${mapContractId.toHexString})
+         |  mapContract.insert{@$genesisAddress -> ALPH: 2 alph}()
+         |  mapContract.checkAndUpdate()
+         |}
+         |$mapContract
+         |""".stripMargin
+
     def runTest() = {
       mapKeyAndValue.foreach { case (key, _) =>
         val subContractId = calcSubContractId(key)
@@ -4947,6 +4957,8 @@ class VMSpec extends AlephiumSpec with Generators {
         val worldState = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
         worldState.contractExists(subContractId).rightValue is false
       }
+
+      callTxScript(insertAndUpdate)
     }
   }
 
