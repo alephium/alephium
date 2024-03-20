@@ -110,9 +110,14 @@ object Compiler {
       compileMultiContract(input).map { multiContract =>
         val statefulContracts =
           multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
-        val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
+        val statefulScripts    = multiContract.genStatefulScripts()(compilerOptions)
+        val generatedContracts = ContractGenerator.generatedContracts()
         ContractGenerator.clearCache()
-        (statefulContracts, statefulScripts, AVector.from(multiContract.structs))
+        (
+          statefulContracts ++ generatedContracts,
+          statefulScripts,
+          AVector.from(multiContract.structs)
+        )
       }
     } catch {
       case e: Error => Left(e)
