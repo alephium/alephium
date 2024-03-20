@@ -1228,6 +1228,24 @@ class VMSpec extends AlephiumSpec with Generators {
     }
   }
 
+  it should "test groupOfAddress builtin" in new ContractFixture {
+    override val configValues =
+      Map(("alephium.broker.groups", 4), ("alephium.broker.broker-num", 1))
+
+    val script =
+      s"""
+         |@using(preapprovedAssets = false)
+         |TxScript Main {
+         |  assert!(groupOfAddress!(@226T1XspViny5o6Ce1jQR6UCGrDXuq5NBVoCFNufMEWBZ) == 0, 0)
+         |  assert!(groupOfAddress!(@14UAjZ3qcmEVKdTo84Kwf4RprTQi86w2TefnnGFjov9xF) == 1, 0)
+         |  assert!(groupOfAddress!(@qeKk7r92Vn2Xjn4GcMEcJ2EwVfVs27kWUpptrWcWsUWC) == 2, 0)
+         |  assert!(groupOfAddress!(@Wz8UJ2YZqQxBN2Af9fvTpDQR3daZUC3hpPrc6omCP2U3iYqAxCVPCdPtgocRTsZfYrgvswf63DUyLda4QKhmGtzkpwcutG2SwReiv6p7SQhkxYfQT3S2cFGGyqkbAvoamqwcJD) == 3, 0)
+         |}
+         |""".stripMargin
+
+    testSimpleScript(script)
+  }
+
   it should "test contract exists" in new ContractFixture {
     val foo =
       s"""
