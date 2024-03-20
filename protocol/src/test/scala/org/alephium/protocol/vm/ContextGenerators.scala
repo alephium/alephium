@@ -17,7 +17,7 @@
 package org.alephium.protocol.vm
 
 import org.alephium.protocol.Signature
-import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, TimeStamp}
 
@@ -76,7 +76,7 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       txEnv,
       cachedWorldState.staging(),
       gasLimit
-    )(networkConfig, LogConfig.allEnabled())
+    )(networkConfig, LogConfig.allEnabled(), groupConfig)
   }
 
   def prepareStatefulScript(
@@ -115,10 +115,12 @@ trait ContextGenerators extends VMFactory with NoIndexModelGenerators {
       _networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled()
     ) isE ()
 
-    val obj = halfDecoded.toObjectUnsafeTestOnly(contractId, immFields, mutFields)
+    val obj          = halfDecoded.toObjectUnsafeTestOnly(contractId, immFields, mutFields)
+    val _groupConfig = groupConfig
     val context = new StatefulContext {
       val worldState: WorldState.Staging = cachedWorldState.staging()
       val networkConfig: NetworkConfig   = _networkConfig
+      val groupConfig: GroupConfig       = _groupConfig
       val outputBalances: MutBalances    = MutBalances.empty
       def nextOutputIndex: Int           = 0
       val blockEnv: BlockEnv             = genBlockEnv()

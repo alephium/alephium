@@ -92,7 +92,7 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
   }
 
   trait GhostForkFixture extends AllInstrsFixture {
-    val ghostStatelessInstrs = AVector[GhostInstr[StatelessContext]]()
+    val ghostStatelessInstrs = AVector[GhostInstr[StatelessContext]](GroupOfAddress)
     val ghostStatefulInstrs =
       AVector[GhostInstr[StatefulContext]](
         PayGasFee,
@@ -1968,6 +1968,24 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
 
   it should "U256From32Byte" in new U256FromBytesFixture {
     test(U256From32Byte, 32)
+  }
+
+  it should "GroupOfAddress" in new StatelessInstrFixture {
+    def lemanP2CLockupGen(groupIndex: GroupIndex): Gen[LockupScript.P2C] = {
+      txIdGen.map(txId => LockupScript.p2c(ContractId.from(txId, 0, groupIndex)))
+    }
+    def lockupScriptGen(groupIndex: GroupIndex): Gen[LockupScript] = {
+      Gen.oneOf(assetLockupGen(groupIndex), lemanP2CLockupGen(groupIndex))
+    }
+    forAll(groupIndexGen) { groupIndex =>
+      val lockupScript = lockupScriptGen(groupIndex).sample.get
+
+      stack.push(Val.Address(lockupScript))
+      runAndCheckGas(GroupOfAddress)
+      stack.size is 1
+      stack.top.get is Val.U256(U256.unsafe(groupIndex.value))
+      stack.pop()
+    }
   }
 
   trait StatefulFixture extends GenFixture {
@@ -3955,7 +3973,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadLocalByIndex -> 5, StoreLocalByIndex -> 5, Dup -> 2, AssertWithErrorCode -> 3, Swap -> 2,
       vm.BlockHash -> 2, DEBUG(AVector.empty) -> 0, TxGasPrice -> 2, TxGasAmount -> 2, TxGasFee -> 2,
       I256Exp -> 1610, U256Exp -> 1610, U256ModExp -> 1610, VerifyBIP340Schnorr -> 2000, GetSegregatedSignature -> 3, MulModN -> 13, AddModN -> 8,
-      U256ToString -> 4, I256ToString -> 4, BoolToString -> 4
+      U256ToString -> 4, I256ToString -> 4, BoolToString -> 4,
+      /* Below are instructions for Ghost hard fork */
+      GroupOfAddress -> 5
     )
     val statefulCases: AVector[(Instr[_], Int)] = AVector(
       LoadMutField(byte) -> 3, StoreMutField(byte) -> 3, /* CallExternal(byte) -> ???, */
@@ -4087,6 +4107,8 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       vm.BlockHash -> 125, DEBUG(AVector.empty) -> 126, TxGasPrice -> 127, TxGasAmount -> 128, TxGasFee -> 129,
       I256Exp -> 130, U256Exp -> 131, U256ModExp -> 132, VerifyBIP340Schnorr -> 133, GetSegregatedSignature -> 134, MulModN -> 135, AddModN -> 136,
       U256ToString -> 137, I256ToString -> 138, BoolToString -> 139,
+      /* Below are instructions for Ghost hard fork */
+      GroupOfAddress -> 140,
       // stateful instructions
       LoadMutField(byte) -> 160, StoreMutField(byte) -> 161,
       ApproveAlph -> 162, ApproveToken -> 163, AlphRemaining -> 164, TokenRemaining -> 165, IsPaying -> 166,
@@ -4148,7 +4170,9 @@ class InstrSpec extends AlephiumSpec with NumericHelpers {
       LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
       vm.BlockHash, DEBUG(AVector.empty), TxGasPrice, TxGasAmount, TxGasFee,
       I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN,
-      U256ToString, I256ToString, BoolToString
+      U256ToString, I256ToString, BoolToString,
+      /* Below are instructions for Ghost hard fork */
+      GroupOfAddress
     )
     val statefulInstrs: AVector[Instr[StatefulContext]] = AVector(
       LoadMutField(byte), StoreMutField(byte), CallExternal(byte),

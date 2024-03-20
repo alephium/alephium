@@ -23,7 +23,7 @@ import akka.util.ByteString
 import org.scalatest.Assertion
 
 import org.alephium.protocol.{ALPH, Signature, SignatureSchema}
-import org.alephium.protocol.config.{NetworkConfig, NetworkConfigFixture}
+import org.alephium.protocol.config.{GroupConfigFixture, NetworkConfig, NetworkConfigFixture}
 import org.alephium.protocol.model._
 import org.alephium.serde._
 import org.alephium.util._
@@ -258,7 +258,7 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
     val balances1    = MutBalancesPerLockup(ALPH.oneAlph, mutable.Map(tokenId -> 99), 0)
 
     def mockContext(): StatefulContext =
-      new StatefulContext with NetworkConfigFixture.Default {
+      new StatefulContext with NetworkConfigFixture.Default with GroupConfigFixture.Default {
         val worldState: WorldState.Staging = cachedWorldState.staging()
         def blockEnv: BlockEnv             = genBlockEnv()
         def txEnv: TxEnv                   = genTxEnv(None, AVector.empty)
