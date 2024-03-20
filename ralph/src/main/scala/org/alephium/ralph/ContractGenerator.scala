@@ -21,7 +21,7 @@ import scala.collection.mutable
 
 import org.alephium.protocol.vm._
 import org.alephium.serde.serialize
-import org.alephium.util.U256
+import org.alephium.util.{AVector, U256}
 
 final class ContractGenerator(state: Compiler.State[StatefulContext], tpe: Type) {
   import ContractGenerator._
@@ -241,6 +241,12 @@ object ContractGenerator {
   type FuncIndex = immutable.Map[Seq[FieldSelector], Int]
 
   private[ralph] def clearCache(): Unit = ContractsCache.clear()
+
+  private[ralph] def generatedContracts(): AVector[CompiledContract] = {
+    AVector.from(ContractsCache.view.values.map { wrapper =>
+      CompiledContract(wrapper.compiled, wrapper.contract, AVector.empty, wrapper.compiled)
+    })
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def genContract[Ctx <: StatelessContext](
