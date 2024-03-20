@@ -62,7 +62,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
     def generatedCode(tpe: Type): String = {
       val typeSignature = ContractGenerator.getTypeSignature(tpe)
       s"""
-         |Contract PrimitiveWrapper(mut value: $typeSignature,  parentContractId: ByteVec) {
+         |Contract SimpleWrapper${typeSignature}(mut value: $typeSignature,  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
@@ -99,7 +99,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract PrimitiveWrapper(mut value: [U256;2],  parentContractId: ByteVec) {
+         |Contract SimpleWrapperU2562(mut value: [U256;2],  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
@@ -142,7 +142,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract PrimitiveWrapper(mut value: [[U256;2];3],  parentContractId: ByteVec) {
+         |Contract SimpleWrapperU25623(mut value: [[U256;2];3],  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
@@ -197,7 +197,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract PrimitiveWrapper(mut value: [Bar;2],  parentContractId: ByteVec) {
+         |Contract SimpleWrapperBar2(mut value: [Bar;2],  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
@@ -249,7 +249,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract BarWrapper(a: I256, mut b: [Foo;2],  parentContractId: ByteVec) {
+         |Contract StructWrapperBar(a: I256, mut b: [Foo;2],  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
@@ -307,7 +307,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract BarWrapper(mut a: I256, mut b: [Foo;2],  parentContractId: ByteVec) {
+         |Contract StructWrapperBar(mut a: I256, mut b: [Foo;2],  parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
@@ -395,7 +395,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
 
     val generatedCode: String = {
       s"""
-         |Contract BazWrapper(c: Bool, mut d: [Bar;2], parentContractId: ByteVec) {
+         |Contract StructWrapperBaz(c: Bool, mut d: [Bar;2], parentContractId: ByteVec) {
          |  fn f0(callerContractId: ByteVec) -> () {
          |    checkCaller!(callerContractId == parentContractId, 0)
          |  }
@@ -461,7 +461,7 @@ class ContractGeneratorSpec extends AlephiumSpec {
   it should "generate fresh one if the contract name has been used" in new Fixture {
     val code =
       s"""
-         |Contract PrimitiveWrapper(mut map: Map[U256, U256]) {
+         |Contract SimpleWrapperU256(mut map: Map[U256, U256]) {
          |  pub fn f() -> () {
          |    map[0] = 0
          |  }
@@ -469,6 +469,6 @@ class ContractGeneratorSpec extends AlephiumSpec {
          |""".stripMargin
 
     val generated = genContract(code, Type.U256)
-    generated.contract.ident.name is "PrimitiveWrapper_"
+    generated.contract.ident.name is "SimpleWrapperU256_"
   }
 }

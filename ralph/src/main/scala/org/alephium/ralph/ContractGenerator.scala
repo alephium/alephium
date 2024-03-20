@@ -189,8 +189,10 @@ final class ContractGenerator(state: Compiler.State[StatefulContext], tpe: Type)
 
   private def getContractName: String = {
     val baseName = tpe match {
-      case Type.Struct(id) => s"${id.name}Wrapper"
-      case _               => "PrimitiveWrapper"
+      case Type.Struct(id) => s"StructWrapper${id.name}"
+      case _ =>
+        val name = s"SimpleWrapper${getTypeSignature(tpe)}"
+        name.filterNot(c => "[;]".contains(c))
     }
     val usedTypeName =
       state.contractTable.view.keys.map(_.name).toSeq ++ state.globalState.structs.map(_.name)
