@@ -192,9 +192,7 @@ object HeaderValidation {
       }
     }
 
-    protected[validation] def checkVersion(
-        header: BlockHeader
-    ): HeaderValidationResult[Unit] = {
+    protected[validation] def checkVersion(header: BlockHeader): HeaderValidationResult[Unit] = {
       if (header.version == DefaultBlockVersion) {
         validHeader(())
       } else {
