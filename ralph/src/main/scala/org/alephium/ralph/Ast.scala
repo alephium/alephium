@@ -802,6 +802,20 @@ object Ast {
     }
   }
 
+  private def genMapDebug(
+      state: Compiler.State[StatefulContext],
+      pathCodes: Seq[Instr[StatefulContext]],
+      isInsert: Boolean
+  ): Seq[Instr[StatefulContext]] = {
+    if (state.allowDebug) {
+      val constant    = if (isInsert) ConstTrue else ConstFalse
+      val stringParts = AVector(ByteString.empty, ByteString.fromString(","), ByteString.empty)
+      pathCodes ++ Seq(Dup, constant, DEBUG(stringParts.map(Val.ByteVec.apply)))
+    } else {
+      pathCodes
+    }
+  }
+
   final case class InsertToMap(
       ident: Ident,
       approveAssets: Seq[ApproveAsset[StatefulContext]],
@@ -816,7 +830,7 @@ object Ast {
       val mapType   = getMapType(state)
       val contract  = ContractGenerator.genContract(state, mapType.value)
       val pathCodes = ContractGenerator.genSubContractPath(state, ident, args(0))
-      contract.genCreate(state, args(1), pathCodes)
+      contract.genCreate(state, args(1), genMapDebug(state, pathCodes, isInsert = true))
     }
     def genCode(state: Compiler.State[StatefulContext]): Seq[Instr[StatefulContext]] = {
       val approveAssetCodes   = approveAssets.flatMap(_.genCode(state))
@@ -835,7 +849,7 @@ object Ast {
       val mapType   = getMapType(state)
       val contract  = ContractGenerator.genContract(state, mapType.value)
       val pathCodes = ContractGenerator.genSubContractPath(state, ident, args(0))
-      contract.genDestroy(state, args(1), pathCodes)
+      contract.genDestroy(state, args(1), genMapDebug(state, pathCodes, isInsert = false))
     }
   }
 

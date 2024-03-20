@@ -4774,9 +4774,18 @@ class VMSpec extends AlephiumSpec with Generators {
 
     def mapKeyAndValue: Map[Val, (AVector[Val], AVector[Val])]
 
+    def calcSubPath(key: Val) = {
+      val prefix = ByteString.fromArrayUnsafe(s"__map__0__".getBytes(StandardCharsets.US_ASCII))
+      prefix ++ key.toByteVec().bytes
+    }
+
+    def calcLogPath(key: Val) = {
+      val subPath = calcSubPath(key)
+      ByteString.fromString(Hex.toHexString(subPath)) ++ ByteString.fromString(",")
+    }
+
     def calcSubContractId(key: Val) = {
-      val prefix  = ByteString.fromArrayUnsafe(s"__map__0__".getBytes(StandardCharsets.US_ASCII))
-      val subPath = prefix ++ key.toByteVec().bytes
+      val subPath = calcSubPath(key)
       mapContractId.subContractId(subPath, mapContractId.groupIndex)
     }
 
@@ -4791,13 +4800,19 @@ class VMSpec extends AlephiumSpec with Generators {
          |""".stripMargin
 
     def runTest() = {
+      val currentCount = getCurrentCount(blockFlow, chainIndex.from, mapContractId).getOrElse(0)
       mapKeyAndValue.foreach { case (key, _) =>
         val subContractId = calcSubContractId(key)
         val worldState = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
         worldState.contractExists(subContractId).rightValue is false
       }
       callTxScript(insert)
-      mapKeyAndValue.foreach { case (key, (immFields, mutFields)) =>
+      val insertEvent = getLogStates(blockFlow, mapContractId, currentCount).value
+      insertEvent.states.length is mapKeyAndValue.size
+      mapKeyAndValue.zipWithIndex.foreach { case ((key, (immFields, mutFields)), index) =>
+        val logState = insertEvent.states(index)
+        logState.index is debugEventIndexInt.toByte
+        logState.fields is AVector[Val](Val.ByteVec(calcLogPath(key) ++ Val.True.toDebugString()))
         val subContractId = calcSubContractId(key)
         val worldState = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
         val contractState = worldState.getContractState(subContractId).rightValue
@@ -4806,7 +4821,12 @@ class VMSpec extends AlephiumSpec with Generators {
       }
       callTxScript(checkAndUpdate)
       callTxScript(remove)
-      mapKeyAndValue.foreach { case (key, _) =>
+      val removeEvent = getLogStates(blockFlow, mapContractId, currentCount + 1).value
+      removeEvent.states.length is mapKeyAndValue.size
+      mapKeyAndValue.zipWithIndex.foreach { case ((key, _), index) =>
+        val logState = removeEvent.states(index)
+        logState.index is debugEventIndexInt.toByte
+        logState.fields is AVector[Val](Val.ByteVec(calcLogPath(key) ++ Val.False.toDebugString()))
         val subContractId = calcSubContractId(key)
         val worldState = blockFlow.getBestPersistedWorldState(mapContractId.groupIndex).rightValue
         worldState.contractExists(subContractId).rightValue is false
