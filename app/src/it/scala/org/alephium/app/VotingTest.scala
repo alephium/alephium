@@ -127,7 +127,7 @@ class VotingTest extends AlephiumActorSpec {
     def checkState(nbYes: Int, nbNo: Int, isClosed: Boolean, isInitialized: Boolean) = {
       val contractState =
         request[ContractState](
-          getContractState(contractAddress.toBase58, activeAddressesGroup),
+          getContractState(contractAddress.toBase58),
           restPort
         )
       contractState.mutFields.get(0).get is ValU256(U256.unsafe(nbYes))

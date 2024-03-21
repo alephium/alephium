@@ -102,6 +102,16 @@
     "returns": "@returns the id of the contract"
   },
   {
+    "name": "contractAddress",
+    "category": "Contract",
+    "signature": "fn contractAddress!(contract:<Contract>) -> (Address)",
+    "doc": "Returns the address of the contract",
+    "params": [
+      "@param contract the contract variable"
+    ],
+    "returns": "@returns the address of the contract"
+  },
+  {
     "name": "callerContractId",
     "category": "Contract",
     "signature": "fn callerContractId!() -> (ByteVec)",
@@ -897,11 +907,11 @@
     "name": "blake2b",
     "category": "Cryptography",
     "signature": "fn blake2b!(data:ByteVec) -> (ByteVec)",
-    "doc": "Computes the Blake2b hash of the input.",
+    "doc": "Computes the Blake2b-256 hash of the input.",
     "params": [
       "@param data the input data to be hashed"
     ],
-    "returns": "@returns the hash result"
+    "returns": "@returns the 32 bytes hash result"
   },
   {
     "name": "keccak256",

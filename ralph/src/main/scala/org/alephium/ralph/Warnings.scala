@@ -87,6 +87,18 @@ trait Warnings {
       warnings += Warnings.noCheckExternalCallerMsg(typeId.name, funcId.name)
     }
   }
+
+  def warnPrivateFuncHasCheckExternalCaller(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+    if (!compilerOptions.ignoreCheckExternalCallerWarnings) {
+      warnings += s"No need to add the checkExternalCaller annotation to the private function ${Ast
+          .funcName(typeId, funcId)}"
+    }
+  }
+
+  def warningUnusedCallReturn(typeId: Ast.TypeId, funcId: Ast.FuncId): Unit = {
+    warnings += s"The return values of the function ${Ast.funcName(typeId, funcId)} are not used." +
+      s" If this is intentional, consider using anonymous variables to suppress this warning."
+  }
 }
 
 object Warnings {

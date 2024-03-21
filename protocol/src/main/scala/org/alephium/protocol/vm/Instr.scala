@@ -16,6 +16,7 @@
 
 package org.alephium.protocol.vm
 
+import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 
 import scala.annotation.switch
@@ -28,7 +29,7 @@ import org.alephium.crypto.SecP256K1
 import org.alephium.macros.ByteCode
 import org.alephium.protocol.{PublicKey, SignatureSchema}
 import org.alephium.protocol.model
-import org.alephium.protocol.model.{AssetOutput, ContractId, GroupIndex, TokenId}
+import org.alephium.protocol.model.{Address, AssetOutput, ContractId, GroupIndex, TokenId}
 import org.alephium.protocol.vm.TokenIssuance.{
   IssueTokenAndTransfer,
   IssueTokenWithoutTransfer,
@@ -415,12 +416,17 @@ object StoreLocal extends StatelessInstrCompanion1[Byte]
 sealed trait VarIndexInstr[Ctx <: StatelessContext]
     extends LemanInstrWithSimpleGas[Ctx]
     with GasLow {
-  def popIndex[C <: Ctx](frame: Frame[C], error: ExeFailure): ExeResult[Int] = {
+  def popIndex[C <: Ctx](
+      frame: Frame[C],
+      error: (BigInteger, Int) => ExeFailure
+  ): ExeResult[Int] = {
+    val maxIndex = 0xff
+
     for {
       u256 <- frame.popOpStackU256()
       index <- u256.v.toInt
-        .flatMap(v => if (v > 0xff) None else Some(v))
-        .toRight(Right(error))
+        .flatMap(v => if (v > maxIndex) None else Some(v))
+        .toRight(Right(error(u256.v.v, maxIndex)))
     } yield index
   }
 }
@@ -1146,10 +1152,12 @@ case object ByteVecToAddress
     with GasToByte {
   def runWithLeman[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
-      bytes   <- frame.popOpStackByteVec().map(_.bytes)
-      address <- decode[Val.Address](bytes).left.map(e => Right(SerdeErrorByteVecToAddress(e)))
-      _       <- frame.ctx.chargeGasWithSize(this, bytes.length)
-      _       <- frame.pushOpStack(address)
+      bytes <- frame.popOpStackByteVec().map(_.bytes)
+      address <- decode[Val.Address](bytes).left.map(e =>
+        Right(SerdeErrorByteVecToAddress(bytes, e))
+      )
+      _ <- frame.ctx.chargeGasWithSize(this, bytes.length)
+      _ <- frame.pushOpStack(address)
     } yield ()
   }
 }
@@ -1396,13 +1404,15 @@ case object VerifyTxSignature
     val signatures = frame.ctx.signatures
     for {
       rawPublicKey <- frame.popOpStackByteVec()
-      publicKey    <- PublicKey.from(rawPublicKey.bytes).toRight(Right(InvalidPublicKey))
-      signature    <- signatures.pop()
+      publicKey <- PublicKey
+        .from(rawPublicKey.bytes)
+        .toRight(Right(InvalidPublicKey(rawPublicKey.bytes)))
+      signature <- signatures.pop()
       _ <- {
         if (SignatureSchema.verify(rawData, signature, publicKey)) {
           okay
         } else {
-          failed(InvalidSignature)
+          failed(InvalidSignature(rawPublicKey.bytes, rawData, signature.bytes))
         }
       }
     } yield ()
@@ -1440,12 +1450,24 @@ sealed trait GenericVerifySignature[PubKey, Sig]
   def _runWith[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
     for {
       rawSignature <- frame.popOpStackByteVec()
-      signature    <- buildSignature(rawSignature).toRight(Right(InvalidSignatureFormat))
+      signature <- buildSignature(rawSignature).toRight(
+        Right(InvalidSignatureFormat(rawSignature.bytes))
+      )
       rawPublicKey <- frame.popOpStackByteVec()
-      publicKey    <- buildPubKey(rawPublicKey).toRight(Right(InvalidPublicKey))
+      publicKey    <- buildPubKey(rawPublicKey).toRight(Right(InvalidPublicKey(rawPublicKey.bytes)))
       rawData      <- frame.popOpStackByteVec()
-      _            <- if (rawData.bytes.length == 32) okay else failed(SignedDataIsNot32Bytes)
-      _ <- if (verify(rawData.bytes, signature, publicKey)) okay else failed(InvalidSignature)
+      _ <-
+        if (rawData.bytes.length == 32) {
+          okay
+        } else {
+          failed(SignedDataIsNot32Bytes(rawData.bytes.length))
+        }
+      _ <-
+        if (verify(rawData.bytes, signature, publicKey)) {
+          okay
+        } else {
+          failed(InvalidSignature(rawPublicKey.bytes, rawData.bytes, rawSignature.bytes))
+        }
     } yield ()
   }
 
@@ -1592,7 +1614,9 @@ sealed trait LockApprovedAssetsInstr extends LemanAssetInstr with StatefulInstrC
     for {
       timestampU256 <- frame.popOpStackU256()
       timestamp     <- timestampU256.v.toLong.map(TimeStamp.unsafe).toRight(Right(LockTimeOverflow))
-      _ <- if (timestamp > frame.ctx.blockEnv.timeStamp) okay else failed(InvalidLockTime)
+      blockTime = frame.ctx.blockEnv.timeStamp
+      _ <-
+        if (timestamp > blockTime) okay else failed(InvalidLockTime(timestamp, blockTime))
     } yield timestamp
   }
 }
@@ -1603,9 +1627,11 @@ object LockApprovedAssets extends LockApprovedAssetsInstr {
       lockTime     <- popTimestamp(frame)
       lockupScript <- frame.popAssetAddress()
       balanceState <- frame.getBalanceState()
-      approved     <- balanceState.useAllApproved(lockupScript).toRight(Right(NoAssetsApproved))
-      outputs      <- approved.toLockedTxOutput(lockupScript, lockTime)
-      _            <- outputs.foreachE(frame.ctx.generateOutput)
+      approved <- balanceState
+        .useAllApproved(lockupScript)
+        .toRight(Right(NoAssetsApproved(Address.Asset(lockupScript))))
+      outputs <- approved.toLockedTxOutput(lockupScript, lockTime)
+      _       <- outputs.foreachE(frame.ctx.generateOutput)
     } yield ()
   }
 }
@@ -1693,7 +1719,7 @@ object AlphRemaining extends AssetInstr with StatefulInstrCompanion0 {
       balanceState <- frame.getBalanceState()
       amount <- balanceState
         .alphRemaining(address.lockupScript)
-        .toRight(Right(NoAlphBalanceForTheAddress))
+        .toRight(Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript))))
       _ <- frame.pushOpStack(Val.U256(amount))
     } yield ()
   }
@@ -1710,11 +1736,13 @@ object TokenRemaining extends AssetInstr with StatefulInstrCompanion0 {
         if (frame.ctx.getHardFork().isLemanEnabled() && tokenId == TokenId.alph) {
           balanceState
             .alphRemaining(address.lockupScript)
-            .toRight(Right(NoAlphBalanceForTheAddress))
+            .toRight(Right(NoAlphBalanceForTheAddress(Address.from(address.lockupScript))))
         } else {
           balanceState
             .tokenRemaining(address.lockupScript, tokenId)
-            .toRight(Right(NoTokenBalanceForTheAddress))
+            .toRight(
+              Right(NoTokenBalanceForTheAddress(tokenId, Address.from(address.lockupScript)))
+            )
         }
       _ <- frame.pushOpStack(Val.U256(amount))
     } yield ()
@@ -1978,6 +2006,7 @@ sealed trait CreateContractAbstract extends ContractInstr {
       )
       _ <- frame.createContract(
         newContractId,
+        if (subContract) frame.obj.contractIdOpt else None,
         contractCode,
         immFields,
         mutFields,
@@ -2371,7 +2400,7 @@ object BlockTarget extends BlockInstr {
     for {
       target <- {
         val value = frame.ctx.blockEnv.target.value
-        util.U256.from(value).toRight(Right(InvalidTarget(value)))
+        util.U256.from(value).toRight(Right(InvalidBlockTarget(value)))
       }
       _ <- frame.pushOpStack(Val.U256(target))
     } yield ()
@@ -2460,7 +2489,7 @@ object VerifyAbsoluteLocktime extends LockTimeInstr with GasLow {
       lockUntil <- popTimeStamp(frame)
       _ <-
         if (lockUntil > frame.ctx.blockEnv.timeStamp) {
-          failed(AbsoluteLockTimeVerificationFailed)
+          failed(AbsoluteLockTimeVerificationFailed(lockUntil, frame.ctx.blockEnv.timeStamp))
         } else {
           okay
         }
@@ -2487,7 +2516,7 @@ object VerifyRelativeLocktime extends LockTimeInstr with GasMid {
       lockUntil       <- getLockUntil(preOutput, lockDuration)
       _ <-
         if (lockUntil > frame.ctx.blockEnv.timeStamp) {
-          failed(RelativeLockTimeVerificationFailed)
+          failed(RelativeLockTimeVerificationFailed(lockUntil, frame.ctx.blockEnv.timeStamp))
         } else {
           okay
         }

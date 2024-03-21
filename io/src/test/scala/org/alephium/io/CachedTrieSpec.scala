@@ -214,6 +214,22 @@ class CachedTrieSpec extends AlephiumSpec {
     cachedSMT.remove(key0).leftValue.toString() is
       IOError.keyNotFound(key0, "CachedTrie.remove").toString()
   }
+
+  it should "be able to persist twice" in new Fixture {
+    val tests     = Array.fill(10)(generateKV())
+    val cachedSMT = CachedSMT.from(unCached)
+    tests.foreach { case (key, value) =>
+      cachedSMT.put(key, value)
+      cachedSMT.exists(key) isE true
+    }
+    val trie0 = cachedSMT.persist().rightValue
+    val trie1 = cachedSMT.persist().rightValue
+    tests.foreach { case (key, _) =>
+      cachedSMT.exists(key) isE true
+      trie0.exists(key) isE true
+      trie1.exists(key) isE true
+    }
+  }
 }
 
 object CachedTrieSpec {
