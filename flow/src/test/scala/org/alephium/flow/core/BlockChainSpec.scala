@@ -899,7 +899,17 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
     result0 is expected
 
     val result1 = blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, length + 1)
-    result1 is (result0.filter(_ != uncles.head._1) ++ AVector(uncles.head._1, block.hash))
+    result1 is (result0 ++ AVector(uncles.head._1, block.hash))
+
+    val hashes = (0 until ALPH.MaxUncleAge).map { _ =>
+      val parentHash = blockChain.getBestTipUnsafe()
+      val block      = blockGen(chainIndex, TimeStamp.now(), parentHash).sample.get
+      addBlock(blockChain, block)
+      block.hash
+    }
+    val result2 =
+      blockChain.getSyncDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeight.rightValue)
+    result2 is (result1 ++ AVector.from(hashes))
   }
 
   it should "get recent data" in new GetSyncDataFixture {
@@ -931,5 +941,15 @@ class BlockChainSpec extends AlephiumSpec with BeforeAndAfter {
 
     val result3 = blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, length + 1)
     result3 is (result1 ++ AVector(block0.hash, block2.hash))
+
+    val hashes = (0 until ALPH.MaxUncleAge).map { _ =>
+      val parentHash = blockChain.getBestTipUnsafe()
+      val block      = blockGen(chainIndex, TimeStamp.now(), parentHash).sample.get
+      addBlock(blockChain, block)
+      block.hash
+    }
+    val result4 =
+      blockChain.getRecentDataUnsafe(ALPH.GenesisHeight + 1, blockChain.maxHeight.rightValue)
+    result4 is (result1 ++ AVector(block0.hash, block2.hash, block3.hash) ++ AVector.from(hashes))
   }
 }

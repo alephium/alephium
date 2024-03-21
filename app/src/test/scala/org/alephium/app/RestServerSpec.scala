@@ -1183,7 +1183,7 @@ abstract class RestServerSpec(
 
   it should "convert target to hashrate" in {
     val target = "1b032b55"
-
+    val now    = TimeStamp.now()
     Post(
       s"/utils/target-to-hashrate",
       body = s"""
@@ -1194,10 +1194,14 @@ abstract class RestServerSpec(
     ) check { response =>
       response.code is StatusCode.Ok
 
-      val consensusConfig  = consensusConfigs.getConsensusConfig(TimeStamp.now())
       val hashrateResponse = response.as[TargetToHashrate.Result]
       val expected =
-        HashRate.from(Target.unsafe(Hex.unsafe(target)), consensusConfig.blockTargetTime).value
+        HashRate
+          .from(
+            Target.unsafe(Hex.unsafe(target)),
+            consensusConfigs.getConsensusConfig(now).blockTargetTime
+          )
+          .value
 
       hashrateResponse.hashrate is expected
     }
