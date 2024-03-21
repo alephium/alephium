@@ -313,8 +313,13 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   // use by-name parameter because of https://github.com/com-lihaoyi/fastparse/pull/204
   def arrayType[Unknown: P](baseType: => P[Type]): P[Type] = {
-    P("[" ~ baseType ~ ";" ~ nonNegativeNum("array size") ~ "]").map { case (tpe, size) =>
-      Type.FixedSizeArray(tpe, size)
+    P("[" ~ Index ~ baseType ~ Index ~ ";" ~ nonNegativeNum("array size") ~ "]").map {
+      case (from, tpe, to, size) =>
+        if (tpe.isMapType) {
+          val sourceIndex = Some(SourceIndex(from, to - from, fileURI))
+          throw Compiler.Error("Array element type cannot be map", sourceIndex)
+        }
+        Type.FixedSizeArray(tpe, size)
     }
   }
   def argument[Unknown: P](

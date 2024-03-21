@@ -1865,6 +1865,11 @@ class ParserSpec(fileURI: Option[java.net.URI]) extends AlephiumSpec {
       StatefulParser.parseType(Type.NamedType)(_),
       "The value type of map cannot be map"
     )
+    fail(
+      s"[$$Map[U256, U256]; 2]",
+      StatefulParser.parseType(Type.NamedType)(_),
+      "Array element type cannot be map"
+    )
 
     parse(
       "map.insert!{address -> ALPH: 1 alph}(1, 0)",
