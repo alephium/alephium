@@ -88,18 +88,15 @@ trait BlockHashChain extends BlockHashPool with ChainDifficultyAdjustment with B
       height: Int,
       isCanonical: Boolean
   ): IOResult[Unit] = {
-    heightIndexStorage.getOpt(height).flatMap {
-      case Some(hashes) =>
-        val blockHashes = if (isCanonical) {
-          hash +: hashes
-        } else {
-          hashes :+ hash
-        }
+    heightIndexStorage
+      .getOpt(height)
+      .map {
+        case Some(hashes) => if (isCanonical) hash +: hashes else hashes :+ hash
+        case None         => AVector(hash)
+      }
+      .flatMap { blockHashes =>
         heightIndexStorage.put(height, blockHashes).map(_ => cacheHashes(height, blockHashes))
-      case None =>
-        val blockHashes = AVector(hash)
-        heightIndexStorage.put(height, blockHashes).map(_ => cacheHashes(height, blockHashes))
-    }
+      }
   }
 
   def getParentHash(hash: BlockHash): IOResult[BlockHash]

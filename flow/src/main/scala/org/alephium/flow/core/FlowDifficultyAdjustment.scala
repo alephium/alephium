@@ -71,7 +71,7 @@ trait FlowDifficultyAdjustment {
     }
   }
 
-  private def getNextHashTarget(
+  private def getNextHashTargetSinceLeman(
       chainIndex: ChainIndex,
       deps: BlockDeps
   )(implicit consensusConfig: ConsensusSetting): IOResult[Target] = IOUtils.tryExecute {
@@ -90,13 +90,13 @@ trait FlowDifficultyAdjustment {
       chainIndex: ChainIndex,
       deps: BlockDeps
   ): IOResult[Target] =
-    getNextHashTarget(chainIndex, deps)(consensusConfigs.mainnet)
+    getNextHashTargetSinceLeman(chainIndex, deps)(consensusConfigs.mainnet)
 
   def getNextHashTargetGhost(
       chainIndex: ChainIndex,
       deps: BlockDeps
   ): IOResult[Target] =
-    getNextHashTarget(chainIndex, deps)(consensusConfigs.ghost)
+    getNextHashTargetSinceLeman(chainIndex, deps)(consensusConfigs.ghost)
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def calHeightDiffUnsafe(chainDep: BlockHash, oldTimeStamp: TimeStamp): Int = {

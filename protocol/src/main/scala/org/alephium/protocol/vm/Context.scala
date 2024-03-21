@@ -383,8 +383,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
         outputRef,
         contractOutput
       )
+      _ <- cacheNewContractIfNecessary(contractId)
     } yield {
-      blockContractLoad(contractId)
       contractId
     }
   }

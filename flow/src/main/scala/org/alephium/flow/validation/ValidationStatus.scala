@@ -68,11 +68,14 @@ final case object BlockDoubleSpending                               extends Inva
 final case class ExistInvalidTx(t: Transaction, e: InvalidTxStatus) extends InvalidBlockStatus
 final case object InvalidFlowDeps                                   extends InvalidBlockStatus
 final case object InvalidFlowTxs                                    extends InvalidBlockStatus
-case object InvalidUnclesBeforeGhostHardFork                        extends InvalidBlockStatus
-case object InvalidUncleSize                                        extends InvalidBlockStatus
-case object DuplicatedUncles                                        extends InvalidBlockStatus
-case object InvalidUncles                                           extends InvalidBlockStatus
-case object UncleDoesNotExist                                       extends InvalidBlockStatus
+
+sealed trait InvalidUncleStatus              extends InvalidBlockStatus
+case object InvalidUnclesBeforeGhostHardFork extends InvalidUncleStatus
+case object InvalidUncleSize                 extends InvalidUncleStatus
+case object DuplicatedUncles                 extends InvalidUncleStatus
+case object InvalidUncleDeps                 extends InvalidUncleStatus
+case object InvalidUncles                    extends InvalidUncleStatus
+case object UncleDoesNotExist                extends InvalidUncleStatus
 
 object ValidationStatus {
   private[validation] def invalidHeader[T](status: InvalidHeaderStatus): HeaderValidationResult[T] =

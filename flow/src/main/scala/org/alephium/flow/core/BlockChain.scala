@@ -61,8 +61,87 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
     blockCache.getUnsafe(hash)(blockStorage.getUnsafe(hash))
   }
 
+  def getSyncDataUnsafe(locators: AVector[BlockHash]): AVector[BlockHash] = {
+    val reversed           = locators.reverse
+    val lastCanonicalIndex = reversed.indexWhere(isCanonicalUnsafe)
+    if (lastCanonicalIndex == -1) {
+      AVector.empty // nothing in common
+    } else {
+      val lastCanonicalHash = reversed(lastCanonicalIndex)
+      val heightFrom        = getHeightUnsafe(lastCanonicalHash) + 1
+      getSyncDataFromHeightUnsafe(heightFrom)
+    }
+  }
+
+  def getSyncDataFromHeightUnsafe(heightFrom: Int): AVector[BlockHash] = {
+    val heightTo = math.min(heightFrom + maxSyncBlocksPerChain, maxHeightUnsafe)
+    if (Utils.unsafe(isRecentHeight(heightFrom))) {
+      getRecentDataUnsafe(heightFrom, heightTo)
+    } else {
+      getSyncDataUnsafe(heightFrom, heightTo)
+    }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  private def getHashesUnsafe(header: BlockHeader, acc: AVector[BlockHash]): AVector[BlockHash] = {
+    val hardFork = networkConfig.getHardFork(header.timestamp)
+    if (hardFork.isGhostEnabled()) {
+      val block = getBlockUnsafe(header.hash)
+      val uncles = block.uncleHashes match {
+        case Right(hashes) => hashes
+        case Left(error)   => throw error
+      }
+      val newAcc = if (acc.contains(header.hash)) acc else acc :+ header.hash
+      uncles.fold(newAcc) { case (acc, uncleHash) =>
+        val uncleHeader = getBlockHeaderUnsafe(uncleHash)
+        getHashesUnsafe(uncleHeader, acc)
+      }
+    } else {
+      acc :+ header.hash
+    }
+  }
+
+  // heightFrom is exclusive, heightTo is inclusive
+  def getSyncDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
+    @tailrec
+    def iter(
+        currentHeader: BlockHeader,
+        currentHeight: Int,
+        acc: AVector[BlockHash]
+    ): AVector[BlockHash] = {
+      if (currentHeight <= heightFrom) {
+        getHashesUnsafe(currentHeader, acc)
+      } else {
+        val newAcc       = getHashesUnsafe(currentHeader, acc)
+        val parentHeader = getBlockHeaderUnsafe(currentHeader.parentHash)
+        iter(parentHeader, currentHeight - 1, newAcc)
+      }
+    }
+
+    val startHeader = Utils.unsafe(getHashes(heightTo).map(_.head).flatMap(getBlockHeader))
+    iter(startHeader, heightTo, AVector.empty).reverse
+  }
+
+  def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
+    // For a block with a height from `heightFrom` to `uncleHeightTo`, its uncle's height may lower than `heightFrom`
+    val uncleHeightTo = math.min(heightFrom + ALPH.MaxUncleAge - 1, heightTo)
+    val hashes = AVector.from(heightFrom to uncleHeightTo).fold(AVector.empty[BlockHash]) {
+      case (acc, height) =>
+        val hashes = getHashesUnsafe(height)
+        hashes.fold(acc) { case (acc, hash) =>
+          val header = getBlockHeaderUnsafe(hash)
+          getHashesUnsafe(header, acc)
+        }
+    }
+    if (uncleHeightTo < heightTo) {
+      hashes ++ AVector.from((uncleHeightTo + 1) to heightTo).flatMap(getHashesUnsafe)
+    } else {
+      hashes
+    }
+  }
+
   def getUsedUnclesAndAncestorsUnsafe(
-      header: BlockHeader
+      parentHeader: BlockHeader
   ): (AVector[BlockHash], AVector[BlockHash]) = {
     @tailrec
     def iter(
@@ -87,27 +166,27 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
         }
       }
     }
-    iter(header.hash, ALPH.MaxUncleAge, AVector.empty, AVector.empty)
+    iter(parentHeader.hash, ALPH.MaxUncleAge, AVector.empty, AVector.empty)
   }
 
   def getUsedUnclesAndAncestors(
-      header: BlockHeader
+      parentHeader: BlockHeader
   ): IOResult[(AVector[BlockHash], AVector[BlockHash])] = {
-    IOUtils.tryExecute(getUsedUnclesAndAncestorsUnsafe(header))
+    IOUtils.tryExecute(getUsedUnclesAndAncestorsUnsafe(parentHeader))
   }
 
   def selectUnclesUnsafe(
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
-  ): AVector[(BlockHash, LockupScript.Asset)] = {
+  ): AVector[(BlockHash, LockupScript.Asset, Int)] = {
     @tailrec
     def iter(
         fromHeader: BlockHeader,
         num: Int,
         usedUncles: AVector[BlockHash],
         ancestors: AVector[BlockHash],
-        unclesAcc: AVector[(BlockHash, LockupScript.Asset)]
-    ): AVector[(BlockHash, LockupScript.Asset)] = {
+        unclesAcc: AVector[(BlockHash, LockupScript.Asset, Int)]
+    ): AVector[(BlockHash, LockupScript.Asset, Int)] = {
       if (fromHeader.isGenesis || num == 0 || unclesAcc.length >= ALPH.MaxUncleSize) {
         unclesAcc
       } else {
@@ -120,7 +199,7 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
               ancestors.exists(_ == uncle.parentHash) &&
               validator(uncle.header)
           )
-          .map(block => (block.hash, block.minerLockupScript))
+          .map(block => (block.hash, block.minerLockupScript, height))
         val parentHeader = getBlockHeaderUnsafe(fromHeader.parentHash)
         iter(parentHeader, num - 1, usedUncles, ancestors, unclesAcc ++ selected)
       }
@@ -128,17 +207,14 @@ trait BlockChain extends BlockPool with BlockHeaderChain with BlockHashChain {
 
     val (usedUncles, ancestors) = getUsedUnclesAndAncestorsUnsafe(parentHeader)
     val availableUncles = iter(parentHeader, ALPH.MaxUncleAge, usedUncles, ancestors, AVector.empty)
-    if (availableUncles.length <= ALPH.MaxUncleSize) {
-      availableUncles
-    } else {
-      availableUncles.take(ALPH.MaxUncleSize)
-    }
+    val blockHeight     = getHeightUnsafe(parentHeader.hash) + 1
+    availableUncles.takeUpto(ALPH.MaxUncleSize).map(u => (u._1, u._2, blockHeight - u._3))
   }
 
   def selectUncles(
       parentHeader: BlockHeader,
       validator: BlockHeader => Boolean
-  ): IOResult[AVector[(BlockHash, LockupScript.Asset)]] = {
+  ): IOResult[AVector[(BlockHash, LockupScript.Asset, Int)]] = {
     IOUtils.tryExecute(selectUnclesUnsafe(parentHeader, validator))
   }
 

@@ -16,8 +16,6 @@
 
 package org.alephium.flow.core
 
-import scala.annotation.tailrec
-
 import com.typesafe.scalalogging.LazyLogging
 
 import org.alephium.flow.Utils
@@ -159,8 +157,9 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
       } else {
         val blockHashes = hash +: hashes.filter(_ != hash)
         for {
-          _ <- heightIndexStorage.put(height, blockHashes)
-          _ = cacheHashes(height, blockHashes)
+          _ <- heightIndexStorage
+            .put(height, blockHashes)
+            .map(_ => cacheHashes(height, blockHashes))
           parent <- getParentHash(hash)
           _      <- reorgFrom(parent, height - 1)
         } yield ()
@@ -208,51 +207,6 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
     } yield BlockEnv(chainIndex, networkConfig.networkId, now, target, Some(tip))
   }
 
-  def getSyncDataUnsafe(locators: AVector[BlockHash]): AVector[BlockHash] = {
-    val reversed           = locators.reverse
-    val lastCanonicalIndex = reversed.indexWhere(isCanonicalUnsafe)
-    if (lastCanonicalIndex == -1) {
-      AVector.empty // nothing in common
-    } else {
-      val lastCanonicalHash = reversed(lastCanonicalIndex)
-      val heightFrom        = getHeightUnsafe(lastCanonicalHash) + 1
-      getSyncDataFromHeightUnsafe(heightFrom)
-    }
-  }
-
-  def getSyncDataFromHeightUnsafe(heightFrom: Int): AVector[BlockHash] = {
-    val heightTo = math.min(heightFrom + maxSyncBlocksPerChain, maxHeightUnsafe)
-    if (Utils.unsafe(isRecentHeight(heightFrom))) {
-      getRecentDataUnsafe(heightFrom, heightTo)
-    } else {
-      getSyncDataUnsafe(heightFrom, heightTo)
-    }
-  }
-
-  // heightFrom is exclusive, heightTo is inclusive
-  def getSyncDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
-    @tailrec
-    def iter(
-        currentHeader: BlockHeader,
-        currentHeight: Int,
-        acc: AVector[BlockHash]
-    ): AVector[BlockHash] = {
-      if (currentHeight <= heightFrom) {
-        acc :+ currentHeader.hash
-      } else {
-        val parentHeader = getBlockHeaderUnsafe(currentHeader.parentHash)
-        iter(parentHeader, currentHeight - 1, acc :+ currentHeader.hash)
-      }
-    }
-
-    val startHeader = Utils.unsafe(getHashes(heightTo).map(_.head).flatMap(getBlockHeader))
-    iter(startHeader, heightTo, AVector.empty).reverse
-  }
-
-  def getRecentDataUnsafe(heightFrom: Int, heightTo: Int): AVector[BlockHash] = {
-    AVector.from(heightFrom to heightTo).flatMap(getHashesUnsafe)
-  }
-
   def getBlockTime(header: BlockHeader): IOResult[Duration] = {
     getBlockHeader(header.parentHash)
       .map(header.timestamp deltaUnsafe _.timestamp)
@@ -287,6 +241,7 @@ trait BlockHeaderChain extends BlockHeaderPool with BlockHashChain with LazyLogg
         logger.warn(s"Update hashes order at: chainIndex $chainIndex; height $nextHeight")
         val blockHashes = nextHash +: nextHashes.filter(_ != nextHash)
         heightIndexStorage.put(nextHeight, blockHashes)
+        // Update cache if the height is cached
         if (hashesCache.contains(nextHeight)) {
           hashesCache.put(nextHeight, blockHashes)
         }

@@ -17,7 +17,9 @@
 package org.alephium.flow.model
 
 import org.alephium.protocol.Hash
+import org.alephium.protocol.config.{ConsensusConfigs, NetworkConfig}
 import org.alephium.protocol.model.{Block, BlockHash, ChainIndex, Target, Transaction}
+import org.alephium.protocol.vm.LockupScript
 import org.alephium.util.{AVector, TimeStamp}
 
 final case class BlockFlowTemplate(
@@ -29,4 +31,23 @@ final case class BlockFlowTemplate(
     transactions: AVector[Transaction]
 ) {
   lazy val txsHash = Block.calTxsHash(transactions)
+
+  def rebuild(
+      txs: AVector[Transaction],
+      uncles: AVector[(BlockHash, LockupScript.Asset, Int)],
+      miner: LockupScript.Asset
+  )(implicit
+      consensusConfigs: ConsensusConfigs,
+      networkConfig: NetworkConfig
+  ): BlockFlowTemplate = {
+    val coinbase = Transaction.coinbase(
+      index,
+      txs,
+      miner,
+      target,
+      templateTs,
+      uncles
+    )
+    this.copy(transactions = txs :+ coinbase)
+  }
 }

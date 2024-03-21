@@ -18,6 +18,7 @@ package org.alephium.protocol.model
 
 import scala.util.Random
 
+import akka.util.ByteString
 import org.scalacheck.Gen
 
 import org.alephium.crypto.{Blake2b, Blake3, MerkleHashable}
@@ -388,5 +389,28 @@ class BlockSpec extends AlephiumSpec with NoIndexModelGenerators {
       val blk = block(transaction)
       blk.verify("txs-with-contract-inputs-outputs")
     }
+  }
+
+  it should "cache block uncle hashes" in {
+    val block = blockGen.sample.get
+    block.uncleHashes.rightValue.isEmpty is true
+    block._uncleHashes is Some(AVector.empty[BlockHash])
+
+    val uncleHashes = AVector.fill(2)(BlockHash.random)
+    val coinbaseData: CoinbaseData = CoinbaseDataV2(
+      CoinbaseDataPrefix.from(block.chainIndex, block.timestamp),
+      uncleHashes,
+      ByteString.empty
+    )
+    val newOutput =
+      block.coinbase.unsigned.fixedOutputs.head.copy(additionalData = serialize(coinbaseData))
+    val newCoinbaseTx = block.coinbase.copy(
+      unsigned = block.coinbase.unsigned.copy(
+        fixedOutputs = block.coinbase.unsigned.fixedOutputs.replace(0, newOutput)
+      )
+    )
+    val newBlock = block.copy(transactions = AVector(newCoinbaseTx))
+    newBlock.uncleHashes.rightValue is uncleHashes
+    newBlock._uncleHashes is Some(uncleHashes)
   }
 }
