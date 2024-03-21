@@ -155,7 +155,7 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
           }
           _            <- validateUncles(flow, chainIndex, block, uncleBlocks)
           _            <- checkUncleDeps(block, flow, uncleBlocks)
-          parentHeight <- from(blockchain.getHeight(block.parentHash))
+          parentHeight <- from(blockchain.getHeight(block.uncleHash(chainIndex.to)))
           uncleHeights <- from(uncleHashes.mapE(blockchain.getHeight))
         } yield uncleBlocks.zipWithIndex.map { case (uncleBlock, index) =>
           val uncleHeight = uncleHeights(index)
@@ -336,9 +336,9 @@ trait BlockValidation extends Validation[Block, InvalidBlockStatus, Option[World
       lockedReward: U256,
       uncles: AVector[(LockupScript.Asset, Int)]
   ): BlockValidationResult[Unit] = {
-    val mainChainReward = Coinbase.calcMainChainReward(netReward)
-    val uncleRewards    = uncles.map(uncle => Coinbase.calcUncleReward(mainChainReward, uncle._2))
-    val blockReward     = Coinbase.calcBlockReward(mainChainReward, uncleRewards)
+    val mainChainReward   = Coinbase.calcMainChainReward(netReward)
+    val uncleRewards      = uncles.map(uncle => Coinbase.calcUncleReward(mainChainReward, uncle._2))
+    val blockReward       = Coinbase.calcBlockReward(mainChainReward, uncleRewards)
     val blockRewardLocked = blockReward.mulUnsafe(lockedReward).divUnsafe(netReward)
 
     val coinbase           = block.coinbase.unsigned
