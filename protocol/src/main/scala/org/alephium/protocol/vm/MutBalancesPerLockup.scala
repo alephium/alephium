@@ -114,9 +114,9 @@ final case class MutBalancesPerLockup(
             .toRight(Right(InvalidOutputBalances(lockupScript, tokens.length, attoAlphAmount)))
         case l: LockupScript.P2C =>
           if (attoAlphAmount < minimalAlphInContract) {
-            failed(LowerThanContractMinimalBalance)
+            failed(LowerThanContractMinimalBalance(Address.Contract(l), attoAlphAmount))
           } else if (tokens.length > maxTokenPerContractUtxo) {
-            failed(InvalidTokenNumForContractOutput)
+            failed(InvalidTokenNumForContractOutput(Address.Contract(l), tokens.length))
           } else {
             Right(AVector[TxOutput](ContractOutput(attoAlphAmount, l, tokens)))
           }

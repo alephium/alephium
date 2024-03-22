@@ -28,6 +28,7 @@ class KeywordSpec extends AlephiumSpec {
       "AssetScript",
       "TxScript",
       "Interface",
+      "struct",
       "let",
       "mut",
       "fn",
@@ -48,7 +49,9 @@ class KeywordSpec extends AlephiumSpec {
       "const",
       "enum",
       "Abstract",
-      "ALPH"
+      "ALPH",
+      "emptyMap",
+      "Map"
     )
 
   it should "match string keyword" in {

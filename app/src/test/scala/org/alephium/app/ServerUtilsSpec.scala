@@ -21,6 +21,7 @@ import java.net.InetSocketAddress
 import scala.util.Random
 
 import akka.util.ByteString
+import org.scalacheck.Gen
 
 import org.alephium.api.{model => api}
 import org.alephium.api.ApiError
@@ -29,6 +30,7 @@ import org.alephium.crypto.BIP340Schnorr
 import org.alephium.flow.FlowFixture
 import org.alephium.flow.core.{AMMContract, BlockFlow}
 import org.alephium.flow.gasestimation._
+import org.alephium.flow.setting.NetworkSetting
 import org.alephium.protocol._
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig}
 import org.alephium.protocol.model.{AssetOutput => _, ContractOutput => _, _}
@@ -37,7 +39,7 @@ import org.alephium.ralph.Compiler
 import org.alephium.serde.{deserialize, serialize}
 import org.alephium.util._
 
-// scalastyle:off file.size.limit
+// scalastyle:off file.size.limit number.of.methods
 class ServerUtilsSpec extends AlephiumSpec {
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
   val defaultUtxosLimit: Int                         = ALPH.MaxTxInputNum * 2
@@ -980,7 +982,256 @@ class ServerUtilsSpec extends AlephiumSpec {
     )
   }
 
+  "ServerUtils.buildMultiInputsTransaction" should "transfer a single input" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex            = ChainIndex.unsafe(0, 0)
+    val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val amount                = Amount(ALPH.oneAlph)
+    val destination           = Destination(generateAddress(chainIndex), amount)
+
+    val source = BuildMultiAddressesTransaction.Source(
+      fromPublicKey.bytes,
+      AVector(destination)
+    )
+
+    val buildTransaction = serverUtils
+      .buildMultiInputsTransaction(
+        blockFlow,
+        BuildMultiAddressesTransaction(AVector(source))
+      )
+      .rightValue
+
+    val unsignedTransaction =
+      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+
+    unsignedTransaction.inputs.length is 1
+    unsignedTransaction.fixedOutputs.length is 2
+  }
+
+  it should "transfer a multiple inputs" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val nbOfInputs             = 10
+    val chainIndex             = ChainIndex.unsafe(0, 0)
+    val (fromPrivateKey, _, _) = genesisKeys(chainIndex.from.value)
+    val amount                 = ALPH.alph(10)
+    val destination            = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph))
+
+    val inputPubKeys = AVector.fill(10)(chainIndex.to.generateKey._2)
+
+    inputPubKeys.foreach { pubKey =>
+      val block = transfer(blockFlow, fromPrivateKey, pubKey, amount)
+      addAndCheck(blockFlow, block)
+    }
+
+    val sources = inputPubKeys.map { pubKey =>
+      BuildMultiAddressesTransaction.Source(
+        pubKey.bytes,
+        AVector(destination)
+      )
+    }
+
+    val buildTransaction = serverUtils
+      .buildMultiInputsTransaction(
+        blockFlow,
+        BuildMultiAddressesTransaction(sources)
+      )
+      .rightValue
+
+    val unsignedTransaction =
+      serverUtils.decodeUnsignedTransaction(buildTransaction.unsignedTx).rightValue
+
+    unsignedTransaction.inputs.length is nbOfInputs
+    unsignedTransaction.fixedOutputs.length is 1 + nbOfInputs
+  }
+
+  it should "fail with non unique inputs" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex            = ChainIndex.unsafe(0, 0)
+    val (_, fromPublicKey, _) = genesisKeys(chainIndex.from.value)
+    val destination           = generateDestination(chainIndex)
+
+    val source = BuildMultiAddressesTransaction.Source(
+      fromPublicKey.bytes,
+      AVector(destination)
+    )
+
+    serverUtils
+      .buildMultiInputsTransaction(
+        blockFlow,
+        BuildMultiAddressesTransaction(AVector(source, source))
+      )
+      .leftValue
+      .detail is "Some addresses defined multiple time"
+  }
+
+  "ServerUtils.mergeAndprepareOutputInfos" should "with empty list" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+    serverUtils.mergeAndprepareOutputInfos(AVector.empty).rightValue is AVector
+      .empty[UnsignedTransaction.TxOutputInfo]
+  }
+
+  it should "merge simple destinations" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val destination = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils.mergeAndprepareOutputInfos(AVector.fill(i)(destination)).rightValue
+      outputs.length is 1
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector.empty[(TokenId, U256)]
+    }
+
+    val destination2 = Destination(generateAddress(chainIndex), Amount(ALPH.alph(2)))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils
+        .mergeAndprepareOutputInfos(
+          AVector.fill(i)(AVector(destination, destination2)).flatMap(identity)
+        )
+        .rightValue
+      outputs.length is 2
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector.empty[(TokenId, U256)]
+      outputs(1).attoAlphAmount is ALPH.alph(2 * i.toLong)
+      outputs(1).tokens is AVector.empty[(TokenId, U256)]
+    }
+  }
+
+  it should "merge tokens" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val tokenId1 = TokenId.random
+    val tokenId2 = TokenId.random
+
+    val tokens = AVector(Token(tokenId1, U256.One), Token(tokenId2, U256.Two))
+
+    val destination = Destination(generateAddress(chainIndex), Amount(ALPH.oneAlph), Some(tokens))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils.mergeAndprepareOutputInfos(AVector.fill(i)(destination)).rightValue
+      outputs.length is 1
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector(
+        (tokenId1, U256.unsafe(i)),
+        (tokenId2, U256.unsafe(2 * i.toLong))
+      )
+    }
+
+    val destination2 = Destination(generateAddress(chainIndex), Amount(ALPH.alph(2)), Some(tokens))
+
+    forAll(Gen.choose(1, 20)) { i =>
+      val outputs = serverUtils
+        .mergeAndprepareOutputInfos(
+          AVector.fill(i)(AVector(destination, destination2)).flatMap(identity)
+        )
+        .rightValue
+      outputs.length is 2
+      outputs(0).attoAlphAmount is ALPH.alph(i.toLong)
+      outputs(0).tokens is AVector(
+        (tokenId1, U256.unsafe(i)),
+        (tokenId2, U256.unsafe(2 * i.toLong))
+      )
+      outputs(1).attoAlphAmount is ALPH.alph(2 * i.toLong)
+      outputs(1).tokens is AVector(
+        (tokenId1, U256.unsafe(i)),
+        (tokenId2, U256.unsafe(2 * i.toLong))
+      )
+    }
+  }
+
+  it should "separate destinations with lockTime or message" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val destAddress = generateAddress(chainIndex)
+    val destination = Destination(destAddress, Amount(ALPH.oneAlph))
+    val destinationLockTime =
+      Destination(destAddress, Amount(ALPH.oneAlph), lockTime = Some(TimeStamp.now()))
+    val destinationMessage =
+      Destination(destAddress, Amount(ALPH.oneAlph), message = Some(ByteString.empty))
+    val destinationBoth = Destination(
+      destAddress,
+      Amount(ALPH.oneAlph),
+      lockTime = Some(TimeStamp.now()),
+      message = Some(ByteString.empty)
+    )
+
+    val destinations = AVector(
+      destination,
+      destination,
+      destinationLockTime,
+      destinationMessage,
+      destinationBoth
+    )
+
+    val outputs = serverUtils.mergeAndprepareOutputInfos(destinations).rightValue
+    outputs.length is 4
+    outputs(0).attoAlphAmount is ALPH.alph(2)
+
+    outputs(1).attoAlphAmount is ALPH.alph(1)
+    outputs(1).lockTime.isDefined is true
+    outputs(1).additionalDataOpt.isEmpty is true
+
+    outputs(2).attoAlphAmount is ALPH.alph(1)
+    outputs(2).lockTime.isEmpty is true
+    outputs(2).additionalDataOpt.isDefined is true
+
+    outputs(3).attoAlphAmount is ALPH.alph(1)
+    outputs(3).lockTime.isDefined is true
+    outputs(3).additionalDataOpt.isDefined is true
+  }
+
+  it should "work with only `complex` destinations" in new FlowFixtureWithApi {
+    val serverUtils = new ServerUtils
+
+    val chainIndex = ChainIndex.unsafe(0, 0)
+
+    val destAddress = generateAddress(chainIndex)
+    val destinationLockTime =
+      Destination(destAddress, Amount(ALPH.oneAlph), lockTime = Some(TimeStamp.now()))
+    val destinationMessage =
+      Destination(destAddress, Amount(ALPH.oneAlph), message = Some(ByteString.empty))
+    val destinationBoth = Destination(
+      destAddress,
+      Amount(ALPH.oneAlph),
+      lockTime = Some(TimeStamp.now()),
+      message = Some(ByteString.empty)
+    )
+
+    val destinations = AVector(
+      destinationLockTime,
+      destinationMessage,
+      destinationBoth
+    )
+
+    val outputs = serverUtils.mergeAndprepareOutputInfos(destinations).rightValue
+    outputs.length is 3
+
+    outputs(0).attoAlphAmount is ALPH.alph(1)
+    outputs(0).lockTime.isDefined is true
+    outputs(0).additionalDataOpt.isEmpty is true
+
+    outputs(1).attoAlphAmount is ALPH.alph(1)
+    outputs(1).lockTime.isEmpty is true
+    outputs(1).additionalDataOpt.isDefined is true
+
+    outputs(2).attoAlphAmount is ALPH.alph(1)
+    outputs(2).lockTime.isDefined is true
+    outputs(2).additionalDataOpt.isDefined is true
+  }
+
   trait CallContractFixture extends Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
     val chainIndex    = ChainIndex.unsafe(0, 0)
     val lockupScript  = getGenesisLockupScript(chainIndex)
     val callerAddress = Address.Asset(lockupScript)
@@ -1031,6 +1282,9 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  pub fn getContractId() -> ByteVec {
          |    return selfContractId!()
          |  }
+         |  pub fn getName() -> ByteVec {
+         |    return b`Class` ++ b` ` ++ b`Foo`
+         |  }
          |}
          |
          |$barCode
@@ -1060,7 +1314,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
-  it should "call contract" in new CallContractFixture {
+  "ServerUtils.callContract" should "call contract" in new CallContractFixture {
     executeScript(callScript)
     checkContractStates(barId, U256.unsafe(1), minimalAlphInContract)
     checkContractStates(fooId, U256.unsafe(1), minimalAlphInContract + ALPH.oneNanoAlph)
@@ -1076,7 +1330,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val callContractResult0 =
       serverUtils.callContract(blockFlow, params0).asInstanceOf[CallContractSucceeded]
     callContractResult0.returns is AVector[Val](ValU256(2))
-    callContractResult0.gasUsed is 23200
+    callContractResult0.gasUsed is 23203
     callContractResult0.txOutputs.length is 2
     val contractAttoAlphAmount0 = minimalAlphInContract + ALPH.nanoAlph(2)
     callContractResult0.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount0
@@ -1098,7 +1352,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val callContractResult1 =
       serverUtils.callContract(blockFlow, params1).asInstanceOf[CallContractSucceeded]
     callContractResult1.returns is AVector[Val](ValU256(1))
-    callContractResult1.gasUsed is 23200
+    callContractResult1.gasUsed is 23203
     callContractResult1.txOutputs.length is 2
     val contractAttoAlphAmount1 = minimalAlphInContract + ALPH.oneNanoAlph
     callContractResult1.txOutputs(0).attoAlphAmount.value is contractAttoAlphAmount1
@@ -1114,6 +1368,14 @@ class ServerUtilsSpec extends AlephiumSpec {
     fooState1.mutFields is AVector[Val](ValU256(1))
     fooState1.address is fooAddress
     fooState1.asset is AssetState(contractAttoAlphAmount1, Some(AVector.empty))
+
+    info("call getName method successfully")
+    val params2 = params0.copy(methodIndex = 2)
+    val callContractResult2 =
+      serverUtils.callContract(blockFlow, params2).asInstanceOf[CallContractSucceeded]
+
+    callContractResult2.returns is AVector[Val](ValByteVec(ByteString("Class Foo".getBytes())))
+    callContractResult2.gasUsed is 5588
   }
 
   it should "multiple call contract" in new CallContractFixture {
@@ -1139,7 +1401,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     result1.returns is AVector[Val](ValByteVec(fooId.bytes))
 
     val result2 = multipleCallContractResult.results(2).asInstanceOf[CallContractFailed]
-    result2.error is s"VM execution error: InvalidMethodIndex($invalidMethodIndex)"
+    result2.error is s"VM execution error: Invalid method index $invalidMethodIndex, method length: 3"
   }
 
   it should "returns error if the number of contract calls exceeds the maximum limit" in new CallContractFixture {
@@ -1153,6 +1415,19 @@ class ServerUtilsSpec extends AlephiumSpec {
       .multipleCallContract(blockFlow, multipleCallContract)
       .leftValue
       .detail is "The number of contract calls exceeds the maximum limit(3)"
+  }
+
+  it should "returns error if caller is in different group than contract" in new CallContractFixture {
+    val params0 = CallContract(
+      group = 1,
+      address = fooAddress,
+      methodIndex = 0,
+      inputAssets = Some(AVector(inputAsset)),
+      existingContracts = Some(AVector(barAddress))
+    )
+    val callContractResult0 =
+      serverUtils.callContract(blockFlow, params0).asInstanceOf[CallContractFailed]
+    callContractResult0.error is s"Group mismatch: provided group is 1; group for ${fooAddress.toBase58} is 0"
   }
 
   "the test contract endpoint" should "handle create and destroy contracts properly" in new Fixture {
@@ -1226,6 +1501,94 @@ class ServerUtilsSpec extends AlephiumSpec {
     assetOutput.attoAlphAmount is Amount(
       ALPH.alph(2).subUnsafe(nonCoinbaseMinGasPrice * maximalGasPerTx)
     )
+  }
+
+  it should "test destroying self" in new Fixture {
+    val groupIndex   = brokerConfig.chainIndexes.sample().from
+    val (_, pubKey)  = SignatureSchema.generatePriPub()
+    val assetAddress = Address.Asset(LockupScript.p2pkh(pubKey))
+    val foo =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn destroy() -> () {
+         |    destroySelf!(@$assetAddress)
+         |  }
+         |}
+         |""".stripMargin
+
+    val fooContract        = Compiler.compileContract(foo).rightValue
+    val fooContractId      = ContractId.random
+    val fooContractAddress = Address.contract(fooContractId)
+
+    val testContractParams = TestContract(
+      group = Some(groupIndex.value),
+      address = Some(fooContractAddress),
+      bytecode = fooContract,
+      initialAsset = Some(AssetState(ALPH.alph(10))),
+      existingContracts = None,
+      inputAssets = None
+    ).toComplete().rightValue
+
+    val testFlow    = BlockFlow.emptyUnsafe(config)
+    val serverUtils = new ServerUtils()
+    val result =
+      serverUtils.runTestContract(testFlow, testContractParams).rightValue
+
+    result.contracts.isEmpty is true
+    result.txInputs.length is 1
+    result.txInputs(0).lockupScript is fooContractAddress.lockupScript
+    result.txOutputs.length is 1
+    result.txOutputs(0).attoAlphAmount.value is ALPH.alph(10)
+    result.txOutputs(0).address is assetAddress
+  }
+
+  it should "test with caller address" in new Fixture {
+    val child =
+      s"""
+         |Contract Child(parentId: ByteVec, parentAddress: Address) {
+         |  pub fn checkParent() -> () {
+         |    assert!(callerContractId!() == parentId, 0)
+         |    assert!(callerAddress!() == parentAddress, 1)
+         |  }
+         |}
+         |""".stripMargin
+    val childContract = Compiler.compileContract(child).rightValue
+    val childAddress  = Address.contract(ContractId.random)
+
+    val parentContractId   = ContractId.random
+    val parentAddress      = Address.contract(parentContractId)
+    val wrongParentId      = ContractId.random
+    val wrongParentAddress = Address.contract(wrongParentId)
+
+    val serverUtils = new ServerUtils()
+
+    def buildTestParam(callerAddressOpt: Option[Address.Contract]): TestContract.Complete = {
+      TestContract(
+        bytecode = childContract,
+        address = Some(childAddress),
+        callerAddress = callerAddressOpt,
+        initialImmFields = Option(
+          AVector[Val](
+            ValByteVec(parentContractId.bytes),
+            ValAddress(parentAddress)
+          )
+        )
+      )
+        .toComplete()
+        .rightValue
+    }
+    val testContractParams0 = buildTestParam(Some(parentAddress))
+    val testResult0         = serverUtils.runTestContract(blockFlow, testContractParams0)
+    testResult0.isRight is true
+
+    val testContractParams1 = buildTestParam(Some(wrongParentAddress))
+    val testResult1         = serverUtils.runTestContract(blockFlow, testContractParams1)
+    testResult1.leftValue.detail is s"VM execution error: Assertion Failed in Contract @ ${childAddress.toBase58}, Error Code: 0"
+
+    val testContractParams2 = buildTestParam(None)
+    val testResult2         = serverUtils.runTestContract(blockFlow, testContractParams2)
+    testResult2.leftValue.detail is "VM execution error: ExpectAContract"
   }
 
   trait DestroyFixture extends Fixture {
@@ -1326,12 +1689,14 @@ class ServerUtilsSpec extends AlephiumSpec {
   }
 
   it should "fail to destroy contracts and transfer fund to non-calling address" in new DestroyFixture {
+    lazy val randomAddress = Address.contract(ContractId.random).toBase58
+
     override def fooCaller: String =
       s"""
          |Contract FooCaller(fooId: ByteVec) {
          |  pub fn destroyFoo() -> () {
          |    let foo = Foo(fooId)
-         |    foo.destroy(@${Address.contract(ContractId.random).toBase58})
+         |    foo.destroy(@${randomAddress})
          |  }
          |}
          |
@@ -1344,7 +1709,7 @@ class ServerUtilsSpec extends AlephiumSpec {
         testContractParams.toComplete().rightValue
       )
       .leftValue
-      .detail is "VM execution error: PayToContractAddressNotInCallerTrace"
+      .detail is s"VM execution error: Pay to contract address $randomAddress is not allowed when this contract address is not in the call stack"
   }
 
   it should "show debug message when contract execution failed" in new Fixture {
@@ -1363,8 +1728,8 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testContract = TestContract(bytecode = code).toComplete().rightValue
     val testError    = serverUtils.runTestContract(blockFlow, testContract).leftValue.detail
     testError is
-      s"DEBUG - ${Address.contract(testContract.contractId).toBase58} - Hello, Alephium!\n" ++
-      "VM execution error: AssertionFailedWithErrorCode(tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq,0)"
+      s"> Contract @ ${Address.contract(testContract.contractId).toBase58} - Hello, Alephium!\n" ++
+      "VM execution error: Assertion Failed in Contract @ tgx7VNFoP9DJiFMFgXXtafQZkUvyEdDHT9ryamHJYrjq, Error Code: 0"
   }
 
   ignore should "test blockHash function for Ralph" in new TestContractFixture {
@@ -1439,7 +1804,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     val testResult  = serverUtils.runTestContract(blockFlow, testContract).rightValue
     testResult.events.isEmpty is true
     testResult.debugMessages is AVector(
-      DebugMessage(Address.contract(testContract.contractId), "Hello, Alephium!")
+      DebugMessage(Address.contract(testContract.contractId), "Hello, 416c65706869756d!")
     )
   }
 
@@ -1963,9 +2328,9 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  Bar(id).foo()
          |}
          |""".stripMargin
-    val (contracts, scripts) = Compiler.compileProject(rawCode).rightValue
-    val query                = Compile.Project(rawCode)
-    val result               = serverUtils.compileProject(query).rightValue
+    val (contracts, scripts, _) = Compiler.compileProject(rawCode).rightValue
+    val query                   = Compile.Project(rawCode)
+    val result                  = serverUtils.compileProject(query).rightValue
 
     result.contracts.length is 1
     contracts.length is 1
@@ -2107,9 +2472,62 @@ class ServerUtilsSpec extends AlephiumSpec {
          |  }
          |}
          |""".stripMargin
-    val contract          = Compiler.compileContract(rawCode).rightValue
-    val (_, publicKey, _) = genesisKeys(0)
-    val fromAddress       = Address.p2pkh(publicKey)
+    val contract              = Compiler.compileContract(rawCode).rightValue
+    val (_, fromPublicKey, _) = genesisKeys(0)
+    val fromAddress           = Address.p2pkh(fromPublicKey)
+    val (_, toPublicKey, _)   = genesisKeys(1)
+    val toAddress             = Address.p2pkh(toPublicKey)
+
+    {
+      info("Without token issuance")
+      val codeRaw                        = Hex.toHexString(serialize(contract))
+      val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
+      val stateRaw                       = Hex.toHexString(serialize(initialFields))
+
+      val expected =
+        s"""
+           |TxScript Main {
+           |  createContract!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00)
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(expected).isRight is true
+      ServerUtils
+        .buildDeployContractScriptRawWithParsedState(
+          codeRaw,
+          fromAddress,
+          initialImmFields = initialFields,
+          initialMutFields = AVector.empty,
+          U256.unsafe(10),
+          AVector.empty,
+          None
+        ) is expected
+    }
+
+    {
+      info("Issue token and transfer to an address")
+      val codeRaw                        = Hex.toHexString(serialize(contract))
+      val initialFields: AVector[vm.Val] = AVector(vm.Val.U256.unsafe(0))
+      val stateRaw                       = Hex.toHexString(serialize(initialFields))
+
+      val expected =
+        s"""
+           |TxScript Main {
+           |  createContractWithToken!{@$fromAddress -> ALPH: 10}(#$codeRaw, #$stateRaw, #00, 50, @$toAddress)
+           |  transferToken!{@$fromAddress -> ALPH: dustAmount!()}(@$fromAddress, @$toAddress, ALPH, dustAmount!())
+           |}
+           |""".stripMargin
+      Compiler.compileTxScript(expected).isRight is true
+      ServerUtils
+        .buildDeployContractScriptRawWithParsedState(
+          codeRaw,
+          fromAddress,
+          initialImmFields = initialFields,
+          initialMutFields = AVector.empty,
+          U256.unsafe(10),
+          AVector.empty,
+          Some((U256.unsafe(50), Some(toAddress)))
+        ) is expected
+    }
 
     {
       info("With approved tokens")
@@ -2134,7 +2552,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           initialMutFields = AVector.empty,
           U256.unsafe(10),
           AVector((token1, U256.unsafe(10)), (token2, U256.unsafe(20))),
-          Some(U256.unsafe(50))
+          Some((U256.unsafe(50), None))
         ) is expected
     }
 
@@ -2159,7 +2577,7 @@ class ServerUtilsSpec extends AlephiumSpec {
           initialMutFields = AVector.empty,
           U256.unsafe(10),
           AVector.empty,
-          Some(U256.unsafe(50))
+          Some((U256.unsafe(50), None))
         ) is expected
     }
   }
@@ -2337,6 +2755,545 @@ class ServerUtilsSpec extends AlephiumSpec {
     }
   }
 
+  trait GasFeeFixture extends Fixture {
+    override val configValues = Map(("alephium.broker.broker-num", 1))
+
+    implicit val serverUtils = new ServerUtils
+
+    val chainIndex                        = ChainIndex.unsafe(0, 0)
+    val (testPriKey, testPubKey)          = chainIndex.from.generateKey
+    val testAddress                       = Address.p2pkh(testPubKey)
+    val (genesisPriKey, genesisPubKey, _) = genesisKeys(0)
+    val genesisAddress                    = Address.p2pkh(genesisPubKey)
+
+    def confirmNewBlock(blockFlow: BlockFlow, chainIndex: ChainIndex) = {
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      block.nonCoinbase.foreach(_.scriptExecutionOk is true)
+      addAndCheck(blockFlow, block)
+    }
+
+    def executeScript(
+        rawScript: String,
+        keyPairOpt: Option[(PrivateKey, PublicKey)] = None
+    ) = {
+      val script = Compiler.compileTxScript(rawScript).toOption.get
+      val block  = payableCall(blockFlow, chainIndex, script, keyPairOpt = keyPairOpt)
+      addAndCheck(blockFlow, block)
+      block
+    }
+
+    def deployContract(
+        contract: String,
+        initialAttoAlphAmount: Amount = Amount(ALPH.alph(3))
+    ): Address.Contract = {
+      val code = Compiler.compileContract(contract).toOption.get
+
+      val deployContractTxResult = serverUtils
+        .buildDeployContractTx(
+          blockFlow,
+          BuildDeployContractTx(
+            Hex.unsafe(testPubKey.toHexString),
+            bytecode = serialize(code) ++ ByteString(0, 0),
+            initialAttoAlphAmount = Some(initialAttoAlphAmount)
+          )
+        )
+        .rightValue
+
+      val deployContractTx =
+        deserialize[UnsignedTransaction](Hex.unsafe(deployContractTxResult.unsignedTx)).rightValue
+      deployContractTx.fixedOutputs.length is 1
+
+      val testAddressAlphBalance = getAlphBalance(blockFlow, LockupScript.p2pkh(testPubKey))
+      signAndAddToMemPool(
+        deployContractTxResult.txId,
+        deployContractTxResult.unsignedTx,
+        chainIndex,
+        testPriKey
+      )
+
+      confirmNewBlock(blockFlow, ChainIndex.unsafe(1, 1))
+      confirmNewBlock(blockFlow, ChainIndex.unsafe(0, 0))
+      serverUtils.getTransaction(blockFlow, deployContractTxResult.txId, None, None).rightValue
+
+      // Check that gas is paid correctly
+      getAlphBalance(blockFlow, LockupScript.p2pkh(testPubKey)) is testAddressAlphBalance.subUnsafe(
+        deployContractTx.gasPrice * deployContractTx.gasAmount + initialAttoAlphAmount.value
+      )
+      deployContractTxResult.contractAddress
+
+    }
+
+    val testAddressBalance = ALPH.alph(1000)
+    val block              = transfer(blockFlow, genesisKeys(1)._1, testPubKey, testAddressBalance)
+    addAndCheck(blockFlow, block)
+    checkAddressBalance(testAddress, testAddressBalance)
+
+    def scriptCaller = genesisAddress
+
+    def fooContract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |  }
+         |}
+         |""".stripMargin
+
+    def fooContractConditional: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo(contractPay: Bool) -> () {
+         |    if (contractPay) {
+         |      payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+  }
+
+  it should "should throw exception for payGasFee instr before Ghost hardfork" in new GasFeeFixture {
+    implicit override lazy val networkConfig: NetworkSetting = config.network.copy(
+      ghostHardForkTimestamp = TimeStamp.unsafe(Long.MaxValue)
+    )
+
+    val contractAddress = deployContract(fooContract)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo()
+         |}
+         |
+         |$fooContract
+         |""".stripMargin
+
+    val exception = intercept[AssertionError](executeScript(script))
+    exception.getMessage() is "Right(TxScriptExeFailed(InactiveInstr(PayGasFee)))"
+  }
+
+  it should "not charge caller gas fee when contract is paying gas" in new GasFeeFixture {
+    val contractAddress = deployContract(fooContract)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo()
+         |}
+         |
+         |$fooContract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3).subUnsafe(scriptTxGasFee))
+  }
+
+  it should "charge caller gas fee when contract is not paying gas fee" in new GasFeeFixture {
+    def contract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractAddress = deployContract(contract)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).addUnsafe(ALPH.oneAlph).subUnsafe(scriptTxGasFee)
+    )
+    checkAddressBalance(contractAddress, ALPH.alph(2))
+  }
+
+  it should "charge caller gas fee when paying full gas fee in the TxScript" in new GasFeeFixture {
+    def script =
+      s"""
+         |TxScript Main {
+         |  payGasFee!{callerAddress!() -> ALPH: txGasFee!()}()
+         |}
+         |
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).subUnsafe(scriptTxGasFee)
+    )
+  }
+
+  it should "charge caller gas fee when paying partial gas fee in the TxScript" in new GasFeeFixture {
+    val halfGasFee = nonCoinbaseMinGasFee.divUnsafe(2)
+    def script =
+      s"""
+         |TxScript Main {
+         |  payGasFee!{callerAddress!() -> ALPH: ${halfGasFee}}()
+         |}
+         |
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).subUnsafe(scriptTxGasFee)
+    )
+  }
+
+  it should "charge caller gas fee when paying gas fee using multiple payGasFee function the TxScript" in new GasFeeFixture {
+    val halfGasFee = nonCoinbaseMinGasFee.divUnsafe(2)
+    def script =
+      s"""
+         |TxScript Main {
+         |  payGasFee!{callerAddress!() -> ALPH: ${halfGasFee}}()
+         |  payGasFee!{callerAddress!() -> ALPH: ${halfGasFee}}()
+         |  payGasFee!{callerAddress!() -> ALPH: ${halfGasFee}}()
+         |}
+         |
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).subUnsafe(scriptTxGasFee)
+    )
+  }
+
+  it should "not charge caller gas fee when contract is paying gas conditionally" in new GasFeeFixture {
+    val contractAddress = deployContract(fooContractConditional)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo(true)
+         |}
+         |
+         |$fooContractConditional
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3).subUnsafe(scriptTxGasFee))
+  }
+
+  it should "charge caller gas fee when contract is not paying gas conditionally" in new GasFeeFixture {
+    val contractAddress = deployContract(fooContractConditional)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo(false)
+         |}
+         |
+         |$fooContractConditional
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000).subUnsafe(scriptTxGasFee))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+  }
+
+  it should "charge caller gas fee when contract doen't have enough to pay gas fee" in new GasFeeFixture {
+    def contract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo(contractPay: Bool) -> () {
+         |    if (contractPay) {
+         |      payGasFee!{selfAddress!() -> ALPH: 0}()
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractAddress = deployContract(contract, Amount(ALPH.alph(1)))
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo(true)
+         |}
+         |
+         |$contract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(1))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000) subUnsafe scriptTxGasFee
+    )
+    checkAddressBalance(contractAddress, ALPH.alph(1))
+  }
+
+  it should "charge caller partial gas fee when contract can also pay partial gas fee" in new GasFeeFixture {
+    val partialGasFee = nonCoinbaseMinGasFee.divUnsafe(2)
+
+    def contract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo(contractPay: Bool) -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |    if (contractPay) {
+         |      payGasFee!{selfAddress!() -> ALPH: 2}()
+         |    }
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractAddress = deployContract(contract, Amount(ALPH.alph(2).addUnsafe(partialGasFee)))
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  payGasFee!{callerAddress!() -> ALPH: 100}()
+         |  Foo(#${contractAddress.toBase58}).foo(true)
+         |}
+         |
+         |$contract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(2).addUnsafe(partialGasFee))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).addUnsafe(ALPH.oneAlph).subUnsafe(scriptTxGasFee.subUnsafe(U256.Two))
+    )
+    checkAddressBalance(contractAddress, ALPH.alph(1).addUnsafe(partialGasFee).subUnsafe(2))
+  }
+
+  it should "charge the contract that has enough balance for gas" in new GasFeeFixture {
+    val partialGasFee = nonCoinbaseMinGasFee.divUnsafe(2)
+
+    def barContract: String =
+      s"""
+         |Contract Bar() {
+         |  @using(assetsInContract = true)
+         |  pub fn bar() -> () {
+         |    payGasFee!{selfAddress!() -> ALPH: ${partialGasFee}}()
+         |  }
+         |}
+         |""".stripMargin
+
+    val barContractAddress =
+      deployContract(barContract, Amount(ALPH.alph(1).addUnsafe(partialGasFee)))
+
+    override def fooContract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |    payGasFee!{selfAddress!() -> ALPH: 0}()
+         |    Bar(#${barContractAddress.toBase58}).bar()
+         |  }
+         |}
+         |
+         |$barContract
+         |""".stripMargin
+
+    val fooContractAddress = deployContract(fooContract, Amount(ALPH.alph(2)))
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooContractAddress.toBase58}).foo()
+         |}
+         |
+         |$fooContract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(fooContractAddress, ALPH.alph(2))
+    checkAddressBalance(barContractAddress, ALPH.alph(1).addUnsafe(partialGasFee))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(
+      scriptCaller,
+      ALPH.alph(1000000).addUnsafe(ALPH.alph(1)).subUnsafe(scriptTxGasFee.subUnsafe(partialGasFee))
+    )
+    checkAddressBalance(fooContractAddress, ALPH.alph(1))
+    checkAddressBalance(barContractAddress, ALPH.alph(1))
+  }
+
+  it should "charge the contract that pays the for gas the first" in new GasFeeFixture {
+    def barContract: String =
+      s"""
+         |Contract Bar() {
+         |  @using(assetsInContract = true)
+         |  pub fn bar() -> () {
+         |    payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |  }
+         |}
+         |""".stripMargin
+
+    val barContractAddress = deployContract(barContract, Amount(ALPH.alph(10)))
+
+    override def fooContract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    Bar(#${barContractAddress.toBase58}).bar()
+         |    transferTokenFromSelf!(callerAddress!(), ALPH, 1 alph)
+         |    payGasFee!{selfAddress!() -> ALPH: txGasFee!()}()
+         |  }
+         |}
+         |
+         |$barContract
+         |""".stripMargin
+
+    val fooContractAddress = deployContract(fooContract, Amount(ALPH.alph(10)))
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${fooContractAddress.toBase58}).foo()
+         |}
+         |
+         |$fooContract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(fooContractAddress, ALPH.alph(10))
+    checkAddressBalance(barContractAddress, ALPH.alph(10))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000).addUnsafe(ALPH.alph(1)))
+    checkAddressBalance(fooContractAddress, ALPH.alph(9))
+    checkAddressBalance(barContractAddress, ALPH.alph(10).subUnsafe(scriptTxGasFee))
+  }
+
+  it should "split gas fee between contract and caller depending on approved token amount" in new GasFeeFixture {
+    def contract: String =
+      s"""
+         |Contract Foo() {
+         |  @using(preapprovedAssets = true, assetsInContract = true)
+         |  pub fn foo() -> () {
+         |    payGasFee!{
+         |      selfAddress!()   -> ALPH: txGasFee!() / 2;
+         |      callerAddress!() -> ALPH: txGasFee!() / 2
+         |    }()
+         |  }
+         |}
+         |""".stripMargin
+
+    val contractAddress = deployContract(contract)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo{callerAddress!() -> ALPH: txGasFee!() / 2}()
+         |}
+         |
+         |$contract
+         |""".stripMargin
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000))
+    checkAddressBalance(contractAddress, ALPH.alph(3))
+
+    val scriptBlock    = executeScript(script)
+    val scriptTxGasFee = scriptBlock.nonCoinbase.head.gasFeeUnsafe
+
+    checkAddressBalance(scriptCaller, ALPH.alph(1000000).subUnsafe(scriptTxGasFee / 2))
+    checkAddressBalance(contractAddress, ALPH.alph(3).subUnsafe(scriptTxGasFee / 2))
+  }
+
+  it should "fail if caller doesn't have enough to pay for gas even if contract pays for it" in new GasFeeFixture {
+    val contractAddress = deployContract(fooContract)
+
+    def script =
+      s"""
+         |TxScript Main {
+         |  Foo(#${contractAddress.toBase58}).foo()
+         |}
+         |
+         |$fooContract
+         |""".stripMargin
+
+    {
+      info("Caller doesn't have enough to pay for gas")
+      val (testPriKey, testPubKey) = chainIndex.from.generateKey
+      val testAddress              = Address.p2pkh(testPubKey)
+
+      val block1 = transfer(blockFlow, genesisPriKey, testPubKey, dustUtxoAmount)
+      addAndCheck(blockFlow, block1)
+      checkAddressBalance(testAddress, dustUtxoAmount)
+
+      val exception =
+        intercept[AssertionError](executeScript(script, Some((testPriKey, testPubKey))))
+      exception.getMessage() is "Right(InvalidRemainingBalancesForFailedScriptTx)"
+    }
+
+    {
+      info("Caller has no inputs")
+      val (testPriKey, testPubKey) = chainIndex.from.generateKey
+
+      checkAddressBalance(contractAddress, ALPH.alph(3))
+      val exception =
+        intercept[AssertionError](executeScript(script, Some((testPriKey, testPubKey))))
+      exception.getMessage() is "Right(InvalidInputGroupIndex)"
+    }
+  }
+
   it should "considers dustAmount for change output when selecting UTXOs, without amounts" in new DustAmountFixture {
     override def attoAlphAmount: Option[Amount] = None
     executeTxScript()
@@ -2382,10 +3339,11 @@ class ServerUtilsSpec extends AlephiumSpec {
     blockFlow.getGrandPool().get(deployContractTxResult.txId).isEmpty is true
   }
 
-  it should "deploy contract with preapproved assets" in new Fixture {
+  trait ContractDeploymentFixture extends Fixture {
     val chainIndex                 = ChainIndex.unsafe(0, 0)
     val lockupScript               = getGenesisLockupScript(chainIndex)
     val (privateKey, publicKey, _) = genesisKeys(chainIndex.from.value)
+    val (_, toPublicKey)           = chainIndex.from.generateKey
     val code =
       s"""
          |Contract Foo() {
@@ -2394,6 +3352,29 @@ class ServerUtilsSpec extends AlephiumSpec {
          |""".stripMargin
     val contract = Compiler.compileContract(code).rightValue
 
+    implicit val serverUtils = new ServerUtils()
+    def buildDeployContractTx(query: BuildDeployContractTx): BuildDeployContractTxResult = {
+      val result = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
+      signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
+      val block = mineFromMemPool(blockFlow, chainIndex)
+      addAndCheck(blockFlow, block)
+      result
+    }
+
+    def checkBalance(
+        lockupScript: LockupScript,
+        expectedAlphBalance: U256,
+        tokenId: TokenId,
+        expectedTokenBalance: Option[U256]
+    ) = {
+      val (alphAmount, _, tokens, _, _) =
+        blockFlow.getBalance(lockupScript, defaultUtxoLimit, true).rightValue
+      expectedAlphBalance is alphAmount
+      tokens.find(_._1 == tokenId).map(_._2) is expectedTokenBalance
+    }
+  }
+
+  it should "deploy contract with preapproved assets" in new ContractDeploymentFixture {
     def createToken(amount: U256): ContractId = {
       val issuanceInfo = Some(TokenIssuance.Info(vm.Val.U256(amount), Some(lockupScript)))
       val script =
@@ -2421,17 +3402,58 @@ class ServerUtilsSpec extends AlephiumSpec {
       initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
       initialTokenAmounts = Some(AVector(Token(tokenId, U256.unsafe(4))))
     )
-    implicit val serverUtils = new ServerUtils()
-    val result               = serverUtils.buildDeployContractTx(blockFlow, query).rightValue
-    signAndAddToMemPool(result.txId, result.unsignedTx, chainIndex, privateKey)
-    val block = mineFromMemPool(blockFlow, chainIndex)
-    addAndCheck(blockFlow, block)
 
-    val (alphAmount, _, tokens1, _, _) = blockFlow
-      .getBalance(LockupScript.P2C(result.contractAddress.contractId), defaultUtxoLimit, true)
-      .rightValue
-    alphAmount is ALPH.alph(2)
-    tokens1.find(_._1 == tokenId).map(_._2) is Some(U256.unsafe(4))
+    val result = buildDeployContractTx(query)
+
+    checkBalance(
+      LockupScript.P2C(result.contractAddress.contractId),
+      ALPH.alph(2),
+      tokenId,
+      Some(U256.unsafe(4))
+    )
+  }
+
+  it should "deploy contract with token issuance" in new ContractDeploymentFixture {
+    val query = BuildDeployContractTx(
+      fromPublicKey = publicKey.bytes,
+      bytecode = serialize(contract) ++ ByteString(0, 0),
+      initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
+      issueTokenAmount = Some(Amount(U256.unsafe(10))),
+      issueTokenTo = Some(Address.p2pkh(toPublicKey))
+    )
+
+    val result  = buildDeployContractTx(query)
+    val tokenId = TokenId.from(result.contractAddress.contractId)
+
+    checkBalance(
+      LockupScript.P2C(result.contractAddress.contractId),
+      ALPH.alph(2),
+      tokenId,
+      None
+    )
+
+    checkBalance(
+      LockupScript.p2pkh(toPublicKey),
+      dustUtxoAmount,
+      tokenId,
+      Some(U256.unsafe(10))
+    )
+  }
+
+  it should "fail when `issueTokenTo` is specified but `issueTokenAmount` is not" in new ContractDeploymentFixture {
+    val query = BuildDeployContractTx(
+      fromPublicKey = publicKey.bytes,
+      bytecode = serialize(contract) ++ ByteString(0, 0),
+      initialAttoAlphAmount = Some(Amount(ALPH.alph(2))),
+      issueTokenAmount = None,
+      issueTokenTo = Some(Address.p2pkh(publicKey))
+    )
+
+    serverUtils.buildDeployContractTx(blockFlow, query) is Left(
+      ApiError.BadRequest(
+        "`issueTokenTo` is specified, but `issueTokenAmount` is not specified"
+      )
+    )
   }
 
   private def generateDestination(
@@ -2475,7 +3497,7 @@ class ServerUtilsSpec extends AlephiumSpec {
     txTemplate
   }
 
-  private def checkAddressBalance(address: Address.Asset, amount: U256, utxoNum: Int = 1)(implicit
+  private def checkAddressBalance(address: Address, amount: U256, utxoNum: Int = 1)(implicit
       serverUtils: ServerUtils,
       blockFlow: BlockFlow
   ) = {

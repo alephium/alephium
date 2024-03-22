@@ -76,7 +76,8 @@ object StaticAnalysis {
       vm.TransferAlphToSelf,
       vm.TransferTokenToSelf,
       vm.DestroySelf,
-      vm.SelfAddress
+      vm.SelfAddress,
+      vm.PayGasFee
     )
 
   def checkCodeUsingContractAssets(
@@ -86,7 +87,8 @@ object StaticAnalysis {
   ): Unit = {
     if (func.useAssetsInContract && !method.instrs.exists(contractAssetsInstrs.contains(_))) {
       throw Compiler.Error(
-        s"Function ${Ast.funcName(contractId, func.id)} does not use contract assets, but its annotation of contract assets is turn on"
+        s"Function ${Ast.funcName(contractId, func.id)} does not use contract assets, but its annotation of contract assets is turn on",
+        func.sourceIndex
       )
     }
   }

@@ -21,13 +21,22 @@ import org.alephium.util.{AlephiumFixture, AlephiumSpec, AVector}
 class TypeSpec extends AlephiumSpec {
   it should "return correct signature" in new TypeSignatureFixture {
     contractAst.getFieldsSignature() is
-      "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2])"
+      "Contract Foo(aa:Bool,mut bb:U256,cc:I256,mut dd:ByteVec,ee:Address,ff:[[Bool;1];2],gg:Account,mut map:Map[U256,Account])"
     contractAst.getFieldNames() is
-      AVector("aa", "bb", "cc", "dd", "ee", "ff")
+      AVector("aa", "bb", "cc", "dd", "ee", "ff", "gg", "map")
     contractAst.getFieldTypes() is
-      AVector("Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]")
+      AVector(
+        "Bool",
+        "U256",
+        "I256",
+        "ByteVec",
+        "Address",
+        "[[Bool;1];2]",
+        "Account",
+        "Map[U256,Account]"
+      )
     contractAst.getFieldMutability() is
-      AVector(false, true, false, true, false, false)
+      AVector(false, true, false, true, false, false, false, true)
     contractAst.funcs.map(_.getArgNames()) is
       Seq(AVector("a", "b", "c", "d", "e", "f"))
     contractAst.funcs.map(_.getArgTypeSignatures()) is
@@ -54,12 +63,25 @@ class TypeSpec extends AlephiumSpec {
       AVector(false, false, false, false, false)
     scriptAst.events.map(_.signature) is Seq.empty
   }
+
+  it should "get the signature of array type" in {
+    Type.FixedSizeArray(Type.U256, 2).signature is "[U256;2]"
+    Type.FixedSizeArray(Type.NamedType(Ast.TypeId("Foo")), 2).signature is "[Foo;2]"
+    Type.FixedSizeArray(Type.FixedSizeArray(Type.U256, 3), 2).signature is "[[U256;3];2]"
+    Type
+      .FixedSizeArray(Type.FixedSizeArray(Type.NamedType(Ast.TypeId("Foo")), 3), 2)
+      .signature is "[[Foo;3];2]"
+  }
 }
 
 trait TypeSignatureFixture extends AlephiumFixture {
   val contractStr =
     s"""
-       |Contract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2]) {
+       |struct Account {
+       |  amount: U256,
+       |  id: ByteVec
+       |}
+       |Contract Foo(aa: Bool, mut bb: U256, cc: I256, mut dd: ByteVec, ee: Address, ff: [[Bool;1];2], gg: Account, @unused mut map: Map[U256, Account]) {
        |  event Bar(a: Bool, b: U256, d: ByteVec, e: Address)
        |
        |  const A = true
@@ -73,6 +95,7 @@ trait TypeSignatureFixture extends AlephiumFixture {
        |    emit Bar(aa, bb, dd, ee)
        |    emit Debug(`xx`)
        |    transferTokenToSelf!(callerAddress!(), ALPH, 1 alph)
+       |    let _ = gg
        |    b = 0
        |    bb = 0
        |    d = #
@@ -81,17 +104,24 @@ trait TypeSignatureFixture extends AlephiumFixture {
        |  }
        |}
        |""".stripMargin
-  lazy val compiledContract = Compiler.compileContractFull(contractStr).rightValue
+  lazy val project          = Compiler.compileProject(contractStr).rightValue
+  lazy val compiledContract = project._1.head
   lazy val CompiledContract(contract, contractAst, contractWarnings, _) = compiledContract
+  lazy val compiledStruct                                               = project._3.head
 
   val scriptStr =
     s"""
+       |struct Account {
+       |  amount: U256,
+       |  id: ByteVec
+       |}
        |TxScript Foo(aa: Bool, bb: U256, cc: I256, dd: ByteVec, ee: Address) {
        |  return
-       |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2]) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
+       |  pub fn bar(a: Bool, mut b: U256, c: I256, mut d: ByteVec, e: Address, f: [[Bool;1];2], g: Account) -> (U256, I256, ByteVec, Address, [[Bool;1];2]) {
        |    emit Debug(`xx`)
        |    b = 0
        |    d = #
+       |    let _ = g
        |    return b, c, d, e, f
        |  }
        |}

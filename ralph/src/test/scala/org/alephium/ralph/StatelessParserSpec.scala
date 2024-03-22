@@ -23,6 +23,7 @@ import org.alephium.util._
 
 // scalastyle:off no.equal file.size.limit
 class StatelessParserSpec extends AlephiumSpec {
+  val StatelessParser = new StatelessParser(None)
 
   it should "disallow mutable template params" in {
     def createProgram(params: String) =
@@ -152,10 +153,10 @@ class StatelessParserSpec extends AlephiumSpec {
       )
 
     val indexOfB = program.indexOf("Blah")
-    error is CompilerError.ExpectedEndOfInput('B', indexOfB)
+    error is CompilerError.ExpectedEndOfInput('B', indexOfB, None)
 
     if (!OperatingSystem.isWindows) {
-      error.toError(program).message is
+      error.format(program) is
         """-- error (8:1): Syntax error
           |8 |Blah
           |  |^

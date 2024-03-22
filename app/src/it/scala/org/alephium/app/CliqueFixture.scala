@@ -48,7 +48,7 @@ import org.alephium.flow.validation.BlockValidation
 import org.alephium.http.HttpFixture
 import org.alephium.json.Json._
 import org.alephium.protocol.{ALPH, PrivateKey, Signature, SignatureSchema}
-import org.alephium.protocol.model.{Address, Block, ChainIndex, TokenId, TransactionId}
+import org.alephium.protocol.model.{Address, Block, ChainIndex, GroupIndex, TokenId, TransactionId}
 import org.alephium.protocol.vm
 import org.alephium.protocol.vm.{GasPrice, LockupScript}
 import org.alephium.rpc.model.JsonRPC.NotificationUnsafe
@@ -80,6 +80,11 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
 
   def generateAccount: (String, String, String) = {
     val (priKey, pubKey) = SignatureSchema.generatePriPub()
+    (Address.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
+  }
+
+  def generateAccount(groupIndex: GroupIndex): (String, String, String) = {
+    val (priKey, pubKey) = groupIndex.generateKey
     (Address.p2pkh(pubKey).toBase58, pubKey.toHexString, priKey.toHexString)
   }
 
@@ -149,6 +154,18 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     val unsignedTx = request[BuildTransactionResult](buildTx, restPort)
     val submitTx   = submitTransaction(unsignedTx, privateKey)
     val res        = request[SubmitTxResult](submitTx, restPort)
+    res
+  }
+
+  def transferGeneric(
+      inputs: AVector[BuildMultiAddressesTransaction.Source],
+      privateKeys: AVector[String],
+      restPort: Int
+  ): SubmitTxResult = eventually {
+    val buildTx          = buildGenericTransaction(inputs)
+    val unsignedTx       = request[BuildTransactionResult](buildTx, restPort)
+    val submitMultisigTx = signAndSubmitMultisigTransaction(unsignedTx, privateKeys)
+    val res              = request[SubmitTxResult](submitMultisigTx, restPort)
     res
   }
 
@@ -428,6 +445,20 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     )
   }
 
+  def buildGenericTransaction(
+      inputs: AVector[BuildMultiAddressesTransaction.Source]
+  ): Int => HttpRequest = {
+    val p = s"""
+               |{
+               |  "from": ${write(inputs)}
+               |}
+        """.stripMargin
+    httpPost(
+      "/transactions/build-multi-addresses",
+      Some(p)
+    )
+  }
+
   def buildMultisigTransaction(
       fromAddress: String,
       fromPublicKeys: AVector[String],
@@ -630,8 +661,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
     httpPost(s"/contracts/compile-contract", Some(contract))
   }
 
-  def getContractState(address: String, group: Int) = {
-    httpGet(s"/contracts/${address}/state?group=${group}")
+  def getContractState(address: String) = {
+    httpGet(s"/contracts/${address}/state")
   }
 
   def getContractEvents(start: Int, address: Address) = {
@@ -692,7 +723,8 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
       gasPrice: Option[GasPrice] = None,
       initialImmFields: Option[AVector[vm.Val]] = None,
       initialMutFields: Option[AVector[vm.Val]] = None,
-      issueTokenAmount: Option[U256] = None
+      issueTokenAmount: Option[U256] = None,
+      initialAttoAlphAmount: Option[U256] = None
   ) = {
     val bytecode = code + Hex.toHexString(serialize(initialImmFields.getOrElse(AVector.empty))) +
       Hex.toHexString(serialize(initialMutFields.getOrElse(AVector.empty)))
@@ -704,6 +736,9 @@ class CliqueFixture(implicit spec: AlephiumActorSpec)
          |  ${gas.map(g => s""","gasAmount": $g""").getOrElse("")}
          |  ${gasPrice.map(g => s""","gasPrice": "$g"""").getOrElse("")}
          |  ${issueTokenAmount.map(v => s""","issueTokenAmount": "${v.v}"""").getOrElse("")}
+         |  ${initialAttoAlphAmount
+          .map(v => s""","initialAttoAlphAmount": "${v.v}"""")
+          .getOrElse("")}
          |}
          |""".stripMargin
     }

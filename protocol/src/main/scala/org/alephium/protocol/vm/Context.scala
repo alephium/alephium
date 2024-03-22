@@ -170,6 +170,14 @@ trait StatelessContext extends CostStrategy {
     }
   }
 
+  def checkGhostHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
+    if (getHardFork().isGhostEnabled()) {
+      okay
+    } else {
+      failed(InactiveInstr(instr))
+    }
+  }
+
   def txEnv: TxEnv
   def getInitialBalances(): ExeResult[MutBalances]
 
@@ -183,7 +191,9 @@ trait StatelessContext extends CostStrategy {
   def signatures: Stack[Signature] = txEnv.signatures
 
   def getTxPrevOutput(indexRaw: Val.U256): ExeResult[AssetOutput] = {
-    indexRaw.v.toInt.flatMap(txEnv.prevOutputs.get).toRight(Right(InvalidTxInputIndex))
+    indexRaw.v.toInt
+      .flatMap(txEnv.prevOutputs.get)
+      .toRight(Right(InvalidTxInputIndex(indexRaw.v.v)))
   }
 
   def getTxInputAddressAt(indexRaw: Val.U256): ExeResult[Val.Address] = {
@@ -205,7 +215,10 @@ trait StatelessContext extends CostStrategy {
         if (txEnv.prevOutputs.tail.forall(_.lockupScript == firstInput.lockupScript)) {
           Right(Val.Address(firstInput.lockupScript))
         } else {
-          failed(TxInputAddressesAreNotIdentical)
+          val addresses = txEnv.prevOutputs.map { v =>
+            Address.Asset(v.lockupScript)
+          }.toSet
+          failed(TxInputAddressesAreNotIdentical(addresses))
         }
       case None =>
         failed(NoTxInput)
@@ -282,7 +295,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
   ): ExeResult[Unit] = {
     val inputIndex = contractInputs.indexWhere(_._2.lockupScript.contractId == contractId)
     if (inputIndex == -1) {
-      failed(ContractAssetUnloaded)
+      failed(ContractAssetUnloaded(Address.contract(contractId)))
     } else {
       val (_, input) = contractInputs(inputIndex)
       if (contractOutput == input) {
@@ -359,7 +372,7 @@ trait StatefulContext extends StatelessContext with ContractPool {
           case Left(otherIOError) =>
             ioFailed(IOErrorLoadContract(otherIOError))
           case Right(_) =>
-            Left(Right(ContractAlreadyExists(contractId)))
+            Left(Right(ContractAlreadyExists(Address.contract(contractId))))
         }
       _ <- code.check(initialImmFields, initialMutFields)
       _ <- createContract(
