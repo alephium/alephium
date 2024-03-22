@@ -43,6 +43,7 @@ package object model {
 
   val maximalCodeSizePreLeman: Int = 12 * 1024 // 12KB
   val maximalCodeSizeLeman: Int    = 4 * 1024  // 4KB
+  val maximalCodeSizeRhone: Int    = 32 * 1024 // 32KB
   val maximalFieldSize: Int        = 3 * 1024  // 3KB
 
   val dustUtxoAmount: U256           = ALPH.nanoAlph(1000000)

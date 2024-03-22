@@ -166,8 +166,11 @@ object VM {
       codeBytes: ByteString,
       hardFork: HardFork
   ): ExeResult[GasBox] = {
-    val maximalCodeSize =
-      if (hardFork.isLemanEnabled()) maximalCodeSizeLeman else maximalCodeSizePreLeman
+    val maximalCodeSize = {
+      if (hardFork.isGhostEnabled()) { maximalCodeSizeRhone }
+      else if (hardFork.isLemanEnabled()) { maximalCodeSizeLeman }
+      else { maximalCodeSizePreLeman }
+    }
     if (codeBytes.length > maximalCodeSize) {
       failed(CodeSizeTooLarge(codeBytes.length, maximalCodeSize))
     } else {
