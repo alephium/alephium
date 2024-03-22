@@ -2788,7 +2788,7 @@
           "refId": "C"
         },
         {
-          "expr": "sum(rate(alephium_block_duration_milliseconds_sum[1m]))",
+          "expr": "sum(rate(alephium_block_duration_milliseconds_sum[1m])) / sum(rate(alephium_block_duration_milliseconds_count[1m]))",
           "interval": "",
           "legendFormat": "Average",
           "refId": "D"
