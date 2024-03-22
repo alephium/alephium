@@ -102,10 +102,10 @@ object Coinbase {
     val lockTime = blockTs + networkConfig.coinbaseLockupPeriod
     val hardFork = networkConfig.getHardFork(blockTs)
     val outputs = if (hardFork.isGhostEnabled()) {
-      assume(coinbaseData.isV2)
+      assume(coinbaseData.isGhostEnabled)
       coinbaseOutputsGhost(coinbaseData, miningReward, lockupScript, lockTime, uncleMiners)
     } else {
-      assume(!coinbaseData.isV2)
+      assume(!coinbaseData.isGhostEnabled)
       coinbaseOutputsPreGhost(coinbaseData, miningReward, lockupScript, lockTime)
     }
     Transaction(

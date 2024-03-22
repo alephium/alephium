@@ -38,9 +38,9 @@ object CoinbaseDataPrefix {
 
 sealed trait CoinbaseData {
   def prefix: CoinbaseDataPrefix
-  def isV2: Boolean = this match {
-    case _: CoinbaseDataV2 => true
-    case _                 => false
+  def isGhostEnabled: Boolean = this match {
+    case _: CoinbaseDataV1 => false
+    case _                 => true
   }
 }
 
