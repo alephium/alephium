@@ -541,6 +541,23 @@ class VMSpec extends AlephiumSpec with ContextGenerators with NetworkConfigFixtu
       ByteString.fromArrayUnsafe(Array.ofDim[Byte](4 * 1024)),
       HardFork.Leman
     ) isE GasBox.zero
+
+    VM
+      .checkCodeSize(
+        minimalGas,
+        ByteString.fromArrayUnsafe(Array.ofDim[Byte](32 * 1024 + 1)),
+        HardFork.Ghost
+      )
+      .leftValue
+      .rightValue
+      .toString is "Code size 32769 bytes is too large, max size: 32768 bytes"
+
+    VM
+      .checkCodeSize(
+        GasBox.unsafe(200 + 32 * 1024),
+      ByteString.fromArrayUnsafe(Array.ofDim[Byte](32 * 1024)),
+      HardFork.Ghost
+    ) isE GasBox.zero
   }
 
   it should "check field size" in {
