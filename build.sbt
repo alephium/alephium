@@ -212,7 +212,8 @@ lazy val app = mainProject("app")
     docker / imageNames := {
       dockerImageNames(
         baseImageName = "alephium/dev-alephium",
-        versionTag = version.value.replace('+', '_')
+        versionTag = version.value.replace('+', '_'),
+        gitTag = git.gitCurrentTags.value.headOption.getOrElse("")
       )
     },
     buildInfoKeys := Seq[BuildInfoKey](
@@ -300,9 +301,16 @@ lazy val tools = mainProject("tools")
     docker / imageNames := {
       dockerImageNames(
         baseImageName = "alephium/dev-alephium-tools",
-        versionTag = version.value.replace('+', '_')
+        versionTag = version.value.replace('+', '_'),
+        gitTag = git.gitCurrentTags.value.headOption.getOrElse("")
       )
-    }
+    },
+    docker / buildOptions := BuildOptions.apply(
+      cache = false,
+      removeIntermediateContainers = BuildOptions.Remove.Always,
+      pullBaseImage = BuildOptions.Pull.Always,
+      platforms = List("linux/amd64", "linux/arm64", "linux/arm/v7"),
+    )
   )
   .dependsOn(app)
 
@@ -526,12 +534,19 @@ val wartsTestExcludes = wartsCompileExcludes ++ Seq(
   Wart.OptionPartial
 )
 
-def dockerImageNames(baseImageName: String, versionTag: String): Seq[ImageName] = {
-  Seq(
-    ImageName(baseImageName + ":latest"),
-    ImageName(baseImageName + ":" + versionTag),
-    ImageName(baseImageName + ":" + versionTag + "-jdk17")
-  )
+def dockerImageNames(baseImageName: String, versionTag: String, gitTag: String): Seq[ImageName] = {
+  if (gitTag.contains("rhone")) {
+    Seq(
+      ImageName(baseImageName + ":" + gitTag),
+      ImageName(baseImageName + ":" + gitTag + "-jdk17")
+    )
+  } else {
+    Seq(
+      ImageName(baseImageName + ":latest"),
+      ImageName(baseImageName + ":" + versionTag),
+      ImageName(baseImageName + ":" + versionTag + "-jdk17")
+    )
+  }
 }
 
 addCommandAlias(
