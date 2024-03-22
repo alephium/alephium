@@ -188,7 +188,9 @@ object Instr {
     LoadLocalByIndex, StoreLocalByIndex, Dup, AssertWithErrorCode, Swap,
     BlockHash, DEBUG, TxGasPrice, TxGasAmount, TxGasFee,
     I256Exp, U256Exp, U256ModExp, VerifyBIP340Schnorr, GetSegregatedSignature, MulModN, AddModN,
-    U256ToString, I256ToString, BoolToString
+    U256ToString, I256ToString, BoolToString,
+    /* Below are instructions for Ghost hard fork */
+    GroupOfAddress
   )
   val statefulInstrs0: AVector[InstrCompanion[StatefulContext]] = AVector(
     LoadMutField, StoreMutField, CallExternal,
@@ -598,6 +600,19 @@ case object MinimalContractDeposit
     with StatefulInstrCompanion0 {
   def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
     frame.pushOpStack(Val.U256(model.minimalAlphInContract))
+  }
+}
+
+case object GroupOfAddress
+    extends GhostInstrWithSimpleGas[StatelessContext]
+    with GasLow
+    with StatelessInstrCompanion0 {
+  def runWithGhost[C <: StatelessContext](frame: Frame[C]): ExeResult[Unit] = {
+    for {
+      address <- frame.popOpStackAddress()
+      group = address.lockupScript.groupIndex(frame.ctx.groupConfig)
+      _ <- frame.pushOpStack(Val.U256(util.U256.unsafe(group.value)))
+    } yield ()
   }
 }
 

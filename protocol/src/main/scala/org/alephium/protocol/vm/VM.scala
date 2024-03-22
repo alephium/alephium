@@ -20,7 +20,7 @@ import scala.annotation.tailrec
 
 import akka.util.ByteString
 
-import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, EitherF, Math, U256}
 
@@ -428,7 +428,10 @@ object StatelessVM {
       initialGas: GasBox,
       script: StatelessScript,
       args: AVector[Val]
-  )(implicit networkConfig: NetworkConfig): ExeResult[AssetScriptExecution] = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      groupConfig: GroupConfig
+  ): ExeResult[AssetScriptExecution] = {
     val context = StatelessContext(blockEnv, txEnv, initialGas)
     val obj     = script.toObject
     execute(context, obj, args)
@@ -469,6 +472,7 @@ object StatefulVM {
       generatedOutputs: AVector[TxOutput]
   )
 
+  // scalastyle:off parameter.number
   def runTxScript(
       worldState: WorldState.Staging,
       blockEnv: BlockEnv,
@@ -476,10 +480,15 @@ object StatefulVM {
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      groupConfig: GroupConfig
+  ): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
     runTxScript(context, script)
   }
+  // scalastyle:on parameter.number
 
   def runTxScript(
       context: StatefulContext,
@@ -491,6 +500,7 @@ object StatefulVM {
     } yield result
   }
 
+  // scalastyle:off parameter.number
   def runTxScriptMockup(
       worldState: WorldState.Staging,
       blockEnv: BlockEnv,
@@ -498,10 +508,15 @@ object StatefulVM {
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      groupConfig: GroupConfig
+  ): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
     runTxScriptMockup(context, script)
   }
+  // scalastyle:on parameter.number
 
   def runTxScriptMockup(
       context: StatefulContext,

@@ -1027,6 +1027,16 @@ object BuiltIn {
     )
   }
 
+  val groupOfAddress: BuiltIn[StatelessContext] =
+    SimpleBuiltIn.utilsSimple(
+      "groupOfAddress",
+      Seq(Type.Address),
+      Seq(Type.U256),
+      GroupOfAddress,
+      Seq("address" -> "the input address"),
+      retComment = "the group of the input address"
+    )
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -1084,7 +1094,8 @@ object BuiltIn {
     addModN,
     u256Max,
     i256Max,
-    i256Min
+    i256Min,
+    groupOfAddress
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap
