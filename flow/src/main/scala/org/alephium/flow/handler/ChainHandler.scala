@@ -22,7 +22,7 @@ import org.alephium.flow.core.{BlockFlow, BlockHeaderChain}
 import org.alephium.flow.model.DataOrigin
 import org.alephium.flow.validation._
 import org.alephium.io.{IOError, IOResult}
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs, NetworkConfig}
 import org.alephium.protocol.mining.HashRate
 import org.alephium.protocol.model.{BlockHeader, ChainIndex, FlowData}
 import org.alephium.serde.{serialize, Serde}
@@ -99,7 +99,8 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
   import ChainHandler._
 
   implicit val brokerConfig: BrokerConfig = blockFlow.brokerConfig
-  def consensusConfig: ConsensusConfig
+  def networkConfig: NetworkConfig
+  def consensusConfigs: ConsensusConfigs
 
   def chainValidationTotalLabeled: Counter.Child
   def chainValidationDurationMilliSecondsLabeled: Histogram.Child
@@ -191,11 +192,12 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
   def measure(data: T): Unit
 
   def showHeader(header: BlockHeader): String = {
-    val total     = blockFlow.numHashes
-    val index     = header.chainIndex
-    val chain     = blockFlow.getHeaderChain(header)
-    val hashRate  = HashRate.from(header.target, consensusConfig.blockTargetTime)
-    val blockTime = chain.getBlockTime(header).fold(_ => "?ms", time => s"${time.millis}ms")
+    val total           = blockFlow.numHashes
+    val index           = header.chainIndex
+    val chain           = blockFlow.getHeaderChain(header)
+    val consensusConfig = consensusConfigs.getConsensusConfig(header.timestamp)(networkConfig)
+    val hashRate        = HashRate.from(header.target, consensusConfig.blockTargetTime)
+    val blockTime       = chain.getBlockTime(header).fold(_ => "?ms", time => s"${time.millis}ms")
 
     s"hash: ${header.hash.toHexString}; ${index.prettyString}; ${chain.showHeight(
         header.hash
@@ -219,7 +221,8 @@ abstract class ChainHandler[T <: FlowData: Serde, S <: InvalidStatus, R, V <: Va
       }
     }
 
-    val hashRate = HashRate.from(header.target, consensusConfig.blockTargetTime)
+    val consensusConfig = consensusConfigs.getConsensusConfig(header.timestamp)(networkConfig)
+    val hashRate        = HashRate.from(header.target, consensusConfig.blockTargetTime)
     targetHashRateHertzLabeled.set(hashRate.value.doubleValue)
 
     chain

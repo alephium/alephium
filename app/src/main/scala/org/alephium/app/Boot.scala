@@ -29,7 +29,7 @@ import io.prometheus.client.Gauge
 import io.prometheus.client.hotspot.DefaultExports
 
 import org.alephium.flow.setting.{AlephiumConfig, Configs, Platform}
-import org.alephium.protocol.model.Block
+import org.alephium.protocol.model.{Block, NetworkId}
 import org.alephium.util.{AVector, Duration, Env}
 
 object Boot extends App with StrictLogging {
@@ -50,6 +50,15 @@ class BootUp extends StrictLogging {
   implicit val config: AlephiumConfig = AlephiumConfig.load(typesafeConfig, "alephium")
   implicit val apiConfig: ApiConfig   = ApiConfig.load(typesafeConfig, "alephium.api")
   val flowSystem: ActorSystem         = ActorSystem("flow", typesafeConfig)
+
+  if (
+    config.network.networkId == NetworkId.AlephiumMainNet || config.network.networkId == NetworkId.AlephiumTestNet
+  ) {
+    logger.error(
+      "This is a testing release for Rhone upgrade, please don't use it for mainnet or testnet"
+    )
+    System.exit(-1)
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.GlobalExecutionContext"))
   implicit val executionContext: ExecutionContext =

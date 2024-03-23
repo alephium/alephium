@@ -46,7 +46,7 @@ object Miner extends LazyLogging {
   ): Option[(Block, U256)] = {
     mine(index, template.headerBlob, Target.unsafe(template.target)).map {
       case (nonce, miningCount) =>
-        val blockBlob = nonce.value ++ template.headerBlob ++ template.txsBlob
+        val blockBlob = template.toBlockBlob(nonce)
         deserialize[Block](blockBlob) match {
           case Left(error)  => throw new RuntimeException(s"Unable to deserialize block: $error")
           case Right(block) => block -> miningCount
@@ -61,7 +61,7 @@ object Miner extends LazyLogging {
     val nonceStep = U256.unsafe(Int.MaxValue)
     mine(index, template.headerBlob, target, nonceStep) match {
       case Some((nonce, _)) =>
-        val blockBlob = nonce.value ++ template.headerBlob ++ template.txsBlob
+        val blockBlob = template.toBlockBlob(nonce)
         deserialize[Block](blockBlob) match {
           case Left(error)  => throw new RuntimeException(s"Unable to deserialize block: $error")
           case Right(block) => block

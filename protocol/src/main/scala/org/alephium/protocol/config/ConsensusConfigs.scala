@@ -16,26 +16,24 @@
 
 package org.alephium.protocol.config
 
-import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.Target
-import org.alephium.util.Duration
+import org.alephium.protocol.model.{HardFork, Target}
+import org.alephium.util.{Duration, Math, TimeStamp}
 
-trait ConsensusConfigFixture {
-  def groupConfig: GroupConfig
+trait ConsensusConfigs {
+  def mainnet: ConsensusConfig
+  def ghost: ConsensusConfig
 
-  def consensusConfig: ConsensusConfig
-}
+  lazy val maxAllowedMiningTarget: Target = Math.max(mainnet.maxMiningTarget, ghost.maxMiningTarget)
 
-object ConsensusConfigFixture {
-  trait Default extends ConsensusConfigFixture with GroupConfigFixture.Default {
-    implicit lazy val consensusConfig: ConsensusConfig = new ConsensusConfig {
-      override val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
-
-      def uncleDependencyGapTime: Duration = blockTargetTime
-
-      override val maxMiningTarget: Target = Target.Max
-
-      override val emission: Emission = Emission(groupConfig, blockTargetTime)
-    }
+  def getConsensusConfig(hardFork: HardFork): ConsensusConfig = {
+    if (hardFork.isGhostEnabled()) ghost else mainnet
   }
+
+  def getConsensusConfig(ts: TimeStamp)(implicit networkConfig: NetworkConfig): ConsensusConfig = {
+    getConsensusConfig(networkConfig.getHardFork(ts))
+  }
+
+  // scalastyle:off magic.number
+  val maxHeaderTimeStampDrift: Duration = Duration.ofSecondsUnsafe(15) // same as geth
+  // scalastyle:on magic.number
 }

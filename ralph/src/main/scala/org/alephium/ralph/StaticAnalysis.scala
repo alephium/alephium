@@ -76,7 +76,8 @@ object StaticAnalysis {
       vm.TransferAlphToSelf,
       vm.TransferTokenToSelf,
       vm.DestroySelf,
-      vm.SelfAddress
+      vm.SelfAddress,
+      vm.PayGasFee
     )
 
   def checkCodeUsingContractAssets(

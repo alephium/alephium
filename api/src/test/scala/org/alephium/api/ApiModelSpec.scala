@@ -1077,9 +1077,9 @@ class ApiModelSpec extends JsonFixture with ApiModelFixture with EitherValues wi
          |  "codeHash": "8232ffadc0c21503d4968607332b425617fd05e62edd0a27bb34df02fd191016",
          |  "codeHashDebug":"049ce2b22e2eed2d6b92326f2e4677aa899a50f7922f8da3102dbe36ca1ae965",
          |  "fields": {
-         |    "names": ["aa","bb","cc","dd","ee","ff", "gg"],
-         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]", "Account"],
-         |    "isMutable": [false, true, false, true, false, false, false]
+         |    "names": ["aa","bb","cc","dd","ee","ff", "gg", "map"],
+         |    "types": ["Bool", "U256", "I256", "ByteVec", "Address", "[[Bool;1];2]", "Account", "Map[U256,Account]"],
+         |    "isMutable": [false, true, false, true, false, false, false, true]
          |  },
          |  "functions": [
          |    {

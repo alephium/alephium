@@ -17,14 +17,14 @@
 package org.alephium.flow.validation
 
 import org.alephium.flow.core._
-import org.alephium.protocol.config.{BrokerConfig, ConsensusConfig}
+import org.alephium.protocol.config.{BrokerConfig, ConsensusConfigs}
 import org.alephium.protocol.mining.PoW
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Forest}
 
 abstract class Validation[T <: FlowData, I <: InvalidStatus, R] {
   implicit def brokerConfig: BrokerConfig
-  implicit def consensusConfig: ConsensusConfig
+  def consensusConfigs: ConsensusConfigs
 
   def validate(data: T, flow: BlockFlow): ValidationResult[I, R]
 
@@ -45,7 +45,9 @@ object Validation {
 
   def preValidate[T <: FlowData](
       datas: AVector[T]
-  )(implicit consensusConfig: ConsensusConfig): Boolean = {
-    datas.forall { data => (data.target <= consensusConfig.maxMiningTarget) && PoW.checkWork(data) }
+  )(implicit consensusConfigs: ConsensusConfigs): Boolean = {
+    datas.forall { data =>
+      (data.target <= consensusConfigs.maxAllowedMiningTarget) && PoW.checkWork(data)
+    }
   }
 }

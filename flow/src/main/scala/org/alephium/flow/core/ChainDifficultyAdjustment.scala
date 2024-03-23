@@ -26,7 +26,6 @@ import org.alephium.protocol.model.{BlockHash, Target}
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait ChainDifficultyAdjustment {
-  implicit def consensusConfig: ConsensusSetting
   implicit def networkConfig: NetworkConfig
 
   val difficultyBombPatchConfig =
@@ -48,7 +47,7 @@ trait ChainDifficultyAdjustment {
       hash: BlockHash,
       height: Int,
       nextTimeStamp: TimeStamp
-  ): IOResult[Option[Duration]] = {
+  )(implicit consensusConfig: ConsensusSetting): IOResult[Option[Duration]] = {
     val earlyHeight = height - consensusConfig.powAveragingWindow - 1
     assume(earlyHeight >= ALPH.GenesisHeight)
     calTimeSpan(hash, height).map { case (timestampLast, timestampNow) =>
@@ -66,7 +65,7 @@ trait ChainDifficultyAdjustment {
   final protected[core] def calTimeSpan(
       hash: BlockHash,
       height: Int
-  ): IOResult[(TimeStamp, TimeStamp)] = {
+  )(implicit consensusConfig: ConsensusSetting): IOResult[(TimeStamp, TimeStamp)] = {
     val earlyHeight = height - consensusConfig.powAveragingWindow - 1
     assume(earlyHeight >= ALPH.GenesisHeight)
     for {
@@ -110,7 +109,7 @@ trait ChainDifficultyAdjustment {
       currentTarget: Target,
       currentTimeStamp: TimeStamp,
       nextTimeStamp: TimeStamp
-  ): IOResult[Target] = {
+  )(implicit consensusConfig: ConsensusSetting): IOResult[Target] = {
     getHeight(hash).flatMap {
       case height if ChainDifficultyAdjustment.enoughHeight(height) =>
         calTimeSpan(hash, height, nextTimeStamp).flatMap {

@@ -779,9 +779,10 @@ abstract class RestServerSpec(
   it should "call GET /infos/chain-params" in {
     Get(s"/infos/chain-params") check { response =>
       response.code is StatusCode.Ok
+      val now = TimeStamp.now()
       response.as[ChainParams] is ChainParams(
         networkConfig.networkId,
-        consensusConfig.numZerosAtLeastInHash,
+        consensusConfigs.getConsensusConfig(now).numZerosAtLeastInHash,
         brokerConfig.groupNumPerBroker,
         brokerConfig.groups
       )
@@ -1182,7 +1183,7 @@ abstract class RestServerSpec(
 
   it should "convert target to hashrate" in {
     val target = "1b032b55"
-
+    val now    = TimeStamp.now()
     Post(
       s"/utils/target-to-hashrate",
       body = s"""
@@ -1195,7 +1196,12 @@ abstract class RestServerSpec(
 
       val hashrateResponse = response.as[TargetToHashrate.Result]
       val expected =
-        HashRate.from(Target.unsafe(Hex.unsafe(target)), consensusConfig.blockTargetTime).value
+        HashRate
+          .from(
+            Target.unsafe(Hex.unsafe(target)),
+            consensusConfigs.getConsensusConfig(now).blockTargetTime
+          )
+          .value
 
       hashrateResponse.hashrate is expected
     }

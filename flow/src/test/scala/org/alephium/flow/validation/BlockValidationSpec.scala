@@ -16,6 +16,8 @@
 
 package org.alephium.flow.validation
 
+import scala.util.Random
+
 import akka.util.ByteString
 import org.scalatest.Assertion
 import org.scalatest.EitherValues._
@@ -27,10 +29,11 @@ import org.alephium.protocol.{ALPH, Hash, Signature, SignatureSchema}
 import org.alephium.protocol.config._
 import org.alephium.protocol.model._
 import org.alephium.protocol.vm
-import org.alephium.protocol.vm.{GasBox, GasPrice, Method, StatefulScript}
+import org.alephium.protocol.vm.{GasBox, GasPrice, LockupScript, Method, StatefulScript}
 import org.alephium.serde.serialize
 import org.alephium.util.{AlephiumSpec, AVector, TimeStamp, U256}
 
+// scalastyle:off file.size.limit
 class BlockValidationSpec extends AlephiumSpec {
 
   trait Fixture extends BlockValidation with FlowFixture with NoIndexModelGeneratorsLike {
@@ -49,9 +52,9 @@ class BlockValidationSpec extends AlephiumSpec {
           block.copy(transactions = block.nonCoinbase :+ f(block.coinbase))
         }
 
-        def output(f: AssetOutput => AssetOutput): Block = {
+        def output(f: AssetOutput => AssetOutput, index: Int = 0): Block = {
           val outputs = block.coinbase.unsigned.fixedOutputs
-          unsignedTx(_.copy(fixedOutputs = outputs.replace(0, f(outputs.head))))
+          unsignedTx(_.copy(fixedOutputs = outputs.replace(index, f(outputs(index)))))
         }
       }
 
@@ -89,7 +92,8 @@ class BlockValidationSpec extends AlephiumSpec {
 
   trait GenesisForkFixture extends Fixture {
     override val configValues = Map(
-      ("alephium.network.leman-hard-fork-timestamp ", TimeStamp.now().plusHoursUnsafe(1).millis)
+      ("alephium.network.leman-hard-fork-timestamp", TimeStamp.now().plusHoursUnsafe(1).millis),
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis)
     )
     networkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
   }
@@ -166,36 +170,98 @@ class BlockValidationSpec extends AlephiumSpec {
     block.Coinbase.tx(_.copy(scriptSignatures = testSignatures)).fail()
   }
 
-  it should "check coinbase data" in new Fixture {
-    val block        = emptyBlock(blockFlow, chainIndex)
-    val coinbaseData = block.coinbase.unsigned.fixedOutputs.head.additionalData
-    val expected     = serialize(CoinbaseFixedData.from(chainIndex, block.header.timestamp))
-    coinbaseData.startsWith(expected) is true
+  trait PreGhostForkFixture extends Fixture {
+    override val configValues = Map(
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis)
+    )
+  }
 
-    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk)
+  trait CoinbaseDataFixture extends Fixture {
+    def block: Block
+    def uncles: AVector[BlockHash]
+    lazy val coinbaseData: CoinbaseData =
+      CoinbaseData.from(chainIndex, block.timestamp, uncles, ByteString.empty)
+
+    def wrongTimeStamp(ts: TimeStamp): ByteString = {
+      serialize(CoinbaseData.from(chainIndex, ts, uncles, ByteString.empty))
+    }
+
+    def wrongChainIndex(chainIndex: ChainIndex): ByteString = {
+      serialize(
+        CoinbaseData.from(
+          chainIndex,
+          block.header.timestamp,
+          uncles,
+          ByteString.empty
+        )
+      )
+    }
+  }
+
+  it should "check coinbase data for pre-ghost hardfork" in new CoinbaseDataFixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
+    networkConfig.getHardFork(TimeStamp.now()) isnot HardFork.Ghost
+
+    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
+
+    val block  = emptyBlock(blockFlow, chainIndex)
+    val uncles = AVector.empty
+    block.coinbase.unsigned.fixedOutputs.head.additionalData is serialize(coinbaseData)
+    block.pass()
 
     info("wrong block timestamp")
-    val wrongTimestamp =
-      serialize(CoinbaseFixedData.from(chainIndex, TimeStamp.now().plusSecondsUnsafe(5)))
-    block.Coinbase.output(_.copy(additionalData = wrongTimestamp)).fail(InvalidCoinbaseData)
+    val data0 = wrongTimeStamp(block.timestamp.plusSecondsUnsafe(5))
+    block.Coinbase.output(_.copy(additionalData = data0)).fail(InvalidCoinbaseData)
 
     info("wrong chain index")
-    val wrongChainIndex = {
-      val index = chainIndexGen.retryUntil(_ != chainIndex).sample.get
-      serialize(CoinbaseFixedData.from(index, block.header.timestamp))
-    }
-    block.Coinbase.output(_.copy(additionalData = wrongChainIndex)).fail(InvalidCoinbaseData)
+    val data1 = wrongChainIndex(chainIndexGen.retryUntil(_ != chainIndex).sample.get)
+    block.Coinbase.output(_.copy(additionalData = data1)).fail(InvalidCoinbaseData)
 
     info("wrong format")
     val wrongFormat = ByteString("wrong-coinbase-data-format")
     block.Coinbase.output(_.copy(additionalData = wrongFormat)).fail(InvalidCoinbaseData)
   }
 
-  it should "check coinbase locked amount" in new Fixture {
+  it should "check coinbase data for ghost hardfork" in new CoinbaseDataFixture {
+    override val configValues = Map(("alephium.network.ghost-hard-fork-timestamp", 0))
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+
+    implicit val validator = (blk: Block) => checkCoinbaseData(blk.chainIndex, blk).map(_ => ())
+
+    val uncleBlock = blockGen(chainIndex).sample.get
+    val uncles     = AVector(uncleBlock.hash)
+    val block = mineWithoutCoinbase(
+      blockFlow,
+      chainIndex,
+      AVector.empty,
+      TimeStamp.now(),
+      uncles.map(hash => (hash, p2pkScriptGen(chainIndex.to).sample.get.lockup, 1))
+    )
+    block.coinbase.unsigned.fixedOutputs.head.additionalData is serialize(coinbaseData)
+    block.pass()
+
+    info("wrong block timestamp")
+    val data0 = wrongTimeStamp(block.timestamp.plusSecondsUnsafe(5))
+    block.Coinbase.output(_.copy(additionalData = data0)).fail(InvalidCoinbaseData)
+
+    info("wrong chain index")
+    val data1 = wrongChainIndex(chainIndexGen.retryUntil(_ != chainIndex).sample.get)
+    block.Coinbase.output(_.copy(additionalData = data1)).fail(InvalidCoinbaseData)
+
+    info("wrong format")
+    val wrongFormat = ByteString("wrong-coinbase-data-format")
+    block.Coinbase.output(_.copy(additionalData = wrongFormat)).fail(InvalidCoinbaseData)
+  }
+
+  it should "check coinbase locked amount pre-ghost" in new Fixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     val block              = emptyBlock(blockFlow, chainIndex)
+    val consensusConfig    = consensusConfigs.getConsensusConfig(block.timestamp)
     val miningReward       = consensusConfig.emission.reward(block.header).miningReward
     val lockedAmount       = miningReward
-    implicit val validator = (blk: Block) => checkLockedReward(blk, lockedAmount)
+    implicit val validator = (blk: Block) => checkLockedReward(blk, AVector(lockedAmount))
 
     info("valid")
     block.pass()
@@ -207,14 +273,17 @@ class BlockValidationSpec extends AlephiumSpec {
     block.Coinbase.output(_.copy(lockTime = TimeStamp.now())).fail(InvalidCoinbaseLockupPeriod)
   }
 
-  it should "check coinbase reward" in new Fixture {
+  it should "check coinbase reward pre-ghost" in new Fixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     val block = emptyBlock(blockFlow, chainIndex)
     implicit val validator = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
-      checkCoinbase(blk.chainIndex, blk, groupView, HardFork.Leman)
+      checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Leman)
     }
 
-    val miningReward = consensusConfig.emission.reward(block.header).miningReward
+    val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
+    val miningReward    = consensusConfig.emission.reward(block.header).miningReward
     block.Coinbase.output(_.copy(amount = miningReward)).pass()
 
     val invalidMiningReward = miningReward.subUnsafe(1)
@@ -225,15 +294,16 @@ class BlockValidationSpec extends AlephiumSpec {
 
     implicit val validator = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
-      checkCoinbase(blk.chainIndex, blk, groupView, HardFork.Mainnet)
+      checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Mainnet)
     }
 
     val block0 = transfer(blockFlow, chainIndex)
     block0.pass()
 
     info("gas reward is set to 1/2 of miningReward, miningReward not enough")
-    val miningReward = consensusConfig.emission.reward(block0.header).miningReward
-    val block1       = block0.replaceTxGas(miningReward)
+    val consensusConfig = consensusConfigs.getConsensusConfig(block0.timestamp)
+    val miningReward    = consensusConfig.emission.reward(block0.header).miningReward
+    val block1          = block0.replaceTxGas(miningReward)
     block1.fail(InvalidCoinbaseReward)
 
     info("adjust the miningReward to account for the adjusted gas reward")
@@ -248,17 +318,20 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "check gas reward for Leman fork" in new Fixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     networkConfig.getHardFork(TimeStamp.now()).isLemanEnabled() is true
 
     implicit val validator = (blk: Block) => {
       val groupView = blockFlow.getMutableGroupView(blk).rightValue
-      checkCoinbase(blk.chainIndex, blk, groupView, HardFork.Leman)
+      checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Leman)
     }
 
     val block = transfer(blockFlow, chainIndex)
     block.pass()
 
-    val miningReward = consensusConfig.emission.reward(block.header).miningReward
+    val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
+    val miningReward    = consensusConfig.emission.reward(block.header).miningReward
     block.coinbase.unsigned.fixedOutputs.head.amount is miningReward
   }
 
@@ -447,27 +520,32 @@ class BlockValidationSpec extends AlephiumSpec {
   }
 
   it should "invalidate blocks with breaking instrs" in new Fixture {
+    override val configValues =
+      Map(("alephium.network.ghost-hard-fork-timestamp", TimeStamp.Max.millis))
     override lazy val chainIndex: ChainIndex = ChainIndex.unsafe(0, 0)
     val newStorages =
       StoragesFixture.buildStorages(rootPath.resolveSibling(Hash.generate.toHexString))
     val genesisNetworkConfig = new NetworkConfigFixture.Default {
       override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+      override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     }.networkConfig
-    val lemanNetworkConfig = (new NetworkConfigFixture.Default {}).networkConfig
+    val lemanNetworkConfig = new NetworkConfigFixture.Default {
+      override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
+    }.networkConfig
 
     genesisNetworkConfig.getHardFork(TimeStamp.now()) is HardFork.Mainnet
     lemanNetworkConfig.getHardFork(TimeStamp.now()) is HardFork.Leman
     val blockflowGenesis = BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)(
       implicitly,
       genesisNetworkConfig,
-      blockFlow.consensusConfig,
+      blockFlow.consensusConfigs,
       implicitly,
       implicitly
     )
     val blockflowLeman = BlockFlow.fromGenesisUnsafe(newStorages, config.genesisBlocks)(
       implicitly,
       lemanNetworkConfig,
-      blockFlow.consensusConfig,
+      blockFlow.consensusConfigs,
       implicitly,
       implicitly
     )
@@ -484,5 +562,420 @@ class BlockValidationSpec extends AlephiumSpec {
       UsingBreakingInstrs
     )
     validatorLeman.validate(block, blockflowLeman).isRight is true
+  }
+
+  trait GhostCoinbaseFixture extends Fixture {
+    def randomLockupScript: LockupScript.Asset = {
+      val (_, toPublicKey) = chainIndex.to.generateKey
+      LockupScript.p2pkh(toPublicKey)
+    }
+
+    def getMiningReward(block: Block): U256 = {
+      val consensusConfig = consensusConfigs.getConsensusConfig(block.timestamp)
+      consensusConfig.emission.reward(block.header).miningReward
+    }
+
+    def mineBlock(parentHash: BlockHash): Block = {
+      val miner       = randomLockupScript
+      val template0   = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+      val parentIndex = brokerConfig.groups - 1 + chainIndex.to.value
+      val newDeps     = template0.deps.replace(parentIndex, parentHash)
+      val template1 = template0
+        .rebuild(template0.transactions.init, AVector.empty, miner)
+        .copy(
+          deps = newDeps,
+          depStateHash =
+            blockFlow.getDepStateHash(BlockDeps.unsafe(newDeps), chainIndex.from).rightValue
+        )
+      mine(blockFlow, template1)
+    }
+
+    def mineBlockWith1Uncle(heightDiff: Int): Block = {
+      (0 until heightDiff).foreach(_ => addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex)))
+      val maxHeight  = blockFlow.getMaxHeight(chainIndex).rightValue
+      val parentHash = blockFlow.getHashes(chainIndex, maxHeight - heightDiff).rightValue.head
+      addAndCheck(blockFlow, mineBlock(parentHash))
+      val block       = mineBlockTemplate(blockFlow, chainIndex)
+      val uncleHashes = block.uncleHashes.rightValue
+      uncleHashes.length is 1
+      val blockHeight = maxHeight + 1
+      (blockHeight - blockFlow.getHeight(uncleHashes.head).rightValue) is heightDiff
+      block
+    }
+
+    def mineBlockWith2Uncle(heightDiff0: Int, heightDiff1: Int): Block = {
+      assume(heightDiff0 <= heightDiff1)
+      (0 until ALPH.MaxUncleAge).foreach(_ =>
+        addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+      )
+      val maxHeight   = blockFlow.getMaxHeight(chainIndex).rightValue
+      val parentHash0 = blockFlow.getHashes(chainIndex, maxHeight - heightDiff0).rightValue.head
+      addAndCheck(blockFlow, mineBlock(parentHash0))
+      val parentHash1 = blockFlow.getHashes(chainIndex, maxHeight - heightDiff1).rightValue.head
+      addAndCheck(blockFlow, mineBlock(parentHash1))
+
+      val block       = mineBlockTemplate(blockFlow, chainIndex)
+      val uncleHashes = block.uncleHashes.rightValue
+      uncleHashes.length is 2
+      val blockHeight = maxHeight + 1
+      (blockHeight - blockFlow.getHeight(uncleHashes(0)).rightValue) is heightDiff0
+      (blockHeight - blockFlow.getHeight(uncleHashes(1)).rightValue) is heightDiff1
+      block
+    }
+  }
+
+  it should "check coinbase locked amount ghost" in new GhostCoinbaseFixture {
+    {
+      info("block has no uncle")
+      val block              = emptyBlock(blockFlow, chainIndex)
+      val miningReward       = getMiningReward(block)
+      val mainChainReward    = Coinbase.calcMainChainReward(miningReward)
+      val lockedReward       = mainChainReward
+      implicit val validator = (blk: Block) => checkLockedReward(blk, AVector(lockedReward))
+
+      info("valid")
+      block.pass()
+
+      info("invalid locked amount")
+      block.Coinbase.output(_.copy(amount = U256.One)).fail(InvalidCoinbaseLockedAmount)
+      block.Coinbase.output(_.copy(amount = miningReward)).fail(InvalidCoinbaseLockedAmount)
+
+      info("invalid lockup period")
+      block.Coinbase.output(_.copy(lockTime = TimeStamp.now())).fail(InvalidCoinbaseLockupPeriod)
+    }
+
+    {
+      info("block has 1 uncle")
+      val heightDiff      = Random.between(1, ALPH.MaxUncleAge)
+      val block           = mineBlockWith1Uncle(heightDiff)
+      val miningReward    = getMiningReward(block)
+      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+      val uncleReward     = Coinbase.calcUncleReward(mainChainReward, heightDiff)
+      val blockReward     = mainChainReward.addUnsafe(uncleReward.divUnsafe(32))
+      implicit val validator =
+        (blk: Block) => checkLockedReward(blk, AVector(blockReward, uncleReward))
+
+      info("valid")
+      block.pass()
+
+      info("invalid locked amount")
+      block.Coinbase
+        .output(_.copy(amount = blockReward.addOneUnsafe()))
+        .fail(InvalidCoinbaseLockedAmount)
+      block.Coinbase
+        .output(_.copy(amount = uncleReward.addOneUnsafe()), 1)
+        .fail(InvalidCoinbaseLockedAmount)
+
+      info("invalid lockup period")
+      block.Coinbase.output(_.copy(lockTime = TimeStamp.now())).fail(InvalidCoinbaseLockupPeriod)
+      block.Coinbase.output(_.copy(lockTime = TimeStamp.now()), 1).fail(InvalidCoinbaseLockupPeriod)
+    }
+
+    {
+      info("block has 2 uncles")
+      val diffs           = (0 until 2).map(_ => Random.between(1, ALPH.MaxUncleAge)).sorted
+      val block           = mineBlockWith2Uncle(diffs(0), diffs(1))
+      val miningReward    = getMiningReward(block)
+      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+      val uncleReward0    = Coinbase.calcUncleReward(mainChainReward, diffs(0))
+      val uncleReward1    = Coinbase.calcUncleReward(mainChainReward, diffs(1))
+      val blockReward =
+        mainChainReward.addUnsafe(uncleReward0.addUnsafe(uncleReward1).divUnsafe(32))
+      implicit val validator =
+        (blk: Block) => checkLockedReward(blk, AVector(blockReward, uncleReward0, uncleReward1))
+
+      info("valid")
+      block.pass()
+
+      info("invalid locked amount")
+      block.Coinbase
+        .output(_.copy(amount = blockReward.addOneUnsafe()))
+        .fail(InvalidCoinbaseLockedAmount)
+      block.Coinbase
+        .output(_.copy(amount = uncleReward0.addOneUnsafe()), 1)
+        .fail(InvalidCoinbaseLockedAmount)
+      block.Coinbase
+        .output(_.copy(amount = uncleReward1.addOneUnsafe()), 2)
+        .fail(InvalidCoinbaseLockedAmount)
+
+      info("invalid lockup period")
+      block.Coinbase.output(_.copy(lockTime = TimeStamp.now())).fail(InvalidCoinbaseLockupPeriod)
+      block.Coinbase.output(_.copy(lockTime = TimeStamp.now()), 1).fail(InvalidCoinbaseLockupPeriod)
+      block.Coinbase.output(_.copy(lockTime = TimeStamp.now()), 2).fail(InvalidCoinbaseLockupPeriod)
+    }
+  }
+
+  it should "check coinbase reward ghost" in new GhostCoinbaseFixture {
+    implicit val validator = (blk: Block) => {
+      val groupView = blockFlow.getMutableGroupView(blk).rightValue
+      checkCoinbase(blockFlow, blk.chainIndex, blk, groupView, HardFork.Ghost)
+    }
+
+    {
+      info("block has no uncle")
+      val block = emptyBlock(blockFlow, chainIndex)
+
+      info("valid")
+      block.pass()
+
+      val miningReward    = getMiningReward(block)
+      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+
+      info("invalid block reward")
+      block.Coinbase.output(_.copy(amount = miningReward)).fail(InvalidCoinbaseReward)
+      block.Coinbase
+        .output(_.copy(amount = mainChainReward.subOneUnsafe()))
+        .fail(InvalidCoinbaseReward)
+    }
+
+    {
+      info("block has 1 uncle")
+      val heightDiff      = Random.between(1, ALPH.MaxUncleAge)
+      val block           = mineBlockWith1Uncle(heightDiff)
+      val miningReward    = getMiningReward(block)
+      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+      val uncleReward     = Coinbase.calcUncleReward(mainChainReward, heightDiff)
+
+      info("valid")
+      block.pass()
+
+      info("invalid reward amount")
+      block.Coinbase.output(_.copy(amount = miningReward)).fail(InvalidCoinbaseReward)
+      block.Coinbase.output(_.copy(amount = uncleReward)).fail(InvalidCoinbaseReward)
+      block.Coinbase
+        .output(_.copy(amount = uncleReward.subOneUnsafe()), 1)
+        .fail(InvalidCoinbaseReward)
+
+      info("invalid uncle miner lockup script")
+      block.Coinbase
+        .output(_.copy(lockupScript = randomLockupScript), 1)
+        .fail(InvalidCoinbaseReward)
+    }
+
+    {
+      info("block has 2 uncles")
+      val diffs           = (0 until 2).map(_ => Random.between(1, ALPH.MaxUncleAge)).sorted
+      val block           = mineBlockWith2Uncle(diffs(0), diffs(1))
+      val miningReward    = getMiningReward(block)
+      val mainChainReward = Coinbase.calcMainChainReward(miningReward)
+      val uncleReward0    = Coinbase.calcUncleReward(mainChainReward, diffs(0))
+      val uncleReward1    = Coinbase.calcUncleReward(mainChainReward, diffs(1))
+
+      info("valid")
+      block.pass()
+
+      info("invalid reward amount")
+      block.Coinbase
+        .output(_.copy(amount = miningReward))
+        .fail(InvalidCoinbaseReward)
+      block.Coinbase
+        .output(_.copy(amount = uncleReward0.addOneUnsafe()), 1)
+        .fail(InvalidCoinbaseReward)
+      block.Coinbase
+        .output(_.copy(amount = uncleReward1.addOneUnsafe()), 2)
+        .fail(InvalidCoinbaseReward)
+
+      info("invalid uncle miner lockup script")
+      block.Coinbase
+        .output(_.copy(lockupScript = randomLockupScript), 1)
+        .fail(InvalidCoinbaseReward)
+      block.Coinbase
+        .output(_.copy(lockupScript = randomLockupScript), 2)
+        .fail(InvalidCoinbaseReward)
+    }
+  }
+
+  trait GhostFixture extends Fixture {
+    override val configValues = Map(
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.now().millis)
+    )
+    networkConfig.getHardFork(TimeStamp.now()) is HardFork.Ghost
+    lazy val miner = getGenesisLockupScript(chainIndex.to)
+
+    def mineBlocks(size: Int): AVector[BlockHash] = {
+      val blocks = (0 to size).map(_ => emptyBlock(blockFlow, chainIndex))
+      addAndCheck(blockFlow, blocks: _*)
+      val hashes = blockFlow.getHashes(chainIndex, 1).rightValue
+      hashes.length is size + 1
+      hashes
+    }
+
+    def mineChain(size: Int): AVector[Block] = {
+      val blockFlow = isolatedBlockFlow()
+      val blocks = (0 until size).map(_ => {
+        val block = emptyBlock(blockFlow, chainIndex)
+        addAndCheck(blockFlow, block)
+        block
+      })
+      AVector.from(blocks)
+    }
+  }
+
+  it should "invalidate block with invalid uncles size" in new GhostFixture {
+    val hashes        = mineBlocks(ALPH.MaxUncleSize + 1)
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate.uncleHashes.length is ALPH.MaxUncleSize
+    val uncleHashes = hashes.tail
+    uncleHashes.length is ALPH.MaxUncleSize + 1
+    val block = mine(blockFlow, blockTemplate.setUncles(uncleHashes.map((_, miner, 1))))
+    checkBlock(block, blockFlow).left.value isE InvalidUncleSize
+  }
+
+  it should "invalidate block with duplicate uncles" in new GhostFixture {
+    mineBlocks(ALPH.MaxUncleSize)
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    val block =
+      mine(
+        blockFlow,
+        blockTemplate.setUncles(AVector.fill(2)((blockTemplate.uncleHashes.head, miner, 1)))
+      )
+    checkBlock(block, blockFlow).left.value isE DuplicatedUncles
+  }
+
+  it should "invalidate block with used uncles" in new GhostFixture {
+    mineBlocks(ALPH.MaxUncleSize)
+    val block0 = mineBlockTemplate(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0)
+
+    val block1Template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    block1Template.uncleHashes.isEmpty is true
+    val block1 = mine(
+      blockFlow,
+      block1Template.setUncles(AVector((block0.uncleHashes.rightValue.head, miner, 1)))
+    )
+    checkBlock(block1, blockFlow).left.value isE InvalidUncles
+  }
+
+  it should "invalidate block if uncle is sibling" in new GhostFixture {
+    val block0 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0)
+    val block10 = emptyBlock(blockFlow, chainIndex)
+    block10.parentHash is block0.hash
+
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    val block11       = mine(blockFlow, blockTemplate.setUncles(AVector((block10.hash, miner, 1))))
+    block11.parentHash is block0.hash
+    checkBlock(block11, blockFlow).left.value isE UncleDoesNotExist
+
+    addAndCheck(blockFlow, block10)
+    checkBlock(block11, blockFlow).left.value isE InvalidUncles
+  }
+
+  it should "invalidate block if uncle is ancestor" in new GhostFixture {
+    val block0 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block0)
+
+    var parentBlock = block0
+    (0 until ALPH.MaxUncleAge).foreach { _ =>
+      val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+      val invalidBlock  = mine(blockFlow, blockTemplate.setUncles(AVector((block0.hash, miner, 1))))
+      invalidBlock.parentHash is parentBlock.hash
+      checkBlock(invalidBlock, blockFlow).left.value isE InvalidUncles
+
+      parentBlock = emptyBlock(blockFlow, chainIndex)
+      addAndCheck(blockFlow, parentBlock)
+    }
+  }
+
+  it should "invalidate block if uncles' parent is not from mainchain" in new GhostFixture {
+    val (blocks0, blocks1) = (mineChain(4), mineChain(4))
+    addAndCheck(blockFlow, blocks0.toSeq: _*)
+    addAndCheck(blockFlow, blocks1.toSeq: _*)
+    val hashes = blockFlow.getHashes(chainIndex, 3).rightValue
+    hashes.length is 2
+    val uncleHashes = hashes.tail
+
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate.uncleHashes.length is 1
+    val block = mine(
+      blockFlow,
+      blockTemplate.setUncles((blockTemplate.uncleHashes ++ uncleHashes).map((_, miner, 1)))
+    )
+    checkBlock(block, blockFlow).left.value isE InvalidUncles
+  }
+
+  it should "invalidate block with invalid uncle intra deps" in new Fixture {
+    override val configValues = Map(
+      ("alephium.broker.broker-num", 1),
+      ("alephium.network.ghost-hard-fork-timestamp", TimeStamp.now().millis)
+    )
+    override lazy val chainIndex: ChainIndex = ChainIndex.unsafe(1, 2)
+    val chain00                              = ChainIndex.unsafe(0, 0)
+    val depBlock0                            = emptyBlock(blockFlow, chain00)
+    val depBlock1                            = emptyBlock(blockFlow, chain00)
+    addAndCheck(blockFlow, depBlock0, depBlock1)
+
+    val miner              = getGenesisLockupScript(chainIndex.to)
+    val uncleBlockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    val parent = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, parent)
+
+    val uncle0 = mine(
+      blockFlow,
+      uncleBlockTemplate.copy(deps = uncleBlockTemplate.deps.replace(0, depBlock0.hash))
+    )
+    val uncle1 = mine(
+      blockFlow,
+      uncleBlockTemplate.copy(deps = uncleBlockTemplate.deps.replace(0, depBlock1.hash))
+    )
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    val (validUncle, invalidUncle) =
+      if (parent.blockDeps.inDeps(0) == depBlock0.hash) {
+        (uncle0, uncle1)
+      } else {
+        (uncle1, uncle0)
+      }
+    val block0 =
+      mine(
+        blockFlow,
+        blockTemplate.setUncles(AVector((validUncle.hash, miner, 1), (invalidUncle.hash, miner, 1)))
+      )
+    addAndCheck(blockFlow, uncle0, uncle1)
+    checkBlock(block0, blockFlow).leftValue is Right(InvalidUncleDeps)
+
+    val block1 = mine(blockFlow, blockTemplate.setUncles(AVector((validUncle.hash, miner, 2))))
+    checkBlock(block1, blockFlow).isRight is true
+
+    val block2 = mine(blockFlow, blockTemplate.setUncles(AVector((invalidUncle.hash, miner, 1))))
+    checkBlock(block2, blockFlow).leftValue is Right(InvalidUncleDeps)
+  }
+
+  it should "validate block with valid uncles" in new GhostFixture {
+    mineBlocks(ALPH.MaxUncleSize)
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate.uncleHashes.length is ALPH.MaxUncleSize
+    (0 until blockTemplate.uncleHashes.length).foreach { size =>
+      val uncleHashes = blockTemplate.uncleHashes.take(size)
+      val uncleMiners = uncleHashes.map { hash =>
+        val lockupScript = blockFlow.getBlockUnsafe(hash).minerLockupScript
+        (hash, lockupScript, 1)
+      }
+      val block = mine(blockFlow, blockTemplate.setUncles(uncleMiners))
+      checkBlock(block, blockFlow).isRight is true
+    }
+  }
+
+  it should "validate block if uncle header used by another uncle block" in new GhostFixture {
+    val block10 = emptyBlock(blockFlow, chainIndex)
+    val block11 = emptyBlock(blockFlow, chainIndex)
+    addAndCheck(blockFlow, block10, block11)
+    val hashesAtHeight1 = blockFlow.getHashes(chainIndex, 1).rightValue
+    hashesAtHeight1.length is 2
+
+    val block20 = emptyBlock(blockFlow, chainIndex)
+    block20.parentHash is hashesAtHeight1.head
+    block20.uncleHashes.value.length is 0
+    val block21Template = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    block21Template.uncleHashes is hashesAtHeight1.tail
+    val block21 = mine(blockFlow, block21Template)
+
+    addAndCheck(blockFlow, block20)
+    addAndCheck(blockFlow, emptyBlock(blockFlow, chainIndex))
+    addAndCheck(blockFlow, block21)
+
+    val blockTemplate = blockFlow.prepareBlockFlowUnsafe(chainIndex, miner)
+    blockTemplate.uncleHashes is block21.hash +: hashesAtHeight1.tail
+    addAndCheck(blockFlow, mine(blockFlow, blockTemplate))
   }
 }

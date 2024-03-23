@@ -299,6 +299,7 @@ case object InvalidTokenId                              extends ExeFailure
 case object InvalidContractId                           extends ExeFailure
 case object ExpectAContract                             extends ExeFailure
 case object OutOfGas                                    extends ExeFailure
+case object GasOverflow                                 extends ExeFailure
 case object ContractPoolOverflow                        extends ExeFailure
 case object ContractFieldOverflow                       extends ExeFailure
 final case class ContractLoadDisallowed(id: ContractId) extends ExeFailure

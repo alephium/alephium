@@ -16,15 +16,18 @@
 
 package org.alephium.ralph
 
+import java.nio.charset.StandardCharsets
+
 import scala.collection.{immutable, mutable}
 
+import akka.util.ByteString
 import fastparse.Parsed
 
 import org.alephium.protocol.vm._
 import org.alephium.ralph.Ast.MultiContract
 import org.alephium.ralph.error.CompilerError
 import org.alephium.ralph.error.CompilerError.FastParseError
-import org.alephium.util.AVector
+import org.alephium.util.{AVector, U256}
 
 //TODO add SourceIndex to warnings
 final case class CompiledContract(
@@ -91,7 +94,9 @@ object Compiler {
 
   private def compileStateful[T](input: String, genCode: MultiContract => T): Either[Error, T] = {
     try {
-      compileMultiContract(input).map(genCode)
+      val result = compileMultiContract(input).map(genCode)
+      ContractGenerator.clearCache()
+      result
     } catch {
       case e: Error => Left(e)
     }
@@ -105,8 +110,14 @@ object Compiler {
       compileMultiContract(input).map { multiContract =>
         val statefulContracts =
           multiContract.genStatefulContracts()(compilerOptions).map(c => c._1)
-        val statefulScripts = multiContract.genStatefulScripts()(compilerOptions)
-        (statefulContracts, statefulScripts, AVector.from(multiContract.structs))
+        val statefulScripts    = multiContract.genStatefulScripts()(compilerOptions)
+        val generatedContracts = ContractGenerator.generatedContracts()
+        ContractGenerator.clearCache()
+        (
+          statefulContracts ++ generatedContracts,
+          statefulScripts,
+          AVector.from(multiContract.structs)
+        )
       }
     } catch {
       case e: Error => Left(e)
@@ -147,7 +158,6 @@ object Compiler {
     def genCodeForArgs[C <: Ctx](args: Seq[Ast.Expr[C]], state: State[C]): Seq[Instr[C]] =
       args.flatMap(_.genCode(state))
     def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]]
-    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]]
   }
 
   type Error = CompilerError.FormattableError
@@ -198,6 +208,11 @@ object Compiler {
     ) extends VarInfo {
       def isLocal: Boolean = false
     }
+    final case class MapVar(tpe: Type.Map, isUnused: Boolean, index: Int) extends VarInfo {
+      def isMutable: Boolean   = true
+      def isGenerated: Boolean = false
+      def isLocal: Boolean     = false
+    }
     final case class Template(tpe: Type, index: Int, isGenerated: Boolean) extends VarInfo {
       def isMutable: Boolean = false
       def isUnused: Boolean  = false
@@ -226,6 +241,11 @@ object Compiler {
     def argsType: Seq[Type]
     def returnType: Seq[Type]
     def isStatic: Boolean = false
+    def genExternalCallCode(
+        state: Compiler.State[StatefulContext],
+        objCodes: Seq[Instr[StatefulContext]],
+        typeId: Ast.TypeId
+    ): Seq[Instr[StatefulContext]] = ???
   }
   final case class SimpleFunc[Ctx <: StatelessContext](
       id: Ast.FuncId,
@@ -257,9 +277,18 @@ object Compiler {
       Seq(CallLocal(index))
     }
 
-    override def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
+    override def genExternalCallCode(
+        state: Compiler.State[StatefulContext],
+        objCodes: Seq[Instr[StatefulContext]],
+        typeId: Ast.TypeId
+    ): Seq[Instr[StatefulContext]] = {
       if (isPublic) {
-        Seq(CallExternal(index))
+        val argLength = state.flattenTypeLength(argsType)
+        val retLength = state.flattenTypeLength(returnType)
+        Seq(
+          ConstInstr.u256(Val.U256(U256.unsafe(argLength))),
+          ConstInstr.u256(Val.U256(U256.unsafe(retLength)))
+        ) ++ objCodes :+ CallExternal(index)
       } else {
         throw Error(s"Call external private function of ${typeId.name}", typeId.sourceIndex)
       }
@@ -504,33 +533,12 @@ object Compiler {
 
     @inline def getStruct(typeId: Ast.TypeId): Ast.Struct = globalState.getStruct(typeId)
 
-    def getOrCreateStructRef(expr: Ast.Expr[Ctx]): (StructRef[Ctx], Seq[Instr[Ctx]]) = {
-      val (ref, codes) = getOrCreateVariablesRef(expr)
-      ref match {
-        case ref: StructRef[Ctx @unchecked] => (ref, codes)
-        case _ =>
-          throw Compiler.Error(s"Expected struct type, got ${ref.tpe}", expr.sourceIndex)
-      }
-    }
-
-    def getOrCreateArrayRef(expr: Ast.Expr[Ctx]): (ArrayRef[Ctx], Seq[Instr[Ctx]]) = {
-      val (ref, codes) = getOrCreateVariablesRef(expr)
-      ref match {
-        case ref: ArrayRef[Ctx @unchecked] => (ref, codes)
-        case _ =>
-          throw Compiler.Error(s"Expected array type, got ${ref.tpe}", expr.sourceIndex)
-      }
-    }
-
-    @scala.annotation.tailrec
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def getOrCreateVariablesRef(expr: Ast.Expr[Ctx]): (VariablesRef[Ctx], Seq[Instr[Ctx]]) = {
       expr match {
-        case Ast.StructFieldSelector(struct, selector) =>
-          val (ref, codes) = getOrCreateStructRef(struct)
-          (ref.subRef(this, selector), codes)
-        case Ast.ArrayElement(array, index) =>
-          val (ref, codes) = getOrCreateArrayRef(array)
-          (ref.subRef(this, index), codes)
+        case Ast.LoadFieldBySelectors(base, selectors) =>
+          val (ref, codes) = getOrCreateVariablesRef(base)
+          (ref.subRef(this, selectors), codes)
         case Ast.Variable(ident)  => (getVariablesRef(ident), Seq.empty)
         case Ast.ParenExpr(inner) => getOrCreateVariablesRef(inner)
         case _ =>
@@ -575,9 +583,9 @@ object Compiler {
         isGenerated: Boolean,
         ref: VariablesRef[Ctx]
     ): Unit = {
-      val sname = checkNewVariable(ident)
-      varTable(sname) = VarInfo.MultipleVar(isMutable, isUnused, isGenerated, ref)
-      trackGenCodePhaseNewVars(sname)
+      val sname   = checkNewVariable(ident)
+      val varInfo = VarInfo.MultipleVar(isMutable, isUnused, isGenerated, ref)
+      addVarInfo(sname, varInfo)
     }
 
     def getVariablesRef(ident: Ast.Ident): VariablesRef[Ctx] = {
@@ -594,6 +602,21 @@ object Compiler {
     @inline private def scopedNamePrefix(scopeId: Ast.FuncId): String = s"${scopeId.name}."
     protected def scopedName(scopeId: Ast.FuncId, name: String): String = {
       s"${scopedNamePrefix(scopeId)}$name"
+    }
+
+    @inline private def addVarInfo(sname: String, varInfo: VarInfo): Unit = {
+      varTable(sname) = varInfo
+      trackGenCodePhaseNewVars(sname)
+    }
+
+    private[ralph] def addMapVar(
+        ident: Ast.Ident,
+        tpe: Type.Map,
+        isUnused: Boolean,
+        mapIndex: Int
+    ): Unit = {
+      val sname = checkNewVariable(ident)
+      addVarInfo(sname, VarInfo.MapVar(tpe, isUnused, mapIndex))
     }
 
     def addTemplateVariable(ident: Ast.Ident, tpe: Type): Unit = {
@@ -673,24 +696,15 @@ object Compiler {
             varInfoBuilder
           )
           ()
-        case c: Type.Contract =>
-          varTable(sname) = varInfoBuilder(
-            Type.Contract(c.id),
-            isMutable,
-            isUnused,
-            getAndUpdateVarIndex(isTemplate, isLocal, isMutable).toByte,
-            isGenerated
-          )
-          trackGenCodePhaseNewVars(sname)
         case _ =>
-          varTable(sname) = varInfoBuilder(
+          val varInfo = varInfoBuilder(
             tpe,
             isMutable,
             isUnused,
             getAndUpdateVarIndex(isTemplate, isLocal, isMutable).toByte,
             isGenerated
           )
-          trackGenCodePhaseNewVars(sname)
+          addVarInfo(sname, varInfo)
       }
     }
     // scalastyle:on parameter.number
@@ -807,6 +821,7 @@ object Compiler {
         .filter { case (name, varInfo) =>
           !varInfo.isLocal &&
           varInfo.isMutable &&
+          isTypeMutable(varInfo.tpe) &&
           !varInfo.isGenerated &&
           !varInfo.isUnused &&
           !accessedVars.contains(WriteVariable(name))
@@ -836,31 +851,23 @@ object Compiler {
       index.getType(this) match {
         case Seq(Type.U256) =>
         case tpe =>
+          val tpeStr = if (tpe.length == 1) quote(tpe(0)) else quote(tpe)
           throw Compiler.Error(
-            s"Invalid array index type ${quote(tpe)}, expected ${quote("U256")}",
+            s"Invalid array index type $tpeStr, expected ${quote("U256")}",
             index.sourceIndex
           )
       }
     }
 
-    def getArrayElementType(array: Ast.Expr[Ctx], index: Ast.Expr[Ctx]): Type = {
-      checkArrayIndexType(index)
-      array.getType(this) match {
-        case Seq(tpe: Type.FixedSizeArray) => resolveType(tpe.baseType)
+    def checkMapKeyType(mapType: Type.Map, index: Ast.Expr[Ctx]): Unit = {
+      index.getType(this) match {
+        case Seq(tpe) if tpe == mapType.key =>
         case tpe =>
+          val tpeStr = if (tpe.length == 1) quote(tpe(0)) else quote(tpe)
           throw Compiler.Error(
-            s"Expected array type, got ${if (tpe.length == 1) quote(tpe(0)) else quote(tpe)}",
-            array.sourceIndex
+            s"Invalid map key type $tpeStr, expected ${quote(mapType.key)}",
+            index.sourceIndex
           )
-      }
-    }
-
-    def getStructFieldType(expr: Ast.Expr[Ctx], selector: Ast.Ident): Type = {
-      expr.getType(this) match {
-        case Seq(tpe: Type.Struct) =>
-          val struct = getStruct(tpe.id)
-          resolveType(struct.getField(selector).tpe)
-        case tpe => throw Compiler.Error(s"Expected struct type, got $tpe", expr.sourceIndex)
       }
     }
 
@@ -892,6 +899,17 @@ object Compiler {
 
     @inline def flattenTypeMutability(tpe: Type, isMutable: Boolean): Seq[Boolean] =
       globalState.flattenTypeMutability(tpe, isMutable)
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def isTypeMutable(tpe: Type): Boolean = {
+      resolveType(tpe) match {
+        case t: Type.Struct =>
+          val struct = getStruct(t.id)
+          struct.fields.forall(field => field.isMutable && isTypeMutable(field.tpe))
+        case t: Type.FixedSizeArray => isTypeMutable(t.baseType)
+        case _                      => true
+      }
+    }
 
     def flattenArgs(exprs: Seq[Ast.Expr[Ctx]]): (Seq[Instr[Ctx]], Seq[Seq[Instr[Ctx]]]) = {
       exprs.foldLeft((Seq.empty[Instr[Ctx]], Seq.empty[Seq[Instr[Ctx]]])) {
@@ -1067,6 +1085,8 @@ object Compiler {
           Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
         case v: VarInfo.MultipleVar[StatelessContext @unchecked] => v.ref.genLoadCode(this)
         case v: VarInfo.Constant[StatelessContext @unchecked]    => v.instrs
+        case _: VarInfo.MapVar =>
+          throw Error("Script should not have map variables", typeId.sourceIndex)
       }
     }
 
@@ -1080,6 +1100,8 @@ object Compiler {
         case v: VarInfo.MultipleVar[StatelessContext @unchecked] => v.ref.genStoreCode(this)
         case _: VarInfo.Constant[StatelessContext @unchecked] =>
           throw Error(s"Unexpected constant variable: ${ident.name}", ident.sourceIndex)
+        case _: VarInfo.MapVar =>
+          throw Error(s"Unexpected map variable: ${ident.name}", ident.sourceIndex)
       }
     }
   }
@@ -1158,6 +1180,12 @@ object Compiler {
       )
     }
 
+    private def genMapIndex(index: Int): Seq[Instr[StatefulContext]] = {
+      val bytes =
+        ByteString.fromArrayUnsafe(s"__map__${index}__".getBytes(StandardCharsets.US_ASCII))
+      Seq(BytesConst(Val.ByteVec(bytes)))
+    }
+
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def genLoadCode(ident: Ast.Ident): Seq[Instr[StatefulContext]] = {
       getVariable(ident) match {
@@ -1168,6 +1196,7 @@ object Compiler {
           Seq(TemplateVariable(ident.name, resolveType(v.tpe).toVal, v.index))
         case v: VarInfo.MultipleVar[StatefulContext @unchecked] => v.ref.genLoadCode(this)
         case v: VarInfo.Constant[StatefulContext @unchecked]    => v.instrs
+        case VarInfo.MapVar(_, _, index)                        => genMapIndex(index)
       }
     }
 
@@ -1181,6 +1210,8 @@ object Compiler {
         case v: VarInfo.MultipleVar[StatefulContext @unchecked] => v.ref.genStoreCode(this)
         case _: VarInfo.Constant[StatefulContext @unchecked] =>
           throw Error(s"Unexpected constant variable: ${ident.name}", ident.sourceIndex)
+        case _: VarInfo.MapVar =>
+          throw Error(s"Unexpected map variable: ${ident.name}", ident.sourceIndex)
       }
     }
   }

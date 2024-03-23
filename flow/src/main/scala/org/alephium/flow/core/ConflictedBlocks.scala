@@ -20,14 +20,14 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.flow.core.ConflictedBlocks.GroupCache
-import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.flow.setting.ConsensusSettings
 import org.alephium.protocol.config.BrokerConfig
 import org.alephium.protocol.model._
 import org.alephium.util.{AVector, Duration, TimeStamp}
 
 trait ConflictedBlocks {
   implicit def brokerConfig: BrokerConfig
-  def consensusConfig: ConsensusSetting
+  def consensusConfigs: ConsensusSettings
 
   def getHashesForDoubleSpendingCheckUnsafe(
       groupIndex: GroupIndex,
@@ -36,8 +36,8 @@ trait ConflictedBlocks {
 
   lazy val caches = AVector.fill(brokerConfig.groupNumPerBroker)(
     ConflictedBlocks.emptyCache(
-      consensusConfig.blockCacheCapacityPerChain * brokerConfig.groups,
-      consensusConfig.conflictCacheKeepDuration
+      consensusConfigs.blockCacheCapacityPerChain * brokerConfig.groups,
+      consensusConfigs.conflictCacheKeepDuration
     )
   )
 

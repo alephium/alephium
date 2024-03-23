@@ -20,7 +20,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.alephium.io.IOError
 import org.alephium.protocol.Signature
-import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
 import org.alephium.util.{discard, AVector, TimeStamp, U256}
 
@@ -159,11 +159,20 @@ object LogConfig {
 
 trait StatelessContext extends CostStrategy {
   def networkConfig: NetworkConfig
+  def groupConfig: GroupConfig
   def blockEnv: BlockEnv
 
   @inline def getHardFork(): HardFork = blockEnv.getHardFork()
   def checkLemanHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
     if (getHardFork().isLemanEnabled()) {
+      okay
+    } else {
+      failed(InactiveInstr(instr))
+    }
+  }
+
+  def checkGhostHardFork[C <: StatelessContext](instr: Instr[C]): ExeResult[Unit] = {
+    if (getHardFork().isGhostEnabled()) {
       okay
     } else {
       failed(InactiveInstr(instr))
@@ -231,14 +240,14 @@ object StatelessContext {
       blockEnv: BlockEnv,
       txEnv: TxEnv,
       txGas: GasBox
-  )(implicit networkConfig: NetworkConfig): StatelessContext =
+  )(implicit networkConfig: NetworkConfig, groupConfig: GroupConfig): StatelessContext =
     new Impl(blockEnv, txEnv, txGas)
 
   final class Impl(
       val blockEnv: BlockEnv,
       val txEnv: TxEnv,
       var gasRemaining: GasBox
-  )(implicit val networkConfig: NetworkConfig)
+  )(implicit val networkConfig: NetworkConfig, val groupConfig: GroupConfig)
       extends StatelessContext {
     def getInitialBalances(): ExeResult[MutBalances] = failed(ExpectNonPayableMethod)
 
@@ -375,8 +384,8 @@ trait StatefulContext extends StatelessContext with ContractPool {
         outputRef,
         contractOutput
       )
+      _ <- cacheNewContractIfNecessary(contractId)
     } yield {
-      blockContractLoad(contractId)
       contractId
     }
   }
@@ -483,7 +492,11 @@ object StatefulContext {
       txEnv: TxEnv,
       worldState: WorldState.Staging,
       gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): StatefulContext = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      groupConfig: GroupConfig
+  ): StatefulContext = {
     new Impl(blockEnv, txEnv, worldState, gasRemaining)
   }
 
@@ -493,7 +506,11 @@ object StatefulContext {
       gasRemaining: GasBox,
       worldState: WorldState.Staging,
       preOutputs: AVector[AssetOutput]
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): StatefulContext = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      groupConfig: GroupConfig
+  ): StatefulContext = {
     val txEnv = TxEnv(tx, preOutputs, Stack.popOnly(tx.scriptSignatures))
     apply(blockEnv, txEnv, worldState, gasRemaining)
   }
@@ -503,8 +520,11 @@ object StatefulContext {
       val txEnv: TxEnv,
       val worldState: WorldState.Staging,
       var gasRemaining: GasBox
-  )(implicit val networkConfig: NetworkConfig, val logConfig: LogConfig)
-      extends StatefulContext {
+  )(implicit
+      val networkConfig: NetworkConfig,
+      val logConfig: LogConfig,
+      val groupConfig: GroupConfig
+  ) extends StatefulContext {
     def preOutputs: AVector[AssetOutput] = txEnv.prevOutputs
 
     def nextOutputIndex: Int = txEnv.fixedOutputs.length + generatedOutputs.length

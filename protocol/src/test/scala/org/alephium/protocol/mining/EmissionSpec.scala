@@ -58,7 +58,7 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
       override def groups: Int = 4
     }
     val blockTime = Duration.ofSecondsUnsafe(64)
-    val emission  = Emission(groupConfig, blockTime)
+    val emission  = Emission.mainnet(groupConfig, blockTime)
   }
 
   it should "compute correct constants" in new Fixture {
@@ -74,11 +74,11 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
     emission.oneEhPerSecondRank is 60
     emission.a128EhPerSecondRank is 67
 
-    val maxRewards = Emission.initialMaxReward * emission.blocksInAboutOneYearPerChain
+    val maxRewards = emission.initialMaxReward * emission.blocksInAboutOneYearPerChain
     val maxRate    = getInflationRate(maxRewards)
     (maxRate > 0.029 && maxRate < 0.03) is true
 
-    val stableRewards = Emission.stableMaxReward * emission.blocksInAboutOneYearPerChain
+    val stableRewards = emission.stableMaxReward * emission.blocksInAboutOneYearPerChain
     val stableRate    = getInflationRate(stableRewards)
     (stableRate > 0.0098 && stableRate < 0.0099) is true
   }
@@ -182,7 +182,7 @@ class EmissionSpec extends AlephiumSpec with NumericHelpers {
       override def groups: Int = 4
     }
     val blockTargetTime: Duration = Duration.ofSecondsUnsafe(64)
-    val emission: Emission        = Emission(groupConfig, blockTargetTime)
+    val emission: Emission        = Emission.mainnet(groupConfig, blockTargetTime)
 
     def check[T](rewards: IndexedSeq[(T, U256)], file: String, tToString: T => String): Unit = {
       Using(Source.fromResource(file)) { source =>

@@ -20,9 +20,9 @@ import scala.annotation.tailrec
 
 import akka.util.ByteString
 
-import org.alephium.protocol.config.NetworkConfig
+import org.alephium.protocol.config.{GroupConfig, NetworkConfig}
 import org.alephium.protocol.model._
-import org.alephium.util.{AVector, EitherF}
+import org.alephium.util.{AVector, EitherF, Math, U256}
 
 sealed abstract class VM[Ctx <: StatelessContext](
     ctx: Ctx,
@@ -166,8 +166,11 @@ object VM {
       codeBytes: ByteString,
       hardFork: HardFork
   ): ExeResult[GasBox] = {
-    val maximalCodeSize =
-      if (hardFork.isLemanEnabled()) maximalCodeSizeLeman else maximalCodeSizePreLeman
+    val maximalCodeSize = {
+      if (hardFork.isGhostEnabled()) { maximalCodeSizeRhone }
+      else if (hardFork.isLemanEnabled()) { maximalCodeSizeLeman }
+      else { maximalCodeSizePreLeman }
+    }
     if (codeBytes.length > maximalCodeSize) {
       failed(CodeSizeTooLarge(codeBytes.length, maximalCodeSize))
     } else {
@@ -347,6 +350,7 @@ final class StatefulVM(
   }
 
   private def cleanBalances(lastFrame: Frame[StatefulContext]): ExeResult[Unit] = {
+    val hardFork = ctx.getHardFork()
     if (lastFrame.method.usesAssets()) {
       val resultOpt = for {
         balances <- lastFrame.balanceStateOpt
@@ -358,18 +362,49 @@ final class StatefulVM(
           case Some(_) => okay
           case None    => failed(InvalidBalances)
         }
+        _ <- reimburseGas(hardFork)
         _ <- outputGeneratedBalances(ctx.outputBalances)
         _ <- ctx.checkAllAssetsFlushed()
       } yield ()
     } else {
       if (ctx.getHardFork().isLemanEnabled()) {
         for {
+          _ <- reimburseGas(hardFork)
           _ <- outputGeneratedBalances(ctx.outputBalances)
           _ <- ctx.checkAllAssetsFlushed()
         } yield ()
       } else {
         Right(())
       }
+    }
+  }
+
+  def reimburseGas(hardFork: HardFork): ExeResult[Unit] = {
+    if (hardFork.isGhostEnabled()) {
+      val totalGasFee = ctx.txEnv.gasFeeUnsafe
+      val gasFeePaid  = ctx.gasFeePaid
+
+      totalGasFee.sub(gasFeePaid) match {
+        case Some(gasFeeRemaining @ _) =>
+          ctx.txEnv.prevOutputs.headOption match {
+            case Some(firstInput) =>
+              val reimbursedGasFee = Math.min(totalGasFee, gasFeePaid)
+              if (reimbursedGasFee > U256.Zero) {
+                ctx.outputBalances
+                  .addAlph(firstInput.lockupScript, reimbursedGasFee)
+                  .toRight(Right(InvalidBalances))
+              } else {
+                okay
+              }
+            case None =>
+              okay
+          }
+
+        case None =>
+          failed(GasOverflow)
+      }
+    } else {
+      okay
     }
   }
 
@@ -396,7 +431,10 @@ object StatelessVM {
       initialGas: GasBox,
       script: StatelessScript,
       args: AVector[Val]
-  )(implicit networkConfig: NetworkConfig): ExeResult[AssetScriptExecution] = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      groupConfig: GroupConfig
+  ): ExeResult[AssetScriptExecution] = {
     val context = StatelessContext(blockEnv, txEnv, initialGas)
     val obj     = script.toObject
     execute(context, obj, args)
@@ -437,6 +475,7 @@ object StatefulVM {
       generatedOutputs: AVector[TxOutput]
   )
 
+  // scalastyle:off parameter.number
   def runTxScript(
       worldState: WorldState.Staging,
       blockEnv: BlockEnv,
@@ -444,10 +483,15 @@ object StatefulVM {
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      groupConfig: GroupConfig
+  ): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
     runTxScript(context, script)
   }
+  // scalastyle:on parameter.number
 
   def runTxScript(
       context: StatefulContext,
@@ -459,6 +503,7 @@ object StatefulVM {
     } yield result
   }
 
+  // scalastyle:off parameter.number
   def runTxScriptMockup(
       worldState: WorldState.Staging,
       blockEnv: BlockEnv,
@@ -466,10 +511,15 @@ object StatefulVM {
       preOutputs: AVector[AssetOutput],
       script: StatefulScript,
       gasRemaining: GasBox
-  )(implicit networkConfig: NetworkConfig, logConfig: LogConfig): ExeResult[TxScriptExecution] = {
+  )(implicit
+      networkConfig: NetworkConfig,
+      logConfig: LogConfig,
+      groupConfig: GroupConfig
+  ): ExeResult[TxScriptExecution] = {
     val context = StatefulContext(blockEnv, tx, gasRemaining, worldState, preOutputs)
     runTxScriptMockup(context, script)
   }
+  // scalastyle:on parameter.number
 
   def runTxScriptMockup(
       context: StatefulContext,

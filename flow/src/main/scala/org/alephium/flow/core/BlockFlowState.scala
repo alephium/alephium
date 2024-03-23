@@ -21,7 +21,7 @@ import scala.reflect.ClassTag
 
 import org.alephium.flow.core.BlockChain.TxIndex
 import org.alephium.flow.mempool.MemPool
-import org.alephium.flow.setting.ConsensusSetting
+import org.alephium.flow.setting.ConsensusSettings
 import org.alephium.io.IOResult
 import org.alephium.protocol.Hash
 import org.alephium.protocol.config.{BrokerConfig, GroupConfig, NetworkConfig}
@@ -36,7 +36,7 @@ trait BlockFlowState extends FlowTipsUtil {
 
   implicit def brokerConfig: BrokerConfig
   implicit def networkConfig: NetworkConfig
-  def consensusConfig: ConsensusSetting
+  def consensusConfigs: ConsensusSettings
   def groups: Int = brokerConfig.groups
   def genesisBlocks: AVector[AVector[Block]]
 
@@ -129,7 +129,7 @@ trait BlockFlowState extends FlowTipsUtil {
 
   // Cache latest blocks for trie update, UTXO indexing
   lazy val groupCaches = AVector.fill(brokerConfig.groupNumPerBroker) {
-    FlowCache.blocks(consensusConfig.blockCacheCapacityPerChain)
+    FlowCache.blockCaches(consensusConfigs.blockCacheCapacityPerChain)
   }
 
   def getGroupCache(groupIndex: GroupIndex): FlowCache[BlockHash, BlockCache] = {

@@ -64,7 +64,7 @@ object Val {
         case U256    => decode[util.U256](content).map(_.mapValue(U256(_)))
         case ByteVec => decode[ByteString](content).map(_.mapValue(ByteVec(_)))
         case Address => decode[LockupScript](content).map(_.mapValue(Address(_)))
-        case _: FixedSizeArray | _: Struct => Left(SerdeError.Other("Unexpected type"))
+        case _: FixedSizeArray | _: Struct | _: Map => Left(SerdeError.Other("Unexpected type"))
       }
   }
 
@@ -212,6 +212,12 @@ object Val {
     override def default: Val       = throw new RuntimeException("Struct has no default value")
     override def isNumeric: Boolean = false
     override def toString: String   = name
+  }
+  final case class Map(key: Type, value: Type) extends Type {
+    override def id: scala.Byte     = throw new RuntimeException("Map has no type id")
+    override def default: Val       = throw new RuntimeException("Map has no default value")
+    override def isNumeric: Boolean = false
+    override def toString: String   = s"Map[$key,$value]"
   }
 
   val True: Bool                       = Bool(true)

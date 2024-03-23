@@ -37,13 +37,6 @@ object BuiltIn {
 
     def isPublic: Boolean        = true
     def useUpdateFields: Boolean = false
-
-    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = {
-      throw Compiler.Error(
-        s"Built-in function $name does not belong to contract ${typeId.name}",
-        typeId.sourceIndex
-      )
-    }
   }
 
   sealed trait Category {
@@ -1034,6 +1027,16 @@ object BuiltIn {
     )
   }
 
+  val groupOfAddress: BuiltIn[StatelessContext] =
+    SimpleBuiltIn.utilsSimple(
+      "groupOfAddress",
+      Seq(Type.Address),
+      Seq(Type.U256),
+      GroupOfAddress,
+      Seq("address" -> "the input address"),
+      retComment = "the group of the input address"
+    )
+
   val statelessFuncsSeq: Seq[(String, BuiltIn[StatelessContext])] = Seq(
     blake2b,
     keccak256,
@@ -1091,7 +1094,8 @@ object BuiltIn {
     addModN,
     u256Max,
     i256Max,
-    i256Min
+    i256Min,
+    groupOfAddress
   ).map(f => f.name -> f)
 
   val statelessFuncs: Map[String, BuiltIn[StatelessContext]] = statelessFuncsSeq.toMap
@@ -1570,6 +1574,29 @@ object BuiltIn {
       retComment = "the contract code hash of the contract"
     )
 
+  val payGasFee: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.asset(
+      "payGasFee",
+      Seq.empty,
+      Seq.empty,
+      PayGasFee,
+      argsName = Seq.empty,
+      retComment = "",
+      doc = "Pay gas fee.",
+      usePreapprovedAssets = true
+    )
+
+  val minimalContractDeposit: SimpleBuiltIn[StatefulContext] =
+    SimpleBuiltIn.utils(
+      "minimalContractDeposit",
+      Seq.empty,
+      Seq(Type.U256),
+      MinimalContractDeposit,
+      argsName = Seq.empty,
+      retComment = "the minimal ALPH amount of contract deposit",
+      doc = "The minimal contract deposit"
+    )
+
   sealed abstract private class SubContractBuiltIn extends BuiltIn[StatefulContext] with DocUtils {
     def name: String
     def category: Category            = Category.SubContract
@@ -1819,7 +1846,9 @@ object BuiltIn {
       subContractIdOf,
       subContractIdInParentGroup,
       nullContractAddress,
-      selfContract
+      selfContract,
+      payGasFee,
+      minimalContractDeposit
     ).map(f => f.name -> f)
 
   val statefulFuncs: Map[String, BuiltIn[StatefulContext]] = statefulFuncsSeq.toMap
@@ -1831,8 +1860,6 @@ object BuiltIn {
     val useUpdateFields: Boolean      = false
 
     override def isStatic: Boolean = true
-
-    def genExternalCallCode(typeId: Ast.TypeId): Seq[Instr[StatefulContext]] = ???
 
     def returnType: Seq[Type]
     def getReturnType[C <: Ctx](inputType: Seq[Type], state: Compiler.State[C]): Seq[Type] = {
@@ -1858,38 +1885,6 @@ object BuiltIn {
           )
         case _ => Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(fieldLength)), Encode)
       }
-    }
-  }
-
-  def encodeImmFields[Ctx <: StatelessContext](
-      stdInterfaceIdOpt: Option[Ast.StdInterfaceId],
-      fields: Seq[Ast.Argument],
-      globalState: Ast.GlobalState
-  ): Compiler.ContractFunc[Ctx] = {
-    val immFieldsTypes = fields.filter(!_.isMutable).map(_.tpe)
-
-    new ContractBuiltIn[Ctx] {
-      val name: String          = "encodeImmFields"
-      val argsType: Seq[Type]   = globalState.resolveTypes(immFieldsTypes)
-      val returnType: Seq[Type] = Seq(Type.ByteVec)
-
-      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
-        ContractBuiltIn.genCodeForStdId(stdInterfaceIdOpt, globalState.flattenTypeLength(argsType))
-    }
-  }
-
-  def encodeMutFields[Ctx <: StatelessContext](
-      fields: Seq[Ast.Argument],
-      globalState: Ast.GlobalState
-  ): Compiler.ContractFunc[Ctx] = {
-    val mutFieldsTypes = fields.filter(_.isMutable).map(_.tpe)
-    new ContractBuiltIn[Ctx] {
-      val name: String          = "encodeMutFields"
-      val argsType: Seq[Type]   = globalState.resolveTypes(mutFieldsTypes)
-      val returnType: Seq[Type] = Seq(Type.ByteVec)
-
-      def genCode(inputType: Seq[Type]): Seq[Instr[Ctx]] =
-        Seq[Instr[Ctx]](U256Const(Val.U256.unsafe(globalState.flattenTypeLength(argsType))), Encode)
     }
   }
 

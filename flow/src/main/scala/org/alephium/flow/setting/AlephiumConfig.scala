@@ -36,7 +36,7 @@ import org.alephium.flow.network.nat.Upnp
 import org.alephium.protocol.{ALPH, Hash}
 import org.alephium.protocol.config._
 import org.alephium.protocol.mining.Emission
-import org.alephium.protocol.model.{Address, Block, Difficulty, NetworkId, Target, Weight}
+import org.alephium.protocol.model.{Address, Block, Difficulty, HardFork, NetworkId, Target, Weight}
 import org.alephium.protocol.vm.LogConfig
 import org.alephium.util._
 
@@ -50,7 +50,6 @@ final case class ConsensusSetting(
     blockTargetTime: Duration,
     uncleDependencyGapTime: Duration,
     numZerosAtLeastInHash: Int,
-    blockCacheCapacityPerChain: Int,
     emission: Emission
 ) extends ConsensusConfig {
   val maxMiningTarget: Target =
@@ -79,14 +78,34 @@ final case class ConsensusSetting(
   val windowTimeSpanMax: Duration =
     (expectedWindowTimeSpan * (100L + diffAdjustUpMax)).get divUnsafe 100L
 
-  val recentBlockHeightDiff: Int         = 30
-  val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
-
   val tipsPruneDuration: Duration = blockTargetTime.timesUnsafe(maxForkDepth.toLong)
-  val conflictCacheKeepDuration: Duration =
-    expectedTimeSpan timesUnsafe blockCacheCapacityPerChain.toLong
 }
 //scalastyle:on
+
+final case class ConsensusSettings(
+    mainnet: ConsensusSetting,
+    ghost: ConsensusSetting,
+    blockCacheCapacityPerChain: Int
+) extends ConsensusConfigs {
+  override def getConsensusConfig(hardFork: HardFork): ConsensusSetting = {
+    if (hardFork.isGhostEnabled()) ghost else mainnet
+  }
+  override def getConsensusConfig(
+      ts: TimeStamp
+  )(implicit networkConfig: NetworkConfig): ConsensusSetting = {
+    getConsensusConfig(networkConfig.getHardFork(ts))
+  }
+
+  val conflictCacheKeepDuration: Duration =
+    Math.max(
+      mainnet.expectedTimeSpan,
+      ghost.expectedTimeSpan
+    ) timesUnsafe blockCacheCapacityPerChain.toLong
+  val tipsPruneDuration: Duration = Math.max(mainnet.tipsPruneDuration, ghost.tipsPruneDuration)
+
+  val recentBlockHeightDiff: Int         = 30
+  val recentBlockTimestampDiff: Duration = Duration.ofMinutesUnsafe(30)
+}
 
 final case class MiningSetting(
     minerAddresses: Option[AVector[Address.Asset]],
@@ -99,6 +118,7 @@ final case class MiningSetting(
 final case class NetworkSetting(
     networkId: NetworkId,
     lemanHardForkTimestamp: TimeStamp,
+    ghostHardForkTimestamp: TimeStamp,
     noPreMineProof: ByteString,
     maxOutboundConnectionsPerGroup: Int,
     maxInboundConnectionsPerGroup: Int,
@@ -204,7 +224,7 @@ final case class GenesisSetting(allocations: AVector[Allocation])
 
 final case class AlephiumConfig(
     broker: BrokerSetting,
-    consensus: ConsensusSetting,
+    consensus: ConsensusSettings,
     mining: MiningSetting,
     network: NetworkSetting,
     discovery: DiscoverySetting,
@@ -224,19 +244,32 @@ final case class AlephiumConfig(
 object AlephiumConfig {
   import ConfigUtils._
 
+  final private case class TempConsensusSettings(
+      mainnet: TempConsensusSetting,
+      ghost: TempConsensusSetting,
+      blockCacheCapacityPerChain: Int,
+      numZerosAtLeastInHash: Int
+  ) {
+    def toConsensusSettings(groupConfig: GroupConfig): ConsensusSettings = {
+      val mainnetEmission = Emission.mainnet(groupConfig, mainnet.blockTargetTime)
+      val ghostEmission =
+        Emission.ghost(groupConfig, mainnet.blockTargetTime, ghost.blockTargetTime)
+      ConsensusSettings(
+        mainnet.toConsensusSetting(mainnetEmission, numZerosAtLeastInHash),
+        ghost.toConsensusSetting(ghostEmission, numZerosAtLeastInHash),
+        blockCacheCapacityPerChain
+      )
+    }
+  }
   final private case class TempConsensusSetting(
       blockTargetTime: Duration,
-      uncleDependencyGapTime: Option[Duration],
-      numZerosAtLeastInHash: Int,
-      blockCacheCapacityPerChain: Int
+      uncleDependencyGapTime: Option[Duration]
   ) {
-    def toConsensusSetting(groupConfig: GroupConfig): ConsensusSetting = {
-      val emission = Emission(groupConfig, blockTargetTime)
+    def toConsensusSetting(emission: Emission, numZerosAtLeastInHash: Int): ConsensusSetting = {
       ConsensusSetting(
         blockTargetTime,
         uncleDependencyGapTime.getOrElse(blockTargetTime.divUnsafe(4)),
         numZerosAtLeastInHash,
-        blockCacheCapacityPerChain,
         emission
       )
     }
@@ -245,6 +278,7 @@ object AlephiumConfig {
   final private case class TempNetworkSetting(
       networkId: NetworkId,
       lemanHardForkTimestamp: TimeStamp,
+      ghostHardForkTimestamp: TimeStamp,
       noPreMineProof: Seq[String],
       maxOutboundConnectionsPerGroup: Int,
       maxInboundConnectionsPerGroup: Int,
@@ -280,6 +314,7 @@ object AlephiumConfig {
       NetworkSetting(
         networkId,
         lemanHardForkTimestamp,
+        ghostHardForkTimestamp,
         proofInOne,
         maxOutboundConnectionsPerGroup,
         maxInboundConnectionsPerGroup,
@@ -334,7 +369,7 @@ object AlephiumConfig {
 
   final private case class TempAlephiumConfig(
       broker: BrokerSetting,
-      consensus: TempConsensusSetting,
+      consensus: TempConsensusSettings,
       mining: TempMiningSetting,
       network: TempNetworkSetting,
       discovery: DiscoverySetting,
@@ -345,7 +380,7 @@ object AlephiumConfig {
   ) {
     lazy val toAlephiumConfig: AlephiumConfig = {
       parseMiners(mining.minerAddresses)(broker).map { minerAddresses =>
-        val consensusExtracted = consensus.toConsensusSetting(broker)
+        val consensusExtracted = consensus.toConsensusSettings(broker)
         val networkExtracted   = network.toNetworkSetting(ActorRefT.apply)
         val discoveryRefined = if (network.networkId == NetworkId.AlephiumTestNet) {
           discovery.copy(bootstrap =
@@ -379,7 +414,7 @@ object AlephiumConfig {
     valueReader { implicit cfg =>
       TempAlephiumConfig(
         as[BrokerSetting]("broker"),
-        as[TempConsensusSetting]("consensus"),
+        as[TempConsensusSettings]("consensus"),
         as[TempMiningSetting]("mining"),
         as[TempNetworkSetting]("network"),
         as[DiscoverySetting]("discovery"),

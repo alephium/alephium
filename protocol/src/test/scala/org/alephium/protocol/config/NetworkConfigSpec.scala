@@ -21,12 +21,22 @@ import org.alephium.util.{AlephiumSpec, Duration, TimeStamp}
 
 class NetworkConfigSpec extends AlephiumSpec with NetworkConfigFixture.Default {
   override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now()
+  override def ghostHardForkTimestamp: TimeStamp = lemanHardForkTimestamp.plusMinutesUnsafe(1)
 
-  networkConfig.getHardFork(lemanHardForkTimestamp) is HardFork.Leman
-  networkConfig.getHardFork(
-    lemanHardForkTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
-  ) is HardFork.Mainnet
-  networkConfig.getHardFork(
-    lemanHardForkTimestamp.plusUnsafe(Duration.ofSecondsUnsafe(1))
-  ) is HardFork.Leman
+  it should "get hard fork" in {
+    networkConfig.getHardFork(lemanHardForkTimestamp) is HardFork.Leman
+    networkConfig.getHardFork(
+      lemanHardForkTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    ) is HardFork.Mainnet
+    networkConfig.getHardFork(
+      lemanHardForkTimestamp.plusUnsafe(Duration.ofSecondsUnsafe(1))
+    ) is HardFork.Leman
+    networkConfig.getHardFork(ghostHardForkTimestamp) is HardFork.Ghost
+    networkConfig.getHardFork(
+      ghostHardForkTimestamp.minusUnsafe(Duration.ofSecondsUnsafe(1))
+    ) is HardFork.Leman
+    networkConfig.getHardFork(
+      ghostHardForkTimestamp.plusUnsafe(Duration.ofSecondsUnsafe(1))
+    ) is HardFork.Ghost
+  }
 }

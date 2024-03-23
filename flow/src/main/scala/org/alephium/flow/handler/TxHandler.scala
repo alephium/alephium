@@ -82,9 +82,7 @@ object TxHandler {
       blockFlow: BlockFlow,
       txTemplate: TransactionTemplate,
       publishBlock: Block => Unit
-  )(implicit
-      groupConfig: GroupConfig
-  ): Either[String, Unit] = {
+  )(implicit groupConfig: GroupConfig): Either[String, Unit] = {
     val chainIndex = txTemplate.chainIndex
     val grandPool  = blockFlow.getGrandPool()
     grandPool.add(chainIndex, txTemplate, TimeStamp.now()) match {

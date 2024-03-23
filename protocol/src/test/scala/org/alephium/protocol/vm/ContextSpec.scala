@@ -33,7 +33,7 @@ class ContextSpec
     lazy val initialGas = 1000000
     lazy val context    = genStatefulContext(None, gasLimit = initialGas)
 
-    def createContract(): ContractId = {
+    def createContract(unblock: Boolean = true): ContractId = {
       val output =
         contractOutputGen(scriptGen = Gen.const(LockupScript.P2C(ContractId.zero))).sample.get
       val balances = MutBalancesPerLockup.from(output)
@@ -59,7 +59,9 @@ class ContextSpec
       context.generatedOutputs.size is 1
 
       context.checkIfBlocked(contractId).leftValue isE ContractLoadDisallowed(contractId)
-      context.contractBlockList.remove(contractId)
+      if (unblock) {
+        context.contractBlockList.remove(contractId)
+      }
       contractId
     }
   }
@@ -91,7 +93,9 @@ class ContextSpec
     context.generatedOutputs.size is 1
   }
 
-  it should "generate contract output when the contract is loaded" in new Fixture {
+  it should "generate contract output when the contract is loaded before Rhone upgrade" in new Fixture {
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    context.getHardFork() is HardFork.Leman
     val contractId   = createContract()
     val oldOutputRef = context.worldState.getContractState(contractId).rightValue.contractOutputRef
     val newOutput =
@@ -108,6 +112,29 @@ class ContextSpec
       GasSchedule.txInputBaseGas.value -
       GasSchedule.txOutputBaseGas.value) is context.gasRemaining.value
     context.generatedOutputs.size is 2
+  }
+
+  it should "not generate contract output when the contract is loaded from Rhone upgrade" in new Fixture {
+    context.getHardFork() is HardFork.Ghost
+    val contractId = createContract()
+    context.loadContractObj(contractId).isRight is true
+    context.useContractAssets(contractId).leftValue.rightValue is ContractAssetAlreadyFlushed
+  }
+
+  it should "not cache new contract before Rhone upgrade" in new Fixture {
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    context.getHardFork() is HardFork.Leman
+    val contractId = createContract(unblock = false)
+    context.contractBlockList.contains(contractId) is true
+    context.contractPool.contains(contractId) is false
+  }
+
+  it should "cache new contract from Rhone upgrade" in new Fixture {
+    context.getHardFork() is HardFork.Ghost
+    val contractId = createContract(unblock = false)
+    context.contractBlockList.contains(contractId) is true
+    context.contractPool.contains(contractId) is true
+    context.loadContractObj(contractId).isRight is true
   }
 
   it should "migrate contract without state change" in new Fixture {
@@ -153,6 +180,7 @@ class ContextSpec
 
   it should "charge gas based on mainnet hardfork" in new Fixture {
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Mainnet
 
     context.chargeGasWithSizeLeman(ByteVecEq, 7)
@@ -165,6 +193,7 @@ class ContextSpec
   }
 
   it should "charge gas based on leman hardfork" in new Fixture {
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Leman
 
     context.chargeGasWithSizeLeman(ByteVecEq, 7)
@@ -177,10 +206,11 @@ class ContextSpec
   }
 
   trait ContractOutputFixture extends NetworkConfigFixture.Default {
-    val contractId = ContractId.random
-    val tokenId0   = TokenId.random
-    val tokenId1   = TokenId.random
-    val outputRef  = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
+    val contractId                                 = ContractId.random
+    val tokenId0                                   = TokenId.random
+    val tokenId1                                   = TokenId.random
+    val outputRef = contractOutputRefGen(GroupIndex.unsafe(0)).sample.get
     val output =
       ContractOutput(100, LockupScript.p2c(contractId), AVector(tokenId0 -> 200, tokenId1 -> 300))
     val modifiedOutputs = Seq(
@@ -223,10 +253,12 @@ class ContextSpec
 
   trait MainnetContractOutputFixture extends ContractOutputFixture {
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Mainnet
   }
 
   trait LemanContractOutputFixture extends ContractOutputFixture {
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Leman
   }
 
@@ -281,10 +313,12 @@ class ContextSpec
 
   trait MainnetAssetOutputFixture extends AssetOutputFixture {
     override def lemanHardForkTimestamp: TimeStamp = TimeStamp.now().plusHoursUnsafe(1)
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Mainnet
   }
 
   trait LemanAssetOutputFixture extends AssetOutputFixture {
+    override def ghostHardForkTimestamp: TimeStamp = TimeStamp.Max
     context.getHardFork() is HardFork.Leman
   }
 

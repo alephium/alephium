@@ -50,10 +50,9 @@ object ValidateDifficultyBombPatch extends App {
     val expectecTarget =
       Target.clipByTwoTimes(depTargets.fold(weightedTarget)(Math.max), weightedTarget)
 
-    val hashrate =
-      HashRate.from(template.target, config.consensus.blockTargetTime)(config.broker).MHs
-    val expectedHashRate =
-      HashRate.from(expectecTarget, config.consensus.blockTargetTime)(config.broker).MHs
+    val blockTargetTime  = config.consensus.mainnet.blockTargetTime
+    val hashrate         = HashRate.from(template.target, blockTargetTime)(config.broker).MHs
+    val expectedHashRate = HashRate.from(expectecTarget, blockTargetTime)(config.broker).MHs
     if (expectecTarget != template.target) {
       throw new RuntimeException(
         s"ChainIndex: $chainIndex, parent: ${parent.toHexString}, expected: $expectedHashRate, have: $hashrate"

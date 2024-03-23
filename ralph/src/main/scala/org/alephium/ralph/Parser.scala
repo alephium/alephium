@@ -139,8 +139,10 @@ abstract class Parser[Ctx <: StatelessContext] {
       idx
   }
 
-  def arrayIndex[Unknown: P]: P[Ast.Expr[Ctx]] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
-    case (from, expr, to) => expr.overwriteSourceIndex(from, to, fileURI)
+  def indexSelector[Unknown: P]: P[Ast.FieldSelector] = P(Index ~~ "[" ~ expr ~ "]" ~~ Index).map {
+    case (from, expr, to) =>
+      val indexExpr = expr.overwriteSourceIndex(from, to, fileURI)
+      Ast.IndexSelector(indexExpr).atSourceIndex(from, to, fileURI)
   }
 
   // Optimize chained comparisons
@@ -176,24 +178,13 @@ abstract class Parser[Ctx <: StatelessContext] {
     P(chain(arithExpr0, Lexer.opMul | Lexer.opDiv | Lexer.opMod | Lexer.opModMul))
   def arithExpr0[Unknown: P]: P[Ast.Expr[Ctx]] = P(chain(unaryExpr, Lexer.opExp | Lexer.opModExp))
   def unaryExpr[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(arrayElementOrStructFieldSelector | PP(Lexer.opNot ~ arrayElementOrStructFieldSelector) {
-      case (op, expr) =>
-        Ast.UnaryOp.apply[Ctx](op, expr)
+    P(loadFieldBySelectors | PP(Lexer.opNot ~ loadFieldBySelectors) { case (op, expr) =>
+      Ast.UnaryOp.apply[Ctx](op, expr)
     })
-  def arrayElementOrStructFieldSelector[Unknown: P]: P[Ast.Expr[Ctx]] =
-    P(atom ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0)).map { case (expr, list) =>
-      list.foldLeft(expr) { case (acc, e) =>
-        e match {
-          case index: Ast.Expr[Ctx @unchecked] =>
-            Ast
-              .ArrayElement(acc, index)
-              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex))
-          case ident: Ast.Ident =>
-            Ast
-              .StructFieldSelector(acc, ident)
-              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex))
-        }
-      }
+
+  def loadFieldBySelectors[Unknown: P]: P[Ast.Expr[Ctx]] =
+    PP(atom ~ fieldSelector.rep(0)) { case (expr, selectors) =>
+      if (selectors.isEmpty) expr else Ast.LoadFieldBySelectors(expr, selectors)
     }
   def atom[Unknown: P]: P[Ast.Expr[Ctx]]
 
@@ -285,36 +276,26 @@ abstract class Parser[Ctx <: StatelessContext] {
     varDeclaration.map(Seq(_)) | "(" ~ varDeclaration.rep(1, ",") ~ ")"
   )
   def varDef[Unknown: P]: P[Ast.VarDef[Ctx]] =
-    PP(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr) { case (_, vars, expr) =>
-      Ast.VarDef(vars, expr)
+    P(Lexer.token(Keyword.let) ~/ varDeclarations ~ "=" ~ expr).map { case (from, vars, expr) =>
+      val sourceIndex = SourceIndex(Some(from), expr.sourceIndex)
+      Ast.VarDef(vars, expr).atSourceIndex(sourceIndex)
     }
-  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-  def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] = PP(
-    Lexer.ident ~ P(P("." ~ Lexer.ident) | arrayIndex).rep(0)
-  ) { case (ident, list) =>
-    if (list.isEmpty) {
-      Ast.AssignmentSimpleTarget(ident)
-    } else {
-      val variable: Ast.Expr[Ctx] = Ast.Variable(ident).atSourceIndex(ident.sourceIndex)
-      val expr = list.init.foldLeft(variable) { case (acc, e) =>
-        e match {
-          case index: Ast.Expr[Ctx @unchecked] =>
-            Ast
-              .ArrayElement(acc, index)
-              .atSourceIndex(SourceIndex(acc.sourceIndex, index.sourceIndex))
-          case ident: Ast.Ident =>
-            Ast
-              .StructFieldSelector(acc, ident)
-              .atSourceIndex(SourceIndex(acc.sourceIndex, ident.sourceIndex))
-        }
-      }
-      list.last match {
-        case arrayIndex: Ast.Expr[Ctx @unchecked] =>
-          Ast.AssignmentArrayElementTarget(ident, expr, arrayIndex)
-        case selector: Ast.Ident => Ast.AssignmentStructFieldTarget(ident, expr, selector)
-      }
-    }
+
+  def identSelector[Unknown: P]: P[Ast.FieldSelector] = P(
+    "." ~ Index ~ Lexer.ident ~ Index
+  ).map { case (from, ident, to) =>
+    Ast.IdentSelector(ident).atSourceIndex(from, to, fileURI)
   }
+  def fieldSelector[Unknown: P]: P[Ast.FieldSelector] = P(identSelector | indexSelector)
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+  def assignmentTarget[Unknown: P]: P[Ast.AssignmentTarget[Ctx]] =
+    PP(Lexer.ident ~ fieldSelector.rep(0)) { case (ident, selectors) =>
+      if (selectors.isEmpty) {
+        Ast.AssignmentSimpleTarget(ident)
+      } else {
+        Ast.AssignmentFieldTarget(ident, selectors)
+      }
+    }
 
   def assign[Unknown: P]: P[Ast.Assign[Ctx]] =
     P(assignmentTarget.rep(1, ",") ~ "=" ~ expr).map { case (targets, expr) =>
@@ -332,8 +313,13 @@ abstract class Parser[Ctx <: StatelessContext] {
 
   // use by-name parameter because of https://github.com/com-lihaoyi/fastparse/pull/204
   def arrayType[Unknown: P](baseType: => P[Type]): P[Type] = {
-    P("[" ~ baseType ~ ";" ~ nonNegativeNum("array size") ~ "]").map { case (tpe, size) =>
-      Type.FixedSizeArray(tpe, size)
+    P("[" ~ Index ~ baseType ~ Index ~ ";" ~ nonNegativeNum("array size") ~ "]").map {
+      case (from, tpe, to, size) =>
+        if (tpe.isMapType) {
+          val sourceIndex = Some(SourceIndex(from, to - from, fileURI))
+          throw Compiler.Error("Array element type cannot be map", sourceIndex)
+        }
+        Type.FixedSizeArray(tpe, size)
     }
   }
   def argument[Unknown: P](
@@ -732,9 +718,43 @@ class StatelessParser(val fileURI: Option[java.net.URI]) extends Parser[Stateles
 class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulContext] {
   def atom[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(
-      const | stringLiteral | alphTokenId | callExpr | contractCallExpr | contractConv |
+      const | stringLiteral | alphTokenId | callExpr | mapContains | contractCallExpr | contractConv |
         enumFieldSelector | structCtor | variable | parenExpr | arrayExpr | ifelseExpr
     )
+
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  override def parseType[Unknown: P](contractTypeCtor: Ast.TypeId => Type): P[Type] = {
+    P(
+      mapType | Lexer.typeId.map(id => Lexer.primTpes.getOrElse(id.name, contractTypeCtor(id))) |
+        arrayType(parseType(contractTypeCtor))
+    )
+  }
+
+  def mapKeyType[Unknown: P]: P[Type] = {
+    P(Index ~ parseType(Type.NamedType) ~ Index).map { case (from, tpe, to) =>
+      if (!tpe.isPrimitive) {
+        val sourceIndex = Some(SourceIndex(from, to - from, fileURI))
+        throw Compiler.Error("The key type of map can only be primitive type", sourceIndex)
+      }
+      tpe
+    }
+  }
+
+  def mapValueType[Unknown: P]: P[Type] = {
+    P(Index ~ parseType(Type.NamedType) ~ Index).map { case (from, tpe, to) =>
+      if (tpe.isMapType) {
+        val sourceIndex = Some(SourceIndex(from, to - from, fileURI))
+        throw Compiler.Error("The value type of map cannot be map", sourceIndex)
+      }
+      tpe
+    }
+  }
+
+  def mapType[Unknown: P]: P[Type] = {
+    P(Lexer.token(Keyword.Map) ~ "[" ~ mapKeyType ~ "," ~ mapValueType ~ "]").map {
+      case (_, key, value) => Type.Map(key, value)
+    }
+  }
 
   def contractCallExpr[Unknown: P]: P[Ast.Expr[StatefulContext]] =
     P(Index ~ (callExpr | contractConv | variableIdOnly) ~ ("." ~ callAbs).rep(1) ~~ Index).map {
@@ -745,6 +765,12 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
             .ContractCallExpr(acc, funcId, approveAssets, arguments)
             .atSourceIndex(fromIndex, endIndex, fileURI)
         })
+    }
+
+  def mapContains[Unknown: P]: P[Ast.Expr[StatefulContext]] =
+    P(Index ~ (callExpr | variableIdOnly) ~ ".contains!" ~ "(" ~ expr ~ ")" ~~ Index).map {
+      case (fromIndex, base, index, endIndex) =>
+        Ast.MapContains(base, index).atSourceIndex(fromIndex, endIndex, fileURI)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
@@ -765,8 +791,24 @@ class StatefulParser(val fileURI: Option[java.net.URI]) extends Parser[StatefulC
 
   def statement[Unknown: P]: P[Ast.Statement[StatefulContext]] =
     P(
-      varDef | assign | debug | funcCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
+      varDef | assign | debug | funcCall | mapCall | contractCall | ifelseStmt | whileStmt | forLoopStmt | ret | emitEvent
     )
+
+  def insertToMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
+    P(Index ~ Lexer.ident ~ "." ~ "insert!" ~ approveAssets ~ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index)
+      .map { case (fromIndex, ident, approveAssets, exprs, endIndex) =>
+        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
+        Ast.InsertToMap(ident, approveAssets, exprs).atSourceIndex(sourceIndex)
+      }
+
+  def removeFromMap[Unknown: P]: P[Ast.Statement[StatefulContext]] =
+    P(Index ~ Lexer.ident ~ "." ~ "remove!" ~ "(" ~ expr.rep(0, ",") ~ ")" ~~ Index).map {
+      case (fromIndex, ident, exprs, endIndex) =>
+        val sourceIndex = Some(SourceIndex(fromIndex, endIndex - fromIndex, fileURI))
+        Ast.RemoveFromMap(ident, exprs).atSourceIndex(sourceIndex)
+    }
+
+  def mapCall[Unknown: P]: P[Ast.Statement[StatefulContext]] = P(insertToMap | removeFromMap)
 
   def contractFields[Unknown: P]: P[Seq[Ast.Argument]] =
     P(

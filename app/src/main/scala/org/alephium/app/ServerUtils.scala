@@ -48,7 +48,7 @@ import org.alephium.util._
 // scalastyle:off file.size.limit number.of.types
 class ServerUtils(implicit
     brokerConfig: BrokerConfig,
-    consensusConfig: ConsensusConfig,
+    consensusConfigs: ConsensusConfigs,
     networkConfig: NetworkConfig,
     apiConfig: ApiConfig,
     logConfig: LogConfig,
@@ -1432,6 +1432,7 @@ class ServerUtils(implicit
       args: AVector[Val],
       method: Method[StatefulContext]
   ): Try[(AVector[vm.Val], StatefulVM.TxScriptExecution)] = {
+    val consensusConfig = consensusConfigs.getConsensusConfig(blockTimeStamp)
     val blockEnv = BlockEnv(
       ChainIndex(groupIndex, groupIndex),
       networkConfig.networkId,
