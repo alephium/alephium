@@ -580,7 +580,7 @@ case object MinimalContractDeposit
     with GasBase
     with StatefulInstrCompanion0 {
   def runWithGhost[C <: StatefulContext](frame: Frame[C]): ExeResult[Unit] = {
-    frame.pushOpStack(Val.U256(model.minimalAlphInContractRhone))
+    frame.pushOpStack(Val.U256(model.minimalAlphInContract))
   }
 }
 

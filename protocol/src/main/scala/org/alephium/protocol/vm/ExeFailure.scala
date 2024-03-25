@@ -260,7 +260,7 @@ case object BalanceErrorWhenSwitchingBackFrame extends ExeFailure
 final case class LowerThanContractMinimalBalance(address: Address, amount: U256)
     extends ExeFailure {
   override def toString: String =
-    s"Contract output contains ${amount}, less than contract minimal balance ${minimalAlphInContractRhone}"
+    s"Contract output contains ${amount}, less than contract minimal balance ${minimalAlphInContract}"
 }
 
 case object UnableToPayGasFee extends ExeFailure {

@@ -52,11 +52,11 @@ package object model {
   val maxTokenPerAssetUtxo: Int      = 1
   val deprecatedMaxTokenPerUtxo: Int = 64
 
-  val minimalAlphInContract: U256      = ALPH.oneAlph
-  val minimalAlphInContractRhone: U256 = ALPH.oneAlph.divUnsafe(U256.unsafe(10))
+  val minimalAlphInContractPreRhone: U256 = ALPH.oneAlph
+  val minimalAlphInContract: U256         = ALPH.oneAlph.divUnsafe(U256.unsafe(10))
 
   def minimalContractStorageDeposit(hardFork: HardFork): U256 = {
-    if (hardFork.isGhostEnabled()) minimalAlphInContractRhone else minimalAlphInContract
+    if (hardFork.isGhostEnabled()) minimalAlphInContract else minimalAlphInContractPreRhone
   }
 
   implicit val hashOrdering: Ordering[Hash] = Ordering.by(_.bytes)
